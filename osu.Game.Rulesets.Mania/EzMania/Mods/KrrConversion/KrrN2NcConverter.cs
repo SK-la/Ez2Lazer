@@ -1119,6 +1119,5 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
 
             return true;
         }
-
     }
 }

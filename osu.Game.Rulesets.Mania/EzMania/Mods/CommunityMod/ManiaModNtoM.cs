@@ -13,6 +13,7 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.EzOsuGame.Mods;
@@ -248,51 +249,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
                 for (int i = 0; i < newColumnObjects.Count; i++)
                 {
-                    bool overlap = false, outIndex = false;
-
                     if (newColumnObjects[i].Column < 0 || newColumnObjects[i].Column > Key.Value - 1)
-                    {
-                        outIndex = true;
                         newColumnObjects[i].Column = rng.Next(Key.Value - 1);
-                    }
+                }
 
-                    for (int j = i + 1; j < newColumnObjects.Count; j++)
-                    {
-                        // 两个分支都要求 newColumnObjects[i].StartTime >= newColumnObjects[j].StartTime - 2，
-                        // 而本列表按开始时间非降序（由 locations 的顺序追加而来），所以 j 的开始时间一旦超出 i+2，
-                        // 后面的 j 只会更晚，直接收尾。原来这里每轮都要把整表扫完。
-                        if (newColumnObjects[j].StartTime > newColumnObjects[i].StartTime + 2)
-                            break;
+                List<ManiaHitObject> cleaned = ManiaNoteCleanupTool.CleanupObjects(maniaBeatmap, newColumnObjects);
+                var remaining = new HashSet<ManiaHitObject>(cleaned);
 
-                        if (newColumnObjects[i].Column == newColumnObjects[j].Column && newColumnObjects[i].StartTime >= newColumnObjects[j].StartTime - 2
-                                                                                     && newColumnObjects[i].StartTime <= newColumnObjects[j].StartTime + 2) overlap = true;
+                foreach (ManiaHitObject hitObject in newColumnObjects)
+                {
+                    if (remaining.Remove(hitObject))
+                        fixedColumnObjects.Add(hitObject);
+                }
 
-                        if (newColumnObjects[j].StartTime != newColumnObjects[j].GetEndTime())
-                        {
-                            if (newColumnObjects[i].Column == newColumnObjects[j].Column && newColumnObjects[i].StartTime >= newColumnObjects[j].StartTime - 2
-                                                                                         && newColumnObjects[i].StartTime <= newColumnObjects[j].GetEndTime() + 2)
-                                overlap = true;
-                        }
-                    }
-
-                    if (outIndex) overlap = true;
-
-                    if (!overlap)
-                        fixedColumnObjects.Add(newColumnObjects[i]);
-                    else
-                    {
-                        // 原来的两次 FindOverlapInList(obj, 过滤到某列的列表) 恒为 true（判定内部按 obj.Column 比较，
-                        // 而列表已按别的列过滤），于是这个循环实际只是在边界内按 k 挪列。删掉每轮 keyValue 次
-                        // 「过滤 + 全表扫描 + 临时列表」，语义不变。
-                        for (int k = 1; k < keyValue; k++)
-                        {
-                            if (newColumnObjects[i].Column - k >= 0)
-                                newColumnObjects[i].Column -= k;
-                            else if (newColumnObjects[i].Column + k <= keyValue - 1) newColumnObjects[i].Column += k;
-                        }
-
-                        fixedColumnObjects.Add(newColumnObjects[i]);
-                    }
+                foreach (ManiaHitObject hitObject in cleaned)
+                {
+                    if (remaining.Contains(hitObject))
+                        fixedColumnObjects.Add(hitObject);
                 }
 
                 if (keyValue < Key.Value)
