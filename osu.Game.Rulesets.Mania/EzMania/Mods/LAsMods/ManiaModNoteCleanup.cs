@@ -31,14 +31,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         public override bool ValidForFreestyleAsRequiredMod => false;
 
-        [SettingSource(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.CLEAN_OVERLAP_LABEL), nameof(NoteCleanupStrings.CLEAN_OVERLAP_DESCRIPTION))]
-        public BindableBool CleanOverlap { get; } = new BindableBool(true);
+        [SettingSource(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.LN_BODY_MODE_LABEL), nameof(NoteCleanupStrings.LN_BODY_MODE_DESCRIPTION))]
+        public Bindable<LnBodyTapMode> BodyTapMode { get; } = new Bindable<LnBodyTapMode>
+        {
+            Default = LnBodyTapMode.Continue,
+            Value = LnBodyTapMode.Continue,
+        };
 
         [SettingSource(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.ENFORCE_MIN_GAPS_LABEL), nameof(NoteCleanupStrings.ENFORCE_MIN_GAPS_DESCRIPTION))]
         public BindableBool EnforceMinGaps { get; } = new BindableBool(true);
 
         [SettingSource(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.ENFORCE_LN_GAP_LABEL), nameof(NoteCleanupStrings.ENFORCE_LN_GAP_DESCRIPTION))]
-        public BindableBool EnforceLNGap { get; } = new BindableBool(true);
+        public BindableBool EnforceLNGap { get; } = new BindableBool(false);
+
+        [SettingSource(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.USE_BEAT_GAP_LABEL), nameof(NoteCleanupStrings.USE_BEAT_GAP_DESCRIPTION))]
+        public BindableBool UseBeatGap { get; } = new BindableBool(false);
 
         [SettingSource(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.BEAT_DIVISOR_LABEL), nameof(NoteCleanupStrings.BEAT_DIVISOR_DESCRIPTION))]
         public BindableNumber<int> BeatDivisor { get; } = new BindableInt(8)
@@ -49,12 +56,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         };
 
         [SettingSource(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.MINIMUM_GAP_MS_LABEL), nameof(NoteCleanupStrings.MINIMUM_GAP_MS_DESCRIPTION))]
-        public BindableNumber<int> MinimumGapMs { get; } = new BindableInt(30)
+        public BindableNumber<int> MinimumGapMs { get; } = new BindableInt(16)
         {
             MinValue = 1,
             MaxValue = 125,
             Precision = 1,
         };
+
+        [SettingSource(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.USE_KEEP_STRATEGY_LABEL), nameof(NoteCleanupStrings.USE_KEEP_STRATEGY_DESCRIPTION))]
+        public BindableBool UseKeepStrategy { get; } = new BindableBool(false);
 
         [SettingSource(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.KEEP_STRATEGY_LABEL), nameof(NoteCleanupStrings.KEEP_STRATEGY_DESCRIPTION))]
         public BindableNumber<int> KeepStrategy { get; } = new BindableInt(1)
@@ -65,10 +75,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         };
 
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
-        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(90)
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(1000)
         {
             MinValue = 0,
-            MaxValue = 100,
+            MaxValue = 1000,
         };
 
         public int ApplyOrder => ApplyOrderIndex.Value;
@@ -77,13 +87,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         {
             get
             {
-                if (CleanOverlap.Value) yield return (NoteCleanupStrings.CLEAN_OVERLAP_LABEL, "On");
+                yield return (NoteCleanupStrings.LN_BODY_MODE_LABEL, BodyTapMode.Value.ToString());
                 if (EnforceMinGaps.Value) yield return (NoteCleanupStrings.ENFORCE_MIN_GAPS_LABEL, "On");
                 if (EnforceLNGap.Value) yield return (NoteCleanupStrings.ENFORCE_LN_GAP_LABEL, "On");
+                if (UseBeatGap.Value) yield return (NoteCleanupStrings.BEAT_DIVISOR_LABEL, $"1/{BeatDivisor.Value}");
+                if (UseKeepStrategy.Value) yield return (NoteCleanupStrings.KEEP_STRATEGY_LABEL, $"{KeepStrategy.Value}");
 
-                yield return (NoteCleanupStrings.BEAT_DIVISOR_LABEL, $"1/{BeatDivisor.Value}");
                 yield return (NoteCleanupStrings.MINIMUM_GAP_MS_LABEL, $"{MinimumGapMs.Value}ms");
-                yield return (NoteCleanupStrings.KEEP_STRATEGY_LABEL, $"{KeepStrategy.Value}");
                 yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
             }
         }
@@ -92,11 +102,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         {
             var options = new NoteCleanupOptions
             {
-                CleanOverlap = CleanOverlap.Value,
-                EnforceMinimumGaps = EnforceMinGaps.Value,
+                LnBodyTapMode = BodyTapMode.Value,
+                CleanDenseNotes = EnforceMinGaps.Value,
                 EnforceHoldReleaseGap = EnforceLNGap.Value,
-                BeatDivisor = BeatDivisor.Value,
+                BeatDivisor = UseBeatGap.Value ? BeatDivisor.Value : null,
                 MinimumGapMs = MinimumGapMs.Value,
+                UseKeepStrategy = UseKeepStrategy.Value,
                 KeepStrategy = (NoteCleanupKeepStrategy)KeepStrategy.Value,
             };
 
@@ -107,20 +118,26 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
     public static class NoteCleanupStrings
     {
         public static readonly LocalisableString NOTE_CLEANUP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "清理谱面中的重叠、过密音符与 LN 尾缝问题。",
-            "Clean overlapping, overly dense notes and LN release gaps on the beatmap.");
+            "删除重叠单点，按所选方式处理 LN 体内单点，并清理过密音符。",
+            "Remove overlapping taps, handle taps inside LNs, and thin overly dense notes.");
 
-        public static readonly LocalisableString CLEAN_OVERLAP_LABEL = new EzLocalizationManager.EzLocalisableString("去除重叠", "Clean Overlap");
+        public static readonly LocalisableString LN_BODY_MODE_LABEL = new EzLocalizationManager.EzLocalisableString("LN 体内单点", "Tap Inside LN");
 
-        public static readonly LocalisableString CLEAN_OVERLAP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "删除同列中与前一音符时间重叠的 note/LN。",
-            "Remove notes/LNs that overlap the previous object on the same column.");
+        public static readonly LocalisableString LN_BODY_MODE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "单点落在 LN 体内时：删单点、只截断 LN，或截断并把单点接成后半段 LN。",
+            "When a tap sits inside an LN: drop the tap, truncate the LN, or truncate and continue the LN from the tap.");
+
+        public static readonly LocalisableString LN_BODY_DROP_TAP = new EzLocalizationManager.EzLocalisableString("删单点", "Drop Tap");
+
+        public static readonly LocalisableString LN_BODY_TRUNCATE = new EzLocalizationManager.EzLocalisableString("截断 LN", "Truncate LN");
+
+        public static readonly LocalisableString LN_BODY_CONTINUE = new EzLocalizationManager.EzLocalisableString("截断并延续", "Truncate and Continue");
 
         public static readonly LocalisableString ENFORCE_MIN_GAPS_LABEL = new EzLocalizationManager.EzLocalisableString("去除过密", "Enforce Min Gaps");
 
         public static readonly LocalisableString ENFORCE_MIN_GAPS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "剔除间距小于 max(最小毫秒, beatLength/节拍分割) 的音符。",
-            "Remove notes closer than max(minimum ms, beatLength/beat divisor).");
+            "间隙小于阈值的一段里，删掉结尾之前的第 2、4、6 颗，结尾那颗非密集 note 留下。",
+            "In a dense run, drop the 2nd, 4th and 6th notes before the closing non-dense note, which is kept.");
 
         public static readonly LocalisableString ENFORCE_LN_GAP_LABEL = new EzLocalizationManager.EzLocalisableString("LN 尾缝", "Enforce LN Gap");
 
@@ -130,20 +147,32 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         public static readonly LocalisableString BEAT_DIVISOR_LABEL = new EzLocalizationManager.EzLocalisableString("节拍分割", "Beat Divisor");
 
+        public static readonly LocalisableString USE_BEAT_GAP_LABEL = new EzLocalizationManager.EzLocalisableString("用节拍间隙", "Use Beat Gap");
+
+        public static readonly LocalisableString USE_BEAT_GAP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "打开后，间隙改为当前音符时刻的 BeatLength / 节拍分割，不再用最小毫秒。",
+            "When on, the gap is BeatLength at the note divided by the beat divisor, instead of the millisecond value.");
+
         public static readonly LocalisableString BEAT_DIVISOR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "最小间距的节拍分母（如 8 表示 1/8 beat）。",
-            "Beat fraction denominator for minimum gap (e.g. 8 means 1/8 beat).");
+            "只在「用节拍间隙」打开时生效。如 8 表示 1/8 beat。",
+            "Used only when beat gap is on. 8 means 1/8 beat.");
 
         public static readonly LocalisableString MINIMUM_GAP_MS_LABEL = new EzLocalizationManager.EzLocalisableString("最小毫秒", "Minimum Gap Ms");
 
         public static readonly LocalisableString MINIMUM_GAP_MS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "与节拍间距取较大值作为最终最小间距。",
-            "Fixed millisecond floor; the larger of this and beat-based gap is used.");
+            "过密与 LN 截断使用的固定间隙。默认 16ms。节拍间隙打开时不使用。",
+            "Fixed gap for density thinning and LN truncation. Defaults to 16ms. Unused while beat gap is on.");
+
+        public static readonly LocalisableString USE_KEEP_STRATEGY_LABEL = new EzLocalizationManager.EzLocalisableString("使用保留策略", "Use Keep Strategy");
+
+        public static readonly LocalisableString USE_KEEP_STRATEGY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "打开后，同一时刻的重叠单点按保留策略留旧或留新。默认关掉，总是留较早的那颗。",
+            "When on, same-time overlapping taps follow the keep strategy. Off keeps the earlier tap.");
 
         public static readonly LocalisableString KEEP_STRATEGY_LABEL = new EzLocalizationManager.EzLocalisableString("保留策略", "Keep Strategy");
 
         public static readonly LocalisableString KEEP_STRATEGY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "过密冲突时保留较旧(1)或较新(2)的音符。",
-            "When notes are too close, keep the older (1) or newer (2) note.");
+            "同一时刻的重叠单点保留较旧(1)或较新(2)。只在「使用保留策略」打开时生效。",
+            "For same-time overlapping taps, keep the older (1) or newer (2). Used only when keep strategy is on.");
     }
 }
