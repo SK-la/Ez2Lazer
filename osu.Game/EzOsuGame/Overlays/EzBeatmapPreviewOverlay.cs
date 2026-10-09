@@ -11,7 +11,6 @@ using osu.Framework.Extensions;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
 using osu.Framework.Threading;
@@ -49,10 +48,12 @@ namespace osu.Game.EzOsuGame.Overlays
         private const float button_height = 30;
         private const float button_width = 90;
 
-        // 大于框架 ClickDragDistance（10）。视觉条和命中范围用同一厚度。
+        // 命中范围，需大于框架 ClickDragDistance（10）。不参与边框外观。
         private const float resize_grip_extent = 16f;
-        private static readonly Color4 resize_grip_idle_colour = new Color4(255, 255, 255, 32);
-        private static readonly Color4 resize_grip_hover_colour = new Color4(255, 255, 255, 128);
+
+        private const float resize_border_thickness = 2.5f;
+        private static readonly Color4 resize_border_idle_colour = new Color4(255, 255, 255, 64);
+        private static readonly Color4 resize_border_hover_colour = new Color4(255, 255, 255, 128);
 
         private const float dynamic_preview_duration = 10000;
         private const float dynamic_preview_repeat_delay = 500;
@@ -75,8 +76,10 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly OsuSpriteText loadTimeText;
         private readonly FillFlowContainer previewModeButtonList;
         private readonly Dictionary<EzBeatmapPreviewMode, PreviewModeButton> previewModeButtons = new Dictionary<EzBeatmapPreviewMode, PreviewModeButton>();
-        private readonly Box topResizeHandle;
-        private readonly Box rightResizeHandle;
+        private readonly Container topResizeGrip;
+        private readonly Container rightResizeGrip;
+        private readonly Box topResizeBorder;
+        private readonly Box rightResizeBorder;
 
         private bool heightResizeActive;
         private bool widthResizeActive;
@@ -278,21 +281,35 @@ namespace osu.Game.EzOsuGame.Overlays
                                     }
                                 }
                             },
-                            topResizeHandle = new Box
+                            topResizeGrip = new Container
                             {
                                 RelativeSizeAxes = Axes.X,
                                 Height = resize_grip_extent,
                                 Anchor = Anchor.TopLeft,
                                 Origin = Anchor.TopLeft,
-                                Colour = resize_grip_idle_colour
+                                Child = topResizeBorder = new Box
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    Height = resize_border_thickness,
+                                    Anchor = Anchor.TopLeft,
+                                    Origin = Anchor.TopLeft,
+                                    Colour = resize_border_idle_colour
+                                }
                             },
-                            rightResizeHandle = new Box
+                            rightResizeGrip = new Container
                             {
                                 RelativeSizeAxes = Axes.Y,
                                 Width = resize_grip_extent,
                                 Anchor = Anchor.TopRight,
                                 Origin = Anchor.TopRight,
-                                Colour = resize_grip_idle_colour
+                                Child = rightResizeBorder = new Box
+                                {
+                                    RelativeSizeAxes = Axes.Y,
+                                    Width = resize_border_thickness,
+                                    Anchor = Anchor.TopRight,
+                                    Origin = Anchor.TopRight,
+                                    Colour = resize_border_idle_colour
+                                }
                             }
                         }
                     }
@@ -1145,24 +1162,24 @@ namespace osu.Game.EzOsuGame.Overlays
         private void updateResizeGripHover()
         {
             bool allowHover = expanded && !fullMapFocusActive;
-            setResizeGripColour(topResizeHandle, allowHover && topResizeHandle.IsHovered, ref topGripHovered);
-            setResizeGripColour(rightResizeHandle, allowHover && rightResizeHandle.IsHovered, ref rightGripHovered);
+            setResizeBorderColour(topResizeBorder, allowHover && topResizeGrip.IsHovered, ref topGripHovered);
+            setResizeBorderColour(rightResizeBorder, allowHover && rightResizeGrip.IsHovered, ref rightGripHovered);
         }
 
-        private static void setResizeGripColour(Box grip, bool hovered, ref bool storedHovered)
+        private static void setResizeBorderColour(Box border, bool hovered, ref bool storedHovered)
         {
             if (storedHovered == hovered)
                 return;
 
             storedHovered = hovered;
-            grip.FadeColour(hovered ? resize_grip_hover_colour : resize_grip_idle_colour, 80, Easing.OutQuint);
+            border.FadeColour(hovered ? resize_border_hover_colour : resize_border_idle_colour, 80, Easing.OutQuint);
         }
 
         private bool isWithinWidthResizeHandle(Vector2 screenSpacePosition)
-            => rightResizeHandle.ScreenSpaceDrawQuad.AABBFloat.Contains(screenSpacePosition);
+            => rightResizeGrip.ScreenSpaceDrawQuad.AABBFloat.Contains(screenSpacePosition);
 
         private bool isWithinHeightResizeHandle(Vector2 screenSpacePosition)
-            => topResizeHandle.ScreenSpaceDrawQuad.AABBFloat.Contains(screenSpacePosition);
+            => topResizeGrip.ScreenSpaceDrawQuad.AABBFloat.Contains(screenSpacePosition);
 
         private double computeDefaultStartTime(IBeatmap playableBeatmap, RulesetInfo ruleset, double fallback)
         {
@@ -1375,8 +1392,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
             previewModeButtonList.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
             loadTimeText.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
-            topResizeHandle.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
-            rightResizeHandle.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
+            topResizeGrip.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
+            rightResizeGrip.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
             stateText.FadeTo(focused ? 0 : stateText.Alpha, 100, Easing.OutQuint);
 
             updatePreviewControlsLayout();
