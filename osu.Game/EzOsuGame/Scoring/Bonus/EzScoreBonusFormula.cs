@@ -11,7 +11,10 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
     public static class EzScoreBonusFormula
     {
         public const double KPS_START = 5;
-        public const double KPS_SATURATION = 40;
+
+        private const int key_count_min = 4;
+        private const int key_count_max = 18;
+        private const double key_exponent_numerator = 10;
 
         public const double OFFSET_FULL_MS = 6;
         public const double OFFSET_CROSS_MS = 44;
@@ -31,31 +34,43 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
 
         /// <summary>
         /// 失误折算系数。判定和失误都除以总 Note 数，失误再乘这个系数。
+        /// <remarks> 该系数主要影响正负的分数比例，过大时error罚分更重，过小时error罚分更轻。 </remarks>
         /// </summary>
         public const double ERROR_INFLUENCE = 50;
 
-        public static double NormalisedKps(double kps)
-            => Math.Clamp((kps - KPS_START) / (KPS_SATURATION - KPS_START), 0, 1);
+        /// <summary>
+        /// 失误路径上的 KPS 修正。只乘在 <see cref="ErrorWeight"/>，不改变判定加成。
+        /// <remarks>
+        /// 该系数主要影响更高KPS(高星)图下，失误的程度。
+        /// 更低的系数会使高KPS图下的失误罚分更轻，过高的系数会使高KPS图下的失误罚分更重。
+        /// </remarks>
+        /// </summary>
+        public static double ErrorKpsCorrection => 0.75;
 
         /// <summary>
-        /// 判定用 KPS 权重 W(K)。正向：Smoothstep，<see cref="KPS_START"/> 以下为 0，<see cref="KPS_SATURATION"/> 以上为 1；颠倒后镜像。
+        /// 判定加成的 KPS 系数。<paramref name="kps"/> 不超过 <see cref="KPS_START"/> 时为 0；键数夹在 4–18。
+        /// <remarks>
+        /// (1 - KPS_START / kps) 描述函数 f(kps) 的性质：
+        /// KPS 越高，判定加成越大。键数越多，判定加成越小。
+        /// <para>
+        /// 指数 key_exponent_numerator / keys 描述函数 f(keys) 与kps的相关性：
+        /// 键数越多，kps的影响越小，键数越少，kps的影响越大。
+        /// </para></remarks>
         /// </summary>
-        public static double JudgeWeight(double kps, bool favourHighKps = true)
+        public static double HitWeight(double kps, int keyCount)
         {
-            double z = NormalisedKps(kps);
-            double w = z * z * (3 - 2 * z);
-            return favourHighKps ? w : 1 - w;
+            if (!double.IsFinite(kps) || kps <= KPS_START)
+                return 0;
+
+            int keys = Math.Clamp(keyCount, key_count_min, key_count_max);
+            return Math.Pow(1 - KPS_START / kps, key_exponent_numerator / keys);
         }
 
         /// <summary>
-        /// Miss 用 KPS 权重。正向：从 0 KPS 的 0.3 线性升到 <see cref="KPS_SATURATION"/> 的 1。
+        /// 失误罚分的 KPS 系数：<see cref="HitWeight"/> 再乘 <see cref="ErrorKpsCorrection"/>。
         /// </summary>
-        public static double MissWeight(double kps, bool favourHighKps = true)
-        {
-            const double floor = 0.3;
-            double t = Math.Clamp(kps / KPS_SATURATION, 0, 1);
-            return floor + (1 - floor) * (favourHighKps ? t : 1 - t);
-        }
+        public static double ErrorWeight(double kps, int keyCount)
+            => HitWeight(kps, keyCount) * ErrorKpsCorrection;
 
         /// <param name="crossMs">判定与失误的分界。默认 <see cref="OFFSET_CROSS_MS"/>。</param>
         public static double OffsetQuality(double absoluteErrorMs, bool cotangent = false, double missBoundaryMs = OFFSET_MISS_MS, double crossMs = OFFSET_CROSS_MS)

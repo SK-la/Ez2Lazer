@@ -27,13 +27,14 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
     public static class EzScoreBonusCalculator
     {
         public static EzScoreBonusSet Calculate(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents, double rate, IEzKpsSectionLookup? kps = null,
-                                                IReadOnlyList<double>? cachedKps = null)
+                                                IReadOnlyList<double>? cachedKps = null, int? keyCount = null)
         {
             if (rate <= 0 || double.IsNaN(rate))
                 rate = 1;
 
             kps ??= resolveKps(playableBeatmap, rate, cachedKps);
             double cross = resolveCrossMs();
+            int keys = keyCount ?? resolveKeyCount(playableBeatmap);
 
             var pending = new HashSet<(int column, double time)>();
             var releaseNotes = new HashSet<(int column, double time)>();
@@ -72,12 +73,14 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
                 counted++;
 
                 double sectionKps = kps.KpsAt(e.HitObject.StartTime);
-                double weight = EzScoreBonusFormula.JudgeWeight(sectionKps, favourHighKps: true);
                 double gameplayRate = e.GameplayRate is > 0 ? e.GameplayRate.Value : rate;
                 bool isMiss = e.Result == HitResult.Miss;
                 double missBoundary = resolveMissBoundary(e.HitObject, gameplayRate);
                 double errorMs = isMiss ? missBoundary : Math.Abs(e.TimeOffset) / gameplayRate;
                 bool error = isMiss || errorMs > cross;
+                double weight = error
+                    ? EzScoreBonusFormula.ErrorWeight(sectionKps, keys)
+                    : EzScoreBonusFormula.HitWeight(sectionKps, keys);
 
                 cotangent.Add(weight, EzScoreBonusFormula.OffsetQuality(errorMs, cotangent: true, missBoundary, cross), error);
                 inverseCotangent.Add(weight, EzScoreBonusFormula.OffsetQuality(errorMs, missBoundaryMs: missBoundary, crossMs: cross), error);
@@ -119,7 +122,8 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         /// 由 <see cref="ScoreInfo.HitEvents"/> 计算并写入临时字段 <see cref="ScoreInfo.EzBonus"/>；无 HitEvents 时置空。
         /// </summary>
         /// <param name="playableBeatmap">与 <see cref="ScoreInfo.HitEvents"/> 同一次运行的可玩谱面。</param>
-        public static void Apply(ScoreInfo score, IBeatmap playableBeatmap, IReadOnlyList<double>? cachedKps = null)
+        /// <param name="keyCount">转谱完成后的键数。为空时用 <paramref name="playableBeatmap"/> 的 CircleSize。</param>
+        public static void Apply(ScoreInfo score, IBeatmap playableBeatmap, IReadOnlyList<double>? cachedKps = null, int? keyCount = null)
         {
             if (score.HitEvents.Count == 0 || playableBeatmap.HitObjects.Count == 0)
             {
@@ -127,8 +131,14 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
                 return;
             }
 
-            score.EzBonus = Calculate(playableBeatmap, score.HitEvents, ModUtils.CalculateRateWithMods(score.Mods), cachedKps: cachedKps);
+            score.EzBonus = Calculate(playableBeatmap, score.HitEvents, ModUtils.CalculateRateWithMods(score.Mods), cachedKps: cachedKps, keyCount: keyCount);
         }
+
+        /// <summary>
+        /// 转谱完成后的键数：<see cref="BeatmapDifficulty.CircleSize"/> 四舍五入。4–18 的夹紧在权重公式里。
+        /// </summary>
+        public static int KeyCountOf(IBeatmap convertedBeatmap)
+            => resolveKeyCount(convertedBeatmap);
 
         private static IEzKpsSectionLookup resolveKps(IBeatmap playableBeatmap, double rate, IReadOnlyList<double>? cachedKps)
         {
@@ -140,6 +150,16 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
             }
 
             return EzKpsListLookup.FromBeatmap(playableBeatmap, rate);
+        }
+
+        private static int resolveKeyCount(IBeatmap convertedBeatmap)
+        {
+            double circleSize = convertedBeatmap.Difficulty.CircleSize;
+
+            if (!double.IsFinite(circleSize))
+                return 0;
+
+            return (int)Math.Round(circleSize);
         }
 
         private static double resolveCrossMs()

@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Scoring.Bonus;
 using osu.Game.Scoring;
 
@@ -87,7 +88,7 @@ namespace osu.Game.EzOsuGame.Scoring
                         cachedKps = cached.KpsList;
                 }
 
-                EzScoreBonusCalculator.Apply(result.Score.ScoreInfo, playableBeatmap, cachedKps);
+                EzScoreBonusCalculator.Apply(result.Score.ScoreInfo, playableBeatmap, cachedKps, convertedKeyCount(workingBeatmap, scoreInfo, cancellationToken));
                 EzScoreBonusProvider.Store(scoreInfo, result.Score.ScoreInfo.EzBonus);
             }
 
@@ -145,8 +146,14 @@ namespace osu.Game.EzOsuGame.Scoring
             }
 
             var sessionInfo = result.Score.ScoreInfo;
-            EzScoreBonusCalculator.Apply(sessionInfo, playableBeatmap, cachedKps);
+            EzScoreBonusCalculator.Apply(sessionInfo, playableBeatmap, cachedKps, convertedKeyCount(workingBeatmap, scoreInfo, cancellationToken));
             return sessionInfo.EzBonus;
+        }
+
+        private static int convertedKeyCount(IWorkingBeatmap working, ScoreInfo scoreInfo, CancellationToken cancellationToken)
+        {
+            IBeatmap converted = EzPlayableBeatmapCache.GetShared(working, scoreInfo.Ruleset, scoreInfo.Mods, cancellationToken);
+            return EzScoreBonusCalculator.KeyCountOf(converted);
         }
     }
 }
