@@ -36,22 +36,18 @@ namespace osu.Game.EzOsuGame.Overlays
 {
     public partial class EzBeatmapPreviewOverlay : CompositeDrawable
     {
-        private const float panel_left_margin = 12;
-        private const float panel_width_ratio = 0.6f;
-        private const float panel_right_margin = 20;
-        private const float default_panel_height = 340;
+        private const float max_panel_width = 720;
         private const float min_panel_width = 360;
-        private const float fallback_max_panel_width = 720;
-        private const float panel_background_focus_opacity = 0.92f;
         private const float min_panel_height = 180;
         private const float max_panel_height = 560;
-        private const float bottom_controls_height = 30;
-        private const float resize_handle_height = 10;
-        private const float resize_handle_width = 10;
-        private const float preview_mode_button_width = 90;
-        private const float preview_mode_list_width = preview_mode_button_width;
-        private const float preview_mode_button_height = 30;
-        private const float preview_mode_button_spacing = 6;
+
+        private const float panel_width_ratio = 0.6f;
+        private const float panel_background_focus_opacity = 0.92f;
+
+        private const float button_height = 30;
+        private const float button_width = 90;
+
+        private const float resize_handle_thickness = 10;
 
         private const float dynamic_preview_duration = 10000;
         private const float dynamic_preview_repeat_delay = 500;
@@ -62,8 +58,8 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly FramedClock framedPreviewClock;
         private readonly Bindable<EzBeatmapPreviewMode> previewMode = new Bindable<EzBeatmapPreviewMode>();
 
-        private readonly Container panelContainer;
         private readonly EzAcrylicPanelBackground panelBackground;
+        private readonly Container panelContainer;
         private readonly Container stageViewport;
         private readonly Container stageScaleContainer;
         private readonly Container stageAreaContainer;
@@ -85,7 +81,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private float dragStartPanelHeight;
 
         private float panelWidth;
-        private float panelHeight = default_panel_height;
+        private float panelHeight = max_panel_width / 2;
 
         private double playbackStartTime;
         private double beatmapMinTime;
@@ -184,20 +180,20 @@ namespace osu.Game.EzOsuGame.Overlays
                                 Anchor = Anchor.TopLeft,
                                 Origin = Anchor.TopLeft,
                                 Depth = float.MinValue,
-                                Position = new Vector2(8, resize_handle_height + 8),
-                                Width = preview_mode_list_width,
+                                Position = new Vector2(8, resize_handle_thickness + 8),
+                                Width = button_width,
                                 AutoSizeAxes = Axes.Y,
                                 Direction = FillDirection.Vertical,
-                                Spacing = new Vector2(0, preview_mode_button_spacing),
+                                Spacing = new Vector2(0, 6),
                             },
                             stageAreaContainer = new Container
                             {
                                 RelativeSizeAxes = Axes.Both,
                                 Padding = new MarginPadding
                                 {
-                                    Top = resize_handle_height,
-                                    Bottom = bottom_controls_height,
-                                    Left = preview_mode_list_width + 16,
+                                    Top = resize_handle_thickness,
+                                    Bottom = button_height,
+                                    Left = button_width + 16,
                                     Right = 8
                                 },
                                 Children = new Drawable[]
@@ -238,14 +234,14 @@ namespace osu.Game.EzOsuGame.Overlays
                             bottomControlsContainer = new Container
                             {
                                 RelativeSizeAxes = Axes.X,
-                                Height = bottom_controls_height,
+                                Height = button_height,
                                 Anchor = Anchor.BottomLeft,
                                 Origin = Anchor.BottomLeft,
                                 Padding = new MarginPadding
                                 {
                                     Top = 10,
                                     Bottom = 10,
-                                    Left = preview_mode_list_width + 16,
+                                    Left = button_width + 16,
                                     Right = 10
                                 },
                                 Children = new Drawable[]
@@ -278,7 +274,7 @@ namespace osu.Game.EzOsuGame.Overlays
                             topResizeHandle = new Box
                             {
                                 RelativeSizeAxes = Axes.X,
-                                Height = resize_handle_height,
+                                Height = resize_handle_thickness,
                                 Anchor = Anchor.TopLeft,
                                 Origin = Anchor.TopLeft,
                                 Colour = Color4.White.Opacity(0.22f)
@@ -286,7 +282,7 @@ namespace osu.Game.EzOsuGame.Overlays
                             rightResizeHandle = new Box
                             {
                                 RelativeSizeAxes = Axes.Y,
-                                Width = resize_handle_width,
+                                Width = resize_handle_thickness,
                                 Anchor = Anchor.TopRight,
                                 Origin = Anchor.TopRight,
                                 Colour = Color4.White.Opacity(0.15f)
@@ -345,7 +341,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             panelContainer.ClearTransforms();
             beginPanelTransition();
-            panelContainer.MoveTo(new Vector2(panel_left_margin, 14));
+            panelContainer.MoveTo(new Vector2(0, 14));
             panelContainer.FadeIn(panel_transition_duration, Easing.OutQuint).Finally(_ => finishPanelTransition());
             panelContainer.MoveToY(0, panel_transition_duration, Easing.OutQuint);
 
@@ -654,7 +650,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 lastAppliedPanelHeight = displayPanelHeight;
             }
 
-            panelContainer.X = fullMapFocusActive ? 0 : panel_left_margin;
+            panelContainer.X = 0;
 
             if (targetPanelY != lastAppliedPanelY)
             {
@@ -971,7 +967,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 float targetRightEdge = ToLocalSpace(new Vector2(DefaultPanelRightEdgeInScreenSpace(), 0)).X;
 
                 if (!float.IsNaN(targetRightEdge) && !float.IsInfinity(targetRightEdge))
-                    preferred = targetRightEdge - panel_left_margin;
+                    preferred = targetRightEdge;
             }
 
             return clampPanelWidth(preferred);
@@ -1060,14 +1056,14 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             bool showTimeline = expanded && !fullMapFocusActive && !fullMapMode;
 
-            bottomControlsContainer.Height = showTimeline ? bottom_controls_height : 0;
+            bottomControlsContainer.Height = showTimeline ? button_height : 0;
             bottomControlsContainer.Alpha = showTimeline ? 1 : 0;
 
             stageAreaContainer.Padding = new MarginPadding
             {
-                Top = resize_handle_height,
-                Bottom = showTimeline ? bottom_controls_height : 8,
-                Left = preview_mode_list_width + 16,
+                Top = resize_handle_thickness,
+                Bottom = showTimeline ? button_height : 8,
+                Left = button_width + 16,
                 Right = 8
             };
         }
@@ -1115,10 +1111,10 @@ namespace osu.Game.EzOsuGame.Overlays
                 float targetRightEdge = ToLocalSpace(new Vector2(DefaultPanelRightEdgeInScreenSpace(), 0)).X;
 
                 if (!float.IsNaN(targetRightEdge) && !float.IsInfinity(targetRightEdge))
-                    return Math.Max(min_panel_width, targetRightEdge - panel_left_margin);
+                    return Math.Max(min_panel_width, targetRightEdge);
             }
 
-            return Math.Min(fallback_max_panel_width, DrawWidth - panel_left_margin - panel_right_margin);
+            return Math.Min(max_panel_width, DrawWidth - resize_handle_thickness);
         }
 
         private float clampPanelWidth(float width)
@@ -1140,10 +1136,10 @@ namespace osu.Game.EzOsuGame.Overlays
             var quad = rightResizeHandle.ScreenSpaceDrawQuad;
             // 扩展检测区域到面板右边缘，补偿圆角裁剪
             var expandedQuad = new Quad(
-                new Vector2(quad.TopLeft.X - resize_handle_width, quad.TopLeft.Y),
-                new Vector2(quad.TopRight.X + resize_handle_width, quad.TopRight.Y),
-                new Vector2(quad.BottomLeft.X - resize_handle_width, quad.BottomLeft.Y),
-                new Vector2(quad.BottomRight.X + resize_handle_width, quad.BottomRight.Y)
+                new Vector2(quad.TopLeft.X - resize_handle_thickness, quad.TopLeft.Y),
+                new Vector2(quad.TopRight.X + resize_handle_thickness, quad.TopRight.Y),
+                new Vector2(quad.BottomLeft.X - resize_handle_thickness, quad.BottomLeft.Y),
+                new Vector2(quad.BottomRight.X + resize_handle_thickness, quad.BottomRight.Y)
             );
             return expandedQuad.AABBFloat.Contains(screenSpacePosition);
         }
@@ -1153,10 +1149,10 @@ namespace osu.Game.EzOsuGame.Overlays
             var quad = topResizeHandle.ScreenSpaceDrawQuad;
             // 扩展检测区域到面板左右边缘，补偿圆角裁剪
             var expandedQuad = new Quad(
-                new Vector2(quad.TopLeft.X - resize_handle_width, quad.TopLeft.Y - resize_handle_height),
-                new Vector2(quad.TopRight.X + resize_handle_width, quad.TopRight.Y - resize_handle_height),
-                new Vector2(quad.BottomLeft.X - resize_handle_width, quad.BottomLeft.Y),
-                new Vector2(quad.BottomRight.X + resize_handle_width, quad.BottomRight.Y)
+                new Vector2(quad.TopLeft.X - resize_handle_thickness, quad.TopLeft.Y - resize_handle_thickness),
+                new Vector2(quad.TopRight.X + resize_handle_thickness, quad.TopRight.Y - resize_handle_thickness),
+                new Vector2(quad.BottomLeft.X - resize_handle_thickness, quad.BottomLeft.Y),
+                new Vector2(quad.BottomRight.X + resize_handle_thickness, quad.BottomRight.Y)
             );
             return expandedQuad.AABBFloat.Contains(screenSpacePosition);
         }
@@ -1214,8 +1210,8 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 previewModeButtons[mode] = new PreviewModeButton
                 {
-                    Width = preview_mode_button_width,
-                    Height = preview_mode_button_height,
+                    Width = button_width,
+                    Height = button_height,
                     Text = mode.GetLocalisableDescription(),
                     Action = () => setPreviewMode(mode)
                 };

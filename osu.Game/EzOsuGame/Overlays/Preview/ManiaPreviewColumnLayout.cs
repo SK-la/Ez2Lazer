@@ -13,7 +13,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         public const float UNIT_ROW_STEP = 8f;
 
         /// <summary>Fixed note height; always half of <see cref="UNIT_ROW_STEP" />.</summary>
-        public const float UNIT_NOTE_HEIGHT = UNIT_ROW_STEP * 0.5f;
+        public const float UNIT_NOTE_HEIGHT = UNIT_ROW_STEP * 0.25f;
 
         /// <summary>Fixed measure height in the abstract grid.</summary>
         public const float UNIT_MEASURE_HEIGHT = ManiaPreviewFixedLayout.ROWS_PER_MEASURE * UNIT_ROW_STEP;
@@ -38,12 +38,12 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
         public static ManiaPreviewColumnLayout ForScroll(int totalRows, float viewportWidth, float viewportHeight, float density)
         {
-            int measuresPerColumn = Math.Clamp((int)Math.Round(2f / density), 1, 8);
+            int measuresPerColumn = measuresPerColumnForDensity(density);
             int rowsPerColumn = measuresPerColumn * ManiaPreviewFixedLayout.ROWS_PER_MEASURE;
             int columnCount = Math.Max(1, (totalRows + rowsPerColumn - 1) / rowsPerColumn);
             float columnWidth = Math.Max(96f, viewportWidth * 0.22f);
 
-            (float rowStep, float noteHeight) = ManiaPreviewDrawHelper.ComputeRowMetrics(rowsPerColumn, viewportHeight);
+            (float rowStep, _) = ManiaPreviewDrawHelper.ComputeRowMetrics(rowsPerColumn, viewportHeight);
 
             return new ManiaPreviewColumnLayout
             {
@@ -52,7 +52,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                 ColumnCount = columnCount,
                 ColumnWidth = columnWidth,
                 RowStep = rowStep,
-                NoteHeight = noteHeight,
+                NoteHeight = noteHeightAtUnitDensity(viewportHeight),
                 PanelHeight = viewportHeight,
                 ContentWidth = columnCount * columnWidth + Math.Max(0, columnCount - 1) * COLUMN_SPACING,
                 FitScale = 1f
@@ -62,7 +62,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         /// <summary>
         ///     Full-map layout: fixed measure units, time-based rows, search column split to match viewport aspect and fill.
         /// </summary>
-        /// <param name="density">Biases measures-per-column to adjust beat row pixel spacing; 1 keeps the auto-filled layout.</param>
+        /// <param name="density">Biases measures-per-column so on-screen beat-line spacing changes. Note thickness stays at the density-1 size.</param>
         public static ManiaPreviewColumnLayout ForFullMapMeasureGrid(double durationMs, double msPerMeasure, float viewportWidth, float viewportHeight, float density = 1f)
         {
             if (msPerMeasure <= 0)
@@ -104,8 +104,14 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
                 int measuresPerColumnTarget = Math.Clamp((int)Math.Round(best.MeasuresPerColumn / density), 1, totalMeasures);
                 var biased = buildMeasureGridLayout(totalMeasures, measuresPerColumnTarget);
+                float fitScale = computeFitScale(biased, viewportWidth, viewportHeight);
+                float screenNoteHeight = best.NoteHeight * best.FitScale;
 
-                return biased with { FitScale = computeFitScale(biased, viewportWidth, viewportHeight) };
+                return biased with
+                {
+                    FitScale = fitScale,
+                    NoteHeight = screenNoteHeight / fitScale,
+                };
             }
 
             return buildMeasureGridLayout(totalMeasures, 1) with
@@ -115,6 +121,15 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                     0.05f,
                     16f)
             };
+        }
+
+        private static int measuresPerColumnForDensity(float density)
+            => Math.Clamp((int)Math.Round(2f / density), 1, 8);
+
+        private static float noteHeightAtUnitDensity(float viewportHeight)
+        {
+            int rows = measuresPerColumnForDensity(1f) * ManiaPreviewFixedLayout.ROWS_PER_MEASURE;
+            return ManiaPreviewDrawHelper.ComputeRowMetrics(rows, viewportHeight).noteHeight;
         }
 
         private static float computeFitScale(in ManiaPreviewColumnLayout layout, float viewportWidth, float viewportHeight)
