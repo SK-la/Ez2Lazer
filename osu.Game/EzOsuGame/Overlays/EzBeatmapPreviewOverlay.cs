@@ -17,6 +17,7 @@ using osu.Framework.Input.Events;
 using osu.Framework.Threading;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Overlays.Preview;
 using osu.Game.EzOsuGame.UI;
@@ -26,6 +27,7 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Screens.Footer;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -35,15 +37,15 @@ namespace osu.Game.EzOsuGame.Overlays
     public partial class EzBeatmapPreviewOverlay : CompositeDrawable
     {
         private const float panel_left_margin = 12;
-        private const float panel_width_ratio = 0.54f;
+        private const float panel_width_ratio = 0.6f;
         private const float panel_right_margin = 20;
         private const float default_panel_height = 340;
         private const float min_panel_width = 360;
-        private const float fallback_max_panel_width = 560;
+        private const float fallback_max_panel_width = 720;
         private const float panel_background_focus_opacity = 0.92f;
         private const float min_panel_height = 180;
         private const float max_panel_height = 560;
-        private const float bottom_controls_height = 56;
+        private const float bottom_controls_height = 30;
         private const float resize_handle_height = 10;
         private const float resize_handle_width = 10;
         private const float preview_mode_button_width = 90;
@@ -148,6 +150,7 @@ namespace osu.Game.EzOsuGame.Overlays
         public EzBeatmapPreviewOverlay()
         {
             RelativeSizeAxes = Axes.Both;
+            Padding = new MarginPadding { Bottom = ScreenFooter.HEIGHT };
 
             framedPreviewClock = new FramedClock(previewClock);
 
@@ -158,7 +161,7 @@ namespace osu.Game.EzOsuGame.Overlays
                     Anchor = Anchor.BottomLeft,
                     Origin = Anchor.BottomLeft,
                     Masking = true,
-                    CornerRadius = 10,
+                    CornerRadius = EzAcrylicStyle.CORNER_RADIUS_DISPLAY,
                     Alpha = 0,
                     RelativeSizeAxes = Axes.None,
                     Child = new Container
@@ -633,8 +636,9 @@ namespace osu.Game.EzOsuGame.Overlays
             }
             else
             {
-                displayPanelWidth = DrawWidth;
-                displayPanelHeight = DrawHeight;
+                // 全谱聚焦铺满可用区域。DrawSize 含 footer 留白，底边用 ChildSize 才贴在 footer 上沿。
+                displayPanelWidth = ChildSize.X;
+                displayPanelHeight = ChildSize.Y;
                 targetPanelY = 0;
             }
 
@@ -1125,7 +1129,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private float clampPanelHeight(float height)
         {
-            float maxHeight = Math.Min(max_panel_height, DrawHeight - 30);
+            float maxHeight = Math.Min(max_panel_height, ChildSize.Y - 30);
             return Math.Clamp(height, min_panel_height, Math.Max(min_panel_height, maxHeight));
         }
 
