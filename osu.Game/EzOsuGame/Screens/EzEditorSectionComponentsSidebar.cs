@@ -170,14 +170,13 @@ namespace osu.Game.EzOsuGame.Screens
 
         private Texture? createStagePreview(string stageSet)
         {
-            // for (int i = 0; i < 6; i++)
-            // {
-            //     var t = textures.Get($"Stage/{stageSet}/Stage/GrooveLight_{i}");
-            //     if (t != null)
-            //         return t;
-            // }
+            string basePath = $"Stage/{stageSet}/Stage";
+            string? keyFolder = EzLocalTextureFactory.ResolveStageKeyFolder(resources.ListSubdirectories(basePath), EzLocalTextureFactory.MAX_STAGE_KEYS);
 
-            return resources.Get($"Stage/{stageSet}/Stage/eightkey/Body", EzTextureUsage.Large);
+            if (keyFolder == null)
+                return null;
+
+            return resources.Get($"{basePath}/{keyFolder}/Body", EzTextureUsage.Large);
         }
 
         private partial class VisualTextureItem : CompositeDrawable

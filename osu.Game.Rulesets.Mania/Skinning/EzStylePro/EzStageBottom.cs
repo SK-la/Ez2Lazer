@@ -1,13 +1,16 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Layout;
+using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.Beatmaps;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -20,8 +23,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private readonly IBindable<double> hitPositonBindable = new Bindable<double>();
 
         private Bindable<string> stageName = null!;
+        private int columnCount;
 
-        [Resolved(CanBeNull = true)]
+        [Resolved]
         private EzLocalTextureFactory factory { get; set; } = null!;
 
         [Resolved]
@@ -45,10 +49,24 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         [BackgroundDependencyLoader]
-        private void load(IEzSkinInfo ezSkinInfo)
+        private void load(IEzSkinInfo ezSkinInfo, StageDefinition stageDefinition, IBeatmap beatmap)
         {
+            columnCount = playableKeyCount(beatmap, stageDefinition);
             hitPositonBindable.BindTo(ezSkinInfo.HitPosition);
             stageName = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
+        }
+
+        private static int playableKeyCount(IBeatmap beatmap, StageDefinition stageDefinition)
+        {
+            int fromCs = (int)Math.Round(beatmap.Difficulty.CircleSize);
+
+            if (beatmap is ManiaBeatmap && stageDefinition.Columns > 0 && stageDefinition.Columns != fromCs)
+                return stageDefinition.Columns;
+
+            if (fromCs > 0)
+                return fromCs;
+
+            return stageDefinition.Columns;
         }
 
         protected override void LoadComplete()
@@ -65,8 +83,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             sprite.Clear();
 
-            var container = factory.CreateStage("Body");
-            sprite.Add(container);
+            sprite.Add(factory.CreateStage(columnCount));
 
             // var judgeLine = new EzJudgementLine();
             // sprite.Add(judgeLine);
