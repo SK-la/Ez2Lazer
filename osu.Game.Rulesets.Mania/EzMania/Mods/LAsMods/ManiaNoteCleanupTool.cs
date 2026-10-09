@@ -90,7 +90,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         private const double empty_span_beats = 4;
 
         /// <summary>
-        /// 统一格式化铺面。重叠单点必删，默认再截断 LN 并延续、按 16ms 删过密偶数项。
+        /// 统一格式化整份铺面。重叠单点必删，默认再截断 LN 并延续、按 16ms 删过密偶数项。
         /// </summary>
         public static NoteCleanupReport CleanupBeatmap(ManiaBeatmap beatmap, int? seed = null)
         {
@@ -101,20 +101,68 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public static NoteCleanupReport CleanupBeatmap(ManiaBeatmap beatmap, NoteCleanupOptions options)
         {
             var report = new NoteCleanupReport();
+            List<ManiaHitObject> resolved = CleanupObjects(beatmap, beatmap.HitObjects, options, report);
+            replaceHitObjects(beatmap, resolved);
+            logReport(report);
+            return report;
+        }
 
-            if (beatmap.HitObjects.Count == 0)
-                return report;
+        /// <summary>
+        /// 只清理 <paramref name="objects"/> 这一片，不改谱面物件列表。拍长仍从 <paramref name="beatmap"/> 的控制点读取。
+        /// 渐进转谱可以转完一片再把这一片传进来，循环处理下一片。
+        /// </summary>
+        public static List<ManiaHitObject> CleanupObjects(ManiaBeatmap beatmap, IEnumerable<ManiaHitObject> objects, NoteCleanupOptions? options = null)
+        {
+            return CleanupObjects(beatmap, objects, options ?? NoteCleanupOptions.Default, new NoteCleanupReport());
+        }
 
-            List<ManiaHitObject> original = beatmap.HitObjects.ToList();
-            List<ManiaHitObject> resolved = resolveColumns(beatmap, original, options, report);
+        /// <summary>
+        /// 只清理 <paramref name="objects"/> 这一片，并把删除、截断写进 <paramref name="report"/>。不写日志，也不改谱面物件列表。
+        /// </summary>
+        public static List<ManiaHitObject> CleanupObjects(ManiaBeatmap beatmap, IEnumerable<ManiaHitObject> objects, NoteCleanupOptions options, NoteCleanupReport report)
+        {
+            ArgumentNullException.ThrowIfNull(beatmap);
+            ArgumentNullException.ThrowIfNull(objects);
+            ArgumentNullException.ThrowIfNull(options);
+            ArgumentNullException.ThrowIfNull(report);
+
+            List<ManiaHitObject> source = objects.ToList();
+
+            if (source.Count == 0)
+                return source;
+
+            List<ManiaHitObject> resolved = resolveColumns(beatmap, source, options, report);
 
             if (options.CleanDenseNotes || options.CleanLnDensity)
                 resolved = applyDensity(beatmap, resolved, options, report);
 
-            replaceHitObjects(beatmap, resolved);
+            collectEmptySpans(beatmap, source, resolved, report);
+            return resolved;
+        }
 
-            collectEmptySpans(beatmap, original, beatmap.HitObjects, report);
-            logReport(report);
+        /// <summary>
+        /// 只清理开始时间落在 <c>[startTime, endTime)</c> 的物件，其余原样留在谱面上。
+        /// 窗口按开始时间切开，跨窗口的长条算在它开始的那一片里。
+        /// </summary>
+        public static NoteCleanupReport CleanupRange(ManiaBeatmap beatmap, double startTime, double endTime, NoteCleanupOptions? options = null)
+        {
+            ArgumentNullException.ThrowIfNull(beatmap);
+            options ??= NoteCleanupOptions.Default;
+
+            var report = new NoteCleanupReport();
+            var inside = new List<ManiaHitObject>();
+            var outside = new List<ManiaHitObject>();
+
+            foreach (ManiaHitObject hitObject in beatmap.HitObjects)
+            {
+                if (hitObject.StartTime >= startTime && hitObject.StartTime < endTime)
+                    inside.Add(hitObject);
+                else
+                    outside.Add(hitObject);
+            }
+
+            outside.AddRange(CleanupObjects(beatmap, inside, options, report));
+            replaceHitObjects(beatmap, outside);
             return report;
         }
 

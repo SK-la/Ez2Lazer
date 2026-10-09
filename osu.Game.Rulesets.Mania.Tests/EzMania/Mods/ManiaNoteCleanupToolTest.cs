@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps.ControlPoints;
@@ -168,6 +169,38 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
         }
 
         [Test]
+        public void TestCleanupObjectsLeavesTheRestOfTheBeatmapUntouched()
+        {
+            ManiaBeatmap beatmap = createBeatmap(
+                new Note { StartTime = 0, Column = 1 },
+                new Note { StartTime = 10000, Column = 1 });
+
+            List<ManiaHitObject> fragment = ManiaNoteCleanupTool.CleanupObjects(beatmap, new ManiaHitObject[]
+            {
+                new Note { StartTime = 1000, Column = 0 },
+                new Note { StartTime = 1000, Column = 0 },
+            });
+
+            Assert.That(serialiseList(fragment), Is.EqualTo("N0@1000"));
+            Assert.That(serialise(beatmap), Is.EqualTo("N1@0 N1@10000"));
+        }
+
+        [Test]
+        public void TestCleanupRangeOnlyRewritesTheWindow()
+        {
+            ManiaBeatmap beatmap = createBeatmap(
+                new Note { StartTime = 0, Column = 0 },
+                new Note { StartTime = 10, Column = 0 },
+                new Note { StartTime = 20, Column = 0 },
+                new Note { StartTime = 30, Column = 0 },
+                new Note { StartTime = 10000, Column = 0 });
+
+            ManiaNoteCleanupTool.CleanupRange(beatmap, 0, 100);
+
+            Assert.That(serialise(beatmap), Is.EqualTo("N0@0 N0@20 N0@30 N0@10000"));
+        }
+
+        [Test]
         public void TestBeatDivisorUsesTimingAtTheNote()
         {
             ManiaBeatmap beatmap = createBeatmap(
@@ -192,8 +225,10 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
             return beatmap;
         }
 
-        private static string serialise(ManiaBeatmap beatmap) =>
-            string.Join(" ", beatmap.HitObjects.Select(hitObject =>
+        private static string serialise(ManiaBeatmap beatmap) => serialiseList(beatmap.HitObjects);
+
+        private static string serialiseList(IEnumerable<ManiaHitObject> hitObjects) =>
+            string.Join(" ", hitObjects.Select(hitObject =>
             {
                 if (hitObject is HoldNote hold)
                     return $"H{hold.Column}@{hold.StartTime}+{hold.Duration}";
