@@ -348,7 +348,7 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModPlayfieldTransformation(),
                         new ManiaModReleaseAdjust(),
                         new ManiaModRemedy(),
-                        new ManiaModTrueRelease(),
+                        new ManiaModTrueInverse(),
                         // new ModStarRatingRebirth(),
                     };
 

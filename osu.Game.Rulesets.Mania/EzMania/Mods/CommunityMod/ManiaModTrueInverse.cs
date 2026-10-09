@@ -17,7 +17,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
-    public enum TrueReleaseUnit
+    public enum TrueInverseUnit
     {
         Beats,
         Milliseconds,
@@ -26,13 +26,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
     /// <summary>
     /// 点/面互相焊接：消掉面头、把点和面尾拉成新面，短面塌缩回点，所有列对齐到公共结束时间。
     /// </summary>
-    public class ManiaModTrueRelease : Mod, IApplicableAfterBeatmapConversion, IEzApplyOrder
+    public class ManiaModTrueInverse : Mod, IApplicableAfterBeatmapConversion, IEzApplyOrder
     {
         public override string Name => "True Inverse";
 
         public override string Acronym => "TI";
 
-        public override LocalisableString Description => TrueReleaseStrings.TRUE_RELEASE_DESCRIPTION;
+        public override LocalisableString Description => TrueInverseStrings.TRUE_INVERSE_DESCRIPTION;
 
         public override IconUsage? Icon => FontAwesome.Solid.ExpandArrowsAlt;
 
@@ -44,38 +44,38 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override bool ValidForFreestyleAsRequiredMod => false;
 
-        [SettingSource(typeof(TrueReleaseStrings), nameof(TrueReleaseStrings.MIN_HOLD_LENGTH_LABEL), nameof(TrueReleaseStrings.MIN_HOLD_LENGTH_DESCRIPTION))]
+        [SettingSource(typeof(TrueInverseStrings), nameof(TrueInverseStrings.MIN_HOLD_LENGTH_LABEL), nameof(TrueInverseStrings.MIN_HOLD_LENGTH_DESCRIPTION))]
         public BindableDouble MinHoldLength { get; } = new BindableDouble(0.25)
         {
             MinValue = 0,
             MaxValue = 4,
         };
 
-        [SettingSource(typeof(TrueReleaseStrings), nameof(TrueReleaseStrings.TAIL_GAP_LABEL), nameof(TrueReleaseStrings.TAIL_GAP_DESCRIPTION))]
+        [SettingSource(typeof(TrueInverseStrings), nameof(TrueInverseStrings.TAIL_GAP_LABEL), nameof(TrueInverseStrings.TAIL_GAP_DESCRIPTION))]
         public BindableDouble TailGap { get; } = new BindableDouble(0.5)
         {
             MinValue = 0,
             MaxValue = 4,
         };
 
-        [SettingSource(typeof(TrueReleaseStrings), nameof(TrueReleaseStrings.MINIJACK_LABEL), nameof(TrueReleaseStrings.MINIJACK_DESCRIPTION))]
+        [SettingSource(typeof(TrueInverseStrings), nameof(TrueInverseStrings.MINIJACK_LABEL), nameof(TrueInverseStrings.MINIJACK_DESCRIPTION))]
         public BindableDouble Minijack { get; } = new BindableDouble(0.5)
         {
             MinValue = 0,
             MaxValue = 4,
         };
 
-        [SettingSource(typeof(TrueReleaseStrings), nameof(TrueReleaseStrings.UNIT_LABEL), nameof(TrueReleaseStrings.UNIT_DESCRIPTION))]
-        public Bindable<TrueReleaseUnit> Unit { get; } = new Bindable<TrueReleaseUnit>(TrueReleaseUnit.Beats);
+        [SettingSource(typeof(TrueInverseStrings), nameof(TrueInverseStrings.UNIT_LABEL), nameof(TrueInverseStrings.UNIT_DESCRIPTION))]
+        public Bindable<TrueInverseUnit> Unit { get; } = new Bindable<TrueInverseUnit>(TrueInverseUnit.Beats);
 
-        public ManiaModTrueRelease()
+        public ManiaModTrueInverse()
         {
             Unit.BindValueChanged(_ => applyUnitRange(), true);
         }
 
         private void applyUnitRange()
         {
-            bool ms = Unit.Value == TrueReleaseUnit.Milliseconds;
+            bool ms = Unit.Value == TrueInverseUnit.Milliseconds;
             double beatsPrecision = 1.0 / 12.0;
 
             applyRange(MinHoldLength, ms, 160, 0.25, beatsPrecision);
@@ -104,15 +104,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         {
             get
             {
-                yield return (TrueReleaseStrings.MIN_HOLD_LENGTH_LABEL, $"{MinHoldLength.Value:0.##} {Unit}");
-                yield return (TrueReleaseStrings.TAIL_GAP_LABEL, $"{TailGap.Value:0.##} {Unit}");
-                yield return (TrueReleaseStrings.MINIJACK_LABEL, $"{Minijack.Value:0.##} {Unit}");
+                yield return (TrueInverseStrings.MIN_HOLD_LENGTH_LABEL, $"{MinHoldLength.Value:0.##} {Unit}");
+                yield return (TrueInverseStrings.TAIL_GAP_LABEL, $"{TailGap.Value:0.##} {Unit}");
+                yield return (TrueInverseStrings.MINIJACK_LABEL, $"{Minijack.Value:0.##} {Unit}");
                 yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
             }
         }
 
         private double resolveMs(BindableDouble v, double atTime, IBeatmap beatmap)
-            => Unit.Value == TrueReleaseUnit.Milliseconds
+            => Unit.Value == TrueInverseUnit.Milliseconds
                 ? v.Value
                 : v.Value * beatmap.ControlPointInfo.TimingPointAt(atTime).BeatLength;
 
@@ -263,25 +263,25 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         }
     }
 
-    public static class TrueReleaseStrings
+    public static class TrueInverseStrings
     {
-        public static readonly LocalisableString TRUE_RELEASE_DESCRIPTION =
-            new EzLocalizationManager.EzLocalisableString("把相邻的点/面互相焊接，短面塌缩回点，所有列对齐到公共结束时间",
-                "Weld adjacent notes into holds; collapse short holds; align all columns to a common end.");
+        public static readonly LocalisableString TRUE_INVERSE_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("将普通note转换为长note，将长note转换为空。",
+                "Converts regular notes into long notes and long notes into gaps.");
 
         public static readonly LocalisableString MIN_HOLD_LENGTH_LABEL = new EzLocalizationManager.EzLocalisableString("最短面长", "Minimum hold length");
-        public static readonly LocalisableString MIN_HOLD_LENGTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("短于该长度的面会被当作点",
-            "Holds shorter than this are treated as notes (unit below)");
+        public static readonly LocalisableString MIN_HOLD_LENGTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("短于该长度的长note会被当作普通note",
+            "Holds shorter than this are treated as taps (unit below)");
 
         public static readonly LocalisableString TAIL_GAP_LABEL = new EzLocalizationManager.EzLocalisableString("面尾空隙", "Tail gap");
-        public static readonly LocalisableString TAIL_GAP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("点被拉成面时，在与下一个对象之间留出的空隙",
-            "Gap left before the next object when stretching a note into a hold (unit below)");
+        public static readonly LocalisableString TAIL_GAP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("产生的长note与下一个对象之间留出的空隙",
+            "Gap left between the generated hold and the next object (unit below)");
 
-        public static readonly LocalisableString MINIJACK_LABEL = new EzLocalizationManager.EzLocalisableString("Minijack", "Minijack");
-        public static readonly LocalisableString MINIJACK_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("面尾产生的头离下一个点产生的头小于该值时，放弃成头",
-            "If a hold-tail-born head is closer than this to the next point-born head, it is dropped instead of becoming a head (unit below)");
+        public static readonly LocalisableString MINIJACK_LABEL = new EzLocalizationManager.EzLocalisableString("防小叠", "Avoid minijack");
+        public static readonly LocalisableString MINIJACK_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("防止产生小于该值的小叠",
+            "avoid generate minijack shorter than this value (unit below)");
 
-        public static readonly LocalisableString UNIT_LABEL = new EzLocalizationManager.EzLocalisableString("单位", "Unit");
+        public static readonly LocalisableString UNIT_LABEL = new EzLocalizationManager.EzLocalisableString("单位（节拍/毫秒）", "Unit");
         public static readonly LocalisableString UNIT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("上述参数使用的时间单位", "Time unit used by the parameters above");
     }
 }
