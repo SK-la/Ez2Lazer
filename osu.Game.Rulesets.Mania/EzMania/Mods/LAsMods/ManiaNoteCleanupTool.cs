@@ -4,7 +4,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Localisation;
+using osu.Framework.Logging;
+using osu.Game.Audio;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
 using osu.Game.Rulesets.Mania.Objects;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
@@ -15,44 +20,154 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         Newer = 2,
     }
 
+    /// <summary>
+    /// 单点落在 LN 体内时的处理。三种都会执行其中一种。
+    /// </summary>
+    public enum LnBodyTapMode
+    {
+        [LocalisableDescription(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.LN_BODY_DROP_TAP))]
+        DropTap,
+
+        [LocalisableDescription(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.LN_BODY_TRUNCATE))]
+        Truncate,
+
+        [LocalisableDescription(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.LN_BODY_CONTINUE))]
+        Continue,
+    }
+
+    /// <summary>
+    /// 清理参数。重叠单点每次都删。默认再做 LN 体内截断并延续，以及 16ms 过密删偶数项。
+    /// </summary>
     public sealed class NoteCleanupOptions
     {
         public static NoteCleanupOptions Default { get; } = new NoteCleanupOptions();
 
-        public bool CleanOverlap { get; init; } = true;
-        public bool EnforceMinimumGaps { get; init; } = true;
-        public bool EnforceHoldReleaseGap { get; init; } = true;
-        public int BeatDivisor { get; init; } = 8;
-        public int MinimumGapMs { get; init; } = 30;
+        public LnBodyTapMode LnBodyTapMode { get; init; } = LnBodyTapMode.Continue;
+
+        /// <summary>
+        /// 单点过密：删偶数项，留下结尾那颗非密集 note。
+        /// </summary>
+        public bool CleanDenseNotes { get; init; } = true;
+
+        /// <summary>
+        /// LN 过密：与相邻 note 过近时按同一间隙收尾，或把 LN 头后移。默认开。
+        /// </summary>
+        public bool CleanLnDensity { get; init; } = true;
+
+        /// <summary>
+        /// 非 null 时，间隙取该时刻 <c>BeatLength / 分母</c>，不再用 <see cref="MinimumGapMs"/>。
+        /// </summary>
+        public int? BeatDivisor { get; init; }
+
+        public int MinimumGapMs { get; init; } = 16;
+
+        public bool UseKeepStrategy { get; init; }
+
         public NoteCleanupKeepStrategy KeepStrategy { get; init; } = NoteCleanupKeepStrategy.Older;
+    }
+
+    /// <summary>
+    /// 一次清理改了什么。无变化时不写日志。
+    /// </summary>
+    public sealed class NoteCleanupReport
+    {
+        public int Dropped { get; set; }
+
+        public int Truncated { get; set; }
+
+        public int ConvertedToTap { get; set; }
+
+        public int Continued { get; set; }
+
+        public List<(double Start, double End)> EmptySpans { get; } = new List<(double Start, double End)>();
+
+        public bool HasChanges => Dropped > 0 || Truncated > 0 || ConvertedToTap > 0 || Continued > 0 || EmptySpans.Count > 0;
     }
 
     public static class ManiaNoteCleanupTool
     {
+        private const double empty_span_floor_ms = 2000;
+        private const double empty_span_beats = 4;
+
         /// <summary>
-        /// 统一格式化铺面，去除重叠、过密等无法正常游玩的内容。
-        /// <para></para>缝隙检测为 30ms ~ 1/8 beatLength
+        /// 统一格式化整份铺面。重叠单点必删，默认再截断 LN 并延续、按 16ms 删过密偶数项。
         /// </summary>
-        public static void CleanupBeatmap(ManiaBeatmap beatmap, int? seed = null) =>
-            CleanupBeatmap(beatmap, NoteCleanupOptions.Default);
-
-        public static void CleanupBeatmap(ManiaBeatmap beatmap, NoteCleanupOptions options)
+        public static NoteCleanupReport CleanupBeatmap(ManiaBeatmap beatmap, int? seed = null)
         {
-            if (beatmap.HitObjects.Count == 0)
-                return;
+            _ = seed;
+            return CleanupBeatmap(beatmap, NoteCleanupOptions.Default);
+        }
 
-            if (options.CleanOverlap)
-                CleanOverlapNotes(beatmap, options);
-
-            if (options.EnforceHoldReleaseGap)
-                EnforceHoldReleaseGap(beatmap, options);
-
-            if (options.EnforceMinimumGaps)
-                EnforceMinimumGaps(beatmap, options);
+        public static NoteCleanupReport CleanupBeatmap(ManiaBeatmap beatmap, NoteCleanupOptions options)
+        {
+            var report = new NoteCleanupReport();
+            List<ManiaHitObject> resolved = CleanupObjects(beatmap, beatmap.HitObjects, options, report);
+            replaceHitObjects(beatmap, resolved);
+            logReport(report);
+            return report;
         }
 
         /// <summary>
-        /// 清理重叠note，重叠LN
+        /// 只清理 <paramref name="objects"/> 这一片，不改谱面物件列表。拍长仍从 <paramref name="beatmap"/> 的控制点读取。
+        /// 渐进转谱可以转完一片再把这一片传进来，循环处理下一片。
+        /// </summary>
+        public static List<ManiaHitObject> CleanupObjects(ManiaBeatmap beatmap, IEnumerable<ManiaHitObject> objects, NoteCleanupOptions? options = null)
+        {
+            return CleanupObjects(beatmap, objects, options ?? NoteCleanupOptions.Default, new NoteCleanupReport());
+        }
+
+        /// <summary>
+        /// 只清理 <paramref name="objects"/> 这一片，并把删除、截断写进 <paramref name="report"/>。不写日志，也不改谱面物件列表。
+        /// </summary>
+        public static List<ManiaHitObject> CleanupObjects(ManiaBeatmap beatmap, IEnumerable<ManiaHitObject> objects, NoteCleanupOptions options, NoteCleanupReport report)
+        {
+            ArgumentNullException.ThrowIfNull(beatmap);
+            ArgumentNullException.ThrowIfNull(objects);
+            ArgumentNullException.ThrowIfNull(options);
+            ArgumentNullException.ThrowIfNull(report);
+
+            List<ManiaHitObject> source = objects.ToList();
+
+            if (source.Count == 0)
+                return source;
+
+            List<ManiaHitObject> resolved = resolveColumns(beatmap, source, options, report);
+
+            if (options.CleanDenseNotes || options.CleanLnDensity)
+                resolved = applyDensity(beatmap, resolved, options, report);
+
+            collectEmptySpans(beatmap, source, resolved, report);
+            return resolved;
+        }
+
+        /// <summary>
+        /// 只清理开始时间落在 <c>[startTime, endTime)</c> 的物件，其余原样留在谱面上。
+        /// 窗口按开始时间切开，跨窗口的长条算在它开始的那一片里。
+        /// </summary>
+        public static NoteCleanupReport CleanupRange(ManiaBeatmap beatmap, double startTime, double endTime, NoteCleanupOptions? options = null)
+        {
+            ArgumentNullException.ThrowIfNull(beatmap);
+            options ??= NoteCleanupOptions.Default;
+
+            var report = new NoteCleanupReport();
+            var inside = new List<ManiaHitObject>();
+            var outside = new List<ManiaHitObject>();
+
+            foreach (ManiaHitObject hitObject in beatmap.HitObjects)
+            {
+                if (hitObject.StartTime >= startTime && hitObject.StartTime < endTime)
+                    inside.Add(hitObject);
+                else
+                    outside.Add(hitObject);
+            }
+
+            outside.AddRange(CleanupObjects(beatmap, inside, options, report));
+            replaceHitObjects(beatmap, outside);
+            return report;
+        }
+
+        /// <summary>
+        /// 同列重叠：删重叠单点，并按 <see cref="LnBodyTapMode"/> 处理落在 LN 体内的单点。
         /// </summary>
         public static void CleanOverlapNotes(ManiaBeatmap beatmap) =>
             CleanOverlapNotes(beatmap, NoteCleanupOptions.Default);
@@ -62,33 +177,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             if (beatmap.HitObjects.Count == 0)
                 return;
 
-            var toRemove = new HashSet<ManiaHitObject>();
-
-            foreach (var group in beatmap.HitObjects.GroupBy(h => h.Column))
-            {
-                double currentEnd = double.MinValue;
-                ManiaHitObject? current = null;
-
-                foreach (var obj in group.OrderBy(h => h.StartTime))
-                {
-                    double objEnd = obj is HoldNote hold ? hold.EndTime : obj.StartTime;
-
-                    if (current != null && obj.StartTime < currentEnd)
-                    {
-                        toRemove.Add(obj);
-                        continue;
-                    }
-
-                    current = obj;
-                    currentEnd = Math.Max(currentEnd, objEnd);
-                }
-            }
-
-            if (toRemove.Count == 0)
-                return;
-
-            foreach (var obj in toRemove)
-                beatmap.HitObjects.Remove(obj);
+            var report = new NoteCleanupReport();
+            List<ManiaHitObject> resolved = resolveColumns(beatmap, beatmap.HitObjects.ToList(), options, report);
+            replaceHitObjects(beatmap, resolved);
+            logReport(report);
         }
 
         public static double GetMinimumGapMs(ManiaBeatmap beatmap, int beat = 8)
@@ -97,30 +189,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 return 0;
 
             double startTime = beatmap.HitObjects.Min(h => h.StartTime);
-            return getMinimumGapAtTime(beatmap, startTime, beat);
+            return gapAt(beatmap, startTime, new NoteCleanupOptions { BeatDivisor = beat });
         }
 
         public static double GetMinimumGapMs(ManiaBeatmap beatmap, double time, NoteCleanupOptions options) =>
-            getMinimumGapAtTime(beatmap, time, options);
-
-        private static double getMinimumGapAtTime(ManiaBeatmap beatmap, double time, NoteCleanupOptions options)
-        {
-            int safeBeatDivisor = Math.Max(1, options.BeatDivisor);
-            double beatLength = beatmap.ControlPointInfo.TimingPointAt(time).BeatLength;
-
-            if (beatLength <= 0)
-                return options.MinimumGapMs;
-
-            double beatGap = beatLength / safeBeatDivisor;
-
-            return Math.Max(options.MinimumGapMs, beatGap);
-        }
-
-        private static double getMinimumGapAtTime(ManiaBeatmap beatmap, double time, int beat = 8) =>
-            getMinimumGapAtTime(beatmap, time, new NoteCleanupOptions { BeatDivisor = beat });
+            gapAt(beatmap, time, options);
 
         /// <summary>
-        /// 中位去除高速note，长按
+        /// 过密段删偶数项，留下每段最后一颗非密集 note。
         /// </summary>
         public static void EnforceMinimumGaps(ManiaBeatmap beatmap) =>
             EnforceMinimumGaps(beatmap, NoteCleanupOptions.Default);
@@ -130,55 +206,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             if (beatmap.HitObjects.Count == 0)
                 return;
 
-            int targetKeys = beatmap.TotalColumns;
-
-            var byColumn = beatmap.HitObjects.ToList().GroupBy(o => Math.Clamp(o.Column, 0, Math.Max(0, targetKeys - 1)));
-            var survivors = new List<ManiaHitObject>();
-
-            foreach (var colGroup in byColumn)
-            {
-                var list = colGroup.OrderBy(o => o.StartTime).ToList();
-                if (list.Count == 0)
-                    continue;
-
-                var kept = new List<ManiaHitObject> { list[0] };
-
-                for (int i = 1; i < list.Count; i++)
-                {
-                    var prev = kept.Last();
-                    var current = list[i];
-
-                    double prevEnd = prev is HoldNote prevHold ? prevHold.EndTime : prev.StartTime;
-                    double requiredGap = getMinimumGapAtTime(beatmap, prevEnd, options);
-                    double actualGap = current.StartTime - prevEnd;
-
-                    if (actualGap < requiredGap)
-                    {
-                        if (options.KeepStrategy == NoteCleanupKeepStrategy.Newer)
-                        {
-                            kept.RemoveAt(kept.Count - 1);
-                            kept.Add(current);
-                        }
-
-                        continue;
-                    }
-
-                    kept.Add(current);
-                }
-
-                survivors.AddRange(kept);
-            }
-
-            beatmap.HitObjects.Clear();
-            beatmap.HitObjects.AddRange(survivors.OrderBy(o => o.StartTime).ThenBy(o => o.Column));
+            var report = new NoteCleanupReport();
+            List<ManiaHitObject> thinned = applyDensity(beatmap, beatmap.HitObjects.ToList(), options, report);
+            replaceHitObjects(beatmap, thinned);
+            logReport(report);
         }
 
         /// <summary>
-        /// 截断过短的反键缝隙，默认最大允许 1/8 beat
-        /// <para>面尾缩短避让下一个note</para>面过短则降低为米
+        /// 截断过短的反键缝隙。默认按 1/8 拍与 30ms 取较大值，供仍单独调用这条的转谱使用。
         /// </summary>
         public static void EnforceHoldReleaseGap(ManiaBeatmap beatmap, int beat = 8) =>
-            EnforceHoldReleaseGap(beatmap, new NoteCleanupOptions { BeatDivisor = beat });
+            EnforceHoldReleaseGap(beatmap, new NoteCleanupOptions { BeatDivisor = beat, MinimumGapMs = 30 });
 
         public static void EnforceHoldReleaseGap(ManiaBeatmap beatmap, NoteCleanupOptions options)
         {
@@ -193,11 +231,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
                 for (int i = 0; i < list.Count - 1; i++)
                 {
-                    if (list[i] is not HoldNote hold)
+                    if (list[i] is not HoldNote hold || !isHold(hold))
                         continue;
 
                     var next = list[i + 1];
-                    double minGapMs = getMinimumGapAtTime(beatmap, next.StartTime, options);
+                    double minGapMs = holdReleaseGap(beatmap, next.StartTime, options);
                     double gap = next.StartTime - hold.EndTime;
 
                     if (gap >= minGapMs)
@@ -210,7 +248,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
                     if (hold.EndTime - hold.StartTime < minGapMs)
                     {
-                        var note = new Note { StartTime = hold.StartTime, Column = hold.Column, Samples = hold.Samples.ToList() };
+                        var note = toTap(hold);
                         beatmap.HitObjects.Remove(hold);
                         beatmap.HitObjects.Add(note);
                         list[i] = note;
@@ -218,5 +256,450 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 }
             }
         }
+
+        private static List<ManiaHitObject> resolveColumns(ManiaBeatmap beatmap, List<ManiaHitObject> source, NoteCleanupOptions options, NoteCleanupReport report)
+        {
+            int columnCount = Math.Max(1, beatmap.TotalColumns);
+
+            foreach (ManiaHitObject hitObject in source)
+                columnCount = Math.Max(columnCount, hitObject.Column + 1);
+
+            var index = new ManiaObjectColumnIndex(columnCount);
+            var skipped = new List<ManiaHitObject>();
+
+            foreach (ManiaHitObject hitObject in source)
+            {
+                if ((uint)hitObject.Column >= (uint)columnCount)
+                    skipped.Add(hitObject);
+                else
+                    index.Add(hitObject);
+            }
+
+            var resolved = new List<ManiaHitObject>(source.Count);
+            var column = new List<ManiaHitObject>();
+
+            for (int i = 0; i < columnCount; i++)
+            {
+                index.CopyColumn(i, column);
+                resolved.AddRange(resolveColumn(beatmap, column, options, report));
+            }
+
+            resolved.AddRange(skipped);
+            return resolved;
+        }
+
+        private static List<ManiaHitObject> resolveColumn(ManiaBeatmap beatmap, List<ManiaHitObject> column, NoteCleanupOptions options, NoteCleanupReport report)
+        {
+            var kept = new List<ManiaHitObject>(column.Count);
+
+            foreach (ManiaHitObject obj in column)
+            {
+                ManiaHitObject incoming = obj;
+
+                if (kept.Count > 0 && isTap(incoming) && incoming.StartTime == kept[^1].StartTime)
+                {
+                    if (isTap(kept[^1]) && options.UseKeepStrategy && options.KeepStrategy == NoteCleanupKeepStrategy.Newer)
+                        kept[^1] = incoming;
+
+                    report.Dropped++;
+                    continue;
+                }
+
+                if (kept.Count > 0 && isTap(kept[^1]) && isHold(incoming) && incoming.StartTime == kept[^1].StartTime)
+                {
+                    kept.RemoveAt(kept.Count - 1);
+                    report.Dropped++;
+                }
+
+                if (kept.Count > 0 && isHold(kept[^1]) && isTap(incoming) && isInsideHold(kept[^1], incoming.StartTime))
+                {
+                    if (!applyBodyTap(beatmap, kept, ref incoming, options, report))
+                        continue;
+                }
+                else if (kept.Count > 0 && isHold(kept[^1]) && isHold(incoming))
+                {
+                    if (!applyHoldOverlap(beatmap, kept, incoming, options, report))
+                        continue;
+                }
+
+                kept.Add(incoming);
+            }
+
+            return kept;
+        }
+
+        private static bool applyBodyTap(ManiaBeatmap beatmap, List<ManiaHitObject> kept, ref ManiaHitObject incoming, NoteCleanupOptions options, NoteCleanupReport report)
+        {
+            var hold = (HoldNote)kept[^1];
+            double originalEnd = hold.EndTime;
+            double gap = gapAt(beatmap, incoming.StartTime, options);
+
+            if (options.LnBodyTapMode == LnBodyTapMode.DropTap)
+            {
+                report.Dropped++;
+                return false;
+            }
+
+            truncateHold(kept, hold, incoming.StartTime - gap, gap, report);
+
+            if (options.LnBodyTapMode == LnBodyTapMode.Continue && originalEnd - incoming.StartTime >= gap)
+            {
+                incoming = toHold(incoming, originalEnd);
+                report.Continued++;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// 返回 false 表示后一条 LN 被丢掉。
+        /// </summary>
+        private static bool applyHoldOverlap(ManiaBeatmap beatmap, List<ManiaHitObject> kept, ManiaHitObject incoming, NoteCleanupOptions options, NoteCleanupReport report)
+        {
+            ManiaHitObject prev = kept[^1];
+
+            if (incoming.StartTime == prev.StartTime)
+            {
+                if (endTime(incoming) > endTime(prev))
+                    kept[^1] = incoming;
+
+                report.Dropped++;
+                return false;
+            }
+
+            if (incoming.StartTime < endTime(prev))
+            {
+                double gap = gapAt(beatmap, incoming.StartTime, options);
+                truncateHold(kept, (HoldNote)prev, incoming.StartTime - gap, gap, report);
+            }
+
+            return true;
+        }
+
+        private static void truncateHold(List<ManiaHitObject> kept, HoldNote hold, double newEnd, double gap, NoteCleanupReport report)
+        {
+            if (newEnd - hold.StartTime < gap)
+            {
+                kept[^1] = toTap(hold);
+                report.ConvertedToTap++;
+                return;
+            }
+
+            if (newEnd < hold.EndTime)
+            {
+                hold.EndTime = newEnd;
+                report.Truncated++;
+            }
+        }
+
+        private static List<ManiaHitObject> thinDenseNotes(ManiaBeatmap beatmap, List<ManiaHitObject> source, NoteCleanupOptions options, NoteCleanupReport report)
+        {
+            int columnCount = 1;
+
+            foreach (ManiaHitObject hitObject in source)
+                columnCount = Math.Max(columnCount, hitObject.Column + 1);
+
+            var index = new ManiaObjectColumnIndex(columnCount);
+            var skipped = new List<ManiaHitObject>();
+
+            foreach (ManiaHitObject hitObject in source)
+            {
+                if ((uint)hitObject.Column >= (uint)columnCount)
+                    skipped.Add(hitObject);
+                else
+                    index.Add(hitObject);
+            }
+
+            var thinned = new List<ManiaHitObject>(source.Count);
+            var column = new List<ManiaHitObject>();
+
+            for (int i = 0; i < columnCount; i++)
+            {
+                index.CopyColumn(i, column);
+                thinned.AddRange(thinColumn(beatmap, column, options, report));
+            }
+
+            thinned.AddRange(skipped);
+            return thinned;
+        }
+
+        private static List<ManiaHitObject> thinColumn(ManiaBeatmap beatmap, List<ManiaHitObject> notes, NoteCleanupOptions options, NoteCleanupReport report)
+        {
+            var result = new List<ManiaHitObject>(notes.Count);
+            int i = 0;
+
+            while (i < notes.Count)
+            {
+                if (i == notes.Count - 1
+                    || gapBetween(notes[i], notes[i + 1]) >= gapAt(beatmap, notes[i + 1].StartTime, options)
+                    || involvesHold(notes[i], notes[i + 1]))
+                {
+                    result.Add(notes[i]);
+                    i++;
+                    continue;
+                }
+
+                int j = i + 1;
+
+                while (j < notes.Count
+                       && gapBetween(notes[j - 1], notes[j]) < gapAt(beatmap, notes[j].StartTime, options)
+                       && !involvesHold(notes[j - 1], notes[j]))
+                    j++;
+
+                bool stoppedBeforeHold = j < notes.Count && involvesHold(notes[j - 1], notes[j]);
+
+                if (stoppedBeforeHold)
+                {
+                    int lastTap = j - 1;
+
+                    for (int k = i; k <= lastTap; k++)
+                    {
+                        bool isTerminator = k == lastTap;
+                        bool dropEven = !isTerminator && ((k - i) % 2 == 1);
+
+                        if (dropEven)
+                            report.Dropped++;
+                        else
+                            result.Add(notes[k]);
+                    }
+
+                    i = j;
+                    continue;
+                }
+
+                int terminator = j < notes.Count ? j : notes.Count - 1;
+
+                for (int k = i; k <= terminator; k++)
+                {
+                    bool isTerminator = k == terminator;
+                    bool dropEven = !isTerminator && ((k - i) % 2 == 1);
+
+                    if (dropEven)
+                        report.Dropped++;
+                    else
+                        result.Add(notes[k]);
+                }
+
+                i = terminator + 1;
+            }
+
+            return result;
+        }
+
+        private static List<ManiaHitObject> applyDensity(ManiaBeatmap beatmap, List<ManiaHitObject> source, NoteCleanupOptions options, NoteCleanupReport report)
+        {
+            List<ManiaHitObject> current = source;
+
+            if (options.CleanDenseNotes)
+                current = thinDenseNotes(beatmap, current, options, report);
+
+            if (options.CleanLnDensity)
+                current = openLnGaps(beatmap, current, options, report);
+
+            return current;
+        }
+
+        private static List<ManiaHitObject> openLnGaps(ManiaBeatmap beatmap, List<ManiaHitObject> source, NoteCleanupOptions options, NoteCleanupReport report)
+        {
+            int columnCount = 1;
+
+            foreach (ManiaHitObject hitObject in source)
+                columnCount = Math.Max(columnCount, hitObject.Column + 1);
+
+            var index = new ManiaObjectColumnIndex(columnCount);
+            var skipped = new List<ManiaHitObject>();
+
+            foreach (ManiaHitObject hitObject in source)
+            {
+                if ((uint)hitObject.Column >= (uint)columnCount)
+                    skipped.Add(hitObject);
+                else
+                    index.Add(hitObject);
+            }
+
+            var opened = new List<ManiaHitObject>(source.Count);
+            var column = new List<ManiaHitObject>();
+
+            for (int i = 0; i < columnCount; i++)
+            {
+                index.CopyColumn(i, column);
+                opened.AddRange(openColumn(beatmap, column, options, report));
+            }
+
+            opened.AddRange(skipped);
+            return opened;
+        }
+
+        private static List<ManiaHitObject> openColumn(ManiaBeatmap beatmap, List<ManiaHitObject> notes, NoteCleanupOptions options, NoteCleanupReport report)
+        {
+            var result = new List<ManiaHitObject>(notes.Count);
+
+            for (int i = 0; i < notes.Count; i++)
+            {
+                if (i == notes.Count - 1)
+                {
+                    result.Add(notes[i]);
+                    break;
+                }
+
+                ManiaHitObject prev = notes[i];
+                ManiaHitObject next = notes[i + 1];
+                double required = gapAt(beatmap, next.StartTime, options);
+
+                if (gapBetween(prev, next) >= required || !involvesHold(prev, next))
+                {
+                    result.Add(prev);
+                    continue;
+                }
+
+                if (isHold(prev))
+                {
+                    double newEnd = next.StartTime - required;
+
+                    if (newEnd - prev.StartTime < required)
+                    {
+                        result.Add(toTap(prev));
+                        report.ConvertedToTap++;
+                    }
+                    else
+                    {
+                        ((HoldNote)prev).EndTime = newEnd;
+                        result.Add(prev);
+                        report.Truncated++;
+                    }
+
+                    continue;
+                }
+
+                result.Add(prev);
+
+                var hold = (HoldNote)next;
+                double end = hold.EndTime;
+                double newStart = endTime(prev) + required;
+
+                if (end - newStart < required)
+                {
+                    notes[i + 1] = toTap(hold);
+                    report.ConvertedToTap++;
+                }
+                else
+                {
+                    hold.StartTime = newStart;
+                    hold.EndTime = end;
+                    report.Truncated++;
+                }
+            }
+
+            return result;
+        }
+
+        private static bool involvesHold(ManiaHitObject prev, ManiaHitObject next) =>
+            isHold(prev) || isHold(next);
+
+        private static void collectEmptySpans(ManiaBeatmap beatmap, List<ManiaHitObject> original, IEnumerable<ManiaHitObject> survivors, NoteCleanupReport report)
+        {
+            List<double> originalTimes = original.Select(h => h.StartTime).OrderBy(t => t).ToList();
+
+            if (originalTimes.Count == 0)
+                return;
+
+            List<double> survivorTimes = survivors.Select(h => h.StartTime).Distinct().OrderBy(t => t).ToList();
+
+            if (survivorTimes.Count == 0)
+            {
+                tryAddEmptySpan(beatmap, originalTimes, originalTimes[0], originalTimes[^1], report);
+                return;
+            }
+
+            for (int i = 0; i < survivorTimes.Count - 1; i++)
+                tryAddEmptySpan(beatmap, originalTimes, survivorTimes[i], survivorTimes[i + 1], report);
+        }
+
+        private static void tryAddEmptySpan(ManiaBeatmap beatmap, List<double> originalTimes, double start, double end, NoteCleanupReport report)
+        {
+            double span = end - start;
+            double beatLength = beatmap.ControlPointInfo.TimingPointAt(start).BeatLength;
+            double limit = beatLength > 0 ? Math.Max(empty_span_floor_ms, beatLength * empty_span_beats) : empty_span_floor_ms;
+
+            if (span <= limit)
+                return;
+
+            if (!originalTimes.Any(t => t > start && t < end))
+                return;
+
+            report.EmptySpans.Add((start, end));
+        }
+
+        private static void logReport(NoteCleanupReport report)
+        {
+            if (!report.HasChanges)
+                return;
+
+            string spans = report.EmptySpans.Count == 0
+                ? string.Empty
+                : " empty=" + string.Join(",", report.EmptySpans.Select(s => $"{s.Start:0.###}-{s.End:0.###}"));
+
+            Logger.Log($"[ManiaNoteCleanup] dropped={report.Dropped} truncated={report.Truncated} toTap={report.ConvertedToTap} continued={report.Continued}{spans}",
+                Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+        }
+
+        private static void replaceHitObjects(ManiaBeatmap beatmap, List<ManiaHitObject> objects)
+        {
+            beatmap.HitObjects.Clear();
+            beatmap.HitObjects.AddRange(objects.OrderBy(o => o.StartTime).ThenBy(o => o.Column));
+        }
+
+        private static double gapAt(ManiaBeatmap beatmap, double time, NoteCleanupOptions options)
+        {
+            if (options.BeatDivisor is int divisor && divisor > 0)
+            {
+                double beatLength = beatmap.ControlPointInfo.TimingPointAt(time).BeatLength;
+
+                if (beatLength > 0)
+                    return beatLength / divisor;
+            }
+
+            return options.MinimumGapMs;
+        }
+
+        private static double holdReleaseGap(ManiaBeatmap beatmap, double time, NoteCleanupOptions options)
+        {
+            int divisor = Math.Max(1, options.BeatDivisor ?? 8);
+            double beatLength = beatmap.ControlPointInfo.TimingPointAt(time).BeatLength;
+
+            if (beatLength <= 0)
+                return options.MinimumGapMs;
+
+            return Math.Max(options.MinimumGapMs, beatLength / divisor);
+        }
+
+        private static double gapBetween(ManiaHitObject prev, ManiaHitObject next) =>
+            next.StartTime - endTime(prev);
+
+        private static double endTime(ManiaHitObject hitObject) =>
+            isHold(hitObject) ? ((HoldNote)hitObject).EndTime : hitObject.StartTime;
+
+        private static bool isHold(ManiaHitObject hitObject) =>
+            hitObject is HoldNote hold && hold.EndTime > hold.StartTime;
+
+        private static bool isTap(ManiaHitObject hitObject) => !isHold(hitObject);
+
+        private static bool isInsideHold(ManiaHitObject hold, double time) =>
+            time > hold.StartTime && time < endTime(hold);
+
+        private static Note toTap(ManiaHitObject source) => new Note
+        {
+            StartTime = source.StartTime,
+            Column = source.Column,
+            Samples = source.Samples?.ToList() ?? new List<HitSampleInfo>(),
+        };
+
+        private static HoldNote toHold(ManiaHitObject tap, double end) => new HoldNote
+        {
+            Column = tap.Column,
+            StartTime = tap.StartTime,
+            Duration = end - tap.StartTime,
+            NodeSamples = new List<IList<HitSampleInfo>> { tap.Samples?.ToList() ?? new List<HitSampleInfo>(), Array.Empty<HitSampleInfo>() },
+        };
     }
 }

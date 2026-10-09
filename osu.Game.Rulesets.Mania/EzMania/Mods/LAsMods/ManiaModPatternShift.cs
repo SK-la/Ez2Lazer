@@ -729,7 +729,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             }
 
             maniaBeatmap.HitObjects = newObjects.OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToList();
-            ManiaNoteCleanupTool.EnforceHoldReleaseGap(maniaBeatmap);
+            ManiaNoteCleanupTool.CleanupBeatmap(maniaBeatmap);
         }
 
         private class PatternShiftNote
