@@ -44,9 +44,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         public LnBodyTapMode LnBodyTapMode { get; init; } = LnBodyTapMode.Continue;
 
+        /// <summary>
+        /// 单点过密：删偶数项，留下结尾那颗非密集 note。
+        /// </summary>
         public bool CleanDenseNotes { get; init; } = true;
 
-        public bool EnforceHoldReleaseGap { get; init; }
+        /// <summary>
+        /// LN 过密：与相邻 note 过近时按同一间隙收尾，或把 LN 头后移。默认开。
+        /// </summary>
+        public bool CleanLnDensity { get; init; } = true;
 
         /// <summary>
         /// 非 null 时，间隙取该时刻 <c>BeatLength / 分母</c>，不再用 <see cref="MinimumGapMs"/>。
@@ -102,13 +108,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             List<ManiaHitObject> original = beatmap.HitObjects.ToList();
             List<ManiaHitObject> resolved = resolveColumns(beatmap, original, options, report);
 
-            if (options.CleanDenseNotes)
-                resolved = thinDenseNotes(beatmap, resolved, options, report);
+            if (options.CleanDenseNotes || options.CleanLnDensity)
+                resolved = applyDensity(beatmap, resolved, options, report);
 
             replaceHitObjects(beatmap, resolved);
-
-            if (options.EnforceHoldReleaseGap)
-                EnforceHoldReleaseGap(beatmap, options);
 
             collectEmptySpans(beatmap, original, beatmap.HitObjects, report);
             logReport(report);
@@ -156,7 +159,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 return;
 
             var report = new NoteCleanupReport();
-            List<ManiaHitObject> thinned = thinDenseNotes(beatmap, beatmap.HitObjects.ToList(), options, report);
+            List<ManiaHitObject> thinned = applyDensity(beatmap, beatmap.HitObjects.ToList(), options, report);
             replaceHitObjects(beatmap, thinned);
             logReport(report);
         }
@@ -379,7 +382,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
             while (i < notes.Count)
             {
-                if (i == notes.Count - 1 || gapBetween(notes[i], notes[i + 1]) >= gapAt(beatmap, notes[i + 1].StartTime, options))
+                if (i == notes.Count - 1
+                    || gapBetween(notes[i], notes[i + 1]) >= gapAt(beatmap, notes[i + 1].StartTime, options)
+                    || involvesHold(notes[i], notes[i + 1]))
                 {
                     result.Add(notes[i]);
                     i++;
@@ -388,8 +393,31 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
                 int j = i + 1;
 
-                while (j < notes.Count && gapBetween(notes[j - 1], notes[j]) < gapAt(beatmap, notes[j].StartTime, options))
+                while (j < notes.Count
+                       && gapBetween(notes[j - 1], notes[j]) < gapAt(beatmap, notes[j].StartTime, options)
+                       && !involvesHold(notes[j - 1], notes[j]))
                     j++;
+
+                bool stoppedBeforeHold = j < notes.Count && involvesHold(notes[j - 1], notes[j]);
+
+                if (stoppedBeforeHold)
+                {
+                    int lastTap = j - 1;
+
+                    for (int k = i; k <= lastTap; k++)
+                    {
+                        bool isTerminator = k == lastTap;
+                        bool dropEven = !isTerminator && ((k - i) % 2 == 1);
+
+                        if (dropEven)
+                            report.Dropped++;
+                        else
+                            result.Add(notes[k]);
+                    }
+
+                    i = j;
+                    continue;
+                }
 
                 int terminator = j < notes.Count ? j : notes.Count - 1;
 
@@ -409,6 +437,116 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
             return result;
         }
+
+        private static List<ManiaHitObject> applyDensity(ManiaBeatmap beatmap, List<ManiaHitObject> source, NoteCleanupOptions options, NoteCleanupReport report)
+        {
+            List<ManiaHitObject> current = source;
+
+            if (options.CleanDenseNotes)
+                current = thinDenseNotes(beatmap, current, options, report);
+
+            if (options.CleanLnDensity)
+                current = openLnGaps(beatmap, current, options, report);
+
+            return current;
+        }
+
+        private static List<ManiaHitObject> openLnGaps(ManiaBeatmap beatmap, List<ManiaHitObject> source, NoteCleanupOptions options, NoteCleanupReport report)
+        {
+            int columnCount = 1;
+
+            foreach (ManiaHitObject hitObject in source)
+                columnCount = Math.Max(columnCount, hitObject.Column + 1);
+
+            var index = new ManiaObjectColumnIndex(columnCount);
+            var skipped = new List<ManiaHitObject>();
+
+            foreach (ManiaHitObject hitObject in source)
+            {
+                if ((uint)hitObject.Column >= (uint)columnCount)
+                    skipped.Add(hitObject);
+                else
+                    index.Add(hitObject);
+            }
+
+            var opened = new List<ManiaHitObject>(source.Count);
+            var column = new List<ManiaHitObject>();
+
+            for (int i = 0; i < columnCount; i++)
+            {
+                index.CopyColumn(i, column);
+                opened.AddRange(openColumn(beatmap, column, options, report));
+            }
+
+            opened.AddRange(skipped);
+            return opened;
+        }
+
+        private static List<ManiaHitObject> openColumn(ManiaBeatmap beatmap, List<ManiaHitObject> notes, NoteCleanupOptions options, NoteCleanupReport report)
+        {
+            var result = new List<ManiaHitObject>(notes.Count);
+
+            for (int i = 0; i < notes.Count; i++)
+            {
+                if (i == notes.Count - 1)
+                {
+                    result.Add(notes[i]);
+                    break;
+                }
+
+                ManiaHitObject prev = notes[i];
+                ManiaHitObject next = notes[i + 1];
+                double required = gapAt(beatmap, next.StartTime, options);
+
+                if (gapBetween(prev, next) >= required || !involvesHold(prev, next))
+                {
+                    result.Add(prev);
+                    continue;
+                }
+
+                if (isHold(prev))
+                {
+                    double newEnd = next.StartTime - required;
+
+                    if (newEnd - prev.StartTime < required)
+                    {
+                        result.Add(toTap(prev));
+                        report.ConvertedToTap++;
+                    }
+                    else
+                    {
+                        ((HoldNote)prev).EndTime = newEnd;
+                        result.Add(prev);
+                        report.Truncated++;
+                    }
+
+                    continue;
+                }
+
+                result.Add(prev);
+
+                var hold = (HoldNote)next;
+                double end = hold.EndTime;
+                double newStart = endTime(prev) + required;
+
+                if (end - newStart < required)
+                {
+                    notes[i + 1] = toTap(hold);
+                    report.ConvertedToTap++;
+                }
+                else
+                {
+                    hold.StartTime = newStart;
+                    hold.EndTime = end;
+                    report.Truncated++;
+                }
+            }
+
+            return result;
+        }
+
+        private static bool involvesHold(ManiaHitObject prev, ManiaHitObject next) =>
+            isHold(prev) || isHold(next);
 
         private static void collectEmptySpans(ManiaBeatmap beatmap, List<ManiaHitObject> original, IEnumerable<ManiaHitObject> survivors, NoteCleanupReport report)
         {

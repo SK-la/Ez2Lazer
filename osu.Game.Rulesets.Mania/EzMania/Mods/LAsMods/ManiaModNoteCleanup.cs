@@ -41,8 +41,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         [SettingSource(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.ENFORCE_MIN_GAPS_LABEL), nameof(NoteCleanupStrings.ENFORCE_MIN_GAPS_DESCRIPTION))]
         public BindableBool EnforceMinGaps { get; } = new BindableBool(true);
 
-        [SettingSource(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.ENFORCE_LN_GAP_LABEL), nameof(NoteCleanupStrings.ENFORCE_LN_GAP_DESCRIPTION))]
-        public BindableBool EnforceLNGap { get; } = new BindableBool(false);
+        [SettingSource(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.MINIMUM_GAP_MS_LABEL), nameof(NoteCleanupStrings.MINIMUM_GAP_MS_DESCRIPTION))]
+        public BindableNumber<int> MinimumGapMs { get; } = new BindableInt(16)
+        {
+            MinValue = 1,
+            MaxValue = 125,
+            Precision = 1,
+        };
 
         [SettingSource(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.USE_BEAT_GAP_LABEL), nameof(NoteCleanupStrings.USE_BEAT_GAP_DESCRIPTION))]
         public BindableBool UseBeatGap { get; } = new BindableBool(false);
@@ -55,13 +60,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             Precision = 1,
         };
 
-        [SettingSource(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.MINIMUM_GAP_MS_LABEL), nameof(NoteCleanupStrings.MINIMUM_GAP_MS_DESCRIPTION))]
-        public BindableNumber<int> MinimumGapMs { get; } = new BindableInt(16)
-        {
-            MinValue = 1,
-            MaxValue = 125,
-            Precision = 1,
-        };
+        [SettingSource(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.LN_DENSITY_LABEL), nameof(NoteCleanupStrings.LN_DENSITY_DESCRIPTION))]
+        public BindableBool EnforceLnDensity { get; } = new BindableBool(true);
 
         [SettingSource(typeof(NoteCleanupStrings), nameof(NoteCleanupStrings.USE_KEEP_STRATEGY_LABEL), nameof(NoteCleanupStrings.USE_KEEP_STRATEGY_DESCRIPTION))]
         public BindableBool UseKeepStrategy { get; } = new BindableBool(false);
@@ -89,7 +89,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             {
                 yield return (NoteCleanupStrings.LN_BODY_MODE_LABEL, BodyTapMode.Value.ToString());
                 if (EnforceMinGaps.Value) yield return (NoteCleanupStrings.ENFORCE_MIN_GAPS_LABEL, "On");
-                if (EnforceLNGap.Value) yield return (NoteCleanupStrings.ENFORCE_LN_GAP_LABEL, "On");
+                if (EnforceLnDensity.Value) yield return (NoteCleanupStrings.LN_DENSITY_LABEL, "On");
                 if (UseBeatGap.Value) yield return (NoteCleanupStrings.BEAT_DIVISOR_LABEL, $"1/{BeatDivisor.Value}");
                 if (UseKeepStrategy.Value) yield return (NoteCleanupStrings.KEEP_STRATEGY_LABEL, $"{KeepStrategy.Value}");
 
@@ -104,7 +104,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             {
                 LnBodyTapMode = BodyTapMode.Value,
                 CleanDenseNotes = EnforceMinGaps.Value,
-                EnforceHoldReleaseGap = EnforceLNGap.Value,
+                CleanLnDensity = EnforceLnDensity.Value,
                 BeatDivisor = UseBeatGap.Value ? BeatDivisor.Value : null,
                 MinimumGapMs = MinimumGapMs.Value,
                 UseKeepStrategy = UseKeepStrategy.Value,
@@ -133,17 +133,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         public static readonly LocalisableString LN_BODY_CONTINUE = new EzLocalizationManager.EzLocalisableString("截断并延续", "Truncate and Continue");
 
-        public static readonly LocalisableString ENFORCE_MIN_GAPS_LABEL = new EzLocalizationManager.EzLocalisableString("去除过密", "Enforce Min Gaps");
+        public static readonly LocalisableString ENFORCE_MIN_GAPS_LABEL = new EzLocalizationManager.EzLocalisableString("Note密度处理", "Note Density");
 
         public static readonly LocalisableString ENFORCE_MIN_GAPS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "间隙小于阈值的一段里，删掉结尾之前的第 2、4、6 颗，结尾那颗非密集 note 留下。",
-            "In a dense run, drop the 2nd, 4th and 6th notes before the closing non-dense note, which is kept.");
+            "过密单点向后收到第一颗非密集 note，删掉它前面的第 2、4、6 颗。间隙用下面的最小毫秒或节拍。",
+            "In a dense tap run, drop the 2nd, 4th and 6th notes before the closing note. Uses the gap below.");
 
-        public static readonly LocalisableString ENFORCE_LN_GAP_LABEL = new EzLocalizationManager.EzLocalisableString("LN 尾缝", "Enforce LN Gap");
+        public static readonly LocalisableString LN_DENSITY_LABEL = new EzLocalizationManager.EzLocalisableString("LongNote密度处理", "Long Note Density");
 
-        public static readonly LocalisableString ENFORCE_LN_GAP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "截断 LN 尾端以留出最小间距；过短 LN 转为单点 note。",
-            "Trim LN ends to preserve minimum gap; convert too-short LNs to taps.");
+        public static readonly LocalisableString LN_DENSITY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "LN 与相邻 note 过近时，按上面的同一间隙收短尾巴，或把 LN 头后移。不把后一颗卷进删除。",
+            "When an LN is too close to a neighbour, open the same gap by trimming the tail or delaying the head. The neighbour is kept.");
 
         public static readonly LocalisableString BEAT_DIVISOR_LABEL = new EzLocalizationManager.EzLocalisableString("节拍分割", "Beat Divisor");
 
@@ -160,8 +160,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public static readonly LocalisableString MINIMUM_GAP_MS_LABEL = new EzLocalizationManager.EzLocalisableString("最小毫秒", "Minimum Gap Ms");
 
         public static readonly LocalisableString MINIMUM_GAP_MS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "过密与 LN 截断使用的固定间隙。默认 16ms。节拍间隙打开时不使用。",
-            "Fixed gap for density thinning and LN truncation. Defaults to 16ms. Unused while beat gap is on.");
+            "Note 密度和 LongNote 密度共用的固定间隙。默认 16ms。节拍间隙打开时不使用。",
+            "Shared gap for note density and long note density. Defaults to 16ms. Unused while beat gap is on.");
 
         public static readonly LocalisableString USE_KEEP_STRATEGY_LABEL = new EzLocalizationManager.EzLocalisableString("使用保留策略", "Use Keep Strategy");
 

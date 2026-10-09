@@ -118,6 +118,56 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
         }
 
         [Test]
+        public void TestHoldTailOpensTheSameGapWithoutTakingTheNextNote()
+        {
+            ManiaBeatmap beatmap = createBeatmap(
+                new HoldNote { StartTime = 0, Duration = 100, Column = 0 },
+                new Note { StartTime = 110, Column = 0 });
+
+            ManiaNoteCleanupTool.CleanupBeatmap(beatmap);
+
+            Assert.That(serialise(beatmap), Is.EqualTo("H0@0+94 N0@110"));
+        }
+
+        [Test]
+        public void TestTapThenHoldDelaysTheHoldHead()
+        {
+            ManiaBeatmap beatmap = createBeatmap(
+                new Note { StartTime = 0, Column = 0 },
+                new HoldNote { StartTime = 10, Duration = 500, Column = 0 });
+
+            ManiaNoteCleanupTool.CleanupBeatmap(beatmap);
+
+            Assert.That(serialise(beatmap), Is.EqualTo("N0@0 H0@16+494"));
+        }
+
+        [Test]
+        public void TestDenseTapsStopBeforeAFollowingHold()
+        {
+            ManiaBeatmap beatmap = createBeatmap(
+                new Note { StartTime = 0, Column = 0 },
+                new Note { StartTime = 10, Column = 0 },
+                new Note { StartTime = 20, Column = 0 },
+                new HoldNote { StartTime = 30, Duration = 200, Column = 0 });
+
+            ManiaNoteCleanupTool.CleanupBeatmap(beatmap);
+
+            Assert.That(serialise(beatmap), Is.EqualTo("N0@0 N0@20 H0@36+194"));
+        }
+
+        [Test]
+        public void TestLnDensityCanBeDisabledOnItsOwn()
+        {
+            ManiaBeatmap beatmap = createBeatmap(
+                new HoldNote { StartTime = 0, Duration = 100, Column = 0 },
+                new Note { StartTime = 110, Column = 0 });
+
+            ManiaNoteCleanupTool.CleanupBeatmap(beatmap, new NoteCleanupOptions { CleanLnDensity = false });
+
+            Assert.That(serialise(beatmap), Is.EqualTo("H0@0+100 N0@110"));
+        }
+
+        [Test]
         public void TestBeatDivisorUsesTimingAtTheNote()
         {
             ManiaBeatmap beatmap = createBeatmap(
