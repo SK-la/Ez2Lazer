@@ -19,14 +19,13 @@ namespace osu.Game.EzOsuGame.Screens.Menu
         private readonly AcrylicBackdropDrawable acrylic;
 
         private EzAcrylicCaptureController? capture;
-        private EzLogoBackdropSampler? sampler;
 
         private Bindable<EzLogoBackdropStyle> style = null!;
         private Bindable<Colour4> solidColour = null!;
         private Bindable<double> blur = null!;
         private Bindable<double> opacity = null!;
 
-        private Colour4 appliedLinked = EzLogoBackdropSampler.DefaultColour;
+        // private Colour4 appliedLinked = EzLogoBackdropSampler.DefaultColour;
 
         public EzMenuLogoBackdrop()
         {
@@ -51,7 +50,6 @@ namespace osu.Game.EzOsuGame.Screens.Menu
         [BackgroundDependencyLoader(true)]
         private void load(Ez2ConfigManager? ezConfig, IAcrylicCaptureRegistrar? registrar, EzLogoBackdropSampler? backdropSampler)
         {
-            sampler = backdropSampler;
             capture = new EzAcrylicCaptureController(registrar, acrylic);
 
             if (ezConfig == null)
@@ -67,28 +65,25 @@ namespace osu.Game.EzOsuGame.Screens.Menu
         {
             base.LoadComplete();
 
-            if (style == null)
-                return;
-
             style.BindValueChanged(_ => apply(), true);
             solidColour.BindValueChanged(_ => apply());
             blur.BindValueChanged(_ => apply());
             opacity.BindValueChanged(_ => apply());
         }
 
-        protected override void Update()
-        {
-            base.Update();
-
-            if (style == null || style.Value != EzLogoBackdropStyle.Linked || sampler == null)
-                return;
-
-            if (sampler.Colour == appliedLinked)
-                return;
-
-            appliedLinked = sampler.Colour;
-            applyLinkedFill();
-        }
+        // protected override void Update()
+        // {
+        //     base.Update();
+        //
+        //     if (sampler == null)
+        //         return;
+        //
+        //     if (sampler.Colour == appliedLinked)
+        //         return;
+        //
+        //     appliedLinked = sampler.Colour;
+        //     applyLinkedFill();
+        // }
 
         private void apply()
         {
@@ -104,9 +99,9 @@ namespace osu.Game.EzOsuGame.Screens.Menu
                     fill.Alpha = 1;
                     break;
 
-                case EzLogoBackdropStyle.Linked:
-                    applyLinkedFill();
-                    break;
+                // case EzLogoBackdropStyle.Linked:
+                //     applyLinkedFill();
+                //     break;
 
                 default:
                     fill.Alpha = 0;
@@ -114,13 +109,13 @@ namespace osu.Game.EzOsuGame.Screens.Menu
             }
         }
 
-        private void applyLinkedFill()
-        {
-            Colour4 colour = sampler?.Colour ?? EzLogoBackdropSampler.DefaultColour;
-            appliedLinked = colour;
-            fill.Colour = colour;
-            fill.Alpha = (float)opacity.Value;
-        }
+        // private void applyLinkedFill()
+        // {
+        //     Colour4 colour = sampler?.Colour ?? EzLogoBackdropSampler.DefaultColour;
+        //     appliedLinked = colour;
+        //     fill.Colour = colour;
+        //     fill.Alpha = (float)opacity.Value;
+        // }
 
         protected override void Dispose(bool isDisposing)
         {

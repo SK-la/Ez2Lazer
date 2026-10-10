@@ -58,7 +58,7 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
             {
                 logoBackdropColour.CanBeShown.Value = style.NewValue == EzLogoBackdropStyle.Solid;
                 logoBackdropBlur.CanBeShown.Value = style.NewValue == EzLogoBackdropStyle.Acrylic;
-                logoBackdropOpacity.CanBeShown.Value = style.NewValue == EzLogoBackdropStyle.Linked;
+                // logoBackdropOpacity.CanBeShown.Value = style.NewValue == EzLogoBackdropStyle.Linked;
             }, true);
 
             ensureItemAvailable(menuLogoPath, menu_logo_items);

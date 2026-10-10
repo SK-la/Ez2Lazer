@@ -8,7 +8,7 @@ using osu.Framework.Graphics.Video;
 
 namespace osu.Game.EzOsuGame.Background
 {
-    public partial class VideoBackgroundScreen : EzVideoBackground
+    public partial class VideoBackgroundScreen : osu.Game.Graphics.Backgrounds.Background //EzVideoBackground
     {
         private readonly string videoPath;
 
@@ -29,12 +29,12 @@ namespace osu.Game.EzOsuGame.Background
             video.FillMode = FillMode.Fill;
             video.FillAspectRatio = 1.0f * video.DrawSize.X / video.DrawSize.Y;
 
-            UseVideo(video);
+            // UseVideo(video);
             AddInternal(video);
         }
     }
 
-    public partial class StreamVideoBackgroundScreen : EzVideoBackground
+    public partial class StreamVideoBackgroundScreen : osu.Game.Graphics.Backgrounds.Background //EzVideoBackground
     {
         private readonly Stream videoStream;
 
@@ -51,7 +51,8 @@ namespace osu.Game.EzOsuGame.Background
                 RelativeSizeAxes = Axes.Both,
                 Loop = true
             };
-            UseVideo(video);
+
+            // UseVideo(video);
             AddInternal(video);
         }
     }
