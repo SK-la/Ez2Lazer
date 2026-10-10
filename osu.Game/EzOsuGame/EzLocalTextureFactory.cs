@@ -408,6 +408,9 @@ namespace osu.Game.EzOsuGame
                 }
             }
 
+            addPlateCounter(container, layout.Score, EzStagePlateCounter.Source.Score);
+            addPlateCounter(container, layout.Combo, EzStagePlateCounter.Source.MaxCombo);
+
             if (layout.Character != null)
             {
                 bool placed = false;
@@ -513,6 +516,14 @@ namespace osu.Game.EzOsuGame
         {
             string relative = piece != null && !string.IsNullOrEmpty(piece.Path) ? piece.Path : fallback;
             return $"{basePath}/{relative}";
+        }
+
+        private static void addPlateCounter(Container parent, EzStagePlateDigits? digits, EzStagePlateCounter.Source source)
+        {
+            if (digits == null || !digits.Enabled || digits.Digits <= 0)
+                return;
+
+            parent.Add(new EzStagePlateCounter(digits, source));
         }
 
         private bool addPlateSprite(Container parent, EzStagePlateSprite? piece, string texturePath)

@@ -31,11 +31,11 @@ namespace osu.Game.EzOsuGame
         [JsonPropertyName("character")]
         public EzStagePlateSprite? Character { get; set; }
 
-        // number/score。缺省或 enabled 为 false 时不加载。
+        // 主题 number/score。缺省或 enabled 为 false 时不加载。
         [JsonPropertyName("score")]
         public EzStagePlateDigits? Score { get; set; }
 
-        // number/combo，舞台上的最大连击统计，不是 HUD 连击。
+        // 主题 number/maxcombo（没有则 number/combo）。舞台上的最大连击，不是 HUD 当前连击。
         [JsonPropertyName("combo")]
         public EzStagePlateDigits? Combo { get; set; }
 
