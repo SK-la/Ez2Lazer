@@ -9,7 +9,7 @@ using osuTK;
 
 namespace osu.Game.EzOsuGame
 {
-    // 坐标是 GLB 像素、Y 朝上。贴图按 ScaleAdjust 2 显示，所以画到 osu 时位置折半，并且 X 取反。贴图像素不翻转。
+    // 坐标是 GLB 像素、Y 朝上。画到 osu 时 X、Y 都取反。
     internal sealed class EzStagePlateLayout
     {
         [JsonPropertyName("body")]

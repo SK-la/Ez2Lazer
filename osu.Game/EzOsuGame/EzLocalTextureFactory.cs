@@ -520,7 +520,7 @@ namespace osu.Game.EzOsuGame
 
             if (frames.Count == 1)
             {
-                return new Sprite
+                var sprite = new Sprite
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
@@ -528,6 +528,11 @@ namespace osu.Game.EzOsuGame
                     Texture = frames[0],
                     Blending = blending,
                 };
+
+                if (isSingleFrameGlow(texturePath))
+                    return new EzStageSingleLightBreath(sprite);
+
+                return sprite;
             }
 
             var animation = new TextureAnimation
@@ -543,6 +548,10 @@ namespace osu.Game.EzOsuGame
             animation.AddFrames(frames);
             return animation;
         }
+
+        private static bool isSingleFrameGlow(string texturePath)
+            => texturePath.EndsWith("/GrooveLight", StringComparison.OrdinalIgnoreCase)
+               || texturePath.EndsWith("/GrooveGaugeLight", StringComparison.OrdinalIgnoreCase);
 
         // Stage 组件帧：交给层2/层3 同一规则（多帧 AnimationSafe，空则回退 Large 单图）。
         private List<Texture> loadStageComponentFrames(string basePath) => resource.LoadStageFrames(basePath);
