@@ -79,5 +79,10 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString LOGO_VIS_DOTS = new EzLocalizationManager.EzLocalisableString("圆点", "Dots");
         public static readonly LocalisableString LOGO_VIS_NET = new EzLocalizationManager.EzLocalisableString("网状", "Net");
         public static readonly LocalisableString LOGO_VIS_OFF = new EzLocalizationManager.EzLocalisableString("关闭", "Off");
+
+        public static readonly LocalisableString LOGO_BACKDROP_SOLID = new EzLocalizationManager.EzLocalisableString("单色", "Solid");
+        public static readonly LocalisableString LOGO_BACKDROP_ACRYLIC = new EzLocalizationManager.EzLocalisableString("亚克力", "Acrylic");
+        public static readonly LocalisableString LOGO_BACKDROP_LINKED = new EzLocalizationManager.EzLocalisableString("联动背景", "Linked");
+        public static readonly LocalisableString LOGO_BACKDROP_CLEAR = new EzLocalizationManager.EzLocalisableString("透明", "Clear");
     }
 }

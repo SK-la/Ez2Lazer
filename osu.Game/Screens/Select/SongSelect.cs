@@ -52,6 +52,7 @@ using osu.Game.Overlays.Volume;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
+using osu.Game.Screens.Backgrounds;
 using osu.Game.Screens.Footer;
 using osu.Game.Screens.Menu;
 using osu.Game.Screens.Play;
@@ -176,6 +177,7 @@ namespace osu.Game.Screens.Select
 
         private Bindable<bool> configBackgroundBlur = null!;
         private Bindable<bool> acrylicUiEnabled = null!;
+        private Bindable<bool> useEzBackground = null!;
         private Bindable<bool> showConvertedBeatmaps = null!;
         private Bindable<KeySoundPreviewMode> keySoundPreview = null!;
         private EzPreviewTrackManager ezPreviewManager = null!;
@@ -348,6 +350,16 @@ namespace osu.Game.Screens.Select
                 if (!this.IsCurrentScreen())
                     return;
 
+                updateBackgroundDim();
+            });
+
+            useEzBackground = ezConfig.GetBindable<bool>(Ez2Setting.SongSelectUseEzBackground);
+            useEzBackground.BindValueChanged(_ =>
+            {
+                if (!this.IsCurrentScreen())
+                    return;
+
+                RefreshBackground();
                 updateBackgroundDim();
             });
 
@@ -1016,29 +1028,38 @@ namespace osu.Game.Screens.Select
             }
         }
 
-        private void updateBackgroundDim() => ApplyToBackground(backgroundModeBeatmap =>
+        protected override BackgroundScreen CreateBackground()
+            => useEzBackground.Value ? new BackgroundScreenDefault() : new BackgroundScreenBeatmap(Beatmap.Value);
+
+        private void updateBackgroundDim()
         {
-            backgroundModeBeatmap.Beatmap = Beatmap.Value;
+            if (useEzBackground.Value)
+                return;
 
-            // [Ez] Only while acrylic UI is on: apply gameplay DimLevel / BlurLevel.
-            // Off = official IgnoreUserSettings path (fixed 0.1 dim; SongSelectBackgroundBlur only).
-            if (acrylicUiEnabled.Value)
+            ApplyToBackground(backgroundModeBeatmap =>
             {
-                backgroundModeBeatmap.IgnoreUserSettings.Value = false;
-            }
-            else
-            {
-                backgroundModeBeatmap.IgnoreUserSettings.Value = true;
-                backgroundModeBeatmap.DimWhenUserSettingsIgnored.Value = 0.1f;
-            }
+                backgroundModeBeatmap.Beatmap = Beatmap.Value;
 
-            // Required to undo results screen dimming the background.
-            // Probably needs more thought because this needs to be in every `ApplyToBackground` currently to restore sane defaults.
-            backgroundModeBeatmap.FadeColour(Color4.White, 250);
+                // [Ez] Only while acrylic UI is on: apply gameplay DimLevel / BlurLevel.
+                // Off = official IgnoreUserSettings path (fixed 0.1 dim; SongSelectBackgroundBlur only).
+                if (acrylicUiEnabled.Value)
+                {
+                    backgroundModeBeatmap.IgnoreUserSettings.Value = false;
+                }
+                else
+                {
+                    backgroundModeBeatmap.IgnoreUserSettings.Value = true;
+                    backgroundModeBeatmap.DimWhenUserSettingsIgnored.Value = 0.1f;
+                }
 
-            bool backgroundRevealActive = revealBackgroundDelegate?.State == ScheduledDelegate.RunState.Running || revealBackgroundDelegate?.State == ScheduledDelegate.RunState.Complete;
-            backgroundModeBeatmap.BlurAmount.Value = configBackgroundBlur.Value && !backgroundRevealActive ? 20 : 0f;
-        });
+                // Required to undo results screen dimming the background.
+                // Probably needs more thought because this needs to be in every `ApplyToBackground` currently to restore sane defaults.
+                backgroundModeBeatmap.FadeColour(Color4.White, 250);
+
+                bool backgroundRevealActive = revealBackgroundDelegate?.State == ScheduledDelegate.RunState.Running || revealBackgroundDelegate?.State == ScheduledDelegate.RunState.Complete;
+                backgroundModeBeatmap.BlurAmount.Value = configBackgroundBlur.Value && !backgroundRevealActive ? 20 : 0f;
+            });
+        }
 
         #endregion
 

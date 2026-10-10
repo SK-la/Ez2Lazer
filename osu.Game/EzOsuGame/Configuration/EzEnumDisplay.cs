@@ -90,4 +90,19 @@ namespace osu.Game.EzOsuGame.Configuration
         [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.LOGO_VIS_OFF))]
         Off,
     }
+
+    public enum EzLogoBackdropStyle
+    {
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.LOGO_BACKDROP_SOLID))]
+        Solid,
+
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.LOGO_BACKDROP_ACRYLIC))]
+        Acrylic,
+
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.LOGO_BACKDROP_LINKED))]
+        Linked,
+
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.LOGO_BACKDROP_CLEAR))]
+        Clear,
+    }
 }

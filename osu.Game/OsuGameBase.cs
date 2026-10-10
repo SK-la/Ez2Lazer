@@ -53,6 +53,7 @@ using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Screens.Menu;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Graphics;
@@ -354,6 +355,7 @@ namespace osu.Game
             GlobalConfigStore.EzConfig = Ez2ConfigManager;
             dependencies.Cache(Ez2ConfigManager);
             dependencies.Cache(new PixivBackgroundCoordinator(Storage, Ez2ConfigManager));
+            dependencies.Cache(new EzLogoBackdropSampler());
 
             Func<IEzCameraBackend> cameraFactory = null;
 

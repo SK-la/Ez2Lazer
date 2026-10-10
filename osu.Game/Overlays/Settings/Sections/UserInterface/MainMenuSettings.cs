@@ -33,6 +33,33 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
         {
             var backgroundSource = config.GetBindable<BackgroundSource>(OsuSetting.MenuBackgroundSource);
             var menuLogoPath = ezConfig.GetBindable<string>(Ez2Setting.MenuLogoPath);
+            var logoBackdropStyle = ezConfig.GetBindable<EzLogoBackdropStyle>(Ez2Setting.MenuLogoBackdropStyle);
+
+            var logoBackdropColour = new SettingsItemV2(new EzFormColour
+            {
+                Caption = EzSettingsStrings.LOGO_BACKDROP_COLOUR,
+                Current = ezConfig.GetBindable<Colour4>(Ez2Setting.MenuLogoBackdropColour),
+            });
+            var logoBackdropBlur = new SettingsItemV2(new FormSliderBar<double>
+            {
+                Caption = EzSettingsStrings.LOGO_BACKDROP_BLUR,
+                Current = ezConfig.GetBindable<double>(Ez2Setting.MenuLogoBackdropBlur),
+                KeyboardStep = 1,
+            });
+            var logoBackdropOpacity = new SettingsItemV2(new FormSliderBar<double>
+            {
+                Caption = EzSettingsStrings.LOGO_BACKDROP_OPACITY,
+                HintText = EzSettingsStrings.LOGO_BACKDROP_OPACITY_TOOLTIP,
+                Current = ezConfig.GetBindable<double>(Ez2Setting.MenuLogoBackdropOpacity),
+                KeyboardStep = 0.01f,
+            });
+
+            logoBackdropStyle.BindValueChanged(style =>
+            {
+                logoBackdropColour.CanBeShown.Value = style.NewValue == EzLogoBackdropStyle.Solid;
+                logoBackdropBlur.CanBeShown.Value = style.NewValue == EzLogoBackdropStyle.Acrylic;
+                logoBackdropOpacity.CanBeShown.Value = style.NewValue == EzLogoBackdropStyle.Linked;
+            }, true);
 
             ensureItemAvailable(menuLogoPath, menu_logo_items);
 
@@ -69,6 +96,12 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
                     Caption = UserInterfaceStrings.BackgroundSource,
                     Current = backgroundSource,
                 }),
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.SONG_SELECT_EZ_BACKGROUND,
+                    HintText = EzSettingsStrings.SONG_SELECT_EZ_BACKGROUND_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.SongSelectUseEzBackground),
+                }),
                 new SettingsItemV2(new FormDropdown<string>
                 {
                     Caption = "Menu Logo",
@@ -88,6 +121,15 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
                     HintText = EzSettingsStrings.LOGO_VISUALISATION_TOOLTIP,
                     Current = ezConfig.GetBindable<EzLogoVisualisationStyle>(Ez2Setting.MenuLogoVisualisationStyle),
                 }),
+                new SettingsItemV2(new FormEnumDropdown<EzLogoBackdropStyle>
+                {
+                    Caption = EzSettingsStrings.LOGO_BACKDROP,
+                    HintText = EzSettingsStrings.LOGO_BACKDROP_TOOLTIP,
+                    Current = logoBackdropStyle,
+                }),
+                logoBackdropColour,
+                logoBackdropBlur,
+                logoBackdropOpacity,
                 new EzPixivBackgroundSettings(ezConfig, pixivBackgroundCoordinator, notifications, backgroundSource),
                 new SettingsItemV2(new FormEnumDropdown<SeasonalBackgroundMode>
                 {

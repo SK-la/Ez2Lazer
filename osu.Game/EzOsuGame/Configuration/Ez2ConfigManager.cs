@@ -100,6 +100,11 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.MenuLogoPath, @"Menu/logo");
             SetDefault(Ez2Setting.MenuLogoText, "(´・ω・｀),120");
             SetDefault(Ez2Setting.MenuLogoVisualisationStyle, EzLogoVisualisationStyle.RadialBars);
+            SetDefault(Ez2Setting.MenuLogoBackdropStyle, EzLogoBackdropStyle.Acrylic);
+            SetDefault(Ez2Setting.MenuLogoBackdropColour, Colour4.FromHex("ff66ab"));
+            SetDefault(Ez2Setting.MenuLogoBackdropBlur, 16.0, 0.0, 40.0, 1.0);
+            SetDefault(Ez2Setting.MenuLogoBackdropOpacity, 1.0, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.SongSelectUseEzBackground, false);
             SetDefault(Ez2Setting.NotificationBehaviour, EzNotificationBehaviour.Normal);
             SetDefault(Ez2Setting.ScreenshotAction, EzScreenshotAction.SaveAndCopy);
             SetDefault(Ez2Setting.HitObjectLifetimeUsesOwnTime, !DebugUtils.IsNUnitRunning);
@@ -944,6 +949,31 @@ namespace osu.Game.EzOsuGame.Configuration
         /// 主菜单/选歌 logo 外圈音频可视化样式。
         /// </summary>
         MenuLogoVisualisationStyle,
+
+        /// <summary>
+        /// 主界面大 logo 圆圈底色：单色、亚克力、联动背景或透明。
+        /// </summary>
+        MenuLogoBackdropStyle,
+
+        /// <summary>
+        /// <see cref="MenuLogoBackdropStyle"/> 为单色时的颜色，含透明度。
+        /// </summary>
+        MenuLogoBackdropColour,
+
+        /// <summary>
+        /// <see cref="MenuLogoBackdropStyle"/> 为亚克力时的虚化强度。
+        /// </summary>
+        MenuLogoBackdropBlur,
+
+        /// <summary>
+        /// <see cref="MenuLogoBackdropStyle"/> 为联动背景时的不透明度。
+        /// </summary>
+        MenuLogoBackdropOpacity,
+
+        /// <summary>
+        /// 开启后选歌界面沿用主页背景，不单独加载当前谱面背景。
+        /// </summary>
+        SongSelectUseEzBackground,
         NotificationBehaviour,
         ScreenshotAction,
         ManiaSkipEmptyEdgeColumns,
