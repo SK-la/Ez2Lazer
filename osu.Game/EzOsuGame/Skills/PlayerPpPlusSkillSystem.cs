@@ -7,33 +7,34 @@ using osu.Game.EzOsuGame.LocalProfile;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Chart-side MinaCalc MSD axes. Each axis is an independent skill (not one blob).
+    /// osu!standard player-side PP+-shaped axes (aggregated across local scores).
+    /// Slice key in Realm is <see cref="EzSkillSystems.OSU_SLICE_KEY"/> (no keymode).
     /// </summary>
-    public sealed class BeatmapMsdSkillSystem : IEzSkillSystem
+    public sealed class PlayerPpPlusSkillSystem : IEzSkillSystem
     {
-        public string SystemId => EzSkillSystems.BEATMAP_MSD;
+        public string SystemId => EzSkillSystems.PLAYER_PPPLUS;
 
-        public EzSkillScope Scope => EzSkillScope.Beatmap;
+        public EzSkillScope Scope => EzSkillScope.Player;
 
         public bool IsDefaultRadar => true;
 
         public IReadOnlyList<EzSkillDefinition> Skills { get; } = createSkills();
 
         public bool AppliesToRuleset(int rulesetOnlineId)
-            => rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID;
+            => rulesetOnlineId == EzLocalProfileConstants.OSU_RULESET_ID;
 
         private static IReadOnlyList<EzSkillDefinition> createSkills()
         {
-            var list = new List<EzSkillDefinition>(EzMinaSkillAxisExtensions.All.Length);
+            var list = new List<EzSkillDefinition>(EzOsuSkillAxisExtensions.PlayerAxes.Length);
 
-            foreach (var axis in EzMinaSkillAxisExtensions.All)
+            foreach (var axis in EzOsuSkillAxisExtensions.PlayerAxes)
             {
                 var chip = axis.Chip();
                 list.Add(new EzSkillDefinition(
-                    EzSkillSystems.BEATMAP_MSD,
-                    axis.ToMsdSkillId(),
+                    EzSkillSystems.PLAYER_PPPLUS,
+                    axis.ToPlayerSkillId(),
                     chip.Name,
-                    EzSkillScope.Beatmap,
+                    EzSkillScope.Player,
                     chip.AccentHex));
             }
 

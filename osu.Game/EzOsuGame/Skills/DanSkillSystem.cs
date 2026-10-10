@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
+using osu.Game.EzOsuGame.LocalProfile;
 
 namespace osu.Game.EzOsuGame.Skills
 {
@@ -25,7 +26,14 @@ namespace osu.Game.EzOsuGame.Skills
 
         public string SystemId => EzSkillSystems.DAN;
 
+        public EzSkillScope Scope => EzSkillScope.Player;
+
+        public bool IsDefaultRadar => false;
+
         public IReadOnlyList<EzSkillDefinition> Skills { get; } = createSkills();
+
+        public bool AppliesToRuleset(int rulesetOnlineId)
+            => rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID;
 
         private static IReadOnlyList<EzSkillDefinition> createSkills()
         {

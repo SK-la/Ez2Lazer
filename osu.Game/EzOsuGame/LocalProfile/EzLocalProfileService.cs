@@ -28,6 +28,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private readonly EzLocalProfileAggregator aggregator;
         private readonly EzPlayerSsrAggregator? ssrAggregator;
         private readonly EzPlayerDanAggregator? danAggregator;
+        private readonly EzPlayerPpPlusAggregator? osuPpPlusAggregator;
         private readonly EzSkillProvider? skillProvider;
         private readonly Lock computeLock = new Lock();
 
@@ -76,12 +77,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
             EzPlayerSsrAggregator? ssrAggregator = null,
             EzPlayerDanAggregator? danAggregator = null,
             EzLocalProfileStore? sharedStore = null,
-            EzSkillProvider? skillProvider = null)
+            EzSkillProvider? skillProvider = null,
+            EzPlayerPpPlusAggregator? osuPpPlusAggregator = null)
         {
             Store = sharedStore ?? new EzLocalProfileStore(storage);
             aggregator = new EzLocalProfileAggregator(realm, analysisStore, beatmapManager);
             this.ssrAggregator = ssrAggregator;
             this.danAggregator = danAggregator;
+            this.osuPpPlusAggregator = osuPpPlusAggregator;
             this.skillProvider = skillProvider;
             Snapshot.Value = Store.LoadSnapshot();
         }
@@ -565,7 +568,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// </summary>
         private void refreshAllPlayerSkills()
         {
-            if (ssrAggregator == null && danAggregator == null)
+            if (ssrAggregator == null && danAggregator == null && osuPpPlusAggregator == null)
                 return;
 
             var included = Store.LoadIncludedUsernames()
@@ -574,15 +577,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                 .Distinct(StringComparer.Ordinal)
                                 .ToList();
 
-            var combined = new List<EzSkillPlayRow>();
+            var maniaCombined = new List<EzSkillPlayRow>();
+            var osuCombined = new List<EzSkillPlayRow>();
 
             if (included.Count > 0)
             {
-                foreach (var list in aggregator.CollectManiaPlayRows(included, CancellationToken.None).Values)
-                    combined.AddRange(list);
+                foreach (var list in aggregator.CollectPlayRows(EzLocalProfileConstants.MANIA_RULESET_ID, included, CancellationToken.None).Values)
+                    maniaCombined.AddRange(list);
+
+                foreach (var list in aggregator.CollectPlayRows(EzLocalProfileConstants.OSU_RULESET_ID, included, CancellationToken.None).Values)
+                    osuCombined.AddRange(list);
             }
 
-            if (combined.Count == 0)
+            if (maniaCombined.Count == 0 && osuCombined.Count == 0)
             {
                 skillProvider?.PlayerSkills.Delete(EzLocalProfileConstants.ALL_PLAYERS);
                 return;
@@ -591,14 +598,31 @@ namespace osu.Game.EzOsuGame.LocalProfile
             // The excluded player is gone from the included set, so anything the pass cannot read is reported here too.
             danAggregator?.BeginSkillPass();
 
-            persistUserSkills(
-                EzLocalProfileConstants.ALL_PLAYERS,
-                combined,
-                () => { },
-                CancellationToken.None,
-                ssrAggregator?.LoadPlayCache(),
-                danAggregator?.LoadPlayCache(),
-                new HashSet<string>(StringComparer.Ordinal));
+            bool persisted = false;
+
+            if (maniaCombined.Count > 0)
+            {
+                persisted |= persistUserSkills(
+                    EzLocalProfileConstants.ALL_PLAYERS,
+                    maniaCombined,
+                    () => { },
+                    CancellationToken.None,
+                    ssrAggregator?.LoadPlayCache(),
+                    danAggregator?.LoadPlayCache(),
+                    new HashSet<string>(StringComparer.Ordinal));
+            }
+
+            if (osuCombined.Count > 0)
+            {
+                persisted |= persistOsuUserSkills(
+                    EzLocalProfileConstants.ALL_PLAYERS,
+                    osuCombined,
+                    () => { },
+                    CancellationToken.None);
+            }
+
+            if (persisted)
+                skillProvider?.PlayerSkills.SetStale(EzLocalProfileConstants.ALL_PLAYERS, false);
         }
 
         /// <summary>How many not-yet-cached scores are analysed before progress is flushed to disk.</summary>
@@ -825,24 +849,34 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var wanted = new HashSet<string>(refreshReal, StringComparer.Ordinal);
             wanted.UnionWith(included);
 
-            var collected = aggregator.CollectManiaPlayRows(wanted, token);
+            var maniaCollected = aggregator.CollectPlayRows(EzLocalProfileConstants.MANIA_RULESET_ID, wanted, token);
+            var osuCollected = aggregator.CollectPlayRows(EzLocalProfileConstants.OSU_RULESET_ID, wanted, token);
 
             var maniaPlaysByUser = new Dictionary<string, List<EzSkillPlayRow>>(StringComparer.Ordinal);
+            var osuPlaysByUser = new Dictionary<string, List<EzSkillPlayRow>>(StringComparer.Ordinal);
 
             foreach (string username in refreshReal)
-                maniaPlaysByUser[username] = collected.TryGetValue(username, out var list) ? list : new List<EzSkillPlayRow>();
+            {
+                maniaPlaysByUser[username] = maniaCollected.TryGetValue(username, out var maniaList) ? maniaList : new List<EzSkillPlayRow>();
+                osuPlaysByUser[username] = osuCollected.TryGetValue(username, out var osuList) ? osuList : new List<EzSkillPlayRow>();
+            }
 
-            var allBag = new List<EzSkillPlayRow>();
+            var allManiaBag = new List<EzSkillPlayRow>();
+            var allOsuBag = new List<EzSkillPlayRow>();
 
             foreach (string username in included)
             {
-                if (collected.TryGetValue(username, out var list))
-                    allBag.AddRange(list);
+                if (maniaCollected.TryGetValue(username, out var maniaList))
+                    allManiaBag.AddRange(maniaList);
+
+                if (osuCollected.TryGetValue(username, out var osuList))
+                    allOsuBag.AddRange(osuList);
             }
 
-            int perUserTotal = maniaPlaysByUser.Values.Sum(list => list.Count);
-            bool materializeAll = refreshAll && allBag.Count > 0;
-            int skillsTotal = Math.Max(1, (perUserTotal + (materializeAll ? allBag.Count : 0)) * passCount);
+            int perUserTotal = maniaPlaysByUser.Values.Sum(list => list.Count)
+                               + osuPlaysByUser.Values.Sum(list => list.Count);
+            bool materializeAll = refreshAll && (allManiaBag.Count > 0 || allOsuBag.Count > 0);
+            int skillsTotal = Math.Max(1, (perUserTotal + (materializeAll ? allManiaBag.Count + allOsuBag.Count : 0)) * passCount);
             int skillsProcessed = 0;
 
             var missingCharts = new HashSet<string>(StringComparer.Ordinal);
@@ -872,18 +906,25 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 token.ThrowIfCancellationRequested();
 
-                if (!maniaPlaysByUser.TryGetValue(username, out var scores) || scores.Count == 0)
+                maniaPlaysByUser.TryGetValue(username, out var maniaScores);
+                osuPlaysByUser.TryGetValue(username, out var osuScores);
+                maniaScores ??= new List<EzSkillPlayRow>();
+                osuScores ??= new List<EzSkillPlayRow>();
+
+                if (maniaScores.Count == 0 && osuScores.Count == 0)
                 {
-                    // The slice holds no mania play for this player, so no pass can ever re-derive the rows the stale
-                    // flag points at. Drop them instead of leaving a flag the status readout can never clear - the
-                    // same rule the archive-wide bag follows (see refreshAllPlayerSkills). Self-healing: a play that
-                    // becomes readable again leaves a drill the ledger can no longer match, so the next compute
-                    // rebuilds this player's slice and re-derives the rows.
+                    // No mania or osu plays for this player — drop stale skill rows rather than leave an uncleared flag.
                     skillProvider?.PlayerSkills.Delete(username);
                     continue;
                 }
 
-                bool persisted = persistUserSkills(username, scores, tick, token, ssrPlayCache, danPlayCache, missingCharts);
+                bool persisted = false;
+
+                if (maniaScores.Count > 0)
+                    persisted |= persistUserSkills(username, maniaScores, tick, token, ssrPlayCache, danPlayCache, missingCharts);
+
+                if (osuScores.Count > 0)
+                    persisted |= persistOsuUserSkills(username, osuScores, tick, token);
 
                 if (!persisted)
                     continue;
@@ -895,7 +936,15 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 token.ThrowIfCancellationRequested();
 
-                if (persistUserSkills(EzLocalProfileConstants.ALL_PLAYERS, allBag, tick, token, ssrPlayCache, danPlayCache, missingCharts))
+                bool persisted = false;
+
+                if (allManiaBag.Count > 0)
+                    persisted |= persistUserSkills(EzLocalProfileConstants.ALL_PLAYERS, allManiaBag, tick, token, ssrPlayCache, danPlayCache, missingCharts);
+
+                if (allOsuBag.Count > 0)
+                    persisted |= persistOsuUserSkills(EzLocalProfileConstants.ALL_PLAYERS, allOsuBag, tick, token);
+
+                if (persisted)
                     skillProvider?.PlayerSkills.SetStale(EzLocalProfileConstants.ALL_PLAYERS, false);
             }
             else if (refreshAll)
@@ -981,6 +1030,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
             missingCharts.UnionWith(playerMissed);
 
             return persisted;
+        }
+
+        private bool persistOsuUserSkills(
+            string username,
+            List<EzSkillPlayRow> plays,
+            Action tick,
+            CancellationToken token)
+        {
+            return tryComputeAndPersist(
+                username,
+                () => osuPpPlusAggregator!.ComputeAndStore(username, plays, aggregator.CreateWindowedScoreResolver(plays, token), token, tick),
+                osuPpPlusAggregator != null,
+                "[EzLocalProfile] Failed to compute/persist player osu perf skills after profile save.");
         }
 
         private static bool tryComputeAndPersist(string username, Action action, bool enabled, string errorMessage)

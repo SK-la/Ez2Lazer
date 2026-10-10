@@ -7,11 +7,11 @@ using osu.Game.EzOsuGame.LocalProfile;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Chart-side MinaCalc MSD axes. Each axis is an independent skill (not one blob).
+    /// osu!standard chart-side PP+-shaped axes (Jump / Flow / Precision / Speed / Stamina / Accuracy + Aim Total).
     /// </summary>
-    public sealed class BeatmapMsdSkillSystem : IEzSkillSystem
+    public sealed class BeatmapPpPlusSkillSystem : IEzSkillSystem
     {
-        public string SystemId => EzSkillSystems.BEATMAP_MSD;
+        public string SystemId => EzSkillSystems.BEATMAP_PPPLUS;
 
         public EzSkillScope Scope => EzSkillScope.Beatmap;
 
@@ -20,18 +20,18 @@ namespace osu.Game.EzOsuGame.Skills
         public IReadOnlyList<EzSkillDefinition> Skills { get; } = createSkills();
 
         public bool AppliesToRuleset(int rulesetOnlineId)
-            => rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID;
+            => rulesetOnlineId == EzLocalProfileConstants.OSU_RULESET_ID;
 
         private static IReadOnlyList<EzSkillDefinition> createSkills()
         {
-            var list = new List<EzSkillDefinition>(EzMinaSkillAxisExtensions.All.Length);
+            var list = new List<EzSkillDefinition>(EzOsuSkillAxisExtensions.ChartAxes.Length);
 
-            foreach (var axis in EzMinaSkillAxisExtensions.All)
+            foreach (var axis in EzOsuSkillAxisExtensions.ChartAxes)
             {
                 var chip = axis.Chip();
                 list.Add(new EzSkillDefinition(
-                    EzSkillSystems.BEATMAP_MSD,
-                    axis.ToMsdSkillId(),
+                    EzSkillSystems.BEATMAP_PPPLUS,
+                    axis.ToChartSkillId(),
                     chip.Name,
                     EzSkillScope.Beatmap,
                     chip.AccentHex));

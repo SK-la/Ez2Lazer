@@ -97,6 +97,46 @@ namespace osu.Game.EzOsuGame.Skills
 
         public EzSkillRegistry Registry { get; }
 
+        /// <summary>Ruleset skill wiring (systems + default radar). Null when no plugin applies.</summary>
+        public EzSkillProfile? GetProfile(int rulesetOnlineId)
+            => Registry.GetProfile(rulesetOnlineId);
+
+        /// <summary>
+        /// Generic beatmap skill read for any registered <paramref name="systemId"/>.
+        /// Prefer this over mania-specific helpers when the caller already knows the system.
+        /// </summary>
+        public IReadOnlyDictionary<string, double> GetBeatmapSystemSkills(string beatmapHash, string systemId)
+        {
+            if (string.IsNullOrEmpty(beatmapHash) || string.IsNullOrEmpty(systemId))
+                return new Dictionary<string, double>(StringComparer.Ordinal);
+
+            return Store.GetBeatmapSkills(beatmapHash, systemId);
+        }
+
+        /// <summary>
+        /// Generic player skill read. <paramref name="sliceKey"/> is keymode for mania, or
+        /// <see cref="EzSkillSystems.OSU_SLICE_KEY"/> for osu.
+        /// </summary>
+        public IReadOnlyDictionary<string, double> GetPlayerSystemSkills(string username, int sliceKey, string systemId)
+        {
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(systemId))
+                return new Dictionary<string, double>(StringComparer.Ordinal);
+
+            return Store.GetPlayerSkills(username, sliceKey, systemId);
+        }
+
+        public (int AnalyzedPlays, bool Provisional, bool Stale) GetPlayerSystemSkillMeta(string username, int sliceKey, string systemId)
+        {
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(systemId))
+                return (0, false, false);
+
+            var meta = Store.GetPlayerSystemSkillMeta(username, sliceKey, systemId);
+            if (meta.AnalyzedPlays > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
+                return meta;
+
+            return Store.GetPlayerSystemSkillMeta(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, sliceKey, systemId);
+        }
+
         public IReadOnlyDictionary<string, double> GetBeatmapMsd(string beatmapHash)
         {
             if (string.IsNullOrEmpty(beatmapHash))

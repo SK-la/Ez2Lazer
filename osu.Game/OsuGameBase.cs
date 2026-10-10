@@ -438,29 +438,35 @@ namespace osu.Game
             ReplaySession = new EzReplaySessionRouter(RulesetStore.AvailableRulesets, BeatmapManager);
             dependencies.CacheAs<IEzReplaySession>(ReplaySession);
 
-            // Skill metrics: MSD (beatmap), SSR + Dan (player). Read via EzSkillProvider; writers stay separate.
-            // See EzSkillSystems. Dan is a player skill for Profile, but uses its own estimate table/algorithm.
+            // Skill metrics: ruleset plugins via EzSkillRegistry / EzSkillProfile.
+            // Mania: MSD / SSR / pattern / Dan. Osu: PP+ chart / player (stub engine). Read via EzSkillProvider; writers stay separate.
             var skillRegistry = new EzSkillRegistry();
             var skillStore = new EzSkillStore(realm);
+            var ppPlusEngine = new EzPpPlusStubEngine();
             var beatmapMsdComputer = new EzBeatmapMsdComputer(BeatmapManager, skillStore);
+            var beatmapPpPlusComputer = new EzBeatmapPpPlusComputer(BeatmapManager, skillStore, ppPlusEngine);
             var chartDanEstimator = new EzChartDanEstimator(BeatmapManager, beatmapMsdComputer);
             var localProfileStore = new EzLocalProfileStore(Storage);
             // Skill aggregators reuse localProfileStore as the per-play SSR / Dan cache (incremental backfill).
             var playerSsrAggregator = new EzPlayerSsrAggregator(BeatmapManager, skillStore, localProfileStore);
             var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanEstimator, skillStore, localProfileStore);
+            var playerPpPlusAggregator = new EzPlayerPpPlusAggregator(BeatmapManager, skillStore, ppPlusEngine);
             var skillProvider = new EzSkillProvider(skillStore, skillRegistry, chartDanEstimator, localProfileStore, BeatmapManager);
 
             dependencies.Cache(skillRegistry);
             dependencies.Cache(skillStore);
             dependencies.Cache(localProfileStore);
             dependencies.Cache(skillProvider);
+            dependencies.CacheAs<IEzPpPlusEngine>(ppPlusEngine);
             // Write-side services still cached for LocalProfile / analysis pipelines.
             dependencies.Cache(beatmapMsdComputer);
+            dependencies.Cache(beatmapPpPlusComputer);
             dependencies.Cache(chartDanEstimator);
             dependencies.Cache(playerSsrAggregator);
             dependencies.Cache(playerDanAggregator);
+            dependencies.Cache(playerPpPlusAggregator);
 
-            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, playerSsrAggregator, playerDanAggregator, localProfileStore, skillProvider));
+            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, playerSsrAggregator, playerDanAggregator, localProfileStore, skillProvider, playerPpPlusAggregator));
             dependencies.Cache(new EzLocalProfileOnlinePullService(API, ScoreManager, BeatmapManager, realm, Storage));
             dependencies.Cache(new EzAnalysisPlayerSelection());
 
