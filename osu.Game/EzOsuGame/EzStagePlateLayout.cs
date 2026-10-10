@@ -30,6 +30,14 @@ namespace osu.Game.EzOsuGame
         [JsonPropertyName("character")]
         public EzStagePlateSprite? Character { get; set; }
 
+        // number/score。缺省或 enabled 为 false 时不加载。
+        [JsonPropertyName("score")]
+        public EzStagePlateDigits? Score { get; set; }
+
+        // number/combo，舞台上的最大连击统计，不是 HUD 连击。
+        [JsonPropertyName("combo")]
+        public EzStagePlateDigits? Combo { get; set; }
+
         public static EzStagePlateLayout? TryLoad(EzResourceStore resource, string stageName)
         {
             using (Stream? stream = resource.GetEzResourceStream($"Stage/{stageName}/Stage/layout.json"))
@@ -78,6 +86,27 @@ namespace osu.Game.EzOsuGame
 
         [JsonPropertyName("scaleY")]
         public float ScaleY { get; set; }
+    }
+
+    // 个位锚点与 body 同一坐标系。高一位在 x + spacing。
+    internal sealed class EzStagePlateDigits
+    {
+        [JsonPropertyName("enabled")]
+        public bool Enabled { get; set; }
+
+        [JsonPropertyName("x")]
+        public float X { get; set; }
+
+        [JsonPropertyName("y")]
+        public float Y { get; set; }
+
+        [JsonPropertyName("digits")]
+        public int Digits { get; set; }
+
+        [JsonPropertyName("spacing")]
+        public float Spacing { get; set; }
+
+        public Vector2 ToOsuPosition() => EzStagePlateSprite.ToOsu(X, Y);
     }
 
     internal sealed class EzStagePlateSprite
