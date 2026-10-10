@@ -361,6 +361,9 @@ namespace osu.Game.EzOsuGame.Animation
         Turtle,
         Various_Ways,
         ArcadeScore,
+        NIGHT_TRAVELER,
+        EMOTIONAL_SENSE,
+        Invisible,
         // ReSharper restore InconsistentNaming
     }
 }
