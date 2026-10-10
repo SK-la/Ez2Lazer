@@ -31,7 +31,7 @@ namespace osu.Game.EzOsuGame
         [JsonPropertyName("character")]
         public EzStagePlateSprite? Character { get; set; }
 
-        // path 是主题内的字形目录，按 body prefab 的贴图来，不按槽位名猜。
+        // path 相对 Stage/{舞台名}。共用一套数字时是 number，分开时是 number/score 与 number/combo。
         [JsonPropertyName("score")]
         public EzStagePlateDigits? Score { get; set; }
 
@@ -99,7 +99,7 @@ namespace osu.Game.EzOsuGame
         [JsonPropertyName("enabled")]
         public bool Enabled { get; set; }
 
-        // 相对 GameTheme/{主题} 的字形目录。共用一套数字时是 number，分开时才是 number/score、number/combo、number/maxcombo。
+        // 相对 Stage/{舞台名}。共用一套时是 number，分开时是 number/score、number/combo。
         [JsonPropertyName("path")]
         public string? Path { get; set; }
 

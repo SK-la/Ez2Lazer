@@ -8,7 +8,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.HUD;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.EzOsuGame
@@ -30,7 +29,7 @@ namespace osu.Game.EzOsuGame
         private readonly Texture?[] glyphs = new Texture?[10];
 
         private long shownValue;
-        private Bindable<EzEnumGameThemeName>? theme;
+        private Bindable<string>? stageName;
         private IBindable<long>? score;
         private IBindable<int>? maxCombo;
 
@@ -71,12 +70,8 @@ namespace osu.Game.EzOsuGame
         {
             base.LoadComplete();
 
-            theme = config.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName).GetBoundCopy();
-            theme.BindValueChanged(_ =>
-            {
-                loadGlyphs();
-                apply(shownValue);
-            }, true);
+            stageName = config.GetBindable<string>(Ez2Setting.StageName);
+            stageName.BindValueChanged(_ => reloadGlyphs());
 
             if (scoreProcessor == null)
             {
@@ -96,22 +91,49 @@ namespace osu.Game.EzOsuGame
             }
         }
 
-        protected override void Dispose(bool isDisposing)
+        private void reloadGlyphs()
         {
-            theme?.UnbindAll();
-            score?.UnbindAll();
-            maxCombo?.UnbindAll();
-
-            base.Dispose(isDisposing);
+            loadGlyphs();
+            apply(shownValue);
         }
 
+        // 整套字形先按 body（舞台名）找 layout 里的目录。没有 0，再用当前主题名。
         private void loadGlyphs()
         {
-            string themeName = config.Get<EzEnumGameThemeName>(Ez2Setting.GameThemeName).ToString().Replace(' ', '_');
-            string root = $"GameTheme/{themeName}/";
+            string? root = chooseRoot();
 
             for (int digit = 0; digit < glyphs.Length; digit++)
-                glyphs[digit] = loadDigit(root, digit);
+                glyphs[digit] = root == null ? null : loadDigit(root, digit);
+        }
+
+        private string? chooseRoot()
+        {
+            string? body = stageName?.Value;
+            string? path = layout.Path?.Trim().Trim('/');
+
+            if (string.IsNullOrEmpty(path))
+            {
+                if (source == Source.Score)
+                {
+                    return rootIf(body, "number/score")
+                           ?? rootIf(body, "number");
+                }
+
+                return rootIf(body, "number/combo")
+                       ?? rootIf(body, "number");
+            }
+
+            return rootIf(body, path)
+                   ?? (path == "number" ? null : rootIf(body, "number"));
+        }
+
+        private string? rootIf(string? name, string path)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return null;
+
+            string root = $"Stage/{name}/";
+            return resources.Get($"{root}{path}/0", EzTextureUsage.Glyph) != null ? root : null;
         }
 
         private Texture? loadDigit(string root, int digit)
@@ -134,8 +156,7 @@ namespace osu.Game.EzOsuGame
                        ?? resources.Get($"{root}number/{digit}", EzTextureUsage.Glyph);
             }
 
-            return resources.Get($"{root}number/maxcombo/{digit}", EzTextureUsage.Glyph)
-                   ?? resources.Get($"{root}number/combo/{digit}", EzTextureUsage.Glyph)
+            return resources.Get($"{root}number/combo/{digit}", EzTextureUsage.Glyph)
                    ?? resources.Get($"{root}number/{digit}", EzTextureUsage.Glyph);
         }
 
