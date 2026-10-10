@@ -90,6 +90,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
                     savedLayout = true;
                 }
 
+                Anchor = Anchor.BottomCentre;
+                Origin = Anchor.TopCentre;
+
                 ManiaPlayfieldLayoutHelper.ApplyHitPositionPlacement(
                     this,
                     ManiaPlayfieldLayoutHelper.GetHitPosition(skin, hitPositionGlobalEnable.Value, hitPosition.Value));

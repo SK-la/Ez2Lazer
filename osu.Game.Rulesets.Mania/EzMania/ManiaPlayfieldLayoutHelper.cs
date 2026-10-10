@@ -40,8 +40,6 @@ namespace osu.Game.Rulesets.Mania.EzMania
         /// </summary>
         public static void ApplyHitPositionPlacement(Drawable drawable, float hitPosition)
         {
-            drawable.Anchor = Anchor.BottomCentre;
-            drawable.Origin = Anchor.Centre;
             drawable.Position = new Vector2(0, -hitPosition);
         }
 
