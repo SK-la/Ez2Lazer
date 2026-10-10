@@ -23,6 +23,8 @@ namespace osu.Game.EzOsuGame.Background
             var video = new Video(videoPath)
             {
                 RelativeSizeAxes = Axes.Both,
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
                 Loop = true,
             };
 
@@ -49,6 +51,8 @@ namespace osu.Game.EzOsuGame.Background
             var video = new Video(videoStream)
             {
                 RelativeSizeAxes = Axes.Both,
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
                 Loop = true
             };
 
