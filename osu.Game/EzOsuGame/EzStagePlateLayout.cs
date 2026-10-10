@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -37,6 +38,10 @@ namespace osu.Game.EzOsuGame
         // number/combo，舞台上的最大连击统计，不是 HUD 连击。
         [JsonPropertyName("combo")]
         public EzStagePlateDigits? Combo { get; set; }
+
+        // 固定槽位之外的图，按 path 加载，不按皮肤名分支。
+        [JsonPropertyName("parts")]
+        public List<EzStagePlateSprite>? Parts { get; set; }
 
         public static EzStagePlateLayout? TryLoad(EzResourceStore resource, string stageName)
         {
@@ -111,6 +116,10 @@ namespace osu.Game.EzOsuGame
 
     internal sealed class EzStagePlateSprite
     {
+        // 相对 Stage/{舞台}/Stage 的文件名。缺省时沿用该槽位原来的固定路径。
+        [JsonPropertyName("path")]
+        public string? Path { get; set; }
+
         [JsonPropertyName("x")]
         public float X { get; set; }
 
@@ -126,6 +135,10 @@ namespace osu.Game.EzOsuGame
         [JsonPropertyName("frameMs")]
         public double FrameMs { get; set; }
 
+        // 正角度为 Unity 的 +Z，屏幕上逆时针。seconds 是转过 degrees 的时间。
+        [JsonPropertyName("spin")]
+        public EzStagePlateSpin? Spin { get; set; }
+
         public static Vector2 ToOsu(float x, float y) => new Vector2(-x, -y);
 
         public Vector2 ToOsuPosition() => ToOsu(X, Y);
@@ -133,5 +146,17 @@ namespace osu.Game.EzOsuGame
         public bool IsAdditive => string.Equals(Blend, "additive", StringComparison.OrdinalIgnoreCase);
 
         public double FrameLength => FrameMs > 0 ? FrameMs : 66;
+    }
+
+    internal sealed class EzStagePlateSpin
+    {
+        [JsonPropertyName("seconds")]
+        public double Seconds { get; set; }
+
+        [JsonPropertyName("degrees")]
+        public float Degrees { get; set; }
+
+        [JsonPropertyName("loop")]
+        public bool Loop { get; set; }
     }
 }

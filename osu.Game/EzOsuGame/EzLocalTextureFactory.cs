@@ -395,11 +395,28 @@ namespace osu.Game.EzOsuGame
                     container.Add(new EzStageGrooveMeter(layout.Meter, gauge, bright));
             }
 
-            addPlateSprite(container, layout.OverObject, $"{basePath}/{stageName.Value}_OverObject/{stageName.Value}_OverObject");
+            addPlateSprite(container, layout.OverObject, plateTexturePath(basePath, layout.OverObject, $"{stageName.Value}_OverObject/{stageName.Value}_OverObject"));
+
+            if (layout.Parts != null)
+            {
+                foreach (EzStagePlateSprite part in layout.Parts)
+                {
+                    if (string.IsNullOrEmpty(part.Path))
+                        continue;
+
+                    addPlateSprite(container, part, $"{basePath}/{part.Path}");
+                }
+            }
 
             if (layout.Character != null)
             {
-                bool placed = keyFolder != null && addPlateSprite(container, layout.Character, $"{basePath}/{keyFolder}/Character");
+                bool placed = false;
+
+                if (!string.IsNullOrEmpty(layout.Character.Path))
+                    placed = addPlateSprite(container, layout.Character, $"{basePath}/{layout.Character.Path}");
+
+                if (!placed && keyFolder != null)
+                    placed = addPlateSprite(container, layout.Character, $"{basePath}/{keyFolder}/Character");
 
                 if (!placed)
                     addPlateSprite(container, layout.Character, $"{basePath}/Character_overlayer");
@@ -492,6 +509,12 @@ namespace osu.Game.EzOsuGame
             return false;
         }
 
+        private static string plateTexturePath(string basePath, EzStagePlateSprite? piece, string fallback)
+        {
+            string relative = piece != null && !string.IsNullOrEmpty(piece.Path) ? piece.Path : fallback;
+            return $"{basePath}/{relative}";
+        }
+
         private bool addPlateSprite(Container parent, EzStagePlateSprite? piece, string texturePath)
         {
             if (piece == null)
@@ -530,8 +553,12 @@ namespace osu.Game.EzOsuGame
                 };
 
                 if (isSingleFrameGlow(texturePath))
+                {
+                    applySpin(sprite, piece);
                     return new EzStageSingleLightBreath(sprite);
+                }
 
+                applySpin(sprite, piece);
                 return sprite;
             }
 
@@ -546,7 +573,38 @@ namespace osu.Game.EzOsuGame
             };
 
             animation.AddFrames(frames);
+            applySpin(animation, piece);
             return animation;
+        }
+
+        private static void applySpin(Drawable drawable, EzStagePlateSprite piece)
+        {
+            EzStagePlateSpin? spin = piece.Spin;
+
+            if (spin == null || spin.Seconds <= 0 || spin.Degrees == 0)
+                return;
+
+            double revolution = spin.Seconds * 360.0 / Math.Abs(spin.Degrees);
+            RotationDirection direction = spin.Degrees > 0 ? RotationDirection.Counterclockwise : RotationDirection.Clockwise;
+            bool loop = spin.Loop;
+            float angle = direction == RotationDirection.Counterclockwise ? -Math.Abs(spin.Degrees) : Math.Abs(spin.Degrees);
+            double seconds = spin.Seconds;
+
+            // Loop 会读 Clock.Time。零件这时还没挂进画面，时钟为空。
+            void start(Drawable target)
+            {
+                target.OnLoadComplete -= start;
+
+                if (loop)
+                    target.Spin(revolution, direction);
+                else
+                    target.RotateTo(angle, seconds, Easing.None);
+            }
+
+            if (drawable.IsLoaded)
+                start(drawable);
+            else
+                drawable.OnLoadComplete += start;
         }
 
         private static bool isSingleFrameGlow(string texturePath)
