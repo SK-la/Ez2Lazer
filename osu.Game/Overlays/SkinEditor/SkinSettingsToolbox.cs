@@ -41,6 +41,16 @@ namespace osu.Game.Overlays.SkinEditor
         [BackgroundDependencyLoader]
         private void load()
         {
+            rebuild();
+
+            if (component is IScopedSkinSettings scoped)
+                scoped.WatchSettingsScope(() => Scheduler.AddOnce(rebuild));
+        }
+
+        private void rebuild()
+        {
+            Content.Clear(disposeChildren: true);
+
             var controls = component.CreateSettingsControls().ToArray();
             Drawable[] positionControls = [];
 

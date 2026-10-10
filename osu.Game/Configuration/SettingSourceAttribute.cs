@@ -111,8 +111,13 @@ namespace osu.Game.Configuration
     {
         public static IEnumerable<Drawable> CreateSettingsControls(this object obj)
         {
+            var scoped = obj as IScopedSkinSettings;
+
             foreach (var (attr, property) in obj.GetOrderedSettingsSourceProperties())
             {
+                if (scoped?.IsSettingActive(property) == false)
+                    continue;
+
                 object value = property.GetValue(obj)!;
 
                 if (attr.SettingControlType != null)

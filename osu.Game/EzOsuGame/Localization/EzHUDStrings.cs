@@ -323,5 +323,23 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString CAMERA_UNAVAILABLE = new EzLocalizationManager.EzLocalisableString("摄像头未能打开。", "The camera could not be opened.");
         public static readonly LocalisableString CAMERA_PLATFORM_UNSUPPORTED = new EzLocalizationManager.EzLocalisableString("当前平台没有本地摄像头后端。", "This platform has no local camera backend.");
+
+        public static readonly LocalisableString BOUNCE_PEAK_LABEL = new EzLocalizationManager.EzLocalisableString("弹跳顶点", "Bounce Peak");
+        public static readonly LocalisableString BOUNCE_PEAK_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("相对静止位置的上下位移，向下为正。", "Vertical offset from rest. Positive is downward.");
+
+        public static readonly LocalisableString BOUNCE_ALPHA_LABEL = new EzLocalizationManager.EzLocalisableString("弹跳透明度", "Bounce Alpha");
+        public static readonly LocalisableString BOUNCE_ALPHA_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("弹出后收到的透明度。", "Alpha reached after the pop.");
+
+        public static readonly LocalisableString BOUNCE_RETURN_LABEL = new EzLocalizationManager.EzLocalisableString("回到原位时长", "Return Duration");
+        public static readonly LocalisableString BOUNCE_RETURN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("从顶点回到静止位置的时间（毫秒）。", "Time to return from the peak to rest (milliseconds).");
+
+        public static readonly LocalisableString BOUNCE_EASING_LABEL = new EzLocalizationManager.EzLocalisableString("弹跳缓动", "Bounce Easing");
+        public static readonly LocalisableString BOUNCE_EASING_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("关键帧之间的缓动。直线为 None。", "Easing between keys. None is linear.");
+
+        public static readonly LocalisableString BOUNCE_OVERSHOOT_LABEL = new EzLocalizationManager.EzLocalisableString("回弹位移", "Overshoot");
+        public static readonly LocalisableString BOUNCE_OVERSHOOT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("回到原位后再走的位移，0 为不回弹。向下为正。", "Extra offset after returning to rest. Zero skips it. Positive is downward.");
+
+        public static readonly LocalisableString BOUNCE_START_ALPHA_LABEL = new EzLocalizationManager.EzLocalisableString("起始透明度", "Start Alpha");
+        public static readonly LocalisableString BOUNCE_START_ALPHA_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("弹出开始时的透明度。", "Alpha at the start of the pop.");
     }
 }
