@@ -20,6 +20,10 @@ namespace osu.Game.EzOsuGame.Animation
 
         public const string COMBO = "Combo";
 
+        public const string COMBO_NEW = "ComboAni_New";
+
+        public const string COMBO_NEW_TITLE = "ComboAni_New_Title";
+
         public const string OVER_OBJECT = "OverObject";
 
         public const string JUDGEMENT_ANI = "JudgementAni";
@@ -49,6 +53,23 @@ namespace osu.Game.EzOsuGame.Animation
                 return false;
             }
 
+            return true;
+        }
+
+        /// <summary>
+        /// 播放该主题的 combo 出现动画。标题只播标题通道。
+        /// </summary>
+        public static bool TryPlayCombo(EzEnumDeformTemplate selection, Drawable drawable, bool title)
+        {
+            if (!TryGetDeformTheme(selection, out EzEnumGameThemeName theme))
+                return false;
+
+            string clip = title ? COMBO_NEW_TITLE : COMBO_NEW;
+
+            if (!TryGet(COMBO, clip, theme, out EzAnimationTemplate template))
+                return false;
+
+            template.Play(drawable, true);
             return true;
         }
 

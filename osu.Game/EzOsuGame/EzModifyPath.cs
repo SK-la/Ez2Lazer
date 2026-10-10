@@ -11,6 +11,8 @@ namespace osu.Game.EzOsuGame
         public const string RESOURCES_PATH = @"EzResources";
         public const string NOTE_PATH = @"EzResources/note";
         public const string STAGE_PATH = @"EzResources/Stage";
+        public const string PANEL_PATH = @"EzResources/Panel";
+        public const string COLUMN_PATH = @"EzResources/Column";
         public const string GAME_THEME_PATH = @"EzResources/GameTheme";
         public const string FULL_COMBO = @"EzResources/Modify/FullCombo";
 

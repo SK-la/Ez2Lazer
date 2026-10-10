@@ -98,7 +98,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             float scale = actualPanelWidth / 412.0f;
 
             sprite.Scale = new Vector2(scale);
-            sprite.Y = 205f - 384f * scale + ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
+
+            // 以后加入Hint后，还要下调第一个值。
+            sprite.Y = 285f - 384f * scale + ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
 
             // 计算纹理高度和位置
             // float textureHeight = sprite.Child.Height * scale;

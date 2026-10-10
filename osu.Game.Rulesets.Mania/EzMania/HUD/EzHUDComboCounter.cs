@@ -1,12 +1,14 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Animation;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
@@ -21,6 +23,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
     public partial class EzHUDComboCounter : ComboCounter
     {
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.ANIMATION_TEMPLATE_LABEL), nameof(EzHUDManiaStrings.ANIMATION_TEMPLATE_DESCRIPTION))]
+        public Bindable<EzEnumDeformTemplate> AnimationTemplate { get; } = new Bindable<EzEnumDeformTemplate>();
+
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.FONT_LABEL), nameof(EzHUDManiaStrings.FONT_DESCRIPTION), SettingControlType = typeof(EzSelectorEnumList))]
         public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
@@ -78,11 +83,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
 
         public EzComboText Text = null!;
+
         protected override double RollingDuration => 250;
         protected virtual bool DisplayXSymbol => true;
 
         [BackgroundDependencyLoader]
-        private void load(ScoreProcessor scoreProcessor)
+        private void load(ScoreProcessor scoreProcessor, Ez2ConfigManager ezConfig)
         {
             Current.BindTo(scoreProcessor.Combo);
             Current.BindValueChanged(combo =>
@@ -100,10 +106,33 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
             AccentAlpha.BindValueChanged(alpha => Text.Alpha = alpha.NewValue, true);
             AccentColour.BindValueChanged(_ => Text.Colour = AccentColour.Value, true);
+            AnimationTemplate.BindValueChanged(_ => updateHandwrittenEffect(), true);
+            ezConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName).BindValueChanged(theme =>
+            {
+                if (Enum.TryParse(theme.NewValue.ToString(), out EzEnumDeformTemplate template))
+                    AnimationTemplate.Value = template;
+            });
+        }
+
+        private void updateHandwrittenEffect()
+        {
+            bool extracted = EzAnimationLibrary.TryGetDeformTheme(AnimationTemplate.Value, out EzEnumGameThemeName theme)
+                             && EzAnimationLibrary.TryGet(EzAnimationLibrary.COMBO, EzAnimationLibrary.COMBO_NEW, theme, out _);
+
+            EffectType.Disabled = extracted;
+            EffectStartFactor.Disabled = extracted;
+            EffectEndFactor.Disabled = extracted;
+            EffectStartTime.Disabled = extracted;
+            EffectEndDuration.Disabled = extracted;
         }
 
         private void applyAnimation(bool wasIncrease, bool wasMiss)
         {
+            if (EzAnimationLibrary.TryPlayCombo(AnimationTemplate.Value, Text.TextContainer, title: false))
+                return;
+
+            resetHandwrittenTarget();
+
             switch (EffectType.Value)
             {
                 case EzComEffectType.Scale:
@@ -128,6 +157,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
                         EffectEndDuration.Value);
                     break;
             }
+        }
+
+        private void resetHandwrittenTarget()
+        {
+            Text.TextContainer.FinishTransforms();
+            Text.TextContainer.Scale = Vector2.One;
+            Text.TextContainer.Position = Vector2.Zero;
+            Text.TextContainer.Alpha = 1;
         }
 
         protected override LocalisableString FormatCount(int count) => DisplayXSymbol ? $@"{count}" : count.ToString();

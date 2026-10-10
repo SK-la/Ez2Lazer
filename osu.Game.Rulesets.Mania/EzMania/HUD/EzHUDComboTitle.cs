@@ -1,10 +1,12 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Animation;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
@@ -20,6 +22,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
     public partial class EzHUDComboTitle : HitErrorMeter
     {
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.ANIMATION_TEMPLATE_LABEL), nameof(EzHUDManiaStrings.ANIMATION_TEMPLATE_DESCRIPTION))]
+        public Bindable<EzEnumDeformTemplate> AnimationTemplate { get; } = new Bindable<EzEnumDeformTemplate>();
+
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.FONT_LABEL), nameof(EzHUDManiaStrings.FONT_DESCRIPTION), SettingControlType = typeof(EzSelectorEnumList))]
         public Bindable<EzEnumGameThemeName> Font { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
@@ -80,7 +85,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         }
 
         [BackgroundDependencyLoader]
-        private void load(ScoreProcessor scoreProcessor)
+        private void load(ScoreProcessor scoreProcessor, Ez2ConfigManager ezConfig)
         {
             InternalChildren = new Drawable[]
             {
@@ -100,6 +105,25 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
                 applyAnimation(wasIncrease, wasMiss);
             });
+
+            AnimationTemplate.BindValueChanged(_ => updateHandwrittenEffect(), true);
+            ezConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName).BindValueChanged(theme =>
+            {
+                if (Enum.TryParse(theme.NewValue.ToString(), out EzEnumDeformTemplate template))
+                    AnimationTemplate.Value = template;
+            });
+        }
+
+        private void updateHandwrittenEffect()
+        {
+            bool extracted = EzAnimationLibrary.TryGetDeformTheme(AnimationTemplate.Value, out EzEnumGameThemeName theme)
+                             && EzAnimationLibrary.TryGet(EzAnimationLibrary.COMBO, EzAnimationLibrary.COMBO_NEW_TITLE, theme, out _);
+
+            Effect.Disabled = extracted;
+            EffectOrigin.Disabled = extracted;
+            EffectStartFactor.Disabled = extracted;
+            EffectStartTime.Disabled = extracted;
+            EffectEndDuration.Disabled = extracted;
         }
 
         protected override void LoadComplete()
@@ -138,6 +162,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
         private void applyAnimation(bool wasIncrease, bool wasMiss)
         {
+            if (EzAnimationLibrary.TryPlayCombo(AnimationTemplate.Value, Text.TextContainer, title: true))
+                return;
+
+            Text.TextContainer.FinishTransforms();
+            Text.TextContainer.Scale = Vector2.One;
+            Text.TextContainer.Position = Vector2.Zero;
+            Text.TextContainer.Alpha = 1;
+
             switch (Effect.Value)
             {
                 case EzComEffectType.Scale:
