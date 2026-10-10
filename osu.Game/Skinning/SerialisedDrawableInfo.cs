@@ -79,11 +79,11 @@ namespace osu.Game.Skinning
             if (component is ISerialisableDrawable serialisableDrawable)
                 UsesFixedAnchor = serialisableDrawable.UsesFixedAnchor;
 
-            foreach (var (_, property) in component.GetSettingsSourceProperties())
+            foreach (var entry in component.GetSkinSettingEntries())
             {
-                var bindable = (IBindable)property.GetValue(component)!;
+                var bindable = (IBindable)entry.Property.GetValue(entry.Target)!;
 
-                Settings.Add(property.Name.ToSnakeCase(), bindable.GetUnderlyingSettingValue());
+                Settings.Add(entry.StorageName.ToSnakeCase(), bindable.GetUnderlyingSettingValue());
             }
 
             if (component is Container<Drawable> container)

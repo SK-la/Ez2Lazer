@@ -48,7 +48,7 @@ namespace osu.Game.EzOsuGame.Configuration
         StaticScroll,
     }
 
-    public enum EzComEffectType
+    public enum EzEffectType
     {
         [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.SCALE))]
         Scale,
