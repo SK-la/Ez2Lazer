@@ -324,6 +324,21 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString CAMERA_UNAVAILABLE = new EzLocalizationManager.EzLocalisableString("摄像头未能打开。", "The camera could not be opened.");
         public static readonly LocalisableString CAMERA_PLATFORM_UNSUPPORTED = new EzLocalizationManager.EzLocalisableString("当前平台没有本地摄像头后端。", "This platform has no local camera backend.");
 
+        public static readonly LocalisableString EFFECT_TYPE_LABEL = new EzLocalizationManager.EzLocalisableString("动画效果", "Animation Effect");
+        public static readonly LocalisableString EFFECT_TYPE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择动画效果类型", "Select animation effect type.");
+
+        public static readonly LocalisableString EFFECT_START_FACTOR_LABEL = new EzLocalizationManager.EzLocalisableString("动效起始系数", "Effect Start Factor");
+        public static readonly LocalisableString EFFECT_START_FACTOR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动画开始时的缩放或位移系数", "Scaling or displacement factor at animation start.");
+
+        public static readonly LocalisableString EFFECT_END_FACTOR_LABEL = new EzLocalizationManager.EzLocalisableString("动效结束系数", "Effect End Factor");
+        public static readonly LocalisableString EFFECT_END_FACTOR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动画结束时的缩放或位移系数", "Scaling or displacement factor at animation end.");
+
+        public static readonly LocalisableString EFFECT_START_DURATION_LABEL = new EzLocalizationManager.EzLocalisableString("动效起始时长", "Effect Start Duration");
+        public static readonly LocalisableString EFFECT_START_DURATION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动画开始阶段的持续时间（毫秒）", "Duration of the animation start phase (milliseconds).");
+
+        public static readonly LocalisableString EFFECT_END_DURATION_LABEL = new EzLocalizationManager.EzLocalisableString("动效结束时长", "Effect End Duration");
+        public static readonly LocalisableString EFFECT_END_DURATION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动画结束阶段的持续时间（毫秒）", "Duration of the animation end phase (milliseconds).");
+
         public static readonly LocalisableString BOUNCE_PEAK_LABEL = new EzLocalizationManager.EzLocalisableString("弹跳顶点", "Bounce Peak");
         public static readonly LocalisableString BOUNCE_PEAK_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("相对静止位置的上下位移，向下为正。", "Vertical offset from rest. Positive is downward.");
 

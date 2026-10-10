@@ -98,19 +98,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     combo1.Origin = Anchor.TopCentre;
                                     combo1.Y = 200;
                                     combo1.AccentAlpha.Value = 0.8f;
-                                    combo1.EffectStartFactor.Value = 1.5f;
-                                    combo1.EffectEndFactor.Value = 1f;
-                                    combo1.EffectStartTime.Value = 10;
-                                    combo1.EffectEndDuration.Value = 500;
+                                    combo1.Effects.Scale.StartFactor.Value = 1.5f;
+                                    combo1.Effects.Scale.EndFactor.Value = 1f;
+                                    combo1.Effects.Scale.StartTime.Value = 10;
+                                    combo1.Effects.Scale.EndDuration.Value = 500;
 
                                     combo2.Anchor = Anchor.TopCentre;
                                     combo2.Origin = Anchor.TopCentre;
                                     combo2.Y = 200;
                                     combo2.AccentAlpha.Value = 0.4f;
-                                    combo2.EffectStartFactor.Value = 3f;
-                                    combo2.EffectEndFactor.Value = 1f;
-                                    combo2.EffectStartTime.Value = 10;
-                                    combo2.EffectEndDuration.Value = 300;
+                                    combo2.Effects.Scale.StartFactor.Value = 3f;
+                                    combo2.Effects.Scale.EndFactor.Value = 1f;
+                                    combo2.Effects.Scale.StartTime.Value = 10;
+                                    combo2.Effects.Scale.EndDuration.Value = 300;
                                 }
 
                                 var keyCounter = container.ChildrenOfType<EzHUDKeyCounterDisplay>().FirstOrDefault();

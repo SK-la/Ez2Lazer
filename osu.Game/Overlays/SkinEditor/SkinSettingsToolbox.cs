@@ -2,10 +2,12 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Linq;
+using System.Reflection;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Effects;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Edit;
@@ -45,6 +47,15 @@ namespace osu.Game.Overlays.SkinEditor
 
             if (component is IScopedSkinSettings scoped)
                 scoped.WatchSettingsScope(() => Scheduler.AddOnce(rebuild));
+
+            foreach (var property in component.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (property.GetCustomAttribute<EzBuiltinEffectSourceAttribute>(true) == null)
+                    continue;
+
+                if (property.GetValue(component) is IScopedSkinSettings host)
+                    host.WatchSettingsScope(() => Scheduler.AddOnce(rebuild));
+            }
         }
 
         private void rebuild()

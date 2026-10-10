@@ -79,7 +79,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                                     combo1.Anchor = Anchor.TopCentre;
                                     combo1.Origin = Anchor.Centre;
                                     combo1.Y = 200;
-                                    combo1.EffectType.Value = EzEffectType.None;
+                                    combo1.Effects.EffectType.Value = EzEffectType.None;
                                 }
 
                                 var hitErrorMeter = container.OfType<BarHitErrorMeter>().FirstOrDefault();

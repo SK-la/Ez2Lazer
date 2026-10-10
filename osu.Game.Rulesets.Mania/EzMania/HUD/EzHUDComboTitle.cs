@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Reflection;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -21,19 +20,13 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
-    public partial class EzHUDComboTitle : HitErrorMeter, IScopedSkinSettings
+    public partial class EzHUDComboTitle : HitErrorMeter
     {
-        private readonly EzScaleEffect scaleEffect = EzScaleEffect.ForTitle();
-        private readonly EzBounceEffect bounceEffect = EzBounceEffect.ForTitle();
-
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.ANIMATION_TEMPLATE_LABEL), nameof(EzHUDManiaStrings.ANIMATION_TEMPLATE_DESCRIPTION))]
         public Bindable<EzEnumDeformTemplate> AnimationTemplate { get; } = new Bindable<EzEnumDeformTemplate>();
 
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.FONT_LABEL), nameof(EzHUDManiaStrings.FONT_DESCRIPTION), SettingControlType = typeof(EzSelectorEnumList))]
         public Bindable<EzEnumGameThemeName> Font { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
-
-        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_TYPE_LABEL), nameof(EzHUDManiaStrings.EFFECT_TYPE_DESCRIPTION))]
-        public Bindable<EzEffectType> Effect { get; } = new Bindable<EzEffectType>(EzEffectType.Scale);
 
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_ORIGIN_LABEL), nameof(EzHUDManiaStrings.EFFECT_ORIGIN_DESCRIPTION), SettingControlType = typeof(AnchorDropdown))]
         public Bindable<Anchor> EffectOrigin { get; } = new Bindable<Anchor>(Anchor.TopCentre)
@@ -42,45 +35,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             Value = Anchor.TopCentre
         };
 
-        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_START_FACTOR_LABEL), nameof(EzHUDManiaStrings.EFFECT_START_FACTOR_DESCRIPTION))]
-        [EzEffectSetting(EzEffectType.Scale)]
-        public BindableNumber<float> EffectStartFactor => scaleEffect.StartFactor;
-
-        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_START_DURATION_LABEL), nameof(EzHUDManiaStrings.EFFECT_START_DURATION_DESCRIPTION))]
-        [EzEffectSetting(EzEffectType.Scale)]
-        public BindableNumber<float> EffectStartTime => scaleEffect.StartTime;
-
-        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_END_DURATION_LABEL), nameof(EzHUDManiaStrings.EFFECT_END_DURATION_DESCRIPTION))]
-        [EzEffectSetting(EzEffectType.Scale)]
-        public BindableNumber<float> EffectEndDuration => scaleEffect.EndDuration;
-
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BOUNCE_PEAK_LABEL), nameof(EzHUDStrings.BOUNCE_PEAK_DESCRIPTION))]
-        [EzEffectSetting(EzEffectType.Bounce)]
-        public BindableNumber<float> BouncePeak => bounceEffect.Peak;
-
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BOUNCE_RETURN_LABEL), nameof(EzHUDStrings.BOUNCE_RETURN_DESCRIPTION))]
-        [EzEffectSetting(EzEffectType.Bounce)]
-        public BindableNumber<float> BounceReturnDuration => bounceEffect.ReturnDuration;
-
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BOUNCE_EASING_LABEL), nameof(EzHUDStrings.BOUNCE_EASING_DESCRIPTION))]
-        [EzEffectSetting(EzEffectType.Bounce)]
-        public Bindable<Easing> BounceEasing => bounceEffect.Ease;
-
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BOUNCE_OVERSHOOT_LABEL), nameof(EzHUDStrings.BOUNCE_OVERSHOOT_DESCRIPTION))]
-        [EzEffectSetting(EzEffectType.Bounce)]
-        public BindableNumber<float> BounceOvershoot => bounceEffect.Overshoot;
-
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BOUNCE_START_ALPHA_LABEL), nameof(EzHUDStrings.BOUNCE_START_ALPHA_DESCRIPTION))]
-        [EzEffectSetting(EzEffectType.Bounce)]
-        public BindableNumber<float> BounceStartAlpha => bounceEffect.StartAlpha;
-
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BOUNCE_ALPHA_LABEL), nameof(EzHUDStrings.BOUNCE_ALPHA_DESCRIPTION))]
-        [EzEffectSetting(EzEffectType.Bounce)]
-        public BindableNumber<float> BounceAlpha => bounceEffect.Alpha;
-
-        public bool IsSettingActive(PropertyInfo property) => EzEffectSettingAttribute.IsActive(property, Effect.Value);
-
-        public void WatchSettingsScope(Action onChange) => Effect.BindValueChanged(_ => onChange());
+        [EzBuiltinEffectSource("Effect")]
+        public EzBuiltinEffectHost Effects { get; } = EzBuiltinEffectHost.ForTitle();
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.ALPHA_LABEL), nameof(EzHUDStrings.ALPHA_DESCRIPTION))]
         public BindableNumber<float> BoxAlpha { get; } = new BindableNumber<float>(1)
@@ -126,22 +82,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
                 applyAnimation(wasIncrease, wasMiss);
             });
 
-            AnimationTemplate.BindValueChanged(_ => updateHandwrittenEffect(), true);
             ezConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName).BindValueChanged(theme =>
             {
                 if (Enum.TryParse(theme.NewValue.ToString(), out EzEnumDeformTemplate template))
                     AnimationTemplate.Value = template;
             });
-        }
-
-        private void updateHandwrittenEffect()
-        {
-            bool extracted = EzAnimationLibrary.TryGetDeformTheme(AnimationTemplate.Value, out EzEnumGameThemeName theme)
-                             && EzAnimationLibrary.TryGet(EzAnimationLibrary.COMBO, EzAnimationLibrary.COMBO_NEW_TITLE, theme, out _);
-
-            scaleEffect.SetEnabled(!extracted);
-            bounceEffect.SetEnabled(!extracted);
-            EffectOrigin.Disabled = extracted;
         }
 
         protected override void LoadComplete()
@@ -157,17 +102,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
                 {
                     EffectOrigin.Value = Anchor.TopCentre; // 设置为默认值
                 }
-
-                // switch (EffectOrigin.Value)
-                // {
-                //     case Anchor.TopCentre:
-                //         Text.TextContainer.Anchor = Anchor.BottomCentre;
-                //         break;
-                //
-                //     case Anchor.BottomCentre:
-                //         Text.TextContainer.Anchor = Anchor.TopCentre;
-                //         break;
-                // }
 
                 Text.TextContainer.Anchor = EffectOrigin.Value;
             }, true);
@@ -187,17 +121,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             Text.TextContainer.Scale = Vector2.One;
             Text.TextContainer.Position = Vector2.Zero;
             Text.TextContainer.Alpha = 1;
-
-            switch (Effect.Value)
-            {
-                case EzEffectType.Scale:
-                    scaleEffect.Play(Text.TextContainer, wasIncrease, wasMiss);
-                    break;
-
-                case EzEffectType.Bounce:
-                    bounceEffect.Play(Text.TextContainer, wasIncrease, wasMiss);
-                    break;
-            }
+            Effects.Play(Text.TextContainer, wasIncrease, wasMiss);
         }
 
         protected override void OnNewJudgement(JudgementResult judgement)
