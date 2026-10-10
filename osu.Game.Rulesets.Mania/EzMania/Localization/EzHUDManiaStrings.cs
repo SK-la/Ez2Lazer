@@ -9,6 +9,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Localization
     public static class EzHUDManiaStrings
     {
         // EzHUDComboCounter & EzHUDComboTitle
+        public static readonly LocalisableString ANIMATION_TEMPLATE_LABEL = new EzLocalizationManager.EzLocalisableString("动画模板", "Animation Template");
+
+        public static readonly LocalisableString ANIMATION_TEMPLATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "默认内置，和另一个组件互不影响。切换全局主题时套用到这里，之后仍可单独改成内置或其他主题。",
+            "Built-in by default, independent of the other component. Changing the global theme applies it here; it can still be set back to built-in or another theme afterwards.");
+
         public static readonly LocalisableString FONT_LABEL = new EzLocalizationManager.EzLocalisableString("字体", "Font");
         public static readonly LocalisableString FONT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("加载来自EzResources的自定义资源", "Load custom resources from EzResources.");
 
