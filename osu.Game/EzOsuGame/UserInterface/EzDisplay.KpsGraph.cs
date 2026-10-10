@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
 using osu.Framework.Layout;
@@ -22,16 +23,14 @@ namespace osu.Game.EzOsuGame.UserInterface
     /// <summary>
     /// KPS折线图
     /// </summary>
-    /// 支持可选的尾部补零，默认单色 TriangleBorder 折线。
+    /// 支持可选的尾部补零，单色抗锯齿折线直接画到屏幕。
     public partial class EzDisplayKpsGraph : CompositeDrawable
     {
         private const float line_thickness = 1.5f;
-        private const float border_thickness = 0.15f;
-        private const float border_texel_size = 0.005f;
         private const int max_display_points = 128;
 
         private readonly Container graphColourContainer;
-        private readonly TriangleBorderPath graphPath;
+        private readonly KpsStroke stroke;
 
         private float[] values;
         private Color4 lineColour = Colour4.CornflowerBlue;
@@ -108,7 +107,12 @@ namespace osu.Game.EzOsuGame.UserInterface
         public void AlignBesideRow(Drawable row, float leftMargin = 4f)
         {
             float y = (row.DrawHeight - DrawHeight) * 0.5f;
-            Position = new Vector2(row.DrawWidth + leftMargin, y);
+            var next = new Vector2(row.DrawWidth + leftMargin, y);
+
+            if (Position == next)
+                return;
+
+            Position = next;
         }
 
         public EzDisplayKpsGraph()
@@ -120,11 +124,9 @@ namespace osu.Game.EzOsuGame.UserInterface
                 Masking = true,
                 RelativeSizeAxes = Axes.Both,
                 Colour = ColourInfo.SingleColour(lineColour),
-                Child = graphPath = new TriangleBorderPath(border_thickness, border_texel_size)
+                Child = stroke = new KpsStroke
                 {
-                    AutoSizeAxes = Axes.None,
                     RelativeSizeAxes = Axes.Both,
-                    PathRadius = line_thickness / 2f,
                 }
             });
 
@@ -190,7 +192,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 ActualMaxValue = float.NaN;
                 ActualMinValue = float.NaN;
 
-                graphPath.ClearVertices();
+                stroke.ClearPoints();
                 pathCached.Invalidate();
                 lastExtendToBaseline = extendToBaseline;
                 lastSourceLengthMs = sourceLengthMs;
@@ -269,22 +271,26 @@ namespace osu.Game.EzOsuGame.UserInterface
 
         private void applyPath()
         {
-            graphPath.ClearVertices();
-
             if (valuesCount < 2)
+            {
+                stroke.ClearPoints();
                 return;
+            }
 
-            float inset = 2 * graphPath.PathRadius;
-            float availableWidth = Math.Max(0, graphPath.DrawWidth - inset);
-            float availableHeight = Math.Max(0, graphPath.DrawHeight - inset);
+            float inset = line_thickness;
+            float availableWidth = Math.Max(0, stroke.DrawWidth - inset);
+            float availableHeight = Math.Max(0, stroke.DrawHeight - inset);
             int denominator = Math.Max(1, valuesCount - 1);
+            var points = stroke.PreparePoints(valuesCount);
 
             for (int i = 0; i < valuesCount; i++)
             {
                 float x = i / (float)denominator * availableWidth;
                 float y = getYPosition(values[i]) * availableHeight;
-                graphPath.AddVertex(new Vector2(x, y));
+                points[i] = new Vector2(x, y);
             }
+
+            stroke.CommitPoints();
         }
 
         private static int getSourceIndex(int index, int sampledCount, int sourceCount)
@@ -371,5 +377,70 @@ namespace osu.Game.EzOsuGame.UserInterface
         }
 
         private float getYPosition(float value) => getYPosition(value, ActualMinValue, ActualMaxValue);
+
+        private partial class KpsStroke : Drawable
+        {
+            private Vector2[] points = Array.Empty<Vector2>();
+            private int pointCount;
+
+            public void ClearPoints()
+            {
+                if (pointCount == 0)
+                    return;
+
+                pointCount = 0;
+                Invalidate(Invalidation.DrawNode);
+            }
+
+            public Span<Vector2> PreparePoints(int count)
+            {
+                if (points.Length < count)
+                    Array.Resize(ref points, count);
+
+                pointCount = count;
+                return points.AsSpan(0, count);
+            }
+
+            public void CommitPoints() => Invalidate(Invalidation.DrawNode);
+
+            protected override DrawNode CreateDrawNode() => new KpsStrokeDrawNode(this);
+
+            private class KpsStrokeDrawNode : DrawNode
+            {
+                private readonly KpsStroke source;
+                private Vector2[] points = Array.Empty<Vector2>();
+                private int pointCount;
+
+                public KpsStrokeDrawNode(KpsStroke source)
+                    : base(source)
+                {
+                    this.source = source;
+                }
+
+                public override void ApplyState()
+                {
+                    base.ApplyState();
+
+                    pointCount = source.pointCount;
+
+                    if (points.Length < pointCount)
+                        Array.Resize(ref points, pointCount);
+
+                    if (pointCount > 0)
+                        Array.Copy(source.points, points, pointCount);
+                }
+
+                protected override void Draw(IRenderer renderer)
+                {
+                    if (pointCount < 2)
+                        return;
+
+                    Color4 colour = DrawColourInfo.Colour.TopLeft;
+                    renderer.PushLocalMatrix(DrawInfo.Matrix);
+                    EzSoftStroke.Draw(renderer, renderer.WhitePixel, points.AsSpan(0, pointCount), line_thickness, colour, false);
+                    renderer.PopLocalMatrix();
+                }
+            }
+        }
     }
 }

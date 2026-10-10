@@ -102,7 +102,7 @@ namespace osu.Game.EzOsuGame.HUD
         public BindableColour4 LabelColour { get; } = new BindableColour4(new Color4(255, 230, 128, 255));
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
-        public BindableColour4 BaseLineColour { get; } = new BindableColour4(new Color4(32, 32, 32, 240));
+        public BindableColour4 BaseLineColour { get; } = new BindableColour4(new Color4(255, 255, 255, 51));
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_BASE_AREA_COLOUR), nameof(EzHUDStrings.RADAR_BASE_AREA_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 BaseAreaColour { get; } = new BindableColour4(new Color4(44, 44, 50, 128));

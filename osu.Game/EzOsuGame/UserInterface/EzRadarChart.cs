@@ -3,28 +3,21 @@
 
 using System;
 using System.Collections.Generic;
-using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
+using osu.Framework.Graphics.Textures;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Lines;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Graphics.Textures;
 using osu.Framework.Layout;
 using osuTK;
 using osuTK.Graphics;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using Triangle = osu.Framework.Graphics.Primitives.Triangle;
 
 namespace osu.Game.EzOsuGame.UserInterface
 {
     public partial class EzRadarChart : CompositeDrawable
     {
-        private const float triangle_border_thickness = 0.15f;
-        private const float triangle_border_texel_size = 0.005f;
-
         private int axisCount = 6;
         private float[] dataRatios = new float[6];
         private float[]? secondaryDataRatios;
@@ -33,12 +26,6 @@ namespace osu.Game.EzOsuGame.UserInterface
         private readonly Container pointsLayer;
         private readonly List<Circle> primaryDots = new List<Circle>();
         private readonly List<Circle> secondaryDots = new List<Circle>();
-        private readonly Container strokeLayer;
-        private readonly List<SmoothPath> gridPaths = new List<SmoothPath>();
-        private readonly List<SmoothPath> axisPaths = new List<SmoothPath>();
-        private readonly SmoothPath outerRingPath;
-        private readonly TriangleBorderPath primaryOutline;
-        private readonly TriangleBorderPath secondaryOutline;
 
         private readonly LayoutValue geometryCached = new LayoutValue(Invalidation.DrawSize);
 
@@ -112,23 +99,12 @@ namespace osu.Game.EzOsuGame.UserInterface
         {
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
-            outerRingPath = createSmoothStrokePath();
 
             InternalChildren = new Drawable[]
             {
                 fillLayer = new EzRadarChartFillLayer(this)
                 {
                     RelativeSizeAxes = Axes.Both,
-                },
-                strokeLayer = new Container
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Blending = BlendingParameters.Additive,
-                    Children = new Drawable[]
-                    {
-                        primaryOutline = createTriangleBorderStrokePath(),
-                        secondaryOutline = createTriangleBorderStrokePath(),
-                    }
                 },
                 pointsLayer = new Container
                 {
@@ -138,18 +114,6 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             AddLayout(geometryCached);
         }
-
-        private static SmoothPath createSmoothStrokePath() => new SmoothPath
-        {
-            AutoSizeAxes = Axes.None,
-            RelativeSizeAxes = Axes.Both,
-        };
-
-        private TriangleBorderPath createTriangleBorderStrokePath() => new TriangleBorderPath(triangle_border_thickness, triangle_border_texel_size)
-        {
-            AutoSizeAxes = Axes.None,
-            RelativeSizeAxes = Axes.Both,
-        };
 
         private void invalidateGeometry()
         {
@@ -191,84 +155,30 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             if (!geometryCached.IsValid)
             {
-                rebuildStrokeGeometry();
+                layoutPoints();
                 geometryCached.Validate();
             }
         }
 
-        private void rebuildStrokeGeometry()
+        private void layoutPoints()
         {
             float radius = Math.Min(DrawWidth, DrawHeight) * 0.5f * Math.Clamp(RadiusRatio, 0.1f, 1);
             if (radius <= 0)
                 return;
 
             Vector2 center = DrawSize * 0.5f;
-            int levels = Math.Max(1, GridLevels);
-            int internalLevels = Math.Max(0, levels - 1);
-
-            ensureSmoothPathPool(gridPaths, internalLevels);
-            ensureSmoothPathPool(axisPaths, axisCount);
-
-            strokeLayer.Clear(false);
-            for (int i = 0; i < internalLevels; i++)
-                strokeLayer.Add(gridPaths[i]);
-            strokeLayer.Add(outerRingPath);
-            for (int i = 0; i < axisCount; i++)
-                strokeLayer.Add(axisPaths[i]);
-
-            var outerVertices = new Vector2[axisCount];
-            var outerRingVertices = new Vector2[axisCount];
-            var levelVertices = new Vector2[axisCount];
             var primaryVertices = new Vector2[axisCount];
-            var secondaryVertices = new Vector2[axisCount];
-
-            fillVerticesUniform(outerVertices, center, radius, 1f);
-            fillVerticesUniform(outerRingVertices, center, radius, 1f, Math.Max(0f, OuterRingRadialOffset));
-
-            for (int level = 1; level <= internalLevels; level++)
-            {
-                float ratio = level / (float)levels;
-                fillVerticesUniform(levelVertices, center, radius, ratio);
-                updateClosedPath(gridPaths[level - 1], levelVertices, GridColour, GridThickness);
-            }
-
-            updateClosedPath(outerRingPath, outerRingVertices, OuterRingColour, OuterRingThickness);
-
-            for (int i = 0; i < axisCount; i++)
-                updateOpenPath(axisPaths[i], center, outerVertices[i], AxisColour, AxisThickness);
-
             fillVerticesFromRatios(primaryVertices, center, radius, dataRatios);
 
-            if (secondaryDataRatios == null)
+            Vector2[]? secondaryVertices = null;
+
+            if (secondaryDataRatios != null)
             {
-                updateClosedPath(primaryOutline, primaryVertices, DataStrokeColour, DataOutlineThickness);
-                secondaryOutline.Alpha = 0;
-                strokeLayer.Add(primaryOutline);
-            }
-            else
-            {
+                secondaryVertices = new Vector2[axisCount];
                 fillVerticesFromRatios(secondaryVertices, center, radius, secondaryDataRatios);
-                secondaryOutline.Alpha = 1;
-
-                bool primaryIsSmaller = averageRatio(dataRatios) <= averageRatio(secondaryDataRatios);
-
-                if (primaryIsSmaller)
-                {
-                    updateClosedPath(secondaryOutline, secondaryVertices, SecondaryDataStrokeColour, DataOutlineThickness);
-                    updateClosedPath(primaryOutline, primaryVertices, DataStrokeColour, DataOutlineThickness);
-                    strokeLayer.Add(secondaryOutline);
-                    strokeLayer.Add(primaryOutline);
-                }
-                else
-                {
-                    updateClosedPath(primaryOutline, primaryVertices, DataStrokeColour, DataOutlineThickness);
-                    updateClosedPath(secondaryOutline, secondaryVertices, SecondaryDataStrokeColour, DataOutlineThickness);
-                    strokeLayer.Add(primaryOutline);
-                    strokeLayer.Add(secondaryOutline);
-                }
             }
 
-            rebuildPointGeometry(primaryVertices, secondaryDataRatios == null ? null : secondaryVertices);
+            rebuildPointGeometry(primaryVertices, secondaryVertices);
         }
 
         private void rebuildPointGeometry(Vector2[] primaryVertices, Vector2[]? secondaryVertices)
@@ -320,33 +230,6 @@ namespace osu.Game.EzOsuGame.UserInterface
             dot.Alpha = 1;
         }
 
-        private void ensureSmoothPathPool(List<SmoothPath> pool, int count)
-        {
-            while (pool.Count < count)
-                pool.Add(createSmoothStrokePath());
-        }
-
-        private static void updateClosedPath(Path path, IReadOnlyList<Vector2> polygonVertices, Color4 colour, float thickness)
-        {
-            path.PathRadius = Math.Max(0.5f, thickness) / 2f;
-            path.Colour = ColourInfo.SingleColour(colour);
-            path.ClearVertices();
-
-            for (int i = 0; i < polygonVertices.Count; i++)
-                path.AddVertex(polygonVertices[i]);
-
-            path.AddVertex(polygonVertices[0]);
-        }
-
-        private static void updateOpenPath(Path path, Vector2 start, Vector2 end, Color4 colour, float thickness)
-        {
-            path.PathRadius = Math.Max(0.5f, thickness) / 2f;
-            path.Colour = ColourInfo.SingleColour(colour);
-            path.ClearVertices();
-            path.AddVertex(start);
-            path.AddVertex(end);
-        }
-
         private void fillVerticesUniform(Vector2[] vertices, Vector2 center, float radius, float ratio, float radialOffset = 0f)
         {
             float distance = radius * ratio + radialOffset;
@@ -388,34 +271,10 @@ namespace osu.Game.EzOsuGame.UserInterface
         private partial class EzRadarChartFillLayer : Drawable
         {
             private readonly EzRadarChart chart;
-            private Texture? whitePixel;
 
             public EzRadarChartFillLayer(EzRadarChart chart)
             {
                 this.chart = chart;
-            }
-
-            [BackgroundDependencyLoader]
-            private void load(IRenderer renderer)
-            {
-                whitePixel = createWhitePixelTexture(renderer);
-            }
-
-            private static Texture createWhitePixelTexture(IRenderer renderer)
-            {
-                var texture = renderer.CreateTexture(1, 1, true);
-                var image = new Image<Rgba32>(1, 1);
-                image[0, 0] = new Rgba32(255, 255, 255, 255);
-                texture.SetData(new TextureUpload(image));
-                return texture;
-            }
-
-            protected override void Dispose(bool isDisposing)
-            {
-                if (isDisposing)
-                    whitePixel?.Dispose();
-
-                base.Dispose(isDisposing);
             }
 
             protected override DrawNode CreateDrawNode() => new EzRadarChartFillDrawNode(this);
@@ -428,11 +287,21 @@ namespace osu.Game.EzOsuGame.UserInterface
                 private float[]? secondaryRatios;
                 private int axisCount;
                 private float radiusRatio;
+                private int gridLevels;
+                private float gridThickness;
+                private float axisThickness;
+                private float outerRingThickness;
+                private float outerRingRadialOffset;
+                private float dataOutlineThickness;
+                private Color4 gridColour;
+                private Color4 axisColour;
+                private Color4 outerRingColour;
                 private Color4 baseFillColour;
                 private Color4 dataFillColour;
+                private Color4 dataStrokeColour;
                 private Color4 secondaryDataFillColour;
+                private Color4 secondaryDataStrokeColour;
                 private Vector2 drawSize;
-                private Texture? texture;
 
                 private Vector2[] outerVertices = Array.Empty<Vector2>();
                 private Vector2[] primaryVertices = Array.Empty<Vector2>();
@@ -448,15 +317,25 @@ namespace osu.Game.EzOsuGame.UserInterface
                 {
                     base.ApplyState();
 
-                    texture = source.whitePixel;
                     var chart = source.chart;
 
                     drawSize = source.DrawSize;
                     axisCount = chart.axisCount;
                     radiusRatio = Math.Clamp(chart.RadiusRatio, 0.1f, 1);
+                    gridLevels = Math.Max(1, chart.GridLevels);
+                    gridThickness = chart.GridThickness;
+                    axisThickness = chart.AxisThickness;
+                    outerRingThickness = chart.OuterRingThickness;
+                    outerRingRadialOffset = Math.Max(0f, chart.OuterRingRadialOffset);
+                    dataOutlineThickness = chart.DataOutlineThickness;
+                    gridColour = chart.GridColour;
+                    axisColour = chart.AxisColour;
+                    outerRingColour = chart.OuterRingColour;
                     baseFillColour = chart.BaseFillColour;
                     dataFillColour = chart.DataFillColour;
+                    dataStrokeColour = chart.DataStrokeColour;
                     secondaryDataFillColour = chart.SecondaryDataFillColour;
+                    secondaryDataStrokeColour = chart.SecondaryDataStrokeColour;
 
                     if (ratios.Length != axisCount)
                         Array.Resize(ref ratios, axisCount);
@@ -483,25 +362,24 @@ namespace osu.Game.EzOsuGame.UserInterface
 
                 protected override void Draw(IRenderer renderer)
                 {
-                    if (texture == null)
-                        return;
-
                     float radius = Math.Min(drawSize.X, drawSize.Y) * 0.5f * radiusRatio;
                     if (radius <= 0)
                         return;
 
                     Vector2 center = drawSize * 0.5f;
+                    Texture whitePixel = renderer.WhitePixel;
 
                     renderer.PushLocalMatrix(DrawInfo.Matrix);
 
                     fillVerticesUniform(outerVertices, center, radius, 1, axisCount);
-                    drawPolygonFill(renderer, outerVertices, baseFillColour);
+                    drawPolygonFill(renderer, whitePixel, outerVertices, baseFillColour);
 
                     fillVerticesFromRatios(primaryVertices, center, radius, ratios, axisCount);
 
                     if (secondaryRatios == null)
                     {
-                        drawFanFill(renderer, center, primaryVertices, dataFillColour);
+                        drawFanFill(renderer, whitePixel, center, primaryVertices, dataFillColour);
+                        drawStrokes(renderer, whitePixel, center, radius, primaryOnTop: true);
                     }
                     else
                     {
@@ -510,17 +388,51 @@ namespace osu.Game.EzOsuGame.UserInterface
 
                         if (primaryIsSmaller)
                         {
-                            drawFanFill(renderer, center, secondaryVertices, secondaryDataFillColour);
-                            drawFanFill(renderer, center, primaryVertices, dataFillColour);
+                            drawFanFill(renderer, whitePixel, center, secondaryVertices, secondaryDataFillColour);
+                            drawFanFill(renderer, whitePixel, center, primaryVertices, dataFillColour);
                         }
                         else
                         {
-                            drawFanFill(renderer, center, primaryVertices, dataFillColour);
-                            drawFanFill(renderer, center, secondaryVertices, secondaryDataFillColour);
+                            drawFanFill(renderer, whitePixel, center, primaryVertices, dataFillColour);
+                            drawFanFill(renderer, whitePixel, center, secondaryVertices, secondaryDataFillColour);
                         }
+
+                        drawStrokes(renderer, whitePixel, center, radius, primaryOnTop: primaryIsSmaller);
                     }
 
                     renderer.PopLocalMatrix();
+                }
+
+                private void drawStrokes(IRenderer renderer, Texture whitePixel, Vector2 center, float radius, bool primaryOnTop)
+                {
+                    int internalLevels = Math.Max(0, gridLevels - 1);
+
+                    for (int level = 1; level <= internalLevels; level++)
+                    {
+                        fillVerticesUniform(outerVertices, center, radius, level / (float)gridLevels, axisCount);
+                        EzSoftStroke.Draw(renderer, whitePixel, outerVertices.AsSpan(0, axisCount), gridThickness, gridColour, true);
+                    }
+
+                    fillVerticesUniform(outerVertices, center, radius + outerRingRadialOffset, 1, axisCount);
+                    EzSoftStroke.Draw(renderer, whitePixel, outerVertices.AsSpan(0, axisCount), outerRingThickness, outerRingColour, true);
+
+                    Span<Vector2> axis = stackalloc Vector2[2];
+                    axis[0] = center;
+                    fillVerticesUniform(outerVertices, center, radius, 1, axisCount);
+
+                    for (int i = 0; i < axisCount; i++)
+                    {
+                        axis[1] = outerVertices[i];
+                        EzSoftStroke.Draw(renderer, whitePixel, axis, axisThickness, axisColour, false);
+                    }
+
+                    if (primaryOnTop && secondaryRatios != null)
+                        EzSoftStroke.Draw(renderer, whitePixel, secondaryVertices.AsSpan(0, axisCount), dataOutlineThickness, secondaryDataStrokeColour, true);
+
+                    EzSoftStroke.Draw(renderer, whitePixel, primaryVertices.AsSpan(0, axisCount), dataOutlineThickness, dataStrokeColour, true);
+
+                    if (!primaryOnTop && secondaryRatios != null)
+                        EzSoftStroke.Draw(renderer, whitePixel, secondaryVertices.AsSpan(0, axisCount), dataOutlineThickness, secondaryDataStrokeColour, true);
                 }
 
                 private static void ensureVertexCapacity(ref Vector2[] buffer, int count)
@@ -540,12 +452,12 @@ namespace osu.Game.EzOsuGame.UserInterface
                     }
                 }
 
-                private void drawPolygonFill(IRenderer renderer, IReadOnlyList<Vector2> polygonVertices, Color4 colour)
+                private static void drawPolygonFill(IRenderer renderer, Texture texture, IReadOnlyList<Vector2> polygonVertices, Color4 colour)
                 {
                     for (int i = 1; i < polygonVertices.Count - 1; i++)
                     {
                         renderer.DrawTriangle(
-                            texture!,
+                            texture,
                             new Triangle(
                                 polygonVertices[0],
                                 polygonVertices[i],
@@ -566,12 +478,12 @@ namespace osu.Game.EzOsuGame.UserInterface
                     }
                 }
 
-                private void drawFanFill(IRenderer renderer, Vector2 center, IReadOnlyList<Vector2> polygonVertices, Color4 colour)
+                private static void drawFanFill(IRenderer renderer, Texture texture, Vector2 center, IReadOnlyList<Vector2> polygonVertices, Color4 colour)
                 {
                     for (int i = 0; i < polygonVertices.Count; i++)
                     {
                         renderer.DrawTriangle(
-                            texture!,
+                            texture,
                             new Triangle(
                                 center,
                                 polygonVertices[i],
