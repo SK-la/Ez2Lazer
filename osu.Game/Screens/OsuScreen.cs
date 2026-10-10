@@ -319,6 +319,52 @@ namespace osu.Game.Screens
         /// </summary>
         protected virtual BackgroundScreen CreateBackground() => null;
 
+        /// <summary>
+        /// Replace this screen's background using <see cref="CreateBackground"/>.
+        /// A new instance that equals the current background is not pushed.
+        /// </summary>
+        protected void RefreshBackground()
+        {
+            if (backgroundStack == null || !this.IsCurrentScreen())
+                return;
+
+            BackgroundScreen next = CreateBackground();
+
+            if (next == null)
+                return;
+
+            if (backgroundStack.CurrentScreen is BackgroundScreen current && current.Equals(next))
+            {
+                next.Dispose();
+                background = current;
+                return;
+            }
+
+            if (ownedBackground != null && backgroundStack.CurrentScreen == ownedBackground)
+            {
+                backgroundStack.Exit();
+                ownedBackground = null;
+            }
+
+            if (backgroundStack.CurrentScreen is BackgroundScreen revealed && revealed.Equals(next))
+            {
+                next.Dispose();
+                background = revealed;
+                return;
+            }
+
+            if (backgroundStack.Push(next))
+            {
+                ownedBackground = next;
+                background = next;
+                return;
+            }
+
+            next.Dispose();
+            ownedBackground = null;
+            background = backgroundStack.CurrentScreen as BackgroundScreen;
+        }
+
         public virtual IReadOnlyList<ScreenFooterButton> CreateFooterButtons() => Array.Empty<ScreenFooterButton>();
 
         public virtual bool OnBackButton() => false;

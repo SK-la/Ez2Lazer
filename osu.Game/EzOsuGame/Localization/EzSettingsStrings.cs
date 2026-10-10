@@ -70,6 +70,33 @@ namespace osu.Game.EzOsuGame.Localization
             "主菜单与选歌界面 logo 外圈的音频抖动样式。",
             "Audio visualiser style around the logo on the main menu and song select.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_BACKDROP =
+            new EzLocalizationManager.EzLocalisableString("Logo 背景", "Logo background");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_BACKDROP_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "主界面大 logo 圆圈里的底色。",
+            "Fill inside the large logo on the main menu.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_BACKDROP_COLOUR =
+            new EzLocalizationManager.EzLocalisableString("颜色", "Colour");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_BACKDROP_BLUR =
+            new EzLocalizationManager.EzLocalisableString("虚化程度", "Blur");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_BACKDROP_OPACITY =
+            new EzLocalizationManager.EzLocalisableString("不透明度", "Opacity");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_BACKDROP_OPACITY_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "联动取色叠在圆圈上的不透明度。1 为完全不透明，0 为完全透明。",
+            "Opacity of the colour sampled from the background. 1 is opaque, 0 is clear.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SONG_SELECT_EZ_BACKGROUND =
+            new EzLocalizationManager.EzLocalisableString("仅使用 Ez 背景", "Ez background only");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SONG_SELECT_EZ_BACKGROUND_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后，选歌界面沿用主页背景，不再单独铺当前谱面的背景。主页来源是图片、视频或 Pixiv 时，选歌看到的是同一套。",
+            "When enabled, song select keeps the main menu background instead of loading the current beatmap background. Picture, video and Pixiv sources match the menu.");
+
         public static readonly EzLocalizationManager.EzLocalisableString HIDE_MAIN_MENU_ONLINE_BANNER =
             new EzLocalizationManager.EzLocalisableString("屏蔽主界面底部新闻广告", "Hide main menu bottom news banner");
 
