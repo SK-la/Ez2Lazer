@@ -14,12 +14,17 @@ namespace osu.Game.EzOsuGame.HUD
 {
     public partial class EzComboText : CompositeDrawable, IHasText
     {
+        private const float glyph_target_height = 25;
+
         private readonly EzComboSpriteText textPart;
         public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         // public Bindable<bool> UseLazerFont { get; } = new Bindable<bool>(false);
 
         public FillFlowContainer TextContainer { get; private set; }
+
+        // 位移写在字形父级上，不会跟着字形缩放。源图像素先经过度量缩放，再乘适配缩放。
+        public float SourcePixelScale => textPart.Scale.Y * EzSpriteText.GLYPH_METRIC_SCALE;
 
         public LocalisableString Text
         {
@@ -79,7 +84,7 @@ namespace osu.Game.EzOsuGame.HUD
             ThemeName.BindValueChanged(e =>
             {
                 textPart.ThemeName.Value = e.NewValue;
-                float scale = getUniformHeightScale(textPart.Height);
+                float scale = getUniformHeightScale(textPart.Height, glyph_target_height);
                 textPart.Scale = new Vector2(scale);
                 textPart.Invalidate(); // 确保 UI 立即刷新
             }, true);
