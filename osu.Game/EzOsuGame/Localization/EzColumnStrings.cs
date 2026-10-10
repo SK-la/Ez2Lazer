@@ -33,6 +33,34 @@ namespace osu.Game.EzOsuGame.Localization
             "Set the blur of each column, 0 is no blur, 1 is fully blurred."
             + "\nWhen set to 0, the blur container will not be loaded; requires reloading the gameplay screen to take effect.");
 
+        public static readonly LocalisableString STAGE_BACKGROUND = new EzLocalizationManager.EzLocalisableString(
+            "Stage-Background",
+            "Stage-Background");
+
+        public static readonly LocalisableString STAGE_BACKGROUND_NONE = new EzLocalizationManager.EzLocalisableString(
+            "无",
+            "None");
+
+        public static readonly LocalisableString STAGE_BACKGROUND_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "从 EzResources/Panel 加载一张图，作为整段 Stage 的背景（不拆到各列）。"
+            + "\n默认无，与现在一致。选中后按列总宽等比例缩放，图片底部对齐判定线，并进入 Stage 虚化。"
+            + "\n选项在打开设置时重新读取。",
+            "Load one image from EzResources/Panel as a single stage background (not split per column)."
+            + "\nDefault is none. When selected, the image scales to the total column width, sits with its bottom on the judgement line, and is included in the stage blur."
+            + "\nThe list is refreshed when settings are opened.");
+
+        public static readonly LocalisableString COLUMN_SET = new EzLocalizationManager.EzLocalisableString(
+            "Column Set",
+            "Column Set");
+
+        public static readonly LocalisableString COLUMN_SET_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "按键光只在选中的 EzResources/Column 子文件夹里查找。先按列类型取图，没有再按 S、E、P、B、A、ColumnLight。"
+            + "\n这一串都没有就不显示。内置资源只在 EzColumnLight 仍找不到时使用。"
+            + "\n选项在打开设置时重新读取。",
+            "Column lights are loaded only from the selected EzResources/Column subfolder: the column type first, then lower types in order S, E, P, B, A, then ColumnLight."
+            + "\nIf none of those exist, nothing is shown. Built-in resources are used only when EzColumnLight still has no match."
+            + "\nThe list is refreshed when settings are opened.");
+
         public static readonly LocalisableString STAGE_PANEL = new EzLocalizationManager.EzLocalisableString(
             "显示Stage前景面板",
             "Stage Panel");

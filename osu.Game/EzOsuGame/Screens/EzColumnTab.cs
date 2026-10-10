@@ -3,7 +3,11 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Platform;
+using osu.Game.EzOsuGame.Edit.Settings;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
@@ -41,6 +45,9 @@ namespace osu.Game.EzOsuGame.Screens
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         [Resolved]
+        private Storage storage { get; set; } = null!;
+
+        [Resolved]
         private Bindable<WorkingBeatmap> beatmap { get; set; } = null!;
 
         [Resolved]
@@ -61,6 +68,24 @@ namespace osu.Game.EzOsuGame.Screens
             colorBindables[Ez2Setting.ColumnTypeE] = createColorBindable(Ez2Setting.ColumnTypeE);
             colorBindables[Ez2Setting.ColumnTypeP] = createColorBindable(Ez2Setting.ColumnTypeP);
 
+            var panelItems = new List<string> { string.Empty };
+            panelItems.AddRange(EzResourceDiscovery.ListPanelImages(storage));
+
+            string currentPanel = ezSkinConfig.Get<string>(Ez2Setting.StageBackground);
+
+            if (!string.IsNullOrEmpty(currentPanel) && !panelItems.Contains(currentPanel))
+                panelItems.Insert(1, currentPanel);
+
+            var columnItems = EzResourceDiscovery.ListColumnSets(storage).ToList();
+
+            if (!columnItems.Contains("EzColumnLight"))
+                columnItems.Insert(0, "EzColumnLight");
+
+            string currentColumn = ezSkinConfig.Get<string>(Ez2Setting.ColumnLightName);
+
+            if (!string.IsNullOrEmpty(currentColumn) && !columnItems.Contains(currentColumn))
+                columnItems.Insert(0, currentColumn);
+
             InternalChild = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
@@ -69,6 +94,21 @@ namespace osu.Game.EzOsuGame.Screens
                 Spacing = new Vector2(5),
                 Children = new Drawable[]
                 {
+                    new EzOptionalStringDropdown
+                    {
+                        LabelText = EzColumnStrings.STAGE_BACKGROUND,
+                        TooltipText = EzColumnStrings.STAGE_BACKGROUND_TOOLTIP,
+                        EmptyLabel = EzColumnStrings.STAGE_BACKGROUND_NONE,
+                        Current = ezSkinConfig.GetBindable<string>(Ez2Setting.StageBackground),
+                        Items = panelItems,
+                    },
+                    new SettingsDropdown<string>
+                    {
+                        LabelText = EzColumnStrings.COLUMN_SET,
+                        TooltipText = EzColumnStrings.COLUMN_SET_TOOLTIP,
+                        Current = ezSkinConfig.GetBindable<string>(Ez2Setting.ColumnLightName),
+                        Items = columnItems,
+                    },
                     new SettingsSlider<double>
                     {
                         LabelText = EzColumnStrings.STAGE_DIAGONAL_LANE_ANGLE,

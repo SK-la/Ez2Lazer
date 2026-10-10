@@ -9,7 +9,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Performance;
 using osu.Game.Rulesets.Judgements;
 using osu.Framework.Logging;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -67,17 +66,10 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
-        [Resolved(canBeNull: true)]
-        private IBackdropCaptureSourceProvider? backdropCaptureSourceProvider { get; set; }
-
         // private Bindable<double> osuConfigDim = null!;
         private Bindable<double> columnDim = null!;
-        private Bindable<double> columnBlur = null!;
-        private Bindable<bool> turboMode = null!;
-        private bool blurEnabledByConfig;
 
         private readonly Box dimBox;
-        private readonly BackdropBlurDrawable? stageBackdropBlur;
         private readonly SkinnableDrawable stageForeground;
 
         public Stage(int firstColumnIndex, StageDefinition definition, ref ManiaAction columnStartAction)
@@ -97,14 +89,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
             InternalChildren = new Drawable[]
             {
-                stageBackdropBlur = new BackdropBlurDrawable
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    // 初始关闭；由 ColumnBlur 配置在运行时驱动开关，确保即时生效。
-                    EffectEnabled = false,
-                },
+                new EzStageBackdrop(),
                 dimBox = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
@@ -205,8 +190,6 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             currentSkin = skin;
 
-            stageBackdropBlur?.CaptureSourceProvider = backdropCaptureSourceProvider;
-
             currentSkin.SourceChanged += onSkinChanged;
             onSkinChanged();
 
@@ -219,14 +202,6 @@ namespace osu.Game.Rulesets.Mania.UI
                 dimBox.Alpha = (float)v.NewValue;
             }, true);
 
-            columnBlur = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnBlur);
-            columnBlur.BindValueChanged(_ => updateColumnBlur(), true);
-
-            // [Ez] 列模糊在极速模式下不走配置压制：它是皮肤 JSON 的一部分，换皮肤会经 EzSkinJsonBridge
-            // 写回配置，压制值会被覆盖、还原时又会反过来污染皮肤设置。所以只在这个唯一的消费点跳过。
-            turboMode = ezSkinConfig.GetBindable<bool>(Ez2Setting.TurboMode);
-            turboMode.BindValueChanged(_ => updateColumnBlur());
-
             var stagePanelEnabled = ezSkinConfig.GetBindable<bool>(Ez2Setting.StagePanelEnabled);
             stagePanelEnabled.BindValueChanged(e =>
             {
@@ -235,18 +210,6 @@ namespace osu.Game.Rulesets.Mania.UI
                 else
                     stageForeground.Hide();
             }, true);
-        }
-
-        private void updateColumnBlur()
-        {
-            float sigma = EzTurboMode.Active ? 0 : (float)columnBlur.Value * 50;
-            blurEnabledByConfig = sigma > 0.01f;
-
-            if (stageBackdropBlur != null)
-            {
-                stageBackdropBlur.BlurSigma = new Vector2(sigma);
-                updateBackdropBlurState();
-            }
         }
 
         private void onSkinChanged()
@@ -265,21 +228,6 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             // must happen before children are disposed in base call to prevent illegal accesses to the judgement pool.
             NewResult -= OnNewResult;
-
-            // 清理模糊容器的引用，释放 D3D11 渲染目标资源
-            if (stageBackdropBlur != null)
-            {
-                // 先禁用效果，防止清理过程中继续捕获
-                stageBackdropBlur.EffectEnabled = false;
-
-                // 断开所有捕获目标
-                stageBackdropBlur.CaptureSourceProvider = null;
-                stageBackdropBlur.CaptureTarget = null;
-                stageBackdropBlur.CaptureTargets.Clear();
-
-                // 强制过期并移除
-                stageBackdropBlur.Expire();
-            }
 
             base.Dispose(isDisposing);
 
@@ -373,11 +321,6 @@ namespace osu.Game.Rulesets.Mania.UI
             // Due to masking differences, it is not possible to get the width of the columns container automatically
             // While masking on effectively only the Y-axis, so we need to set the width of the bar line container manually
             barLineContainer.Width = columnFlow.Width;
-        }
-
-        private void updateBackdropBlurState()
-        {
-            stageBackdropBlur?.EffectEnabled = blurEnabledByConfig;
         }
     }
 }

@@ -40,6 +40,42 @@ namespace osu.Game.EzOsuGame.Overlays
         public static IReadOnlyList<string> ListStageCandidates(Storage storage)
             => listSubdirectories(storage, EzModifyPath.STAGE_PATH);
 
+        public static IReadOnlyList<string> ListColumnSets(Storage storage)
+            => listSubdirectories(storage, EzModifyPath.COLUMN_PATH);
+
+        public static IReadOnlyList<string> ListPanelImages(Storage storage)
+        {
+            var list = new List<string>();
+
+            try
+            {
+                string path = storage.GetFullPath(EzModifyPath.PANEL_PATH);
+
+                if (!Directory.Exists(path))
+                    return list;
+
+                foreach (string file in Directory.GetFiles(path))
+                {
+                    string extension = Path.GetExtension(file);
+
+                    if (extension.Equals(".png", StringComparison.OrdinalIgnoreCase)
+                        || extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase)
+                        || extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase)
+                        || extension.Equals(".gif", StringComparison.OrdinalIgnoreCase))
+                    {
+                        list.Add(Path.GetFileNameWithoutExtension(file));
+                    }
+                }
+
+                list.Sort(StringComparer.OrdinalIgnoreCase);
+            }
+            catch
+            {
+            }
+
+            return list;
+        }
+
         private static List<string> listSubdirectories(Storage storage, string relativePath)
         {
             var list = new List<string>();
