@@ -76,7 +76,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
         private void applyAnimation(bool wasIncrease, bool wasMiss)
         {
-            if (EzAnimationLibrary.TryPlayCombo(AnimationTemplate.Value, Text.TextContainer, title: false))
+            if (EzAnimationLibrary.TryPlayCombo(AnimationTemplate.Value, Text.TextContainer, false, Text.SourcePixelScale))
                 return;
 
             resetHandwrittenTarget();

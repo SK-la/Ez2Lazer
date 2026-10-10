@@ -114,7 +114,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
         private void applyAnimation(bool wasIncrease, bool wasMiss)
         {
-            if (EzAnimationLibrary.TryPlayCombo(AnimationTemplate.Value, Text.TextContainer, title: true))
+            if (EzAnimationLibrary.TryPlayCombo(AnimationTemplate.Value, Text.TextContainer, true, Text.SourcePixelScale))
                 return;
 
             Text.TextContainer.FinishTransforms();

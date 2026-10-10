@@ -59,7 +59,7 @@ namespace osu.Game.EzOsuGame.Animation
         /// <summary>
         /// 播放该主题的 combo 出现动画。标题只播标题通道。
         /// </summary>
-        public static bool TryPlayCombo(EzEnumDeformTemplate selection, Drawable drawable, bool title)
+        public static bool TryPlayCombo(EzEnumDeformTemplate selection, Drawable drawable, bool title, float positionScale = 1)
         {
             if (!TryGetDeformTheme(selection, out EzEnumGameThemeName theme))
                 return false;
@@ -69,7 +69,7 @@ namespace osu.Game.EzOsuGame.Animation
             if (!TryGet(COMBO, clip, theme, out EzAnimationTemplate template))
                 return false;
 
-            template.Play(drawable, true);
+            template.Play(drawable, true, positionScale);
             return true;
         }
 
@@ -138,13 +138,14 @@ namespace osu.Game.EzOsuGame.Animation
 
         /// <summary>
         /// 按关键帧播放。多帧贴图传 <paramref name="includeAlpha"/> 为 false，避免盖住帧闪烁。
+        /// <paramref name="positionScale"/> 把源图像素位移缩到当前字形大小，判定传 1。
         /// </summary>
-        public void Play(Drawable drawable, bool includeAlpha)
+        public void Play(Drawable drawable, bool includeAlpha, float positionScale = 1)
         {
             drawable.FinishTransforms();
 
             playScale(drawable);
-            playPosition(drawable);
+            playPosition(drawable, positionScale);
 
             if (includeAlpha && !Alpha.IsEmpty)
                 playAlpha(drawable);
@@ -171,24 +172,27 @@ namespace osu.Game.EzOsuGame.Animation
             }
         }
 
-        private void playPosition(Drawable drawable)
+        private void playPosition(Drawable drawable, float positionScale)
         {
             if (PositionX.IsEmpty && PositionY.IsEmpty)
                 return;
 
             double[] times = mergeTimes(PositionX, PositionY);
-            drawable.Position = new Vector2(PositionX.ValueAt(times[0], 0), PositionY.ValueAt(times[0], 0));
+            drawable.Position = scaledPosition(times[0], positionScale);
 
             for (int i = 0; i < times.Length - 1; i++)
             {
                 double start = times[i];
                 double duration = times[i + 1] - start;
-                var target = new Vector2(PositionX.ValueAt(times[i + 1], 0), PositionY.ValueAt(times[i + 1], 0));
+                Vector2 target = scaledPosition(times[i + 1], positionScale);
 
                 using (drawable.BeginDelayedSequence(toMilliseconds(start)))
                     drawable.MoveTo(target, toMilliseconds(duration), Easing.None);
             }
         }
+
+        private Vector2 scaledPosition(double time, float positionScale)
+            => new Vector2(PositionX.ValueAt(time, 0) * positionScale, PositionY.ValueAt(time, 0) * positionScale);
 
         private void playAlpha(Drawable drawable)
         {
@@ -361,6 +365,9 @@ namespace osu.Game.EzOsuGame.Animation
         Turtle,
         Various_Ways,
         ArcadeScore,
+        NIGHT_TRAVELER,
+        EMOTIONAL_SENSE,
+        Invisible,
         // ReSharper restore InconsistentNaming
     }
 }

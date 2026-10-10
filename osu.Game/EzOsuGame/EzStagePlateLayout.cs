@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -29,6 +30,18 @@ namespace osu.Game.EzOsuGame
 
         [JsonPropertyName("character")]
         public EzStagePlateSprite? Character { get; set; }
+
+        // path 相对 Stage/{舞台名}。共用一套数字时是 number，分开时是 number/score 与 number/combo。
+        [JsonPropertyName("score")]
+        public EzStagePlateDigits? Score { get; set; }
+
+        // 舞台上的最大连击，不是 HUD 当前连击。path 同样来自 prefab。
+        [JsonPropertyName("combo")]
+        public EzStagePlateDigits? Combo { get; set; }
+
+        // 固定槽位之外的图，按 path 加载，不按皮肤名分支。
+        [JsonPropertyName("parts")]
+        public List<EzStagePlateSprite>? Parts { get; set; }
 
         public static EzStagePlateLayout? TryLoad(EzResourceStore resource, string stageName)
         {
@@ -80,8 +93,37 @@ namespace osu.Game.EzOsuGame
         public float ScaleY { get; set; }
     }
 
+    // 个位锚点与 body 同一坐标系。高一位在 x + spacing。
+    internal sealed class EzStagePlateDigits
+    {
+        [JsonPropertyName("enabled")]
+        public bool Enabled { get; set; }
+
+        // 相对 Stage/{舞台名}。共用一套时是 number，分开时是 number/score、number/combo。
+        [JsonPropertyName("path")]
+        public string? Path { get; set; }
+
+        [JsonPropertyName("x")]
+        public float X { get; set; }
+
+        [JsonPropertyName("y")]
+        public float Y { get; set; }
+
+        [JsonPropertyName("digits")]
+        public int Digits { get; set; }
+
+        [JsonPropertyName("spacing")]
+        public float Spacing { get; set; }
+
+        public Vector2 ToOsuPosition() => EzStagePlateSprite.ToOsu(X, Y);
+    }
+
     internal sealed class EzStagePlateSprite
     {
+        // 相对 Stage/{舞台}/Stage 的文件名。缺省时沿用该槽位原来的固定路径。
+        [JsonPropertyName("path")]
+        public string? Path { get; set; }
+
         [JsonPropertyName("x")]
         public float X { get; set; }
 
@@ -97,6 +139,10 @@ namespace osu.Game.EzOsuGame
         [JsonPropertyName("frameMs")]
         public double FrameMs { get; set; }
 
+        // 正角度为 Unity 的 +Z，屏幕上逆时针。seconds 是转过 degrees 的时间。
+        [JsonPropertyName("spin")]
+        public EzStagePlateSpin? Spin { get; set; }
+
         public static Vector2 ToOsu(float x, float y) => new Vector2(-x, -y);
 
         public Vector2 ToOsuPosition() => ToOsu(X, Y);
@@ -104,5 +150,17 @@ namespace osu.Game.EzOsuGame
         public bool IsAdditive => string.Equals(Blend, "additive", StringComparison.OrdinalIgnoreCase);
 
         public double FrameLength => FrameMs > 0 ? FrameMs : 66;
+    }
+
+    internal sealed class EzStagePlateSpin
+    {
+        [JsonPropertyName("seconds")]
+        public double Seconds { get; set; }
+
+        [JsonPropertyName("degrees")]
+        public float Degrees { get; set; }
+
+        [JsonPropertyName("loop")]
+        public bool Loop { get; set; }
     }
 }

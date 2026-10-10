@@ -19,6 +19,9 @@ namespace osu.Game.EzOsuGame.HUD
     /// </summary>
     public abstract partial class EzSpriteText : OsuSpriteText
     {
+        // 与 Argon 位图字体相同：度量先缩到纹理的 1/8，Font.Size 再决定绘制大小。
+        internal const float GLYPH_METRIC_SCALE = 0.125f;
+
         protected override char FixedWidthReferenceCharacter => '5';
 
         public Bindable<EzEnumGameThemeName> ThemeName { get; }
@@ -148,7 +151,7 @@ namespace osu.Game.EzOsuGame.HUD
                             glyph = new TexturedCharacterGlyph(
                                 new CharacterGlyph(character, 0, 0, texture.Width, texture.Height, null),
                                 texture,
-                                0.125f);
+                                GLYPH_METRIC_SCALE);
                             break;
                         }
                     }
