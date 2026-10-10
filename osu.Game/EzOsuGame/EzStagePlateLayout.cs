@@ -9,7 +9,7 @@ using osuTK;
 
 namespace osu.Game.EzOsuGame
 {
-    // 坐标是 GLB 像素、Y 朝上。贴图按 ScaleAdjust 2 显示，所以画到 osu 时位置折半，并且 X 取反。贴图本身也要水平翻转，才和取反后的位置对齐。
+    // 坐标是 GLB 像素、Y 朝上。贴图按 ScaleAdjust 2 显示，所以画到 osu 时位置折半，并且 X 取反。贴图像素不翻转。
     internal sealed class EzStagePlateLayout
     {
         [JsonPropertyName("body")]
@@ -97,9 +97,7 @@ namespace osu.Game.EzOsuGame
         [JsonPropertyName("frameMs")]
         public double FrameMs { get; set; }
 
-        internal const float DISPLAY_SCALE = 0.5f;
-
-        public static Vector2 ToOsu(float x, float y) => new Vector2(-x, -y) * DISPLAY_SCALE;
+        public static Vector2 ToOsu(float x, float y) => new Vector2(-x, -y);
 
         public Vector2 ToOsuPosition() => ToOsu(X, Y);
 

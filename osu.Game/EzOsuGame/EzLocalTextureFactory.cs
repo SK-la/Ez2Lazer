@@ -517,10 +517,6 @@ namespace osu.Game.EzOsuGame
                 return null;
 
             BlendingParameters blending = piece.IsAdditive ? BlendingParameters.Additive : BlendingParameters.Inherit;
-            // X 取反后贴图也要翻转，GrooveLight 才和 Body 重合。OverObject 帧比 Body 小一倍，单独补回。
-            bool overObject = texturePath.Contains("_OverObject", StringComparison.Ordinal);
-            float size = overObject ? 2 : 1;
-            var scale = new Vector2(-size, size);
 
             if (frames.Count == 1)
             {
@@ -529,7 +525,6 @@ namespace osu.Game.EzOsuGame
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
                     Position = piece.ToOsuPosition(),
-                    Scale = scale,
                     Texture = frames[0],
                     Blending = blending,
                 };
@@ -540,7 +535,6 @@ namespace osu.Game.EzOsuGame
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 Position = piece.ToOsuPosition(),
-                Scale = scale,
                 Loop = piece.Loop,
                 DefaultFrameLength = piece.FrameLength,
                 Blending = blending,
