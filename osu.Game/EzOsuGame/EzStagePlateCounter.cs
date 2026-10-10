@@ -107,8 +107,8 @@ namespace osu.Game.EzOsuGame
 
         private void loadGlyphs()
         {
-            string theme = config.Get<EzEnumGameThemeName>(Ez2Setting.GameThemeName).ToString().Replace(' ', '_');
-            string root = $"GameTheme/{theme}/number/";
+            string themeName = config.Get<EzEnumGameThemeName>(Ez2Setting.GameThemeName).ToString().Replace(' ', '_');
+            string root = $"GameTheme/{themeName}/";
 
             for (int digit = 0; digit < glyphs.Length; digit++)
                 glyphs[digit] = loadDigit(root, digit);
@@ -116,15 +116,27 @@ namespace osu.Game.EzOsuGame
 
         private Texture? loadDigit(string root, int digit)
         {
-            if (source == Source.Score)
+            string? path = layout.Path?.Trim().Trim('/');
+
+            if (!string.IsNullOrEmpty(path))
             {
-                return resources.Get($"{root}score/{digit}", EzTextureUsage.Glyph)
-                       ?? resources.Get($"{root}{digit}", EzTextureUsage.Glyph);
+                Texture? exact = resources.Get($"{root}{path}/{digit}", EzTextureUsage.Glyph);
+
+                if (exact != null || path == "number")
+                    return exact;
+
+                return resources.Get($"{root}number/{digit}", EzTextureUsage.Glyph);
             }
 
-            return resources.Get($"{root}maxcombo/{digit}", EzTextureUsage.Glyph)
-                   ?? resources.Get($"{root}combo/{digit}", EzTextureUsage.Glyph)
-                   ?? resources.Get($"{root}{digit}", EzTextureUsage.Glyph);
+            if (source == Source.Score)
+            {
+                return resources.Get($"{root}number/score/{digit}", EzTextureUsage.Glyph)
+                       ?? resources.Get($"{root}number/{digit}", EzTextureUsage.Glyph);
+            }
+
+            return resources.Get($"{root}number/maxcombo/{digit}", EzTextureUsage.Glyph)
+                   ?? resources.Get($"{root}number/combo/{digit}", EzTextureUsage.Glyph)
+                   ?? resources.Get($"{root}number/{digit}", EzTextureUsage.Glyph);
         }
 
         private void apply(long value)

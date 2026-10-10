@@ -31,11 +31,11 @@ namespace osu.Game.EzOsuGame
         [JsonPropertyName("character")]
         public EzStagePlateSprite? Character { get; set; }
 
-        // 主题 number/score。缺省或 enabled 为 false 时不加载。
+        // path 是主题内的字形目录，按 body prefab 的贴图来，不按槽位名猜。
         [JsonPropertyName("score")]
         public EzStagePlateDigits? Score { get; set; }
 
-        // 主题 number/maxcombo（没有则 number/combo）。舞台上的最大连击，不是 HUD 当前连击。
+        // 舞台上的最大连击，不是 HUD 当前连击。path 同样来自 prefab。
         [JsonPropertyName("combo")]
         public EzStagePlateDigits? Combo { get; set; }
 
@@ -98,6 +98,10 @@ namespace osu.Game.EzOsuGame
     {
         [JsonPropertyName("enabled")]
         public bool Enabled { get; set; }
+
+        // 相对 GameTheme/{主题} 的字形目录。共用一套数字时是 number，分开时才是 number/score、number/combo、number/maxcombo。
+        [JsonPropertyName("path")]
+        public string? Path { get; set; }
 
         [JsonPropertyName("x")]
         public float X { get; set; }
