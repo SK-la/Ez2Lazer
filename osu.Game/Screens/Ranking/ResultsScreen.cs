@@ -30,7 +30,6 @@ using osu.Game.EzOsuGame.Screens.Rotation;
 using osu.Game.Localisation;
 using osu.Game.Online.Placeholders;
 using osu.Game.Overlays;
-using osu.Game.Overlays.Volume;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 using osu.Game.Tests.Visual;
@@ -129,7 +128,6 @@ namespace osu.Game.Screens.Ranking
                                     RelativeSizeAxes = Axes.Both,
                                     Children = new Drawable[]
                                     {
-                                        new AltScrollAdjustsVolume(),
                                         StatisticsPanel = new StatisticsPanel
                                         {
                                             RelativeSizeAxes = Axes.Both,
@@ -601,30 +599,6 @@ namespace osu.Game.Screens.Ranking
 
         public void OnReleased(KeyBindingReleaseEvent<GlobalAction> e)
         {
-        }
-
-        protected override bool OnScroll(ScrollEvent e)
-        {
-            // Match stable behaviour of only alt-scroll adjusting volume.
-            // This is the same behaviour as the song selection screen.
-            if (!e.CurrentState.Keyboard.AltPressed)
-                return true;
-
-            return base.OnScroll(e);
-        }
-
-        /// <summary>
-        /// Volume adjust only with Alt+scroll so plain wheel can scroll statistics / score panels.
-        /// </summary>
-        private partial class AltScrollAdjustsVolume : GlobalScrollAdjustsVolume
-        {
-            protected override bool OnScroll(ScrollEvent e)
-            {
-                if (!e.AltPressed)
-                    return false;
-
-                return base.OnScroll(e);
-            }
         }
 
         protected partial class VerticalScrollContainer : OsuScrollContainer
