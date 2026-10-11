@@ -391,19 +391,11 @@ namespace osu.Game.Rulesets.Mania.UI
         /// 重算并缓存判定线位置。只在皮肤或相关设置变化时调用。
         /// </summary>
         /// <remarks>
-        /// <see cref="updateTimeRange"/> 每帧都会被 <see cref="Update"/> 调到，而皮肤配置查询（<c>GetConfig</c>）
-        /// 需要构造 lookup 并走一遍皮肤配置链，放在每帧里纯属白烧。这里把结果缓存下来供其直接使用。
+        /// <see cref="updateTimeRange"/> 每帧都会被 <see cref="Update"/> 调到。判定线查询放在这里缓存，避免每帧走皮肤配置。
         /// </remarks>
         private void updateHitPosition()
         {
-            if (globalHitPosition.Value)
-                hitPosition = (float)hitPositonBindable.Value;
-            else
-            {
-                hitPosition = currentSkin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                                  new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
-                              ?? (float)hitPositonBindable.Value;
-            }
+            hitPosition = ManiaPlayfieldLayoutHelper.GetHitPosition(currentSkin, globalHitPosition.Value, hitPositonBindable.Value);
         }
 
         private void updateTimeRange()

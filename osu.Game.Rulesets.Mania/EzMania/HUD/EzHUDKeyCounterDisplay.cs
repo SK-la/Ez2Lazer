@@ -9,7 +9,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.EzMania.Localization;
-using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning;
 using osuTK;
@@ -168,13 +167,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             if (displayColumns <= 0)
                 return;
 
+            int keyMode = controller.Triggers.Count;
+
             for (int i = 0; i < displayColumns; i++)
             {
-                float? widthS = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                                        new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnWidth, i))
-                                    ?.Value;
+                var columnSize = ManiaPlayfieldLayoutHelper.CalculateColumnSize(
+                    i,
+                    keyMode,
+                    skin,
+                    skinManager,
+                    ezSkinConfig,
+                    columnWidth.Value,
+                    specialFactor.Value,
+                    columnWidthStyle.Value,
+                    mobileAdjust: 1f,
+                    MatchManiaPanelWidth.Value);
 
-                if (widthS == 0)
+                if (columnSize.Width == 0)
                     continue;
 
                 keyFlow.Add(new EzKeyCounter(controller.Triggers[i]));

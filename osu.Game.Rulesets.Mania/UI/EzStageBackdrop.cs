@@ -12,7 +12,7 @@ using osu.Framework.Layout;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Performance;
-using osu.Game.Rulesets.Mania.Skinning;
+using osu.Game.Rulesets.Mania.EzMania;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Skinning;
 using osuTK;
@@ -154,11 +154,7 @@ namespace osu.Game.Rulesets.Mania.UI
             if (graphic.Width <= 0)
                 return;
 
-            float hit = globalHitPosition.Value
-                ? (float)hitPosition.Value
-                : skin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                      new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
-                  ?? (float)hitPosition.Value;
+            float hit = ManiaPlayfieldLayoutHelper.GetHitPosition(skin, globalHitPosition.Value, hitPosition.Value);
 
             bool receptorAtTop = direction.Value == ScrollingDirection.Up;
 
