@@ -87,12 +87,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         private Bindable<ColumnWidthStyle> columnWidthStyle = null!;
         private Bindable<bool> hitPositionGlobalEnable = null!;
         private Bindable<double> hitPosition = null!;
-        private Ez2ConfigManager ezSkinConfig = null!;
 
         private Anchor savedAnchor;
         private Anchor savedOrigin;
         private Vector2 savedPosition;
         private bool savedLayout;
+
+        [Resolved]
+        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         [Resolved]
         private InputCountController controller { get; set; } = null!;
@@ -104,9 +106,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         private SkinManager skinManager { get; set; } = null!;
 
         [BackgroundDependencyLoader]
-        private void load(Ez2ConfigManager ezSkinConfig)
+        private void load()
         {
-            this.ezSkinConfig = ezSkinConfig;
             columnWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
             specialFactor = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
             columnWidthStyle = ezSkinConfig.GetBindable<ColumnWidthStyle>(Ez2Setting.ColumnWidthStyle);
@@ -254,7 +255,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             hitPosition.BindValueChanged(_ => updateHitPositionLayout());
             MatchManiaHitPositionLayout.BindValueChanged(_ => updateHitPositionLayout(), true);
 
-            ezSkinConfig.ColumnTypeChanged += (_, __, ___) => updateWidth();
+            ezSkinConfig.ColumnTypeChanged += updateWidth;
             skin.SourceChanged += onSkinChanged;
 
             // 更新标识块高度
@@ -301,6 +302,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
                 else
                     updateAllMarkerPositions();
             }, true);
+        }
+
+        private void updateWidth(int arg1, int arg2, EzColumnType arg3)
+        {
+            updateWidth();
         }
 
         private void updateWidth()
@@ -489,6 +495,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
             foreach (var column in columns)
                 column.Clear();
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                ezSkinConfig.ColumnTypeChanged -= updateWidth;
+                skin.SourceChanged -= onSkinChanged;
+            }
         }
     }
 }
