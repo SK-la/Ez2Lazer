@@ -19,8 +19,12 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
-    public partial class EzHUDHitTiming : HitErrorMeter
+    public partial class EzHUDHitTiming : HitErrorMeter, IEzHudThemeTarget
     {
+        EzHudThemeSlot IEzHudThemeTarget.Slot => EzHudThemeSlot.EarlyLate;
+
+        Bindable<EzEnumGameThemeName> IEzHudThemeTarget.Theme => TextFont;
+
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.OFFSET_NUMBER_FONT_LABEL), nameof(EzHUDManiaStrings.OFFSET_NUMBER_FONT_DESCRIPTION), SettingControlType = typeof(EzSelectorEnumList))]
         public Bindable<EzEnumGameThemeName> NumberFont { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 

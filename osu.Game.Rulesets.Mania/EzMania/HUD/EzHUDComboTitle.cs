@@ -20,8 +20,12 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
-    public partial class EzHUDComboTitle : HitErrorMeter
+    public partial class EzHUDComboTitle : HitErrorMeter, IEzHudThemeTarget
     {
+        EzHudThemeSlot IEzHudThemeTarget.Slot => EzHudThemeSlot.Combo;
+
+        Bindable<EzEnumGameThemeName> IEzHudThemeTarget.Theme => Font;
+
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.ANIMATION_TEMPLATE_LABEL), nameof(EzHUDManiaStrings.ANIMATION_TEMPLATE_DESCRIPTION))]
         public Bindable<EzEnumDeformTemplate> AnimationTemplate { get; } = new Bindable<EzEnumDeformTemplate>();
 

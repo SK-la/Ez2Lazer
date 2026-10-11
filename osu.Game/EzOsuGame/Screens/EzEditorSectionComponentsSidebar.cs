@@ -77,7 +77,7 @@ namespace osu.Game.EzOsuGame.Screens
                     {
                         LabelText = "组件类型",
                         Current = componentType,
-                        Items = new[] { "Note", "Stage", "Panel", "GameTheme", "ColumnLight" }
+                        Items = new[] { "Note", "Stage", "Panel", "EarlyLate", "judgement", "combo", "ColumnLight" }
                     },
                     new Box
                     {
@@ -166,8 +166,16 @@ namespace osu.Game.EzOsuGame.Screens
                     populatePanelCards();
                     break;
 
-                case "GameTheme":
-                    populateGameThemeCards();
+                case "EarlyLate":
+                    populateThemeCards(EzHudThemeSlot.EarlyLate, theme => namedPreview($"GameTheme/{theme}/Early"), shownTheme(EzHudThemeSlot.EarlyLate));
+                    break;
+
+                case "judgement":
+                    populateThemeCards(EzHudThemeSlot.Judgement, theme => namedPreview($"GameTheme/{theme}/judgement/Kool"), shownTheme(EzHudThemeSlot.Judgement));
+                    break;
+
+                case "combo":
+                    populateThemeCards(EzHudThemeSlot.Combo, theme => namedPreview($"GameTheme/{theme}/combo/Title"), shownTheme(EzHudThemeSlot.Combo));
                     break;
 
                 case "ColumnLight":
@@ -216,21 +224,48 @@ namespace osu.Game.EzOsuGame.Screens
             }
         }
 
-        private void populateGameThemeCards()
+        private void populateThemeCards(EzHudThemeSlot slot, Func<string, Texture?> preview, EzEnumGameThemeName shown)
         {
             foreach (string theme in availableGameThemes)
             {
                 cardFlow.Add(new VisualTextureItem(
                     theme,
-                    firstFolderImage($"GameTheme/{theme}"),
+                    preview(theme),
                     () =>
                     {
-                        if (Enum.TryParse(theme, out EzEnumGameThemeName parsed))
-                            gameThemeName!.Value = parsed;
+                        if (!Enum.TryParse(theme, out EzEnumGameThemeName parsed))
+                            return;
+
+                        applyHudTheme(slot, parsed);
                     },
-                    () => gameThemeName!.Value.ToString() == theme));
+                    () => shown.ToString() == theme));
             }
         }
+
+        private EzEnumGameThemeName shownTheme(EzHudThemeSlot slot)
+        {
+            foreach (IEzHudThemeTarget target in hudThemeTargets())
+            {
+                if (target.Slot == slot)
+                    return target.Theme.Value;
+            }
+
+            return gameThemeName!.Value;
+        }
+
+        private void applyHudTheme(EzHudThemeSlot slot, EzEnumGameThemeName theme)
+        {
+            foreach (IEzHudThemeTarget target in hudThemeTargets())
+            {
+                if (target.Slot == slot)
+                    target.Theme.Value = theme;
+            }
+
+            rebuildVisualLists();
+        }
+
+        private IEnumerable<IEzHudThemeTarget> hudThemeTargets()
+            => this.FindClosestParent<Game.Overlays.SkinEditor.SkinEditor>()?.HudThemeTargets() ?? Enumerable.Empty<IEzHudThemeTarget>();
 
         private void populateColumnLightCards()
         {
@@ -243,6 +278,9 @@ namespace osu.Game.EzOsuGame.Screens
                     () => columnLightName!.Value == setName));
             }
         }
+
+        private Texture? namedPreview(string path)
+            => resources.Get(path, EzTextureUsage.Large) ?? firstFolderImage(path);
 
         private Texture? firstFolderImage(string directory)
         {

@@ -21,8 +21,12 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
-    public partial class EzHUDComboCounter : ComboCounter
+    public partial class EzHUDComboCounter : ComboCounter, IEzHudThemeTarget
     {
+        EzHudThemeSlot IEzHudThemeTarget.Slot => EzHudThemeSlot.Combo;
+
+        Bindable<EzEnumGameThemeName> IEzHudThemeTarget.Theme => ThemeName;
+
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.ANIMATION_TEMPLATE_LABEL), nameof(EzHUDManiaStrings.ANIMATION_TEMPLATE_DESCRIPTION))]
         public Bindable<EzEnumDeformTemplate> AnimationTemplate { get; } = new Bindable<EzEnumDeformTemplate>();
 

@@ -30,8 +30,12 @@ using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.HUD
 {
-    public partial class EzHUDHitResultScore : CompositeDrawable, ISerialisableDrawable, IEzGameplayWarmUp //, IPreviewable //, IAnimatableJudgement
+    public partial class EzHUDHitResultScore : CompositeDrawable, ISerialisableDrawable, IEzGameplayWarmUp, IEzHudThemeTarget //, IPreviewable //, IAnimatableJudgement
     {
+        EzHudThemeSlot IEzHudThemeTarget.Slot => EzHudThemeSlot.Judgement;
+
+        Bindable<EzEnumGameThemeName> IEzHudThemeTarget.Theme => ThemeName;
+
         public bool UsesFixedAnchor { get; set; }
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_TEXT_FONT_LABEL), nameof(EzHUDStrings.HITRESULT_TEXT_FONT_DESCRIPTION))]
