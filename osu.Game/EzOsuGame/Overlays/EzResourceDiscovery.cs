@@ -58,10 +58,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     string extension = Path.GetExtension(file);
 
-                    if (extension.Equals(".png", StringComparison.OrdinalIgnoreCase)
-                        || extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase)
-                        || extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase)
-                        || extension.Equals(".gif", StringComparison.OrdinalIgnoreCase))
+                    if (extension.Equals(".png", StringComparison.OrdinalIgnoreCase))
                     {
                         list.Add(Path.GetFileNameWithoutExtension(file));
                     }
@@ -87,10 +84,9 @@ namespace osu.Game.EzOsuGame.Overlays
                 if (!Directory.Exists(path))
                     return list;
 
-                list.AddRange(
-                    Directory.GetDirectories(path)
-                             .Select(Path.GetFileName)
-                             .Where(n => !string.IsNullOrEmpty(n))!);
+                list.AddRange(Directory.GetDirectories(path)
+                                       .Select(Path.GetFileName)
+                                       .Where(n => !string.IsNullOrEmpty(n))!);
             }
             catch
             {
