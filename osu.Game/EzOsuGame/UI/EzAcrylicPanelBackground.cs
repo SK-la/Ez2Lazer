@@ -5,6 +5,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
@@ -38,6 +39,9 @@ namespace osu.Game.EzOsuGame.UI
 
         [Resolved(canBeNull: true)]
         private IAcrylicCaptureRegistrar? acrylicCaptureRegistrar { get; set; }
+
+        [Resolved]
+        private IRenderer renderer { get; set; } = null!;
 
         /// <param name="initialTint">Veil colour drawn over the blurred backdrop.</param>
         /// <param name="frameBufferScale">Optional downscale for the blur pass (panels use 0.5).</param>
@@ -99,7 +103,7 @@ namespace osu.Game.EzOsuGame.UI
             };
 
             AddInternal(acrylicBackdrop);
-            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, acrylicBackdrop);
+            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, acrylicBackdrop, renderer);
         }
 
         private void releaseBackdrop()

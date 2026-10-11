@@ -5,6 +5,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
@@ -48,9 +49,9 @@ namespace osu.Game.EzOsuGame.Screens.Menu
         }
 
         [BackgroundDependencyLoader(true)]
-        private void load(Ez2ConfigManager? ezConfig, IAcrylicCaptureRegistrar? registrar, EzLogoBackdropSampler? backdropSampler)
+        private void load(Ez2ConfigManager? ezConfig, IAcrylicCaptureRegistrar? registrar, EzLogoBackdropSampler? backdropSampler, IRenderer renderer)
         {
-            capture = new EzAcrylicCaptureController(registrar, acrylic);
+            capture = new EzAcrylicCaptureController(registrar, acrylic, renderer);
 
             if (ezConfig == null)
                 return;
