@@ -463,24 +463,39 @@ namespace osu.Game.EzOsuGame
             if (columnCount > MAX_STAGE_KEYS)
                 columnCount = MAX_STAGE_KEYS;
 
-            if (columnCount >= stage_key_downward_floor)
+            if (best[columnCount] != null)
+                return best[columnCount];
+
+            // 先耗尽同奇偶（先下后上，向下不低于 4），再按同样顺序耗尽异奇偶。
+            int parity = columnCount & 1;
+
+            return scanParity(parity) ?? scanParity(parity ^ 1);
+
+            string? scanParity(int wantedParity)
             {
-                for (int keys = columnCount; keys >= stage_key_downward_floor; keys--)
+                if (columnCount >= stage_key_downward_floor)
                 {
+                    for (int keys = columnCount - 1; keys >= stage_key_downward_floor; keys--)
+                    {
+                        if ((keys & 1) != wantedParity)
+                            continue;
+
+                        if (best[keys] != null)
+                            return best[keys];
+                    }
+                }
+
+                for (int keys = columnCount + 1; keys <= MAX_STAGE_KEYS; keys++)
+                {
+                    if ((keys & 1) != wantedParity)
+                        continue;
+
                     if (best[keys] != null)
                         return best[keys];
                 }
-            }
-            else if (best[columnCount] != null)
-                return best[columnCount];
 
-            for (int keys = columnCount + 1; keys <= MAX_STAGE_KEYS; keys++)
-            {
-                if (best[keys] != null)
-                    return best[keys];
+                return null;
             }
-
-            return null;
         }
 
         private static int keyFolderPreference(string name, int keys)
