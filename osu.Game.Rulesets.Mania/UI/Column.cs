@@ -194,7 +194,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
             InternalChildren = new Drawable[]
             {
-                hitExplosionPool = new DrawablePool<PoolableHitExplosion>(5),
+                hitExplosionPool = new DrawablePool<PoolableHitExplosion>(10),
                 sampleTriggerSource = new EzGameplaySampleTriggerSource(HitObjectContainer),
                 HitObjectArea,
                 keyArea = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.KeyArea), _ => new DefaultKeyArea())
