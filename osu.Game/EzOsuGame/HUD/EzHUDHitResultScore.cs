@@ -53,7 +53,7 @@ namespace osu.Game.EzOsuGame.HUD
         };
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_ANIMATION_TEMPLATE_LABEL), nameof(EzHUDStrings.HITRESULT_ANIMATION_TEMPLATE_DESCRIPTION), SettingControlType = typeof(SettingsTextBox))]
-        public Bindable<string> AnimationFrameTemplate { get; } = new Bindable<string>("{result}/frame_{0}");
+        public Bindable<string> AnimationFrameTemplate { get; } = new Bindable<string>("{result}/{000}");
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_FORCE_DEFORM_LABEL), nameof(EzHUDStrings.HITRESULT_FORCE_DEFORM_DESCRIPTION))]
         public BindableBool ForceDeformAnimation { get; } = new BindableBool(true);
@@ -252,7 +252,7 @@ namespace osu.Game.EzOsuGame.HUD
             double frameLength = 1000.0 / FPS.Value;
 
             hitAnimation = probeJudgementDrawable(result, ThemeName.Value.ToString(),
-                AnimationFrameTemplate.Value?.Trim() ?? "{result}/frame_{0}", frameLength, resolveActiveTemplate());
+                AnimationFrameTemplate.Value?.Trim() ?? "{result}/{000}", frameLength, resolveActiveTemplate());
 
             if (hitAnimation != null)
             {
@@ -377,7 +377,7 @@ namespace osu.Game.EzOsuGame.HUD
         {
             // 与 CreateJudgementTexture 取同一来源：那是组件自己的 ThemeName 设置，不一定是全局配置。
             string theme = ThemeName.Value.ToString();
-            string template = AnimationFrameTemplate.Value?.Trim() ?? "{result}/frame_{0}";
+            string template = AnimationFrameTemplate.Value?.Trim() ?? "{result}/{000}";
             double frameLength = 1000.0 / FPS.Value;
             EzEnumHitMode activeTemplate = resolveActiveTemplate();
 
@@ -397,7 +397,7 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             // checkFullCombo 直接取 FullCombo/full-combo（不带 GameTheme 前缀）。
-            resources.GetAnimation(@"FullCombo/full-combo", looping: false)?.Dispose();
+            resources.GetAnimation(new EzAnimationRequest { Path = @"FullCombo/full-combo" }, looping: false)?.Dispose();
         }
 
         #endregion
@@ -422,7 +422,7 @@ namespace osu.Game.EzOsuGame.HUD
 
             if (missCounter.ResultCount.Value == 0)
             {
-                fullComboAnimation = resources.GetAnimation(@"FullCombo/full-combo", looping: false) ?? Empty();
+                fullComboAnimation = resources.GetAnimation(new EzAnimationRequest { Path = @"FullCombo/full-combo" }, looping: false) ?? Empty();
                 fullComboAnimation.Anchor = Anchor.Centre;
                 fullComboAnimation.Origin = Anchor.Centre;
                 // fullComboAnimation.Scale = new Vector2(1.5f);

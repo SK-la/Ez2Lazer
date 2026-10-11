@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Graphics.Textures;
 using osu.Framework.Text;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics.Sprites;
@@ -102,11 +103,11 @@ namespace osu.Game.EzOsuGame.HUD
         /// <summary>
         /// 获取字符可能的纹理路径（子类必须实现）
         /// </summary>
-        /// <param name="themeRoot">主题根路径</param>
+        /// <param name="themeName">主题名，不含目录。子类自己拼写死的字形路径。</param>
         /// <param name="lookup">字符对应的查找名</param>
         /// <param name="character">原始字符</param>
         /// <returns>可能的路径数组，按优先级排序</returns>
-        protected abstract string[] GetPossiblePaths(string themeRoot, string lookup, char character);
+        protected abstract string[] GetPossiblePaths(string themeName, string lookup, char character);
 
         /// <summary>
         /// GlyphStore - 纹理字符查找存储
@@ -136,24 +137,16 @@ namespace osu.Game.EzOsuGame.HUD
 
                 if (textureName != null)
                 {
-                    string textureNameReplace = textureName.Replace(" ", "_");
-                    string themeRoot = @$"GameTheme/{textureNameReplace}/";
+                    string themeName = textureName.Replace(" ", "_");
+                    string[] possiblePaths = getPathResolver(themeName, lookup, character);
+                    Texture? texture = resources.GetGlyph(possiblePaths);
 
-                    // 通过子类提供的路径解析器获取可能路径
-                    string[] possiblePaths = getPathResolver(themeRoot, lookup, character);
-
-                    foreach (string path in possiblePaths)
+                    if (texture != null)
                     {
-                        var texture = resources.Get(path, EzTextureUsage.Glyph);
-
-                        if (texture != null)
-                        {
-                            glyph = new TexturedCharacterGlyph(
-                                new CharacterGlyph(character, 0, 0, texture.Width, texture.Height, null),
-                                texture,
-                                GLYPH_METRIC_SCALE);
-                            break;
-                        }
+                        glyph = new TexturedCharacterGlyph(
+                            new CharacterGlyph(character, 0, 0, texture.Width, texture.Height, null),
+                            texture,
+                            GLYPH_METRIC_SCALE);
                     }
                 }
 

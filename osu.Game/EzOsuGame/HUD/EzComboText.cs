@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.IO;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -113,28 +112,29 @@ namespace osu.Game.EzOsuGame.HUD
             protected override char[] GetPreloadSpecialChars()
                 => new[] { 't', 'e', 'l' };
 
-            protected override string[] GetPossiblePaths(string themeRoot, string lookup, char character)
+            protected override string[] GetPossiblePaths(string themeName, string lookup, char character)
             {
+                string root = $"GameTheme/{themeName}";
+
                 switch (character)
                 {
                     case 'e':
                     case 'l':
                         return new[]
                         {
-                            Path.Combine(themeRoot, lookup)
+                            $"{root}/{lookup}"
                         };
 
                     case 't':
                         return new[]
                         {
-                            Path.Combine(themeRoot, "combo", lookup)
+                            $"{root}/combo/{lookup}"
                         };
 
                     default:
-                        // 数字从 combo/number 目录读取
                         return new[]
                         {
-                            Path.Combine(themeRoot, "combo", "number", lookup),
+                            $"{root}/combo/number/{lookup}",
                         };
                 }
             }

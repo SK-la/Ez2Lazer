@@ -138,12 +138,14 @@ namespace osu.Game.EzOsuGame.Localization
             "内置", "Built-in");
 
         public static readonly LocalisableString HITRESULT_ANIMATION_TEMPLATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "在 GameTheme/…/judgement/ 下按帧加载时的相对路径模板（在自动探测 result-0、result_0 之后尝试）。"
-            + "\n占位符：{result} 为判定资源名；{0}、{00} 等为帧序号。"
-            + "\n默认 {result}/frame_{0} 对应子目录帧，如 Cool/frame_0；{result}-{0} 对应同级命名 Cool-0。",
-            "Relative path template for frame lookup under GameTheme/…/judgement/ (after auto-detecting result-0 / result_0)."
-            + "\nPlaceholders: {result} is the judgement asset name; {0}, {00}, etc. are frame indices."
-            + "\nDefault {result}/frame_{0} → e.g. Cool/frame_0; {result}-{0} → e.g. Cool-0.");
+            "在 GameTheme/{theme}/judgement/ 下的帧模板。默认 {result}/{000}，只查子目录里从 000.png 起的一组。"
+            + "\n找不到时只再试 {result}.gif、{result}.png，不再试同目录的其它帧。"
+            + "\n留空则按子目录帧、同层连字符帧、gif、png 的顺序探测。"
+            + "\n帧号只认 {0} 和 {000}。",
+            "Frame template under GameTheme/{theme}/judgement/. Default {result}/{000} loads the subdirectory sequence starting at 000.png."
+            + "\nIf that misses, only {result}.gif then {result}.png are tried."
+            + "\nAn empty template runs subdirectory frames, same-level hyphen frames, gif, then png."
+            + "\nFrame indices accept {0} and {000} only.");
 
         public static readonly LocalisableString HITRESULT_BLENDING_LABEL = new EzLocalizationManager.EzLocalisableString("混合模式", "Blending Mode");
         public static readonly LocalisableString HITRESULT_BLENDING_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设置混合模式", "Set the blending mode.");

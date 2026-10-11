@@ -16,8 +16,8 @@ using SixLabors.ImageSharp.PixelFormats;
 namespace osu.Game.Tests.EzOsuGame.Textures
 {
     /// <summary>
-    /// 守卫三模板解析：子目录 / 同层前缀分级 / 单图回退，以及层1 的两条硬约束——
-    /// 取像键不带后缀（否则与既有调用点各解一遍码）、用户根覆盖内置根。
+    /// 守卫探测顺序：子目录 000/0、子目录连字符帧、同层连字符帧、gif、png。
+    /// 帧号宽度只有 1 和 3，整组必须从 0 开始。自定义模板失败后只继续 gif、png。
     /// </summary>
     /// <remarks>
     /// 帧以不同边长区分，故断言的是「取到了哪几帧、顺序如何」，而不是只看帧数。
@@ -114,6 +114,7 @@ namespace osu.Game.Tests.EzOsuGame.Textures
             });
 
             AddAssert("纯数字文件名成帧", () => expect(new[] { 10, 11 }, "Sub/Note"));
+            AddAssert("显式 {name}/{000} 命中同一组", () => expect(new[] { 10, 11 }, "Sub/Note", template: "{name}/{000}"));
             AddAssert("{name}/frame_0 成帧", () => expect(new[] { 20, 21 }, "Sub/Judge"));
             AddAssert("{name}/frame-0 成帧", () => expect(new[] { 30, 31 }, "Sub/Flat"));
             AddAssert("子目录内无连接符不算帧", () => expect(System.Array.Empty<int>(), "Sub/Bad"));
@@ -150,7 +151,7 @@ namespace osu.Game.Tests.EzOsuGame.Textures
 
             AddAssert("默认三模板不加载", () => expect(System.Array.Empty<int>(), "Bare/Name"));
 
-            AddAssert("显式模板 {name}{0} 仍可取", () => expect(new[] { 950, 951 }, "Bare/Name", template: "{name}{0}"));
+            AddAssert("显式模板 {name}{0} 没有连字符，不算帧", () => expect(System.Array.Empty<int>(), "Bare/Name", template: "{name}{0}"));
         }
 
         [Test]
@@ -191,7 +192,7 @@ namespace osu.Game.Tests.EzOsuGame.Textures
             AddAssert("关闭单图回退后为 0 帧", () => expect(System.Array.Empty<int>(), "Alone/Still", allowSingleFallback: false));
             AddAssert("显式 {name}/frame_{0} 命中子目录", () => expect(new[] { 400, 401 }, "Judge/Cool", template: "{name}/frame_{0}"));
             AddAssert("{name}_overlay 表达单图", () => expect(new[] { 500 }, "Judge/Single", template: "{name}_overlay"));
-            AddAssert("含序号但不含 {name} 时自动前置资源名", () => expect(new[] { 600, 601 }, "Judge/Suffixed", template: "{0}"));
+            AddAssert("没有连字符的 {0} 不算帧", () => expect(System.Array.Empty<int>(), "Judge/Suffixed", template: "{0}"));
         }
 
         [Test]

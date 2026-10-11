@@ -165,7 +165,7 @@ namespace osu.Game.EzOsuGame
         #region 纹理获取 API
 
         /// <summary>
-        /// 按用途获取纹理（推荐入口）。
+        /// 按用途取一张已解码纹理。动画和字形不要直接拼路径调用：动画走 <see cref="GetAnimation(EzAnimationRequest, bool, bool, double?, bool)"/>，字形走 <see cref="GetGlyph"/>。
         /// </summary>
         /// <param name="path">完整路径（不含后缀）</param>
         /// <param name="usage">纹理用途，决定底层 store</param>
@@ -179,6 +179,29 @@ namespace osu.Game.EzOsuGame
                 EzTextureUsage.Badge => danStore.Get(path),
                 _ => textureStore.Get(path),
             };
+        }
+
+        /// <summary>
+        /// 按顺序取第一张字形。路径先经 <see cref="EzResourcePath"/> 规整，用途固定为 <see cref="EzTextureUsage.Glyph"/>。
+        /// 字形是单张图，不走动画帧探测。
+        /// </summary>
+        public Texture? GetGlyph(IReadOnlyList<string> candidates)
+        {
+            if (candidates == null)
+                return null;
+
+            foreach (string candidate in candidates)
+            {
+                if (string.IsNullOrWhiteSpace(candidate))
+                    continue;
+
+                Texture? texture = Get(EzResourcePath.Normalise(candidate), EzTextureUsage.Glyph);
+
+                if (texture != null)
+                    return texture;
+            }
+
+            return null;
         }
 
         /// <summary>

@@ -99,13 +99,15 @@ namespace osu.Game.EzOsuGame.HUD
             {
             }
 
-            protected override string[] GetPossiblePaths(string themeRoot, string lookup, char character)
+            protected override string[] GetPossiblePaths(string themeName, string lookup, char character)
             {
+                string root = $"GameTheme/{themeName}/";
+
                 return new[]
                 {
-                    $@"{themeRoot}number/score/{lookup}",
-                    $@"{themeRoot}number/combo/{lookup}",
-                    $@"{themeRoot}number/{lookup}",
+                    $"{root}combo/number/{lookup}",
+                    $"{root}number/score/{lookup}",
+                    $"{root}number/{lookup}",
                 };
             }
         }
