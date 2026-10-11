@@ -60,7 +60,11 @@
   <ItemGroup Label="Windows Icons">
     <Content Include="*.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
-  <Target Name="StageEzCameraBackend" AfterTargets="Build" Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+  <!-- 摄像头后端不是 Desktop 的 ProjectReference，dotnet publish 不会还原它。 -->
+  <Target Name="RestoreEzCameraBackend" BeforeTargets="Build" Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <MSBuild Projects="$(MSBuildThisFileDirectory)..\osu.Game.EzCamera.Windows\osu.Game.EzCamera.Windows.csproj" Targets="Restore" Properties="Configuration=$(Configuration)" />
+  </Target>
+  <Target Name="StageEzCameraBackend" AfterTargets="Build" DependsOnTargets="RestoreEzCameraBackend" Condition="$([MSBuild]::IsOSPlatform('Windows'))">
     <MSBuild Projects="$(MSBuildThisFileDirectory)..\osu.Game.EzCamera.Windows\osu.Game.EzCamera.Windows.csproj" Targets="Build" Properties="Configuration=$(Configuration)" />
     <MSBuild Projects="$(MSBuildThisFileDirectory)..\osu.Game.EzCamera.Windows\osu.Game.EzCamera.Windows.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration)">
       <Output TaskParameter="TargetOutputs" ItemName="_EzCameraDll" />
