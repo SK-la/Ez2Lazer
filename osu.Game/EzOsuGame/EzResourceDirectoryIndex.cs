@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
 
@@ -41,7 +42,7 @@ namespace osu.Game.EzOsuGame
         private readonly IResourceStore<byte[]>? embeddedRoot;
 
         private readonly ConcurrentDictionary<string, EzResourceDirectory> directories = new ConcurrentDictionary<string, EzResourceDirectory>(StringComparer.OrdinalIgnoreCase);
-        private readonly object embeddedLock = new object();
+        private readonly Lock embeddedLock = new Lock();
         private Dictionary<string, List<string>>? embeddedFiles;
 
         /// <param name="userRoot">用户 <c>EzResources</c> 存储根；可为 <c>null</c>。</param>
@@ -122,7 +123,7 @@ namespace osu.Game.EzOsuGame
             }
         }
 
-        internal static int extensionRank(string fileName)
+        internal static int ExtensionRank(string fileName)
         {
             int dot = fileName.LastIndexOf('.');
 
@@ -276,11 +277,11 @@ namespace osu.Game.EzOsuGame
         {
             string stem = EzResourcePath.Stem(fileName);
 
-            if (stem.Length > 0 && !exact.ContainsKey(stem))
-                exact.Add(stem, key);
+            if (stem.Length > 0)
+                exact.TryAdd(stem, key);
 
-            if (!string.Equals(fileName, stem, StringComparison.Ordinal) && !exact.ContainsKey(fileName))
-                exact.Add(fileName, key);
+            if (!string.Equals(fileName, stem, StringComparison.Ordinal))
+                exact.TryAdd(fileName, key);
         }
 
         private void registerFrame(string fileName, string key)
@@ -332,7 +333,7 @@ namespace osu.Game.EzOsuGame
             if (byRoot != 0)
                 return byRoot;
 
-            int byExtension = EzResourceDirectoryIndex.extensionRank(a.Name).CompareTo(EzResourceDirectoryIndex.extensionRank(b.Name));
+            int byExtension = EzResourceDirectoryIndex.ExtensionRank(a.Name).CompareTo(EzResourceDirectoryIndex.ExtensionRank(b.Name));
 
             return byExtension != 0 ? byExtension : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
         }
@@ -369,8 +370,7 @@ namespace osu.Game.EzOsuGame
             if (width < Width)
                 Width = width;
 
-            if (!byIndex.ContainsKey(index))
-                byIndex.Add(index, key);
+            byIndex.TryAdd(index, key);
         }
     }
 }

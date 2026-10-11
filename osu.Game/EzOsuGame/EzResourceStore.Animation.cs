@@ -183,7 +183,7 @@ namespace osu.Game.EzOsuGame
             EzResourcePath.Split(request.Path, out string directory, out string name);
 
             if (name.Length == 0 || request.MaxFrames <= 0)
-                return EzFrameSet.Empty;
+                return EzFrameSet.EMPTY;
 
             string? template = string.IsNullOrWhiteSpace(request.FrameTemplate) ? null : request.FrameTemplate!.Trim();
 
@@ -199,7 +199,7 @@ namespace osu.Game.EzOsuGame
                     keys = new[] { single };
             }
 
-            return keys.Count == 0 ? EzFrameSet.Empty : new EzFrameSet(keys);
+            return keys.Count == 0 ? EzFrameSet.EMPTY : new EzFrameSet(keys);
         }
 
         // 三模板默认：子目录 → 同层 → 单图，命中即停；优先级固定，不按帧数比较。
@@ -307,7 +307,7 @@ namespace osu.Game.EzOsuGame
             if (start == 0 && count == keys.Count)
                 return keys;
 
-            var slice = new string[count];
+            string[] slice = new string[count];
 
             for (int i = 0; i < count; i++)
                 slice[i] = keys[start + i];
@@ -440,7 +440,7 @@ namespace osu.Game.EzOsuGame
     /// </summary>
     internal sealed class EzFrameSet
     {
-        public static readonly EzFrameSet Empty = new EzFrameSet(Array.Empty<string>());
+        public static readonly EzFrameSet EMPTY = new EzFrameSet(Array.Empty<string>());
 
         private Texture[]? textures;
 
