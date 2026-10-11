@@ -5,6 +5,7 @@ using System;
 using osu.Framework;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.UI;
@@ -153,8 +154,7 @@ namespace osu.Game.Rulesets.Mania.EzMania
             switch (columnWidthStyle)
             {
                 case ColumnWidthStyle.EzSkinOnly:
-                    var skinInfoType = skinManager.CurrentSkinInfo.Value.GetType();
-                    if (skinInfoType == typeof(EzStyleProSkin) || skinInfoType == typeof(Ez2Skin) || skinInfoType == typeof(SbISkin))
+                    if (usesEzColumnWidth(skin, skinManager))
                         width = ezWidth;
                     break;
 
@@ -207,6 +207,20 @@ namespace osu.Game.Rulesets.Mania.EzMania
             }
 
             return totalWidth;
+        }
+
+        private static bool usesEzColumnWidth(ISkinSource skin, SkinManager skinManager)
+        {
+            foreach (var source in skin.AllSources)
+            {
+                if (source is EzStyleProSkin or Ez2Skin or SbISkin)
+                    return true;
+            }
+
+            string instantiationInfo = skinManager.CurrentSkinInfo.Value.GetType().GetInvariantInstantiationInfo();
+            return instantiationInfo == typeof(EzStyleProSkin).GetInvariantInstantiationInfo()
+                   || instantiationInfo == typeof(Ez2Skin).GetInvariantInstantiationInfo()
+                   || instantiationInfo == typeof(SbISkin).GetInvariantInstantiationInfo();
         }
     }
 }
