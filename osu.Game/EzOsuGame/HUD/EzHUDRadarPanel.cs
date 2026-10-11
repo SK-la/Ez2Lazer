@@ -21,6 +21,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
@@ -173,7 +174,7 @@ namespace osu.Game.EzOsuGame.HUD
         private ModSettingChangeTracker? modSettingTracker;
 
         private Container? axisLabelContainer;
-        private EzHUDRadarChart? chart;
+        private EzRadarChart? chart;
         private Box background = null!;
         private FillFlowContainer[] axisLabelContainers = Array.Empty<FillFlowContainer>();
         private string[] activeAxisLabels = default_axis_labels;
@@ -236,7 +237,7 @@ namespace osu.Game.EzOsuGame.HUD
                         },
                     },
                 },
-                chart = new EzHUDRadarChart
+                chart = new EzRadarChart
                 {
                     AxisCount = parameterRatios.Length,
                     Size = new Vector2(chart_size),

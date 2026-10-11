@@ -47,14 +47,6 @@ namespace osu.Game.EzOsuGame.UserInterface
             }
         }
 
-        public int GridLevels { get; set; } = 4;
-
-        public float RadiusRatio { get; set; } = 0.82f;
-
-        public float GridThickness { get; set; } = 2.5f;
-
-        public float AxisThickness { get; set; } = 2.5f;
-
         /// <summary>
         /// 最外圈描边粗细（不受 <see cref="GridThickness"/> 影响）。
         /// </summary>
@@ -65,6 +57,25 @@ namespace osu.Game.EzOsuGame.UserInterface
         /// <para>推荐值为 <see cref="OuterRingThickness"/> - 1.5f</para>
         /// </summary>
         public float OuterRingRadialOffset { get; set; } = 1f;
+
+        /// <summary>
+        /// 最外圈颜色。
+        /// </summary>
+        public Color4 OuterRingColour { get; set; } = new Color4(255, 255, 255, 128);
+
+        /// <summary>
+        /// 网格层数。
+        /// </summary>
+        public int GridLevels { get; set; } = 4;
+
+        /// <summary>
+        /// 数据区域半径相对控件最小边长的一半的比例。
+        /// </summary>
+        public float RadiusRatio { get; set; } = 0.82f;
+
+        public float GridThickness { get; set; } = 2.5f;
+
+        public float AxisThickness { get; set; } = 2.5f;
 
         public float DataOutlineThickness { get; set; } = 3.5f;
 
@@ -78,8 +89,6 @@ namespace osu.Game.EzOsuGame.UserInterface
         public Color4 GridColour { get; set; } = new Color4(255, 255, 210, 110);
 
         public Color4 AxisColour { get; set; } = new Color4(255, 255, 210, 95);
-
-        public Color4 OuterRingColour { get; set; } = new Color4(255, 255, 255, 95);
 
         public Color4 BaseFillColour { get; set; } = new Color4(255, 255, 200, 30);
 
