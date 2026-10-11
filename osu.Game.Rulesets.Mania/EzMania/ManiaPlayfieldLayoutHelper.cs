@@ -7,6 +7,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Skinning;
@@ -209,6 +210,31 @@ namespace osu.Game.Rulesets.Mania.EzMania
             return totalWidth;
         }
 
+        /// <summary>
+        /// Ez2Ac (10k2s1p) display column count. A 14-column stage renders as 13 when empty edge columns are skipped.
+        /// </summary>
+        public static int GetDisplayColumnCount(StageDefinition stage) => GetDisplayColumnCount(stage.Columns);
+
+        /// <summary>
+        /// Ez2Ac (10k2s1p) display column count. A 14-column stage renders as 13 when empty edge columns are skipped.
+        /// </summary>
+        public static int GetDisplayColumnCount(int logicalColumnCount)
+        {
+            if (logicalColumnCount <= 0)
+                return 0;
+
+            if (GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns) && logicalColumnCount == 14)
+                return 13;
+
+            return logicalColumnCount;
+        }
+
+        /// <summary>
+        /// Whether a beatmap column is past the on-screen column count and should not be rendered.
+        /// </summary>
+        public static bool ShouldSkipBeatmapColumn(StageDefinition stage, int beatmapColumnIndex)
+            => beatmapColumnIndex >= GetDisplayColumnCount(stage);
+
         private static bool usesEzColumnWidth(ISkinSource skin, SkinManager skinManager)
         {
             foreach (var source in skin.AllSources)
@@ -217,7 +243,7 @@ namespace osu.Game.Rulesets.Mania.EzMania
                     return true;
             }
 
-            string instantiationInfo = skinManager.CurrentSkinInfo.Value.GetType().GetInvariantInstantiationInfo();
+            string instantiationInfo = skinManager.CurrentSkinInfo.Value.PerformRead(s => s.InstantiationInfo);
             return instantiationInfo == typeof(EzStyleProSkin).GetInvariantInstantiationInfo()
                    || instantiationInfo == typeof(Ez2Skin).GetInvariantInstantiationInfo()
                    || instantiationInfo == typeof(SbISkin).GetInvariantInstantiationInfo();

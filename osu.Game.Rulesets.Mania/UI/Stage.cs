@@ -151,7 +151,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 }
             };
 
-            int displayColumns = ManiaEzColumnLayout.GetDisplayColumnCount(definition);
+            int displayColumns = ManiaPlayfieldLayoutHelper.GetDisplayColumnCount(definition);
 
             for (int i = 0; i < displayColumns; i++)
             {
@@ -279,7 +279,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
             int localColumn = hitObject.Column - firstColumnIndex;
 
-            if (ManiaEzColumnLayout.ShouldSkipBeatmapColumn(Definition, localColumn))
+            if (ManiaPlayfieldLayoutHelper.ShouldSkipBeatmapColumn(Definition, localColumn))
             {
                 Logger.Log($"Skipping hit object in column {hitObject.Column} because Ez2Ac mode hides the last column of 14K beatmaps.");
                 return false;

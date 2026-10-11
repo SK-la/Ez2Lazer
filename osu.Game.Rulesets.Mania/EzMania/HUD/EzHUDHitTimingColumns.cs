@@ -121,7 +121,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         private void recreateComponents()
         {
             ClearInternal();
-            keyCount = ManiaEzColumnLayout.GetDisplayColumnCount(controller.Triggers.Count);
+            keyCount = ManiaPlayfieldLayoutHelper.GetDisplayColumnCount(controller.Triggers.Count);
 
             if (keyCount <= 0)
             {

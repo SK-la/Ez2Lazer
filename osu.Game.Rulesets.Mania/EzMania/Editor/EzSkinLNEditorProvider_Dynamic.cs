@@ -35,14 +35,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             var stageDefinition = new StageDefinition(keyCount);
             var beatmap = new ManiaBeatmap(stageDefinition);
             const int spacing = preview_hold_duration;
-            int displayColumns = ManiaEzColumnLayout.GetDisplayColumnCount(stageDefinition);
+            int displayColumns = ManiaPlayfieldLayoutHelper.GetDisplayColumnCount(stageDefinition);
             int cycleLength = spacing * displayColumns;
 
             for (int cycle = 0; cycle < 16; cycle++)
             {
                 for (int column = 0; column < keyCount; column++)
                 {
-                    if (ManiaEzColumnLayout.ShouldSkipBeatmapColumn(stageDefinition, column))
+                    if (ManiaPlayfieldLayoutHelper.ShouldSkipBeatmapColumn(stageDefinition, column))
                         continue;
 
                     double holdStart = cycle * cycleLength + (column + 1) * spacing;

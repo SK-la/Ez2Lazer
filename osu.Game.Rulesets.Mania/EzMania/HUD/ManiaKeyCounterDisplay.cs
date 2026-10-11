@@ -78,7 +78,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         {
             KeyFlow.Clear();
 
-            int displayColumns = ManiaEzColumnLayout.GetDisplayColumnCount(StageDefinition.Columns);
+            int displayColumns = ManiaPlayfieldLayoutHelper.GetDisplayColumnCount(StageDefinition.Columns);
 
             if (displayColumns <= 0)
                 return;

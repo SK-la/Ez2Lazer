@@ -124,7 +124,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             panelWidth = 0;
 
             int keyMode = inputCountController?.Triggers.Count ?? 0;
-            int displayColumns = ManiaEzColumnLayout.GetDisplayColumnCount(keyMode);
+            int displayColumns = ManiaPlayfieldLayoutHelper.GetDisplayColumnCount(keyMode);
 
             if (displayColumns <= 0)
                 return false;

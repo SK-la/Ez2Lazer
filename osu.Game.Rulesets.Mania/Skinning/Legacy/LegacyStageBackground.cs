@@ -64,7 +64,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
                 }
             };
 
-            int displayColumns = ManiaEzColumnLayout.GetDisplayColumnCount(stageDefinition);
+            int displayColumns = ManiaPlayfieldLayoutHelper.GetDisplayColumnCount(stageDefinition);
 
             for (int i = 0; i < displayColumns; i++)
                 columnBackgrounds.SetContentForColumn(i, new ColumnBackground(i, i == displayColumns - 1));
