@@ -244,9 +244,7 @@ namespace osu.Game.EzOsuGame
 
                 imageKeys.Add(key);
                 registerExact(fileName, key);
-
-                if (EzResourcePath.Extension(fileName) == ".png")
-                    registerFrame(fileName, key);
+                registerFrame(fileName, key);
             }
 
             pendingFiles.Clear();

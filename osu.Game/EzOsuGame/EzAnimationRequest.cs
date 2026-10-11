@@ -29,7 +29,7 @@ namespace osu.Game.EzOsuGame
         public string Path { get; init; } = string.Empty;
 
         /// <summary>
-        /// 可选的帧名模板。留空走层 1 到层 4。非空时只查这一条，失败后只继续 gif、png。
+        /// 可选的帧名模板。留空走层 1 到层 4。非空时只查这一条，失败后按名字取单图。
         /// 帧号只认 <c>{0}</c> 与 <c>{000}</c>。<c>{result}/{000}</c> 是子目录里从 <c>000.png</c> 起的一组。
         /// </summary>
         public string? FrameTemplate { get; init; }

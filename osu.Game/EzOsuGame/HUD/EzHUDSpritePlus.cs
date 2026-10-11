@@ -102,18 +102,6 @@ namespace osu.Game.EzOsuGame.HUD
             AutoSizeAxes = Axes.Both;
         }
 
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            ModifyPath.BindValueChanged(_ => scheduleReload());
-            SpriteName.BindValueChanged(_ => scheduleReload());
-            FrameTemplate.BindValueChanged(_ => scheduleReload());
-
-            AccentColour.BindValueChanged(_ => applyVisualSettings(), true);
-            Blend.BindValueChanged(_ => applyVisualSettings(), true);
-        }
-
         [BackgroundDependencyLoader]
         private void load()
         {
@@ -124,6 +112,18 @@ namespace osu.Game.EzOsuGame.HUD
             AddInternal(speedTracker = new EzBeatmapSpeedTracker());
 
             scheduleReload();
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            ModifyPath.BindValueChanged(_ => scheduleReload());
+            SpriteName.BindValueChanged(_ => scheduleReload());
+            FrameTemplate.BindValueChanged(_ => scheduleReload());
+
+            AccentColour.BindValueChanged(_ => applyVisualSettings(), true);
+            Blend.BindValueChanged(_ => applyVisualSettings(), true);
         }
 
         protected override void Update()

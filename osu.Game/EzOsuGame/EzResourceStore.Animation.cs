@@ -27,7 +27,7 @@ namespace osu.Game.EzOsuGame
         /// </summary>
         /// <remarks>
         /// 调用方只交 <see cref="EzAnimationRequest"/>。<see cref="EzAnimationRequest.FrameTemplate"/> 为空时走层 1 到层 4；
-        /// 非空时只查该模板，失败后只继续 gif、png，不回到层 1 和层 2。
+        /// 非空时只查该模板，失败后按名字取单图，不回到层 1 和层 2。
         /// 解码原语是 <see cref="Get(string, EzTextureUsage)"/>，字形用 <see cref="GetGlyph"/>。判定以外的 HUD 不传帧模板。
         /// </remarks>
         /// <param name="request">帧加载请求；见 <see cref="EzAnimationRequest"/>。</param>
@@ -203,7 +203,7 @@ namespace osu.Game.EzOsuGame
             return keys.Count == 0 ? EzFrameSet.EMPTY : new EzFrameSet(keys);
         }
 
-        // 无自定义模板：层1 子目录 → 层2 同层连字符 → 层3 gif → 层4 png。命中即停。
+        // 无自定义模板：层1 子目录 → 层2 同层连字符 → 单图。命中即停。
         private IReadOnlyList<string> resolveDefaultKeys(EzAnimationRequest request, string directory, string name)
         {
             EzResourceDirectory subdirectory = directoryIndex.Get(EzResourcePath.Combine(directory, name));
@@ -237,10 +237,10 @@ namespace osu.Game.EzOsuGame
             if (!request.AllowSingleFallback)
                 return Array.Empty<string>();
 
-            return resolveGifThenPng(directory, name);
+            return resolveSingle(directory, name);
         }
 
-        // 自定义模板是层 1 的收窄。失败后不回到层 1 和层 2，只继续 gif、png。
+        // 自定义模板不走层 1–4。失败后按名字取单图，后缀不检查。
         private IReadOnlyList<string> resolveCustomKeys(EzAnimationRequest request, string directory, string name, string template)
         {
             if (tryParseFrameTemplate(template, out string prefixText, out int width))
@@ -261,7 +261,7 @@ namespace osu.Game.EzOsuGame
             if (!request.AllowSingleFallback)
                 return Array.Empty<string>();
 
-            return resolveGifThenPng(directory, name);
+            return resolveSingle(directory, name);
         }
 
         private IReadOnlyList<string>? resolveHyphenFrames(EzResourceDirectory directory, string name, int width, EzAnimationRequest request, bool allowFrozen)
@@ -313,29 +313,13 @@ namespace osu.Game.EzOsuGame
             return tryResolveExact(directory, expanded, out string? key) ? key : null;
         }
 
-        private IReadOnlyList<string> resolveGifThenPng(string directory, string name)
+        // 同名不同后缀已在索引里只留一张。这里按名字取那张，不再看后缀。
+        private IReadOnlyList<string> resolveSingle(string directory, string name)
         {
-            EzResourceDirectory folder = directoryIndex.Get(directory);
-
-            if (tryNamedImage(folder, name, ".gif", out string? gif))
-                return new[] { gif };
-
-            if (tryNamedImage(folder, name, ".png", out string? png))
-                return new[] { png };
+            if (directoryIndex.Get(directory).TryGetExact(name, out string? key))
+                return new[] { key };
 
             return Array.Empty<string>();
-        }
-
-        private static bool tryNamedImage(EzResourceDirectory folder, string name, string extension, [NotNullWhen(true)] out string? key)
-        {
-            if (folder.TryGetExact(name + extension, out key))
-                return true;
-
-            if (name.EndsWith(extension, StringComparison.OrdinalIgnoreCase) && folder.TryGetExact(name, out key))
-                return true;
-
-            key = null;
-            return false;
         }
 
         private IReadOnlyList<string>? collectIfPresent(EzResourceDirectory directory, string prefix, int width, EzAnimationRequest request)

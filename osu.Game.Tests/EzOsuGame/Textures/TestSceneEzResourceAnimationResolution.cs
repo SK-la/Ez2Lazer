@@ -16,8 +16,8 @@ using SixLabors.ImageSharp.PixelFormats;
 namespace osu.Game.Tests.EzOsuGame.Textures
 {
     /// <summary>
-    /// 守卫探测顺序：子目录 000/0、子目录连字符帧、同层连字符帧、gif、png。
-    /// 帧号宽度只有 1 和 3，整组必须从 0 开始。自定义模板失败后只继续 gif、png。
+    /// 守卫探测顺序：子目录 000/0、子目录连字符帧、同层连字符帧、单图。
+    /// 帧号宽度只有 1 和 3，整组必须从 0 开始。自定义模板失败后按名字取单图，不检查后缀。
     /// </summary>
     /// <remarks>
     /// 帧以不同边长区分，故断言的是「取到了哪几帧、顺序如何」，而不是只看帧数。
