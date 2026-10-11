@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -10,6 +11,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Text;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Graphics.Sprites;
 
 namespace osu.Game.EzOsuGame.HUD
@@ -18,7 +20,7 @@ namespace osu.Game.EzOsuGame.HUD
     /// 基于 EzTextureStore 的纹理字体基类
     /// 提供通用的纹理加载和缓存机制，子类只需实现路径查找规则
     /// </summary>
-    public abstract partial class EzSpriteText : OsuSpriteText
+    public abstract partial class EzSpriteText : OsuSpriteText, IEzGameplayWarmUp
     {
         // 与 Argon 位图字体相同：度量先缩到纹理的 1/8，Font.Size 再决定绘制大小。
         internal const float GLYPH_METRIC_SCALE = 0.125f;
@@ -36,6 +38,9 @@ namespace osu.Game.EzOsuGame.HUD
 
         [Resolved]
         private EzResourceStore resources { get; set; } = null!;
+
+        [Resolved]
+        private EzGameplayWarmUpService warmUpService { get; set; } = null!;
 
         protected EzSpriteText(Func<char, string> getLookup, Bindable<EzEnumGameThemeName> themeName)
         {
@@ -65,6 +70,29 @@ namespace osu.Game.EzOsuGame.HUD
                 glyphStore?.ClearCache();
                 glyphStore = CreateGlyphStore(resources, getLookup);
             }, true);
+
+            // 登记放在字形库建好之后。PlayerLoader 要等这份预热结束才进局。
+            warmUpService.Register(this);
+        }
+
+        /// <summary>
+        /// 进图前把 0–9 和子类声明的特殊字符解码完，并等到字形页上传结束。
+        /// 否则首个判定把分数/连击从 0 跳开时，缺的数字会在更新线程上现解。
+        /// </summary>
+        public Task WarmUpAsync(CancellationToken cancellationToken)
+        {
+            GlyphStore? store = glyphStore;
+            string fontName = ThemeName.Value.ToString();
+
+            if (store == null)
+                return Task.CompletedTask;
+
+            return Task.Run(() =>
+            {
+                var uploads = new List<Texture>();
+                PreloadCharacters(store, fontName, uploads);
+                EzGameplayWarmUpService.WaitForUpload(uploads, cancellationToken);
+            }, cancellationToken);
         }
 
         protected override TextBuilder CreateTextBuilder(ITexturedGlyphLookupStore store) => base.CreateTextBuilder(glyphStore);
@@ -80,19 +108,24 @@ namespace osu.Game.EzOsuGame.HUD
         /// <summary>
         /// 预加载字符（允许子类自定义预加载范围）
         /// </summary>
-        protected virtual void PreloadCharacters(GlyphStore store, string fontName)
+        protected virtual void PreloadCharacters(GlyphStore store, string fontName, List<Texture>? uploads = null)
         {
-            // 默认预加载数字和常见符号
             foreach (char c in GetPreloadSpecialChars())
-                store.Get(fontName, c);
+                rememberUpload(store.Get(fontName, c), uploads);
 
             for (int i = 0; i < 10; i++)
-                store.Get(fontName, (char)('0' + i));
+                rememberUpload(store.Get(fontName, (char)('0' + i)), uploads);
         }
 
         public void Preload()
         {
             PreloadCharacters(glyphStore!, ThemeName.Value.ToString());
+        }
+
+        private static void rememberUpload(ITexturedCharacterGlyph? glyph, List<Texture>? uploads)
+        {
+            if (uploads != null && glyph?.Texture != null)
+                uploads.Add(glyph.Texture);
         }
 
         /// <summary>
@@ -119,6 +152,7 @@ namespace osu.Game.EzOsuGame.HUD
             private readonly Func<string, string, char, string[]> getPathResolver;
 
             private readonly Dictionary<char, ITexturedCharacterGlyph?> cache = new Dictionary<char, ITexturedCharacterGlyph?>();
+            private readonly Lock cacheLock = new Lock();
 
             public GlyphStore(EzResourceStore resources, Func<char, string> getLookup, Func<string, string, char, string[]> getPathResolver)
             {
@@ -129,8 +163,11 @@ namespace osu.Game.EzOsuGame.HUD
 
             public ITexturedCharacterGlyph? Get(string? textureName, char character)
             {
-                if (cache.TryGetValue(character, out var cached))
-                    return cached;
+                lock (cacheLock)
+                {
+                    if (cache.TryGetValue(character, out var cached))
+                        return cached;
+                }
 
                 string lookup = getLookup(character);
                 TexturedCharacterGlyph? glyph = null;
@@ -150,14 +187,24 @@ namespace osu.Game.EzOsuGame.HUD
                     }
                 }
 
-                cache[character] = glyph;
-                return glyph;
+                lock (cacheLock)
+                {
+                    if (cache.TryGetValue(character, out var cached))
+                        return cached;
+
+                    cache[character] = glyph;
+                    return glyph;
+                }
             }
 
             public Task<ITexturedCharacterGlyph?> GetAsync(string fontName, char character)
                 => Task.Run(() => Get(fontName, character));
 
-            public void ClearCache() => cache.Clear();
+            public void ClearCache()
+            {
+                lock (cacheLock)
+                    cache.Clear();
+            }
         }
     }
 }

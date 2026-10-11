@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,6 +11,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Textures;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Animation;
 using osu.Game.EzOsuGame.Configuration;
@@ -371,33 +373,58 @@ namespace osu.Game.EzOsuGame.HUD
         /// <remarks>
         /// 这些资源原先只在**首次**判定/首个满连时才被解码，表现为进局后第一次判定 update/draw 各掉一帧。
         /// 这里按当前 <see cref="ThemeName"/> / <see cref="AnimationFrameTemplate"/> / 生效的 HitMode 模板
-        /// 复刻 <see cref="CreateJudgementTexture"/> 的探测路径（含回退名），在线程池里完成解码。
+        /// 复刻 <see cref="CreateJudgementTexture"/> 的探测路径（含回退名），在线程池里完成解码，并等到绘制线程把上传排空。
+        /// 不在这里创建 drawable：预热线程不在场景树上，创建后再 Dispose 也带不走 GPU 上传。
         /// </remarks>
         public Task WarmUpAsync(CancellationToken cancellationToken)
         {
             // 与 CreateJudgementTexture 取同一来源：那是组件自己的 ThemeName 设置，不一定是全局配置。
             string theme = ThemeName.Value.ToString();
             string template = AnimationFrameTemplate.Value?.Trim() ?? "{result}/{000}";
-            double frameLength = 1000.0 / FPS.Value;
             EzEnumHitMode activeTemplate = resolveActiveTemplate();
 
-            return Task.Run(() => warmUpJudgementResources(theme, template, frameLength, activeTemplate, cancellationToken), cancellationToken);
+            return Task.Run(() => warmUpJudgementResources(theme, template, activeTemplate, cancellationToken), cancellationToken);
         }
 
-        private void warmUpJudgementResources(string theme, string template, double frameLength, EzEnumHitMode activeTemplate, CancellationToken cancellationToken)
+        private void warmUpJudgementResources(string theme, string template, EzEnumHitMode activeTemplate, CancellationToken cancellationToken)
         {
+            var uploads = new List<Texture>();
+
             foreach (HitResult result in warm_up_results)
             {
-                if (cancellationToken.IsCancellationRequested)
-                    return;
+                cancellationToken.ThrowIfCancellationRequested();
 
-                // 与进局走同一份探测（命中即停）：解出来的必然是进局会命中的那一条，
-                // 既不会多探后面那些永远用不到的变体 / 回退名，也不会漏掉真正要用的。
-                probeJudgementDrawable(result, theme, template, frameLength, activeTemplate)?.Dispose();
+                // 与进局走同一份探测（命中即停）：解出来的必然是进局会命中的那一条。
+                addUploads(uploads, probeJudgementFrames(result, theme, template, activeTemplate));
             }
 
             // checkFullCombo 直接取 FullCombo/full-combo（不带 GameTheme 前缀）。
-            resources.GetAnimation(new EzAnimationRequest { Path = @"FullCombo/full-combo" }, looping: false)?.Dispose();
+            addUploads(uploads, resources.GetTextureFrames(new EzAnimationRequest { Path = @"FullCombo/full-combo" }));
+            EzGameplayWarmUpService.WaitForUpload(uploads, cancellationToken);
+        }
+
+        private Texture[] probeJudgementFrames(HitResult result, string theme, string template, EzEnumHitMode activeTemplate)
+        {
+            Texture[] frames = probeJudgementVariantFrames(theme, EzHitResultNameTemplate.GetResourceName(activeTemplate, result), template);
+
+            if (frames.Length > 0)
+                return frames;
+
+            return probeJudgementVariantFrames(theme, EzHitResultNameTemplate.GetFallbackResourceName(activeTemplate, result), template);
+        }
+
+        private Texture[] probeJudgementVariantFrames(string theme, string resultName, string template)
+        {
+            if (string.IsNullOrEmpty(resultName))
+                return [];
+
+            return resources.GetTextureFrames(buildJudgementRequest(theme, resultName, template));
+        }
+
+        private static void addUploads(List<Texture> uploads, Texture[] frames)
+        {
+            for (int i = 0; i < frames.Length; i++)
+                uploads.Add(frames[i]);
         }
 
         #endregion
