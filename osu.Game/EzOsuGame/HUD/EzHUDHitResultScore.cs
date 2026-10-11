@@ -99,7 +99,9 @@ namespace osu.Game.EzOsuGame.HUD
         //     Value = Anchor.TopCentre
         // };
 
-        private Drawable? hitAnimation;
+        private readonly Dictionary<HitResult, Drawable> judgementDrawables = new Dictionary<HitResult, Drawable>();
+        private readonly HashSet<HitResult> unavailableResults = new HashSet<HitResult>();
+        private HitResult? visibleResult;
         private Drawable? fullComboAnimation;
         private ISample? fullComboSound;
 
@@ -146,11 +148,7 @@ namespace osu.Game.EzOsuGame.HUD
                 ThemeName.Value = e.NewValue;
             });
 
-            ThemeName.BindValueChanged(_ =>
-            {
-                ClearInternal();
-                hitAnimation?.Invalidate();
-            }, true);
+            ThemeName.BindValueChanged(_ => invalidateCurrentAnimation(), true);
 
             // HitMode 模板：自动模式跟随 Ez 全局 HitMode 配置；手动模式使用下拉栏的固定值。
             maniaHitModeConfig = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
@@ -177,7 +175,12 @@ namespace osu.Game.EzOsuGame.HUD
             ForceDeformAnimation.BindValueChanged(e =>
             {
                 DeformTemplate.Disabled = !e.NewValue;
+                invalidateCurrentAnimation();
             }, true);
+
+            FPS.BindValueChanged(_ => invalidateCurrentAnimation());
+
+            AnimationFrameTemplate.BindValueChanged(_ => invalidateCurrentAnimation());
 
             HitResultBlendModeSetting.BindValueChanged(mode =>
             {
@@ -199,6 +202,9 @@ namespace osu.Game.EzOsuGame.HUD
                         Destination = BlendingType.One
                     }
                 };
+
+                foreach (var drawable in judgementDrawables.Values)
+                    drawable.Blending = hitResultBlending.Value;
             }, true);
 
             AccentColour.BindValueChanged(_ => Colour = AccentColour.Value, true);
@@ -239,44 +245,98 @@ namespace osu.Game.EzOsuGame.HUD
             if (hitResult.GetIndexForOrderedDisplay() < SkipBetterJudgement.Value.GetIndexForOrderedDisplay())
                 return;
 
-            // 清除内部元素前先结束所有变换
-            hitAnimation?.FinishTransforms();
+            if (visibleResult is HitResult previous && previous != hitResult && judgementDrawables.TryGetValue(previous, out var previousDrawable))
+                hideJudgement(previousDrawable);
 
-            ClearInternal();
-            hitAnimation = null;
+            var drawable = getOrCreateJudgement(hitResult);
 
-            var judgementText = CreateJudgementTexture(judgement.Type);
-            AddInternal(judgementText);
-        }
-
-        protected Drawable CreateJudgementTexture(HitResult result)
-        {
-            double frameLength = 1000.0 / FPS.Value;
-
-            hitAnimation = probeJudgementDrawable(result, ThemeName.Value.ToString(),
-                AnimationFrameTemplate.Value?.Trim() ?? "{result}/{000}", frameLength, resolveActiveTemplate());
-
-            if (hitAnimation != null)
+            if (drawable == null)
             {
-                configureJudgementDrawable(result, hitAnimation, frameLength);
-                return hitAnimation;
+                visibleResult = null;
+                return;
             }
 
-            // 所有尝试都失败，返回空动画（跳过显示）
-            return new TextureAnimation
+            visibleResult = hitResult;
+            replayJudgement(hitResult, drawable);
+        }
+
+        private Drawable? getOrCreateJudgement(HitResult result)
+        {
+            if (judgementDrawables.TryGetValue(result, out var existing))
+                return existing;
+
+            if (unavailableResults.Contains(result))
+                return null;
+
+            double frameLength = 1000.0 / FPS.Value;
+            var drawable = probeJudgementDrawable(result, ThemeName.Value.ToString(),
+                AnimationFrameTemplate.Value?.Trim() ?? "{result}/{000}", frameLength, resolveActiveTemplate());
+
+            if (drawable == null)
             {
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre,
-                Loop = false,
-                Alpha = 0 // 完全透明，不显示
-            };
+                unavailableResults.Add(result);
+                return null;
+            }
+
+            configureJudgementDrawable(drawable, frameLength);
+            drawable.Hide();
+            AddInternal(drawable);
+            judgementDrawables[result] = drawable;
+            return drawable;
+        }
+
+        private void replayJudgement(HitResult result, Drawable drawable)
+        {
+            if (!drawable.IsLoaded)
+            {
+                Schedule(() =>
+                {
+                    if (visibleResult == result
+                        && judgementDrawables.TryGetValue(result, out var current)
+                        && current == drawable)
+                        replayJudgement(result, drawable);
+                });
+
+                return;
+            }
+
+            if (drawable is TextureAnimation animation)
+                animation.Restart();
+
+            if (ForceDeformAnimation.Value)
+            {
+                PlayAnimation(result, drawable);
+                return;
+            }
+
+            drawable.ClearTransforms();
+            drawable.Alpha = 1;
+            drawable.Position = Vector2.Zero;
+
+            if (drawable is TextureAnimation playing)
+            {
+                // playing.Scale = new Vector2(1.2f);
+                PlayAnimationGif(result, playing);
+            }
+            else
+                drawable.Scale = new Vector2(0.5f);
+        }
+
+        private static void hideJudgement(Drawable drawable)
+        {
+            drawable.FinishTransforms();
+
+            if (drawable is TextureAnimation animation)
+                animation.Stop();
+
+            drawable.Hide();
         }
 
         /// <summary>
         /// 判定纹理的探测：原名与回退名各解析一次，命中即停。
         /// </summary>
         /// <remarks>
-        /// 进局（<see cref="CreateJudgementTexture"/>）与进图预热共用这一份，避免两套探测逻辑漂移——
+        /// 进局（<see cref="getOrCreateJudgement"/>）与进图预热共用这一份，避免两套探测逻辑漂移——
         /// 漂移会让预热解码出进局用不到的帧、或漏掉进局真正要用的那一条。
         /// 这里刻意不读写组件字段、不做 configure / 播放，所以预热侧可以安全调用后直接 Dispose。
         /// </remarks>
@@ -306,7 +366,7 @@ namespace osu.Game.EzOsuGame.HUD
             FrameTemplate = string.IsNullOrWhiteSpace(template) ? null : template,
         };
 
-        private void configureJudgementDrawable(HitResult result, Drawable drawable, double frameLength)
+        private void configureJudgementDrawable(Drawable drawable, double frameLength)
         {
             drawable.Anchor = Anchor.Centre;
             drawable.Origin = Anchor.Centre;
@@ -318,33 +378,6 @@ namespace osu.Game.EzOsuGame.HUD
                 animation.Loop = ForceDeformAnimation.Value;
                 animation.DefaultFrameLength = frameLength;
             }
-
-            if (ForceDeformAnimation.Value)
-            {
-                drawable.Alpha = 0;
-
-                if (drawable is not TextureAnimation)
-                    drawable.Scale = new Vector2(0.5f);
-
-                // 等加载后再变形，避免 applyFadeEffect 因未加载直接返回。
-                Schedule(() => PlayAnimation(result, drawable));
-                return;
-            }
-
-            drawable.Alpha = 1;
-
-            if (drawable is TextureAnimation playing)
-            {
-                playing.Scale = new Vector2(1.2f);
-                Schedule(() => PlayAnimationGif(result, playing));
-                playing.OnUpdate += _ =>
-                {
-                    if (playing.CurrentFrameIndex == playing.FrameCount - 1)
-                        playing.Expire();
-                };
-            }
-            else
-                drawable.Scale = new Vector2(0.5f);
         }
 
         /// <summary>
@@ -373,12 +406,12 @@ namespace osu.Game.EzOsuGame.HUD
         /// <remarks>
         /// 这些资源原先只在**首次**判定/首个满连时才被解码，表现为进局后第一次判定 update/draw 各掉一帧。
         /// 这里按当前 <see cref="ThemeName"/> / <see cref="AnimationFrameTemplate"/> / 生效的 HitMode 模板
-        /// 复刻 <see cref="CreateJudgementTexture"/> 的探测路径（含回退名），在线程池里完成解码，并等到绘制线程把上传排空。
+        /// 复刻 <see cref="getOrCreateJudgement"/> 的探测路径（含回退名），在线程池里完成解码，并等到绘制线程把上传排空。
         /// 不在这里创建 drawable：预热线程不在场景树上，创建后再 Dispose 也带不走 GPU 上传。
         /// </remarks>
         public Task WarmUpAsync(CancellationToken cancellationToken)
         {
-            // 与 CreateJudgementTexture 取同一来源：那是组件自己的 ThemeName 设置，不一定是全局配置。
+            // 与 getOrCreateJudgement 取同一来源：那是组件自己的 ThemeName 设置，不一定是全局配置。
             string theme = ThemeName.Value.ToString();
             string template = AnimationFrameTemplate.Value?.Trim() ?? "{result}/{000}";
             EzEnumHitMode activeTemplate = resolveActiveTemplate();
@@ -431,9 +464,29 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void invalidateCurrentAnimation()
         {
-            hitAnimation?.FinishTransforms();
+            visibleResult = null;
+            judgementDrawables.Clear();
+            unavailableResults.Clear();
+            fullComboAnimation = null;
             ClearInternal();
-            hitAnimation = null;
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (ForceDeformAnimation.Value || visibleResult is not HitResult shown)
+                return;
+
+            if (judgementDrawables.TryGetValue(shown, out var drawable)
+                && drawable is TextureAnimation animation
+                && !animation.Loop
+                && animation.Duration > 0
+                && animation.PlaybackPosition >= animation.Duration)
+            {
+                animation.Hide();
+                visibleResult = null;
+            }
         }
 
         private void checkFullCombo()
@@ -441,6 +494,7 @@ namespace osu.Game.EzOsuGame.HUD
             if (!FullComboEffectEnabled.Value)
             {
                 fullComboAnimation?.Expire();
+                fullComboAnimation = null;
                 return;
             }
 
@@ -449,6 +503,9 @@ namespace osu.Game.EzOsuGame.HUD
 
             if (missCounter.ResultCount.Value == 0)
             {
+                if (fullComboAnimation?.Parent != null)
+                    return;
+
                 fullComboAnimation = resources.GetAnimation(new EzAnimationRequest { Path = @"FullCombo/full-combo" }, looping: false) ?? Empty();
                 fullComboAnimation.Anchor = Anchor.Centre;
                 fullComboAnimation.Origin = Anchor.Centre;
@@ -464,6 +521,7 @@ namespace osu.Game.EzOsuGame.HUD
             else
             {
                 fullComboAnimation?.Expire();
+                fullComboAnimation = null;
             }
         }
 
@@ -642,7 +700,12 @@ namespace osu.Game.EzOsuGame.HUD
         {
             FinishTransforms(true);
 
-            ClearInternal();
+            foreach (var drawable in judgementDrawables.Values)
+                hideJudgement(drawable);
+
+            visibleResult = null;
+            fullComboAnimation?.Expire();
+            fullComboAnimation = null;
         }
 
         protected override void Dispose(bool isDisposing)
