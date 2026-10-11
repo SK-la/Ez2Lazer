@@ -2,10 +2,17 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Textures;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.EzOsuGame;
+using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania.Editor;
 using osu.Game.Rulesets.Mania.Objects;
@@ -22,15 +29,32 @@ namespace osu.Game.Rulesets.Mania.EzMania.WarmUp
     /// 与皮肤无关——EzPro / Ez2 / SbI / Legacy / Argon / scripted 全走各自的 transformer，
     /// 因此不再需要任何写死的 <c>note/{noteSet}</c> / <c>Stage/{stage}</c> 路径枚举。
     /// 组件返回空（该皮肤不提供）时自然跳过。
+    /// 爆炸光效不靠这几帧更新排空上传队列，而是按当前 note set 解码 noteflare、noteflaregood、longnoteflare 并等到上传完成。
     ///
     /// 依赖由一个最小宿主（复用编辑器预览用的 <see cref="EzSkinLNEditorProvider.PreviewDependencyContainer"/>）提供
     /// <c>Column</c> / <c>StageDefinition</c> / <c>IScrollingInfo</c> / <c>IGameplayClock</c>，
     /// 让 <c>[Resolved] Column</c> 等依赖在 Player 树外也能解析。
     /// </remarks>
-    public partial class ManiaGameplayWarmUpDrawable : Container
+    public partial class ManiaGameplayWarmUpDrawable : Container, IEzGameplayWarmUp
     {
         // 预热用 LN 长度。只影响中部布局与 tick 数量，不参与纹理探测，取一个铺得开的值即可。
         private const double warm_up_hold_duration = 500;
+
+        // 与 EzLocalTextureFactory 的 note 帧上限一致，保证和进局 CreateAnimation 命中同一份帧缓存。
+        private const int flare_frame_limit = 60;
+
+        private static readonly string[] flare_components = { "noteflare", "noteflaregood", "longnoteflare" };
+
+        [Resolved]
+        private EzGameplayWarmUpService warmUpService { get; set; } = null!;
+
+        [Resolved]
+        private EzResourceStore resources { get; set; } = null!;
+
+        [Resolved]
+        private EzLocalTextureFactory factory { get; set; } = null!;
+
+        private bool registered;
 
         public ManiaGameplayWarmUpDrawable(ManiaRuleset ruleset, ISkin skin, ManiaBeatmap beatmap)
         {
@@ -71,6 +95,52 @@ namespace osu.Game.Rulesets.Mania.EzMania.WarmUp
             }
 
             Child = host;
+        }
+
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            warmUpService.Register(this);
+            registered = true;
+        }
+
+        public Task WarmUpAsync(CancellationToken cancellationToken)
+        {
+            string[] paths = new string[flare_components.Length];
+
+            for (int i = 0; i < flare_components.Length; i++)
+                paths[i] = factory.GetNotePath(flare_components[i]);
+
+            return Task.Run(() => warmUpFlares(paths, cancellationToken), cancellationToken);
+        }
+
+        private void warmUpFlares(string[] paths, CancellationToken cancellationToken)
+        {
+            var uploads = new List<Texture>();
+
+            for (int i = 0; i < paths.Length; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                Texture[] frames = resources.GetTextureFrames(new EzAnimationRequest
+                {
+                    Path = paths[i],
+                    MaxFrames = flare_frame_limit,
+                });
+
+                for (int f = 0; f < frames.Length; f++)
+                    uploads.Add(frames[f]);
+            }
+
+            EzGameplayWarmUpService.WaitForUpload(uploads, cancellationToken);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing && registered)
+                warmUpService.Unregister(this);
+
+            base.Dispose(isDisposing);
         }
 
         // note 系列的组件不是独立存在的：它们在 BDL 里注入 owner 的 DrawableHitObject 并按 owner 初始化，

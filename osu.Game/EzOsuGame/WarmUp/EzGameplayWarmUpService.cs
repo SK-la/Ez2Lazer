@@ -137,7 +137,7 @@ namespace osu.Game.EzOsuGame.WarmUp
         /// 等到这些纹理的 GPU 上传被绘制线程消化完。解码在后台完成只代表进了上传队列，
         /// 队列按每帧像素预算排空；门控若在排空前放行，第一次真正画到它们的那一帧会卡住。
         /// </summary>
-        internal static void WaitForUpload(IReadOnlyList<Texture> textures, CancellationToken cancellationToken)
+        public static void WaitForUpload(IReadOnlyList<Texture> textures, CancellationToken cancellationToken)
         {
             if (textures.Count == 0)
                 return;
@@ -150,9 +150,9 @@ namespace osu.Game.EzOsuGame.WarmUp
 
                 for (int i = 0; i < textures.Count; i++)
                 {
-                    Texture? texture = textures[i];
+                    Texture texture = textures[i];
 
-                    if (texture != null && !texture.UploadComplete)
+                    if (!texture.UploadComplete)
                     {
                         pending = true;
                         break;
