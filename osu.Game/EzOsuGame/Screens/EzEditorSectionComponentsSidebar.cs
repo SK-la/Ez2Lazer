@@ -15,6 +15,8 @@ using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.HUD;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
@@ -46,10 +48,16 @@ namespace osu.Game.EzOsuGame.Screens
 
         private Bindable<string>? noteSetName;
         private Bindable<string>? stageName;
+        private Bindable<string>? panelName;
+        private Bindable<EzEnumGameThemeName>? gameThemeName;
+        private Bindable<string>? columnLightName;
         private bool ezSkinBindingsBound;
 
         private readonly List<string> availableNoteSets = new List<string>();
         private readonly List<string> availableStageSets = new List<string>();
+        private readonly List<string> availablePanels = new List<string>();
+        private readonly List<string> availableGameThemes = new List<string>();
+        private readonly List<string> availableColumnLights = new List<string>();
 
         [BackgroundDependencyLoader]
         private void load()
@@ -69,7 +77,7 @@ namespace osu.Game.EzOsuGame.Screens
                     {
                         LabelText = "组件类型",
                         Current = componentType,
-                        Items = new[] { "Note", "Stage" }
+                        Items = new[] { "Note", "Stage", "Panel", "GameTheme", "ColumnLight" }
                     },
                     new Box
                     {
@@ -90,6 +98,9 @@ namespace osu.Game.EzOsuGame.Screens
 
             noteSetName!.BindValueChanged(_ => rebuildVisualLists());
             stageName!.BindValueChanged(_ => rebuildVisualLists());
+            panelName!.BindValueChanged(_ => rebuildVisualLists());
+            gameThemeName!.BindValueChanged(_ => rebuildVisualLists());
+            columnLightName!.BindValueChanged(_ => rebuildVisualLists());
             componentType.BindValueChanged(_ => rebuildVisualLists());
             rebuildVisualLists();
         }
@@ -97,14 +108,19 @@ namespace osu.Game.EzOsuGame.Screens
         private void ensureEzSkinBindings()
         {
             noteSetName ??= ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
-
             stageName ??= ezConfig.GetBindable<string>(Ez2Setting.StageName);
+            panelName ??= ezConfig.GetBindable<string>(Ez2Setting.StageBackground);
+            gameThemeName ??= ezConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName);
+            columnLightName ??= ezConfig.GetBindable<string>(Ez2Setting.ColumnLightName);
 
             if (ezSkinBindingsBound)
                 return;
 
             noteSetName.BindValueChanged(v => ezConfig.SetValue(Ez2Setting.NoteSetName, v.NewValue));
             stageName.BindValueChanged(v => ezConfig.SetValue(Ez2Setting.StageName, v.NewValue));
+            panelName.BindValueChanged(v => ezConfig.SetValue(Ez2Setting.StageBackground, v.NewValue));
+            gameThemeName.BindValueChanged(v => ezConfig.SetValue(Ez2Setting.GameThemeName, v.NewValue));
+            columnLightName.BindValueChanged(v => ezConfig.SetValue(Ez2Setting.ColumnLightName, v.NewValue));
             ezSkinBindingsBound = true;
         }
 
@@ -112,9 +128,15 @@ namespace osu.Game.EzOsuGame.Screens
         {
             availableNoteSets.Clear();
             availableStageSets.Clear();
+            availablePanels.Clear();
+            availableGameThemes.Clear();
+            availableColumnLights.Clear();
 
             availableNoteSets.AddRange(listSubdirs(EzModifyPath.NOTE_PATH));
             availableStageSets.AddRange(listSubdirs(EzModifyPath.STAGE_PATH));
+            availablePanels.AddRange(EzResourceDiscovery.ListPanelImages(storage));
+            availableGameThemes.AddRange(EzResourceDiscovery.ListGameThemeCandidates(storage));
+            availableColumnLights.AddRange(EzResourceDiscovery.ListColumnSets(storage));
         }
 
         private IEnumerable<string> listSubdirs(string relativePath)
@@ -134,10 +156,28 @@ namespace osu.Game.EzOsuGame.Screens
             refreshEzSkinOptions();
             cardFlow.Clear();
 
-            if (componentType.Value == "Stage")
-                populateStageCards();
-            else
-                populateNoteCards();
+            switch (componentType.Value)
+            {
+                case "Stage":
+                    populateStageCards();
+                    break;
+
+                case "Panel":
+                    populatePanelCards();
+                    break;
+
+                case "GameTheme":
+                    populateGameThemeCards();
+                    break;
+
+                case "ColumnLight":
+                    populateColumnLightCards();
+                    break;
+
+                default:
+                    populateNoteCards();
+                    break;
+            }
         }
 
         private void populateNoteCards()
@@ -162,6 +202,70 @@ namespace osu.Game.EzOsuGame.Screens
                     () => stageName!.Value = stageSet,
                     () => stageName!.Value == stageSet));
             }
+        }
+
+        private void populatePanelCards()
+        {
+            foreach (string panel in availablePanels)
+            {
+                cardFlow.Add(new VisualTextureItem(
+                    panel,
+                    resources.Get($"Panel/{panel}", EzTextureUsage.Large),
+                    () => panelName!.Value = panel,
+                    () => panelName!.Value == panel));
+            }
+        }
+
+        private void populateGameThemeCards()
+        {
+            foreach (string theme in availableGameThemes)
+            {
+                cardFlow.Add(new VisualTextureItem(
+                    theme,
+                    firstFolderImage($"GameTheme/{theme}"),
+                    () =>
+                    {
+                        if (Enum.TryParse(theme, out EzEnumGameThemeName parsed))
+                            gameThemeName!.Value = parsed;
+                    },
+                    () => gameThemeName!.Value.ToString() == theme));
+            }
+        }
+
+        private void populateColumnLightCards()
+        {
+            foreach (string setName in availableColumnLights)
+            {
+                cardFlow.Add(new VisualTextureItem(
+                    setName,
+                    firstFolderImage($"ColumnLight/{setName}"),
+                    () => columnLightName!.Value = setName,
+                    () => columnLightName!.Value == setName));
+            }
+        }
+
+        private Texture? firstFolderImage(string directory)
+        {
+            foreach (string key in resources.ListImageKeys(directory))
+            {
+                Texture? texture = resources.Get(key, EzTextureUsage.Large);
+
+                if (texture != null)
+                    return texture;
+            }
+
+            foreach (string child in resources.ListSubdirectories(directory))
+            {
+                foreach (string key in resources.ListImageKeys($"{directory}/{child}"))
+                {
+                    Texture? texture = resources.Get(key, EzTextureUsage.Large);
+
+                    if (texture != null)
+                        return texture;
+                }
+            }
+
+            return null;
         }
 
         private Texture? createNotePreview(string noteSet)

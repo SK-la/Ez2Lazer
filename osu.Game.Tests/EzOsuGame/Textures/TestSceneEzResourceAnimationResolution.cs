@@ -128,14 +128,14 @@ namespace osu.Game.Tests.EzOsuGame.Textures
 
             AddStep("复现现场：同层 '-' 序列 + 子目录里的同名无分隔符单图", () =>
             {
-                writePng("EzResources/Column/ColumnLight-0.png", 900);
-                writePng("EzResources/Column/ColumnLight-1.png", 901);
-                writePng("EzResources/Column/ColumnLight/ColumnLight1.png", 1);
-                writePng("EzResources/Column/ColumnLight/1ColumnLight.png", 2);
-                writePng("EzResources/Column/ColumnLight/S-Light.png", 3);
+                writePng("EzResources/ColumnLight/ColumnLight-0.png", 900);
+                writePng("EzResources/ColumnLight/ColumnLight-1.png", 901);
+                writePng("EzResources/ColumnLight/ColumnLight/ColumnLight1.png", 1);
+                writePng("EzResources/ColumnLight/ColumnLight/1ColumnLight.png", 2);
+                writePng("EzResources/ColumnLight/ColumnLight/S-Light.png", 3);
             });
 
-            AddAssert("取同层 '-' 序列，子目录里的 {name}{数值} 不参与", () => expect(new[] { 900, 901 }, "Column/ColumnLight"));
+            AddAssert("取同层 '-' 序列，子目录里的 {name}{数值} 不参与", () => expect(new[] { 900, 901 }, "ColumnLight/ColumnLight"));
         }
 
         [Test]

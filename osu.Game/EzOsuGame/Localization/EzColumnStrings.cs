@@ -62,10 +62,10 @@ namespace osu.Game.EzOsuGame.Localization
             "Column Set");
 
         public static readonly LocalisableString COLUMN_SET_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "按键光只在选中的 EzResources/Column 子文件夹里查找。先按列类型取图，没有再按 S、E、P、B、A、ColumnLight。"
+            "按键光只在选中的 EzResources/ColumnLight 子文件夹里查找。先按列类型取图，没有再按 S、E、P、B、A、ColumnLight。"
             + "\n这一串都没有就不显示。内置资源只在 EzColumnLight 仍找不到时使用。"
             + "\n选项在打开设置时重新读取。",
-            "Column lights are loaded only from the selected EzResources/Column subfolder: the column type first, then lower types in order S, E, P, B, A, then ColumnLight."
+            "Column lights are loaded only from the selected EzResources/ColumnLight subfolder: the column type first, then lower types in order S, E, P, B, A, then ColumnLight."
             + "\nIf none of those exist, nothing is shown. Built-in resources are used only when EzColumnLight still has no match."
             + "\nThe list is refreshed when settings are opened.");
 

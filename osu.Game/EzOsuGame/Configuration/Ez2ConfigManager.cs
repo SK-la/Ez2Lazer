@@ -1180,7 +1180,7 @@ namespace osu.Game.EzOsuGame.Configuration
         StageBackgroundColour,
 
         /// <summary>
-        /// 子文件夹名，对应 <c>EzResources/Column</c>。在选中目录内先按列类型取图，没有再按 S、E、P、B、A 向下降级，最后用 ColumnLight 兜底。
+        /// 子文件夹名，对应 <c>EzResources/ColumnLight</c>。在选中目录内先按列类型取图，没有再按 S、E、P、B、A 向下降级，最后用 ColumnLight 兜底。
         /// 整段都没有则不加载。内置资源只在 <c>EzColumnLight</c> 仍找不到时使用。
         /// </summary>
         ColumnLightName,

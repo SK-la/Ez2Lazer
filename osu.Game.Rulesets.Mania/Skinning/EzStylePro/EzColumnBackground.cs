@@ -27,7 +27,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     public partial class EzColumnBackground : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
         private const string default_column_set = "EzColumnLight";
-        private const string builtin_column_light_path = "Column/ColumnLight";
+        private const string builtin_column_light_path = "ColumnLight/ColumnLight";
         private static readonly EzColumnType[] type_fallback_order = { EzColumnType.S, EzColumnType.E, EzColumnType.P, EzColumnType.B, EzColumnType.A };
 
         private Container lightContainer = null!;
@@ -173,7 +173,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 return graphic;
             }
 
-            Drawable? columnLight = resources.GetAnimation($"Column/{setName}/ColumnLight");
+            Drawable? columnLight = resources.GetAnimation($"ColumnLight/{setName}/ColumnLight");
 
             if (columnLight != null)
             {
@@ -188,7 +188,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Drawable? loadColour(string setName, string colour)
             => resources.GetAnimation(new EzAnimationRequest
             {
-                Path = $"Column/{setName}/{colour}",
+                Path = $"ColumnLight/{setName}/{colour}",
                 Usage = EzTextureUsage.Large,
             });
 
