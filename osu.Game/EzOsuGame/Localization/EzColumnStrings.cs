@@ -49,6 +49,14 @@ namespace osu.Game.EzOsuGame.Localization
             + "\nDefault is none. When selected, the image scales to the total column width and sits with its bottom on the judgement line, under the column blur. Column blur above 0 blurs the beatmap background and this image together; 0 draws it sharp."
             + "\nThe list is refreshed when settings are opened.");
 
+        public static readonly LocalisableString STAGE_BACKGROUND_COLOUR = new EzLocalizationManager.EzLocalisableString(
+            "Panel 颜色",
+            "Panel colour");
+
+        public static readonly LocalisableString STAGE_BACKGROUND_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "乘到 EzResources/Panel 这张图上，含透明度。默认不透明白。列虚化会连同这个颜色一起虚化。",
+            "Tint applied to the EzResources/Panel image, including alpha. Default is opaque white. Column blur includes this tint.");
+
         public static readonly LocalisableString COLUMN_SET = new EzLocalizationManager.EzLocalisableString(
             "Column Set",
             "Column Set");

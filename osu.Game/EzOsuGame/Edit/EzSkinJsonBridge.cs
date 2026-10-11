@@ -170,7 +170,7 @@ namespace osu.Game.EzOsuGame.Edit
                     or Ez2Setting.ManiaHoldTailMaskDynamicEnable or Ez2Setting.ColorSettingsEnabled => typeof(bool),
                 Ez2Setting.ColumnWidthStyle => typeof(ColumnWidthStyle),
                 Ez2Setting.ColumnTypeListSelect => typeof(int),
-                Ez2Setting.ColumnTypeA or Ez2Setting.ColumnTypeB or Ez2Setting.ColumnTypeS or Ez2Setting.ColumnTypeE or Ez2Setting.ColumnTypeP => typeof(Colour4),
+                Ez2Setting.StageBackgroundColour or Ez2Setting.ColumnTypeA or Ez2Setting.ColumnTypeB or Ez2Setting.ColumnTypeS or Ez2Setting.ColumnTypeE or Ez2Setting.ColumnTypeP => typeof(Colour4),
                 Ez2Setting.ColumnTypeOf4K or Ez2Setting.ColumnTypeOf5K or Ez2Setting.ColumnTypeOf6K or Ez2Setting.ColumnTypeOf7K or Ez2Setting.ColumnTypeOf8K
                     or Ez2Setting.ColumnTypeOf9K or Ez2Setting.ColumnTypeOf10K or Ez2Setting.ColumnTypeOf12K or Ez2Setting.ColumnTypeOf14K
                     or Ez2Setting.ColumnTypeOf16K or Ez2Setting.ColumnTypeOf18K => typeof(string),

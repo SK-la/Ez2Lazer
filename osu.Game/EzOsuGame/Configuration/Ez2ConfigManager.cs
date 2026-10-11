@@ -188,6 +188,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.StageName, "Celeste_Lumiere");
             SetDefault(Ez2Setting.StagePanelEnabled, true);
             SetDefault(Ez2Setting.StageBackground, string.Empty);
+            SetDefault(Ez2Setting.StageBackgroundColour, Colour4.White);
             SetDefault(Ez2Setting.ColumnLightName, "EzColumnLight");
 
             SetDefault(Ez2Setting.ColumnWidthStyle, ColumnWidthStyle.EzSkinOnly);
@@ -1172,6 +1173,11 @@ namespace osu.Game.EzOsuGame.Configuration
         /// 文件名（不含扩展名），对应 <c>EzResources/Panel</c>。空字符串表示不显示。
         /// </summary>
         StageBackground,
+
+        /// <summary>
+        /// Panel 图的乘色，含透明度。默认不透明白。
+        /// </summary>
+        StageBackgroundColour,
 
         /// <summary>
         /// 子文件夹名，对应 <c>EzResources/Column</c>。在选中目录内先按列类型取图，没有再按 S、E、P、B、A 向下降级，最后用 ColumnLight 兜底。

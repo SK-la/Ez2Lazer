@@ -102,6 +102,12 @@ namespace osu.Game.EzOsuGame.Screens
                         Current = ezSkinConfig.GetBindable<string>(Ez2Setting.StageBackground),
                         Items = panelItems,
                     },
+                    new EzSettingsColour
+                    {
+                        LabelText = EzColumnStrings.STAGE_BACKGROUND_COLOUR,
+                        TooltipText = EzColumnStrings.STAGE_BACKGROUND_COLOUR_TOOLTIP,
+                        Current = ezSkinConfig.GetBindable<Colour4>(Ez2Setting.StageBackgroundColour),
+                    },
                     new SettingsDropdown<string>
                     {
                         LabelText = EzColumnStrings.COLUMN_SET,

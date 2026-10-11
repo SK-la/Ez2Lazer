@@ -10,6 +10,7 @@ using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays;
+using osu.Game.EzOsuGame.Screens;
 using osu.Game.Overlays.Settings;
 using osuTK;
 
@@ -61,6 +62,12 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                     EmptyLabel = EzColumnStrings.STAGE_BACKGROUND_NONE,
                     Current = ezSkinConfig.GetBindable<string>(Ez2Setting.StageBackground),
                     Items = panelItems,
+                },
+                new EzSettingsColour
+                {
+                    LabelText = EzColumnStrings.STAGE_BACKGROUND_COLOUR,
+                    TooltipText = EzColumnStrings.STAGE_BACKGROUND_COLOUR_TOOLTIP,
+                    Current = ezSkinConfig.GetBindable<Colour4>(Ez2Setting.StageBackgroundColour),
                 },
                 new SettingsDropdown<string>
                 {

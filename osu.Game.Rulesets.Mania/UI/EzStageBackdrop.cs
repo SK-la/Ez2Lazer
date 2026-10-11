@@ -29,6 +29,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private EzResourceStore resources = null!;
         private Bindable<string> backgroundName = null!;
+        private Bindable<Colour4> backgroundColour = null!;
         private Bindable<double> hitPosition = null!;
         private Bindable<bool> globalHitPosition = null!;
         private Bindable<double> columnBlur = null!;
@@ -71,6 +72,7 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             this.resources = resources;
             backgroundName = ezConfig.GetBindable<string>(Ez2Setting.StageBackground);
+            backgroundColour = ezConfig.GetBindable<Colour4>(Ez2Setting.StageBackgroundColour);
             hitPosition = ezConfig.GetBindable<double>(Ez2Setting.HitPosition);
             globalHitPosition = ezConfig.GetBindable<bool>(Ez2Setting.HitPositionGlobalEnable);
             columnBlur = ezConfig.GetBindable<double>(Ez2Setting.ColumnBlur);
@@ -85,6 +87,7 @@ namespace osu.Game.Rulesets.Mania.UI
             base.LoadComplete();
 
             backgroundName.BindValueChanged(_ => applyTexture(), true);
+            backgroundColour.BindValueChanged(colour => panel.Colour = colour.NewValue, true);
             hitPosition.BindValueChanged(_ => layout.Invalidate());
             globalHitPosition.BindValueChanged(_ => layout.Invalidate());
             direction.BindValueChanged(_ => layout.Invalidate());

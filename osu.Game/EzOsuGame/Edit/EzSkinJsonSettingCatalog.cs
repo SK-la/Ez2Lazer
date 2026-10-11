@@ -19,6 +19,7 @@ namespace osu.Game.EzOsuGame.Edit
             Ez2Setting.StageName,
             Ez2Setting.NoteSetName,
             Ez2Setting.StageBackground,
+            Ez2Setting.StageBackgroundColour,
             Ez2Setting.ColumnLightName,
 
             // Stage
