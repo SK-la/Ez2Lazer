@@ -43,10 +43,10 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString STAGE_BACKGROUND_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "从 EzResources/Panel 加载一张图，作为整段 Stage 的背景（不拆到各列）。"
-            + "\n默认无，与现在一致。选中后按列总宽等比例缩放，图片底部对齐判定线，并进入 Stage 虚化。"
+            + "\n默认无。选中后按列总宽等比例缩放，图片底部对齐判定线，画在列虚化下面。列虚化大于 0 时，谱面背景和这张图一起被虚化；为 0 时按原图画。"
             + "\n选项在打开设置时重新读取。",
             "Load one image from EzResources/Panel as a single stage background (not split per column)."
-            + "\nDefault is none. When selected, the image scales to the total column width, sits with its bottom on the judgement line, and is included in the stage blur."
+            + "\nDefault is none. When selected, the image scales to the total column width and sits with its bottom on the judgement line, under the column blur. Column blur above 0 blurs the beatmap background and this image together; 0 draws it sharp."
             + "\nThe list is refreshed when settings are opened.");
 
         public static readonly LocalisableString COLUMN_SET = new EzLocalizationManager.EzLocalisableString(
