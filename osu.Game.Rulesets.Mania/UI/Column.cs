@@ -241,9 +241,6 @@ namespace osu.Game.Rulesets.Mania.UI
                 skin,
                 skinManager,
                 ezConfig,
-                ezConfig.Get<double>(Ez2Setting.ColumnWidth),
-                ezConfig.Get<double>(Ez2Setting.SpecialFactor),
-                ezConfig.Get<ColumnWidthStyle>(Ez2Setting.ColumnWidthStyle),
                 mobileAdjust: 1f,
                 applyGlobalWidthSettings: true);
 

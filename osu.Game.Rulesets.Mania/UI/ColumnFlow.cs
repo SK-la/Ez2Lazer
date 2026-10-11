@@ -136,9 +136,6 @@ namespace osu.Game.Rulesets.Mania.UI
                     skin,
                     skinManager,
                     ezSkinConfig,
-                    columnWidthBindable.Value,
-                    specialFactorBindable.Value,
-                    ezColumnWidthStyle.Value,
                     mobileAdjust,
                     applyGlobalWidthSettings: true);
 

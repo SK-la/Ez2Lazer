@@ -325,9 +325,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
                     skin,
                     skinManager,
                     ezSkinConfig,
-                    columnWidth.Value,
-                    specialFactor.Value,
-                    columnWidthStyle.Value,
                     mobileAdjust: 1f,
                     MatchManiaPanelWidth.Value);
 

@@ -81,10 +81,7 @@ namespace osu.Game.Rulesets.Mania.EzMania
         /// <summary>
         /// Returns the effective hit position using the same rules as the in-game playfield.
         /// </summary>
-        public static float GetHitPosition(
-            ISkinSource skin,
-            bool hitPositionGlobalEnable,
-            double hitPosition)
+        public static float GetHitPosition(ISkinSource skin, bool hitPositionGlobalEnable, double hitPosition)
         {
             if (hitPositionGlobalEnable)
                 return (float)hitPosition;
@@ -101,10 +98,7 @@ namespace osu.Game.Rulesets.Mania.EzMania
         /// <param name="keyMode">The number of columns in the stage.</param>
         /// <param name="skin">The skin source.</param>
         /// <param name="skinManager">The skin manager.</param>
-        /// <param name="ezSkinConfig">The Ez skin configuration.</param>
-        /// <param name="columnWidth">Configured base column width.</param>
-        /// <param name="specialFactor">Configured special-column width factor.</param>
-        /// <param name="columnWidthStyle">Global column width style from Ez skin settings.</param>
+        /// <param name="ezSkinConfig">The Ez skin configuration. Column width, special factor, and width style are read from here.</param>
         /// <param name="mobileAdjust">Mobile landscape column scale factor.</param>
         /// <param name="applyGlobalWidthSettings">Whether to apply global width settings.</param>
         public static ManiaColumnSize CalculateColumnSize(
@@ -113,13 +107,12 @@ namespace osu.Game.Rulesets.Mania.EzMania
             ISkinSource skin,
             SkinManager skinManager,
             Ez2ConfigManager ezSkinConfig,
-            double columnWidth,
-            double specialFactor,
-            ColumnWidthStyle columnWidthStyle,
             float mobileAdjust,
             bool applyGlobalWidthSettings)
         {
             ArgumentOutOfRangeException.ThrowIfNegative(columnIndex);
+
+            double columnWidth = ezSkinConfig.Get<double>(Ez2Setting.ColumnWidth);
 
             if (!applyGlobalWidthSettings)
             {
@@ -149,6 +142,8 @@ namespace osu.Game.Rulesets.Mania.EzMania
             if (width == 0)
                 return ManiaColumnSize.Zero;
 
+            double specialFactor = ezSkinConfig.Get<double>(Ez2Setting.SpecialFactor);
+            ColumnWidthStyle columnWidthStyle = ezSkinConfig.Get<ColumnWidthStyle>(Ez2Setting.ColumnWidthStyle);
             bool isSpecialColumn = ezSkinConfig.IsSpecialColumnFast(keyMode, columnIndex);
             float ezWidth = (float)columnWidth * (isSpecialColumn ? (float)specialFactor : 1);
 
@@ -184,9 +179,6 @@ namespace osu.Game.Rulesets.Mania.EzMania
             ISkinSource skin,
             SkinManager skinManager,
             Ez2ConfigManager ezSkinConfig,
-            double columnWidth,
-            double specialFactor,
-            ColumnWidthStyle columnWidthStyle,
             float mobileAdjust,
             bool applyGlobalWidthSettings)
         {
@@ -200,9 +192,6 @@ namespace osu.Game.Rulesets.Mania.EzMania
                     skin,
                     skinManager,
                     ezSkinConfig,
-                    columnWidth,
-                    specialFactor,
-                    columnWidthStyle,
                     mobileAdjust,
                     applyGlobalWidthSettings).TotalWidth;
             }
