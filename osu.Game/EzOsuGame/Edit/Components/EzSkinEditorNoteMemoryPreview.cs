@@ -6,6 +6,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.Skinning;
 using osuTK;
@@ -105,13 +106,13 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
                 if (isHold)
                 {
-                    holdHeadSprite.Texture = profile.GetNoteTexture(skin, request, EzSkinEditorNotePart.HoldHead);
-                    holdBodySprite.Texture = profile.GetNoteTexture(skin, request, EzSkinEditorNotePart.HoldBody);
-                    holdTailSprite.Texture = profile.GetNoteTexture(skin, request, EzSkinEditorNotePart.HoldTail);
+                    holdHeadSprite.Texture = profile.GetNoteTexture(skin, request, EzManiaNotePart.HoldHead);
+                    holdBodySprite.Texture = profile.GetNoteTexture(skin, request, EzManiaNotePart.HoldBody);
+                    holdTailSprite.Texture = profile.GetNoteTexture(skin, request, EzManiaNotePart.HoldTail);
                 }
                 else
                 {
-                    tapSprite.Texture = profile.GetNoteTexture(skin, request, EzSkinEditorNotePart.Note);
+                    tapSprite.Texture = profile.GetNoteTexture(skin, request, EzManiaNotePart.Note);
                 }
             }
 

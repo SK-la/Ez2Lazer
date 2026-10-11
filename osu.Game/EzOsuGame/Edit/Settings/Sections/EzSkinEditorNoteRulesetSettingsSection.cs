@@ -6,6 +6,7 @@ using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays.Settings;
@@ -49,7 +50,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                 ItemSource = rulesets,
             });
 
-            Add(new SettingsEnumDropdown<EzSkinEditorNotePart>
+            Add(new SettingsEnumDropdown<EzManiaNotePart>
             {
                 LabelText = EzEditorStrings.NOTE_PART_LABEL,
                 Current = session.Part,

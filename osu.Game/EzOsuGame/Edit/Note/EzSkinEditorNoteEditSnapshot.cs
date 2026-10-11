@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Graphics;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets;
 
 namespace osu.Game.EzOsuGame.Edit.Note
@@ -13,7 +14,7 @@ namespace osu.Game.EzOsuGame.Edit.Note
     {
         public RulesetInfo Ruleset { get; private set; } = null!;
 
-        public EzSkinEditorNotePart Part { get; private set; }
+        public EzManiaNotePart Part { get; private set; }
 
         public string VariantId { get; private set; } = string.Empty;
 

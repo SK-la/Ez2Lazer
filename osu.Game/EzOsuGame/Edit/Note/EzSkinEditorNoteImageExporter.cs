@@ -4,6 +4,7 @@
 using System;
 using System.IO;
 using osu.Framework.Graphics;
+using osu.Game.EzOsuGame.Configuration;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -25,7 +26,7 @@ namespace osu.Game.EzOsuGame.Edit.Note
 
         private static Image<Rgba32>? exportTap(IEzSkinEditorNoteRulesetProfile profile, EzSkinEditorNotePreviewRequest request, string mountedSkinPath)
         {
-            string? textureName = profile.ResolveTextureName(request.UseEzNoteVariants, EzSkinEditorNotePart.Note, request.VariantId);
+            string? textureName = profile.ResolveTextureName(request.UseEzNoteVariants, EzManiaNotePart.Note, request.VariantId);
 
             if (textureName == null)
                 return null;
@@ -46,9 +47,9 @@ namespace osu.Game.EzOsuGame.Edit.Note
 
         private static Image<Rgba32>? exportHold(IEzSkinEditorNoteRulesetProfile profile, EzSkinEditorNotePreviewRequest request, string mountedSkinPath)
         {
-            using var head = loadTextureImage(mountedSkinPath, profile.ResolveTextureName(request.UseEzNoteVariants, EzSkinEditorNotePart.HoldHead, request.VariantId));
-            using var body = loadTextureImage(mountedSkinPath, profile.ResolveTextureName(request.UseEzNoteVariants, EzSkinEditorNotePart.HoldBody, request.VariantId));
-            using var tail = loadTextureImage(mountedSkinPath, profile.ResolveTextureName(request.UseEzNoteVariants, EzSkinEditorNotePart.HoldTail, request.VariantId));
+            using var head = loadTextureImage(mountedSkinPath, profile.ResolveTextureName(request.UseEzNoteVariants, EzManiaNotePart.HoldHead, request.VariantId));
+            using var body = loadTextureImage(mountedSkinPath, profile.ResolveTextureName(request.UseEzNoteVariants, EzManiaNotePart.HoldBody, request.VariantId));
+            using var tail = loadTextureImage(mountedSkinPath, profile.ResolveTextureName(request.UseEzNoteVariants, EzManiaNotePart.HoldTail, request.VariantId));
 
             if (head == null && body == null && tail == null)
                 return null;

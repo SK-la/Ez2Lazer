@@ -3,6 +3,7 @@
 
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets;
 
 namespace osu.Game.EzOsuGame.Edit.Note
@@ -14,7 +15,7 @@ namespace osu.Game.EzOsuGame.Edit.Note
     {
         public Bindable<RulesetInfo> Ruleset { get; } = new Bindable<RulesetInfo>();
 
-        public Bindable<EzSkinEditorNotePart> Part { get; } = new Bindable<EzSkinEditorNotePart>(EzSkinEditorNotePart.Note);
+        public Bindable<EzManiaNotePart> Part { get; } = new Bindable<EzManiaNotePart>(EzManiaNotePart.Note);
 
         public Bindable<string> VariantId { get; } = new Bindable<string>(string.Empty);
 

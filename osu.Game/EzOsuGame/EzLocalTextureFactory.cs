@@ -670,10 +670,10 @@ namespace osu.Game.EzOsuGame
 
             string[] pathsToTry =
             {
-                $"Stage/{currentStageName}/Stage/_8key/keybase/{component}",
-                $"Stage/{currentStageName}/Stage/_8key/keypress/{component}",
-                $"Stage/{currentStageName}/Stage/_8key/keybase/{component}_{keySuffix}",
-                $"Stage/{currentStageName}/Stage/_8key/keypress/{component}_{keySuffix}",
+                $"Stage/{currentStageName}/Stage/_5key/keybase/{component}",
+                $"Stage/{currentStageName}/Stage/_5key/keypress/{component}",
+                $"Stage/{currentStageName}/Stage/_5key/keybase/{component}_{keySuffix}",
+                $"Stage/{currentStageName}/Stage/_5key/keypress/{component}_{keySuffix}",
             };
 
             foreach (string basePath in pathsToTry)

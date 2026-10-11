@@ -15,7 +15,7 @@ namespace osu.Game.EzOsuGame.Edit.Note
             EzSkinEditorNoteCompareKind compareKind,
             string variantId,
             RulesetInfo ruleset,
-            EzSkinEditorNotePart exportPart = EzSkinEditorNotePart.Note) =>
+            EzManiaNotePart exportPart = EzManiaNotePart.Note) =>
             new EzSkinEditorNotePreviewRequest
             {
                 UseEzNoteVariants = useEzNoteVariants,
@@ -35,7 +35,7 @@ namespace osu.Game.EzOsuGame.Edit.Note
             EzSkinEditorNoteCompareKind compareKind,
             string variantId,
             RulesetInfo ruleset,
-            EzSkinEditorNotePart exportPart = EzSkinEditorNotePart.Note)
+            EzManiaNotePart exportPart = EzManiaNotePart.Note)
         {
             var saved = EzSkinJsonBridge.Capture(config);
 
