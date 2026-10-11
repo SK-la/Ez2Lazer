@@ -33,13 +33,8 @@ namespace osu.Game.EzOsuGame
         Large,
 
         /// <summary>
-        /// 位图字形的专用页（<c>GameTheme/{theme}/combo/number/*</c> 等）。
+        /// 数字共用 字形页。超过绘制余量的图在上传前缩小。
         /// </summary>
-        /// <remarks>
-        /// 必须独占一页：同一套字形（数字 0-9 等）会被连续绘制，若与其他纹理共享页，
-        /// 大件会把分配器挤到页底触发换页，同一套字形就被拆到两页上——
-        /// 数值每变一次都要在两页之间切换纹理绑定（打断批处理）。
-        /// </remarks>
         Glyph,
 
         /// <summary>

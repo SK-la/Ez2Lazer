@@ -154,7 +154,7 @@ namespace osu.Game.EzOsuGame
         {
             columnWidth.BindValueChanged(_ => scheduleTextureRefresh());
             specialFactor.BindValueChanged(_ => scheduleTextureRefresh());
-            noteHeightScaleToWidth.BindValueChanged(_ => scheduleTextureRefresh(), true);
+            noteHeightScaleToWidth.BindValueChanged(_ => scheduleTextureRefresh());
         }
 
         private void initializeColourEvents()

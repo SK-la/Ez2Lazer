@@ -13,7 +13,7 @@ namespace osu.Game.EzOsuGame.HUD
 {
     public partial class EzComboText : CompositeDrawable, IHasText
     {
-        private const float glyph_target_height = 25;
+        internal const float GLYPH_TARGET_HEIGHT = 25;
 
         private readonly EzComboSpriteText textPart;
         public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
@@ -83,7 +83,7 @@ namespace osu.Game.EzOsuGame.HUD
             ThemeName.BindValueChanged(e =>
             {
                 textPart.ThemeName.Value = e.NewValue;
-                float scale = getUniformHeightScale(textPart.Height, glyph_target_height);
+                float scale = getUniformHeightScale(textPart.Height, GLYPH_TARGET_HEIGHT);
                 textPart.Scale = new Vector2(scale);
                 textPart.Invalidate(); // 确保 UI 立即刷新
             }, true);

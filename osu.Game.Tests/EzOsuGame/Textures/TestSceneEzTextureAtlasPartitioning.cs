@@ -41,7 +41,7 @@ namespace osu.Game.Tests.EzOsuGame.Textures
         private const int badge_texture_size = 128;
 
         // 字形页尺寸，需与 EzResourceStore 保持一致。
-        private const int glyph_atlas_size = 2048;
+        private const int glyph_atlas_size = 1024;
 
         private readonly List<string> atlasOverflows = new List<string>();
         private readonly List<Texture> glyphTextures = new List<Texture>();
@@ -106,6 +106,44 @@ namespace osu.Game.Tests.EzOsuGame.Textures
                 Assert.That(glyph, Is.Not.SameAs(resources.StoreFor(EzTextureUsage.Atlas)), "字形与通用 UI 共用了同一图集页");
 
                 return true;
+            });
+
+            AddStep("原图过大的字形收到 128 后仍在这张 1024 页", () =>
+            {
+                writePng("EzResources/Digits/big.png", 400);
+
+                Texture? texture = resources!.Get("Digits/big", EzTextureUsage.Glyph);
+
+                Assert.That(texture, Is.Not.Null);
+                Assert.That(texture!.Height, Is.EqualTo(128));
+                Assert.That(pageSizeOf(texture), Is.EqualTo(glyph_atlas_size).Within(0.5f));
+            });
+
+            AddStep("舞台两套数字与 HUD 字形同页且不换页", () =>
+            {
+                atlasOverflows.Clear();
+
+                for (int i = 0; i < 10; i++)
+                {
+                    writePng($"EzResources/Stage/Test/number/score/{i}.png", 66);
+                    writePng($"EzResources/Stage/Test/number/combo/{i}.png", 66);
+                }
+
+                var stage = new List<Texture>();
+
+                for (int i = 0; i < 10; i++)
+                {
+                    Texture? score = resources!.Get($"Stage/Test/number/score/{i}", EzTextureUsage.Glyph);
+                    Texture? combo = resources.Get($"Stage/Test/number/combo/{i}", EzTextureUsage.Glyph);
+                    Assert.That(score, Is.Not.Null);
+                    Assert.That(combo, Is.Not.Null);
+                    Assert.That(score!.Height, Is.EqualTo(66));
+                    stage.Add(score);
+                    stage.Add(combo!);
+                }
+
+                Assert.That(stage.Select(pageSizeOf).Distinct().ToArray(), Is.EqualTo(new[] { (float)glyph_atlas_size }));
+                Assert.That(atlasOverflows, Is.Empty, "舞台数字把字形页拆开了");
             });
         }
 

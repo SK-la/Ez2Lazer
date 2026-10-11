@@ -13,6 +13,8 @@ namespace osu.Game.EzOsuGame.HUD
 {
     public partial class EzScoreText : CompositeDrawable, IHasText
     {
+        internal const float GLYPH_TARGET_HEIGHT = 25;
+
         private readonly EzScoreSpriteText textPart;
 
         public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
@@ -75,7 +77,7 @@ namespace osu.Game.EzOsuGame.HUD
             ThemeName.BindValueChanged(e =>
             {
                 textPart.ThemeName.Value = e.NewValue;
-                float scale = getUniformHeightScale(textPart.Height);
+                float scale = getUniformHeightScale(textPart.Height, GLYPH_TARGET_HEIGHT);
                 textPart.Scale = new Vector2(scale);
                 textPart.Invalidate(); // **确保 UI 立即刷新**
             }, true);
@@ -98,6 +100,8 @@ namespace osu.Game.EzOsuGame.HUD
                 : base(getLookup, themeName)
             {
             }
+
+            protected override char[] GetPreloadSpecialChars() => new[] { '.', '%' };
 
             protected override string[] GetPossiblePaths(string themeName, string lookup, char character)
             {
