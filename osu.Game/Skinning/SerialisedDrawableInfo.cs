@@ -118,12 +118,20 @@ namespace osu.Game.Skinning
         /// <param name="ruleset">The ruleset to filter results to. If <c>null</c>, global components will be returned instead.</param>
         public static Type[] GetAllAvailableDrawables(RulesetInfo? ruleset = null)
         {
-            return (ruleset?.CreateInstance().GetType() ?? typeof(OsuGame))
-                   .Assembly.GetTypes()
-                   .Where(t => !t.IsInterface && !t.IsAbstract && t.IsPublic)
-                   .Where(t => typeof(ISerialisableDrawable).IsAssignableFrom(t))
-                   .OrderBy(t => t.Name)
-                   .ToArray();
+            try
+            {
+                return (ruleset?.CreateInstance().GetType() ?? typeof(OsuGame))
+                       .Assembly.GetTypes()
+                       .Where(t => !t.IsInterface && !t.IsAbstract && t.IsPublic)
+                       .Where(t => typeof(ISerialisableDrawable).IsAssignableFrom(t))
+                       .OrderBy(t => t.Name)
+                       .ToArray();
+            }
+            catch (Exception e)
+            {
+                Logger.Log($"Could not list skinnable components for ruleset '{ruleset?.ShortName}': {e.Message}");
+                return Array.Empty<Type>();
+            }
         }
     }
 }

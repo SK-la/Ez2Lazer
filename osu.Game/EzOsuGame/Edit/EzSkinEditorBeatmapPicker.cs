@@ -46,7 +46,7 @@ namespace osu.Game.EzOsuGame.Edit
         {
             workingBeatmap = null;
 
-            if (tryPickRandomWithKnownObjectCount(ruleset.OnlineID, out var beatmapInfo))
+            if (tryPickRandomWithKnownObjectCount(ruleset, out var beatmapInfo))
             {
                 workingBeatmap = beatmaps.GetWorkingBeatmap(beatmapInfo);
                 return true;
@@ -61,18 +61,18 @@ namespace osu.Game.EzOsuGame.Edit
             return false;
         }
 
-        private bool tryPickRandomWithKnownObjectCount(int rulesetOnlineId, out BeatmapInfo beatmapInfo)
+        private bool tryPickRandomWithKnownObjectCount(RulesetInfo ruleset, out BeatmapInfo beatmapInfo)
         {
             beatmapInfo = null!;
 
-            int count = realm.Run(r => buildFastQuery(r, rulesetOnlineId).Count());
+            int count = realm.Run(r => buildFastQuery(r, ruleset.ShortName).Count());
 
             if (count == 0)
                 return false;
 
             int index = RNG.Next(0, count);
 
-            beatmapInfo = realm.Run(r => buildFastQuery(r, rulesetOnlineId)
+            beatmapInfo = realm.Run(r => buildFastQuery(r, ruleset.ShortName)
                                          .AsEnumerable()
                                          .ElementAt(index)
                                          .Detach());
@@ -84,7 +84,7 @@ namespace osu.Game.EzOsuGame.Edit
         {
             beatmapInfo = null!;
 
-            int count = realm.Run(r => buildUnknownObjectCountQuery(r, ruleset.OnlineID).Count());
+            int count = realm.Run(r => buildUnknownObjectCountQuery(r, ruleset.ShortName).Count());
 
             if (count == 0)
                 return false;
@@ -93,12 +93,12 @@ namespace osu.Game.EzOsuGame.Edit
             {
                 int index = RNG.Next(0, count);
 
-                var candidate = realm.Run(r => buildUnknownObjectCountQuery(r, ruleset.OnlineID)
+                var candidate = realm.Run(r => buildUnknownObjectCountQuery(r, ruleset.ShortName)
                                                .AsEnumerable()
                                                .ElementAt(index)
                                                .Detach());
 
-                if (!IsMetadataCandidate(candidate, ruleset.OnlineID))
+                if (!IsMetadataCandidate(candidate, ruleset))
                     continue;
 
                 try
@@ -120,9 +120,9 @@ namespace osu.Game.EzOsuGame.Edit
             return false;
         }
 
-        internal static bool IsMetadataCandidate(BeatmapInfo beatmapInfo, int rulesetOnlineId)
+        internal static bool IsMetadataCandidate(BeatmapInfo beatmapInfo, RulesetInfo ruleset)
         {
-            if (beatmapInfo.Ruleset.OnlineID != rulesetOnlineId)
+            if (!ruleset.Equals(beatmapInfo.Ruleset))
                 return false;
 
             if (beatmapInfo.BeatmapSet?.Protected == true)
@@ -131,18 +131,18 @@ namespace osu.Game.EzOsuGame.Edit
             return beatmapInfo.TotalObjectCount != 0;
         }
 
-        private static IQueryable<BeatmapInfo> buildFastQuery(Realm r, int rulesetOnlineId) =>
+        private static IQueryable<BeatmapInfo> buildFastQuery(Realm r, string rulesetShortName) =>
             r.All<BeatmapInfo>()
              .Filter($@"{nameof(BeatmapInfo.BeatmapSet)}.{nameof(BeatmapSetInfo.DeletePending)} == false")
              .Filter($@"{nameof(BeatmapInfo.BeatmapSet)}.{nameof(BeatmapSetInfo.Protected)} == false")
-             .Filter($@"{nameof(BeatmapInfo.Ruleset)}.{nameof(RulesetInfo.OnlineID)} == $0", rulesetOnlineId)
+             .Filter($@"{nameof(BeatmapInfo.Ruleset)}.{nameof(RulesetInfo.ShortName)} == $0", rulesetShortName)
              .Filter($@"{nameof(BeatmapInfo.TotalObjectCount)} > 0");
 
-        private static IQueryable<BeatmapInfo> buildUnknownObjectCountQuery(Realm r, int rulesetOnlineId) =>
+        private static IQueryable<BeatmapInfo> buildUnknownObjectCountQuery(Realm r, string rulesetShortName) =>
             r.All<BeatmapInfo>()
              .Filter($@"{nameof(BeatmapInfo.BeatmapSet)}.{nameof(BeatmapSetInfo.DeletePending)} == false")
              .Filter($@"{nameof(BeatmapInfo.BeatmapSet)}.{nameof(BeatmapSetInfo.Protected)} == false")
-             .Filter($@"{nameof(BeatmapInfo.Ruleset)}.{nameof(RulesetInfo.OnlineID)} == $0", rulesetOnlineId)
+             .Filter($@"{nameof(BeatmapInfo.Ruleset)}.{nameof(RulesetInfo.ShortName)} == $0", rulesetShortName)
              .Filter($@"{nameof(BeatmapInfo.TotalObjectCount)} == -1");
     }
 }

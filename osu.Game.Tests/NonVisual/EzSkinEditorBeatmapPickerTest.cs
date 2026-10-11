@@ -6,6 +6,7 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Overlays.Preview;
+using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mania;
 
 namespace osu.Game.Tests.NonVisual
@@ -39,9 +40,9 @@ namespace osu.Game.Tests.NonVisual
                 BeatmapSet = new BeatmapSetInfo(),
             };
 
-            Assert.That(EzSkinEditorBeatmapPicker.IsMetadataCandidate(withObjects, ruleset.OnlineID), Is.True);
-            Assert.That(EzSkinEditorBeatmapPicker.IsMetadataCandidate(empty, ruleset.OnlineID), Is.False);
-            Assert.That(EzSkinEditorBeatmapPicker.IsMetadataCandidate(unknown, ruleset.OnlineID), Is.True);
+            Assert.That(EzSkinEditorBeatmapPicker.IsMetadataCandidate(withObjects, ruleset), Is.True);
+            Assert.That(EzSkinEditorBeatmapPicker.IsMetadataCandidate(empty, ruleset), Is.False);
+            Assert.That(EzSkinEditorBeatmapPicker.IsMetadataCandidate(unknown, ruleset), Is.True);
         }
 
         [Test]
@@ -56,7 +57,24 @@ namespace osu.Game.Tests.NonVisual
                 BeatmapSet = new BeatmapSetInfo { Protected = true },
             };
 
-            Assert.That(EzSkinEditorBeatmapPicker.IsMetadataCandidate(protectedBeatmap, ruleset.OnlineID), Is.False);
+            Assert.That(EzSkinEditorBeatmapPicker.IsMetadataCandidate(protectedBeatmap, ruleset), Is.False);
+        }
+
+        [Test]
+        public void TestMetadataCandidateMatchesRulesetShortName()
+        {
+            var active = new RulesetInfo { ShortName = @"custom", OnlineID = -1 };
+            var other = new RulesetInfo { ShortName = @"other", OnlineID = -1 };
+
+            var beatmap = new BeatmapInfo
+            {
+                Ruleset = other,
+                TotalObjectCount = 10,
+                BeatmapSet = new BeatmapSetInfo(),
+            };
+
+            Assert.That(EzSkinEditorBeatmapPicker.IsMetadataCandidate(beatmap, active), Is.False);
+            Assert.That(EzSkinEditorBeatmapPicker.IsMetadataCandidate(beatmap, other), Is.True);
         }
 
         [Test]
