@@ -41,7 +41,7 @@ namespace osu.Game.EzOsuGame.HUD
     }
 
     //TODO: 枚举维护不方便，修改后要清理重构，考虑改为读取配置文件，或自动搜索子文件夹生成列表
-    //这里使用枚举，加载的是Resource.dll中的资源
+    //这里使用枚举，主要为了全局纹理用，加载强依赖文件夹名称一致。note\stage使用动态加载，judge\score\earlylate使用枚举，后续可以考虑统一
     //注释用来备份，不要删除
     public enum EzEnumGameThemeName
     {
@@ -79,6 +79,7 @@ namespace osu.Game.EzOsuGame.HUD
         Kings,
         Limited,
         NIGHT_FALL,
+        NIGHT_TRAVELER,
         O2_A9100,
         O2_EA05,
         O2_Jam,
@@ -97,9 +98,6 @@ namespace osu.Game.EzOsuGame.HUD
         Turtle,
         Various_Ways,
         ArcadeScore,
-        NIGHT_TRAVELER,
-        EMOTIONAL_SENSE,
-        Invisible,
         // ReSharper restore InconsistentNaming
     }
 }

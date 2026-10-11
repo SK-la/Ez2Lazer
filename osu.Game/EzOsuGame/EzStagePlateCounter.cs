@@ -71,7 +71,7 @@ namespace osu.Game.EzOsuGame
             base.LoadComplete();
 
             stageName = config.GetBindable<string>(Ez2Setting.StageName);
-            stageName.BindValueChanged(_ => reloadGlyphs());
+            stageName.BindValueChanged(_ => reloadGlyphs(), true);
 
             if (scoreProcessor == null)
             {
@@ -97,7 +97,7 @@ namespace osu.Game.EzOsuGame
             apply(shownValue);
         }
 
-        // 整套字形先按 body（舞台名）找 layout 里的目录。没有 0，再用当前主题名。
+        // 字形在 Stage/{舞台名} 下，path 来自 layout（number、number/score、number/combo）。
         private void loadGlyphs()
         {
             string? root = chooseRoot();
