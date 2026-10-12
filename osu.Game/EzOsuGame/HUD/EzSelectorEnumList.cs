@@ -1,27 +1,44 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
-using System.Linq;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Platform;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Overlays.Settings;
 
 // ReSharper disable UnusedMember.Global
 
 namespace osu.Game.EzOsuGame.HUD
 {
-    public partial class EzSelectorEnumList : SettingsDropdown<EzEnumGameThemeName>
+    public partial class EzSelectorEnumList : SettingsDropdown<string>
     {
-        // public const string DEFAULT_NAME = "Celeste_Lumiere";
-        public const EzEnumGameThemeName DEFAULT_NAME = EzEnumGameThemeName.Celeste_Lumiere;
+        public const string DEFAULT_NAME = EzGameThemeNames.DEFAULT;
+
+        [Resolved]
+        private Storage storage { get; set; } = null!;
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            // 动态加载GameTheme文件夹
-            // var availableThemes = loadAvailableThemes();
-            Items = Enum.GetValues(typeof(EzEnumGameThemeName)).Cast<EzEnumGameThemeName>().ToList();
+
+            if (EzGameThemeCandidates.Items.Count == 0)
+                EzGameThemeCandidates.Refresh(storage);
+
+            refreshItems();
+            EzGameThemeCandidates.Changed += refreshItems;
+        }
+
+        private void refreshItems()
+        {
+            Items = EzGameThemeCandidates.CreateDropdownItems(Current);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            EzGameThemeCandidates.Changed -= refreshItems;
+            base.Dispose(isDisposing);
         }
     }
 

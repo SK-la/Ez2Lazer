@@ -49,14 +49,13 @@ namespace osu.Game.EzOsuGame.Screens
         private Bindable<string>? noteSetName;
         private Bindable<string>? stageName;
         private Bindable<string>? panelName;
-        private Bindable<EzEnumGameThemeName>? gameThemeName;
+        private Bindable<string>? gameThemeName;
         private Bindable<string>? columnLightName;
         private bool ezSkinBindingsBound;
 
         private readonly List<string> availableNoteSets = new List<string>();
         private readonly List<string> availableStageSets = new List<string>();
         private readonly List<string> availablePanels = new List<string>();
-        private readonly List<string> availableGameThemes = new List<string>();
         private readonly List<string> availableColumnLights = new List<string>();
 
         [BackgroundDependencyLoader]
@@ -77,7 +76,7 @@ namespace osu.Game.EzOsuGame.Screens
                     {
                         LabelText = "组件类型",
                         Current = componentType,
-                        Items = new[] { "Note", "Stage", "Panel", "EarlyLate", "judgement", "combo", "ColumnLight" }
+                        Items = new[] { "Note", "Stage", "Panel", "EarlyLate", "Judgement", "Combo", "ColumnLight" }
                     },
                     new Box
                     {
@@ -102,15 +101,30 @@ namespace osu.Game.EzOsuGame.Screens
             gameThemeName!.BindValueChanged(_ => rebuildVisualLists());
             columnLightName!.BindValueChanged(_ => rebuildVisualLists());
             componentType.BindValueChanged(_ => rebuildVisualLists());
+            EzGameThemeCandidates.Refresh(storage);
             rebuildVisualLists();
         }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            EzGameThemeCandidates.Changed += onGameThemeCandidatesChanged;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            EzGameThemeCandidates.Changed -= onGameThemeCandidatesChanged;
+            base.Dispose(isDisposing);
+        }
+
+        private void onGameThemeCandidatesChanged() => rebuildVisualLists();
 
         private void ensureEzSkinBindings()
         {
             noteSetName ??= ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
             stageName ??= ezConfig.GetBindable<string>(Ez2Setting.StageName);
             panelName ??= ezConfig.GetBindable<string>(Ez2Setting.StageBackground);
-            gameThemeName ??= ezConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName);
+            gameThemeName ??= ezConfig.GetBindable<string>(Ez2Setting.GameThemeName);
             columnLightName ??= ezConfig.GetBindable<string>(Ez2Setting.ColumnLightName);
 
             if (ezSkinBindingsBound)
@@ -129,13 +143,11 @@ namespace osu.Game.EzOsuGame.Screens
             availableNoteSets.Clear();
             availableStageSets.Clear();
             availablePanels.Clear();
-            availableGameThemes.Clear();
             availableColumnLights.Clear();
 
             availableNoteSets.AddRange(listSubdirs(EzModifyPath.NOTE_PATH));
             availableStageSets.AddRange(listSubdirs(EzModifyPath.STAGE_PATH));
             availablePanels.AddRange(EzResourceDiscovery.ListPanelImages(storage));
-            availableGameThemes.AddRange(EzResourceDiscovery.ListGameThemeCandidates(storage));
             availableColumnLights.AddRange(EzResourceDiscovery.ListColumnSets(storage));
         }
 
@@ -224,36 +236,30 @@ namespace osu.Game.EzOsuGame.Screens
             }
         }
 
-        private void populateThemeCards(EzHudThemeSlot slot, Func<string, Texture?> preview, EzEnumGameThemeName shown)
+        private void populateThemeCards(EzHudThemeSlot slot, Func<string, Texture?> preview, string shown)
         {
-            foreach (string theme in availableGameThemes)
+            foreach (string theme in EzGameThemeCandidates.CreateCardItems(shown))
             {
                 cardFlow.Add(new VisualTextureItem(
                     theme,
                     preview(theme),
-                    () =>
-                    {
-                        if (!Enum.TryParse(theme, out EzEnumGameThemeName parsed))
-                            return;
-
-                        applyHudTheme(slot, parsed);
-                    },
-                    () => shown.ToString() == theme));
+                    () => applyHudTheme(slot, theme),
+                    () => shown == theme));
             }
         }
 
-        private EzEnumGameThemeName shownTheme(EzHudThemeSlot slot)
+        private string shownTheme(EzHudThemeSlot slot)
         {
             foreach (IEzHudThemeTarget target in hudThemeTargets())
             {
                 if (target.Slot == slot)
-                    return target.Theme.Value;
+                    return EzGameThemeNames.Normalize(target.Theme.Value);
             }
 
-            return gameThemeName!.Value;
+            return EzGameThemeNames.Normalize(gameThemeName!.Value);
         }
 
-        private void applyHudTheme(EzHudThemeSlot slot, EzEnumGameThemeName theme)
+        private void applyHudTheme(EzHudThemeSlot slot, string theme)
         {
             foreach (IEzHudThemeTarget target in hudThemeTargets())
             {

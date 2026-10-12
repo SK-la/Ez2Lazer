@@ -12,8 +12,8 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Edit.Components;
 using osuTK;
@@ -43,7 +43,8 @@ namespace osu.Game.EzOsuGame.Screens
         private readonly List<string> availableGameThemes = new List<string>();
         private Bindable<string> nameOfNote = null!;
         private Bindable<string> nameOfStage = null!;
-        private Bindable<EzEnumGameThemeName> nameOfGameTheme = null!;
+        private Bindable<string> nameOfGameTheme = null!;
+        private SettingsDropdown<string>? gameThemeDropdown;
 
         [BackgroundDependencyLoader]
         private void load()
@@ -54,7 +55,10 @@ namespace osu.Game.EzOsuGame.Screens
 
             nameOfNote = ezSkinConfig.GetBindable<string>(Ez2Setting.NoteSetName);
             nameOfStage = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
-            nameOfGameTheme = ezSkinConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName);
+            nameOfGameTheme = ezSkinConfig.GetBindable<string>(Ez2Setting.GameThemeName);
+            EzGameThemeCandidates.Refresh(storage);
+            EzGameThemeCandidates.EnsureInitialSelection(nameOfGameTheme);
+            refreshGameThemeDropdownItems();
 
             InternalChild = new FillFlowContainer
             {
@@ -64,11 +68,27 @@ namespace osu.Game.EzOsuGame.Screens
                 Spacing = new Vector2(10),
                 Children = new Drawable[]
                 {
-                    new SettingsEnumDropdown<EzEnumGameThemeName>
+                    new FillFlowContainer
                     {
-                        LabelText = EzSkinStrings.GLOBAL_TEXTURE_NAME,
-                        TooltipText = EzSkinStrings.GLOBAL_TEXTURE_NAME_TOOLTIP,
-                        Current = nameOfGameTheme,
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                        Direction = FillDirection.Vertical,
+                        Spacing = new Vector2(4),
+                        Children = new Drawable[]
+                        {
+                            gameThemeDropdown = new SettingsDropdown<string>
+                            {
+                                LabelText = EzSkinStrings.GLOBAL_TEXTURE_NAME,
+                                TooltipText = EzSkinStrings.GLOBAL_TEXTURE_NAME_TOOLTIP,
+                                Current = nameOfGameTheme,
+                                Items = availableGameThemes,
+                            },
+                            new SettingsButton
+                            {
+                                Text = EzSkinStrings.RESCAN_GAME_THEME_LIST,
+                                Action = () => EzGameThemeCandidates.Refresh(storage),
+                            },
+                        }
                     },
                     new SettingsDropdown<string>
                     {
@@ -191,6 +211,24 @@ namespace osu.Game.EzOsuGame.Screens
             {
                 ezSkinConfig.SetValue(Ez2Setting.GameThemeName, e.NewValue);
             });
+
+            EzGameThemeCandidates.Changed += onGameThemeCandidatesChanged;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            EzGameThemeCandidates.Changed -= onGameThemeCandidatesChanged;
+            base.Dispose(isDisposing);
+        }
+
+        private void onGameThemeCandidatesChanged() => refreshGameThemeDropdownItems();
+
+        private void refreshGameThemeDropdownItems()
+        {
+            availableGameThemes.Clear();
+            availableGameThemes.AddRange(EzGameThemeCandidates.CreateDropdownItems(nameOfGameTheme));
+
+            gameThemeDropdown?.Items = availableGameThemes;
         }
 
         private void loadFolderSets(string type)

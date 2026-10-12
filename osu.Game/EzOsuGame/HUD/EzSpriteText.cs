@@ -27,8 +27,8 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected override char FixedWidthReferenceCharacter => '5';
 
-        public Bindable<EzEnumGameThemeName> ThemeName { get; }
-        private Bindable<EzEnumGameThemeName> themeName = null!;
+        public Bindable<string> ThemeName { get; }
+        private Bindable<string> themeName = null!;
 
         private readonly Func<char, string> getLookup;
         private GlyphStore? glyphStore;
@@ -42,7 +42,7 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved]
         private EzGameplayWarmUpService warmUpService { get; set; } = null!;
 
-        protected EzSpriteText(Func<char, string> getLookup, Bindable<EzEnumGameThemeName> themeName)
+        protected EzSpriteText(Func<char, string> getLookup, Bindable<string> themeName)
         {
             this.getLookup = getLookup;
             ThemeName = themeName;
@@ -54,17 +54,18 @@ namespace osu.Game.EzOsuGame.HUD
         [BackgroundDependencyLoader]
         private void load()
         {
-            themeName = ezConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName);
+            themeName = ezConfig.GetBindable<string>(Ez2Setting.GameThemeName);
 
             themeName.BindValueChanged(e =>
             {
-                ThemeName.Value = e.NewValue;
+                ThemeName.Value = EzGameThemeNames.Normalize(e.NewValue);
                 Preload();
             });
 
             ThemeName.BindValueChanged(e =>
             {
-                Font = new FontUsage(ThemeName.Value.ToString(), 1);
+                string fontName = EzGameThemeNames.Normalize(e.NewValue);
+                Font = new FontUsage(fontName, 1);
 
                 // 清理旧的 GlyphStore 缓存，防止每次切换字体时，缓存堆积
                 glyphStore?.ClearCache();
@@ -82,7 +83,7 @@ namespace osu.Game.EzOsuGame.HUD
         public Task WarmUpAsync(CancellationToken cancellationToken)
         {
             GlyphStore? store = glyphStore;
-            string fontName = ThemeName.Value.ToString();
+            string fontName = EzGameThemeNames.Normalize(ThemeName.Value);
 
             if (store == null)
                 return Task.CompletedTask;
@@ -119,7 +120,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         public void Preload()
         {
-            PreloadCharacters(glyphStore!, ThemeName.Value.ToString());
+            PreloadCharacters(glyphStore!, EzGameThemeNames.Normalize(ThemeName.Value));
         }
 
         private static void rememberUpload(ITexturedCharacterGlyph? glyph, List<Texture>? uploads)

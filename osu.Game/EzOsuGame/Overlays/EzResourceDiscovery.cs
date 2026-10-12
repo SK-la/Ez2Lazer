@@ -7,7 +7,6 @@ using System.IO;
 using System.Linq;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Platform;
-using osu.Game.EzOsuGame.HUD;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
@@ -17,22 +16,7 @@ namespace osu.Game.EzOsuGame.Overlays
     public static class EzResourceDiscovery
     {
         public static IReadOnlyList<string> ListGameThemeCandidates(Storage storage)
-        {
-            var list = new List<string>();
-            string basePath = storage.GetFullPath(EzModifyPath.GAME_THEME_PATH);
-
-            if (!Directory.Exists(basePath))
-                return list;
-
-            foreach (EzEnumGameThemeName v in Enum.GetValues(typeof(EzEnumGameThemeName)))
-            {
-                string name = v.ToString();
-                if (Directory.Exists(Path.Combine(basePath, name)))
-                    list.Add(name);
-            }
-
-            return list;
-        }
+            => listSubdirectories(storage, EzModifyPath.GAME_THEME_PATH);
 
         public static IReadOnlyList<string> ListNoteSetCandidates(Storage storage)
             => listSubdirectories(storage, EzModifyPath.NOTE_PATH);

@@ -25,13 +25,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
     {
         EzHudThemeSlot IEzHudThemeTarget.Slot => EzHudThemeSlot.Combo;
 
-        Bindable<EzEnumGameThemeName> IEzHudThemeTarget.Theme => ThemeName;
+        Bindable<string> IEzHudThemeTarget.Theme => ThemeName;
 
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.ANIMATION_TEMPLATE_LABEL), nameof(EzHUDManiaStrings.ANIMATION_TEMPLATE_DESCRIPTION))]
         public Bindable<EzEnumDeformTemplate> AnimationTemplate { get; } = new Bindable<EzEnumDeformTemplate>();
 
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.FONT_LABEL), nameof(EzHUDManiaStrings.FONT_DESCRIPTION), SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<string> ThemeName { get; } = new Bindable<string>(EzSelectorEnumList.DEFAULT_NAME);
 
         [EzBuiltinEffectSource]
         public EzBuiltinEffectHost Effects { get; } = EzBuiltinEffectHost.ForDigits();
@@ -71,9 +71,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
             AccentAlpha.BindValueChanged(alpha => Text.Alpha = alpha.NewValue, true);
             AccentColour.BindValueChanged(_ => Text.Colour = AccentColour.Value, true);
-            ezConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName).BindValueChanged(theme =>
+            ezConfig.GetBindable<string>(Ez2Setting.GameThemeName).BindValueChanged(theme =>
             {
-                if (Enum.TryParse(theme.NewValue.ToString(), out EzEnumDeformTemplate template))
+                if (Enum.TryParse(theme.NewValue, out EzEnumDeformTemplate template))
                     AnimationTemplate.Value = template;
             });
         }

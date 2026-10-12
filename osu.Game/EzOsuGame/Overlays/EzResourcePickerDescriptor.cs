@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Framework.Platform;
-using osu.Game.EzOsuGame.HUD;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
@@ -25,22 +24,18 @@ namespace osu.Game.EzOsuGame.Overlays
 
         public required Action<string> Commit { get; init; }
 
-        public static EzResourcePickerDescriptor ForGameTheme(Storage storage, Bindable<EzEnumGameThemeName> bindable)
+        public static EzResourcePickerDescriptor ForGameTheme(Storage storage, Bindable<string> bindable)
         {
-            var items = EzResourceDiscovery.ListGameThemeCandidates(storage);
-            string current = bindable.Value.ToString();
+            EzGameThemeCandidates.Refresh(storage);
+            var items = EzGameThemeCandidates.CreateDropdownItems(bindable);
 
             return new EzResourcePickerDescriptor
             {
                 Title = @"GameTheme",
                 Category = EzResourcePickerCategory.GameTheme,
                 Items = items,
-                CurrentKey = current,
-                Commit = key =>
-                {
-                    if (Enum.TryParse(key, out EzEnumGameThemeName parsed))
-                        bindable.Value = parsed;
-                }
+                CurrentKey = bindable.Value,
+                Commit = key => bindable.Value = key
             };
         }
 

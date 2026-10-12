@@ -12,8 +12,16 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString GLOBAL_TEXTURE_NAME_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "统一修改当前皮肤中所有Ez-HUD组件的纹理名称, 如score、combo、判定等纹理。"
-            + "\n在本地EzResources/GameTheme/中，不支持增减子文件夹。",
-            "Set a global texture name for all EZ-HUD components in the current skin. Such as: score, combo, judgement, etc.");
+            + "\n在本地 EzResources/GameTheme/ 中，支持自定义子文件夹增减修改，选项会在重扫时重新读取文件夹名称。",
+            "Set a global texture name for all EZ-HUD components in the current skin. Such as: score, combo, judgement, etc."
+            + "\nSupports adding or removing subfolders under local EzResources/GameTheme/. Use rescan to reload folder names.");
+
+        public static readonly LocalisableString RESCAN_GAME_THEME_LIST = new EzLocalizationManager.EzLocalisableString(
+            "重扫 GameTheme 列表", "Rescan GameTheme folders");
+
+        public static readonly LocalisableString RESCAN_GAME_THEME_LIST_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "重新读取 EzResources/GameTheme/ 下的子文件夹名称，更新下拉与预览卡片；不会修改当前选中的主题名。",
+            "Re-read subfolders under EzResources/GameTheme/ and refresh dropdowns and preview cards without changing the current selection.");
 
         public static readonly LocalisableString STAGE_SET = new EzLocalizationManager.EzLocalisableString(
             "[EzPro] Stage Set", "[EzPro] Stage Set");
