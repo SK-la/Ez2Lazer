@@ -143,9 +143,11 @@ namespace osu.Game.Screens.Footer
                 },
                 BackButton = new ScreenBackButton
                 {
-                    Margin = new MarginPadding { Bottom = 0, Left = OsuGame.SCREEN_EDGE_MARGIN },
+                    Margin = new MarginPadding { Left = OsuGame.SCREEN_EDGE_MARGIN },
                     Anchor = Anchor.BottomLeft,
                     Origin = Anchor.BottomLeft,
+                    // footer buttons are taller than the footer, match the flow's offset so all of them sit at the same height.
+                    Y = ScreenFooterButton.CORNER_RADIUS,
                     Action = onBackPressed,
                 },
                 hiddenButtonsContainer = new Container<ScreenFooterButton>
