@@ -7,7 +7,7 @@ namespace osu.Game.EzOsuGame.HUD
 {
     public static class EzGameThemeNames
     {
-        public const string Default = "Celeste_Lumiere";
+        public const string DEFAULT = "Celeste_Lumiere";
 
         /// <summary>
         /// 皮肤里 ThemeName 曾按 enum 存成数字字符串；解析为文件夹名后再用于列表与纹理路径。
@@ -31,7 +31,7 @@ namespace osu.Game.EzOsuGame.HUD
         public static string Normalize(string? value)
         {
             string resolved = Resolve(value);
-            return string.IsNullOrWhiteSpace(resolved) ? Default : resolved;
+            return string.IsNullOrWhiteSpace(resolved) ? DEFAULT : resolved;
         }
     }
 }

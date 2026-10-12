@@ -14,7 +14,7 @@ namespace osu.Game.EzOsuGame.HUD
 {
     public partial class EzSelectorEnumList : SettingsDropdown<string>
     {
-        public const string DEFAULT_NAME = EzGameThemeNames.Default;
+        public const string DEFAULT_NAME = EzGameThemeNames.DEFAULT;
 
         [Resolved]
         private Storage storage { get; set; } = null!;

@@ -183,7 +183,7 @@ namespace osu.Game.EzOsuGame.Configuration
             #region 皮肤与舞台资源
 
             SetDefault(Ez2Setting.GlobalTextureName, 4);
-            SetDefault(Ez2Setting.GameThemeName, EzGameThemeNames.Default);
+            SetDefault(Ez2Setting.GameThemeName, EzGameThemeNames.DEFAULT);
             SetDefault(Ez2Setting.NoteSetName, "lucenteclat");
             SetDefault(Ez2Setting.StageName, "Celeste_Lumiere");
             SetDefault(Ez2Setting.StagePanelEnabled, true);

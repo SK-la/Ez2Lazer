@@ -34,7 +34,7 @@ namespace osu.Game.EzOsuGame.Overlays
             ensureCurrentListed(items, current.Value);
 
             if (items.Count == 0)
-                items.Add(EzGameThemeNames.Default);
+                items.Add(EzGameThemeNames.DEFAULT);
 
             return items;
         }
@@ -51,7 +51,7 @@ namespace osu.Game.EzOsuGame.Overlays
             if (!string.IsNullOrEmpty(current.Value))
                 return;
 
-            current.Value = cached.FirstOrDefault() ?? EzGameThemeNames.Default;
+            current.Value = cached.FirstOrDefault() ?? EzGameThemeNames.DEFAULT;
         }
 
         private static void ensureCurrentListed(List<string> items, string? value)
