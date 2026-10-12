@@ -11,11 +11,9 @@ using osu.Framework.Development;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
-using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Screens;
@@ -25,18 +23,19 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.EzOsuGame.Screens.Rotation;
 using osu.Game.Localisation;
 using osu.Game.Online.Placeholders;
 using osu.Game.Overlays;
 using osu.Game.Scoring;
+using osu.Game.Screens.Footer;
 using osu.Game.Screens.Play;
 using osu.Game.Tests.Visual;
 using osu.Game.Screens.Ranking.Expanded.Accuracy;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
-using osuTK;
 
 namespace osu.Game.Screens.Ranking
 {
@@ -69,7 +68,6 @@ namespace osu.Game.Screens.Ranking
 
         protected StatisticsPanel StatisticsPanel { get; private set; } = null!;
 
-        private Drawable bottomPanel = null!;
         private Container<ScorePanel> detachedPanelContainer = null!;
 
         private Task lastFetchTask = Task.CompletedTask;
@@ -103,10 +101,8 @@ namespace osu.Game.Screens.Ranking
         }
 
         [BackgroundDependencyLoader]
-        private void load(AudioManager audio)
+        private void load(AudioManager audio, Ez2ConfigManager ezConfig)
         {
-            FillFlowContainer buttons;
-
             popInSample = audio.Samples.Get(@"UI/overlay-pop-in");
 
             InternalChild = new PopoverContainer
@@ -148,38 +144,10 @@ namespace osu.Game.Screens.Ranking
                                 }
                             },
                         },
-                        new[]
-                        {
-                            bottomPanel = new Container
-                            {
-                                Anchor = Anchor.BottomLeft,
-                                Origin = Anchor.BottomLeft,
-                                RelativeSizeAxes = Axes.X,
-                                Height = TwoLayerButton.SIZE_EXTENDED.Y,
-                                Alpha = 0,
-                                Children = new Drawable[]
-                                {
-                                    new Box
-                                    {
-                                        RelativeSizeAxes = Axes.Both,
-                                        Colour = Color4Extensions.FromHex("#333")
-                                    },
-                                    buttons = new FillFlowContainer
-                                    {
-                                        Anchor = Anchor.Centre,
-                                        Origin = Anchor.Centre,
-                                        AutoSizeAxes = Axes.Both,
-                                        Spacing = new Vector2(5),
-                                        Direction = FillDirection.Horizontal
-                                    },
-                                }
-                            }
-                        }
                     },
                     RowDimensions = new[]
                     {
-                        new Dimension(),
-                        new Dimension(GridSizeMode.AutoSize)
+                        new Dimension()
                     }
                 }
             };
@@ -196,30 +164,12 @@ namespace osu.Game.Screens.Ranking
                 Scheduler.AddDelayed(() => OverlayActivationMode.Value = OverlayActivation.All, shouldFlair ? AccuracyCircle.TOTAL_DURATION + 1000 : 0);
             }
 
-            bool allowHotkeyRetry = false;
+            environmentControls = new ResultsEnvironmentControls(ezConfig);
 
-            if (AllowWatchingReplay)
-            {
-                buttons.Add(new ReplayDownloadButton(SelectedScore.Value)
-                {
-                    Score = { BindTarget = SelectedScore },
-                    Width = 300
-                });
-
-                // for simplicity, only allow this when coming from a replay player where we know the replay is ready to be played.
-                //
-                // if we show it in all cases, consider the case where a user comes from song select and potentially has to download
-                // the replay before it can be played back. it wouldn't flow well with the quick retry in such a case.
-                allowHotkeyRetry = player is ReplayPlayer;
-            }
-
-            if (player != null && AllowRetry)
-            {
-                buttons.Add(new RetryButton { Width = 300 });
-                allowHotkeyRetry = true;
-            }
-
-            EzQuickRotationResults.TryAddContinueButton(buttons, this);
+            // for simplicity, only allow the retry hotkey when coming from a replay player where we know the replay is ready to be played.
+            // if we allow it in all cases, consider the case where a user comes from song select and potentially has to download
+            // the replay before it can be played back. it wouldn't flow well with the quick retry in such a case.
+            bool allowHotkeyRetry = (AllowWatchingReplay && player is ReplayPlayer) || (player != null && AllowRetry);
 
             if (allowHotkeyRetry)
             {
@@ -234,6 +184,26 @@ namespace osu.Game.Screens.Ranking
                     },
                 });
             }
+        }
+
+        public override bool ShowFooter => true;
+
+        public override IReadOnlyList<ScreenFooterButton> CreateFooterButtons()
+        {
+            var buttons = new List<ScreenFooterButton>();
+
+            if (AllowWatchingReplay)
+            {
+                buttons.Add(new ReplayDownloadButton(SelectedScore.Value)
+                {
+                    Score = { BindTarget = SelectedScore },
+                });
+            }
+
+            if (player != null && AllowRetry)
+                buttons.Add(new RetryButton());
+
+            EzQuickRotationResults.TryAddContinueButton(buttons, this);
 
             if (Score?.BeatmapInfo != null)
                 buttons.Add(new CollectionButton(Score.BeatmapInfo));
@@ -244,7 +214,9 @@ namespace osu.Game.Screens.Ranking
             if (Score?.BeatmapInfo?.BeatmapSet != null && Score.BeatmapInfo.BeatmapSet.OnlineID > 0)
                 buttons.Add(new FavouriteButton(Score.BeatmapInfo.BeatmapSet));
 
-            buttons.Add(environmentControls = new ResultsEnvironmentControls());
+            buttons.AddRange(environmentControls.CreateFooterButtons());
+
+            return buttons;
         }
 
         protected override void LoadComplete()
@@ -478,8 +450,6 @@ namespace osu.Game.Screens.Ranking
                 b.BlurAmount.Value = BACKGROUND_BLUR;
                 b.FadeColour(OsuColour.Gray(0.5f), 250);
             });
-
-            bottomPanel.FadeTo(1, 250);
 
             popInSample?.Play();
         }

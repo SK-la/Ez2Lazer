@@ -13,7 +13,7 @@ using osu.Framework.Extensions;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
-using osu.Game.Graphics.UserInterface;
+using osu.Game.Overlays;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Scoring;
 using osu.Game.Screens.Ranking;
@@ -26,6 +26,9 @@ namespace osu.Game.Tests.Visual.Gameplay
     [TestFixture]
     public partial class TestSceneReplayDownloadButton : OsuManualInputManagerTestScene
     {
+        [Cached]
+        private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Aquamarine);
+
         private const long online_score_id = 2553163309;
 
         private TestReplayDownloadButton downloadButton;
@@ -137,7 +140,7 @@ namespace osu.Game.Tests.Visual.Gameplay
             AddUntilStep("wait for load", () => downloadButton.IsLoaded);
 
             checkState(DownloadState.NotDownloaded);
-            AddAssert("button is not enabled", () => !downloadButton.ChildrenOfType<DownloadButton>().First().Enabled.Value);
+            AddAssert("button is not enabled", () => !downloadButton.Enabled.Value);
         }
 
         [Test]
@@ -159,7 +162,7 @@ namespace osu.Game.Tests.Visual.Gameplay
             AddUntilStep("wait for load", () => downloadButton.IsLoaded);
 
             checkState(DownloadState.NotDownloaded);
-            AddAssert("button is not enabled", () => !downloadButton.ChildrenOfType<DownloadButton>().First().Enabled.Value);
+            AddAssert("button is not enabled", () => !downloadButton.Enabled.Value);
         }
 
         [Test]
@@ -182,12 +185,12 @@ namespace osu.Game.Tests.Visual.Gameplay
             AddStep("import score", () => imported = scoreManager.Import(getScoreInfo(true)));
 
             checkState(DownloadState.LocallyAvailable);
-            AddAssert("button is enabled", () => downloadButton.ChildrenOfType<DownloadButton>().First().Enabled.Value);
+            AddAssert("button is enabled", () => downloadButton.Enabled.Value);
 
             AddStep("delete score", () => scoreManager.Delete(imported.Value));
 
             checkState(DownloadState.NotDownloaded);
-            AddAssert("button is not enabled", () => !downloadButton.ChildrenOfType<DownloadButton>().First().Enabled.Value);
+            AddAssert("button is not enabled", () => !downloadButton.Enabled.Value);
         }
 
         [Test]
@@ -205,7 +208,7 @@ namespace osu.Game.Tests.Visual.Gameplay
             AddUntilStep("wait for load", () => downloadButton.IsLoaded);
 
             checkState(DownloadState.Unknown);
-            AddAssert("button is not enabled", () => !downloadButton.ChildrenOfType<DownloadButton>().First().Enabled.Value);
+            AddAssert("button is not enabled", () => !downloadButton.Enabled.Value);
         }
 
         private void checkState(DownloadState expectedState) =>
