@@ -40,3 +40,10 @@
 - 回复和 PLAN 只写必要结论。不贴长文件、长日志、长 diff、代码路径。必要时给摘要。
 - 用户是在提问时，只回答，不修改代码。
 - 用户追问刚刚那次提交时，用这次对话里已经有的内容回答，不要再读文件或查 git。
+
+## Cursor Cloud
+
+- .NET SDK 10 在 `/usr/local/share/dotnet`。直接跑 `osu.Desktop` 的 apphost 时依赖 `DOTNET_ROOT`；环境安装会把它链到 `/usr/share/dotnet`。
+- 不要构建 `osu.sln`。解决方案引用了仓库外的 `ez2lazer-framework` 和 `ez2lazer-resources`。默认用 NuGet：构建 `osu.Desktop/osu.Desktop.csproj`，测试用 `osu.Game.Tests`。
+- `fonts-noto-color-emoji` 会让 `EzFontSettingsOverlay` 在启动时因 FreeType `invalid pixel size` 退出。环境安装会卸掉这个包。
+- 冒烟测试：`dotnet test osu.Game.Tests/osu.Game.Tests.csproj --filter FullyQualifiedName~FilterQueryParserTest`。
