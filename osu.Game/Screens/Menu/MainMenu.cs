@@ -64,8 +64,6 @@ namespace osu.Game.Screens.Menu
 
         public override bool? AllowGlobalTrackControl => true;
 
-        private MenuSideFlashes sideFlashes;
-
         protected ButtonSystem Buttons;
 
         [Resolved]
@@ -190,7 +188,6 @@ namespace osu.Game.Screens.Menu
                     }
                 },
                 logoTarget = new Container { RelativeSizeAxes = Axes.Both, },
-                sideFlashes = SeasonalUIConfig.ENABLED ? new SeasonalMenuSideFlashes() : new MenuSideFlashes(),
                 songTicker = new SongTicker
                 {
                     Anchor = Anchor.TopRight,
@@ -323,8 +320,6 @@ namespace osu.Game.Screens.Menu
 
                 this.FadeIn(FADE_IN_DURATION, Easing.OutQuint);
                 buttonsContainer.MoveTo(new Vector2(0, 0), FADE_IN_DURATION, Easing.OutQuint);
-
-                sideFlashes.Delay(FADE_IN_DURATION).FadeIn(64, Easing.InQuint);
             }
             else
             {
@@ -415,8 +410,6 @@ namespace osu.Game.Screens.Menu
 
             this.FadeOut(FADE_OUT_DURATION, Easing.InSine);
             buttonsContainer.MoveTo(new Vector2(-800, 0), FADE_OUT_DURATION, Easing.InSine);
-
-            sideFlashes.FadeOut(64, Easing.OutQuint);
 
             bottomElementsFlow
                 .ScaleTo(0.9f, 1000, Easing.OutQuint)
