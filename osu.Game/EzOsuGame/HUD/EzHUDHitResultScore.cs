@@ -34,12 +34,12 @@ namespace osu.Game.EzOsuGame.HUD
     {
         EzHudThemeSlot IEzHudThemeTarget.Slot => EzHudThemeSlot.Judgement;
 
-        Bindable<EzEnumGameThemeName> IEzHudThemeTarget.Theme => ThemeName;
+        Bindable<string> IEzHudThemeTarget.Theme => ThemeName;
 
         public bool UsesFixedAnchor { get; set; }
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_TEXT_FONT_LABEL), nameof(EzHUDStrings.HITRESULT_TEXT_FONT_DESCRIPTION))]
-        public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<string> ThemeName { get; } = new Bindable<string>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_AUTO_MAP_HITMODE_LABEL), nameof(EzHUDStrings.HITRESULT_AUTO_MAP_HITMODE_DESCRIPTION))]
         public BindableBool AutoMapHitMode { get; } = new BindableBool();
@@ -127,7 +127,7 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved(canBeNull: true)]
         private GameplayClockContainer? gameplayClockContainer { get; set; }
 
-        private Bindable<EzEnumGameThemeName> themeName = null!;
+        private Bindable<string> themeName = null!;
         private Bindable<EzEnumHitMode> maniaHitModeConfig = null!;
 
         public EzHUDHitResultScore()
@@ -146,10 +146,10 @@ namespace osu.Game.EzOsuGame.HUD
             // 而 LoadComplete 跑在 `Ready` 之后，那时登记就已经晚了一帧、会被漏掉。
             warmUpService.Register(this);
 
-            themeName = ezConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName);
+            themeName = ezConfig.GetBindable<string>(Ez2Setting.GameThemeName);
             themeName.BindValueChanged(e =>
             {
-                ThemeName.Value = e.NewValue;
+                ThemeName.Value = EzGameThemeNames.Normalize(e.NewValue);
             });
 
             ThemeName.BindValueChanged(_ => invalidateCurrentAnimation(), true);
@@ -273,7 +273,7 @@ namespace osu.Game.EzOsuGame.HUD
                 return null;
 
             double frameLength = 1000.0 / FPS.Value;
-            var drawable = probeJudgementDrawable(result, ThemeName.Value.ToString(),
+            var drawable = probeJudgementDrawable(result, EzGameThemeNames.Normalize(ThemeName.Value),
                 AnimationFrameTemplate.Value?.Trim() ?? "{result}/{000}", frameLength, resolveActiveTemplate());
 
             if (drawable == null)
@@ -416,7 +416,7 @@ namespace osu.Game.EzOsuGame.HUD
         public Task WarmUpAsync(CancellationToken cancellationToken)
         {
             // 与 getOrCreateJudgement 取同一来源：那是组件自己的 ThemeName 设置，不一定是全局配置。
-            string theme = ThemeName.Value.ToString();
+            string theme = EzGameThemeNames.Normalize(ThemeName.Value);
             string template = AnimationFrameTemplate.Value?.Trim() ?? "{result}/{000}";
             EzEnumHitMode activeTemplate = resolveActiveTemplate();
 
