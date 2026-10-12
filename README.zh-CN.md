@@ -33,7 +33,7 @@ Ez2Lazer 基于 [osu!](https://github.com/ppy/osu)，采用 [MIT 许可](https:/
 ## 下载与运行
 
 - 最新版本发布页：[SK-la/Ez2Lazer Releases](https://github.com/SK-la/Ez2Lazer/releases)
-- 资源包：[EzResources (OneDrive)](https://la1225-my.sharepoint.com/:f:/g/personal/la_la1225_onmicrosoft_com/EiosAbw_1C9ErYCNRD1PQvkBaYvhflOkt8G9ZKHNYuppLg?e=DWY1kn)
+- 资源包：[EzResources (OneDrive)](https://1drv.ms/f/c/f3cc2de32b3b7226/IgBk_21pXWxGS68n3ucCBC5lAappj0tXAeQAUBnNG1eWki0?e=nTkpPz)
 - 运行时要求：[.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
 
 **自动更新（推荐）**  
