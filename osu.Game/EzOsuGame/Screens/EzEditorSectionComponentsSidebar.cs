@@ -253,10 +253,10 @@ namespace osu.Game.EzOsuGame.Screens
             foreach (IEzHudThemeTarget target in hudThemeTargets())
             {
                 if (target.Slot == slot)
-                    return target.Theme.Value;
+                    return EzGameThemeNames.Normalize(target.Theme.Value);
             }
 
-            return gameThemeName!.Value;
+            return EzGameThemeNames.Normalize(gameThemeName!.Value);
         }
 
         private void applyHudTheme(EzHudThemeSlot slot, string theme)

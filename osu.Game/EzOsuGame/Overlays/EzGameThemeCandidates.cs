@@ -56,8 +56,10 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private static void ensureCurrentListed(List<string> items, string? value)
         {
-            if (!string.IsNullOrEmpty(value) && !items.Contains(value))
-                items.Insert(0, value);
+            string resolved = EzGameThemeNames.Resolve(value);
+
+            if (!string.IsNullOrEmpty(resolved) && !items.Contains(resolved))
+                items.Insert(0, resolved);
         }
     }
 }
