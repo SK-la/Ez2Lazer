@@ -228,8 +228,7 @@ namespace osu.Game.EzOsuGame.Screens
             availableGameThemes.Clear();
             availableGameThemes.AddRange(EzGameThemeCandidates.CreateDropdownItems(nameOfGameTheme));
 
-            if (gameThemeDropdown != null)
-                gameThemeDropdown.Items = availableGameThemes;
+            gameThemeDropdown?.Items = availableGameThemes;
         }
 
         private void loadFolderSets(string type)

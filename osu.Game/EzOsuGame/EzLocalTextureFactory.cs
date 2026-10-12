@@ -12,7 +12,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.HUD;
 using osuTK;
 
 namespace osu.Game.EzOsuGame

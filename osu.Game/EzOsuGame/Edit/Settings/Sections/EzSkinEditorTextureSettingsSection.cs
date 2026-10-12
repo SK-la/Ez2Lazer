@@ -122,8 +122,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             availableGameThemes.Clear();
             availableGameThemes.AddRange(EzGameThemeCandidates.CreateDropdownItems(nameOfGameTheme));
 
-            if (gameThemeDropdown != null)
-                gameThemeDropdown.Items = availableGameThemes;
+            gameThemeDropdown?.Items = availableGameThemes;
         }
 
         private static void ensureDropdownItems(Bindable<string> current, List<string> items)

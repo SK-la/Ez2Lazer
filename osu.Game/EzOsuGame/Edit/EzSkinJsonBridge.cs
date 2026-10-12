@@ -7,7 +7,6 @@ using System.Reflection;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.HUD;
 
 namespace osu.Game.EzOsuGame.Edit
 {

@@ -52,8 +52,6 @@ namespace osu.Game.EzOsuGame.HUD
             }, true);
         }
 
-        protected override IHasText CreateText() => Text = new EzScoreText(ThemeName)
-        {
-        };
+        protected override IHasText CreateText() => Text = new EzScoreText(ThemeName);
     }
 }

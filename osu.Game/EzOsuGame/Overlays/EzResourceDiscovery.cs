@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Platform;
 
