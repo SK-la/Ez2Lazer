@@ -64,6 +64,9 @@ namespace osu.Game.Screens.Ranking
 
             localUser.BindTo(api.LocalUser);
             localUser.BindValueChanged(_ => updateUser(), true);
+
+            // 离线、连接中或本地账号下 LocalUser 可能不变，状态变化也要重新判定。
+            api.State.BindValueChanged(_ => updateUser(), true);
         }
 
         private void getBeatmapSet()
@@ -145,7 +148,8 @@ namespace osu.Game.Screens.Ranking
                 return;
             }
 
-            if (!(localUser.Value is GuestUser) && BeatmapSetInfo.OnlineID > 0)
+            // 状态非在线（登出、连接中）时 LocalUser 可能还是旧值，不应据此拉取收藏状态。
+            if (api.State.Value == APIState.Online && !(localUser.Value is GuestUser) && BeatmapSetInfo.OnlineID > 0)
                 getBeatmapSet();
             else
             {
