@@ -3,10 +3,12 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables.Cards;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Online;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
@@ -16,11 +18,11 @@ using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Resources.Localisation.Web;
-using osuTK;
+using osu.Game.Screens.Footer;
 
 namespace osu.Game.Screens.Ranking
 {
-    public partial class FavouriteButton : GrayButton
+    public partial class FavouriteButton : ScreenFooterButton
     {
         public readonly BeatmapSetInfo BeatmapSetInfo;
         private APIBeatmapSet? beatmapSet;
@@ -41,12 +43,9 @@ namespace osu.Game.Screens.Ranking
         private INotificationOverlay? notifications { get; set; }
 
         public FavouriteButton(BeatmapSetInfo beatmapSetInfo)
-            : base(FontAwesome.Regular.Heart)
         {
             BeatmapSetInfo = beatmapSetInfo;
             current = new BindableWithCurrent<BeatmapSetFavouriteState>(new BeatmapSetFavouriteState(false, 0));
-
-            Size = new Vector2(75, 30);
         }
 
         [BackgroundDependencyLoader]
@@ -107,7 +106,6 @@ namespace osu.Game.Screens.Ranking
 
             favouriteRequest?.Cancel();
             favouriteRequest = new PostBeatmapFavouriteRequest(beatmapSet.OnlineID, actionType);
-
             favouriteRequest.Success += () =>
             {
                 bool favourited = actionType == BeatmapFavouriteAction.Favourite;
@@ -162,16 +160,29 @@ namespace osu.Game.Screens.Ranking
         {
             if (current.Value.Favourited)
             {
-                Background.Colour = colours.Green;
-                Icon.Icon = FontAwesome.Solid.Heart;
+                AccentColour = colours.Lime1;
+                OverlayState.Value = Visibility.Visible;
+                Icon = FontAwesome.Solid.Heart;
+                Text = FavouriteStrings.UNFAVOURITE;
                 TooltipText = BeatmapsetsStrings.ShowDetailsUnfavourite;
             }
             else
             {
-                Background.Colour = colours.Gray4;
-                Icon.Icon = FontAwesome.Regular.Heart;
+                AccentColour = colours.Pink1;
+                OverlayState.Value = Visibility.Hidden;
+                Icon = FontAwesome.Regular.Heart;
+                Text = FavouriteStrings.FAVOURITE;
                 TooltipText = BeatmapsetsStrings.ShowDetailsFavourite;
             }
+        }
+
+        private static class FavouriteStrings
+        {
+            internal static readonly EzLocalizationManager.EzLocalisableString FAVOURITE = new EzLocalizationManager.EzLocalisableString(
+                "收藏", "Favourite");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString UNFAVOURITE = new EzLocalizationManager.EzLocalisableString(
+                "取消收藏", "Unfavourite");
         }
     }
 }

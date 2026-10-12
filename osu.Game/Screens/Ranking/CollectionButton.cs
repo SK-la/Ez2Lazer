@@ -6,8 +6,7 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
-using osu.Framework.Extensions.LocalisationExtensions;
-using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
@@ -15,14 +14,13 @@ using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Database;
 using osu.Game.Graphics;
-using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
-using osuTK;
+using osu.Game.Screens.Footer;
 using Realms;
 
 namespace osu.Game.Screens.Ranking
 {
-    public partial class CollectionButton : GrayButton, IHasPopover
+    public partial class CollectionButton : ScreenFooterButton, IHasPopover
     {
         private readonly BeatmapInfo beatmapInfo;
         private readonly Bindable<bool> isInAnyCollection;
@@ -30,25 +28,24 @@ namespace osu.Game.Screens.Ranking
         [Resolved]
         private RealmAccess realmAccess { get; set; } = null!;
 
-        private IDisposable? collectionSubscription;
-
         [Resolved]
         private OsuColour colours { get; set; } = null!;
 
+        private IDisposable? collectionSubscription;
+
         public CollectionButton(BeatmapInfo beatmapInfo)
-            : base(FontAwesome.Solid.Book)
         {
             this.beatmapInfo = beatmapInfo;
             isInAnyCollection = new Bindable<bool>(false);
-
-            Size = new Vector2(75, 30);
-
-            TooltipText = CommonStrings.Collections.ToLower();
         }
 
         [BackgroundDependencyLoader]
         private void load()
         {
+            Icon = FontAwesome.Solid.Book;
+            AccentColour = colours.Lime1;
+            Text = CommonStrings.Collections;
+            TooltipText = CommonStrings.Collections;
             Action = this.ShowPopover;
         }
 
@@ -73,10 +70,10 @@ namespace osu.Game.Screens.Ranking
             isInAnyCollection.Value = sender.AsEnumerable().Any(c => c.BeatmapMD5Hashes.Contains(beatmapInfo.MD5Hash));
         }
 
-        private void updateState()
-        {
-            Background.FadeColour(isInAnyCollection.Value ? colours.Green : colours.Gray4, 500, Easing.InOutExpo);
-        }
+        /// <summary>
+        /// 谱面属于任意收藏夹时让按钮保持高亮，等价于旧版绿色背景。
+        /// </summary>
+        private void updateState() => OverlayState.Value = isInAnyCollection.Value ? Visibility.Visible : Visibility.Hidden;
 
         public Popover GetPopover() => new CollectionPopover(beatmapInfo);
     }
