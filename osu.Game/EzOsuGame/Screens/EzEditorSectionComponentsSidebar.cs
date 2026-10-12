@@ -77,7 +77,7 @@ namespace osu.Game.EzOsuGame.Screens
                     {
                         LabelText = "组件类型",
                         Current = componentType,
-                        Items = new[] { "Note", "Stage", "Panel", "EarlyLate", "judgement", "combo", "ColumnLight" }
+                        Items = new[] { "Note", "Stage", "Panel", "EarlyLate", "Judgement", "Combo", "ColumnLight" }
                     },
                     new Box
                     {
