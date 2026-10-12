@@ -7,7 +7,6 @@ using System.Reflection;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.HUD;
 
 namespace osu.Game.EzOsuGame.Edit
 {
@@ -160,7 +159,7 @@ namespace osu.Game.EzOsuGame.Edit
             // Access default type via a temporary bindable lookup through public getters for known settings.
             return setting switch
             {
-                Ez2Setting.GameThemeName => typeof(EzEnumGameThemeName),
+                Ez2Setting.GameThemeName => typeof(string),
                 Ez2Setting.StageName or Ez2Setting.NoteSetName or Ez2Setting.StageBackground or Ez2Setting.ColumnLightName => typeof(string),
                 Ez2Setting.ManiaPseudo3DRotation or Ez2Setting.ColumnDim or Ez2Setting.ColumnBlur or Ez2Setting.ColumnWidth or Ez2Setting.SpecialFactor
                     or Ez2Setting.HitPosition or Ez2Setting.HitTargetFloatFixed or Ez2Setting.HitTargetAlpha or Ez2Setting.NoteHeightScaleToWidth

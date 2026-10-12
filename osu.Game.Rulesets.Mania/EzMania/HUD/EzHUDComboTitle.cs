@@ -24,13 +24,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
     {
         EzHudThemeSlot IEzHudThemeTarget.Slot => EzHudThemeSlot.Combo;
 
-        Bindable<EzEnumGameThemeName> IEzHudThemeTarget.Theme => Font;
+        Bindable<string> IEzHudThemeTarget.Theme => Font;
 
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.ANIMATION_TEMPLATE_LABEL), nameof(EzHUDManiaStrings.ANIMATION_TEMPLATE_DESCRIPTION))]
         public Bindable<EzEnumDeformTemplate> AnimationTemplate { get; } = new Bindable<EzEnumDeformTemplate>();
 
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.FONT_LABEL), nameof(EzHUDManiaStrings.FONT_DESCRIPTION), SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<EzEnumGameThemeName> Font { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<string> Font { get; } = new Bindable<string>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_ORIGIN_LABEL), nameof(EzHUDManiaStrings.EFFECT_ORIGIN_DESCRIPTION), SettingControlType = typeof(AnchorDropdown))]
         public Bindable<Anchor> EffectOrigin { get; } = new Bindable<Anchor>(Anchor.TopCentre)
@@ -86,9 +86,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
                 applyAnimation(wasIncrease, wasMiss);
             });
 
-            ezConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName).BindValueChanged(theme =>
+            ezConfig.GetBindable<string>(Ez2Setting.GameThemeName).BindValueChanged(theme =>
             {
-                if (Enum.TryParse(theme.NewValue.ToString(), out EzEnumDeformTemplate template))
+                if (Enum.TryParse(theme.NewValue, out EzEnumDeformTemplate template))
                     AnimationTemplate.Value = template;
             });
         }

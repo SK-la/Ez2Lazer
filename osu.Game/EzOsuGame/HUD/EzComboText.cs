@@ -16,7 +16,7 @@ namespace osu.Game.EzOsuGame.HUD
         internal const float GLYPH_TARGET_HEIGHT = 25;
 
         private readonly EzComboSpriteText textPart;
-        public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<string> ThemeName { get; } = new Bindable<string>(EzSelectorEnumList.DEFAULT_NAME);
 
         // public Bindable<bool> UseLazerFont { get; } = new Bindable<bool>(false);
 
@@ -31,7 +31,7 @@ namespace osu.Game.EzOsuGame.HUD
             set => textPart.Text = value;
         }
 
-        public EzComboText(Bindable<EzEnumGameThemeName>? externalThemeName = null)
+        public EzComboText(Bindable<string>? externalThemeName = null)
         {
             AutoSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
@@ -104,7 +104,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         private partial class EzComboSpriteText : EzSpriteText
         {
-            public EzComboSpriteText(Func<char, string> getLookup, Bindable<EzEnumGameThemeName> themeName)
+            public EzComboSpriteText(Func<char, string> getLookup, Bindable<string> themeName)
                 : base(getLookup, themeName)
             {
             }

@@ -12,7 +12,7 @@ namespace osu.Game.EzOsuGame.HUD
     {
         EzHudThemeSlot Slot { get; }
 
-        Bindable<EzEnumGameThemeName> Theme { get; }
+        Bindable<string> Theme { get; }
     }
 
     public enum EzHudThemeSlot
