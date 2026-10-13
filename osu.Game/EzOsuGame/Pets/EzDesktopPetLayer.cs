@@ -85,6 +85,7 @@ namespace osu.Game.EzOsuGame.Pets
         private bool hovered;
         private bool dragging;
         private bool suppressPositionApply;
+        private bool temporaryHidden;
         private Guid lastStarBeatmapId;
         private double lastStarRating = double.NaN;
         private ScoreProcessor? boundScoreProcessor;
@@ -93,6 +94,25 @@ namespace osu.Game.EzOsuGame.Pets
         private bool firedClear;
 
         protected override bool StartHidden => false;
+
+        /// <summary>
+        /// When set, hides the pet without touching the master toggle or per-scene settings.
+        /// Used while the beatmap preview overlay covers the screen in fullscreen focus.
+        /// </summary>
+        public bool TemporaryHidden
+        {
+            get => temporaryHidden;
+            set
+            {
+                if (temporaryHidden == value)
+                    return;
+
+                temporaryHidden = value;
+
+                if (enabled != null)
+                    updateVisibility();
+            }
+        }
 
         public EzDesktopPetLayer()
         {
@@ -754,7 +774,7 @@ namespace osu.Game.EzOsuGame.Pets
 
         private void updateVisibility()
         {
-            bool show = enabled.Value && !eventHidden && sceneAllowsDisplay();
+            bool show = enabled.Value && !eventHidden && !temporaryHidden && sceneAllowsDisplay();
 
             if (show)
                 Show();

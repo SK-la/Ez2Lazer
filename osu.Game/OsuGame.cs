@@ -1242,7 +1242,7 @@ namespace osu.Game
                 Margin = new MarginPadding(5),
             }, topMostOverlayContent.Add);
 
-            loadComponentSingleFile(new EzDesktopPetLayer(), topMostOverlayContent.Add);
+            loadComponentSingleFile(new EzDesktopPetLayer(), topMostOverlayContent.Add, true);
 
             if (!IsDeployedBuild)
                 loadComponentSingleFile(devBuildBanner = new DevBuildBanner(), ScreenContainer.Add);

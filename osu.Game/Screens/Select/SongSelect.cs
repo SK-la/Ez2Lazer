@@ -42,6 +42,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Overlays;
+using osu.Game.EzOsuGame.Pets;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Localisation;
@@ -174,6 +175,9 @@ namespace osu.Game.Screens.Select
 
         [Resolved]
         private EzLayoutLayer? ezLayoutLayer { get; set; }
+
+        [Resolved]
+        private EzDesktopPetLayer? ezDesktopPetLayer { get; set; }
 
         private InputManager inputManager = null!;
 
@@ -455,10 +459,11 @@ namespace osu.Game.Screens.Select
 
             FilterControl.CriteriaChanged += criteriaChanged;
 
-            // 全屏预览会铺满屏幕，隐藏游戏级 Ez 布局层的选歌 HUD，避免被其遮挡。
+            // 全屏预览会铺满屏幕，隐藏游戏级 Ez 布局层的选歌 HUD 与桌宠（含 Live2D），避免被其遮挡。
             ezBeatmapPreviewOverlay.FullMapFocusState.BindValueChanged(e =>
             {
                 ezLayoutLayer?.SongSelectLayoutSuppressed = e.NewValue;
+                ezDesktopPetLayer?.TemporaryHidden = e.NewValue;
             });
 
             modSelectOverlay.State.BindValueChanged(v =>
