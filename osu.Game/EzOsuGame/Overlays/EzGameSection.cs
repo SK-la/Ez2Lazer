@@ -19,6 +19,8 @@ namespace osu.Game.EzOsuGame.Overlays
             Icon = OsuIcon.GameplayB
         };
 
+        protected override bool ShowSubsectionIndex => true;
+
         public EzGameSection()
         {
             Children = new Drawable[]

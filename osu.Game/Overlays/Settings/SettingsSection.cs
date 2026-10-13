@@ -3,8 +3,10 @@
 
 #nullable disable
 
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -31,6 +33,11 @@ namespace osu.Game.Overlays.Settings
 
         public abstract Drawable CreateIcon();
         public abstract LocalisableString Header { get; }
+
+        /// <summary>
+        /// Whether a clickable index of this section's subsections is shown above its content.
+        /// </summary>
+        protected virtual bool ShowSubsectionIndex => true;
 
         public bool UseSmallerSidebarButton { get; init; }
 
@@ -61,6 +68,8 @@ namespace osu.Game.Overlays.Settings
         public override bool IsPresent => base.IsPresent && MatchingFilter;
 
         public bool FilteringActive { get; set; }
+
+        private SettingsSubsection[] indexedSubsections;
 
         [Resolved(canBeNull: true)]
         private SettingsPanel settingsPanel { get; set; }
@@ -134,6 +143,19 @@ namespace osu.Game.Overlays.Settings
 
             selectedSection = settingsPanel?.CurrentSection.GetBoundCopy() ?? new Bindable<SettingsSection>(this);
             selectedSection.BindValueChanged(_ => updateContentFade(), true);
+        }
+
+        /// <summary>
+        /// The subsections directly contained by this section, used to drive second-level sidebar navigation.
+        /// </summary>
+        public IReadOnlyList<SettingsSubsection> IndexedSubsections => indexedSubsections ?? Array.Empty<SettingsSubsection>();
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            if (ShowSubsectionIndex)
+                indexedSubsections = FlowContent.Children.OfType<SettingsSubsection>().ToArray();
         }
 
         private bool isCurrentSection => selectedSection.Value == this;

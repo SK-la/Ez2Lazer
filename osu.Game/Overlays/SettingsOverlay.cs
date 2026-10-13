@@ -162,6 +162,8 @@ namespace osu.Game.Overlays
                     Sidebar.Expanded.Value = false;
                     Sidebar.FadeColour(Color4.DarkGray, 300, Easing.OutQuint);
 
+                    SetSubsectionNavSuppressed(true);
+
                     SectionsContainer.FadeOut(300, Easing.OutQuint);
                     ContentContainer.MoveToX(-PANEL_WIDTH, 500, Easing.OutQuint);
 
@@ -172,6 +174,8 @@ namespace osu.Game.Overlays
                 case Visibility.Hidden:
                     Sidebar.Expanded.Value = true;
                     Sidebar.FadeColour(Color4.White, 300, Easing.OutQuint);
+
+                    SetSubsectionNavSuppressed(false);
 
                     SectionsContainer.FadeIn(500, Easing.OutQuint);
                     ContentContainer.MoveToX(0, 500, Easing.OutQuint);
