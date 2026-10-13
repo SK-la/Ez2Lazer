@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Text;
 using System.Threading;
 using JetBrains.Annotations;
@@ -153,6 +154,8 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.BeatmapPreviewMode, EzBeatmapPreviewMode.Static);
             SetDefault(Ez2Setting.BeatmapPreviewModeMania, EzBeatmapPreviewMode.StaticFullMap);
             SetDefault(Ez2Setting.BeatmapPreviewDensity, 1.0, 0.1, 5.0, 0.05);
+            // 宽或高 <= 0 表示对应轴未手动调整，打开时使用默认宽度 / 最大高度。
+            SetDefault(Ez2Setting.BeatmapPreviewPanelSize, new Size(-1, -1));
             SetDefault(Ez2Setting.EditorSyncTimelineSpacing, true);
             SetDefault(Ez2Setting.SkinEditorHudSnapEnabled, false);
             SetDefault(Ez2Setting.SkinEditorHudSnapDistance, 20, 10, 50, 5);
@@ -1116,6 +1119,10 @@ namespace osu.Game.EzOsuGame.Configuration
         BeatmapPreviewMode,
         BeatmapPreviewModeMania,
         BeatmapPreviewDensity,
+
+        /// <summary>已手动调整的谱面预览面板尺寸（像素，分量 &lt;= 0 = 该轴未调整）。</summary>
+        BeatmapPreviewPanelSize,
+
         EditorSyncTimelineSpacing,
 
         /// <summary>

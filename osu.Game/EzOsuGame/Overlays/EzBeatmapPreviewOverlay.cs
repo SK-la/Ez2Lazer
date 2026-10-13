@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Threading;
 using osu.Framework.Allocation;
@@ -117,6 +118,11 @@ namespace osu.Game.EzOsuGame.Overlays
         private Bindable<double> previewDensity = null!;
         private Bindable<EzBeatmapPreviewMode> sharedPreviewModeConfig = null!;
         private Bindable<EzBeatmapPreviewMode> maniaPreviewModeConfig = null!;
+        private Bindable<Size>? previewPanelSizeConfig;
+
+        // 手动调整过的尺寸需等到布局尺寸有效后才能安全还原，否则会被首帧的 clamp 压到最小值。
+        private Size restoredPanelSize;
+        private bool panelSizeRestorePending;
 
         [Resolved(CanBeNull = true)]
         private ISkin? skin { get; set; }
@@ -331,6 +337,9 @@ namespace osu.Game.EzOsuGame.Overlays
             sharedPreviewModeConfig = ezConfig.GetBindable<EzBeatmapPreviewMode>(Ez2Setting.BeatmapPreviewMode);
             maniaPreviewModeConfig = ezConfig.GetBindable<EzBeatmapPreviewMode>(Ez2Setting.BeatmapPreviewModeMania);
             previewDensity = ezConfig.GetBindable<double>(Ez2Setting.BeatmapPreviewDensity);
+            previewPanelSizeConfig = ezConfig.GetBindable<Size>(Ez2Setting.BeatmapPreviewPanelSize);
+            restoredPanelSize = previewPanelSizeConfig.Value;
+            panelSizeRestorePending = restoredPanelSize.Width > 0 || restoredPanelSize.Height > 0;
             densityController = new PreviewDensityController(previewDensity);
             applyPreviewModeForCurrentRuleset();
         }
@@ -641,6 +650,20 @@ namespace osu.Game.EzOsuGame.Overlays
                 }
             }
 
+            if (panelSizeRestorePending && DrawWidth > 0 && DrawHeight > 0)
+            {
+                panelSizeRestorePending = false;
+
+                if (restoredPanelSize.Width > 0)
+                {
+                    panelWidth = restoredPanelSize.Width;
+                    panelWidthManuallyAdjusted = true;
+                }
+
+                if (restoredPanelSize.Height > 0)
+                    panelHeight = restoredPanelSize.Height;
+            }
+
             float targetPanelY = expanded ? 0 : 14;
             float displayPanelWidth;
             float displayPanelHeight;
@@ -903,6 +926,9 @@ namespace osu.Game.EzOsuGame.Overlays
 
         protected override void OnDragEnd(DragEndEvent e)
         {
+            if (heightResizeActive || widthResizeActive)
+                persistPanelSize();
+
             heightResizeActive = false;
             widthResizeActive = false;
             base.OnDragEnd(e);
@@ -1016,6 +1042,11 @@ namespace osu.Game.EzOsuGame.Overlays
         private void setPanelHeight(float height)
         {
             panelHeight = clampPanelHeight(height);
+        }
+
+        private void persistPanelSize()
+        {
+            previewPanelSizeConfig?.Value = new Size((int)MathF.Round(panelWidth), (int)MathF.Round(panelHeight));
         }
 
         private void setStateText(string text)
