@@ -19,7 +19,7 @@ namespace osu.Game.EzOsuGame.HUD
         protected override double RollingDuration => 250;
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_FONT_LABEL), nameof(EzHUDStrings.SCORE_FONT_DESCRIPTION), SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<string> ThemeName { get; } = new Bindable<string>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel))]
         public Bindable<bool> ShowLabel { get; } = new BindableBool();
@@ -52,8 +52,6 @@ namespace osu.Game.EzOsuGame.HUD
             }, true);
         }
 
-        protected override IHasText CreateText() => Text = new EzScoreText(ThemeName)
-        {
-        };
+        protected override IHasText CreateText() => Text = new EzScoreText(ThemeName);
     }
 }

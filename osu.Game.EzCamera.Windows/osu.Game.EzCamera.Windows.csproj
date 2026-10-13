@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>osu.Game.EzCamera.Windows</RootNamespace>
+    <Description>Windows MediaCapture backend for the Ez camera HUD.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\osu.Game\osu.Game.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))">
+    <Compile Remove="WindowsEzCameraService.cs" />
+  </ItemGroup>
+
+  <Target Name="CopyWinRTProjection" AfterTargets="Build" Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <ItemGroup>
+      <_WinRTRuntime Include="$(NuGetPackageRoot)microsoft.windows.sdk.net.ref\*\lib\net8.0\Microsoft.Windows.SDK.NET.dll" />
+      <_WinRTRuntime Include="$(NuGetPackageRoot)microsoft.windows.sdk.net.ref\*\lib\net8.0\WinRT.Runtime.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_WinRTRuntime)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

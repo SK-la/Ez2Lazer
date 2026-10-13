@@ -14,10 +14,12 @@ using osu.Framework.Input;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Layout;
+using osu.Framework.Logging;
 using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.Database;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
 using osu.Game.EzOsuGame.Edit;
@@ -73,6 +75,14 @@ namespace osu.Game.Overlays.SkinEditor
 
         [Resolved]
         private IBindable<WorkingBeatmap> beatmap { get; set; } = null!;
+
+        [Resolved]
+        private BeatmapManager beatmaps { get; set; } = null!;
+
+        [Resolved]
+        private RealmAccess realm { get; set; } = null!;
+
+        private EzSkinEditorBeatmapPicker? beatmapPicker;
 
         protected OsuScreen? LastTargetScreen;
         private InvokeOnDisposal? nestedInputManagerDisable;
@@ -196,44 +206,95 @@ namespace osu.Game.Overlays.SkinEditor
                 if (State.Value != Visibility.Visible)
                     return;
 
-                if (beatmap.Value is DummyWorkingBeatmap)
-                {
-                    // presume we don't have anything good to play and just bail.
-                    return;
-                }
-
-                // If we're playing the intro, switch away to another beatmap.
-                if (beatmap.Value.BeatmapSetInfo.Protected)
-                {
-                    if (!attemptedBeatmapSwitch)
-                    {
-                        music.NextTrack();
-                        Schedule(() => presentGameplay(true));
-                    }
-
-                    return;
-                }
-
                 if (screen is Player)
                     return;
 
-                // the validity of the current game-wide beatmap + ruleset combination is enforced by song select.
-                // if we're anywhere else, the state is unknown and may not make sense, so forcibly set something that does.
+                // Song select already holds a valid beatmap and ruleset pair, including converts.
+                // Anywhere else, the global track may still be the intro, so choose a beatmap for the active ruleset.
                 if (screen is not SoloSongSelect)
-                    ruleset.Value = beatmap.Value.BeatmapInfo.Ruleset;
-                var replayGeneratingMod = ruleset.Value.CreateInstance().GetAutoplayMod();
+                {
+                    if (!tryUseBeatmapForActiveRuleset())
+                        return;
+                }
+                else if (!ensureCurrentBeatmapPlayable(attemptedBeatmapSwitch))
+                    return;
 
-                IReadOnlyList<Mod> usableMods = mods.Value;
+                if (ruleset.Value?.Available != true)
+                    return;
 
-                if (replayGeneratingMod != null)
-                    usableMods = usableMods.Append(replayGeneratingMod).ToArray();
+                ModAutoplay? replayGeneratingMod;
+
+                try
+                {
+                    replayGeneratingMod = ruleset.Value.CreateInstance().GetAutoplayMod();
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Skin editor skipped gameplay for ruleset '{ruleset.Value.ShortName}': {e.Message}");
+                    return;
+                }
+
+                if (replayGeneratingMod == null)
+                    return;
+
+                IReadOnlyList<Mod> usableMods = mods.Value.Append(replayGeneratingMod).ToArray();
 
                 if (!ModUtils.CheckCompatibleSet(usableMods, out var invalid))
                     mods.Value = mods.Value.Except(invalid).ToArray();
 
-                if (replayGeneratingMod != null)
-                    screen.Push(new EndlessPlayer(replayGeneratingMod.CreateScoreFromReplayData));
+                screen.Push(new EndlessPlayer(replayGeneratingMod.CreateScoreFromReplayData));
             }, new[] { typeof(Player), typeof(SoloSongSelect) });
+        }
+
+        private bool tryUseBeatmapForActiveRuleset()
+        {
+            if (ruleset.Value is not RulesetInfo active || !active.Available)
+                return false;
+
+            if (isPlayableForRuleset(beatmap.Value, active))
+                return true;
+
+            beatmapPicker ??= new EzSkinEditorBeatmapPicker(realm, beatmaps);
+
+            if (!beatmapPicker.TryPickRandom(active, out var working) || working is not WorkingBeatmap picked)
+                return false;
+
+            if (beatmap is not Bindable<WorkingBeatmap> writable || writable.Disabled)
+                return false;
+
+            writable.Value = picked;
+            return isPlayableForRuleset(picked, active);
+        }
+
+        private bool ensureCurrentBeatmapPlayable(bool attemptedBeatmapSwitch)
+        {
+            if (beatmap.Value is DummyWorkingBeatmap)
+                return false;
+
+            if (!beatmap.Value.BeatmapSetInfo.Protected)
+                return true;
+
+            if (!attemptedBeatmapSwitch)
+            {
+                music.NextTrack();
+                Schedule(() => presentGameplay(true));
+            }
+
+            return false;
+        }
+
+        private static bool isPlayableForRuleset(WorkingBeatmap working, RulesetInfo active)
+        {
+            if (working is DummyWorkingBeatmap)
+                return false;
+
+            if (working.BeatmapSetInfo.Protected)
+                return false;
+
+            if (!active.Equals(working.BeatmapInfo.Ruleset))
+                return false;
+
+            return working.BeatmapInfo.TotalObjectCount != 0;
         }
 
         protected override void Update()

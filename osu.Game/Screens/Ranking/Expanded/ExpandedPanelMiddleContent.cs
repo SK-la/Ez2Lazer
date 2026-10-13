@@ -12,6 +12,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Scoring.Bonus;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -87,6 +88,8 @@ namespace osu.Game.Screens.Ranking.Expanded
             statisticDisplays.AddRange(topStatistics);
             statisticDisplays.AddRange(bottomStatistics);
 
+            bool hasEzBonus = EzScoreBonusTracker.AppliesTo(score);
+
             AddInternal(new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.Both,
@@ -110,7 +113,7 @@ namespace osu.Game.Screens.Ranking.Expanded
                                 Origin = Anchor.TopCentre,
                                 Margin = new MarginPadding { Top = 40 },
                                 RelativeSizeAxes = Axes.X,
-                                Height = 230,
+                                Height = hasEzBonus ? 230 - EzScoreBonusBreakdown.HEIGHT : 230,
                                 Child = new AccuracyCircle(score, withFlair)
                                 {
                                     Anchor = Anchor.Centre,
@@ -126,6 +129,7 @@ namespace osu.Game.Screens.Ranking.Expanded
                                 Alpha = 0,
                                 AlwaysPresent = true
                             },
+                            hasEzBonus ? new EzScoreBonusBreakdown(score) : Empty(),
                             new FillFlowContainer
                             {
                                 Anchor = Anchor.TopCentre,

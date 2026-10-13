@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
 
@@ -41,7 +42,7 @@ namespace osu.Game.EzOsuGame
         private readonly IResourceStore<byte[]>? embeddedRoot;
 
         private readonly ConcurrentDictionary<string, EzResourceDirectory> directories = new ConcurrentDictionary<string, EzResourceDirectory>(StringComparer.OrdinalIgnoreCase);
-        private readonly object embeddedLock = new object();
+        private readonly Lock embeddedLock = new Lock();
         private Dictionary<string, List<string>>? embeddedFiles;
 
         /// <param name="userRoot">用户 <c>EzResources</c> 存储根；可为 <c>null</c>。</param>
@@ -122,7 +123,7 @@ namespace osu.Game.EzOsuGame
             }
         }
 
-        internal static int extensionRank(string fileName)
+        internal static int ExtensionRank(string fileName)
         {
             int dot = fileName.LastIndexOf('.');
 
@@ -148,7 +149,8 @@ namespace osu.Game.EzOsuGame
     internal sealed class EzResourceDirectory
     {
         private readonly Dictionary<string, string> exact = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, EzFrameGroup> frames = new Dictionary<string, EzFrameGroup>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, EzFrameGroup> frames1 = new Dictionary<string, EzFrameGroup>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, EzFrameGroup> frames3 = new Dictionary<string, EzFrameGroup>(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> subdirectories = new List<string>();
         private readonly List<(string Name, int Root)> pendingFiles = new List<(string Name, int Root)>();
         private readonly List<string> imageKeys = new List<string>();
@@ -157,7 +159,8 @@ namespace osu.Game.EzOsuGame
         private readonly HashSet<string> registeredKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         private string[] prefixes = Array.Empty<string>();
-        private EzFrameGroup? bestFrames;
+        private EzFrameGroup? frozenHyphen1;
+        private EzFrameGroup? frozenHyphen3;
         private bool frozen;
 
         public EzResourceDirectory(string directory)
@@ -182,30 +185,27 @@ namespace osu.Game.EzOsuGame
         public bool TryGetExact(string name, [NotNullWhen(true)] out string? key) => exact.TryGetValue(name, out key);
 
         /// <summary>
-        /// 按前缀取帧组。模板里写的补零位数不参与匹配——磁盘上是几位就按几位成组，故 <c>{0}</c> 与 <c>{000}</c> 都能吃下。
+        /// 按前缀和帧号宽度取一组。<paramref name="width"/> 只认 1（<c>{0}</c>）和 3（<c>{000}</c>）。
         /// </summary>
-        public bool TryGetFrames(string prefix, [NotNullWhen(true)] out EzFrameGroup? group) => frames.TryGetValue(prefix, out group);
-
-        /// <summary>取满足 <paramref name="accept"/> 的一组（并列取补零宽度更窄者、再按前缀序）；不比较帧数。</summary>
-        /// <param name="accept">前缀过滤器；<c>null</c> 表示接受任意前缀。</param>
-        /// <param name="group">选中的组；无满足条件者时为 <c>null</c>。</param>
-        public bool TryGetBestFrames(Func<string, bool>? accept, [NotNullWhen(true)] out EzFrameGroup? group)
+        public bool TryGetFrames(string prefix, int width, [NotNullWhen(true)] out EzFrameGroup? group)
         {
-            group = null;
+            Dictionary<string, EzFrameGroup>? table = tableFor(width);
 
-            if (bestFrames != null && (accept == null || accept(bestFrames.Prefix)))
+            if (table == null)
             {
-                group = bestFrames;
-                return true;
+                group = null;
+                return false;
             }
 
-            foreach (EzFrameGroup candidate in frames.Values)
-            {
-                if (accept != null && !accept(candidate.Prefix))
-                    continue;
+            return table.TryGetValue(prefix, out group);
+        }
 
-                group = isBetter(candidate, group) ? candidate : group;
-            }
+        /// <summary>
+        /// 该目录冻结时定下的连字符前缀组（空前缀除外）。请求时不再扫描全部前缀。
+        /// </summary>
+        public bool TryGetFrozenHyphenFrames(int width, [NotNullWhen(true)] out EzFrameGroup? group)
+        {
+            group = width == 1 ? frozenHyphen1 : width == 3 ? frozenHyphen3 : null;
 
             return group != null;
         }
@@ -248,16 +248,55 @@ namespace osu.Game.EzOsuGame
             }
 
             pendingFiles.Clear();
+            freezeFrames();
+        }
 
-            if (frames.Count > 0)
+        private void freezeFrames()
+        {
+            var prefixSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            collectPrefixes(frames1, prefixSet);
+            collectPrefixes(frames3, prefixSet);
+
+            prefixes = new string[prefixSet.Count];
+            prefixSet.CopyTo(prefixes);
+            Array.Sort(prefixes, StringComparer.OrdinalIgnoreCase);
+
+            frozenHyphen1 = pickFrozenHyphen(frames1);
+            frozenHyphen3 = pickFrozenHyphen(frames3);
+        }
+
+        private static void collectPrefixes(Dictionary<string, EzFrameGroup> table, HashSet<string> prefixSet)
+        {
+            foreach (string prefix in table.Keys)
+                prefixSet.Add(prefix);
+        }
+
+        private static EzFrameGroup? pickFrozenHyphen(Dictionary<string, EzFrameGroup> table)
+        {
+            EzFrameGroup? picked = null;
+
+            foreach (EzFrameGroup candidate in table.Values)
             {
-                prefixes = new string[frames.Count];
-                frames.Keys.CopyTo(prefixes, 0);
-                Array.Sort(prefixes, StringComparer.OrdinalIgnoreCase);
+                if (!isHyphenPrefix(candidate.Prefix))
+                    continue;
 
-                foreach (EzFrameGroup group in frames.Values)
-                    bestFrames = isBetter(group, bestFrames) ? group : bestFrames;
+                if (picked == null || string.Compare(candidate.Prefix, picked.Prefix, StringComparison.OrdinalIgnoreCase) < 0)
+                    picked = candidate;
             }
+
+            return picked;
+        }
+
+        private Dictionary<string, EzFrameGroup>? tableFor(int width)
+        {
+            if (width == 1)
+                return frames1;
+
+            if (width == 3)
+                return frames3;
+
+            return null;
         }
 
         // 取像键：默认去掉后缀（加载链自会补 png/jpg 探针），仅加载链探不到的格式保留真实文件名。
@@ -276,18 +315,16 @@ namespace osu.Game.EzOsuGame
         {
             string stem = EzResourcePath.Stem(fileName);
 
-            if (stem.Length > 0 && !exact.ContainsKey(stem))
-                exact.Add(stem, key);
+            if (stem.Length > 0)
+                exact.TryAdd(stem, key);
 
-            if (!string.Equals(fileName, stem, StringComparison.Ordinal) && !exact.ContainsKey(fileName))
-                exact.Add(fileName, key);
+            if (!string.Equals(fileName, stem, StringComparison.Ordinal))
+                exact.TryAdd(fileName, key);
         }
 
         private void registerFrame(string fileName, string key)
         {
             string stem = EzResourcePath.Stem(fileName);
-
-            // 末尾连续的 ASCII 数字即帧号，其前为前缀（可为空，如裸数字文件名 000.png）。
             int digitsStart = stem.Length;
 
             while (digitsStart > 0 && char.IsAsciiDigit(stem[digitsStart - 1]))
@@ -299,29 +336,43 @@ namespace osu.Game.EzOsuGame
             string prefix = stem[..digitsStart];
             string digits = stem[digitsStart..];
 
+            if (prefix.Length > 0 && !isHyphenPrefix(prefix))
+                return;
+
             if (!int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out int index))
                 return;
 
-            if (frames.TryGetValue(prefix, out EzFrameGroup? existing))
+            int width = frameWidth(digits);
+
+            if (width == 0)
+                return;
+
+            Dictionary<string, EzFrameGroup> table = width == 3 ? frames3 : frames1;
+
+            if (table.TryGetValue(prefix, out EzFrameGroup? existing))
             {
-                existing.Add(index, key, digits.Length);
+                existing.Add(index, key, width);
                 return;
             }
 
-            var group = new EzFrameGroup(prefix, digits.Length);
-            group.Add(index, key, digits.Length);
-            frames[prefix] = group;
+            var group = new EzFrameGroup(prefix, width);
+            group.Add(index, key, width);
+            table[prefix] = group;
         }
 
-        private static bool isBetter(EzFrameGroup candidate, EzFrameGroup? current)
+        private static bool isHyphenPrefix(string prefix)
+            => prefix.Length > 0 && (prefix[^1] == '-' || prefix[^1] == '_');
+
+        // {000} 是恰好三位。{0} 是不补零：一位，或更长且没有前导 0（10、11）。{00} 不建组。
+        private static int frameWidth(string digits)
         {
-            if (current == null)
-                return true;
+            if (digits.Length == 3)
+                return 3;
 
-            if (candidate.Width != current.Width)
-                return candidate.Width < current.Width;
+            if (digits.Length == 1 || digits[0] != '0')
+                return 1;
 
-            return string.CompareOrdinal(candidate.Prefix, current.Prefix) < 0;
+            return 0;
         }
 
         // 先按根优先级（用户覆盖内置），再按后缀优先级（同名时 png 胜出），最后按名忽略大小写。
@@ -332,14 +383,14 @@ namespace osu.Game.EzOsuGame
             if (byRoot != 0)
                 return byRoot;
 
-            int byExtension = EzResourceDirectoryIndex.extensionRank(a.Name).CompareTo(EzResourceDirectoryIndex.extensionRank(b.Name));
+            int byExtension = EzResourceDirectoryIndex.ExtensionRank(a.Name).CompareTo(EzResourceDirectoryIndex.ExtensionRank(b.Name));
 
             return byExtension != 0 ? byExtension : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
         }
     }
 
     /// <summary>
-    /// 同一前缀下、按帧号升序的一组帧；<see cref="Width"/> 为该组帧号观察到的最窄补零宽度。
+    /// 同一前缀、同一帧号宽度下按帧号升序的一组帧。宽度只有 1 和 3。
     /// </summary>
     internal sealed class EzFrameGroup
     {
@@ -369,8 +420,7 @@ namespace osu.Game.EzOsuGame
             if (width < Width)
                 Width = width;
 
-            if (!byIndex.ContainsKey(index))
-                byIndex.Add(index, key);
+            byIndex.TryAdd(index, key);
         }
     }
 }

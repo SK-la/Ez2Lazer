@@ -14,6 +14,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -26,9 +27,9 @@ namespace osu.Game.Screens.Footer
 {
     public partial class ScreenFooterButton : OsuClickableContainer, IKeyBindingHandler<GlobalAction>
     {
-        public const int CORNER_RADIUS = 10;
+        public static float CORNER_RADIUS => EzUIStyleV1.CORNER_RADIUS_FOOTER;
 
-        public const int HEIGHT = 75;
+        public static int HEIGHT => 52;
         protected const int BUTTON_WIDTH = 116;
 
         /// <summary>
@@ -143,7 +144,7 @@ namespace osu.Game.Screens.Footer
                                 {
                                     Anchor = Anchor.TopCentre,
                                     Origin = Anchor.TopCentre,
-                                    Y = 35,
+                                    Y = -25,
                                     AutoSizeAxes = Axes.Both,
                                     Child = text = new OsuSpriteText
                                     {
@@ -153,8 +154,8 @@ namespace osu.Game.Screens.Footer
                                 },
                                 icon = new SpriteIcon
                                 {
-                                    Y = 10,
-                                    Size = new Vector2(16),
+                                    Y = 12.5f,
+                                    Size = new Vector2(22),
                                     Anchor = Anchor.TopCentre,
                                     Origin = Anchor.TopCentre
                                 },
@@ -172,6 +173,7 @@ namespace osu.Game.Screens.Footer
                             Child = bar = new Box
                             {
                                 RelativeSizeAxes = Axes.Both,
+                                Alpha = 0
                             }
                         },
                         flashLayer = new Box
@@ -237,6 +239,8 @@ namespace osu.Game.Screens.Footer
             Color4 backgroundColour = OverlayState.Value == Visibility.Visible ? buttonAccentColour : colourProvider.Background3;
             Color4 textColour = OverlayState.Value == Visibility.Visible ? colourProvider.Background6 : colourProvider.Content1;
             Color4 accentColour = OverlayState.Value == Visibility.Visible ? colourProvider.Background6 : buttonAccentColour;
+
+            bar.Alpha = IsHovered ? 1 : 0;
 
             if (!Enabled.Value)
                 backgroundColour = backgroundColour.Darken(1f);

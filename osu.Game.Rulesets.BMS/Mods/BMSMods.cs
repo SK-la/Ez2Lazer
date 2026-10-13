@@ -42,7 +42,7 @@ namespace osu.Game.Rulesets.BMS.Mods
         public override ModReplayData CreateReplayData(IBeatmap beatmap, IReadOnlyList<Mod> mods)
         {
             if (BmsRuntimeAudioContext.PreferNativeAutoplayReplay)
-                return new ModReplayData(new BMSAutoGenerator(beatmap).Generate(), new ModCreatedUser { Username = @"osu!topus" });
+                return new ModReplayData(new BMSAutoGenerator(beatmap).Generate(), new ModCreatedUser { Username = @"bms topus" });
 
             ManiaBeatmap mania = beatmap as ManiaBeatmap ?? ManiaConvertedWorkingBeatmap.ConvertToManiaBeatmap(beatmap);
             return new ManiaModAutoplay().CreateReplayData(mania, mods);

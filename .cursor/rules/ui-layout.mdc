@@ -1,0 +1,21 @@
+---
+description: osu!framework 布局约束。违反会在布局阶段崩溃
+globs:
+  - "**/*Drawable*.cs"
+  - "**/*Overlay*.cs"
+  - "**/*Screen*.cs"
+  - "**/UI/**/*.cs"
+  - "**/Graphics/**/*.cs"
+alwaysApply: false
+---
+
+# osu!framework 布局
+
+- 连续排列用 FillFlow，左右分列用 Container，表格用 Grid。
+- 圆角裁切：在有背景 Box 的那一层设置 Masking 和 CornerRadius。
+- 同一 FillFlow 里，子项在流动轴上的 Anchor 必须一致。不用 FillFlow 做左右分列。
+- 同一轴上不要同时 AutoSize 和固定 Width 或 Height。
+- FillFlow 子项的 RelativeSizeAxes 不得和父级 AutoSizeAxes 冲突。
+- 多列均分用显式 Width 或 GridContainer。
+- 一次只改一个布局关切。改前读同模块现有布局。改完写明锚点与 AutoSize 的检查结果。
+- 开发期调试尺寸不写常量，优先 => value，适合热重载的写法。

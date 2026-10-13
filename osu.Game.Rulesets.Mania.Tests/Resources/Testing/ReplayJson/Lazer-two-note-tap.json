@@ -1,0 +1,17 @@
+{
+  "hitMode": "Lazer",
+  "healthMode": "Lazer",
+  "judgePrecedence": "Earliest",
+  "columns": 4,
+  "frameSource": "synthetic-subms",
+  "hitObjects": [
+    { "type": "Note", "time": 1000.25, "column": 0 },
+    { "type": "Note", "time": 2000.75, "column": 0 }
+  ],
+  "frames": [
+    { "t": 900.1, "keys": 1 },
+    { "t": 1100.2, "keys": 0 },
+    { "t": 1900.3, "keys": 1 },
+    { "t": 2100.4, "keys": 0 }
+  ]
+}

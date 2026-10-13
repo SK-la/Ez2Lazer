@@ -23,8 +23,13 @@ namespace osu.Game.EzOsuGame
         #region 层2 公开动画加载
 
         /// <summary>
-        /// 按请求加载动画：命中多帧返回 <see cref="TextureAnimation"/>，单帧返回 <see cref="Sprite"/>，无资源返回 <c>null</c>。
+        /// 按请求加载动画。多帧返回 <see cref="TextureAnimation"/>，单帧返回 <see cref="Sprite"/>，没有资源返回 <c>null</c>。
         /// </summary>
+        /// <remarks>
+        /// 调用方只交 <see cref="EzAnimationRequest"/>。<see cref="EzAnimationRequest.FrameTemplate"/> 为空时走层 1 到层 4；
+        /// 非空时只查该模板，失败后按名字取单图，不回到层 1 和层 2。
+        /// 解码原语是 <see cref="Get(string, EzTextureUsage)"/>，字形用 <see cref="GetGlyph"/>。判定以外的 HUD 不传帧模板。
+        /// </remarks>
         /// <param name="request">帧加载请求；见 <see cref="EzAnimationRequest"/>。</param>
         /// <param name="looping">多帧时是否循环。</param>
         /// <param name="startAtCurrentTime">多帧是否从当前时钟位置起播。</param>
@@ -34,7 +39,7 @@ namespace osu.Game.EzOsuGame
             => createAnimationDrawable(GetTextureFrames(request), looping, startAtCurrentTime, frameLength, isPlaying);
 
         /// <summary>
-        /// <see cref="GetAnimation(EzAnimationRequest, bool, bool, double?, bool)"/> 的路径快捷重载，用默认三模板解析。
+        /// 不带帧模板的快捷方式，走层 1 到层 4。判定 HUD 不要用这个重载，改交 <see cref="EzAnimationRequest"/>。
         /// </summary>
         /// <param name="path">EzResources 相对路径，末段即资源名。</param>
         public Drawable? GetAnimation(string path, bool looping = true, bool startAtCurrentTime = true, double? frameLength = null, bool isPlaying = true)
@@ -178,96 +183,167 @@ namespace osu.Game.EzOsuGame
             return frameSets.GetOrAdd(request, buildFrameSet(request));
         }
 
+        private static readonly int[] frame_widths = { 3, 1 };
+
+        private static readonly string[] default_separators = { "-", "_" };
+
         private EzFrameSet buildFrameSet(EzAnimationRequest request)
         {
             EzResourcePath.Split(request.Path, out string directory, out string name);
 
             if (name.Length == 0 || request.MaxFrames <= 0)
-                return EzFrameSet.Empty;
+                return EzFrameSet.EMPTY;
 
             string? template = string.IsNullOrWhiteSpace(request.FrameTemplate) ? null : request.FrameTemplate!.Trim();
 
             IReadOnlyList<string> keys = template == null
                 ? resolveDefaultKeys(request, directory, name)
-                : resolveTemplateKeys(request, directory, name, template);
+                : resolveCustomKeys(request, directory, name, template);
 
-            if (keys.Count == 0 && request.AllowSingleFallback)
-            {
-                string? single = resolveSingleKey(directory, name, template);
-
-                if (single != null)
-                    keys = new[] { single };
-            }
-
-            return keys.Count == 0 ? EzFrameSet.Empty : new EzFrameSet(keys);
+            return keys.Count == 0 ? EzFrameSet.EMPTY : new EzFrameSet(keys);
         }
 
-        // 三模板默认：子目录 → 同层 → 单图，命中即停；优先级固定，不按帧数比较。
+        // 无自定义模板：层1 子目录 → 层2 同层连字符 → 单图。命中即停。
         private IReadOnlyList<string> resolveDefaultKeys(EzAnimationRequest request, string directory, string name)
         {
-            // 模板3 子目录：[dir]/[name]/[前缀][连接符][数值]，连接符只认 - 与 _（纯数字文件名亦可，前缀为空）。
-            // 只用于多帧动画：{name}{数值} 这种没有连接符的命名不算帧组。
-            if (directoryIndex.Get(EzResourcePath.Combine(directory, name)).TryGetBestFrames(isFramePrefix, out EzFrameGroup? group))
-                return collectKeys(group, request.StartIndex, request.MaxFrames);
+            EzResourceDirectory subdirectory = directoryIndex.Get(EzResourcePath.Combine(directory, name));
+
+            foreach (int width in frame_widths)
+            {
+                IReadOnlyList<string>? bare = collectIfPresent(subdirectory, string.Empty, width, request);
+
+                if (bare != null)
+                    return bare;
+            }
+
+            foreach (int width in frame_widths)
+            {
+                IReadOnlyList<string>? hyphen = resolveHyphenFrames(subdirectory, name, width, request, allowFrozen: true);
+
+                if (hyphen != null)
+                    return hyphen;
+            }
 
             EzResourceDirectory parent = directoryIndex.Get(directory);
 
-            // 模板2 同层：[dir]/[name][连接符][数值]，连接符同样只认 - 与 _。
-            if (request.Separators is { Count: > 0 } separators)
+            foreach (int width in frame_widths)
             {
-                foreach (string separator in separators)
-                {
-                    if (parent.TryGetFrames(name + separator, out group))
-                        return collectKeys(group, request.StartIndex, request.MaxFrames);
-                }
+                IReadOnlyList<string>? sameLevel = resolveHyphenFrames(parent, name, width, request, allowFrozen: false);
 
-                return Array.Empty<string>();
+                if (sameLevel != null)
+                    return sameLevel;
             }
 
-            if (parent.TryGetFrames(name + "-", out group) || parent.TryGetFrames(name + "_", out group))
-                return collectKeys(group, request.StartIndex, request.MaxFrames);
-
-            // 模板1 单图由 AllowSingleFallback 处理
-            return Array.Empty<string>();
-        }
-
-        // 帧文件名的前缀：空（纯数字，如 note 的 000.png），或以连接符 - / _ 结尾。
-        private static bool isFramePrefix(string prefix)
-            => prefix.Length == 0 || prefix[^1] is '-' or '_';
-
-        private IReadOnlyList<string> resolveTemplateKeys(EzAnimationRequest request, string directory, string name, string template)
-        {
-            if (!trySplitFrameTemplate(template, out string prefixText))
+            if (!request.AllowSingleFallback)
                 return Array.Empty<string>();
 
+            return resolveSingle(directory, name);
+        }
+
+        // 自定义模板不走层 1–4。失败后按名字取单图，后缀不检查。
+        private IReadOnlyList<string> resolveCustomKeys(EzAnimationRequest request, string directory, string name, string template)
+        {
+            if (tryParseFrameTemplate(template, out string prefixText, out int width))
+            {
+                IReadOnlyList<string>? frames = lookupTemplateFrames(request, directory, name, template, prefixText, width);
+
+                if (frames != null)
+                    return frames;
+            }
+            else
+            {
+                string? exact = resolveUntemplatedImage(directory, name, template);
+
+                if (exact != null)
+                    return new[] { exact };
+            }
+
+            if (!request.AllowSingleFallback)
+                return Array.Empty<string>();
+
+            return resolveSingle(directory, name);
+        }
+
+        private IReadOnlyList<string>? resolveHyphenFrames(EzResourceDirectory directory, string name, int width, EzAnimationRequest request, bool allowFrozen)
+        {
+            foreach (string separator in separatorsOf(request))
+            {
+                IReadOnlyList<string>? named = collectIfPresent(directory, name + separator, width, request);
+
+                if (named != null)
+                    return named;
+            }
+
+            if (!allowFrozen || !directory.TryGetFrozenHyphenFrames(width, out EzFrameGroup? frozen))
+                return null;
+
+            if (!separatorAllowed(frozen.Prefix, request))
+                return null;
+
+            foreach (string separator in separatorsOf(request))
+            {
+                if (frozen.Prefix.Equals(name + separator, StringComparison.OrdinalIgnoreCase))
+                    return null;
+            }
+
+            return collectKeys(frozen, request.StartIndex, request.MaxFrames) is { Count: > 0 } keys ? keys : null;
+        }
+
+        private IReadOnlyList<string>? lookupTemplateFrames(EzAnimationRequest request, string directory, string name, string template, string prefixText, int width)
+        {
             string expandable = prefixText;
 
             if (!containsNamePlaceholder(template))
                 expandable = name + expandable;
 
-            string expanded = substituteName(expandable, name);
-
-            EzResourcePath.Split(expanded, out string prefixDirectory, out string prefix);
+            splitFramePrefix(substituteName(expandable, name), out string prefixDirectory, out string prefix);
 
             EzResourceDirectory target = directoryIndex.Get(EzResourcePath.Combine(directory, prefixDirectory));
 
-            return target.TryGetFrames(prefix, out EzFrameGroup? group)
-                ? collectKeys(group, request.StartIndex, request.MaxFrames)
-                : Array.Empty<string>();
+            return collectIfPresent(target, prefix, width, request);
         }
 
-        // 无多帧时回退单图：模板不含序号时先试模板文本（如 {name}_overlay），再回退资源名本身。
-        private string? resolveSingleKey(string directory, string name, string? template)
+        private string? resolveUntemplatedImage(string directory, string name, string template)
         {
-            if (template != null && !trySplitFrameTemplate(template, out _))
-            {
-                string expanded = substituteName(containsNamePlaceholder(template) ? template : name + template, name);
+            string expanded = substituteName(containsNamePlaceholder(template) ? template : name + template, name);
 
-                if (!string.Equals(expanded, name, StringComparison.Ordinal) && tryResolveExact(directory, expanded, out string? covered))
-                    return covered;
+            if (string.Equals(expanded, name, StringComparison.Ordinal))
+                return null;
+
+            return tryResolveExact(directory, expanded, out string? key) ? key : null;
+        }
+
+        // 同名不同后缀已在索引里只留一张。这里按名字取那张，不再看后缀。
+        private IReadOnlyList<string> resolveSingle(string directory, string name)
+        {
+            if (directoryIndex.Get(directory).TryGetExact(name, out string? key))
+                return new[] { key };
+
+            return Array.Empty<string>();
+        }
+
+        private IReadOnlyList<string>? collectIfPresent(EzResourceDirectory directory, string prefix, int width, EzAnimationRequest request)
+        {
+            if (!directory.TryGetFrames(prefix, width, out EzFrameGroup? group))
+                return null;
+
+            IReadOnlyList<string> keys = collectKeys(group, request.StartIndex, request.MaxFrames);
+
+            return keys.Count == 0 ? null : keys;
+        }
+
+        private static IReadOnlyList<string> separatorsOf(EzAnimationRequest request)
+            => request.Separators is { Count: > 0 } separators ? separators : default_separators;
+
+        private static bool separatorAllowed(string prefix, EzAnimationRequest request)
+        {
+            foreach (string separator in separatorsOf(request))
+            {
+                if (prefix.EndsWith(separator, StringComparison.Ordinal))
+                    return true;
             }
 
-            return tryResolveExact(directory, name, out string? key) ? key : null;
+            return false;
         }
 
         private bool tryResolveExact(string directory, string relativeName, [NotNullWhen(true)] out string? key)
@@ -283,11 +359,14 @@ namespace osu.Game.EzOsuGame
             return directoryIndex.Get(EzResourcePath.Combine(directory, subDirectory)).TryGetExact(fileName, out key);
         }
 
-        // 从分组里取连续帧：跳过起始帧号之前的部分，遇到断号即停（停帧令只取前半段）。
+        // 整组必须从 0 开始。断号即停。
         private static IReadOnlyList<string> collectKeys(EzFrameGroup group, int startIndex, int maxFrames)
         {
             IReadOnlyList<int> numbers = group.Numbers;
             IReadOnlyList<string> keys = group.Keys;
+
+            if (numbers.Count == 0 || numbers[0] != 0)
+                return Array.Empty<string>();
 
             int start = 0;
 
@@ -307,7 +386,7 @@ namespace osu.Game.EzOsuGame
             if (start == 0 && count == keys.Count)
                 return keys;
 
-            var slice = new string[count];
+            string[] slice = new string[count];
 
             for (int i = 0; i < count; i++)
                 slice[i] = keys[start + i];
@@ -372,15 +451,12 @@ namespace osu.Game.EzOsuGame
         #region 模板语法
 
         /// <summary>
-        /// 拆出序号占位符（<c>{0}</c> / <c>{00}</c> …）之前的文本；无序号时返回 <c>false</c>（该模板表达单图）。
+        /// 只认 <c>{0}</c> 与 <c>{000}</c>。<c>{00}</c> 不是帧号。占位符前的 <c>/</c> 是子目录，帧前缀为空。
         /// </summary>
-        /// <remarks>
-        /// 只认最后一个占位符且允许其后跟图片后缀（如 <c>frame_{0}.png</c>）：位数只作说明，
-        /// 实际宽度由磁盘分组决定；序号后还有其它文本的模板不当作帧模板，避免拼出永远不存在的键。
-        /// </remarks>
-        private static bool trySplitFrameTemplate(string template, out string prefixText)
+        private static bool tryParseFrameTemplate(string template, out string prefixText, out int width)
         {
             prefixText = string.Empty;
+            width = 0;
 
             if (string.IsNullOrEmpty(template))
                 return false;
@@ -398,11 +474,13 @@ namespace osu.Game.EzOsuGame
                 while (j < template.Length && template[j] == '0')
                     j++;
 
-                if (j == i + 1 || j >= template.Length || template[j] != '}')
+                int count = j - (i + 1);
+
+                if ((count != 1 && count != 3) || j >= template.Length || template[j] != '}')
                     continue;
 
                 open = i;
-                digits = j - (i + 1);
+                digits = count;
                 i = j;
             }
 
@@ -415,7 +493,20 @@ namespace osu.Game.EzOsuGame
                 return false;
 
             prefixText = template[..open];
+            width = digits;
             return true;
+        }
+
+        private static void splitFramePrefix(string expanded, out string directory, out string prefix)
+        {
+            if (expanded.EndsWith('/'))
+            {
+                directory = EzResourcePath.Normalise(expanded);
+                prefix = string.Empty;
+                return;
+            }
+
+            EzResourcePath.Split(expanded, out directory, out prefix);
         }
 
         private static bool containsNamePlaceholder(string template)
@@ -440,7 +531,7 @@ namespace osu.Game.EzOsuGame
     /// </summary>
     internal sealed class EzFrameSet
     {
-        public static readonly EzFrameSet Empty = new EzFrameSet(Array.Empty<string>());
+        public static readonly EzFrameSet EMPTY = new EzFrameSet(Array.Empty<string>());
 
         private Texture[]? textures;
 

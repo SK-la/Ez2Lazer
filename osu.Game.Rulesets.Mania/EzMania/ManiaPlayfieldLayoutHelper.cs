@@ -5,7 +5,9 @@ using System;
 using osu.Framework;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Skinning;
@@ -40,8 +42,6 @@ namespace osu.Game.Rulesets.Mania.EzMania
         /// </summary>
         public static void ApplyHitPositionPlacement(Drawable drawable, float hitPosition)
         {
-            drawable.Anchor = Anchor.BottomCentre;
-            drawable.Origin = Anchor.Centre;
             drawable.Position = new Vector2(0, -hitPosition);
         }
 
@@ -81,10 +81,7 @@ namespace osu.Game.Rulesets.Mania.EzMania
         /// <summary>
         /// Returns the effective hit position using the same rules as the in-game playfield.
         /// </summary>
-        public static float GetHitPosition(
-            ISkinSource skin,
-            bool hitPositionGlobalEnable,
-            double hitPosition)
+        public static float GetHitPosition(ISkinSource skin, bool hitPositionGlobalEnable, double hitPosition)
         {
             if (hitPositionGlobalEnable)
                 return (float)hitPosition;
@@ -101,10 +98,7 @@ namespace osu.Game.Rulesets.Mania.EzMania
         /// <param name="keyMode">The number of columns in the stage.</param>
         /// <param name="skin">The skin source.</param>
         /// <param name="skinManager">The skin manager.</param>
-        /// <param name="ezSkinConfig">The Ez skin configuration.</param>
-        /// <param name="columnWidth">Configured base column width.</param>
-        /// <param name="specialFactor">Configured special-column width factor.</param>
-        /// <param name="columnWidthStyle">Global column width style from Ez skin settings.</param>
+        /// <param name="ezSkinConfig">The Ez skin configuration. Column width, special factor, and width style are read from here.</param>
         /// <param name="mobileAdjust">Mobile landscape column scale factor.</param>
         /// <param name="applyGlobalWidthSettings">Whether to apply global width settings.</param>
         public static ManiaColumnSize CalculateColumnSize(
@@ -113,13 +107,12 @@ namespace osu.Game.Rulesets.Mania.EzMania
             ISkinSource skin,
             SkinManager skinManager,
             Ez2ConfigManager ezSkinConfig,
-            double columnWidth,
-            double specialFactor,
-            ColumnWidthStyle columnWidthStyle,
             float mobileAdjust,
             bool applyGlobalWidthSettings)
         {
             ArgumentOutOfRangeException.ThrowIfNegative(columnIndex);
+
+            double columnWidth = ezSkinConfig.Get<double>(Ez2Setting.ColumnWidth);
 
             if (!applyGlobalWidthSettings)
             {
@@ -149,14 +142,15 @@ namespace osu.Game.Rulesets.Mania.EzMania
             if (width == 0)
                 return ManiaColumnSize.Zero;
 
+            double specialFactor = ezSkinConfig.Get<double>(Ez2Setting.SpecialFactor);
+            ColumnWidthStyle columnWidthStyle = ezSkinConfig.Get<ColumnWidthStyle>(Ez2Setting.ColumnWidthStyle);
             bool isSpecialColumn = ezSkinConfig.IsSpecialColumnFast(keyMode, columnIndex);
             float ezWidth = (float)columnWidth * (isSpecialColumn ? (float)specialFactor : 1);
 
             switch (columnWidthStyle)
             {
                 case ColumnWidthStyle.EzSkinOnly:
-                    var skinInfoType = skinManager.CurrentSkinInfo.Value.GetType();
-                    if (skinInfoType == typeof(EzStyleProSkin) || skinInfoType == typeof(Ez2Skin) || skinInfoType == typeof(SbISkin))
+                    if (usesEzColumnWidth(skin, skinManager))
                         width = ezWidth;
                     break;
 
@@ -185,9 +179,6 @@ namespace osu.Game.Rulesets.Mania.EzMania
             ISkinSource skin,
             SkinManager skinManager,
             Ez2ConfigManager ezSkinConfig,
-            double columnWidth,
-            double specialFactor,
-            ColumnWidthStyle columnWidthStyle,
             float mobileAdjust,
             bool applyGlobalWidthSettings)
         {
@@ -201,14 +192,50 @@ namespace osu.Game.Rulesets.Mania.EzMania
                     skin,
                     skinManager,
                     ezSkinConfig,
-                    columnWidth,
-                    specialFactor,
-                    columnWidthStyle,
                     mobileAdjust,
                     applyGlobalWidthSettings).TotalWidth;
             }
 
             return totalWidth;
+        }
+
+        /// <summary>
+        /// Ez2Ac (10k2s1p) display column count. A 14-column stage renders as 13 when empty edge columns are skipped.
+        /// </summary>
+        public static int GetDisplayColumnCount(StageDefinition stage) => GetDisplayColumnCount(stage.Columns);
+
+        /// <summary>
+        /// Ez2Ac (10k2s1p) display column count. A 14-column stage renders as 13 when empty edge columns are skipped.
+        /// </summary>
+        public static int GetDisplayColumnCount(int logicalColumnCount)
+        {
+            if (logicalColumnCount <= 0)
+                return 0;
+
+            if (GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns) && logicalColumnCount == 14)
+                return 13;
+
+            return logicalColumnCount;
+        }
+
+        /// <summary>
+        /// Whether a beatmap column is past the on-screen column count and should not be rendered.
+        /// </summary>
+        public static bool ShouldSkipBeatmapColumn(StageDefinition stage, int beatmapColumnIndex)
+            => beatmapColumnIndex >= GetDisplayColumnCount(stage);
+
+        private static bool usesEzColumnWidth(ISkinSource skin, SkinManager skinManager)
+        {
+            foreach (var source in skin.AllSources)
+            {
+                if (source is EzStyleProSkin or Ez2Skin or SbISkin)
+                    return true;
+            }
+
+            string instantiationInfo = skinManager.CurrentSkinInfo.Value.PerformRead(s => s.InstantiationInfo);
+            return instantiationInfo == typeof(EzStyleProSkin).GetInvariantInstantiationInfo()
+                   || instantiationInfo == typeof(Ez2Skin).GetInvariantInstantiationInfo()
+                   || instantiationInfo == typeof(SbISkin).GetInvariantInstantiationInfo();
         }
     }
 }

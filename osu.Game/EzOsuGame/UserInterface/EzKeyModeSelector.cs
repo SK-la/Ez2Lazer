@@ -13,25 +13,78 @@ using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
+using osu.Game.Screens.Select;
+using osu.Game.Screens.Select.Filter;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.UserInterface
 {
     public partial class EzKeyModeSelector : CompositeDrawable
     {
-        private Bindable<string> keyModeId = new Bindable<string>();
+        private static readonly int[] all_items =
+        {
+            1, 2, 3,
+            4, 5, 6, 7, 8, 9, 10,
+            12, 14, 16, 18
+        };
+
+        public static List<int> GetModesForRuleset(int rulesetId)
+        {
+            if (rulesetId == 3)
+                return all_items.Where(v => v >= 4).ToList();
+
+            return all_items.Where(v => v <= 12).ToList();
+        }
+
+        public static IReadOnlyList<int> GetSelectedModeValues(int rulesetId, IEnumerable<string> selectedModeIds)
+        {
+            var selected = selectedModeIds as ICollection<string> ?? selectedModeIds.ToList();
+
+            if (selected.Count == 0)
+                return Array.Empty<int>();
+
+            return GetModesForRuleset(rulesetId)
+                   .Where(m => selected.Contains(m.ToString()))
+                   .ToList();
+        }
+
+        public void ApplyToFilterCriteria(FilterCriteria criteria)
+        {
+            int rulesetId = ruleset.Value.OnlineID;
+            var modes = GetSelectedModeValues(rulesetId, SelectedModeIds);
+
+            if (modes.Count == 0)
+                return;
+
+            if (rulesetId == 3)
+            {
+                criteria.RulesetCriteria?.TryParseCustomKeywordCriteria("keys", Operator.Equal, string.Join(",", modes));
+            }
+            else
+            {
+                criteria.CircleSize = new FilterCriteria.OptionalRange<float>
+                {
+                    Min = modes.Min() - 0.5f,
+                    Max = modes.Max() + 0.5f,
+                    IsLowerInclusive = false,
+                    IsUpperInclusive = false
+                };
+            }
+        }
+
         private readonly BindableBool isMultiSelectMode = new BindableBool(true);
-        private readonly Dictionary<int, HashSet<string>> modeSelections = new Dictionary<int, HashSet<string>>();
-        private int currentRulesetId = -1;
+        private Bindable<string> persistedSelections = null!;
+        private Dictionary<int, HashSet<string>> selectionsByRuleset = new Dictionary<int, HashSet<string>>();
+        private bool isWritingConfig;
 
         private ShearedButton labelButton = null!;
         private ShearedCsModeTabControl tabControl = null!;
-        private ShearedToggleButton multiSelectButton = null!;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
@@ -39,28 +92,23 @@ namespace osu.Game.EzOsuGame.UserInterface
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
 
-        public IBindable<string> Current => tabControl.Current;
+        public IBindable<string> Current => persistedSelections;
 
         public HashSet<string> SelectedModeIds { get; } = new HashSet<string>();
-
-        public void SetSelection(HashSet<string> modeIds)
-        {
-            SelectedModeIds.Clear();
-            SelectedModeIds.UnionWith(modeIds);
-        }
 
         public EzKeyModeSelector()
         {
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
-            CornerRadius = 8;
-            Masking = true;
             Shear = OsuGame.SHEAR;
         }
 
         [BackgroundDependencyLoader]
         private void load()
         {
+            CornerRadius = EzUIStyleV1.CORNER_RADIUS_CHIP;
+            Masking = true;
+
             InternalChildren = new Drawable[]
             {
                 new GridContainer
@@ -72,7 +120,6 @@ namespace osu.Game.EzOsuGame.UserInterface
                     {
                         new Dimension(GridSizeMode.AutoSize),
                         new Dimension(),
-                        new Dimension(GridSizeMode.AutoSize),
                     },
                     Content = new[]
                     {
@@ -88,135 +135,108 @@ namespace osu.Game.EzOsuGame.UserInterface
                                 Height = 30f,
                                 Shear = new Vector2(0),
                                 TooltipText = EzSongSelectStrings.CLEAR_SELECTION,
+                                Action = () => commitSelection(new HashSet<string>()),
                             },
                             tabControl = new ShearedCsModeTabControl
                             {
                                 RelativeSizeAxes = Axes.X,
                                 Shear = new Vector2(0),
                             },
-                            multiSelectButton = new ShearedToggleButton
-                            {
-                                Anchor = Anchor.Centre,
-                                Origin = Anchor.Centre,
-                                Shear = new Vector2(0),
-                                Text = "K +",
-                                Height = 30f,
-                                TooltipText = EzSongSelectStrings.MULTI_SELECT_BUTTON_TOOLTIP,
-                            }
                         }
                     }
                 }
             };
 
-            multiSelectButton.Active.BindTo(isMultiSelectMode);
+            persistedSelections = ezConfig.GetBindable<string>(Ez2Setting.EzSelectCsMode);
+            selectionsByRuleset = EzSelectCsModePersistence.Parse(persistedSelections.Value);
+            persistedSelections.BindValueChanged(onPersistedSelectionsChanged);
 
-            labelButton.Action = () =>
-            {
-                SelectedModeIds.Clear();
-                updateValue();
-            };
-
-            keyModeId = ezConfig.GetBindable<string>(Ez2Setting.EzSelectCsMode);
-            keyModeId.BindValueChanged(onSelectorChanged, true);
-
-            isMultiSelectMode.BindValueChanged(_ => updateValue(), true);
             ruleset.BindValueChanged(onRulesetChanged, true);
+            isMultiSelectMode.BindValueChanged(_ => commitSelection(copySelection()));
 
-            tabControl.Current.BindTarget = keyModeId;
+            tabControl.SelectionChanged = commitSelection;
+            tabControl.IsMultiSelectMode = true;
         }
 
-        private void onRulesetChanged(ValueChangedEvent<RulesetInfo> e)
+        private void onRulesetChanged(ValueChangedEvent<RulesetInfo> e) => applyRuleset(e.NewValue.OnlineID);
+
+        private void onPersistedSelectionsChanged(ValueChangedEvent<string> e)
         {
-            if (currentRulesetId >= 0)
-                modeSelections[currentRulesetId] = new HashSet<string>(SelectedModeIds);
+            if (isWritingConfig)
+                return;
 
-            int id = e.NewValue.OnlineID;
-            currentRulesetId = id;
+            selectionsByRuleset = EzSelectCsModePersistence.Parse(e.NewValue);
+            applyRuleset(ruleset.Value.OnlineID);
+        }
 
-            var validIds = CsItemIds.GetModesForRuleset(id)
-                                    .Select(m => m.Id)
-                                    .ToHashSet();
-
-            if (!modeSelections.TryGetValue(id, out var selectionForRuleset))
-                selectionForRuleset = parseModeIds(keyModeId.Value);
-
-            selectionForRuleset.IntersectWith(validIds);
-            SetSelection(selectionForRuleset);
-            modeSelections[id] = new HashSet<string>(selectionForRuleset);
-
-            if (id == 1) // Taiko
+        private void applyRuleset(int rulesetId)
+        {
+            if (rulesetId == 1)
             {
                 Hide();
-                SelectedModeIds.Clear();
+                replaceSelection(new HashSet<string>());
+                return;
             }
+
+            Show();
+            labelButton.Text = rulesetId == 3 ? "Keys" : "CS";
+
+            var validIds = getValidModeIdSet(rulesetId);
+            var stored = EzSelectCsModePersistence.GetSelection(selectionsByRuleset, rulesetId);
+            stored.IntersectWith(validIds);
+
+            replaceSelection(stored);
+            tabControl.UpdateForRuleset(rulesetId);
+            tabControl.UpdateTabItemUI(SelectedModeIds);
+        }
+
+        private void commitSelection(HashSet<string> modes)
+        {
+            replaceSelection(modes);
+
+            int rulesetId = ruleset.Value.OnlineID;
+
+            if (rulesetId == 1)
+                return;
+
+            if (SelectedModeIds.Count == 0)
+                selectionsByRuleset.Remove(rulesetId);
             else
             {
-                Show();
+                selectionsByRuleset[rulesetId] = copySelection();
+                selectionsByRuleset.Remove(EzSelectCsModePersistence.legacy_ruleset_key);
             }
 
-            tabControl.UpdateForRuleset(id);
-            labelButton.Text = id == 3 ? "Keys" : "CS";
-
-            updateValue();
+            writeConfig();
+            tabControl.UpdateTabItemUI(SelectedModeIds);
         }
 
-        private void onSelectorChanged(ValueChangedEvent<string> e)
+        private void writeConfig()
         {
-            var modes = parseModeIds(e.NewValue);
-            SetSelection(modes);
-            tabControl.UpdateTabItemUI(modes);
+            isWritingConfig = true;
+            persistedSelections.Value = EzSelectCsModePersistence.Serialize(selectionsByRuleset);
+            isWritingConfig = false;
         }
 
-        private void updateValue()
+        private void replaceSelection(HashSet<string> modeIds)
         {
-            int activeRulesetId = ruleset.Value.OnlineID;
-
-            if (!modeSelections.ContainsKey(activeRulesetId))
-                modeSelections[activeRulesetId] = new HashSet<string>();
-
-            HashSet<string> selectedModes = SelectedModeIds;
-
-            if (selectedModes.Count == 0)
-            {
-                keyModeId.Value = "";
-            }
-            else
-            {
-                if (isMultiSelectMode.Value)
-                {
-                    keyModeId.Value = string.Join(",", selectedModes.OrderBy(x => x));
-                }
-                else
-                {
-                    keyModeId.Value = selectedModes.First();
-                }
-            }
-
-            modeSelections[activeRulesetId] = new HashSet<string>(selectedModes);
-            tabControl.UpdateForRuleset(activeRulesetId);
-            tabControl.UpdateTabItemUI(selectedModes);
-            tabControl.IsMultiSelectMode = isMultiSelectMode.Value;
+            SelectedModeIds.Clear();
+            SelectedModeIds.UnionWith(modeIds);
         }
 
-        private HashSet<string> parseModeIds(string value)
-        {
-            if (string.IsNullOrEmpty(value))
-                return new HashSet<string>();
+        private HashSet<string> copySelection() => new HashSet<string>(SelectedModeIds);
 
-            return new HashSet<string>(value.Split(','));
-        }
+        private static HashSet<string> getValidModeIdSet(int rulesetId) =>
+            GetModesForRuleset(rulesetId).Select(m => m.ToString()).ToHashSet();
 
         public partial class ShearedCsModeTabControl : OsuTabControl<string>
         {
-            private HashSet<string> currentSelection = new HashSet<string>();
+            private HashSet<string> displayedSelection = new HashSet<string>();
             private int currentRulesetId = -1;
 
             public bool IsMultiSelectMode { get; set; }
 
-            public Action<HashSet<string>>? SetCurrentSelections;
-
-            // [Resolved]
-            // private OverlayColourProvider colourProvider { get; set; } = null!;
+            public Action<HashSet<string>>? SelectionChanged;
 
             public ShearedCsModeTabControl()
             {
@@ -231,7 +251,6 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 TabContainer.Anchor = Anchor.CentreLeft;
                 TabContainer.Origin = Anchor.CentreLeft;
-                // TabContainer.Shear = OsuGame.SHEAR;
                 TabContainer.RelativeSizeAxes = Axes.X;
                 TabContainer.AutoSizeAxes = Axes.Y;
                 TabContainer.Spacing = new Vector2(0f);
@@ -244,12 +263,10 @@ namespace osu.Game.EzOsuGame.UserInterface
 
                 currentRulesetId = rulesetId;
 
-                var keyModes = CsItemIds.GetModesForRuleset(rulesetId)
-                                        .Select(m => m.Id)
-                                        .ToList();
+                var keyModes = GetModesForRuleset(rulesetId);
 
                 TabContainer.Clear();
-                Items = keyModes;
+                Items = keyModes.Select(v => v.ToString()).ToList();
 
                 Schedule(() =>
                 {
@@ -264,20 +281,18 @@ namespace osu.Game.EzOsuGame.UserInterface
                     }
                 });
 
-                UpdateTabItemUI(currentSelection);
+                UpdateTabItemUI(displayedSelection);
             }
 
             public void UpdateTabItemUI(HashSet<string> selectedModes)
             {
+                displayedSelection = new HashSet<string>(selectedModes);
+
                 foreach (var tabItem in TabContainer.Children.Cast<ShearedCsModeTabItem>())
-                {
-                    bool isSelected = selectedModes.Contains(tabItem.Value);
-                    tabItem.UpdateButton(isSelected);
-                }
+                    tabItem.UpdateButton(selectedModes.Contains(tabItem.Value));
             }
 
             protected override Dropdown<string> CreateDropdown() => null!;
-            // protected override bool AddEnumEntriesAutomatically => false;
 
             protected override TabItem<string> CreateTabItem(string value)
             {
@@ -288,14 +303,12 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             private void onTabItemClicked(string mode)
             {
-                var newSelection = new HashSet<string>(currentSelection);
+                var newSelection = new HashSet<string>(displayedSelection);
 
                 if (!newSelection.Remove(mode))
                 {
                     if (IsMultiSelectMode)
-                    {
                         newSelection.Add(mode);
-                    }
                     else
                     {
                         newSelection.Clear();
@@ -303,11 +316,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                     }
                 }
 
-                currentSelection = newSelection;
-                Current.Value = newSelection.Count == 0 ? "" : string.Join(",", newSelection.OrderBy(x => x));
-                UpdateTabItemUI(newSelection);
-
-                SetCurrentSelections?.Invoke(newSelection);
+                SelectionChanged?.Invoke(newSelection);
             }
 
             public partial class ShearedCsModeTabItem : TabItem<string>
@@ -321,14 +330,9 @@ namespace osu.Game.EzOsuGame.UserInterface
                 public ShearedCsModeTabItem(string value)
                     : base(value)
                 {
-                    // Shear = OsuGame.SHEAR;
                     CornerRadius = ShearedButton.CORNER_RADIUS;
                     Masking = true;
-                    // Width = 40;
                     AutoSizeAxes = Axes.Y;
-                    Margin = new MarginPadding { Left = 4 };
-
-                    var modeInfo = CsItemIds.GetById(value);
 
                     InternalChildren = new Drawable[]
                     {
@@ -338,7 +342,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                         },
                         text = new OsuSpriteText
                         {
-                            Text = modeInfo?.DisplayName ?? value,
+                            Text = value,
                             Margin = new MarginPadding
                                 { Horizontal = 10f, Vertical = 7f },
                             Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
@@ -361,7 +365,6 @@ namespace osu.Game.EzOsuGame.UserInterface
                 {
                     base.LoadComplete();
                     if (Width > 40) Width = 40;
-                    // if (Width < 30) Width = 30;
                 }
 
                 public void UpdateButton(bool isSelected)

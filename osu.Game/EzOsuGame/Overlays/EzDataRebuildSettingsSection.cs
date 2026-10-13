@@ -64,8 +64,7 @@ namespace osu.Game.EzOsuGame.Overlays
         }
 
         /// <summary>
-        /// Note readout + refresh button for the chart skill chain. The readout measures itself as soon as the
-        /// settings panel is shown; the button only re-measures on demand (e.g. once a backfill has finished).
+        /// Note readout + refresh button for the chart skill chain. Measurement runs only when the user taps refresh.
         /// </summary>
         private static void addSkillDataStatus(
             SettingsSubsection subsection,
@@ -85,8 +84,7 @@ namespace osu.Game.EzOsuGame.Overlays
             refreshButton.Enabled.Value = skillStore != null;
             refreshButton.Action = statusNote.Measure;
 
-            // The note also measures on load; keep the button disabled while a measurement is in flight so the
-            // manual pass cannot stack on top of it.
+            // Keep the button disabled while a measurement is in flight.
             statusNote.Measuring.BindValueChanged(m => refreshButton.Enabled.Value = skillStore != null && !m.NewValue);
 
             subsection.Add(refreshButton);

@@ -70,6 +70,7 @@ namespace osu.Game.Screens.Select
         [Resolved]
         private EzAnalysisDatabase ezAnalysisDatabase { get; set; } = null!;
 
+        private FillFlowContainer panelMetaFlow = null!;
         private EzDisplayKpsGraph ezDisplayKpsGraph = null!;
         private EzDisplayKps ezDisplayKps = null!;
         private EzDisplayKpc ezDisplayKpc = null!;
@@ -199,58 +200,64 @@ namespace osu.Game.Screens.Select
                                 artistText = new OsuSpriteText
                                 {
                                     Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold),
-                                    Padding = new MarginPadding { Top = -2 },
+                                    Padding = new MarginPadding { Top = -2, Bottom = -2 },
                                 },
-                                new FillFlowContainer
+                                new Container
                                 {
-                                    Direction = FillDirection.Horizontal,
                                     AutoSizeAxes = Axes.Both,
-                                    Padding = new MarginPadding { Top = 2, Bottom = 2 },
                                     Children = new Drawable[]
                                     {
-                                        statusPill = new BeatmapSetOnlineStatusPill
+                                        panelMetaFlow = new FillFlowContainer
                                         {
-                                            Animated = false,
-                                            Origin = Anchor.BottomLeft,
-                                            Anchor = Anchor.BottomLeft,
-                                            TextSize = OsuFont.Style.Caption2.Size,
-                                            Margin = new MarginPadding { Right = 4f },
-                                        },
-                                        updateButton = new PanelUpdateBeatmapButton
-                                        {
-                                            Scale = new Vector2(0.8f),
-                                            Anchor = Anchor.BottomLeft,
-                                            Origin = Anchor.BottomLeft,
-                                            Margin = new MarginPadding { Right = 4f, Bottom = -1f },
-                                        },
-                                        keyCountText = new OsuSpriteText
-                                        {
-                                            Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
-                                            Anchor = Anchor.BottomLeft,
-                                            Origin = Anchor.BottomLeft,
-                                            Alpha = 0,
-                                        },
-                                        difficultyText = new OsuSpriteText
-                                        {
-                                            Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
-                                            Anchor = Anchor.BottomLeft,
-                                            Origin = Anchor.BottomLeft,
-                                            Margin = new MarginPadding { Right = 3f },
-                                        },
-                                        authorText = new OsuSpriteText
-                                        {
-                                            Colour = colourProvider.Content2,
-                                            Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold),
-                                            Anchor = Anchor.BottomLeft,
-                                            Origin = Anchor.BottomLeft
+                                            Direction = FillDirection.Horizontal,
+                                            AutoSizeAxes = Axes.Both,
+                                            Padding = new MarginPadding { Top = 2, Bottom = 2 },
+                                            Children = new Drawable[]
+                                            {
+                                                statusPill = new BeatmapSetOnlineStatusPill
+                                                {
+                                                    Animated = false,
+                                                    Origin = Anchor.BottomLeft,
+                                                    Anchor = Anchor.BottomLeft,
+                                                    TextSize = OsuFont.Style.Caption2.Size,
+                                                    Margin = new MarginPadding { Right = 4f },
+                                                },
+                                                updateButton = new PanelUpdateBeatmapButton
+                                                {
+                                                    Scale = new Vector2(0.8f),
+                                                    Anchor = Anchor.BottomLeft,
+                                                    Origin = Anchor.BottomLeft,
+                                                    Margin = new MarginPadding { Right = 4f, Bottom = -1f },
+                                                },
+                                                keyCountText = new OsuSpriteText
+                                                {
+                                                    Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
+                                                    Anchor = Anchor.BottomLeft,
+                                                    Origin = Anchor.BottomLeft,
+                                                    Alpha = 0,
+                                                },
+                                                difficultyText = new OsuSpriteText
+                                                {
+                                                    Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
+                                                    Anchor = Anchor.BottomLeft,
+                                                    Origin = Anchor.BottomLeft,
+                                                    Margin = new MarginPadding { Right = 3f },
+                                                },
+                                                authorText = new OsuSpriteText
+                                                {
+                                                    Colour = colourProvider.Content2,
+                                                    Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold),
+                                                    Anchor = Anchor.BottomLeft,
+                                                    Origin = Anchor.BottomLeft
+                                                },
+                                            }
                                         },
                                         ezDisplayKpsGraph = new EzDisplayKpsGraph
                                         {
+                                            ExcludeFromParentAutoSize = true,
+                                            OverlayAnchorRow = panelMetaFlow,
                                             Size = new Vector2(300, 20),
                                             Blending = BlendingParameters.Mixture,
-                                            Anchor = Anchor.BottomLeft,
-                                            Origin = Anchor.BottomLeft,
-                                            Margin = new MarginPadding { Left = 4f },
                                         },
                                     }
                                 },

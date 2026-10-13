@@ -143,7 +143,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private void onServerPresetChanged(ValueChangedEvent<ServerPreset> e)
         {
-            if (e.NewValue == ServerPreset.Official || e.NewValue == ServerPreset.Gu)
+            if (e.NewValue == ServerPreset.Official || e.NewValue == ServerPreset.g0v0)
                 dialogOverlay?.Push(new ConfirmDialog(server_preset_restart_prompt, () => game.Exit()));
         }
 

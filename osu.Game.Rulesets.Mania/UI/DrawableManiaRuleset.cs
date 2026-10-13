@@ -12,7 +12,6 @@ using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Input;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
-using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
@@ -26,9 +25,6 @@ using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.EzMania;
-#if DEBUG
-using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
-#endif
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
@@ -43,6 +39,11 @@ using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osuTK.Input;
+
+#if DEBUG
+using osu.Framework.Logging;
+using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
+#endif
 
 namespace osu.Game.Rulesets.Mania.UI
 {
@@ -390,19 +391,11 @@ namespace osu.Game.Rulesets.Mania.UI
         /// 重算并缓存判定线位置。只在皮肤或相关设置变化时调用。
         /// </summary>
         /// <remarks>
-        /// <see cref="updateTimeRange"/> 每帧都会被 <see cref="Update"/> 调到，而皮肤配置查询（<c>GetConfig</c>）
-        /// 需要构造 lookup 并走一遍皮肤配置链，放在每帧里纯属白烧。这里把结果缓存下来供其直接使用。
+        /// <see cref="updateTimeRange"/> 每帧都会被 <see cref="Update"/> 调到。判定线查询放在这里缓存，避免每帧走皮肤配置。
         /// </remarks>
         private void updateHitPosition()
         {
-            if (globalHitPosition.Value)
-                hitPosition = (float)hitPositonBindable.Value;
-            else
-            {
-                hitPosition = currentSkin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                                  new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
-                              ?? (float)hitPositonBindable.Value;
-            }
+            hitPosition = ManiaPlayfieldLayoutHelper.GetHitPosition(currentSkin, globalHitPosition.Value, hitPositonBindable.Value);
         }
 
         private void updateTimeRange()

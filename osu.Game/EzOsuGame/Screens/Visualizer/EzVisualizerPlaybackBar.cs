@@ -17,7 +17,6 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Database;
-using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.UI;
@@ -110,7 +109,7 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
                     Alpha = 0,
                     Children = new Drawable[]
                     {
-                        acrylicBackground = new EzAcrylicPanelBackground(EzAcrylicStyle.FooterVeil)
+                        acrylicBackground = new EzAcrylicPanelBackground(EzUIStyleV1.FooterVeil)
                         {
                             AcrylicCaptureVisible = false,
                         },

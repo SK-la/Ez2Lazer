@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -11,7 +12,13 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.IO;
+using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
+using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.Replays;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Scoring.Legacy;
@@ -20,142 +27,881 @@ using osu.Game.Tests.Beatmaps;
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 {
     /// <summary>
-    /// Mania osr 完整金标门禁。CI 断言解码后全部基线字段；Session 对齐用同一套金标（Explicit：纯净 master 已知小缺口）。
+    ///     Mania osr 双轨金标旁证（多谱面套件）——<b>不是</b>局内对齐门禁。
+    ///     <para>
+    ///     局内 Drawable ≡ Session 走高精度 JSON：
+    ///     <see cref="ManiaReplayJsonFixture"/> + <c>TestSceneReplaySessionParity.TestJson_*</c>。
+    ///     osr 为整数 ms Round，不能单独定责 Drawable/列管理器拆分。
+    ///     </para>
+    ///     <list type="bullet">
+    ///         <item>
+    ///             <b>Lazer Header</b>：冻结 osr 嵌入 Statistics / 分 / combo（解码 ≡ 嵌入）。
+    ///         </item>
+    ///         <item>
+    ///             <b>Lazer / Classic Session</b>：冻结<strong>现行</strong>
+    ///             <see cref="ManiaReplaySession"/> 产出（与局内对齐后的 Session）；
+    ///             与嵌入/stable 客户端数字可因整数帧与历史 LN 语义不同。
+    ///         </item>
+    ///     </list>
+    ///     套件：Hanatachi、PORTRAiT。Classic 主判定键门禁（不含 Ignore*）；Lazer Session 全量非零。
+    ///     高难度 LN 闭环仍用 <see cref="OsrAuditTest" /> + GramNibelungen23（勿当金标）。
     /// </summary>
     [TestFixture]
     public class ManiaOsrAuditAssertTest
     {
-        private const string report_file_name = "mania_osr_audit_assert.txt";
-        private const string osr_resource = "Resources/Testing/Replays/GramNibelungen23-53miss.osr";
-        private const string beatmap_resource = "Resources/Testing/Beatmaps/GramNibelungen23.osu";
-
-        private const string expected_beatmap_md5 = "3229df33df91aa3e83b4db14ee4cb4cb";
-        private const long expected_total_score = 764114;
-        private const int expected_max_combo = 715;
-        private const double expected_accuracy = 0.9340671270971999;
-        private const ScoreRank expected_rank = ScoreRank.A;
-        private const int expected_total_score_version = 30000019;
-        private const bool expected_is_legacy = false;
-
-        private static readonly IReadOnlyDictionary<HitResult, int> expected_statistics = new Dictionary<HitResult, int>
-        {
-            [HitResult.Miss] = 53,
-            [HitResult.Meh] = 54,
-            [HitResult.Ok] = 99,
-            [HitResult.Good] = 555,
-            [HitResult.Great] = 1984,
-            [HitResult.Perfect] = 3144,
-            [HitResult.IgnoreMiss] = 18,
-            [HitResult.IgnoreHit] = 4902,
-            [HitResult.ComboBreak] = 20,
-        };
-
         private static readonly DllResourceStore resources = new DllResourceStore(typeof(ManiaOsrAuditAssertTest).Assembly);
 
         [OneTimeSetUp]
-        public void OneTimeSetUp() => GlobalConfigStore.EnsureInitialized();
-
-        [Test]
-        public void AuditEmbeddedScoreHeaderMatchesAnchor()
+        public void OneTimeSetUp()
         {
-            assumeResourcesPresent();
-
-            var decoder = new HarnessScoreDecoder();
-            Score score;
-
-            using (var stream = resources.GetStream(osr_resource))
-                score = decoder.Parse(stream);
-
-            assertFullBaseline(score.ScoreInfo);
+            GlobalConfigStore.EnsureInitialized();
         }
 
-        [Test]
-        [Explicit("master 纯净环境实测 Session≠锚点。修判定后去掉 Explicit。")]
-        public void AuditEmbeddedScoreStatisticsMatchSession()
-        {
-            assumeResourcesPresent();
+        // ── Lazer 套件 ─────────────────────────────────────────────────────────
 
-            var decoder = new HarnessScoreDecoder();
+        // Header = osr 嵌入；Session* = 现行 ManiaReplaySession（局内对齐后，含整数帧量化缝）。
+        private static readonly AuditFixture lazer_hanatachi = new AuditFixture(
+            "Lazer-Hanatachi",
+            "Resources/Testing/Replays/ManiaAudit-Lazer-Hanatachi.osr",
+            "Resources/Testing/Beatmaps/ManiaAudit-Hanatachi.osu",
+            EzEnumHitMode.Lazer,
+            "29278f227275b1720e995d532130710b",
+            920155,
+            3451,
+            0.9801182063007212,
+            ScoreRank.S,
+            30000019,
+            false,
+            Array.Empty<string>(),
+            new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 15,
+                [HitResult.Meh] = 12,
+                [HitResult.Ok] = 22,
+                [HitResult.Good] = 148,
+                [HitResult.Great] = 1063,
+                [HitResult.Perfect] = 4182,
+                [HitResult.IgnoreMiss] = 5,
+                [HitResult.IgnoreHit] = 2093,
+                [HitResult.ComboBreak] = 8,
+            },
+            true,
+            true,
+            919507,
+            3451,
+            0.9799073387917894,
+            new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 17,
+                [HitResult.Meh] = 12,
+                [HitResult.Ok] = 21,
+                [HitResult.Good] = 147,
+                [HitResult.Great] = 1073,
+                [HitResult.Perfect] = 4172,
+                [HitResult.IgnoreMiss] = 6,
+                [HitResult.IgnoreHit] = 2091,
+                [HitResult.ComboBreak] = 9,
+            });
+
+        private static readonly AuditFixture lazer_portrait = new AuditFixture(
+            "Lazer-PORTRAiT",
+            "Resources/Testing/Replays/ManiaAudit-Lazer-PORTRAiT.osr",
+            "Resources/Testing/Beatmaps/ManiaAudit-PORTRAiT.osu",
+            EzEnumHitMode.Lazer,
+            "5737c0072e3c1319d95cf117b3f78648",
+            876539,
+            892,
+            0.9716775696247674,
+            ScoreRank.S,
+            30000019,
+            false,
+            Array.Empty<string>(),
+            new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 56,
+                [HitResult.Meh] = 24,
+                [HitResult.Ok] = 37,
+                [HitResult.Good] = 206,
+                [HitResult.Great] = 2224,
+                [HitResult.Perfect] = 4808,
+                [HitResult.IgnoreMiss] = 25,
+                [HitResult.IgnoreHit] = 5598,
+                [HitResult.ComboBreak] = 31,
+            },
+            true,
+            true,
+            874701,
+            892,
+            0.971189444004859,
+            new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 60,
+                [HitResult.Meh] = 24,
+                [HitResult.Ok] = 36,
+                [HitResult.Good] = 208,
+                [HitResult.Great] = 2198,
+                [HitResult.Perfect] = 4829,
+                [HitResult.IgnoreMiss] = 27,
+                [HitResult.IgnoreHit] = 5594,
+                [HitResult.ComboBreak] = 33,
+            });
+
+        public static IEnumerable<AuditFixture> LazerFixtures()
+        {
+            yield return lazer_hanatachi;
+            yield return lazer_portrait;
+        }
+
+        // Classic：Expected* = stable 二进制头旁证（本轨不做 Header 门禁）；Session* = 现行 Classic Session。
+        private static readonly AuditFixture classic_hanatachi = new AuditFixture(
+            "Classic-Hanatachi",
+            "Resources/Testing/Replays/ManiaAudit-Classic-Hanatachi.osr",
+            "Resources/Testing/Beatmaps/ManiaAudit-Hanatachi.osu",
+            EzEnumHitMode.Classic,
+            "29278f227275b1720e995d532130710b",
+            904544,
+            1728,
+            0.9774174631810525,
+            ScoreRank.S,
+            null,
+            true,
+            new[] { "CL" },
+            new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 36,
+                [HitResult.Meh] = 10,
+                [HitResult.Ok] = 9,
+                [HitResult.Good] = 103,
+                [HitResult.Great] = 808,
+                [HitResult.Perfect] = 3423,
+            },
+            false,
+            false,
+            905608,
+            1925,
+            0.9778267793703296,
+            new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 49,
+                [HitResult.Meh] = 14,
+                [HitResult.Ok] = 16,
+                [HitResult.Good] = 148,
+                [HitResult.Great] = 955,
+                [HitResult.Perfect] = 4260,
+            });
+
+        private static readonly AuditFixture classic_portrait = new AuditFixture(
+            "Classic-PORTRAiT",
+            "Resources/Testing/Replays/ManiaAudit-Classic-PORTRAiT.osr",
+            "Resources/Testing/Beatmaps/ManiaAudit-PORTRAiT.osu",
+            EzEnumHitMode.Classic,
+            "5737c0072e3c1319d95cf117b3f78648",
+            871917,
+            1340,
+            0.9669379597984128,
+            ScoreRank.S,
+            null,
+            true,
+            new[] { "CL" },
+            new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 38,
+                [HitResult.Meh] = 8,
+                [HitResult.Ok] = 15,
+                [HitResult.Good] = 190,
+                [HitResult.Great] = 1801,
+                [HitResult.Perfect] = 2476,
+            },
+            false,
+            false,
+            892585,
+            1328,
+            0.9742125538182642,
+            new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 60,
+                [HitResult.Meh] = 20,
+                [HitResult.Ok] = 33,
+                [HitResult.Good] = 273,
+                [HitResult.Great] = 2558,
+                [HitResult.Perfect] = 4411,
+            });
+
+        public static IEnumerable<AuditFixture> ClassicFixtures()
+        {
+            yield return classic_hanatachi;
+            yield return classic_portrait;
+        }
+
+        [TestCaseSource(nameof(LazerFixtures))]
+        public void AuditLazerEmbeddedScoreHeaderMatchesAnchor(AuditFixture fixture)
+        {
+            assertDecodedHeader(fixture);
+        }
+
+        [TestCaseSource(nameof(LazerFixtures))]
+        public void AuditLazerSessionMatchesAnchor(AuditFixture fixture)
+        {
+            assertSessionMatchesAnchor(fixture);
+        }
+
+        [TestCaseSource(nameof(ClassicFixtures))]
+        public void AuditClassicSessionMatchesAnchor(AuditFixture fixture)
+        {
+            assertSessionMatchesAnchor(fixture);
+        }
+
+        private static void assertDecodedHeader(AuditFixture fixture)
+        {
+            Assume.That(fixture.AssertDecodedHeader, "本夹具不以解码 Header 为门禁");
+            assumeResourcesPresent(fixture);
+
+            var decoder = new HarnessScoreDecoder(fixture.BeatmapResource);
             Score score;
 
-            using (var stream = resources.GetStream(osr_resource))
+            using (var stream = resources.GetStream(fixture.OsrResource))
                 score = decoder.Parse(stream);
 
-            assertFullBaseline(score.ScoreInfo);
+            assertAgainstAnchor(score.ScoreInfo, fixture, null, false);
+        }
+
+        private static void assertSessionMatchesAnchor(AuditFixture fixture)
+        {
+            assumeResourcesPresent(fixture);
+
+            var decoder = new HarnessScoreDecoder(fixture.BeatmapResource);
+            Score score;
+
+            using (var stream = resources.GetStream(fixture.OsrResource))
+                score = decoder.Parse(stream);
+
+            // Classic：丢弃 Lazer 解码嵌入 Statistics/分数，只保留 Replay 帧；Mods/HitMode 按静态契约注入。
+            if (!fixture.AssertDecodedHeader)
+                prepareScoreForClassicSession(score, fixture);
 
             var playable = decoder.LastWorkingBeatmap!.GetPlayableBeatmap(score.ScoreInfo.Ruleset, score.ScoreInfo.Mods);
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
+            // 金标环境固定：不得扫 JudgePrecedence / OffsetPlusMania。
+            var environment = ReplayJudgeTestConfig.Create(
+                fixture.HitMode,
+                EzEnumHealthMode.Lazer);
 
             ManiaReplaySession.Run(score, playable, environment);
 
-            string report = buildReport(score);
-            archiveReport(report);
-            assertFullBaseline(score.ScoreInfo, report);
+            string report = buildReport(score, fixture);
+            archiveReport(fixture, report);
+            assertAgainstAnchor(score.ScoreInfo, fixture, report, true);
         }
 
-        private static void assertFullBaseline(ScoreInfo info, string? report = null)
+        private static void prepareScoreForClassicSession(Score score, AuditFixture fixture)
         {
+            var ruleset = new ManiaRuleset();
+            score.ScoreInfo.Ruleset = ruleset.RulesetInfo;
+            score.ScoreInfo.Mods = resolveMods(ruleset, fixture.ExpectedModAcronyms);
+
+            // 不以 Lazer 解码的嵌入成绩为真；清空后由 Session PopulateScore 写回再对静态锚点。
+            score.ScoreInfo.Statistics = new Dictionary<HitResult, int>();
+            score.ScoreInfo.MaximumStatistics = new Dictionary<HitResult, int>();
+            score.ScoreInfo.TotalScore = 0;
+            score.ScoreInfo.MaxCombo = 0;
+            score.ScoreInfo.Accuracy = 0;
+            score.ScoreInfo.Rank = ScoreRank.D;
+            score.ScoreInfo.ManiaHitMode = (int)fixture.HitMode;
+            score.ScoreInfo.IsLegacyScore = fixture.ExpectedIsLegacy ?? true;
+        }
+
+        private static Mod[] resolveMods(Ruleset ruleset, IReadOnlyList<string> acronyms)
+        {
+            if (acronyms.Count == 0)
+                return Array.Empty<Mod>();
+
+            var all = ruleset.CreateAllMods().ToArray();
+            var resolved = new List<Mod>(acronyms.Count);
+
+            foreach (string acronym in acronyms)
+            {
+                var mod = all.FirstOrDefault(m => m.Acronym == acronym);
+                Assert.That(mod, Is.Not.Null, $"Ruleset 无 Mod {acronym}");
+                resolved.Add(mod!);
+            }
+
+            return resolved.ToArray();
+        }
+
+        private static void assertAgainstAnchor(ScoreInfo info, AuditFixture fixture, string? report, bool afterSession)
+        {
+            long expectedTotal = afterSession ? fixture.SessionTotalScore : fixture.ExpectedTotalScore;
+            int expectedCombo = afterSession ? fixture.SessionMaxCombo : fixture.ExpectedMaxCombo;
+            double expectedAcc = afterSession ? fixture.SessionAccuracy : fixture.ExpectedAccuracy;
+            var expectedStats = afterSession ? fixture.SessionStatistics : fixture.ExpectedStatistics;
+
             Assert.Multiple(() =>
             {
-                Assert.That(info.BeatmapInfo?.MD5Hash, Is.EqualTo(expected_beatmap_md5), report);
-                Assert.That(info.TotalScore, Is.EqualTo(expected_total_score), report);
-                Assert.That(info.MaxCombo, Is.EqualTo(expected_max_combo), report);
-                Assert.That(info.Accuracy, Is.EqualTo(expected_accuracy).Within(1e-12), report);
-                Assert.That(info.Rank, Is.EqualTo(expected_rank), report);
-                Assert.That(info.TotalScoreVersion, Is.EqualTo(expected_total_score_version), report);
-                Assert.That(info.IsLegacyScore, Is.EqualTo(expected_is_legacy), report);
-                Assert.That(info.Mods.Select(m => m.Acronym).ToArray(), Is.Empty, report);
-                assertStatisticsEqual(info.Statistics, expected_statistics, report);
+                if (fixture.ExpectedBeatmapMd5 != null)
+                    Assert.That(info.BeatmapInfo?.MD5Hash, Is.EqualTo(fixture.ExpectedBeatmapMd5), report);
+
+                Assert.That(info.TotalScore, Is.EqualTo(expectedTotal), report);
+                Assert.That(info.MaxCombo, Is.EqualTo(expectedCombo), report);
+                // Classic Acc 权值可能暂不一致；Session 轨用实测冻结值，容差收紧到浮点噪声。
+                double accTolerance = afterSession || fixture.AssertDecodedHeader ? 1e-12 : 5e-3;
+                Assert.That(info.Accuracy, Is.EqualTo(expectedAcc).Within(accTolerance), report);
+
+                if (fixture.ExpectedRank is ScoreRank rank)
+                    Assert.That(info.Rank, Is.EqualTo(rank), report);
+
+                if (fixture.ExpectedTotalScoreVersion is int version && !afterSession)
+                    Assert.That(info.TotalScoreVersion, Is.EqualTo(version), report);
+
+                if (fixture.ExpectedIsLegacy is bool legacy && (fixture.AssertDecodedHeader || afterSession))
+                    Assert.That(info.IsLegacyScore, Is.EqualTo(legacy), report);
+
+                if (fixture.AssertDecodedHeader || afterSession)
+                {
+                    Assert.That(
+                        info.Mods.Select(m => m.Acronym).OrderBy(a => a).ToArray(),
+                        Is.EqualTo(fixture.ExpectedModAcronyms.OrderBy(a => a).ToArray()),
+                        report);
+                }
+
+                assertStatisticsEqual(info.Statistics, expectedStats, fixture.AssertFullNonZeroStatistics, report);
             });
         }
 
         private static void assertStatisticsEqual(
             IReadOnlyDictionary<HitResult, int> actual,
             IReadOnlyDictionary<HitResult, int> expected,
+            bool assertFullNonZero,
             string? report)
         {
-            var actualNonZero = actual.Where(kv => kv.Value != 0).OrderBy(kv => kv.Key).ToArray();
-            var expectedNonZero = expected.Where(kv => kv.Value != 0).OrderBy(kv => kv.Key).ToArray();
+            // assertFullNonZero：Lazer 全量非零对账（含 Ignore*/ComboBreak）。
+            // 否则只对 expected 键（Classic 用户主判定；未给的辅判不门禁）。
+            var keys = assertFullNonZero
+                ? expected.Keys.Union(actual.Keys).Where(k => actual.GetValueOrDefault(k) != 0 || expected.GetValueOrDefault(k) != 0).OrderBy(k => k).ToArray()
+                : expected.Keys.OrderBy(k => k).ToArray();
 
-            Assert.That(
-                actualNonZero.Select(kv => $"{kv.Key}={kv.Value}"),
-                Is.EqualTo(expectedNonZero.Select(kv => $"{kv.Key}={kv.Value}")),
-                report);
+            string[] actualVals = keys.Select(k => $"{k}={actual.GetValueOrDefault(k)}").ToArray();
+            string[] expectedVals = keys.Select(k => $"{k}={expected.GetValueOrDefault(k)}").ToArray();
+
+            Assert.That(actualVals, Is.EqualTo(expectedVals), report);
         }
 
-        private static void assumeResourcesPresent()
+        private static void assumeResourcesPresent(AuditFixture fixture)
         {
-            if (resources.GetStream(osr_resource) == null || resources.GetStream(beatmap_resource) == null)
-                Assert.Ignore($"缺少内嵌资源：{osr_resource} / {beatmap_resource}");
+            if (resources.GetStream(fixture.OsrResource) == null || resources.GetStream(fixture.BeatmapResource) == null)
+                Assert.Ignore($"缺少内嵌资源：{fixture.OsrResource} / {fixture.BeatmapResource}");
         }
 
-        private static string buildReport(Score score)
+        private static string buildReport(Score score, AuditFixture fixture)
         {
             var sb = new StringBuilder();
-            sb.AppendLine($"osr: {osr_resource}");
-            sb.AppendLine($"anchor: acc={expected_accuracy:R} rank={expected_rank} total={expected_total_score} combo={expected_max_combo}");
+            sb.AppendLine($"fixture: {fixture.Name}");
+            sb.AppendLine($"osr: {fixture.OsrResource}");
+            sb.AppendLine($"hitMode: {fixture.HitMode}");
+            sb.AppendLine($"env: HitMode={fixture.HitMode} HealthMode=Lazer JudgePrecedence=Earliest OffsetPlusMania=0");
+            sb.AppendLine($"header-anchor: acc={fixture.ExpectedAccuracy:R} total={fixture.ExpectedTotalScore} combo={fixture.ExpectedMaxCombo}");
+            sb.AppendLine($"session-anchor: acc={fixture.SessionAccuracy:R} total={fixture.SessionTotalScore} combo={fixture.SessionMaxCombo}");
             sb.AppendLine($"session: acc={score.ScoreInfo.Accuracy:R} rank={score.ScoreInfo.Rank} total={score.ScoreInfo.TotalScore} combo={score.ScoreInfo.MaxCombo}");
+            sb.AppendLine($"session mods: {string.Join(",", score.ScoreInfo.Mods.Select(m => m.Acronym))}");
             sb.AppendLine($"session stats: {string.Join(", ", score.ScoreInfo.Statistics.Where(kv => kv.Value != 0).OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value}"))}");
+            sb.AppendLine("delta (session − session-anchor):");
+
+            foreach (var key in fixture.SessionStatistics.Keys.OrderBy(k => k))
+            {
+                int delta = score.ScoreInfo.Statistics.GetValueOrDefault(key) - fixture.SessionStatistics[key];
+                if (delta != 0)
+                    sb.AppendLine($"  {key}: {delta:+#;-#;0}");
+            }
+
+            long scoreDelta = score.ScoreInfo.TotalScore - fixture.SessionTotalScore;
+            int comboDelta = score.ScoreInfo.MaxCombo - fixture.SessionMaxCombo;
+            if (scoreDelta != 0)
+                sb.AppendLine($"  TotalScore: {scoreDelta:+#;-#;0}");
+            if (comboDelta != 0)
+                sb.AppendLine($"  MaxCombo: {comboDelta:+#;-#;0}");
+
+            appendHitEventAttribution(sb, score.ScoreInfo.HitEvents, score.Replay);
             return sb.ToString();
         }
 
-        private static void archiveReport(string report)
+        private static void appendHitEventAttribution(StringBuilder sb, IReadOnlyList<HitEvent> hitEvents, Replay? replay = null)
         {
-            string path = Path.Combine(TestContext.CurrentContext.WorkDirectory, report_file_name);
+            static string kind(HitEvent e) => e.HitObject switch
+            {
+                HeadNote => "Head",
+                TailNote => "Tail",
+                Note => "Note",
+                HoldNoteTick => "Tick",
+                HoldNoteBody => "Body",
+                HoldNote => "Hold",
+                _ => e.HitObject?.GetType().Name ?? "?",
+            };
+
+            void dumpBucket(string title, HitResult result)
+            {
+                var items = hitEvents.Where(e => e.Result == result).ToArray();
+                var byKind = items.GroupBy(kind).OrderBy(g => g.Key)
+                                  .Select(g => $"{g.Key}={g.Count()}");
+                sb.AppendLine($"{title}: total={items.Length} [{string.Join(", ", byKind)}]");
+
+                if (result != HitResult.Perfect)
+                    return;
+
+                int overJudged = 0;
+                int tailSeamRaw26 = 0; // |raw|∈(P, P*lenience] — 靠 release lenience 抬进 Perfect
+                int noteHeadOver = 0;
+
+                foreach (var e in items)
+                {
+                    if (e.HitObject?.HitWindows == null)
+                        continue;
+
+                    double abs = Math.Abs(e.TimeOffset);
+                    double perfect = e.HitObject.HitWindows.WindowFor(HitResult.Perfect);
+                    bool isTail = e.HitObject is TailNote;
+                    double judgedAbs = isTail ? abs / TailNote.RELEASE_WINDOW_LENIENCE : abs;
+
+                    if (judgedAbs > perfect)
+                        overJudged++;
+
+                    if (isTail && abs > perfect && judgedAbs <= perfect)
+                        tailSeamRaw26++;
+                    else if (!isTail && abs > perfect)
+                        noteHeadOver++;
+                }
+
+                int tailRaw26 = items.Count(e => e.HitObject is TailNote && Math.Abs(e.TimeOffset) == 26);
+                int seam172 = items.Count(e =>
+                {
+                    if (e.HitObject?.HitWindows == null) return false;
+
+                    double judgedAbs = e.HitObject is TailNote
+                        ? Math.Abs(e.TimeOffset) / TailNote.RELEASE_WINDOW_LENIENCE
+                        : Math.Abs(e.TimeOffset);
+                    return judgedAbs > 17.0 && judgedAbs <= 17.5;
+                });
+                sb.AppendLine($"  Perfect window: overJudged={overJudged} noteHeadOver={noteHeadOver} tailLenienceSeam={tailSeamRaw26} tailRawEq26={tailRaw26} seam(17,17.5]={seam172}");
+            }
+
+            dumpBucket("Miss by type", HitResult.Miss);
+            dumpBucket("Meh by type", HitResult.Meh);
+            dumpBucket("Good by type", HitResult.Good);
+            dumpBucket("Great by type", HitResult.Great);
+            dumpBucket("Perfect by type", HitResult.Perfect);
+
+            // Perfect/Great 边界带：判据 offset（Tail 除 lenience）相对 Perfect 窗。
+            double? perfectWindow = hitEvents.Select(e => e.HitObject?.HitWindows?.WindowFor(HitResult.Perfect)).FirstOrDefault(w => w is > 0);
+            sb.AppendLine($"PerfectWindow={perfectWindow}");
+
+            if (perfectWindow is double pWin)
+            {
+                int greatJustOver = 0, greatJustOverNote = 0, greatJustOverHead = 0, greatJustOverTail = 0;
+
+                foreach (var e in hitEvents)
+                {
+                    if (e.Result != HitResult.Great || e.HitObject?.HitWindows == null) continue;
+
+                    bool tail = e.HitObject is TailNote;
+
+                    double j = Math.Abs(e.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
+
+                    if (j <= pWin || j > pWin + 0.5) continue;
+
+                    greatJustOver++;
+
+                    switch (e.HitObject)
+                    {
+                        case TailNote: greatJustOverTail++; break;
+
+                        case HeadNote: greatJustOverHead++; break;
+
+                        case Note: greatJustOverNote++; break;
+                    }
+                }
+
+                sb.AppendLine($"  Great just over P (P,P+0.5]: n={greatJustOver} Note={greatJustOverNote} Head={greatJustOverHead} Tail={greatJustOverTail}");
+
+                int exactBoundary = hitEvents.Count(ev =>
+                {
+                    if (ev.Result != HitResult.Great || ev.HitObject?.HitWindows == null) return false;
+                    bool tail = ev.HitObject is TailNote;
+                    double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
+                    return Math.Abs(j - (pWin + 0.5)) < 1e-9;
+                });
+                int perfectAtP = hitEvents.Count(ev =>
+                {
+                    if (ev.Result != HitResult.Perfect || ev.HitObject?.HitWindows == null) return false;
+                    bool tail = ev.HitObject is TailNote;
+                    double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
+                    return Math.Abs(j - pWin) < 1e-9;
+                });
+                sb.AppendLine($"  exact |j|=P+0.5 Great={exactBoundary}; exact |j|=P Perfect={perfectAtP}");
+
+                foreach (var e in hitEvents
+                                   .Where(ev => ev.Result == HitResult.Great && ev.HitObject?.HitWindows != null)
+                                   .Select(ev =>
+                                   {
+                                       bool tail = ev.HitObject is TailNote;
+                                       double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
+                                       return (ev, j, tail);
+                                   })
+                                   .Where(x => x.j > pWin && x.j <= pWin + 0.5)
+                                   .OrderBy(x => x.ev.HitObject!.StartTime)
+                                   .Take(15))
+                {
+                    string column = e.ev.HitObject is IHasColumn c ? c.Column.ToString() : "-";
+                    sb.AppendLine($"    {kind(e.ev)}@{e.ev.HitObject!.StartTime:F3} col={column} off={e.ev.TimeOffset:R} j={e.j:R}");
+                }
+            }
+
+            foreach ((double lo, double hi, string label) in new[]
+                     {
+                         (0, 16.5, "j(0,16.5]"),
+                         (16.5, 17.0, "j(16.5,17]"),
+                         (17.0, 17.5, "j(17,17.5]"),
+                         (17.5, 18.5, "j(17.5,18.5]"),
+                         (18.5, 22, "j(18.5,22]"),
+                     })
+            {
+                int great = 0, perfect = 0, greatTail = 0, perfectTail = 0;
+
+                foreach (var e in hitEvents)
+                {
+                    if (e.HitObject?.HitWindows == null) continue;
+                    if (e.Result is not (HitResult.Great or HitResult.Perfect)) continue;
+
+                    bool tail = e.HitObject is TailNote;
+                    double j = Math.Abs(e.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
+                    if (j <= lo || j > hi) continue;
+
+                    if (e.Result == HitResult.Great)
+                    {
+                        great++;
+                        if (tail) greatTail++;
+                    }
+                    else
+                    {
+                        perfect++;
+                        if (tail) perfectTail++;
+                    }
+                }
+
+                sb.AppendLine($"  {label}: Great={great}(T={greatTail}) Perfect={perfect}(T={perfectTail})");
+            }
+
+            sb.AppendLine("first misses:");
+
+            foreach (var e in hitEvents.Where(ev => ev.Result == HitResult.Miss).OrderBy(ev => ev.HitObject?.StartTime ?? 0).Take(20))
+            {
+                string column = e.HitObject is IHasColumn c ? c.Column.ToString() : "-";
+                double end = e.HitObject?.GetEndTime() ?? 0;
+                double missWin = e.HitObject?.HitWindows?.WindowFor(HitResult.Miss) ?? 0;
+                double absForWin = e.HitObject is TailNote
+                    ? Math.Abs(e.TimeOffset) / TailNote.RELEASE_WINDOW_LENIENCE
+                    : Math.Abs(e.TimeOffset);
+                string tag = missWin > 0 && absForWin <= missWin ? "in-miss-win" : "outside/passive";
+                sb.AppendLine($"  {kind(e)}@{e.HitObject?.StartTime:F0} end={end:F0} col={column} offset={e.TimeOffset:F1} {tag}");
+            }
+
+            // Small stored offset + Body ComboBreak: usually auto-miss after early break when the next
+            // press was column-routed elsewhere (no rearm). Not EvaluateTail(ResultFor=Miss).
+            sb.AppendLine("Tail Miss (|off|<40) with Head/Body:");
+
+            foreach (var e in hitEvents.Where(ev => ev.Result == HitResult.Miss && ev.HitObject is TailNote)
+                                       .Where(ev => Math.Abs(ev.TimeOffset) < 40)
+                                       .OrderBy(ev => ev.HitObject!.StartTime)
+                                       .Take(15))
+            {
+                var tail = (TailNote)e.HitObject!;
+                var hold = hitEvents.Select(ev => ev.HitObject).OfType<HoldNote>()
+                                    .FirstOrDefault(h => ReferenceEquals(h.Tail, tail));
+                string headInfo = "-";
+                string bodyInfo = "-";
+
+                if (hold != null)
+                {
+                    var headEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Head));
+                    var bodyEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Body));
+                    headInfo = headEv.HitObject != null ? $"{headEv.Result}@{headEv.TimeOffset:F1}" : "no-head-event";
+                    bodyInfo = bodyEv.HitObject != null ? $"{bodyEv.Result}" : "no-body-event";
+                }
+
+                string column = tail is IHasColumn c2 ? c2.Column.ToString() : "-";
+                sb.AppendLine($"  Tail@{tail.StartTime:F0} col={column} off={e.TimeOffset:F1} head={headInfo} body={bodyInfo}");
+            }
+
+            double? sampleMissWindow = hitEvents.Select(ev => ev.HitObject?.HitWindows?.WindowFor(HitResult.Miss)).FirstOrDefault(w => w is > 0);
+            if (sampleMissWindow is double missWindowMs)
+            {
+                int mehAtMissEdge = hitEvents.Count(ev =>
+                {
+                    if (ev.Result != HitResult.Meh || ev.HitObject?.HitWindows == null) return false;
+                    bool tail = ev.HitObject is TailNote;
+                    double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
+                    return Math.Abs(j - missWindowMs) <= 1.0 || Math.Abs(j - (missWindowMs + 0.5)) < 1e-9;
+                });
+                int missAtMissEdge = hitEvents.Count(ev =>
+                {
+                    if (ev.Result != HitResult.Miss || ev.HitObject?.HitWindows == null) return false;
+                    bool tail = ev.HitObject is TailNote;
+                    double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
+                    return Math.Abs(j - missWindowMs) <= 1.0 || Math.Abs(j - (missWindowMs + 0.5)) < 1e-9;
+                });
+                sb.AppendLine($"MissWindow={missWindowMs}: Meh near miss-edge={mehAtMissEdge}; Miss near miss-edge={missAtMissEdge}");
+            }
+
+            appendHoldOutcomeBuckets(sb, hitEvents, replay);
+        }
+
+        private static void appendHoldOutcomeBuckets(StringBuilder sb, IReadOnlyList<HitEvent> hitEvents, Replay? replay)
+        {
+            var holds = hitEvents.Select(ev => ev.HitObject).OfType<HoldNote>().Distinct().ToArray();
+            var buckets = new Dictionary<string, int>(StringComparer.Ordinal);
+
+            int tailMiss = 0, tailMeh = 0, tailOtherHit = 0;
+            int bodyCb = 0, bodyIgnoreHit = 0, bodyMissing = 0;
+            int holdIgnoreMiss = 0, holdIgnoreHit = 0;
+
+            foreach (var hold in holds)
+            {
+                var headEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Head));
+                var tailEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Tail));
+                var bodyEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Body));
+                var holdEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold));
+
+                string head = headEv.HitObject != null ? headEv.Result.ToString() : "none";
+                string tail = tailEv.HitObject != null ? tailEv.Result.ToString() : "none";
+                string body = bodyEv.HitObject != null ? bodyEv.Result.ToString() : "none";
+                string holdAux = holdEv.HitObject != null ? holdEv.Result.ToString() : "none";
+                string key = $"H={head}|T={tail}|B={body}|P={holdAux}";
+                buckets[key] = buckets.GetValueOrDefault(key) + 1;
+
+                if (tailEv.HitObject != null)
+                {
+                    if (tailEv.Result == HitResult.Miss) tailMiss++;
+                    else if (tailEv.Result == HitResult.Meh) tailMeh++;
+                    else if (tailEv.Result.IsHit()) tailOtherHit++;
+                }
+
+                if (bodyEv.HitObject == null) bodyMissing++;
+                else if (bodyEv.Result == HitResult.ComboBreak) bodyCb++;
+                else if (bodyEv.Result == HitResult.IgnoreHit) bodyIgnoreHit++;
+
+                if (holdEv.Result == HitResult.IgnoreMiss) holdIgnoreMiss++;
+                else if (holdEv.Result == HitResult.IgnoreHit) holdIgnoreHit++;
+            }
+
+            sb.AppendLine($"hold outcomes: n={holds.Length} TailMiss={tailMiss} TailMeh={tailMeh} TailOtherHit={tailOtherHit} BodyCB={bodyCb} BodyIH={bodyIgnoreHit} BodyNone={bodyMissing} HoldIM={holdIgnoreMiss} HoldIH={holdIgnoreHit}");
+
+            sb.AppendLine("hold Body=ComboBreak:");
+            foreach (var kv in buckets.Where(kv => kv.Key.Contains("|B=ComboBreak|", StringComparison.Ordinal)).OrderByDescending(kv => kv.Value))
+                sb.AppendLine($"  {kv.Key}: {kv.Value}");
+
+            sb.AppendLine("hold Tail=Meh (all):");
+            foreach (var kv in buckets.Where(kv => kv.Key.Contains("|T=Meh|", StringComparison.Ordinal)).OrderByDescending(kv => kv.Value))
+                sb.AppendLine($"  {kv.Key}: {kv.Value}");
+
+            // Head 命中但尾 Miss：典型「断连后未重臂 → 尾被动 Miss」；列出时刻便于对照回放。
+            // sameColHit=同列在 (head,tail) 内命中其它物件（列路由占键 → 不应重臂）；none=期间无同列命中（若仍有空按应能重臂）。
+            sb.AppendLine("hold HeadHit|TailMiss detail:");
+            foreach (var hold in holds.OrderBy(h => h.StartTime))
+            {
+                var headEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Head));
+                var tailEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Tail));
+                var bodyEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Body));
+
+                if (headEv.HitObject == null || tailEv.HitObject == null)
+                    continue;
+
+                if (!headEv.Result.IsHit() || tailEv.Result != HitResult.Miss)
+                    continue;
+
+                string body = bodyEv.HitObject != null ? bodyEv.Result.ToString() : "none";
+
+                var sameColHits = hitEvents
+                    .Where(ev => ev.HitObject is IHasColumn hc
+                                 && hc.Column == hold.Column
+                                 && !ReferenceEquals(ev.HitObject, hold.Head)
+                                 && !ReferenceEquals(ev.HitObject, hold.Tail)
+                                 && !ReferenceEquals(ev.HitObject, hold.Body)
+                                 && !ReferenceEquals(ev.HitObject, hold)
+                                 && ev.HitObject!.StartTime > hold.StartTime - 200
+                                 && ev.HitObject.StartTime < hold.EndTime + 400)
+                    .Select(ev =>
+                    {
+                        string k = ev.HitObject switch
+                        {
+                            HeadNote => "Head",
+                            Note => "Note",
+                            _ => ev.HitObject!.GetType().Name,
+                        };
+                        double abs = ev.HitObject!.StartTime + ev.TimeOffset;
+                        return $"{k}@{ev.HitObject.StartTime:0.###}:{ev.Result}@t{abs:0.###}";
+                    })
+                    .ToArray();
+
+                string routeTag = sameColHits.Length == 0 ? "nearCol=none" : $"nearCol={string.Join(',', sameColHits)}";
+                string repressTag = describeColumnRepress(replay, hold);
+                sb.AppendLine(
+                    $"  Hold@{hold.StartTime:0.###} col={hold.Column} end={hold.EndTime:0.###} H={headEv.Result}@{headEv.TimeOffset:0.###} T=Miss@{tailEv.TimeOffset:0.###} B={body} {routeTag} {repressTag}");
+            }
+
+            sb.AppendLine("Note Miss (|off|<80):");
+            foreach (var ev in hitEvents.Where(e => e.HitObject is Note and not HeadNote and not TailNote && e.Result == HitResult.Miss)
+                                        .OrderBy(e => e.HitObject!.StartTime))
+            {
+                if (Math.Abs(ev.TimeOffset) >= 80)
+                    continue;
+
+                var note = (Note)ev.HitObject!;
+                double abs = note.StartTime + ev.TimeOffset;
+                double missWin = note.HitWindows?.WindowFor(HitResult.Miss) ?? 0;
+                // ForceMiss 用命中时刻写 offset；auto-miss 用 deadline/按键史。列边沿可区分「有按下未吃到」vs「被后键钉死」。
+                string edges = describeColumnEdgesNear(replay, note.Column, note.StartTime - missWin, note.StartTime + missWin + 50);
+                var laterHit = hitEvents.FirstOrDefault(x =>
+                    x.Result.IsHit()
+                    && x.HitObject is IHasColumn hc
+                    && hc.Column == note.Column
+                    && x.HitObject!.StartTime > note.StartTime
+                    && Math.Abs((x.HitObject.StartTime + x.TimeOffset) - abs) < 0.75);
+                string forceTag = laterHit.HitObject != null
+                    ? $"forceVia={laterHit.HitObject.GetType().Name}@{laterHit.HitObject.StartTime:0.###}"
+                    : "forceVia=none";
+
+                var atPress = hitEvents
+                    .Where(x => x.HitObject is IHasColumn hc
+                                && hc.Column == note.Column
+                                && Math.Abs((x.HitObject!.StartTime + x.TimeOffset) - abs) < 0.75)
+                    .Select(x =>
+                    {
+                        string k = x.HitObject switch
+                        {
+                            HeadNote => "Head",
+                            TailNote => "Tail",
+                            Note => "Note",
+                            _ => x.HitObject!.GetType().Name,
+                        };
+                        return $"{k}@{x.HitObject!.StartTime:0.###}:{x.Result}";
+                    })
+                    .ToArray();
+                string atTag = atPress.Length == 0 ? "atPress=none" : $"atPress={string.Join(',', atPress)}";
+
+                var earlierUnhit = hitEvents
+                    .Where(x => x.HitObject is IHasColumn hc
+                                && hc.Column == note.Column
+                                && x.HitObject is Note
+                                && x.HitObject!.StartTime < note.StartTime
+                                && x.HitObject.StartTime > note.StartTime - missWin - 50
+                                && (x.Result == HitResult.Miss || !x.Result.IsHit()))
+                    .Select(x => $"{x.HitObject!.StartTime:0.###}:{x.Result}")
+                    .ToArray();
+                string lockTag = earlierUnhit.Length == 0 ? "prev=none" : $"prevMiss={string.Join(',', earlierUnhit)}";
+
+                sb.AppendLine($"  Note@{note.StartTime:0.###} col={note.Column} off={ev.TimeOffset:0.###} abs={abs:0.###} {forceTag} {atTag} {lockTag} {edges}");
+            }
+
+            sb.AppendLine("hold outcome top:");
+            foreach (var kv in buckets.OrderByDescending(kv => kv.Value).Take(12))
+                sb.AppendLine($"  {kv.Key}: {kv.Value}");
+        }
+
+        /// <summary>
+        /// 在 (head+1ms, tail+Meh*lenience] 内该列的按下边沿：empty=可能重臂；无边沿=未重按。
+        /// </summary>
+        private static string describeColumnRepress(Replay? replay, HoldNote hold)
+        {
+            double to = hold.EndTime + (hold.Tail.HitWindows?.WindowFor(HitResult.Meh) ?? 0) * TailNote.RELEASE_WINDOW_LENIENCE;
+            return describeColumnEdgesNear(replay, hold.Column, hold.StartTime + 1, to, "repress");
+        }
+
+        private static string describeColumnEdgesNear(Replay? replay, int column, double from, double to, string label = "edges")
+        {
+            if (replay?.Frames == null || replay.Frames.Count == 0)
+                return $"{label}=?";
+
+            var action = ManiaAction.Key1 + column;
+            bool wasDown = false;
+            var edges = new List<string>();
+
+            foreach (var frame in replay.Frames.OrderBy(f => f.Time))
+            {
+                if (frame.Time < from)
+                {
+                    if (frame is ManiaReplayFrame early)
+                        wasDown = early.Actions.Contains(action);
+                    continue;
+                }
+
+                if (frame.Time > to)
+                    break;
+
+                if (frame is not ManiaReplayFrame mania)
+                    continue;
+
+                bool down = mania.Actions.Contains(action);
+
+                if (down && !wasDown)
+                    edges.Add($"↓{frame.Time:0.###}");
+                else if (!down && wasDown)
+                    edges.Add($"↑{frame.Time:0.###}");
+
+                wasDown = down;
+            }
+
+            return edges.Count == 0 ? $"{label}=none" : $"{label}={string.Join(',', edges)}";
+        }
+
+        private static void archiveReport(AuditFixture fixture, string report)
+        {
+            string path = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"mania_osr_audit_{fixture.Name}.txt");
             File.WriteAllText(path, report);
             TestContext.AddTestAttachment(path);
             TestContext.WriteLine(report);
         }
 
+        public sealed record AuditFixture(
+            string Name,
+            string OsrResource,
+            string BeatmapResource,
+            EzEnumHitMode HitMode,
+            string? ExpectedBeatmapMd5,
+            long ExpectedTotalScore,
+            int ExpectedMaxCombo,
+            double ExpectedAccuracy,
+            ScoreRank? ExpectedRank,
+            int? ExpectedTotalScoreVersion,
+            bool? ExpectedIsLegacy,
+            IReadOnlyList<string> ExpectedModAcronyms,
+            IReadOnlyDictionary<HitResult, int> ExpectedStatistics,
+            bool AssertFullNonZeroStatistics,
+            bool AssertDecodedHeader,
+            long SessionTotalScore,
+            int SessionMaxCombo,
+            double SessionAccuracy,
+            IReadOnlyDictionary<HitResult, int> SessionStatistics)
+        {
+            public override string ToString()
+            {
+                return Name;
+            }
+        }
+
         private sealed class HarnessScoreDecoder : LegacyScoreDecoder
         {
             public WorkingBeatmap? LastWorkingBeatmap { get; private set; }
+            private readonly string beatmapResource;
 
-            protected override Ruleset GetRuleset(int rulesetId) => new ManiaRuleset();
+            public HarnessScoreDecoder(string beatmapResource)
+            {
+                this.beatmapResource = beatmapResource;
+            }
+
+            protected override Ruleset GetRuleset(int rulesetId)
+            {
+                return new ManiaRuleset();
+            }
 
             protected override WorkingBeatmap GetBeatmap(string md5Hash)
             {
-                using var stream = resources.GetStream(beatmap_resource);
+                using var stream = resources.GetStream(beatmapResource);
                 IBeatmap decoded = new LegacyBeatmapDecoder().Decode(new LineBufferedReader(stream));
                 decoded.BeatmapInfo.MD5Hash = md5Hash;
                 LastWorkingBeatmap = new TestWorkingBeatmap(decoded);

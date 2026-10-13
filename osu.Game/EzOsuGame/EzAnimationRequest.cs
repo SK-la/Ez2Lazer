@@ -29,10 +29,8 @@ namespace osu.Game.EzOsuGame
         public string Path { get; init; } = string.Empty;
 
         /// <summary>
-        /// 可选的帧名模板，留空即启用三模板默认解析。支持的占位符：
-        /// <c>{name}</c>（<c>{result}</c> 为其别名）与 <c>{0}</c> / <c>{00}</c> / <c>{000}</c>（序号位数只作说明，
-        /// 实际位数由磁盘分组决定）。不含序号时该模板表达单图，如 <c>{name}_overlay</c>；
-        /// 含序号但不含 <c>{name}</c> 时（如 <c>{0}</c>）自动把资源名前置。
+        /// 可选的帧名模板。留空走层 1 到层 4。非空时只查这一条，失败后按名字取单图。
+        /// 帧号只认 <c>{0}</c> 与 <c>{000}</c>。<c>{result}/{000}</c> 是子目录里从 <c>000.png</c> 起的一组。
         /// </summary>
         public string? FrameTemplate { get; init; }
 

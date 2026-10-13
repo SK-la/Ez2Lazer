@@ -67,20 +67,12 @@ namespace osu.Game.Skinning
                 case GlobalSkinnableContainerLookup containerLookup:
                     switch (containerLookup.Lookup)
                     {
-                        case GlobalSkinnableContainers.SongSelect:
-                            var songSelectComponents = new DefaultSkinComponentsContainer(c =>
-                            {
-                                var dim = c.OfType<EzHUDRadarPanel>().FirstOrDefault();
-
-                                if (dim != null)
-                                {
-                                    dim.Anchor = Anchor.BottomCentre;
-                                    dim.Origin = Anchor.Centre;
-                                    dim.Position = new Vector2(-80, -150);
-                                }
-                            });
-
-                            return songSelectComponents;
+                        // case GlobalSkinnableContainers.SongSelect:
+                        //     var songSelectComponents = new DefaultSkinComponentsContainer(c =>
+                        //     {
+                        //     });
+                        //
+                        //     return songSelectComponents;
 
                         case GlobalSkinnableContainers.MainHUDComponents:
 
@@ -119,7 +111,7 @@ namespace osu.Game.Skinning
                                         score.Origin = Anchor.TopLeft;
                                         score.Position = new Vector2(x_offset, x_offset);
                                         score.ShowLabel.Value = false;
-                                        score.ThemeName.Value = EzEnumGameThemeName.Celeste_Lumiere;
+                                        score.ThemeName.Value = EzGameThemeNames.DEFAULT;
                                     }
 
                                     var attributeTexts = container.OfType<BeatmapAttributeText>().ToArray();

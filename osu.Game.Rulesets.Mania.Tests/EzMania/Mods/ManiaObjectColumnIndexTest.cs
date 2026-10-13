@@ -80,6 +80,24 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
         }
 
         [Test]
+        public void TestIntervalQueryHitsHoldAndTapButNotTheOpenEnd()
+        {
+            var index = new ManiaObjectColumnIndex(column_count);
+            index.Add(new HoldNote { StartTime = 0, Duration = 1000, Column = 0 });
+            index.Add(new Note { StartTime = 500, Column = 1 });
+
+            Assert.That(index.TryFindFirstIntersection(0, 100, 200, out double holdStart, out double holdEnd), Is.True);
+            Assert.That(holdStart, Is.EqualTo(0));
+            Assert.That(holdEnd, Is.EqualTo(1000));
+
+            Assert.That(index.TryFindFirstIntersection(0, 1000, 1100, out _, out _), Is.False);
+
+            Assert.That(index.TryFindFirstIntersection(1, 500, 501, out double tapStart, out _), Is.True);
+            Assert.That(tapStart, Is.EqualTo(500));
+            Assert.That(index.TryFindFirstIntersection(1, 499, 500, out _, out _), Is.False);
+        }
+
+        [Test]
         public void TestClearResetsToEmptyIndex()
         {
             var rng = new System.Random(5150);

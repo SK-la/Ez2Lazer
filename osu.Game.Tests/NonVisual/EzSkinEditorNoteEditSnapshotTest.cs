@@ -3,6 +3,7 @@
 
 using NUnit.Framework;
 using osu.Framework.Graphics;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.Rulesets.Mania;
 
@@ -19,7 +20,7 @@ namespace osu.Game.Tests.NonVisual
                 Ruleset = { Value = new ManiaRuleset().RulesetInfo },
                 Part =
                 {
-                    Value = EzSkinEditorNotePart.HoldBody
+                    Value = EzManiaNotePart.HoldBody
                 },
                 VariantId =
                 {
@@ -46,7 +47,7 @@ namespace osu.Game.Tests.NonVisual
             var snapshot = new EzSkinEditorNoteEditSnapshot();
             snapshot.CaptureFrom(session);
 
-            session.Part.Value = EzSkinEditorNotePart.Note;
+            session.Part.Value = EzManiaNotePart.Note;
             session.VariantId.Value = "1";
             session.NoteColour.Value = Colour4.Red;
             session.Width.Value = 50;
@@ -55,7 +56,7 @@ namespace osu.Game.Tests.NonVisual
 
             snapshot.ApplyTo(session);
 
-            Assert.That(session.Part.Value, Is.EqualTo(EzSkinEditorNotePart.HoldBody));
+            Assert.That(session.Part.Value, Is.EqualTo(EzManiaNotePart.HoldBody));
             Assert.That(session.VariantId.Value, Is.EqualTo("2"));
             Assert.That(session.NoteColour.Value, Is.EqualTo(Colour4.Cyan));
             Assert.That(session.Width.Value, Is.EqualTo(120));

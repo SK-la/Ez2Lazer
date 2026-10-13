@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Textures;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets;
 using osu.Game.Skinning;
 
@@ -15,15 +16,15 @@ namespace osu.Game.EzOsuGame.Edit.Note
 
         RulesetInfo RulesetInfo { get; }
 
-        IReadOnlyList<EzSkinEditorNotePart> SupportedParts { get; }
+        IReadOnlyList<EzManiaNotePart> SupportedParts { get; }
 
-        IReadOnlyList<EzSkinEditorNoteVariant> GetVariants(bool useEzNoteVariants, EzSkinEditorNotePart part);
+        IReadOnlyList<EzSkinEditorNoteVariant> GetVariants(bool useEzNoteVariants, EzManiaNotePart part);
 
-        string GetDefaultVariantId(bool useEzNoteVariants, EzSkinEditorNotePart part);
+        string GetDefaultVariantId(bool useEzNoteVariants, EzManiaNotePart part);
 
-        string? ResolveTextureName(bool useEzNoteVariants, EzSkinEditorNotePart part, string variantId);
+        string? ResolveTextureName(bool useEzNoteVariants, EzManiaNotePart part, string variantId);
 
-        Texture? GetNoteTexture(ISkin skin, EzSkinEditorNotePreviewRequest request, EzSkinEditorNotePart part);
+        Texture? GetNoteTexture(ISkin skin, EzSkinEditorNotePreviewRequest request, EzManiaNotePart part);
 
         Drawable? CreateDrawableComparisonPreview(ISkin skin, EzSkinEditorNotePreviewRequest request);
 

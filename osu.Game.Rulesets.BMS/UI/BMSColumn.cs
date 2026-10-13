@@ -85,7 +85,7 @@ namespace osu.Game.Rulesets.BMS.UI
                 {
                     RelativeSizeAxes = Axes.Both,
                 },
-                hitExplosionPool = new DrawablePool<PoolableHitExplosion>(5),
+                hitExplosionPool = new DrawablePool<PoolableHitExplosion>(10),
             };
         }
 

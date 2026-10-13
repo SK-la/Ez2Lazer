@@ -1,16 +1,18 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Animation;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Effects;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.Localization;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
@@ -18,13 +20,17 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
-    public partial class EzHUDComboTitle : HitErrorMeter
+    public partial class EzHUDComboTitle : HitErrorMeter, IEzHudThemeTarget
     {
-        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.FONT_LABEL), nameof(EzHUDManiaStrings.FONT_DESCRIPTION), SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<EzEnumGameThemeName> Font { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        EzHudThemeSlot IEzHudThemeTarget.Slot => EzHudThemeSlot.Combo;
 
-        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_TYPE_LABEL), nameof(EzHUDManiaStrings.EFFECT_TYPE_DESCRIPTION))]
-        public Bindable<EzComEffectType> Effect { get; } = new Bindable<EzComEffectType>(EzComEffectType.Scale);
+        Bindable<string> IEzHudThemeTarget.Theme => Font;
+
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.ANIMATION_TEMPLATE_LABEL), nameof(EzHUDManiaStrings.ANIMATION_TEMPLATE_DESCRIPTION))]
+        public Bindable<EzEnumDeformTemplate> AnimationTemplate { get; } = new Bindable<EzEnumDeformTemplate>();
+
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.FONT_LABEL), nameof(EzHUDManiaStrings.FONT_DESCRIPTION), SettingControlType = typeof(EzSelectorEnumList))]
+        public Bindable<string> Font { get; } = new Bindable<string>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_ORIGIN_LABEL), nameof(EzHUDManiaStrings.EFFECT_ORIGIN_DESCRIPTION), SettingControlType = typeof(AnchorDropdown))]
         public Bindable<Anchor> EffectOrigin { get; } = new Bindable<Anchor>(Anchor.TopCentre)
@@ -33,29 +39,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             Value = Anchor.TopCentre
         };
 
-        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_START_FACTOR_LABEL), nameof(EzHUDManiaStrings.EFFECT_START_FACTOR_DESCRIPTION))]
-        public BindableNumber<float> EffectStartFactor { get; } = new BindableNumber<float>(2f)
-        {
-            MinValue = 0.1f,
-            MaxValue = 5f,
-            Precision = 0.05f,
-        };
-
-        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_START_DURATION_LABEL), nameof(EzHUDManiaStrings.EFFECT_START_DURATION_DESCRIPTION))]
-        public BindableNumber<float> EffectStartTime { get; } = new BindableNumber<float>(10)
-        {
-            MinValue = 1,
-            MaxValue = 300,
-            Precision = 1f,
-        };
-
-        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_END_DURATION_LABEL), nameof(EzHUDManiaStrings.EFFECT_END_DURATION_DESCRIPTION))]
-        public BindableNumber<float> EffectEndDuration { get; } = new BindableNumber<float>(300)
-        {
-            MinValue = 10,
-            MaxValue = 500,
-            Precision = 10f,
-        };
+        [EzBuiltinEffectSource("Effect")]
+        public EzBuiltinEffectHost Effects { get; } = EzBuiltinEffectHost.ForTitle();
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.ALPHA_LABEL), nameof(EzHUDStrings.ALPHA_DESCRIPTION))]
         public BindableNumber<float> BoxAlpha { get; } = new BindableNumber<float>(1)
@@ -80,7 +65,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         }
 
         [BackgroundDependencyLoader]
-        private void load(ScoreProcessor scoreProcessor)
+        private void load(ScoreProcessor scoreProcessor, Ez2ConfigManager ezConfig)
         {
             InternalChildren = new Drawable[]
             {
@@ -100,6 +85,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
                 applyAnimation(wasIncrease, wasMiss);
             });
+
+            ezConfig.GetBindable<string>(Ez2Setting.GameThemeName).BindValueChanged(theme =>
+            {
+                if (Enum.TryParse(theme.NewValue, out EzEnumDeformTemplate template))
+                    AnimationTemplate.Value = template;
+            });
         }
 
         protected override void LoadComplete()
@@ -116,17 +107,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
                     EffectOrigin.Value = Anchor.TopCentre; // 设置为默认值
                 }
 
-                // switch (EffectOrigin.Value)
-                // {
-                //     case Anchor.TopCentre:
-                //         Text.TextContainer.Anchor = Anchor.BottomCentre;
-                //         break;
-                //
-                //     case Anchor.BottomCentre:
-                //         Text.TextContainer.Anchor = Anchor.TopCentre;
-                //         break;
-                // }
-
                 Text.TextContainer.Anchor = EffectOrigin.Value;
             }, true);
             Font.BindValueChanged(e =>
@@ -138,30 +118,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
         private void applyAnimation(bool wasIncrease, bool wasMiss)
         {
-            switch (Effect.Value)
-            {
-                case EzComEffectType.Scale:
-                    EzEffectHelper.ApplyScaleAnimation(
-                        Text.TextContainer,
-                        wasIncrease,
-                        wasMiss,
-                        EffectStartFactor.Value,
-                        1,
-                        EffectStartTime.Value,
-                        EffectEndDuration.Value);
-                    break;
+            if (EzAnimationLibrary.TryPlayCombo(AnimationTemplate.Value, Text.TextContainer, true, Text.SourcePixelScale))
+                return;
 
-                case EzComEffectType.Bounce:
-                    EzEffectHelper.ApplyBounceAnimation(
-                        Text.TextContainer,
-                        wasIncrease,
-                        wasMiss,
-                        EffectStartFactor.Value / 2,
-                        0.8f,
-                        EffectStartTime.Value,
-                        EffectEndDuration.Value);
-                    break;
-            }
+            Text.TextContainer.FinishTransforms();
+            Text.TextContainer.Scale = Vector2.One;
+            Text.TextContainer.Position = Vector2.Zero;
+            Text.TextContainer.Alpha = 1;
+            Effects.Play(Text.TextContainer, wasIncrease, wasMiss);
         }
 
         protected override void OnNewJudgement(JudgementResult judgement)

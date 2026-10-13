@@ -71,6 +71,7 @@ namespace osu.Game.Screens.Menu
         protected Sample SampleDownbeat;
 
         private readonly Container colourAndTriangles;
+        private readonly EzMenuLogoBackdrop logoBackdrop;
         private readonly TrianglesV2 triangles;
 
         /// <summary>
@@ -209,11 +210,7 @@ namespace osu.Game.Screens.Menu
                                                                     Origin = Anchor.Centre,
                                                                     Children = new Drawable[]
                                                                     {
-                                                                        new Box
-                                                                        {
-                                                                            RelativeSizeAxes = Axes.Both,
-                                                                            Colour = ColourInfo.GradientVertical(Color4Extensions.FromHex(@"ff66ab"), Color4Extensions.FromHex(@"cc5289")),
-                                                                        },
+                                                                        logoBackdrop = new EzMenuLogoBackdrop(),
                                                                         triangles = new TrianglesV2
                                                                         {
                                                                             Anchor = Anchor.Centre,
@@ -307,6 +304,7 @@ namespace osu.Game.Screens.Menu
             SampleDownbeat = audio.Samples.Get(@"Menu/osu-logo-downbeat");
 
             holdActivationDelay = config.GetBindable<double>(OsuSetting.UIHoldActivationDelay);
+            logoBackdrop.ShowDecorations.BindValueChanged(v => triangles.Alpha = v.NewValue ? 1 : 0, true);
 
             if (ezConfig != null)
             {

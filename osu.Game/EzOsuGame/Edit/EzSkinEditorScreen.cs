@@ -653,7 +653,7 @@ namespace osu.Game.EzOsuGame.Edit
             if (profile == null)
                 return null;
 
-            string variantId = profile.GetDefaultVariantId(usesEzNoteVariants, EzSkinEditorNotePart.Note);
+            string variantId = profile.GetDefaultVariantId(usesEzNoteVariants, EzManiaNotePart.Note);
 
             return new ConfigSnapshotComparisonSource(
                 ezSkinConfig,

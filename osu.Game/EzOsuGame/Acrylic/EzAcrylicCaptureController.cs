@@ -2,62 +2,71 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Rendering;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.Acrylic
 {
     /// <summary>
     /// Shared acquire/release logic for <see cref="AcrylicBackdropDrawable"/> consumers.
-    /// Always uses <see cref="IAcrylicCaptureRegistrar"/> so footer / overlays share the same
-    /// BufferedContainer path as song-select wedges (backbuffer region copy is unreliable for late-drawn chrome).
+    /// D3D11, Metal, Vulkan, and desktop OpenGL sample a shared backbuffer blur and do not acquire the fullscreen capture.
+    /// Deferred renderers still acquire <see cref="IAcrylicCaptureRegistrar"/>.
     /// </summary>
     internal sealed class EzAcrylicCaptureController
     {
         private readonly IAcrylicCaptureRegistrar? registrar;
         private readonly AcrylicBackdropDrawable acrylicBackdrop;
+        private readonly IRenderer? renderer;
         private bool captureAcquired;
 
-        public EzAcrylicCaptureController(IAcrylicCaptureRegistrar? registrar, AcrylicBackdropDrawable acrylicBackdrop)
+        public EzAcrylicCaptureController(IAcrylicCaptureRegistrar? registrar, AcrylicBackdropDrawable acrylicBackdrop, IRenderer? renderer = null)
         {
             this.registrar = registrar;
             this.acrylicBackdrop = acrylicBackdrop;
+            this.renderer = renderer;
         }
 
         public void Sync(bool wantsCapture, float blurStrength)
         {
             acrylicBackdrop.BlurSigma = new Vector2(blurStrength);
 
-            if (wantsCapture)
-            {
-                if (!captureAcquired && registrar != null)
-                {
-                    registrar.AcquireCapture();
-                    captureAcquired = true;
-                }
-
-                acrylicBackdrop.EffectEnabled = captureAcquired || registrar == null;
-            }
-            else
+            if (!wantsCapture)
             {
                 acrylicBackdrop.EffectEnabled = false;
-
-                if (captureAcquired && registrar != null)
-                {
-                    registrar.ReleaseCapture();
-                    captureAcquired = false;
-                }
+                releaseCapture();
+                return;
             }
+
+            // Deferred renderers never report backbuffer-region copy support and keep acquiring the capture.
+            if (renderer?.SupportsBackbufferRegionCopy == true)
+            {
+                releaseCapture();
+                acrylicBackdrop.EffectEnabled = true;
+                return;
+            }
+
+            if (!captureAcquired && registrar != null)
+            {
+                registrar.AcquireCapture();
+                captureAcquired = true;
+            }
+
+            acrylicBackdrop.EffectEnabled = captureAcquired || registrar == null;
+        }
+
+        private void releaseCapture()
+        {
+            if (!captureAcquired || registrar == null)
+                return;
+
+            registrar.ReleaseCapture();
+            captureAcquired = false;
         }
 
         public void Dispose()
         {
             acrylicBackdrop.EffectEnabled = false;
-
-            if (captureAcquired && registrar != null)
-            {
-                registrar.ReleaseCapture();
-                captureAcquired = false;
-            }
+            releaseCapture();
         }
     }
 }

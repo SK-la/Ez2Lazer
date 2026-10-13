@@ -9,6 +9,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
@@ -18,7 +19,7 @@ namespace osu.Game.Graphics.UserInterface
 {
     public partial class ShearedSearchTextBox : CompositeDrawable, IHasCurrentValue<string>
     {
-        private const float corner_radius = 7;
+        private const float corner_radius = EzUIStyleV1.CORNER_RADIUS_SHEARED;
 
         private readonly Box background;
         protected readonly InnerSearchTextBox TextBox;

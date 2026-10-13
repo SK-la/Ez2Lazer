@@ -54,7 +54,7 @@ namespace osu.Game.Screens.Select
                         Depth = 1,
                         RelativeSizeAxes = Axes.Both,
                         Shear = OsuGame.SHEAR,
-                        CornerRadius = 5f,
+                        CornerRadius = CORNER_RADIUS / 2,
                         Masking = true,
                         ChildrenEnumerable = spectrum.Zip(spectrum.Skip(1))
                                                      .Select(p => new Box
@@ -78,7 +78,7 @@ namespace osu.Game.Screens.Select
                             BorderThickness = 2,
                             Masking = true,
                             Shear = OsuGame.SHEAR,
-                            CornerRadius = 5f,
+                            CornerRadius = CORNER_RADIUS / 2,
                             Child = new Box
                             {
                                 Colour = Color4.Transparent,

@@ -47,6 +47,7 @@ namespace osu.Game.EzOsuGame.Startup
                 return;
             }
 
+            EzStartupTrace.Log("Settings.preload scheduled");
             settings.BeginLoadingSections();
         }
 

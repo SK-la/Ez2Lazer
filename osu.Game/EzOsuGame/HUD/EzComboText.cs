@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.IO;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -14,12 +13,17 @@ namespace osu.Game.EzOsuGame.HUD
 {
     public partial class EzComboText : CompositeDrawable, IHasText
     {
+        internal const float GLYPH_TARGET_HEIGHT = 25;
+
         private readonly EzComboSpriteText textPart;
-        public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<string> ThemeName { get; } = new Bindable<string>(EzSelectorEnumList.DEFAULT_NAME);
 
         // public Bindable<bool> UseLazerFont { get; } = new Bindable<bool>(false);
 
         public FillFlowContainer TextContainer { get; private set; }
+
+        // 位移写在字形父级上，不会跟着字形缩放。源图像素先经过度量缩放，再乘适配缩放。
+        public float SourcePixelScale => textPart.Scale.Y * EzSpriteText.GLYPH_METRIC_SCALE;
 
         public LocalisableString Text
         {
@@ -27,7 +31,7 @@ namespace osu.Game.EzOsuGame.HUD
             set => textPart.Text = value;
         }
 
-        public EzComboText(Bindable<EzEnumGameThemeName>? externalThemeName = null)
+        public EzComboText(Bindable<string>? externalThemeName = null)
         {
             AutoSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
@@ -79,7 +83,7 @@ namespace osu.Game.EzOsuGame.HUD
             ThemeName.BindValueChanged(e =>
             {
                 textPart.ThemeName.Value = e.NewValue;
-                float scale = getUniformHeightScale(textPart.Height);
+                float scale = getUniformHeightScale(textPart.Height, GLYPH_TARGET_HEIGHT);
                 textPart.Scale = new Vector2(scale);
                 textPart.Invalidate(); // 确保 UI 立即刷新
             }, true);
@@ -100,7 +104,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         private partial class EzComboSpriteText : EzSpriteText
         {
-            public EzComboSpriteText(Func<char, string> getLookup, Bindable<EzEnumGameThemeName> themeName)
+            public EzComboSpriteText(Func<char, string> getLookup, Bindable<string> themeName)
                 : base(getLookup, themeName)
             {
             }
@@ -108,28 +112,29 @@ namespace osu.Game.EzOsuGame.HUD
             protected override char[] GetPreloadSpecialChars()
                 => new[] { 't', 'e', 'l' };
 
-            protected override string[] GetPossiblePaths(string themeRoot, string lookup, char character)
+            protected override string[] GetPossiblePaths(string themeName, string lookup, char character)
             {
+                string root = $"GameTheme/{themeName}";
+
                 switch (character)
                 {
                     case 'e':
                     case 'l':
                         return new[]
                         {
-                            Path.Combine(themeRoot, lookup)
+                            $"{root}/{lookup}"
                         };
 
                     case 't':
                         return new[]
                         {
-                            Path.Combine(themeRoot, "combo", lookup)
+                            $"{root}/combo/{lookup}"
                         };
 
                     default:
-                        // 数字从 combo/number 目录读取
                         return new[]
                         {
-                            Path.Combine(themeRoot, "combo", "number", lookup),
+                            $"{root}/combo/number/{lookup}",
                         };
                 }
             }

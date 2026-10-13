@@ -44,7 +44,7 @@ namespace osu.Game.Rulesets.Mania.UI
         public ColumnFlow(StageDefinition stageDefinition)
         {
             this.stageDefinition = stageDefinition;
-            displayColumns = ManiaEzColumnLayout.GetDisplayColumnCount(stageDefinition);
+            displayColumns = ManiaPlayfieldLayoutHelper.GetDisplayColumnCount(stageDefinition);
             Content = new TContent[displayColumns];
 
             AutoSizeAxes = Axes.X;
@@ -136,9 +136,6 @@ namespace osu.Game.Rulesets.Mania.UI
                     skin,
                     skinManager,
                     ezSkinConfig,
-                    columnWidthBindable.Value,
-                    specialFactorBindable.Value,
-                    ezColumnWidthStyle.Value,
                     mobileAdjust,
                     applyGlobalWidthSettings: true);
 

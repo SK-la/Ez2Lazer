@@ -17,6 +17,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "osu.Game.Tests", "osu.Game.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "osu.Desktop", "osu.Desktop\osu.Desktop.csproj", "{419659FD-72EA-4678-9EB8-B22A746CED70}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "osu.Game.EzCamera.Windows", "osu.Game.EzCamera.Windows\osu.Game.EzCamera.Windows.csproj", "{B4E8C1A7-6D24-4F0A-9E53-1C7A8D2F64B0}"
+EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "osu.Game.Rulesets.Catch.Tests", "osu.Game.Rulesets.Catch.Tests\osu.Game.Rulesets.Catch.Tests.csproj", "{3AD63355-D6B1-4365-8D31-5652C989BEF1}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "osu.Game.Rulesets.Mania.Tests", "osu.Game.Rulesets.Mania.Tests\osu.Game.Rulesets.Mania.Tests.csproj", "{7E9E9C34-B204-406B-82E2-E01E900699CD}"
@@ -89,6 +91,10 @@ Global
 		{419659FD-72EA-4678-9EB8-B22A746CED70}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{419659FD-72EA-4678-9EB8-B22A746CED70}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{419659FD-72EA-4678-9EB8-B22A746CED70}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B4E8C1A7-6D24-4F0A-9E53-1C7A8D2F64B0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B4E8C1A7-6D24-4F0A-9E53-1C7A8D2F64B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B4E8C1A7-6D24-4F0A-9E53-1C7A8D2F64B0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B4E8C1A7-6D24-4F0A-9E53-1C7A8D2F64B0}.Release|Any CPU.Build.0 = Release|Any CPU
 		{3AD63355-D6B1-4365-8D31-5652C989BEF1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{3AD63355-D6B1-4365-8D31-5652C989BEF1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3AD63355-D6B1-4365-8D31-5652C989BEF1}.Release|Any CPU.ActiveCfg = Release|Any CPU

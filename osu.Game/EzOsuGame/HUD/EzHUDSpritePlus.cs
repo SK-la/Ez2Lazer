@@ -25,7 +25,6 @@ using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
 using osu.Game.Skinning;
 using osu.Game.Utils;
-using osuTK;
 
 namespace osu.Game.EzOsuGame.HUD
 {
@@ -53,14 +52,6 @@ namespace osu.Game.EzOsuGame.HUD
             MinValue = 1,
             MaxValue = 240,
             Precision = 1f
-        };
-
-        [SettingSource("Scale")]
-        public BindableNumber<float> TextureScale { get; } = new BindableNumber<float>(1)
-        {
-            MinValue = 0.01f,
-            MaxValue = 10f,
-            Precision = 0.01f
         };
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), SettingControlType = typeof(EzSettingsColour))]
@@ -111,19 +102,6 @@ namespace osu.Game.EzOsuGame.HUD
             AutoSizeAxes = Axes.Both;
         }
 
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            ModifyPath.BindValueChanged(_ => scheduleReload());
-            SpriteName.BindValueChanged(_ => scheduleReload());
-            FrameTemplate.BindValueChanged(_ => scheduleReload());
-
-            TextureScale.BindValueChanged(_ => applyVisualSettings(), true);
-            AccentColour.BindValueChanged(_ => applyVisualSettings(), true);
-            Blend.BindValueChanged(_ => applyVisualSettings(), true);
-        }
-
         [BackgroundDependencyLoader]
         private void load()
         {
@@ -134,6 +112,18 @@ namespace osu.Game.EzOsuGame.HUD
             AddInternal(speedTracker = new EzBeatmapSpeedTracker());
 
             scheduleReload();
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            ModifyPath.BindValueChanged(_ => scheduleReload());
+            SpriteName.BindValueChanged(_ => scheduleReload());
+            FrameTemplate.BindValueChanged(_ => scheduleReload());
+
+            AccentColour.BindValueChanged(_ => applyVisualSettings(), true);
+            Blend.BindValueChanged(_ => applyVisualSettings(), true);
         }
 
         protected override void Update()
@@ -267,7 +257,6 @@ namespace osu.Game.EzOsuGame.HUD
         {
             if (currentDrawable != null)
             {
-                currentDrawable.Scale = new Vector2(TextureScale.Value);
                 currentDrawable.Colour = AccentColour.Value;
                 currentDrawable.Blending = getBlendingParameters(Blend.Value);
             }

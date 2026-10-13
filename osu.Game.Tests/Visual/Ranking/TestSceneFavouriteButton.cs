@@ -2,18 +2,23 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using NUnit.Framework;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests;
 using osu.Game.Online.API.Requests.Responses;
+using osu.Game.Overlays;
 using osu.Game.Screens.Ranking;
 
 namespace osu.Game.Tests.Visual.Ranking
 {
     public partial class TestSceneFavouriteButton : OsuTestScene
     {
+        [Cached]
+        private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Aquamarine);
+
         private FavouriteButton? favourite;
 
         private readonly BeatmapSetInfo beatmapSetInfo = new BeatmapSetInfo { OnlineID = 88 };

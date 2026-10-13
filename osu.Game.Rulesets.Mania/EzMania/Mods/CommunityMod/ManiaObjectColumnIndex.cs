@@ -63,19 +63,74 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         {
             ArgumentNullException.ThrowIfNull(hitObject);
 
-            Add(hitObject.Column, hitObject.StartTime, hitObject.GetEndTime());
+            add(hitObject.Column, hitObject.StartTime, hitObject.GetEndTime(), hitObject);
         }
 
-        public void Add(int column, double startTime, double endTime)
+        public void Add(int column, double startTime, double endTime) =>
+            add(column, startTime, endTime, null);
+
+        /// <summary>
+        /// 把该列按开始时间升序的对象抄到 <paramref name="destination"/>。只包含 <see cref="Add(ManiaHitObject)"/> 放进去的对象。
+        /// </summary>
+        public void CopyColumn(int column, List<ManiaHitObject> destination)
+        {
+            ArgumentNullException.ThrowIfNull(destination);
+            destination.Clear();
+
+            if ((uint)column >= (uint)entries.Length)
+                return;
+
+            List<Entry> columnEntries = entries[column];
+
+            for (int i = 0; i < columnEntries.Count; i++)
+            {
+                ManiaHitObject? hitObject = columnEntries[i].HitObject;
+
+                if (hitObject != null)
+                    destination.Add(hitObject);
+            }
+        }
+
+        /// <summary>
+        /// 同列上第一个与半开区间 <c>[start, end)</c> 相交的条目。
+        /// 正长条相交条件是双方区间重叠；零长与负长只在开始时间落在查询区间内时相交。
+        /// </summary>
+        public bool TryFindFirstIntersection(int column, double start, double end, out double hitStart, out double hitEnd)
+        {
+            hitStart = 0;
+            hitEnd = 0;
+
+            if ((uint)column >= (uint)entries.Length || !(end > start))
+                return false;
+
+            List<Entry> columnEntries = entries[column];
+            int limit = lowerBound(columnEntries, end);
+
+            for (int i = 0; i < limit; i++)
+            {
+                Entry entry = columnEntries[i];
+
+                if (!intersects(entry, start, end))
+                    continue;
+
+                hitStart = entry.Start;
+                hitEnd = entry.End;
+                return true;
+            }
+
+            return false;
+        }
+
+        private void add(int column, double startTime, double endTime, ManiaHitObject? hitObject)
         {
             // 越界列与 NaN 开始时间在原判定里永远不成立，直接不入索引即可（入不了也就查不到）。
-            if (!isTrackable(column, startTime))
+            if (!isTrackable(column, startTime) || (uint)column >= (uint)entries.Length)
                 return;
 
             List<Entry> columnEntries = entries[column];
             int position = upperBound(columnEntries, startTime);
 
-            columnEntries.Insert(position, new Entry(startTime, endTime));
+            columnEntries.Insert(position, new Entry(startTime, endTime, hitObject));
             repairPrefix(column, position);
         }
 
@@ -110,6 +165,32 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         }
 
         private static bool isTrackable(int column, double startTime) => column >= 0 && !double.IsNaN(startTime);
+
+        private static bool intersects(Entry entry, double start, double end)
+        {
+            if (entry.End > entry.Start)
+                return entry.Start < end && entry.End > start;
+
+            return entry.Start >= start && entry.Start < end;
+        }
+
+        private static int lowerBound(List<Entry> columnEntries, double startTime)
+        {
+            int low = 0;
+            int high = columnEntries.Count;
+
+            while (low < high)
+            {
+                int mid = (low + high) >> 1;
+
+                if (columnEntries[mid].Start < startTime)
+                    low = mid + 1;
+                else
+                    high = mid;
+            }
+
+            return low;
+        }
 
         private static int upperBound(List<Entry> columnEntries, double startTime)
         {
@@ -169,11 +250,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         {
             public readonly double Start;
             public readonly double End;
+            public readonly ManiaHitObject? HitObject;
 
-            public Entry(double start, double end)
+            public Entry(double start, double end, ManiaHitObject? hitObject)
             {
                 Start = start;
                 End = end;
+                HitObject = hitObject;
             }
         }
     }

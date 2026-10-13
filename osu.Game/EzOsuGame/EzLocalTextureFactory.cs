@@ -12,7 +12,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.HUD;
 using osuTK;
 
 namespace osu.Game.EzOsuGame
@@ -38,7 +37,7 @@ namespace osu.Game.EzOsuGame
 
         private readonly Bindable<string> stageName = new Bindable<string>();
         private readonly Bindable<string> noteSetName = new Bindable<string>();
-        private readonly Bindable<EzEnumGameThemeName> gameThemeName = new Bindable<EzEnumGameThemeName>();
+        private readonly Bindable<string> gameThemeName = new Bindable<string>();
 
         private readonly BindableBool colorSettingsEnabled = new BindableBool(true);
         private readonly Bindable<Colour4> columnTypeA = new Bindable<Colour4>();
@@ -51,6 +50,9 @@ namespace osu.Game.EzOsuGame
         private readonly Dictionary<NoteSizeCacheKey, Bindable<Vector2>> noteSizeBindables = new Dictionary<NoteSizeCacheKey, Bindable<Vector2>>();
 
         private readonly Action<int, int, EzColumnType>? onColumnTypeChangedHandler;
+
+        private string? plateLayoutStage;
+        private EzStagePlateLayout? plateLayout;
 
         private readonly struct NoteSizeCacheKey : IEquatable<NoteSizeCacheKey>
         {
@@ -79,7 +81,7 @@ namespace osu.Game.EzOsuGame
 
             ezConfig.BindWith(Ez2Setting.NoteSetName, noteSetName);
             ezConfig.BindWith(Ez2Setting.StageName, stageName);
-            gameThemeName.BindTo(ezConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName));
+            gameThemeName.BindTo(ezConfig.GetBindable<string>(Ez2Setting.GameThemeName));
 
             ezConfig.BindWith(Ez2Setting.ColumnWidth, columnWidth);
             ezConfig.BindWith(Ez2Setting.SpecialFactor, specialFactor);
@@ -151,7 +153,7 @@ namespace osu.Game.EzOsuGame
         {
             columnWidth.BindValueChanged(_ => scheduleTextureRefresh());
             specialFactor.BindValueChanged(_ => scheduleTextureRefresh());
-            noteHeightScaleToWidth.BindValueChanged(_ => scheduleTextureRefresh(), true);
+            noteHeightScaleToWidth.BindValueChanged(_ => scheduleTextureRefresh());
         }
 
         private void initializeColourEvents()
@@ -360,69 +362,279 @@ namespace osu.Game.EzOsuGame
 
         #region Stage Creation
 
-        public Container CreateStage(string component)
+        public Container CreateStage(int columnCount)
         {
             var container = new Container
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
-
-                // AutoSizeAxes = Axes.X,
-                // Height = default_stage_body_height,
-                // Masking = true,
             };
 
-            string basePath = $"Stage/{stageName.Value}/Stage";
+            EzStagePlateLayout? layout = getPlateLayout();
 
-            container.Add(getStageTextureAnimation($"{basePath}/eightkey/{component}"));
-            container.Add(getStageTextureAnimation($"{basePath}/GrooveLight")); //此纹理需要修改正片叠底
-            container.Add(getStageTextureAnimation($"{basePath}/{stageName.Value}_OverObject/{stageName.Value}_OverObject"));
+            if (layout == null)
+                return container;
+
+            string basePath = $"Stage/{stageName.Value}/Stage";
+            string? keyFolder = ResolveStageKeyFolder(resource.ListSubdirectories(basePath), columnCount);
+
+            addPlateSprite(container, layout.Back, $"{basePath}/BlackPanel");
+
+            if (keyFolder != null)
+                addPlateSprite(container, layout.Body, $"{basePath}/{keyFolder}/Body");
+
+            addPlateSprite(container, layout.GrooveLight, $"{basePath}/GrooveLight");
+
+            if (layout.Meter != null)
+            {
+                Drawable? gauge = createPlateDrawable($"{basePath}/GrooveGauge", layout.Meter.Gauge);
+                Drawable? bright = createPlateDrawable($"{basePath}/GrooveGaugeLight", layout.Meter.Bright);
+
+                if (gauge != null || bright != null)
+                    container.Add(new EzStageGrooveMeter(layout.Meter, gauge, bright));
+            }
+
+            addPlateSprite(container, layout.OverObject, plateTexturePath(basePath, layout.OverObject, $"{stageName.Value}_OverObject/{stageName.Value}_OverObject"));
+
+            if (layout.Parts != null)
+            {
+                foreach (EzStagePlateSprite part in layout.Parts)
+                {
+                    if (string.IsNullOrEmpty(part.Path))
+                        continue;
+
+                    addPlateSprite(container, part, $"{basePath}/{part.Path}");
+                }
+            }
+
+            addPlateCounter(container, layout.Score, EzStagePlateCounter.Source.Score);
+            addPlateCounter(container, layout.Combo, EzStagePlateCounter.Source.MaxCombo);
+
+            if (layout.Character != null)
+            {
+                bool placed = false;
+
+                if (!string.IsNullOrEmpty(layout.Character.Path))
+                    placed = addPlateSprite(container, layout.Character, $"{basePath}/{layout.Character.Path}");
+
+                if (!placed && keyFolder != null)
+                    placed = addPlateSprite(container, layout.Character, $"{basePath}/{keyFolder}/Character");
+
+                if (!placed)
+                    addPlateSprite(container, layout.Character, $"{basePath}/Character_overlayer");
+            }
 
             return container;
         }
 
-        private Drawable getStageTextureAnimation(string basePath)
+        private EzStagePlateLayout? getPlateLayout()
         {
-            var frames = loadStageComponentFrames(basePath);
+            if (plateLayoutStage == stageName.Value)
+                return plateLayout;
 
-            // 1 帧即普通纹理，不按动画加载。
+            plateLayoutStage = stageName.Value;
+            plateLayout = EzStagePlateLayout.TryLoad(resource, stageName.Value);
+            return plateLayout;
+        }
+
+        internal const int MAX_STAGE_KEYS = 18;
+
+        private const int stage_key_downward_floor = 4;
+
+        internal static string? ResolveStageKeyFolder(IEnumerable<string> folderNames, int columnCount)
+        {
+            if (columnCount <= 0)
+                return null;
+
+            string?[] best = new string?[MAX_STAGE_KEYS + 1];
+
+            foreach (string name in folderNames)
+            {
+                if (!tryParseKeyFolder(name, out int keys))
+                    continue;
+
+                string? current = best[keys];
+
+                if (current == null || keyFolderPreference(name, keys) > keyFolderPreference(current, keys))
+                    best[keys] = name;
+            }
+
+            if (columnCount > MAX_STAGE_KEYS)
+                columnCount = MAX_STAGE_KEYS;
+
+            if (best[columnCount] != null)
+                return best[columnCount];
+
+            // 先耗尽同奇偶（先下后上，向下不低于 4），再按同样顺序耗尽异奇偶。
+            int parity = columnCount & 1;
+
+            return scanParity(parity) ?? scanParity(parity ^ 1);
+
+            string? scanParity(int wantedParity)
+            {
+                if (columnCount >= stage_key_downward_floor)
+                {
+                    for (int keys = columnCount - 1; keys >= stage_key_downward_floor; keys--)
+                    {
+                        if ((keys & 1) != wantedParity)
+                            continue;
+
+                        if (best[keys] != null)
+                            return best[keys];
+                    }
+                }
+
+                for (int keys = columnCount + 1; keys <= MAX_STAGE_KEYS; keys++)
+                {
+                    if ((keys & 1) != wantedParity)
+                        continue;
+
+                    if (best[keys] != null)
+                        return best[keys];
+                }
+
+                return null;
+            }
+        }
+
+        private static int keyFolderPreference(string name, int keys)
+        {
+            if (name.Equals($"_{keys}key", StringComparison.OrdinalIgnoreCase))
+                return 2;
+
+            if (name.Equals($"{keys}key", StringComparison.OrdinalIgnoreCase))
+                return 1;
+
+            return 0;
+        }
+
+        private static bool tryParseKeyFolder(string folder, out int keys)
+        {
+            keys = 0;
+
+            if (folder.Length <= 3 || !folder.EndsWith("key", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            string head = folder[..^3].TrimStart('_');
+
+            if (head.Length == 0)
+                return false;
+
+            if (int.TryParse(head, out keys))
+                return keys is >= 1 and <= MAX_STAGE_KEYS;
+
+            return false;
+        }
+
+        private static string plateTexturePath(string basePath, EzStagePlateSprite? piece, string fallback)
+        {
+            string relative = piece != null && !string.IsNullOrEmpty(piece.Path) ? piece.Path : fallback;
+            return $"{basePath}/{relative}";
+        }
+
+        private static void addPlateCounter(Container parent, EzStagePlateDigits? digits, EzStagePlateCounter.Source source)
+        {
+            if (digits == null || !digits.Enabled || digits.Digits <= 0)
+                return;
+
+            parent.Add(new EzStagePlateCounter(digits, source));
+        }
+
+        private bool addPlateSprite(Container parent, EzStagePlateSprite? piece, string texturePath)
+        {
+            if (piece == null)
+                return false;
+
+            Drawable? drawable = createPlateDrawable(texturePath, piece);
+
+            if (drawable == null)
+                return false;
+
+            parent.Add(drawable);
+            return true;
+        }
+
+        private Drawable? createPlateDrawable(string texturePath, EzStagePlateSprite? piece)
+        {
+            if (piece == null)
+                return null;
+
+            var frames = loadStageComponentFrames(texturePath);
+
+            if (frames.Count == 0)
+                return null;
+
+            BlendingParameters blending = piece.IsAdditive ? BlendingParameters.Additive : BlendingParameters.Inherit;
+
             if (frames.Count == 1)
             {
                 var sprite = new Sprite
                 {
-                    Anchor = Anchor.BottomCentre,
-                    Origin = Anchor.BottomCentre,
-                    Y = 384f + 247f,
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Position = piece.ToOsuPosition(),
                     Texture = frames[0],
+                    Blending = blending,
                 };
 
-                if (basePath.Contains("GrooveLight"))
-                    sprite.Blending = BlendingParameters.Additive;
+                if (isSingleFrameGlow(texturePath))
+                {
+                    applySpin(sprite, piece);
+                    return new EzStageSingleLightBreath(sprite);
+                }
 
+                applySpin(sprite, piece);
                 return sprite;
             }
 
             var animation = new TextureAnimation
             {
-                Anchor = Anchor.BottomCentre,
-                Origin = Anchor.BottomCentre,
-                Y = 384f + 247f,
-                // RelativeSizeAxes = Axes.None,
-                // FillMode = FillMode.Fill,
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Position = piece.ToOsuPosition(),
+                Loop = piece.Loop,
+                DefaultFrameLength = piece.FrameLength,
+                Blending = blending,
             };
 
-            if (basePath.Contains("GrooveLight"))
-                animation.Blending = BlendingParameters.Additive;
-
-            animation.Loop = frames.Count > 1;
-            animation.Scale = frames.Count > 1
-                ? new Vector2(2f)
-                : Vector2.One;
-
             animation.AddFrames(frames);
-
+            applySpin(animation, piece);
             return animation;
         }
+
+        private static void applySpin(Drawable drawable, EzStagePlateSprite piece)
+        {
+            EzStagePlateSpin? spin = piece.Spin;
+
+            if (spin == null || spin.Seconds <= 0 || spin.Degrees == 0)
+                return;
+
+            double revolution = spin.Seconds * 360.0 / Math.Abs(spin.Degrees);
+            RotationDirection direction = spin.Degrees > 0 ? RotationDirection.Counterclockwise : RotationDirection.Clockwise;
+            bool loop = spin.Loop;
+            float angle = direction == RotationDirection.Counterclockwise ? -Math.Abs(spin.Degrees) : Math.Abs(spin.Degrees);
+            double seconds = spin.Seconds;
+
+            // Loop 会读 Clock.Time。零件这时还没挂进画面，时钟为空。
+            void start(Drawable target)
+            {
+                target.OnLoadComplete -= start;
+
+                if (loop)
+                    target.Spin(revolution, direction);
+                else
+                    target.RotateTo(angle, seconds, Easing.None);
+            }
+
+            if (drawable.IsLoaded)
+                start(drawable);
+            else
+                drawable.OnLoadComplete += start;
+        }
+
+        private static bool isSingleFrameGlow(string texturePath)
+            => texturePath.EndsWith("/GrooveLight", StringComparison.OrdinalIgnoreCase)
+               || texturePath.EndsWith("/GrooveGaugeLight", StringComparison.OrdinalIgnoreCase);
 
         // Stage 组件帧：交给层2/层3 同一规则（多帧 AnimationSafe，空则回退 Large 单图）。
         private List<Texture> loadStageComponentFrames(string basePath) => resource.LoadStageFrames(basePath);
@@ -472,10 +684,10 @@ namespace osu.Game.EzOsuGame
 
             string[] pathsToTry =
             {
-                $"Stage/{currentStageName}/Stage/eightkey/keybase/{component}",
-                $"Stage/{currentStageName}/Stage/eightkey/keypress/{component}",
-                $"Stage/{currentStageName}/Stage/eightkey/keybase/{component}_{keySuffix}",
-                $"Stage/{currentStageName}/Stage/eightkey/keypress/{component}_{keySuffix}",
+                $"Stage/{currentStageName}/Stage/_5key/keybase/{component}",
+                $"Stage/{currentStageName}/Stage/_5key/keypress/{component}",
+                $"Stage/{currentStageName}/Stage/_5key/keybase/{component}_{keySuffix}",
+                $"Stage/{currentStageName}/Stage/_5key/keypress/{component}_{keySuffix}",
             };
 
             foreach (string basePath in pathsToTry)

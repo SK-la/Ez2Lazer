@@ -15,7 +15,6 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Threading;
-using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Containers;
@@ -97,7 +96,7 @@ namespace osu.Game.Screens.Footer
                     Children = new Drawable[]
                     {
                         // N: frosted glass — cool FooterVeil so blur reads (not same hue as solid M).
-                        footerAcrylic = new EzAcrylicPanelBackground(EzAcrylicStyle.FooterVeil)
+                        footerAcrylic = new EzAcrylicPanelBackground(EzUIStyleV1.FooterVeil)
                         {
                             AcrylicCaptureVisible = true,
                         },
@@ -129,23 +128,25 @@ namespace osu.Game.Screens.Footer
                                 Origin = Anchor.BottomLeft,
                                 Y = ScreenFooterButton.CORNER_RADIUS,
                                 Direction = FillDirection.Horizontal,
-                                Spacing = new Vector2(7, 0),
+                                Spacing = new Vector2(0, 0),
                                 AutoSizeAxes = Axes.Both,
                             },
                             overlayContentContainer = new Container
                             {
                                 Name = "Overlay-provided extra content",
                                 RelativeSizeAxes = Axes.Both,
-                                Y = -OsuGame.SCREEN_EDGE_MARGIN,
+                                // Y = -OsuGame.SCREEN_EDGE_MARGIN,
                             },
                         },
                     }
                 },
                 BackButton = new ScreenBackButton
                 {
-                    Margin = new MarginPadding { Bottom = OsuGame.SCREEN_EDGE_MARGIN, Left = OsuGame.SCREEN_EDGE_MARGIN },
+                    Margin = new MarginPadding { Left = OsuGame.SCREEN_EDGE_MARGIN },
                     Anchor = Anchor.BottomLeft,
                     Origin = Anchor.BottomLeft,
+                    // footer buttons are taller than the footer, match the flow's offset so all of them sit at the same height.
+                    Y = ScreenFooterButton.CORNER_RADIUS,
                     Action = onBackPressed,
                 },
                 hiddenButtonsContainer = new Container<ScreenFooterButton>
@@ -364,7 +365,7 @@ namespace osu.Game.Screens.Footer
 
             background.FadeColour(colourProvider.Background5, 150, Easing.OutQuint);
             // Light scheme wash only — keep frost readable (do not retint to opaque Background5).
-            footerAcrylic.TintBox.FadeColour(colourProvider.Background5.Opacity(EzAcrylicStyle.FooterSchemeTintAlpha), 150, Easing.OutQuint);
+            footerAcrylic.TintBox.FadeColour(colourProvider.Background5.Opacity(EzUIStyleV1.FooterSchemeTintAlpha), 150, Easing.OutQuint);
 
             foreach (var button in buttonsFlow)
                 button.UpdateDisplay();

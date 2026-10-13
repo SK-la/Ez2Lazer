@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,8 +11,9 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Sprites;
+using osu.Framework.Graphics.Textures;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Animation;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Screens;
@@ -28,12 +30,16 @@ using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.HUD
 {
-    public partial class EzHUDHitResultScore : CompositeDrawable, ISerialisableDrawable, IEzGameplayWarmUp //, IPreviewable //, IAnimatableJudgement
+    public partial class EzHUDHitResultScore : CompositeDrawable, ISerialisableDrawable, IEzGameplayWarmUp, IEzHudThemeTarget //, IPreviewable //, IAnimatableJudgement
     {
+        EzHudThemeSlot IEzHudThemeTarget.Slot => EzHudThemeSlot.Judgement;
+
+        Bindable<string> IEzHudThemeTarget.Theme => ThemeName;
+
         public bool UsesFixedAnchor { get; set; }
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_TEXT_FONT_LABEL), nameof(EzHUDStrings.HITRESULT_TEXT_FONT_DESCRIPTION))]
-        public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<string> ThemeName { get; } = new Bindable<string>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_AUTO_MAP_HITMODE_LABEL), nameof(EzHUDStrings.HITRESULT_AUTO_MAP_HITMODE_DESCRIPTION))]
         public BindableBool AutoMapHitMode { get; } = new BindableBool();
@@ -45,7 +51,7 @@ namespace osu.Game.EzOsuGame.HUD
         public Bindable<EzEnumHitResult> SkipBetterJudgement { get; } = new Bindable<EzEnumHitResult>();
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.PLAYBACK_FPS_LABEL), nameof(EzHUDStrings.PLAYBACK_FPS_DESCRIPTION))]
-        public BindableNumber<float> FPS { get; } = new BindableNumber<float>(60)
+        public BindableNumber<float> FPS { get; } = new BindableNumber<float>(30)
         {
             MinValue = 1,
             MaxValue = 240,
@@ -53,7 +59,13 @@ namespace osu.Game.EzOsuGame.HUD
         };
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_ANIMATION_TEMPLATE_LABEL), nameof(EzHUDStrings.HITRESULT_ANIMATION_TEMPLATE_DESCRIPTION), SettingControlType = typeof(SettingsTextBox))]
-        public Bindable<string> AnimationFrameTemplate { get; } = new Bindable<string>("{result}/frame_{0}");
+        public Bindable<string> AnimationFrameTemplate { get; } = new Bindable<string>("{result}/{000}");
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_FORCE_DEFORM_LABEL), nameof(EzHUDStrings.HITRESULT_FORCE_DEFORM_DESCRIPTION))]
+        public BindableBool ForceDeformAnimation { get; } = new BindableBool(true);
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_DEFORM_TEMPLATE_LABEL), nameof(EzHUDStrings.HITRESULT_DEFORM_TEMPLATE_DESCRIPTION))]
+        public Bindable<EzEnumDeformTemplate> DeformTemplate { get; } = new Bindable<EzEnumDeformTemplate>();
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
@@ -91,7 +103,9 @@ namespace osu.Game.EzOsuGame.HUD
         //     Value = Anchor.TopCentre
         // };
 
-        private Drawable? hitAnimation;
+        private readonly Dictionary<HitResult, Drawable> judgementDrawables = new Dictionary<HitResult, Drawable>();
+        private readonly HashSet<HitResult> unavailableResults = new HashSet<HitResult>();
+        private HitResult? visibleResult;
         private Drawable? fullComboAnimation;
         private ISample? fullComboSound;
 
@@ -113,7 +127,7 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved(canBeNull: true)]
         private GameplayClockContainer? gameplayClockContainer { get; set; }
 
-        private Bindable<EzEnumGameThemeName> themeName = null!;
+        private Bindable<string> themeName = null!;
         private Bindable<EzEnumHitMode> maniaHitModeConfig = null!;
 
         public EzHUDHitResultScore()
@@ -132,17 +146,13 @@ namespace osu.Game.EzOsuGame.HUD
             // 而 LoadComplete 跑在 `Ready` 之后，那时登记就已经晚了一帧、会被漏掉。
             warmUpService.Register(this);
 
-            themeName = ezConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName);
+            themeName = ezConfig.GetBindable<string>(Ez2Setting.GameThemeName);
             themeName.BindValueChanged(e =>
             {
-                ThemeName.Value = e.NewValue;
+                ThemeName.Value = EzGameThemeNames.Normalize(e.NewValue);
             });
 
-            ThemeName.BindValueChanged(_ =>
-            {
-                ClearInternal();
-                hitAnimation?.Invalidate();
-            }, true);
+            ThemeName.BindValueChanged(_ => invalidateCurrentAnimation(), true);
 
             // HitMode 模板：自动模式跟随 Ez 全局 HitMode 配置；手动模式使用下拉栏的固定值。
             maniaHitModeConfig = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
@@ -166,6 +176,16 @@ namespace osu.Game.EzOsuGame.HUD
                     invalidateCurrentAnimation();
             });
 
+            ForceDeformAnimation.BindValueChanged(e =>
+            {
+                DeformTemplate.Disabled = !e.NewValue;
+                invalidateCurrentAnimation();
+            }, true);
+
+            FPS.BindValueChanged(_ => invalidateCurrentAnimation());
+
+            AnimationFrameTemplate.BindValueChanged(_ => invalidateCurrentAnimation());
+
             HitResultBlendModeSetting.BindValueChanged(mode =>
             {
                 hitResultBlending.Value = mode.NewValue switch
@@ -186,6 +206,9 @@ namespace osu.Game.EzOsuGame.HUD
                         Destination = BlendingType.One
                     }
                 };
+
+                foreach (var drawable in judgementDrawables.Values)
+                    drawable.Blending = hitResultBlending.Value;
             }, true);
 
             AccentColour.BindValueChanged(_ => Colour = AccentColour.Value, true);
@@ -226,44 +249,98 @@ namespace osu.Game.EzOsuGame.HUD
             if (hitResult.GetIndexForOrderedDisplay() < SkipBetterJudgement.Value.GetIndexForOrderedDisplay())
                 return;
 
-            // 清除内部元素前先结束所有变换
-            hitAnimation?.FinishTransforms();
+            if (visibleResult is HitResult previous && previous != hitResult && judgementDrawables.TryGetValue(previous, out var previousDrawable))
+                hideJudgement(previousDrawable);
 
-            ClearInternal();
-            hitAnimation = null;
+            var drawable = getOrCreateJudgement(hitResult);
 
-            var judgementText = CreateJudgementTexture(judgement.Type);
-            AddInternal(judgementText);
-        }
-
-        protected Drawable CreateJudgementTexture(HitResult result)
-        {
-            double frameLength = 1000.0 / FPS.Value;
-
-            hitAnimation = probeJudgementDrawable(result, ThemeName.Value.ToString(),
-                AnimationFrameTemplate.Value?.Trim() ?? "{result}/frame_{0}", frameLength, resolveActiveTemplate());
-
-            if (hitAnimation != null)
+            if (drawable == null)
             {
-                configureJudgementDrawable(result, hitAnimation, frameLength);
-                return hitAnimation;
+                visibleResult = null;
+                return;
             }
 
-            // 所有尝试都失败，返回空动画（跳过显示）
-            return new TextureAnimation
+            visibleResult = hitResult;
+            replayJudgement(hitResult, drawable);
+        }
+
+        private Drawable? getOrCreateJudgement(HitResult result)
+        {
+            if (judgementDrawables.TryGetValue(result, out var existing))
+                return existing;
+
+            if (unavailableResults.Contains(result))
+                return null;
+
+            double frameLength = 1000.0 / FPS.Value;
+            var drawable = probeJudgementDrawable(result, EzGameThemeNames.Normalize(ThemeName.Value),
+                AnimationFrameTemplate.Value?.Trim() ?? "{result}/{000}", frameLength, resolveActiveTemplate());
+
+            if (drawable == null)
             {
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre,
-                Loop = false,
-                Alpha = 0 // 完全透明，不显示
-            };
+                unavailableResults.Add(result);
+                return null;
+            }
+
+            configureJudgementDrawable(drawable, frameLength);
+            drawable.Hide();
+            AddInternal(drawable);
+            judgementDrawables[result] = drawable;
+            return drawable;
+        }
+
+        private void replayJudgement(HitResult result, Drawable drawable)
+        {
+            if (!drawable.IsLoaded)
+            {
+                Schedule(() =>
+                {
+                    if (visibleResult == result
+                        && judgementDrawables.TryGetValue(result, out var current)
+                        && current == drawable)
+                        replayJudgement(result, drawable);
+                });
+
+                return;
+            }
+
+            if (drawable is TextureAnimation animation)
+                animation.Restart();
+
+            if (ForceDeformAnimation.Value)
+            {
+                PlayAnimation(result, drawable);
+                return;
+            }
+
+            drawable.ClearTransforms();
+            drawable.Alpha = 1;
+            drawable.Position = Vector2.Zero;
+
+            if (drawable is TextureAnimation playing)
+            {
+                // playing.Scale = new Vector2(1.2f);
+                PlayAnimationGif(result, playing);
+            }
+            else
+                drawable.Scale = new Vector2(0.5f);
+        }
+
+        private static void hideJudgement(Drawable drawable)
+        {
+            drawable.FinishTransforms();
+
+            if (drawable is TextureAnimation animation)
+                animation.Stop();
+
+            drawable.Hide();
         }
 
         /// <summary>
         /// 判定纹理的探测：原名与回退名各解析一次，命中即停。
         /// </summary>
         /// <remarks>
-        /// 进局（<see cref="CreateJudgementTexture"/>）与进图预热共用这一份，避免两套探测逻辑漂移——
+        /// 进局（<see cref="getOrCreateJudgement"/>）与进图预热共用这一份，避免两套探测逻辑漂移——
         /// 漂移会让预热解码出进局用不到的帧、或漏掉进局真正要用的那一条。
         /// 这里刻意不读写组件字段、不做 configure / 播放，所以预热侧可以安全调用后直接 Dispose。
         /// </remarks>
@@ -293,33 +370,17 @@ namespace osu.Game.EzOsuGame.HUD
             FrameTemplate = string.IsNullOrWhiteSpace(template) ? null : template,
         };
 
-        private void configureJudgementDrawable(HitResult result, Drawable drawable, double frameLength)
+        private void configureJudgementDrawable(Drawable drawable, double frameLength)
         {
-            if (drawable is Sprite)
-            {
-                drawable.Anchor = Anchor.Centre;
-                drawable.Origin = Anchor.Centre;
-                drawable.Scale = new Vector2(0.5f);
-                drawable.Alpha = 0;
-                drawable.Blending = hitResultBlending.Value;
+            drawable.Anchor = Anchor.Centre;
+            drawable.Origin = Anchor.Centre;
+            drawable.Blending = hitResultBlending.Value;
 
-                Schedule(() => PlayAnimation(result, drawable));
-            }
-            else if (drawable is TextureAnimation animation)
+            if (drawable is TextureAnimation animation)
             {
-                animation.Anchor = Anchor.Centre;
-                animation.Origin = Anchor.Centre;
-                animation.Scale = new Vector2(1.2f);
-                animation.Loop = false;
+                // 强制变形时多帧只负责循环，播完与否由变形的淡出决定。
+                animation.Loop = ForceDeformAnimation.Value;
                 animation.DefaultFrameLength = frameLength;
-
-                PlayAnimationGif(result, animation);
-
-                animation.OnUpdate += _ =>
-                {
-                    if (animation.CurrentFrameIndex == animation.FrameCount - 1)
-                        animation.Expire();
-                };
             }
         }
 
@@ -349,42 +410,87 @@ namespace osu.Game.EzOsuGame.HUD
         /// <remarks>
         /// 这些资源原先只在**首次**判定/首个满连时才被解码，表现为进局后第一次判定 update/draw 各掉一帧。
         /// 这里按当前 <see cref="ThemeName"/> / <see cref="AnimationFrameTemplate"/> / 生效的 HitMode 模板
-        /// 复刻 <see cref="CreateJudgementTexture"/> 的探测路径（含回退名），在线程池里完成解码。
+        /// 复刻 <see cref="getOrCreateJudgement"/> 的探测路径（含回退名），在线程池里完成解码，并等到绘制线程把上传排空。
+        /// 不在这里创建 drawable：预热线程不在场景树上，创建后再 Dispose 也带不走 GPU 上传。
         /// </remarks>
         public Task WarmUpAsync(CancellationToken cancellationToken)
         {
-            // 与 CreateJudgementTexture 取同一来源：那是组件自己的 ThemeName 设置，不一定是全局配置。
-            string theme = ThemeName.Value.ToString();
-            string template = AnimationFrameTemplate.Value?.Trim() ?? "{result}/frame_{0}";
-            double frameLength = 1000.0 / FPS.Value;
+            // 与 getOrCreateJudgement 取同一来源：那是组件自己的 ThemeName 设置，不一定是全局配置。
+            string theme = EzGameThemeNames.Normalize(ThemeName.Value);
+            string template = AnimationFrameTemplate.Value?.Trim() ?? "{result}/{000}";
             EzEnumHitMode activeTemplate = resolveActiveTemplate();
 
-            return Task.Run(() => warmUpJudgementResources(theme, template, frameLength, activeTemplate, cancellationToken), cancellationToken);
+            return Task.Run(() => warmUpJudgementResources(theme, template, activeTemplate, cancellationToken), cancellationToken);
         }
 
-        private void warmUpJudgementResources(string theme, string template, double frameLength, EzEnumHitMode activeTemplate, CancellationToken cancellationToken)
+        private void warmUpJudgementResources(string theme, string template, EzEnumHitMode activeTemplate, CancellationToken cancellationToken)
         {
+            var uploads = new List<Texture>();
+
             foreach (HitResult result in warm_up_results)
             {
-                if (cancellationToken.IsCancellationRequested)
-                    return;
+                cancellationToken.ThrowIfCancellationRequested();
 
-                // 与进局走同一份探测（命中即停）：解出来的必然是进局会命中的那一条，
-                // 既不会多探后面那些永远用不到的变体 / 回退名，也不会漏掉真正要用的。
-                probeJudgementDrawable(result, theme, template, frameLength, activeTemplate)?.Dispose();
+                // 与进局走同一份探测（命中即停）：解出来的必然是进局会命中的那一条。
+                addUploads(uploads, probeJudgementFrames(result, theme, template, activeTemplate));
             }
 
             // checkFullCombo 直接取 FullCombo/full-combo（不带 GameTheme 前缀）。
-            resources.GetAnimation(@"FullCombo/full-combo", looping: false)?.Dispose();
+            addUploads(uploads, resources.GetTextureFrames(new EzAnimationRequest { Path = @"FullCombo/full-combo" }));
+            EzGameplayWarmUpService.WaitForUpload(uploads, cancellationToken);
+        }
+
+        private Texture[] probeJudgementFrames(HitResult result, string theme, string template, EzEnumHitMode activeTemplate)
+        {
+            Texture[] frames = probeJudgementVariantFrames(theme, EzHitResultNameTemplate.GetResourceName(activeTemplate, result), template);
+
+            if (frames.Length > 0)
+                return frames;
+
+            return probeJudgementVariantFrames(theme, EzHitResultNameTemplate.GetFallbackResourceName(activeTemplate, result), template);
+        }
+
+        private Texture[] probeJudgementVariantFrames(string theme, string resultName, string template)
+        {
+            if (string.IsNullOrEmpty(resultName))
+                return [];
+
+            return resources.GetTextureFrames(buildJudgementRequest(theme, resultName, template));
+        }
+
+        private static void addUploads(List<Texture> uploads, Texture[] frames)
+        {
+            for (int i = 0; i < frames.Length; i++)
+                uploads.Add(frames[i]);
         }
 
         #endregion
 
         private void invalidateCurrentAnimation()
         {
-            hitAnimation?.FinishTransforms();
+            visibleResult = null;
+            judgementDrawables.Clear();
+            unavailableResults.Clear();
+            fullComboAnimation = null;
             ClearInternal();
-            hitAnimation = null;
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (ForceDeformAnimation.Value || visibleResult is not HitResult shown)
+                return;
+
+            if (judgementDrawables.TryGetValue(shown, out var drawable)
+                && drawable is TextureAnimation animation
+                && !animation.Loop
+                && animation.Duration > 0
+                && animation.PlaybackPosition >= animation.Duration)
+            {
+                animation.Hide();
+                visibleResult = null;
+            }
         }
 
         private void checkFullCombo()
@@ -392,6 +498,7 @@ namespace osu.Game.EzOsuGame.HUD
             if (!FullComboEffectEnabled.Value)
             {
                 fullComboAnimation?.Expire();
+                fullComboAnimation = null;
                 return;
             }
 
@@ -400,7 +507,10 @@ namespace osu.Game.EzOsuGame.HUD
 
             if (missCounter.ResultCount.Value == 0)
             {
-                fullComboAnimation = resources.GetAnimation(@"FullCombo/full-combo", looping: false) ?? Empty();
+                if (fullComboAnimation?.Parent != null)
+                    return;
+
+                fullComboAnimation = resources.GetAnimation(new EzAnimationRequest { Path = @"FullCombo/full-combo" }, looping: false) ?? Empty();
                 fullComboAnimation.Anchor = Anchor.Centre;
                 fullComboAnimation.Origin = Anchor.Centre;
                 // fullComboAnimation.Scale = new Vector2(1.5f);
@@ -415,6 +525,7 @@ namespace osu.Game.EzOsuGame.HUD
             else
             {
                 fullComboAnimation?.Expire();
+                fullComboAnimation = null;
             }
         }
 
@@ -475,8 +586,15 @@ namespace osu.Game.EzOsuGame.HUD
             // 防止空引用异常
             if (drawable == null) return;
 
-            double flashSpeed = FPS.Value * 2;
-            applyFadeEffect(hitResult, drawable, flashSpeed);
+            if (tryPlayExtractedAnimation(hitResult, drawable))
+                return;
+
+            // 该主题没有提取到片段时，仍走手写变形。
+            if (drawable is not TextureAnimation)
+            {
+                double flashSpeed = FPS.Value * 2;
+                applyFadeEffect(hitResult, drawable, flashSpeed);
+            }
 
             switch (hitResult)
             {
@@ -511,6 +629,23 @@ namespace osu.Game.EzOsuGame.HUD
                     applyEzStyleEffect(drawable, new Vector2(1.2f));
                     break;
             }
+        }
+
+        private bool tryPlayExtractedAnimation(HitResult hitResult, Drawable drawable)
+        {
+            if (!EzAnimationLibrary.TryGetDeformTheme(DeformTemplate.Value, out EzEnumGameThemeName theme))
+                return false;
+
+            string primary = hitResult == HitResult.Perfect ? EzAnimationLibrary.JUDGEMENT_ANI_KOOL_1 : EzAnimationLibrary.JUDGEMENT_ANI_1;
+            string fallback = hitResult == HitResult.Perfect ? EzAnimationLibrary.JUDGEMENT_ANI_KOOL : EzAnimationLibrary.JUDGEMENT_ANI;
+
+            if (!EzAnimationLibrary.TryGet(EzAnimationLibrary.JUDGEMENT, primary, theme, out EzAnimationTemplate template)
+                && !EzAnimationLibrary.TryGet(EzAnimationLibrary.JUDGEMENT, fallback, theme, out template))
+                return false;
+
+            // 多帧的闪烁来自帧本身，不套片段里的透明度。
+            template.Play(drawable, includeAlpha: drawable is not TextureAnimation);
+            return true;
         }
 
         private void applyEzStyleEffect(Drawable drawable, Vector2 scaleUp, float moveDistance = 0)
@@ -569,7 +704,12 @@ namespace osu.Game.EzOsuGame.HUD
         {
             FinishTransforms(true);
 
-            ClearInternal();
+            foreach (var drawable in judgementDrawables.Values)
+                hideJudgement(drawable);
+
+            visibleResult = null;
+            fullComboAnimation?.Expire();
+            fullComboAnimation = null;
         }
 
         protected override void Dispose(bool isDisposing)

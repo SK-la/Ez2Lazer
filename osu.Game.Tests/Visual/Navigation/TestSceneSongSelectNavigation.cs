@@ -66,7 +66,7 @@ namespace osu.Game.Tests.Visual.Navigation
             // TODO: without this step, a critical bug will be hit, see inline comment in `OsuGame.handleBackButton`.
             AddUntilStep("Wait for song select", () => Game.ScreenStack.CurrentScreen is SoloSongSelect select && select.IsLoaded);
 
-            AddStep("press back button", () => Game.ChildrenOfType<ScreenBackButton>().First().Action!.Invoke());
+            AddStep("press back button", () => Game.ChildrenOfType<ScreenBackButton>().First().TriggerClick());
 
             ConfirmAtMainMenu();
         }

@@ -18,7 +18,7 @@ namespace osu.Game.EzOsuGame.Analysis
     /// 显示列数 = Ez2Ac 10k2s1p（<see cref="Ez2Setting.ManiaSkipEmptyEdgeColumns"/>）开启时 14k 按 13 列渲染。
     /// </para>
     /// <para>
-    /// 游戏内渲染的列数由 Mania 程序集内的 <c>ManiaEzColumnLayout</c> 负责；本类供无法引用 Mania 程序集的消费方
+    /// 游戏内渲染的列数由 Mania 程序集内的 <c>ManiaPlayfieldLayoutHelper</c> 负责；本类供无法引用 Mania 程序集的消费方
     /// （选歌面板 scratch 标签、KPC 图）使用。
     /// </para>
     /// </summary>

@@ -11,12 +11,12 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Cursor;
 using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
-using osu.Game.Graphics.UserInterface;
 using osu.Game.Online;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests;
@@ -27,6 +27,7 @@ using osu.Game.Rulesets.Osu;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens;
+using osu.Game.Screens.Footer;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Ranking;
 using osu.Game.Screens.Ranking.Expanded.Accuracy;
@@ -455,7 +456,7 @@ namespace osu.Game.Tests.Visual.Ranking
             loadResultsScreen(() => screen = createResultsScreen());
             AddUntilStep("wait for load", () => this.ChildrenOfType<ScorePanelList>().Single().AllPanelsVisible);
 
-            AddAssert("download button is disabled", () => !screen.ChildrenOfType<DownloadButton>().Last().Enabled.Value);
+            AddAssert("download button is disabled", () => !this.ChildrenOfType<ReplayDownloadButton>().Single().Enabled.Value);
 
             AddStep("click contracted panel", () =>
             {
@@ -464,7 +465,7 @@ namespace osu.Game.Tests.Visual.Ranking
                 InputManager.Click(MouseButton.Left);
             });
 
-            AddAssert("download button is enabled", () => screen.ChildrenOfType<DownloadButton>().Last().Enabled.Value);
+            AddAssert("download button is enabled", () => this.ChildrenOfType<ReplayDownloadButton>().Single().Enabled.Value);
         }
 
         [Test]
@@ -490,6 +491,9 @@ namespace osu.Game.Tests.Visual.Ranking
 
             AddStep("load results", () => Child = resultsContainer = new TestResultsContainer(results = createResults()));
 
+            // 屏幕推入测试容器时才开始异步加载，先等面板就位再做居中检查。
+            AddUntilStep("wait for load", () => this.ChildrenOfType<ScorePanelList>().SingleOrDefault()?.AllPanelsVisible == true);
+
             // expanded panel should be centered the moment results screen is loaded
             // but can potentially be scrolled away on certain specific load scenarios.
             // see: https://github.com/ppy/osu/issues/18226
@@ -512,21 +516,41 @@ namespace osu.Game.Tests.Visual.Ranking
             [Cached(typeof(UserStatisticsWatcher))]
             public readonly UserStatisticsWatcher UserStatisticsWatcher;
 
+            private readonly OsuScreenStack stack;
+
+            // 挂载后再推入屏幕，否则 footer 找不到祖先 PopoverContainer。
+            private readonly IScreen initialScreen;
+
             public TestResultsContainer(IScreen screen)
             {
                 RelativeSizeAxes = Axes.Both;
-                OsuScreenStack stack;
+                initialScreen = screen;
 
                 InternalChildren = new Drawable[]
                 {
                     UserStatisticsWatcher = new UserStatisticsWatcher(new LocalUserStatisticsProvider()),
-                    stack = new OsuScreenStack
+                    // 结算按钮挂在 footer 上，测试容器需要自带 footer 才会创建这些按钮。
+                    // PopoverContainer 是 footer 隐藏下拉弹层所需。
+                    new PopoverContainer
                     {
                         RelativeSizeAxes = Axes.Both,
-                    }
+                        Children = new Drawable[]
+                        {
+                            stack = new OsuScreenStack
+                            {
+                                RelativeSizeAxes = Axes.Both,
+                            },
+                            new ScreenStackFooter(stack),
+                        }
+                    },
                 };
+            }
 
-                stack.Push(screen);
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+
+                stack.Push(initialScreen);
             }
         }
 

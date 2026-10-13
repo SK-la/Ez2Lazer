@@ -13,9 +13,11 @@ namespace osu.Game.EzOsuGame.HUD
 {
     public partial class EzScoreText : CompositeDrawable, IHasText
     {
+        internal const float GLYPH_TARGET_HEIGHT = 25;
+
         private readonly EzScoreSpriteText textPart;
 
-        public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<string> ThemeName { get; } = new Bindable<string>(EzSelectorEnumList.DEFAULT_NAME);
 
         // public Bindable<bool> UseLazerFont { get; } = new Bindable<bool>();
 
@@ -27,7 +29,7 @@ namespace osu.Game.EzOsuGame.HUD
             set => textPart.Text = value;
         }
 
-        public EzScoreText(Bindable<EzEnumGameThemeName>? externalThemeName = null)
+        public EzScoreText(Bindable<string>? externalThemeName = null)
         {
             AutoSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
@@ -75,7 +77,7 @@ namespace osu.Game.EzOsuGame.HUD
             ThemeName.BindValueChanged(e =>
             {
                 textPart.ThemeName.Value = e.NewValue;
-                float scale = getUniformHeightScale(textPart.Height);
+                float scale = getUniformHeightScale(textPart.Height, GLYPH_TARGET_HEIGHT);
                 textPart.Scale = new Vector2(scale);
                 textPart.Invalidate(); // **确保 UI 立即刷新**
             }, true);
@@ -94,18 +96,22 @@ namespace osu.Game.EzOsuGame.HUD
 
         private partial class EzScoreSpriteText : EzSpriteText
         {
-            public EzScoreSpriteText(Func<char, string> getLookup, Bindable<EzEnumGameThemeName> themeName)
+            public EzScoreSpriteText(Func<char, string> getLookup, Bindable<string> themeName)
                 : base(getLookup, themeName)
             {
             }
 
-            protected override string[] GetPossiblePaths(string themeRoot, string lookup, char character)
+            protected override char[] GetPreloadSpecialChars() => new[] { '.', '%' };
+
+            protected override string[] GetPossiblePaths(string themeName, string lookup, char character)
             {
+                string root = $"GameTheme/{themeName}/";
+
                 return new[]
                 {
-                    $@"{themeRoot}number/score/{lookup}",
-                    $@"{themeRoot}number/combo/{lookup}",
-                    $@"{themeRoot}number/{lookup}",
+                    $"{root}combo/number/{lookup}",
+                    $"{root}number/score/{lookup}",
+                    $"{root}number/{lookup}",
                 };
             }
         }

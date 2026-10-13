@@ -37,10 +37,12 @@ namespace osu.Game.Screens.Menu
 
             var screen = songSelectScreenFactory.Create();
 
+            EzStartupTrace.Log("SongSelect.preload begin");
             LoadComponentAsync(screen, loaded =>
             {
                 songSelectPreloadScheduled = false;
                 preloadedSongSelect = loaded;
+                EzStartupTrace.Log("SongSelect.preload ready");
             });
         }
 

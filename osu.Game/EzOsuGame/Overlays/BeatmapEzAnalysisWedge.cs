@@ -52,7 +52,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             InternalChild = new ShearAligningWrapper(new Container
             {
-                CornerRadius = 10,
+                CornerRadius = EzUIStyleV1.CORNER_RADIUS_WEDGE,
                 Masking = true,
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
@@ -86,11 +86,13 @@ namespace osu.Game.EzOsuGame.Overlays
                                         {
                                             Anchor = Anchor.TopLeft,
                                             Origin = Anchor.TopLeft,
+                                            BackgroundColour = { Value= Colour4.Transparent },
                                         },
                                         rightRadar = new EzHUDRadarPanel
                                         {
                                             Anchor = Anchor.TopLeft,
                                             Origin = Anchor.TopLeft,
+                                            BackgroundColour = { Value= Colour4.Transparent },
                                         },
                                     },
                                 },

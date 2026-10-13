@@ -85,7 +85,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         // 2、无参步进跳过，记录跳过序号数组；
         // 3、有参步进处理，半拍切块，传入键型处理2次。参数：ManiaBeatmap, Type, PSSettings, lamda覆写
         // 4、apply方法内部实现具体逻辑，重复处理次数
-        // 5、最终统一清洗
+        // 5、每个处理过的窗口立刻按开始时间清理，后面的窗口看到的是清完的谱
         public static void ProcessRollingWindowWithOscillator(ManiaBeatmap beatmap,
                                                               KeyPatternType patternType,
                                                               KeyPatternSettings psSettings,
@@ -194,14 +194,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 }
                 finally
                 {
-                    // 若 applyPattern 修改了 beatmap，则重建 objects 以便后续窗口使用最新数据
-                    bool changed = beatmap.HitObjects.Count != objects.Count;
-
-                    if (changed)
-                    {
-                        objects = beatmap.HitObjects.ToList();
-                        objects.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
-                    }
+                    // 清理会改时间和长短，件数不变时也要按谱面重建，后面的窗口不能接着用旧列表。
+                    ManiaNoteCleanupTool.CleanupRange(beatmap, info.start, info.end);
+                    objects = beatmap.HitObjects.ToList();
+                    objects.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
 
                     returnWindowObjectsToPool(windowObjects);
                 }

@@ -20,7 +20,9 @@ namespace osu.Game.EzOsuGame.Startup
 
         public static void Log(string message)
         {
-            Logger.Log($"[EzStartupTrace] +{stopwatch.ElapsedMilliseconds}ms {message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+            string line = $"[EzStartupTrace] +{stopwatch.ElapsedMilliseconds}ms {message}";
+            Logger.Log(line, Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+            Logger.Log(line, level: LogLevel.Verbose);
         }
     }
 }

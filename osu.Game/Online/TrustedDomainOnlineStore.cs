@@ -21,7 +21,7 @@ namespace osu.Game.Online
             switch (customApiUrl)
             {
                 case ServerPreset.Manual:
-                case ServerPreset.Gu:
+                case ServerPreset.g0v0:
                     #if DEBUG
                     // 任何从服务器获取资源的事件都会引发这个日志输出
                     if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? customUri) || !customUri.Host.EndsWith(@".ppy.sh", StringComparison.OrdinalIgnoreCase))

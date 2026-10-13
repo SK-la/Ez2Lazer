@@ -27,6 +27,8 @@ namespace osu.Game.Screens.Select
 {
     public partial class BeatmapMetadataWedge : VisibilityContainer
     {
+        public const float CORNER_RADIUS = EzUIStyleV1.CORNER_RADIUS_WEDGE;
+
         private MetadataDisplay creator = null!;
         private MetadataDisplay source = null!;
         private MetadataDisplay genre = null!;
@@ -92,7 +94,7 @@ namespace osu.Game.Screens.Select
                 {
                     new ShearAligningWrapper(new Container
                     {
-                        CornerRadius = 10,
+                        CornerRadius = CORNER_RADIUS,
                         Masking = true,
                         RelativeSizeAxes = Axes.X,
                         AutoSizeAxes = Axes.Y,
@@ -185,7 +187,7 @@ namespace osu.Game.Screens.Select
                     new ShearAligningWrapper(ratingsWedge = new Container
                     {
                         Alpha = 0f,
-                        CornerRadius = 10,
+                        CornerRadius = CORNER_RADIUS,
                         Masking = true,
                         RelativeSizeAxes = Axes.X,
                         AutoSizeAxes = Axes.Y,
@@ -224,7 +226,7 @@ namespace osu.Game.Screens.Select
                     new ShearAligningWrapper(failRetryWedge = new Container
                     {
                         Alpha = 0f,
-                        CornerRadius = 10,
+                        CornerRadius = CORNER_RADIUS,
                         Masking = true,
                         RelativeSizeAxes = Axes.X,
                         AutoSizeAxes = Axes.Y,

@@ -26,18 +26,19 @@ namespace osu.Game.EzOsuGame
     /// <summary>
     /// Ez2 资源提供者 - 基于官方 IStorageResourceProvider 接口设计
     ///
-    /// 纹理路径（经 <see cref="EzTextureUsage"/> 选择，勿直接持有底层 store）；
-    /// 字形与段位标各自拥有独立页，不与其它纹理挤占（见 <see cref="EzTextureUsage.Glyph"/> / <see cref="EzTextureUsage.Badge"/>）：
+    /// 纹理路径（经 <see cref="EzTextureUsage"/> 选择，勿直接持有底层 store）。
+    /// HUD 的 combo、score 与舞台两套数字共用一张 1024 字形页。note、判定图、光效不进页。
     /// 1. <see cref="EzTextureUsage.Atlas"/> — 小 UI
     /// 2. <see cref="EzTextureUsage.AnimationSafe"/> — 多帧/循环动画（非 atlas，Dispose 为空操作）
     /// 3. <see cref="EzTextureUsage.Large"/> — 单帧大图（refcount，禁止给 TextureAnimation）
-    /// 4. <see cref="EzTextureUsage.Glyph"/> — 位图字形（数字等成套纹理，必须同页）
+    /// 4. <see cref="EzTextureUsage.Glyph"/> — HUD combo / score 与舞台数字（1024 页）
     /// 5. <see cref="EzTextureUsage.Badge"/> — 段位标（加载期限边后进页，成套共用）
     /// </summary>
     public partial class EzResourceStore : Component, IStorageResourceProvider
     {
-        // 字形页尺寸。取值只为「一整套字形必然放得下」留余量：同页是硬要求，尺寸只是实现手段。
-        private const int glyph_atlas_size = 2048;
+        // HUD combo（绘制高 25）与 score（绘制高 25）共用。100 是 score 的 4 倍，整套进一张 1024 页。
+        private const int glyph_atlas_size = 1024;
+        private const int glyph_upload_edge = 128;
 
         // 段位标规范边长。段位图最多 97 张，最大显示 33px（BadgeSize 22 × 父级 Scale 1.5），
         // 128 约为其 4 倍（覆盖 HiDPI），再大只会多占页。
@@ -141,8 +142,9 @@ namespace osu.Game.EzOsuGame
             largeTextureStore = new LargeTextureStore(renderer, textureLoaderStore1);
             largeTextureStore.AddTextureSource(baseTextureLoader);
 
-            // 字形页：独占一页，保证同一套字形（数字 0-9 等）永不被其它纹理挤到两页上。
-            glyphStore = new TextureStore(renderer, textureLoaderStore1, true, TextureFilteringMode.Linear, false, 2, glyph_atlas_size, null);
+            // HUD combo / score 与舞台数字共用。超过 100 的图先缩小再进 1024 页。
+            var glyphLoader = new MaxDimensionLimitedTextureLoaderStore(new TextureLoaderStore(combinedStore), glyph_upload_edge, ResizeMode.Max);
+            glyphStore = new TextureStore(renderer, glyphLoader, true, TextureFilteringMode.Linear, false, 2, glyph_atlas_size, null);
             glyphStore.AddTextureSource(baseTextureLoader);
 
             // 段位标页：加载期把边长压到规范尺寸后再进页，故源图再大也只占一张页。
@@ -165,7 +167,7 @@ namespace osu.Game.EzOsuGame
         #region 纹理获取 API
 
         /// <summary>
-        /// 按用途获取纹理（推荐入口）。
+        /// 按用途取一张已解码纹理。动画和字形不要直接拼路径调用：动画走 <see cref="GetAnimation(EzAnimationRequest, bool, bool, double?, bool)"/>，字形走 <see cref="GetGlyph"/>。
         /// </summary>
         /// <param name="path">完整路径（不含后缀）</param>
         /// <param name="usage">纹理用途，决定底层 store</param>
@@ -179,6 +181,29 @@ namespace osu.Game.EzOsuGame
                 EzTextureUsage.Badge => danStore.Get(path),
                 _ => textureStore.Get(path),
             };
+        }
+
+        /// <summary>
+        /// 按顺序取第一张字形。路径先经 <see cref="EzResourcePath"/> 规整，用途固定为 <see cref="EzTextureUsage.Glyph"/>。
+        /// 字形是单张图，不走动画帧探测。
+        /// </summary>
+        public Texture? GetGlyph(IReadOnlyList<string> candidates)
+        {
+            if (candidates == null)
+                return null;
+
+            foreach (string candidate in candidates)
+            {
+                if (string.IsNullOrWhiteSpace(candidate))
+                    continue;
+
+                Texture? texture = Get(EzResourcePath.Normalise(candidate), EzTextureUsage.Glyph);
+
+                if (texture != null)
+                    return texture;
+            }
+
+            return null;
         }
 
         /// <summary>

@@ -80,14 +80,14 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                 switch (note.Kind)
                 {
                     case ManiaPreviewNoteKind.Tap:
-                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, startRow, note.Kind));
+                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, startRow, note.Kind, note.StartTime, note.StartTime));
                         break;
 
                     case ManiaPreviewNoteKind.HoldHead:
                     {
                         int endRow = Math.Max(startRow + 1, timeToRow(note.EndTime));
-                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, startRow, ManiaPreviewNoteKind.HoldHead));
-                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, endRow, ManiaPreviewNoteKind.HoldBody));
+                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, startRow, ManiaPreviewNoteKind.HoldHead, note.StartTime, note.StartTime));
+                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, endRow, ManiaPreviewNoteKind.HoldBody, note.StartTime, note.EndTime));
                         // entries.Add(new ManiaPreviewLayoutEntry(note.Column, endRow, endRow, ManiaPreviewNoteKind.HoldTail));
                         break;
                     }

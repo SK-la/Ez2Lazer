@@ -66,7 +66,7 @@ namespace osu.Game.Screens.Select
             private void load()
             {
                 Masking = true;
-                CornerRadius = 5;
+                CornerRadius = CORNER_RADIUS / 2;
                 Shear = OsuGame.SHEAR;
 
                 AddRange(new Drawable[]

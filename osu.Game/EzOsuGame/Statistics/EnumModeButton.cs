@@ -3,34 +3,55 @@
 
 using System;
 using System.Linq;
+using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Cursor;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Localisation;
+using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
-using osuTK;
+using osu.Game.Screens.Footer;
 
 namespace osu.Game.EzOsuGame.Statistics
 {
-    public partial class EnumModeButton<TEnum> : RoundedButton, IHasPopover
+    /// <summary>
+    /// 结算界面底部用于切换 <typeparamref name="TEnum"/> 模式的 footer 按钮，点击后弹出全部枚举值。
+    /// </summary>
+    public partial class EnumModeButton<TEnum> : ScreenFooterButton, IHasPopover
         where TEnum : struct, Enum
     {
         private readonly Bindable<TEnum> current;
         private readonly Action<TEnum> setValue;
+        private readonly Action<ValueChangedEvent<TEnum>> updateText;
 
-        public EnumModeButton(Bindable<TEnum> current, Action<TEnum>? setValue = null)
+        public EnumModeButton(Bindable<TEnum> current, IconUsage icon, LocalisableString description, Action<TEnum>? setValue = null)
         {
             this.current = current;
             this.setValue = setValue ?? (value => current.Value = value);
 
-            Size = new Vector2(75, 30);
-            Text = current.Value.ToString();
+            Icon = icon;
+            TooltipText = description;
 
-            current.BindValueChanged(v => Text = v.NewValue.ToString());
+            updateText = v => Text = v.NewValue.ToString();
+            current.BindValueChanged(updateText, true);
+        }
 
+        [BackgroundDependencyLoader]
+        private void load(OsuColour colours)
+        {
+            AccentColour = colours.Purple1;
             Action = this.ShowPopover;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            current.ValueChanged -= updateText;
         }
 
         public Popover GetPopover() => new EnumModePopover(setValue);

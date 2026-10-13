@@ -32,7 +32,8 @@ namespace osu.Game
             loadComponentSingleFile(preloader, Add, true);
             Dependencies.CacheAs<IEzStartupContentPreloader>(preloader);
 
-            preloader.ScheduleSettingsPreload();
+            if (!EzStartupTuning.DeferSettingsPreloadUntilBdspFinished)
+                preloader.ScheduleSettingsPreload();
         }
 
         private void onScreenExitedForStartupPreload(IOsuScreen? lastScreen, IOsuScreen? newScreen)

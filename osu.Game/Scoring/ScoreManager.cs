@@ -59,11 +59,11 @@ namespace osu.Game.Scoring
             scoreExporter = new LegacyScoreExporter(storage, info =>
             {
                 var score = scoreImporter.GetScore(info);
-                if (score?.ScoreInfo.BeatmapInfo == null || score.Replay == null)
+                if (score.ScoreInfo.BeatmapInfo == null || score.Replay == null)
                     return null;
 
                 var playable = beatmaps().GetWorkingBeatmap(score.ScoreInfo.BeatmapInfo)
-                                        .GetPlayableBeatmap(score.ScoreInfo.Ruleset, score.ScoreInfo.Mods);
+                                         .GetPlayableBeatmap(score.ScoreInfo.Ruleset, score.ScoreInfo.Mods);
                 return (score, playable);
             })
             {

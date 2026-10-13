@@ -71,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         public BindableBool MatchManiaPanelWidth { get; } = ManiaPlayfieldLayoutHelper.CreateDefaultMatchPanelWidthBindable();
 
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.MATCH_HIT_POSITION_LAYOUT_LABEL), nameof(EzHUDManiaStrings.MATCH_HIT_POSITION_LAYOUT_DESCRIPTION))]
-        public BindableBool MatchManiaHitPositionLayout { get; } = new BindableBool();
+        public BindableBool MatchManiaHitPositionLayout { get; } = new BindableBool(true);
 
         private Container[]? columns;
         private Box[] judgementMarkers = null!;
@@ -87,12 +87,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         private Bindable<ColumnWidthStyle> columnWidthStyle = null!;
         private Bindable<bool> hitPositionGlobalEnable = null!;
         private Bindable<double> hitPosition = null!;
-        private Ez2ConfigManager ezSkinConfig = null!;
 
         private Anchor savedAnchor;
         private Anchor savedOrigin;
         private Vector2 savedPosition;
         private bool savedLayout;
+
+        [Resolved]
+        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         [Resolved]
         private InputCountController controller { get; set; } = null!;
@@ -104,9 +106,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         private SkinManager skinManager { get; set; } = null!;
 
         [BackgroundDependencyLoader]
-        private void load(Ez2ConfigManager ezSkinConfig)
+        private void load()
         {
-            this.ezSkinConfig = ezSkinConfig;
             columnWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
             specialFactor = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
             columnWidthStyle = ezSkinConfig.GetBindable<ColumnWidthStyle>(Ez2Setting.ColumnWidthStyle);
@@ -120,7 +121,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         private void recreateComponents()
         {
             ClearInternal();
-            keyCount = ManiaEzColumnLayout.GetDisplayColumnCount(controller.Triggers.Count);
+            keyCount = ManiaPlayfieldLayoutHelper.GetDisplayColumnCount(controller.Triggers.Count);
 
             if (keyCount <= 0)
             {
@@ -254,7 +255,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             hitPosition.BindValueChanged(_ => updateHitPositionLayout());
             MatchManiaHitPositionLayout.BindValueChanged(_ => updateHitPositionLayout(), true);
 
-            ezSkinConfig.ColumnTypeChanged += (_, __, ___) => updateWidth();
+            ezSkinConfig.ColumnTypeChanged += updateWidth;
             skin.SourceChanged += onSkinChanged;
 
             // 更新标识块高度
@@ -303,6 +304,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             }, true);
         }
 
+        private void updateWidth(int arg1, int arg2, EzColumnType arg3)
+        {
+            updateWidth();
+        }
+
         private void updateWidth()
         {
             if (keyCount <= 0 || columns == null)
@@ -319,9 +325,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
                     skin,
                     skinManager,
                     ezSkinConfig,
-                    columnWidth.Value,
-                    specialFactor.Value,
-                    columnWidthStyle.Value,
                     mobileAdjust: 1f,
                     MatchManiaPanelWidth.Value);
 
@@ -350,6 +353,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
                     savedPosition = Position;
                     savedLayout = true;
                 }
+
+                Anchor = Anchor.BottomCentre;
+                Origin = Anchor.Centre;
 
                 ManiaPlayfieldLayoutHelper.ApplyHitPositionPlacement(
                     this,
@@ -486,6 +492,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
             foreach (var column in columns)
                 column.Clear();
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                ezSkinConfig.ColumnTypeChanged -= updateWidth;
+                skin.SourceChanged -= onSkinChanged;
+            }
         }
     }
 }

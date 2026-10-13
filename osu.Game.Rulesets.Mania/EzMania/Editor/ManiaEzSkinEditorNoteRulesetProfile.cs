@@ -13,12 +13,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
 {
     public partial class ManiaEzSkinEditorNoteRulesetProfile : IEzSkinEditorNoteRulesetProfile
     {
-        private static readonly EzSkinEditorNotePart[] supported_parts =
+        private static readonly EzManiaNotePart[] supported_parts =
         {
-            EzSkinEditorNotePart.Note,
-            EzSkinEditorNotePart.HoldHead,
-            EzSkinEditorNotePart.HoldBody,
-            EzSkinEditorNotePart.HoldTail,
+            EzManiaNotePart.Note,
+            EzManiaNotePart.HoldHead,
+            EzManiaNotePart.HoldBody,
+            EzManiaNotePart.HoldTail,
         };
 
         private static readonly EzSkinEditorNoteVariant[] legacy_variants =
@@ -41,20 +41,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
 
         public RulesetInfo RulesetInfo => new ManiaRuleset().RulesetInfo;
 
-        public IReadOnlyList<EzSkinEditorNotePart> SupportedParts => supported_parts;
+        public IReadOnlyList<EzManiaNotePart> SupportedParts => supported_parts;
 
-        public IReadOnlyList<EzSkinEditorNoteVariant> GetVariants(bool useEzNoteVariants, EzSkinEditorNotePart part) =>
+        public IReadOnlyList<EzSkinEditorNoteVariant> GetVariants(bool useEzNoteVariants, EzManiaNotePart part) =>
             useEzNoteVariants ? ez_variants : legacy_variants;
 
-        public string GetDefaultVariantId(bool useEzNoteVariants, EzSkinEditorNotePart part) =>
+        public string GetDefaultVariantId(bool useEzNoteVariants, EzManiaNotePart part) =>
             useEzNoteVariants ? nameof(EzColumnType.A) : "1";
 
-        public string ResolveTextureName(bool useEzNoteVariants, EzSkinEditorNotePart part, string variantId) =>
+        public string ResolveTextureName(bool useEzNoteVariants, EzManiaNotePart part, string variantId) =>
             useEzNoteVariants
                 ? resolveEzTextureName(part, variantId)
                 : resolveLegacyTextureName(part, variantId);
 
-        public Texture? GetNoteTexture(ISkin skin, EzSkinEditorNotePreviewRequest request, EzSkinEditorNotePart part)
+        public Texture? GetNoteTexture(ISkin skin, EzSkinEditorNotePreviewRequest request, EzManiaNotePart part)
         {
             string variantId = string.IsNullOrEmpty(request.VariantId)
                 ? GetDefaultVariantId(request.UseEzNoteVariants, part)
@@ -73,7 +73,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
 
         public Drawable? CreateRulesetSettingsContent() => null;
 
-        private static string resolveLegacyTextureName(EzSkinEditorNotePart part, string variantId)
+        private static string resolveLegacyTextureName(EzManiaNotePart part, string variantId)
         {
             string index = variantId switch
             {
@@ -84,14 +84,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
 
             return part switch
             {
-                EzSkinEditorNotePart.HoldHead => $"mania-note{index}H",
-                EzSkinEditorNotePart.HoldBody => $"mania-note{index}L",
-                EzSkinEditorNotePart.HoldTail => $"mania-note{index}T",
+                EzManiaNotePart.HoldHead => $"mania-note{index}H",
+                EzManiaNotePart.HoldBody => $"mania-note{index}L",
+                EzManiaNotePart.HoldTail => $"mania-note{index}T",
                 _ => $"mania-note{index}",
             };
         }
 
-        private static string resolveEzTextureName(EzSkinEditorNotePart part, string variantId)
+        private static string resolveEzTextureName(EzManiaNotePart part, string variantId)
         {
             string prefix = variantId switch
             {
@@ -102,9 +102,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
 
             return part switch
             {
-                EzSkinEditorNotePart.HoldHead => $"{prefix}longnote/head",
-                EzSkinEditorNotePart.HoldBody => $"{prefix}longnote/middle",
-                EzSkinEditorNotePart.HoldTail => $"{prefix}longnote/tail",
+                EzManiaNotePart.HoldHead => $"{prefix}longnote/head",
+                EzManiaNotePart.HoldBody => $"{prefix}longnote/middle",
+                EzManiaNotePart.HoldTail => $"{prefix}longnote/tail",
                 _ => $"{prefix}note",
             };
         }

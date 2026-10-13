@@ -81,7 +81,7 @@ namespace osu.Game.Screens.Select
             private void load(OverlayColourProvider colourProvider)
             {
                 Masking = true;
-                CornerRadius = 10;
+                CornerRadius = CORNER_RADIUS;
                 Shear = OsuGame.SHEAR;
 
                 InternalChildren = new Drawable[]
@@ -176,7 +176,7 @@ namespace osu.Game.Screens.Select
                                     RelativeSizeAxes = Axes.X,
                                     AutoSizeAxes = Axes.Y,
                                     Masking = true,
-                                    CornerRadius = 10 - border_weight,
+                                    CornerRadius = EzUIStyleV1.CORNER_RADIUS_WEDGE - border_weight,
                                     Shear = OsuGame.SHEAR,
                                     Children = new Drawable[]
                                     {
@@ -372,7 +372,7 @@ namespace osu.Game.Screens.Select
                 difficultyText.MaxWidth = Math.Max(nameLine.DrawWidth - mappedByText.DrawWidth - mapperText.DrawWidth - 20, 0);
 
                 // Use difficulty colour until it gets too dark to be visible against dark backgrounds.
-                Color4 col = starRatingDisplay.DisplayedStars.Value >= OsuColour.STAR_DIFFICULTY_DEFINED_COLOUR_CUTOFF ? starRatingDisplay.DisplayedDifficultyTextColour : starRatingDisplay.DisplayedDifficultyColour;
+                Color4 col = starRatingDisplay.ForegroundTextColour;
 
                 difficultyText.Colour = col;
                 mappedByText.Colour = Colour4.WhiteSmoke;

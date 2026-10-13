@@ -177,7 +177,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 psSettings,
                 oscillator,
                 ApplyPatternForWindow);
-            ManiaNoteCleanupTool.CleanupBeatmap(maniaBeatmap, seed: seed);
         }
     }
 }

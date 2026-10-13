@@ -4,6 +4,7 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
@@ -39,7 +40,7 @@ namespace osu.Game.EzOsuGame.UI
         private IAcrylicCaptureRegistrar? acrylicCaptureRegistrar { get; set; }
 
         [BackgroundDependencyLoader]
-        private void load(Ez2ConfigManager ezConfig)
+        private void load(Ez2ConfigManager ezConfig, IRenderer renderer)
         {
             RelativeSizeAxes = Axes.Both;
 
@@ -57,7 +58,7 @@ namespace osu.Game.EzOsuGame.UI
                 darkVeil = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = EzAcrylicStyle.Veil,
+                    Colour = EzUIStyleV1.Veil,
                     Alpha = 0,
                 },
                 wedgeBackground = new WedgeBackground
@@ -69,7 +70,7 @@ namespace osu.Game.EzOsuGame.UI
                 },
             };
 
-            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, acrylicBackdrop);
+            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, acrylicBackdrop, renderer);
         }
 
         protected override void LoadComplete()

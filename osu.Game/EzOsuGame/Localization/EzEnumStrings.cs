@@ -30,6 +30,18 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString JUDGE_PRECEDENCE_EARLIEST = new EzLocalizationManager.EzLocalisableString("最早note优先(osu风格)", "By Earliest Note");
         public static readonly LocalisableString JUDGE_PRECEDENCE_SCORE = new EzLocalizationManager.EzLocalisableString("分数优先(势利)", "By Score");
 
+        public static readonly LocalisableString SCORE_BONUS_TENDENCY_HIGH_JUDGE_RATIO = new EzLocalizationManager.EzLocalisableString(
+            "高判定比例",
+            "High Judge Ratio");
+
+        public static readonly LocalisableString SCORE_BONUS_TENDENCY_LOW_ERROR_RATE = new EzLocalizationManager.EzLocalisableString(
+            "低失误率",
+            "Low Error Rate");
+
+        public static readonly LocalisableString SCORE_BONUS_TENDENCY_HIDDEN = new EzLocalizationManager.EzLocalisableString(
+            "不展示",
+            "Hidden");
+
         public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_NORMAL = new EzLocalizationManager.EzLocalisableString("正常", "Normal");
         public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_IN_GAME_FOCUS = new EzLocalizationManager.EzLocalisableString("游戏内聚焦", "In-game focus");
         public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_NEVER = new EzLocalizationManager.EzLocalisableString("永不通知", "Never notify");
@@ -46,7 +58,6 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_PP = new EzLocalizationManager.EzLocalisableString("Realm PP", "Realm PP");
         public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_ALL = new EzLocalizationManager.EzLocalisableString("Realm 全部元数据", "Realm all metadata");
         public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_SCORES = new EzLocalizationManager.EzLocalisableString("Realm 成绩全量重算", "Realm full score recalculation");
-
         public static readonly LocalisableString DATA_REBUILD_TARGET_SQLITE_MAIN = new EzLocalizationManager.EzLocalisableString("SQLite 主库 kps/KPC", "SQLite main kps/KPC");
         public static readonly LocalisableString DATA_REBUILD_TARGET_SQLITE_BRANCHES = new EzLocalizationManager.EzLocalisableString("SQLite 分支曲库 xxy/PP", "SQLite songs branches xxy/PP");
 
@@ -68,5 +79,10 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString LOGO_VIS_DOTS = new EzLocalizationManager.EzLocalisableString("圆点", "Dots");
         public static readonly LocalisableString LOGO_VIS_NET = new EzLocalizationManager.EzLocalisableString("网状", "Net");
         public static readonly LocalisableString LOGO_VIS_OFF = new EzLocalizationManager.EzLocalisableString("关闭", "Off");
+
+        public static readonly LocalisableString LOGO_BACKDROP_SOLID = new EzLocalizationManager.EzLocalisableString("单色", "Solid");
+        public static readonly LocalisableString LOGO_BACKDROP_ACRYLIC = new EzLocalizationManager.EzLocalisableString("亚克力", "Acrylic");
+        // public static readonly LocalisableString LOGO_BACKDROP_LINKED = new EzLocalizationManager.EzLocalisableString("联动背景", "Linked");
+        public static readonly LocalisableString LOGO_BACKDROP_CLEAR = new EzLocalizationManager.EzLocalisableString("透明", "Clear");
     }
 }

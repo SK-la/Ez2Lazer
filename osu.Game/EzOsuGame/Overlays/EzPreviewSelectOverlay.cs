@@ -13,6 +13,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.EzOsuGame.UI;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.Overlays
@@ -341,7 +342,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 Size = new Vector2(cell_w, cell_h);
                 Masking = true;
-                CornerRadius = 8;
+                CornerRadius = EzUIStyleV1.CORNER_RADIUS_SHEARED;
 
                 Anchor = Anchor.TopLeft;
                 Origin = Anchor.TopLeft;
@@ -376,7 +377,7 @@ namespace osu.Game.EzOsuGame.Overlays
                                 RelativeSizeAxes = Axes.X,
                                 Height = 78,
                                 Masking = true,
-                                CornerRadius = 6,
+                                CornerRadius = EzUIStyleV1.CORNER_RADIUS_CHIP,
                                 Children = new Drawable[]
                                 {
                                     new Box { RelativeSizeAxes = Axes.Both, Colour = Colour4.Black.Opacity(0.35f) },

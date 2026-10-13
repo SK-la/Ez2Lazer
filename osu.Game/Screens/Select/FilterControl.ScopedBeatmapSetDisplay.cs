@@ -34,7 +34,7 @@ namespace osu.Game.Screens.Select
             {
                 RelativeSizeAxes = Axes.X;
                 AutoSizeAxes = Axes.Y;
-                CornerRadius = 8f;
+                CornerRadius = CORNER_RADIUS;
                 Masking = true;
             }
 

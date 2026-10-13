@@ -7,7 +7,6 @@ using System.IO;
 using System.Linq;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Platform;
-using osu.Game.EzOsuGame.HUD;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
@@ -17,28 +16,46 @@ namespace osu.Game.EzOsuGame.Overlays
     public static class EzResourceDiscovery
     {
         public static IReadOnlyList<string> ListGameThemeCandidates(Storage storage)
-        {
-            var list = new List<string>();
-            string basePath = storage.GetFullPath(EzModifyPath.GAME_THEME_PATH);
-
-            if (!Directory.Exists(basePath))
-                return list;
-
-            foreach (EzEnumGameThemeName v in Enum.GetValues(typeof(EzEnumGameThemeName)))
-            {
-                string name = v.ToString();
-                if (Directory.Exists(Path.Combine(basePath, name)))
-                    list.Add(name);
-            }
-
-            return list;
-        }
+            => listSubdirectories(storage, EzModifyPath.GAME_THEME_PATH);
 
         public static IReadOnlyList<string> ListNoteSetCandidates(Storage storage)
             => listSubdirectories(storage, EzModifyPath.NOTE_PATH);
 
         public static IReadOnlyList<string> ListStageCandidates(Storage storage)
             => listSubdirectories(storage, EzModifyPath.STAGE_PATH);
+
+        public static IReadOnlyList<string> ListColumnSets(Storage storage)
+            => listSubdirectories(storage, EzModifyPath.COLUMN_PATH);
+
+        public static IReadOnlyList<string> ListPanelImages(Storage storage)
+        {
+            var list = new List<string>();
+
+            try
+            {
+                string path = storage.GetFullPath(EzModifyPath.PANEL_PATH);
+
+                if (!Directory.Exists(path))
+                    return list;
+
+                foreach (string file in Directory.GetFiles(path))
+                {
+                    string extension = Path.GetExtension(file);
+
+                    if (extension.Equals(".png", StringComparison.OrdinalIgnoreCase))
+                    {
+                        list.Add(Path.GetFileNameWithoutExtension(file));
+                    }
+                }
+
+                list.Sort(StringComparer.OrdinalIgnoreCase);
+            }
+            catch
+            {
+            }
+
+            return list;
+        }
 
         private static List<string> listSubdirectories(Storage storage, string relativePath)
         {
@@ -51,10 +68,9 @@ namespace osu.Game.EzOsuGame.Overlays
                 if (!Directory.Exists(path))
                     return list;
 
-                list.AddRange(
-                    Directory.GetDirectories(path)
-                             .Select(Path.GetFileName)
-                             .Where(n => !string.IsNullOrEmpty(n))!);
+                list.AddRange(Directory.GetDirectories(path)
+                                       .Select(Path.GetFileName)
+                                       .Where(n => !string.IsNullOrEmpty(n))!);
             }
             catch
             {

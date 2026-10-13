@@ -16,6 +16,7 @@ using osu.Game.Extensions;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.EzMania;
 using osu.Game.Rulesets.Mania.EzMania.Audio;
 using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
@@ -106,6 +107,9 @@ namespace osu.Game.Rulesets.Mania.UI
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
+        private SkinManager skinManager { get; set; } = null!;
+
+        [Resolved]
         private EzLocalTextureFactory ezFactory { get; set; } = null!;
 
         // 保留备用，以后有精力对比一下全局注入和列级缓存的差异
@@ -190,7 +194,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
             InternalChildren = new Drawable[]
             {
-                hitExplosionPool = new DrawablePool<PoolableHitExplosion>(5),
+                hitExplosionPool = new DrawablePool<PoolableHitExplosion>(10),
                 sampleTriggerSource = new EzGameplaySampleTriggerSource(HitObjectContainer),
                 HitObjectArea,
                 keyArea = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.KeyArea), _ => new DefaultKeyArea())
@@ -231,13 +235,17 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             AccentColour.Value = skin.GetManiaSkinConfig<Color4>(LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour, Index)?.Value ?? Color4.Black;
 
-            leftColumnSpacing = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                                        new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.LeftColumnSpacing, Index))
-                                    ?.Value ?? Stage.COLUMN_SPACING;
+            var columnSize = ManiaPlayfieldLayoutHelper.CalculateColumnSize(
+                Index,
+                KeyMode,
+                skin,
+                skinManager,
+                ezConfig,
+                mobileAdjust: 1f,
+                applyGlobalWidthSettings: true);
 
-            rightColumnSpacing = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                                         new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.RightColumnSpacing, Index))
-                                     ?.Value ?? Stage.COLUMN_SPACING;
+            leftColumnSpacing = columnSize.Margin.Left;
+            rightColumnSpacing = columnSize.Margin.Right;
         }
 
         public event Action? NoteSetChanged;

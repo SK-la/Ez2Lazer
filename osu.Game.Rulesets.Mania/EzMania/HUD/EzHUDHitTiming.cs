@@ -19,13 +19,17 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
-    public partial class EzHUDHitTiming : HitErrorMeter
+    public partial class EzHUDHitTiming : HitErrorMeter, IEzHudThemeTarget
     {
+        EzHudThemeSlot IEzHudThemeTarget.Slot => EzHudThemeSlot.EarlyLate;
+
+        Bindable<string> IEzHudThemeTarget.Theme => TextFont;
+
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.OFFSET_NUMBER_FONT_LABEL), nameof(EzHUDManiaStrings.OFFSET_NUMBER_FONT_DESCRIPTION), SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<EzEnumGameThemeName> NumberFont { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<string> NumberFont { get; } = new Bindable<string>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.OFFSET_TEXT_FONT_LABEL), nameof(EzHUDManiaStrings.OFFSET_TEXT_FONT_DESCRIPTION), SettingControlType = typeof(OffsetTextNameSelector))]
-        public Bindable<EzEnumGameThemeName> TextFont { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<string> TextFont { get; } = new Bindable<string>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.SINGLE_SHOW_EL_LABEL), nameof(EzHUDManiaStrings.SINGLE_SHOW_EL_DESCRIPTION))]
         public Bindable<AloneShowMenu> AloneShow { get; } = new Bindable<AloneShowMenu>(AloneShowMenu.None);

@@ -114,13 +114,38 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString HITRESULT_ANIMATION_TEMPLATE_LABEL = new EzLocalizationManager.EzLocalisableString(
             "动画路径模板", "Animation Path Template");
 
+        public static readonly LocalisableString HITRESULT_FORCE_DEFORM_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "强制变形动画", "Force Deform Animation");
+
+        public static readonly LocalisableString HITRESULT_FORCE_DEFORM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "开启后，按下方选择的变形模板播放。"
+            + "\n多帧在变形期间循环播放，结束时机由变形动画决定。"
+            + "\n关闭后按资源本身播放，播完即结束。",
+            "When enabled, the deformation template selected below is played."
+            + "\nMultiple frames loop during deformation; the end timing is determined by the deformation animation."
+            + "\nWhen disabled, the animation plays according to the resource itself and ends once finished.");
+
+        public static readonly LocalisableString HITRESULT_DEFORM_TEMPLATE_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "变形模板", "Deform Template");
+
+        public static readonly LocalisableString HITRESULT_DEFORM_TEMPLATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "强制变形开启后使用的动画，与判定字体分开选择。"
+            + "\n内置为手写压扁。其余项是该主题提取出的判定曲线；该主题没有曲线时仍用手写压扁。",
+            "Animation used while force deform is on. Chosen separately from the judgement font."
+            + "\nBuilt-in is the handwritten squash. Other entries are that theme's extracted judgement curves; a theme with no curves still uses the handwritten squash.");
+
+        public static readonly LocalisableString HITRESULT_DEFORM_TEMPLATE_BUILTIN = new EzLocalizationManager.EzLocalisableString(
+            "内置", "Built-in");
+
         public static readonly LocalisableString HITRESULT_ANIMATION_TEMPLATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "在 GameTheme/…/judgement/ 下按帧加载时的相对路径模板（在自动探测 result-0、result_0 之后尝试）。"
-            + "\n占位符：{result} 为判定资源名；{0}、{00} 等为帧序号。"
-            + "\n默认 {result}/frame_{0} 对应子目录帧，如 Cool/frame_0；{result}-{0} 对应同级命名 Cool-0。",
-            "Relative path template for frame lookup under GameTheme/…/judgement/ (after auto-detecting result-0 / result_0)."
-            + "\nPlaceholders: {result} is the judgement asset name; {0}, {00}, etc. are frame indices."
-            + "\nDefault {result}/frame_{0} → e.g. Cool/frame_0; {result}-{0} → e.g. Cool-0.");
+            "在 GameTheme/{theme}/judgement/ 下的帧模板。默认 {result}/{000}，只查子目录里从 000.png 起的一组。"
+            + "\n找不到时只再试 {result}.gif、{result}.png，不再试同目录的其它帧。"
+            + "\n留空则按子目录帧、同层连字符帧、gif、png 的顺序探测。"
+            + "\n帧号只认 {0} 和 {000}。",
+            "Frame template under GameTheme/{theme}/judgement/. Default {result}/{000} loads the subdirectory sequence starting at 000.png."
+            + "\nIf that misses, only {result}.gif then {result}.png are tried."
+            + "\nAn empty template runs subdirectory frames, same-level hyphen frames, gif, then png."
+            + "\nFrame indices accept {0} and {000} only.");
 
         public static readonly LocalisableString HITRESULT_BLENDING_LABEL = new EzLocalizationManager.EzLocalisableString("混合模式", "Blending Mode");
         public static readonly LocalisableString HITRESULT_BLENDING_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设置混合模式", "Set the blending mode.");
@@ -261,5 +286,77 @@ namespace osu.Game.EzOsuGame.Localization
             "Auto by width; Horizontal side-by-side; Vertical stacked.");
 
         public static readonly LocalisableString DAN_PANEL_RATING = new EzLocalizationManager.EzLocalisableString("Rating", "Rating");
+
+        public static readonly LocalisableString CAMERA_SOURCE_LABEL = new EzLocalizationManager.EzLocalisableString("来源类型", "Source");
+        public static readonly LocalisableString CAMERA_SOURCE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("物理摄像头或虚拟摄像头。", "Physical camera or virtual camera.");
+        public static readonly LocalisableString CAMERA_SOURCE_PHYSICAL = new EzLocalizationManager.EzLocalisableString("物理", "Physical");
+        public static readonly LocalisableString CAMERA_SOURCE_VIRTUAL = new EzLocalizationManager.EzLocalisableString("虚拟", "Virtual");
+
+        public static readonly LocalisableString CAMERA_DEVICE_LABEL = new EzLocalizationManager.EzLocalisableString("设备", "Device");
+        public static readonly LocalisableString CAMERA_DEVICE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("按来源类型过滤。留空则使用该类型的第一台设备。", "Filtered by source. Empty uses the first device of that kind.");
+        public static readonly LocalisableString CAMERA_DEVICE_DEFAULT = new EzLocalizationManager.EzLocalisableString("默认（该类型第一台）", "Default (first of this kind)");
+
+        public static readonly LocalisableString CAMERA_AUTO_FOCUS_LABEL = new EzLocalizationManager.EzLocalisableString("自动对焦", "Auto focus");
+        public static readonly LocalisableString CAMERA_AUTO_FOCUS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设备不支持时不会生效。", "Ignored when the device does not support it.");
+        public static readonly LocalisableString CAMERA_FOCUS_LABEL = new EzLocalizationManager.EzLocalisableString("手动对焦", "Manual focus");
+        public static readonly LocalisableString CAMERA_FOCUS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("关闭自动对焦后，在设备支持的范围内调节。", "Used when auto focus is off, mapped across the device range.");
+
+        public static readonly LocalisableString CAMERA_AUTO_EXPOSURE_LABEL = new EzLocalizationManager.EzLocalisableString("自动曝光", "Auto exposure");
+        public static readonly LocalisableString CAMERA_AUTO_EXPOSURE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设备不支持时不会生效。", "Ignored when the device does not support it.");
+        public static readonly LocalisableString CAMERA_EXPOSURE_LABEL = new EzLocalizationManager.EzLocalisableString("曝光", "Exposure");
+        public static readonly LocalisableString CAMERA_EXPOSURE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("关闭自动曝光后，在设备支持的范围内调节。", "Used when auto exposure is off, mapped across the device range.");
+
+        public static readonly LocalisableString CAMERA_AUTO_WHITE_BALANCE_LABEL = new EzLocalizationManager.EzLocalisableString("自动白平衡", "Auto white balance");
+        public static readonly LocalisableString CAMERA_AUTO_WHITE_BALANCE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设备不支持时不会生效。", "Ignored when the device does not support it.");
+        public static readonly LocalisableString CAMERA_WHITE_BALANCE_LABEL = new EzLocalizationManager.EzLocalisableString("白平衡", "White balance");
+        public static readonly LocalisableString CAMERA_WHITE_BALANCE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("关闭自动白平衡后，在设备色温范围内调节。", "Used when auto white balance is off, mapped across the device kelvin range.");
+
+        public static readonly LocalisableString CAMERA_FPS_LABEL = new EzLocalizationManager.EzLocalisableString("目标帧率", "Target frame rate");
+        public static readonly LocalisableString CAMERA_FPS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "采集优先不超过 720p，并尽量贴近此帧率。60 更耗上传带宽。",
+            "Capture prefers ≤720p and the closest rate. 60 costs more to upload.");
+        public static readonly LocalisableString CAMERA_FPS_15 = new EzLocalizationManager.EzLocalisableString("15", "15");
+        public static readonly LocalisableString CAMERA_FPS_24 = new EzLocalizationManager.EzLocalisableString("24", "24");
+        public static readonly LocalisableString CAMERA_FPS_30 = new EzLocalizationManager.EzLocalisableString("30", "30");
+        public static readonly LocalisableString CAMERA_FPS_60 = new EzLocalizationManager.EzLocalisableString("60（更耗）", "60 (higher cost)");
+
+        public static readonly LocalisableString CAMERA_CORNER_RADIUS_LABEL = new EzLocalizationManager.EzLocalisableString("圆角", "Corner radius");
+        public static readonly LocalisableString CAMERA_CORNER_RADIUS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("相对短边的圆角比例。", "Corner radius as a fraction of the shorter side.");
+
+        public static readonly LocalisableString CAMERA_UNAVAILABLE = new EzLocalizationManager.EzLocalisableString("摄像头未能打开。", "The camera could not be opened.");
+        public static readonly LocalisableString CAMERA_PLATFORM_UNSUPPORTED = new EzLocalizationManager.EzLocalisableString("当前平台没有本地摄像头后端。", "This platform has no local camera backend.");
+
+        public static readonly LocalisableString EFFECT_TYPE_LABEL = new EzLocalizationManager.EzLocalisableString("动画效果", "Animation Effect");
+        public static readonly LocalisableString EFFECT_TYPE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择动画效果类型", "Select animation effect type.");
+
+        public static readonly LocalisableString EFFECT_START_FACTOR_LABEL = new EzLocalizationManager.EzLocalisableString("动效起始系数", "Effect Start Factor");
+        public static readonly LocalisableString EFFECT_START_FACTOR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动画开始时的缩放或位移系数", "Scaling or displacement factor at animation start.");
+
+        public static readonly LocalisableString EFFECT_END_FACTOR_LABEL = new EzLocalizationManager.EzLocalisableString("动效结束系数", "Effect End Factor");
+        public static readonly LocalisableString EFFECT_END_FACTOR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动画结束时的缩放或位移系数", "Scaling or displacement factor at animation end.");
+
+        public static readonly LocalisableString EFFECT_START_DURATION_LABEL = new EzLocalizationManager.EzLocalisableString("动效起始时长", "Effect Start Duration");
+        public static readonly LocalisableString EFFECT_START_DURATION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动画开始阶段的持续时间（毫秒）", "Duration of the animation start phase (milliseconds).");
+
+        public static readonly LocalisableString EFFECT_END_DURATION_LABEL = new EzLocalizationManager.EzLocalisableString("动效结束时长", "Effect End Duration");
+        public static readonly LocalisableString EFFECT_END_DURATION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动画结束阶段的持续时间（毫秒）", "Duration of the animation end phase (milliseconds).");
+
+        public static readonly LocalisableString BOUNCE_PEAK_LABEL = new EzLocalizationManager.EzLocalisableString("弹跳顶点", "Bounce Peak");
+        public static readonly LocalisableString BOUNCE_PEAK_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("相对静止位置的上下位移，向下为正。", "Vertical offset from rest. Positive is downward.");
+
+        public static readonly LocalisableString BOUNCE_ALPHA_LABEL = new EzLocalizationManager.EzLocalisableString("弹跳透明度", "Bounce Alpha");
+        public static readonly LocalisableString BOUNCE_ALPHA_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("弹出后收到的透明度。", "Alpha reached after the pop.");
+
+        public static readonly LocalisableString BOUNCE_RETURN_LABEL = new EzLocalizationManager.EzLocalisableString("回到原位时长", "Return Duration");
+        public static readonly LocalisableString BOUNCE_RETURN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("从顶点回到静止位置的时间（毫秒）。", "Time to return from the peak to rest (milliseconds).");
+
+        public static readonly LocalisableString BOUNCE_EASING_LABEL = new EzLocalizationManager.EzLocalisableString("弹跳缓动", "Bounce Easing");
+        public static readonly LocalisableString BOUNCE_EASING_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("关键帧之间的缓动。直线为 None。", "Easing between keys. None is linear.");
+
+        public static readonly LocalisableString BOUNCE_OVERSHOOT_LABEL = new EzLocalizationManager.EzLocalisableString("回弹位移", "Overshoot");
+        public static readonly LocalisableString BOUNCE_OVERSHOOT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("回到原位后再走的位移，0 为不回弹。向下为正。", "Extra offset after returning to rest. Zero skips it. Positive is downward.");
+
+        public static readonly LocalisableString BOUNCE_START_ALPHA_LABEL = new EzLocalizationManager.EzLocalisableString("起始透明度", "Start Alpha");
+        public static readonly LocalisableString BOUNCE_START_ALPHA_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("弹出开始时的透明度。", "Alpha at the start of the pop.");
     }
 }

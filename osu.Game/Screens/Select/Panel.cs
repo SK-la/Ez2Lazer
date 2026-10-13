@@ -20,7 +20,6 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Overlays;
@@ -31,7 +30,7 @@ namespace osu.Game.Screens.Select
 {
     public abstract partial class Panel : PoolableDrawable, ICarouselPanel, IHasContextMenu
     {
-        public const float CORNER_RADIUS = 10;
+        public const float CORNER_RADIUS = EzUIStyleV1.CORNER_RADIUS_WEDGE;
 
         private const float active_x_offset = 25f;
 
@@ -128,9 +127,11 @@ namespace osu.Game.Screens.Select
                 {
                     // Full-bleed under accent strip + Content so Content's left corner radius
                     // reveals the same glass (no (| crescent seam against a strip-only background).
-                    PanelGlass = new EzAcrylicPanelBackground(EzAcrylicStyle.PanelVeil, EzAcrylicStyle.PanelFrameBufferScale)
+                    PanelGlass = new EzAcrylicPanelBackground(EzUIStyleV1.PanelVeil, EzUIStyleV1.PanelFrameBufferScale)
                     {
-                        AcrylicCaptureVisible = true,
+                        // Capture starts in PrepareForUse. The carousel pool constructs every panel up front;
+                        // leaving this on would pin a blur framebuffer for each card ever shown.
+                        AcrylicCaptureVisible = false,
                         Alpha = 0,
                     },
                     backgroundContainer = new Container
@@ -376,6 +377,9 @@ namespace osu.Game.Screens.Select
             updateXOffset(animated: false);
             updateSelectedState(animated: false);
 
+            PanelGlass.AcrylicCaptureVisible = true;
+            PanelGlass.SyncAcrylicCaptureState();
+
             this.FadeIn(DURATION, Easing.OutQuint);
         }
 
@@ -387,6 +391,11 @@ namespace osu.Game.Screens.Select
 
             // Important to set this to null to handle reuse scenarios correctly, see `Item` implementation.
             item = null;
+
+            // Each card owns three blur textures (source, horizontal, full). Drop them on return
+            // so selecting another set does not keep the previous cards' framebuffers.
+            PanelGlass.AcrylicCaptureVisible = false;
+            PanelGlass.SyncAcrylicCaptureState();
         }
 
         protected override bool OnClick(ClickEvent e)

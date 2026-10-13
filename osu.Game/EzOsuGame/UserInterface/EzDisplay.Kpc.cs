@@ -13,6 +13,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.UserInterfaceV2;
 using osuTK;
 using osuTK.Graphics;
@@ -106,7 +107,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             InternalChild = new Container
             {
                 Masking = true,
-                CornerRadius = 6,
+                CornerRadius = EzUIStyleV1.CORNER_RADIUS_CHIP,
                 AutoSizeAxes = Axes.X,
                 RelativeSizeAxes = Axes.Y,
                 Children = new Drawable[]

@@ -54,49 +54,38 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             float height,
             float rowStep,
             float noteHeight,
-            bool flatNotes)
+            bool flatNotes,
+            double timeOriginMs = double.NaN,
+            double msPerRow = 0)
         {
             float laneWidth = width / Math.Max(1, totalColumns);
             float laneInset = laneWidth * 0.1f;
             float headHeight = flatNotes ? Math.Max(1f, noteHeight * 0.55f) : noteHeight;
+            bool mapTime = msPerRow > 0 && !double.IsNaN(timeOriginMs);
+
+            float yAtTime(double time) => height - (float)((time - timeOriginMs) / msPerRow) * rowStep;
 
             foreach (ManiaPreviewLayoutEntry entry in entries)
             {
                 float x = originX + entry.Column * laneWidth + laneInset;
                 float laneW = laneWidth - laneInset * 2;
+                float anchorY = mapTime ? yAtTime(entry.StartTime) : GetSlotBottomY(entry.Row, rowStep, height);
 
                 switch (entry.Kind)
                 {
                     case ManiaPreviewNoteKind.Tap:
-                    {
-                        float y = GetSlotBottomY(entry.Row, rowStep, height) - headHeight;
-                        quads.Add(new PreviewQuad(x, y, laneW, headHeight, getColour(entry.Kind)));
-                        break;
-                    }
-
                     case ManiaPreviewNoteKind.HoldHead:
                     {
-                        // Head at bottom of LN (press / start time row).
-                        float y = GetSlotBottomY(entry.Row, rowStep, height) - headHeight;
-                        quads.Add(new PreviewQuad(x, y, laneW, headHeight, getColour(entry.Kind)));
+                        quads.Add(new PreviewQuad(x, anchorY - headHeight, laneW, headHeight, getColour(entry.Kind)));
                         break;
                     }
-
-                    // 不绘制面尾，更容易分辨缝隙
-                    // case ManiaPreviewNoteKind.HoldTail:
-                    // {
-                    //     // Tail at top of LN (release / end time row).
-                    //     float y = GetSlotTopY(entry.Row, rowStep, height);
-                    //     quads.Add(new PreviewQuad(x, y, laneW, headHeight, getColour(entry.Kind)));
-                    //     break;
-                    // }
 
                     case ManiaPreviewNoteKind.HoldBody:
                     {
-                        // Body spans from the head up to the LN end row; no separate tail block is drawn.
-                        float bodyBottom = GetSlotBottomY(entry.Row, rowStep, height) - headHeight;
-                        float bodyTop = GetSlotTopY(entry.EndRow, rowStep, height);
-                        float h = Math.Max(headHeight, bodyBottom - bodyTop);
+                        // 身体停在结束时刻。不要铺到格子远端，否则尾巴会和下一个头贴死，滚动映射比例也拉不开。
+                        float bodyTop = mapTime ? yAtTime(entry.EndTime) : GetSlotBottomY(entry.EndRow, rowStep, height);
+                        float bodyBottom = anchorY - headHeight;
+                        float h = Math.Max(1f, bodyBottom - bodyTop);
                         quads.Add(new PreviewQuad(x, bodyTop, laneW, h, getColour(entry.Kind)));
                         break;
                     }

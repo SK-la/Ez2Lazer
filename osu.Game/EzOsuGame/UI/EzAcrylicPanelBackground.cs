@@ -5,6 +5,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
@@ -28,7 +29,9 @@ namespace osu.Game.EzOsuGame.UI
 
         public Box TintBox { get; private set; }
 
-        private readonly AcrylicBackdropDrawable acrylicBackdrop;
+        private readonly Vector2 frameBufferScale;
+
+        private AcrylicBackdropDrawable? acrylicBackdrop;
         private EzAcrylicCaptureController? captureController;
 
         private Bindable<bool> acrylicUiEnabled = null!;
@@ -37,25 +40,22 @@ namespace osu.Game.EzOsuGame.UI
         [Resolved(canBeNull: true)]
         private IAcrylicCaptureRegistrar? acrylicCaptureRegistrar { get; set; }
 
+        [Resolved]
+        private IRenderer renderer { get; set; } = null!;
+
         /// <param name="initialTint">Veil colour drawn over the blurred backdrop.</param>
         /// <param name="frameBufferScale">Optional downscale for the blur pass (panels use 0.5).</param>
         public EzAcrylicPanelBackground(Color4 initialTint, Vector2? frameBufferScale = null)
         {
             RelativeSizeAxes = Axes.Both;
+            this.frameBufferScale = frameBufferScale ?? Vector2.One;
 
-            InternalChildren = new Drawable[]
+            // Backdrop is created only while capture is wanted. Pooled song-select cards otherwise
+            // keep one raw slice plus the horizontal and full blur textures after they leave the screen.
+            InternalChild = TintBox = new Box
             {
-                acrylicBackdrop = new AcrylicBackdropDrawable
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    EffectEnabled = false,
-                    FrameBufferScale = frameBufferScale ?? Vector2.One,
-                },
-                TintBox = new Box
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = initialTint,
-                },
+                RelativeSizeAxes = Axes.Both,
+                Colour = initialTint,
             };
         }
 
@@ -64,8 +64,6 @@ namespace osu.Game.EzOsuGame.UI
         {
             acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
             acrylicUiBlurStrength = ezConfig.GetBindable<double>(Ez2Setting.AcrylicUiBlurStrength);
-
-            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, acrylicBackdrop);
         }
 
         protected override void LoadComplete()
@@ -81,7 +79,43 @@ namespace osu.Game.EzOsuGame.UI
 
         private void syncAcrylicState()
         {
-            captureController?.Sync(WantsAcrylicCapture, (float)acrylicUiBlurStrength.Value);
+            if (WantsAcrylicCapture)
+            {
+                ensureBackdrop();
+                captureController?.Sync(true, (float)acrylicUiBlurStrength.Value);
+                return;
+            }
+
+            releaseBackdrop();
+        }
+
+        private void ensureBackdrop()
+        {
+            if (acrylicBackdrop != null)
+                return;
+
+            acrylicBackdrop = new AcrylicBackdropDrawable
+            {
+                RelativeSizeAxes = Axes.Both,
+                Depth = 1,
+                EffectEnabled = false,
+                FrameBufferScale = frameBufferScale,
+            };
+
+            AddInternal(acrylicBackdrop);
+            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, acrylicBackdrop, renderer);
+        }
+
+        private void releaseBackdrop()
+        {
+            captureController?.Dispose();
+            captureController = null;
+
+            if (acrylicBackdrop == null)
+                return;
+
+            RemoveInternal(acrylicBackdrop, true);
+            acrylicBackdrop = null;
         }
 
         protected override void Dispose(bool isDisposing)

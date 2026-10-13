@@ -12,7 +12,6 @@ using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
-using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
@@ -73,7 +72,7 @@ namespace osu.Game.Overlays.Music
                     },
                     Children = new Drawable[]
                     {
-                        acrylicBackground = new EzAcrylicPanelBackground(EzAcrylicStyle.FooterVeil)
+                        acrylicBackground = new EzAcrylicPanelBackground(EzUIStyleV1.FooterVeil)
                         {
                             AcrylicCaptureVisible = false,
                         },

@@ -1,9 +1,14 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Beatmaps;
+using osu.Game.EzOsuGame.Scoring.Bonus;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.Scoring
@@ -23,11 +28,17 @@ namespace osu.Game.EzOsuGame.Scoring
             IEzReplaySession replaySession,
             ScoreInfo scoreInfo,
             ReplayRunPurpose purpose,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            EzAnalysisCache? analysisCache = null)
         {
             if (scoreInfo.Ruleset.OnlineID != 3)
             {
                 scoreManager.Recalculate(scoreInfo);
+                // var bonus = await CalculateBonusAsync(scoreManager, beatmapManager, replaySession, scoreInfo, cancellationToken, analysisCache).ConfigureAwait(false);
+                //
+                // if (bonus != null)
+                //     EzScoreBonusProvider.Store(scoreInfo, bonus);
+
                 return;
             }
 
@@ -59,7 +70,90 @@ namespace osu.Game.EzOsuGame.Scoring
                 new ReplayRunRequest(databasedScore.DeepClone(), playableBeatmap, purpose),
                 cancellationToken).ConfigureAwait(false);
 
+            if (result.WasCancelled || !result.IsValidReplay || result.Score.ScoreInfo == null)
+            {
+                scoreManager.Recalculate(scoreInfo);
+                return;
+            }
+
+            if (EzScoreBonusTracker.IsEnabled)
+            {
+                IReadOnlyList<double>? cachedKps = null;
+
+                if (analysisCache != null && scoreInfo.BeatmapInfo is BeatmapInfo beatmapInfo)
+                {
+                    var analysis = await analysisCache.GetAnalysisAsync(beatmapInfo, scoreInfo.Ruleset, scoreInfo.Mods, cancellationToken).ConfigureAwait(false);
+
+                    if (analysis is EzAnalysisResult cached && cached.KpsList.Count > 0)
+                        cachedKps = cached.KpsList;
+                }
+
+                EzScoreBonusCalculator.Apply(result.Score.ScoreInfo, playableBeatmap, cachedKps, convertedKeyCount(workingBeatmap, scoreInfo, cancellationToken));
+                EzScoreBonusProvider.Store(scoreInfo, result.Score.ScoreInfo.EzBonus);
+            }
+
             scoreManager.ApplyEzSessionRecalculation(scoreInfo, result.Score.ScoreInfo, purpose, result.ResolvedEnvironment!);
+        }
+
+        /// <summary>
+        /// 回放重跑（ForStored）只为得到附加分；不写 Realm，原分 / 判定统计不变。
+        /// </summary>
+        /// <returns><see langword="null"/>：无回放或谱面不可用。</returns>
+        public static async Task<EzScoreBonusSet?> CalculateBonusAsync(
+            ScoreManager scoreManager,
+            BeatmapManager beatmapManager,
+            IEzReplaySession replaySession,
+            ScoreInfo scoreInfo,
+            CancellationToken cancellationToken = default,
+            EzAnalysisCache? analysisCache = null)
+        {
+            if (!EzScoreBonusTracker.IsEnabled)
+                return null;
+
+            var databasedScore = scoreManager.GetScore(scoreInfo);
+
+            if (databasedScore?.Replay == null || databasedScore.Replay.Frames.Count == 0)
+                return null;
+
+            var workingBeatmap = beatmapManager.GetWorkingBeatmap(scoreInfo.BeatmapInfo);
+
+            if (workingBeatmap is DummyWorkingBeatmap)
+                return null;
+
+            var playableBeatmap = workingBeatmap.GetPlayableBeatmap(scoreInfo.Ruleset, scoreInfo.Mods);
+
+            if (playableBeatmap.HitObjects.Count == 0)
+                return null;
+
+            var result = await replaySession.RunRequestAsync(
+                new ReplayRunRequest(databasedScore.DeepClone(), playableBeatmap, ReplayRunPurpose.ForStored),
+                cancellationToken).ConfigureAwait(false);
+
+            if (result.WasCancelled)
+                throw new OperationCanceledException(cancellationToken);
+
+            if (!result.IsValidReplay || result.Score.ScoreInfo == null)
+                return null;
+
+            IReadOnlyList<double>? cachedKps = null;
+
+            if (analysisCache != null && scoreInfo.BeatmapInfo is BeatmapInfo beatmapInfo)
+            {
+                var analysis = await analysisCache.GetAnalysisAsync(beatmapInfo, scoreInfo.Ruleset, scoreInfo.Mods, cancellationToken).ConfigureAwait(false);
+
+                if (analysis is EzAnalysisResult cached && cached.KpsList.Count > 0)
+                    cachedKps = cached.KpsList;
+            }
+
+            var sessionInfo = result.Score.ScoreInfo;
+            EzScoreBonusCalculator.Apply(sessionInfo, playableBeatmap, cachedKps, convertedKeyCount(workingBeatmap, scoreInfo, cancellationToken));
+            return sessionInfo.EzBonus;
+        }
+
+        private static int convertedKeyCount(IWorkingBeatmap working, ScoreInfo scoreInfo, CancellationToken cancellationToken)
+        {
+            IBeatmap converted = EzPlayableBeatmapCache.GetShared(working, scoreInfo.Ruleset, scoreInfo.Mods, cancellationToken);
+            return EzScoreBonusCalculator.KeyCountOf(converted);
         }
     }
 }

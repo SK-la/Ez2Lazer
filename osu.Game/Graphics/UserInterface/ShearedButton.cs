@@ -8,6 +8,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
@@ -17,7 +18,7 @@ namespace osu.Game.Graphics.UserInterface
     public partial class ShearedButton : OsuClickableContainer
     {
         public const float DEFAULT_HEIGHT = 50;
-        public const float CORNER_RADIUS = 7;
+        public const float CORNER_RADIUS = EzUIStyleV1.CORNER_RADIUS_SHEARED;
         public const float BORDER_THICKNESS = 2;
 
         public LocalisableString Text

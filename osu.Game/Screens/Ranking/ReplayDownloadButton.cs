@@ -4,28 +4,28 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
-using osu.Game.Graphics.Containers;
-using osu.Game.Graphics.UserInterface;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.Graphics;
 using osu.Game.Input.Bindings;
 using osu.Game.Online;
 using osu.Game.Scoring;
-using osuTK;
+using osu.Game.Screens.Footer;
 
 namespace osu.Game.Screens.Ranking
 {
-    public partial class ReplayDownloadButton : CompositeDrawable, IKeyBindingHandler<GlobalAction>
+    public partial class ReplayDownloadButton : ScreenFooterButton, IKeyBindingHandler<GlobalAction>
     {
         public readonly Bindable<ScoreInfo?> Score = new Bindable<ScoreInfo?>();
 
-        protected readonly Bindable<DownloadState> State = new Bindable<DownloadState>();
-
-        private DownloadButton button = null!;
-        private ShakeContainer shakeContainer = null!;
+        protected new readonly Bindable<DownloadState> State = new Bindable<DownloadState>();
 
         private ScoreDownloadTracker? downloadTracker;
+
+        [Resolved]
+        private OsuGame? game { get; set; }
 
         [Resolved]
         private ScoreManager scoreManager { get; set; } = null!;
@@ -47,22 +47,14 @@ namespace osu.Game.Screens.Ranking
         public ReplayDownloadButton(ScoreInfo? score)
         {
             Score.Value = score;
-            Size = new Vector2(50, 30);
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuGame? game, ScoreModelDownloader scoreDownloader)
+        private void load(OsuColour colours, ScoreModelDownloader scoreDownloader)
         {
-            InternalChild = shakeContainer = new ShakeContainer
-            {
-                RelativeSizeAxes = Axes.Both,
-                Child = button = new DownloadButton
-                {
-                    RelativeSizeAxes = Axes.Both,
-                }
-            };
+            AccentColour = colours.Blue1;
 
-            button.Action = () =>
+            Action = () =>
             {
                 switch (State.Value)
                 {
@@ -76,7 +68,7 @@ namespace osu.Game.Screens.Ranking
 
                     case DownloadState.Importing:
                     case DownloadState.Downloading:
-                        shakeContainer.Shake();
+                        shake();
                         break;
                 }
             };
@@ -93,7 +85,7 @@ namespace osu.Game.Screens.Ranking
 
                 if (score.NewValue != null)
                 {
-                    AddInternal(downloadTracker = new ScoreDownloadTracker(score.NewValue)
+                    Add(downloadTracker = new ScoreDownloadTracker(score.NewValue)
                     {
                         State = { BindTarget = State }
                     });
@@ -104,14 +96,31 @@ namespace osu.Game.Screens.Ranking
 
             State.BindValueChanged(state =>
             {
-                button.State.Value = state.NewValue;
                 updateState();
+
+                AccentColour = state.NewValue switch
+                {
+                    DownloadState.LocallyAvailable => colours.Lime1,
+                    DownloadState.Downloading or DownloadState.Importing => colours.Yellow,
+                    _ => colours.Blue1,
+                };
             }, true);
+        }
+
+        private void shake()
+        {
+            Content.FinishTransforms();
+
+            Content.MoveToX(-5, 40, Easing.OutSine)
+                   .Then()
+                   .MoveToX(5, 80, Easing.InOutSine)
+                   .Then()
+                   .MoveToX(0, 40, Easing.InSine);
         }
 
         #region Export via hotkey logic (also in SaveFailedScoreButton)
 
-        public bool OnPressed(KeyBindingPressEvent<GlobalAction> e)
+        public override bool OnPressed(KeyBindingPressEvent<GlobalAction> e)
         {
             if (e.Repeat)
                 return false;
@@ -119,7 +128,7 @@ namespace osu.Game.Screens.Ranking
             switch (e.Action)
             {
                 case GlobalAction.SaveReplay:
-                    button.TriggerClick();
+                    TriggerClick();
                     return true;
 
                 case GlobalAction.ExportReplay:
@@ -130,8 +139,9 @@ namespace osu.Game.Screens.Ranking
                     else
                     {
                         // A download needs to be performed before we can export this replay.
-                        button.TriggerClick();
-                        if (button.Enabled.Value)
+                        TriggerClick();
+
+                        if (Enabled.Value)
                             State.BindValueChanged(exportWhenReady, true);
                     }
 
@@ -141,7 +151,7 @@ namespace osu.Game.Screens.Ranking
             return false;
         }
 
-        public void OnReleased(KeyBindingReleaseEvent<GlobalAction> e)
+        public override void OnReleased(KeyBindingReleaseEvent<GlobalAction> e)
         {
         }
 
@@ -161,18 +171,24 @@ namespace osu.Game.Screens.Ranking
             switch (replayAvailability)
             {
                 case ReplayAvailability.Local:
-                    button.TooltipText = @"watch replay";
-                    button.Enabled.Value = true;
+                    Icon = FontAwesome.Solid.Play;
+                    Text = ReplayStrings.WATCH;
+                    TooltipText = ReplayStrings.WATCH;
+                    Enabled.Value = true;
                     break;
 
                 case ReplayAvailability.Online:
-                    button.TooltipText = @"download replay";
-                    button.Enabled.Value = true;
+                    Icon = FontAwesome.Solid.Download;
+                    Text = ReplayStrings.DOWNLOAD;
+                    TooltipText = ReplayStrings.DOWNLOAD;
+                    Enabled.Value = true;
                     break;
 
                 default:
-                    button.TooltipText = @"replay unavailable";
-                    button.Enabled.Value = false;
+                    Icon = FontAwesome.Solid.Times;
+                    Text = ReplayStrings.UNAVAILABLE;
+                    TooltipText = ReplayStrings.UNAVAILABLE;
+                    Enabled.Value = false;
                     break;
             }
         }
@@ -182,6 +198,18 @@ namespace osu.Game.Screens.Ranking
             Local,
             Online,
             NotAvailable,
+        }
+
+        private static class ReplayStrings
+        {
+            internal static readonly EzLocalizationManager.EzLocalisableString WATCH = new EzLocalizationManager.EzLocalisableString(
+                "观看回放", "Watch replay");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString DOWNLOAD = new EzLocalizationManager.EzLocalisableString(
+                "下载回放", "Download replay");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString UNAVAILABLE = new EzLocalizationManager.EzLocalisableString(
+                "无可用回放", "Replay unavailable");
         }
     }
 }

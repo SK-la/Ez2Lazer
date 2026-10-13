@@ -106,7 +106,9 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
             content.Size = new Vector2(layout.ContentWidth, layout.PanelHeight);
             batchDrawable.Size = new Vector2(layout.ContentWidth, layout.PanelHeight);
-            scaleContainer.Scale = new Vector2(layout.FitScale);
+
+            float scaleX = layout.WidthScale > 0 ? layout.WidthScale : layout.FitScale;
+            scaleContainer.Scale = new Vector2(scaleX, layout.FitScale);
 
             var quads = new List<PreviewQuad>(layoutEntries.Count + layout.ColumnCount * (data.TotalColumns + layout.RowsPerColumn));
 

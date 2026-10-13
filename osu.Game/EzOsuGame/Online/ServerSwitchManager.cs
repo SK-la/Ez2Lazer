@@ -106,7 +106,7 @@ namespace osu.Game.EzOsuGame.Online
         {
             return preset switch
             {
-                ServerPreset.Gu => (Ez2Setting.ServerGuUsername, Ez2Setting.ServerGuToken),
+                ServerPreset.g0v0 => (Ez2Setting.ServerGuUsername, Ez2Setting.ServerGuToken),
                 ServerPreset.Manual => (Ez2Setting.ServerManualUsername, Ez2Setting.ServerManualToken),
                 _ => (Ez2Setting.ServerOfficialUsername, Ez2Setting.ServerOfficialToken)
             };

@@ -2,10 +2,12 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Linq;
+using System.Reflection;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Effects;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Edit;
@@ -22,7 +24,7 @@ namespace osu.Game.Overlays.SkinEditor
         protected override Container<Drawable> Content { get; }
 
         private readonly Drawable component;
-        private SkinHudPositionSettings? positionSettings;
+        private SkinHudCommonSettings? commonSettings;
 
         public SkinSettingsToolbox(Drawable component)
             : base(SkinEditorStrings.Settings(component.GetType().Name))
@@ -41,14 +43,33 @@ namespace osu.Game.Overlays.SkinEditor
         [BackgroundDependencyLoader]
         private void load()
         {
+            rebuild();
+
+            if (component is IScopedSkinSettings scoped)
+                scoped.WatchSettingsScope(() => Scheduler.AddOnce(rebuild));
+
+            foreach (var property in component.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (property.GetCustomAttribute<EzBuiltinEffectSourceAttribute>(true) == null)
+                    continue;
+
+                if (property.GetValue(component) is IScopedSkinSettings host)
+                    host.WatchSettingsScope(() => Scheduler.AddOnce(rebuild));
+            }
+        }
+
+        private void rebuild()
+        {
+            Content.Clear(disposeChildren: true);
+
             var controls = component.CreateSettingsControls().ToArray();
             Drawable[] positionControls = [];
 
-            positionSettings = SkinHudPositionSettings.TryCreate(component);
+            commonSettings = SkinHudCommonSettings.TryCreate(component);
 
-            if (positionSettings != null)
+            if (commonSettings != null)
             {
-                positionControls = positionSettings.CreateControls();
+                positionControls = commonSettings.CreateControls();
                 Content.AddRange(positionControls);
             }
 
@@ -66,7 +87,7 @@ namespace osu.Game.Overlays.SkinEditor
         protected override void Update()
         {
             base.Update();
-            positionSettings?.SyncFromComponent();
+            commonSettings?.SyncFromComponent();
         }
     }
 }

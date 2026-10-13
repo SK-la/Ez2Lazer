@@ -21,6 +21,7 @@ using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Statistics;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -115,7 +116,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 this.ruleset = ruleset;
                 this.mods = mods;
 
-                Body.CornerRadius = 4;
+                // Body.CornerRadius = CORNER_RADIUS;
                 AllowableAnchors = new[] { Anchor.TopCentre };
             }
 
@@ -343,7 +344,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 private void load()
                 {
                     SpriteText.Colour = TextColour ?? Color4.White;
-                    Content.CornerRadius = 10;
+                    Content.CornerRadius = EzUIStyleV1.CORNER_RADIUS_WEDGE;
 
                     Add(new SpriteIcon
                     {

@@ -9,6 +9,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osuTK;
@@ -86,7 +87,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 AutoSizeAxes = Axes.Both,
                 Masking = true,
-                CornerRadius = 4,
+                CornerRadius = EzUIStyleV1.CORNER_RADIUS_CHIP,
                 Children = new Drawable[]
                 {
                     background = new Box

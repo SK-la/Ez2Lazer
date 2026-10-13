@@ -32,6 +32,7 @@ using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Edit;
 using osu.Game.Screens.Edit.Components;
 using osu.Game.Screens.Edit.Components.Menus;
+using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.ScriptedSkin;
 using osu.Game.Skinning;
 using osu.Framework.Graphics.Cursor;
@@ -589,6 +590,14 @@ namespace osu.Game.Overlays.SkinEditor
             TargetScreen?.ChildrenOfType<SkinnableContainer>() ?? Enumerable.Empty<SkinnableContainer>();
 
         protected SkinnableContainer? GetFirstTarget() => AvailableTargets.FirstOrDefault();
+
+        internal IEnumerable<IEzHudThemeTarget> HudThemeTargets()
+        {
+            if (TargetScreen == null)
+                return Enumerable.Empty<IEzHudThemeTarget>();
+
+            return TargetScreen.ChildrenOfType<Drawable>().OfType<IEzHudThemeTarget>();
+        }
 
         protected virtual SkinnableContainer? GetTarget(GlobalSkinnableContainerLookup? target)
         {
