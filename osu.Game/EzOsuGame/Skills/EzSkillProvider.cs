@@ -114,8 +114,8 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Generic player skill read. <paramref name="sliceKey"/> is the keymode slice for keymode-scoped
-        /// rulesets; rulesets without keymode slices use a single sentinel slice.
+        /// Generic player skill read. <paramref name="sliceKey"/> is keymode for mania, or
+        /// <see cref="EzSkillSystems.OSU_SLICE_KEY"/> for osu.
         /// </summary>
         public IReadOnlyDictionary<string, double> GetPlayerSystemSkills(string username, int sliceKey, string systemId)
         {
