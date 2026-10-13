@@ -27,6 +27,7 @@ namespace osu.Game.Skinning
     [Serializable]
     public sealed class SerialisedDrawableInfo
     {
+        [JsonConverter(typeof(TypeNameJsonConverter))]
         public Type Type { get; set; } = null!;
 
         public Vector2 Position { get; set; }
