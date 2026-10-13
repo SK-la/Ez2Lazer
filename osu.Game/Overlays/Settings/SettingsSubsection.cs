@@ -22,6 +22,11 @@ namespace osu.Game.Overlays.Settings
 
         protected abstract LocalisableString Header { get; }
 
+        /// <summary>
+        /// The user-facing title of this subsection, exposed so section navigation can reference it.
+        /// </summary>
+        public LocalisableString Title => Header;
+
         public virtual IEnumerable<LocalisableString> FilterTerms => new[] { Header };
 
         public bool MatchingFilter

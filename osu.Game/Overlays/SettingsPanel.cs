@@ -47,9 +47,14 @@ namespace osu.Game.Overlays
         public const float PANEL_WIDTH = 400;
 
         /// <summary>
-        /// The full width of the settings panel, including the sidebar.
+        /// The width of the subsection navigation column shown to the left of the content.
         /// </summary>
-        public const float WIDTH = sidebar_width + PANEL_WIDTH;
+        public const float SUBSECTION_NAV_WIDTH = 150;
+
+        /// <summary>
+        /// The full width of the settings panel, including the sidebar and subsection navigation column.
+        /// </summary>
+        public const float WIDTH = sidebar_width + SUBSECTION_NAV_WIDTH + PANEL_WIDTH;
 
         protected Container<Drawable> ContentContainer;
 
@@ -57,6 +62,36 @@ namespace osu.Game.Overlays
 
         protected SettingsSidebar Sidebar;
         private SidebarIconButton selectedSidebarButton;
+
+        private SettingsSubsectionNavColumn subsectionNavColumn;
+
+        /// <summary>
+        /// Whether the subsection navigation column is currently shown.
+        /// </summary>
+        private bool subsectionNavVisible;
+
+        /// <summary>
+        /// Suppresses the subsection navigation column, e.g. while a sub-panel is open.
+        /// </summary>
+        private bool subsectionNavSuppressed;
+
+        private bool searchActive;
+
+        private SettingsSection indexedSection;
+
+        /// <summary>
+        /// The section whose subsections are currently navigable. Only set when the user explicitly
+        /// jumps to a category, so that normal scrolling never brings up the subsection column.
+        /// </summary>
+        private SettingsSection subsectionNavSection;
+
+        private ScheduledDelegate subsectionHighlightDelegate;
+
+        private double subsectionHighlightSuppressUntil;
+
+        private const double subsection_highlight_suppress_duration = 700;
+
+        private const double subsection_nav_transition_duration = 500;
 
         public SettingsSectionsContainer SectionsContainer { get; private set; }
 
@@ -171,6 +206,18 @@ namespace osu.Game.Overlays
                 }
             });
 
+            AddInternal(subsectionNavColumn = new SettingsSubsectionNavColumn
+            {
+                EntryClicked = subsection =>
+                {
+                    // keep the clicked entry selected while the scroll animation runs; the
+                    // scroll-position tracker would otherwise snap the highlight to the top item.
+                    subsectionHighlightSuppressUntil = Time.Current + subsection_highlight_suppress_duration;
+                    SectionsContainer?.ScrollTo(subsection);
+                },
+                Alpha = 0,
+            });
+
             AddInternal(Sidebar = new SettingsSidebar(showBackButton)
             {
                 BackButtonAction = Hide,
@@ -193,6 +240,10 @@ namespace osu.Game.Overlays
 
         protected override void PopIn()
         {
+            // the subsection column is opt-in per category click, and shouldn't linger from a previous open.
+            subsectionNavSection = null;
+            resetSubsectionNav();
+
             if (!AreSectionsReadyForDisplay)
             {
                 loading.Show();
@@ -229,6 +280,8 @@ namespace osu.Game.Overlays
         {
             base.PopOut();
 
+            stopSubsectionHighlight();
+
             SectionsContainer.FadeEdgeEffectTo(0, WaveContainer.DISAPPEAR_DURATION, Easing.In);
             ContentContainer.MoveToX(-WIDTH + ExpandedPosition, TRANSITION_LENGTH, Easing.OutQuint);
 
@@ -252,7 +305,14 @@ namespace osu.Game.Overlays
         {
             base.UpdateAfterChildren();
 
-            ContentContainer.Margin = new MarginPadding { Left = Sidebar?.DrawWidth ?? 0 };
+            float sidebarWidth = Sidebar?.DrawWidth ?? 0;
+            float subsectionNavWidth = subsectionNavColumn?.DrawWidth ?? 0;
+
+            // the subsection column only reserves space while it is expanded, so the panel keeps its
+            // original geometry when hidden and grows smoothly (as the column's width animates) when shown.
+            ContentContainer.Margin = new MarginPadding { Left = sidebarWidth + subsectionNavWidth };
+
+            subsectionNavColumn?.X = ContentContainer.X + sidebarWidth;
         }
 
         private const double fade_in_duration = 500;
@@ -395,7 +455,13 @@ namespace osu.Game.Overlays
 
             loading.Hide();
 
-            SearchTextBox.Current.BindValueChanged(term => SectionsContainer.SearchTerm = term.NewValue, true);
+            SearchTextBox.Current.BindValueChanged(term =>
+            {
+                SectionsContainer.SearchTerm = term.NewValue;
+
+                searchActive = !string.IsNullOrEmpty(term.NewValue);
+                updateSubsectionNav();
+            }, true);
 
             mountSidebarButtons();
         }
@@ -427,6 +493,8 @@ namespace osu.Game.Overlays
                 selectedSidebarButton = Sidebar.Children.OfType<SidebarIconButton>().FirstOrDefault(b => b.Section == section.NewValue);
 
                 selectedSidebarButton?.Selected = true;
+
+                updateSubsectionNav();
             }, true);
 
             AreSectionsReadyForDisplay = true;
@@ -448,10 +516,123 @@ namespace osu.Game.Overlays
                         if (!SectionsContainer.IsLoaded)
                             return;
 
+                        // an explicit category jump is the only thing that enables the subsection column.
+                        subsectionNavSection = section;
                         SectionsContainer.ScrollTo(section);
+                        updateSubsectionNav();
                     },
                 };
             }
+        }
+
+        /// <summary>
+        /// Suppresses or restores the subsection navigation column, e.g. while a sub-panel is shown.
+        /// </summary>
+        public void SetSubsectionNavSuppressed(bool suppressed)
+        {
+            if (subsectionNavSuppressed == suppressed)
+                return;
+
+            subsectionNavSuppressed = suppressed;
+            updateSubsectionNav();
+        }
+
+        /// <summary>
+        /// Whether the subsection navigation column should ever be shown for this panel.
+        /// Sub-panels such as the key binding panel provide their own navigation and opt out.
+        /// </summary>
+        protected virtual bool ShowSubsectionNavColumn => true;
+
+        private void updateSubsectionNav()
+        {
+            var section = CurrentSection.Value;
+            var subsections = section?.IndexedSubsections;
+
+            // only shown for the category the user explicitly jumped to, and only when there is
+            // enough of a subsection list to be worth navigating.
+            bool shouldShow = ShowSubsectionNavColumn
+                              && subsectionNavSection != null
+                              && ReferenceEquals(section, subsectionNavSection)
+                              && subsections != null
+                              && subsections.Count > 3
+                              && !subsectionNavSuppressed
+                              && !searchActive;
+
+            if (shouldShow && indexedSection != section)
+            {
+                indexedSection = section;
+                subsectionNavColumn.SetSubsections(subsections);
+            }
+            else if (!shouldShow)
+            {
+                indexedSection = null;
+            }
+
+            bool wasVisible = subsectionNavVisible;
+            subsectionNavVisible = shouldShow;
+
+            if (wasVisible != shouldShow)
+                subsectionNavColumn.SetExpanded(shouldShow, subsection_nav_transition_duration);
+
+            if (shouldShow)
+                startSubsectionHighlight();
+            else
+                stopSubsectionHighlight();
+        }
+
+        /// <summary>
+        /// Immediately collapses the subsection column without animating, e.g. while the panel is off-screen.
+        /// </summary>
+        private void resetSubsectionNav()
+        {
+            subsectionNavVisible = false;
+            subsectionNavColumn?.SetExpanded(false, 0);
+            stopSubsectionHighlight();
+        }
+
+        private void startSubsectionHighlight()
+        {
+            if (subsectionHighlightDelegate != null)
+                return;
+
+            subsectionHighlightDelegate = Scheduler.AddDelayed(updateSubsectionHighlight, 100, true);
+            updateSubsectionHighlight();
+        }
+
+        private void stopSubsectionHighlight()
+        {
+            subsectionHighlightDelegate?.Cancel();
+            subsectionHighlightDelegate = null;
+        }
+
+        private void updateSubsectionHighlight()
+        {
+            if (indexedSection == null)
+                return;
+
+            // a click sets the selection optimistically; don't fight it while the scroll animation settles.
+            if (Time.Current < subsectionHighlightSuppressUntil)
+                return;
+
+            float threshold = (SectionsContainer.FixedHeader?.ScreenSpaceDrawQuad.BottomLeft.Y ?? SectionsContainer.ScreenSpaceDrawQuad.TopLeft.Y) + 8;
+
+            SettingsSubsection current = null;
+            SettingsSubsection firstPresent = null;
+
+            foreach (var subsection in indexedSection.IndexedSubsections)
+            {
+                if (!subsection.IsPresent)
+                    continue;
+
+                firstPresent ??= subsection;
+
+                if (subsection.ScreenSpaceDrawQuad.TopLeft.Y <= threshold)
+                    current = subsection;
+                else
+                    break;
+            }
+
+            subsectionNavColumn.SetSelected(current ?? firstPresent);
         }
 
         private partial class NonMaskedContent : Container<Drawable>
