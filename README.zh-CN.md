@@ -91,3 +91,4 @@ git clone https://github.com/SK-la/ez2lazer-resources
 - [g0v0](https://github.com/GooGuTeam/g0v0-server)：提供私服支持。
 - [mania-hub](https://github.com/aleju03/mania-hub)：数据展示灵感。
 - [MinaCalc](https://github.com/etternagame/etterna)：技能算法。
+- [Syriiin/osu](https://github.com/Syriiin/osu)：PP Plus（PPP）难度公式参考。
