@@ -4,16 +4,9 @@
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Realm <c>SystemId</c> namespaces and meta skill ids (not Mina axes).
-    /// Topology (lean hybrid C):
-    /// <list type="number">
-    /// <item><b>Skills now</b> — <see cref="EzMinaSkillAxis"/> (RcMina) and <see cref="EzPlayerPatternAxis"/> (6/7/8K pattern ratings).</item>
-    /// <item><b>Dan</b> — parallel to metrics: <c>key×</c><see cref="EzDanSide"/> → <see cref="Dan.IEzDanLadder"/> + estimator;
-    /// not under skills. Profile dan uses its own estimate table/algorithm.</item>
-    /// <item><b>Chip</b> — optional UX axis (<see cref="EzChartDanVerdict.DominantAxis"/>); do not invent a parallel family enum.</item>
-    /// </list>
-    /// Catalogs register via <see cref="IEzSkillSystem"/> / <see cref="EzSkillRegistry"/>.
-    /// Axis bare ids: <see cref="EzMinaSkillAxisExtensions.ToId"/>. Reads: <see cref="EzSkillProvider"/>; writers are separate DI services.
+    /// Realm <c>SystemId</c> namespaces and meta skill ids.
+    /// Mania (Mina / pattern / dan) plugins register under <see cref="EzSkillRegistry"/>;
+    /// ruleset wiring is <see cref="EzSkillProfile"/>.
     /// </summary>
     public static class EzSkillSystems
     {
@@ -44,6 +37,16 @@ namespace osu.Game.EzOsuGame.Skills
 
         public static string DanSkillId(int keyCount, EzDanSide side)
             => $"{DAN}.{keyCount}k.{side.ToId()}";
+
+        /// <summary>
+        /// Default algorithm version for skill-value rows of <paramref name="systemId"/>.
+        /// Unknown ids return 0 (caller should pass an explicit version).
+        /// </summary>
+        public static int ResolveAlgorithmVersion(string systemId) => systemId switch
+        {
+            BEATMAP_MSD or PLAYER_SSR or PLAYER_PATTERN => EzManiaSkillAlgorithm.VERSION,
+            _ => 0,
+        };
     }
 
     /// <summary>

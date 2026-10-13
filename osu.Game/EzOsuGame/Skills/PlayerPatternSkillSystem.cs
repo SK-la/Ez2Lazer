@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.EzOsuGame.LocalProfile;
 
 namespace osu.Game.EzOsuGame.Skills
 {
@@ -12,6 +13,10 @@ namespace osu.Game.EzOsuGame.Skills
     public sealed class PlayerPatternSkillSystem : IEzSkillSystem
     {
         public string SystemId => EzSkillSystems.PLAYER_PATTERN;
+
+        public EzSkillScope Scope => EzSkillScope.Player;
+
+        public bool IsDefaultRadar => false;
 
         public IReadOnlyList<EzSkillDefinition> Skills { get; } =
             EzPlayerPatternAxisExtensions.All
@@ -26,5 +31,8 @@ namespace osu.Game.EzOsuGame.Skills
                                                  meta.AccentHex);
                                          })
                                          .ToList();
+
+        public bool AppliesToRuleset(int rulesetOnlineId)
+            => rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID;
     }
 }

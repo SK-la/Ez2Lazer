@@ -5,6 +5,7 @@ using System;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
@@ -257,6 +258,21 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             // No skill id is shared across systems.
             var ids = registry.AllSkills.Select(s => s.SkillId).ToList();
             Assert.That(ids.Distinct().Count(), Is.EqualTo(ids.Count));
+        }
+
+        [Test]
+        public void Profiles_split_by_ruleset()
+        {
+            var registry = new EzSkillRegistry();
+
+            var mania = registry.GetProfile(EzLocalProfileConstants.MANIA_RULESET_ID);
+            Assert.That(mania, Is.Not.Null);
+            Assert.That(mania!.DefaultChartSystemId, Is.EqualTo(EzSkillSystems.BEATMAP_MSD));
+            Assert.That(mania.DefaultPlayerSystemId, Is.EqualTo(EzSkillSystems.PLAYER_SSR));
+            Assert.That(mania.ContainsSystem(EzSkillSystems.DAN), Is.True);
+
+            Assert.That(registry.GetProfile(1), Is.Null); // taiko — no plugin yet
+            Assert.That(registry.GetProfile(2), Is.Null); // catch
         }
     }
 

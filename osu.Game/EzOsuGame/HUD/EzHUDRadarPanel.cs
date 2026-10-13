@@ -19,6 +19,7 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.UserInterface;
@@ -440,7 +441,27 @@ namespace osu.Game.EzOsuGame.HUD
         {
             var beatmapInfo = beatmap.Value.BeatmapInfo;
 
-            if (beatmapInfo == null || beatmapInfo.Ruleset.OnlineID != 3)
+            if (beatmapInfo == null)
+            {
+                cancelLiveKick();
+                cancelRadarAnalysis();
+                clearChartData();
+                chart?.ClearSecondaryData();
+                return;
+            }
+
+            var profile = skillProvider?.GetProfile(beatmapInfo.Ruleset.OnlineID);
+
+            if (profile == null)
+            {
+                cancelLiveKick();
+                cancelRadarAnalysis();
+                clearChartData();
+                chart?.ClearSecondaryData();
+                return;
+            }
+
+            if (beatmapInfo.Ruleset.OnlineID != EzLocalProfileConstants.MANIA_RULESET_ID)
             {
                 cancelLiveKick();
                 cancelRadarAnalysis();
