@@ -26,9 +26,9 @@
       <NoWarn>NU1903</NoWarn>
     </PackageReference>
     <PackageReference Include="DiffPlex" Version="1.9.0" />
-    <PackageReference Include="HtmlAgilityPack" Version="1.13.0" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.13.1" />
     <PackageReference Include="Humanizer" Version="3.0.10" />
-    <PackageReference Include="MessagePack" Version="3.1.10" />
+    <PackageReference Include="MessagePack" Version="3.1.12" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.12" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="10.0.12" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.NewtonsoftJson" Version="10.0.12" />
@@ -44,9 +44,9 @@
     <PackageReference Include="Realm" Version="20.1.0"/>
     <PackageReference Include="ez2lazer.Framework" Version="[$(Ez2LazerFrameworkVersion)]" Condition="'$(UseEz2LazerLocalFrameworkProject)' != 'true'"/>
     <PackageReference Include="ez2lazer.Game.Resources" Version="[$(Ez2LazerGameResourcesVersion)]" Condition="'$(UseEz2LazerLocalResourcesProject)' != 'true'"/>
-    <PackageReference Include="Sentry" Version="6.11.0"/>
+    <PackageReference Include="Sentry" Version="6.12.1" />
     <PackageReference Include="SharpCompress" Version="0.50.4"/>
-    <PackageReference Include="NUnit" Version="4.6.1"/>
+    <PackageReference Include="NUnit" Version="5.0.0" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5"/>
     <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0"/>
     <PackageReference Include="TagLibSharp" Version="2.3.0"/>
