@@ -524,6 +524,13 @@ namespace osu.Game.Rulesets.Objects.Drawables
             using (BeginAbsoluteSequence(HitStateUpdateTime))
                 UpdateHitStateTransforms(newState);
 
+            // 未判定也不结束生命周期：判定与输入继续按原时间进行，只把视觉在自身结束时间处收掉。
+            if (newState == ArmedState.Idle && HideVisualsAfterOwnTime)
+            {
+                using (BeginAbsoluteSequence(HitStateUpdateTime))
+                    this.FadeOut();
+            }
+
             state.Value = newState;
 
             if (LifetimeEnd == double.MaxValue && (state.Value != ArmedState.Idle || HitObject.HitWindows == null))
@@ -771,6 +778,13 @@ namespace osu.Game.Rulesets.Objects.Drawables
         /// 控制命中后状态变换是否固定使用物件自身时间作为基准。
         /// </summary>
         protected virtual bool HitObjectLifetimeUsesOwnTime => ownerLifetime;
+
+        /// <summary>
+        /// 是否在物件自身结束时间到达时收掉视觉。
+        /// 与生命周期无关：判定与输入仍按原时间进行，只影响“超过判定线后是否还看得见”。
+        /// 嵌套物件的显隐由父物件管理，因此默认只作用于顶层物件。
+        /// </summary>
+        protected virtual bool HideVisualsAfterOwnTime => HitObjectLifetimeUsesOwnTime && ParentHitObject == null;
 
         /// <summary>
         /// 当前物件命中后状态变换所使用的时间基准。
