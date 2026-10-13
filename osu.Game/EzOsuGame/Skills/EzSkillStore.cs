@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Startup;
@@ -37,6 +38,34 @@ namespace osu.Game.EzOsuGame.Skills
                                         && v.AlgorithmVersion == version);
 
                 return rows.ToDictionary(v => v.SkillId, v => v.Value, StringComparer.Ordinal);
+            });
+        }
+
+        /// <summary>
+        /// PPP rows whose <see cref="EzBeatmapSkillValue.AlgorithmVersion"/> matches the bundle revision for that beatmap's ruleset.
+        /// </summary>
+        public IReadOnlyDictionary<string, double> GetBeatmapSkillsAtCurrentVersions(string beatmapHash, string systemId)
+        {
+            return realmAccess.Run(r =>
+            {
+                int rulesetId = resolveRulesetForBeatmapHash(r, beatmapHash);
+                int bundle = EzPppSkillVersions.ForRuleset(rulesetId);
+
+                if (bundle <= 0)
+                    return new Dictionary<string, double>(StringComparer.Ordinal);
+
+                var rows = r.All<EzBeatmapSkillValue>()
+                            .Where(v => v.BeatmapHash == beatmapHash && v.SystemId == systemId);
+
+                var result = new Dictionary<string, double>(StringComparer.Ordinal);
+
+                foreach (var row in rows)
+                {
+                    if (row.AlgorithmVersion == bundle)
+                        result[row.SkillId] = row.Value;
+                }
+
+                return result;
             });
         }
 
@@ -110,7 +139,9 @@ namespace osu.Game.EzOsuGame.Skills
             IReadOnlyDictionary<string, double> skills,
             Guid beatmapId = default,
             DateTimeOffset? computedAt = null,
-            int? algorithmVersion = null)
+            int? algorithmVersion = null,
+            IReadOnlyDictionary<string, int>? skillVersions = null,
+            int? pppRulesetOnlineId = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(beatmapHash);
             ArgumentException.ThrowIfNullOrWhiteSpace(systemId);
@@ -130,6 +161,8 @@ namespace osu.Game.EzOsuGame.Skills
 
                 foreach (var (skillId, value) in skills)
                 {
+                    int rowVersion = rowVersionFor(systemId, skillId, version, skillVersions, pppRulesetOnlineId);
+
                     r.Add(new EzBeatmapSkillValue
                     {
                         BeatmapHash = beatmapHash,
@@ -137,7 +170,7 @@ namespace osu.Game.EzOsuGame.Skills
                         SystemId = systemId,
                         SkillId = skillId,
                         Value = value,
-                        AlgorithmVersion = version,
+                        AlgorithmVersion = rowVersion,
                         ComputedAt = at,
                     });
                 }
@@ -156,7 +189,8 @@ namespace osu.Game.EzOsuGame.Skills
             bool provisional = false,
             bool stale = false,
             DateTimeOffset? computedAt = null,
-            int? algorithmVersion = null)
+            int? algorithmVersion = null,
+            IReadOnlyDictionary<string, int>? skillVersions = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
             ArgumentException.ThrowIfNullOrWhiteSpace(systemId);
@@ -178,6 +212,8 @@ namespace osu.Game.EzOsuGame.Skills
 
                 foreach (var (skillId, value) in skills)
                 {
+                    int rowVersion = rowVersionFor(systemId, skillId, version, skillVersions);
+
                     r.Add(new EzPlayerSkillValue
                     {
                         Username = username,
@@ -188,7 +224,7 @@ namespace osu.Game.EzOsuGame.Skills
                         AnalyzedPlays = analyzedPlays,
                         Provisional = provisional,
                         Stale = stale,
-                        AlgorithmVersion = version,
+                        AlgorithmVersion = rowVersion,
                         ComputedAt = at,
                     });
                 }
@@ -373,6 +409,30 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
+        /// <summary>
+        /// PPP player rows whose algorithm version matches the bundle revision for that skill's metric.
+        /// </summary>
+        public IReadOnlyDictionary<string, double> GetPlayerSkillsAtCurrentVersions(string username, int keyCount, string systemId)
+        {
+            return realmAccess.Run(r =>
+            {
+                var rows = r.All<EzPlayerSkillValue>()
+                            .Where(v => v.Username == username
+                                        && v.KeyCount == keyCount
+                                        && v.SystemId == systemId);
+
+                var result = new Dictionary<string, double>(StringComparer.Ordinal);
+
+                foreach (var row in rows)
+                {
+                    if (row.AlgorithmVersion == EzPppSkillVersions.ForSkillId(row.SkillId))
+                        result[row.SkillId] = row.Value;
+                }
+
+                return result;
+            });
+        }
+
         /// <summary>Row metadata for a player system slice (analyzed plays / provisional / stale).</summary>
         public (int AnalyzedPlays, bool Provisional, bool Stale) GetPlayerSystemSkillMeta(
             string username,
@@ -380,15 +440,22 @@ namespace osu.Game.EzOsuGame.Skills
             string systemId,
             int? algorithmVersion = null)
         {
+            bool perSkill = algorithmVersion == null
+                            && systemId is EzSkillSystems.BEATMAP_PPPLUS or EzSkillSystems.PLAYER_PPPLUS;
             int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
 
             return realmAccess.Run(r =>
             {
-                var row = r.All<EzPlayerSkillValue>()
-                           .FirstOrDefault(v => v.Username == username
-                                                && v.KeyCount == keyCount
-                                                && v.SystemId == systemId
-                                                && v.AlgorithmVersion == version);
+                var row = perSkill
+                    ? r.All<EzPlayerSkillValue>()
+                       .Where(v => v.Username == username && v.KeyCount == keyCount && v.SystemId == systemId)
+                       .AsEnumerable()
+                       .FirstOrDefault(v => v.AlgorithmVersion == EzPppSkillVersions.ForSkillId(v.SkillId))
+                    : r.All<EzPlayerSkillValue>()
+                       .FirstOrDefault(v => v.Username == username
+                                            && v.KeyCount == keyCount
+                                            && v.SystemId == systemId
+                                            && v.AlgorithmVersion == version);
 
                 return row == null
                     ? (0, false, false)
@@ -977,7 +1044,163 @@ namespace osu.Game.EzOsuGame.Skills
         /// </para>
         /// </summary>
         public EzDataStateReport GetSkillDataStatus(DateTimeOffset? measuredAt = null)
-            => CollectChartChainState().ToReport(measuredAt ?? DateTimeOffset.UtcNow);
+        {
+            DateTimeOffset at = measuredAt ?? DateTimeOffset.UtcNow;
+            var report = CollectChartChainState().ToReport(at);
+            var facets = new List<EzFacetStatus>(report.Facets.Count + 1);
+            facets.AddRange(report.Facets);
+            facets.Add(scanPppCharts().Status);
+
+            return new EzDataStateReport
+            {
+                UniverseCount = report.UniverseCount,
+                Facets = facets,
+                MeasuredAt = at,
+            };
+        }
+
+        /// <summary>Beatmaps whose PPP chart skills are missing a current per-skill version.</summary>
+        public IReadOnlyList<Guid> CollectPppChartDebt()
+            => scanPppCharts().OwedIds;
+
+        public void ClearBeatmapPpPlus()
+        {
+            realmAccess.Write(r =>
+            {
+                var rows = r.All<EzBeatmapSkillValue>()
+                            .Where(v => v.SystemId == EzSkillSystems.BEATMAP_PPPLUS)
+                            .ToList();
+
+                foreach (var row in rows)
+                    r.Remove(row);
+            });
+        }
+
+        private PppChartScan scanPppCharts()
+        {
+            return realmAccess.Run(r =>
+            {
+                var candidates = new List<(Guid Id, string Hash, int Ruleset)>();
+
+                foreach (var beatmap in r.All<BeatmapInfo>())
+                {
+                    if (beatmap.BeatmapSet == null || string.IsNullOrEmpty(beatmap.Hash))
+                        continue;
+
+                    int rulesetId = beatmap.Ruleset.OnlineID;
+
+                    if (!EzPppSkillCatalog.SupportsRuleset(rulesetId))
+                        continue;
+
+                    candidates.Add((beatmap.ID, beatmap.Hash, rulesetId));
+                }
+
+                var byHash = new Dictionary<string, List<EzBeatmapSkillValue>>(StringComparer.Ordinal);
+
+                foreach (var row in r.All<EzBeatmapSkillValue>().Where(v => v.SystemId == EzSkillSystems.BEATMAP_PPPLUS))
+                {
+                    if (!byHash.TryGetValue(row.BeatmapHash, out var list))
+                    {
+                        list = new List<EzBeatmapSkillValue>();
+                        byHash[row.BeatmapHash] = list;
+                    }
+
+                    list.Add(row);
+                }
+
+                var owed = new List<Guid>();
+                var rows = new Dictionary<string, EzFacetRowState>(candidates.Count, StringComparer.Ordinal);
+
+                foreach (var candidate in candidates)
+                {
+                    byHash.TryGetValue(candidate.Hash, out var stored);
+                    bool complete = isCurrentPppChart(candidate.Ruleset, stored);
+
+                    if (!complete)
+                        owed.Add(candidate.Id);
+
+                    if (stored == null || stored.Count == 0)
+                        continue;
+
+                    rows[candidate.Hash] = new EzFacetRowState(complete ? EzPppSkillVersions.FACET_REVISION : 0, false);
+                }
+
+                var facet = new EzDataStateFacet
+                {
+                    Id = "PPP",
+                    Facet = EzAnalysisFacet.PPPAlgorithm,
+                    CurrentRevision = EzPppSkillVersions.FACET_REVISION,
+                    UniverseCount = candidates.Count,
+                    Rows = rows,
+                };
+
+                return new PppChartScan(owed, EzDataStateChecker.Count(facet));
+            });
+        }
+
+        private static int rowVersionFor(
+            string systemId,
+            string skillId,
+            int fallback,
+            IReadOnlyDictionary<string, int>? skillVersions,
+            int? pppRulesetOnlineId = null)
+        {
+            if (skillVersions != null && skillVersions.TryGetValue(skillId, out int specific))
+                return specific;
+
+            if (systemId == EzSkillSystems.BEATMAP_PPPLUS && pppRulesetOnlineId is int chartRuleset)
+            {
+                int bundle = EzPppSkillVersions.ForRuleset(chartRuleset);
+
+                if (bundle > 0)
+                    return bundle;
+            }
+
+            if (systemId == EzSkillSystems.PLAYER_PPPLUS)
+            {
+                int bundle = EzPppSkillVersions.ForSkillId(skillId);
+
+                if (bundle > 0)
+                    return bundle;
+            }
+
+            return fallback;
+        }
+
+        private static bool isCurrentPppChart(int rulesetId, List<EzBeatmapSkillValue>? stored)
+        {
+            if (stored == null || stored.Count == 0)
+                return false;
+
+            int bundle = EzPppSkillVersions.ForRuleset(rulesetId);
+
+            if (bundle <= 0)
+                return false;
+
+            var present = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var row in stored)
+            {
+                if (row.AlgorithmVersion == bundle)
+                    present.Add(row.SkillId);
+            }
+
+            foreach (string required in EzPppSkillCatalog.RequiredChartSkillIds(rulesetId))
+            {
+                if (!present.Contains(required))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private readonly record struct PppChartScan(List<Guid> OwedIds, EzFacetStatus Status);
+
+        private static int resolveRulesetForBeatmapHash(Realm r, string beatmapHash)
+        {
+            var beatmap = r.All<BeatmapInfo>().FirstOrDefault(b => b.Hash == beatmapHash);
+            return beatmap?.Ruleset.OnlineID ?? -1;
+        }
 
         /// <summary>
         /// Batch-read typed ChartSkillInfo rows for many hashes in one Realm run.

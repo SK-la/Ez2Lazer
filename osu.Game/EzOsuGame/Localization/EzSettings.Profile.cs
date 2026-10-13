@@ -155,6 +155,9 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SKILL_RATING =
             new EzLocalizationManager.EzLocalisableString("{0}K 技能评分", "{0}K skill rating");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_OSU_SKILL_RATING =
+            new EzLocalizationManager.EzLocalisableString("osu 技能评分", "osu skill rating");
+
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SKILL_PLAYS =
             new EzLocalizationManager.EzLocalisableString("{0} 局分析", "{0} analyzed plays");
 
