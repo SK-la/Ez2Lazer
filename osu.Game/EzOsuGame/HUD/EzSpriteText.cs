@@ -88,7 +88,7 @@ namespace osu.Game.EzOsuGame.HUD
             if (store == null)
                 return Task.CompletedTask;
 
-            return Task.Run(() =>
+            return EzGameplayWarmUpService.RunBlocking(() =>
             {
                 var uploads = new List<Texture>();
                 PreloadCharacters(store, fontName, uploads);

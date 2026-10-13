@@ -210,7 +210,7 @@ namespace osu.Game.EzOsuGame.HUD
             // 与 reloadDrawable 取同一份请求：解析命中同一帧集缓存，解码只发生一次，
             // 且预热解出来的必然是进局会用的那些，不会多解也不会漏。
             // 这里刻意不创建 / 挂载 drawable：Player 在门控放行之前不在场景树里，Schedule 出来的更新不会跑。
-            return Task.Run(() => getFrames(spriteName), cancellationToken);
+            return EzGameplayWarmUpService.RunBlocking(() => getFrames(spriteName), cancellationToken);
         }
 
         // Only the sprite is swapped out: the speed tracker is an internal child too, so a blanket ClearInternal would

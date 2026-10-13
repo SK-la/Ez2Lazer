@@ -111,7 +111,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.WarmUp
             for (int i = 0; i < flare_components.Length; i++)
                 paths[i] = factory.GetNotePath(flare_components[i]);
 
-            return Task.Run(() => warmUpFlares(paths, cancellationToken), cancellationToken);
+            return EzGameplayWarmUpService.RunBlocking(() => warmUpFlares(paths, cancellationToken), cancellationToken);
         }
 
         private void warmUpFlares(string[] paths, CancellationToken cancellationToken)

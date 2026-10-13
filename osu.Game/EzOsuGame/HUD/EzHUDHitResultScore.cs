@@ -420,7 +420,7 @@ namespace osu.Game.EzOsuGame.HUD
             string template = AnimationFrameTemplate.Value?.Trim() ?? "{result}/{000}";
             EzEnumHitMode activeTemplate = resolveActiveTemplate();
 
-            return Task.Run(() => warmUpJudgementResources(theme, template, activeTemplate, cancellationToken), cancellationToken);
+            return EzGameplayWarmUpService.RunBlocking(() => warmUpJudgementResources(theme, template, activeTemplate, cancellationToken), cancellationToken);
         }
 
         private void warmUpJudgementResources(string theme, string template, EzEnumHitMode activeTemplate, CancellationToken cancellationToken)
