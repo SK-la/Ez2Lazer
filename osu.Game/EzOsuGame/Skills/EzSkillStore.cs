@@ -27,7 +27,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         public IReadOnlyDictionary<string, double> GetBeatmapSkills(string beatmapHash, string systemId, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
 
             return realmAccess.Run(r =>
             {
@@ -58,7 +58,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (hashSet.Count == 0)
                 return new Dictionary<string, IReadOnlyDictionary<string, double>>(StringComparer.Ordinal);
 
-            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
 
             return realmAccess.Run(r =>
             {
@@ -99,6 +99,100 @@ namespace osu.Game.EzOsuGame.Skills
 
             value = found;
             return true;
+        }
+
+        /// <summary>
+        /// Replace all beatmap skill rows for <paramref name="systemId"/> with <paramref name="skills"/>.
+        /// </summary>
+        public void WriteBeatmapSystemSkills(
+            string beatmapHash,
+            string systemId,
+            IReadOnlyDictionary<string, double> skills,
+            Guid beatmapId = default,
+            DateTimeOffset? computedAt = null,
+            int? algorithmVersion = null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(beatmapHash);
+            ArgumentException.ThrowIfNullOrWhiteSpace(systemId);
+            ArgumentNullException.ThrowIfNull(skills);
+
+            DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
+            int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
+
+            realmAccess.Write(r =>
+            {
+                var existing = r.All<EzBeatmapSkillValue>()
+                                .Where(v => v.BeatmapHash == beatmapHash && v.SystemId == systemId)
+                                .ToList();
+
+                foreach (var row in existing)
+                    r.Remove(row);
+
+                foreach (var (skillId, value) in skills)
+                {
+                    r.Add(new EzBeatmapSkillValue
+                    {
+                        BeatmapHash = beatmapHash,
+                        BeatmapId = beatmapId,
+                        SystemId = systemId,
+                        SkillId = skillId,
+                        Value = value,
+                        AlgorithmVersion = version,
+                        ComputedAt = at,
+                    });
+                }
+            });
+        }
+
+        /// <summary>
+        /// Replace all player skill rows for (<paramref name="username"/>, <paramref name="sliceKey"/>, <paramref name="systemId"/>).
+        /// </summary>
+        public void WritePlayerSystemSkills(
+            string username,
+            int sliceKey,
+            string systemId,
+            IReadOnlyDictionary<string, double> skills,
+            int analyzedPlays,
+            bool provisional = false,
+            bool stale = false,
+            DateTimeOffset? computedAt = null,
+            int? algorithmVersion = null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+            ArgumentException.ThrowIfNullOrWhiteSpace(systemId);
+            ArgumentNullException.ThrowIfNull(skills);
+
+            DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
+            int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
+
+            realmAccess.Write(r =>
+            {
+                var existing = r.All<EzPlayerSkillValue>()
+                                .Where(v => v.Username == username
+                                            && v.KeyCount == sliceKey
+                                            && v.SystemId == systemId)
+                                .ToList();
+
+                foreach (var row in existing)
+                    r.Remove(row);
+
+                foreach (var (skillId, value) in skills)
+                {
+                    r.Add(new EzPlayerSkillValue
+                    {
+                        Username = username,
+                        KeyCount = sliceKey,
+                        SystemId = systemId,
+                        SkillId = skillId,
+                        Value = value,
+                        AnalyzedPlays = analyzedPlays,
+                        Provisional = provisional,
+                        Stale = stale,
+                        AlgorithmVersion = version,
+                        ComputedAt = at,
+                    });
+                }
+            });
         }
 
         public void WriteBeatmapMsd(string beatmapHash, EzSkillsetVector vector, Guid beatmapId = default, DateTimeOffset? computedAt = null, double? holdRatio = null)
@@ -265,7 +359,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         public IReadOnlyDictionary<string, double> GetPlayerSkills(string username, int keyCount, string systemId, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
 
             return realmAccess.Run(r =>
             {
@@ -276,6 +370,29 @@ namespace osu.Game.EzOsuGame.Skills
                                         && v.AlgorithmVersion == version);
 
                 return rows.ToDictionary(v => v.SkillId, v => v.Value, StringComparer.Ordinal);
+            });
+        }
+
+        /// <summary>Row metadata for a player system slice (analyzed plays / provisional / stale).</summary>
+        public (int AnalyzedPlays, bool Provisional, bool Stale) GetPlayerSystemSkillMeta(
+            string username,
+            int keyCount,
+            string systemId,
+            int? algorithmVersion = null)
+        {
+            int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
+
+            return realmAccess.Run(r =>
+            {
+                var row = r.All<EzPlayerSkillValue>()
+                           .FirstOrDefault(v => v.Username == username
+                                                && v.KeyCount == keyCount
+                                                && v.SystemId == systemId
+                                                && v.AlgorithmVersion == version);
+
+                return row == null
+                    ? (0, false, false)
+                    : (row.AnalyzedPlays, row.Provisional, row.Stale);
             });
         }
 
