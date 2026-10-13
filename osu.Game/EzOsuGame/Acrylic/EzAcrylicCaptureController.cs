@@ -37,7 +37,7 @@ namespace osu.Game.EzOsuGame.Acrylic
                 return;
             }
 
-            // TODO(Deferred): recorded frames cannot read the swapchain yet.
+            // Deferred renderers never report backbuffer-region copy support and keep acquiring the capture.
             if (renderer?.SupportsBackbufferRegionCopy == true)
             {
                 releaseCapture();
