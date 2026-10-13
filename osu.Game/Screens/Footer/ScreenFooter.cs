@@ -15,7 +15,6 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Threading;
-using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Containers;
@@ -97,7 +96,7 @@ namespace osu.Game.Screens.Footer
                     Children = new Drawable[]
                     {
                         // N: frosted glass — cool FooterVeil so blur reads (not same hue as solid M).
-                        footerAcrylic = new EzAcrylicPanelBackground(EzAcrylicStyle.FooterVeil)
+                        footerAcrylic = new EzAcrylicPanelBackground(EzUIStyleV1.FooterVeil)
                         {
                             AcrylicCaptureVisible = true,
                         },
@@ -366,7 +365,7 @@ namespace osu.Game.Screens.Footer
 
             background.FadeColour(colourProvider.Background5, 150, Easing.OutQuint);
             // Light scheme wash only — keep frost readable (do not retint to opaque Background5).
-            footerAcrylic.TintBox.FadeColour(colourProvider.Background5.Opacity(EzAcrylicStyle.FooterSchemeTintAlpha), 150, Easing.OutQuint);
+            footerAcrylic.TintBox.FadeColour(colourProvider.Background5.Opacity(EzUIStyleV1.FooterSchemeTintAlpha), 150, Easing.OutQuint);
 
             foreach (var button in buttonsFlow)
                 button.UpdateDisplay();

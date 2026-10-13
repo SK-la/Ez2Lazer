@@ -12,7 +12,7 @@ using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
 using osu.Framework.Layout;
-using osu.Game.EzOsuGame.Acrylic;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osuTK;
@@ -149,7 +149,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                         Origin = Anchor.TopCentre,
                         Position = new Vector2(0, -4),
                         Masking = true,
-                        CornerRadius = EzAcrylicStyle.CORNER_RADIUS_DISPLAY,
+                        CornerRadius = EzUIStyleV1.CORNER_RADIUS_DISPLAY,
                         Children = new Drawable[]
                         {
                             new Box

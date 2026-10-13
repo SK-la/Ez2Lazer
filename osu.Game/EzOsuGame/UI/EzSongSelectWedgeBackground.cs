@@ -58,7 +58,7 @@ namespace osu.Game.EzOsuGame.UI
                 darkVeil = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = EzAcrylicStyle.Veil,
+                    Colour = EzUIStyleV1.Veil,
                     Alpha = 0,
                 },
                 wedgeBackground = new WedgeBackground

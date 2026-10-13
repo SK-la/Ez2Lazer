@@ -8,7 +8,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
-using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Containers;
@@ -90,7 +89,7 @@ namespace osu.Game.Overlays.Mods
                         RelativeSizeAxes = Axes.Both,
                         Children = new Drawable[]
                         {
-                            pageAcrylic = new EzAcrylicPanelBackground(EzAcrylicStyle.ModPageVeil)
+                            pageAcrylic = new EzAcrylicPanelBackground(EzUIStyleV1.ModPageVeil)
                             {
                                 AcrylicCaptureVisible = true,
                             },

@@ -11,7 +11,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
@@ -114,7 +113,7 @@ namespace osu.Game.Screens.Menu
 
                 Children = new Drawable[]
                 {
-                    acrylicBackground = new EzAcrylicPanelBackground(EzAcrylicStyle.FooterVeil)
+                    acrylicBackground = new EzAcrylicPanelBackground(EzUIStyleV1.FooterVeil)
                     {
                         AcrylicCaptureVisible = false,
                     },

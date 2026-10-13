@@ -16,7 +16,6 @@ using osu.Framework.Input.Events;
 using osu.Framework.Threading;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Overlays.Preview;
 using osu.Game.EzOsuGame.UI;
@@ -167,7 +166,7 @@ namespace osu.Game.EzOsuGame.Overlays
                     Anchor = Anchor.BottomLeft,
                     Origin = Anchor.BottomLeft,
                     Masking = true,
-                    CornerRadius = EzAcrylicStyle.CORNER_RADIUS_DISPLAY,
+                    CornerRadius = EzUIStyleV1.CORNER_RADIUS_DISPLAY,
                     Alpha = 0,
                     RelativeSizeAxes = Axes.None,
                     Child = new Container

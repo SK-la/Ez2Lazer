@@ -11,7 +11,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Sprites;
@@ -120,7 +119,7 @@ namespace osu.Game.Screens.Menu
                     Origin = Anchor.Centre,
                     Children = new Drawable[]
                     {
-                        acrylicBackground = new EzAcrylicPanelBackground(colour.Opacity(EzAcrylicStyle.MENU_BUTTON_TINT_ALPHA), EzAcrylicStyle.PanelFrameBufferScale)
+                        acrylicBackground = new EzAcrylicPanelBackground(colour.Opacity(EzUIStyleV1.MENU_BUTTON_TINT_ALPHA), EzUIStyleV1.PanelFrameBufferScale)
                         {
                             AcrylicCaptureVisible = false,
                             RelativeSizeAxes = Axes.Y,

@@ -20,7 +20,6 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Overlays;
@@ -128,7 +127,7 @@ namespace osu.Game.Screens.Select
                 {
                     // Full-bleed under accent strip + Content so Content's left corner radius
                     // reveals the same glass (no (| crescent seam against a strip-only background).
-                    PanelGlass = new EzAcrylicPanelBackground(EzAcrylicStyle.PanelVeil, EzAcrylicStyle.PanelFrameBufferScale)
+                    PanelGlass = new EzAcrylicPanelBackground(EzUIStyleV1.PanelVeil, EzUIStyleV1.PanelFrameBufferScale)
                     {
                         // Capture starts in PrepareForUse. The carousel pool constructs every panel up front;
                         // leaving this on would pin a blur framebuffer for each card ever shown.

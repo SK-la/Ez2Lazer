@@ -13,7 +13,7 @@ using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Acrylic;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -38,7 +38,7 @@ namespace osu.Game.EzOsuGame.UserInterface
     public partial class EzDisplayTag : CompositeDrawable
     {
         private const int max_visible_tags = 10;
-        private const float tag_corner_radius = EzAcrylicStyle.CORNER_RADIUS_DISPLAY / 2;
+        private const float tag_corner_radius = EzUIStyleV1.CORNER_RADIUS_DISPLAY / 2;
 
         private readonly FillFlowContainer rootFlow;
         private readonly FillFlowContainer tagFlow;

@@ -4,13 +4,13 @@
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.EzOsuGame.Acrylic
+namespace osu.Game.EzOsuGame.UI
 {
     /// <summary>
     /// Acrylic glass (N) appearance constants only — tune for hot reload.
     /// Classic chrome (M) is never half-alpha; use <see cref="UI.EzAcrylicOverlayAlpha.BindExclusive"/>.
     /// </summary>
-    public static class EzAcrylicStyle
+    public static class EzUIStyleV1
     {
         /// <summary>Cool dark veil over blurred backdrop (wedges / preview).</summary>
         public static readonly Color4 Veil = new Color4(8 / 255f, 10 / 255f, 14 / 255f, 0.40f);
