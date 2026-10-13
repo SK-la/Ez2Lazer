@@ -6,6 +6,7 @@ using osu.Framework.Audio;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Framework.Logging;
@@ -261,18 +262,56 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 new ScreenFooterButton
                 {
                     Text = BmsStrings.SONG_SELECT_BACK,
+                    Icon = FontAwesome.Solid.SignOutAlt,
+                    TooltipText = BmsStrings.SONG_SELECT_EXIT_TOOLTIP,
                     Action = () =>
                     {
                         if (!navigator.TryGoBack())
                             this.Exit();
                     },
                 },
-                new ScreenFooterButton { Text = BmsStrings.SONG_SELECT_REFRESH_LIBRARY, Action = refreshLibrary },
-                new ScreenFooterButton { Text = BmsStrings.SONG_SELECT_BUILD_ANALYTICS_SHORT, Action = buildAnalytics },
-                new ScreenFooterButton { Text = BmsStrings.SONG_SELECT_SYNC_BUILTIN_TABLES, Action = syncBuiltinTables },
-                new ScreenFooterButton { Text = BmsStrings.SONG_SELECT_ADD_TABLE_URL, Action = promptAddTableUrl },
-                new ScreenFooterButton { Text = BmsStrings.SONG_SELECT_OPEN_CHART_DOWNLOAD, Action = openSelectedChartDownload },
-                new ScreenFooterButton { Text = BmsStrings.SONG_SELECT_OPEN_TABLES_FOLDER, Action = openTablesFolder },
+                new ScreenFooterButton
+                {
+                    Text = BmsStrings.SONG_SELECT_REFRESH_LIBRARY,
+                    Icon = FontAwesome.Solid.SyncAlt,
+                    TooltipText = BmsStrings.SONG_SELECT_REFRESH_LIBRARY_TOOLTIP,
+                    Action = refreshLibrary,
+                },
+                new ScreenFooterButton
+                {
+                    Text = BmsStrings.SONG_SELECT_BUILD_ANALYTICS_SHORT,
+                    Icon = FontAwesome.Solid.ChartLine,
+                    TooltipText = BmsStrings.SONG_SELECT_BUILD_ANALYTICS_TOOLTIP,
+                    Action = buildAnalytics,
+                },
+                new ScreenFooterButton
+                {
+                    Text = BmsStrings.SONG_SELECT_SYNC_BUILTIN_TABLES,
+                    Icon = FontAwesome.Solid.CloudDownloadAlt,
+                    TooltipText = BmsStrings.SONG_SELECT_SYNC_BUILTIN_TABLES_TOOLTIP,
+                    Action = syncBuiltinTables,
+                },
+                new ScreenFooterButton
+                {
+                    Text = BmsStrings.SONG_SELECT_ADD_TABLE_URL,
+                    Icon = FontAwesome.Solid.Link,
+                    TooltipText = BmsStrings.SONG_SELECT_ADD_TABLE_URL_TOOLTIP,
+                    Action = promptAddTableUrl,
+                },
+                new ScreenFooterButton
+                {
+                    Text = BmsStrings.SONG_SELECT_OPEN_CHART_DOWNLOAD,
+                    Icon = FontAwesome.Solid.Download,
+                    TooltipText = BmsStrings.SONG_SELECT_OPEN_CHART_DOWNLOAD_TOOLTIP,
+                    Action = openSelectedChartDownload,
+                },
+                new ScreenFooterButton
+                {
+                    Text = BmsStrings.SONG_SELECT_OPEN_TABLES_FOLDER,
+                    Icon = FontAwesome.Solid.FolderOpen,
+                    TooltipText = BmsStrings.SONG_SELECT_OPEN_TABLES_FOLDER_TOOLTIP,
+                    Action = openTablesFolder,
+                },
             };
         }
 

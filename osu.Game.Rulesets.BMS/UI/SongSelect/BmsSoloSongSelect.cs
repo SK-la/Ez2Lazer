@@ -299,6 +299,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             {
                 Text = BmsStrings.SONG_SELECT_REFRESH_LIBRARY,
                 Icon = FontAwesome.Solid.SyncAlt,
+                TooltipText = BmsStrings.SONG_SELECT_REFRESH_LIBRARY_TOOLTIP,
                 Action = refreshLibrary,
             });
 

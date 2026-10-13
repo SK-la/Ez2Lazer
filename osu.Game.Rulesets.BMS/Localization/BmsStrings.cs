@@ -168,6 +168,27 @@ namespace osu.Game.Rulesets.BMS.Localization
         public static readonly LocalisableString SONG_SELECT_OPEN_CHART_DOWNLOAD =
             new BmsLocalizationManager.BmsLocalisableString("打开下载", "Open download");
 
+        public static readonly LocalisableString SONG_SELECT_EXIT_TOOLTIP =
+            new BmsLocalizationManager.BmsLocalisableString("返回上一级；无处可返回时退出 BMS 选歌", "Go back; exit BMS song select when there is nowhere to return to");
+
+        public static readonly LocalisableString SONG_SELECT_REFRESH_LIBRARY_TOOLTIP =
+            new BmsLocalizationManager.BmsLocalisableString("重新扫描 BMS 曲库并同步元数据（含内容 hash）", "Rescan the BMS library and sync metadata, including content hashes");
+
+        public static readonly LocalisableString SONG_SELECT_BUILD_ANALYTICS_TOOLTIP =
+            new BmsLocalizationManager.BmsLocalisableString("为曲库生成 / 更新分析数据：星级、xxySR、KPS 等", "Build or update analytics data for the library: stars, xxySR, KPS, and more");
+
+        public static readonly LocalisableString SONG_SELECT_SYNC_BUILTIN_TABLES_TOOLTIP =
+            new BmsLocalizationManager.BmsLocalisableString("下载并同步内置难度表目录", "Download and sync the built-in difficulty table catalog");
+
+        public static readonly LocalisableString SONG_SELECT_ADD_TABLE_URL_TOOLTIP =
+            new BmsLocalizationManager.BmsLocalisableString("从右上角搜索框的 URL 导入难度表", "Import a difficulty table from the URL in the search box");
+
+        public static readonly LocalisableString SONG_SELECT_OPEN_CHART_DOWNLOAD_TOOLTIP =
+            new BmsLocalizationManager.BmsLocalisableString("打开选中未导入谱面的下载页", "Open the download page of the selected missing chart");
+
+        public static readonly LocalisableString SONG_SELECT_OPEN_TABLES_FOLDER_TOOLTIP =
+            new BmsLocalizationManager.BmsLocalisableString("打开 EzBMS/tables 目录", "Open the EzBMS/tables directory");
+
         public static readonly LocalisableString SONG_SELECT_TABLE_SYNCING =
             new BmsLocalizationManager.BmsLocalisableString("正在同步内置难度表…", "Syncing built-in difficulty tables…");
 
