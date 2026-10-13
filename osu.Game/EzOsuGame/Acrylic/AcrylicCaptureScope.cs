@@ -23,7 +23,7 @@ namespace osu.Game.EzOsuGame.Acrylic
     /// wrap around song-select backgrounds makes nested blur/dim look sharp or ineffective.
     /// Pixel alignment stays on <c>AcrylicBackdropDrawable</c> effect buffers instead.
     /// D3D11, Metal, Vulkan, and desktop OpenGL copy the swapchain instead of entering this scope.
-    /// TODO(Deferred): this fullscreen buffer stays the capture until a recorded frame can read its own drawable.
+    /// Deferred keeps this capture: its recorded frame has no swapchain pixels to copy until it executes.
     /// </remarks>
     [Cached(typeof(IAcrylicCaptureRegistrar))]
     public partial class AcrylicCaptureScope : CompositeDrawable, IAcrylicCaptureRegistrar
