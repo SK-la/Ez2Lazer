@@ -23,7 +23,7 @@ namespace osu.Game.EzOsuGame.Layout
     {
         public EzLayoutStore Store { get; private set; } = null!;
 
-        public EzLayoutContainer SongSelectContainer { get; private set; } = null!;
+        public EzLayoutContainer? SongSelectContainer { get; private set; }
 
         /// <summary>
         /// Fired after song-select / gameplay containers are shown, hidden, or recreated.
@@ -33,6 +33,26 @@ namespace osu.Game.EzOsuGame.Layout
         private EzLayoutContainer? gameplayContainer;
         private EzLayoutContainer? rulesetGameplayContainer;
         private Player? pendingPlayer;
+
+        private bool onSongSelect;
+        private bool songSelectLayoutSuppressed;
+
+        /// <summary>
+        /// When set, hides the song-select layout container even while song select is the current screen.
+        /// Used while the beatmap preview overlay covers the screen in fullscreen focus.
+        /// </summary>
+        public bool SongSelectLayoutSuppressed
+        {
+            get => songSelectLayoutSuppressed;
+            set
+            {
+                if (songSelectLayoutSuppressed == value)
+                    return;
+
+                songSelectLayoutSuppressed = value;
+                updateSongSelectContainerVisibility();
+            }
+        }
 
         [Resolved]
         private OsuGame game { get; set; } = null!;
@@ -86,10 +106,10 @@ namespace osu.Game.EzOsuGame.Layout
         {
             unbindPendingPlayer();
 
-            bool onSongSelect = screen is SongSelect;
+            onSongSelect = screen is SongSelect;
             bool onPlayer = screen is Player;
 
-            SongSelectContainer.Alpha = onSongSelect ? 1 : 0;
+            updateSongSelectContainerVisibility();
 
             if (onPlayer && screen is Player player)
             {
@@ -172,6 +192,11 @@ namespace osu.Game.EzOsuGame.Layout
             gameplayContainer = null;
             rulesetGameplayContainer?.Expire();
             rulesetGameplayContainer = null;
+        }
+
+        private void updateSongSelectContainerVisibility()
+        {
+            SongSelectContainer?.Alpha = onSongSelect && !songSelectLayoutSuppressed ? 1 : 0;
         }
 
         private void notifyTargetsChanged() => LayoutTargetsChanged?.Invoke();
