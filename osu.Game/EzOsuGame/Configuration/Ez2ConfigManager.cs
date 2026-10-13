@@ -155,7 +155,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.BeatmapPreviewModeMania, EzBeatmapPreviewMode.StaticFullMap);
             SetDefault(Ez2Setting.BeatmapPreviewDensity, 1.0, 0.1, 5.0, 0.05);
             // 宽或高 <= 0 表示对应轴未手动调整，打开时使用默认宽度 / 最大高度。
-            SetDefault(Ez2Setting.BeatmapPreviewPanelSize, new Size(-1, -1));
+            SetDefault(Ez2Setting.BeatmapPreviewPanelSize, new Size(-1, -1), null);
             SetDefault(Ez2Setting.EditorSyncTimelineSpacing, true);
             SetDefault(Ez2Setting.SkinEditorHudSnapEnabled, false);
             SetDefault(Ez2Setting.SkinEditorHudSnapDistance, 20, 10, 50, 5);
