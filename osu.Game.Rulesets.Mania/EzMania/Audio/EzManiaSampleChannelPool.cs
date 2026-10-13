@@ -44,8 +44,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
     /// </remarks>
     public partial class EzManiaSampleChannelPool : Drawable
     {
-        [Resolved]
-        private ISkinSource source { get; set; } = null!;
+        [Resolved(CanBeNull = true)]
+        private ISkinSource? source { get; set; }
 
         [Resolved(canBeNull: true)]
         private ISamplePlaybackDisabler? samplePlaybackDisabler { get; set; }
@@ -92,7 +92,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
         [BackgroundDependencyLoader]
         private void load()
         {
-            source.SourceChanged += onSourceChanged;
+            source?.SourceChanged += onSourceChanged;
         }
 
         protected override void LoadAsyncComplete()
@@ -184,7 +184,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
             // 皮肤取不到时 GetSample 返回 null，这个结果也记住，避免每次触发都重新查一遍。
             resolvedSamples.Add(sampleInfo, cached = new ResolvedSample
             {
-                Sample = source.GetSample(sampleInfo),
+                Sample = source?.GetSample(sampleInfo),
                 Key = channelKeyFor(sampleInfo),
             });
 
@@ -250,7 +250,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
         {
             if (isDisposing)
             {
-                source.SourceChanged -= onSourceChanged;
+                // 加载被中途取消（例如退出 PlayerLoader）时 [Resolved] 还没注入，也就从未订阅过。
+                if (source != null)
+                    source.SourceChanged -= onSourceChanged;
                 pendingSourceChange?.Cancel();
                 pendingSourceChange = null;
 
