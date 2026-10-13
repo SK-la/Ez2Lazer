@@ -29,7 +29,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 AutoSizeAxes = Axes.Both,
                 Masking = true,
-                CornerRadius = EzUIStyleV1.CORNER_RADIUS_DISPLAY,
+                CornerRadius = EzUIStyleV1.CORNER_RADIUS_CHIP,
                 BorderThickness = 1.5f,
                 Children = new Drawable[]
                 {

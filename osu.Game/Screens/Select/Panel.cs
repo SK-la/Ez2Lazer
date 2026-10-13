@@ -30,7 +30,7 @@ namespace osu.Game.Screens.Select
 {
     public abstract partial class Panel : PoolableDrawable, ICarouselPanel, IHasContextMenu
     {
-        public const float CORNER_RADIUS = 10;
+        public const float CORNER_RADIUS = EzUIStyleV1.CORNER_RADIUS_WEDGE;
 
         private const float active_x_offset = 25f;
 

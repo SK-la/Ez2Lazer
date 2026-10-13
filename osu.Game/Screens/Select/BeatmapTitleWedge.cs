@@ -35,7 +35,7 @@ namespace osu.Game.Screens.Select
 {
     public partial class BeatmapTitleWedge : VisibilityContainer
     {
-        private const float corner_radius = 10;
+        public const float CORNER_RADIUS = EzUIStyleV1.CORNER_RADIUS_WEDGE;
 
         [Resolved]
         private IBindable<WorkingBeatmap> working { get; set; } = null!;
@@ -107,7 +107,7 @@ namespace osu.Game.Screens.Select
         private void load()
         {
             Masking = true;
-            CornerRadius = corner_radius;
+            CornerRadius = CORNER_RADIUS;
 
             InternalChildren = new Drawable[]
             {

@@ -141,7 +141,7 @@ namespace osu.Game.Screens.Select
                         {
                             Left = -40f,
                         },
-                        CornerRadius = 10f,
+                        CornerRadius = EzUIStyleV1.CORNER_RADIUS_WEDGE,
                         Masking = true,
                         // push the personal best 1px down to hide masking issues
                         Y = 1f,

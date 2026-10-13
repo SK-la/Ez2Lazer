@@ -81,7 +81,7 @@ namespace osu.Game.Screens.Select
             private void load(OverlayColourProvider colourProvider)
             {
                 Masking = true;
-                CornerRadius = 10;
+                CornerRadius = CORNER_RADIUS;
                 Shear = OsuGame.SHEAR;
 
                 InternalChildren = new Drawable[]
@@ -176,7 +176,7 @@ namespace osu.Game.Screens.Select
                                     RelativeSizeAxes = Axes.X,
                                     AutoSizeAxes = Axes.Y,
                                     Masking = true,
-                                    CornerRadius = 10 - border_weight,
+                                    CornerRadius = EzUIStyleV1.CORNER_RADIUS_WEDGE - border_weight,
                                     Shear = OsuGame.SHEAR,
                                     Children = new Drawable[]
                                     {

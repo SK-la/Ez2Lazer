@@ -37,6 +37,7 @@ using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Scoring.Bonus;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Scoring;
 using osu.Game.Users;
@@ -104,7 +105,7 @@ namespace osu.Game.Screens.Select
         private const float statistics_compact_min_width = 90;
         private const float rank_label_width = 40;
 
-        private const int corner_radius = 10;
+        private const float corner_radius = EzUIStyleV1.CORNER_RADIUS_WEDGE;
         private const int transition_duration = 200;
 
         private static readonly Color4 personal_best_gradient_left = Color4Extensions.FromHex("#66FFCC");

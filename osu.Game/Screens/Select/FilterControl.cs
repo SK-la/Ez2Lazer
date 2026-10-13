@@ -46,9 +46,9 @@ namespace osu.Game.Screens.Select
     public sealed partial class FilterControl : OverlayContainer
     {
         // taken from draw visualiser. used for carousel alignment purposes.
-        public const float HEIGHT_FROM_SCREEN_TOP = 171 - corner_radius;
+        public const float HEIGHT_FROM_SCREEN_TOP = 171 - CORNER_RADIUS;
 
-        private const float corner_radius = 10;
+        public const float CORNER_RADIUS = EzUIStyleV1.CORNER_RADIUS_WEDGE;
 
         public IBindable<BeatmapSetInfo?> ScopedBeatmapSet { get; } = new Bindable<BeatmapSetInfo?>();
 
@@ -110,14 +110,14 @@ namespace osu.Game.Screens.Select
             AutoSizeAxes = Axes.Y;
 
             Shear = OsuGame.SHEAR;
-            Margin = new MarginPadding { Top = -corner_radius, Right = -40 };
+            Margin = new MarginPadding { Top = -CORNER_RADIUS, Right = -40 };
 
             InternalChildren = new Drawable[]
             {
                 new Container
                 {
                     RelativeSizeAxes = Axes.Both,
-                    CornerRadius = corner_radius,
+                    CornerRadius = CORNER_RADIUS,
                     Masking = true,
                     Child = new EzSongSelectWedgeBackground
                     {
@@ -131,7 +131,7 @@ namespace osu.Game.Screens.Select
                     AutoSizeAxes = Axes.Y,
                     Direction = FillDirection.Vertical,
                     Spacing = new Vector2(0f, 5f),
-                    Padding = new MarginPadding { Top = corner_radius - 0.5f, Bottom = 2, Right = 40f, Left = 2f },
+                    Padding = new MarginPadding { Top = CORNER_RADIUS - 0.5f, Bottom = 2, Right = 40f, Left = 2f },
                     Children = new Drawable[]
                     {
                         new ReverseChildIDFillFlowContainer<Drawable>
@@ -564,7 +564,7 @@ namespace osu.Game.Screens.Select
                 {
                     RelativeSizeAxes = Axes.Y;
                     Width = 50;
-                    CornerRadius = 7;
+                    CornerRadius = EzUIStyleV1.CORNER_RADIUS_SHEARED;
                     Masking = true;
 
                     Child = background = new Box

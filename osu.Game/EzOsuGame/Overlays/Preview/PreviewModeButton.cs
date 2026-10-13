@@ -4,6 +4,7 @@
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
@@ -50,7 +51,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         public PreviewModeButton()
         {
             Size = new Vector2(108, 28);
-            Content.CornerRadius = 6;
+            Content.CornerRadius = EzUIStyleV1.CORNER_RADIUS_CHIP;
         }
 
         protected override float HoverLayerFinalAlpha => 0.06f;

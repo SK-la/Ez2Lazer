@@ -38,7 +38,7 @@ namespace osu.Game.EzOsuGame.UserInterface
     public partial class EzDisplayTag : CompositeDrawable
     {
         private const int max_visible_tags = 10;
-        private const float tag_corner_radius = EzUIStyleV1.CORNER_RADIUS_DISPLAY / 2;
+        private const float tag_corner_radius = EzUIStyleV1.CORNER_RADIUS_CHIP;
 
         private readonly FillFlowContainer rootFlow;
         private readonly FillFlowContainer tagFlow;

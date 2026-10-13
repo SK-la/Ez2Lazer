@@ -22,6 +22,7 @@ using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.UserInterface;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
@@ -227,7 +228,7 @@ namespace osu.Game.EzOsuGame.HUD
                     Origin = Anchor.Centre,
                     RelativeSizeAxes = Axes.Both,
                     Masking = true,
-                    CornerRadius = 10, //ScreenFooterButton.CORNER_RADIUS,
+                    CornerRadius = EzUIStyleV1.CORNER_RADIUS_WEDGE,
                     Children = new Drawable[]
                     {
                         background = new Box

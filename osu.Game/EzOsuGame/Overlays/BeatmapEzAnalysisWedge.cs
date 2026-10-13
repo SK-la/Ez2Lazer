@@ -52,7 +52,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             InternalChild = new ShearAligningWrapper(new Container
             {
-                CornerRadius = 10,
+                CornerRadius = EzUIStyleV1.CORNER_RADIUS_WEDGE,
                 Masking = true,
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,

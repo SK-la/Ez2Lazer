@@ -107,7 +107,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             InternalChild = new Container
             {
                 Masking = true,
-                CornerRadius = EzUIStyleV1.CORNER_RADIUS_DISPLAY,
+                CornerRadius = EzUIStyleV1.CORNER_RADIUS_CHIP,
                 AutoSizeAxes = Axes.X,
                 RelativeSizeAxes = Axes.Y,
                 Children = new Drawable[]

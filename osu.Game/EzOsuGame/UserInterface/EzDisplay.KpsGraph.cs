@@ -149,7 +149,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                         Origin = Anchor.TopCentre,
                         Position = new Vector2(0, -4),
                         Masking = true,
-                        CornerRadius = EzUIStyleV1.CORNER_RADIUS_DISPLAY,
+                        CornerRadius = EzUIStyleV1.CORNER_RADIUS_CHIP,
                         Children = new Drawable[]
                         {
                             new Box

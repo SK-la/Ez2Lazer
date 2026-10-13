@@ -15,6 +15,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Framework.Layout;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -158,7 +159,7 @@ namespace osu.Game.Screens.Select
                 private void load()
                 {
                     Size = new Vector2(OsuFont.Style.Caption1.Size);
-                    CornerRadius = 1.5f;
+                    CornerRadius = EzUIStyleV1.CORNER_RADIUS_MICRO;
                     Masking = true;
 
                     InternalChildren = new Drawable[]

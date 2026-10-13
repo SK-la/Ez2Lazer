@@ -55,7 +55,7 @@ namespace osu.Game.Screens.Select
             {
                 AutoSizeAxes = Axes.X;
                 RelativeSizeAxes = Axes.Y;
-                Content.CornerRadius = 5;
+                Content.CornerRadius = CORNER_RADIUS / 2;
 
                 Action = () =>
                 {
