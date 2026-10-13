@@ -40,7 +40,7 @@ namespace osu.Game.EzOsuGame.BeatmapPools
     {
         public EzBeatmapPoolKey(string rulesetShortName, int variant)
         {
-            RulesetShortName = rulesetShortName?.Trim() ?? string.Empty;
+            RulesetShortName = rulesetShortName.Trim();
             Variant = variant;
         }
 
