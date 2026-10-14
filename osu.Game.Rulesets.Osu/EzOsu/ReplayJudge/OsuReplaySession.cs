@@ -80,9 +80,9 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
             beatmapProcessor?.PostProcess();
 
             if (scoreProcessor is OsuScoreProcessor osuSp)
-                osuSp.JudgementTrackOverride = environment.StdHitMode;
+                osuSp.JudgementTrackOverride = environment.HitMode;
 
-            if (score.ScoreInfo.IsLegacyScore || OsuStableClassicScoring.ShouldUseLegacyScoreAlgorithm(environment.StdHitMode))
+            if (score.ScoreInfo.IsLegacyScore || OsuStableClassicScoring.ShouldUseLegacyScoreAlgorithm(environment.HitMode))
                 scoreProcessor.IsLegacyScore = true;
 
             // StableClassic 窗口在 OsuScoreProcessor.ApplyBeatmap 内注入（与 live Drawable 同路）。

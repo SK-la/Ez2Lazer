@@ -58,16 +58,16 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             };
 
             var stored = config.ResolveEnvironment(ReplayRunPurpose.ForStored, scoreInfo);
-            Assert.That(stored.ManiaHitMode, Is.EqualTo(EzEnumHitMode.LR2_HD));
+            Assert.That(stored.HitMode, Is.EqualTo(EzEnumHitMode.LR2_HD));
             Assert.That(stored.ManiaHealthMode, Is.EqualTo(EzEnumHealthMode.IIDX_HD));
             Assert.That(stored.OffsetPlusMania, Is.EqualTo(0));
 
             var legacy = config.ResolveEnvironment(ReplayRunPurpose.ForStored, new ScoreInfo { Ruleset = new ManiaRuleset().RulesetInfo });
-            Assert.That(legacy.ManiaHitMode, Is.EqualTo(EzEnumHitMode.Lazer));
+            Assert.That(legacy.HitMode, Is.EqualTo(EzEnumHitMode.Lazer));
             Assert.That(legacy.ManiaHealthMode, Is.EqualTo(EzEnumHealthMode.Lazer));
 
-            var live = config.GetGameplayEnvironment();
-            Assert.That(live.ManiaHitMode, Is.EqualTo(EzEnumHitMode.IIDX_HD));
+            var live = config.GetGameplayEnvironment(new ManiaRuleset().RulesetInfo);
+            Assert.That(live.HitMode, Is.EqualTo(EzEnumHitMode.IIDX_HD));
             Assert.That(live.ManiaHealthMode, Is.EqualTo(EzEnumHealthMode.Lazer));
             Assert.That(live.OffsetPlusMania, Is.EqualTo(25.0));
 

@@ -237,7 +237,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TestMalodyTailJudgementAfterEnvironmentApply()
         {
             var (_, beatmap, environment) = HitModeReplayFixtures.CreateMalodyHoldPerfect();
-            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, environment.ManiaHitMode);
+            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, environment.HitMode);
 
             var tail = beatmap.HitObjects.OfType<HoldNote>().Single().Tail;
             Assert.That(tail.Judgement, Is.TypeOf<MalodyTailJudgement>());
@@ -248,7 +248,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TestO2TailJudgementAfterEnvironmentApply()
         {
             var (_, beatmap, environment) = HitModeReplayFixtures.CreateO2HoldPerfect();
-            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, environment.ManiaHitMode);
+            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, environment.HitMode);
 
             var tail = beatmap.HitObjects.OfType<HoldNote>().Single().Tail;
             Assert.That(tail.Judgement.MaxResult, Is.EqualTo(HitResult.Perfect));

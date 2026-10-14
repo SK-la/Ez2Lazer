@@ -13,7 +13,7 @@ using osu.Game.Rulesets.Scoring;
 namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
 {
     /// <summary>
-    /// OSL-013：StableClassic 轨与 Lazer 在判窗/计分上可区分；Session 经 env.StdHitMode 切换。
+    /// OSL-013：StableClassic 轨与 Lazer 在判窗/计分上可区分；Session 经 env.HitMode 切换。
     /// </summary>
     [TestFixture]
     public class OsuStableClassicTrackTest
@@ -56,7 +56,7 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
         }
 
         private static GameplayEnvironment withTrack(GameplayEnvironment env, EzEnumHitMode track)
-            => env with { StdHitMode = track };
+            => env with { HitMode = track };
 
         private static int count(IReadOnlyDictionary<HitResult, int> stats, HitResult result)
             => stats.TryGetValue(result, out int n) ? n : 0;

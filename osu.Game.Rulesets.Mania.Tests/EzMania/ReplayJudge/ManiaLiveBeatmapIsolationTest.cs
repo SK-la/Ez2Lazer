@@ -60,7 +60,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             // autoplay 的 ScoreInfo 尚无嵌入 hitmode → ForStored 回退 Lazer（与崩溃现场一致）。
             var storedEnvironment = GlobalConfigStore.EzConfig.ResolveEnvironment(ReplayRunPurpose.ForStored, score.ScoreInfo);
-            Assert.That(storedEnvironment.ManiaHitMode, Is.EqualTo(EzEnumHitMode.Lazer), "前置条件：ForStored 应回退 Lazer");
+            Assert.That(storedEnvironment.HitMode, Is.EqualTo(EzEnumHitMode.Lazer), "前置条件：ForStored 应回退 Lazer");
 
             var service = new ManiaReplaySessionService();
             service.AttachBeatmaps(createCache(createEz2AcHoldBeatmap));

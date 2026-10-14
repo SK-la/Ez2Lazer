@@ -50,13 +50,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             PillModeEnabled = pillModeEnabled;
             JudgePrecedence = environment.JudgePrecedence;
             MutableState = mutableState;
-            IsO2Jam = environment.ManiaHitMode == EzEnumHitMode.O2Jam;
+            IsO2Jam = environment.HitMode == EzEnumHitMode.O2Jam;
             this.beatmap = beatmap;
         }
 
         public static ManiaJudgementRound Create(GameplayEnvironment environment, IBeatmap? beatmap = null)
         {
-            var strategy = ManiaJudgementRegistry.GetHitModeJudgement(environment.ManiaHitMode);
+            var strategy = ManiaJudgementRegistry.GetHitModeJudgement(environment.HitMode);
             bool poorEnabled = HealthModeHelper.ComputeKPoorEnabled(environment.ManiaHealthMode, environment.BmsPoorHitResultEnable);
             bool pillModeEnabled = environment.ManiaHealthMode.ToString().Contains("O2Jam");
 
@@ -69,7 +69,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 beatmap);
         }
 
-        public bool IsEzHitMode => ManiaJudgementRegistry.IsEzHitMode(Environment.ManiaHitMode);
+        public bool IsEzHitMode => ManiaJudgementRegistry.IsEzHitMode(Environment.HitMode);
 
         /// <summary>
         /// 列级按键：缓存本按 press-time BPM（O2 每输入至多查表一次）。

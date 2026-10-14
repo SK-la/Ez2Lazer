@@ -154,7 +154,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             assertEquivalent(forStoredAfterRecalc, nowAfterRecalc, $"{testCase.Name}: ForStored vs ForLive after recalc");
             assertEquivalent(nowAfterRecalc, now, $"{testCase.Name}: d(Now after recalc) vs b(Now)");
 
-            if (testCase.SourceEnvironment.ManiaHitMode == testCase.TargetEnvironment.ManiaHitMode
+            if (testCase.SourceEnvironment.HitMode == testCase.TargetEnvironment.HitMode
                 && testCase.SourceEnvironment.ManiaHealthMode == testCase.TargetEnvironment.ManiaHealthMode)
             {
                 var beforeRecalc = snapshot(await runForLiveScoreInfo(testCase.CreateFixture, testCase.SourceEnvironment, testCase.TargetEnvironment).ConfigureAwait(true));
@@ -209,8 +209,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var (score, beatmap, _) = createFixture();
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, embeddedEnvironment);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(liveEnvironment);
-            var live = GlobalConfigStore.EzConfig.GetGameplayEnvironment();
-            Assert.That(live.ManiaHitMode, Is.EqualTo(liveEnvironment.ManiaHitMode));
+            var live = GlobalConfigStore.EzConfig.GetGameplayEnvironment(new ManiaRuleset().RulesetInfo);
+            Assert.That(live.HitMode, Is.EqualTo(liveEnvironment.HitMode));
             Assert.That(live.ManiaHealthMode, Is.EqualTo(liveEnvironment.ManiaHealthMode));
             return await scoreInfoFromRunRequestAsync(new ManiaReplaySessionService(), score.DeepClone(), beatmap).ConfigureAwait(true);
         }
@@ -260,7 +260,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             => $"acc={snapshot.Accuracy:F8} score={snapshot.TotalScore} hitMode={snapshot.ManiaHitMode} health={snapshot.ManiaHealthMode} stats=[{ManiaReplayParityHelper.DescribeStatistics(snapshot.Statistics)}]";
 
         private static int expectedPersistedHitMode(GameplayEnvironment environment)
-            => (int)environment.ManiaHitMode;
+            => (int)environment.HitMode;
 
         private static int expectedPersistedHealthMode(GameplayEnvironment environment)
             => (int)environment.ManiaHealthMode;

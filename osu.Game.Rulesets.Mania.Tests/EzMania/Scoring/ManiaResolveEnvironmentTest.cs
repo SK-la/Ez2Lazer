@@ -45,7 +45,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
 
             var env = GlobalConfigStore.EzConfig.ResolveEnvironment(ReplayRunPurpose.ForStored, scoreInfo);
 
-            Assert.That(env.ManiaHitMode, Is.EqualTo(EzEnumHitMode.IIDX_HD));
+            Assert.That(env.HitMode, Is.EqualTo(EzEnumHitMode.IIDX_HD));
             Assert.That(env.ManiaHealthMode, Is.EqualTo(EzEnumHealthMode.IIDX_HD));
             Assert.That(env.JudgePrecedence, Is.EqualTo(liveBaseline.JudgePrecedence));
             Assert.That(env.OffsetPlusMania, Is.EqualTo(0));
@@ -59,7 +59,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
 
             var stored = GlobalConfigStore.EzConfig.ResolveEnvironment(ReplayRunPurpose.ForStored, scoreInfo);
 
-            Assert.That(stored.ManiaHitMode, Is.EqualTo(EzEnumHitMode.Lazer));
+            Assert.That(stored.HitMode, Is.EqualTo(EzEnumHitMode.Lazer));
             Assert.That(stored.ManiaHealthMode, Is.EqualTo(EzEnumHealthMode.Lazer));
             Assert.That(stored.JudgePrecedence, Is.EqualTo(liveBaseline.JudgePrecedence));
             Assert.That(stored.OffsetPlusMania, Is.EqualTo(0));

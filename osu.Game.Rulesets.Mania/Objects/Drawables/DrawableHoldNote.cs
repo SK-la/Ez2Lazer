@@ -495,7 +495,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             else if (isEarlyHoldRelease() || UsesEzJudgement)
             {
                 // EZ2AC LN：中途松手由 tick IgnoreMiss 处理，Miss 不断 combo。
-                if (ManiaEzDrawableJudgement.GetJudgementRound(this).Environment.ManiaHitMode == EzEnumHitMode.EZ2AC)
+                if (ManiaEzDrawableJudgement.GetJudgementRound(this).Environment.HitMode == EzEnumHitMode.EZ2AC)
                     return;
 
                 // Body 已判定：首次断连已落 ComboBreak，后续松手仅在允许多次断连的 hitmode 下补发瞬态断连。

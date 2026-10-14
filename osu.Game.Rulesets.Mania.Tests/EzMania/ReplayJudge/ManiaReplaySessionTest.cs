@@ -212,8 +212,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var sessionLive = ManiaReplaySession.RunHitEvents(score, beatmap, fromLive);
             var sessionStored = ManiaReplaySession.RunHitEvents(score, beatmap, fromStored);
 
-            Assert.That(fromLive.ManiaHitMode, Is.EqualTo(EzEnumHitMode.Lazer));
-            Assert.That(fromStored.ManiaHitMode, Is.EqualTo(EzEnumHitMode.IIDX_HD));
+            Assert.That(fromLive.HitMode, Is.EqualTo(EzEnumHitMode.Lazer));
+            Assert.That(fromStored.HitMode, Is.EqualTo(EzEnumHitMode.IIDX_HD));
             Assert.That(ManiaReplayParityHelper.AreJudgementsEquivalent(generatorEvents, sessionLive), Is.True,
                 () => ManiaReplayParityHelper.DescribeJudgements(generatorEvents));
             Assert.That(ManiaReplayParityHelper.AreJudgementsEquivalent(generatorEvents, sessionStored), Is.False);

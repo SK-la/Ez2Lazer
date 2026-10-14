@@ -62,7 +62,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var (env2, columns2, hitObjects2, frames2, score2) = ManiaReplayJsonFixture.ToParts(document);
 
             Assert.That(columns, Is.EqualTo(columns2));
-            Assert.That(environment.ManiaHitMode, Is.EqualTo(env2.ManiaHitMode));
+            Assert.That(environment.HitMode, Is.EqualTo(env2.HitMode));
             Assert.That(hitObjects, Has.Count.EqualTo(hitObjects2.Count));
             Assert.That(score.Replay.Frames, Has.Count.EqualTo(score2.Replay.Frames.Count));
             Assert.That(score.Replay.Frames, Has.Count.EqualTo(frames2.Count));

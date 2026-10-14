@@ -47,9 +47,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             ArgumentNullException.ThrowIfNull(beatmap);
             ArgumentNullException.ThrowIfNull(environment);
 
-            record(beatmap, environment.ManiaHitMode, owned: false);
+            record(beatmap, environment.HitMode, owned: false);
             ManiaWindowBaker.AlignForLive(beatmap, environment);
-            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, environment.ManiaHitMode);
+            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, environment.HitMode);
         }
 
         /// <summary>

@@ -49,7 +49,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// 命中即说明上游绑定出了问题，故计数不受诊断开关控制。
         /// </summary>
         internal static HitResult SanitizeResult(DrawableManiaHitObject drawable, HitResult result)
-            => SanitizeResult(drawable.Result?.Judgement, result, drawable.EzDrawableManiaRuleset?.JudgementRound?.Environment.ManiaHitMode);
+            => SanitizeResult(drawable.Result?.Judgement, result, drawable.EzDrawableManiaRuleset?.JudgementRound?.Environment.HitMode);
 
         /// <summary>区间校验与降级决策本体（与 Drawable 解耦，便于单测）。</summary>
         internal static HitResult SanitizeResult(Judgement? judgement, HitResult result, EzEnumHitMode? hitMode)
@@ -70,7 +70,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         public static bool ShouldHideTailDisplayResult(ManiaJudgementRound? round)
-            => round?.Environment.ManiaHitMode == EzEnumHitMode.O2Jam;
+            => round?.Environment.HitMode == EzEnumHitMode.O2Jam;
 
         internal static BmsHitModeJudgement.BmsRouteState GetBmsState(DrawableNote note)
         {
@@ -98,7 +98,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 return round;
 
             var ruleset = drawable?.FindClosestParent<DrawableRuleset>();
-            var env = GlobalConfigStore.EzConfig.ResolveEnvironment(ReplayRunPurpose.ForLive, ruleset?.ReplayScore?.ScoreInfo, ignoreOffset: ruleset?.ReplayScore != null);
+            var env = GlobalConfigStore.EzConfig.ResolveEnvironment(ReplayRunPurpose.ForLive, ruleset?.ReplayScore?.ScoreInfo, ignoreOffset: ruleset?.ReplayScore != null, ruleset: ruleset?.Ruleset.RulesetInfo);
             return ManiaJudgementRound.Create(env);
         }
 
@@ -106,7 +106,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             var round = getJudgementRound(hold);
 
-            if (!MalodyHitModeJudgement.IsMalodyMode(round.Environment.ManiaHitMode))
+            if (!MalodyHitModeJudgement.IsMalodyMode(round.Environment.HitMode))
                 return false;
 
             if (!hold.IsHolding.Value)
@@ -123,7 +123,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             var round = getJudgementRound(hold);
 
-            if (!MalodyHitModeJudgement.IsMalodyMode(round.Environment.ManiaHitMode))
+            if (!MalodyHitModeJudgement.IsMalodyMode(round.Environment.HitMode))
                 return false;
 
             if (!hold.Tail.AllJudged)
@@ -137,7 +137,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             var round = getJudgementRound(hold);
 
-            if (round.Environment.ManiaHitMode != EzEnumHitMode.EZ2AC)
+            if (round.Environment.HitMode != EzEnumHitMode.EZ2AC)
                 return false;
 
             if (!hold.IsHolding.Value)
@@ -163,7 +163,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             var round = getJudgementRound(hold);
 
-            if (round.Environment.ManiaHitMode != EzEnumHitMode.EZ2AC)
+            if (round.Environment.HitMode != EzEnumHitMode.EZ2AC)
                 return false;
 
             if (!hold.Tail.AllJudged)
@@ -186,7 +186,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             var round = getJudgementRound(tick);
 
-            if (round.Environment.ManiaHitMode != EzEnumHitMode.EZ2AC)
+            if (round.Environment.HitMode != EzEnumHitMode.EZ2AC)
                 return false;
 
             var state = GetEz2AcHoldState(hold);
@@ -204,7 +204,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             var round = getJudgementRound(hold);
 
-            if (round.Environment.ManiaHitMode != EzEnumHitMode.EZ2AC)
+            if (round.Environment.HitMode != EzEnumHitMode.EZ2AC)
                 return;
 
             var state = GetEz2AcHoldState(hold);
@@ -216,7 +216,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             var round = getJudgementRound(hold);
 
-            if (round.Environment.ManiaHitMode != EzEnumHitMode.EZ2AC)
+            if (round.Environment.HitMode != EzEnumHitMode.EZ2AC)
                 return;
 
             if (!hold.Head.AllJudged)
@@ -261,7 +261,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             var round = getJudgementRound(hold);
 
-            if (round.Environment.ManiaHitMode != EzEnumHitMode.O2Jam)
+            if (round.Environment.HitMode != EzEnumHitMode.O2Jam)
                 return false;
 
             return O2HitModeJudgement.Instance.TryO2HoldCheckForResult(hold, userTriggered, timeOffset);
@@ -275,7 +275,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     if (!userTriggered && outcome.Result == HitResult.Miss)
                         drawable.EzApplyPassiveMissWithStoredOffset();
                     else
-                        drawable.EzApplyFinalResult(outcome.Result, round.Environment.ManiaHitMode);
+                        drawable.EzApplyFinalResult(outcome.Result, round.Environment.HitMode);
 
                     if (drawable is DrawableHoldNoteHead head && head.ParentHold is DrawableHoldNote hold)
                         NotifyEz2AcHeadJudged(hold, outcome.Result, wasHoldingBeforePress: false);
@@ -289,10 +289,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         internal static void ApplyBmsAction(DrawableNote drawable, ManiaJudgementRound round, BmsHitModeJudgement.DrawableAction action, BmsHitModeJudgement.BmsRouteState state)
-            => applyBmsAction(drawable, r => drawable.EzApplyFinalResult(r, round.Environment.ManiaHitMode), drawable.EzDispatchExtraResult, action, state);
+            => applyBmsAction(drawable, r => drawable.EzApplyFinalResult(r, round.Environment.HitMode), drawable.EzDispatchExtraResult, action, state);
 
         internal static void ApplyBmsAction(DrawableHoldNoteTail drawable, ManiaJudgementRound round, BmsHitModeJudgement.DrawableAction action, BmsHitModeJudgement.BmsRouteState state)
-            => applyBmsAction(drawable, r => drawable.EzApplyFinalResult(r, round.Environment.ManiaHitMode), drawable.EzDispatchExtraResult, action, state);
+            => applyBmsAction(drawable, r => drawable.EzApplyFinalResult(r, round.Environment.HitMode), drawable.EzDispatchExtraResult, action, state);
 
         private static void applyBmsAction<T>(
             T _,
@@ -423,7 +423,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             if (result.FinalResult != null)
             {
-                drawable.EzApplyFinalResult(result.FinalResult.Value, round.Environment.ManiaHitMode);
+                drawable.EzApplyFinalResult(result.FinalResult.Value, round.Environment.HitMode);
                 return true;
             }
 
@@ -473,7 +473,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             BmsHitModeJudgement.ApplyRouteState(state, action);
             var result = BmsHitModeJudgement.MapTo(action.Judge);
-            drawable.EzApplyBmsAutoMissFinalWithStoredOffset(result, round.Environment.ManiaHitMode);
+            drawable.EzApplyBmsAutoMissFinalWithStoredOffset(result, round.Environment.HitMode);
         }
 
         private static long getFrameStableId(DrawableHitObject drawable)

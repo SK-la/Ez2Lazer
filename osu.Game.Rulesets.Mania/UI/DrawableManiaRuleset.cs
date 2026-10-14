@@ -239,7 +239,7 @@ namespace osu.Game.Rulesets.Mania.UI
             gameplayHitMode = hitModeBindable.Value;
 
             JudgementRound = ManiaJudgementRound.Create(
-                ezConfig.ResolveEnvironment(ReplayRunPurpose.ForLive, ReplayScore?.ScoreInfo, ignoreOffset: ReplayScore != null),
+                ezConfig.ResolveEnvironment(ReplayRunPurpose.ForLive, ReplayScore?.ScoreInfo, ignoreOffset: ReplayScore != null, ruleset: Ruleset.RulesetInfo),
                 Beatmap);
             // 本局实例的 hitmode 绑定。仿真一律在 ManiaSimulationBeatmapProvider 产出的独立副本上绑定
             // （见 ManiaReplaySessionService），所以这里不再需要「本局实例」登记。

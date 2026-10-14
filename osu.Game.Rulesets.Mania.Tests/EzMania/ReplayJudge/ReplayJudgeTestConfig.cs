@@ -14,7 +14,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var config = GlobalConfigStore.EzConfig;
             GlobalConfigStore.EzConfig = config;
 
-            config.SetValue(Ez2Setting.ManiaHitMode, environment.ManiaHitMode);
+            config.SetValue(Ez2Setting.ManiaHitMode, environment.HitMode);
             config.SetValue(Ez2Setting.ManiaHealthMode, environment.ManiaHealthMode);
             config.SetValue(Ez2Setting.JudgePrecedence, environment.JudgePrecedence);
             config.SetValue(Ez2Setting.OffsetPlusMania, environment.OffsetPlusMania);
@@ -24,14 +24,14 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public static GameplayEnvironment ApplyAndSnapshot(GameplayEnvironment environment)
         {
             ApplyToGlobalConfig(environment);
-            return GlobalConfigStore.EzConfig.GetGameplayEnvironment();
+            return GlobalConfigStore.EzConfig.GetGameplayEnvironment(new ManiaRuleset().RulesetInfo);
         }
 
         public static void ResetGlobalConfig() => ApplyToGlobalConfig(Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer));
 
         public static void ApplyEmbeddedModes(Score score, GameplayEnvironment environment)
         {
-            score.ScoreInfo.ManiaHitMode = (int)environment.ManiaHitMode;
+            score.ScoreInfo.ManiaHitMode = (int)environment.HitMode;
             score.ScoreInfo.ManiaHealthMode = (int)environment.ManiaHealthMode;
         }
 
@@ -43,7 +43,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             bool bmsPoorHitResultEnable = false)
             => new GameplayEnvironment
             {
-                ManiaHitMode = hitMode,
+                HitMode = hitMode,
                 ManiaHealthMode = healthMode,
                 JudgePrecedence = judgePrecedence,
                 OffsetPlusMania = offsetPlusMania,

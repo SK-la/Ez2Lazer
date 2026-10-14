@@ -26,7 +26,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             ArgumentNullException.ThrowIfNull(environment);
 
-            alignCore(beatmap, environment.ManiaHitMode, computePoorEnabled(environment));
+            alignCore(beatmap, environment.HitMode, computePoorEnabled(environment));
         }
 
         /// <summary>
@@ -50,10 +50,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             ArgumentNullException.ThrowIfNull(environment);
 
-            if (environment.ManiaHitMode == EzEnumHitMode.O2Jam)
+            if (environment.HitMode == EzEnumHitMode.O2Jam)
                 O2HitModeExtension.InitializeRuntime(beatmap);
 
-            alignCore(beatmap, environment.ManiaHitMode, computePoorEnabled(environment));
+            alignCore(beatmap, environment.HitMode, computePoorEnabled(environment));
         }
 
         private static bool computePoorEnabled(IGameplayEnvironment environment)

@@ -60,7 +60,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 return null;
 
             var mods = EzModCompatibility.StripUnknown(scoreInfo.Mods);
-            EzEnumHitMode hitMode = environment.ManiaHitMode;
+            EzEnumHitMode hitMode = environment.HitMode;
 
             return EzPlayableBeatmapCache.GetBound(workingBeatmap, scoreInfo.Ruleset, mods, bindingScopeFor(hitMode),
                 playable => ManiaBeatmapBinding.BindForSimulation(playable, hitMode, providerOwned: true), cancellationToken);

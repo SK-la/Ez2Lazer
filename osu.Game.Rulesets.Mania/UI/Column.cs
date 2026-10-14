@@ -546,7 +546,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void ensureLaneConfigured(ManiaJudgementRound round)
         {
-            var hitMode = round.Environment.ManiaHitMode;
+            var hitMode = round.Environment.HitMode;
 
             if (configuredMissCollectionHitMode == hitMode)
                 return;

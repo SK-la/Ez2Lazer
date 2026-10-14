@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         public static IManiaNoteJudgementStrategy GetNoteStrategy(IGameplayEnvironment environment)
         {
-            var hitMode = GetHitModeJudgement(environment.ManiaHitMode);
+            var hitMode = GetHitModeJudgement(environment.HitMode);
             if (hitMode != null)
                 return hitMode;
 
@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         public static IManiaHoldJudgementStrategy GetHoldStrategy(IGameplayEnvironment environment)
         {
-            var hitMode = GetHitModeJudgement(environment.ManiaHitMode);
+            var hitMode = GetHitModeJudgement(environment.HitMode);
             if (hitMode != null)
                 return hitMode;
 
