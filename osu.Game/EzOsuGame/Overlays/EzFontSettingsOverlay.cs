@@ -22,6 +22,7 @@ using osu.Framework.Threading;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Fonts;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -90,7 +91,7 @@ namespace osu.Game.EzOsuGame.Overlays
             Size = new Vector2(0.58f, 0.78f);
 
             Masking = true;
-            CornerRadius = 10;
+            CornerRadius = EzUIStyleV1.CORNER_RADIUS_WEDGE;
         }
 
         /// <summary>
@@ -186,6 +187,7 @@ namespace osu.Game.EzOsuGame.Overlays
                                 {
                                     RelativeSizeAxes = Axes.Both,
                                     Masking = true,
+                                    CornerRadius = EzUIStyleV1.CORNER_RADIUS_WEDGE,
                                     Children = new Drawable[]
                                     {
                                         new Box
