@@ -83,7 +83,7 @@ namespace osu.Game.Screens.Ranking.Statistics
                 Children = new Drawable[]
                 {
                     content = new Container { RelativeSizeAxes = Axes.Both },
-                    spinner = new LoadingSpinner(),
+                    spinner = new LoadingSpinner()
                 }
             };
         }

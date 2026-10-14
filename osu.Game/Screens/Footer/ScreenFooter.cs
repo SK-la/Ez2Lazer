@@ -40,7 +40,7 @@ namespace osu.Game.Screens.Footer
         /// </summary>
         public Action? BackButtonPressed { private get; init; }
 
-        public const int HEIGHT = 50;
+        public const int HEIGHT = EzUIStyleV1.FOOTER_HEIGHT;
 
         private const int padding = 60;
         private const float delay_per_button = 30;

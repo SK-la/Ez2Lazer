@@ -26,6 +26,7 @@ using osu.Game.Input.Bindings;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.EzOsuGame.Screens.Rotation;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Localisation;
 using osu.Game.Online.Placeholders;
 using osu.Game.Overlays;
@@ -43,7 +44,7 @@ namespace osu.Game.Screens.Ranking
     public abstract partial class ResultsScreen : ScreenWithBeatmapBackground, IKeyBindingHandler<GlobalAction>
     {
         protected const float BACKGROUND_BLUR = 10;
-        private static readonly float screen_height = 768 - TwoLayerButton.SIZE_EXTENDED.Y;
+        private static readonly float screen_height = 768 - TwoLayerButton.SIZE_EXTENDED.Y - EzUIStyleV1.FOOTER_HEIGHT;
 
         public override bool DisallowExternalBeatmapRulesetChanges => true;
 
@@ -104,6 +105,7 @@ namespace osu.Game.Screens.Ranking
         private void load(AudioManager audio, Ez2ConfigManager ezConfig)
         {
             popInSample = audio.Samples.Get(@"UI/overlay-pop-in");
+            Padding = new MarginPadding { Bottom = EzUIStyleV1.FOOTER_HEIGHT };
 
             InternalChild = new PopoverContainer
             {

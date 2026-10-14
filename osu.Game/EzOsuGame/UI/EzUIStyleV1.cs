@@ -52,5 +52,10 @@ namespace osu.Game.EzOsuGame.UI
 
         /// <summary>Tier D: Footer 按钮。</summary>
         public const float CORNER_RADIUS_FOOTER = 2f;
+
+        /// <summary>
+        /// Footer height in pixels. This is the height of the footer bar at the bottom of the screen.
+        /// </summary>
+        public const int FOOTER_HEIGHT = 50;
     }
 }
