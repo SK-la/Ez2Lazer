@@ -9,6 +9,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame;
@@ -302,6 +303,8 @@ namespace osu.Game.Screens.Select
                         tabControl.SelectItem(Selection.Details);
                 });
             }
+
+            protected override bool OnMouseDown(MouseDownEvent e) => true;
 
             #region Reading / writing state from / to configuration
 

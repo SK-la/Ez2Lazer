@@ -99,6 +99,7 @@ namespace osu.Game.Rulesets.BMS.Tests
 
             public IEnumerable<string> LookupNames { get; }
             public int Volume => 100;
+            public bool IsHitsound => true;
         }
 
         private class TrackingSkin : ISkin

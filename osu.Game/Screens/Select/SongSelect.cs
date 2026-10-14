@@ -32,6 +32,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Cursor;
@@ -61,7 +62,6 @@ using osu.Game.Screens.Play;
 using osu.Game.Screens.Ranking;
 using osu.Game.Skinning;
 using osu.Game.Utils;
-using osuTK;
 using osuTK.Graphics;
 using osuTK.Input;
 
@@ -264,7 +264,6 @@ namespace osu.Game.Screens.Select
                                                     wedgesContainer = new FillFlowContainer
                                                     {
                                                         RelativeSizeAxes = Axes.Both,
-                                                        Spacing = new Vector2(0f, 4f),
                                                         Direction = FillDirection.Vertical,
                                                         Children = new Drawable[]
                                                         {
@@ -272,6 +271,11 @@ namespace osu.Game.Screens.Select
                                                             {
                                                                 TopPadding = TopPadding,
                                                             }),
+                                                            new InputBlockingContainer
+                                                            {
+                                                                RelativeSizeAxes = Axes.X,
+                                                                Height = 4
+                                                            },
                                                             new ShearAligningWrapper(detailsArea = new BeatmapDetailsArea()),
                                                         },
                                                     },
@@ -962,6 +966,7 @@ namespace osu.Game.Screens.Select
             modSelectOverlay.SelectedMods.UnbindFrom(Mods);
             modSelectOverlay.Ruleset.UnbindFrom(Ruleset);
             modSelectOverlay.Beatmap.UnbindFrom(Beatmap);
+            modSelectOverlay.Hide();
 
             updateWedgeVisibility();
 
@@ -1089,6 +1094,7 @@ namespace osu.Game.Screens.Select
         public bool IsFiltering => carousel.IsFiltering || filterDebounce?.State == ScheduledDelegate.RunState.Waiting;
 
         private const double filter_delay = 250;
+        public const double REVEAL_BACKGROUND_DELAY = 200;
 
         private ScheduledDelegate? filterDebounce;
 
@@ -1226,7 +1232,7 @@ namespace osu.Game.Screens.Select
                     updateBackgroundDim();
 
                     Footer?.Hide();
-                }, 200);
+                }, REVEAL_BACKGROUND_DELAY);
             }
 
             return base.OnMouseDown(e);
