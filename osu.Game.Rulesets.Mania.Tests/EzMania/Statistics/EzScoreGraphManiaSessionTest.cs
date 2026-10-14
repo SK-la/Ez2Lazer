@@ -60,7 +60,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
             var (score, beatmap, _) = JudgeModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
 
             var lazerEnv = createSessionEnvironment(EzEnumJudgeMode.Lazer);
-            var bmsEnv = createSessionEnvironment(EzEnumJudgeMode.IIDX_HD) with { ManiaHealthMode = EzEnumHealthMode.IIDX_HD, BmsPoorHitResultEnable = true };
+            var bmsEnv = createSessionEnvironment(EzEnumJudgeMode.IIDX_HD) with { HealthMode = EzEnumHealthMode.IIDX_HD, BmsPoorHitResultEnable = true };
 
             var lazerRun = ManiaReplaySession.Run(score.DeepClone(), beatmap, lazerEnv);
             var bmsRun = ManiaReplaySession.Run(score.DeepClone(), beatmap, bmsEnv);

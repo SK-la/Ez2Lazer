@@ -169,7 +169,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             return new GameplayEnvironment
             {
                 JudgeMode = environment.JudgeMode,
-                ManiaHealthMode = environment.ManiaHealthMode,
+                HealthMode = environment.HealthMode,
                 JudgePrecedence = environment.JudgePrecedence,
                 OffsetPlusMania = 0,
                 BmsPoorHitResultEnable = environment.BmsPoorHitResultEnable,

@@ -155,7 +155,7 @@ namespace osu.Game.EzOsuGame.Scoring
             switch (timelineMode)
             {
                 case EzScoreRaceGhostTimelineMode.ManiaSession:
-                    return $"{identity}|m|{modFp}|{beatmapFp}|hm{(int)environment.JudgeMode}|hh{(int)environment.ManiaHealthMode}|jp{(int)environment.JudgePrecedence}";
+                    return $"{identity}|m|{modFp}|{beatmapFp}|hm{(int)environment.JudgeMode}|hh{(int)environment.HealthMode}|jp{(int)environment.JudgePrecedence}";
 
                 case EzScoreRaceGhostTimelineMode.OsuSession:
                 case EzScoreRaceGhostTimelineMode.TaikoSession:

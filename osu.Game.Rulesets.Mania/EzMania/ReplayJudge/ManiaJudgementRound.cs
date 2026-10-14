@@ -57,8 +57,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         public static ManiaJudgementRound Create(GameplayEnvironment environment, IBeatmap? beatmap = null)
         {
             var strategy = ManiaJudgementRegistry.GetJudgeModeJudgement(environment.JudgeMode);
-            bool poorEnabled = HealthModeHelper.ComputeKPoorEnabled(environment.ManiaHealthMode, environment.BmsPoorHitResultEnable);
-            bool pillModeEnabled = environment.ManiaHealthMode.ToString().Contains("O2Jam");
+            bool poorEnabled = HealthModeHelper.ComputeKPoorEnabled(environment.HealthMode, environment.BmsPoorHitResultEnable);
+            bool pillModeEnabled = environment.HealthMode.ToString().Contains("O2Jam");
 
             return new ManiaJudgementRound(
                 environment,

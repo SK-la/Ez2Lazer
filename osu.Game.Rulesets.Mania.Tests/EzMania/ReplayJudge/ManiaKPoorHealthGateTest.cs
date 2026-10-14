@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TestBmsJudgeModeLazerHealthProducesNoExtraPoorFromKPoorRouting()
         {
             var (score, beatmap, bmsHealthEnv) = JudgeModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
-            var lazerHealthEnv = bmsHealthEnv with { ManiaHealthMode = EzEnumHealthMode.Lazer };
+            var lazerHealthEnv = bmsHealthEnv with { HealthMode = EzEnumHealthMode.Lazer };
 
             var withBmsHealth = ManiaReplaySession.Run(score.DeepClone(), beatmap, bmsHealthEnv);
             var withLazerHealth = ManiaReplaySession.Run(score.DeepClone(), beatmap, lazerHealthEnv);
@@ -59,16 +59,16 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             var stored = config.ResolveEnvironment(ReplayRunPurpose.ForStored, scoreInfo);
             Assert.That(stored.JudgeMode, Is.EqualTo(EzEnumJudgeMode.LR2_HD));
-            Assert.That(stored.ManiaHealthMode, Is.EqualTo(EzEnumHealthMode.IIDX_HD));
+            Assert.That(stored.HealthMode, Is.EqualTo(EzEnumHealthMode.IIDX_HD));
             Assert.That(stored.OffsetPlusMania, Is.EqualTo(0));
 
             var legacy = config.ResolveEnvironment(ReplayRunPurpose.ForStored, new ScoreInfo { Ruleset = new ManiaRuleset().RulesetInfo });
             Assert.That(legacy.JudgeMode, Is.EqualTo(EzEnumJudgeMode.Lazer));
-            Assert.That(legacy.ManiaHealthMode, Is.EqualTo(EzEnumHealthMode.Lazer));
+            Assert.That(legacy.HealthMode, Is.EqualTo(EzEnumHealthMode.Lazer));
 
             var live = config.GetGameplayEnvironment(new ManiaRuleset().RulesetInfo);
             Assert.That(live.JudgeMode, Is.EqualTo(EzEnumJudgeMode.IIDX_HD));
-            Assert.That(live.ManiaHealthMode, Is.EqualTo(EzEnumHealthMode.Lazer));
+            Assert.That(live.HealthMode, Is.EqualTo(EzEnumHealthMode.Lazer));
             Assert.That(live.OffsetPlusMania, Is.EqualTo(25.0));
 
             var recalcStored = config.ResolveEnvironment(ReplayRunPurpose.ForStored, scoreInfo);

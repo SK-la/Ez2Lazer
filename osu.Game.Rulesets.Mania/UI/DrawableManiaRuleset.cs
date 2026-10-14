@@ -107,7 +107,7 @@ namespace osu.Game.Rulesets.Mania.UI
         // 以本局冻结环境为准，而不是某个 ManiaHealthProcessor 实例：BMS 复用本 Drawable 但用的是
         // BMSNoFailHealthProcessor，没有 Ez 血量模式，读处理器实例会把 BMS 记成 Lazer（旧实现更糟：
         // 读 ManiaHealthProcessor 的 static，记的是上一局 Mania 的遗留值）。
-        int IManiaGameplayModeSnapshot.HealthMode => (int)(JudgementRound?.Environment.ManiaHealthMode ?? EzEnumHealthMode.Lazer);
+        int IManiaGameplayModeSnapshot.HealthMode => (int)(JudgementRound?.Environment.HealthMode ?? EzEnumHealthMode.Lazer);
 
         /// <summary>
         /// 列级按键输入由 <see cref="UI.Column"/> 路由到单一 press 目标（C2 COLUMN-INPUT）。

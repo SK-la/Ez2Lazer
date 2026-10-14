@@ -38,9 +38,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             ManiaReplayTimelineRecorder? timelineRecorder,
             CancellationToken cancellationToken)
         {
-            bool poorEnabled = HealthModeHelper.ComputeKPoorEnabled(environment.ManiaHealthMode, environment.BmsPoorHitResultEnable);
+            bool poorEnabled = HealthModeHelper.ComputeKPoorEnabled(environment.HealthMode, environment.BmsPoorHitResultEnable);
 
-            bool pillModeEnabled = environment.ManiaHealthMode.ToString().Contains("O2Jam");
+            bool pillModeEnabled = environment.HealthMode.ToString().Contains("O2Jam");
             var bms = noteStrategy as BmsJudgeModeJudgement;
             var judgementRound = createJudgementRound(environment, beatmap);
 
@@ -851,7 +851,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             GameplayEnvironment gameplay = environment as GameplayEnvironment ?? new GameplayEnvironment
             {
                 JudgeMode = environment.JudgeMode,
-                ManiaHealthMode = environment.ManiaHealthMode,
+                HealthMode = environment.HealthMode,
                 JudgePrecedence = environment.JudgePrecedence,
                 OffsetPlusMania = environment.OffsetPlusMania,
                 BmsPoorHitResultEnable = environment.BmsPoorHitResultEnable,

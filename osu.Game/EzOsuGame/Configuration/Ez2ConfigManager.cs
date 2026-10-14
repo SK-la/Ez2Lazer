@@ -388,7 +388,7 @@ namespace osu.Game.EzOsuGame.Configuration
         private GameplayEnvironment readLiveGameplayEnvironment(int rulesetId) => new GameplayEnvironment
         {
             JudgeMode = resolveLiveJudgeMode(rulesetId),
-            ManiaHealthMode = Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode),
+            HealthMode = Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode),
             JudgePrecedence = Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence),
             OffsetPlusMania = Get<double>(Ez2Setting.OffsetPlusMania),
             OffsetPlusNonMania = Get<double>(Ez2Setting.OffsetPlusNonMania),
@@ -412,7 +412,7 @@ namespace osu.Game.EzOsuGame.Configuration
                 return live with
                 {
                     JudgeMode = (EzEnumJudgeMode)judgeMode,
-                    ManiaHealthMode = (EzEnumHealthMode)healthMode,
+                    HealthMode = (EzEnumHealthMode)healthMode,
                 };
             }
 
@@ -421,7 +421,7 @@ namespace osu.Game.EzOsuGame.Configuration
                 return live with
                 {
                     JudgeMode = EzEnumJudgeMode.Lazer,
-                    ManiaHealthMode = EzEnumHealthMode.Lazer,
+                    HealthMode = EzEnumHealthMode.Lazer,
                 };
             }
 

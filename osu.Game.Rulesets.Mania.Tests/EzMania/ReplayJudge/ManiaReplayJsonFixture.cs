@@ -97,7 +97,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var doc = new Document
             {
                 JudgeMode = environment.JudgeMode.ToString(),
-                HealthMode = environment.ManiaHealthMode.ToString(),
+                HealthMode = environment.HealthMode.ToString(),
                 JudgePrecedence = environment.JudgePrecedence.ToString(),
                 Columns = columns,
                 BeatmapResource = beatmapResource,

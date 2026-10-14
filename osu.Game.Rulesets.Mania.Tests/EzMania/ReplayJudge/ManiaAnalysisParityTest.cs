@@ -155,7 +155,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             assertEquivalent(nowAfterRecalc, now, $"{testCase.Name}: d(Now after recalc) vs b(Now)");
 
             if (testCase.SourceEnvironment.JudgeMode == testCase.TargetEnvironment.JudgeMode
-                && testCase.SourceEnvironment.ManiaHealthMode == testCase.TargetEnvironment.ManiaHealthMode)
+                && testCase.SourceEnvironment.HealthMode == testCase.TargetEnvironment.HealthMode)
             {
                 var beforeRecalc = snapshot(await runForLiveScoreInfo(testCase.CreateFixture, testCase.SourceEnvironment, testCase.TargetEnvironment).ConfigureAwait(true));
                 assertEquivalent(listAfterRecalc, beforeRecalc, $"{testCase.Name}: X=Y recalc is idempotent");
@@ -211,7 +211,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             ReplayJudgeTestConfig.ApplyToGlobalConfig(liveEnvironment);
             var live = GlobalConfigStore.EzConfig.GetGameplayEnvironment(new ManiaRuleset().RulesetInfo);
             Assert.That(live.JudgeMode, Is.EqualTo(liveEnvironment.JudgeMode));
-            Assert.That(live.ManiaHealthMode, Is.EqualTo(liveEnvironment.ManiaHealthMode));
+            Assert.That(live.HealthMode, Is.EqualTo(liveEnvironment.HealthMode));
             return await scoreInfoFromRunRequestAsync(new ManiaReplaySessionService(), score.DeepClone(), beatmap).ConfigureAwait(true);
         }
 
@@ -263,7 +263,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             => (int)environment.JudgeMode;
 
         private static int expectedPersistedHealthMode(GameplayEnvironment environment)
-            => (int)environment.ManiaHealthMode;
+            => (int)environment.HealthMode;
 
         public sealed record AnalysisFixtureCase(
             string Name,

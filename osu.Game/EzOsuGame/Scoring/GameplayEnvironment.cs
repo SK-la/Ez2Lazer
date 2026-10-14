@@ -13,7 +13,7 @@ namespace osu.Game.EzOsuGame.Scoring
     {
         public EzEnumJudgeMode JudgeMode { get; init; }
 
-        public EzEnumHealthMode ManiaHealthMode { get; init; }
+        public EzEnumHealthMode HealthMode { get; init; }
 
         public EzEnumJudgePrecedence JudgePrecedence { get; init; }
 

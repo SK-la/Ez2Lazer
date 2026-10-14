@@ -15,7 +15,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             GlobalConfigStore.EzConfig = config;
 
             config.SetValue(Ez2Setting.ManiaJudgeMode, environment.JudgeMode);
-            config.SetValue(Ez2Setting.ManiaHealthMode, environment.ManiaHealthMode);
+            config.SetValue(Ez2Setting.ManiaHealthMode, environment.HealthMode);
             config.SetValue(Ez2Setting.JudgePrecedence, environment.JudgePrecedence);
             config.SetValue(Ez2Setting.OffsetPlusMania, environment.OffsetPlusMania);
             config.SetValue(Ez2Setting.BmsPoorHitResultEnable, environment.BmsPoorHitResultEnable);
@@ -32,7 +32,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public static void ApplyEmbeddedModes(Score score, GameplayEnvironment environment)
         {
             score.ScoreInfo.ManiaHitMode = (int)environment.JudgeMode;
-            score.ScoreInfo.ManiaHealthMode = (int)environment.ManiaHealthMode;
+            score.ScoreInfo.ManiaHealthMode = (int)environment.HealthMode;
         }
 
         public static GameplayEnvironment Create(
@@ -44,7 +44,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             => new GameplayEnvironment
             {
                 JudgeMode = judgeMode,
-                ManiaHealthMode = healthMode,
+                HealthMode = healthMode,
                 JudgePrecedence = judgePrecedence,
                 OffsetPlusMania = offsetPlusMania,
                 BmsPoorHitResultEnable = bmsPoorHitResultEnable,

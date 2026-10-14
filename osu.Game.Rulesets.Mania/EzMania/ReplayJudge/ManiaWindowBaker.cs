@@ -57,7 +57,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         private static bool computePoorEnabled(IGameplayEnvironment environment)
-            => HealthModeHelper.ComputeKPoorEnabled(environment.ManiaHealthMode, environment.BmsPoorHitResultEnable);
+            => HealthModeHelper.ComputeKPoorEnabled(environment.HealthMode, environment.BmsPoorHitResultEnable);
 
         private static void alignCore(IBeatmap beatmap, EzEnumJudgeMode judgeMode, bool? poorEnabled)
         {
