@@ -62,7 +62,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var sb = new StringBuilder();
             sb.AppendLine($"osr: {osr_resource}");
             sb.AppendLine($"beatmap: {score.ScoreInfo.BeatmapInfo}");
-            sb.AppendLine($"embedded ManiaHitMode={score.ScoreInfo.ManiaHitMode} ManiaHealthMode={score.ScoreInfo.ManiaHealthMode}");
+            sb.AppendLine($"embedded ManiaJudgeMode={score.ScoreInfo.ManiaHitMode} ManiaHealthMode={score.ScoreInfo.ManiaHealthMode}");
             sb.AppendLine($"mods: {string.Join(",", score.ScoreInfo.Mods.Select(m => m.Acronym))}");
             sb.AppendLine($"imported version={score.ScoreInfo.TotalScoreVersion} legacy={score.ScoreInfo.IsLegacyScore}");
             sb.AppendLine($"original stats: {describeCounts(score.ScoreInfo.Statistics)}");

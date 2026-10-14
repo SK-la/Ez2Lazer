@@ -21,7 +21,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         private ManiaSimulationBeatmapProvider? beatmapProvider;
 
         /// <summary>
-        /// 注入 beatmap 来源：之后每次仿真都在 <see cref="ManiaSimulationBeatmapProvider"/> 产出的独立副本上绑定 hitmode，
+        /// 注入 beatmap 来源：之后每次仿真都在 <see cref="ManiaSimulationBeatmapProvider"/> 产出的独立副本上绑定 JudgeMode，
         /// 调用方传进来的实例（可能是本局 live 实例，或被多个 ghost 共享的 Race 实例）不再被改写。
         /// </summary>
         /// <remarks>未注入时（测试、无 BeatmapManager 的宿主）沿用调用方实例——那时调用方自己拥有该实例。</remarks>

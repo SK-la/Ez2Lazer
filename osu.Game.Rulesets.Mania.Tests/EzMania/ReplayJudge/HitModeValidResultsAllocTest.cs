@@ -9,29 +9,29 @@ using osu.Game.Rulesets.Mania.EzMania.Helper;
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 {
     [TestFixture]
-    public class HitModeValidResultsAllocTest
+    public class JudgeModeValidResultsAllocTest
     {
         [Test]
-        public void GetHitModeValidHitResultsReturnsCachedInstance()
+        public void GetJudgeModeValidHitResultsReturnsCachedInstance()
         {
-            var a = HitModeHelper.GetHitModeValidHitResults(EzEnumJudgeMode.Lazer);
-            var b = HitModeHelper.GetHitModeValidHitResults(EzEnumJudgeMode.Lazer);
+            var a = JudgeModeHelper.GetJudgeModeValidHitResults(EzEnumJudgeMode.Lazer);
+            var b = JudgeModeHelper.GetJudgeModeValidHitResults(EzEnumJudgeMode.Lazer);
             Assert.That(ReferenceEquals(a, b), Is.True);
         }
 
         [Test]
-        public void GetHitModeValidHitResultsDoesNotAllocate()
+        public void GetJudgeModeValidHitResultsDoesNotAllocate()
         {
             // warm
-            HitModeHelper.GetHitModeValidHitResults(EzEnumJudgeMode.Lazer);
+            JudgeModeHelper.GetJudgeModeValidHitResults(EzEnumJudgeMode.Lazer);
 
             long before = GC.GetAllocatedBytesForCurrentThread();
 
             for (int i = 0; i < 50_000; i++)
             {
-                HitModeHelper.GetHitModeValidHitResults(EzEnumJudgeMode.Lazer);
-                HitModeHelper.GetHitModeValidHitResults(EzEnumJudgeMode.IIDX_HD);
-                HitModeHelper.GetHitModeValidHitResults(EzEnumJudgeMode.O2Jam);
+                JudgeModeHelper.GetJudgeModeValidHitResults(EzEnumJudgeMode.Lazer);
+                JudgeModeHelper.GetJudgeModeValidHitResults(EzEnumJudgeMode.IIDX_HD);
+                JudgeModeHelper.GetJudgeModeValidHitResults(EzEnumJudgeMode.O2Jam);
             }
 
             long after = GC.GetAllocatedBytesForCurrentThread();

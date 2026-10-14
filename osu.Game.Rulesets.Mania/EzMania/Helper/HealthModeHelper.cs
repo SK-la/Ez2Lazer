@@ -30,11 +30,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             { 0.0015, 0.0012, 0.0003, 0, -0.05, -0.10, -0.05 }, // raja Hard
         };
 
-        public static bool IsBMSHealthMode(EzEnumHealthMode hitMode)
+        public static bool IsBMSHealthMode(EzEnumHealthMode judgeMode)
         {
-            return hitMode == EzEnumHealthMode.IIDX_HD ||
-                   hitMode == EzEnumHealthMode.LR2_HD ||
-                   hitMode == EzEnumHealthMode.Raja_HD;
+            return judgeMode == EzEnumHealthMode.IIDX_HD ||
+                   judgeMode == EzEnumHealthMode.LR2_HD ||
+                   judgeMode == EzEnumHealthMode.Raja_HD;
         }
 
         /// <summary>

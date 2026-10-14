@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         [TestCase(EzEnumHealthMode.IIDX_HD, true, true)]
         public void TestPoorWindowFollowsHealthModeAndToggle(EzEnumHealthMode healthMode, bool poorToggle, bool expected)
         {
-            // hitmode 固定为 BMS 系列，用血量模式做唯一区分。
+            // JudgeMode 固定为 BMS 系列，用血量模式做唯一区分。
             ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumJudgeMode.IIDX_HD, healthMode, bmsPoorHitResultEnable: poorToggle));
 
             var hitWindows = new ManiaHitWindows();

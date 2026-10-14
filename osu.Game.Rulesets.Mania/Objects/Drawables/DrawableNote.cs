@@ -87,7 +87,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
-            if (UsesEzJudgement && ManiaEzDrawableJudgement.TryHitModeCheckForResult(this, userTriggered, timeOffset))
+            if (UsesEzJudgement && ManiaEzDrawableJudgement.TryJudgeModeCheckForResult(this, userTriggered, timeOffset))
                 return;
 
             Debug.Assert(HitObject.HitWindows != null);
@@ -155,11 +155,11 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 r.Type = data.result;
 
                 if (data.result == HitResult.Miss
-                    || (data.result == HitResult.Meh && HitModeHelper.MehBreaksCombo(data.hitMode)))
+                    || (data.result == HitResult.Meh && JudgeModeHelper.MehBreaksCombo(data.judgeMode)))
                 {
                     r.IsComboHit = false;
                 }
-            }, (result, hitMode: judgeMode));
+            }, (result, judgeMode: judgeMode));
         }
 
         internal void EzDispatchExtraResult(HitResult result) => DispatchNewResult(result);

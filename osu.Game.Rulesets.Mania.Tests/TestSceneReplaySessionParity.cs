@@ -28,7 +28,7 @@ using osu.Game.Tests.Visual;
 namespace osu.Game.Rulesets.Mania.Tests
 {
     /// <summary>
-    /// Drawable replay 路径与 <see cref="ManiaReplaySession"/> 的 parity（Lazer + Ez HitMode）。
+    /// Drawable replay 路径与 <see cref="ManiaReplaySession"/> 的 parity（Lazer + Ez JudgeMode）。
     /// 高精度夹具用 <see cref="ManiaReplayJsonFixture"/>（JSON double ms）；勿用 osr 验局内。
     /// </summary>
     public partial class TestSceneReplaySessionParity : RateAdjustedBeatmapTestScene
@@ -46,7 +46,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         public void TearDown()
         {
             GlobalConfigStore.EzConfig.SetValue(Ez2Setting.BmsPoorHitResultEnable, false);
-            GlobalConfigStore.EzConfig.SetValue(Ez2Setting.ManiaHitMode, EzEnumJudgeMode.Lazer);
+            GlobalConfigStore.EzConfig.SetValue(Ez2Setting.ManiaJudgeMode, EzEnumJudgeMode.Lazer);
             GlobalConfigStore.EzConfig.SetValue(Ez2Setting.ManiaHealthMode, EzEnumHealthMode.Lazer);
             GlobalConfigStore.EzConfig.SetValue(Ez2Setting.JudgePrecedence, EzEnumJudgePrecedence.Earliest);
         }
@@ -246,19 +246,19 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestEz2AcManyNoteTapDrawableMatchesSession()
         {
-            runDrawableParityTestFromFixture(HitModeReplayFixtures.CreateEz2AcManyNoteTap());
+            runDrawableParityTestFromFixture(JudgeModeReplayFixtures.CreateEz2AcManyNoteTap());
         }
 
         [Test]
         public void TestMalodyETapDrawableMatchesSession()
         {
-            runDrawableParityTestFromFixture(HitModeReplayFixtures.CreateMalodyManyNoteTap());
+            runDrawableParityTestFromFixture(JudgeModeReplayFixtures.CreateMalodyManyNoteTap());
         }
 
         [Test]
         public void TestO2VariableBpmTapDrawableMatchesSession()
         {
-            runDrawableParityTestFromFixture(HitModeReplayFixtures.CreateO2VariableBpmTap());
+            runDrawableParityTestFromFixture(JudgeModeReplayFixtures.CreateO2VariableBpmTap());
         }
 
         [Test]
@@ -304,7 +304,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestO2PillDrawableMatchesSession()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateO2PillUpgradeOnBadRange();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateO2PillUpgradeOnBadRange();
             parityEnvironment = environment;
 
             runDrawableParityTest(
@@ -315,7 +315,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestEz2AcHoldDrawableMatchesSession()
         {
-            runDrawableParityTestFromFixture(HitModeReplayFixtures.CreateEz2AcHoldThroughEnd());
+            runDrawableParityTestFromFixture(JudgeModeReplayFixtures.CreateEz2AcHoldThroughEnd());
         }
 
         // ==================== POLICY-PARITY: JudgePrecedence × 叠键 ====================
@@ -548,37 +548,37 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestReplayAfterRecalcEz2AcMatchesNow()
         {
-            runReplayAfterRecalcParityTest(HitModeReplayFixtures.CreateEz2AcManyNoteTap());
+            runReplayAfterRecalcParityTest(JudgeModeReplayFixtures.CreateEz2AcManyNoteTap());
         }
 
         [Test]
         public void TestReplayAfterRecalcMalodyEMatchesNow()
         {
-            runReplayAfterRecalcParityTest(HitModeReplayFixtures.CreateMalodyManyNoteTap());
+            runReplayAfterRecalcParityTest(JudgeModeReplayFixtures.CreateMalodyManyNoteTap());
         }
 
         [Test]
         public void TestReplayAfterRecalcO2VariableBpmMatchesNow()
         {
-            runReplayAfterRecalcParityTest(HitModeReplayFixtures.CreateO2VariableBpmTap());
+            runReplayAfterRecalcParityTest(JudgeModeReplayFixtures.CreateO2VariableBpmTap());
         }
 
         [Test]
         public void TestIidxManyNoteTapDrawableMatchesSession_LazerHealth()
         {
-            runFullScoreParityTestFromFixture(HitModeReplayFixtures.CreateBmsManyNoteTap(EzEnumJudgeMode.IIDX_HD));
+            runFullScoreParityTestFromFixture(JudgeModeReplayFixtures.CreateBmsManyNoteTap(EzEnumJudgeMode.IIDX_HD));
         }
 
         [Test]
         public void TestLr2ManyNoteTapDrawableMatchesSession_LazerHealth()
         {
-            runFullScoreParityTestFromFixture(HitModeReplayFixtures.CreateBmsManyNoteTap(EzEnumJudgeMode.LR2_HD));
+            runFullScoreParityTestFromFixture(JudgeModeReplayFixtures.CreateBmsManyNoteTap(EzEnumJudgeMode.LR2_HD));
         }
 
         [Test]
         public void TestRajaManyNoteTapDrawableMatchesSession_LazerHealth()
         {
-            runFullScoreParityTestFromFixture(HitModeReplayFixtures.CreateBmsManyNoteTap(EzEnumJudgeMode.Raja_NM));
+            runFullScoreParityTestFromFixture(JudgeModeReplayFixtures.CreateBmsManyNoteTap(EzEnumJudgeMode.Raja_NM));
         }
 
         private void runFullScoreParityTestFromFixture((Score score, IBeatmap beatmap, GameplayEnvironment environment) fixture)

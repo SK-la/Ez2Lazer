@@ -575,7 +575,7 @@ namespace osu.Game.EzOsuGame.Scoring
 
                         int representative = group[0];
 
-                        // Mania：AttachBeatmaps 后由 SimulationBeatmapProvider.GetBound(hitmode) 取谱；不传 shared。
+                        // Mania：AttachBeatmaps 后由 SimulationBeatmapProvider.GetBound(JudgeMode) 取谱；不传 shared。
                         // 其余模式：GetBound(session-ready) 同 Mod 复用。
                         IBeatmap? sharedPlayable = maniaUsesProvider
                             ? null

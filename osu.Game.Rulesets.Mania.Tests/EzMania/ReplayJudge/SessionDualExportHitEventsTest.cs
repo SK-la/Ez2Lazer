@@ -45,7 +45,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public async Task TestBmsKpoorDualExportHitEventsMatch()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, environment);
             var service = new ManiaReplaySessionService();
@@ -59,7 +59,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public async Task TestEz2AcHoldDualExportHitEventsMatch()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcHoldHeadGreatSoftened();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateEz2AcHoldHeadGreatSoftened();
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, environment);
             var service = new ManiaReplaySessionService();
@@ -73,7 +73,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public async Task TestRunHitEventsAsyncMatchesRunAsyncHitEventsForEz2Hold()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcHoldHeadGreatSoftened();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateEz2AcHoldHeadGreatSoftened();
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, environment);
 

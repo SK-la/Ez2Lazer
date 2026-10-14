@@ -41,11 +41,11 @@ namespace osu.Game.EzOsuGame.HUD
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_TEXT_FONT_LABEL), nameof(EzHUDStrings.HITRESULT_TEXT_FONT_DESCRIPTION))]
         public Bindable<string> ThemeName { get; } = new Bindable<string>(EzSelectorEnumList.DEFAULT_NAME);
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_AUTO_MAP_HITMODE_LABEL), nameof(EzHUDStrings.HITRESULT_AUTO_MAP_HITMODE_DESCRIPTION))]
-        public BindableBool AutoMapHitMode { get; } = new BindableBool();
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_AUTO_MAP_JUDGEMODE_LABEL), nameof(EzHUDStrings.HITRESULT_AUTO_MAP_JUDGEMODE_DESCRIPTION))]
+        public BindableBool AutoMapJudgeMode { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_HITMODE_TEMPLATE_LABEL), nameof(EzHUDStrings.HITRESULT_HITMODE_TEMPLATE_DESCRIPTION))]
-        public Bindable<EzEnumJudgeMode> HitModeTemplate { get; } = new Bindable<EzEnumJudgeMode>(EzEnumJudgeMode.EZ2AC);
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_JUDGEMODE_TEMPLATE_LABEL), nameof(EzHUDStrings.HITRESULT_JUDGEMODE_TEMPLATE_DESCRIPTION))]
+        public Bindable<EzEnumJudgeMode> JudgeModeTemplate { get; } = new Bindable<EzEnumJudgeMode>(EzEnumJudgeMode.EZ2AC);
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SKIP_BETTER_JUDGEMENT), nameof(EzHUDStrings.SKIP_BETTER_JUDGEMENT_DESCRIPTION))]
         public Bindable<EzEnumHitResult> SkipBetterJudgement { get; } = new Bindable<EzEnumHitResult>();
@@ -128,7 +128,7 @@ namespace osu.Game.EzOsuGame.HUD
         private GameplayClockContainer? gameplayClockContainer { get; set; }
 
         private Bindable<string> themeName = null!;
-        private Bindable<EzEnumJudgeMode> maniaHitModeConfig = null!;
+        private Bindable<EzEnumJudgeMode> maniaJudgeModeConfig = null!;
 
         public EzHUDHitResultScore()
         {
@@ -154,25 +154,25 @@ namespace osu.Game.EzOsuGame.HUD
 
             ThemeName.BindValueChanged(_ => invalidateCurrentAnimation(), true);
 
-            // HitMode 模板：自动模式跟随 Ez 全局 HitMode 配置；手动模式使用下拉栏的固定值。
-            maniaHitModeConfig = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode);
+            // JudgeMode 模板：自动模式跟随 Ez 全局 JudgeMode 配置；手动模式使用下拉栏的固定值。
+            maniaJudgeModeConfig = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
 
-            AutoMapHitMode.BindValueChanged(e =>
+            AutoMapJudgeMode.BindValueChanged(e =>
             {
                 // 自动映射开启时锁定手动下拉栏（灰显），关闭时解锁。
-                HitModeTemplate.Disabled = e.NewValue;
+                JudgeModeTemplate.Disabled = e.NewValue;
                 invalidateCurrentAnimation();
             }, true);
 
-            HitModeTemplate.BindValueChanged(_ =>
+            JudgeModeTemplate.BindValueChanged(_ =>
             {
-                if (!AutoMapHitMode.Value)
+                if (!AutoMapJudgeMode.Value)
                     invalidateCurrentAnimation();
             });
 
-            maniaHitModeConfig.BindValueChanged(_ =>
+            maniaJudgeModeConfig.BindValueChanged(_ =>
             {
-                if (AutoMapHitMode.Value)
+                if (AutoMapJudgeMode.Value)
                     invalidateCurrentAnimation();
             });
 
@@ -385,10 +385,10 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         /// <summary>
-        /// 计算当前生效的命名模板：自动映射开启时跟随 Ez 全局 HitMode 配置，关闭时使用手动下拉栏选择。
+        /// 计算当前生效的命名模板：自动映射开启时跟随 Ez 全局 JudgeMode 配置，关闭时使用手动下拉栏选择。
         /// </summary>
         private EzEnumJudgeMode resolveActiveTemplate()
-            => AutoMapHitMode.Value ? maniaHitModeConfig.Value : HitModeTemplate.Value;
+            => AutoMapJudgeMode.Value ? maniaJudgeModeConfig.Value : JudgeModeTemplate.Value;
 
         #region 自述预热
 
@@ -409,7 +409,7 @@ namespace osu.Game.EzOsuGame.HUD
         /// </summary>
         /// <remarks>
         /// 这些资源原先只在**首次**判定/首个满连时才被解码，表现为进局后第一次判定 update/draw 各掉一帧。
-        /// 这里按当前 <see cref="ThemeName"/> / <see cref="AnimationFrameTemplate"/> / 生效的 HitMode 模板
+        /// 这里按当前 <see cref="ThemeName"/> / <see cref="AnimationFrameTemplate"/> / 生效的 JudgeMode 模板
         /// 复刻 <see cref="getOrCreateJudgement"/> 的探测路径（含回退名），在线程池里完成解码，并等到绘制线程把上传排空。
         /// 不在这里创建 drawable：预热线程不在场景树上，创建后再 Dispose 也带不走 GPU 上传。
         /// </remarks>

@@ -244,7 +244,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         {
             base.LoadComplete();
 
-            PillCount.BindTo(O2HitModeExtension.PILL_COUNT);
+            PillCount.BindTo(O2JudgeModeExtension.PILL_COUNT);
 
             PillCount.BindValueChanged(value =>
             {

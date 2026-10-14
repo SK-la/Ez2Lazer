@@ -15,15 +15,15 @@ using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 {
     /// <summary>
-    /// 把 hitmode 绑进 beatmap 的唯一入口：就地写 <c>HitWindows</c>（<see cref="ManiaWindowBaker"/>）
+    /// 把 JudgeMode 绑进 beatmap 的唯一入口：就地写 <c>HitWindows</c>（<see cref="ManiaWindowBaker"/>）
     /// 与 <c>HitObject.Judgement</c>（<see cref="ManiaEnvironmentJudgements"/>）。
     /// </summary>
     /// <remarks>
-    /// 绑定是就地改写，所以一个实例只应承载一个 hitmode。仿真侧的保证来自
-    /// <see cref="ManiaSimulationBeatmapProvider"/>：每个 <c>(working beatmap, ruleset, mods, hitmode)</c> 都有自己的实例。
+    /// 绑定是就地改写，所以一个实例只应承载一个 JudgeMode。仿真侧的保证来自
+    /// <see cref="ManiaSimulationBeatmapProvider"/>：每个 <c>(working beatmap, ruleset, mods, JudgeMode)</c> 都有自己的实例。
     /// 冲突因此按来源分档：
     /// <list type="bullet">
-    /// <item>provider 产出的实例（<see cref="BindForSimulation"/> 标记为 owned）出现异 hitmode 绑定 ⇒ provider 的键或缓存逻辑有 bug，DEBUG 直接断言。</item>
+    /// <item>provider 产出的实例（<see cref="BindForSimulation"/> 标记为 owned）出现异 JudgeMode 绑定 ⇒ provider 的键或缓存逻辑有 bug，DEBUG 直接断言。</item>
     /// <item>其它实例（测试的静态注入、调用方自备且反复复用的实例）沿用 last-wins 并打点，保持既有行为。</item>
     /// </list>
     /// </remarks>
@@ -35,13 +35,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         private sealed class BindingRecord
         {
-            public int BoundHitMode = unbound;
+            public int BoundJudgeMode = unbound;
             public bool Owned;
         }
 
         private static readonly ConditionalWeakTable<IBeatmap, BindingRecord> records = new ConditionalWeakTable<IBeatmap, BindingRecord>();
 
-        /// <summary>本地游玩：绑定 hitmode，并初始化 O2 HUD / press-time BPM 所需的运行态。</summary>
+        /// <summary>本地游玩：绑定 JudgeMode，并初始化 O2 HUD / press-time BPM 所需的运行态。</summary>
         public static void BindForLive(IBeatmap beatmap, IGameplayEnvironment environment)
         {
             ArgumentNullException.ThrowIfNull(beatmap);
@@ -55,7 +55,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// <summary>
         /// 仿真：对齐 <c>HitWindows</c> 并绑定 Judgement。Session 用它绑定拿到的实例；
         /// <paramref name="providerOwned"/> 由 <see cref="ManiaSimulationBeatmapProvider"/> 为自己的副本声明归属，
-        /// 声明之后若再被绑到别的 hitmode，按 provider 的实现缺陷处理（DEBUG 断言）。
+        /// 声明之后若再被绑到别的 JudgeMode，按 provider 的实现缺陷处理（DEBUG 断言）。
         /// </summary>
         public static void BindForSimulation(IBeatmap beatmap, EzEnumJudgeMode judgeMode, bool providerOwned = false)
         {
@@ -89,8 +89,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             lock (entry)
             {
-                conflict = entry.BoundHitMode != unbound && entry.BoundHitMode != (int)judgeMode;
-                entry.BoundHitMode = (int)judgeMode;
+                conflict = entry.BoundJudgeMode != unbound && entry.BoundJudgeMode != (int)judgeMode;
+                entry.BoundJudgeMode = (int)judgeMode;
                 entry.Owned |= owned;
                 isOwned = entry.Owned;
             }
@@ -100,8 +100,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             ManiaJudgeHotPathTrace.RecordBeatmapRebindConflict();
 
-            string message = $"[ManiaJudgeBinding] beatmap rebound to a different hitmode (now {judgeMode}, owned={isOwned}, "
-                             + $"objects={beatmap.HitObjects.Count}); one instance must not carry two hitmodes.";
+            string message = $"[ManiaJudgeBinding] beatmap rebound to a different JudgeMode (now {judgeMode}, owned={isOwned}, "
+                             + $"objects={beatmap.HitObjects.Count}); one instance must not carry two JudgeModes.";
 
             Logger.Log(message, Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
 
@@ -110,7 +110,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         /// <summary>
-        /// 共享缓存条目（<see cref="EzPlayableBeatmapCache.GetShared"/>）按契约只读：对它做就地绑定，等于把一个 hitmode 的
+        /// 共享缓存条目（<see cref="EzPlayableBeatmapCache.GetShared"/>）按契约只读：对它做就地绑定，等于把一个 JudgeMode 的
         /// Judgement / HitWindows 泄漏给同进程里拿到同一实例的其它消费者，而且是 last-wins。
         /// </summary>
         /// <remarks>
@@ -124,7 +124,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             if (Interlocked.Increment(ref sharedBindingWarnCount) > 10)
                 return;
 
-            string message = $"[ManiaJudgeBinding] bound a shared EzPlayableBeatmapCache instance in place (hitmode {judgeMode}, "
+            string message = $"[ManiaJudgeBinding] bound a shared EzPlayableBeatmapCache instance in place (JudgeMode {judgeMode}, "
                              + $"objects={beatmap.HitObjects.Count}); shared instances are read-only, ask for GetBound instead.";
 
             Logger.Log(message, Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);

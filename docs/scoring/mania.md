@@ -30,7 +30,7 @@ flowchart TB
   MLPS[ManiaLanePressSelector]
   Ez{UsesEzJudgement?}
   Kernel[ManiaJudgementKernel]
-  Map[HitMode Mapping]
+  Map[JudgeMode Mapping]
   Lazer["Lazer: HitWindows inline"]
   SP[ScoreProcessor]
   Round --> Ez
@@ -43,7 +43,7 @@ flowchart TB
 
 | 层 | 职责 | 锚点 |
 |----|------|------|
-| L0 | 开局冻结 HitMode/Poor/Precedence | `ManiaJudgementRound` |
+| L0 | 开局冻结 JudgeMode/Poor/Precedence | `ManiaJudgementRound` |
 | L2 路由 | 叠键选目标、AutoMiss 队列 | `ManiaLaneController` + `ManiaLanePressSelector` |
 | L2 判官 | offset → HitResult | `ManiaJudgementKernel` → Mapping |
 | L3 | 输入、ApplyResult、视觉、LN 持有 | `Column` / Drawable |
@@ -68,9 +68,9 @@ flowchart TB
 
 Ez：「等级怎么判」已单源。痛点在 Lazer 数学双轨 + AutoMiss/LN 驱动。
 
-**绑定**：一 beatmap 实例 = 一 hitmode；Session 用 `ManiaSimulationBeatmapProvider` 副本，勿喂 live 实例。
+**绑定**：一 beatmap 实例 = 一 JudgeMode；Session 用 `ManiaSimulationBeatmapProvider` 副本，勿喂 live 实例。
 
-**KPoor**：仅 BMS HitMode + BMS HealthMode + `BmsPoorHitResultEnable`；M/N 同一 `poorEnabled` 公式。
+**KPoor**：仅 BMS JudgeMode + BMS HealthMode + `BmsPoorHitResultEnable`；M/N 同一 `poorEnabled` 公式。
 
 ---
 
@@ -84,7 +84,7 @@ Ez：「等级怎么判」已单源。痛点在 Lazer 数学双轨 + AutoMiss/LN
 | Graph **Now** = replay + ForLive Session，不读 Realm 数字冒充 Now |
 | Graph **Original** / list 卡 = Realm 快照 |
 | 禁止 UI 过滤掩盖 Statistics 真差异；禁止入库前 Session 同步 |
-| HitMode `0`=Lazer；无「未设置」档 |
+| JudgeMode `0`=Lazer；无「未设置」档 |
 
 场景：本地玩/回放→M；重算/Graph Now/补 HitEvents/Race→N。
 
@@ -94,7 +94,7 @@ Ez：「等级怎么判」已单源。痛点在 Lazer 数学双轨 + AutoMiss/LN
 
 **U1 P0 — Lazer 数学单源**  
 Replica 成唯一数学源；Drawable Lazer `CheckForResult` 一行委托。  
-文件：`Replicas/Lazer*JudgementReplica.cs`、`ManiaJudgementRegistry`、`DrawableNote`/`HoldTail`、`IManiaHitModeJudgement` 注释。  
+文件：`Replicas/Lazer*JudgementReplica.cs`、`ManiaJudgementRegistry`、`DrawableNote`/`HoldTail`、`IManiaJudgeModeJudgement` 注释。  
 验收：现有 parity 绿 + Lazer 轨 Drawable≡Session。
 
 **U2 P1 — AutoMiss / LN**  

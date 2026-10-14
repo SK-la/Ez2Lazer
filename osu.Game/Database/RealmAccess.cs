@@ -114,7 +114,7 @@ namespace osu.Game.Database
         ///
         /// Ez2Lazer-only revisions are tracked separately via <see cref="EZ_REALM_SCHEMA_VERSION"/>.
         /// The on-disk Realm schema version is <see cref="EzFileSchemaVersion"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 52010).
-        /// Ez v1: Add ScoreInfo.ManiaHitMode and ManiaHealthMode.
+        /// Ez v1: Add ScoreInfo.ManiaJudgeMode and ManiaHealthMode.
         /// Ez v2: Add BeatmapInfo.HasVideo and HasStoryboard.
         /// Ez v3: Add BeatmapInfo.XxyStarRating.
         /// Ez v4: Add BeatmapInfo.PerformancePoints.

@@ -44,7 +44,7 @@ namespace osu.Game.Benchmarks
             jackScore = createTestScore(jackBeatmap);
 
             var environment = GlobalConfigStore.EzConfig.ResolveEnvironment(ReplayRunPurpose.ForStored, score.ScoreInfo);
-            GlobalConfigStore.EzConfig.SetValue(Ez2Setting.ManiaHitMode, environment.JudgeMode);
+            GlobalConfigStore.EzConfig.SetValue(Ez2Setting.ManiaJudgeMode, environment.JudgeMode);
             GlobalConfigStore.EzConfig.SetValue(Ez2Setting.ManiaHealthMode, environment.ManiaHealthMode);
             GlobalConfigStore.EzConfig.SetValue(Ez2Setting.JudgePrecedence, BenchPrecedence);
             GlobalConfigStore.EzConfig.SetValue(Ez2Setting.BmsPoorHitResultEnable, environment.BmsPoorHitResultEnable);

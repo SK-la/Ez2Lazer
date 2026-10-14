@@ -20,7 +20,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         public static Judgement CreateForTailNote(EzEnumJudgeMode judgeMode)
         {
             // Malody / EZ2AC：尾不单独计分（无松手窗），仅 Ignore 完结。
-            if (MalodyHitModeJudgement.IsMalodyMode(judgeMode) || judgeMode == EzEnumJudgeMode.EZ2AC)
+            if (MalodyJudgeModeJudgement.IsMalodyMode(judgeMode) || judgeMode == EzEnumJudgeMode.EZ2AC)
                 return new MalodyTailJudgement();
 
             return new ManiaJudgement();
@@ -39,7 +39,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             // EZ2AC 的 16 分 tick 必须在判定绑定之前补齐：ManiaScoreProcessor 的全谱模拟按嵌套物件算
             // MaximumBaseScore，缺 tick 会把 EZ2AC 的 LN 按官方头尾语义计价。
-            // 放在这里而不是转换期，是为了让 tick 集合由 hitmode 决定，而不是由「转换当时全局设置是不是 EZ2AC」决定。
+            // 放在这里而不是转换期，是为了让 tick 集合由 JudgeMode 决定，而不是由「转换当时全局设置是不是 EZ2AC」决定。
             if (judgeMode == EzEnumJudgeMode.EZ2AC)
             {
                 foreach (var hitObject in beatmap.HitObjects)

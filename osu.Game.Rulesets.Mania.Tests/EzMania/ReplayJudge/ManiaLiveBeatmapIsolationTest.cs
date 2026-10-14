@@ -45,7 +45,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public void TestServiceSimulationUsesCopyAndLeavesCallerInstanceUntouched()
         {
-            var (score, callerBeatmap, environment) = HitModeReplayFixtures.CreateEz2AcHoldHeadPerfect();
+            var (score, callerBeatmap, environment) = JudgeModeReplayFixtures.CreateEz2AcHoldHeadPerfect();
             score.ScoreInfo.BeatmapInfo = callerBeatmap.BeatmapInfo;
 
             // 模拟局内：调用方实例按 EZ2AC 绑定（窗口 + Judgement）。
@@ -58,7 +58,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             Assert.That(headWindows.ActiveJudgeMode, Is.EqualTo(EzEnumJudgeMode.EZ2AC));
             Assert.That(tick.Judgement, Is.TypeOf<HoldNoteTickJudgement>());
 
-            // autoplay 的 ScoreInfo 尚无嵌入 hitmode → ForStored 回退 Lazer（与崩溃现场一致）。
+            // autoplay 的 ScoreInfo 尚无嵌入 JudgeMode → ForStored 回退 Lazer（与崩溃现场一致）。
             var storedEnvironment = GlobalConfigStore.EzConfig.ResolveEnvironment(ReplayRunPurpose.ForStored, score.ScoreInfo);
             Assert.That(storedEnvironment.JudgeMode, Is.EqualTo(EzEnumJudgeMode.Lazer), "前置条件：ForStored 应回退 Lazer");
 
@@ -89,7 +89,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         [Test]
-        public void TestProviderCachesPerHitModeAndNeverReturnsSourceInstance()
+        public void TestProviderCachesPerJudgeModeAndNeverReturnsSourceInstance()
         {
             var (score, beatmap, _) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
             score.ScoreInfo.BeatmapInfo = beatmap.BeatmapInfo;
@@ -101,13 +101,13 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             var first = provider.TryCreate(score, lazer, CancellationToken.None);
             var sameKey = provider.TryCreate(score, lazer, CancellationToken.None);
-            var otherHitMode = provider.TryCreate(score, ez2ac, CancellationToken.None);
+            var otherJudgeMode = provider.TryCreate(score, ez2ac, CancellationToken.None);
 
             Assert.That(first, Is.Not.Null);
             Assert.That(first, Is.Not.SameAs(beatmap), "副本不得是调用方实例");
             Assert.That(sameKey, Is.SameAs(first), "同键应复用同一副本");
-            Assert.That(otherHitMode, Is.Not.SameAs(first), "不同 hitmode 必须拿到不同实例");
-            Assert.That(((ManiaHitWindows)otherHitMode!.HitObjects.OfType<HoldNote>().Single().Head.HitWindows!).ActiveJudgeMode,
+            Assert.That(otherJudgeMode, Is.Not.SameAs(first), "不同 JudgeMode 必须拿到不同实例");
+            Assert.That(((ManiaHitWindows)otherJudgeMode!.HitObjects.OfType<HoldNote>().Single().Head.HitWindows!).ActiveJudgeMode,
                         Is.EqualTo(EzEnumJudgeMode.EZ2AC));
         }
 
@@ -130,7 +130,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         [Test]
-        public void TestRebindingDifferentHitModeIsReportedAndLastWins()
+        public void TestRebindingDifferentJudgeModeIsReportedAndLastWins()
         {
             // 非 provider 实例（测试注入、调用方自备）沿用既有 last-wins 行为，但必须留下可 grep 的计数。
             var beatmap = createEz2AcHoldBeatmap();
@@ -146,7 +146,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         [Test]
-        public void TestSameHitModeRebindingIsIdempotentAndSilent()
+        public void TestSameJudgeModeRebindingIsIdempotentAndSilent()
         {
             var beatmap = createEz2AcHoldBeatmap();
 
@@ -165,7 +165,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var judgement = tick.Result.Judgement;
             Assert.That(judgement, Is.TypeOf<IgnoreJudgement>(), "tick 默认绑定官方 IgnoreJudgement");
 
-            // 同 hitmode 下 EZ2AC tick 会给 SliderTailHit —— 正是崩溃现场。
+            // 同 JudgeMode 下 EZ2AC tick 会给 SliderTailHit —— 正是崩溃现场。
             var sanitized = ManiaEzDrawableJudgement.SanitizeResult(tick, HitResult.SliderTailHit);
 
             Assert.That(sanitized, Is.Not.EqualTo(HitResult.SliderTailHit));

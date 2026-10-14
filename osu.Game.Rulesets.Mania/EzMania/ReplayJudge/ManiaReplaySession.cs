@@ -86,11 +86,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             scoreProcessor.Mods.Value = resolvedMods;
 
             if (scoreProcessor is ManiaScoreProcessor maniaScoreProcessor)
-                maniaScoreProcessor.HitModeOverride = environment.JudgeMode;
+                maniaScoreProcessor.JudgeModeOverride = environment.JudgeMode;
 
             var simulationEnvironment = createSimulationEnvironment(environment);
 
-            // 副本由 ManiaReplaySessionService 经 ManiaSimulationBeatmapProvider 提供（每个 (谱面, mods, hitmode) 一份），
+            // 副本由 ManiaReplaySessionService 经 ManiaSimulationBeatmapProvider 提供（每个 (谱面, mods, JudgeMode) 一份），
             // 静态入口直接调用时用调用方实例；这里只负责绑定，且必须早于 ApplyBeatmap，
             // 否则 MaximumBaseScore 会按官方尾 Perfect 虚高。
             ManiaBeatmapBinding.BindForSimulation(beatmap, simulationEnvironment.JudgeMode);

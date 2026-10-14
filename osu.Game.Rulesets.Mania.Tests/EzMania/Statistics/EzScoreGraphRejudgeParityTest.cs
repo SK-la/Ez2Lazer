@@ -30,7 +30,7 @@ using osu.Game.Tests.Beatmaps;
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
 {
     /// <summary>
-    /// 验证每个 hitmode 的 rejudge 路径（<c>rejudgeOriginalHitEvents</c>）使用了
+    /// 验证每个 JudgeMode 的 rejudge 路径（<c>rejudgeOriginalHitEvents</c>）使用了
     /// 与 Session 模拟器一致的判定逻辑，产生匹配的判定计数。
     /// </summary>
     [TestFixture]
@@ -71,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
 
             var expectedCounts = extractBasicCounts(originalHitEvents, judgeMode);
             var windows = createHitWindows(judgeMode, beatmap.Difficulty.OverallDifficulty);
-            var judgement = ManiaJudgementRegistry.GetHitModeJudgement(judgeMode);
+            var judgement = ManiaJudgementRegistry.GetJudgeModeJudgement(judgeMode);
             var actualCounts = rejudgeEvents(originalHitEvents, windows, judgement, judgeMode);
 
             assertCountsMatch(expectedCounts, actualCounts, judgeMode, "tap only");
@@ -100,7 +100,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
 
             var expectedCounts = extractBasicCounts(originalHitEvents, judgeMode);
             var windows = createHitWindows(judgeMode, beatmap.Difficulty.OverallDifficulty);
-            var judgement = ManiaJudgementRegistry.GetHitModeJudgement(judgeMode);
+            var judgement = ManiaJudgementRegistry.GetJudgeModeJudgement(judgeMode);
             var actualCounts = rejudgeEvents(originalHitEvents, windows, judgement, judgeMode);
 
             assertCountsMatch(expectedCounts, actualCounts, judgeMode, "tap only v2");
@@ -109,7 +109,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         [Test]
         public void TestEz2AcLnHeadGreatSoftensToPerfect()
         {
-            var (score, beatmap, env) = HitModeReplayFixtures.CreateEz2AcHoldHeadGreatSoftened();
+            var (score, beatmap, env) = JudgeModeReplayFixtures.CreateEz2AcHoldHeadGreatSoftened();
             ReplayJudgeTestConfig.ApplyToGlobalConfig(env);
 
             var sessionScore = ManiaReplaySession.Run(score.DeepClone(), beatmap, env);
@@ -120,7 +120,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
             Assert.That(headEvents, Has.Count.GreaterThan(0), "应有 HeadNote HitEvent");
 
             var windows = createHitWindows(EzEnumJudgeMode.EZ2AC, beatmap.Difficulty.OverallDifficulty);
-            var ez2Ac = Ez2AcHitModeJudgement.Instance;
+            var ez2Ac = Ez2AcJudgeModeJudgement.Instance;
 
             foreach (var headEvent in headEvents)
             {
@@ -325,8 +325,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
             if (judgeMode != EzEnumJudgeMode.O2Jam)
                 return;
 
-            O2HitModeExtension.SetControlPoints(beatmap.ControlPointInfo);
-            O2HitModeExtension.SetOriginalBPM(beatmap.BeatmapInfo.BPM);
+            O2JudgeModeExtension.SetControlPoints(beatmap.ControlPointInfo);
+            O2JudgeModeExtension.SetOriginalBPM(beatmap.BeatmapInfo.BPM);
         }
 
         private static ManiaHitWindows createHitWindows(EzEnumJudgeMode judgeMode, double od)
@@ -345,7 +345,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         private static Dictionary<HitResult, int> extractBasicCounts(
             IReadOnlyList<HitEvent> events, EzEnumJudgeMode judgeMode)
         {
-            var validResults = HitModeHelper.GetHitModeValidHitResults(judgeMode).ToHashSet();
+            var validResults = JudgeModeHelper.GetJudgeModeValidHitResults(judgeMode).ToHashSet();
             var counts = new Dictionary<HitResult, int>();
 
             foreach (var e in events)
@@ -369,10 +369,10 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         private static Dictionary<HitResult, int> rejudgeEvents(
             IReadOnlyList<HitEvent> events,
             ManiaHitWindows windows,
-            IManiaHitModeJudgement? judgement,
+            IManiaJudgeModeJudgement? judgement,
             EzEnumJudgeMode judgeMode)
         {
-            var validResults = HitModeHelper.GetHitModeValidHitResults(judgeMode).ToHashSet();
+            var validResults = JudgeModeHelper.GetJudgeModeValidHitResults(judgeMode).ToHashSet();
             var counts = new Dictionary<HitResult, int>();
             bool isO2Jam = judgeMode == EzEnumJudgeMode.O2Jam;
 

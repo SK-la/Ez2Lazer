@@ -180,7 +180,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
             SetDefault(Ez2Setting.OffsetPlusMania, 0.0, -200.0, 200.0, 1.0);
             SetDefault(Ez2Setting.OffsetPlusNonMania, 0.0, -200.0, 200.0, 1.0);
-            SetDefault(Ez2Setting.StdHitMode, EzEnumJudgeMode.Lazer);
+            SetDefault(Ez2Setting.StdJudgeMode, EzEnumJudgeMode.Lazer);
 
             #endregion
 
@@ -288,7 +288,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         private void initializeManiaDefaults()
         {
-            SetDefault(Ez2Setting.ManiaHitMode, EzEnumJudgeMode.Lazer);
+            SetDefault(Ez2Setting.ManiaJudgeMode, EzEnumJudgeMode.Lazer);
             SetDefault(Ez2Setting.ManiaHealthMode, EzEnumHealthMode.Lazer);
             SetDefault(Ez2Setting.BmsPoorHitResultEnable, !DebugUtils.IsNUnitRunning);
             SetDefault(Ez2Setting.JudgePrecedence, EzEnumJudgePrecedence.Earliest);
@@ -352,10 +352,10 @@ namespace osu.Game.EzOsuGame.Configuration
             => ResolveEnvironment(ReplayRunPurpose.ForLive, ruleset: ruleset);
 
         /// <summary>
-        /// 统一环境解析：Purpose 决定 HitMode/HealthMode 来源；score 可选。
+        /// 统一环境解析：Purpose 决定 JudgeMode/HealthMode 来源；score 可选。
         /// </summary>
         /// <param name="purpose">
-        /// <see cref="ReplayRunPurpose.ForStored"/>：读 score 嵌入 HitMode/HealthMode（无嵌入时 Mania 回退 Lazer）。
+        /// <see cref="ReplayRunPurpose.ForStored"/>：读 score 嵌入 JudgeMode/HealthMode（无嵌入时 Mania 回退 Lazer）。
         /// <see cref="ReplayRunPurpose.ForLive"/>：读当前全局配置，判定轨按规则集取。
         /// </param>
         /// <param name="score">可选；ForStored 时用于嵌入模式查询，并作为规则集来源。</param>
@@ -387,7 +387,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         private GameplayEnvironment readLiveGameplayEnvironment(int rulesetId) => new GameplayEnvironment
         {
-            JudgeMode = resolveLiveHitMode(rulesetId),
+            JudgeMode = resolveLiveJudgeMode(rulesetId),
             ManiaHealthMode = Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode),
             JudgePrecedence = Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence),
             OffsetPlusMania = Get<double>(Ez2Setting.OffsetPlusMania),
@@ -398,20 +398,20 @@ namespace osu.Game.EzOsuGame.Configuration
         /// <summary>
         /// live 判定轨按规则集取：Mania/BMS 读 Mania 档，Osu 读 std 判定轨，其余默认 Lazer。
         /// </summary>
-        private EzEnumJudgeMode resolveLiveHitMode(int rulesetId) => rulesetId switch
+        private EzEnumJudgeMode resolveLiveJudgeMode(int rulesetId) => rulesetId switch
         {
-            3 => Get<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode),
-            0 => Get<EzEnumJudgeMode>(Ez2Setting.StdHitMode),
+            3 => Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode),
+            0 => Get<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode),
             _ => EzEnumJudgeMode.Lazer,
         };
 
         private static GameplayEnvironment resolveStoredModes(GameplayEnvironment live, ScoreInfo? score, int rulesetId)
         {
-            if (score != null && score.TryGetManiaGameplayModes(out int hitMode, out int healthMode))
+            if (score != null && score.TryGetManiaGameplayModes(out int judgeMode, out int healthMode))
             {
                 return live with
                 {
-                    JudgeMode = (EzEnumJudgeMode)hitMode,
+                    JudgeMode = (EzEnumJudgeMode)judgeMode,
                     ManiaHealthMode = (EzEnumHealthMode)healthMode,
                 };
             }
@@ -430,7 +430,7 @@ namespace osu.Game.EzOsuGame.Configuration
                 // ForStored：优先成绩内存嵌入（[Ignored]，未升 Realm）；无则 Lazer。
                 return live with
                 {
-                    JudgeMode = score != null && score.StdHitMode >= 0 ? (EzEnumJudgeMode)score.StdHitMode : EzEnumJudgeMode.Lazer,
+                    JudgeMode = score != null && score.StdJudgeMode >= 0 ? (EzEnumJudgeMode)score.StdJudgeMode : EzEnumJudgeMode.Lazer,
                 };
             }
 
@@ -1160,7 +1160,7 @@ namespace osu.Game.EzOsuGame.Configuration
         AsioUseExternalPCM,
         OffsetPlusMania,
         OffsetPlusNonMania,
-        StdHitMode,
+        StdJudgeMode,
         HitObjectLifetimeUsesOwnTime,
 
         // 皮肤与舞台资源
@@ -1205,7 +1205,7 @@ namespace osu.Game.EzOsuGame.Configuration
         HitPosition,
 
         // Mania 专属行为
-        ManiaHitMode,
+        ManiaJudgeMode,
         ManiaHealthMode,
         BmsPoorHitResultEnable,
         JudgePrecedence,

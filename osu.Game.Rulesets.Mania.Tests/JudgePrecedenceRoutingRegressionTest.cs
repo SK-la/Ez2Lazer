@@ -24,7 +24,7 @@ namespace osu.Game.Rulesets.Mania.Tests
             // Earlier note is already outside user-triggered hit range (Result=None).
             // Later note is still hittable; precedence must never route to the None candidate.
             double[] noteTimes = new[] { 1000d, 1080d };
-            var helper = new HitModeHelper(mode)
+            var helper = new JudgeModeHelper(mode)
             {
                 OverallDifficulty = 5,
                 BPM = 180
@@ -72,7 +72,7 @@ namespace osu.Game.Rulesets.Mania.Tests
             EzEnumJudgeMode mode,
             EzEnumJudgePrecedence precedence)
         {
-            var helper = new HitModeHelper(mode)
+            var helper = new JudgeModeHelper(mode)
             {
                 OverallDifficulty = 5,
                 BPM = 180

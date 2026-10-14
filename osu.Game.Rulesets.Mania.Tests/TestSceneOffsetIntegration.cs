@@ -37,7 +37,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         public void TearDown()
         {
             GlobalConfigStore.EzConfig.SetValue(Ez2Setting.OffsetPlusMania, 0.0);
-            GlobalConfigStore.EzConfig.SetValue(Ez2Setting.ManiaHitMode, EzEnumJudgeMode.Lazer);
+            GlobalConfigStore.EzConfig.SetValue(Ez2Setting.ManiaJudgeMode, EzEnumJudgeMode.Lazer);
             GlobalConfigStore.EzConfig.SetValue(Ez2Setting.ManiaHealthMode, EzEnumHealthMode.Lazer);
         }
 

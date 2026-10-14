@@ -146,7 +146,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             set
             {
                 bpm = value;
-                setHitMode();
+                setJudgeMode();
                 updateWindows();
             }
         }
@@ -174,13 +174,13 @@ namespace osu.Game.Rulesets.Mania.Scoring
         /// </summary>
         public EzEnumJudgeMode ActiveJudgeMode { get; private set; }
 
-        // 模式的唯一来源是本对象的 ActiveHitMode（构造参数 / SetHitMode）。默认用 Lazer 起步只为满足字段初始化，
-        // 构造体随后立刻用 ActiveHitMode 覆盖；不要让默认值再去回读全局配置。
-        private readonly HitModeHelper helper = new HitModeHelper(EzEnumJudgeMode.Lazer);
+        // 模式的唯一来源是本对象的 ActiveJudgeMode（构造参数 / SetJudgeMode）。默认用 Lazer 起步只为满足字段初始化，
+        // 构造体随后立刻用 ActiveJudgeMode 覆盖；不要让默认值再去回读全局配置。
+        private readonly JudgeModeHelper helper = new JudgeModeHelper(EzEnumJudgeMode.Lazer);
 
-        public ManiaHitWindows(EzEnumJudgeMode? hitModeOverride = null)
+        public ManiaHitWindows(EzEnumJudgeMode? judgeModeOverride = null)
         {
-            ActiveJudgeMode = hitModeOverride ?? GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode);
+            ActiveJudgeMode = judgeModeOverride ?? GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
             helper.JudgeMode = ActiveJudgeMode;
             updateWindows();
         }
@@ -200,7 +200,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case HitResult.Meh:
                 case HitResult.Miss:
                     // 直接查静态有效判定表（单一数据源），无需额外的 per-result switch 副本。
-                    var valid = HitModeHelper.GetHitModeValidHitResults(ActiveJudgeMode);
+                    var valid = JudgeModeHelper.GetJudgeModeValidHitResults(ActiveJudgeMode);
 
                     for (int i = 0; i < valid.Count; i++)
                     {
@@ -240,7 +240,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             updateWindows();
         }
 
-        private bool setHitMode()
+        private bool setJudgeMode()
         {
             // 需要先更新属性，保证数值同步
             helper.JudgeMode = ActiveJudgeMode;
@@ -266,7 +266,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private void updateWindows()
         {
-            if (setHitMode() && !HasReset)
+            if (setJudgeMode() && !HasReset)
             {
                 perfect = perfectRange;
                 great = greatRange;
@@ -383,7 +383,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             return shouldUseHelper ? helper.ResultFor(timeOffset) : base.ResultFor(timeOffset);
         }
 
-        public void SetHitMode(EzEnumJudgeMode mode)
+        public void SetJudgeMode(EzEnumJudgeMode mode)
         {
             if (ActiveJudgeMode == mode)
                 return;
@@ -397,7 +397,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             if (ActiveJudgeMode != EzEnumJudgeMode.O2Jam)
                 return;
 
-            BPM = O2HitModeExtension.GetBPMAtTime(time);
+            BPM = O2JudgeModeExtension.GetBPMAtTime(time);
         }
     }
 }

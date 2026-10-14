@@ -334,7 +334,7 @@ namespace osu.Game.Screens.Play
                 dependencies.CacheAs(scrollingRuleset.ScrollingInfo);
 
             ScoreProcessor = ruleset.CreateScoreProcessor();
-            // [Ez] 冻结当前全局游玩环境（HitMode 等）；必须先于 ApplyBeatmap 的全谱模拟。
+            // [Ez] 冻结当前全局游玩环境（JudgeMode 等）；必须先于 ApplyBeatmap 的全谱模拟。
             ScoreProcessor.ApplyEzGameplayEnvironment();
             ScoreProcessor.Mods.Value = gameplayMods;
             ScoreProcessor.ApplyBeatmap(playableBeatmap);
@@ -1612,7 +1612,7 @@ namespace osu.Game.Screens.Play
             // the import process will re-attach managed beatmap/rulesets to this score. we don't want this for now, so create a temporary copy to import.
             var importableScore = score.ScoreInfo.DeepClone();
 
-            int maniaHitMode = importableScore.ManiaHitMode;
+            int maniaJudgeMode = importableScore.ManiaHitMode;
             int maniaHealthMode = importableScore.ManiaHealthMode;
 
             var imported = scoreManager.Import(importableScore, replayReader);
@@ -1630,7 +1630,7 @@ namespace osu.Game.Screens.Play
 
             imported.PerformWrite(s =>
             {
-                s.ManiaHitMode = maniaHitMode;
+                s.ManiaHitMode = maniaJudgeMode;
                 s.ManiaHealthMode = maniaHealthMode;
             });
 

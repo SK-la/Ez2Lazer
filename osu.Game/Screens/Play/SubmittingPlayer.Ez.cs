@@ -13,7 +13,7 @@ namespace osu.Game.Screens.Play
     {
         private void queueEzManiaMetadataSubmission(Score score, long onlineScoreId)
         {
-            if (!score.ScoreInfo.TryGetManiaGameplayModes(out int hitMode, out int healthMode))
+            if (!score.ScoreInfo.TryGetManiaGameplayModes(out int judgeMode, out int healthMode))
                 return;
 
             var preset = GlobalConfigStore.EzConfig.Get<ServerPreset>(Ez2Setting.ServerPreset);
@@ -26,10 +26,10 @@ namespace osu.Game.Screens.Play
             if (beatmapId <= 0)
                 return;
 
-            var request = new SubmitEzManiaScoreMetadataRequest(hitMode, healthMode, onlineScoreId, beatmapId);
+            var request = new SubmitEzManiaScoreMetadataRequest(judgeMode, healthMode, onlineScoreId, beatmapId);
 
             request.Success += () => Logger.Log(
-                $"[EzMania] Uploaded gameplay mode metadata (hit={hitMode}, hp={healthMode}) for score {onlineScoreId}",
+                $"[EzMania] Uploaded gameplay mode metadata (hit={judgeMode}, hp={healthMode}) for score {onlineScoreId}",
                 Ez2ConfigManager.LOGGER_NAME,
                 LogLevel.Debug);
 

@@ -22,7 +22,7 @@ using osu.Game.Tests.Beatmaps;
 
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 {
-    internal static class HitModeReplayFixtures
+    internal static class JudgeModeReplayFixtures
     {
         public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateBmsEarlyBadWithPostBadKPoor()
         {
@@ -503,7 +503,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return (createScore(ruleset, replay), beatmap, environment);
         }
 
-        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateHoldPerfectForHitMode(EzEnumJudgeMode judgeMode)
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateHoldPerfectForJudgeMode(EzEnumJudgeMode judgeMode)
         {
             return judgeMode switch
             {
@@ -555,11 +555,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return (createScore(ruleset, replay), beatmap, environment);
         }
 
-        public static BmsJudge ToBmsJudge(HitResult result) => BmsHitModeJudgement.FromHitResult(result);
+        public static BmsJudge ToBmsJudge(HitResult result) => BmsJudgeModeJudgement.FromHitResult(result);
 
-        public static O2Judge ToO2Judge(HitResult result) => O2HitModeJudgement.FromHitResult(result);
+        public static O2Judge ToO2Judge(HitResult result) => O2JudgeModeJudgement.FromHitResult(result);
 
-        public static Ez2AcJudge ToEz2AcJudge(HitResult result) => Ez2AcHitModeJudgement.FromHitResult(result);
+        public static Ez2AcJudge ToEz2AcJudge(HitResult result) => Ez2AcJudgeModeJudgement.FromHitResult(result);
 
         public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateBmsEarlyKPoorPress()
         {
@@ -701,8 +701,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
         private static double findO2PillConsumingOffset(double bpm)
         {
-            double goodRange = O2HitModeExtension.BASE_GOOD / bpm;
-            double badRange = O2HitModeExtension.BASE_BAD / bpm;
+            double goodRange = O2JudgeModeExtension.BASE_GOOD / bpm;
+            double badRange = O2JudgeModeExtension.BASE_BAD / bpm;
             var windows = new ManiaHitWindows(EzEnumJudgeMode.O2Jam);
 
             for (double offset = goodRange + 1; offset <= badRange; offset++)
@@ -717,8 +717,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         private static double findBmsEarlyKPoorPressOffset()
         {
             var windows = new ManiaHitWindows(EzEnumJudgeMode.IIDX_HD);
-            double badEarly = BmsHitModeJudgement.WindowFor(windows, BmsJudge.Bad, true);
-            double kPoorEarly = BmsHitModeJudgement.WindowFor(windows, BmsJudge.KPoor, true);
+            double badEarly = BmsJudgeModeJudgement.WindowFor(windows, BmsJudge.Bad, true);
+            double kPoorEarly = BmsJudgeModeJudgement.WindowFor(windows, BmsJudge.KPoor, true);
 
             if (kPoorEarly <= badEarly)
                 return 0;

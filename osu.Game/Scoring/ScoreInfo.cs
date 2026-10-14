@@ -253,7 +253,7 @@ namespace osu.Game.Scoring
             clone.ManiaHealthMode = ManiaHealthMode;
             clone.SessionOffsetPlusMania = SessionOffsetPlusMania;
             clone.SessionOffsetPlusNonMania = SessionOffsetPlusNonMania;
-            clone.StdHitMode = StdHitMode;
+            clone.StdJudgeMode = StdJudgeMode;
             clone.SessionAccuracyCutoffA = SessionAccuracyCutoffA;
             clone.SessionAccuracyCutoffS = SessionAccuracyCutoffS;
             clone.SessionSettingsCaptured = SessionSettingsCaptured;
@@ -319,7 +319,7 @@ namespace osu.Game.Scoring
         /// -1 = 未设置（ForStored 回退 Lazer）；0 = Lazer；1 = StableClassic。
         /// </summary>
         [Ignored]
-        public int StdHitMode { get; set; } = -1;
+        public int StdJudgeMode { get; set; } = -1;
 
         /// <summary>
         /// Ez2Lazer: Accuracy cutoff A at gameplay start (submission eligibility snapshot).

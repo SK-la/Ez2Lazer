@@ -41,10 +41,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             bool poorEnabled = HealthModeHelper.ComputeKPoorEnabled(environment.ManiaHealthMode, environment.BmsPoorHitResultEnable);
 
             bool pillModeEnabled = environment.ManiaHealthMode.ToString().Contains("O2Jam");
-            var bms = noteStrategy as BmsHitModeJudgement;
+            var bms = noteStrategy as BmsJudgeModeJudgement;
             var judgementRound = createJudgementRound(environment, beatmap);
 
-            var hitWindowHelper = new HitModeHelper(environment.JudgeMode)
+            var hitWindowHelper = new JudgeModeHelper(environment.JudgeMode)
             {
                 OverallDifficulty = beatmap.Difficulty.OverallDifficulty,
                 BPM = resolveSimulationBpm(beatmap, 0, environment.JudgeMode),
@@ -285,7 +285,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     // 局内 OnReleased 先判尾、后写 Body，因此这一投看到的 Body 断连必然仍是 false：
                     // 由「提前松手」反推 HoldBroken 会把合法的提前松手压成 Meh（Common，Lazer/Classic）或直接否决（O2）。
                     // 仅 BMS 尾语义按自身规则消费 HoldBroken。
-                    if (HitModeHelper.IsBMSHitMode(environment.JudgeMode) && !input.IsPress && isTail && headHit && wasHoldingBeforeEvent && rawOffset < 0)
+                    if (JudgeModeHelper.IsBMSJudgeMode(environment.JudgeMode) && !input.IsPress && isTail && headHit && wasHoldingBeforeEvent && rawOffset < 0)
                         selected.HoldBroken = true;
 
                     if (input.IsPress && target is HeadNote headNote && holdByHead.TryGetValue(headNote, out var hold))
@@ -300,7 +300,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
                     if (isTail)
                     {
-                        if (judgementRound.IsEzHitMode)
+                        if (judgementRound.IsEzJudgeMode)
                         {
                             var tailEval = ManiaJudgementKernel.EvaluateHoldTail(new ManiaJudgementKernel.HoldTailEvaluationRequest
                             {
@@ -350,7 +350,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
                             // Lazer / Classic：窗外 None → 不判尾（断连 / 重臂 / auto-miss）；
                             // Miss 窗内 ResultFor=Miss 须落判（对齐 DrawableHoldNoteTail），不得吞成 None。
-                            if (!judgementRound.IsEzHitMode && result == HitResult.None)
+                            if (!judgementRound.IsEzJudgeMode && result == HitResult.None)
                             {
                                 // [parity] 本次松手未判定尾键 → 检查是否构成断连（Body ComboBreak）。
                                 if (!input.IsPress)
@@ -363,15 +363,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     {
                         var sessionOutcome = bms.EvaluateSessionPress(bmsWindows, timeOffsetForJudgement, selected.BmsRoute, poorEnabled);
 
-                        if (sessionOutcome.Kind == BmsHitModeJudgement.SessionPressKind.None)
+                        if (sessionOutcome.Kind == BmsJudgeModeJudgement.SessionPressKind.None)
                             return;
 
-                        if (sessionOutcome.Kind == BmsHitModeJudgement.SessionPressKind.DispatchExtra)
+                        if (sessionOutcome.Kind == BmsJudgeModeJudgement.SessionPressKind.DispatchExtra)
                         {
                             ApplyTransientResult(
                                 scoreProcessor,
                                 target,
-                                BmsHitModeJudgement.MapTo(sessionOutcome.Judge),
+                                BmsJudgeModeJudgement.MapTo(sessionOutcome.Judge),
                                 ComputeStoredTimeOffset(input.Time, target),
                                 input.Time,
                                 gameplayRate,
@@ -379,10 +379,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                             return;
                         }
 
-                        result = BmsHitModeJudgement.MapTo(sessionOutcome.Judge);
+                        result = BmsJudgeModeJudgement.MapTo(sessionOutcome.Judge);
                         selected.BmsRoute.CanRouteToKPoor = sessionOutcome.EnableCanRouteToKPoor;
                     }
-                    else if (judgementRound.IsEzHitMode)
+                    else if (judgementRound.IsEzJudgeMode)
                     {
                         var noteEval = ManiaJudgementKernel.EvaluateNote(new ManiaJudgementKernel.NoteEvaluationRequest
                         {
@@ -508,7 +508,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                             && holdByHead.TryGetValue(head, out var judgedHold))
                         {
                             var state = getEz2AcState(ez2AcHoldStates, judgedHold);
-                            state.OnHeadJudged(Ez2AcHitModeJudgement.FromHitResult(result), preHeld: wasHoldingBeforeEvent);
+                            state.OnHeadJudged(Ez2AcJudgeModeJudgement.FromHitResult(result), preHeld: wasHoldingBeforeEvent);
                         }
                     }
                 } // processInputEventCore
@@ -780,7 +780,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         continue;
 
                     // 涨 combo 由态机（是否已接上/未断开）+ 按住决定；不另查 head 档位。
-                    var result = Ez2AcHitModeJudgement.Instance.EvaluateTick(state, holding);
+                    var result = Ez2AcJudgeModeJudgement.Instance.EvaluateTick(state, holding);
                     judgedTicks.Add(tick);
                     // 与 Drawable 到点结算对齐：事件时间取 tick.StartTime，TimeOffset≈0。
                     ApplyAuxiliaryResult(
@@ -877,7 +877,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     if (!evaluation.BmsAction.Handled || !evaluation.BmsAction.ApplyFinal)
                         return false;
 
-                    result = BmsHitModeJudgement.MapTo(evaluation.BmsAction.Judge);
+                    result = BmsJudgeModeJudgement.MapTo(evaluation.BmsAction.Judge);
                     return result != HitResult.None;
 
                 default:
@@ -906,7 +906,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             if (evaluation.BmsAction.Handled && evaluation.BmsAction.ApplyFinal)
             {
-                result = BmsHitModeJudgement.MapTo(evaluation.BmsAction.Judge);
+                result = BmsJudgeModeJudgement.MapTo(evaluation.BmsAction.Judge);
                 return result != HitResult.None;
             }
 
@@ -937,7 +937,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 laneStates,
                 inputTime,
                 environment.JudgePrecedence,
-                HitModeHelper.IsBMSHitMode(environment.JudgeMode));
+                JudgeModeHelper.IsBMSJudgeMode(environment.JudgeMode));
         }
 
         /// <summary>
@@ -1082,7 +1082,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             List<LaneTargetState> laneStates,
             IBeatmap beatmap,
             double eventTime,
-            HitModeHelper hitWindowHelper,
+            JudgeModeHelper hitWindowHelper,
             EzEnumJudgeMode judgeMode)
         {
             if (laneStates.Count == 0)
@@ -1096,10 +1096,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             double baseEarlyWindow = hitWindowHelper.WindowFor(HitResult.Miss, true);
             double baseLateWindow = hitWindowHelper.WindowFor(HitResult.Miss, false);
 
-            if (HitModeHelper.IsBMSHitMode(judgeMode))
+            if (JudgeModeHelper.IsBMSJudgeMode(judgeMode))
             {
                 double lenienceForBms = 1;
-                BmsHitModeJudgement.ExpandMissCollectionWindows(hitWindowHelper, lenienceForBms, ref baseEarlyWindow, ref baseLateWindow);
+                BmsJudgeModeJudgement.ExpandMissCollectionWindows(hitWindowHelper, lenienceForBms, ref baseEarlyWindow, ref baseLateWindow);
             }
 
             // 二分查找定位第一个 StartTime >= eventTime - missLateWindow 的位置。
@@ -1140,8 +1140,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 double missEarlyWindow = hitWindowHelper.WindowFor(HitResult.Miss, true) * lenienceFactor;
                 double missLateWindow = hitWindowHelper.WindowFor(HitResult.Miss, false) * lenienceFactor;
 
-                if (HitModeHelper.IsBMSHitMode(judgeMode))
-                    BmsHitModeJudgement.ExpandMissCollectionWindows(hitWindowHelper, lenienceFactor, ref missEarlyWindow, ref missLateWindow);
+                if (JudgeModeHelper.IsBMSJudgeMode(judgeMode))
+                    BmsJudgeModeJudgement.ExpandMissCollectionWindows(hitWindowHelper, lenienceFactor, ref missEarlyWindow, ref missLateWindow);
 
                 double minTime = state.Target.StartTime - missEarlyWindow;
                 double maxTime = state.Target.StartTime + missLateWindow;
@@ -1157,7 +1157,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         private static double resolveSimulationBpm(IBeatmap beatmap, double time, EzEnumJudgeMode judgeMode)
         {
             if (judgeMode == EzEnumJudgeMode.O2Jam)
-                return O2HitModeExtension.GetBPMAtTime(time);
+                return O2JudgeModeExtension.GetBPMAtTime(time);
 
             return getBpmAtTime(beatmap, time);
         }
@@ -1193,7 +1193,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             JudgementResultTimingHelper.ApplyTiming(judgementResult, timeOffset, gameplayRate);
 
             if (result == HitResult.Miss
-                || (result == HitResult.Meh && HitModeHelper.MehBreaksCombo(judgeMode)))
+                || (result == HitResult.Meh && JudgeModeHelper.MehBreaksCombo(judgeMode)))
             {
                 judgementResult.IsComboHit = false;
             }
@@ -1251,7 +1251,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             if (activeHead == null)
                 return;
 
-            if (MalodyHitModeJudgement.IsMalodyMode(environment.JudgeMode)
+            if (MalodyJudgeModeJudgement.IsMalodyMode(environment.JudgeMode)
                 || environment.JudgeMode == EzEnumJudgeMode.EZ2AC)
                 return;
 
@@ -1279,7 +1279,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             if (state == null || state.Judged)
                 return;
 
-            // 首次断连已落 Body 判定（final）；后续松手只在允许多次断连的 hitmode 下补发瞬态 ComboBreak。
+            // 首次断连已落 Body 判定（final）；后续松手只在允许多次断连的 JudgeMode 下补发瞬态 ComboBreak。
             if (state.BodyJudged)
             {
                 if (!holdStrategy.AllowsRepeatedHoldBreak)

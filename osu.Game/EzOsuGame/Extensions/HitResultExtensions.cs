@@ -11,15 +11,15 @@ namespace osu.Game.EzOsuGame.Extensions
     public static class HitResultExtensions
     {
         /// <summary>
-        /// 获取指定 HitResult 在当前 HitMode 下的显示名称。
+        /// 获取指定 HitResult 在当前 JudgeMode 下的显示名称。
         /// </summary>
-        public static LocalisableString GetHitModeDisplayName(this HitResult result)
-            => result.GetHitModeDisplayName(GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode));
+        public static LocalisableString GetJudgeModeDisplayName(this HitResult result)
+            => result.GetJudgeModeDisplayName(GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode));
 
         /// <summary>
-        /// 获取指定 HitResult 在给定 HitMode 下的显示名称。
+        /// 获取指定 HitResult 在给定 JudgeMode 下的显示名称。
         /// </summary>
-        public static LocalisableString GetHitModeDisplayName(this HitResult result, EzEnumJudgeMode judgeMode)
+        public static LocalisableString GetJudgeModeDisplayName(this HitResult result, EzEnumJudgeMode judgeMode)
         {
             string displayName = getDisplayNameForMode(result, judgeMode);
 

@@ -39,7 +39,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         [Test]
         public void TestExtractDisplayCountsMatchesFilteredStatisticsTotal()
         {
-            var (score, beatmap, _) = HitModeReplayFixtures.CreateEz2AcManyNoteTap();
+            var (score, beatmap, _) = JudgeModeReplayFixtures.CreateEz2AcManyNoteTap();
             var sessionScore = ManiaReplaySession.Run(score.DeepClone(), beatmap, createSessionEnvironment(EzEnumJudgeMode.EZ2AC));
             var statistics = sessionScore.ScoreInfo.Statistics;
 
@@ -55,9 +55,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         }
 
         [Test]
-        public void TestSessionStatisticsChangeBetweenHitModes()
+        public void TestSessionStatisticsChangeBetweenJudgeModes()
         {
-            var (score, beatmap, _) = HitModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
+            var (score, beatmap, _) = JudgeModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
 
             var lazerEnv = createSessionEnvironment(EzEnumJudgeMode.Lazer);
             var bmsEnv = createSessionEnvironment(EzEnumJudgeMode.IIDX_HD) with { ManiaHealthMode = EzEnumHealthMode.IIDX_HD, BmsPoorHitResultEnable = true };

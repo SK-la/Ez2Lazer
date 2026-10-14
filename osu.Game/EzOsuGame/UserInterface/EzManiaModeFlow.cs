@@ -34,7 +34,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         private bool displayedHorizontal = true;
         private float lastAppliedWidth = -1f;
 
-        private IBindable<EzEnumJudgeMode> maniaHitModeBindable = null!;
+        private IBindable<EzEnumJudgeMode> maniaJudgeModeBindable = null!;
         private IBindable<EzEnumHealthMode> maniaHealthModeBindable = null!;
 
         [Resolved]
@@ -79,7 +79,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
         {
-            maniaHitModeBindable = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode);
+            maniaJudgeModeBindable = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
             maniaHealthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
         }
 
@@ -88,7 +88,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             base.LoadComplete();
 
             ruleset.BindValueChanged(_ => updateDisplay(), true);
-            maniaHitModeBindable.BindValueChanged(_ => updateDisplay(), true);
+            maniaJudgeModeBindable.BindValueChanged(_ => updateDisplay(), true);
             maniaHealthModeBindable.BindValueChanged(_ => updateDisplay(), true);
 
             updateBlockWidth();
@@ -130,7 +130,7 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             if (isMania)
             {
-                blockA.SetValues("Hit", EzScoreInfoExtensions.GetHitModeDisplayName((int)maniaHitModeBindable.Value));
+                blockA.SetValues("Hit", EzScoreInfoExtensions.GetJudgeModeDisplayName((int)maniaJudgeModeBindable.Value));
                 blockB.SetValues("HP", EzScoreInfoExtensions.GetHealthModeDisplayName((int)maniaHealthModeBindable.Value));
 
                 Show();
@@ -157,7 +157,7 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             foreach (EzEnumJudgeMode mode in Enum.GetValues<EzEnumJudgeMode>())
             {
-                widthMeasureText.Text = EzScoreInfoExtensions.GetHitModeDisplayName((int)mode);
+                widthMeasureText.Text = EzScoreInfoExtensions.GetJudgeModeDisplayName((int)mode);
                 maxContentWidth = Math.Max(maxContentWidth, maxLabelWidth + label_value_spacing + widthMeasureText.DrawWidth);
             }
 

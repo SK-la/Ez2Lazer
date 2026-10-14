@@ -19,9 +19,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TearDown() => ReplayJudgeTestConfig.ResetGlobalConfig();
 
         [Test]
-        public void TestBmsHitModeLazerHealthProducesNoExtraPoorFromKPoorRouting()
+        public void TestBmsJudgeModeLazerHealthProducesNoExtraPoorFromKPoorRouting()
         {
-            var (score, beatmap, bmsHealthEnv) = HitModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
+            var (score, beatmap, bmsHealthEnv) = JudgeModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
             var lazerHealthEnv = bmsHealthEnv with { ManiaHealthMode = EzEnumHealthMode.Lazer };
 
             var withBmsHealth = ManiaReplaySession.Run(score.DeepClone(), beatmap, bmsHealthEnv);
@@ -46,7 +46,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TestResolveEnvironmentForStoredUsesEmbeddedModesOrLazerFallback()
         {
             var config = GlobalConfigStore.EzConfig;
-            config.SetValue(Ez2Setting.ManiaHitMode, EzEnumJudgeMode.IIDX_HD);
+            config.SetValue(Ez2Setting.ManiaJudgeMode, EzEnumJudgeMode.IIDX_HD);
             config.SetValue(Ez2Setting.ManiaHealthMode, EzEnumHealthMode.Lazer);
             config.SetValue(Ez2Setting.OffsetPlusMania, 25.0);
 

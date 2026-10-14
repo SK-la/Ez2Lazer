@@ -7,7 +7,7 @@ using osu.Game.Rulesets.Scoring;
 namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Replicas
 {
     /// <summary>
-    /// Lazer/Classic hold 判定 replica；Ez HitMode 已迁至 <see cref="Mappings"/>。
+    /// Lazer/Classic hold 判定 replica；Ez JudgeMode 已迁至 <see cref="Mappings"/>。
     /// </summary>
     public sealed class CommonHoldJudgementStrategy : IManiaHoldJudgementStrategy
     {

@@ -19,7 +19,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
         private static long autoMissSkipped;
         private static long missStoredOffsetResolves;
 
-        // 「一个实例一个 hitmode」的缺陷信号：故意不受 EzJudgmentDiagnostics.Enabled 控制，
+        // 「一个实例一个 JudgeMode」的缺陷信号：故意不受 EzJudgmentDiagnostics.Enabled 控制，
         // 否则诊断开关关掉时缺陷会被静默吞掉。
         private static long beatmapRebindConflicts;
         private static long judgementResultDowngrades;
@@ -57,7 +57,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
 
         public static long MissStoredOffsetResolves => Interlocked.Read(ref missStoredOffsetResolves);
 
-        /// <summary><c>ManiaBeatmapBinding</c> 观察到的「同一实例被绑到不同 hitmode」次数。</summary>
+        /// <summary><c>ManiaBeatmapBinding</c> 观察到的「同一实例被绑到不同 JudgeMode」次数。</summary>
         public static long BeatmapRebindConflicts => Interlocked.Read(ref beatmapRebindConflicts);
 
         /// <summary><c>ManiaEzDrawableJudgement.SanitizeResult</c> 实际降级次数。</summary>

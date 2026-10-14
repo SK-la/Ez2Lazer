@@ -275,7 +275,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             using (var stream = resources.GetStream(fixture.OsrResource))
                 score = decoder.Parse(stream);
 
-            // Classic：丢弃 Lazer 解码嵌入 Statistics/分数，只保留 Replay 帧；Mods/HitMode 按静态契约注入。
+            // Classic：丢弃 Lazer 解码嵌入 Statistics/分数，只保留 Replay 帧；Mods/JudgeMode 按静态契约注入。
             if (!fixture.AssertDecodedHeader)
                 prepareScoreForClassicSession(score, fixture);
 
@@ -395,8 +395,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var sb = new StringBuilder();
             sb.AppendLine($"fixture: {fixture.Name}");
             sb.AppendLine($"osr: {fixture.OsrResource}");
-            sb.AppendLine($"hitMode: {fixture.JudgeMode}");
-            sb.AppendLine($"env: HitMode={fixture.JudgeMode} HealthMode=Lazer JudgePrecedence=Earliest OffsetPlusMania=0");
+            sb.AppendLine($"judgeMode: {fixture.JudgeMode}");
+            sb.AppendLine($"env: JudgeMode={fixture.JudgeMode} HealthMode=Lazer JudgePrecedence=Earliest OffsetPlusMania=0");
             sb.AppendLine($"header-anchor: acc={fixture.ExpectedAccuracy:R} total={fixture.ExpectedTotalScore} combo={fixture.ExpectedMaxCombo}");
             sb.AppendLine($"session-anchor: acc={fixture.SessionAccuracy:R} total={fixture.SessionTotalScore} combo={fixture.SessionMaxCombo}");
             sb.AppendLine($"session: acc={score.ScoreInfo.Accuracy:R} rank={score.ScoreInfo.Rank} total={score.ScoreInfo.TotalScore} combo={score.ScoreInfo.MaxCombo}");

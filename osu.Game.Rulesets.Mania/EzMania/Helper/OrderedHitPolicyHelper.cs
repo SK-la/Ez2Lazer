@@ -49,7 +49,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             var ezConfig1 = GlobalConfigStore.EzConfig;
 
             // 取普通值：同一按键里 isBMS() 要读一次，且该设置局内不变，无需为它常驻订阅。
-            judgeMode = ezConfig1.Get<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode);
+            judgeMode = ezConfig1.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
 
             // 取普通值：每次按键都要用，且该设置局内不变，无需为它常驻订阅。
             JudgePrecedence = ezConfig1.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence);
@@ -406,7 +406,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         }
 
         private bool isBMS()
-            => HitModeHelper.IsBMSHitMode(judgeMode);
+            => JudgeModeHelper.IsBMSJudgeMode(judgeMode);
 
         public static DrawableHitObject? SelectFoldDrawable(IReadOnlyList<DrawableHitObject> sortedByStartTime, double pressTime, bool comboAlgorithm)
         {

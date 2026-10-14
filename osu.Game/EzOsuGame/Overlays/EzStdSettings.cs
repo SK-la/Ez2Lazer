@@ -13,7 +13,7 @@ using osu.Game.Screens.Play.PlayerSettings;
 namespace osu.Game.EzOsuGame.Overlays
 {
     /// <summary>
-    /// Ez Osu 设置：StdHitMode 判定轨与进阶偏移。
+    /// Ez Osu 设置：StdJudgeMode 判定轨与进阶偏移。
     /// </summary>
     public partial class EzStdSettings : EzEnvironmentSettingsSubsection
     {
@@ -22,7 +22,7 @@ namespace osu.Game.EzOsuGame.Overlays
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
         {
-            var judgementTrack = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.StdHitMode);
+            var judgementTrack = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode);
             var offsetNonMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania);
 
             Children = new Drawable[]

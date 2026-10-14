@@ -31,9 +31,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
         public int O2CoolCombo { get; set; }
     }
 
-    public sealed class O2HitModeJudgement : IManiaHitModeJudgement
+    public sealed class O2JudgeModeJudgement : IManiaJudgeModeJudgement
     {
-        public static O2HitModeJudgement Instance { get; } = new O2HitModeJudgement();
+        public static O2JudgeModeJudgement Instance { get; } = new O2JudgeModeJudgement();
 
         // O2 首次断连即封掉后续输入（ApplyDrawableHoldBreakUpdate），Body 维持单次。
         public bool AllowsRepeatedHoldBreak => false;
@@ -80,7 +80,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
         public ManiaNoteJudgementOutcome EvaluateAutoMiss(double timeOffset, HitWindows hitWindows, double bpm)
         {
             bool canHit = bpm > 0
-                ? O2HitModeExtension.CanBeHit(timeOffset, bpm, ManiaJudgementRound.GetTotalMultiplier(hitWindows))
+                ? O2JudgeModeExtension.CanBeHit(timeOffset, bpm, ManiaJudgementRound.GetTotalMultiplier(hitWindows))
                 : hitWindows.CanBeHit(timeOffset);
 
             if (!canHit)
@@ -157,7 +157,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
         private static HitResult resolvePressResult(double timeOffset, HitWindows hitWindows, bool usePressTimeBpm, double bpm)
         {
             if (usePressTimeBpm && bpm > 0)
-                return O2HitModeExtension.ResultFor(timeOffset, bpm, ManiaJudgementRound.GetTotalMultiplier(hitWindows));
+                return O2JudgeModeExtension.ResultFor(timeOffset, bpm, ManiaJudgementRound.GetTotalMultiplier(hitWindows));
 
             return hitWindows.ResultFor(timeOffset);
         }
@@ -176,9 +176,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
 
         internal static void ApplyPillLogic(double absOffset, double bpm, ManiaReplayJudgementState state, ref O2Judge judge)
         {
-            double coolRange = O2HitModeExtension.BASE_COOL / bpm;
-            double goodRange = O2HitModeExtension.BASE_GOOD / bpm;
-            double badRange = O2HitModeExtension.BASE_BAD / bpm;
+            double coolRange = O2JudgeModeExtension.BASE_COOL / bpm;
+            double goodRange = O2JudgeModeExtension.BASE_GOOD / bpm;
+            double badRange = O2JudgeModeExtension.BASE_BAD / bpm;
 
             if (absOffset <= coolRange)
             {

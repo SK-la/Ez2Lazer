@@ -25,16 +25,16 @@ namespace osu.Game.EzOsuGame.Scoring
         /// 存量负值（EZ1 迁移、<c>.osr</c> 导入当年写入的 -1）按默认 Lazer 处理，不视为"无模式"。
         /// 判定为"非默认"只能靠值本身是否 != Lazer，不能靠是否有值。
         /// </remarks>
-        public static bool TryGetManiaGameplayModes(this ScoreInfo score, out int hitMode, out int healthMode)
+        public static bool TryGetManiaGameplayModes(this ScoreInfo score, out int judgeMode, out int healthMode)
         {
-            hitMode = score.ManiaHitMode;
+            judgeMode = score.ManiaHitMode;
             healthMode = score.ManiaHealthMode;
 
             if (score.Ruleset.OnlineID != 3)
                 return false;
 
-            if (hitMode < 0)
-                hitMode = (int)EzEnumJudgeMode.Lazer;
+            if (judgeMode < 0)
+                judgeMode = (int)EzEnumJudgeMode.Lazer;
 
             if (healthMode < 0)
                 healthMode = (int)EzEnumHealthMode.Lazer;
@@ -43,16 +43,16 @@ namespace osu.Game.EzOsuGame.Scoring
         }
 
         /// <summary>
-        /// Mania 展示层 HitMode：嵌入成绩 &gt; 局内全局（score 为 null）&gt; 旧成绩 Lazer 回退。
+        /// Mania 展示层 JudgeMode：嵌入成绩 &gt; 局内全局（score 为 null）&gt; 旧成绩 Lazer 回退。
         /// 供 HUD 判定计数器与 Ruleset 展示名共用。
         /// </summary>
-        public static EzEnumJudgeMode ResolveDisplayHitMode(ScoreInfo? score)
+        public static EzEnumJudgeMode ResolveDisplayJudgeMode(ScoreInfo? score)
         {
-            if (score != null && score.TryGetManiaGameplayModes(out int hitMode, out _))
-                return (EzEnumJudgeMode)hitMode;
+            if (score != null && score.TryGetManiaGameplayModes(out int judgeMode, out _))
+                return (EzEnumJudgeMode)judgeMode;
 
             if (score == null)
-                return GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode);
+                return GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
 
             return EzEnumJudgeMode.Lazer;
         }
@@ -63,11 +63,11 @@ namespace osu.Game.EzOsuGame.Scoring
                 return;
 
             // 游玩与 Replay 结束进结算均写入当场 Drawable 环境，供 ForStored 解析与左栏 Statistics 对齐。
-            score.ManiaHitMode = snapshot.HitMode;
+            score.ManiaHitMode = snapshot.JudgeMode;
             score.ManiaHealthMode = snapshot.HealthMode;
         }
 
-        public static string GetHitModeDisplayName(int hitMode) => getEnumDescription<EzEnumJudgeMode>(hitMode);
+        public static string GetJudgeModeDisplayName(int judgeMode) => getEnumDescription<EzEnumJudgeMode>(judgeMode);
 
         public static string GetHealthModeDisplayName(int healthMode) => getEnumDescription<EzEnumHealthMode>(healthMode);
 
@@ -82,9 +82,9 @@ namespace osu.Game.EzOsuGame.Scoring
             if (score.Ruleset.ShortName != "osu")
                 return false;
 
-            stdMode = score.StdHitMode >= 0
-                ? score.StdHitMode
-                : (int)GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.StdHitMode);
+            stdMode = score.StdJudgeMode >= 0
+                ? score.StdJudgeMode
+                : (int)GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode);
 
             return true;
         }
@@ -95,9 +95,9 @@ namespace osu.Game.EzOsuGame.Scoring
         /// </summary>
         public static Drawable CreateDisplayDrawable(ScoreInfo score, float fontSize = 11, Anchor anchor = Anchor.TopLeft)
         {
-            if (score.TryGetManiaGameplayModes(out int hitMode, out int healthMode))
+            if (score.TryGetManiaGameplayModes(out int judgeMode, out int healthMode))
             {
-                if (hitMode == (int)EzEnumJudgeMode.Lazer && healthMode == (int)EzEnumHealthMode.Lazer)
+                if (judgeMode == (int)EzEnumJudgeMode.Lazer && healthMode == (int)EzEnumHealthMode.Lazer)
                     return createPlaceholder(anchor);
 
                 return new FillFlowContainer
@@ -109,7 +109,7 @@ namespace osu.Game.EzOsuGame.Scoring
                     Spacing = new Vector2(0, 2),
                     Children = new[]
                     {
-                        createModeLine("Hit", GetHitModeDisplayName(hitMode), fontSize, anchor),
+                        createModeLine("Hit", GetJudgeModeDisplayName(judgeMode), fontSize, anchor),
                         createModeLine("HP", GetHealthModeDisplayName(healthMode), fontSize, anchor),
                     }
                 };
@@ -126,7 +126,7 @@ namespace osu.Game.EzOsuGame.Scoring
                     Spacing = new Vector2(0, 2),
                     Children = new[]
                     {
-                        createModeLine("Judge", GetHitModeDisplayName(stdMode), fontSize, anchor),
+                        createModeLine("Judge", GetJudgeModeDisplayName(stdMode), fontSize, anchor),
                     }
                 };
             }

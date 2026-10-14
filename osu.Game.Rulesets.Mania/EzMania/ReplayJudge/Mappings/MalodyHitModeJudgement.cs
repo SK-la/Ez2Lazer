@@ -17,9 +17,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
         Miss,
     }
 
-    public sealed class MalodyHitModeJudgement : IManiaHitModeJudgement
+    public sealed class MalodyJudgeModeJudgement : IManiaJudgeModeJudgement
     {
-        public static MalodyHitModeJudgement Instance { get; } = new MalodyHitModeJudgement();
+        public static MalodyJudgeModeJudgement Instance { get; } = new MalodyJudgeModeJudgement();
 
         // Malody LN 松手记 IgnoreHit（不断连），Body 维持单次。
         public bool AllowsRepeatedHoldBreak => false;

@@ -110,7 +110,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         [TestCaseSource(nameof(recalculation_cases))]
-        public async Task TestRecalcLoopAbcdAllHitModePairs(RecalculationFixtureCase testCase)
+        public async Task TestRecalcLoopAbcdAllJudgeModePairs(RecalculationFixtureCase testCase)
         {
             var nowScoreInfo = await runForLiveScoreInfo(testCase.CreateFixture, testCase.SourceEnvironment, testCase.TargetEnvironment).ConfigureAwait(true);
             var now = snapshot(nowScoreInfo);
@@ -134,7 +134,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var listAfterRecalc = snapshot(recalculatedScoreInfo);
             assertEquivalent(listAfterRecalc, now, $"{testCase.Name}: a(list after recalc) vs b(Now)");
 
-            Assert.That(recalculatedScoreInfo.ManiaHitMode, Is.EqualTo(expectedPersistedHitMode(testCase.TargetEnvironment)), $"{testCase.Name}: recalculated hit mode");
+            Assert.That(recalculatedScoreInfo.ManiaHitMode, Is.EqualTo(expectedPersistedJudgeMode(testCase.TargetEnvironment)), $"{testCase.Name}: recalculated hit mode");
             Assert.That(recalculatedScoreInfo.ManiaHealthMode, Is.EqualTo(expectedPersistedHealthMode(testCase.TargetEnvironment)), $"{testCase.Name}: recalculated health mode");
 
             var (storedScore, storedBeatmap, _) = testCase.CreateFixture();
@@ -166,9 +166,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         {
             yield return new AnalysisFixtureCase("Lazer tap", LazerTapReplayFixtures.CreateTwoNoteColumnTap, ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer));
             yield return new AnalysisFixtureCase("IIDX tap", BmsTapReplayFixtures.CreateTwoNoteColumnTap, ReplayJudgeTestConfig.Create(EzEnumJudgeMode.IIDX_HD, EzEnumHealthMode.IIDX_HD));
-            yield return new AnalysisFixtureCase("EZ2AC tap", () => HitModeReplayFixtures.CreateEz2AcManyNoteTap(), ReplayJudgeTestConfig.Create(EzEnumJudgeMode.EZ2AC, EzEnumHealthMode.Ez2Ac));
-            yield return new AnalysisFixtureCase("O2Jam tap", HitModeReplayFixtures.CreateO2TwoNoteTap, ReplayJudgeTestConfig.Create(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal));
-            yield return new AnalysisFixtureCase("Malody hold", () => HitModeReplayFixtures.CreateMalodyHoldPerfect(EzEnumJudgeMode.Malody_E), ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Malody_E, EzEnumHealthMode.Lazer));
+            yield return new AnalysisFixtureCase("EZ2AC tap", () => JudgeModeReplayFixtures.CreateEz2AcManyNoteTap(), ReplayJudgeTestConfig.Create(EzEnumJudgeMode.EZ2AC, EzEnumHealthMode.Ez2Ac));
+            yield return new AnalysisFixtureCase("O2Jam tap", JudgeModeReplayFixtures.CreateO2TwoNoteTap, ReplayJudgeTestConfig.Create(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal));
+            yield return new AnalysisFixtureCase("Malody hold", () => JudgeModeReplayFixtures.CreateMalodyHoldPerfect(EzEnumJudgeMode.Malody_E), ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Malody_E, EzEnumHealthMode.Lazer));
         }
 
         private static IEnumerable<RecalculationFixtureCase> recalculation_cases()
@@ -181,13 +181,13 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             yield return new RecalculationFixtureCase("Lazer -> Lazer", LazerTapReplayFixtures.CreateTwoNoteColumnTap, lazer, lazer);
             yield return new RecalculationFixtureCase("IIDX -> IIDX", BmsTapReplayFixtures.CreateTwoNoteColumnTap, iidx, iidx);
-            yield return new RecalculationFixtureCase("EZ2AC -> EZ2AC", () => HitModeReplayFixtures.CreateEz2AcManyNoteTap(), ez2AC, ez2AC);
-            yield return new RecalculationFixtureCase("O2Jam -> O2Jam", HitModeReplayFixtures.CreateO2TwoNoteTap, o2Jam, o2Jam);
+            yield return new RecalculationFixtureCase("EZ2AC -> EZ2AC", () => JudgeModeReplayFixtures.CreateEz2AcManyNoteTap(), ez2AC, ez2AC);
+            yield return new RecalculationFixtureCase("O2Jam -> O2Jam", JudgeModeReplayFixtures.CreateO2TwoNoteTap, o2Jam, o2Jam);
             yield return new RecalculationFixtureCase("Lazer -> IIDX", LazerTapReplayFixtures.CreateTwoNoteColumnTap, lazer, iidx);
             yield return new RecalculationFixtureCase("IIDX -> Lazer", BmsTapReplayFixtures.CreateTwoNoteColumnTap, iidx, lazer);
             yield return new RecalculationFixtureCase("Lazer -> EZ2AC", LazerTapReplayFixtures.CreateTwoNoteColumnTap, lazer, ez2AC);
-            yield return new RecalculationFixtureCase("O2Jam -> Lazer", HitModeReplayFixtures.CreateO2TwoNoteTap, o2Jam, lazer);
-            yield return new RecalculationFixtureCase("Malody -> IIDX", () => HitModeReplayFixtures.CreateMalodyHoldPerfect(EzEnumJudgeMode.Malody_E), malody, iidx);
+            yield return new RecalculationFixtureCase("O2Jam -> Lazer", JudgeModeReplayFixtures.CreateO2TwoNoteTap, o2Jam, lazer);
+            yield return new RecalculationFixtureCase("Malody -> IIDX", () => JudgeModeReplayFixtures.CreateMalodyHoldPerfect(EzEnumJudgeMode.Malody_E), malody, iidx);
         }
 
         private static async Task<ScoreInfo> scoreInfoFromRunRequestAsync(ManiaReplaySessionService service, Score score, IBeatmap beatmap)
@@ -257,9 +257,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         private static string describeSnapshot(ScoreSnapshot snapshot)
-            => $"acc={snapshot.Accuracy:F8} score={snapshot.TotalScore} hitMode={snapshot.ManiaHitMode} health={snapshot.ManiaHealthMode} stats=[{ManiaReplayParityHelper.DescribeStatistics(snapshot.Statistics)}]";
+            => $"acc={snapshot.Accuracy:F8} score={snapshot.TotalScore} judgeMode={snapshot.ManiaJudgeMode} health={snapshot.ManiaHealthMode} stats=[{ManiaReplayParityHelper.DescribeStatistics(snapshot.Statistics)}]";
 
-        private static int expectedPersistedHitMode(GameplayEnvironment environment)
+        private static int expectedPersistedJudgeMode(GameplayEnvironment environment)
             => (int)environment.JudgeMode;
 
         private static int expectedPersistedHealthMode(GameplayEnvironment environment)
@@ -288,7 +288,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             Dictionary<HitResult, int> MaximumStatistics,
             double Accuracy,
             long TotalScore,
-            int ManiaHitMode,
+            int ManiaJudgeMode,
             int ManiaHealthMode);
     }
 }

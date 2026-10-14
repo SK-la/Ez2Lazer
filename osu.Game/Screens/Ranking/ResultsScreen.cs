@@ -225,8 +225,8 @@ namespace osu.Game.Screens.Ranking
         {
             base.LoadComplete();
 
-            environmentControls.HitModeBindable.BindValueChanged(_ => invalidateDisplayedAnalysis());
-            environmentControls.StdHitModeBindable.BindValueChanged(_ => invalidateDisplayedAnalysis());
+            environmentControls.JudgeModeBindable.BindValueChanged(_ => invalidateDisplayedAnalysis());
+            environmentControls.StdJudgeModeBindable.BindValueChanged(_ => invalidateDisplayedAnalysis());
             environmentControls.HealthModeBindable.BindValueChanged(_ => invalidateDisplayedAnalysis());
 
             StatisticsPanel.State.BindValueChanged(onStatisticsStateChanged, true);
@@ -287,7 +287,7 @@ namespace osu.Game.Screens.Ranking
             if (displayedScore == null)
                 return;
 
-            // 回放重跑以 Replay.Frames + 当前 ForLive HitMode 为准；StatisticsPanel / EzGraph 经 Session 产出展示，
+            // 回放重跑以 Replay.Frames + 当前 ForLive JudgeMode 为准；StatisticsPanel / EzGraph 经 Session 产出展示，
             // 不 patch 存储 HitEvents，也不 rejudge 嵌入判定。
             StatisticsPanel.Score.TriggerChange();
         }

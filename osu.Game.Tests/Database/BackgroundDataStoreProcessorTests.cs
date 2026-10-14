@@ -221,7 +221,7 @@ INSERT INTO schema_version (number) VALUES (3);";
         }
 
         /// <summary>
-        /// [Ez] 带 Ez 游玩模式嵌入（ManiaHitMode / ManiaHealthMode）的成绩不得被官方分数升级改写：
+        /// [Ez] 带 Ez 游玩模式嵌入（ManiaJudgeMode / ManiaHealthMode）的成绩不得被官方分数升级改写：
         /// 仅盖 TotalScoreVersion，Rank / TotalScore / Accuracy 保持原值。
         /// </summary>
         [TestCase(30000001)]
@@ -261,7 +261,7 @@ INSERT INTO schema_version (number) VALUES (3);";
         }
 
         /// <summary>
-        /// [Ez] 局内双 Lazer 成绩落库为 ManiaHitMode=0/HealthMode=0（官方语义），
+        /// [Ez] 局内双 Lazer 成绩落库为 ManiaJudgeMode=0/HealthMode=0（官方语义），
         /// 必须跟随 ppy 上游正常升级，不得被 Ez 豁免批次跳过。
         /// </summary>
         [Test]

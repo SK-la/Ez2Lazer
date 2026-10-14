@@ -24,7 +24,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
         }
 
         [Test]
-        public void TestBlocksNonLazerHitModeOnScoreSnapshot()
+        public void TestBlocksNonLazerJudgeModeOnScoreSnapshot()
         {
             var score = createManiaScore((int)EzEnumJudgeMode.O2Jam, (int)EzEnumHealthMode.Lazer);
 
@@ -79,10 +79,10 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             Assert.That(EzOnlineScoreSubmissionPolicy.AllowsOfficialSubmission(score), Is.True);
         }
 
-        private static ScoreInfo createManiaScore(int hitMode, int healthMode) => new ScoreInfo
+        private static ScoreInfo createManiaScore(int judgeMode, int healthMode) => new ScoreInfo
         {
             Ruleset = new ManiaRuleset().RulesetInfo,
-            ManiaHitMode = hitMode,
+            ManiaHitMode = judgeMode,
             ManiaHealthMode = healthMode,
         };
     }

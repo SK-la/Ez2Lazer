@@ -102,7 +102,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             Assert.That(document.BeatmapResource, Is.EqualTo(expectedBeatmapResource));
             Assert.That(document.FrameSource, Is.EqualTo("osr-decoded"));
             Assert.That(document.Frames, Has.Count.GreaterThan(100));
-            Assert.That(document.HitMode, Is.EqualTo(nameof(EzEnumJudgeMode.Lazer)));
+            Assert.That(document.JudgeMode, Is.EqualTo(nameof(EzEnumJudgeMode.Lazer)));
         }
 
         private static void runSessionFromAuditJson(string jsonResource)

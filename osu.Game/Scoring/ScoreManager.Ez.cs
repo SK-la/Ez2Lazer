@@ -25,7 +25,7 @@ namespace osu.Game.Scoring
             Dictionary<HitResult, int>? statistics = null;
             Dictionary<HitResult, int>? maximumStatistics = null;
             List<HitEvent>? hitEvents = null;
-            int? maniaHitMode = null;
+            int? maniaJudgeMode = null;
             int? maniaHealthMode = null;
 
             Realm.Write(realm =>
@@ -43,7 +43,7 @@ namespace osu.Game.Scoring
                 statistics = managed.Statistics.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
                 maximumStatistics = managed.MaximumStatistics.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
                 hitEvents = managed.HitEvents.ToList();
-                maniaHitMode = managed.ManiaHitMode;
+                maniaJudgeMode = managed.ManiaHitMode;
                 maniaHealthMode = managed.ManiaHealthMode;
             });
 
@@ -66,7 +66,7 @@ namespace osu.Game.Scoring
             foreach (var kvp in maximumStatistics!)
                 scoreInfo.MaximumStatistics[kvp.Key] = kvp.Value;
 
-            scoreInfo.ManiaHitMode = maniaHitMode!.Value;
+            scoreInfo.ManiaHitMode = maniaJudgeMode!.Value;
             scoreInfo.ManiaHealthMode = maniaHealthMode!.Value;
             scoreInfo.EzBonus = sessionInfo.EzBonus;
 

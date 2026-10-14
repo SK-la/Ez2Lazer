@@ -14,12 +14,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
     {
         [TestCase(0, 0)]
         [TestCase(-1, -1)]
-        public void TestDefaultAndLegacyModesReadAsLazer(int hitMode, int healthMode)
+        public void TestDefaultAndLegacyModesReadAsLazer(int judgeMode, int healthMode)
         {
-            var score = createScore(hitMode, healthMode);
+            var score = createScore(judgeMode, healthMode);
 
-            Assert.That(score.TryGetManiaGameplayModes(out int resolvedHitMode, out int resolvedHealthMode), Is.True);
-            Assert.That(resolvedHitMode, Is.EqualTo((int)EzEnumJudgeMode.Lazer));
+            Assert.That(score.TryGetManiaGameplayModes(out int resolvedJudgeMode, out int resolvedHealthMode), Is.True);
+            Assert.That(resolvedJudgeMode, Is.EqualTo((int)EzEnumJudgeMode.Lazer));
             Assert.That(resolvedHealthMode, Is.EqualTo((int)EzEnumHealthMode.Lazer));
         }
 
@@ -27,17 +27,17 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         [TestCase(-1, -1, false)]
         [TestCase((int)EzEnumJudgeMode.EZ2AC, (int)EzEnumHealthMode.Ez2Ac, true)]
         [TestCase((int)EzEnumJudgeMode.EZ2AC, (int)EzEnumHealthMode.Lazer, true)]
-        public void TestBadgeOnlyForEzPrivateModes(int hitMode, int healthMode, bool expectsBadge)
+        public void TestBadgeOnlyForEzPrivateModes(int judgeMode, int healthMode, bool expectsBadge)
         {
-            var score = createScore(hitMode, healthMode);
+            var score = createScore(judgeMode, healthMode);
 
             Assert.That(EzScoreInfoExtensions.CreateDisplayDrawable(score) is FillFlowContainer, Is.EqualTo(expectsBadge));
         }
 
-        private static ScoreInfo createScore(int hitMode, int healthMode) => new ScoreInfo
+        private static ScoreInfo createScore(int judgeMode, int healthMode) => new ScoreInfo
         {
             Ruleset = new ManiaRuleset().RulesetInfo,
-            ManiaHitMode = hitMode,
+            ManiaHitMode = judgeMode,
             ManiaHealthMode = healthMode,
         };
     }

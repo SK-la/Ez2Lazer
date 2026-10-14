@@ -14,7 +14,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var config = GlobalConfigStore.EzConfig;
             GlobalConfigStore.EzConfig = config;
 
-            config.SetValue(Ez2Setting.ManiaHitMode, environment.JudgeMode);
+            config.SetValue(Ez2Setting.ManiaJudgeMode, environment.JudgeMode);
             config.SetValue(Ez2Setting.ManiaHealthMode, environment.ManiaHealthMode);
             config.SetValue(Ez2Setting.JudgePrecedence, environment.JudgePrecedence);
             config.SetValue(Ez2Setting.OffsetPlusMania, environment.OffsetPlusMania);
@@ -51,7 +51,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             };
 
         /// <summary>
-        /// BMS HitMode + Lazer HealthMode：无 KPoor 机制（§6.4 标定环境）。
+        /// BMS JudgeMode + Lazer HealthMode：无 KPoor 机制（§6.4 标定环境）。
         /// </summary>
         public static GameplayEnvironment CreateBmsLazerHealth(
             EzEnumJudgeMode judgeMode,

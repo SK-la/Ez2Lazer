@@ -454,7 +454,7 @@ namespace osu.Game.Database
             if (score.ManiaHitMode > (int)EzEnumJudgeMode.Lazer)
             {
                 // 非官方判定语义成绩且无 replay：官方算法不理解 Ez 判定权重，重算只会破坏，保持原值。
-                // 双 Lazer（HitMode=0）是官方语义，继续走下方官方路径。
+                // 双 Lazer（JudgeMode=0）是官方语义，继续走下方官方路径。
                 Logger.Log($"Skipping Ez gameplay-mode score {id} without replay (official recalculation not applicable).");
                 return true;
             }
@@ -1842,12 +1842,12 @@ namespace osu.Game.Database
         }
 
         /// <summary>
-        /// [Ez] 带非官方判定语义（ManiaHitMode &gt; Lazer，即 EZ2AC / O2Jam / IIDX / … / Classic）的成绩
+        /// [Ez] 带非官方判定语义（ManiaJudgeMode &gt; Lazer，即 EZ2AC / O2Jam / IIDX / … / Classic）的成绩
         /// 不参与官方分数升级：官方 legacy 转换 / rank 重算 / mod 倍率升级都不理解 Ez 判定与计分语义
         /// （曾把成绩错转为 D + 超低分）。这里直接把 TotalScoreVersion 盖到最新，避免每次启动重查；
         /// 此类成绩仅能通过 Ez Session 重算刷新。
         /// 注意：Lazer（0，含存量 -1 的旧行）是官方语义，必须跟随 ppy 上游升级，
-        /// 因此判据只看 HitMode &gt; 0；HealthMode 只影响血量、与计分无关，不参与判断。
+        /// 因此判据只看 JudgeMode &gt; 0；HealthMode 只影响血量、与计分无关，不参与判断。
         /// </summary>
         private void stampEzGameplayModeScores()
         {

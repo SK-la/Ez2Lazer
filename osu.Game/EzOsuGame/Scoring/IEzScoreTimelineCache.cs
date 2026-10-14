@@ -7,7 +7,7 @@ namespace osu.Game.EzOsuGame.Scoring
 {
     /// <summary>
     /// Timeline 缓存接口。把 cache 收敛到 Session / 调用方生命周期，避免进程级缓存把
-    /// 不同上下文（HitMode / HealthMode / JudgePrecedence / Beatmap）的 timeline 互相覆盖，
+    /// 不同上下文（JudgeMode / HealthMode / JudgePrecedence / Beatmap）的 timeline 互相覆盖，
     /// 是修复"幽灵成绩停滞 0"问题的核心。
     /// </summary>
     public interface IEzScoreTimelineCache

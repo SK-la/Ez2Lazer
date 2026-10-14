@@ -18,7 +18,7 @@ namespace osu.Game.EzOsuGame.Scoring
     public static class EzScoreRacePlayableResolver
     {
         /// <summary>
-        /// 避开 Mania hitmode+1（通常为小数）占用带；同一 working+mods 的 Session 就绪谱共享此 scope。
+        /// 避开 Mania JudgeMode+1（通常为小数）占用带；同一 working+mods 的 Session 就绪谱共享此 scope。
         /// </summary>
         public const int SESSION_READY_SCOPE = 1000;
 

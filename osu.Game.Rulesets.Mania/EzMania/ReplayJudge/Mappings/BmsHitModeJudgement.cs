@@ -27,9 +27,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
         KPoor,
     }
 
-    public sealed class BmsHitModeJudgement : IManiaHitModeJudgement
+    public sealed class BmsJudgeModeJudgement : IManiaJudgeModeJudgement
     {
-        public static BmsHitModeJudgement Instance { get; } = new BmsHitModeJudgement();
+        public static BmsJudgeModeJudgement Instance { get; } = new BmsJudgeModeJudgement();
 
         public bool AllowsRepeatedHoldBreak => true;
 
@@ -118,10 +118,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
         public static double WindowFor(ManiaHitWindows windows, BmsJudge judge, bool early)
             => windows.WindowFor(MapTo(judge), early);
 
-        public static double WindowFor(HitModeHelper helper, BmsJudge judge, bool early)
+        public static double WindowFor(JudgeModeHelper helper, BmsJudge judge, bool early)
             => helper.WindowFor(MapTo(judge), early);
 
-        public static void ExpandMissCollectionWindows(HitModeHelper helper, double lenienceFactor, ref double missEarly, ref double missLate)
+        public static void ExpandMissCollectionWindows(JudgeModeHelper helper, double lenienceFactor, ref double missEarly, ref double missLate)
         {
             double badLateWindow = WindowFor(helper, BmsJudge.Bad, false) * lenienceFactor;
             double kPoorEarlyWindow = WindowFor(helper, BmsJudge.KPoor, true) * lenienceFactor;
@@ -178,7 +178,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
             IEnumerable<LaneTargetState> unjudgedCandidates,
             double inputTime,
             double offsetPlusMania,
-            HitModeHelper hitWindowHelper,
+            JudgeModeHelper hitWindowHelper,
             Action<HitObject, HitResult> applyTransient)
         {
             var postBadCandidate = laneStates
@@ -431,14 +431,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
             return BmsJudge.None;
         }
 
-        private static bool isWithinMissWindow(HitModeHelper hitWindowHelper, double noteTime, double inputTime)
+        private static bool isWithinMissWindow(JudgeModeHelper hitWindowHelper, double noteTime, double inputTime)
         {
             double early = hitWindowHelper.WindowFor(HitResult.Miss, true);
             double late = hitWindowHelper.WindowFor(HitResult.Miss, false);
             return inputTime >= noteTime - early && inputTime <= noteTime + late;
         }
 
-        private static double distanceToNonBadWindow(double noteTime, double inputTime, HitModeHelper hitWindowHelper)
+        private static double distanceToNonBadWindow(double noteTime, double inputTime, JudgeModeHelper hitWindowHelper)
         {
             double early = hitWindowHelper.WindowFor(HitResult.Good, true);
             double late = hitWindowHelper.WindowFor(HitResult.Good, false);

@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
     /// Malody 数据来自:  <see href="https://mzh.moegirl.org.cn/Malody#.E5.88.86.E6.95.B0"/>
     /// <para></para>
     /// O2Jam 由于机制过于复杂，这里简化忽略加成，只考虑50%比例；原始算法参考: <see href="https://games.sina.com.cn/o/z/jyt/2005-01-11/197476.shtml"/>/// </summary>
-    public partial class HitModeHelper
+    public partial class JudgeModeHelper
     {
         private static readonly double[,] hit_range_bms =
         {
@@ -112,7 +112,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             }
         }
 
-        public HitModeHelper(EzEnumJudgeMode judgeMode)
+        public JudgeModeHelper(EzEnumJudgeMode judgeMode)
         {
             JudgeMode = judgeMode;
             updateRanges();
@@ -499,7 +499,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         #region 公共静态工具
 
-        public static bool IsBMSHitMode(EzEnumJudgeMode judgeMode)
+        public static bool IsBMSJudgeMode(EzEnumJudgeMode judgeMode)
         {
             return judgeMode == EzEnumJudgeMode.IIDX_HD ||
                    judgeMode == EzEnumJudgeMode.LR2_HD ||
@@ -507,7 +507,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         }
 
         /// <summary>
-        /// 在指定 HitMode 下，<see cref="HitResult.Meh"/> 是否打断 Combo。
+        /// 在指定 JudgeMode 下，<see cref="HitResult.Meh"/> 是否打断 Combo。
         /// BMS / O2Jam 模式下 Meh 断 Combo，其余不断。
         /// </summary>
         public static bool MehBreaksCombo(EzEnumJudgeMode judgeMode)
@@ -536,7 +536,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             if (timeOffsetFromHit >= 0)
                 return true;
 
-            if (!IsBMSHitMode(mode))
+            if (!IsBMSJudgeMode(mode))
                 return true;
 
             double maxEarlyMs = mode switch
@@ -611,15 +611,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         };
 
         /// <summary>
-        /// 任一 hitmode 下可能出现的判定并集（判定池预热用）。
+        /// 任一 JudgeMode 下可能出现的判定并集（判定池预热用）。
         /// </summary>
         /// <remarks>
         /// 池缺项时 <c>JudgementPooler.Get</c> 返回 null，该判定会被静默跳过不显示；而当局用的
-        /// hitmode / 血量模式取自冻结环境（回放是成绩里嵌入的模式），可能与展示时的当前设置不同，
+        /// JudgeMode / 血量模式取自冻结环境（回放是成绩里嵌入的模式），可能与展示时的当前设置不同，
         /// 所以池内容不能按当前设置推导。
         /// </remarks>
         public static IReadOnlyList<HitResult> AllModeValidHitResults { get; } = Enum.GetValues<EzEnumJudgeMode>()
-                                                                                     .SelectMany(GetHitModeValidHitResults)
+                                                                                     .SelectMany(GetJudgeModeValidHitResults)
                                                                                      .Distinct()
                                                                                      .ToArray();
 
@@ -634,7 +634,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         public static IReadOnlyList<HitResult> AllModeDisplayableHitResults { get; } =
             AllModeValidHitResults.Where(r => r.IsBasic()).ToArray();
 
-        public static IReadOnlyList<HitResult> GetHitModeValidHitResults(EzEnumJudgeMode mode)
+        public static IReadOnlyList<HitResult> GetJudgeModeValidHitResults(EzEnumJudgeMode mode)
         {
             switch (mode)
             {
@@ -660,17 +660,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             }
         }
 
-        public static IReadOnlyList<HitResult> GetHitModeValidHitResults()
+        public static IReadOnlyList<HitResult> GetJudgeModeValidHitResults()
         {
-            var mode = GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode);
-            return GetHitModeValidHitResults(mode);
+            var mode = GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
+            return GetJudgeModeValidHitResults(mode);
         }
 
         /// <summary>
-        /// 按 <see cref="EzScoreInfoExtensions.ResolveDisplayHitMode"/> 解析展示用 HitMode 后返回有效判定集合。
+        /// 按 <see cref="EzScoreInfoExtensions.ResolveDisplayJudgeMode"/> 解析展示用 JudgeMode 后返回有效判定集合。
         /// </summary>
-        public static IReadOnlyList<HitResult> GetHitModeValidHitResultsForDisplay(ScoreInfo? score)
-            => GetHitModeValidHitResults(EzScoreInfoExtensions.ResolveDisplayHitMode(score));
+        public static IReadOnlyList<HitResult> GetJudgeModeValidHitResultsForDisplay(ScoreInfo? score)
+            => GetJudgeModeValidHitResults(EzScoreInfoExtensions.ResolveDisplayJudgeMode(score));
 
         #endregion
     }

@@ -92,7 +92,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             base.LoadComplete();
 
             drawableManiaRuleset ??= this.FindClosestParent<DrawableManiaRuleset>();
-            UsesEzJudgement = drawableManiaRuleset?.JudgementRound?.IsEzHitMode
+            UsesEzJudgement = drawableManiaRuleset?.JudgementRound?.IsEzJudgeMode
                               ?? (HitObject.HitWindows is ManiaHitWindows windows
                                   && windows.ActiveJudgeMode is not (EzEnumJudgeMode.Lazer or EzEnumJudgeMode.Classic));
             ColumnSchedulesAutoMiss = drawableManiaRuleset?.ColumnRoutesInput == true;
@@ -188,12 +188,12 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                     r.Type = data.result;
 
                     if (data.result == HitResult.Miss
-                        || (data.result == HitResult.Meh && HitModeHelper.MehBreaksCombo(data.hitMode)))
+                        || (data.result == HitResult.Meh && JudgeModeHelper.MehBreaksCombo(data.judgeMode)))
                     {
                         r.IsComboHit = false;
                     }
                 },
-                (result, hitMode: judgeMode),
+                (result, judgeMode: judgeMode),
                 ManiaDrawableMissTiming.ResolveStoredOffset(this));
         }
 

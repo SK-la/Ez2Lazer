@@ -22,7 +22,7 @@ using osu.Game.Tests.Beatmaps;
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 {
     /// <summary>
-    /// Lazer hitmode 下 LN 尾在 Session 里的结算：窗口内松手 → 命中；无窗口内松手边沿 → 尾 Miss（对齐上游被动 miss）。
+    /// Lazer JudgeMode 下 LN 尾在 Session 里的结算：窗口内松手 → 命中；无窗口内松手边沿 → 尾 Miss（对齐上游被动 miss）。
     /// </summary>
     /// <remarks>
     /// 这些是绝对期望，不是 Drawable/Session parity——parity 只保证两边一致，两边同错时依然会绿。
