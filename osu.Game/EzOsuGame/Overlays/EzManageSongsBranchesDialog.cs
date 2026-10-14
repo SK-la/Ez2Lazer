@@ -252,20 +252,16 @@ namespace osu.Game.EzOsuGame.Overlays
                                             RelativeSizeAxes = Axes.Both,
                                             Colour = colours.GreySeaFoamDarker,
                                         },
-                                        new Container
+                                        new OsuScrollContainer
                                         {
                                             RelativeSizeAxes = Axes.Both,
-                                            Padding = new MarginPadding(10),
-                                            Child = new OsuScrollContainer
+                                            Child = listFlow = new FillFlowContainer
                                             {
-                                                RelativeSizeAxes = Axes.Both,
-                                                Child = listFlow = new FillFlowContainer
-                                                {
-                                                    RelativeSizeAxes = Axes.X,
-                                                    AutoSizeAxes = Axes.Y,
-                                                    Direction = FillDirection.Vertical,
-                                                    Spacing = new Vector2(0, 8),
-                                                }
+                                                RelativeSizeAxes = Axes.X,
+                                                AutoSizeAxes = Axes.Y,
+                                                Direction = FillDirection.Vertical,
+                                                Padding = new MarginPadding { Horizontal = 12 },
+                                                Spacing = new Vector2(4, 8),
                                             }
                                         }
                                     }
