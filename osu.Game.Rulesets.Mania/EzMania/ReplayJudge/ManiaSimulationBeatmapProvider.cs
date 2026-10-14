@@ -60,15 +60,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 return null;
 
             var mods = EzModCompatibility.StripUnknown(scoreInfo.Mods);
-            EzEnumHitMode hitMode = environment.HitMode;
+            EzEnumJudgeMode judgeMode = environment.JudgeMode;
 
-            return EzPlayableBeatmapCache.GetBound(workingBeatmap, scoreInfo.Ruleset, mods, bindingScopeFor(hitMode),
-                playable => ManiaBeatmapBinding.BindForSimulation(playable, hitMode, providerOwned: true), cancellationToken);
+            return EzPlayableBeatmapCache.GetBound(workingBeatmap, scoreInfo.Ruleset, mods, bindingScopeFor(judgeMode),
+                playable => ManiaBeatmapBinding.BindForSimulation(playable, judgeMode, providerOwned: true), cancellationToken);
         }
 
         /// <remarks>
-        /// <see cref="EzEnumHitMode.Lazer"/> 是 0，而 0 是共享作用域，所以每个 hitmode 偏移 1 后才作为绑定作用域。
+        /// <see cref="EzEnumJudgeMode.Lazer"/> 是 0，而 0 是共享作用域，所以每个 hitmode 偏移 1 后才作为绑定作用域。
         /// </remarks>
-        private static int bindingScopeFor(EzEnumHitMode hitMode) => (int)hitMode + 1;
+        private static int bindingScopeFor(EzEnumJudgeMode judgeMode) => (int)judgeMode + 1;
     }
 }

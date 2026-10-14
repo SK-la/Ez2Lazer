@@ -14,15 +14,15 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
     [TestFixture]
     public class ManiaAutoMissDeadlineTest
     {
-        [TestCase(EzEnumHitMode.Lazer)]
-        [TestCase(EzEnumHitMode.IIDX_HD)]
-        [TestCase(EzEnumHitMode.O2Jam)]
-        public void NoteDeadlineUsesLateMissWindow(EzEnumHitMode hitMode)
+        [TestCase(EzEnumJudgeMode.Lazer)]
+        [TestCase(EzEnumJudgeMode.IIDX_HD)]
+        [TestCase(EzEnumJudgeMode.O2Jam)]
+        public void NoteDeadlineUsesLateMissWindow(EzEnumJudgeMode judgeMode)
         {
             var note = new Note
             {
                 StartTime = 1000,
-                HitWindows = new ManiaHitWindows(hitMode),
+                HitWindows = new ManiaHitWindows(judgeMode),
             };
             note.HitWindows.SetDifficulty(8);
 
@@ -41,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var note = new Note
             {
                 StartTime = 10_000,
-                HitWindows = new ManiaHitWindows(EzEnumHitMode.Lazer),
+                HitWindows = new ManiaHitWindows(EzEnumJudgeMode.Lazer),
             };
             note.HitWindows.SetDifficulty(8);
 

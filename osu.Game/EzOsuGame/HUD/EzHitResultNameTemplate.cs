@@ -8,7 +8,7 @@ namespace osu.Game.EzOsuGame.HUD
 {
     /// <summary>
     /// 将 <see cref="HitResult"/> 映射到 GameTheme/{theme}/judgement/ 下的资源文件夹名。
-    /// 各机种命名风格用一组独立的模板表达，通过 <see cref="EzEnumHitMode"/> 选择激活的模板。
+    /// 各机种命名风格用一组独立的模板表达，通过 <see cref="EzEnumJudgeMode"/> 选择激活的模板。
     /// </summary>
     /// <remarks>
     /// 返回的字符串需对应 <c>GameTheme/{theme}/judgement/{name}/</c> 子目录名或同级帧前缀，
@@ -19,27 +19,27 @@ namespace osu.Game.EzOsuGame.HUD
         /// <summary>
         /// 取得在指定模板下，<paramref name="result"/> 对应的资源文件夹名。
         /// </summary>
-        public static string GetResourceName(EzEnumHitMode template, HitResult result)
+        public static string GetResourceName(EzEnumJudgeMode template, HitResult result)
         {
             switch (template)
             {
-                case EzEnumHitMode.EZ2AC:
+                case EzEnumJudgeMode.EZ2AC:
                     return getEz2AcName(result);
 
-                case EzEnumHitMode.O2Jam:
+                case EzEnumJudgeMode.O2Jam:
                     return getO2JamName(result);
 
-                case EzEnumHitMode.IIDX_HD:
-                case EzEnumHitMode.LR2_HD:
-                case EzEnumHitMode.Raja_NM:
+                case EzEnumJudgeMode.IIDX_HD:
+                case EzEnumJudgeMode.LR2_HD:
+                case EzEnumJudgeMode.Raja_NM:
                     return getBmsName(result);
 
-                case EzEnumHitMode.Malody_E:
-                case EzEnumHitMode.Malody_B:
+                case EzEnumJudgeMode.Malody_E:
+                case EzEnumJudgeMode.Malody_B:
                     return getMalodyName(result);
 
-                case EzEnumHitMode.Lazer:
-                case EzEnumHitMode.Classic:
+                case EzEnumJudgeMode.Lazer:
+                case EzEnumJudgeMode.Classic:
                 default:
                     return getLazerName(result);
             }
@@ -57,7 +57,7 @@ namespace osu.Game.EzOsuGame.HUD
         /// <param name="template">当前使用的命名模板</param>
         /// <param name="missingResult">缺失资源的原始判定类型</param>
         /// <returns>回退的判定资源名，若无可用的回退则返回空字符串</returns>
-        public static string GetFallbackResourceName(EzEnumHitMode template, HitResult missingResult)
+        public static string GetFallbackResourceName(EzEnumJudgeMode template, HitResult missingResult)
         {
             // 获取原始资源名称
             string originalName = GetResourceName(template, missingResult);

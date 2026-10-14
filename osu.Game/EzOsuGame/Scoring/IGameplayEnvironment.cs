@@ -12,9 +12,9 @@ namespace osu.Game.EzOsuGame.Scoring
     public interface IGameplayEnvironment
     {
         /// <summary>
-        /// 本局判定轨（通用）。按规则集解析：Mania/BMS 取 Mania 档、Osu 取判定轨，其余规则集默认 <see cref="EzEnumHitMode.Lazer"/>。
+        /// 本局判定轨（通用）。按规则集解析：Mania/BMS 取 Mania 档、Osu 取判定轨，其余规则集默认 <see cref="EzEnumJudgeMode.Lazer"/>。
         /// </summary>
-        EzEnumHitMode HitMode { get; }
+        EzEnumJudgeMode JudgeMode { get; }
 
         EzEnumHealthMode ManiaHealthMode { get; }
 

@@ -88,7 +88,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 DurationMs = 2000,
                 FrameStepMs = 1,
                 Precedence = EzEnumJudgePrecedence.Combo,
-                HitMode = EzEnumHitMode.IIDX_HD,
+                JudgeMode = EzEnumJudgeMode.IIDX_HD,
                 AllowBmsFallbackToEarliest = true,
                 PoorEnabled = true,
             }.Run();

@@ -11,7 +11,7 @@ namespace osu.Game.EzOsuGame.Scoring
     /// </summary>
     public sealed record GameplayEnvironment : IGameplayEnvironment
     {
-        public EzEnumHitMode HitMode { get; init; }
+        public EzEnumJudgeMode JudgeMode { get; init; }
 
         public EzEnumHealthMode ManiaHealthMode { get; init; }
 

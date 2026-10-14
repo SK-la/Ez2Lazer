@@ -36,7 +36,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
 
         public EzEnumJudgePrecedence Precedence { get; init; } = EzEnumJudgePrecedence.Combo;
 
-        public EzEnumHitMode HitMode { get; init; } = EzEnumHitMode.Lazer;
+        public EzEnumJudgeMode JudgeMode { get; init; } = EzEnumJudgeMode.Lazer;
 
         public bool AllowBmsFallbackToEarliest { get; init; }
 
@@ -58,14 +58,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
             for (int col = 0; col < Keys; col++)
             {
                 var lane = new ManiaLaneController();
-                lane.ConfigureMissCollection(HitMode, overallDifficulty: 8);
+                lane.ConfigureMissCollection(JudgeMode, overallDifficulty: 8);
                 lane.SetPoorEnabled(PoorEnabled);
                 pressHistories[col] = new List<double>(PeakKps);
 
                 for (int i = 0; i < ConcurrentAlivePerColumn; i++)
                 {
                     double start = mid - 40 - i * AliveSpacingMs;
-                    var note = createNote(start, HitMode);
+                    var note = createNote(start, JudgeMode);
                     lane.Register(note, scheduleAutoMiss: true);
                 }
 
@@ -142,7 +142,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
 
             for (int i = 0; i < objectCount; i++)
             {
-                var note = createNote(durationMs + 500 + i, EzEnumHitMode.Lazer);
+                var note = createNote(durationMs + 500 + i, EzEnumJudgeMode.Lazer);
                 lane.Register(note, scheduleAutoMiss: true);
             }
 
@@ -177,12 +177,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
                 gen0Collections: 0);
         }
 
-        private static DrawableNote createNote(double startTime, EzEnumHitMode hitMode)
+        private static DrawableNote createNote(double startTime, EzEnumJudgeMode judgeMode)
         {
             var note = new Note
             {
                 StartTime = startTime,
-                HitWindows = new ManiaHitWindows(hitMode)
+                HitWindows = new ManiaHitWindows(judgeMode)
             };
             note.HitWindows.SetDifficulty(8);
 

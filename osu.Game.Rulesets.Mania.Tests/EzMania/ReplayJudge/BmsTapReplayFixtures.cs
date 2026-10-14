@@ -61,7 +61,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return (score, beatmap, environment);
         }
 
-        private static GameplayEnvironment createEnvironment() => ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD);
+        private static GameplayEnvironment createEnvironment() => ReplayJudgeTestConfig.Create(EzEnumJudgeMode.IIDX_HD, EzEnumHealthMode.IIDX_HD);
 
         private static Score createScore(ManiaRuleset ruleset, Replay replay) => new Score
         {

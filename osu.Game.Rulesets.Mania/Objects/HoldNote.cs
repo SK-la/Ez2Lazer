@@ -205,7 +205,7 @@ namespace osu.Game.Rulesets.Mania.Objects
         {
             try
             {
-                return GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode) == EzEnumHitMode.EZ2AC;
+                return GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode) == EzEnumJudgeMode.EZ2AC;
             }
             catch
             {

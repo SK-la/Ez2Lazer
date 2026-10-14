@@ -18,16 +18,16 @@ namespace osu.Game.EzOsuGame.Statistics
     /// </summary>
     public class ResultsEnvironmentControls
     {
-        public IBindable<EzEnumHitMode> HitModeBindable => maniaHitMode;
+        public IBindable<EzEnumJudgeMode> HitModeBindable => maniaHitMode;
 
-        public IBindable<EzEnumHitMode> StdHitModeBindable => stdHitMode;
+        public IBindable<EzEnumJudgeMode> StdHitModeBindable => stdHitMode;
 
         public IBindable<EzEnumHealthMode> HealthModeBindable => maniaHealthMode;
 
         private readonly RulesetInfo? ruleset;
 
-        private readonly Bindable<EzEnumHitMode> maniaHitMode;
-        private readonly Bindable<EzEnumHitMode> stdHitMode;
+        private readonly Bindable<EzEnumJudgeMode> maniaHitMode;
+        private readonly Bindable<EzEnumJudgeMode> stdHitMode;
         private readonly Bindable<EzEnumHealthMode> maniaHealthMode;
         private readonly Bindable<double> offsetMania;
         private readonly Bindable<double> offsetNonMania;
@@ -36,8 +36,8 @@ namespace osu.Game.EzOsuGame.Statistics
         {
             this.ruleset = ruleset;
 
-            maniaHitMode = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-            stdHitMode = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.StdHitMode);
+            maniaHitMode = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode);
+            stdHitMode = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.StdHitMode);
             maniaHealthMode = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
             offsetMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
             offsetNonMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania);
@@ -49,8 +49,8 @@ namespace osu.Game.EzOsuGame.Statistics
             {
                 return new ScreenFooterButton[]
                 {
-                    new EnumModeButton<EzEnumHitMode>(maniaHitMode, FontAwesome.Solid.Crosshairs, Strings.HIT_MODE,
-                        items: Enum.GetValues<EzEnumHitMode>().Where(m => m != EzEnumHitMode.StableClassic)),
+                    new EnumModeButton<EzEnumJudgeMode>(maniaHitMode, FontAwesome.Solid.Crosshairs, Strings.HIT_MODE,
+                        items: Enum.GetValues<EzEnumJudgeMode>().Where(m => m != EzEnumJudgeMode.StableClassic)),
                     new EnumModeButton<EzEnumHealthMode>(maniaHealthMode, FontAwesome.Solid.Heartbeat, Strings.HEALTH_MODE),
                     new FooterButtonHitResultOffset(offsetMania),
                 };
@@ -60,8 +60,8 @@ namespace osu.Game.EzOsuGame.Statistics
             {
                 return new ScreenFooterButton[]
                 {
-                    new EnumModeButton<EzEnumHitMode>(stdHitMode, FontAwesome.Solid.Crosshairs, Strings.STD_HIT_MODE,
-                        items: new[] { EzEnumHitMode.Lazer, EzEnumHitMode.StableClassic }),
+                    new EnumModeButton<EzEnumJudgeMode>(stdHitMode, FontAwesome.Solid.Crosshairs, Strings.STD_HIT_MODE,
+                        items: new[] { EzEnumJudgeMode.Lazer, EzEnumJudgeMode.StableClassic }),
                     new FooterButtonHitResultOffset(offsetNonMania),
                 };
             }

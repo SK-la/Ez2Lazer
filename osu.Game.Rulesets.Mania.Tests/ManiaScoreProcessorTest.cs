@@ -61,12 +61,12 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestHitModeOverrideSwitchesToEzWeights()
         {
-            var scoreProcessor = new ManiaScoreProcessor { HitModeOverride = EzEnumHitMode.EZ2AC };
+            var scoreProcessor = new ManiaScoreProcessor { HitModeOverride = EzEnumJudgeMode.EZ2AC };
 
             foreach (var result in new[] { HitResult.Perfect, HitResult.Great, HitResult.Good, HitResult.Meh, HitResult.Miss })
             {
                 Assert.That(scoreProcessor.GetBaseScoreForResult(result),
-                    Is.EqualTo(HitModeHelper.GetBaseScoreForResult(EzEnumHitMode.EZ2AC, result)),
+                    Is.EqualTo(HitModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.EZ2AC, result)),
                     () => $"{result} 应使用 EZ2AC 权重表");
             }
         }

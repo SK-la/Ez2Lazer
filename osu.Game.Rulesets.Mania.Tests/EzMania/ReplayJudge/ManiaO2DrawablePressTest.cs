@@ -27,7 +27,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             };
             beatmap.ControlPointInfo.Add(0, new TimingControlPoint { BeatLength = 1000 });
 
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal);
             ManiaWindowBaker.AlignForLive(beatmap, environment);
 
             Assert.That(O2HitModeExtension.GetBPMAtTime(1000), Is.EqualTo(75).Within(1e-3));
@@ -48,7 +48,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             note.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
             beatmap.HitObjects.Add(note);
 
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal);
             ManiaWindowBaker.AlignForLive(beatmap, environment);
 
             var outcome = O2HitModeJudgement.Instance.EvaluatePress(
@@ -81,7 +81,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var note = new Note { StartTime = 1000, Column = 0 };
             note.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
 
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal);
             ManiaWindowBaker.Align(beatmap, environment);
 
             var outcome = O2HitModeJudgement.Instance.EvaluatePress(
@@ -116,7 +116,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             ManiaWindowBaker.Align(
                 beatmap,
-                ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal));
+                ReplayJudgeTestConfig.Create(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal));
 
             Assert.That(O2HitModeExtension.PILL_COUNT.Value, Is.EqualTo(4));
             Assert.That(O2HitModeExtension.CoolCombo, Is.EqualTo(9));

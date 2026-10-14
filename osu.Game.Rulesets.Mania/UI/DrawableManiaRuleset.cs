@@ -98,11 +98,11 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved(canBeNull: true)]
         private GameplayState? gameplayState { get; set; }
 
-        private readonly Bindable<EzEnumHitMode> hitModeBindable = new Bindable<EzEnumHitMode>();
-        private EzEnumHitMode gameplayHitMode;
+        private readonly Bindable<EzEnumJudgeMode> hitModeBindable = new Bindable<EzEnumJudgeMode>();
+        private EzEnumJudgeMode gameplayJudgeMode;
         private bool suppressHitModeRevert;
 
-        int IManiaGameplayModeSnapshot.HitMode => (int)gameplayHitMode;
+        int IManiaGameplayModeSnapshot.HitMode => (int)gameplayJudgeMode;
 
         // 以本局冻结环境为准，而不是某个 ManiaHealthProcessor 实例：BMS 复用本 Drawable 但用的是
         // BMSNoFailHealthProcessor，没有 Ez 血量模式，读处理器实例会把 BMS 记成 Lazer（旧实现更糟：
@@ -236,7 +236,7 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             base.LoadComplete();
 
-            gameplayHitMode = hitModeBindable.Value;
+            gameplayJudgeMode = hitModeBindable.Value;
 
             JudgementRound = ManiaJudgementRound.Create(
                 ezConfig.ResolveEnvironment(ReplayRunPurpose.ForLive, ReplayScore?.ScoreInfo, ignoreOffset: ReplayScore != null, ruleset: Ruleset.RulesetInfo),
@@ -252,7 +252,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 bool lockHitModeForThisSession = ReplayScore == null && gameplayState?.HasCompleted == false;
 
                 // 游戏中途修改判定模式将回退到开局时的设置
-                if (lockHitModeForThisSession && h.NewValue != gameplayHitMode)
+                if (lockHitModeForThisSession && h.NewValue != gameplayJudgeMode)
                 {
                     if (suppressHitModeRevert)
                         return;
@@ -261,7 +261,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
                     try
                     {
-                        hitModeBindable.Value = gameplayHitMode;
+                        hitModeBindable.Value = gameplayJudgeMode;
                     }
                     finally
                     {
@@ -273,7 +273,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
                 O2HitModeExtension.PILL_COUNT.Value = 0;
 
-                if (h.NewValue == EzEnumHitMode.O2Jam)
+                if (h.NewValue == EzEnumJudgeMode.O2Jam)
                     O2HitModeExtension.InitializeRuntime(Beatmap, resetPillCount: false);
             }, true);
             barLinesBindable.BindValueChanged(b =>

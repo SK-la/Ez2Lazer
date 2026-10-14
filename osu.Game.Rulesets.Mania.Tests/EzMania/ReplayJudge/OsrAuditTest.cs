@@ -90,7 +90,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                           + $"tails={countObjects<TailNote>(playable)} ticks={countObjects<HoldNoteTick>(playable)} "
                           + $"holds={countObjects<HoldNote>(playable, exact: true)}");
 
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer);
 
             ManiaReplaySession.Run(score, playable, environment);
 
@@ -112,7 +112,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                     copy = rerun.Parse(stream);
 
                 var copyBeatmap = rerun.LastWorkingBeatmap!.GetPlayableBeatmap(copy.ScoreInfo.Ruleset, copy.ScoreInfo.Mods);
-                var env = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer, precedence);
+                var env = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer, precedence);
 
                 ManiaReplaySession.Run(copy, copyBeatmap, env);
 

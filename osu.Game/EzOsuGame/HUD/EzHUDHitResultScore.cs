@@ -45,7 +45,7 @@ namespace osu.Game.EzOsuGame.HUD
         public BindableBool AutoMapHitMode { get; } = new BindableBool();
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_HITMODE_TEMPLATE_LABEL), nameof(EzHUDStrings.HITRESULT_HITMODE_TEMPLATE_DESCRIPTION))]
-        public Bindable<EzEnumHitMode> HitModeTemplate { get; } = new Bindable<EzEnumHitMode>(EzEnumHitMode.EZ2AC);
+        public Bindable<EzEnumJudgeMode> HitModeTemplate { get; } = new Bindable<EzEnumJudgeMode>(EzEnumJudgeMode.EZ2AC);
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SKIP_BETTER_JUDGEMENT), nameof(EzHUDStrings.SKIP_BETTER_JUDGEMENT_DESCRIPTION))]
         public Bindable<EzEnumHitResult> SkipBetterJudgement { get; } = new Bindable<EzEnumHitResult>();
@@ -128,7 +128,7 @@ namespace osu.Game.EzOsuGame.HUD
         private GameplayClockContainer? gameplayClockContainer { get; set; }
 
         private Bindable<string> themeName = null!;
-        private Bindable<EzEnumHitMode> maniaHitModeConfig = null!;
+        private Bindable<EzEnumJudgeMode> maniaHitModeConfig = null!;
 
         public EzHUDHitResultScore()
         {
@@ -155,7 +155,7 @@ namespace osu.Game.EzOsuGame.HUD
             ThemeName.BindValueChanged(_ => invalidateCurrentAnimation(), true);
 
             // HitMode 模板：自动模式跟随 Ez 全局 HitMode 配置；手动模式使用下拉栏的固定值。
-            maniaHitModeConfig = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            maniaHitModeConfig = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode);
 
             AutoMapHitMode.BindValueChanged(e =>
             {
@@ -344,7 +344,7 @@ namespace osu.Game.EzOsuGame.HUD
         /// 漂移会让预热解码出进局用不到的帧、或漏掉进局真正要用的那一条。
         /// 这里刻意不读写组件字段、不做 configure / 播放，所以预热侧可以安全调用后直接 Dispose。
         /// </remarks>
-        private Drawable? probeJudgementDrawable(HitResult result, string theme, string template, double frameLength, EzEnumHitMode activeTemplate)
+        private Drawable? probeJudgementDrawable(HitResult result, string theme, string template, double frameLength, EzEnumJudgeMode activeTemplate)
         {
             return probeJudgementVariant(theme, EzHitResultNameTemplate.GetResourceName(activeTemplate, result), template, frameLength)
                    ?? probeJudgementVariant(theme, EzHitResultNameTemplate.GetFallbackResourceName(activeTemplate, result), template, frameLength);
@@ -387,7 +387,7 @@ namespace osu.Game.EzOsuGame.HUD
         /// <summary>
         /// 计算当前生效的命名模板：自动映射开启时跟随 Ez 全局 HitMode 配置，关闭时使用手动下拉栏选择。
         /// </summary>
-        private EzEnumHitMode resolveActiveTemplate()
+        private EzEnumJudgeMode resolveActiveTemplate()
             => AutoMapHitMode.Value ? maniaHitModeConfig.Value : HitModeTemplate.Value;
 
         #region 自述预热
@@ -418,12 +418,12 @@ namespace osu.Game.EzOsuGame.HUD
             // 与 getOrCreateJudgement 取同一来源：那是组件自己的 ThemeName 设置，不一定是全局配置。
             string theme = EzGameThemeNames.Normalize(ThemeName.Value);
             string template = AnimationFrameTemplate.Value?.Trim() ?? "{result}/{000}";
-            EzEnumHitMode activeTemplate = resolveActiveTemplate();
+            EzEnumJudgeMode activeTemplate = resolveActiveTemplate();
 
             return EzGameplayWarmUpService.RunBlocking(() => warmUpJudgementResources(theme, template, activeTemplate, cancellationToken), cancellationToken);
         }
 
-        private void warmUpJudgementResources(string theme, string template, EzEnumHitMode activeTemplate, CancellationToken cancellationToken)
+        private void warmUpJudgementResources(string theme, string template, EzEnumJudgeMode activeTemplate, CancellationToken cancellationToken)
         {
             var uploads = new List<Texture>();
 
@@ -440,7 +440,7 @@ namespace osu.Game.EzOsuGame.HUD
             EzGameplayWarmUpService.WaitForUpload(uploads, cancellationToken);
         }
 
-        private Texture[] probeJudgementFrames(HitResult result, string theme, string template, EzEnumHitMode activeTemplate)
+        private Texture[] probeJudgementFrames(HitResult result, string theme, string template, EzEnumJudgeMode activeTemplate)
         {
             Texture[] frames = probeJudgementVariantFrames(theme, EzHitResultNameTemplate.GetResourceName(activeTemplate, result), template);
 

@@ -21,7 +21,7 @@ namespace osu.Game.EzOsuGame.Configuration
         GlobalTotalWidth = 2,
     }
 
-    public enum EzEnumHitMode
+    public enum EzEnumJudgeMode
     {
         [Description("Lazer")]
         Lazer = 0,

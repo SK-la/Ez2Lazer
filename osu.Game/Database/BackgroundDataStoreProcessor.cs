@@ -451,7 +451,7 @@ namespace osu.Game.Database
                 }
             }
 
-            if (score.ManiaHitMode > (int)EzEnumHitMode.Lazer)
+            if (score.ManiaHitMode > (int)EzEnumJudgeMode.Lazer)
             {
                 // 非官方判定语义成绩且无 replay：官方算法不理解 Ez 判定权重，重算只会破坏，保持原值。
                 // 双 Lazer（HitMode=0）是官方语义，继续走下方官方路径。
@@ -1856,7 +1856,7 @@ namespace osu.Game.Database
             HashSet<Guid> scoreIds = realmAccess.Run(r => new HashSet<Guid>(
                 r.All<ScoreInfo>()
                  .Where(s => s.TotalScoreVersion < LegacyScoreEncoder.LATEST_VERSION
-                             && s.ManiaHitMode > (int)EzEnumHitMode.Lazer)
+                             && s.ManiaHitMode > (int)EzEnumJudgeMode.Lazer)
                  .AsEnumerable()
                  .Select(s => s.ID)));
 
@@ -1899,7 +1899,7 @@ namespace osu.Game.Database
                              && s.TotalScoreWithoutMods > 0
                              // [Ez] non-official judge semantics are exempt from official upgrades (see stampEzGameplayModeScores).
                              // Lazer (0) and unset (-1) both follow ppy upstream behaviour.
-                             && s.ManiaHitMode <= (int)EzEnumHitMode.Lazer)
+                             && s.ManiaHitMode <= (int)EzEnumJudgeMode.Lazer)
                  .AsEnumerable()
                  // must be done after materialisation, as realm doesn't want to support
                  // nested property predicates
@@ -1968,7 +1968,7 @@ namespace osu.Game.Database
                              && s.TotalScoreVersion < LegacyScoreEncoder.LATEST_VERSION
                              // [Ez] non-official judge semantics are exempt from official upgrades (see stampEzGameplayModeScores).
                              // Lazer (0) and unset (-1) both follow ppy upstream behaviour.
-                             && s.ManiaHitMode <= (int)EzEnumHitMode.Lazer)
+                             && s.ManiaHitMode <= (int)EzEnumJudgeMode.Lazer)
                  .AsEnumerable()
                  // must be done after materialisation, as realm doesn't want to support
                  // nested property predicates
@@ -2056,7 +2056,7 @@ namespace osu.Game.Database
                              && !s.BackgroundReprocessingFailed
                              // [Ez] non-official judge semantics are exempt from official upgrades (see stampEzGameplayModeScores).
                              // Lazer (0) and unset (-1) both follow ppy upstream behaviour.
-                             && s.ManiaHitMode <= (int)EzEnumHitMode.Lazer)
+                             && s.ManiaHitMode <= (int)EzEnumJudgeMode.Lazer)
                  .AsEnumerable()
                  // must be done after materialisation, as realm doesn't support
                  // filtering on nested property predicates or projection via `.Select()`

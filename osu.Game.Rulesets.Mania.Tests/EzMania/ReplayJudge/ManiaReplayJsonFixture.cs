@@ -96,7 +96,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         {
             var doc = new Document
             {
-                HitMode = environment.HitMode.ToString(),
+                HitMode = environment.JudgeMode.ToString(),
                 HealthMode = environment.ManiaHealthMode.ToString(),
                 JudgePrecedence = environment.JudgePrecedence.ToString(),
                 Columns = columns,
@@ -118,7 +118,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             validate(document);
 
             var environment = ReplayJudgeTestConfig.Create(
-                Enum.Parse<EzEnumHitMode>(document.HitMode, ignoreCase: true),
+                Enum.Parse<EzEnumJudgeMode>(document.HitMode, ignoreCase: true),
                 Enum.Parse<EzEnumHealthMode>(document.HealthMode, ignoreCase: true),
                 Enum.Parse<EzEnumJudgePrecedence>(document.JudgePrecedence ?? nameof(EzEnumJudgePrecedence.Earliest), ignoreCase: true));
 

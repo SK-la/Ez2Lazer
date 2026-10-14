@@ -64,7 +64,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private OrderedHitPolicyHelper hitPolicyHelper = null!;
         private DrawableHitObject? columnRoutedPressTarget;
         private EzEnumJudgePrecedence judgePrecedence;
-        private EzEnumHitMode? configuredMissCollectionHitMode;
+        private EzEnumJudgeMode? configuredMissCollectionHitMode;
 
         /// <summary>命中时「提前判定为 miss」的条目缓冲，避免每次命中分配一个迭代器。</summary>
         private readonly List<ManiaLaneEntry> forceMissScratch = new List<ManiaLaneEntry>();
@@ -546,7 +546,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void ensureLaneConfigured(ManiaJudgementRound round)
         {
-            var hitMode = round.Environment.HitMode;
+            var hitMode = round.Environment.JudgeMode;
 
             if (configuredMissCollectionHitMode == hitMode)
                 return;
@@ -557,13 +557,13 @@ namespace osu.Game.Rulesets.Mania.UI
             pressHistoryRetentionMs = computePressHistoryRetentionMs(hitMode, overallDifficulty);
         }
 
-        private static double computePressHistoryRetentionMs(EzEnumHitMode hitMode, double overallDifficulty)
+        private static double computePressHistoryRetentionMs(EzEnumJudgeMode judgeMode, double overallDifficulty)
         {
-            var helper = new HitModeHelper(hitMode) { OverallDifficulty = overallDifficulty };
+            var helper = new HitModeHelper(judgeMode) { OverallDifficulty = overallDifficulty };
             double early = helper.WindowFor(HitResult.Miss, true);
             double late = helper.WindowFor(HitResult.Miss, false);
 
-            if (HitModeHelper.IsBMSHitMode(hitMode))
+            if (HitModeHelper.IsBMSHitMode(judgeMode))
                 BmsHitModeJudgement.ExpandMissCollectionWindows(helper, 1, ref early, ref late);
 
             // Keep enough history for nearest-press miss offset (several miss windows + margin).

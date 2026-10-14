@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private Bindable<double> sAcc = null!;
         private Bindable<double> aAcc = null!;
 
-        private Bindable<EzEnumHitMode> maniaHitModeBindable = null!;
+        private Bindable<EzEnumJudgeMode> maniaHitModeBindable = null!;
         private Bindable<EzEnumHealthMode> maniaHealthModeBindable = null!;
         private Bindable<bool> bmsPoorHitResultEnable = null!;
         private Bindable<EzEnumJudgePrecedence> judgePrecedenceBindable = null!;
@@ -36,7 +36,7 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             sAcc = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffS);
             aAcc = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffA);
-            maniaHitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            maniaHitModeBindable = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode);
             maniaHealthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
             bmsPoorHitResultEnable = ezConfig.GetBindable<bool>(Ez2Setting.BmsPoorHitResultEnable);
             judgePrecedenceBindable = ezConfig.GetBindable<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence);
@@ -65,13 +65,13 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "ez", "mania", "acc" }
                 },
-                new SettingsItemV2(new FormEnumDropdown<EzEnumHitMode>
+                new SettingsItemV2(new FormEnumDropdown<EzEnumJudgeMode>
                 {
                     Caption = EzSettingsStrings.HIT_MODE,
                     HintText = EzSettingsStrings.HIT_MODE_TOOLTIP,
                     Current = maniaHitModeBindable,
                     // StableClassic 是给后续共享 classic 预留的档，现行 mania classic 仍是 Classic。
-                    Items = Enum.GetValues<EzEnumHitMode>().Where(m => m != EzEnumHitMode.StableClassic),
+                    Items = Enum.GetValues<EzEnumJudgeMode>().Where(m => m != EzEnumJudgeMode.StableClassic),
                 })
                 {
                     Keywords = new[] { "ez", "mania" }

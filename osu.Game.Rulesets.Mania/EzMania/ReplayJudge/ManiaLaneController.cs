@@ -400,11 +400,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         public bool IsHittableEarliestIndex(int index, double time)
             => ManiaLanePressSelector.IsHittableEarliest(entries, index, time, static e => e.IsPressJudged, static e => e.StartTime);
 
-        public void ConfigureMissCollection(EzEnumHitMode hitMode, double overallDifficulty, double bpm = 180)
+        public void ConfigureMissCollection(EzEnumJudgeMode judgeMode, double overallDifficulty, double bpm = 180)
         {
-            IsBmsMode = HitModeHelper.IsBMSHitMode(hitMode);
+            IsBmsMode = HitModeHelper.IsBMSHitMode(judgeMode);
 
-            missWindowHelper = new HitModeHelper(hitMode)
+            missWindowHelper = new HitModeHelper(judgeMode)
             {
                 OverallDifficulty = overallDifficulty,
                 BPM = bpm,

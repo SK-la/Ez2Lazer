@@ -188,9 +188,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public void TestRegistryReturnsBmsStrategyForIidx()
         {
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.IIDX_HD, EzEnumHealthMode.IIDX_HD);
 
-            Assert.That(ManiaJudgementRegistry.GetHitModeJudgement(EzEnumHitMode.IIDX_HD), Is.SameAs(BmsHitModeJudgement.Instance));
+            Assert.That(ManiaJudgementRegistry.GetHitModeJudgement(EzEnumJudgeMode.IIDX_HD), Is.SameAs(BmsHitModeJudgement.Instance));
             Assert.That(ManiaJudgementRegistry.GetNoteStrategy(environment), Is.SameAs(BmsHitModeJudgement.Instance));
             Assert.That(ManiaJudgementRegistry.GetHoldStrategy(environment), Is.SameAs(BmsHitModeJudgement.Instance));
             Assert.That(BmsHitModeJudgement.MapTo(BmsJudge.Bad), Is.EqualTo(HitResult.Meh));
@@ -212,8 +212,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var sessionLive = ManiaReplaySession.RunHitEvents(score, beatmap, fromLive);
             var sessionStored = ManiaReplaySession.RunHitEvents(score, beatmap, fromStored);
 
-            Assert.That(fromLive.HitMode, Is.EqualTo(EzEnumHitMode.Lazer));
-            Assert.That(fromStored.HitMode, Is.EqualTo(EzEnumHitMode.IIDX_HD));
+            Assert.That(fromLive.JudgeMode, Is.EqualTo(EzEnumJudgeMode.Lazer));
+            Assert.That(fromStored.JudgeMode, Is.EqualTo(EzEnumJudgeMode.IIDX_HD));
             Assert.That(ManiaReplayParityHelper.AreJudgementsEquivalent(generatorEvents, sessionLive), Is.True,
                 () => ManiaReplayParityHelper.DescribeJudgements(generatorEvents));
             Assert.That(ManiaReplayParityHelper.AreJudgementsEquivalent(generatorEvents, sessionStored), Is.False);
@@ -423,7 +423,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TestEz2AcTicksFollowBoundHitModeNotConversionGlobalSetting()
         {
             // 转换前全局显式设为非 EZ2AC：旧实现下转换期不生成 tick，只有 EZ2AC 环境这一侧才能暴露差异。
-            ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer));
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer));
 
             var (scoreUnderLazer, beatmapUnderLazer, environment) = HitModeReplayFixtures.CreateEz2AcHoldHeadPerfect(applyGlobalConfig: false);
             var tickResultsUnderLazer = tickResults(ManiaReplaySession.RunHitEvents(scoreUnderLazer, beatmapUnderLazer, environment));

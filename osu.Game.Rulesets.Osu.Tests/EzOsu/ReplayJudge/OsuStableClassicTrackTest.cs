@@ -41,8 +41,8 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
             var (scoreLazer, beatmapLazer, envBase) = OsuReplayFixtures.CreateSingleCircleLateTap(90);
             var (scoreClassic, beatmapClassic, _) = OsuReplayFixtures.CreateSingleCircleLateTap(90);
 
-            var envLazer = withTrack((GameplayEnvironment)envBase, EzEnumHitMode.Lazer);
-            var envClassic = withTrack((GameplayEnvironment)envBase, EzEnumHitMode.StableClassic);
+            var envLazer = withTrack((GameplayEnvironment)envBase, EzEnumJudgeMode.Lazer);
+            var envClassic = withTrack((GameplayEnvironment)envBase, EzEnumJudgeMode.StableClassic);
 
             var lazer = OsuReplaySession.Run(scoreLazer, beatmapLazer, envLazer);
             var classic = OsuReplaySession.Run(scoreClassic, beatmapClassic, envClassic);
@@ -55,8 +55,8 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
             Assert.That(classic.ScoreInfo.TotalScore, Is.Not.EqualTo(lazer.ScoreInfo.TotalScore));
         }
 
-        private static GameplayEnvironment withTrack(GameplayEnvironment env, EzEnumHitMode track)
-            => env with { HitMode = track };
+        private static GameplayEnvironment withTrack(GameplayEnvironment env, EzEnumJudgeMode track)
+            => env with { JudgeMode = track };
 
         private static int count(IReadOnlyDictionary<HitResult, int> stats, HitResult result)
             => stats.TryGetValue(result, out int n) ? n : 0;

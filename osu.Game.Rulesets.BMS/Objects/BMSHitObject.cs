@@ -35,6 +35,6 @@ namespace osu.Game.Rulesets.BMS.Objects
 
         /// <inheritdoc />
         /// <remarks>Borrows osu mania Ez hit-mode / window tables (<see cref="ManiaHitWindows"/>) via <c>ManiaWindowBaker</c> at binding time; no bespoke BMS skin timing. 转换期不读全局 HitMode（会被烘焙覆盖）。</remarks>
-        protected override HitWindows CreateHitWindows() => new ManiaHitWindows(EzEnumHitMode.Lazer);
+        protected override HitWindows CreateHitWindows() => new ManiaHitWindows(EzEnumJudgeMode.Lazer);
     }
 }

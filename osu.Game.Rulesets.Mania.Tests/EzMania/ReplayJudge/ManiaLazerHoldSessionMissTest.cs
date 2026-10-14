@@ -482,7 +482,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
         private static List<HitEvent> runEvents(List<HitObject> hitObjects, List<ReplayFrame> frames)
         {
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
 
             var ruleset = new ManiaRuleset();

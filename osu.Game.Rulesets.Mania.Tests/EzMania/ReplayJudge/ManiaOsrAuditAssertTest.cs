@@ -64,7 +64,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             "Lazer-Hanatachi",
             "Resources/Testing/Replays/ManiaAudit-Lazer-Hanatachi.osr",
             "Resources/Testing/Beatmaps/ManiaAudit-Hanatachi.osu",
-            EzEnumHitMode.Lazer,
+            EzEnumJudgeMode.Lazer,
             "29278f227275b1720e995d532130710b",
             920155,
             3451,
@@ -107,7 +107,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             "Lazer-PORTRAiT",
             "Resources/Testing/Replays/ManiaAudit-Lazer-PORTRAiT.osr",
             "Resources/Testing/Beatmaps/ManiaAudit-PORTRAiT.osu",
-            EzEnumHitMode.Lazer,
+            EzEnumJudgeMode.Lazer,
             "5737c0072e3c1319d95cf117b3f78648",
             876539,
             892,
@@ -157,7 +157,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             "Classic-Hanatachi",
             "Resources/Testing/Replays/ManiaAudit-Classic-Hanatachi.osr",
             "Resources/Testing/Beatmaps/ManiaAudit-Hanatachi.osu",
-            EzEnumHitMode.Classic,
+            EzEnumJudgeMode.Classic,
             "29278f227275b1720e995d532130710b",
             904544,
             1728,
@@ -194,7 +194,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             "Classic-PORTRAiT",
             "Resources/Testing/Replays/ManiaAudit-Classic-PORTRAiT.osr",
             "Resources/Testing/Beatmaps/ManiaAudit-PORTRAiT.osu",
-            EzEnumHitMode.Classic,
+            EzEnumJudgeMode.Classic,
             "5737c0072e3c1319d95cf117b3f78648",
             871917,
             1340,
@@ -282,7 +282,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var playable = decoder.LastWorkingBeatmap!.GetPlayableBeatmap(score.ScoreInfo.Ruleset, score.ScoreInfo.Mods);
             // 金标环境固定：不得扫 JudgePrecedence / OffsetPlusMania。
             var environment = ReplayJudgeTestConfig.Create(
-                fixture.HitMode,
+                fixture.JudgeMode,
                 EzEnumHealthMode.Lazer);
 
             ManiaReplaySession.Run(score, playable, environment);
@@ -305,7 +305,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             score.ScoreInfo.MaxCombo = 0;
             score.ScoreInfo.Accuracy = 0;
             score.ScoreInfo.Rank = ScoreRank.D;
-            score.ScoreInfo.ManiaHitMode = (int)fixture.HitMode;
+            score.ScoreInfo.ManiaHitMode = (int)fixture.JudgeMode;
             score.ScoreInfo.IsLegacyScore = fixture.ExpectedIsLegacy ?? true;
         }
 
@@ -395,8 +395,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var sb = new StringBuilder();
             sb.AppendLine($"fixture: {fixture.Name}");
             sb.AppendLine($"osr: {fixture.OsrResource}");
-            sb.AppendLine($"hitMode: {fixture.HitMode}");
-            sb.AppendLine($"env: HitMode={fixture.HitMode} HealthMode=Lazer JudgePrecedence=Earliest OffsetPlusMania=0");
+            sb.AppendLine($"hitMode: {fixture.JudgeMode}");
+            sb.AppendLine($"env: HitMode={fixture.JudgeMode} HealthMode=Lazer JudgePrecedence=Earliest OffsetPlusMania=0");
             sb.AppendLine($"header-anchor: acc={fixture.ExpectedAccuracy:R} total={fixture.ExpectedTotalScore} combo={fixture.ExpectedMaxCombo}");
             sb.AppendLine($"session-anchor: acc={fixture.SessionAccuracy:R} total={fixture.SessionTotalScore} combo={fixture.SessionMaxCombo}");
             sb.AppendLine($"session: acc={score.ScoreInfo.Accuracy:R} rank={score.ScoreInfo.Rank} total={score.ScoreInfo.TotalScore} combo={score.ScoreInfo.MaxCombo}");
@@ -861,7 +861,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             string Name,
             string OsrResource,
             string BeatmapResource,
-            EzEnumHitMode HitMode,
+            EzEnumJudgeMode JudgeMode,
             string? ExpectedBeatmapMd5,
             long ExpectedTotalScore,
             int ExpectedMaxCombo,

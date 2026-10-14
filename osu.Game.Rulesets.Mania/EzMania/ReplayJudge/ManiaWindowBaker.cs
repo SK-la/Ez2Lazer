@@ -26,7 +26,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             ArgumentNullException.ThrowIfNull(environment);
 
-            alignCore(beatmap, environment.HitMode, computePoorEnabled(environment));
+            alignCore(beatmap, environment.JudgeMode, computePoorEnabled(environment));
         }
 
         /// <summary>
@@ -36,11 +36,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// 不写 <see cref="ManiaHitWindows.PoorEnabled"/>：调用方没有当局环境，该值保持「按本机当前设置惰性解析」。
         /// 仿真路径的 KPoor 门槛来自 <c>ManiaJudgementRound.PoorEnabled</c>，不读物件窗口。
         /// </remarks>
-        public static void Align(IBeatmap beatmap, EzEnumHitMode hitMode)
+        public static void Align(IBeatmap beatmap, EzEnumJudgeMode judgeMode)
         {
             ArgumentNullException.ThrowIfNull(beatmap);
 
-            alignCore(beatmap, hitMode, poorEnabled: null);
+            alignCore(beatmap, judgeMode, poorEnabled: null);
         }
 
         /// <summary>
@@ -50,30 +50,30 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             ArgumentNullException.ThrowIfNull(environment);
 
-            if (environment.HitMode == EzEnumHitMode.O2Jam)
+            if (environment.JudgeMode == EzEnumJudgeMode.O2Jam)
                 O2HitModeExtension.InitializeRuntime(beatmap);
 
-            alignCore(beatmap, environment.HitMode, computePoorEnabled(environment));
+            alignCore(beatmap, environment.JudgeMode, computePoorEnabled(environment));
         }
 
         private static bool computePoorEnabled(IGameplayEnvironment environment)
             => HealthModeHelper.ComputeKPoorEnabled(environment.ManiaHealthMode, environment.BmsPoorHitResultEnable);
 
-        private static void alignCore(IBeatmap beatmap, EzEnumHitMode hitMode, bool? poorEnabled)
+        private static void alignCore(IBeatmap beatmap, EzEnumJudgeMode judgeMode, bool? poorEnabled)
         {
             ArgumentNullException.ThrowIfNull(beatmap);
 
-            bool isO2Jam = hitMode == EzEnumHitMode.O2Jam;
+            bool isO2Jam = judgeMode == EzEnumJudgeMode.O2Jam;
 
             foreach (var hitObject in beatmap.HitObjects)
-                alignRecursive(hitObject, beatmap, hitMode, isO2Jam, poorEnabled);
+                alignRecursive(hitObject, beatmap, judgeMode, isO2Jam, poorEnabled);
         }
 
-        private static void alignRecursive(HitObject hitObject, IBeatmap beatmap, EzEnumHitMode hitMode, bool isO2Jam, bool? poorEnabled)
+        private static void alignRecursive(HitObject hitObject, IBeatmap beatmap, EzEnumJudgeMode judgeMode, bool isO2Jam, bool? poorEnabled)
         {
             if (hitObject.HitWindows is ManiaHitWindows maniaHitWindows)
             {
-                maniaHitWindows.SetHitMode(hitMode);
+                maniaHitWindows.SetHitMode(judgeMode);
 
                 if (poorEnabled.HasValue)
                     maniaHitWindows.PoorEnabled = poorEnabled.Value;
@@ -85,7 +85,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             }
 
             foreach (var nested in hitObject.NestedHitObjects)
-                alignRecursive(nested, beatmap, hitMode, isO2Jam, poorEnabled);
+                alignRecursive(nested, beatmap, judgeMode, isO2Jam, poorEnabled);
         }
     }
 }

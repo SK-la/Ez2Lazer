@@ -97,7 +97,7 @@ namespace osu.Game.Scoring
 
             if (purpose == ReplayRunPurpose.ForLive)
             {
-                scoreInfo.ManiaHitMode = (int)environment.HitMode;
+                scoreInfo.ManiaHitMode = (int)environment.JudgeMode;
                 scoreInfo.ManiaHealthMode = (int)environment.ManiaHealthMode;
             }
 

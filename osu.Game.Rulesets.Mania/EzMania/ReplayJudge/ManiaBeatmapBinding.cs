@@ -47,9 +47,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             ArgumentNullException.ThrowIfNull(beatmap);
             ArgumentNullException.ThrowIfNull(environment);
 
-            record(beatmap, environment.HitMode, owned: false);
+            record(beatmap, environment.JudgeMode, owned: false);
             ManiaWindowBaker.AlignForLive(beatmap, environment);
-            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, environment.HitMode);
+            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, environment.JudgeMode);
         }
 
         /// <summary>
@@ -57,13 +57,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// <paramref name="providerOwned"/> 由 <see cref="ManiaSimulationBeatmapProvider"/> 为自己的副本声明归属，
         /// 声明之后若再被绑到别的 hitmode，按 provider 的实现缺陷处理（DEBUG 断言）。
         /// </summary>
-        public static void BindForSimulation(IBeatmap beatmap, EzEnumHitMode hitMode, bool providerOwned = false)
+        public static void BindForSimulation(IBeatmap beatmap, EzEnumJudgeMode judgeMode, bool providerOwned = false)
         {
             ArgumentNullException.ThrowIfNull(beatmap);
 
-            record(beatmap, hitMode, providerOwned);
-            ManiaWindowBaker.Align(beatmap, hitMode);
-            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, hitMode);
+            record(beatmap, judgeMode, providerOwned);
+            ManiaWindowBaker.Align(beatmap, judgeMode);
+            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, judgeMode);
         }
 
         /// <summary>
@@ -71,17 +71,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// <see cref="Scoring.ManiaScoreProcessor"/> 全谱模拟沿用此入口：新增的 Tail/Tick 判定必须早于 base，
         /// 否则 EZ2AC / Malody 会把官方尾 Perfect 计入 MaximumBaseScore。
         /// </summary>
-        public static void BindJudgements(IBeatmap beatmap, EzEnumHitMode hitMode)
+        public static void BindJudgements(IBeatmap beatmap, EzEnumJudgeMode judgeMode)
         {
             ArgumentNullException.ThrowIfNull(beatmap);
 
-            record(beatmap, hitMode, owned: false);
-            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, hitMode);
+            record(beatmap, judgeMode, owned: false);
+            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, judgeMode);
         }
 
-        private static void record(IBeatmap beatmap, EzEnumHitMode hitMode, bool owned)
+        private static void record(IBeatmap beatmap, EzEnumJudgeMode judgeMode, bool owned)
         {
-            warnIfSharedInstanceBound(beatmap, hitMode, owned);
+            warnIfSharedInstanceBound(beatmap, judgeMode, owned);
 
             var entry = records.GetValue(beatmap, _ => new BindingRecord());
             bool conflict;
@@ -89,8 +89,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             lock (entry)
             {
-                conflict = entry.BoundHitMode != unbound && entry.BoundHitMode != (int)hitMode;
-                entry.BoundHitMode = (int)hitMode;
+                conflict = entry.BoundHitMode != unbound && entry.BoundHitMode != (int)judgeMode;
+                entry.BoundHitMode = (int)judgeMode;
                 entry.Owned |= owned;
                 isOwned = entry.Owned;
             }
@@ -100,7 +100,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             ManiaJudgeHotPathTrace.RecordBeatmapRebindConflict();
 
-            string message = $"[ManiaJudgeBinding] beatmap rebound to a different hitmode (now {hitMode}, owned={isOwned}, "
+            string message = $"[ManiaJudgeBinding] beatmap rebound to a different hitmode (now {judgeMode}, owned={isOwned}, "
                              + $"objects={beatmap.HitObjects.Count}); one instance must not carry two hitmodes.";
 
             Logger.Log(message, Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
@@ -116,7 +116,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// <remarks>
         /// 只报不改：这是调用方用错了入口（该走 <see cref="EzPlayableBeatmapCache.GetBound"/>），改绑定语义会把问题藏起来。
         /// </remarks>
-        private static void warnIfSharedInstanceBound(IBeatmap beatmap, EzEnumHitMode hitMode, bool owned)
+        private static void warnIfSharedInstanceBound(IBeatmap beatmap, EzEnumJudgeMode judgeMode, bool owned)
         {
             if (owned || !EzPlayableBeatmapCache.IsSharedInstance(beatmap))
                 return;
@@ -124,7 +124,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             if (Interlocked.Increment(ref sharedBindingWarnCount) > 10)
                 return;
 
-            string message = $"[ManiaJudgeBinding] bound a shared EzPlayableBeatmapCache instance in place (hitmode {hitMode}, "
+            string message = $"[ManiaJudgeBinding] bound a shared EzPlayableBeatmapCache instance in place (hitmode {judgeMode}, "
                              + $"objects={beatmap.HitObjects.Count}); shared instances are read-only, ask for GetBound instead.";
 
             Logger.Log(message, Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);

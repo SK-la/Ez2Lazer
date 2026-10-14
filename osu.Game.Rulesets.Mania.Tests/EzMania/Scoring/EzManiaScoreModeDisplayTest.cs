@@ -19,14 +19,14 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
             var score = createScore(hitMode, healthMode);
 
             Assert.That(score.TryGetManiaGameplayModes(out int resolvedHitMode, out int resolvedHealthMode), Is.True);
-            Assert.That(resolvedHitMode, Is.EqualTo((int)EzEnumHitMode.Lazer));
+            Assert.That(resolvedHitMode, Is.EqualTo((int)EzEnumJudgeMode.Lazer));
             Assert.That(resolvedHealthMode, Is.EqualTo((int)EzEnumHealthMode.Lazer));
         }
 
         [TestCase(0, 0, false)]
         [TestCase(-1, -1, false)]
-        [TestCase((int)EzEnumHitMode.EZ2AC, (int)EzEnumHealthMode.Ez2Ac, true)]
-        [TestCase((int)EzEnumHitMode.EZ2AC, (int)EzEnumHealthMode.Lazer, true)]
+        [TestCase((int)EzEnumJudgeMode.EZ2AC, (int)EzEnumHealthMode.Ez2Ac, true)]
+        [TestCase((int)EzEnumJudgeMode.EZ2AC, (int)EzEnumHealthMode.Lazer, true)]
         public void TestBadgeOnlyForEzPrivateModes(int hitMode, int healthMode, bool expectsBadge)
         {
             var score = createScore(hitMode, healthMode);

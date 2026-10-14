@@ -142,7 +142,7 @@ namespace osu.Game.Screens.Select
                             generalStatistics.Add(new StatisticRow("HIT", EzScoreInfoExtensions.GetHitModeDisplayName(hitMode)));
                             generalStatistics.Add(new StatisticRow("HP", EzScoreInfoExtensions.GetHealthModeDisplayName(healthMode)));
                         }
-                        else if (value.TryGetStdGameplayMode(out int stdMode) && stdMode != (int)EzEnumHitMode.Lazer)
+                        else if (value.TryGetStdGameplayMode(out int stdMode) && stdMode != (int)EzEnumJudgeMode.Lazer)
                         {
                             generalStatistics.Add(Empty().With(d => d.Height = 10));
                             generalStatistics.Add(new StatisticRow("JUDGE", EzScoreInfoExtensions.GetHitModeDisplayName(stdMode)));

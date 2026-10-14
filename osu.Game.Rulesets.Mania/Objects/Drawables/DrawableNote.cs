@@ -148,7 +148,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         public bool CanRouteToKPoor => ManiaEzDrawableJudgement.CanRouteToKPoor(this);
 
-        internal virtual void EzApplyFinalResult(HitResult result, EzEnumHitMode hitMode)
+        internal virtual void EzApplyFinalResult(HitResult result, EzEnumJudgeMode judgeMode)
         {
             ApplyResult(static (r, data) =>
             {
@@ -159,7 +159,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 {
                     r.IsComboHit = false;
                 }
-            }, (result, hitMode));
+            }, (result, hitMode: judgeMode));
         }
 
         internal void EzDispatchExtraResult(HitResult result) => DispatchNewResult(result);

@@ -63,14 +63,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         public (double early, double late) RangeKPR { get; private set; }
         public (double early, double late) RangeBD { get; private set; }
 
-        private EzEnumHitMode hitMode = EzEnumHitMode.Classic;
+        private EzEnumJudgeMode judgeMode = EzEnumJudgeMode.Classic;
 
-        public EzEnumHitMode HitMode
+        public EzEnumJudgeMode JudgeMode
         {
-            get => hitMode;
+            get => judgeMode;
             set
             {
-                hitMode = value;
+                judgeMode = value;
                 updateRanges();
             }
         }
@@ -112,9 +112,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             }
         }
 
-        public HitModeHelper(EzEnumHitMode hitMode)
+        public HitModeHelper(EzEnumJudgeMode judgeMode)
         {
-            HitMode = hitMode;
+            JudgeMode = judgeMode;
             updateRanges();
         }
 
@@ -126,9 +126,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             RangeBD = (0, 0);
             RangeKPR = (0, 0);
 
-            switch (hitMode)
+            switch (judgeMode)
             {
-                case EzEnumHitMode.O2Jam:
+                case EzEnumJudgeMode.O2Jam:
                     double safeBpm = double.IsFinite(bpm) && bpm > 0 ? bpm : 75.0;
                     Range305 = 7500.0 / safeBpm * TotalMultiplier;
                     Range300 = Range305;
@@ -138,7 +138,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     Range000 = Range050;
                     break;
 
-                case EzEnumHitMode.EZ2AC:
+                case EzEnumJudgeMode.EZ2AC:
                     Range305 = 16.67 * TotalMultiplier;
                     Range300 = 33.33 * TotalMultiplier;
                     Range200 = 83.33 * TotalMultiplier;
@@ -147,11 +147,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     Range000 = 116.67 * TotalMultiplier;
                     break;
 
-                case EzEnumHitMode.IIDX_HD:
-                case EzEnumHitMode.LR2_HD:
-                case EzEnumHitMode.Raja_NM:
-                    int row = hitMode == EzEnumHitMode.LR2_HD ? 1
-                        : hitMode == EzEnumHitMode.Raja_NM ? 2
+                case EzEnumJudgeMode.IIDX_HD:
+                case EzEnumJudgeMode.LR2_HD:
+                case EzEnumJudgeMode.Raja_NM:
+                    int row = judgeMode == EzEnumJudgeMode.LR2_HD ? 1
+                        : judgeMode == EzEnumJudgeMode.Raja_NM ? 2
                         : 0;
 
                     Range305 = hit_range_bms[row, 0] * TotalMultiplier;
@@ -172,7 +172,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     RangeKPR = (kPoorEarly, kPoorLate);
                     break;
 
-                case EzEnumHitMode.Malody_E:
+                case EzEnumJudgeMode.Malody_E:
                     Range305 = 20.0 * TotalMultiplier;
                     Range300 = 60.0 * TotalMultiplier;
                     Range200 = 94.0 * TotalMultiplier;
@@ -181,7 +181,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     Range000 = 150.0 * TotalMultiplier;
                     break;
 
-                case EzEnumHitMode.Malody_B:
+                case EzEnumJudgeMode.Malody_B:
                     Range305 = 44.0 * TotalMultiplier;
                     Range300 = 84.0 * TotalMultiplier;
                     Range200 = 118.0 * TotalMultiplier;
@@ -190,7 +190,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     Range000 = 150.0 * TotalMultiplier;
                     break;
 
-                case EzEnumHitMode.Classic:
+                case EzEnumJudgeMode.Classic:
                     double invertedOd = Math.Clamp(10 - OverallDifficulty, 0, 10);
                     Range305 = Math.Floor(16 * TotalMultiplier) + 0.5;
                     Range300 = Math.Floor((34 + 3 * invertedOd) * TotalMultiplier) + 0.5;
@@ -200,7 +200,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     Range000 = Math.Floor((158 + 3 * invertedOd) * TotalMultiplier) + 0.5;
                     break;
 
-                case EzEnumHitMode.Lazer:
+                case EzEnumJudgeMode.Lazer:
                     Range305 = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, perfect_window_range) * TotalMultiplier) + 0.5;
                     Range300 = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, great_window_range) * TotalMultiplier) + 0.5;
                     Range200 = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, good_window_range) * TotalMultiplier) + 0.5;
@@ -245,7 +245,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         public HitResult ResultFor(double timeOffset)
         {
-            if (hitMode == EzEnumHitMode.Classic) return ResultForClassic(timeOffset);
+            if (judgeMode == EzEnumJudgeMode.Classic) return ResultForClassic(timeOffset);
 
             double absOffset = Math.Abs(timeOffset);
             if (absOffset <= Range305) return HitResult.Perfect;
@@ -357,31 +357,31 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         /// <summary>
         /// 根据判定模式获取基础分数
         /// </summary>
-        public static int GetBaseScoreForResult(EzEnumHitMode hitMode, HitResult result)
+        public static int GetBaseScoreForResult(EzEnumJudgeMode judgeMode, HitResult result)
         {
-            switch (hitMode)
+            switch (judgeMode)
             {
-                case EzEnumHitMode.Lazer:
+                case EzEnumJudgeMode.Lazer:
                     return getLazerBaseScore(result);
 
-                case EzEnumHitMode.Classic:
+                case EzEnumJudgeMode.Classic:
                     return getClassicBaseScore(result);
 
-                case EzEnumHitMode.EZ2AC:
+                case EzEnumJudgeMode.EZ2AC:
                     return getEZ2ACBaseScore(result);
 
-                case EzEnumHitMode.O2Jam:
+                case EzEnumJudgeMode.O2Jam:
                     return getO2JamBaseScore(result);
 
-                case EzEnumHitMode.IIDX_HD:
-                case EzEnumHitMode.LR2_HD:
-                case EzEnumHitMode.Raja_NM:
+                case EzEnumJudgeMode.IIDX_HD:
+                case EzEnumJudgeMode.LR2_HD:
+                case EzEnumJudgeMode.Raja_NM:
                     return getExScore(result);
 
-                case EzEnumHitMode.Malody_E:
+                case EzEnumJudgeMode.Malody_E:
                     return getMalodyBaseScore(result, 1.2);
 
-                case EzEnumHitMode.Malody_B:
+                case EzEnumJudgeMode.Malody_B:
                     return getMalodyBaseScore(result, 0.85);
 
                 default:
@@ -499,25 +499,25 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         #region 公共静态工具
 
-        public static bool IsBMSHitMode(EzEnumHitMode hitMode)
+        public static bool IsBMSHitMode(EzEnumJudgeMode judgeMode)
         {
-            return hitMode == EzEnumHitMode.IIDX_HD ||
-                   hitMode == EzEnumHitMode.LR2_HD ||
-                   hitMode == EzEnumHitMode.Raja_NM;
+            return judgeMode == EzEnumJudgeMode.IIDX_HD ||
+                   judgeMode == EzEnumJudgeMode.LR2_HD ||
+                   judgeMode == EzEnumJudgeMode.Raja_NM;
         }
 
         /// <summary>
         /// 在指定 HitMode 下，<see cref="HitResult.Meh"/> 是否打断 Combo。
         /// BMS / O2Jam 模式下 Meh 断 Combo，其余不断。
         /// </summary>
-        public static bool MehBreaksCombo(EzEnumHitMode hitMode)
+        public static bool MehBreaksCombo(EzEnumJudgeMode judgeMode)
         {
-            switch (hitMode)
+            switch (judgeMode)
             {
-                case EzEnumHitMode.IIDX_HD:
-                case EzEnumHitMode.LR2_HD:
-                case EzEnumHitMode.Raja_NM:
-                case EzEnumHitMode.O2Jam:
+                case EzEnumJudgeMode.IIDX_HD:
+                case EzEnumJudgeMode.LR2_HD:
+                case EzEnumJudgeMode.Raja_NM:
+                case EzEnumJudgeMode.O2Jam:
                     return true;
 
                 default:
@@ -531,7 +531,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         /// IIDX 无提前上限；LR2 为判定时刻前 1000ms 内；Raja 为前 500ms 内。
         /// 晚按侧 KPoor 不由本方法约束，由 Bad 外与 <c>badLate</c> 衔接的逻辑单独处理。
         /// </summary>
-        public static bool IsWithinEarlyKPoorRecognitionWindow(EzEnumHitMode mode, double timeOffsetFromHit)
+        public static bool IsWithinEarlyKPoorRecognitionWindow(EzEnumJudgeMode mode, double timeOffsetFromHit)
         {
             if (timeOffsetFromHit >= 0)
                 return true;
@@ -541,8 +541,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
             double maxEarlyMs = mode switch
             {
-                EzEnumHitMode.LR2_HD => 1000,
-                EzEnumHitMode.Raja_NM => 500,
+                EzEnumJudgeMode.LR2_HD => 1000,
+                EzEnumJudgeMode.Raja_NM => 500,
                 _ => double.PositiveInfinity,
             };
 
@@ -618,7 +618,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         /// hitmode / 血量模式取自冻结环境（回放是成绩里嵌入的模式），可能与展示时的当前设置不同，
         /// 所以池内容不能按当前设置推导。
         /// </remarks>
-        public static IReadOnlyList<HitResult> AllModeValidHitResults { get; } = Enum.GetValues<EzEnumHitMode>()
+        public static IReadOnlyList<HitResult> AllModeValidHitResults { get; } = Enum.GetValues<EzEnumJudgeMode>()
                                                                                      .SelectMany(GetHitModeValidHitResults)
                                                                                      .Distinct()
                                                                                      .ToArray();
@@ -634,27 +634,27 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         public static IReadOnlyList<HitResult> AllModeDisplayableHitResults { get; } =
             AllModeValidHitResults.Where(r => r.IsBasic()).ToArray();
 
-        public static IReadOnlyList<HitResult> GetHitModeValidHitResults(EzEnumHitMode mode)
+        public static IReadOnlyList<HitResult> GetHitModeValidHitResults(EzEnumJudgeMode mode)
         {
             switch (mode)
             {
-                case EzEnumHitMode.O2Jam:
+                case EzEnumJudgeMode.O2Jam:
                     return valid_results_o2jam;
 
-                case EzEnumHitMode.EZ2AC:
+                case EzEnumJudgeMode.EZ2AC:
                     return valid_results_ez2ac;
 
-                case EzEnumHitMode.IIDX_HD:
-                case EzEnumHitMode.LR2_HD:
-                case EzEnumHitMode.Raja_NM:
+                case EzEnumJudgeMode.IIDX_HD:
+                case EzEnumJudgeMode.LR2_HD:
+                case EzEnumJudgeMode.Raja_NM:
                     return valid_results_bms_family;
 
-                case EzEnumHitMode.Malody_E:
-                case EzEnumHitMode.Malody_B:
+                case EzEnumJudgeMode.Malody_E:
+                case EzEnumJudgeMode.Malody_B:
                     return valid_results_malody;
 
-                case EzEnumHitMode.Lazer:
-                case EzEnumHitMode.Classic:
+                case EzEnumJudgeMode.Lazer:
+                case EzEnumJudgeMode.Classic:
                 default:
                     return valid_results_lazer_classic;
             }
@@ -662,7 +662,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         public static IReadOnlyList<HitResult> GetHitModeValidHitResults()
         {
-            var mode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            var mode = GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode);
             return GetHitModeValidHitResults(mode);
         }
 

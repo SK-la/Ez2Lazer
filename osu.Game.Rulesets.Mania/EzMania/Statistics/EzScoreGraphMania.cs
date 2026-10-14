@@ -40,13 +40,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         private readonly IReadOnlyList<HitEvent>? originalHitEventsOverride;
 
         private readonly ManiaHitWindows hitWindowsNow = new ManiaHitWindows();
-        private readonly HitModeHelper hitWindowsV1 = new HitModeHelper(EzEnumHitMode.Classic);
+        private readonly HitModeHelper hitWindowsV1 = new HitModeHelper(EzEnumJudgeMode.Classic);
 
-        private Bindable<EzEnumHitMode> hitModeBindable = null!;
+        private Bindable<EzEnumJudgeMode> hitModeBindable = null!;
         private Bindable<EzEnumHealthMode> healthModeBindable = null!;
         private Bindable<double> offsetPlusMania = new Bindable<double>();
 
-        private EzEnumHitMode currentHitMode;
+        private EzEnumJudgeMode currentJudgeMode;
         private EzEnumHealthMode currentHealthMode;
         private readonly double originalAccuracy;
         private readonly long originalTotalScore;
@@ -131,7 +131,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         private IReadOnlyList<HitEvent> filterForCurrentHitMode(IEnumerable<HitEvent> events)
         {
-            var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
+            var validResults = HitModeHelper.GetHitModeValidHitResults(currentJudgeMode).ToHashSet();
             var filtered = events.Where(e => isTimingScatterEvent(e)
                                              && (validResults.Contains(e.Result) || e.Result is HitResult.Miss or HitResult.Poor));
 
@@ -189,7 +189,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         /// 公式：NowAccuracy = Σ(countᵢ × baseScoreᵢ) / (totalCount × maxBaseScore)
         ///       NowScore = NowAccuracy × 1_000_000
         /// </summary>
-        private (double accuracy, long score) computeNowAccuracyAndScore(Dictionary<HitResult, int> counts, EzEnumHitMode hitMode)
+        private (double accuracy, long score) computeNowAccuracyAndScore(Dictionary<HitResult, int> counts, EzEnumJudgeMode judgeMode)
         {
             int total = 0;
             long totalBase = 0;
@@ -201,13 +201,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                     continue;
 
                 total += count;
-                totalBase += (long)HitModeHelper.GetBaseScoreForResult(hitMode, result) * count;
+                totalBase += (long)HitModeHelper.GetBaseScoreForResult(judgeMode, result) * count;
             }
 
             if (total == 0)
                 return (0, 0);
 
-            int maxBase = HitModeHelper.GetBaseScoreForResult(hitMode, HitResult.Perfect);
+            int maxBase = HitModeHelper.GetBaseScoreForResult(judgeMode, HitResult.Perfect);
             long totalMax = (long)maxBase * total;
 
             double accuracy = totalMax > 0 ? (double)totalBase / totalMax : 0;
@@ -247,7 +247,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             if (diffs.Count > 0 || origTotal != nowTotal)
             {
                 Logger.Log(
-                    $"[EzScoreGraphMania DIFF] HitMode={currentHitMode} | "
+                    $"[EzScoreGraphMania DIFF] HitMode={currentJudgeMode} | "
                     + $"Total: Orig={origTotal} Now={nowTotal} | "
                     + string.Join(" | ", diffs),
                     Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
@@ -255,7 +255,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             else
             {
                 Logger.Log(
-                    $"[EzScoreGraphMania MATCH] HitMode={currentHitMode} Total={origTotal} — all counts identical",
+                    $"[EzScoreGraphMania MATCH] HitMode={currentJudgeMode} Total={origTotal} — all counts identical",
                     Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
             }
         }
@@ -273,15 +273,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             O2HitModeExtension.SetOriginalBPM(Beatmap.BeatmapInfo.BPM);
 
             // 初始加载时设置当前值，不触发 Session 重放。
-            currentHitMode = ezConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            currentJudgeMode = ezConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode);
             currentHealthMode = ezConfig.Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
-            hitWindowsNow.SetHitMode(currentHitMode);
+            hitWindowsNow.SetHitMode(currentJudgeMode);
 
             // 非 offset 配置变更：清除 Session 缓存并使用 hitWindowsNow 对
             // OriginalHitEvents.TimeOffset 重判（保留现场游玩的精确 timing）。
             // Session 仅在 offset 拖动时使用（OnOffsetChanged 路径）。
             offsetPlusMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
-            hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            hitModeBindable = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode);
             healthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
         }
 
@@ -291,10 +291,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             hitModeBindable.BindValueChanged(v =>
             {
-                currentHitMode = v.NewValue;
-                hitWindowsNow.SetHitMode(currentHitMode);
+                currentJudgeMode = v.NewValue;
+                hitWindowsNow.SetHitMode(currentJudgeMode);
                 // 切换到 O2Jam 时立即同步 BPM，确保后续判定窗口正确
-                if (currentHitMode == EzEnumHitMode.O2Jam && Beatmap.HitObjects.Count > 0)
+                if (currentJudgeMode == EzEnumJudgeMode.O2Jam && Beatmap.HitObjects.Count > 0)
                     hitWindowsNow.UpdateO2JamBpmFromTime(Beatmap.HitObjects[0].StartTime);
                 onReplayConfigChanged();
             });
@@ -318,7 +318,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         protected override double UpdateBoundary(HitResult result, double? time = null)
         {
-            if (currentHitMode == EzEnumHitMode.O2Jam && time.HasValue)
+            if (currentJudgeMode == EzEnumJudgeMode.O2Jam && time.HasValue)
                 hitWindowsNow.UpdateO2JamBpmFromTime(time.Value);
 
             return hitWindowsNow.WindowFor(result);
@@ -341,7 +341,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         protected override void RecalculateNowFromDisplayEvents()
         {
             var displayEvents = GetDisplayHitEvents();
-            var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
+            var validResults = HitModeHelper.GetHitModeValidHitResults(currentJudgeMode).ToHashSet();
             var counts = new Dictionary<HitResult, int>();
 
             foreach (var e in displayEvents)
@@ -355,7 +355,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             }
 
             NowCounts = counts;
-            (NowAccuracy, NowScore) = computeNowAccuracyAndScore(counts, currentHitMode);
+            (NowAccuracy, NowScore) = computeNowAccuracyAndScore(counts, currentJudgeMode);
         }
 
         /// <summary>
@@ -367,10 +367,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             if (offsetPlusMania.Value == CommittedSessionOffset)
                 return hitEvent.Result;
 
-            if (currentHitMode == EzEnumHitMode.O2Jam)
+            if (currentJudgeMode == EzEnumJudgeMode.O2Jam)
                 hitWindowsNow.UpdateO2JamBpmFromTime(hitEvent.HitObject.StartTime);
 
-            var strategy = ManiaJudgementRegistry.GetHitModeJudgement(currentHitMode)
+            var strategy = ManiaJudgementRegistry.GetHitModeJudgement(currentJudgeMode)
                            ?? (IManiaNoteJudgementStrategy)LazerNoteJudgementReplica.Instance;
 
             return strategy.RejudgeHitEvent(hitEvent, hitWindowsNow);
@@ -384,11 +384,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         protected override Score? ResolveInputScore() => scoreManager.GetScore(Score);
 
-        private Dictionary<HitResult, int> extractDisplayCounts(IReadOnlyDictionary<HitResult, int> statistics) => ExtractDisplayCounts(statistics, currentHitMode);
+        private Dictionary<HitResult, int> extractDisplayCounts(IReadOnlyDictionary<HitResult, int> statistics) => ExtractDisplayCounts(statistics, currentJudgeMode);
 
-        internal static Dictionary<HitResult, int> ExtractDisplayCounts(IReadOnlyDictionary<HitResult, int> statistics, EzEnumHitMode hitMode)
+        internal static Dictionary<HitResult, int> ExtractDisplayCounts(IReadOnlyDictionary<HitResult, int> statistics, EzEnumJudgeMode judgeMode)
         {
-            var validResults = HitModeHelper.GetHitModeValidHitResults(hitMode).ToHashSet();
+            var validResults = HitModeHelper.GetHitModeValidHitResults(judgeMode).ToHashSet();
             var counts = new Dictionary<HitResult, int>();
 
             foreach (var (result, count) in statistics)
@@ -408,8 +408,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         /// <summary>
         /// 左侧统计表应展示的判定行（跟随当前 HitMode 有效集合，含 KPoor、ComboBreak）。
         /// </summary>
-        internal static IReadOnlyList<HitResult> GetOrderedStatHitResults(EzEnumHitMode hitMode)
-            => HitModeHelper.GetHitModeValidHitResults(hitMode)
+        internal static IReadOnlyList<HitResult> GetOrderedStatHitResults(EzEnumJudgeMode judgeMode)
+            => HitModeHelper.GetHitModeValidHitResults(judgeMode)
                             .Where(r => r is not (HitResult.IgnoreHit or HitResult.IgnoreMiss))
                             .OrderBy(r => r.GetIndexForOrderedDisplay())
                             .ToList();
@@ -528,9 +528,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 makeSimpleStat("Now | V1", "↓", Colours.Gray8),
             };
 
-            foreach (var r in GetOrderedStatHitResults(currentHitMode))
+            foreach (var r in GetOrderedStatHitResults(currentJudgeMode))
             {
-                string name = r.GetHitModeDisplayName(currentHitMode).ToString();
+                string name = r.GetHitModeDisplayName(currentJudgeMode).ToString();
                 var c = Colours.ForHitResult(r);
                 var item = makeSimpleStat("—", name, c);
                 judgementStatItems[r] = item;
@@ -605,7 +605,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             // statItems[6] = Pauses（pauses 不随 offset 变化，无需更新）
             // statItems[7] = "↓" 分隔线，不需更新
 
-            foreach (var r in GetOrderedStatHitResults(currentHitMode))
+            foreach (var r in GetOrderedStatHitResults(currentJudgeMode))
             {
                 if (!judgementStatItems.TryGetValue(r, out var item))
                     continue;

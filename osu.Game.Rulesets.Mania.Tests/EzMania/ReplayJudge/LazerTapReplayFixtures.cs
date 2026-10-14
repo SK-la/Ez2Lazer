@@ -265,7 +265,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return (createScore(ruleset, replay), beatmap, createEnvironment());
         }
 
-        private static GameplayEnvironment createEnvironment() => ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
+        private static GameplayEnvironment createEnvironment() => ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer);
 
         private static Score createScore(ManiaRuleset ruleset, Replay replay) => new Score
         {

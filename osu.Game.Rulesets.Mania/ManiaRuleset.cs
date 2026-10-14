@@ -613,7 +613,7 @@ namespace osu.Game.Rulesets.Mania
             hitWindows.BPM = beatmapInfo.BPM;
 
             // 获取当前HitMode
-            var currentHitMode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            var currentHitMode = GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode);
             bool isBMSMode = HitModeHelper.IsBMSHitMode(currentHitMode);
 
             yield return new RulesetBeatmapAttribute(SongSelectStrings.Accuracy, @"OD", originalDifficulty.OverallDifficulty, adjustedDifficulty.OverallDifficulty, 10)

@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         [Test]
         public void TestEmbeddedHitModeControlsDisplayedResults()
         {
-            var score = createScore(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
+            var score = createScore(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal);
             score.Statistics[HitResult.Great] = 7;
             score.Statistics[HitResult.Meh] = 3;
 
@@ -39,7 +39,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         public void TestMissingEmbeddedModesUseLazerDisplay()
         {
             ReplayJudgeTestConfig.ApplyToGlobalConfig(
-                ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal));
+                ReplayJudgeTestConfig.Create(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal));
 
             var score = createScore(null, null);
             var displayed = score.GetStatisticsForDisplay().Select(statistic => statistic.Result).ToArray();
@@ -52,7 +52,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         public void TestLegacyNegativeModesUseLazerDisplay()
         {
             ReplayJudgeTestConfig.ApplyToGlobalConfig(
-                ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal));
+                ReplayJudgeTestConfig.Create(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal));
 
             var score = new ScoreInfo
             {
@@ -71,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         public void TestGlobalBmsHitModeIncludesKpoorInHitResultsForDisplay()
         {
             ReplayJudgeTestConfig.ApplyToGlobalConfig(
-                ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD));
+                ReplayJudgeTestConfig.Create(EzEnumJudgeMode.IIDX_HD, EzEnumHealthMode.IIDX_HD));
 
             var ruleset = new ManiaRuleset();
             var displayResults = ruleset.GetHitResultsForDisplay().ToArray();
@@ -82,10 +82,10 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
             Assert.That(poorName.ToString(), Is.EqualTo("KPoor"));
         }
 
-        private static ScoreInfo createScore(EzEnumHitMode? hitMode, EzEnumHealthMode? healthMode) => new ScoreInfo
+        private static ScoreInfo createScore(EzEnumJudgeMode? hitMode, EzEnumHealthMode? healthMode) => new ScoreInfo
         {
             Ruleset = new ManiaRuleset().RulesetInfo,
-            ManiaHitMode = hitMode.HasValue ? (int)hitMode.Value : (int)EzEnumHitMode.Lazer,
+            ManiaHitMode = hitMode.HasValue ? (int)hitMode.Value : (int)EzEnumJudgeMode.Lazer,
             ManiaHealthMode = healthMode.HasValue ? (int)healthMode.Value : (int)EzEnumHealthMode.Lazer,
         };
 
@@ -96,10 +96,10 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         [Test]
         public void TestScoreSetDisplayUnionsPerScoreHitModes()
         {
-            ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer));
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer));
 
-            var lazerScore = createScore(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
-            var bmsScore = createScore(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD);
+            var lazerScore = createScore(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer);
+            var bmsScore = createScore(EzEnumJudgeMode.IIDX_HD, EzEnumHealthMode.IIDX_HD);
 
             var ruleset = new ManiaRuleset();
 

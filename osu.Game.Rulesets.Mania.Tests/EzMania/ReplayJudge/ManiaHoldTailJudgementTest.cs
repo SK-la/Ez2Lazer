@@ -16,12 +16,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
     [TestFixture]
     public class ManiaHoldTailJudgementTest
     {
-        [TestCase(EzEnumHitMode.O2Jam)]
-        [TestCase(EzEnumHitMode.IIDX_HD)]
-        [TestCase(EzEnumHitMode.EZ2AC)]
-        public void TestPerfectHoldSessionHasZeroComboBreak(EzEnumHitMode hitMode)
+        [TestCase(EzEnumJudgeMode.O2Jam)]
+        [TestCase(EzEnumJudgeMode.IIDX_HD)]
+        [TestCase(EzEnumJudgeMode.EZ2AC)]
+        public void TestPerfectHoldSessionHasZeroComboBreak(EzEnumJudgeMode judgeMode)
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateHoldPerfectForHitMode(hitMode);
+            var (score, beatmap, environment) = HitModeReplayFixtures.CreateHoldPerfectForHitMode(judgeMode);
             var result = ManiaReplaySession.Run(score, beatmap, environment);
 
             Assert.That(result.ScoreInfo.Statistics.TryGetValue(HitResult.ComboBreak, out int comboBreak) ? comboBreak : 0, Is.EqualTo(0));
@@ -92,12 +92,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         /// （尾未判、<c>isEarlyHoldRelease()</c>）→ Body ComboBreak；尾保持未判，交由 auto-miss 收束。
         /// Lazer 与 Classic 共用 <see cref="CommonHoldJudgementStrategy"/>，行为必须一致。
         /// </summary>
-        [TestCase(EzEnumHitMode.Lazer)]
-        [TestCase(EzEnumHitMode.Classic)]
-        public void TestEarlyHoldReleaseBreaksComboWithoutJudgingTail(EzEnumHitMode hitMode)
+        [TestCase(EzEnumJudgeMode.Lazer)]
+        [TestCase(EzEnumJudgeMode.Classic)]
+        public void TestEarlyHoldReleaseBreaksComboWithoutJudgingTail(EzEnumJudgeMode judgeMode)
         {
             var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldReleaseAt(releaseTime: 2500);
-            var environment = ReplayJudgeTestConfig.Create(hitMode, EzEnumHealthMode.Lazer);
+            var environment = ReplayJudgeTestConfig.Create(judgeMode, EzEnumHealthMode.Lazer);
 
             var result = ManiaReplaySession.Run(score, beatmap, environment);
 
@@ -110,12 +110,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         /// <summary>
         /// 尾窗内松手：局内先判尾（命中原生结果，头已命中且未断连故不降级）后写 Body IgnoreHit。
         /// </summary>
-        [TestCase(EzEnumHitMode.Lazer)]
-        [TestCase(EzEnumHitMode.Classic)]
-        public void TestReleaseInsideTailWindowJudgesTailWithoutComboBreak(EzEnumHitMode hitMode)
+        [TestCase(EzEnumJudgeMode.Lazer)]
+        [TestCase(EzEnumJudgeMode.Classic)]
+        public void TestReleaseInsideTailWindowJudgesTailWithoutComboBreak(EzEnumJudgeMode judgeMode)
         {
             var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldReleaseAt(releaseTime: 3950);
-            var environment = ReplayJudgeTestConfig.Create(hitMode, EzEnumHealthMode.Lazer);
+            var environment = ReplayJudgeTestConfig.Create(judgeMode, EzEnumHealthMode.Lazer);
 
             var result = ManiaReplaySession.Run(score, beatmap, environment);
 
@@ -129,13 +129,13 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         /// 此时 <c>Body.HasHoldBreak</c> 已为真 → 尾判由 Perfect 降级为 <b>Meh</b>（不断尾判、只降级）。
         /// 与 <c>TestSceneHoldNoteInput.TestPressAtStartThenBreakThenRepressAndReleaseAtTail</c> 同口径。
         /// </summary>
-        [TestCase(EzEnumHitMode.Lazer)]
-        [TestCase(EzEnumHitMode.Classic)]
-        public void TestBreakThenRepressCapsTailToMeh(EzEnumHitMode hitMode)
+        [TestCase(EzEnumJudgeMode.Lazer)]
+        [TestCase(EzEnumJudgeMode.Classic)]
+        public void TestBreakThenRepressCapsTailToMeh(EzEnumJudgeMode judgeMode)
         {
             var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldWithInputs(
                 (1500, true), (2500, false), (3900, true), (4000, false));
-            var environment = ReplayJudgeTestConfig.Create(hitMode, EzEnumHealthMode.Lazer);
+            var environment = ReplayJudgeTestConfig.Create(judgeMode, EzEnumHealthMode.Lazer);
 
             var result = ManiaReplaySession.Run(score, beatmap, environment);
 
@@ -150,13 +150,13 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         /// 单条 LN 中途多次「按下—松开」：stable 语义下每次提前松手都各计一次 ComboBreak。
         /// 覆盖 Lazer / Classic / BMS（<see cref="IManiaHoldJudgementStrategy.AllowsRepeatedHoldBreak"/> 为真）。
         /// </summary>
-        [TestCase(EzEnumHitMode.Lazer)]
-        [TestCase(EzEnumHitMode.Classic)]
-        [TestCase(EzEnumHitMode.IIDX_HD)]
-        public void TestRepeatedHoldBreakCountsEachRelease(EzEnumHitMode hitMode)
+        [TestCase(EzEnumJudgeMode.Lazer)]
+        [TestCase(EzEnumJudgeMode.Classic)]
+        [TestCase(EzEnumJudgeMode.IIDX_HD)]
+        public void TestRepeatedHoldBreakCountsEachRelease(EzEnumJudgeMode judgeMode)
         {
             var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldWithInputs(RepeatedBreakInputs);
-            var environment = ReplayJudgeTestConfig.Create(hitMode, EzEnumHealthMode.Lazer);
+            var environment = ReplayJudgeTestConfig.Create(judgeMode, EzEnumHealthMode.Lazer);
 
             var result = ManiaReplaySession.Run(score, beatmap, environment);
 
@@ -166,13 +166,13 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         /// <summary>
         /// O2 / EZ2AC / Malody 维持单次（或零次）断连语义，不因公共修复被放宽。
         /// </summary>
-        [TestCase(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal, 1)]
-        [TestCase(EzEnumHitMode.EZ2AC, EzEnumHealthMode.Ez2Ac, 0)]
-        [TestCase(EzEnumHitMode.Malody_E, EzEnumHealthMode.Lazer, 0)]
-        public void TestRepeatedHoldBreakKeepsSingleForExcludedHitModes(EzEnumHitMode hitMode, EzEnumHealthMode healthMode, int expected)
+        [TestCase(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal, 1)]
+        [TestCase(EzEnumJudgeMode.EZ2AC, EzEnumHealthMode.Ez2Ac, 0)]
+        [TestCase(EzEnumJudgeMode.Malody_E, EzEnumHealthMode.Lazer, 0)]
+        public void TestRepeatedHoldBreakKeepsSingleForExcludedHitModes(EzEnumJudgeMode judgeMode, EzEnumHealthMode healthMode, int expected)
         {
             var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldWithInputs(RepeatedBreakInputs);
-            var environment = ReplayJudgeTestConfig.Create(hitMode, healthMode);
+            var environment = ReplayJudgeTestConfig.Create(judgeMode, healthMode);
 
             var result = ManiaReplaySession.Run(score, beatmap, environment);
 
@@ -201,7 +201,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TestReleasePastLaterTailIsJudged(EzEnumJudgePrecedence precedence)
         {
             var (score, beatmap, _) = LazerTapReplayFixtures.CreateChainedHoldsReleasePastNextTail();
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer, precedence);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer, precedence);
 
             var tail = ManiaReplaySession.RunHitEvents(score, beatmap, environment)
                                         .Single(e => e.HitObject is TailNote && Math.Abs(e.HitObject.StartTime - 1950) < 1);
@@ -224,7 +224,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TestClassicTailLateReleaseUsesClassicWindows()
         {
             var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldLateTailRelease(lateMs: 30);
-            var classicEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Classic, EzEnumHealthMode.Lazer);
+            var classicEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Classic, EzEnumHealthMode.Lazer);
 
             var classicTail = ManiaReplaySession.RunHitEvents(score, beatmap, classicEnvironment).Single(e => e.HitObject is TailNote);
 
@@ -237,7 +237,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TestMalodyTailJudgementAfterEnvironmentApply()
         {
             var (_, beatmap, environment) = HitModeReplayFixtures.CreateMalodyHoldPerfect();
-            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, environment.HitMode);
+            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, environment.JudgeMode);
 
             var tail = beatmap.HitObjects.OfType<HoldNote>().Single().Tail;
             Assert.That(tail.Judgement, Is.TypeOf<MalodyTailJudgement>());
@@ -248,7 +248,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TestO2TailJudgementAfterEnvironmentApply()
         {
             var (_, beatmap, environment) = HitModeReplayFixtures.CreateO2HoldPerfect();
-            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, environment.HitMode);
+            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, environment.JudgeMode);
 
             var tail = beatmap.HitObjects.OfType<HoldNote>().Single().Tail;
             Assert.That(tail.Judgement.MaxResult, Is.EqualTo(HitResult.Perfect));

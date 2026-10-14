@@ -180,7 +180,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
             SetDefault(Ez2Setting.OffsetPlusMania, 0.0, -200.0, 200.0, 1.0);
             SetDefault(Ez2Setting.OffsetPlusNonMania, 0.0, -200.0, 200.0, 1.0);
-            SetDefault(Ez2Setting.StdHitMode, EzEnumHitMode.Lazer);
+            SetDefault(Ez2Setting.StdHitMode, EzEnumJudgeMode.Lazer);
 
             #endregion
 
@@ -288,7 +288,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         private void initializeManiaDefaults()
         {
-            SetDefault(Ez2Setting.ManiaHitMode, EzEnumHitMode.Lazer);
+            SetDefault(Ez2Setting.ManiaHitMode, EzEnumJudgeMode.Lazer);
             SetDefault(Ez2Setting.ManiaHealthMode, EzEnumHealthMode.Lazer);
             SetDefault(Ez2Setting.BmsPoorHitResultEnable, !DebugUtils.IsNUnitRunning);
             SetDefault(Ez2Setting.JudgePrecedence, EzEnumJudgePrecedence.Earliest);
@@ -387,7 +387,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         private GameplayEnvironment readLiveGameplayEnvironment(int rulesetId) => new GameplayEnvironment
         {
-            HitMode = resolveLiveHitMode(rulesetId),
+            JudgeMode = resolveLiveHitMode(rulesetId),
             ManiaHealthMode = Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode),
             JudgePrecedence = Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence),
             OffsetPlusMania = Get<double>(Ez2Setting.OffsetPlusMania),
@@ -398,11 +398,11 @@ namespace osu.Game.EzOsuGame.Configuration
         /// <summary>
         /// live 判定轨按规则集取：Mania/BMS 读 Mania 档，Osu 读 std 判定轨，其余默认 Lazer。
         /// </summary>
-        private EzEnumHitMode resolveLiveHitMode(int rulesetId) => rulesetId switch
+        private EzEnumJudgeMode resolveLiveHitMode(int rulesetId) => rulesetId switch
         {
-            3 => Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode),
-            0 => Get<EzEnumHitMode>(Ez2Setting.StdHitMode),
-            _ => EzEnumHitMode.Lazer,
+            3 => Get<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode),
+            0 => Get<EzEnumJudgeMode>(Ez2Setting.StdHitMode),
+            _ => EzEnumJudgeMode.Lazer,
         };
 
         private static GameplayEnvironment resolveStoredModes(GameplayEnvironment live, ScoreInfo? score, int rulesetId)
@@ -411,7 +411,7 @@ namespace osu.Game.EzOsuGame.Configuration
             {
                 return live with
                 {
-                    HitMode = (EzEnumHitMode)hitMode,
+                    JudgeMode = (EzEnumJudgeMode)hitMode,
                     ManiaHealthMode = (EzEnumHealthMode)healthMode,
                 };
             }
@@ -420,7 +420,7 @@ namespace osu.Game.EzOsuGame.Configuration
             {
                 return live with
                 {
-                    HitMode = EzEnumHitMode.Lazer,
+                    JudgeMode = EzEnumJudgeMode.Lazer,
                     ManiaHealthMode = EzEnumHealthMode.Lazer,
                 };
             }
@@ -430,7 +430,7 @@ namespace osu.Game.EzOsuGame.Configuration
                 // ForStored：优先成绩内存嵌入（[Ignored]，未升 Realm）；无则 Lazer。
                 return live with
                 {
-                    HitMode = score != null && score.StdHitMode >= 0 ? (EzEnumHitMode)score.StdHitMode : EzEnumHitMode.Lazer,
+                    JudgeMode = score != null && score.StdHitMode >= 0 ? (EzEnumJudgeMode)score.StdHitMode : EzEnumJudgeMode.Lazer,
                 };
             }
 

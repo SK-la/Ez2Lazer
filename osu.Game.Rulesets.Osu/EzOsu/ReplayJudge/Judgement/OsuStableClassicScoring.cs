@@ -14,8 +14,8 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement
     /// </summary>
     public static class OsuStableClassicScoring
     {
-        public static bool ShouldUseLegacyScoreAlgorithm(EzEnumHitMode track)
-            => track == EzEnumHitMode.StableClassic;
+        public static bool ShouldUseLegacyScoreAlgorithm(EzEnumJudgeMode track)
+            => track == EzEnumJudgeMode.StableClassic;
 
         /// <summary>
         /// 就地替换谱面物件 HitWindows（与 Mania BindJudgements 同纪律：Drawable 与 Session 共享同一 beatmap 实例）。

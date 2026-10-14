@@ -27,7 +27,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         /// 同列 80ms 叠键 + 第三次 note 作间隔；第一次按键落在双 note 窗口重叠区（1040ms）。
         /// </summary>
         public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateOverlappingJack(
-            EzEnumHitMode hitMode,
+            EzEnumJudgeMode judgeMode,
             EzEnumHealthMode healthMode,
             EzEnumJudgePrecedence judgePrecedence)
         {
@@ -58,7 +58,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 },
             };
 
-            var environment = ReplayJudgeTestConfig.Create(hitMode, healthMode, judgePrecedence);
+            var environment = ReplayJudgeTestConfig.Create(judgeMode, healthMode, judgePrecedence);
             var score = createScore(ruleset, replay);
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, environment);
             return (score, beatmap, environment);

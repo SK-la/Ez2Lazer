@@ -34,7 +34,7 @@ namespace osu.Game.EzOsuGame.Scoring
                 return false;
 
             if (hitMode < 0)
-                hitMode = (int)EzEnumHitMode.Lazer;
+                hitMode = (int)EzEnumJudgeMode.Lazer;
 
             if (healthMode < 0)
                 healthMode = (int)EzEnumHealthMode.Lazer;
@@ -46,15 +46,15 @@ namespace osu.Game.EzOsuGame.Scoring
         /// Mania 展示层 HitMode：嵌入成绩 &gt; 局内全局（score 为 null）&gt; 旧成绩 Lazer 回退。
         /// 供 HUD 判定计数器与 Ruleset 展示名共用。
         /// </summary>
-        public static EzEnumHitMode ResolveDisplayHitMode(ScoreInfo? score)
+        public static EzEnumJudgeMode ResolveDisplayHitMode(ScoreInfo? score)
         {
             if (score != null && score.TryGetManiaGameplayModes(out int hitMode, out _))
-                return (EzEnumHitMode)hitMode;
+                return (EzEnumJudgeMode)hitMode;
 
             if (score == null)
-                return GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+                return GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaHitMode);
 
-            return EzEnumHitMode.Lazer;
+            return EzEnumJudgeMode.Lazer;
         }
 
         public static void ApplyManiaGameplayModes(this ScoreInfo score, DrawableRuleset? drawableRuleset)
@@ -67,7 +67,7 @@ namespace osu.Game.EzOsuGame.Scoring
             score.ManiaHealthMode = snapshot.HealthMode;
         }
 
-        public static string GetHitModeDisplayName(int hitMode) => getEnumDescription<EzEnumHitMode>(hitMode);
+        public static string GetHitModeDisplayName(int hitMode) => getEnumDescription<EzEnumJudgeMode>(hitMode);
 
         public static string GetHealthModeDisplayName(int healthMode) => getEnumDescription<EzEnumHealthMode>(healthMode);
 
@@ -84,7 +84,7 @@ namespace osu.Game.EzOsuGame.Scoring
 
             stdMode = score.StdHitMode >= 0
                 ? score.StdHitMode
-                : (int)GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.StdHitMode);
+                : (int)GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.StdHitMode);
 
             return true;
         }
@@ -97,7 +97,7 @@ namespace osu.Game.EzOsuGame.Scoring
         {
             if (score.TryGetManiaGameplayModes(out int hitMode, out int healthMode))
             {
-                if (hitMode == (int)EzEnumHitMode.Lazer && healthMode == (int)EzEnumHealthMode.Lazer)
+                if (hitMode == (int)EzEnumJudgeMode.Lazer && healthMode == (int)EzEnumHealthMode.Lazer)
                     return createPlaceholder(anchor);
 
                 return new FillFlowContainer
@@ -115,7 +115,7 @@ namespace osu.Game.EzOsuGame.Scoring
                 };
             }
 
-            if (score.TryGetStdGameplayMode(out int stdMode) && stdMode != (int)EzEnumHitMode.Lazer)
+            if (score.TryGetStdGameplayMode(out int stdMode) && stdMode != (int)EzEnumJudgeMode.Lazer)
             {
                 return new FillFlowContainer
                 {

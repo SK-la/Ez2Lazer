@@ -111,7 +111,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             var controller = new ManiaLaneController();
             controller.Register(createBmsNote(10_000));
-            controller.ConfigureMissCollection(EzEnumHitMode.IIDX_HD, overallDifficulty: 5);
+            controller.ConfigureMissCollection(EzEnumJudgeMode.IIDX_HD, overallDifficulty: 5);
             Assert.That(controller.CollectOverlappingEntries(pressTime), Has.Count.EqualTo(1));
         }
 
@@ -120,7 +120,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var note = new Note
             {
                 StartTime = startTime,
-                HitWindows = new ManiaHitWindows(EzEnumHitMode.Lazer)
+                HitWindows = new ManiaHitWindows(EzEnumJudgeMode.Lazer)
             };
 
             var drawable = new DrawableNote();
@@ -133,7 +133,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var note = new Note
             {
                 StartTime = startTime,
-                HitWindows = new ManiaHitWindows(EzEnumHitMode.IIDX_HD)
+                HitWindows = new ManiaHitWindows(EzEnumJudgeMode.IIDX_HD)
             };
 
             var drawable = new DrawableNote();

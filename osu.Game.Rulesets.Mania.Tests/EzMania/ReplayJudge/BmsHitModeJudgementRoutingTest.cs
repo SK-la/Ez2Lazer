@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             laneStates[0].Result = BmsHitModeJudgement.MapTo(BmsJudge.Bad);
             laneStates[0].BmsRoute.CanRouteToKPoor = true;
 
-            var helper = new HitModeHelper(EzEnumHitMode.IIDX_HD)
+            var helper = new HitModeHelper(EzEnumJudgeMode.IIDX_HD)
             {
                 OverallDifficulty = 5,
                 BPM = 120,

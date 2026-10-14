@@ -36,7 +36,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         {
             try
             {
-                ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.IIDX_HD));
+                ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.IIDX_HD));
                 var first = new ManiaHealthProcessor(0);
                 first.ApplyEzGameplayEnvironment();
 
