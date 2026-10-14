@@ -9,10 +9,12 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mania.Scoring;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Replays;
@@ -533,6 +535,44 @@ namespace osu.Game.Rulesets.Mania.Tests
         }
 
         /// <summary>
+        /// LN 判定调整 Mod 会覆写 <see cref="DrawableHoldNoteBody.TriggerResult"/> 重定义 Body 语义；
+        /// 一条 LN 中途多次「按下—松开」时不得绕过该 Mod 口径补发 ComboBreak。
+        ///
+        ///     -----[           ]-----
+        ///          x      o   x   o   x     o
+        /// </summary>
+        [TestCase(false, false)] // 无 LN：Body 不参与判定
+        [TestCase(true, false)] // 全 LN：Body 按头档位落一次判定
+        public void TestRepeatedReleaseWithLNJudgementAdjustModDoesNotBreakCombo(bool bodyJudgement, bool tailJudgement)
+        {
+            performTest(
+                new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(time_head, ManiaAction.Key1),
+                    new ManiaReplayFrame(time_during_hold_1),
+                    new ManiaReplayFrame(3000, ManiaAction.Key1),
+                    new ManiaReplayFrame(3200),
+                    new ManiaReplayFrame(3800, ManiaAction.Key1),
+                    new ManiaReplayFrame(time_after_tail),
+                },
+                mods: new Mod[]
+                {
+                    new ManiaModLNJudgementAdjust
+                    {
+                        BodyJudgementSwitch = { Value = bodyJudgement },
+                        TailJudgementSwitch = { Value = tailJudgement },
+                    },
+                });
+
+            AddAssert("body judged without extra combo break", () =>
+            {
+                var bodyResults = judgementResults.Where(j => j.HitObject is HoldNoteBody).ToList();
+
+                return (judged: bodyResults.Count, comboBreaks: bodyResults.Count(j => j.Type == HitResult.ComboBreak));
+            }, () => Is.EqualTo((judged: 1, comboBreaks: 0)));
+        }
+
+        /// <summary>
         /// 转换产物拥有自己的 HitObject，所以本用例持有的源对象并不是被判定的那个实例；按类型 / 时间 / 列认同一个对象。
         /// </summary>
         private static bool isSameObject(HitObject judged, HitObject source)
@@ -557,7 +597,7 @@ namespace osu.Game.Rulesets.Mania.Tests
 
         private ScoreAccessibleReplayPlayer currentPlayer = null!;
 
-        private void performTest(List<ReplayFrame> frames, Beatmap<ManiaHitObject>? beatmap = null)
+        private void performTest(List<ReplayFrame> frames, Beatmap<ManiaHitObject>? beatmap = null, IReadOnlyList<Mod>? mods = null)
         {
             if (beatmap == null)
             {
@@ -584,6 +624,9 @@ namespace osu.Game.Rulesets.Mania.Tests
 
             AddStep("load player", () =>
             {
+                if (mods != null)
+                    SelectedMods.Value = mods;
+
                 Beatmap.Value = CreateWorkingBeatmap(beatmap);
 
                 var p = new ScoreAccessibleReplayPlayer(new Score { Replay = new Replay { Frames = frames } });

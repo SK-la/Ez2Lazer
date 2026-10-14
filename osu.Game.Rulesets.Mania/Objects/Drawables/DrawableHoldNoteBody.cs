@@ -37,6 +37,10 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         /// <summary>
         /// 补发瞬态判定：只进统计与 combo，不改变 Body 的判定态（一条 LN 多次断连时用）。
         /// </summary>
-        internal void EzDispatchExtraResult(HitResult result) => DispatchNewResult(result);
+        /// <remarks>
+        /// 覆写 <see cref="TriggerResult"/> 重定义 Body 语义的 Mod（如无 LN / 全 LN）必须一并覆写本方法：
+        /// 否则每次提前松手都会绕过 Mod 口径补发一条 ComboBreak。
+        /// </remarks>
+        internal virtual void EzDispatchExtraResult(HitResult result) => DispatchNewResult(result);
     }
 }

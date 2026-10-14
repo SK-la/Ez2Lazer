@@ -13,7 +13,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Replicas
     {
         public static CommonHoldJudgementStrategy Instance { get; } = new CommonHoldJudgementStrategy();
 
-        // Lazer/Classic 断连语义与 stable 一致：每次提前松手各自计一次。
+        // Lazer / Classic 每次提前松手各计一次断连（Ez 自有语义，非上游 ppy 行为）。
         public bool AllowsRepeatedHoldBreak => true;
 
         public HitResult EvaluateTail(in HoldTailEvaluationContext context)

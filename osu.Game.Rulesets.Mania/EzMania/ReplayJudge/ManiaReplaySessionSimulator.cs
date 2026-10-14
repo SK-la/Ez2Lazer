@@ -1279,8 +1279,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             if (state == null || state.Judged)
                 return;
 
-            state.HoldBroken = true;
-
             // 首次断连已落 Body 判定（final）；后续松手只在允许多次断连的 hitmode 下补发瞬态 ComboBreak。
             if (state.BodyJudged)
             {
@@ -1292,6 +1290,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 return;
             }
 
+            // 断连标志是每条 LN 的单调状态，只在首次断连置位。
+            state.HoldBroken = true;
             state.BodyJudged = true;
             ApplyAuxiliaryResult(scoreProcessor, hold.Body, HitResult.ComboBreak,
                 ComputeDrawableStoredTimeOffset(eventTime, hold.Body), eventTime, gameplayRate, timelineRecorder);
