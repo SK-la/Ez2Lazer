@@ -49,6 +49,13 @@ namespace osu.Game.EzOsuGame.Configuration
 
         [Description("")]
         Classic = 8,
+
+        /// <summary>
+        /// 全规则集共用的 stable 经典判定档，任何规则集都可切到 stable 经典判定/计分。
+        /// 9 是过渡占位：本分支不落库；最终低号段与 mania 私有档重排放在 ScoreInfo 升版迁移里统一做。
+        /// </summary>
+        [Description("Stable Classic")]
+        StableClassic = 9,
     }
 
     public enum EzEnumHealthMode
@@ -91,17 +98,5 @@ namespace osu.Game.EzOsuGame.Configuration
 
         // [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.JUDGE_PRECEDENCE_SCORE))]
         // Score = 3,
-    }
-
-    /// <summary>
-    /// Osu 判定轨（OSL-013）。Lazer = 现行 Drawable/Shadow 语义；StableClassic = stable 原生窗口/计分（进行中）。
-    /// </summary>
-    public enum EzEnumStdHitMode
-    {
-        [Description("Lazer")]
-        Lazer = 0,
-
-        [Description("Stable Classic")]
-        StableClassic = 1,
     }
 }

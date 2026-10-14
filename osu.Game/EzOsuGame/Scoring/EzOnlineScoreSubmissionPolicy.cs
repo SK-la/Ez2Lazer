@@ -26,7 +26,7 @@ namespace osu.Game.EzOsuGame.Scoring
             score.SessionAccuracyCutoffS = config.Get<double>(Ez2Setting.AccuracyCutoffS);
             score.SessionOffsetPlusMania = config.Get<double>(Ez2Setting.OffsetPlusMania);
             score.SessionOffsetPlusNonMania = config.Get<double>(Ez2Setting.OffsetPlusNonMania);
-            score.StdHitMode = (int)config.Get<EzEnumStdHitMode>(Ez2Setting.StdHitMode);
+            score.StdHitMode = (int)config.Get<EzEnumHitMode>(Ez2Setting.StdHitMode);
             score.SessionSettingsCaptured = true;
         }
 

@@ -71,8 +71,6 @@ namespace osu.Game.EzOsuGame.Scoring
 
         public static string GetHealthModeDisplayName(int healthMode) => getEnumDescription<EzEnumHealthMode>(healthMode);
 
-        public static string GetStdHitModeDisplayName(int stdMode) => getEnumDescription<EzEnumStdHitMode>(stdMode);
-
         /// <summary>
         /// 非 mania 成绩的 std 判定轨（OSL-013）。成绩内存值优先；落库成绩无该字段（[Ignored]），回退当前配置。
         /// 仅 Osu 规则集返回 true。
@@ -86,7 +84,7 @@ namespace osu.Game.EzOsuGame.Scoring
 
             stdMode = score.StdHitMode >= 0
                 ? score.StdHitMode
-                : (int)GlobalConfigStore.EzConfig.Get<EzEnumStdHitMode>(Ez2Setting.StdHitMode);
+                : (int)GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.StdHitMode);
 
             return true;
         }
@@ -117,7 +115,7 @@ namespace osu.Game.EzOsuGame.Scoring
                 };
             }
 
-            if (score.TryGetStdGameplayMode(out int stdMode) && stdMode != (int)EzEnumStdHitMode.Lazer)
+            if (score.TryGetStdGameplayMode(out int stdMode) && stdMode != (int)EzEnumHitMode.Lazer)
             {
                 return new FillFlowContainer
                 {
@@ -128,7 +126,7 @@ namespace osu.Game.EzOsuGame.Scoring
                     Spacing = new Vector2(0, 2),
                     Children = new[]
                     {
-                        createModeLine("Judge", GetStdHitModeDisplayName(stdMode), fontSize, anchor),
+                        createModeLine("Judge", GetHitModeDisplayName(stdMode), fontSize, anchor),
                     }
                 };
             }

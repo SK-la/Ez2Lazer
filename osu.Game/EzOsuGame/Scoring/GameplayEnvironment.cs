@@ -22,7 +22,7 @@ namespace osu.Game.EzOsuGame.Scoring
         /// <inheritdoc cref="IGameplayEnvironment.OffsetPlusNonMania"/>
         public double OffsetPlusNonMania { get; init; }
 
-        public EzEnumStdHitMode StdHitMode { get; init; }
+        public EzEnumHitMode StdHitMode { get; init; }
 
         public bool BmsPoorHitResultEnable { get; init; }
 

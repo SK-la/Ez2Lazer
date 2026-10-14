@@ -179,7 +179,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
             SetDefault(Ez2Setting.OffsetPlusMania, 0.0, -200.0, 200.0, 1.0);
             SetDefault(Ez2Setting.OffsetPlusNonMania, 0.0, -200.0, 200.0, 1.0);
-            SetDefault(Ez2Setting.StdHitMode, EzEnumStdHitMode.Lazer);
+            SetDefault(Ez2Setting.StdHitMode, EzEnumHitMode.Lazer);
 
             #endregion
 
@@ -390,20 +390,20 @@ namespace osu.Game.EzOsuGame.Configuration
             JudgePrecedence = Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence),
             OffsetPlusMania = Get<double>(Ez2Setting.OffsetPlusMania),
             OffsetPlusNonMania = Get<double>(Ez2Setting.OffsetPlusNonMania),
-            StdHitMode = Get<EzEnumStdHitMode>(Ez2Setting.StdHitMode),
+            StdHitMode = Get<EzEnumHitMode>(Ez2Setting.StdHitMode),
             BmsPoorHitResultEnable = Get<bool>(Ez2Setting.BmsPoorHitResultEnable),
         };
 
-        private static EzEnumStdHitMode resolveStdHitMode(ReplayRunPurpose purpose, GameplayEnvironment live, ScoreInfo? score)
+        private static EzEnumHitMode resolveStdHitMode(ReplayRunPurpose purpose, GameplayEnvironment live, ScoreInfo? score)
         {
             if (purpose == ReplayRunPurpose.ForLive)
                 return live.StdHitMode;
 
             // ForStored：优先成绩内存嵌入（[Ignored]，未升 Realm）；否则 Lazer。
             if (score != null && score.Ruleset.OnlineID == 0 && score.StdHitMode >= 0)
-                return (EzEnumStdHitMode)score.StdHitMode;
+                return (EzEnumHitMode)score.StdHitMode;
 
-            return EzEnumStdHitMode.Lazer;
+            return EzEnumHitMode.Lazer;
         }
 
         private static GameplayEnvironment resolveStoredModes(GameplayEnvironment live, ScoreInfo? score)

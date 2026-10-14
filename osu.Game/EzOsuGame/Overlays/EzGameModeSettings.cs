@@ -1,6 +1,8 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -68,6 +70,8 @@ namespace osu.Game.EzOsuGame.Overlays
                     Caption = EzSettingsStrings.HIT_MODE,
                     HintText = EzSettingsStrings.HIT_MODE_TOOLTIP,
                     Current = maniaHitModeBindable,
+                    // StableClassic 是给后续共享 classic 预留的档，现行 mania classic 仍是 Classic。
+                    Items = Enum.GetValues<EzEnumHitMode>().Where(m => m != EzEnumHitMode.StableClassic),
                 })
                 {
                     Keywords = new[] { "ez", "mania" }

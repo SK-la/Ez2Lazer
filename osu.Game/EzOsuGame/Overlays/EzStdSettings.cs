@@ -22,17 +22,18 @@ namespace osu.Game.EzOsuGame.Overlays
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
         {
-            var judgementTrack = ezConfig.GetBindable<EzEnumStdHitMode>(Ez2Setting.StdHitMode);
+            var judgementTrack = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.StdHitMode);
             var offsetNonMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania);
 
             Children = new Drawable[]
             {
                 CreateSubmitWarningNote(),
-                new SettingsItemV2(new FormEnumDropdown<EzEnumStdHitMode>
+                new SettingsItemV2(new FormEnumDropdown<EzEnumHitMode>
                 {
                     Caption = EzSettingsStrings.OSU_JUDGEMENT_TRACK,
                     HintText = EzSettingsStrings.OSU_JUDGEMENT_TRACK_TOOLTIP,
                     Current = judgementTrack,
+                    Items = new[] { EzEnumHitMode.Lazer, EzEnumHitMode.StableClassic },
                 })
                 {
                     Keywords = new[] { "ez", "osu", "std", "classic", "judgement" }
