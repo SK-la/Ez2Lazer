@@ -35,6 +35,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
     {
         public static O2HitModeJudgement Instance { get; } = new O2HitModeJudgement();
 
+        // O2 首次断连即封掉后续输入（ApplyDrawableHoldBreakUpdate），Body 维持单次。
+        public bool AllowsRepeatedHoldBreak => false;
+
         public static HitResult MapTo(O2Judge judge) => judge switch
         {
             O2Judge.Cool => HitResult.Perfect,

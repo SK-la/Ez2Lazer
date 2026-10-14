@@ -39,6 +39,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
     public interface IManiaHoldJudgementStrategy
     {
+        /// <summary>
+        /// 一条 LN 中途每次松手是否各计一次断连（stable 语义：每次提前松手重置 combo）。
+        /// 为 <c>false</c> 时整条 LN 最多产出一次 Body 断连，后续松手不再补发。
+        /// </summary>
+        bool AllowsRepeatedHoldBreak { get; }
+
         HitResult EvaluateTail(in HoldTailEvaluationContext context);
 
         bool CanBeginHoldAt(double time, TailNote tail);

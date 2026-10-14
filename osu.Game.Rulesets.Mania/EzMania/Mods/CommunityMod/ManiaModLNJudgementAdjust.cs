@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -307,6 +307,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
                 ApplyMaxResult();
             }
+
+            // 无 LN 模式下 Body 不参与判定，不再补发断连。
+            internal override void EzDispatchExtraResult(HitResult result)
+            {
+            }
         }
 
         public partial class AllLNDrawableHoldNoteBody : DrawableHoldNoteBody
@@ -323,6 +328,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                     ApplyResult(HoldNote.Head.Result.Type);
                 else
                     ApplyResult(HitResult.Miss);
+            }
+
+            // 全 LN 模式下 Body 已按头档位/断连落一次判定，不再补发断连。
+            internal override void EzDispatchExtraResult(HitResult result)
+            {
             }
         }
 

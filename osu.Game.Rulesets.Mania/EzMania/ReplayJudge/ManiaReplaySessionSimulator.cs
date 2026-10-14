@@ -239,7 +239,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         if (activeTail == null)
                         {
                             tryApplyEz2AcHoldRelease(input.Column, holdByHead, headWasHit, headByTail, releaseColumns, ez2AcHoldStates, environment);
-                            tryApplyEarlyHoldBreakBody(releasingHoldHead, input.Time, environment, holdByHead, releaseColumns, scoreProcessor, gameplayRate, timelineRecorder);
+                            tryApplyEarlyHoldBreakBody(releasingHoldHead, input.Time, environment, holdStrategy, holdByHead, releaseColumns, scoreProcessor, gameplayRate, timelineRecorder);
                             return;
                         }
                     }
@@ -249,7 +249,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         // 按下重臂改由 processInputEvent.finally 统一处理。
                         // [parity] 松手落在候选窗口外也可能断连（局内断连不受窗口限制）。
                         if (!input.IsPress)
-                            tryApplyEarlyHoldBreakBody(releasingHoldHead, input.Time, environment, holdByHead, releaseColumns, scoreProcessor, gameplayRate, timelineRecorder);
+                            tryApplyEarlyHoldBreakBody(releasingHoldHead, input.Time, environment, holdStrategy, holdByHead, releaseColumns, scoreProcessor, gameplayRate, timelineRecorder);
 
                         return;
                     }
@@ -262,7 +262,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         if (!input.IsPress)
                         {
                             tryApplyEz2AcHoldRelease(input.Column, holdByHead, headWasHit, headByTail, releaseColumns, ez2AcHoldStates, environment);
-                            tryApplyEarlyHoldBreakBody(releasingHoldHead, input.Time, environment, holdByHead, releaseColumns, scoreProcessor, gameplayRate, timelineRecorder);
+                            tryApplyEarlyHoldBreakBody(releasingHoldHead, input.Time, environment, holdStrategy, holdByHead, releaseColumns, scoreProcessor, gameplayRate, timelineRecorder);
                         }
                         else
                             tryApplyEz2AcHoldRepress(input.Column, holdByHead, headWasHit, headByTail, releaseColumns, ez2AcHoldStates, environment);
@@ -325,7 +325,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                                 if (!input.IsPress)
                                 {
                                     tryApplyEz2AcHoldRelease(input.Column, holdByHead, headWasHit, headByTail, releaseColumns, ez2AcHoldStates, environment);
-                                    tryApplyEarlyHoldBreakBody(releasingHoldHead, input.Time, environment, holdByHead, releaseColumns, scoreProcessor, gameplayRate, timelineRecorder);
+                                    tryApplyEarlyHoldBreakBody(releasingHoldHead, input.Time, environment, holdStrategy, holdByHead, releaseColumns, scoreProcessor, gameplayRate, timelineRecorder);
                                 }
 
                                 return;
@@ -354,7 +354,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                             {
                                 // [parity] 本次松手未判定尾键 → 检查是否构成断连（Body ComboBreak）。
                                 if (!input.IsPress)
-                                    tryApplyEarlyHoldBreakBody(releasingHoldHead, input.Time, environment, holdByHead, releaseColumns, scoreProcessor, gameplayRate, timelineRecorder);
+                                    tryApplyEarlyHoldBreakBody(releasingHoldHead, input.Time, environment, holdStrategy, holdByHead, releaseColumns, scoreProcessor, gameplayRate, timelineRecorder);
                                 return;
                             }
                         }
@@ -1233,12 +1233,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// 对齐局内 <c>DrawableHoldNote.EzTriggerBodyAfterTailRelease</c>（isEarlyHoldRelease → <c>Body.TriggerResult(false)</c>）。
         /// 仅作用于松手前的 <paramref name="activeHead"/>（局内 ActiveHold），不得扫同列未来 LN。
         /// 头 Miss 仍可能持有（<c>beginHoldAt</c>），故不要求 headHit。
+        /// 一条 LN 多次断连：首次落 final ComboBreak；后续仅在
+        /// <see cref="IManiaHoldJudgementStrategy.AllowsRepeatedHoldBreak"/> 为真时补发瞬态 ComboBreak（不改判定态）。
         /// Malody 例外：局内走 <c>TryMalodyHoldOnReleased</c>（Body 记 IgnoreHit），不在此处理。
         /// </summary>
         private static void tryApplyEarlyHoldBreakBody(
             HeadNote? activeHead,
             double eventTime,
             IGameplayEnvironment environment,
+            IManiaHoldJudgementStrategy holdStrategy,
             Dictionary<HeadNote, HoldNote> holdByHead,
             IReadOnlyDictionary<int, List<LaneTargetState>> releaseColumns,
             ScoreProcessor scoreProcessor,
@@ -1273,9 +1276,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 }
             }
 
-            if (state == null || state.Judged || state.BodyJudged)
+            if (state == null || state.Judged)
                 return;
 
+            // 首次断连已落 Body 判定（final）；后续松手只在允许多次断连的 hitmode 下补发瞬态 ComboBreak。
+            if (state.BodyJudged)
+            {
+                if (!holdStrategy.AllowsRepeatedHoldBreak)
+                    return;
+
+                ApplyTransientResult(scoreProcessor, hold.Body, HitResult.ComboBreak,
+                    ComputeDrawableStoredTimeOffset(eventTime, hold.Body), eventTime, gameplayRate, timelineRecorder);
+                return;
+            }
+
+            // 断连标志是每条 LN 的单调状态，只在首次断连置位。
             state.HoldBroken = true;
             state.BodyJudged = true;
             ApplyAuxiliaryResult(scoreProcessor, hold.Body, HitResult.ComboBreak,

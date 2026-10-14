@@ -31,6 +31,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
     {
         public static BmsHitModeJudgement Instance { get; } = new BmsHitModeJudgement();
 
+        public bool AllowsRepeatedHoldBreak => true;
+
         public static HitResult MapTo(BmsJudge judge)
             => judge switch
             {

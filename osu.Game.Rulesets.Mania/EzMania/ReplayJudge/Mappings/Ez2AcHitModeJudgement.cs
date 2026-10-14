@@ -26,6 +26,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
     {
         public static Ez2AcHitModeJudgement Instance { get; } = new Ez2AcHitModeJudgement();
 
+        // EZ2AC LN 的断连由 tick 状态机（IgnoreMiss）承担，Body 维持单次。
+        public bool AllowsRepeatedHoldBreak => false;
+
         public static HitResult MapTo(Ez2AcJudge judge) => judge switch
         {
             Ez2AcJudge.Kool => HitResult.Perfect,
