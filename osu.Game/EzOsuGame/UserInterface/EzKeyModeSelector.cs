@@ -244,6 +244,9 @@ namespace osu.Game.EzOsuGame.UserInterface
                 AutoSizeAxes = Axes.Y;
                 Shear = OsuGame.SHEAR;
                 Masking = true;
+
+                // 选中态完全由 UpdateTabItemUI 驱动；框架默认会点亮第一个 tab，会盖住记忆的选择。
+                SelectFirstTabByDefault = false;
             }
 
             [BackgroundDependencyLoader]
