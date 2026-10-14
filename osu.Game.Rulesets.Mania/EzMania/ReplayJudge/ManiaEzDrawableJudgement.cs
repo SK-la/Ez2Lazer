@@ -332,6 +332,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             return true;
         }
 
+        /// <summary>本局 hitmode 是否允许一条 LN 中途多次断连各计一次（见 <see cref="IManiaHoldJudgementStrategy.AllowsRepeatedHoldBreak"/>）。</summary>
+        internal static bool AllowsRepeatedHoldBreak(DrawableHoldNote hold)
+            => ManiaJudgementRegistry.GetHoldStrategy(getJudgementRound(hold).Environment).AllowsRepeatedHoldBreak;
+
         internal static bool TryApplyEzNoteCheckForResult(DrawableNote drawable, bool userTriggered, double timeOffset)
         {
             ManiaJudgeHotPathTrace.RecordCheckForResult();

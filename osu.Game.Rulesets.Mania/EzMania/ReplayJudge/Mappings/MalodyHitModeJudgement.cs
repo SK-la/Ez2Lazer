@@ -21,6 +21,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
     {
         public static MalodyHitModeJudgement Instance { get; } = new MalodyHitModeJudgement();
 
+        // Malody LN 松手记 IgnoreHit（不断连），Body 维持单次。
+        public bool AllowsRepeatedHoldBreak => false;
+
         public static HitResult MapTo(MalodyJudge judge)
             => judge switch
             {

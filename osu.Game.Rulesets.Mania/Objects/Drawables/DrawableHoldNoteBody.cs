@@ -3,6 +3,8 @@
 
 #nullable disable
 
+using osu.Game.Rulesets.Scoring;
+
 namespace osu.Game.Rulesets.Mania.Objects.Drawables
 {
     public partial class DrawableHoldNoteBody : DrawableManiaHitObject<HoldNoteBody>
@@ -31,5 +33,10 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             else
                 ApplyMinResult();
         }
+
+        /// <summary>
+        /// 补发瞬态判定：只进统计与 combo，不改变 Body 的判定态（一条 LN 多次断连时用）。
+        /// </summary>
+        internal void EzDispatchExtraResult(HitResult result) => DispatchNewResult(result);
     }
 }

@@ -147,6 +147,51 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         /// <summary>
+        /// 单条 LN 中途多次「按下—松开」：stable 语义下每次提前松手都各计一次 ComboBreak。
+        /// 覆盖 Lazer / Classic / BMS（<see cref="IManiaHoldJudgementStrategy.AllowsRepeatedHoldBreak"/> 为真）。
+        /// </summary>
+        [TestCase(EzEnumHitMode.Lazer)]
+        [TestCase(EzEnumHitMode.Classic)]
+        [TestCase(EzEnumHitMode.IIDX_HD)]
+        public void TestRepeatedHoldBreakCountsEachRelease(EzEnumHitMode hitMode)
+        {
+            var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldWithInputs(RepeatedBreakInputs);
+            var environment = ReplayJudgeTestConfig.Create(hitMode, EzEnumHealthMode.Lazer);
+
+            var result = ManiaReplaySession.Run(score, beatmap, environment);
+
+            Assert.That(result.ScoreInfo.Statistics.TryGetValue(HitResult.ComboBreak, out int comboBreak) ? comboBreak : 0, Is.EqualTo(RepeatedBreakCount));
+        }
+
+        /// <summary>
+        /// O2 / EZ2AC / Malody 维持单次（或零次）断连语义，不因公共修复被放宽。
+        /// </summary>
+        [TestCase(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal, 1)]
+        [TestCase(EzEnumHitMode.EZ2AC, EzEnumHealthMode.Ez2Ac, 0)]
+        [TestCase(EzEnumHitMode.Malody_E, EzEnumHealthMode.Lazer, 0)]
+        public void TestRepeatedHoldBreakKeepsSingleForExcludedHitModes(EzEnumHitMode hitMode, EzEnumHealthMode healthMode, int expected)
+        {
+            var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldWithInputs(RepeatedBreakInputs);
+            var environment = ReplayJudgeTestConfig.Create(hitMode, healthMode);
+
+            var result = ManiaReplaySession.Run(score, beatmap, environment);
+
+            Assert.That(result.ScoreInfo.Statistics.TryGetValue(HitResult.ComboBreak, out int comboBreak) ? comboBreak : 0, Is.EqualTo(expected));
+        }
+
+        // 4 次提前松手（均在尾 4000 之前），末尾重新按住过尾收束。
+        private static readonly (double time, bool press)[] RepeatedBreakInputs =
+        {
+            (1500, true), (1650, false),
+            (1800, true), (1950, false),
+            (2100, true), (2250, false),
+            (2400, true), (2550, false),
+            (3800, true), (4100, false),
+        };
+
+        private const int RepeatedBreakCount = 4;
+
+        /// <summary>
         /// 松手落点越过下一条 LN 的尾开始时间时，前一条尾仍须被判定，且不受 JudgePrecedence 影响
         /// （局内 OnReleased 不经过 note-lock；Earliest 的阻挡规则只用于按下选目标）。
         /// </summary>

@@ -509,6 +509,42 @@ namespace osu.Game.Rulesets.Mania.Tests
                 assertJudgedHitsComplete: true);
         }
 
+        /// <summary>
+        /// 一条长 LN 中途多次「按下—松开」：每次提前松手各计一次 ComboBreak（stable 语义）。
+        /// 局内与 Session 必须同为 N 次且全量统计一致。
+        /// </summary>
+        [Test]
+        public void TestFullScoreParity_LazerHoldRepeatedBreak()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
+
+            const double head = 1500;
+            const double tail = 4000;
+            const int breaks = 4;
+
+            var frames = new List<ReplayFrame>();
+
+            for (int i = 0; i < breaks; i++)
+            {
+                frames.Add(new ManiaReplayFrame(head + i * 300, ManiaAction.Key1));
+                frames.Add(new ManiaReplayFrame(head + i * 300 + 150));
+            }
+
+            // 末尾重按并持过尾，避免尾 auto-miss 干扰断连计数。
+            frames.Add(new ManiaReplayFrame(tail - 200, ManiaAction.Key1));
+            frames.Add(new ManiaReplayFrame(tail + 100));
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                },
+                frames);
+
+            AddAssert("repeated hold breaks counted per release", () =>
+                currentPlayer.ScoreProcessor.Statistics.GetValueOrDefault(HitResult.ComboBreak) == breaks);
+        }
+
         [Test]
         public void TestReplayAfterRecalcEz2AcMatchesNow()
         {
