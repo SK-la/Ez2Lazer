@@ -18,7 +18,7 @@ namespace osu.Game.EzOsuGame.Scoring
 
         /// <summary>
         /// Records offset and accuracy cutoff settings at the start of a play session.
-        /// Mania hit/health modes are stored separately via <see cref="EzManiaScoreModeExtensions.ApplyManiaGameplayModes"/>.
+        /// Mania hit/health modes are stored separately via <see cref="EzScoreInfoExtensions.ApplyManiaGameplayModes"/>.
         /// </summary>
         public static void ApplySessionSettingsSnapshot(ScoreInfo score, Ez2ConfigManager config)
         {
@@ -26,7 +26,7 @@ namespace osu.Game.EzOsuGame.Scoring
             score.SessionAccuracyCutoffS = config.Get<double>(Ez2Setting.AccuracyCutoffS);
             score.SessionOffsetPlusMania = config.Get<double>(Ez2Setting.OffsetPlusMania);
             score.SessionOffsetPlusNonMania = config.Get<double>(Ez2Setting.OffsetPlusNonMania);
-            score.OsuJudgementTrack = (int)config.Get<EzEnumOsuJudgementTrack>(Ez2Setting.OsuJudgementTrack);
+            score.StdHitMode = (int)config.Get<EzEnumStdHitMode>(Ez2Setting.StdHitMode);
             score.SessionSettingsCaptured = true;
         }
 

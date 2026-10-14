@@ -510,7 +510,7 @@ namespace osu.Game.Rulesets.Mania
         }
 
         public override LocalisableString GetDisplayNameForHitResult(HitResult result, ScoreInfo? score)
-            => result.GetHitModeDisplayName(EzManiaScoreModeExtensions.ResolveDisplayHitMode(score));
+            => result.GetHitModeDisplayName(EzScoreInfoExtensions.ResolveDisplayHitMode(score));
 
         public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap) => new[]
         {

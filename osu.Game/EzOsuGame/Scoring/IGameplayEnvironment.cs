@@ -26,7 +26,7 @@ namespace osu.Game.EzOsuGame.Scoring
         double OffsetPlusNonMania { get; }
 
         /// <summary>Osu 判定轨；非 Osu 规则集可忽略（默认 Lazer）。</summary>
-        EzEnumOsuJudgementTrack OsuJudgementTrack { get; }
+        EzEnumStdHitMode StdHitMode { get; }
 
         bool BmsPoorHitResultEnable { get; }
 

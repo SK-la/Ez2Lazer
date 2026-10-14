@@ -30,6 +30,7 @@ using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Scoring.Bonus;
@@ -138,8 +139,13 @@ namespace osu.Game.Screens.Select
                         if (value.TryGetManiaGameplayModes(out int hitMode, out int healthMode))
                         {
                             generalStatistics.Add(Empty().With(d => d.Height = 10));
-                            generalStatistics.Add(new StatisticRow("HIT", EzManiaScoreModeExtensions.GetHitModeDisplayName(hitMode)));
-                            generalStatistics.Add(new StatisticRow("HP", EzManiaScoreModeExtensions.GetHealthModeDisplayName(healthMode)));
+                            generalStatistics.Add(new StatisticRow("HIT", EzScoreInfoExtensions.GetHitModeDisplayName(hitMode)));
+                            generalStatistics.Add(new StatisticRow("HP", EzScoreInfoExtensions.GetHealthModeDisplayName(healthMode)));
+                        }
+                        else if (value.TryGetStdGameplayMode(out int stdMode) && stdMode != (int)EzEnumStdHitMode.Lazer)
+                        {
+                            generalStatistics.Add(Empty().With(d => d.Height = 10));
+                            generalStatistics.Add(new StatisticRow("JUDGE", EzScoreInfoExtensions.GetStdHitModeDisplayName(stdMode)));
                         }
 
                         generalStatistics.Add(Empty().With(d => d.Height = 20));

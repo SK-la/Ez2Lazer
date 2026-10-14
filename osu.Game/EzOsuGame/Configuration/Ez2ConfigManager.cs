@@ -179,7 +179,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
             SetDefault(Ez2Setting.OffsetPlusMania, 0.0, -200.0, 200.0, 1.0);
             SetDefault(Ez2Setting.OffsetPlusNonMania, 0.0, -200.0, 200.0, 1.0);
-            SetDefault(Ez2Setting.OsuJudgementTrack, EzEnumOsuJudgementTrack.Lazer);
+            SetDefault(Ez2Setting.StdHitMode, EzEnumStdHitMode.Lazer);
 
             #endregion
 
@@ -374,12 +374,12 @@ namespace osu.Game.EzOsuGame.Configuration
 
             double offsetMania = purpose == ReplayRunPurpose.ForStored || ignoreOffset ? 0 : live.OffsetPlusMania;
             double offsetNonMania = purpose == ReplayRunPurpose.ForStored || ignoreOffset ? 0 : live.OffsetPlusNonMania;
-            var osuTrack = resolveOsuJudgementTrack(purpose, live, score);
+            var osuTrack = resolveStdHitMode(purpose, live, score);
             return resolved with
             {
                 OffsetPlusMania = offsetMania,
                 OffsetPlusNonMania = offsetNonMania,
-                OsuJudgementTrack = osuTrack,
+                StdHitMode = osuTrack,
             };
         }
 
@@ -390,20 +390,20 @@ namespace osu.Game.EzOsuGame.Configuration
             JudgePrecedence = Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence),
             OffsetPlusMania = Get<double>(Ez2Setting.OffsetPlusMania),
             OffsetPlusNonMania = Get<double>(Ez2Setting.OffsetPlusNonMania),
-            OsuJudgementTrack = Get<EzEnumOsuJudgementTrack>(Ez2Setting.OsuJudgementTrack),
+            StdHitMode = Get<EzEnumStdHitMode>(Ez2Setting.StdHitMode),
             BmsPoorHitResultEnable = Get<bool>(Ez2Setting.BmsPoorHitResultEnable),
         };
 
-        private static EzEnumOsuJudgementTrack resolveOsuJudgementTrack(ReplayRunPurpose purpose, GameplayEnvironment live, ScoreInfo? score)
+        private static EzEnumStdHitMode resolveStdHitMode(ReplayRunPurpose purpose, GameplayEnvironment live, ScoreInfo? score)
         {
             if (purpose == ReplayRunPurpose.ForLive)
-                return live.OsuJudgementTrack;
+                return live.StdHitMode;
 
             // ForStored：优先成绩内存嵌入（[Ignored]，未升 Realm）；否则 Lazer。
-            if (score != null && score.Ruleset.OnlineID == 0 && score.OsuJudgementTrack >= 0)
-                return (EzEnumOsuJudgementTrack)score.OsuJudgementTrack;
+            if (score != null && score.Ruleset.OnlineID == 0 && score.StdHitMode >= 0)
+                return (EzEnumStdHitMode)score.StdHitMode;
 
-            return EzEnumOsuJudgementTrack.Lazer;
+            return EzEnumStdHitMode.Lazer;
         }
 
         private static GameplayEnvironment resolveStoredModes(GameplayEnvironment live, ScoreInfo? score)
@@ -1152,7 +1152,7 @@ namespace osu.Game.EzOsuGame.Configuration
         AsioUseExternalPCM,
         OffsetPlusMania,
         OffsetPlusNonMania,
-        OsuJudgementTrack,
+        StdHitMode,
         HitObjectLifetimeUsesOwnTime,
 
         // 皮肤与舞台资源

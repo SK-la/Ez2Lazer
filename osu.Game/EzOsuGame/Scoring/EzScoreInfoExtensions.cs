@@ -16,7 +16,7 @@ using Container = osu.Framework.Graphics.Containers.Container;
 
 namespace osu.Game.EzOsuGame.Scoring
 {
-    public static class EzManiaScoreModeExtensions
+    public static class EzScoreInfoExtensions
     {
         /// <summary>
         /// 成绩上的 Mania 判定/血量模式。Mania 成绩恒为 true：没有"未设置"这一档，Lazer(0) 即默认。

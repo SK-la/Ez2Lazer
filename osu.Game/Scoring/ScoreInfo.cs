@@ -253,7 +253,7 @@ namespace osu.Game.Scoring
             clone.ManiaHealthMode = ManiaHealthMode;
             clone.SessionOffsetPlusMania = SessionOffsetPlusMania;
             clone.SessionOffsetPlusNonMania = SessionOffsetPlusNonMania;
-            clone.OsuJudgementTrack = OsuJudgementTrack;
+            clone.StdHitMode = StdHitMode;
             clone.SessionAccuracyCutoffA = SessionAccuracyCutoffA;
             clone.SessionAccuracyCutoffS = SessionAccuracyCutoffS;
             clone.SessionSettingsCaptured = SessionSettingsCaptured;
@@ -316,10 +316,10 @@ namespace osu.Game.Scoring
 
         /// <summary>
         /// Ez2Lazer: Osu 判定轨嵌入（OSL-013）。暂 [Ignored] 不升 Realm；持久化升版需确认后 bump EZ_REALM_SCHEMA_VERSION。
-        /// -1 = 未设置（ForStored 回退 Lazer）；0 = Lazer；1 = ClassicNative。
+        /// -1 = 未设置（ForStored 回退 Lazer）；0 = Lazer；1 = StableClassic。
         /// </summary>
         [Ignored]
-        public int OsuJudgementTrack { get; set; } = -1;
+        public int StdHitMode { get; set; } = -1;
 
         /// <summary>
         /// Ez2Lazer: Accuracy cutoff A at gameplay start (submission eligibility snapshot).

@@ -160,7 +160,7 @@ namespace osu.Game.EzOsuGame.Scoring
                 case EzScoreRaceGhostTimelineMode.OsuSession:
                 case EzScoreRaceGhostTimelineMode.TaikoSession:
                 case EzScoreRaceGhostTimelineMode.CatchSession:
-                    return $"{identity}|m|{modFp}|{beatmapFp}|jp{(int)environment.JudgePrecedence}|osuTrack:{(int)environment.OsuJudgementTrack}|offsetNM:{environment.OffsetPlusNonMania:F3}";
+                    return $"{identity}|m|{modFp}|{beatmapFp}|jp{(int)environment.JudgePrecedence}|osuTrack:{(int)environment.StdHitMode}|offsetNM:{environment.OffsetPlusNonMania:F3}";
 
                 default:
                     return null;

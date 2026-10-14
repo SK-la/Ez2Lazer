@@ -130,8 +130,8 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             if (isMania)
             {
-                blockA.SetValues("Hit", EzManiaScoreModeExtensions.GetHitModeDisplayName((int)maniaHitModeBindable.Value));
-                blockB.SetValues("HP", EzManiaScoreModeExtensions.GetHealthModeDisplayName((int)maniaHealthModeBindable.Value));
+                blockA.SetValues("Hit", EzScoreInfoExtensions.GetHitModeDisplayName((int)maniaHitModeBindable.Value));
+                blockB.SetValues("HP", EzScoreInfoExtensions.GetHealthModeDisplayName((int)maniaHealthModeBindable.Value));
 
                 Show();
                 this.FadeIn(200, Easing.OutQuint);
@@ -157,13 +157,13 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             foreach (EzEnumHitMode mode in Enum.GetValues<EzEnumHitMode>())
             {
-                widthMeasureText.Text = EzManiaScoreModeExtensions.GetHitModeDisplayName((int)mode);
+                widthMeasureText.Text = EzScoreInfoExtensions.GetHitModeDisplayName((int)mode);
                 maxContentWidth = Math.Max(maxContentWidth, maxLabelWidth + label_value_spacing + widthMeasureText.DrawWidth);
             }
 
             foreach (EzEnumHealthMode mode in Enum.GetValues<EzEnumHealthMode>())
             {
-                widthMeasureText.Text = EzManiaScoreModeExtensions.GetHealthModeDisplayName((int)mode);
+                widthMeasureText.Text = EzScoreInfoExtensions.GetHealthModeDisplayName((int)mode);
                 maxContentWidth = Math.Max(maxContentWidth, maxLabelWidth + label_value_spacing + widthMeasureText.DrawWidth);
             }
 

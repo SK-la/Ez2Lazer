@@ -151,7 +151,7 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
         }
 
         /// <summary>
-        /// 单圈迟到 tap：OD5 下约 90ms 晚于起拍 — Lazer 多为 Ok，ClassicNative 多为 Meh（OK 半窗更紧）。
+        /// 单圈迟到 tap：OD5 下约 90ms 晚于起拍 — Lazer 多为 Ok，StableClassic 多为 Meh（OK 半窗更紧）。
         /// </summary>
         public static (Score score, IBeatmap beatmap, IGameplayEnvironment environment) CreateSingleCircleLateTap(double lateMs = 90)
         {

@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         {
             var score = createScore(hitMode, healthMode);
 
-            Assert.That(EzManiaScoreModeExtensions.CreateDisplayDrawable(score) is FillFlowContainer, Is.EqualTo(expectsBadge));
+            Assert.That(EzScoreInfoExtensions.CreateDisplayDrawable(score) is FillFlowContainer, Is.EqualTo(expectsBadge));
         }
 
         private static ScoreInfo createScore(int hitMode, int healthMode) => new ScoreInfo

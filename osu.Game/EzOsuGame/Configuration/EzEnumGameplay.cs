@@ -94,14 +94,14 @@ namespace osu.Game.EzOsuGame.Configuration
     }
 
     /// <summary>
-    /// Osu 判定轨（OSL-013）。Lazer = 现行 Drawable/Shadow 语义；ClassicNative = stable 原生窗口/计分（进行中）。
+    /// Osu 判定轨（OSL-013）。Lazer = 现行 Drawable/Shadow 语义；StableClassic = stable 原生窗口/计分（进行中）。
     /// </summary>
-    public enum EzEnumOsuJudgementTrack
+    public enum EzEnumStdHitMode
     {
         [Description("Lazer")]
         Lazer = 0,
 
-        [Description("Classic Native")]
-        ClassicNative = 1,
+        [Description("Stable Classic")]
+        StableClassic = 1,
     }
 }

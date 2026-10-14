@@ -13,10 +13,10 @@ using osu.Game.Rulesets.Scoring;
 namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
 {
     /// <summary>
-    /// OSL-013：ClassicNative 轨与 Lazer 在判窗/计分上可区分；Session 经 env.OsuJudgementTrack 切换。
+    /// OSL-013：StableClassic 轨与 Lazer 在判窗/计分上可区分；Session 经 env.StdHitMode 切换。
     /// </summary>
     [TestFixture]
-    public class OsuClassicNativeTrackTest
+    public class OsuStableClassicTrackTest
     {
         [OneTimeSetUp]
         public void OneTimeSetUp() => GlobalConfigStore.EnsureInitialized();
@@ -24,7 +24,7 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
         [Test]
         public void ClassicNativeHitWindowsDifferFromLazerAtOd5()
         {
-            var classic = new OsuClassicNativeHitWindows();
+            var classic = new OsuStableClassicHitWindows();
             classic.SetDifficulty(5);
 
             var lazer = new OsuHitWindows();
@@ -37,12 +37,12 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
         [Test]
         public void SessionLateTapDivergesBetweenLazerAndClassicNativeTracks()
         {
-            // 各轨独立 beatmap：ClassicNative.ApplyHitWindowsToBeatmap 就地改窗。
+            // 各轨独立 beatmap：StableClassic.ApplyHitWindowsToBeatmap 就地改窗。
             var (scoreLazer, beatmapLazer, envBase) = OsuReplayFixtures.CreateSingleCircleLateTap(90);
             var (scoreClassic, beatmapClassic, _) = OsuReplayFixtures.CreateSingleCircleLateTap(90);
 
-            var envLazer = withTrack((GameplayEnvironment)envBase, EzEnumOsuJudgementTrack.Lazer);
-            var envClassic = withTrack((GameplayEnvironment)envBase, EzEnumOsuJudgementTrack.ClassicNative);
+            var envLazer = withTrack((GameplayEnvironment)envBase, EzEnumStdHitMode.Lazer);
+            var envClassic = withTrack((GameplayEnvironment)envBase, EzEnumStdHitMode.StableClassic);
 
             var lazer = OsuReplaySession.Run(scoreLazer, beatmapLazer, envLazer);
             var classic = OsuReplaySession.Run(scoreClassic, beatmapClassic, envClassic);
@@ -50,13 +50,13 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
             Assert.That(count(lazer.ScoreInfo.Statistics, HitResult.Ok), Is.EqualTo(1),
                 "OD5 +90ms：Lazer Ok 窗应接住");
             Assert.That(count(classic.ScoreInfo.Statistics, HitResult.Meh), Is.EqualTo(1),
-                "OD5 +90ms：ClassicNative Ok 半窗更紧 → Meh");
+                "OD5 +90ms：StableClassic Ok 半窗更紧 → Meh");
             Assert.That(count(classic.ScoreInfo.Statistics, HitResult.Ok), Is.EqualTo(0));
             Assert.That(classic.ScoreInfo.TotalScore, Is.Not.EqualTo(lazer.ScoreInfo.TotalScore));
         }
 
-        private static GameplayEnvironment withTrack(GameplayEnvironment env, EzEnumOsuJudgementTrack track)
-            => env with { OsuJudgementTrack = track };
+        private static GameplayEnvironment withTrack(GameplayEnvironment env, EzEnumStdHitMode track)
+            => env with { StdHitMode = track };
 
         private static int count(IReadOnlyDictionary<HitResult, int> stats, HitResult result)
             => stats.TryGetValue(result, out int n) ? n : 0;

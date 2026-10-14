@@ -667,10 +667,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         }
 
         /// <summary>
-        /// 按 <see cref="EzManiaScoreModeExtensions.ResolveDisplayHitMode"/> 解析展示用 HitMode 后返回有效判定集合。
+        /// 按 <see cref="EzScoreInfoExtensions.ResolveDisplayHitMode"/> 解析展示用 HitMode 后返回有效判定集合。
         /// </summary>
         public static IReadOnlyList<HitResult> GetHitModeValidHitResultsForDisplay(ScoreInfo? score)
-            => GetHitModeValidHitResults(EzManiaScoreModeExtensions.ResolveDisplayHitMode(score));
+            => GetHitModeValidHitResults(EzScoreInfoExtensions.ResolveDisplayHitMode(score));
 
         #endregion
     }
