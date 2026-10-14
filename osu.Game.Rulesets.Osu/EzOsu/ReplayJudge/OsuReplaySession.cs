@@ -30,6 +30,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
 
             score.ScoreInfo.HitEvents = scoreProcessor.HitEvents.ToList();
             scoreProcessor.PopulateScore(score.ScoreInfo);
+            score.ScoreInfo.JudgeMode = (int)environment.JudgeMode;
 
             return score;
         }
@@ -50,6 +51,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
 
             score.ScoreInfo.HitEvents = scoreProcessor.HitEvents.ToList();
             scoreProcessor.PopulateScore(score.ScoreInfo);
+            score.ScoreInfo.JudgeMode = (int)environment.JudgeMode;
 
             return (score, timeline ?? new EzScoreTimeline(Array.Empty<EzScoreTimelineSnapshot>()));
         }
