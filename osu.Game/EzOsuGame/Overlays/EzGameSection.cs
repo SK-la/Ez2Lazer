@@ -29,6 +29,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 new EzPetSettings(),
                 new EzGameplaySettings(),
                 new EzQuickRotationSettings(),
+                new EzStdSettings(),
                 new EzGameModeSettings(),
                 new EzSkillSettings(),
                 new ServerSettings(),

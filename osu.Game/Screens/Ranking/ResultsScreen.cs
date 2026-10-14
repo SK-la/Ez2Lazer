@@ -166,7 +166,7 @@ namespace osu.Game.Screens.Ranking
                 Scheduler.AddDelayed(() => OverlayActivationMode.Value = OverlayActivation.All, shouldFlair ? AccuracyCircle.TOTAL_DURATION + 1000 : 0);
             }
 
-            environmentControls = new ResultsEnvironmentControls(ezConfig);
+            environmentControls = new ResultsEnvironmentControls(ezConfig, Score?.Ruleset);
 
             // for simplicity, only allow the retry hotkey when coming from a replay player where we know the replay is ready to be played.
             // if we allow it in all cases, consider the case where a user comes from song select and potentially has to download
@@ -226,6 +226,7 @@ namespace osu.Game.Screens.Ranking
             base.LoadComplete();
 
             environmentControls.HitModeBindable.BindValueChanged(_ => invalidateDisplayedAnalysis());
+            environmentControls.StdHitModeBindable.BindValueChanged(_ => invalidateDisplayedAnalysis());
             environmentControls.HealthModeBindable.BindValueChanged(_ => invalidateDisplayedAnalysis());
 
             StatisticsPanel.State.BindValueChanged(onStatisticsStateChanged, true);
