@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Reflection;
 using osu.Framework.Graphics;
@@ -27,8 +28,8 @@ namespace osu.Game.EzOsuGame.Scoring
         /// </remarks>
         public static bool TryGetManiaGameplayModes(this ScoreInfo score, out int judgeMode, out int healthMode)
         {
-            judgeMode = score.ManiaHitMode;
-            healthMode = score.ManiaHealthMode;
+            judgeMode = score.JudgeMode;
+            healthMode = score.HealthMode;
 
             if (score.Ruleset.OnlineID != 3)
                 return false;
@@ -63,8 +64,8 @@ namespace osu.Game.EzOsuGame.Scoring
                 return;
 
             // 游玩与 Replay 结束进结算均写入当场 Drawable 环境，供 ForStored 解析与左栏 Statistics 对齐。
-            score.ManiaHitMode = snapshot.JudgeMode;
-            score.ManiaHealthMode = snapshot.HealthMode;
+            score.JudgeMode = snapshot.JudgeMode;
+            score.HealthMode = snapshot.HealthMode;
         }
 
         public static string GetJudgeModeDisplayName(int judgeMode) => getEnumDescription<EzEnumJudgeMode>(judgeMode);
@@ -72,8 +73,8 @@ namespace osu.Game.EzOsuGame.Scoring
         public static string GetHealthModeDisplayName(int healthMode) => getEnumDescription<EzEnumHealthMode>(healthMode);
 
         /// <summary>
-        /// 非 mania 成绩的 std 判定轨（OSL-013）。成绩内存值优先；落库成绩无该字段（[Ignored]），回退当前配置。
-        /// 仅 Osu 规则集返回 true。
+        /// 非 mania 成绩的 std 判定轨（OSL-013）。落库成绩按其嵌入的 <see cref="ScoreInfo.JudgeMode"/>（&gt;= 0 有效）；
+        /// 旧行（-1 未设置）回退当前配置。仅 Osu 规则集返回 true。
         /// </summary>
         public static bool TryGetStdGameplayMode(this ScoreInfo score, out int stdMode)
         {
@@ -82,8 +83,8 @@ namespace osu.Game.EzOsuGame.Scoring
             if (score.Ruleset.ShortName != "osu")
                 return false;
 
-            stdMode = score.StdJudgeMode >= 0
-                ? score.StdJudgeMode
+            stdMode = score.JudgeMode >= 0
+                ? score.JudgeMode
                 : (int)GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode);
 
             return true;
@@ -91,47 +92,50 @@ namespace osu.Game.EzOsuGame.Scoring
 
         /// <summary>
         /// Creates a vertical mode label block for use outside <see cref="FillDirection.Full"/> containers.
-        /// Mania 画 HIT/HP；Osu（std）判定轨非 Lazer 时画 Judge。两者皆默认时返回透明占位。
+        /// Lazer 是默认档，不展示：只画非默认的档位（Mania HIT/HP；Osu 判定轨 JUDGE）；全默认时返回透明占位。
         /// </summary>
         public static Drawable CreateDisplayDrawable(ScoreInfo score, float fontSize = 11, Anchor anchor = Anchor.TopLeft)
         {
             if (score.TryGetManiaGameplayModes(out int judgeMode, out int healthMode))
             {
-                if (judgeMode == (int)EzEnumJudgeMode.Lazer && healthMode == (int)EzEnumHealthMode.Lazer)
-                    return createPlaceholder(anchor);
-
-                return new FillFlowContainer
-                {
-                    Anchor = anchor,
-                    Origin = anchor,
-                    AutoSizeAxes = Axes.Both,
-                    Direction = FillDirection.Vertical,
-                    Spacing = new Vector2(0, 2),
-                    Children = new[]
-                    {
-                        createModeLine("Hit", GetJudgeModeDisplayName(judgeMode), fontSize, anchor),
-                        createModeLine("HP", GetHealthModeDisplayName(healthMode), fontSize, anchor),
-                    }
-                };
+                return createModeBlock(anchor, fontSize,
+                    ("Hit", judgeMode == (int)EzEnumJudgeMode.Lazer ? null : GetJudgeModeDisplayName(judgeMode)),
+                    ("HP", healthMode == (int)EzEnumHealthMode.Lazer ? null : GetHealthModeDisplayName(healthMode)));
             }
 
             if (score.TryGetStdGameplayMode(out int stdMode) && stdMode != (int)EzEnumJudgeMode.Lazer)
-            {
-                return new FillFlowContainer
-                {
-                    Anchor = anchor,
-                    Origin = anchor,
-                    AutoSizeAxes = Axes.Both,
-                    Direction = FillDirection.Vertical,
-                    Spacing = new Vector2(0, 2),
-                    Children = new[]
-                    {
-                        createModeLine("Judge", GetJudgeModeDisplayName(stdMode), fontSize, anchor),
-                    }
-                };
-            }
+                return createModeBlock(anchor, fontSize, ("Judge", GetJudgeModeDisplayName(stdMode)));
 
             return createPlaceholder(anchor);
+        }
+
+        /// <summary>
+        /// 按给定档位行构建纵向标签块；值为 <see langword="null"/> 的行（默认 Lazer）跳过。全为空时返回占位。
+        /// </summary>
+        private static Drawable createModeBlock(Anchor anchor, float fontSize, params (string Label, string? Value)[] lines)
+        {
+            var children = new List<Drawable>();
+
+            foreach (var (label, value) in lines)
+            {
+                if (value == null)
+                    continue;
+
+                children.Add(createModeLine(label, value, fontSize, anchor));
+            }
+
+            if (children.Count == 0)
+                return createPlaceholder(anchor);
+
+            return new FillFlowContainer
+            {
+                Anchor = anchor,
+                Origin = anchor,
+                AutoSizeAxes = Axes.Both,
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, 2),
+                ChildrenEnumerable = children,
+            };
         }
 
         private static Drawable createPlaceholder(Anchor anchor) => new Container

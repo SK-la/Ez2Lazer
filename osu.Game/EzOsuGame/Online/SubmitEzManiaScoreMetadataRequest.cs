@@ -38,8 +38,8 @@ namespace osu.Game.EzOsuGame.Online
 
             req.AddRaw(JsonConvert.SerializeObject(new EzManiaScoreMetadataPayload
             {
-                ManiaJudgeMode = judgeMode,
-                ManiaHealthMode = healthMode,
+                JudgeMode = judgeMode,
+                HealthMode = healthMode,
             }));
 
             return req;
@@ -47,11 +47,11 @@ namespace osu.Game.EzOsuGame.Online
 
         private class EzManiaScoreMetadataPayload
         {
-            [JsonProperty("mania_hit_mode")]
-            public int ManiaJudgeMode { get; set; }
+            [JsonProperty("judge_mode")]
+            public int JudgeMode { get; set; }
 
-            [JsonProperty("mania_health_mode")]
-            public int ManiaHealthMode { get; set; }
+            [JsonProperty("health_mode")]
+            public int HealthMode { get; set; }
         }
     }
 }

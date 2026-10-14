@@ -305,7 +305,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             score.ScoreInfo.MaxCombo = 0;
             score.ScoreInfo.Accuracy = 0;
             score.ScoreInfo.Rank = ScoreRank.D;
-            score.ScoreInfo.ManiaHitMode = (int)fixture.JudgeMode;
+            score.ScoreInfo.JudgeMode = (int)fixture.JudgeMode;
             score.ScoreInfo.IsLegacyScore = fixture.ExpectedIsLegacy ?? true;
         }
 

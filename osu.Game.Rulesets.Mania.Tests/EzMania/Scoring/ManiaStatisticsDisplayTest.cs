@@ -57,8 +57,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
             var score = new ScoreInfo
             {
                 Ruleset = new ManiaRuleset().RulesetInfo,
-                ManiaHitMode = -1,
-                ManiaHealthMode = -1,
+                JudgeMode = -1,
+                HealthMode = -1,
             };
 
             var displayed = score.GetStatisticsForDisplay().Select(statistic => statistic.Result).ToArray();
@@ -85,8 +85,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         private static ScoreInfo createScore(EzEnumJudgeMode? judgeMode, EzEnumHealthMode? healthMode) => new ScoreInfo
         {
             Ruleset = new ManiaRuleset().RulesetInfo,
-            ManiaHitMode = judgeMode.HasValue ? (int)judgeMode.Value : (int)EzEnumJudgeMode.Lazer,
-            ManiaHealthMode = healthMode.HasValue ? (int)healthMode.Value : (int)EzEnumHealthMode.Lazer,
+            JudgeMode = judgeMode.HasValue ? (int)judgeMode.Value : (int)EzEnumJudgeMode.Lazer,
+            HealthMode = healthMode.HasValue ? (int)healthMode.Value : (int)EzEnumHealthMode.Lazer,
         };
 
         /// <summary>

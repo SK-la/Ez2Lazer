@@ -82,8 +82,8 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
         private static ScoreInfo createManiaScore(int judgeMode, int healthMode) => new ScoreInfo
         {
             Ruleset = new ManiaRuleset().RulesetInfo,
-            ManiaHitMode = judgeMode,
-            ManiaHealthMode = healthMode,
+            JudgeMode = judgeMode,
+            HealthMode = healthMode,
         };
     }
 }

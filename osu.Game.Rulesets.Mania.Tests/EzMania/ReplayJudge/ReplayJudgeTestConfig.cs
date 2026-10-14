@@ -31,8 +31,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
         public static void ApplyEmbeddedModes(Score score, GameplayEnvironment environment)
         {
-            score.ScoreInfo.ManiaHitMode = (int)environment.JudgeMode;
-            score.ScoreInfo.ManiaHealthMode = (int)environment.HealthMode;
+            score.ScoreInfo.JudgeMode = (int)environment.JudgeMode;
+            score.ScoreInfo.HealthMode = (int)environment.HealthMode;
         }
 
         public static GameplayEnvironment Create(

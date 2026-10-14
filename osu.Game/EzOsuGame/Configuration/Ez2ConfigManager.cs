@@ -427,10 +427,10 @@ namespace osu.Game.EzOsuGame.Configuration
 
             if (rulesetId == 0)
             {
-                // ForStored：优先成绩内存嵌入（[Ignored]，未升 Realm）；无则 Lazer。
+                // ForStored：优先成绩嵌入的 JudgeMode（>= 0 有效；旧行 -1，回退 Lazer）。
                 return live with
                 {
-                    JudgeMode = score != null && score.StdJudgeMode >= 0 ? (EzEnumJudgeMode)score.StdJudgeMode : EzEnumJudgeMode.Lazer,
+                    JudgeMode = score != null && score.JudgeMode >= 0 ? (EzEnumJudgeMode)score.JudgeMode : EzEnumJudgeMode.Lazer,
                 };
             }
 

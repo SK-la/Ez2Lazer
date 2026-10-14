@@ -34,11 +34,34 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
             Assert.That(EzScoreInfoExtensions.CreateDisplayDrawable(score) is FillFlowContainer, Is.EqualTo(expectsBadge));
         }
 
+        /// <summary>
+        /// Lazer 是默认档，不展示：默认档那一行必须被省略（而不是画成 "Lazer"）。
+        /// </summary>
+        [TestCase(0, 0, 0)]
+        [TestCase(-1, -1, 0)]
+        [TestCase((int)EzEnumJudgeMode.EZ2AC, (int)EzEnumHealthMode.Ez2Ac, 2)]
+        [TestCase((int)EzEnumJudgeMode.EZ2AC, (int)EzEnumHealthMode.Lazer, 1)]
+        [TestCase((int)EzEnumJudgeMode.Lazer, (int)EzEnumHealthMode.O2JamNormal, 1)]
+        public void TestLazerRowsAreOmitted(int judgeMode, int healthMode, int expectedLines)
+        {
+            var score = createScore(judgeMode, healthMode);
+
+            var block = EzScoreInfoExtensions.CreateDisplayDrawable(score) as FillFlowContainer;
+
+            if (expectedLines == 0)
+                Assert.That(block, Is.Null);
+            else
+            {
+                Assert.That(block, Is.Not.Null);
+                Assert.That(block!.Children.Count, Is.EqualTo(expectedLines));
+            }
+        }
+
         private static ScoreInfo createScore(int judgeMode, int healthMode) => new ScoreInfo
         {
             Ruleset = new ManiaRuleset().RulesetInfo,
-            ManiaHitMode = judgeMode,
-            ManiaHealthMode = healthMode,
+            JudgeMode = judgeMode,
+            HealthMode = healthMode,
         };
     }
 }

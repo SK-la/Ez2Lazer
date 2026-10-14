@@ -138,9 +138,15 @@ namespace osu.Game.Screens.Select
 
                         if (value.TryGetManiaGameplayModes(out int judgeMode, out int healthMode))
                         {
-                            generalStatistics.Add(Empty().With(d => d.Height = 10));
-                            generalStatistics.Add(new StatisticRow("HIT", EzScoreInfoExtensions.GetJudgeModeDisplayName(judgeMode)));
-                            generalStatistics.Add(new StatisticRow("HP", EzScoreInfoExtensions.GetHealthModeDisplayName(healthMode)));
+                            // Lazer 是默认档，不展示；仅画非默认的档位。
+                            if (judgeMode != (int)EzEnumJudgeMode.Lazer || healthMode != (int)EzEnumHealthMode.Lazer)
+                                generalStatistics.Add(Empty().With(d => d.Height = 10));
+
+                            if (judgeMode != (int)EzEnumJudgeMode.Lazer)
+                                generalStatistics.Add(new StatisticRow("HIT", EzScoreInfoExtensions.GetJudgeModeDisplayName(judgeMode)));
+
+                            if (healthMode != (int)EzEnumHealthMode.Lazer)
+                                generalStatistics.Add(new StatisticRow("HP", EzScoreInfoExtensions.GetHealthModeDisplayName(healthMode)));
                         }
                         else if (value.TryGetStdGameplayMode(out int stdMode) && stdMode != (int)EzEnumJudgeMode.Lazer)
                         {

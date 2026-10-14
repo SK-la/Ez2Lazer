@@ -72,8 +72,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 ReplayRunPurpose.ForLive,
                 environment);
 
-            Assert.That(scoreInfo.ManiaHitMode, Is.EqualTo((int)EzEnumJudgeMode.EZ2AC));
-            Assert.That(scoreInfo.ManiaHealthMode, Is.EqualTo((int)EzEnumHealthMode.Ez2Ac));
+            Assert.That(scoreInfo.JudgeMode, Is.EqualTo((int)EzEnumJudgeMode.EZ2AC));
+            Assert.That(scoreInfo.HealthMode, Is.EqualTo((int)EzEnumHealthMode.Ez2Ac));
         }
 
         [TestCaseSource(nameof(same_environment_cases))]
@@ -134,8 +134,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var listAfterRecalc = snapshot(recalculatedScoreInfo);
             assertEquivalent(listAfterRecalc, now, $"{testCase.Name}: a(list after recalc) vs b(Now)");
 
-            Assert.That(recalculatedScoreInfo.ManiaHitMode, Is.EqualTo(expectedPersistedJudgeMode(testCase.TargetEnvironment)), $"{testCase.Name}: recalculated hit mode");
-            Assert.That(recalculatedScoreInfo.ManiaHealthMode, Is.EqualTo(expectedPersistedHealthMode(testCase.TargetEnvironment)), $"{testCase.Name}: recalculated health mode");
+            Assert.That(recalculatedScoreInfo.JudgeMode, Is.EqualTo(expectedPersistedJudgeMode(testCase.TargetEnvironment)), $"{testCase.Name}: recalculated hit mode");
+            Assert.That(recalculatedScoreInfo.HealthMode, Is.EqualTo(expectedPersistedHealthMode(testCase.TargetEnvironment)), $"{testCase.Name}: recalculated health mode");
 
             var (storedScore, storedBeatmap, _) = testCase.CreateFixture();
             var forStoredAfterRecalc = await snapshotFromRunAsync(
@@ -239,8 +239,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 scoreInfo.MaximumStatistics.ToDictionary(),
                 scoreInfo.Accuracy,
                 scoreInfo.TotalScore,
-                scoreInfo.ManiaHitMode,
-                scoreInfo.ManiaHealthMode);
+                scoreInfo.JudgeMode,
+                scoreInfo.HealthMode);
 
         private static void assertEquivalent(ScoreSnapshot expected, ScoreSnapshot actual, string context)
         {
@@ -257,7 +257,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         private static string describeSnapshot(ScoreSnapshot snapshot)
-            => $"acc={snapshot.Accuracy:F8} score={snapshot.TotalScore} judgeMode={snapshot.ManiaJudgeMode} health={snapshot.ManiaHealthMode} stats=[{ManiaReplayParityHelper.DescribeStatistics(snapshot.Statistics)}]";
+            => $"acc={snapshot.Accuracy:F8} score={snapshot.TotalScore} judgeMode={snapshot.JudgeMode} health={snapshot.HealthMode} stats=[{ManiaReplayParityHelper.DescribeStatistics(snapshot.Statistics)}]";
 
         private static int expectedPersistedJudgeMode(GameplayEnvironment environment)
             => (int)environment.JudgeMode;
@@ -288,7 +288,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             Dictionary<HitResult, int> MaximumStatistics,
             double Accuracy,
             long TotalScore,
-            int ManiaJudgeMode,
-            int ManiaHealthMode);
+            int JudgeMode,
+            int HealthMode);
     }
 }

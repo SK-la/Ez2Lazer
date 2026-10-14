@@ -53,8 +53,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var scoreInfo = new ScoreInfo
             {
                 Ruleset = new ManiaRuleset().RulesetInfo,
-                ManiaHitMode = (int)EzEnumJudgeMode.LR2_HD,
-                ManiaHealthMode = (int)EzEnumHealthMode.IIDX_HD,
+                JudgeMode = (int)EzEnumJudgeMode.LR2_HD,
+                HealthMode = (int)EzEnumHealthMode.IIDX_HD,
             };
 
             var stored = config.ResolveEnvironment(ReplayRunPurpose.ForStored, scoreInfo);

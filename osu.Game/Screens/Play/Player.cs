@@ -1612,8 +1612,8 @@ namespace osu.Game.Screens.Play
             // the import process will re-attach managed beatmap/rulesets to this score. we don't want this for now, so create a temporary copy to import.
             var importableScore = score.ScoreInfo.DeepClone();
 
-            int maniaJudgeMode = importableScore.ManiaHitMode;
-            int maniaHealthMode = importableScore.ManiaHealthMode;
+            int maniaJudgeMode = importableScore.JudgeMode;
+            int maniaHealthMode = importableScore.HealthMode;
 
             var imported = scoreManager.Import(importableScore, replayReader);
             Debug.Assert(imported != null);
@@ -1624,14 +1624,14 @@ namespace osu.Game.Screens.Play
                 score.ScoreInfo.Hash = s.Hash;
                 score.ScoreInfo.ID = s.ID;
                 score.ScoreInfo.Files.AddRange(s.Files.Detach());
-                score.ScoreInfo.ManiaHitMode = s.ManiaHitMode;
-                score.ScoreInfo.ManiaHealthMode = s.ManiaHealthMode;
+                score.ScoreInfo.JudgeMode = s.JudgeMode;
+                score.ScoreInfo.HealthMode = s.HealthMode;
             });
 
             imported.PerformWrite(s =>
             {
-                s.ManiaHitMode = maniaJudgeMode;
-                s.ManiaHealthMode = maniaHealthMode;
+                s.JudgeMode = maniaJudgeMode;
+                s.HealthMode = maniaHealthMode;
             });
 
             if (EzScoreBonusTracker.IsEnabled)
