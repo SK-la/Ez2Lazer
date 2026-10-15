@@ -49,6 +49,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.ExternalRulesets;
 using osu.Game.EzOsuGame.Fonts;
 using osu.Game.EzOsuGame.Input;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Online;
@@ -371,6 +372,7 @@ namespace osu.Game
             dependencies.CacheAs(EzResourceStore = new EzResourceStore(Ez2ConfigManager, Host.Renderer, Audio, Storage, realm));
             dependencies.CacheAs<IStorageResourceProvider>(EzResourceStore);
             dependencies.Cache(new EzLocalTextureFactory(Ez2ConfigManager, EzResourceStore));
+            dependencies.Cache(new ManiaPlayfieldLayoutConfig(Storage));
             dependencies.Cache(EzGameplayWarmUp = new EzGameplayWarmUpService());
 
             dependencies.Cache(realm = new RealmAccess(Storage, CLIENT_DATABASE_FILENAME, Host.UpdateThread));

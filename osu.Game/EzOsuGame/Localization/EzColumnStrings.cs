@@ -15,8 +15,29 @@ namespace osu.Game.EzOsuGame.Localization
             "通过透视映射模拟轨道旋转。0为关闭（需要重载游戏场景），角度越大越明显（上窄下宽）。",
             "Simulate lane rotation using perspective mapping. 0° is the original look, larger angles increase the effect (narrower top and wider bottom).");
 
-        public static readonly LocalisableString COLUMN_BACKGROUND_DIM = new EzLocalizationManager.EzLocalisableString(
-            "Column背景暗化",
+        public static readonly LocalisableString STAGE_POSITION_X = new EzLocalizationManager.EzLocalisableString(
+            "Mania Stage 水平位置",
+            "Mania Stage X position");
+
+        public static readonly LocalisableString STAGE_POSITION_X_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "-100% 贴屏幕左侧，0% 居中，100% 贴屏幕右侧。"
+            + "\n舞台贴边后继续拉伸窗口，舞台会保持贴边。"
+            + "\n开启「跟随判定线布局」的 HUD 会一起移动。",
+            "-100% pins the stage to the left edge, 0% centres it, 100% pins it to the right edge."
+            + "\nOnce pinned, resizing the window keeps the stage against that edge."
+            + "\nHUD elements with \"match judgement line layout\" enabled move along with it.");
+
+        public static readonly LocalisableString STAGE_POSITION_Y = new EzLocalizationManager.EzLocalisableString(
+            "Mania Stage 垂直位置",
+            "Mania Stage Y position");
+
+        public static readonly LocalisableString STAGE_POSITION_Y_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "按半屏高度换算：100% 上移半屏，-100% 下移半屏。正数表示向上。"
+            + "\n开启「跟随判定线布局」的 HUD 会一起移动。",
+            "Scaled by half the screen height: 100% moves half a screen up, -100% moves half a screen down. Positive means up."
+            + "\nHUD elements with \"match judgement line layout\" enabled move along with it.");
+
+        public static readonly LocalisableString COLUMN_BACKGROUND_DIM = new EzLocalizationManager.EzLocalisableString(            "Column背景暗化",
             "Column BackGround Dim");
 
         public static readonly LocalisableString COLUMN_BACKGROUND_DIM_TOOLTIP = new EzLocalizationManager.EzLocalisableString(

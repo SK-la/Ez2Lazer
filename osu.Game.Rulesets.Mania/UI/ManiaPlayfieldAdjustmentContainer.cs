@@ -7,6 +7,8 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Layout;
+using osu.Game.Rulesets.Mania.EzMania;
 using osu.Game.Rulesets.UI;
 using osuTK;
 
@@ -17,6 +19,7 @@ namespace osu.Game.Rulesets.Mania.UI
         protected override Container<Drawable> Content { get; }
 
         private readonly DrawSizePreservingFillContainer scalingContainer;
+        private readonly Container positionContainer;
         private readonly BufferedContainer? perspectiveContainer;
 
         private readonly DrawableManiaRuleset drawableManiaRuleset;
@@ -24,6 +27,12 @@ namespace osu.Game.Rulesets.Mania.UI
 
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
+
+        [Resolved]
+        private ManiaPlayfieldLayoutConfig playfieldLayout { get; set; } = null!;
+
+        private Anchor appliedAnchor;
+        private Vector2 appliedPosition;
 
         public ManiaPlayfieldAdjustmentContainer(DrawableManiaRuleset drawableManiaRuleset)
         {
@@ -41,11 +50,19 @@ namespace osu.Game.Rulesets.Mania.UI
                 RelativeSizeAxes = Axes.Both,
             };
 
+            // The stage position is applied here, outside the pseudo-3D buffer, so an offset never clips against it.
+            positionContainer = new Container
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                RelativeSizeAxes = Axes.Both,
+            };
+
             var rotation = GlobalConfigStore.EzConfig.GetBindable<double>(Ez2Setting.ManiaPseudo3DRotation);
 
             if (!rotation.IsDefault)
             {
-                scalingContainer.Child = perspectiveContainer = new BufferedContainer(pixelSnapping: true)
+                positionContainer.Child = perspectiveContainer = new BufferedContainer(pixelSnapping: true)
                 {
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
@@ -56,8 +73,10 @@ namespace osu.Game.Rulesets.Mania.UI
             }
             else
             {
-                scalingContainer.Child = Content;
+                positionContainer.Child = Content;
             }
+
+            scalingContainer.Child = positionContainer;
         }
 
         [BackgroundDependencyLoader]
@@ -111,6 +130,44 @@ namespace osu.Game.Rulesets.Mania.UI
                 scalingContainer.Size = new Vector2(1f);
                 scalingContainer.TargetDrawSize = new Vector2(1024, 768);
             }
+
+            updateStagePosition();
+        }
+
+        private void updateStagePosition()
+        {
+            float containerWidth = positionContainer.DrawWidth;
+            float containerHeight = positionContainer.DrawHeight;
+
+            if (containerWidth <= 0 || containerHeight <= 0)
+                return;
+
+            float stageWidth = 0;
+
+            foreach (var stage in drawableManiaRuleset.Playfield.Stages)
+                stageWidth += stage.DrawWidth;
+
+            float value = playfieldLayout.StageXFraction;
+            int direction = ManiaPlayfieldLayoutHelper.GetStageHorizontalDirection(value);
+
+            playfieldLayout.StageOffsetFractionX = ManiaPlayfieldLayoutHelper.CalculateStageOffsetFraction(value, containerWidth, stageWidth);
+
+            Anchor anchor = direction < 0 ? Anchor.CentreLeft : direction > 0 ? Anchor.CentreRight : Anchor.Centre;
+            Vector2 position = ManiaPlayfieldLayoutHelper.CalculateStageOffsetPosition(
+                value,
+                playfieldLayout.StageYFraction,
+                direction,
+                containerWidth,
+                containerHeight,
+                stageWidth);
+
+            if (appliedAnchor == anchor && appliedPosition == position)
+                return;
+
+            appliedAnchor = anchor;
+            appliedPosition = position;
+            positionContainer.Anchor = anchor;
+            positionContainer.Position = position;
         }
     }
 }

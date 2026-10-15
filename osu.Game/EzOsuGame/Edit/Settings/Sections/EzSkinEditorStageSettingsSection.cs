@@ -8,6 +8,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.EzOsuGame.Screens;
@@ -23,6 +24,9 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 
         [Resolved]
         private Storage storage { get; set; } = null!;
+
+        [Resolved]
+        private ManiaPlayfieldLayoutConfig playfieldLayout { get; set; } = null!;
 
         public EzSkinEditorStageSettingsSection()
         {
@@ -83,6 +87,22 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                     Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaPseudo3DRotation),
                     KeyboardStep = 1f,
                     DisplayAsPercentage = false,
+                },
+                new SettingsSlider<float>
+                {
+                    LabelText = EzColumnStrings.STAGE_POSITION_X,
+                    TooltipText = EzColumnStrings.STAGE_POSITION_X_TOOLTIP,
+                    Current = playfieldLayout.StageX,
+                    KeyboardStep = 1f,
+                    DisplayAsPercentage = true,
+                },
+                new SettingsSlider<float>
+                {
+                    LabelText = EzColumnStrings.STAGE_POSITION_Y,
+                    TooltipText = EzColumnStrings.STAGE_POSITION_Y_TOOLTIP,
+                    Current = playfieldLayout.StageY,
+                    KeyboardStep = 1f,
+                    DisplayAsPercentage = true,
                 },
                 new SettingsSlider<double>
                 {
