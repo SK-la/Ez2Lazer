@@ -89,6 +89,36 @@ namespace osu.Game.EzOsuGame.Layout
                 storage.Delete(filename);
         }
 
+        public ManiaPlayfieldLayout LoadManiaPlayfieldLayout()
+        {
+            if (!storage.Exists(ManiaPlayfieldLayout.FILENAME))
+                return new ManiaPlayfieldLayout();
+
+            try
+            {
+                using (var stream = storage.GetStream(ManiaPlayfieldLayout.FILENAME))
+                {
+                    if (stream == null)
+                        return new ManiaPlayfieldLayout();
+
+                    using (var reader = new StreamReader(stream, Encoding.UTF8))
+                        return ManiaPlayfieldLayout.Parse(reader.ReadToEnd());
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, $"Failed to load Ez mania playfield layout {ManiaPlayfieldLayout.FILENAME}");
+                return new ManiaPlayfieldLayout();
+            }
+        }
+
+        public void SaveManiaPlayfieldLayout(ManiaPlayfieldLayout layout)
+        {
+            using (var stream = storage.CreateFileSafely(ManiaPlayfieldLayout.FILENAME))
+            using (var writer = new StreamWriter(stream, Encoding.UTF8))
+                writer.Write(layout.Serialize());
+        }
+
         public void Reset(GlobalSkinnableContainerLookup lookup)
         {
             var layout = Load(lookup.Lookup);

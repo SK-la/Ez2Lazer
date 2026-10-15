@@ -7,6 +7,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.UI;
@@ -37,12 +38,66 @@ namespace osu.Game.Rulesets.Mania.EzMania
         public static BindableBool CreateDefaultMatchPanelWidthBindable() => new BindableBool(DEFAULT_MATCH_PANEL_WIDTH);
 
         /// <summary>
-        /// Aligns a HUD element to the judgement line by position (not height).
-        /// Anchor at bottom-centre, origin at centre, X = 0, Y = hit position.
+        /// Aligns a HUD element to the judgement line by position (not height), following the configured stage position.
+        /// The horizontal anchor flips with the stage position; the vertical anchor stays at the bottom.
         /// </summary>
-        public static void ApplyHitPositionPlacement(Drawable drawable, float hitPosition)
+        public static void ApplyHitPositionPlacement(Drawable drawable, float hitPosition, ManiaPlayfieldLayoutConfig? playfieldLayout, Vector2 containerSize)
         {
-            drawable.Position = new Vector2(0, -hitPosition);
+            float x = playfieldLayout?.StageXFraction ?? 0;
+            int direction = GetStageHorizontalDirection(x);
+
+            drawable.Anchor = direction < 0 ? Anchor.BottomLeft : direction > 0 ? Anchor.BottomRight : Anchor.BottomCentre;
+            drawable.Position = new Vector2(
+                CalculateAnchoredPositionX(direction, (playfieldLayout?.StageOffsetFractionX ?? 0) * containerSize.X, containerSize.X),
+                -hitPosition - (playfieldLayout?.StageYFraction ?? 0) * containerSize.Y / 2);
+        }
+
+        /// <summary>
+        /// Horizontal anchor direction for a stage position: -1 pins to the left edge, 1 to the right edge, 0 keeps centring.
+        /// The vertical part of the anchor is never changed.
+        /// </summary>
+        public static int GetStageHorizontalDirection(float value) => value < 0 ? -1 : value > 0 ? 1 : 0;
+
+        /// <summary>
+        /// Stage centre offset from the container centre, as a fraction of the container width.
+        /// ±1 moves the stage exactly against the corresponding edge, so the result stays within ±0.5.
+        /// </summary>
+        public static float CalculateStageOffsetFraction(float value, float containerWidth, float stageWidth)
+        {
+            if (value == 0 || containerWidth <= 0)
+                return 0;
+
+            // ±1 travels across the free space left of the stage, so the stage never leaves the container.
+            float freeSpace = Math.Max(0, containerWidth - stageWidth);
+            return value * freeSpace / (2 * containerWidth);
+        }
+
+        /// <summary>
+        /// Converts an offset from the container centre into a position for the given <see cref="GetStageHorizontalDirection"/>.
+        /// The anchored edge already sits on the matching container edge, so the drawable's centre has to be moved back
+        /// across half the container before the offset is applied.
+        /// </summary>
+        public static float CalculateAnchoredPositionX(int direction, float offsetFromCentre, float containerWidth)
+            => offsetFromCentre - direction * containerWidth / 2;
+
+        /// <summary>
+        /// Placement of the stage position offset. Keeps the container centred vertically; only the horizontal side flips.
+        /// </summary>
+        public static Vector2 CalculateStageOffsetPosition(
+            float value,
+            float verticalValue,
+            int direction,
+            float containerWidth,
+            float containerHeight,
+            float stageWidth)
+        {
+            float offsetFromCentre = CalculateStageOffsetFraction(value, containerWidth, stageWidth) * containerWidth;
+            float x = CalculateAnchoredPositionX(direction, offsetFromCentre, containerWidth);
+
+            // Positive Y moves the stage up, while drawable coordinates grow downwards.
+            float y = -verticalValue * containerHeight / 2;
+
+            return new Vector2(x, y);
         }
 
         public static float CalculateMobileAdjust(int keyMode, ManiaMobileLayout mobileLayout, Vector2? containingCellSize)

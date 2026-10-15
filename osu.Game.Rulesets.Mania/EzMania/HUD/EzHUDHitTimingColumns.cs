@@ -11,6 +11,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.EzMania.Localization;
@@ -93,8 +94,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         private Vector2 savedPosition;
         private bool savedLayout;
 
+        private Vector2 appliedContainerSize;
+        private float appliedStageOffsetFraction;
+
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
+
+        [Resolved(canBeNull: true)]
+        private ManiaPlayfieldLayoutConfig? playfieldLayout { get; set; }
 
         [Resolved]
         private InputCountController controller { get; set; } = null!;
@@ -255,6 +262,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             hitPosition.BindValueChanged(_ => updateHitPositionLayout());
             MatchManiaHitPositionLayout.BindValueChanged(_ => updateHitPositionLayout(), true);
 
+            playfieldLayout?.StageX.BindValueChanged(_ => updateHitPositionLayout());
+            playfieldLayout?.StageY.BindValueChanged(_ => updateHitPositionLayout());
+
             ezSkinConfig.ColumnTypeChanged += updateWidth;
             skin.SourceChanged += onSkinChanged;
 
@@ -302,6 +312,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
                 else
                     updateAllMarkerPositions();
             }, true);
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (!MatchManiaHitPositionLayout.Value || playfieldLayout == null)
+                return;
+
+            if (Parent?.ChildSize != appliedContainerSize || playfieldLayout.StageOffsetFractionX != appliedStageOffsetFraction)
+                updateHitPositionLayout();
         }
 
         private void updateWidth(int arg1, int arg2, EzColumnType arg3)
@@ -354,12 +375,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
                     savedLayout = true;
                 }
 
-                Anchor = Anchor.BottomCentre;
                 Origin = Anchor.Centre;
 
-                ManiaPlayfieldLayoutHelper.ApplyHitPositionPlacement(
-                    this,
-                    ManiaPlayfieldLayoutHelper.GetHitPosition(skin, hitPositionGlobalEnable.Value, hitPosition.Value));
+                float hitPositionValue = ManiaPlayfieldLayoutHelper.GetHitPosition(skin, hitPositionGlobalEnable.Value, hitPosition.Value);
+
+                Vector2 containerSize = Parent?.ChildSize ?? Vector2.Zero;
+
+                // The stage offset depends on the parent size; keep the last placement until it is known.
+                if (playfieldLayout != null && (containerSize.X <= 0 || containerSize.Y <= 0))
+                    return;
+
+                appliedContainerSize = containerSize;
+                appliedStageOffsetFraction = playfieldLayout?.StageOffsetFractionX ?? 0;
+
+                ManiaPlayfieldLayoutHelper.ApplyHitPositionPlacement(this, hitPositionValue, playfieldLayout, containerSize);
                 return;
             }
 

@@ -17,6 +17,7 @@ using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Extensions;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
@@ -46,6 +47,9 @@ namespace osu.Game.EzOsuGame.Screens
 
         [Resolved]
         private Storage storage { get; set; } = null!;
+
+        [Resolved]
+        private ManiaPlayfieldLayoutConfig playfieldLayout { get; set; } = null!;
 
         [Resolved]
         private Bindable<WorkingBeatmap> beatmap { get; set; } = null!;
@@ -122,6 +126,22 @@ namespace osu.Game.EzOsuGame.Screens
                         Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaPseudo3DRotation),
                         KeyboardStep = 1f,
                         DisplayAsPercentage = false
+                    },
+                    new SettingsSlider<float>
+                    {
+                        LabelText = EzColumnStrings.STAGE_POSITION_X,
+                        TooltipText = EzColumnStrings.STAGE_POSITION_X_TOOLTIP,
+                        Current = playfieldLayout.StageX,
+                        KeyboardStep = 1f,
+                        DisplayAsPercentage = true
+                    },
+                    new SettingsSlider<float>
+                    {
+                        LabelText = EzColumnStrings.STAGE_POSITION_Y,
+                        TooltipText = EzColumnStrings.STAGE_POSITION_Y_TOOLTIP,
+                        Current = playfieldLayout.StageY,
+                        KeyboardStep = 1f,
+                        DisplayAsPercentage = true
                     },
                     new SettingsSlider<double>
                     {
