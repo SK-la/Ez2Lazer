@@ -96,7 +96,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             drawableManiaRuleset ??= this.FindClosestParent<DrawableManiaRuleset>();
             UsesEzJudgement = drawableManiaRuleset?.JudgementRound?.IsEzJudgeMode
                               ?? (HitObject.HitWindows is ManiaHitWindows windows
-                                  && windows.ActiveJudgeMode is not (EzEnumJudgeMode.Lazer or EzEnumJudgeMode.Classic));
+                                  && windows.ActiveJudgeMode is not (EzEnumJudgeMode.Lazer or EzEnumJudgeMode.Classic or EzEnumJudgeMode.StableClassic));
             ColumnSchedulesAutoMiss = drawableManiaRuleset?.ColumnRoutesInput == true;
 
             Direction.BindValueChanged(OnDirectionChanged, true);

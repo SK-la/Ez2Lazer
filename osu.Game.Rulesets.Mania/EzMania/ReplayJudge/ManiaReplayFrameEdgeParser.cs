@@ -42,6 +42,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         private readonly List<ManiaAction> lastActions = new List<ManiaAction>();
         private readonly Dictionary<int, List<double>> pressTimes = new Dictionary<int, List<double>>();
         private readonly List<ManiaReplayInputEvent> emitted = new List<ManiaReplayInputEvent>();
+        private readonly List<double> frameTimes = new List<double>();
 
         private int frameIndex;
         private bool finalized;
@@ -73,11 +74,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             foreach (var list in pressTimes.Values)
                 list.Sort();
 
-            return new ManiaReplayInputData(events, clonePressTimes());
+            return new ManiaReplayInputData(events, clonePressTimes(), new List<double>(frameTimes));
         }
 
         private void emitFrame(ManiaReplayFrame frame, List<ManiaReplayInputEvent> destination)
         {
+            frameTimes.Add(frame.Time + frameTimeOffset);
+
             var current = frame.Actions.ToList();
 
             foreach (var action in current)

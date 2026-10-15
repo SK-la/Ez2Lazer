@@ -243,6 +243,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private bool setJudgeMode()
         {
             // 需要先更新属性，保证数值同步
+            helper.IsConvert = isConvert;
             helper.JudgeMode = ActiveJudgeMode;
             helper.OverallDifficulty = overallDifficulty;
             helper.TotalMultiplier = totalMultiplier;

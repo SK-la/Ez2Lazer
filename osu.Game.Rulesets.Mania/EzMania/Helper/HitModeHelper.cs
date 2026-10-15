@@ -7,6 +7,7 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
@@ -112,6 +113,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             }
         }
 
+        /// <summary>
+        /// 谱面是否为非 mania 原谱转换而来（stable 转谱判定窗分支用）。
+        /// </summary>
+        public bool IsConvert { get; set; }
+
         public JudgeModeHelper(EzEnumJudgeMode judgeMode)
         {
             JudgeMode = judgeMode;
@@ -190,6 +196,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     Range000 = 150.0 * TotalMultiplier;
                     break;
 
+                case EzEnumJudgeMode.StableClassic:
+                    var stable = StableManiaWindows.Create(OverallDifficulty, TotalMultiplier, IsConvert);
+                    Range305 = stable.Perfect300g;
+                    Range300 = stable.Great300;
+                    Range200 = stable.Good200;
+                    Range100 = stable.Ok100;
+                    Range050 = stable.Meh50;
+                    Range000 = stable.Miss;
+                    break;
+
                 case EzEnumJudgeMode.Classic:
                     double invertedOd = Math.Clamp(10 - OverallDifficulty, 0, 10);
                     Range305 = Math.Floor(16 * TotalMultiplier) + 0.5;
@@ -245,7 +261,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         public HitResult ResultFor(double timeOffset)
         {
-            if (judgeMode == EzEnumJudgeMode.Classic) return ResultForClassic(timeOffset);
+            if (judgeMode is EzEnumJudgeMode.Classic or EzEnumJudgeMode.StableClassic) return ResultForClassic(timeOffset);
 
             double absOffset = Math.Abs(timeOffset);
             if (absOffset <= Range305) return HitResult.Perfect;

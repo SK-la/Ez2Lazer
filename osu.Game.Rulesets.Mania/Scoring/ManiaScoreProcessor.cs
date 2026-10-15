@@ -10,8 +10,10 @@ using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
@@ -35,6 +37,57 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private EzEnumJudgeMode judgeMode => JudgeModeOverride ?? EzEnumJudgeMode.Lazer;
 
+        private readonly StableManiaScoring stableScoring = new StableManiaScoring();
+
+        private bool isStableClassic => StableClassicJudgeModeJudgement.IsSelected(judgeMode);
+
+        /// <summary>
+        /// stable classic 长条持有期的连击增量（<c>HitCircleManiaLong.Holding</c> 的
+        /// <c>IncreaseScoreType</c> 7）。
+        /// </summary>
+        /// <remarks>
+        /// 只推 <see cref="ScoreProcessor.Combo"/> 与 <see cref="ScoreProcessor.HighestCombo"/>：
+        /// stable 该分支不给判定计数、不加分、不进 <c>HitEvents</c>，因此
+        /// <c>ScoreResultCounts</c> / acc / rank / <c>MaximumStatistics</c> 均不受影响。
+        /// 增量数取决于实际按住时长（无法从谱面枚举），故也不进 <c>MaximumCombo</c>。
+        /// </remarks>
+        internal void ApplyClassicHoldCombo()
+        {
+            if (IsSimulating)
+                return;
+
+            Combo.Value++;
+            HighestCombo.Value = Math.Max(HighestCombo.Value, Combo.Value);
+        }
+
+        protected override bool TotalScoreIsSelfContained => isStableClassic;
+
+        private StableManiaWindows stableWindows => StableManiaWindows.Create(
+            calOD,
+            StableManiaScoring.WindowMultiplier(Mods.Value),
+            Beatmap.Value?.BeatmapInfo.Ruleset.OnlineID != 3);
+
+        private double stableScoreMultiplier()
+        {
+            var beatmap = Beatmap.Value;
+
+            if (beatmap == null)
+                return 1;
+
+            int noteCount = 0;
+
+            foreach (var hitObject in beatmap.HitObjects)
+            {
+                if (hitObject is Note || hitObject is HoldNote)
+                    noteCount++;
+            }
+
+            if (noteCount <= 0)
+                return 1;
+
+            return (double)StableManiaScoring.ScoreMax / noteCount * StableManiaScoring.ModMultiplier(Mods.Value);
+        }
+
         /// <summary>
         /// gameplay 入口（Player / 皮肤编辑器预览）冻结当前全局 JudgeMode。
         /// 必须在 <see cref="ScoreProcessor.ApplyBeatmap"/> 之前调用，否则全谱模拟与实际判定权重不一致。
@@ -49,6 +102,48 @@ namespace osu.Game.Rulesets.Mania.Scoring
             // Tail/Tick 的 Ignore 系 Judgement 必须在全谱模拟前绑定，否则 EZ2AC/Malody 会把官方尾 Perfect 计入 MaximumBaseScore。
             ManiaBeatmapBinding.BindJudgements(beatmap, judgeMode);
             base.ApplyBeatmap(beatmap);
+        }
+
+        protected override void Reset(bool storeResults)
+        {
+            base.Reset(storeResults);
+            stableScoring.Reset(stableScoreMultiplier());
+        }
+
+        public override void ResetFromReplayFrame(ReplayFrame frame)
+        {
+            // 帧头是同轨（classic 原生）的成绩快照：后退 / 跳帧后必须整体重建累加器，
+            // 否则下一次判定会从陈旧状态继续累加，总分与 classic 准确率都会跳变。
+            if (isStableClassic && frame.Header != null)
+            {
+                stableScoring.RestoreFrom(frame.Header.TotalScore);
+
+                if (frame.Header.Statistics != null)
+                    restoreClassicBaseScore(frame.Header.Statistics);
+            }
+
+            base.ResetFromReplayFrame(frame);
+        }
+
+        /// <summary>
+        /// 帧头只带判定计数，按 classic 档位把 <see cref="ScoreProcessor.ClassicBaseScore"/> /
+        /// <see cref="ScoreProcessor.ClassicMaxBaseScore"/> 反推回同一量纲（长条尾按 Perfect 档估），
+        /// 使回退后的 <see cref="ScoreProcessor.AccuracyClassic"/> 不致停在跳帧前的旧值。
+        /// </summary>
+        private void restoreClassicBaseScore(IReadOnlyDictionary<HitResult, int> statistics)
+        {
+            int perfect = JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
+            int judged = 0;
+            long baseScore = 0;
+
+            foreach (var (result, count) in statistics)
+            {
+                judged += count;
+                baseScore += (long)count * JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, result);
+            }
+
+            ClassicMaxBaseScore = (double)judged * perfect;
+            ClassicBaseScore = baseScore;
         }
 
         public ManiaScoreProcessor()
@@ -73,6 +168,10 @@ namespace osu.Game.Rulesets.Mania.Scoring
         // 换版必须同时给存量成绩定版本策略：算法一改，历史成绩与重算结果就会对不齐。
         protected override double ComputeTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
+            // stable 原生 classic：总分由 ComboAddition 状态机逐物件累加，不再走 combo/acc 曲线。
+            if (isStableClassic)
+                return StableManiaScoring.Finalize(stableScoring.TotalScoreDouble);
+
             if (IsLegacyScore || judgeMode == EzEnumJudgeMode.Classic)
             {
                 return 150000 * comboProgress
@@ -93,6 +192,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         protected override double ComputeTheoreticalPerfectJudgedTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
+            if (isStableClassic)
+                return MAX_SCORE * StableManiaScoring.ModMultiplier(Mods.Value);
+
             if (IsLegacyScore || judgeMode == EzEnumJudgeMode.Classic)
             {
                 return 150000 * comboProgress
@@ -144,6 +246,19 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
 
             return GetBaseScoreForResult(result);
+        }
+
+        public override void PopulateScore(ScoreInfo score)
+        {
+            base.PopulateScore(score);
+
+            if (!isStableClassic)
+                return;
+
+            // stable classic 的 acc 分母是「单键数 + 长条数」（一条长条只占一个 300 槽），rank 也按这条 acc 分档。
+            // lazer 的 Accuracy 仍把长条头算进分母（头不落判定却占 MaxResult 槽），会虚高，故 classic 整体改用 AccuracyClassic。
+            score.Accuracy = AccuracyClassic.Value;
+            score.Rank = RankFromScore(AccuracyClassic.Value, ScoreResultCounts);
         }
 
         public override ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results, bool useDefaultCutoffs = false)
@@ -204,13 +319,28 @@ namespace osu.Game.Rulesets.Mania.Scoring
             else if (hitObject is TailNote)
             {
                 ClassicMaxBaseScore += JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
-                ClassicBaseScore += hitWindows.GetClassicLNScore(headOffsets[hitObject.Column], offset);
+
+                if (isStableClassic)
+                {
+                    // 尾已经带着 stable classic 档位落地（StableClassicJudgeModeJudgement），计分侧直接复用，
+                    // 否则统计、acc、总分三处会各算一遍、又各自分叉。
+                    ClassicBaseScore += JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, judgement.Type);
+                    stableScoring.Apply(StableClassicJudgeModeJudgement.FromHitResult(judgement.Type), judgement.ComboAtJudgement);
+                }
+                else
+                {
+                    ClassicBaseScore += hitWindows.GetClassicLNScore(headOffsets[hitObject.Column], offset);
+                }
+
                 headOffsets[hitObject.Column] = 0;
             }
             else if (hitObject is Note)
             {
                 ClassicMaxBaseScore += JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
                 ClassicBaseScore += JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, result);
+
+                if (isStableClassic)
+                    stableScoring.Apply(stableWindows.Judge(offset), judgement.ComboAtJudgement);
             }
 
             UpdateScoreClassic();
@@ -235,13 +365,26 @@ namespace osu.Game.Rulesets.Mania.Scoring
             else if (hitObject is TailNote)
             {
                 ClassicMaxBaseScore -= JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
-                ClassicBaseScore -= hitWindows.GetClassicLNScore(headOffsets[hitObject.Column], offset);
+
+                if (isStableClassic)
+                {
+                    ClassicBaseScore -= JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, judgement.Type);
+                    stableScoring.Revert();
+                }
+                else
+                {
+                    ClassicBaseScore -= hitWindows.GetClassicLNScore(headOffsets[hitObject.Column], offset);
+                }
+
                 headOffsets[hitObject.Column] = 0;
             }
             else if (hitObject is Note)
             {
                 ClassicMaxBaseScore -= JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
                 ClassicBaseScore -= JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, result);
+
+                if (isStableClassic)
+                    stableScoring.Revert();
             }
 
             UpdateScoreClassic();
