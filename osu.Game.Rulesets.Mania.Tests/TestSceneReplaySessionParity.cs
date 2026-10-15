@@ -510,13 +510,13 @@ namespace osu.Game.Rulesets.Mania.Tests
         }
 
         /// <summary>
-        /// [Ez] StableClassic 断连 LN（提早松手、不重按）：尾被动 Miss 仍须出判决，
+        /// [Ez] StableClassic 断连 LN（提早松手、不重按）：尾仍须出判决且与 Session 全量一致，
         /// 覆盖结算门闩——悬空不判会让局内 <c>HasCompleted</c> 永假，局内无法进入结算。
         /// </summary>
         /// <remarks>
-        /// 只断言结算门闩，不断言 live/Session 全量 parity：StableClassic 的 drawable 侧尚未接 stable 长条语义，
-        /// 局内与 Session 目前不一致（局内 HeadNote=Perfect、Session HeadNote=IgnoreHit）。见
-        /// <see cref="TestFullScoreParity_StableClassicLiveSessionDivergence"/>。门闩本身已成立，故不受该差异影响。
+        /// 帧钟按 100ms 铺满：stable classic 的尾判挂在帧钟上（<c>EndTime + HitWindow100</c>），
+        /// 稀疏帧（如只在按键边沿取帧）会把这枚尾判压到下一枚帧，从而与后一个物件的落判顺序互换，
+        /// 总分随之不同——那是帧密度造成的，不是判定语义的差异。
         /// </remarks>
         [Test]
         public void TestFullScoreParity_StableClassicBrokenHoldNoRepress()
@@ -526,28 +526,31 @@ namespace osu.Game.Rulesets.Mania.Tests
             const double head = 1000;
             const double tail = 3000;
 
+            var frames = new List<ReplayFrame>();
+
+            for (double time = head; time <= 1500; time += 100)
+                frames.Add(new ManiaReplayFrame(time, ManiaAction.Key1));
+
+            for (double time = 1600; time <= 3900; time += 100)
+                frames.Add(new ManiaReplayFrame(time));
+
+            frames.Add(new ManiaReplayFrame(4000, ManiaAction.Key2));
+            frames.Add(new ManiaReplayFrame(4100));
+
             runFullScoreParityTest(
                 new List<ManiaHitObject>
                 {
                     new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
                     new Note { StartTime = 4000, Column = 1 },
                 },
-                new List<ReplayFrame>
-                {
-                    new ManiaReplayFrame(head, ManiaAction.Key1),
-                    new ManiaReplayFrame(1500), // 提早松手 → 断连，尾被动 miss
-                    new ManiaReplayFrame(4000, ManiaAction.Key2),
-                    new ManiaReplayFrame(4100),
-                },
-                assertJudgedHitsComplete: true,
-                assertSessionParity: false);
+                frames,
+                assertJudgedHitsComplete: true);
         }
 
         /// <summary>
         /// [Ez] StableClassic 按住过尾不松手：尾落在帧钟的 <c>EndTime + HitWindow50</c> 上，
-        /// 局内同样必须收束，不得因「持过尾」而永不结算。
+        /// 局内同样必须收束，不得因「持过尾」而永不结算；同时与 Session 全量一致。
         /// </summary>
-        /// <remarks>同 <see cref="TestFullScoreParity_StableClassicBrokenHoldNoRepress"/>：只断言结算门闩。</remarks>
         [Test]
         public void TestFullScoreParity_StableClassicHeldPastTail()
         {
@@ -558,8 +561,9 @@ namespace osu.Game.Rulesets.Mania.Tests
 
             var frames = new List<ReplayFrame>();
 
-            // 100ms 帧钟铺到 3400，覆盖 EndTime + HitWindow50 的落判帧。
-            for (double time = head; time <= 3400; time += 100)
+            // 10ms 帧钟铺到 3400：stable classic 的尾判挂在帧钟上（EndTime + HitWindow50），
+            // 落判时刻迟于 live 一个帧长就会换档（Good → Ok），故帧钟要与局内渲染步长同量级。
+            for (double time = head; time <= 3400; time += 10)
                 frames.Add(new ManiaReplayFrame(time, ManiaAction.Key1));
 
             frames.Add(new ManiaReplayFrame(3500));
@@ -573,27 +577,32 @@ namespace osu.Game.Rulesets.Mania.Tests
                     new Note { StartTime = 4000, Column = 1 },
                 },
                 frames,
-                assertJudgedHitsComplete: true,
-                assertSessionParity: false);
+                assertJudgedHitsComplete: true);
         }
 
         /// <summary>
-        /// [Ez] StableClassic 局内与 Session 的已知不一致（<b>当前失败，故挂起</b>）：drawable 侧没有
-        /// stable 长条语义的接入，局内跑的是 lazer 长条判定，Session 跑的是 stable 状态机。
-        /// 实测（head=1000 / tail=3000）：断连不重按 → 局内 <c>HeadNote:Perfect</c> + <c>TailNote:Miss</c>，
-        /// Session 只出 <c>IgnoreHit</c>(头) + <c>TailNote:Miss</c>；按住过尾不松手 → 局内
-        /// <c>Body:ComboBreak</c> + <c>TailNote:Miss</c>，Session 出 <c>TailNote:Ok</c>。
-        /// 局内 accuracy 也恒为 1：<see cref="Helper.JudgeModeHelper.GetBaseScoreForResult"/> 无 StableClassic 分支，
-        /// 落到 <c>default: return 0</c>，当前判定基分全 0。
+        /// [Ez] StableClassic 整条 LN 从未按下：头尾都不给分，但仍须各出判决（头 IgnoreMiss、尾 Miss），
+        /// 否则局内结算门闩永不成立；局内与 Session 的 acc / 总分必须一致。
         /// </summary>
+        /// <remarks>
+        /// 头的判定被压成 <see cref="HitResult.IgnoreMiss"/>（stable 的 LN 头不进 OnHit），
+        /// 故这里也在守「头绑定 IgnoreJudgement 之后，被动 Miss 不得再落 <see cref="HitResult.Miss"/>」。
+        /// </remarks>
         [Test]
-        [Ignore("StableClassic 的 drawable 侧尚未接 stable 长条语义；修复后去掉 Ignore")]
-        public void TestFullScoreParity_StableClassicLiveSessionDivergence()
+        public void TestFullScoreParity_StableClassicHeadNeverPressed()
         {
             parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
 
             const double head = 1000;
             const double tail = 3000;
+
+            var frames = new List<ReplayFrame>();
+
+            for (double time = head; time <= 3900; time += 100)
+                frames.Add(new ManiaReplayFrame(time));
+
+            frames.Add(new ManiaReplayFrame(4000, ManiaAction.Key2));
+            frames.Add(new ManiaReplayFrame(4100));
 
             runFullScoreParityTest(
                 new List<ManiaHitObject>
@@ -601,13 +610,8 @@ namespace osu.Game.Rulesets.Mania.Tests
                     new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
                     new Note { StartTime = 4000, Column = 1 },
                 },
-                new List<ReplayFrame>
-                {
-                    new ManiaReplayFrame(head, ManiaAction.Key1),
-                    new ManiaReplayFrame(1500),
-                    new ManiaReplayFrame(4000, ManiaAction.Key2),
-                    new ManiaReplayFrame(4100),
-                });
+                frames,
+                assertJudgedHitsComplete: true);
         }
 
         /// <summary>
