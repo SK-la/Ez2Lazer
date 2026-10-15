@@ -34,6 +34,17 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
         public static string DescribeHitEvents(IReadOnlyList<HitEvent> hitEvents)
             => string.Join(", ", orderedJudgementEvents(hitEvents).Select(describeHitEvent));
 
+        /// <summary>判定结果序列（过滤 <c>Ignore*</c>，按容器序）。</summary>
+        public static IEnumerable<HitResult> OrderedJudgementResults(IReadOnlyList<HitEvent> hitEvents)
+            => orderedJudgementEvents(hitEvents).Select(e => e.Result);
+
+        /// <summary>
+        /// 只比较判定结果序列（计数 + 结果）。note lock 场景下 Drawable 会把被抢拍的旧物件立刻 Miss，
+        /// Session 让旧物件走自己的过期窗，Miss 时刻因此不同，故这类场景不比较 <see cref="HitEvent.TimeOffset"/>。
+        /// </summary>
+        public static bool AreHitResultSequencesEquivalent(IReadOnlyList<HitEvent> expected, IReadOnlyList<HitEvent> actual)
+            => OrderedJudgementResults(expected).SequenceEqual(OrderedJudgementResults(actual));
+
         private static IEnumerable<HitEvent> orderedJudgementEvents(IReadOnlyList<HitEvent> hitEvents)
             => judgementEvents(hitEvents)
                .OrderBy(e => e.HitObject.StartTime)
