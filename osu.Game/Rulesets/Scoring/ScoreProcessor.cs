@@ -217,7 +217,7 @@ namespace osu.Game.Rulesets.Scoring
         public bool IsLegacyScore = false;
 
         /// <summary>
-        /// [Ez] gameplay 入口调用：将当前全局 Ez 游玩环境（如 mania HitMode）冻结注入本处理器。
+        /// [Ez] gameplay 入口调用：将当前全局 Ez 游玩环境（如 mania JudgeMode）冻结注入本处理器。
         /// 必须在 <see cref="ApplyBeatmap"/> 之前调用。
         /// 无头/转换路径（legacy 转换、后台升级、重算等）不得调用，以保持 ppy 上游官方行为。
         /// </summary>
@@ -478,7 +478,7 @@ namespace osu.Game.Rulesets.Scoring
 
         /// <summary>
         /// 已判定区间全 Perfect 时应达到的标准化总分（含 Mod 倍率）。
-        /// 与 live <see cref="TotalScore"/> 同源公式，按规则集 / HitMode 切换计分方式。
+        /// 与 live <see cref="TotalScore"/> 同源公式，按规则集 / JudgeMode 切换计分方式。
         /// </summary>
         public long GetTheoreticalPerfectJudgedDisplayScore()
         {

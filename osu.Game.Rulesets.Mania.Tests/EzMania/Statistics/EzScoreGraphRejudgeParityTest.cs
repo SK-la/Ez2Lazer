@@ -30,7 +30,7 @@ using osu.Game.Tests.Beatmaps;
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
 {
     /// <summary>
-    /// 验证每个 hitmode 的 rejudge 路径（<c>rejudgeOriginalHitEvents</c>）使用了
+    /// 验证每个 JudgeMode 的 rejudge 路径（<c>rejudgeOriginalHitEvents</c>）使用了
     /// 与 Session 模拟器一致的判定逻辑，产生匹配的判定计数。
     /// </summary>
     [TestFixture]
@@ -50,66 +50,66 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
             -5, 0, 22, 35, 68, 98, 122, 159, 200,
         };
 
-        [TestCase(EzEnumHitMode.Lazer)]
-        [TestCase(EzEnumHitMode.Classic)]
-        [TestCase(EzEnumHitMode.EZ2AC)]
-        [TestCase(EzEnumHitMode.O2Jam)]
-        [TestCase(EzEnumHitMode.IIDX_HD)]
-        [TestCase(EzEnumHitMode.LR2_HD)]
-        [TestCase(EzEnumHitMode.Raja_NM)]
-        [TestCase(EzEnumHitMode.Malody_E)]
-        [TestCase(EzEnumHitMode.Malody_B)]
-        public void TestRejudgeTapNotesMatchesSession(EzEnumHitMode hitMode)
+        [TestCase(EzEnumJudgeMode.Lazer)]
+        [TestCase(EzEnumJudgeMode.Classic)]
+        [TestCase(EzEnumJudgeMode.EZ2AC)]
+        [TestCase(EzEnumJudgeMode.O2Jam)]
+        [TestCase(EzEnumJudgeMode.IIDX_HD)]
+        [TestCase(EzEnumJudgeMode.LR2_HD)]
+        [TestCase(EzEnumJudgeMode.Raja_NM)]
+        [TestCase(EzEnumJudgeMode.Malody_E)]
+        [TestCase(EzEnumJudgeMode.Malody_B)]
+        public void TestRejudgeTapNotesMatchesSession(EzEnumJudgeMode judgeMode)
         {
             var (score, beatmap) = createTapOnlyFixture(tap_offsets);
-            var env = createEnvironment(hitMode);
+            var env = createEnvironment(judgeMode);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(env);
-            initO2Jam(hitMode, beatmap);
+            initO2Jam(judgeMode, beatmap);
 
             var sessionScore = ManiaReplaySession.Run(score.DeepClone(), beatmap, env);
             var originalHitEvents = sessionScore.ScoreInfo.HitEvents;
 
-            var expectedCounts = extractBasicCounts(originalHitEvents, hitMode);
-            var windows = createHitWindows(hitMode, beatmap.Difficulty.OverallDifficulty);
-            var judgement = ManiaJudgementRegistry.GetHitModeJudgement(hitMode);
-            var actualCounts = rejudgeEvents(originalHitEvents, windows, judgement, hitMode);
+            var expectedCounts = extractBasicCounts(originalHitEvents, judgeMode);
+            var windows = createHitWindows(judgeMode, beatmap.Difficulty.OverallDifficulty);
+            var judgement = ManiaJudgementRegistry.GetJudgeModeJudgement(judgeMode);
+            var actualCounts = rejudgeEvents(originalHitEvents, windows, judgement, judgeMode);
 
-            assertCountsMatch(expectedCounts, actualCounts, hitMode, "tap only");
+            assertCountsMatch(expectedCounts, actualCounts, judgeMode, "tap only");
         }
 
-        [TestCase(EzEnumHitMode.EZ2AC)]
-        [TestCase(EzEnumHitMode.Lazer)]
-        [TestCase(EzEnumHitMode.Classic)]
-        [TestCase(EzEnumHitMode.O2Jam)]
-        [TestCase(EzEnumHitMode.IIDX_HD)]
-        [TestCase(EzEnumHitMode.LR2_HD)]
-        [TestCase(EzEnumHitMode.Raja_NM)]
-        [TestCase(EzEnumHitMode.Malody_E)]
-        [TestCase(EzEnumHitMode.Malody_B)]
-        public void TestRejudgeWithHoldsMatchesSession(EzEnumHitMode hitMode)
+        [TestCase(EzEnumJudgeMode.EZ2AC)]
+        [TestCase(EzEnumJudgeMode.Lazer)]
+        [TestCase(EzEnumJudgeMode.Classic)]
+        [TestCase(EzEnumJudgeMode.O2Jam)]
+        [TestCase(EzEnumJudgeMode.IIDX_HD)]
+        [TestCase(EzEnumJudgeMode.LR2_HD)]
+        [TestCase(EzEnumJudgeMode.Raja_NM)]
+        [TestCase(EzEnumJudgeMode.Malody_E)]
+        [TestCase(EzEnumJudgeMode.Malody_B)]
+        public void TestRejudgeWithHoldsMatchesSession(EzEnumJudgeMode judgeMode)
         {
             // 使用第二组 tap offset（与 TestRejudgeTapNotesMatchesSession 不同的偏移）
             double[] offsets = new double[] { -15, 10, 45, 80, 110, 140, 170 };
             var (score, beatmap) = createTapOnlyFixture(offsets);
-            var env = createEnvironment(hitMode);
+            var env = createEnvironment(judgeMode);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(env);
-            initO2Jam(hitMode, beatmap);
+            initO2Jam(judgeMode, beatmap);
 
             var sessionScore = ManiaReplaySession.Run(score.DeepClone(), beatmap, env);
             var originalHitEvents = sessionScore.ScoreInfo.HitEvents;
 
-            var expectedCounts = extractBasicCounts(originalHitEvents, hitMode);
-            var windows = createHitWindows(hitMode, beatmap.Difficulty.OverallDifficulty);
-            var judgement = ManiaJudgementRegistry.GetHitModeJudgement(hitMode);
-            var actualCounts = rejudgeEvents(originalHitEvents, windows, judgement, hitMode);
+            var expectedCounts = extractBasicCounts(originalHitEvents, judgeMode);
+            var windows = createHitWindows(judgeMode, beatmap.Difficulty.OverallDifficulty);
+            var judgement = ManiaJudgementRegistry.GetJudgeModeJudgement(judgeMode);
+            var actualCounts = rejudgeEvents(originalHitEvents, windows, judgement, judgeMode);
 
-            assertCountsMatch(expectedCounts, actualCounts, hitMode, "tap only v2");
+            assertCountsMatch(expectedCounts, actualCounts, judgeMode, "tap only v2");
         }
 
         [Test]
         public void TestEz2AcLnHeadGreatSoftensToPerfect()
         {
-            var (score, beatmap, env) = HitModeReplayFixtures.CreateEz2AcHoldHeadGreatSoftened();
+            var (score, beatmap, env) = JudgeModeReplayFixtures.CreateEz2AcHoldHeadGreatSoftened();
             ReplayJudgeTestConfig.ApplyToGlobalConfig(env);
 
             var sessionScore = ManiaReplaySession.Run(score.DeepClone(), beatmap, env);
@@ -119,8 +119,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
 
             Assert.That(headEvents, Has.Count.GreaterThan(0), "应有 HeadNote HitEvent");
 
-            var windows = createHitWindows(EzEnumHitMode.EZ2AC, beatmap.Difficulty.OverallDifficulty);
-            var ez2Ac = Ez2AcHitModeJudgement.Instance;
+            var windows = createHitWindows(EzEnumJudgeMode.EZ2AC, beatmap.Difficulty.OverallDifficulty);
+            var ez2Ac = Ez2AcJudgeModeJudgement.Instance;
 
             foreach (var headEvent in headEvents)
             {
@@ -149,17 +149,17 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
             const double bpm120 = 120.0;
             const double bpm200 = 200.0;
 
-            var env = ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
+            var env = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(env);
 
             // BPM 120
             var (score120, beatmap120) = createTapOnlyFixture(offsets, bpm: bpm120);
-            initO2Jam(EzEnumHitMode.O2Jam, beatmap120);
+            initO2Jam(EzEnumJudgeMode.O2Jam, beatmap120);
             var session120 = ManiaReplaySession.Run(score120.DeepClone(), beatmap120, env);
 
             // BPM 200
             var (score200, beatmap200) = createTapOnlyFixture(offsets, bpm: bpm200);
-            initO2Jam(EzEnumHitMode.O2Jam, beatmap200);
+            initO2Jam(EzEnumJudgeMode.O2Jam, beatmap200);
             var session200 = ManiaReplaySession.Run(score200.DeepClone(), beatmap200, env);
 
             var events120 = session120.ScoreInfo.HitEvents.ToList();
@@ -176,16 +176,16 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
             }
         }
 
-        [TestCase(EzEnumHitMode.Lazer)]
-        [TestCase(EzEnumHitMode.IIDX_HD)]
-        [TestCase(EzEnumHitMode.EZ2AC)]
-        [TestCase(EzEnumHitMode.O2Jam)]
-        public async Task TestReplayRunRequestOffsetUsesFrameShift(EzEnumHitMode hitMode)
+        [TestCase(EzEnumJudgeMode.Lazer)]
+        [TestCase(EzEnumJudgeMode.IIDX_HD)]
+        [TestCase(EzEnumJudgeMode.EZ2AC)]
+        [TestCase(EzEnumJudgeMode.O2Jam)]
+        public async Task TestReplayRunRequestOffsetUsesFrameShift(EzEnumJudgeMode judgeMode)
         {
             const double offset = 35;
             double[] offsets = { -40, -5, 25, 70 };
 
-            var envWithOffset = createEnvironment(hitMode) with
+            var envWithOffset = createEnvironment(judgeMode) with
             {
                 OffsetPlusMania = offset
             };
@@ -193,7 +193,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
             var (score, beatmap) = createTapOnlyFixture(offsets);
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, envWithOffset);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(envWithOffset);
-            initO2Jam(hitMode, beatmap);
+            initO2Jam(judgeMode, beatmap);
 
             var requested = await new ManiaReplaySessionService().RunRequestAsync(new ReplayRunRequest(score.DeepClone(), beatmap, ReplayRunPurpose.ForLive)
             {
@@ -202,18 +202,18 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
 
             var (manualScore, manualBeatmap) = createTapOnlyFixture(offsets);
             ReplayJudgeTestConfig.ApplyEmbeddedModes(manualScore, envWithOffset);
-            initO2Jam(hitMode, manualBeatmap);
+            initO2Jam(judgeMode, manualBeatmap);
             var manuallyShifted = ManiaReplaySession.Run(
                 shiftReplayFrames(manualScore, offset),
                 manualBeatmap,
                 envWithOffset with { OffsetPlusMania = 0 });
 
-            assertSessionScoreEquivalent(manuallyShifted.ScoreInfo, requested.Score.ScoreInfo, hitMode, "request frame shift");
+            assertSessionScoreEquivalent(manuallyShifted.ScoreInfo, requested.Score.ScoreInfo, judgeMode, "request frame shift");
 
             var (zeroScore, zeroBeatmap) = createTapOnlyFixture(offsets);
             ReplayJudgeTestConfig.ApplyEmbeddedModes(zeroScore, envWithOffset);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(envWithOffset with { OffsetPlusMania = 0 });
-            initO2Jam(hitMode, zeroBeatmap);
+            initO2Jam(judgeMode, zeroBeatmap);
 
             var zeroRequested = await new ManiaReplaySessionService().RunRequestAsync(new ReplayRunRequest(zeroScore.DeepClone(), zeroBeatmap, ReplayRunPurpose.ForLive)
             {
@@ -222,10 +222,10 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
 
             var (zeroExpectedScore, zeroExpectedBeatmap) = createTapOnlyFixture(offsets);
             ReplayJudgeTestConfig.ApplyEmbeddedModes(zeroExpectedScore, envWithOffset);
-            initO2Jam(hitMode, zeroExpectedBeatmap);
+            initO2Jam(judgeMode, zeroExpectedBeatmap);
             var zeroExpected = ManiaReplaySession.Run(zeroExpectedScore.DeepClone(), zeroExpectedBeatmap, envWithOffset with { OffsetPlusMania = 0 });
 
-            assertSessionScoreEquivalent(zeroExpected.ScoreInfo, zeroRequested.Score.ScoreInfo, hitMode, "zero offset request");
+            assertSessionScoreEquivalent(zeroExpected.ScoreInfo, zeroRequested.Score.ScoreInfo, judgeMode, "zero offset request");
         }
 
         /// <summary>
@@ -295,43 +295,43 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
             return shifted;
         }
 
-        private static void assertSessionScoreEquivalent(ScoreInfo expected, ScoreInfo actual, EzEnumHitMode hitMode, string context)
+        private static void assertSessionScoreEquivalent(ScoreInfo expected, ScoreInfo actual, EzEnumJudgeMode judgeMode, string context)
         {
-            Assert.That(actual.Accuracy, Is.EqualTo(expected.Accuracy), $"{context} {hitMode}: accuracy");
-            Assert.That(actual.TotalScore, Is.EqualTo(expected.TotalScore), $"{context} {hitMode}: total score");
+            Assert.That(actual.Accuracy, Is.EqualTo(expected.Accuracy), $"{context} {judgeMode}: accuracy");
+            Assert.That(actual.TotalScore, Is.EqualTo(expected.TotalScore), $"{context} {judgeMode}: total score");
             Assert.That(ManiaReplayParityHelper.AreStatisticsEquivalent(expected.Statistics, actual.Statistics), Is.True,
-                () => $"{context} {hitMode}: statistics expected=[{ManiaReplayParityHelper.DescribeStatistics(expected.Statistics)}] actual=[{ManiaReplayParityHelper.DescribeStatistics(actual.Statistics)}]");
+                () => $"{context} {judgeMode}: statistics expected=[{ManiaReplayParityHelper.DescribeStatistics(expected.Statistics)}] actual=[{ManiaReplayParityHelper.DescribeStatistics(actual.Statistics)}]");
             Assert.That(ManiaReplayParityHelper.AreHitEventsEquivalent(expected.HitEvents, actual.HitEvents), Is.True,
-                () => $"{context} {hitMode}: hit events expected=[{ManiaReplayParityHelper.DescribeHitEvents(expected.HitEvents)}] actual=[{ManiaReplayParityHelper.DescribeHitEvents(actual.HitEvents)}]");
+                () => $"{context} {judgeMode}: hit events expected=[{ManiaReplayParityHelper.DescribeHitEvents(expected.HitEvents)}] actual=[{ManiaReplayParityHelper.DescribeHitEvents(actual.HitEvents)}]");
         }
 
-        private static GameplayEnvironment createEnvironment(EzEnumHitMode hitMode)
+        private static GameplayEnvironment createEnvironment(EzEnumJudgeMode judgeMode)
         {
-            var healthMode = hitMode switch
+            var healthMode = judgeMode switch
             {
-                EzEnumHitMode.IIDX_HD or EzEnumHitMode.LR2_HD or EzEnumHitMode.Raja_NM => EzEnumHealthMode.IIDX_HD,
-                EzEnumHitMode.EZ2AC => EzEnumHealthMode.Ez2Ac,
-                EzEnumHitMode.O2Jam => EzEnumHealthMode.O2JamNormal,
+                EzEnumJudgeMode.IIDX_HD or EzEnumJudgeMode.LR2_HD or EzEnumJudgeMode.Raja_NM => EzEnumHealthMode.IIDX_HD,
+                EzEnumJudgeMode.EZ2AC => EzEnumHealthMode.Ez2Ac,
+                EzEnumJudgeMode.O2Jam => EzEnumHealthMode.O2JamNormal,
                 _ => EzEnumHealthMode.Lazer,
             };
 
-            bool bmsPoor = hitMode is EzEnumHitMode.IIDX_HD or EzEnumHitMode.LR2_HD or EzEnumHitMode.Raja_NM;
+            bool bmsPoor = judgeMode is EzEnumJudgeMode.IIDX_HD or EzEnumJudgeMode.LR2_HD or EzEnumJudgeMode.Raja_NM;
 
-            return ReplayJudgeTestConfig.Create(hitMode, healthMode, bmsPoorHitResultEnable: bmsPoor);
+            return ReplayJudgeTestConfig.Create(judgeMode, healthMode, bmsPoorHitResultEnable: bmsPoor);
         }
 
-        private static void initO2Jam(EzEnumHitMode hitMode, IBeatmap beatmap)
+        private static void initO2Jam(EzEnumJudgeMode judgeMode, IBeatmap beatmap)
         {
-            if (hitMode != EzEnumHitMode.O2Jam)
+            if (judgeMode != EzEnumJudgeMode.O2Jam)
                 return;
 
-            O2HitModeExtension.SetControlPoints(beatmap.ControlPointInfo);
-            O2HitModeExtension.SetOriginalBPM(beatmap.BeatmapInfo.BPM);
+            O2JudgeModeExtension.SetControlPoints(beatmap.ControlPointInfo);
+            O2JudgeModeExtension.SetOriginalBPM(beatmap.BeatmapInfo.BPM);
         }
 
-        private static ManiaHitWindows createHitWindows(EzEnumHitMode hitMode, double od)
+        private static ManiaHitWindows createHitWindows(EzEnumJudgeMode judgeMode, double od)
         {
-            var windows = new ManiaHitWindows(hitMode);
+            var windows = new ManiaHitWindows(judgeMode);
             windows.SetDifficulty(od);
             return windows;
         }
@@ -343,9 +343,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         /// 因为它们无法通过 <c>EvaluatePress</c> 在重判路径中产出。
         /// </summary>
         private static Dictionary<HitResult, int> extractBasicCounts(
-            IReadOnlyList<HitEvent> events, EzEnumHitMode hitMode)
+            IReadOnlyList<HitEvent> events, EzEnumJudgeMode judgeMode)
         {
-            var validResults = HitModeHelper.GetHitModeValidHitResults(hitMode).ToHashSet();
+            var validResults = JudgeModeHelper.GetJudgeModeValidHitResults(judgeMode).ToHashSet();
             var counts = new Dictionary<HitResult, int>();
 
             foreach (var e in events)
@@ -369,12 +369,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         private static Dictionary<HitResult, int> rejudgeEvents(
             IReadOnlyList<HitEvent> events,
             ManiaHitWindows windows,
-            IManiaHitModeJudgement? judgement,
-            EzEnumHitMode hitMode)
+            IManiaJudgeModeJudgement? judgement,
+            EzEnumJudgeMode judgeMode)
         {
-            var validResults = HitModeHelper.GetHitModeValidHitResults(hitMode).ToHashSet();
+            var validResults = JudgeModeHelper.GetJudgeModeValidHitResults(judgeMode).ToHashSet();
             var counts = new Dictionary<HitResult, int>();
-            bool isO2Jam = hitMode == EzEnumHitMode.O2Jam;
+            bool isO2Jam = judgeMode == EzEnumJudgeMode.O2Jam;
 
             var strategy = judgement
                            ?? (IManiaNoteJudgementStrategy)LazerNoteJudgementReplica.Instance;
@@ -401,7 +401,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         private static void assertCountsMatch(
             Dictionary<HitResult, int> expected,
             Dictionary<HitResult, int> actual,
-            EzEnumHitMode hitMode,
+            EzEnumJudgeMode judgeMode,
             string scenario)
         {
             var allResults = expected.Keys.Concat(actual.Keys).Distinct().OrderBy(r => r).ToList();
@@ -419,7 +419,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
             int actTotal = actual.Values.Sum();
 
             Assert.That(mismatches.Count == 0 && expTotal == actTotal,
-                $"[{hitMode} {scenario}] counts mismatch: {string.Join(" | ", mismatches)} "
+                $"[{judgeMode} {scenario}] counts mismatch: {string.Join(" | ", mismatches)} "
                 + $"(total expected={expTotal} actual={actTotal})");
         }
     }

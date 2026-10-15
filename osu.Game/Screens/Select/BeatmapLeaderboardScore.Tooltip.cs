@@ -30,6 +30,7 @@ using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Scoring.Bonus;
@@ -135,11 +136,22 @@ namespace osu.Game.Screens.Select
                             new PerformanceStatisticRow(BeatmapsetsStrings.ShowScoreboardHeaderspp.ToUpper(), score),
                         };
 
-                        if (value.TryGetManiaGameplayModes(out int hitMode, out int healthMode))
+                        if (value.TryGetManiaGameplayModes(out int judgeMode, out int healthMode))
+                        {
+                            // Lazer 是默认档，不展示；仅画非默认的档位。
+                            if (judgeMode != (int)EzEnumJudgeMode.Lazer || healthMode != (int)EzEnumHealthMode.Lazer)
+                                generalStatistics.Add(Empty().With(d => d.Height = 10));
+
+                            if (judgeMode != (int)EzEnumJudgeMode.Lazer)
+                                generalStatistics.Add(new StatisticRow("HIT", EzScoreInfoExtensions.GetJudgeModeDisplayName(judgeMode)));
+
+                            if (healthMode != (int)EzEnumHealthMode.Lazer)
+                                generalStatistics.Add(new StatisticRow("HP", EzScoreInfoExtensions.GetHealthModeDisplayName(healthMode)));
+                        }
+                        else if (value.TryGetStdGameplayMode(out int stdMode) && stdMode != (int)EzEnumJudgeMode.Lazer)
                         {
                             generalStatistics.Add(Empty().With(d => d.Height = 10));
-                            generalStatistics.Add(new StatisticRow("HIT", EzManiaScoreModeExtensions.GetHitModeDisplayName(hitMode)));
-                            generalStatistics.Add(new StatisticRow("HP", EzManiaScoreModeExtensions.GetHealthModeDisplayName(healthMode)));
+                            generalStatistics.Add(new StatisticRow("JUDGE", EzScoreInfoExtensions.GetJudgeModeDisplayName(stdMode)));
                         }
 
                         generalStatistics.Add(Empty().With(d => d.Height = 20));

@@ -18,7 +18,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         [Test]
         public void TestSessionPoorEnabledFromEnvironmentWithoutGlobalConfig()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
 
             var config = GlobalConfigStore.EzConfig;
             GlobalConfigStore.EzConfig = config;

@@ -17,37 +17,37 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
     /// </summary>
     internal static class ManiaEnvironmentJudgements
     {
-        public static Judgement CreateForTailNote(EzEnumHitMode hitMode)
+        public static Judgement CreateForTailNote(EzEnumJudgeMode judgeMode)
         {
             // Malody / EZ2AC：尾不单独计分（无松手窗），仅 Ignore 完结。
-            if (MalodyHitModeJudgement.IsMalodyMode(hitMode) || hitMode == EzEnumHitMode.EZ2AC)
+            if (MalodyJudgeModeJudgement.IsMalodyMode(judgeMode) || judgeMode == EzEnumJudgeMode.EZ2AC)
                 return new MalodyTailJudgement();
 
             return new ManiaJudgement();
         }
 
-        public static Judgement CreateForHoldNoteTick(EzEnumHitMode hitMode)
+        public static Judgement CreateForHoldNoteTick(EzEnumJudgeMode judgeMode)
         {
-            if (hitMode == EzEnumHitMode.EZ2AC)
+            if (judgeMode == EzEnumJudgeMode.EZ2AC)
                 return new HoldNoteTickJudgement();
 
             // 其它模式：tick 仍存在于 nested 树中，Ignore 完结以免卡 AllJudged，且不计分。
             return new IgnoreJudgement();
         }
 
-        public static void ApplyToBeatmap(IBeatmap beatmap, EzEnumHitMode hitMode)
+        public static void ApplyToBeatmap(IBeatmap beatmap, EzEnumJudgeMode judgeMode)
         {
             // EZ2AC 的 16 分 tick 必须在判定绑定之前补齐：ManiaScoreProcessor 的全谱模拟按嵌套物件算
             // MaximumBaseScore，缺 tick 会把 EZ2AC 的 LN 按官方头尾语义计价。
-            // 放在这里而不是转换期，是为了让 tick 集合由 hitmode 决定，而不是由「转换当时全局设置是不是 EZ2AC」决定。
-            if (hitMode == EzEnumHitMode.EZ2AC)
+            // 放在这里而不是转换期，是为了让 tick 集合由 JudgeMode 决定，而不是由「转换当时全局设置是不是 EZ2AC」决定。
+            if (judgeMode == EzEnumJudgeMode.EZ2AC)
             {
                 foreach (var hitObject in beatmap.HitObjects)
                     ensureEz2AcTicksRecursive(hitObject);
             }
 
             foreach (var hitObject in beatmap.HitObjects)
-                applyRecursive(hitObject, hitMode);
+                applyRecursive(hitObject, judgeMode);
         }
 
         private static void ensureEz2AcTicksRecursive(HitObject hitObject)
@@ -59,21 +59,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 ensureEz2AcTicksRecursive(nested);
         }
 
-        private static void applyRecursive(HitObject hitObject, EzEnumHitMode hitMode)
+        private static void applyRecursive(HitObject hitObject, EzEnumJudgeMode judgeMode)
         {
             switch (hitObject)
             {
                 case TailNote:
-                    hitObject.SetJudgement(CreateForTailNote(hitMode));
+                    hitObject.SetJudgement(CreateForTailNote(judgeMode));
                     break;
 
                 case HoldNoteTick:
-                    hitObject.SetJudgement(CreateForHoldNoteTick(hitMode));
+                    hitObject.SetJudgement(CreateForHoldNoteTick(judgeMode));
                     break;
             }
 
             foreach (var nested in hitObject.NestedHitObjects)
-                applyRecursive(nested, hitMode);
+                applyRecursive(nested, judgeMode);
         }
     }
 }

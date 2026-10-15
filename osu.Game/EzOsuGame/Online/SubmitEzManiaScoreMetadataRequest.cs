@@ -16,12 +16,12 @@ namespace osu.Game.EzOsuGame.Online
     {
         private readonly int beatmapId;
         private readonly long scoreId;
-        private readonly int hitMode;
+        private readonly int judgeMode;
         private readonly int healthMode;
 
-        public SubmitEzManiaScoreMetadataRequest(int hitMode, int healthMode, long scoreId, int beatmapId)
+        public SubmitEzManiaScoreMetadataRequest(int judgeMode, int healthMode, long scoreId, int beatmapId)
         {
-            this.hitMode = hitMode;
+            this.judgeMode = judgeMode;
             this.healthMode = healthMode;
             this.scoreId = scoreId;
             this.beatmapId = beatmapId;
@@ -38,8 +38,8 @@ namespace osu.Game.EzOsuGame.Online
 
             req.AddRaw(JsonConvert.SerializeObject(new EzManiaScoreMetadataPayload
             {
-                ManiaHitMode = hitMode,
-                ManiaHealthMode = healthMode,
+                JudgeMode = judgeMode,
+                HealthMode = healthMode,
             }));
 
             return req;
@@ -47,11 +47,11 @@ namespace osu.Game.EzOsuGame.Online
 
         private class EzManiaScoreMetadataPayload
         {
-            [JsonProperty("mania_hit_mode")]
-            public int ManiaHitMode { get; set; }
+            [JsonProperty("judge_mode")]
+            public int JudgeMode { get; set; }
 
-            [JsonProperty("mania_health_mode")]
-            public int ManiaHealthMode { get; set; }
+            [JsonProperty("health_mode")]
+            public int HealthMode { get; set; }
         }
     }
 }

@@ -9,13 +9,13 @@ using osu.Game.Rulesets.Scoring;
 namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement
 {
     /// <summary>
-    /// ClassicNative 计分 / 窗口挂钩（OSL-013）。
+    /// StableClassic 计分 / 窗口挂钩（OSL-013）。
     /// 窗口已对齐 stable OD 半窗；总分走 <see cref="ScoreProcessor.IsLegacyScore"/> classic 算法。
     /// </summary>
-    public static class OsuClassicNativeScoring
+    public static class OsuStableClassicScoring
     {
-        public static bool ShouldUseLegacyScoreAlgorithm(EzEnumOsuJudgementTrack track)
-            => track == EzEnumOsuJudgementTrack.ClassicNative;
+        public static bool ShouldUseLegacyScoreAlgorithm(EzEnumJudgeMode track)
+            => track == EzEnumJudgeMode.StableClassic;
 
         /// <summary>
         /// 就地替换谱面物件 HitWindows（与 Mania BindJudgements 同纪律：Drawable 与 Session 共享同一 beatmap 实例）。
@@ -32,7 +32,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement
         {
             if (hitObject.HitWindows != null && !ReferenceEquals(hitObject.HitWindows, HitWindows.Empty))
             {
-                var classic = new OsuClassicNativeHitWindows();
+                var classic = new OsuStableClassicHitWindows();
                 classic.SetDifficulty(overallDifficulty);
                 hitObject.HitWindows = classic;
             }

@@ -498,19 +498,19 @@ namespace osu.Game.Rulesets.Mania
         }
 
         public override IEnumerable<HitResult> GetValidHitResults()
-            => HitModeHelper.GetHitModeValidHitResults();
+            => JudgeModeHelper.GetJudgeModeValidHitResults();
 
         public override IEnumerable<HitResult> GetValidHitResults(ScoreInfo? score)
-            => HitModeHelper.GetHitModeValidHitResultsForDisplay(score);
+            => JudgeModeHelper.GetJudgeModeValidHitResultsForDisplay(score);
 
         public override LocalisableString GetDisplayNameForHitResult(HitResult result)
         {
-            // 获取对应 HitMode 的显示名称
-            return result.GetHitModeDisplayName();
+            // 获取对应 JudgeMode 的显示名称
+            return result.GetJudgeModeDisplayName();
         }
 
         public override LocalisableString GetDisplayNameForHitResult(HitResult result, ScoreInfo? score)
-            => result.GetHitModeDisplayName(EzManiaScoreModeExtensions.ResolveDisplayHitMode(score));
+            => result.GetJudgeModeDisplayName(EzScoreInfoExtensions.ResolveDisplayJudgeMode(score));
 
         public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap) => new[]
         {
@@ -612,9 +612,9 @@ namespace osu.Game.Rulesets.Mania
             hitWindows.ClassicModActive = mods.Any(m => m is ManiaModClassic);
             hitWindows.BPM = beatmapInfo.BPM;
 
-            // 获取当前HitMode
-            var currentHitMode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-            bool isBMSMode = HitModeHelper.IsBMSHitMode(currentHitMode);
+            // 获取当前JudgeMode
+            var currentJudgeMode = GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
+            bool isBMSMode = JudgeModeHelper.IsBMSJudgeMode(currentJudgeMode);
 
             yield return new RulesetBeatmapAttribute(SongSelectStrings.Accuracy, @"OD", originalDifficulty.OverallDifficulty, adjustedDifficulty.OverallDifficulty, 10)
             {
@@ -644,7 +644,7 @@ namespace osu.Game.Rulesets.Mania
                                                   }
 
                                                   return new RulesetBeatmapAttribute.AdditionalMetric(
-                                                      SongSelectStrings.HitResultWindow(window.result.GetHitModeDisplayName().ToString().ToUpperInvariant()),
+                                                      SongSelectStrings.HitResultWindow(window.result.GetJudgeModeDisplayName().ToString().ToUpperInvariant()),
                                                       windowText,
                                                       colours.ForHitResult(window.result)
                                                   );

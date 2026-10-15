@@ -172,8 +172,8 @@ namespace osu.Game.EzOsuGame.Statistics
             var v1ScoreProcessor = Score.Ruleset.CreateInstance().CreateScoreProcessor();
 
             // 必须在 ApplyBeatmap() 前设置 Legacy 标记：
-            // ManiaScoreProcessor 会在 ApplyBeatmap() 内缓存 hitMode，
-            // 若顺序反了就会把当前 HitMode 当成 V1 路线，导致 classic 结果随 HitMode 改变。
+            // ManiaScoreProcessor 会在 ApplyBeatmap() 内缓存 judgeMode，
+            // 若顺序反了就会把当前 JudgeMode 当成 V1 路线，导致 classic 结果随 JudgeMode 改变。
             v1ScoreProcessor.IsLegacyScore = true;
             v1ScoreProcessor.ApplyBeatmap(Beatmap);
             v1ScoreProcessor.Mods.Value = Score.Mods;
@@ -405,7 +405,7 @@ namespace osu.Game.EzOsuGame.Statistics
         private bool textInitialized;
 
         /// <summary>
-        /// 标记文本统计 UI 需在下次 <see cref="UpdateText"/> 时重建（例如 HitMode 切换导致判定行集合变化）。
+        /// 标记文本统计 UI 需在下次 <see cref="UpdateText"/> 时重建（例如 JudgeMode 切换导致判定行集合变化）。
         /// </summary>
         protected void InvalidateTextUi() => textInitialized = false;
 
@@ -547,7 +547,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
         /// <summary>
         /// 轻量重绘 scatter + health line（带 offset）
-        /// Graph-UX: 使用 <see cref="GetDisplayHitEvents"/>（已按 HitMode 过滤，含 fake offset）
+        /// Graph-UX: 使用 <see cref="GetDisplayHitEvents"/>（已按 JudgeMode 过滤，含 fake offset）
         /// 重建 scatter 和血量，不清空边界线，拖动时性能友好。
         /// 注意：事件 TimeOffset 已经由 <see cref="FilterHitEvents"/> 链路的
         /// applyFakeOffsetToEvents 叠加了 displayOffset，因此 drawPointsGraph 无需再 applyOffset。
@@ -565,7 +565,7 @@ namespace osu.Game.EzOsuGame.Statistics
             foreach (var child in toRemove)
                 graphContainer.Remove(child, true);
 
-            // 使用 GetDisplayHitEvents（已按 HitMode 过滤，已含 displayOffset）
+            // 使用 GetDisplayHitEvents（已按 JudgeMode 过滤，已含 displayOffset）
             var displayEvents = GetDisplayHitEvents().OrderBy(e => e.HitObject.StartTime).ToList();
             drawPointsGraph(displayEvents, applyOffset: false);
 

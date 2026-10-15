@@ -18,7 +18,8 @@ namespace osu.Game.EzOsuGame.Scoring
 
         /// <summary>
         /// Records offset and accuracy cutoff settings at the start of a play session.
-        /// Mania hit/health modes are stored separately via <see cref="EzManiaScoreModeExtensions.ApplyManiaGameplayModes"/>.
+        /// Judge/health modes use the shared <see cref="ScoreInfo.JudgeMode"/>/<see cref="ScoreInfo.HealthMode"/> fields:
+        /// Mania writes them at the end of play via <see cref="EzScoreInfoExtensions.ApplyManiaGameplayModes"/>, osu snapshots its judgement track here.
         /// </summary>
         public static void ApplySessionSettingsSnapshot(ScoreInfo score, Ez2ConfigManager config)
         {
@@ -26,7 +27,10 @@ namespace osu.Game.EzOsuGame.Scoring
             score.SessionAccuracyCutoffS = config.Get<double>(Ez2Setting.AccuracyCutoffS);
             score.SessionOffsetPlusMania = config.Get<double>(Ez2Setting.OffsetPlusMania);
             score.SessionOffsetPlusNonMania = config.Get<double>(Ez2Setting.OffsetPlusNonMania);
-            score.OsuJudgementTrack = (int)config.Get<EzEnumOsuJudgementTrack>(Ez2Setting.OsuJudgementTrack);
+
+            if (score.Ruleset.ShortName == "osu")
+                score.JudgeMode = (int)config.Get<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode);
+
             score.SessionSettingsCaptured = true;
         }
 
@@ -38,15 +42,15 @@ namespace osu.Game.EzOsuGame.Scoring
 
             if (score.Ruleset.OnlineID == 3)
             {
-                if (!score.TryGetManiaGameplayModes(out int hitMode, out int healthMode))
+                if (!score.TryGetManiaGameplayModes(out int judgeMode, out int healthMode))
                 {
                     blockReason = "mania gameplay modes are not set on this score";
                     return false;
                 }
 
-                if (hitMode != (int)EzEnumHitMode.Lazer || healthMode != (int)EzEnumHealthMode.Lazer)
+                if (judgeMode != (int)EzEnumJudgeMode.Lazer || healthMode != (int)EzEnumHealthMode.Lazer)
                 {
-                    blockReason = $"ManiaHitMode={hitMode}, ManiaHealthMode={healthMode} (Lazer required)";
+                    blockReason = $"JudgeMode={judgeMode}, HealthMode={healthMode} (Lazer required)";
                     return false;
                 }
 

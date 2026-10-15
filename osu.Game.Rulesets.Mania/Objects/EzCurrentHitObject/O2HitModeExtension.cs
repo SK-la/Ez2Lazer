@@ -10,7 +10,7 @@ using osu.Game.Rulesets.Scoring;
 namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
     // 代码改编自YuLiangSSS提供的ManiaModO2Judgement
-    public static partial class O2HitModeExtension
+    public static partial class O2JudgeModeExtension
     {
         // 💊数量（可绑定）
         // 上限为 5，在达到一定 Cool 连击后会增加，发生较大偏移时会减少。
@@ -225,7 +225,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             double goodRange = GetGoodRangeAtTime(currentTime);
             double badRange = GetBadRangeAtTime(currentTime);
 
-            // Logger.Log("[O2HitModeExtension] Ranges at time " + currentTime + ": Cool=" + coolRange + ", Good=" + goodRange + ", Bad=" + badRange);
+            // Logger.Log("[O2JudgeModeExtension] Ranges at time " + currentTime + ": Cool=" + coolRange + ", Good=" + goodRange + ", Bad=" + badRange);
 
             if (absOffset <= coolRange)
             {

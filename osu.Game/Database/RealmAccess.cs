@@ -24,6 +24,7 @@ using osu.Game.Beatmaps.ExternalLibraries;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Input;
 using osu.Game.Input.Bindings;
 using osu.Game.Models;
@@ -114,7 +115,7 @@ namespace osu.Game.Database
         ///
         /// Ez2Lazer-only revisions are tracked separately via <see cref="EZ_REALM_SCHEMA_VERSION"/>.
         /// The on-disk Realm schema version is <see cref="EzFileSchemaVersion"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 52010).
-        /// Ez v1: Add ScoreInfo.ManiaHitMode and ManiaHealthMode.
+        /// Ez v1: Add ScoreInfo hit/health mode (later renamed: Judgement=>JudgeMode, health kept).
         /// Ez v2: Add BeatmapInfo.HasVideo and HasStoryboard.
         /// Ez v3: Add BeatmapInfo.XxyStarRating.
         /// Ez v4: Add BeatmapInfo.PerformancePoints.
@@ -125,8 +126,10 @@ namespace osu.Game.Database
         /// EzPlayerSkillHistoryPoint) with extended dan/provisional fields; RulesetInfo.LastAppliedManiaSkillVersion.
         /// Ez v9: Add typed EzBeatmapChartSkillInfo + EzPlayerDanSkillsetValue (no JSON blobs).
         /// Ez v10: Add EzBeatmapChartDan (nomod chart-dan + skillset label stamps).
+        /// Ez v11: Reorder EzEnumJudgeMode/EzEnumHealthMode (StableClassic = 1; Mania private modes at 31+);
+        ///         add canonical ScoreInfo.JudgeMode/HealthMode columns and migrate the legacy ManiaHitMode/ManiaHealthMode data into them.
         /// </summary>
-        public const int EZ_REALM_SCHEMA_VERSION = 10;
+        public const int EZ_REALM_SCHEMA_VERSION = 11;
 
         public static int EzFileSchemaVersion => schema_version * 1000 + EZ_REALM_SCHEMA_VERSION;
 
@@ -1520,8 +1523,8 @@ namespace osu.Game.Database
                     // Realm defaults new int columns to 0 (valid Lazer hit mode). Mark all existing scores as unset.
                     foreach (var score in migration.NewRealm.All<ScoreInfo>())
                     {
-                        score.ManiaHitMode = -1;
-                        score.ManiaHealthMode = -1;
+                        score.JudgeMode = -1;
+                        score.HealthMode = -1;
                     }
 
                     break;
@@ -1585,12 +1588,83 @@ namespace osu.Game.Database
                 case 10:
                     // EzBeatmapChartDan is new and starts empty (BDSP / maintenance warm).
                     break;
+
+                case 11:
+                {
+                    // 判定/血量枚举重排 + 归并历史列：StableClassic 归入共享低段（=1），Mania 私有档改「规则集 ID + 序号」（3x）。
+                    // 判定/血量数据历史落在旧列 ManiaHitMode / ManiaHealthMode；一次无 map 的属性改名曾留下空的 ManiaJudgeMode 列。
+                    // 规范列 JudgeMode/HealthMode 为本版新增，故从旧列取旧值、重排后写入规范列。
+                    string scoreClassName = getMappedOrOriginalName(typeof(ScoreInfo));
+
+                    if (migration.OldRealm.Schema.TryFindObjectSchema(scoreClassName, out var scoreSchema))
+                    {
+                        bool hasLegacyHitMode = scoreSchema.Any(p => p.Name == "ManiaHitMode");
+                        bool hasOrphanJudgeMode = scoreSchema.Any(p => p.Name == "ManiaJudgeMode");
+                        bool hasLegacyHealthMode = scoreSchema.Any(p => p.Name == "ManiaHealthMode");
+
+                        var oldScores = migration.OldRealm.DynamicApi.All(scoreClassName);
+                        var newScores = migration.NewRealm.All<ScoreInfo>().ToList();
+
+                        for (int i = 0; i < newScores.Count; i++)
+                        {
+                            dynamic oldScore = oldScores.ElementAt(i);
+
+                            // 优先真实历史列；兼容无 map 改名产生过的空 ManiaJudgeMode 列；都没有则按默认 Lazer。
+                            int oldJudge = hasLegacyHitMode ? (int)oldScore.ManiaHitMode
+                                : hasOrphanJudgeMode ? (int)oldScore.ManiaJudgeMode
+                                : 0;
+
+                            int oldHealth = hasLegacyHealthMode ? (int)oldScore.ManiaHealthMode : 0;
+
+                            newScores[i].JudgeMode = RemapEzJudgeMode(oldJudge);
+                            newScores[i].HealthMode = RemapEzHealthMode(oldHealth);
+                        }
+                    }
+
+                    break;
+                }
             }
 
             EzRealmMigrationContributorRegistry.ApplyContributors(migration, targetEzVersion);
 
             Logger.Log($"Ez migration completed in {stopwatch.ElapsedMilliseconds}ms");
         }
+
+        /// <summary>
+        /// ez 11 重排前（0..9）的判定档旧值 → 新枚举值。负值（未设置）保持。
+        /// </summary>
+        internal static int RemapEzJudgeMode(int oldValue) => oldValue switch
+        {
+            -1 => -1,
+            0 => (int)EzEnumJudgeMode.Lazer,
+            1 => (int)EzEnumJudgeMode.EZ2AC,
+            2 => (int)EzEnumJudgeMode.O2Jam,
+            3 => (int)EzEnumJudgeMode.IIDX_HD,
+            4 => (int)EzEnumJudgeMode.LR2_HD,
+            5 => (int)EzEnumJudgeMode.Raja_NM,
+            6 => (int)EzEnumJudgeMode.Malody_E,
+            7 => (int)EzEnumJudgeMode.Malody_B,
+            8 => (int)EzEnumJudgeMode.Classic,
+            9 => (int)EzEnumJudgeMode.StableClassic,
+            _ => oldValue,
+        };
+
+        /// <summary>
+        /// ez 11 重排前（0..7）的血量档旧值 → 新枚举值。负值（未设置）保持。
+        /// </summary>
+        internal static int RemapEzHealthMode(int oldValue) => oldValue switch
+        {
+            -1 => -1,
+            0 => (int)EzEnumHealthMode.Lazer,
+            1 => (int)EzEnumHealthMode.O2JamEasy,
+            2 => (int)EzEnumHealthMode.O2JamNormal,
+            3 => (int)EzEnumHealthMode.O2JamHard,
+            4 => (int)EzEnumHealthMode.Ez2Ac,
+            5 => (int)EzEnumHealthMode.IIDX_HD,
+            6 => (int)EzEnumHealthMode.LR2_HD,
+            7 => (int)EzEnumHealthMode.Raja_HD,
+            _ => oldValue,
+        };
 
         private string? getRulesetShortNameFromLegacyID(long rulesetId)
         {

@@ -12,17 +12,17 @@ using osu.Game.Scoring;
 namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 {
     /// <summary>
-    /// 为判定仿真取一份独立 beatmap：按 <c>(working beatmap, ruleset, mods, hitmode)</c> 从
-    /// <see cref="EzPlayableBeatmapCache"/> 取本 hitmode 专属的副本，并已绑定对应 hitmode。
+    /// 为判定仿真取一份独立 beatmap：按 <c>(working beatmap, ruleset, mods, JudgeMode)</c> 从
+    /// <see cref="EzPlayableBeatmapCache"/> 取本 JudgeMode 专属的副本，并已绑定对应 JudgeMode。
     /// </summary>
     /// <remarks>
     /// <para>
-    /// 绑定 hitmode（<see cref="ManiaBeatmapBinding"/>）与 <see cref="ManiaWindowBaker"/> 都是就地改写，所以仿真不能使用调用方
+    /// 绑定 JudgeMode（<see cref="ManiaBeatmapBinding"/>）与 <see cref="ManiaWindowBaker"/> 都是就地改写，所以仿真不能使用调用方
     /// 传进来的实例——那可能是本局正在游玩的实例（曾导致局内 tick/tail 区间被改成官方区间而抛异常），
     /// 也可能是 Race 里被多个 ghost 共享的实例。副本走与 live 完全相同的转换管线，避免依赖私有字段的反射深拷贝。
     /// </para>
     /// <para>
-    /// 缓存本身按 working beatmap 实例弱持有，键含谱面内容哈希、保序 mod 指纹（含解析后的 seed）与 hitmode，
+    /// 缓存本身按 working beatmap 实例弱持有，键含谱面内容哈希、保序 mod 指纹（含解析后的 seed）与 JudgeMode，
     /// 所以用户重掷种子、或谱面被重新导入，都会自然拿到新键而不是旧谱面。
     /// </para>
     /// <para>
@@ -40,7 +40,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         /// <summary>
-        /// 返回可自由绑定的仿真副本（已绑定 hitmode）。无法产出时返回 null：调用方必须自行回退，
+        /// 返回可自由绑定的仿真副本（已绑定 JudgeMode）。无法产出时返回 null：调用方必须自行回退，
         /// 不能假定一定拿得到副本。
         /// </summary>
         public IBeatmap? TryCreate(Score score, IGameplayEnvironment environment, CancellationToken cancellationToken)
@@ -60,15 +60,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 return null;
 
             var mods = EzModCompatibility.StripUnknown(scoreInfo.Mods);
-            EzEnumHitMode hitMode = environment.ManiaHitMode;
+            EzEnumJudgeMode judgeMode = environment.JudgeMode;
 
-            return EzPlayableBeatmapCache.GetBound(workingBeatmap, scoreInfo.Ruleset, mods, bindingScopeFor(hitMode),
-                playable => ManiaBeatmapBinding.BindForSimulation(playable, hitMode, providerOwned: true), cancellationToken);
+            return EzPlayableBeatmapCache.GetBound(workingBeatmap, scoreInfo.Ruleset, mods, bindingScopeFor(judgeMode),
+                playable => ManiaBeatmapBinding.BindForSimulation(playable, judgeMode, providerOwned: true), cancellationToken);
         }
 
         /// <remarks>
-        /// <see cref="EzEnumHitMode.Lazer"/> 是 0，而 0 是共享作用域，所以每个 hitmode 偏移 1 后才作为绑定作用域。
+        /// <see cref="EzEnumJudgeMode.Lazer"/> 是 0，而 0 是共享作用域，所以每个 JudgeMode 偏移 1 后才作为绑定作用域。
         /// </remarks>
-        private static int bindingScopeFor(EzEnumHitMode hitMode) => (int)hitMode + 1;
+        private static int bindingScopeFor(EzEnumJudgeMode judgeMode) => (int)judgeMode + 1;
     }
 }

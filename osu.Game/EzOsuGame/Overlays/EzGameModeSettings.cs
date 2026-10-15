@@ -1,67 +1,50 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring.Bonus;
 using osu.Game.Graphics.UserInterfaceV2;
-using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Play.PlayerSettings;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
-    public partial class EzGameModeSettings : SettingsSubsection
+    public partial class EzGameModeSettings : EzEnvironmentSettingsSubsection
     {
         protected override LocalisableString Header => EzSettingsStrings.EZ_GAME_SETTINGS_HEADER;
-
-        private readonly Bindable<bool> scoreSubmitWarning = new Bindable<bool>();
-        private readonly Bindable<SettingsNote.Data?> warningNote = new Bindable<SettingsNote.Data?>();
 
         private SettingsItemV2 poorCheckBox = null!;
 
         private Bindable<double> sAcc = null!;
         private Bindable<double> aAcc = null!;
 
-        private Bindable<EzEnumHitMode> maniaHitModeBindable = null!;
-        private Bindable<EzEnumOsuJudgementTrack> osuJudgementTrackBindable = null!;
+        private Bindable<EzEnumJudgeMode> maniaJudgeModeBindable = null!;
         private Bindable<EzEnumHealthMode> maniaHealthModeBindable = null!;
         private Bindable<bool> bmsPoorHitResultEnable = null!;
         private Bindable<EzEnumJudgePrecedence> judgePrecedenceBindable = null!;
         private Bindable<double> offsetManiaBindable = null!;
-        private Bindable<double> offsetNonManiaBindable = null!;
 
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
         {
             sAcc = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffS);
             aAcc = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffA);
-            maniaHitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-            osuJudgementTrackBindable = ezConfig.GetBindable<EzEnumOsuJudgementTrack>(Ez2Setting.OsuJudgementTrack);
+            maniaJudgeModeBindable = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
             maniaHealthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
             bmsPoorHitResultEnable = ezConfig.GetBindable<bool>(Ez2Setting.BmsPoorHitResultEnable);
             judgePrecedenceBindable = ezConfig.GetBindable<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence);
             offsetManiaBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
-            offsetNonManiaBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania);
 
             Children = new Drawable[]
             {
-                new Container
-                {
-                    RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y,
-                    Padding = SettingsPanel.CONTENT_PADDING,
-                    Child = new SettingsNote
-                    {
-                        RelativeSizeAxes = Axes.X,
-                        Current = { BindTarget = warningNote },
-                    },
-                },
+                CreateSubmitWarningNote(),
                 new SettingsItemV2(new FormSliderBar<double>
                 {
                     Caption = EzSettingsStrings.ACCURACY_CUTOFF_S,
@@ -82,23 +65,16 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "ez", "mania", "acc" }
                 },
-                new SettingsItemV2(new FormEnumDropdown<EzEnumHitMode>
+                new SettingsItemV2(new FormEnumDropdown<EzEnumJudgeMode>
                 {
                     Caption = EzSettingsStrings.HIT_MODE,
                     HintText = EzSettingsStrings.HIT_MODE_TOOLTIP,
-                    Current = maniaHitModeBindable,
+                    Current = maniaJudgeModeBindable,
+                    // StableClassic 是给后续共享 classic 预留的档，现行 mania classic 仍是 Classic。
+                    Items = Enum.GetValues<EzEnumJudgeMode>().Where(m => m != EzEnumJudgeMode.StableClassic),
                 })
                 {
                     Keywords = new[] { "ez", "mania" }
-                },
-                new SettingsItemV2(new FormEnumDropdown<EzEnumOsuJudgementTrack>
-                {
-                    Caption = EzSettingsStrings.OSU_JUDGEMENT_TRACK,
-                    HintText = EzSettingsStrings.OSU_JUDGEMENT_TRACK_TOOLTIP,
-                    Current = osuJudgementTrackBindable,
-                })
-                {
-                    Keywords = new[] { "ez", "osu", "classic", "judgement" }
                 },
                 new SettingsItemV2(new FormEnumDropdown<EzEnumHealthMode>
                 {
@@ -158,16 +134,6 @@ namespace osu.Game.EzOsuGame.Overlays
                     LabelFormat = v => $"{v:N0} ms",
                     TooltipFormat = BeatmapOffsetControl.GetOffsetExplanatoryText,
                 }),
-                new SettingsItemV2(new FormSliderBar<double>
-                {
-                    Caption = EzSettingsStrings.OFFSET_PLUS_NON_MANIA,
-                    HintText = EzSettingsStrings.OFFSET_PLUS_NON_MANIA_TOOLTIP,
-                    RelativeSizeAxes = Axes.X,
-                    Current =  offsetNonManiaBindable,
-                    KeyboardStep = 1,
-                    LabelFormat = v => $"{v:N0} ms",
-                    TooltipFormat = BeatmapOffsetControl.GetOffsetExplanatoryText,
-                }),
                 new SettingsItemV2(new FormCheckBox
                 {
                     Caption = EzSettingsStrings.SKIP_EMPTY_EDGE_COLUMNS,
@@ -194,39 +160,14 @@ namespace osu.Game.EzOsuGame.Overlays
                         poorCheckBox.Hide();
                         break;
                 }
-
-                Schedule(updateScoreSubmitWarning);
             }, true);
 
-            maniaHitModeBindable.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
-            osuJudgementTrackBindable.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
-
-            aAcc.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
-            sAcc.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
-            offsetManiaBindable.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
-            offsetNonManiaBindable.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
-            scoreSubmitWarning.BindValueChanged(_ => Schedule(updateScoreSubmitWarning), true);
-        }
-
-        private void updateScoreSubmitWarning()
-        {
-            scoreSubmitWarning.Value = (!maniaHitModeBindable.IsDefault ||
-                                        !osuJudgementTrackBindable.IsDefault ||
-                                        !maniaHealthModeBindable.IsDefault ||
-                                        !judgePrecedenceBindable.IsDefault ||
-                                        !aAcc.IsDefault ||
-                                        !sAcc.IsDefault ||
-                                        !offsetManiaBindable.IsDefault ||
-                                        !offsetNonManiaBindable.IsDefault);
-
-            if (scoreSubmitWarning.Value)
-            {
-                warningNote.Value = new SettingsNote.Data(EzSettingsStrings.SCORE_SUBMIT_WARNING, SettingsNote.Type.Warning);
-            }
-            else
-            {
-                warningNote.Value = null;
-            }
+            TrackSubmitWarning(maniaJudgeModeBindable);
+            TrackSubmitWarning(maniaHealthModeBindable);
+            TrackSubmitWarning(judgePrecedenceBindable);
+            TrackSubmitWarning(aAcc);
+            TrackSubmitWarning(sAcc);
+            TrackSubmitWarning(offsetManiaBindable);
         }
     }
 }

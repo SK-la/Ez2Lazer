@@ -34,7 +34,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         private bool displayedHorizontal = true;
         private float lastAppliedWidth = -1f;
 
-        private IBindable<EzEnumHitMode> maniaHitModeBindable = null!;
+        private IBindable<EzEnumJudgeMode> maniaJudgeModeBindable = null!;
         private IBindable<EzEnumHealthMode> maniaHealthModeBindable = null!;
 
         [Resolved]
@@ -79,7 +79,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
         {
-            maniaHitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            maniaJudgeModeBindable = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
             maniaHealthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
         }
 
@@ -88,7 +88,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             base.LoadComplete();
 
             ruleset.BindValueChanged(_ => updateDisplay(), true);
-            maniaHitModeBindable.BindValueChanged(_ => updateDisplay(), true);
+            maniaJudgeModeBindable.BindValueChanged(_ => updateDisplay(), true);
             maniaHealthModeBindable.BindValueChanged(_ => updateDisplay(), true);
 
             updateBlockWidth();
@@ -130,8 +130,8 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             if (isMania)
             {
-                blockA.SetValues("Hit", EzManiaScoreModeExtensions.GetHitModeDisplayName((int)maniaHitModeBindable.Value));
-                blockB.SetValues("HP", EzManiaScoreModeExtensions.GetHealthModeDisplayName((int)maniaHealthModeBindable.Value));
+                blockA.SetValues("Hit", EzScoreInfoExtensions.GetJudgeModeDisplayName((int)maniaJudgeModeBindable.Value));
+                blockB.SetValues("HP", EzScoreInfoExtensions.GetHealthModeDisplayName((int)maniaHealthModeBindable.Value));
 
                 Show();
                 this.FadeIn(200, Easing.OutQuint);
@@ -155,15 +155,15 @@ namespace osu.Game.EzOsuGame.UserInterface
             float hpLabelWidth = widthMeasureText.DrawWidth;
             float maxLabelWidth = Math.Max(hitLabelWidth, hpLabelWidth);
 
-            foreach (EzEnumHitMode mode in Enum.GetValues<EzEnumHitMode>())
+            foreach (EzEnumJudgeMode mode in Enum.GetValues<EzEnumJudgeMode>())
             {
-                widthMeasureText.Text = EzManiaScoreModeExtensions.GetHitModeDisplayName((int)mode);
+                widthMeasureText.Text = EzScoreInfoExtensions.GetJudgeModeDisplayName((int)mode);
                 maxContentWidth = Math.Max(maxContentWidth, maxLabelWidth + label_value_spacing + widthMeasureText.DrawWidth);
             }
 
             foreach (EzEnumHealthMode mode in Enum.GetValues<EzEnumHealthMode>())
             {
-                widthMeasureText.Text = EzManiaScoreModeExtensions.GetHealthModeDisplayName((int)mode);
+                widthMeasureText.Text = EzScoreInfoExtensions.GetHealthModeDisplayName((int)mode);
                 maxContentWidth = Math.Max(maxContentWidth, maxLabelWidth + label_value_spacing + widthMeasureText.DrawWidth);
             }
 

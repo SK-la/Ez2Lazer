@@ -35,7 +35,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TestOverlappingJackSessionIncludesMiddleMiss()
         {
             var (score, beatmap, environment) = JudgePrecedenceReplayFixtures.CreateOverlappingJack(
-                EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer, EzEnumJudgePrecedence.Earliest);
+                EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer, EzEnumJudgePrecedence.Earliest);
             var events = ManiaReplaySession.RunHitEvents(score, beatmap, environment);
             Assert.That(events.Any(e => e.HitObject.StartTime == 1080 && e.Result == HitResult.Miss), Is.True,
                 () => ManiaReplayParityHelper.DescribeHitEvents(events));
@@ -174,6 +174,6 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             };
         }
 
-        private static GameplayEnvironment createEnvironment() => ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
+        private static GameplayEnvironment createEnvironment() => ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer);
     }
 }

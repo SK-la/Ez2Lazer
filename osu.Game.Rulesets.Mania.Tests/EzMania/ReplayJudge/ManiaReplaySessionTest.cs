@@ -84,7 +84,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         [Test]
-        public void TestRunTimelineUsesLiveHitModeNotScoreEmbedded()
+        public void TestRunTimelineUsesLiveJudgeModeNotScoreEmbedded()
         {
             var (score, beatmap, lazerEnvironment) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
             var iidxEnvironment = BmsTapReplayFixtures.CreateTwoNoteColumnTap().environment;
@@ -188,19 +188,19 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public void TestRegistryReturnsBmsStrategyForIidx()
         {
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.IIDX_HD, EzEnumHealthMode.IIDX_HD);
 
-            Assert.That(ManiaJudgementRegistry.GetHitModeJudgement(EzEnumHitMode.IIDX_HD), Is.SameAs(BmsHitModeJudgement.Instance));
-            Assert.That(ManiaJudgementRegistry.GetNoteStrategy(environment), Is.SameAs(BmsHitModeJudgement.Instance));
-            Assert.That(ManiaJudgementRegistry.GetHoldStrategy(environment), Is.SameAs(BmsHitModeJudgement.Instance));
-            Assert.That(BmsHitModeJudgement.MapTo(BmsJudge.Bad), Is.EqualTo(HitResult.Meh));
-            Assert.That(BmsHitModeJudgement.MapTo(BmsJudge.KPoor), Is.EqualTo(HitResult.Poor));
+            Assert.That(ManiaJudgementRegistry.GetJudgeModeJudgement(EzEnumJudgeMode.IIDX_HD), Is.SameAs(BmsJudgeModeJudgement.Instance));
+            Assert.That(ManiaJudgementRegistry.GetNoteStrategy(environment), Is.SameAs(BmsJudgeModeJudgement.Instance));
+            Assert.That(ManiaJudgementRegistry.GetHoldStrategy(environment), Is.SameAs(BmsJudgeModeJudgement.Instance));
+            Assert.That(BmsJudgeModeJudgement.MapTo(BmsJudge.Bad), Is.EqualTo(HitResult.Meh));
+            Assert.That(BmsJudgeModeJudgement.MapTo(BmsJudge.KPoor), Is.EqualTo(HitResult.Poor));
         }
 
         [Test]
-        public void TestGeneratorUsesLiveHitModeNotScoreEmbedded()
+        public void TestGeneratorUsesLiveJudgeModeNotScoreEmbedded()
         {
-            var (score, beatmap, iidxEnvironment) = HitModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
+            var (score, beatmap, iidxEnvironment) = JudgeModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, iidxEnvironment);
 
             var lazerEnvironment = LazerTapReplayFixtures.CreateTwoNoteColumnTap().environment;
@@ -212,8 +212,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var sessionLive = ManiaReplaySession.RunHitEvents(score, beatmap, fromLive);
             var sessionStored = ManiaReplaySession.RunHitEvents(score, beatmap, fromStored);
 
-            Assert.That(fromLive.ManiaHitMode, Is.EqualTo(EzEnumHitMode.Lazer));
-            Assert.That(fromStored.ManiaHitMode, Is.EqualTo(EzEnumHitMode.IIDX_HD));
+            Assert.That(fromLive.JudgeMode, Is.EqualTo(EzEnumJudgeMode.Lazer));
+            Assert.That(fromStored.JudgeMode, Is.EqualTo(EzEnumJudgeMode.IIDX_HD));
             Assert.That(ManiaReplayParityHelper.AreJudgementsEquivalent(generatorEvents, sessionLive), Is.True,
                 () => ManiaReplayParityHelper.DescribeJudgements(generatorEvents));
             Assert.That(ManiaReplayParityHelper.AreJudgementsEquivalent(generatorEvents, sessionStored), Is.False);
@@ -240,66 +240,66 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public void TestBmsEarlyBadSessionProducesBadJudge()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
 
             var sessionEvents = ManiaReplaySession.RunHitEvents(score, beatmap, environment);
 
-            Assert.That(sessionEvents.Any(e => e.HitObject.StartTime == 1000 && HitModeReplayFixtures.ToBmsJudge(e.Result) == BmsJudge.Bad), Is.True,
+            Assert.That(sessionEvents.Any(e => e.HitObject.StartTime == 1000 && JudgeModeReplayFixtures.ToBmsJudge(e.Result) == BmsJudge.Bad), Is.True,
                 () => ManiaReplayParityHelper.DescribeJudgements(sessionEvents));
         }
 
         [Test]
         public void TestBmsPostBadKPoorSessionMatchesGenerator()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
             runSessionAndGeneratorParity(score, beatmap, environment);
         }
 
         [Test]
         public void TestBmsEarlyKPoorPressSessionProducesKPoor()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateBmsEarlyKPoorPress();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateBmsEarlyKPoorPress();
 
             var sessionEvents = ManiaReplaySession.RunHitEvents(score, beatmap, environment);
 
-            Assert.That(sessionEvents.Any(e => HitModeReplayFixtures.ToBmsJudge(e.Result) == BmsJudge.KPoor), Is.True,
+            Assert.That(sessionEvents.Any(e => JudgeModeReplayFixtures.ToBmsJudge(e.Result) == BmsJudge.KPoor), Is.True,
                 () => ManiaReplayParityHelper.DescribeJudgements(sessionEvents));
         }
 
         [Test]
         public void TestO2PillUpgradesBadRangeToCool()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateO2PillUpgradeOnBadRange();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateO2PillUpgradeOnBadRange();
             const int pill_note_time = 1000 + 15 * 400;
 
             var sessionEvents = ManiaReplaySession.RunHitEvents(score, beatmap, environment);
 
-            Assert.That(sessionEvents.Any(e => e.HitObject.StartTime == pill_note_time && HitModeReplayFixtures.ToO2Judge(e.Result) == O2Judge.Cool), Is.True,
+            Assert.That(sessionEvents.Any(e => e.HitObject.StartTime == pill_note_time && JudgeModeReplayFixtures.ToO2Judge(e.Result) == O2Judge.Cool), Is.True,
                 () => ManiaReplayParityHelper.DescribeJudgements(sessionEvents));
         }
 
         [Test]
         public void TestO2PillSessionMatchesGenerator()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateO2PillUpgradeOnBadRange();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateO2PillUpgradeOnBadRange();
             runSessionAndGeneratorParity(score, beatmap, environment);
         }
 
         [Test]
         public void TestEz2AcHoldHeadGreatSoftenedToPerfect()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcHoldHeadGreatSoftened();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateEz2AcHoldHeadGreatSoftened();
 
             var sessionEvents = ManiaReplaySession.RunHitEvents(score, beatmap, environment);
 
-            Assert.That(sessionEvents.Single(e => e.HitObject is HeadNote).Result, Is.EqualTo(Ez2AcHitModeJudgement.MapTo(Ez2AcJudge.Kool)),
+            Assert.That(sessionEvents.Single(e => e.HitObject is HeadNote).Result, Is.EqualTo(Ez2AcJudgeModeJudgement.MapTo(Ez2AcJudge.Kool)),
                 () => ManiaReplayParityHelper.DescribeJudgements(sessionEvents));
         }
 
         [Test]
         public void TestEz2AcHoldHeadSoftenSessionMatchesGenerator()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcHoldHeadGreatSoftened();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateEz2AcHoldHeadGreatSoftened();
 
             var sessionEvents = ManiaReplaySession.RunHitEvents(score, beatmap, environment);
             var generatorEvents = new ManiaReplaySessionService().RunHitEventsAsync(score, beatmap).GetAwaiter().GetResult();
@@ -311,7 +311,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public void TestO2TapSessionMatchesGenerator()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateO2TwoNoteTap();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateO2TwoNoteTap();
 
             var sessionEvents = ManiaReplaySession.RunHitEvents(score, beatmap, environment);
             var generatorEvents = new ManiaReplaySessionService().RunHitEventsAsync(score, beatmap).GetAwaiter().GetResult();
@@ -323,34 +323,34 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public void TestMalodyHoldSessionMatchesGenerator()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateMalodyHoldPerfect();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateMalodyHoldPerfect();
             runSessionAndGeneratorParity(score, beatmap, environment);
         }
 
         [Test]
         public void TestMalodyHoldEarlyReleaseSessionMatchesGenerator()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateMalodyHoldEarlyRelease();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateMalodyHoldEarlyRelease();
             runSessionAndGeneratorParity(score, beatmap, environment);
         }
 
         [Test]
         public void TestEz2AcHoldHeadSessionMatchesGenerator()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcHoldHeadPerfect();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateEz2AcHoldHeadPerfect();
 
             var sessionEvents = ManiaReplaySession.RunHitEvents(score, beatmap, environment);
             var generatorEvents = new ManiaReplaySessionService().RunHitEventsAsync(score, beatmap).GetAwaiter().GetResult();
 
             Assert.That(ManiaReplayParityHelper.AreJudgementsEquivalent(generatorEvents, sessionEvents), Is.True,
                 () => $"generator=[{ManiaReplayParityHelper.DescribeJudgements(generatorEvents)}] session=[{ManiaReplayParityHelper.DescribeJudgements(sessionEvents)}]");
-            Assert.That(sessionEvents.Single(e => e.HitObject is HeadNote).Result, Is.EqualTo(Ez2AcHitModeJudgement.MapTo(Ez2AcJudge.Kool)));
+            Assert.That(sessionEvents.Single(e => e.HitObject is HeadNote).Result, Is.EqualTo(Ez2AcJudgeModeJudgement.MapTo(Ez2AcJudge.Kool)));
         }
 
         [Test]
         public void TestEz2AcHoldThroughEndTicksIncreaseComboWithoutBasicStats()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcHoldThroughEnd();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateEz2AcHoldThroughEnd();
             var hold = (HoldNote)beatmap.HitObjects[0];
 
             Assert.That(hold.Ticks, Is.Not.Null.And.Not.Empty);
@@ -368,7 +368,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public void TestEz2AcHoldEarlyReleaseDoesNotComboBreak()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcHoldEarlyReleaseNoComboBreak();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateEz2AcHoldEarlyReleaseNoComboBreak();
             var resultScore = ManiaReplaySession.Run(score, beatmap, environment);
             var events = resultScore.ScoreInfo.HitEvents;
 
@@ -381,7 +381,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TestEz2AcTimelineTotalScoreMonotonicAndScalesFromZero()
         {
             const int note_count = 20;
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcManyNoteTap(note_count);
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateEz2AcManyNoteTap(note_count);
             var timeline = ManiaReplaySession.RunTimeline(score, beatmap, environment);
 
             Assert.That(timeline.QueryAtTime(0).TotalScore, Is.EqualTo(0));
@@ -407,7 +407,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public void TestRunTimelineFinalTotalScoreMatchesRunTotalScore()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcManyNoteTap();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateEz2AcManyNoteTap();
             long sessionTotal = ManiaReplaySession.Run(score, beatmap, environment).ScoreInfo.TotalScore;
             var timeline = ManiaReplaySession.RunTimeline(score, beatmap, environment);
 
@@ -415,22 +415,22 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         /// <summary>
-        /// EZ2AC 的 16 分 LN tick 集合必须由「绑定的 hitmode」决定，而不是由「转换当时全局设置是不是 EZ2AC」决定：
+        /// EZ2AC 的 16 分 LN tick 集合必须由「绑定的 JudgeMode」决定，而不是由「转换当时全局设置是不是 EZ2AC」决定：
         /// 全局为 Lazer 时按 EZ2AC 环境跑，tick 判定必须与「转换时全局就是 EZ2AC」完全一致，
         /// 否则同一份 EZ2AC 成绩在不同全局设置下会算出不同的 combo / 分数。
         /// </summary>
         [Test]
-        public void TestEz2AcTicksFollowBoundHitModeNotConversionGlobalSetting()
+        public void TestEz2AcTicksFollowBoundJudgeModeNotConversionGlobalSetting()
         {
             // 转换前全局显式设为非 EZ2AC：旧实现下转换期不生成 tick，只有 EZ2AC 环境这一侧才能暴露差异。
-            ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer));
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer));
 
-            var (scoreUnderLazer, beatmapUnderLazer, environment) = HitModeReplayFixtures.CreateEz2AcHoldHeadPerfect(applyGlobalConfig: false);
+            var (scoreUnderLazer, beatmapUnderLazer, environment) = JudgeModeReplayFixtures.CreateEz2AcHoldHeadPerfect(applyGlobalConfig: false);
             var tickResultsUnderLazer = tickResults(ManiaReplaySession.RunHitEvents(scoreUnderLazer, beatmapUnderLazer, environment));
 
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
 
-            var (scoreUnderEz2Ac, beatmapUnderEz2Ac, environment2) = HitModeReplayFixtures.CreateEz2AcHoldHeadPerfect(applyGlobalConfig: false);
+            var (scoreUnderEz2Ac, beatmapUnderEz2Ac, environment2) = JudgeModeReplayFixtures.CreateEz2AcHoldHeadPerfect(applyGlobalConfig: false);
             var tickResultsUnderEz2Ac = tickResults(ManiaReplaySession.RunHitEvents(scoreUnderEz2Ac, beatmapUnderEz2Ac, environment2));
 
             Assert.That(tickResultsUnderEz2Ac, Is.Not.Empty, "EZ2AC 环境本身必须产生 tick 判定");

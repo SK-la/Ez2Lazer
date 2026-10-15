@@ -17,9 +17,9 @@ namespace osu.Game.Rulesets.Osu.Scoring
         /// <summary>
         /// gameplay 开局冻结的判定轨；空则按 Lazer。禁止在无头路径回读全局配置。
         /// </summary>
-        public EzEnumOsuJudgementTrack? JudgementTrackOverride { get; set; }
+        public EzEnumJudgeMode? JudgementTrackOverride { get; set; }
 
-        private EzEnumOsuJudgementTrack judgementTrack => JudgementTrackOverride ?? EzEnumOsuJudgementTrack.Lazer;
+        private EzEnumJudgeMode stdJudgeMode => JudgementTrackOverride ?? EzEnumJudgeMode.Lazer;
 
         public OsuScoreProcessor()
             : base(new OsuRuleset())
@@ -28,16 +28,16 @@ namespace osu.Game.Rulesets.Osu.Scoring
 
         public override void ApplyEzGameplayEnvironment()
         {
-            JudgementTrackOverride ??= GlobalConfigStore.EzConfig.Get<EzEnumOsuJudgementTrack>(Ez2Setting.OsuJudgementTrack);
+            JudgementTrackOverride ??= GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode);
 
-            if (OsuClassicNativeScoring.ShouldUseLegacyScoreAlgorithm(judgementTrack))
+            if (OsuStableClassicScoring.ShouldUseLegacyScoreAlgorithm(stdJudgeMode))
                 IsLegacyScore = true;
         }
 
         public override void ApplyBeatmap(IBeatmap beatmap)
         {
-            if (judgementTrack == EzEnumOsuJudgementTrack.ClassicNative)
-                OsuClassicNativeScoring.ApplyHitWindowsToBeatmap(beatmap);
+            if (stdJudgeMode == EzEnumJudgeMode.StableClassic)
+                OsuStableClassicScoring.ApplyHitWindowsToBeatmap(beatmap);
 
             base.ApplyBeatmap(beatmap);
         }

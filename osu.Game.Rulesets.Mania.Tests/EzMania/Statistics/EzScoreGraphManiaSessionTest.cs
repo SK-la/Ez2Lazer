@@ -20,7 +20,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         public void TestTimeRangeUsesOriginalFallbackWhenDisplayEmpty()
         {
             var (score, beatmap, _) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
-            var sessionScore = ManiaReplaySession.Run(score.DeepClone(), beatmap, createSessionEnvironment(EzEnumHitMode.Lazer));
+            var sessionScore = ManiaReplaySession.Run(score.DeepClone(), beatmap, createSessionEnvironment(EzEnumJudgeMode.Lazer));
             var original = sessionScore.ScoreInfo.HitEvents.ToList();
 
             Assert.That(EzScoreGraphMania.ComputeTimeRangeForTesting(Array.Empty<HitEvent>(), original), Is.GreaterThan(0));
@@ -30,7 +30,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         public void TestTimeRangeFromSessionEventsIsPositive()
         {
             var (score, beatmap, _) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
-            var sessionScore = ManiaReplaySession.Run(score.DeepClone(), beatmap, createSessionEnvironment(EzEnumHitMode.Lazer));
+            var sessionScore = ManiaReplaySession.Run(score.DeepClone(), beatmap, createSessionEnvironment(EzEnumJudgeMode.Lazer));
             var display = sessionScore.ScoreInfo.HitEvents.ToList();
 
             Assert.That(EzScoreGraphMania.ComputeTimeRangeForTesting(display, display), Is.GreaterThan(0));
@@ -39,11 +39,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         [Test]
         public void TestExtractDisplayCountsMatchesFilteredStatisticsTotal()
         {
-            var (score, beatmap, _) = HitModeReplayFixtures.CreateEz2AcManyNoteTap();
-            var sessionScore = ManiaReplaySession.Run(score.DeepClone(), beatmap, createSessionEnvironment(EzEnumHitMode.EZ2AC));
+            var (score, beatmap, _) = JudgeModeReplayFixtures.CreateEz2AcManyNoteTap();
+            var sessionScore = ManiaReplaySession.Run(score.DeepClone(), beatmap, createSessionEnvironment(EzEnumJudgeMode.EZ2AC));
             var statistics = sessionScore.ScoreInfo.Statistics;
 
-            var extracted = EzScoreGraphMania.ExtractDisplayCounts(statistics, EzEnumHitMode.EZ2AC);
+            var extracted = EzScoreGraphMania.ExtractDisplayCounts(statistics, EzEnumJudgeMode.EZ2AC);
             int extractedTotal = extracted.Values.Sum();
 
             int expectedTotal = statistics
@@ -55,23 +55,23 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         }
 
         [Test]
-        public void TestSessionStatisticsChangeBetweenHitModes()
+        public void TestSessionStatisticsChangeBetweenJudgeModes()
         {
-            var (score, beatmap, _) = HitModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
+            var (score, beatmap, _) = JudgeModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
 
-            var lazerEnv = createSessionEnvironment(EzEnumHitMode.Lazer);
-            var bmsEnv = createSessionEnvironment(EzEnumHitMode.IIDX_HD) with { ManiaHealthMode = EzEnumHealthMode.IIDX_HD, BmsPoorHitResultEnable = true };
+            var lazerEnv = createSessionEnvironment(EzEnumJudgeMode.Lazer);
+            var bmsEnv = createSessionEnvironment(EzEnumJudgeMode.IIDX_HD) with { HealthMode = EzEnumHealthMode.IIDX_HD, BmsPoorHitResultEnable = true };
 
             var lazerRun = ManiaReplaySession.Run(score.DeepClone(), beatmap, lazerEnv);
             var bmsRun = ManiaReplaySession.Run(score.DeepClone(), beatmap, bmsEnv);
 
-            var lazerCounts = EzScoreGraphMania.ExtractDisplayCounts(lazerRun.ScoreInfo.Statistics, EzEnumHitMode.Lazer);
-            var bmsCounts = EzScoreGraphMania.ExtractDisplayCounts(bmsRun.ScoreInfo.Statistics, EzEnumHitMode.IIDX_HD);
+            var lazerCounts = EzScoreGraphMania.ExtractDisplayCounts(lazerRun.ScoreInfo.Statistics, EzEnumJudgeMode.Lazer);
+            var bmsCounts = EzScoreGraphMania.ExtractDisplayCounts(bmsRun.ScoreInfo.Statistics, EzEnumJudgeMode.IIDX_HD);
 
             Assert.That(ManiaReplayParityHelper.AreStatisticsEquivalent(lazerRun.ScoreInfo.Statistics, bmsRun.ScoreInfo.Statistics), Is.False);
             Assert.That(lazerCounts, Is.Not.EqualTo(bmsCounts));
         }
 
-        private static GameplayEnvironment createSessionEnvironment(EzEnumHitMode hitMode) => ReplayJudgeTestConfig.Create(hitMode, EzEnumHealthMode.Lazer);
+        private static GameplayEnvironment createSessionEnvironment(EzEnumJudgeMode judgeMode) => ReplayJudgeTestConfig.Create(judgeMode, EzEnumHealthMode.Lazer);
     }
 }

@@ -172,12 +172,12 @@ namespace osu.Game.Rulesets.Mania.UI
                 AddNested(column);
             }
 
-            // [Ez] 池按「任一 hitmode 下可能出现的判定」预热，不能按当前设置的 ManiaHitWindows 推导：
-            // 当局用的 hitmode / 血量模式取自冻结环境（回放是成绩里嵌入的模式），池缺项时
+            // [Ez] 池按「任一 JudgeMode 下可能出现的判定」预热，不能按当前设置的 ManiaHitWindows 推导：
+            // 当局用的 JudgeMode / 血量模式取自冻结环境（回放是成绩里嵌入的模式），池缺项时
             // JudgementPooler.Get 返回 null，该判定会被静默跳过不显示。
             // 但只预热能作为判定图展示的判定：IgnoreHit / IgnoreMiss / ComboBreak 仅供计分，
             // 进池既白建 drawable，又会让缺资源的皮肤回退成默认文字判定（把内部结果名画到屏幕上）。
-            AddInternal(judgementPooler = new JudgementPooler<DrawableManiaJudgement>(HitModeHelper.AllModeDisplayableHitResults));
+            AddInternal(judgementPooler = new JudgementPooler<DrawableManiaJudgement>(JudgeModeHelper.AllModeDisplayableHitResults));
 
             RegisterPool<BarLine, DrawableBarLine>(50, 200);
         }

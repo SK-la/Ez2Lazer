@@ -273,7 +273,7 @@ namespace osu.Game.EzOsuGame.Statistics
             foreach (HitResult r in results)
             {
                 // string name = RulesetInstance.GetDisplayNameForHitResult(r).ToString();
-                string name = r.GetHitModeDisplayName().ToString();
+                string name = r.GetJudgeModeDisplayName().ToString();
 
                 stats.Total.TryGetValue(r, out int total);
                 stats.Early.TryGetValue(r, out int early);

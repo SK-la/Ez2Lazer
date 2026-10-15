@@ -14,8 +14,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var config = GlobalConfigStore.EzConfig;
             GlobalConfigStore.EzConfig = config;
 
-            config.SetValue(Ez2Setting.ManiaHitMode, environment.ManiaHitMode);
-            config.SetValue(Ez2Setting.ManiaHealthMode, environment.ManiaHealthMode);
+            config.SetValue(Ez2Setting.ManiaJudgeMode, environment.JudgeMode);
+            config.SetValue(Ez2Setting.ManiaHealthMode, environment.HealthMode);
             config.SetValue(Ez2Setting.JudgePrecedence, environment.JudgePrecedence);
             config.SetValue(Ez2Setting.OffsetPlusMania, environment.OffsetPlusMania);
             config.SetValue(Ez2Setting.BmsPoorHitResultEnable, environment.BmsPoorHitResultEnable);
@@ -24,39 +24,39 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public static GameplayEnvironment ApplyAndSnapshot(GameplayEnvironment environment)
         {
             ApplyToGlobalConfig(environment);
-            return GlobalConfigStore.EzConfig.GetGameplayEnvironment();
+            return GlobalConfigStore.EzConfig.GetGameplayEnvironment(new ManiaRuleset().RulesetInfo);
         }
 
-        public static void ResetGlobalConfig() => ApplyToGlobalConfig(Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer));
+        public static void ResetGlobalConfig() => ApplyToGlobalConfig(Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer));
 
         public static void ApplyEmbeddedModes(Score score, GameplayEnvironment environment)
         {
-            score.ScoreInfo.ManiaHitMode = (int)environment.ManiaHitMode;
-            score.ScoreInfo.ManiaHealthMode = (int)environment.ManiaHealthMode;
+            score.ScoreInfo.JudgeMode = (int)environment.JudgeMode;
+            score.ScoreInfo.HealthMode = (int)environment.HealthMode;
         }
 
         public static GameplayEnvironment Create(
-            EzEnumHitMode hitMode,
+            EzEnumJudgeMode judgeMode,
             EzEnumHealthMode healthMode,
             EzEnumJudgePrecedence judgePrecedence = EzEnumJudgePrecedence.Earliest,
             double offsetPlusMania = 0,
             bool bmsPoorHitResultEnable = false)
             => new GameplayEnvironment
             {
-                ManiaHitMode = hitMode,
-                ManiaHealthMode = healthMode,
+                JudgeMode = judgeMode,
+                HealthMode = healthMode,
                 JudgePrecedence = judgePrecedence,
                 OffsetPlusMania = offsetPlusMania,
                 BmsPoorHitResultEnable = bmsPoorHitResultEnable,
             };
 
         /// <summary>
-        /// BMS HitMode + Lazer HealthMode：无 KPoor 机制（§6.4 标定环境）。
+        /// BMS JudgeMode + Lazer HealthMode：无 KPoor 机制（§6.4 标定环境）。
         /// </summary>
         public static GameplayEnvironment CreateBmsLazerHealth(
-            EzEnumHitMode hitMode,
+            EzEnumJudgeMode judgeMode,
             EzEnumJudgePrecedence judgePrecedence = EzEnumJudgePrecedence.Earliest,
             bool bmsPoorHitResultEnable = false)
-            => Create(hitMode, EzEnumHealthMode.Lazer, judgePrecedence, bmsPoorHitResultEnable: bmsPoorHitResultEnable);
+            => Create(judgeMode, EzEnumHealthMode.Lazer, judgePrecedence, bmsPoorHitResultEnable: bmsPoorHitResultEnable);
     }
 }

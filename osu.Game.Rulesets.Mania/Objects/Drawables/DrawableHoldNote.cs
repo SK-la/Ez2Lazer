@@ -495,10 +495,10 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             else if (isEarlyHoldRelease() || UsesEzJudgement)
             {
                 // EZ2AC LN：中途松手由 tick IgnoreMiss 处理，Miss 不断 combo。
-                if (ManiaEzDrawableJudgement.GetJudgementRound(this).Environment.ManiaHitMode == EzEnumHitMode.EZ2AC)
+                if (ManiaEzDrawableJudgement.GetJudgementRound(this).Environment.JudgeMode == EzEnumJudgeMode.EZ2AC)
                     return;
 
-                // Body 已判定：首次断连已落 ComboBreak，后续松手仅在允许多次断连的 hitmode 下补发瞬态断连。
+                // Body 已判定：首次断连已落 ComboBreak，后续松手仅在允许多次断连的 JudgeMode 下补发瞬态断连。
                 // 用实时持有态而非缓存 bindable：同一次松手可能同时经 Column.OnReleased 与
                 // DrawableHoldNote.OnReleased 各结算一遍（后者读到的是本帧 Update 前的旧 IsHolding），
                 // 首个调用已 ReportHoldState(false)，据此识别重复，避免同帧多发一次断连。

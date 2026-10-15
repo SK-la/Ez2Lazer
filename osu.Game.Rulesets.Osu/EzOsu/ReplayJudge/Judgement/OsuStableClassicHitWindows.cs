@@ -7,10 +7,10 @@ using osu.Game.Rulesets.Scoring;
 namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement
 {
     /// <summary>
-    /// ClassicNative 轨命中窗口（OSL-013）：对齐 osu!stable OD 公式的近似表。
-    /// 由 <see cref="OsuClassicNativeScoring.ApplyHitWindowsToBeatmap"/> 注入 Drawable/Session 共享谱面。
+    /// StableClassic 轨命中窗口（OSL-013）：对齐 osu!stable OD 公式的近似表。
+    /// 由 <see cref="OsuStableClassicScoring.ApplyHitWindowsToBeatmap"/> 注入 Drawable/Session 共享谱面。
     /// </summary>
-    public class OsuClassicNativeHitWindows : HitWindows
+    public class OsuStableClassicHitWindows : HitWindows
     {
         // stable: 300 = 80 - 6*OD, 100 = 140 - 8*OD, 50 = 200 - 10*OD（ms，半窗）。
         public static readonly DifficultyRange GREAT_WINDOW_RANGE = new DifficultyRange(80, 50, 20);

@@ -41,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         {
             base.LoadComplete();
 
-            O2HitModeExtension.PILL_COUNT.BindValueChanged(pill =>
+            O2JudgeModeExtension.PILL_COUNT.BindValueChanged(pill =>
             {
                 if (IsDisposed) return;
                 // 将药丸计数映射到 0..1。最大药丸数为 5。

@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
             config = GlobalConfigStore.EzConfig;
             GlobalConfigStore.EzConfig = config;
 
-            liveBaseline = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer, offsetPlusMania: 12.0, bmsPoorHitResultEnable: true);
+            liveBaseline = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer, offsetPlusMania: 12.0, bmsPoorHitResultEnable: true);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(liveBaseline);
         }
 
@@ -41,12 +41,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         public void TestForStoredStatisticsUsesEmbeddedModes()
         {
             var scoreInfo = new ScoreInfo { Ruleset = new ManiaRuleset().RulesetInfo };
-            ReplayJudgeTestConfig.ApplyEmbeddedModes(new Score { ScoreInfo = scoreInfo }, ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD));
+            ReplayJudgeTestConfig.ApplyEmbeddedModes(new Score { ScoreInfo = scoreInfo }, ReplayJudgeTestConfig.Create(EzEnumJudgeMode.IIDX_HD, EzEnumHealthMode.IIDX_HD));
 
             var env = GlobalConfigStore.EzConfig.ResolveEnvironment(ReplayRunPurpose.ForStored, scoreInfo);
 
-            Assert.That(env.ManiaHitMode, Is.EqualTo(EzEnumHitMode.IIDX_HD));
-            Assert.That(env.ManiaHealthMode, Is.EqualTo(EzEnumHealthMode.IIDX_HD));
+            Assert.That(env.JudgeMode, Is.EqualTo(EzEnumJudgeMode.IIDX_HD));
+            Assert.That(env.HealthMode, Is.EqualTo(EzEnumHealthMode.IIDX_HD));
             Assert.That(env.JudgePrecedence, Is.EqualTo(liveBaseline.JudgePrecedence));
             Assert.That(env.OffsetPlusMania, Is.EqualTo(0));
             Assert.That(env.BmsPoorHitResultEnable, Is.EqualTo(liveBaseline.BmsPoorHitResultEnable));
@@ -59,8 +59,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
 
             var stored = GlobalConfigStore.EzConfig.ResolveEnvironment(ReplayRunPurpose.ForStored, scoreInfo);
 
-            Assert.That(stored.ManiaHitMode, Is.EqualTo(EzEnumHitMode.Lazer));
-            Assert.That(stored.ManiaHealthMode, Is.EqualTo(EzEnumHealthMode.Lazer));
+            Assert.That(stored.JudgeMode, Is.EqualTo(EzEnumJudgeMode.Lazer));
+            Assert.That(stored.HealthMode, Is.EqualTo(EzEnumHealthMode.Lazer));
             Assert.That(stored.JudgePrecedence, Is.EqualTo(liveBaseline.JudgePrecedence));
             Assert.That(stored.OffsetPlusMania, Is.EqualTo(0));
         }

@@ -13,7 +13,7 @@ using osu.Game.Rulesets.Objects;
 namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 {
     /// <summary>
-    /// 一次性对齐谱面物件 <see cref="ManiaHitWindows"/>（HitMode / 非 O2 窗口 / O2 StartTime BPM 基线）。
+    /// 一次性对齐谱面物件 <see cref="ManiaHitWindows"/>（JudgeMode / 非 O2 窗口 / O2 StartTime BPM 基线）。
     /// 该入口为纯烘焙，不读写 O2 全局运行态，Session / Race 可安全并发调用。
     /// </summary>
     public static class ManiaWindowBaker
@@ -26,21 +26,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             ArgumentNullException.ThrowIfNull(environment);
 
-            alignCore(beatmap, environment.ManiaHitMode, computePoorEnabled(environment));
+            alignCore(beatmap, environment.JudgeMode, computePoorEnabled(environment));
         }
 
         /// <summary>
-        /// 烘焙本体：只依赖 hitmode，live / 仿真 / Race 共用同一份实现。
+        /// 烘焙本体：只依赖 JudgeMode，live / 仿真 / Race 共用同一份实现。
         /// </summary>
         /// <remarks>
         /// 不写 <see cref="ManiaHitWindows.PoorEnabled"/>：调用方没有当局环境，该值保持「按本机当前设置惰性解析」。
         /// 仿真路径的 KPoor 门槛来自 <c>ManiaJudgementRound.PoorEnabled</c>，不读物件窗口。
         /// </remarks>
-        public static void Align(IBeatmap beatmap, EzEnumHitMode hitMode)
+        public static void Align(IBeatmap beatmap, EzEnumJudgeMode judgeMode)
         {
             ArgumentNullException.ThrowIfNull(beatmap);
 
-            alignCore(beatmap, hitMode, poorEnabled: null);
+            alignCore(beatmap, judgeMode, poorEnabled: null);
         }
 
         /// <summary>
@@ -50,30 +50,30 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             ArgumentNullException.ThrowIfNull(environment);
 
-            if (environment.ManiaHitMode == EzEnumHitMode.O2Jam)
-                O2HitModeExtension.InitializeRuntime(beatmap);
+            if (environment.JudgeMode == EzEnumJudgeMode.O2Jam)
+                O2JudgeModeExtension.InitializeRuntime(beatmap);
 
-            alignCore(beatmap, environment.ManiaHitMode, computePoorEnabled(environment));
+            alignCore(beatmap, environment.JudgeMode, computePoorEnabled(environment));
         }
 
         private static bool computePoorEnabled(IGameplayEnvironment environment)
-            => HealthModeHelper.ComputeKPoorEnabled(environment.ManiaHealthMode, environment.BmsPoorHitResultEnable);
+            => HealthModeHelper.ComputeKPoorEnabled(environment.HealthMode, environment.BmsPoorHitResultEnable);
 
-        private static void alignCore(IBeatmap beatmap, EzEnumHitMode hitMode, bool? poorEnabled)
+        private static void alignCore(IBeatmap beatmap, EzEnumJudgeMode judgeMode, bool? poorEnabled)
         {
             ArgumentNullException.ThrowIfNull(beatmap);
 
-            bool isO2Jam = hitMode == EzEnumHitMode.O2Jam;
+            bool isO2Jam = judgeMode == EzEnumJudgeMode.O2Jam;
 
             foreach (var hitObject in beatmap.HitObjects)
-                alignRecursive(hitObject, beatmap, hitMode, isO2Jam, poorEnabled);
+                alignRecursive(hitObject, beatmap, judgeMode, isO2Jam, poorEnabled);
         }
 
-        private static void alignRecursive(HitObject hitObject, IBeatmap beatmap, EzEnumHitMode hitMode, bool isO2Jam, bool? poorEnabled)
+        private static void alignRecursive(HitObject hitObject, IBeatmap beatmap, EzEnumJudgeMode judgeMode, bool isO2Jam, bool? poorEnabled)
         {
             if (hitObject.HitWindows is ManiaHitWindows maniaHitWindows)
             {
-                maniaHitWindows.SetHitMode(hitMode);
+                maniaHitWindows.SetJudgeMode(judgeMode);
 
                 if (poorEnabled.HasValue)
                     maniaHitWindows.PoorEnabled = poorEnabled.Value;
@@ -81,11 +81,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 // O2Jam：按物件 StartTime 写入基线 BPM（auto-miss / note-lock 扫描用）。
                 // 用户触发判定走 press-time BPM，不 mutate 物件窗口。
                 if (isO2Jam)
-                    maniaHitWindows.BPM = O2HitModeExtension.SafeBpm(beatmap.ControlPointInfo.TimingPointAt(hitObject.StartTime).BPM);
+                    maniaHitWindows.BPM = O2JudgeModeExtension.SafeBpm(beatmap.ControlPointInfo.TimingPointAt(hitObject.StartTime).BPM);
             }
 
             foreach (var nested in hitObject.NestedHitObjects)
-                alignRecursive(nested, beatmap, hitMode, isO2Jam, poorEnabled);
+                alignRecursive(nested, beatmap, judgeMode, isO2Jam, poorEnabled);
         }
     }
 }

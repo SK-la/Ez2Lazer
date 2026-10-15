@@ -166,7 +166,7 @@ namespace osu.Game.Screens.Ranking
                 Scheduler.AddDelayed(() => OverlayActivationMode.Value = OverlayActivation.All, shouldFlair ? AccuracyCircle.TOTAL_DURATION + 1000 : 0);
             }
 
-            environmentControls = new ResultsEnvironmentControls(ezConfig);
+            environmentControls = new ResultsEnvironmentControls(ezConfig, Score?.Ruleset);
 
             // for simplicity, only allow the retry hotkey when coming from a replay player where we know the replay is ready to be played.
             // if we allow it in all cases, consider the case where a user comes from song select and potentially has to download
@@ -225,7 +225,8 @@ namespace osu.Game.Screens.Ranking
         {
             base.LoadComplete();
 
-            environmentControls.HitModeBindable.BindValueChanged(_ => invalidateDisplayedAnalysis());
+            environmentControls.JudgeModeBindable.BindValueChanged(_ => invalidateDisplayedAnalysis());
+            environmentControls.StdJudgeModeBindable.BindValueChanged(_ => invalidateDisplayedAnalysis());
             environmentControls.HealthModeBindable.BindValueChanged(_ => invalidateDisplayedAnalysis());
 
             StatisticsPanel.State.BindValueChanged(onStatisticsStateChanged, true);
@@ -286,7 +287,7 @@ namespace osu.Game.Screens.Ranking
             if (displayedScore == null)
                 return;
 
-            // 回放重跑以 Replay.Frames + 当前 ForLive HitMode 为准；StatisticsPanel / EzGraph 经 Session 产出展示，
+            // 回放重跑以 Replay.Frames + 当前 ForLive JudgeMode 为准；StatisticsPanel / EzGraph 经 Session 产出展示，
             // 不 patch 存储 HitEvents，也不 rejudge 嵌入判定。
             StatisticsPanel.Score.TriggerChange();
         }

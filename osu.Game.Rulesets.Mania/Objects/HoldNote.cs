@@ -116,15 +116,15 @@ namespace osu.Game.Rulesets.Mania.Objects
         public List<HoldNoteTick> Ticks { get; private set; }
 
         /// <summary>
-        /// 按 hitmode 补齐 EZ2AC 的 16 分 tick（可重复调用，已有 tick 则直接返回）。
+        /// 按 JudgeMode 补齐 EZ2AC 的 16 分 tick（可重复调用，已有 tick 则直接返回）。
         /// </summary>
         /// <remarks>
         /// 生成时机有两处，缺一不可：
         /// <list type="bullet">
         /// <item>转换期（<see cref="ApplyDefaultsToSelf"/>）：此时只能按「当时的全局设置」判 EZ2AC，live / 编辑器靠这一处拿到 tick；</item>
-        /// <item>绑定期（<see cref="EzMania.ReplayJudge.ManiaEnvironmentJudgements"/>）：按绑定的 hitmode 补生成。</item>
+        /// <item>绑定期（<see cref="EzMania.ReplayJudge.ManiaEnvironmentJudgements"/>）：按绑定的 JudgeMode 补生成。</item>
         /// </list>
-        /// 后者是为了让 tick 集合取决于 hitmode 而不是转换时机：按 EZ2AC 作用域取出的仿真 / 分析副本，
+        /// 后者是为了让 tick 集合取决于 JudgeMode 而不是转换时机：按 EZ2AC 作用域取出的仿真 / 分析副本，
         /// 若在全局设置不是 EZ2AC 时转换，转换期不会生成 tick，只有这里补上才不会把 EZ2AC 的 LN 算成官方头尾语义。
         /// </remarks>
         public void EnsureEz2AcTicks(CancellationToken cancellationToken = default)
@@ -190,22 +190,22 @@ namespace osu.Game.Rulesets.Mania.Objects
 
             Ticks = new List<HoldNoteTick>();
 
-            // 仅 EZ2AC HitMode 生成 16 分 tick；其它模式保持官方头尾松手语义。
+            // 仅 EZ2AC JudgeMode 生成 16 分 tick；其它模式保持官方头尾松手语义。
 #if DEBUG
             if (!ManiaHoldAblation.DisableHoldTickGeneration
-                && (ManiaHoldAblation.ForceHoldTickGeneration || isEz2AcHitMode()))
+                && (ManiaHoldAblation.ForceHoldTickGeneration || isEz2AcJudgeMode()))
                 createTicks(cancellationToken);
 #else
-            if (isEz2AcHitMode())
+            if (isEz2AcJudgeMode())
                 createTicks(cancellationToken);
 #endif
         }
 
-        private static bool isEz2AcHitMode()
+        private static bool isEz2AcJudgeMode()
         {
             try
             {
-                return GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode) == EzEnumHitMode.EZ2AC;
+                return GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode) == EzEnumJudgeMode.EZ2AC;
             }
             catch
             {

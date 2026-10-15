@@ -23,31 +23,31 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private double calOD = 8;
 
         /// <summary>
-        /// 显式注入的 HitMode（gameplay 开局冻结 / Session / Ghost 时间线）。
-        /// 为空时按 <see cref="EzEnumHitMode.Lazer"/> 官方语义计算。
+        /// 显式注入的 JudgeMode（gameplay 开局冻结 / Session / Ghost 时间线）。
+        /// 为空时按 <see cref="EzEnumJudgeMode.Lazer"/> 官方语义计算。
         /// </summary>
         /// <remarks>
         /// 禁止在此回读全局配置：无头路径（官方 legacy 转换、后台升级、重算、PP/难度缓存等）
-        /// 必须保持 ppy 上游行为，否则会被玩家当前 HitMode 污染（曾导致 stable 导入成绩被错转为 D + 超低分）。
+        /// 必须保持 ppy 上游行为，否则会被玩家当前 JudgeMode 污染（曾导致 stable 导入成绩被错转为 D + 超低分）。
         /// gameplay 侧由 <see cref="ApplyEzGameplayEnvironment"/> 在 <see cref="ScoreProcessor.ApplyBeatmap"/> 前冻结注入。
         /// </remarks>
-        public EzEnumHitMode? HitModeOverride { get; set; }
+        public EzEnumJudgeMode? JudgeModeOverride { get; set; }
 
-        private EzEnumHitMode hitMode => HitModeOverride ?? EzEnumHitMode.Lazer;
+        private EzEnumJudgeMode judgeMode => JudgeModeOverride ?? EzEnumJudgeMode.Lazer;
 
         /// <summary>
-        /// gameplay 入口（Player / 皮肤编辑器预览）冻结当前全局 HitMode。
+        /// gameplay 入口（Player / 皮肤编辑器预览）冻结当前全局 JudgeMode。
         /// 必须在 <see cref="ScoreProcessor.ApplyBeatmap"/> 之前调用，否则全谱模拟与实际判定权重不一致。
         /// </summary>
         public override void ApplyEzGameplayEnvironment()
         {
-            HitModeOverride ??= GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            JudgeModeOverride ??= GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
         }
 
         public override void ApplyBeatmap(IBeatmap beatmap)
         {
             // Tail/Tick 的 Ignore 系 Judgement 必须在全谱模拟前绑定，否则 EZ2AC/Malody 会把官方尾 Perfect 计入 MaximumBaseScore。
-            ManiaBeatmapBinding.BindJudgements(beatmap, hitMode);
+            ManiaBeatmapBinding.BindJudgements(beatmap, judgeMode);
             base.ApplyBeatmap(beatmap);
         }
 
@@ -73,14 +73,14 @@ namespace osu.Game.Rulesets.Mania.Scoring
         // 换版必须同时给存量成绩定版本策略：算法一改，历史成绩与重算结果就会对不齐。
         protected override double ComputeTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
-            if (IsLegacyScore || hitMode == EzEnumHitMode.Classic)
+            if (IsLegacyScore || judgeMode == EzEnumJudgeMode.Classic)
             {
                 return 150000 * comboProgress
                        + 850000 * Math.Pow(AccuracyClassic.Value, 2 + 2 * AccuracyClassic.Value) * accuracyProgress
                        + bonusPortion;
             }
 
-            if (hitMode != EzEnumHitMode.Lazer && hitMode != EzEnumHitMode.Classic)
+            if (judgeMode != EzEnumJudgeMode.Lazer && judgeMode != EzEnumJudgeMode.Classic)
             {
                 // 满分制：TotalScore = 已获得 ex / 整谱最大 ex，从 0 随判定累积（非已判子集 acc 反算）
                 return 1_000_000 * MinimumAccuracy.Value;
@@ -93,14 +93,14 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         protected override double ComputeTheoreticalPerfectJudgedTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
-            if (IsLegacyScore || hitMode == EzEnumHitMode.Classic)
+            if (IsLegacyScore || judgeMode == EzEnumJudgeMode.Classic)
             {
                 return 150000 * comboProgress
                        + 850000 * accuracyProgress
                        + bonusPortion;
             }
 
-            if (hitMode != EzEnumHitMode.Lazer && hitMode != EzEnumHitMode.Classic)
+            if (judgeMode != EzEnumJudgeMode.Lazer && judgeMode != EzEnumJudgeMode.Classic)
             {
                 var stats = GetScoreProcessorStatistics();
                 double maximumBaseScoreOnChart = MinimumAccuracy.Value > 0 ? stats.BaseScore / MinimumAccuracy.Value : 0;
@@ -123,8 +123,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public override int GetBaseScoreForResult(HitResult result)
         {
-            if (hitMode != EzEnumHitMode.Lazer)
-                return HitModeHelper.GetBaseScoreForResult(hitMode, result);
+            if (judgeMode != EzEnumJudgeMode.Lazer)
+                return JudgeModeHelper.GetBaseScoreForResult(judgeMode, result);
 
             switch (result)
             {
@@ -189,7 +189,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         protected override void ApplyScoreChange(JudgementResult judgement)
         {
-            var hitWindows = new HitModeHelper(EzEnumHitMode.Classic)
+            var hitWindows = new JudgeModeHelper(EzEnumJudgeMode.Classic)
             {
                 OverallDifficulty = calOD
             };
@@ -203,14 +203,14 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
             else if (hitObject is TailNote)
             {
-                ClassicMaxBaseScore += HitModeHelper.GetBaseScoreForResult(EzEnumHitMode.Classic, HitResult.Perfect);
+                ClassicMaxBaseScore += JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
                 ClassicBaseScore += hitWindows.GetClassicLNScore(headOffsets[hitObject.Column], offset);
                 headOffsets[hitObject.Column] = 0;
             }
             else if (hitObject is Note)
             {
-                ClassicMaxBaseScore += HitModeHelper.GetBaseScoreForResult(EzEnumHitMode.Classic, HitResult.Perfect);
-                ClassicBaseScore += HitModeHelper.GetBaseScoreForResult(EzEnumHitMode.Classic, result);
+                ClassicMaxBaseScore += JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
+                ClassicBaseScore += JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, result);
             }
 
             UpdateScoreClassic();
@@ -220,7 +220,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         protected override void RemoveScoreChange(JudgementResult judgement)
         {
-            var hitWindows = new HitModeHelper(EzEnumHitMode.Classic)
+            var hitWindows = new JudgeModeHelper(EzEnumJudgeMode.Classic)
             {
                 OverallDifficulty = calOD
             };
@@ -234,14 +234,14 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
             else if (hitObject is TailNote)
             {
-                ClassicMaxBaseScore -= HitModeHelper.GetBaseScoreForResult(EzEnumHitMode.Classic, HitResult.Perfect);
+                ClassicMaxBaseScore -= JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
                 ClassicBaseScore -= hitWindows.GetClassicLNScore(headOffsets[hitObject.Column], offset);
                 headOffsets[hitObject.Column] = 0;
             }
             else if (hitObject is Note)
             {
-                ClassicMaxBaseScore -= HitModeHelper.GetBaseScoreForResult(EzEnumHitMode.Classic, HitResult.Perfect);
-                ClassicBaseScore -= HitModeHelper.GetBaseScoreForResult(EzEnumHitMode.Classic, result);
+                ClassicMaxBaseScore -= JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
+                ClassicBaseScore -= JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, result);
             }
 
             UpdateScoreClassic();

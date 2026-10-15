@@ -249,11 +249,10 @@ namespace osu.Game.Scoring
                 CountryCode = RealmUser.CountryCode,
             };
 
-            clone.ManiaHitMode = ManiaHitMode;
-            clone.ManiaHealthMode = ManiaHealthMode;
+            clone.JudgeMode = JudgeMode;
+            clone.HealthMode = HealthMode;
             clone.SessionOffsetPlusMania = SessionOffsetPlusMania;
             clone.SessionOffsetPlusNonMania = SessionOffsetPlusNonMania;
-            clone.OsuJudgementTrack = OsuJudgementTrack;
             clone.SessionAccuracyCutoffA = SessionAccuracyCutoffA;
             clone.SessionAccuracyCutoffS = SessionAccuracyCutoffS;
             clone.SessionSettingsCaptured = SessionSettingsCaptured;
@@ -282,18 +281,21 @@ namespace osu.Game.Scoring
         public bool IsLegacyScore { get; set; }
 
         /// <summary>
-        /// Ez2Lazer: Mania hit mode used when this score was set. Lazer (0) is the default and the only value
-        /// for anything but an Ez-private mode; negative values exist only on scores written before the field
-        /// had a default and read back as Lazer.
+        /// Ez2Lazer: 本成绩的判定档（全规则集共用）。Lazer (0) 为默认；其余为各规则集私有档或共享 stable 经典档。
+        /// 负值仅出现在字段引入前的旧行，读取时按 Lazer 处理。
         /// </summary>
-        public int ManiaHitMode { get; set; }
+        /// <remarks>
+        /// ez v11 起为规范列名；旧列 <c>ManiaHitMode</c> 的数据已由该版迁移搬入。
+        /// </remarks>
+        public int JudgeMode { get; set; }
 
         /// <summary>
-        /// Ez2Lazer: Mania health mode used when this score was set. Lazer (0) is the default and the only value
-        /// for anything but an Ez-private mode; negative values exist only on scores written before the field
-        /// had a default and read back as Lazer.
+        /// Ez2Lazer: 本成绩的血量档（全规则集共用）。语义同 <see cref="JudgeMode"/>。
         /// </summary>
-        public int ManiaHealthMode { get; set; }
+        /// <remarks>
+        /// ez v11 起为规范列名；旧列 <c>ManiaHealthMode</c> 的数据已由该版迁移搬入。
+        /// </remarks>
+        public int HealthMode { get; set; }
 
         /// <summary>
         /// Ez2Lazer: 附加分（两种倾向各一份），与 <see cref="HitEvents"/> 同为临时数据：游玩结束或 Session 重跑后才有，
@@ -313,13 +315,6 @@ namespace osu.Game.Scoring
         /// </summary>
         [Ignored]
         public double SessionOffsetPlusNonMania { get; set; }
-
-        /// <summary>
-        /// Ez2Lazer: Osu 判定轨嵌入（OSL-013）。暂 [Ignored] 不升 Realm；持久化升版需确认后 bump EZ_REALM_SCHEMA_VERSION。
-        /// -1 = 未设置（ForStored 回退 Lazer）；0 = Lazer；1 = ClassicNative。
-        /// </summary>
-        [Ignored]
-        public int OsuJudgementTrack { get; set; } = -1;
 
         /// <summary>
         /// Ez2Lazer: Accuracy cutoff A at gameplay start (submission eligibility snapshot).

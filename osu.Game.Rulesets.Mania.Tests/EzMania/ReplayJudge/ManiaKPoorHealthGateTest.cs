@@ -19,10 +19,10 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TearDown() => ReplayJudgeTestConfig.ResetGlobalConfig();
 
         [Test]
-        public void TestBmsHitModeLazerHealthProducesNoExtraPoorFromKPoorRouting()
+        public void TestBmsJudgeModeLazerHealthProducesNoExtraPoorFromKPoorRouting()
         {
-            var (score, beatmap, bmsHealthEnv) = HitModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
-            var lazerHealthEnv = bmsHealthEnv with { ManiaHealthMode = EzEnumHealthMode.Lazer };
+            var (score, beatmap, bmsHealthEnv) = JudgeModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
+            var lazerHealthEnv = bmsHealthEnv with { HealthMode = EzEnumHealthMode.Lazer };
 
             var withBmsHealth = ManiaReplaySession.Run(score.DeepClone(), beatmap, bmsHealthEnv);
             var withLazerHealth = ManiaReplaySession.Run(score.DeepClone(), beatmap, lazerHealthEnv);
@@ -46,29 +46,29 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TestResolveEnvironmentForStoredUsesEmbeddedModesOrLazerFallback()
         {
             var config = GlobalConfigStore.EzConfig;
-            config.SetValue(Ez2Setting.ManiaHitMode, EzEnumHitMode.IIDX_HD);
+            config.SetValue(Ez2Setting.ManiaJudgeMode, EzEnumJudgeMode.IIDX_HD);
             config.SetValue(Ez2Setting.ManiaHealthMode, EzEnumHealthMode.Lazer);
             config.SetValue(Ez2Setting.OffsetPlusMania, 25.0);
 
             var scoreInfo = new ScoreInfo
             {
                 Ruleset = new ManiaRuleset().RulesetInfo,
-                ManiaHitMode = (int)EzEnumHitMode.LR2_HD,
-                ManiaHealthMode = (int)EzEnumHealthMode.IIDX_HD,
+                JudgeMode = (int)EzEnumJudgeMode.LR2_HD,
+                HealthMode = (int)EzEnumHealthMode.IIDX_HD,
             };
 
             var stored = config.ResolveEnvironment(ReplayRunPurpose.ForStored, scoreInfo);
-            Assert.That(stored.ManiaHitMode, Is.EqualTo(EzEnumHitMode.LR2_HD));
-            Assert.That(stored.ManiaHealthMode, Is.EqualTo(EzEnumHealthMode.IIDX_HD));
+            Assert.That(stored.JudgeMode, Is.EqualTo(EzEnumJudgeMode.LR2_HD));
+            Assert.That(stored.HealthMode, Is.EqualTo(EzEnumHealthMode.IIDX_HD));
             Assert.That(stored.OffsetPlusMania, Is.EqualTo(0));
 
             var legacy = config.ResolveEnvironment(ReplayRunPurpose.ForStored, new ScoreInfo { Ruleset = new ManiaRuleset().RulesetInfo });
-            Assert.That(legacy.ManiaHitMode, Is.EqualTo(EzEnumHitMode.Lazer));
-            Assert.That(legacy.ManiaHealthMode, Is.EqualTo(EzEnumHealthMode.Lazer));
+            Assert.That(legacy.JudgeMode, Is.EqualTo(EzEnumJudgeMode.Lazer));
+            Assert.That(legacy.HealthMode, Is.EqualTo(EzEnumHealthMode.Lazer));
 
-            var live = config.GetGameplayEnvironment();
-            Assert.That(live.ManiaHitMode, Is.EqualTo(EzEnumHitMode.IIDX_HD));
-            Assert.That(live.ManiaHealthMode, Is.EqualTo(EzEnumHealthMode.Lazer));
+            var live = config.GetGameplayEnvironment(new ManiaRuleset().RulesetInfo);
+            Assert.That(live.JudgeMode, Is.EqualTo(EzEnumJudgeMode.IIDX_HD));
+            Assert.That(live.HealthMode, Is.EqualTo(EzEnumHealthMode.Lazer));
             Assert.That(live.OffsetPlusMania, Is.EqualTo(25.0));
 
             var recalcStored = config.ResolveEnvironment(ReplayRunPurpose.ForStored, scoreInfo);

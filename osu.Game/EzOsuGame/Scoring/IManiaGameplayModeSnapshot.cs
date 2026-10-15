@@ -8,7 +8,7 @@ namespace osu.Game.EzOsuGame.Scoring
     /// </summary>
     public interface IManiaGameplayModeSnapshot
     {
-        int HitMode { get; }
+        int JudgeMode { get; }
 
         int HealthMode { get; }
     }

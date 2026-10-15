@@ -33,10 +33,10 @@ namespace osu.Game.Rulesets.Mania.Objects
             return clone;
         }
 
-        // 转换期不读全局 HitMode：真实窗口一律由 ManiaWindowBaker 在绑定期按当局 hitmode 烘焙
+        // 转换期不读全局 JudgeMode：真实窗口一律由 ManiaWindowBaker 在绑定期按当局 JudgeMode 烘焙
         // （live 走 BindForLive、仿真走 BindForSimulation）。这里显式用 Lazer 起步，省掉每个音符一次
         // 全局配置查询与窗口计算——那批结果在绑定时会被整体覆盖，纯属浪费。
-        protected override HitWindows CreateHitWindows() => new ManiaHitWindows(EzEnumHitMode.Lazer);
+        protected override HitWindows CreateHitWindows() => new ManiaHitWindows(EzEnumJudgeMode.Lazer);
 
         #region LegacyBeatmapEncoder
 

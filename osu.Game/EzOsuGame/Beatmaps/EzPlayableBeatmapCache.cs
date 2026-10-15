@@ -66,7 +66,7 @@ namespace osu.Game.EzOsuGame.Beatmaps
 
         /// <summary>
         /// Instances handed out by <see cref="GetShared"/>. Kept so that an in-place binding can be reported rather
-        /// than silently leaking one hitmode's judgements into every other consumer.
+        /// than silently leaking one JudgeMode's judgements into every other consumer.
         /// </summary>
         private static readonly ConditionalWeakTable<IBeatmap, SharedMarker> sharedInstances = new ConditionalWeakTable<IBeatmap, SharedMarker>();
 
@@ -94,7 +94,7 @@ namespace osu.Game.EzOsuGame.Beatmaps
         /// returned to nobody else carrying a different <paramref name="bindingScope"/>.
         /// </summary>
         /// <param name="bindingScope">
-        /// Identifies the environment the instance is bound for (for mania, the hitmode). Must not be
+        /// Identifies the environment the instance is bound for (for mania, the JudgeMode). Must not be
         /// <see cref="SHARED_SCOPE"/>: two different environments must never meet on one instance, because the
         /// binding is in-place and last-wins.
         /// </param>

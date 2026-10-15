@@ -96,8 +96,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         {
             var doc = new Document
             {
-                HitMode = environment.ManiaHitMode.ToString(),
-                HealthMode = environment.ManiaHealthMode.ToString(),
+                JudgeMode = environment.JudgeMode.ToString(),
+                HealthMode = environment.HealthMode.ToString(),
                 JudgePrecedence = environment.JudgePrecedence.ToString(),
                 Columns = columns,
                 BeatmapResource = beatmapResource,
@@ -118,7 +118,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             validate(document);
 
             var environment = ReplayJudgeTestConfig.Create(
-                Enum.Parse<EzEnumHitMode>(document.HitMode, ignoreCase: true),
+                Enum.Parse<EzEnumJudgeMode>(document.JudgeMode, ignoreCase: true),
                 Enum.Parse<EzEnumHealthMode>(document.HealthMode, ignoreCase: true),
                 Enum.Parse<EzEnumJudgePrecedence>(document.JudgePrecedence ?? nameof(EzEnumJudgePrecedence.Earliest), ignoreCase: true));
 
@@ -168,8 +168,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             if (document.Frames == null)
                 throw new InvalidDataException("ReplayJson frames required");
 
-            if (string.IsNullOrWhiteSpace(document.HitMode) || string.IsNullOrWhiteSpace(document.HealthMode))
-                throw new InvalidDataException("ReplayJson hitMode/healthMode required");
+            if (string.IsNullOrWhiteSpace(document.JudgeMode) || string.IsNullOrWhiteSpace(document.HealthMode))
+                throw new InvalidDataException("ReplayJson judgeMode/healthMode required");
         }
 
         private static HitObjectDto toHitObjectDto(ManiaHitObject obj) => obj switch
@@ -235,7 +235,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
         internal sealed class Document
         {
-            public string HitMode { get; set; } = string.Empty;
+            public string JudgeMode { get; set; } = string.Empty;
             public string HealthMode { get; set; } = string.Empty;
             public string? JudgePrecedence { get; set; }
             public int Columns { get; set; } = 4;

@@ -341,7 +341,7 @@ namespace osu.Game.Screens.Select
                                                     Direction = FillDirection.Horizontal,
                                                     Children = new[]
                                                     {
-                                                        EzManiaScoreModeExtensions.CreateDisplayDrawable(Score, fontSize: 12, anchor: Anchor.CentreLeft),
+                                                        EzScoreInfoExtensions.CreateDisplayDrawable(Score, fontSize: 12, anchor: Anchor.CentreLeft),
                                                         new ScoreComponentLabel(BeatmapsetsStrings.ShowScoreboardHeadersCombo.ToUpper(), $"{Score.MaxCombo.ToString()}x",
                                                             Score.IsPerfect(), 60),
                                                         new ScoreComponentLabel(BeatmapsetsStrings.ShowScoreboardHeadersAccuracy.ToUpper(), Score.DisplayAccuracy, Score.Accuracy == 1,

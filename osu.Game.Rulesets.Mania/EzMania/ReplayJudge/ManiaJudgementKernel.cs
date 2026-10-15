@@ -41,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             public long FrameStableId { get; init; }
 
-            public BmsHitModeJudgement.BmsRouteState? BmsState { get; init; }
+            public BmsJudgeModeJudgement.BmsRouteState? BmsState { get; init; }
 
             public bool ForcePoorOnTailHoldBreak { get; init; }
 
@@ -54,7 +54,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             public ManiaNoteJudgementOutcome NoteOutcome { get; init; }
 
-            public BmsHitModeJudgement.DrawableAction BmsAction { get; init; }
+            public BmsJudgeModeJudgement.DrawableAction BmsAction { get; init; }
 
             public static NoteEvaluationResult NotHandled => new NoteEvaluationResult { Kind = NoteEvaluationKind.NotHandled };
 
@@ -63,7 +63,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             public static NoteEvaluationResult FromNoteOutcome(ManiaNoteJudgementOutcome outcome)
                 => new NoteEvaluationResult { Kind = NoteEvaluationKind.ApplyNoteOutcome, NoteOutcome = outcome };
 
-            public static NoteEvaluationResult FromBmsAction(BmsHitModeJudgement.DrawableAction action)
+            public static NoteEvaluationResult FromBmsAction(BmsJudgeModeJudgement.DrawableAction action)
                 => new NoteEvaluationResult { Kind = NoteEvaluationKind.ApplyBmsAction, BmsAction = action };
         }
 
@@ -93,7 +93,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             public long FrameStableId { get; init; }
 
-            public BmsHitModeJudgement.BmsRouteState? BmsState { get; init; }
+            public BmsJudgeModeJudgement.BmsRouteState? BmsState { get; init; }
         }
 
         public readonly struct HoldTailEvaluationResult
@@ -104,7 +104,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             public HitResult? FinalResult { get; init; }
 
-            public BmsHitModeJudgement.DrawableAction BmsAction { get; init; }
+            public BmsJudgeModeJudgement.DrawableAction BmsAction { get; init; }
 
             public static HoldTailEvaluationResult Unhandled => default;
 
@@ -115,7 +115,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             public static HoldTailEvaluationResult FromResult(HitResult result)
                 => new HoldTailEvaluationResult { Handled = true, FinalResult = result };
 
-            public static HoldTailEvaluationResult FromBmsAction(BmsHitModeJudgement.DrawableAction action)
+            public static HoldTailEvaluationResult FromBmsAction(BmsJudgeModeJudgement.DrawableAction action)
                 => new HoldTailEvaluationResult { Handled = true, BmsAction = action };
         }
 
@@ -124,10 +124,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             var round = request.Round;
             var strategy = round.Strategy;
 
-            if (strategy == null || !round.IsEzHitMode)
+            if (strategy == null || !round.IsEzJudgeMode)
                 return NoteEvaluationResult.NotHandled;
 
-            if (strategy is BmsHitModeJudgement bms)
+            if (strategy is BmsJudgeModeJudgement bms)
             {
                 if (request.HitWindows is not ManiaHitWindows maniaWindows || request.BmsState == null)
                     return NoteEvaluationResult.Ignore;
@@ -145,13 +145,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 return NoteEvaluationResult.FromBmsAction(action);
             }
 
-            if (strategy is O2HitModeJudgement o2)
+            if (strategy is O2JudgeModeJudgement o2)
             {
                 double pressBpm = resolveO2PressBpm(request);
 
                 if (request.UserTriggered)
                 {
-                    var outcome = o2.EvaluatePress(request.TimeOffset, request.HitWindows, new O2HitModeJudgement.NotePressContext
+                    var outcome = o2.EvaluatePress(request.TimeOffset, request.HitWindows, new O2JudgeModeJudgement.NotePressContext
                     {
                         RawOffset = request.TimeOffset,
                         Bpm = pressBpm,
@@ -168,7 +168,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 return NoteEvaluationResult.FromNoteOutcome(o2.EvaluateAutoMiss(request.TimeOffset, request.HitWindows, autoMissBpm));
             }
 
-            if (strategy is Ez2AcHitModeJudgement ez2Ac)
+            if (strategy is Ez2AcJudgeModeJudgement ez2Ac)
             {
                 var outcome = request.UserTriggered
                     ? ez2Ac.EvaluatePress(request.TimeOffset, request.HitWindows, request.IsLnHead)
@@ -189,10 +189,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             var round = request.Round;
             var strategy = round.Strategy;
 
-            if (strategy == null || !round.IsEzHitMode)
+            if (strategy == null || !round.IsEzJudgeMode)
                 return HoldTailEvaluationResult.Unhandled;
 
-            if (strategy is MalodyHitModeJudgement)
+            if (strategy is MalodyJudgeModeJudgement)
             {
                 if (!request.UserTriggered && request.TimeOffset < 0)
                     return HoldTailEvaluationResult.HandledNoOp;
@@ -203,7 +203,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 return HoldTailEvaluationResult.FromResult(HitResult.IgnoreHit);
             }
 
-            if (strategy is BmsHitModeJudgement bms)
+            if (strategy is BmsJudgeModeJudgement bms)
             {
                 if (request.HitWindows is not ManiaHitWindows maniaWindows || request.BmsState == null)
                     return HoldTailEvaluationResult.HandledNoOp;
@@ -221,7 +221,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 return HoldTailEvaluationResult.FromBmsAction(action);
             }
 
-            if (strategy is O2HitModeJudgement o2)
+            if (strategy is O2JudgeModeJudgement o2)
             {
                 double pressBpm = resolveO2PressBpm(request);
 
@@ -232,12 +232,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         if (request.TimeOffset < 0)
                             return HoldTailEvaluationResult.HandledNoOp;
 
-                        return HoldTailEvaluationResult.FromResult(O2HitModeJudgement.MapTo(O2Judge.Miss));
+                        return HoldTailEvaluationResult.FromResult(O2JudgeModeJudgement.MapTo(O2Judge.Miss));
                     }
 
                     double mult = ManiaJudgementRound.GetTotalMultiplier(request.HitWindows);
 
-                    if (!O2HitModeExtension.CanBeHit(request.TimeOffset, pressBpm, mult))
+                    if (!O2JudgeModeExtension.CanBeHit(request.TimeOffset, pressBpm, mult))
                         return HoldTailEvaluationResult.MinResult;
 
                     return HoldTailEvaluationResult.HandledNoOp;
@@ -261,10 +261,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 if (judge == O2Judge.None)
                     return HoldTailEvaluationResult.HandledNoOp;
 
-                return HoldTailEvaluationResult.FromResult(O2HitModeJudgement.MapTo(judge));
+                return HoldTailEvaluationResult.FromResult(O2JudgeModeJudgement.MapTo(judge));
             }
 
-            if (strategy is Ez2AcHitModeJudgement)
+            if (strategy is Ez2AcJudgeModeJudgement)
             {
                 // EZ2AC：尾无松手窗。未到尾 → 不完结（可再抓）；到点后 IgnoreHit。
                 if (request.TimeOffset < 0)

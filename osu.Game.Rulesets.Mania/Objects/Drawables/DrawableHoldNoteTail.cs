@@ -100,7 +100,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         public override bool DisplayResult => !ManiaEzDrawableJudgement.ShouldHideTailDisplayResult(ManiaEzDrawableJudgement.GetJudgementRound(this)) && base.DisplayResult;
 
-        internal override void EzApplyFinalResult(HitResult result, EzEnumHitMode hitMode)
+        internal override void EzApplyFinalResult(HitResult result, EzEnumJudgeMode judgeMode)
         {
             result = ManiaEzDrawableJudgement.SanitizeResult(this, result);
 
@@ -109,11 +109,11 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 r.Type = data.result;
 
                 if (data.result == HitResult.Miss
-                    || (data.result == HitResult.Meh && HitModeHelper.MehBreaksCombo(data.hitMode)))
+                    || (data.result == HitResult.Meh && JudgeModeHelper.MehBreaksCombo(data.judgeMode)))
                 {
                     r.IsComboHit = false;
                 }
-            }, (result, hitMode));
+            }, (result, judgeMode: judgeMode));
         }
 
         internal new void EzDispatchExtraResult(HitResult result) => DispatchNewResult(result);

@@ -146,7 +146,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             set
             {
                 bpm = value;
-                setHitMode();
+                setJudgeMode();
                 updateWindows();
             }
         }
@@ -172,16 +172,16 @@ namespace osu.Game.Rulesets.Mania.Scoring
         /// <summary>
         /// 当前 Mania 判定模式（统计与窗口逻辑会依赖此值）。
         /// </summary>
-        public EzEnumHitMode ActiveHitMode { get; private set; }
+        public EzEnumJudgeMode ActiveJudgeMode { get; private set; }
 
-        // 模式的唯一来源是本对象的 ActiveHitMode（构造参数 / SetHitMode）。默认用 Lazer 起步只为满足字段初始化，
-        // 构造体随后立刻用 ActiveHitMode 覆盖；不要让默认值再去回读全局配置。
-        private readonly HitModeHelper helper = new HitModeHelper(EzEnumHitMode.Lazer);
+        // 模式的唯一来源是本对象的 ActiveJudgeMode（构造参数 / SetJudgeMode）。默认用 Lazer 起步只为满足字段初始化，
+        // 构造体随后立刻用 ActiveJudgeMode 覆盖；不要让默认值再去回读全局配置。
+        private readonly JudgeModeHelper helper = new JudgeModeHelper(EzEnumJudgeMode.Lazer);
 
-        public ManiaHitWindows(EzEnumHitMode? hitModeOverride = null)
+        public ManiaHitWindows(EzEnumJudgeMode? judgeModeOverride = null)
         {
-            ActiveHitMode = hitModeOverride ?? GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-            helper.HitMode = ActiveHitMode;
+            ActiveJudgeMode = judgeModeOverride ?? GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
+            helper.JudgeMode = ActiveJudgeMode;
             updateWindows();
         }
 
@@ -200,7 +200,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case HitResult.Meh:
                 case HitResult.Miss:
                     // 直接查静态有效判定表（单一数据源），无需额外的 per-result switch 副本。
-                    var valid = HitModeHelper.GetHitModeValidHitResults(ActiveHitMode);
+                    var valid = JudgeModeHelper.GetJudgeModeValidHitResults(ActiveJudgeMode);
 
                     for (int i = 0; i < valid.Count; i++)
                     {
@@ -240,17 +240,17 @@ namespace osu.Game.Rulesets.Mania.Scoring
             updateWindows();
         }
 
-        private bool setHitMode()
+        private bool setJudgeMode()
         {
             // 需要先更新属性，保证数值同步
-            helper.HitMode = ActiveHitMode;
+            helper.JudgeMode = ActiveJudgeMode;
             helper.OverallDifficulty = overallDifficulty;
             helper.TotalMultiplier = totalMultiplier;
 
-            if (ActiveHitMode == EzEnumHitMode.O2Jam)
+            if (ActiveJudgeMode == EzEnumJudgeMode.O2Jam)
                 helper.BPM = BPM;
 
-            if (ActiveHitMode == EzEnumHitMode.Lazer)
+            if (ActiveJudgeMode == EzEnumJudgeMode.Lazer)
                 return false;
 
             modifyManiaHitRange(helper.GetHitRangeList);
@@ -266,7 +266,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private void updateWindows()
         {
-            if (setHitMode() && !HasReset)
+            if (setJudgeMode() && !HasReset)
             {
                 perfect = perfectRange;
                 great = greatRange;
@@ -379,25 +379,25 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public HitResult ResultFor(double timeOffset, bool? useHelper = null)
         {
-            bool shouldUseHelper = useHelper ?? ActiveHitMode != EzEnumHitMode.Lazer;
+            bool shouldUseHelper = useHelper ?? ActiveJudgeMode != EzEnumJudgeMode.Lazer;
             return shouldUseHelper ? helper.ResultFor(timeOffset) : base.ResultFor(timeOffset);
         }
 
-        public void SetHitMode(EzEnumHitMode mode)
+        public void SetJudgeMode(EzEnumJudgeMode mode)
         {
-            if (ActiveHitMode == mode)
+            if (ActiveJudgeMode == mode)
                 return;
 
-            ActiveHitMode = mode;
+            ActiveJudgeMode = mode;
             updateWindows();
         }
 
         public void UpdateO2JamBpmFromTime(double time)
         {
-            if (ActiveHitMode != EzEnumHitMode.O2Jam)
+            if (ActiveJudgeMode != EzEnumJudgeMode.O2Jam)
                 return;
 
-            BPM = O2HitModeExtension.GetBPMAtTime(time);
+            BPM = O2JudgeModeExtension.GetBPMAtTime(time);
         }
     }
 }

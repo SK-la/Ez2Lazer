@@ -21,7 +21,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// </list>
         /// </summary>
         /// <param name="hitEvent">原始 HitEvent（含 TimeOffset、HitObject、Result）。</param>
-        /// <param name="hitWindows">当前 HitMode 的判定窗口实例。</param>
+        /// <param name="hitWindows">当前 JudgeMode 的判定窗口实例。</param>
         /// <returns>重判后的 HitResult，不可判定时返回 <see cref="HitResult.Miss"/>。</returns>
         HitResult RejudgeHitEvent(HitEvent hitEvent, HitWindows hitWindows);
     }

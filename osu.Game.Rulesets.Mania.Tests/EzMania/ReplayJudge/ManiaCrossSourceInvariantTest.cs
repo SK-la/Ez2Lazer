@@ -26,7 +26,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public void TestRunHitEventsAggregateMatchesStatistics()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcManyNoteTap();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateEz2AcManyNoteTap();
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
 
             var run = snapshotRun(score, beatmap, environment);
@@ -39,7 +39,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public void TestRunIsDeterministic()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcManyNoteTap();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateEz2AcManyNoteTap();
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
 
             var first = snapshotRun(score, beatmap, environment);
@@ -54,7 +54,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public async Task TestMixedEntryDeterministicAcrossFreshServices()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, environment);
 
@@ -106,7 +106,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public void TestSameEnvironmentFromScoreMatchesFromLive()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcManyNoteTap();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateEz2AcManyNoteTap();
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, environment);
 
@@ -121,7 +121,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public async Task TestEz2AcHoldHeadSoftenRunMatchesGeneratorStatistics()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcHoldHeadGreatSoftened();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateEz2AcHoldHeadGreatSoftened();
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, environment);
 
@@ -141,7 +141,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public void TestEz2AcHoldHeadSoftenRunHitEventsAggregateMatchesStatistics()
         {
-            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcHoldHeadGreatSoftened();
+            var (score, beatmap, environment) = JudgeModeReplayFixtures.CreateEz2AcHoldHeadGreatSoftened();
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
 
             var run = snapshotRun(score, beatmap, environment);
@@ -152,7 +152,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         [Test]
-        public void TestDifferentHitModeFromLiveChangesHitEvents()
+        public void TestDifferentJudgeModeFromLiveChangesHitEvents()
         {
             var (score, beatmap, lazerEnvironment) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
             var iidxEnvironment = BmsTapReplayFixtures.CreateTwoNoteColumnTap().environment;

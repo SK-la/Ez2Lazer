@@ -18,6 +18,7 @@ using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Scoring.Bonus;
+using osu.Game.Rulesets;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.Configuration
@@ -179,7 +180,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
             SetDefault(Ez2Setting.OffsetPlusMania, 0.0, -200.0, 200.0, 1.0);
             SetDefault(Ez2Setting.OffsetPlusNonMania, 0.0, -200.0, 200.0, 1.0);
-            SetDefault(Ez2Setting.OsuJudgementTrack, EzEnumOsuJudgementTrack.Lazer);
+            SetDefault(Ez2Setting.StdJudgeMode, EzEnumJudgeMode.Lazer);
 
             #endregion
 
@@ -287,7 +288,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         private void initializeManiaDefaults()
         {
-            SetDefault(Ez2Setting.ManiaHitMode, EzEnumHitMode.Lazer);
+            SetDefault(Ez2Setting.ManiaJudgeMode, EzEnumJudgeMode.Lazer);
             SetDefault(Ez2Setting.ManiaHealthMode, EzEnumHealthMode.Lazer);
             SetDefault(Ez2Setting.BmsPoorHitResultEnable, !DebugUtils.IsNUnitRunning);
             SetDefault(Ez2Setting.JudgePrecedence, EzEnumJudgePrecedence.Earliest);
@@ -347,82 +348,89 @@ namespace osu.Game.EzOsuGame.Configuration
         /// <summary>
         /// 从当前配置读取实时游玩环境快照（等同 <see cref="ResolveEnvironment"/> + <see cref="ReplayRunPurpose.ForLive"/>）。
         /// </summary>
-        public GameplayEnvironment GetGameplayEnvironment()
-            => ResolveEnvironment(ReplayRunPurpose.ForLive);
+        public GameplayEnvironment GetGameplayEnvironment(RulesetInfo? ruleset = null)
+            => ResolveEnvironment(ReplayRunPurpose.ForLive, ruleset: ruleset);
 
         /// <summary>
-        /// 统一环境解析：Purpose 决定 HitMode/HealthMode 来源；score 可选。
+        /// 统一环境解析：Purpose 决定 JudgeMode/HealthMode 来源；score 可选。
         /// </summary>
         /// <param name="purpose">
-        /// <see cref="ReplayRunPurpose.ForStored"/>：读 score 嵌入 HitMode/HealthMode（无嵌入时 Mania 回退 Lazer）。
-        /// <see cref="ReplayRunPurpose.ForLive"/>：读当前全局配置。
+        /// <see cref="ReplayRunPurpose.ForStored"/>：读 score 嵌入 JudgeMode/HealthMode（无嵌入时 Mania 回退 Lazer）。
+        /// <see cref="ReplayRunPurpose.ForLive"/>：读当前全局配置，判定轨按规则集取。
         /// </param>
-        /// <param name="score">可选；ForStored 时用于嵌入模式查询。</param>
+        /// <param name="score">可选；ForStored 时用于嵌入模式查询，并作为规则集来源。</param>
         /// <param name="ignoreOffset">
         /// 为 true 时强制 offset = 0（Session / 分析的 <see cref="ReplayRunPurpose.ForLive"/>）。
         /// 省略时：<see cref="ReplayRunPurpose.ForStored"/> 恒为 0；<see cref="ReplayRunPurpose.ForLive"/> 读全局设置。
         /// </param>
-        public GameplayEnvironment ResolveEnvironment(ReplayRunPurpose purpose, ScoreInfo? score = null, bool ignoreOffset = false)
+        /// <param name="ruleset">可选；score 为 null 时用于解析 live 判定轨的规则集（如无成绩的本地 Mania 局）。</param>
+        public GameplayEnvironment ResolveEnvironment(ReplayRunPurpose purpose, ScoreInfo? score = null, bool ignoreOffset = false, RulesetInfo? ruleset = null)
         {
-            var live = readLiveGameplayEnvironment();
+            int rulesetId = score?.Ruleset.OnlineID ?? ruleset?.OnlineID ?? -1;
+            var live = readLiveGameplayEnvironment(rulesetId);
 
             GameplayEnvironment resolved = purpose switch
             {
-                ReplayRunPurpose.ForStored => resolveStoredModes(live, score),
+                ReplayRunPurpose.ForStored => resolveStoredModes(live, score, rulesetId),
                 _ => live,
             };
 
             double offsetMania = purpose == ReplayRunPurpose.ForStored || ignoreOffset ? 0 : live.OffsetPlusMania;
             double offsetNonMania = purpose == ReplayRunPurpose.ForStored || ignoreOffset ? 0 : live.OffsetPlusNonMania;
-            var osuTrack = resolveOsuJudgementTrack(purpose, live, score);
+
             return resolved with
             {
                 OffsetPlusMania = offsetMania,
                 OffsetPlusNonMania = offsetNonMania,
-                OsuJudgementTrack = osuTrack,
             };
         }
 
-        private GameplayEnvironment readLiveGameplayEnvironment() => new GameplayEnvironment
+        private GameplayEnvironment readLiveGameplayEnvironment(int rulesetId) => new GameplayEnvironment
         {
-            ManiaHitMode = Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode),
-            ManiaHealthMode = Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode),
+            JudgeMode = resolveLiveJudgeMode(rulesetId),
+            HealthMode = Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode),
             JudgePrecedence = Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence),
             OffsetPlusMania = Get<double>(Ez2Setting.OffsetPlusMania),
             OffsetPlusNonMania = Get<double>(Ez2Setting.OffsetPlusNonMania),
-            OsuJudgementTrack = Get<EzEnumOsuJudgementTrack>(Ez2Setting.OsuJudgementTrack),
             BmsPoorHitResultEnable = Get<bool>(Ez2Setting.BmsPoorHitResultEnable),
         };
 
-        private static EzEnumOsuJudgementTrack resolveOsuJudgementTrack(ReplayRunPurpose purpose, GameplayEnvironment live, ScoreInfo? score)
+        /// <summary>
+        /// live 判定轨按规则集取：Mania/BMS 读 Mania 档，Osu 读 std 判定轨，其余默认 Lazer。
+        /// </summary>
+        private EzEnumJudgeMode resolveLiveJudgeMode(int rulesetId) => rulesetId switch
         {
-            if (purpose == ReplayRunPurpose.ForLive)
-                return live.OsuJudgementTrack;
+            3 => Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode),
+            0 => Get<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode),
+            _ => EzEnumJudgeMode.Lazer,
+        };
 
-            // ForStored：优先成绩内存嵌入（[Ignored]，未升 Realm）；否则 Lazer。
-            if (score != null && score.Ruleset.OnlineID == 0 && score.OsuJudgementTrack >= 0)
-                return (EzEnumOsuJudgementTrack)score.OsuJudgementTrack;
-
-            return EzEnumOsuJudgementTrack.Lazer;
-        }
-
-        private static GameplayEnvironment resolveStoredModes(GameplayEnvironment live, ScoreInfo? score)
+        private static GameplayEnvironment resolveStoredModes(GameplayEnvironment live, ScoreInfo? score, int rulesetId)
         {
-            if (score != null && score.TryGetManiaGameplayModes(out int hitMode, out int healthMode))
+            if (score != null && score.TryGetManiaGameplayModes(out int judgeMode, out int healthMode))
             {
                 return live with
                 {
-                    ManiaHitMode = (EzEnumHitMode)hitMode,
-                    ManiaHealthMode = (EzEnumHealthMode)healthMode,
+                    JudgeMode = (EzEnumJudgeMode)judgeMode,
+                    HealthMode = (EzEnumHealthMode)healthMode,
                 };
             }
 
-            if (score?.Ruleset.OnlineID == 3)
+            if (rulesetId == 3)
             {
                 return live with
                 {
-                    ManiaHitMode = EzEnumHitMode.Lazer,
-                    ManiaHealthMode = EzEnumHealthMode.Lazer,
+                    JudgeMode = EzEnumJudgeMode.Lazer,
+                    HealthMode = EzEnumHealthMode.Lazer,
+                };
+            }
+
+            if (rulesetId == 0)
+            {
+                // ForStored：优先成绩嵌入的 JudgeMode（>= 0 有效；旧行 -1，回退 Lazer）。
+                return live with
+                {
+                    JudgeMode = score != null && score.JudgeMode >= 0 ? (EzEnumJudgeMode)score.JudgeMode : EzEnumJudgeMode.Lazer,
                 };
             }
 
@@ -1152,7 +1160,7 @@ namespace osu.Game.EzOsuGame.Configuration
         AsioUseExternalPCM,
         OffsetPlusMania,
         OffsetPlusNonMania,
-        OsuJudgementTrack,
+        StdJudgeMode,
         HitObjectLifetimeUsesOwnTime,
 
         // 皮肤与舞台资源
@@ -1197,7 +1205,7 @@ namespace osu.Game.EzOsuGame.Configuration
         HitPosition,
 
         // Mania 专属行为
-        ManiaHitMode,
+        ManiaJudgeMode,
         ManiaHealthMode,
         BmsPoorHitResultEnable,
         JudgePrecedence,

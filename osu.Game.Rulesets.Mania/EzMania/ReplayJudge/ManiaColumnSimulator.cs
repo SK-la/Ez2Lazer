@@ -17,7 +17,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         public bool Judged { get; set; }
 
-        public BmsHitModeJudgement.BmsRouteState BmsRoute { get; } = new BmsHitModeJudgement.BmsRouteState();
+        public BmsJudgeModeJudgement.BmsRouteState BmsRoute { get; } = new BmsJudgeModeJudgement.BmsRouteState();
 
         public bool HoldBroken { get; set; }
 

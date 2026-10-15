@@ -22,7 +22,7 @@ using osu.Game.Tests.Beatmaps;
 
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 {
-    internal static class HitModeReplayFixtures
+    internal static class JudgeModeReplayFixtures
     {
         public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateBmsEarlyBadWithPostBadKPoor()
         {
@@ -53,7 +53,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 },
             };
 
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD, bmsPoorHitResultEnable: true);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.IIDX_HD, EzEnumHealthMode.IIDX_HD, bmsPoorHitResultEnable: true);
 
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
 
@@ -87,7 +87,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 },
             };
 
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal);
 
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             return (createScore(ruleset, replay), beatmap, environment);
@@ -95,7 +95,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
         public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateEz2AcHoldHeadPerfect(bool applyGlobalConfig = true)
         {
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
 
             if (applyGlobalConfig)
                 ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
@@ -137,7 +137,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         /// </summary>
         public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateEz2AcHoldEarlyReleaseNoComboBreak()
         {
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
 
             var ruleset = new ManiaRuleset();
@@ -191,13 +191,13 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             var replay = new Replay { Frames = frames };
 
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
 
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             return (createScore(ruleset, replay), beatmap, environment);
         }
 
-        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateBmsManyNoteTap(EzEnumHitMode hitMode, int noteCount = 20)
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateBmsManyNoteTap(EzEnumJudgeMode judgeMode, int noteCount = 20)
         {
             var ruleset = new ManiaRuleset();
             var hitObjects = new List<HitObject>();
@@ -222,7 +222,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             beatmap.Difficulty.OverallDifficulty = 5;
 
-            var environment = ReplayJudgeTestConfig.CreateBmsLazerHealth(hitMode);
+            var environment = ReplayJudgeTestConfig.CreateBmsLazerHealth(judgeMode);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
 
             return (createScore(ruleset, new Replay { Frames = frames }), beatmap, environment);
@@ -251,7 +251,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             foreach (var obj in beatmap.HitObjects)
                 obj.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
 
-            var environment = createMalodyEnvironment(EzEnumHitMode.Malody_E);
+            var environment = createMalodyEnvironment(EzEnumJudgeMode.Malody_E);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
 
             return (createScore(ruleset, new Replay { Frames = frames }), beatmap, environment);
@@ -288,13 +288,13 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 },
             };
 
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
 
             return (createScore(ruleset, replay), beatmap, environment);
         }
 
-        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateMalodyHoldPerfect(EzEnumHitMode hitMode = EzEnumHitMode.Malody_E)
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateMalodyHoldPerfect(EzEnumJudgeMode judgeMode = EzEnumJudgeMode.Malody_E)
         {
             const double head = 1500;
             const double tail = 4000;
@@ -321,12 +321,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 },
             };
 
-            var environment = createMalodyEnvironment(hitMode);
+            var environment = createMalodyEnvironment(judgeMode);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             return (createScore(ruleset, replay), beatmap, environment);
         }
 
-        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateMalodyHoldEarlyRelease(EzEnumHitMode hitMode = EzEnumHitMode.Malody_E)
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateMalodyHoldEarlyRelease(EzEnumJudgeMode judgeMode = EzEnumJudgeMode.Malody_E)
         {
             const double head = 1500;
             const double tail = 4000;
@@ -354,7 +354,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 },
             };
 
-            var environment = createMalodyEnvironment(hitMode);
+            var environment = createMalodyEnvironment(judgeMode);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             return (createScore(ruleset, replay), beatmap, environment);
         }
@@ -386,7 +386,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 },
             };
 
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal);
 
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             return (createScore(ruleset, replay), beatmap, environment);
@@ -423,7 +423,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 },
             };
 
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             return (createScore(ruleset, replay), beatmap, environment);
         }
@@ -466,7 +466,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 },
             };
 
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             return (createScore(ruleset, replay), beatmap, environment);
         }
@@ -498,24 +498,24 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 },
             };
 
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             return (createScore(ruleset, replay), beatmap, environment);
         }
 
-        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateHoldPerfectForHitMode(EzEnumHitMode hitMode)
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateHoldPerfectForJudgeMode(EzEnumJudgeMode judgeMode)
         {
-            return hitMode switch
+            return judgeMode switch
             {
-                EzEnumHitMode.Malody_E or EzEnumHitMode.Malody_B => CreateMalodyHoldPerfect(hitMode),
-                EzEnumHitMode.EZ2AC => CreateEz2AcHoldHeadPerfect(),
-                EzEnumHitMode.O2Jam => CreateO2HoldPerfect(),
-                EzEnumHitMode.IIDX_HD or EzEnumHitMode.LR2_HD or EzEnumHitMode.Raja_NM => createBmsHoldPerfect(hitMode),
+                EzEnumJudgeMode.Malody_E or EzEnumJudgeMode.Malody_B => CreateMalodyHoldPerfect(judgeMode),
+                EzEnumJudgeMode.EZ2AC => CreateEz2AcHoldHeadPerfect(),
+                EzEnumJudgeMode.O2Jam => CreateO2HoldPerfect(),
+                EzEnumJudgeMode.IIDX_HD or EzEnumJudgeMode.LR2_HD or EzEnumJudgeMode.Raja_NM => createBmsHoldPerfect(judgeMode),
                 _ => CreateO2HoldPerfect(),
             };
         }
 
-        private static (Score score, IBeatmap beatmap, GameplayEnvironment environment) createBmsHoldPerfect(EzEnumHitMode hitMode)
+        private static (Score score, IBeatmap beatmap, GameplayEnvironment environment) createBmsHoldPerfect(EzEnumJudgeMode judgeMode)
         {
             const double head = 1500;
             const double tail = 4000;
@@ -544,10 +544,10 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 },
             };
 
-            var environment = hitMode switch
+            var environment = judgeMode switch
             {
-                EzEnumHitMode.LR2_HD => ReplayJudgeTestConfig.Create(EzEnumHitMode.LR2_HD, EzEnumHealthMode.LR2_HD, bmsPoorHitResultEnable: true),
-                EzEnumHitMode.Raja_NM => ReplayJudgeTestConfig.Create(EzEnumHitMode.Raja_NM, EzEnumHealthMode.Raja_HD, bmsPoorHitResultEnable: true),
+                EzEnumJudgeMode.LR2_HD => ReplayJudgeTestConfig.Create(EzEnumJudgeMode.LR2_HD, EzEnumHealthMode.LR2_HD, bmsPoorHitResultEnable: true),
+                EzEnumJudgeMode.Raja_NM => ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Raja_NM, EzEnumHealthMode.Raja_HD, bmsPoorHitResultEnable: true),
                 _ => createIidxEnvironment(),
             };
 
@@ -555,11 +555,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return (createScore(ruleset, replay), beatmap, environment);
         }
 
-        public static BmsJudge ToBmsJudge(HitResult result) => BmsHitModeJudgement.FromHitResult(result);
+        public static BmsJudge ToBmsJudge(HitResult result) => BmsJudgeModeJudgement.FromHitResult(result);
 
-        public static O2Judge ToO2Judge(HitResult result) => O2HitModeJudgement.FromHitResult(result);
+        public static O2Judge ToO2Judge(HitResult result) => O2JudgeModeJudgement.FromHitResult(result);
 
-        public static Ez2AcJudge ToEz2AcJudge(HitResult result) => Ez2AcHitModeJudgement.FromHitResult(result);
+        public static Ez2AcJudge ToEz2AcJudge(HitResult result) => Ez2AcJudgeModeJudgement.FromHitResult(result);
 
         public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateBmsEarlyKPoorPress()
         {
@@ -635,7 +635,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             frames.Add(new ManiaReplayFrame(pill_note_time + pillHitOffset, ManiaAction.Key1));
             frames.Add(new ManiaReplayFrame(pill_note_time + pillHitOffset + 50));
 
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal);
 
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             return (createScore(ruleset, new Replay { Frames = frames }), beatmap, environment);
@@ -647,11 +647,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateEz2AcHoldHeadGreatSoftened()
         {
             var ruleset = new ManiaRuleset();
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
 
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
 
-            double greatOffset = findFirstOffsetWithResult(EzEnumHitMode.EZ2AC, HitResult.Great);
+            double greatOffset = findFirstOffsetWithResult(EzEnumJudgeMode.EZ2AC, HitResult.Great);
 
             if (greatOffset == 0)
                 throw new InvalidOperationException("EZ2AC Great window not found for fixture");
@@ -683,9 +683,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return (createScore(ruleset, replay), beatmap, environment);
         }
 
-        private static double findFirstOffsetWithResult(EzEnumHitMode hitMode, HitResult desired)
+        private static double findFirstOffsetWithResult(EzEnumJudgeMode judgeMode, HitResult desired)
         {
-            var windows = new ManiaHitWindows(hitMode);
+            var windows = new ManiaHitWindows(judgeMode);
 
             for (double offset = 1; offset <= 250; offset++)
             {
@@ -701,9 +701,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
         private static double findO2PillConsumingOffset(double bpm)
         {
-            double goodRange = O2HitModeExtension.BASE_GOOD / bpm;
-            double badRange = O2HitModeExtension.BASE_BAD / bpm;
-            var windows = new ManiaHitWindows(EzEnumHitMode.O2Jam);
+            double goodRange = O2JudgeModeExtension.BASE_GOOD / bpm;
+            double badRange = O2JudgeModeExtension.BASE_BAD / bpm;
+            var windows = new ManiaHitWindows(EzEnumJudgeMode.O2Jam);
 
             for (double offset = goodRange + 1; offset <= badRange; offset++)
             {
@@ -716,9 +716,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
         private static double findBmsEarlyKPoorPressOffset()
         {
-            var windows = new ManiaHitWindows(EzEnumHitMode.IIDX_HD);
-            double badEarly = BmsHitModeJudgement.WindowFor(windows, BmsJudge.Bad, true);
-            double kPoorEarly = BmsHitModeJudgement.WindowFor(windows, BmsJudge.KPoor, true);
+            var windows = new ManiaHitWindows(EzEnumJudgeMode.IIDX_HD);
+            double badEarly = BmsJudgeModeJudgement.WindowFor(windows, BmsJudge.Bad, true);
+            double kPoorEarly = BmsJudgeModeJudgement.WindowFor(windows, BmsJudge.KPoor, true);
 
             if (kPoorEarly <= badEarly)
                 return 0;
@@ -727,9 +727,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         private static GameplayEnvironment createIidxEnvironment() => ReplayJudgeTestConfig.Create(
-            EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD, bmsPoorHitResultEnable: true);
+            EzEnumJudgeMode.IIDX_HD, EzEnumHealthMode.IIDX_HD, bmsPoorHitResultEnable: true);
 
-        private static GameplayEnvironment createMalodyEnvironment(EzEnumHitMode hitMode) => ReplayJudgeTestConfig.Create(hitMode, EzEnumHealthMode.Lazer);
+        private static GameplayEnvironment createMalodyEnvironment(EzEnumJudgeMode judgeMode) => ReplayJudgeTestConfig.Create(judgeMode, EzEnumHealthMode.Lazer);
 
         private static ControlPointInfo createTiming120()
         {

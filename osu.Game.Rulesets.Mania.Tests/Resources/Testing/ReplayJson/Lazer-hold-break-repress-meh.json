@@ -1,5 +1,5 @@
 {
-  "hitMode": "Lazer",
+  "judgeMode": "Lazer",
   "healthMode": "Lazer",
   "judgePrecedence": "Earliest",
   "columns": 4,

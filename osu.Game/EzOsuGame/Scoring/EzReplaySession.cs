@@ -149,7 +149,7 @@ namespace osu.Game.EzOsuGame.Scoring
             string scoreKey = $"hash:{score.ScoreInfo.Hash}|id:{score.ScoreInfo.ID}";
             string beatmapKey = $"hash:{beatmap.BeatmapInfo.Hash}|id:{beatmap.BeatmapInfo.ID}";
             string bmsPoorKey = environment.BmsPoorHitResultEnable.ToString();
-            string envKey = $"hm:{(int)environment.ManiaHitMode}|health:{(int)environment.ManiaHealthMode}|judge:{(int)environment.JudgePrecedence}|offset:{environment.OffsetPlusMania:F3}|offsetNM:{environment.OffsetPlusNonMania:F3}|osuTrack:{(int)environment.OsuJudgementTrack}|bmsPoor:{bmsPoorKey}|frameShift:{environment.ApplyInputOffsetViaReplayFrameShift}";
+            string envKey = $"judgeMode:{(int)environment.JudgeMode}|health:{(int)environment.HealthMode}|judge:{(int)environment.JudgePrecedence}|offset:{environment.OffsetPlusMania:F3}|offsetNM:{environment.OffsetPlusNonMania:F3}|bmsPoor:{bmsPoorKey}|frameShift:{environment.ApplyInputOffsetViaReplayFrameShift}";
 
             string raw = $"{purpose}|{scoreKey}|{beatmapKey}|{envKey}|rule:{score.ScoreInfo.Ruleset.OnlineID}";
             return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(raw)));

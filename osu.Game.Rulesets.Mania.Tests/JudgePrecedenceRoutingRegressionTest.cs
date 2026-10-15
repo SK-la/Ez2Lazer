@@ -13,18 +13,18 @@ namespace osu.Game.Rulesets.Mania.Tests
     [TestFixture]
     public class JudgePrecedenceRoutingRegressionTest
     {
-        [TestCase(EzEnumHitMode.Classic)]
-        [TestCase(EzEnumHitMode.EZ2AC)]
-        [TestCase(EzEnumHitMode.O2Jam)]
-        [TestCase(EzEnumHitMode.Malody_B)]
-        [TestCase(EzEnumHitMode.Malody_E)]
-        public void TestMissOnlyOverlapIsFilteredInNonBmsModes(EzEnumHitMode mode)
+        [TestCase(EzEnumJudgeMode.Classic)]
+        [TestCase(EzEnumJudgeMode.EZ2AC)]
+        [TestCase(EzEnumJudgeMode.O2Jam)]
+        [TestCase(EzEnumJudgeMode.Malody_B)]
+        [TestCase(EzEnumJudgeMode.Malody_E)]
+        public void TestMissOnlyOverlapIsFilteredInNonBmsModes(EzEnumJudgeMode mode)
         {
             // Dense pattern: two close notes and a very late press.
             // Earlier note is already outside user-triggered hit range (Result=None).
             // Later note is still hittable; precedence must never route to the None candidate.
             double[] noteTimes = new[] { 1000d, 1080d };
-            var helper = new HitModeHelper(mode)
+            var helper = new JudgeModeHelper(mode)
             {
                 OverallDifficulty = 5,
                 BPM = 180
@@ -43,18 +43,18 @@ namespace osu.Game.Rulesets.Mania.Tests
             double[] noteTimes = new[] { 1000d, 1080d };
             const double press_time = 1240d;
 
-            double? selected = selectJudgeableByPrecedence(noteTimes, press_time, EzEnumHitMode.Raja_NM, EzEnumJudgePrecedence.Duration);
+            double? selected = selectJudgeableByPrecedence(noteTimes, press_time, EzEnumJudgeMode.Raja_NM, EzEnumJudgePrecedence.Duration);
 
             Assert.That(selected, Is.Not.Null);
         }
 
-        [TestCase(EzEnumHitMode.Classic)]
-        [TestCase(EzEnumHitMode.EZ2AC)]
-        [TestCase(EzEnumHitMode.O2Jam)]
-        [TestCase(EzEnumHitMode.Malody_B)]
-        [TestCase(EzEnumHitMode.Malody_E)]
-        [TestCase(EzEnumHitMode.Raja_NM)]
-        public void TestSameTimestampReleaseThenPressStillRoutesToNearestJudgeable(EzEnumHitMode mode)
+        [TestCase(EzEnumJudgeMode.Classic)]
+        [TestCase(EzEnumJudgeMode.EZ2AC)]
+        [TestCase(EzEnumJudgeMode.O2Jam)]
+        [TestCase(EzEnumJudgeMode.Malody_B)]
+        [TestCase(EzEnumJudgeMode.Malody_E)]
+        [TestCase(EzEnumJudgeMode.Raja_NM)]
+        public void TestSameTimestampReleaseThenPressStillRoutesToNearestJudgeable(EzEnumJudgeMode mode)
         {
             // Simulate short-LN boundary scenario: after releasing at tail time, a press on the same timestamp
             // should route to the nearest still-judgeable object in dense spacing.
@@ -69,10 +69,10 @@ namespace osu.Game.Rulesets.Mania.Tests
         private static double? selectJudgeableByPrecedence(
             IEnumerable<double> noteTimes,
             double pressTime,
-            EzEnumHitMode mode,
+            EzEnumJudgeMode mode,
             EzEnumJudgePrecedence precedence)
         {
-            var helper = new HitModeHelper(mode)
+            var helper = new JudgeModeHelper(mode)
             {
                 OverallDifficulty = 5,
                 BPM = 180

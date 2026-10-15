@@ -86,14 +86,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             scoreProcessor.Mods.Value = resolvedMods;
 
             if (scoreProcessor is ManiaScoreProcessor maniaScoreProcessor)
-                maniaScoreProcessor.HitModeOverride = environment.ManiaHitMode;
+                maniaScoreProcessor.JudgeModeOverride = environment.JudgeMode;
 
             var simulationEnvironment = createSimulationEnvironment(environment);
 
-            // 副本由 ManiaReplaySessionService 经 ManiaSimulationBeatmapProvider 提供（每个 (谱面, mods, hitmode) 一份），
+            // 副本由 ManiaReplaySessionService 经 ManiaSimulationBeatmapProvider 提供（每个 (谱面, mods, JudgeMode) 一份），
             // 静态入口直接调用时用调用方实例；这里只负责绑定，且必须早于 ApplyBeatmap，
             // 否则 MaximumBaseScore 会按官方尾 Perfect 虚高。
-            ManiaBeatmapBinding.BindForSimulation(beatmap, simulationEnvironment.ManiaHitMode);
+            ManiaBeatmapBinding.BindForSimulation(beatmap, simulationEnvironment.JudgeMode);
 
             scoreProcessor.ApplyBeatmap(beatmap);
 
@@ -127,7 +127,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 // Zero frames: still need to generate all-miss HitEvents
                 // so that extended statistics can display.
                 var emptyPressTimes = new Dictionary<int, List<double>>();
-                applyForcedMisses(scoreProcessor, targets, emptyPressTimes, holdByHead, headByTail, simulationEnvironment.ManiaHitMode, gameplayRate, CancellationToken.None, recorder);
+                applyForcedMisses(scoreProcessor, targets, emptyPressTimes, holdByHead, headByTail, simulationEnvironment.JudgeMode, gameplayRate, CancellationToken.None, recorder);
                 scoreProcessor.PopulateScore(score.ScoreInfo);
 
                 return (scoreProcessor, recordTimeline ? new EzScoreTimeline(Array.Empty<EzScoreTimelineSnapshot>()) : null);
@@ -156,7 +156,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 recorder,
                 cancellationToken);
 
-            applyForcedMisses(scoreProcessor, targets, inputData.PressTimesByColumn, holdByHead, headByTail, simulationEnvironment.ManiaHitMode, gameplayRate, cancellationToken, recorder);
+            applyForcedMisses(scoreProcessor, targets, inputData.PressTimesByColumn, holdByHead, headByTail, simulationEnvironment.JudgeMode, gameplayRate, cancellationToken, recorder);
 
             return (scoreProcessor, recorder?.Build());
         }
@@ -168,8 +168,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             return new GameplayEnvironment
             {
-                ManiaHitMode = environment.ManiaHitMode,
-                ManiaHealthMode = environment.ManiaHealthMode,
+                JudgeMode = environment.JudgeMode,
+                HealthMode = environment.HealthMode,
                 JudgePrecedence = environment.JudgePrecedence,
                 OffsetPlusMania = 0,
                 BmsPoorHitResultEnable = environment.BmsPoorHitResultEnable,
@@ -191,7 +191,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             Dictionary<int, List<double>> pressTimesByColumn,
             Dictionary<HeadNote, HoldNote> holdByHead,
             Dictionary<TailNote, HeadNote> headByTail,
-            EzEnumHitMode hitMode,
+            EzEnumJudgeMode judgeMode,
             double gameplayRate,
             CancellationToken cancellationToken,
             ManiaReplayTimelineRecorder? recorder)
@@ -214,7 +214,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     ManiaReplaySessionSimulator.ResolveMissStoredOffset(state.Target, pressTimesByColumn),
                     missEventTime,
                     gameplayRate,
-                    hitMode,
+                    judgeMode,
                     recorder);
 
                 // For forced-missed tail notes, also apply HoldNote parent and Body

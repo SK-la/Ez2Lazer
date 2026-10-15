@@ -11,9 +11,9 @@ namespace osu.Game.EzOsuGame.Scoring
     /// </summary>
     public sealed record GameplayEnvironment : IGameplayEnvironment
     {
-        public EzEnumHitMode ManiaHitMode { get; init; }
+        public EzEnumJudgeMode JudgeMode { get; init; }
 
-        public EzEnumHealthMode ManiaHealthMode { get; init; }
+        public EzEnumHealthMode HealthMode { get; init; }
 
         public EzEnumJudgePrecedence JudgePrecedence { get; init; }
 
@@ -21,8 +21,6 @@ namespace osu.Game.EzOsuGame.Scoring
 
         /// <inheritdoc cref="IGameplayEnvironment.OffsetPlusNonMania"/>
         public double OffsetPlusNonMania { get; init; }
-
-        public EzEnumOsuJudgementTrack OsuJudgementTrack { get; init; }
 
         public bool BmsPoorHitResultEnable { get; init; }
 

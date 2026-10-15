@@ -26,7 +26,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TestLazerOverlappingJackSessionIsDeterministic(EzEnumJudgePrecedence precedence)
         {
             var (score, beatmap, environment) = JudgePrecedenceReplayFixtures.CreateOverlappingJack(
-                EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer, precedence);
+                EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer, precedence);
 
             var first = ManiaReplaySession.RunHitEvents(score, beatmap, environment);
             var second = ManiaReplaySession.RunHitEvents(score, beatmap, environment);
@@ -41,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TestIidxOverlappingJackSessionIsDeterministic(EzEnumJudgePrecedence precedence)
         {
             var (score, beatmap, environment) = JudgePrecedenceReplayFixtures.CreateOverlappingJack(
-                EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD, precedence);
+                EzEnumJudgeMode.IIDX_HD, EzEnumHealthMode.IIDX_HD, precedence);
 
             var first = ManiaReplaySession.RunHitEvents(score, beatmap, environment);
             var second = ManiaReplaySession.RunHitEvents(score, beatmap, environment);
@@ -54,10 +54,10 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TestComboAndDurationMayDifferOnOverlappingPress()
         {
             var (score, beatmap, _) = JudgePrecedenceReplayFixtures.CreateOverlappingJack(
-                EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer, EzEnumJudgePrecedence.Earliest);
+                EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer, EzEnumJudgePrecedence.Earliest);
 
-            var comboEnv = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer, EzEnumJudgePrecedence.Combo);
-            var durationEnv = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer, EzEnumJudgePrecedence.Duration);
+            var comboEnv = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer, EzEnumJudgePrecedence.Combo);
+            var durationEnv = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer, EzEnumJudgePrecedence.Duration);
 
             var comboEvents = ManiaReplaySession.RunHitEvents(score, beatmap, comboEnv);
             var durationEvents = ManiaReplaySession.RunHitEvents(score, beatmap, durationEnv);

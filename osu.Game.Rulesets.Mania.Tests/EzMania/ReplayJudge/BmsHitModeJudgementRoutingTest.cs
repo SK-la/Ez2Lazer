@@ -13,7 +13,7 @@ using osu.Game.Rulesets.Scoring;
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 {
     [TestFixture]
-    public class BmsHitModeJudgementRoutingTest
+    public class BmsJudgeModeJudgementRoutingTest
     {
         [Test]
         public void TestTryRoutePostBadKPoorAppliesKPoorWhenCloserThanUnjudged()
@@ -28,10 +28,10 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             };
 
             laneStates[0].Judged = true;
-            laneStates[0].Result = BmsHitModeJudgement.MapTo(BmsJudge.Bad);
+            laneStates[0].Result = BmsJudgeModeJudgement.MapTo(BmsJudge.Bad);
             laneStates[0].BmsRoute.CanRouteToKPoor = true;
 
-            var helper = new HitModeHelper(EzEnumHitMode.IIDX_HD)
+            var helper = new JudgeModeHelper(EzEnumJudgeMode.IIDX_HD)
             {
                 OverallDifficulty = 5,
                 BPM = 120,
@@ -39,7 +39,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             HitResult? routedResult = null;
 
-            bool routed = BmsHitModeJudgement.Instance.TryRoutePostBadKPoor(
+            bool routed = BmsJudgeModeJudgement.Instance.TryRoutePostBadKPoor(
                 laneStates,
                 new[] { laneStates[1] },
                 inputTime: 1180,
@@ -48,7 +48,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 (_, result) => routedResult = result);
 
             Assert.That(routed, Is.True);
-            Assert.That(routedResult, Is.EqualTo(BmsHitModeJudgement.MapTo(BmsJudge.KPoor)));
+            Assert.That(routedResult, Is.EqualTo(BmsJudgeModeJudgement.MapTo(BmsJudge.KPoor)));
             Assert.That(laneStates[0].BmsRoute.HasLateKPoor, Is.True);
             Assert.That(laneStates[0].BmsRoute.CanRouteToKPoor, Is.False);
         }

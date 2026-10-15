@@ -37,7 +37,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         public void TearDown()
         {
             GlobalConfigStore.EzConfig.SetValue(Ez2Setting.OffsetPlusMania, 0.0);
-            GlobalConfigStore.EzConfig.SetValue(Ez2Setting.ManiaHitMode, EzEnumHitMode.Lazer);
+            GlobalConfigStore.EzConfig.SetValue(Ez2Setting.ManiaJudgeMode, EzEnumJudgeMode.Lazer);
             GlobalConfigStore.EzConfig.SetValue(Ez2Setting.ManiaHealthMode, EzEnumHealthMode.Lazer);
         }
 
@@ -62,7 +62,7 @@ namespace osu.Game.Rulesets.Mania.Tests
 
             AddStep("setup base environment", () =>
             {
-                baseEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
+                baseEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer);
                 ReplayJudgeTestConfig.ApplyToGlobalConfig(baseEnvironment);
             });
 
@@ -110,7 +110,7 @@ namespace osu.Game.Rulesets.Mania.Tests
 
             AddStep("setup environment", () =>
             {
-                baseEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
+                baseEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer);
                 ReplayJudgeTestConfig.ApplyToGlobalConfig(baseEnvironment);
             });
 

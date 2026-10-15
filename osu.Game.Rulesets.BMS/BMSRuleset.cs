@@ -228,13 +228,13 @@ namespace osu.Game.Rulesets.BMS
 
         public override IEnumerable<HitResult> GetValidHitResults()
         {
-            return HitModeHelper.GetHitModeValidHitResults();
+            return JudgeModeHelper.GetJudgeModeValidHitResults();
         }
 
         public override LocalisableString GetDisplayNameForHitResult(HitResult result)
         {
-            // 获取对应 HitMode 的显示名称
-            return result.GetHitModeDisplayName();
+            // 获取对应 JudgeMode 的显示名称
+            return result.GetJudgeModeDisplayName();
         }
 
         public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap) => new[]
@@ -342,9 +342,9 @@ namespace osu.Game.Rulesets.BMS
             hitWindows.ClassicModActive = mods.Any(m => m is ManiaModClassic);
             hitWindows.BPM = beatmapInfo.BPM;
 
-            // 获取当前HitMode
-            var currentHitMode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-            bool isBMSMode = HitModeHelper.IsBMSHitMode(currentHitMode);
+            // 获取当前JudgeMode
+            var currentJudgeMode = GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
+            bool isBMSMode = JudgeModeHelper.IsBMSJudgeMode(currentJudgeMode);
 
             yield return new RulesetBeatmapAttribute(SongSelectStrings.Accuracy, @"OD", originalDifficulty.OverallDifficulty, adjustedDifficulty.OverallDifficulty, 10)
             {
@@ -374,7 +374,7 @@ namespace osu.Game.Rulesets.BMS
                                                   }
 
                                                   return new RulesetBeatmapAttribute.AdditionalMetric(
-                                                      $"{window.result.GetHitModeDisplayName().ToString().ToUpperInvariant()} hit window",
+                                                      $"{window.result.GetJudgeModeDisplayName().ToString().ToUpperInvariant()} hit window",
                                                       windowText,
                                                       colours.ForHitResult(window.result)
                                                   );

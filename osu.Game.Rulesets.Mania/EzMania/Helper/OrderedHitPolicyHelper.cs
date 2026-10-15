@@ -29,7 +29,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         /// 命中模式在本 helper 构造时（进图）取一次即固定：它决定 BMS 路由分支，
         /// 而模式设置只在进游戏前确认、局内不切换，所以不持 bindable、不订阅变更。
         /// </summary>
-        private readonly EzEnumHitMode hitMode;
+        private readonly EzEnumJudgeMode judgeMode;
 
         // 每判定复用同一批缓冲：候选与后判对象只在本次调用内有效，不去分配新的 List。
         private readonly List<PrecedenceCandidate> candidateBuffer = new List<PrecedenceCandidate>();
@@ -49,7 +49,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             var ezConfig1 = GlobalConfigStore.EzConfig;
 
             // 取普通值：同一按键里 isBMS() 要读一次，且该设置局内不变，无需为它常驻订阅。
-            hitMode = ezConfig1.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            judgeMode = ezConfig1.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
 
             // 取普通值：每次按键都要用，且该设置局内不变，无需为它常驻订阅。
             JudgePrecedence = ezConfig1.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence);
@@ -406,7 +406,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         }
 
         private bool isBMS()
-            => HitModeHelper.IsBMSHitMode(hitMode);
+            => JudgeModeHelper.IsBMSJudgeMode(judgeMode);
 
         public static DrawableHitObject? SelectFoldDrawable(IReadOnlyList<DrawableHitObject> sortedByStartTime, double pressTime, bool comboAlgorithm)
         {

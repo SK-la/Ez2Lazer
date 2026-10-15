@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
 {
     /// <summary>
     /// 验证 <see cref="EzScoreGraphMania"/> 核心逻辑：
-    /// - 判定行跟随当前 HitMode 有效集合（含 KPoor、ComboBreak）
+    /// - 判定行跟随当前 JudgeMode 有效集合（含 KPoor、ComboBreak）
     /// - Session 未就绪时 Now 列走 rejudge fallback
     /// - 判定计数按 HitResult 键映射，避免 idx 错位
     /// </summary>
@@ -42,7 +42,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         public void TestExtractDisplayCountsWithNullStatisticsReturnsEmpty()
         {
             var result = EzScoreGraphMania.ExtractDisplayCounts(
-                new Dictionary<HitResult, int>(), EzEnumHitMode.Lazer);
+                new Dictionary<HitResult, int>(), EzEnumJudgeMode.Lazer);
 
             Assert.That(result.Count, Is.EqualTo(0));
         }
@@ -59,7 +59,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
                 [HitResult.Miss] = 0,
             };
 
-            var result = EzScoreGraphMania.ExtractDisplayCounts(emptyStats, EzEnumHitMode.Lazer);
+            var result = EzScoreGraphMania.ExtractDisplayCounts(emptyStats, EzEnumJudgeMode.Lazer);
 
             Assert.That(result.Count, Is.EqualTo(0));
         }
@@ -72,13 +72,13 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         public void TestExtractDisplayCountsMatchesSessionStatisticsTotal()
         {
             var (score, beatmap, _) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
-            var env = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
+            var env = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(env);
 
             var sessionScore = ManiaReplaySession.Run(score.DeepClone(), beatmap, env);
             var statistics = sessionScore.ScoreInfo.Statistics;
 
-            var extracted = EzScoreGraphMania.ExtractDisplayCounts(statistics, EzEnumHitMode.Lazer);
+            var extracted = EzScoreGraphMania.ExtractDisplayCounts(statistics, EzEnumJudgeMode.Lazer);
             int extractedTotal = extracted.Values.Sum();
 
             // 过滤后总计数应等于 session 产出的所有有效判定总数
@@ -92,67 +92,67 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         }
 
         /// <summary>
-        /// 测试 B'：不同 HitMode 提取的计数映射到不同的判定集合。
+        /// 测试 B'：不同 JudgeMode 提取的计数映射到不同的判定集合。
         /// </summary>
         [Test]
-        public void TestExtractDisplayCountsDiffersBetweenHitModes()
+        public void TestExtractDisplayCountsDiffersBetweenJudgeModes()
         {
-            var (score, beatmap, _) = HitModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
+            var (score, beatmap, _) = JudgeModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
 
-            var lazerEnv = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
-            var bmsEnv = ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD, bmsPoorHitResultEnable: true);
+            var lazerEnv = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer);
+            var bmsEnv = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.IIDX_HD, EzEnumHealthMode.IIDX_HD, bmsPoorHitResultEnable: true);
 
             var lazerSession = ManiaReplaySession.Run(score.DeepClone(), beatmap, lazerEnv);
             var bmsSession = ManiaReplaySession.Run(score.DeepClone(), beatmap, bmsEnv);
 
-            var lazerCounts = EzScoreGraphMania.ExtractDisplayCounts(lazerSession.ScoreInfo.Statistics, EzEnumHitMode.Lazer);
-            var bmsCounts = EzScoreGraphMania.ExtractDisplayCounts(bmsSession.ScoreInfo.Statistics, EzEnumHitMode.IIDX_HD);
+            var lazerCounts = EzScoreGraphMania.ExtractDisplayCounts(lazerSession.ScoreInfo.Statistics, EzEnumJudgeMode.Lazer);
+            var bmsCounts = EzScoreGraphMania.ExtractDisplayCounts(bmsSession.ScoreInfo.Statistics, EzEnumJudgeMode.IIDX_HD);
 
             Assert.That(lazerCounts, Is.Not.EqualTo(bmsCounts),
-                "不同 HitMode 的 session 结果应映射到不同计数");
+                "不同 JudgeMode 的 session 结果应映射到不同计数");
         }
 
         /// <summary>
-        /// 测试 C：验证切换 HitMode 后重新运行 Session，Now 数据应反映新的 HitMode。
-        /// 由于 fixture 完美时机（offset=0）各 HitMode 都判 Perfect，
-        /// 此处验证 ExtractDisplayCounts 对各 HitMode 返回正确的有效结果集合。
+        /// 测试 C：验证切换 JudgeMode 后重新运行 Session，Now 数据应反映新的 JudgeMode。
+        /// 由于 fixture 完美时机（offset=0）各 JudgeMode 都判 Perfect，
+        /// 此处验证 ExtractDisplayCounts 对各 JudgeMode 返回正确的有效结果集合。
         /// </summary>
         [Test]
-        public void TestExtractDisplayCountsReturnsCorrectResultsPerHitMode()
+        public void TestExtractDisplayCountsReturnsCorrectResultsPerJudgeMode()
         {
-            var (score, beatmap, _) = HitModeReplayFixtures.CreateEz2AcManyNoteTap(noteCount: 10);
+            var (score, beatmap, _) = JudgeModeReplayFixtures.CreateEz2AcManyNoteTap(noteCount: 10);
 
             // 初始 Lazer Session
-            var lazerEnv = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
+            var lazerEnv = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(lazerEnv);
             var lazerSession = ManiaReplaySession.Run(score.DeepClone(), beatmap, lazerEnv);
 
             // 切到 EZ2AC Session
-            var ez2AcEnv = ReplayJudgeTestConfig.Create(EzEnumHitMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
+            var ez2AcEnv = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(ez2AcEnv);
             var ez2AcSession = ManiaReplaySession.Run(score.DeepClone(), beatmap, ez2AcEnv);
 
             // 完美时机时两模式结果相同（都是 Perfect），验证过滤结果有效
-            var lazerCounts = EzScoreGraphMania.ExtractDisplayCounts(lazerSession.ScoreInfo.Statistics, EzEnumHitMode.Lazer);
-            var ez2AcCounts = EzScoreGraphMania.ExtractDisplayCounts(ez2AcSession.ScoreInfo.Statistics, EzEnumHitMode.EZ2AC);
+            var lazerCounts = EzScoreGraphMania.ExtractDisplayCounts(lazerSession.ScoreInfo.Statistics, EzEnumJudgeMode.Lazer);
+            var ez2AcCounts = EzScoreGraphMania.ExtractDisplayCounts(ez2AcSession.ScoreInfo.Statistics, EzEnumJudgeMode.EZ2AC);
 
             // 两模式总计数相同（因为 fixture 完美时机），但有效结果集不同（EZ2AC 额外有 Kool 等）
             Assert.That(lazerCounts.Values.Sum(), Is.EqualTo(10), "完美时机 Lazer 应有 10 个有效判定");
             Assert.That(ez2AcCounts.Values.Sum(), Is.EqualTo(10), "完美时机 EZ2AC 应有 10 个有效判定");
 
-            // 验证 ExtractDisplayCounts 对不同 HitMode 返回不同键集合（EZ2AC 有额外判定类型）
+            // 验证 ExtractDisplayCounts 对不同 JudgeMode 返回不同键集合（EZ2AC 有额外判定类型）
             Assert.That(ez2AcCounts.Keys, Is.SupersetOf(lazerCounts.Keys),
                 "EZ2AC 有效结果集应包含 Lazer 的所有结果");
         }
 
         /// <summary>
-        /// 测试 E：验证切换到 O2Jam HitMode 时 BPM 同步对判定结果有影响。
+        /// 测试 E：验证切换到 O2Jam JudgeMode 时 BPM 同步对判定结果有影响。
         /// BPM 越高窗口越窄，同一 offset 偏移在高 BPM 下判定更差。
         /// </summary>
         [Test]
         public void TestO2JamBpmSyncAffectsJudgement()
         {
-            var env = ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
+            var env = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.O2Jam, EzEnumHealthMode.O2JamNormal);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(env);
 
             // 使用固定偏移（25ms）在不同 BPM 下验证
@@ -174,7 +174,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         [Test]
         public void TestGetOrderedStatHitResultsForBmsIncludesKpoorAndComboBreak()
         {
-            var results = EzScoreGraphMania.GetOrderedStatHitResults(EzEnumHitMode.IIDX_HD);
+            var results = EzScoreGraphMania.GetOrderedStatHitResults(EzEnumJudgeMode.IIDX_HD);
 
             Assert.That(results, Does.Contain(HitResult.Meh));
             Assert.That(results, Does.Contain(HitResult.Miss));
@@ -187,11 +187,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         [Test]
         public void TestBmsExtractDisplayCountsSeparatesBadAndKpoor()
         {
-            var (score, beatmap, _) = HitModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
-            var bmsEnv = ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD, bmsPoorHitResultEnable: true);
+            var (score, beatmap, _) = JudgeModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
+            var bmsEnv = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.IIDX_HD, EzEnumHealthMode.IIDX_HD, bmsPoorHitResultEnable: true);
 
             var bmsSession = ManiaReplaySession.Run(score.DeepClone(), beatmap, bmsEnv);
-            var counts = EzScoreGraphMania.ExtractDisplayCounts(bmsSession.ScoreInfo.Statistics, EzEnumHitMode.IIDX_HD);
+            var counts = EzScoreGraphMania.ExtractDisplayCounts(bmsSession.ScoreInfo.Statistics, EzEnumJudgeMode.IIDX_HD);
 
             Assert.That(counts.GetValueOrDefault(HitResult.Meh, 0), Is.GreaterThan(0), "Bad(Meh) 应单独计数");
             Assert.That(counts.GetValueOrDefault(HitResult.Poor, 0), Is.GreaterThan(0), "KPoor(Poor) 应单独计数");
@@ -202,7 +202,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         [Test]
         public void TestJudgementStatMappingUsesHitResultNotIndex()
         {
-            const EzEnumHitMode hit_mode = EzEnumHitMode.IIDX_HD;
+            const EzEnumJudgeMode hit_mode = EzEnumJudgeMode.IIDX_HD;
             var nowCounts = new Dictionary<HitResult, int>
             {
                 [HitResult.Perfect] = 1,

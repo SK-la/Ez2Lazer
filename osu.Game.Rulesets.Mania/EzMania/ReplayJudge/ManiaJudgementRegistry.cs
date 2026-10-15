@@ -10,35 +10,35 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 {
     public static class ManiaJudgementRegistry
     {
-        public static IManiaHitModeJudgement? GetHitModeJudgement(EzEnumHitMode hitMode)
-            => hitMode switch
+        public static IManiaJudgeModeJudgement? GetJudgeModeJudgement(EzEnumJudgeMode judgeMode)
+            => judgeMode switch
             {
-                EzEnumHitMode.IIDX_HD or EzEnumHitMode.LR2_HD or EzEnumHitMode.Raja_NM => BmsHitModeJudgement.Instance,
-                EzEnumHitMode.O2Jam => O2HitModeJudgement.Instance,
-                EzEnumHitMode.EZ2AC => Ez2AcHitModeJudgement.Instance,
-                EzEnumHitMode.Malody_E or EzEnumHitMode.Malody_B => MalodyHitModeJudgement.Instance,
+                EzEnumJudgeMode.IIDX_HD or EzEnumJudgeMode.LR2_HD or EzEnumJudgeMode.Raja_NM => BmsJudgeModeJudgement.Instance,
+                EzEnumJudgeMode.O2Jam => O2JudgeModeJudgement.Instance,
+                EzEnumJudgeMode.EZ2AC => Ez2AcJudgeModeJudgement.Instance,
+                EzEnumJudgeMode.Malody_E or EzEnumJudgeMode.Malody_B => MalodyJudgeModeJudgement.Instance,
                 _ => null,
             };
 
         public static IManiaNoteJudgementStrategy GetNoteStrategy(IGameplayEnvironment environment)
         {
-            var hitMode = GetHitModeJudgement(environment.ManiaHitMode);
-            if (hitMode != null)
-                return hitMode;
+            var judgeMode = GetJudgeModeJudgement(environment.JudgeMode);
+            if (judgeMode != null)
+                return judgeMode;
 
             return LazerNoteJudgementReplica.Instance;
         }
 
         public static IManiaHoldJudgementStrategy GetHoldStrategy(IGameplayEnvironment environment)
         {
-            var hitMode = GetHitModeJudgement(environment.ManiaHitMode);
-            if (hitMode != null)
-                return hitMode;
+            var judgeMode = GetJudgeModeJudgement(environment.JudgeMode);
+            if (judgeMode != null)
+                return judgeMode;
 
             return CommonHoldJudgementStrategy.Instance;
         }
 
-        public static bool IsEzHitMode(EzEnumHitMode hitMode)
-            => hitMode is not (EzEnumHitMode.Lazer or EzEnumHitMode.Classic);
+        public static bool IsEzJudgeMode(EzEnumJudgeMode judgeMode)
+            => judgeMode is not (EzEnumJudgeMode.Lazer or EzEnumJudgeMode.Classic);
     }
 }

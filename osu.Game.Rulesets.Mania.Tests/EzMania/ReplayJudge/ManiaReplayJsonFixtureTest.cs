@@ -62,7 +62,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var (env2, columns2, hitObjects2, frames2, score2) = ManiaReplayJsonFixture.ToParts(document);
 
             Assert.That(columns, Is.EqualTo(columns2));
-            Assert.That(environment.ManiaHitMode, Is.EqualTo(env2.ManiaHitMode));
+            Assert.That(environment.JudgeMode, Is.EqualTo(env2.JudgeMode));
             Assert.That(hitObjects, Has.Count.EqualTo(hitObjects2.Count));
             Assert.That(score.Replay.Frames, Has.Count.EqualTo(score2.Replay.Frames.Count));
             Assert.That(score.Replay.Frames, Has.Count.EqualTo(frames2.Count));
@@ -102,7 +102,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             Assert.That(document.BeatmapResource, Is.EqualTo(expectedBeatmapResource));
             Assert.That(document.FrameSource, Is.EqualTo("osr-decoded"));
             Assert.That(document.Frames, Has.Count.GreaterThan(100));
-            Assert.That(document.HitMode, Is.EqualTo(nameof(EzEnumHitMode.Lazer)));
+            Assert.That(document.JudgeMode, Is.EqualTo(nameof(EzEnumJudgeMode.Lazer)));
         }
 
         private static void runSessionFromAuditJson(string jsonResource)
@@ -125,7 +125,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             int columns = maniaBeatmap?.TotalColumns
                           ?? playable.HitObjects.OfType<IHasColumn>().Select(h => h.Column).DefaultIfEmpty(0).Max() + 1;
 
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer);
             var document = ManiaReplayJsonFixture.FromParts(
                 environment,
                 columns,

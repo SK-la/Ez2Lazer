@@ -25,7 +25,7 @@ namespace osu.Game.Scoring
             Dictionary<HitResult, int>? statistics = null;
             Dictionary<HitResult, int>? maximumStatistics = null;
             List<HitEvent>? hitEvents = null;
-            int? maniaHitMode = null;
+            int? maniaJudgeMode = null;
             int? maniaHealthMode = null;
 
             Realm.Write(realm =>
@@ -43,8 +43,8 @@ namespace osu.Game.Scoring
                 statistics = managed.Statistics.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
                 maximumStatistics = managed.MaximumStatistics.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
                 hitEvents = managed.HitEvents.ToList();
-                maniaHitMode = managed.ManiaHitMode;
-                maniaHealthMode = managed.ManiaHealthMode;
+                maniaJudgeMode = managed.JudgeMode;
+                maniaHealthMode = managed.HealthMode;
             });
 
             if (accuracy == null)
@@ -66,8 +66,8 @@ namespace osu.Game.Scoring
             foreach (var kvp in maximumStatistics!)
                 scoreInfo.MaximumStatistics[kvp.Key] = kvp.Value;
 
-            scoreInfo.ManiaHitMode = maniaHitMode!.Value;
-            scoreInfo.ManiaHealthMode = maniaHealthMode!.Value;
+            scoreInfo.JudgeMode = maniaJudgeMode!.Value;
+            scoreInfo.HealthMode = maniaHealthMode!.Value;
             scoreInfo.EzBonus = sessionInfo.EzBonus;
 
             if (scoreInfo.OnlineID > 0 || scoreInfo.LegacyOnlineID > 0)
@@ -97,8 +97,8 @@ namespace osu.Game.Scoring
 
             if (purpose == ReplayRunPurpose.ForLive)
             {
-                scoreInfo.ManiaHitMode = (int)environment.ManiaHitMode;
-                scoreInfo.ManiaHealthMode = (int)environment.ManiaHealthMode;
+                scoreInfo.JudgeMode = (int)environment.JudgeMode;
+                scoreInfo.HealthMode = (int)environment.HealthMode;
             }
 
             if (scoreInfo.OnlineID > 0 || scoreInfo.LegacyOnlineID > 0)

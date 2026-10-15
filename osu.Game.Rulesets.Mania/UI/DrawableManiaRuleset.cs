@@ -98,16 +98,16 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved(canBeNull: true)]
         private GameplayState? gameplayState { get; set; }
 
-        private readonly Bindable<EzEnumHitMode> hitModeBindable = new Bindable<EzEnumHitMode>();
-        private EzEnumHitMode gameplayHitMode;
-        private bool suppressHitModeRevert;
+        private readonly Bindable<EzEnumJudgeMode> judgeModeBindable = new Bindable<EzEnumJudgeMode>();
+        private EzEnumJudgeMode gameplayJudgeMode;
+        private bool suppressJudgeModeRevert;
 
-        int IManiaGameplayModeSnapshot.HitMode => (int)gameplayHitMode;
+        int IManiaGameplayModeSnapshot.JudgeMode => (int)gameplayJudgeMode;
 
         // 以本局冻结环境为准，而不是某个 ManiaHealthProcessor 实例：BMS 复用本 Drawable 但用的是
         // BMSNoFailHealthProcessor，没有 Ez 血量模式，读处理器实例会把 BMS 记成 Lazer（旧实现更糟：
         // 读 ManiaHealthProcessor 的 static，记的是上一局 Mania 的遗留值）。
-        int IManiaGameplayModeSnapshot.HealthMode => (int)(JudgementRound?.Environment.ManiaHealthMode ?? EzEnumHealthMode.Lazer);
+        int IManiaGameplayModeSnapshot.HealthMode => (int)(JudgementRound?.Environment.HealthMode ?? EzEnumHealthMode.Lazer);
 
         /// <summary>
         /// 列级按键输入由 <see cref="UI.Column"/> 路由到单一 press 目标（C2 COLUMN-INPUT）。
@@ -218,7 +218,7 @@ namespace osu.Game.Rulesets.Mania.UI
             touchOverlay.BindValueChanged(_ => updateMobileLayout(), true);
 
             ezConfig.BindWith(Ez2Setting.ManiaBarLinesBool, barLinesBindable);
-            ezConfig.BindWith(Ez2Setting.ManiaHitMode, hitModeBindable);
+            ezConfig.BindWith(Ez2Setting.ManiaJudgeMode, judgeModeBindable);
 
             // 进局快照：不 Bindable。档位（含 0）和动态开关局内都不跟随设置变更。
             HoldTailMaskLevel = ezConfig.Get<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight);
@@ -236,45 +236,45 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             base.LoadComplete();
 
-            gameplayHitMode = hitModeBindable.Value;
+            gameplayJudgeMode = judgeModeBindable.Value;
 
             JudgementRound = ManiaJudgementRound.Create(
-                ezConfig.ResolveEnvironment(ReplayRunPurpose.ForLive, ReplayScore?.ScoreInfo, ignoreOffset: ReplayScore != null),
+                ezConfig.ResolveEnvironment(ReplayRunPurpose.ForLive, ReplayScore?.ScoreInfo, ignoreOffset: ReplayScore != null, ruleset: Ruleset.RulesetInfo),
                 Beatmap);
-            // 本局实例的 hitmode 绑定。仿真一律在 ManiaSimulationBeatmapProvider 产出的独立副本上绑定
+            // 本局实例的 JudgeMode 绑定。仿真一律在 ManiaSimulationBeatmapProvider 产出的独立副本上绑定
             // （见 ManiaReplaySessionService），所以这里不再需要「本局实例」登记。
             ManiaBeatmapBinding.BindForLive(Beatmap, JudgementRound.Environment);
 
-            hitModeBindable.BindValueChanged(h =>
+            judgeModeBindable.BindValueChanged(h =>
             {
-                // 仅在“本局本地游玩尚未完成”期间锁定 HitMode，避免中途更改破坏一致性。
+                // 仅在“本局本地游玩尚未完成”期间锁定 JudgeMode，避免中途更改破坏一致性。
                 // 结算/回放/分析等非活跃本地游玩场景应允许改动，不要回退全局设置值。
-                bool lockHitModeForThisSession = ReplayScore == null && gameplayState?.HasCompleted == false;
+                bool lockJudgeModeForThisSession = ReplayScore == null && gameplayState?.HasCompleted == false;
 
                 // 游戏中途修改判定模式将回退到开局时的设置
-                if (lockHitModeForThisSession && h.NewValue != gameplayHitMode)
+                if (lockJudgeModeForThisSession && h.NewValue != gameplayJudgeMode)
                 {
-                    if (suppressHitModeRevert)
+                    if (suppressJudgeModeRevert)
                         return;
 
-                    suppressHitModeRevert = true;
+                    suppressJudgeModeRevert = true;
 
                     try
                     {
-                        hitModeBindable.Value = gameplayHitMode;
+                        judgeModeBindable.Value = gameplayJudgeMode;
                     }
                     finally
                     {
-                        suppressHitModeRevert = false;
+                        suppressJudgeModeRevert = false;
                     }
 
                     return;
                 }
 
-                O2HitModeExtension.PILL_COUNT.Value = 0;
+                O2JudgeModeExtension.PILL_COUNT.Value = 0;
 
-                if (h.NewValue == EzEnumHitMode.O2Jam)
-                    O2HitModeExtension.InitializeRuntime(Beatmap, resetPillCount: false);
+                if (h.NewValue == EzEnumJudgeMode.O2Jam)
+                    O2JudgeModeExtension.InitializeRuntime(Beatmap, resetPillCount: false);
             }, true);
             barLinesBindable.BindValueChanged(b =>
             {

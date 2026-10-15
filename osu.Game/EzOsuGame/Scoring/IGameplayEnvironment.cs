@@ -11,9 +11,12 @@ namespace osu.Game.EzOsuGame.Scoring
     /// </summary>
     public interface IGameplayEnvironment
     {
-        EzEnumHitMode ManiaHitMode { get; }
+        /// <summary>
+        /// 本局判定轨（通用）。按规则集解析：Mania/BMS 取 Mania 档、Osu 取判定轨，其余规则集默认 <see cref="EzEnumJudgeMode.Lazer"/>。
+        /// </summary>
+        EzEnumJudgeMode JudgeMode { get; }
 
-        EzEnumHealthMode ManiaHealthMode { get; }
+        EzEnumHealthMode HealthMode { get; }
 
         EzEnumJudgePrecedence JudgePrecedence { get; }
 
@@ -24,9 +27,6 @@ namespace osu.Game.EzOsuGame.Scoring
         /// replay Session：ForStored / ignoreOffset 解析为 0；<b>不得</b>再叠进 ResultFor/接盘判窗（帧已是有效时刻，见 REGISTRY §1.7b Offset 原则）。
         /// </summary>
         double OffsetPlusNonMania { get; }
-
-        /// <summary>Osu 判定轨；非 Osu 规则集可忽略（默认 Lazer）。</summary>
-        EzEnumOsuJudgementTrack OsuJudgementTrack { get; }
 
         bool BmsPoorHitResultEnable { get; }
 

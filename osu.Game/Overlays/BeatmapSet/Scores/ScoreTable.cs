@@ -106,7 +106,7 @@ namespace osu.Game.Overlays.BeatmapSet.Scores
 
             var ruleset = scores.First().Ruleset.CreateInstance();
 
-            // [Ez] 逐份按成绩自身嵌入的 HitMode 解析后取并集：这套成绩可能来自不同游玩环境
+            // [Ez] 逐份按成绩自身嵌入的 JudgeMode 解析后取并集：这套成绩可能来自不同游玩环境
             // （例如同谱面的 Lazer 成绩 + BMS 成绩），只看当前全局设置会把 KPoor 列整列丢掉。
             foreach (var resultGroup in ruleset.GetHitResultsForDisplay(scores).GroupBy(r => r.displayName))
             {

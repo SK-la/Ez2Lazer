@@ -20,7 +20,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
     {
         public GameplayEnvironment Environment { get; }
 
-        public IManiaHitModeJudgement? Strategy { get; }
+        public IManiaJudgeModeJudgement? Strategy { get; }
 
         public bool PoorEnabled { get; }
 
@@ -38,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         private ManiaJudgementRound(
             GameplayEnvironment environment,
-            IManiaHitModeJudgement? strategy,
+            IManiaJudgeModeJudgement? strategy,
             bool poorEnabled,
             bool pillModeEnabled,
             ManiaReplayJudgementState mutableState,
@@ -50,15 +50,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             PillModeEnabled = pillModeEnabled;
             JudgePrecedence = environment.JudgePrecedence;
             MutableState = mutableState;
-            IsO2Jam = environment.ManiaHitMode == EzEnumHitMode.O2Jam;
+            IsO2Jam = environment.JudgeMode == EzEnumJudgeMode.O2Jam;
             this.beatmap = beatmap;
         }
 
         public static ManiaJudgementRound Create(GameplayEnvironment environment, IBeatmap? beatmap = null)
         {
-            var strategy = ManiaJudgementRegistry.GetHitModeJudgement(environment.ManiaHitMode);
-            bool poorEnabled = HealthModeHelper.ComputeKPoorEnabled(environment.ManiaHealthMode, environment.BmsPoorHitResultEnable);
-            bool pillModeEnabled = environment.ManiaHealthMode.ToString().Contains("O2Jam");
+            var strategy = ManiaJudgementRegistry.GetJudgeModeJudgement(environment.JudgeMode);
+            bool poorEnabled = HealthModeHelper.ComputeKPoorEnabled(environment.HealthMode, environment.BmsPoorHitResultEnable);
+            bool pillModeEnabled = environment.HealthMode.ToString().Contains("O2Jam");
 
             return new ManiaJudgementRound(
                 environment,
@@ -69,7 +69,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 beatmap);
         }
 
-        public bool IsEzHitMode => ManiaJudgementRegistry.IsEzHitMode(Environment.ManiaHitMode);
+        public bool IsEzJudgeMode => ManiaJudgementRegistry.IsEzJudgeMode(Environment.JudgeMode);
 
         /// <summary>
         /// 列级按键：缓存本按 press-time BPM（O2 每输入至多查表一次）。
@@ -102,10 +102,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         private double resolveO2Bpm(double time)
         {
             if (beatmap != null)
-                return O2HitModeExtension.SafeBpm(beatmap.ControlPointInfo.TimingPointAt(time).BPM);
+                return O2JudgeModeExtension.SafeBpm(beatmap.ControlPointInfo.TimingPointAt(time).BPM);
 
             // Detached compatibility only. Live and Session always provide their beatmap.
-            return O2HitModeExtension.GetBPMAtTime(time);
+            return O2JudgeModeExtension.GetBPMAtTime(time);
         }
     }
 }

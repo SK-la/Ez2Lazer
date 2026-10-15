@@ -158,7 +158,7 @@ namespace osu.Game.Screens.Ranking.Expanded
                                         Scale = new Vector2(0.5f),
                                         Current = { Value = score.Mods }
                                     },
-                                    EzManiaScoreModeExtensions.CreateDisplayDrawable(score, anchor: Anchor.CentreLeft)
+                                    EzScoreInfoExtensions.CreateDisplayDrawable(score, anchor: Anchor.CentreLeft)
                                 }
                             },
                             new FillFlowContainer

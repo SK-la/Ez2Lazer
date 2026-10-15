@@ -11,17 +11,17 @@ namespace osu.Game.EzOsuGame.Extensions
     public static class HitResultExtensions
     {
         /// <summary>
-        /// 获取指定 HitResult 在当前 HitMode 下的显示名称。
+        /// 获取指定 HitResult 在当前 JudgeMode 下的显示名称。
         /// </summary>
-        public static LocalisableString GetHitModeDisplayName(this HitResult result)
-            => result.GetHitModeDisplayName(GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode));
+        public static LocalisableString GetJudgeModeDisplayName(this HitResult result)
+            => result.GetJudgeModeDisplayName(GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode));
 
         /// <summary>
-        /// 获取指定 HitResult 在给定 HitMode 下的显示名称。
+        /// 获取指定 HitResult 在给定 JudgeMode 下的显示名称。
         /// </summary>
-        public static LocalisableString GetHitModeDisplayName(this HitResult result, EzEnumHitMode hitMode)
+        public static LocalisableString GetJudgeModeDisplayName(this HitResult result, EzEnumJudgeMode judgeMode)
         {
-            string displayName = getDisplayNameForMode(result, hitMode);
+            string displayName = getDisplayNameForMode(result, judgeMode);
 
             if (string.IsNullOrEmpty(displayName))
                 return result.GetLocalisableDescription();
@@ -29,29 +29,29 @@ namespace osu.Game.EzOsuGame.Extensions
             return displayName;
         }
 
-        private static string getDisplayNameForMode(HitResult result, EzEnumHitMode hitMode)
+        private static string getDisplayNameForMode(HitResult result, EzEnumJudgeMode judgeMode)
         {
-            switch (hitMode)
+            switch (judgeMode)
             {
-                case EzEnumHitMode.Lazer:
-                case EzEnumHitMode.Classic:
+                case EzEnumJudgeMode.Lazer:
+                case EzEnumJudgeMode.Classic:
                     // Lazer 和 Classic 使用默认名称
                     return string.Empty;
 
-                case EzEnumHitMode.O2Jam:
+                case EzEnumJudgeMode.O2Jam:
                     return getO2JamDisplayName(result);
 
-                case EzEnumHitMode.EZ2AC:
+                case EzEnumJudgeMode.EZ2AC:
                     return getEZ2ACDisplayName(result);
 
-                case EzEnumHitMode.IIDX_HD:
-                case EzEnumHitMode.LR2_HD:
-                case EzEnumHitMode.Raja_NM:
+                case EzEnumJudgeMode.IIDX_HD:
+                case EzEnumJudgeMode.LR2_HD:
+                case EzEnumJudgeMode.Raja_NM:
                     // BMS 系列使用相同的命名
                     return getBMSDisplayName(result);
 
-                case EzEnumHitMode.Malody_E:
-                case EzEnumHitMode.Malody_B:
+                case EzEnumJudgeMode.Malody_E:
+                case EzEnumJudgeMode.Malody_B:
                     // Malody 使用相同的命名
                     return getMalodyDisplayName(result);
 

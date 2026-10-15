@@ -44,7 +44,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         private double cachedEarliestEffectiveTime = double.NaN;
         private long cachedEarliestEffectiveGeneration = -1;
 
-        private HitModeHelper? missWindowHelper;
+        private JudgeModeHelper? missWindowHelper;
         private double cachedMaxMissEarly;
         private double cachedMaxMissLate;
         private bool overlapSearchBoundsValid;
@@ -400,11 +400,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         public bool IsHittableEarliestIndex(int index, double time)
             => ManiaLanePressSelector.IsHittableEarliest(entries, index, time, static e => e.IsPressJudged, static e => e.StartTime);
 
-        public void ConfigureMissCollection(EzEnumHitMode hitMode, double overallDifficulty, double bpm = 180)
+        public void ConfigureMissCollection(EzEnumJudgeMode judgeMode, double overallDifficulty, double bpm = 180)
         {
-            IsBmsMode = HitModeHelper.IsBMSHitMode(hitMode);
+            IsBmsMode = JudgeModeHelper.IsBMSJudgeMode(judgeMode);
 
-            missWindowHelper = new HitModeHelper(hitMode)
+            missWindowHelper = new JudgeModeHelper(judgeMode)
             {
                 OverallDifficulty = overallDifficulty,
                 BPM = bpm,
@@ -539,7 +539,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 cachedMaxMissLate = missWindowHelper.WindowFor(HitResult.Miss, false);
 
                 if (IsBmsMode)
-                    BmsHitModeJudgement.ExpandMissCollectionWindows(missWindowHelper, 1, ref cachedMaxMissEarly, ref cachedMaxMissLate);
+                    BmsJudgeModeJudgement.ExpandMissCollectionWindows(missWindowHelper, 1, ref cachedMaxMissEarly, ref cachedMaxMissLate);
             }
             else
             {
@@ -625,7 +625,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             late = entry.PressWindows.WindowFor(HitResult.Miss, false);
 
             if (IsBmsMode && missWindowHelper != null)
-                BmsHitModeJudgement.ExpandMissCollectionWindows(missWindowHelper, 1, ref early, ref late);
+                BmsJudgeModeJudgement.ExpandMissCollectionWindows(missWindowHelper, 1, ref early, ref late);
         }
 
         private static bool isPostBadKPoorRoutable(ManiaLaneEntry entry)
@@ -775,7 +775,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         public ManiaHitWindows? PressWindows { get; }
 
-        public BmsHitModeJudgement.BmsRouteState BmsRoute { get; } = new BmsHitModeJudgement.BmsRouteState();
+        public BmsJudgeModeJudgement.BmsRouteState BmsRoute { get; } = new BmsJudgeModeJudgement.BmsRouteState();
 
         public bool IsJudged => Drawable.Judged;
 

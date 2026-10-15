@@ -150,7 +150,7 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
             IBeatmap first = EzPlayableBeatmapCache.GetBound(working, ruleset, mods, 1, static _ => { });
             IBeatmap second = EzPlayableBeatmapCache.GetBound(working, ruleset, mods, 2, static _ => { });
 
-            Assert.That(second, Is.Not.SameAs(first), "两个 hitmode 不能落在同一份就地绑定的实例上");
+            Assert.That(second, Is.Not.SameAs(first), "两个 JudgeMode 不能落在同一份就地绑定的实例上");
             Assert.That(working.Conversions, Is.EqualTo(2));
         }
 

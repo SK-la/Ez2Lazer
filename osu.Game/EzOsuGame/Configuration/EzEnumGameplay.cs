@@ -21,34 +21,43 @@ namespace osu.Game.EzOsuGame.Configuration
         GlobalTotalWidth = 2,
     }
 
-    public enum EzEnumHitMode
+    public enum EzEnumJudgeMode
     {
         [Description("Lazer")]
         Lazer = 0,
 
+        /// <summary>
+        /// 全规则集共用的 stable 经典判定档。
+        /// </summary>
+        [Description("Stable Classic")]
+        StableClassic = 1,
+
+        // 以下为 Mania 私有判定档。编码为「规则集 OnlineID + 序号」：Mania = 3 → 31..39。
+        // 其他规则集若要加私有档，取自己的 ID 段（如 4x），与共享低段（0 Lazer / 1 StableClassic）隔离。
+
         [Description("EZ2AC: FNEX")]
-        EZ2AC = 1,
+        EZ2AC = 31,
 
         [Description("O2JAM")]
-        O2Jam = 2,
+        O2Jam = 32,
 
         [Description("IIDX")]
-        IIDX_HD = 3,
+        IIDX_HD = 33,
 
         [Description("LR2 Hard")]
-        LR2_HD = 4,
+        LR2_HD = 34,
 
         [Description("Raja Normal")]
-        Raja_NM = 5,
+        Raja_NM = 35,
 
         [Description("Malody E Judge")]
-        Malody_E = 6,
+        Malody_E = 36,
 
         [Description("Malody B Judge")]
-        Malody_B = 7,
+        Malody_B = 37,
 
         [Description("")]
-        Classic = 8,
+        Classic = 38,
     }
 
     public enum EzEnumHealthMode
@@ -56,26 +65,34 @@ namespace osu.Game.EzOsuGame.Configuration
         [Description("Lazer")]
         Lazer = 0,
 
+        /// <summary>
+        /// 全规则集共用的 stable 经典血量档。
+        /// </summary>
+        [Description("Stable Classic")]
+        StableClassic = 1,
+
+        // 以下为 Mania 私有血量档，编码同判定档（Mania = 3 → 31..39）。
+
         [Description("O2Jam Easy")]
-        O2JamEasy = 1,
+        O2JamEasy = 31,
 
         [Description("O2Jam Normal")]
-        O2JamNormal = 2,
+        O2JamNormal = 32,
 
         [Description("O2Jam Hard")]
-        O2JamHard = 3,
+        O2JamHard = 33,
 
         [Description("")]
-        Ez2Ac = 4,
+        Ez2Ac = 34,
 
         [Description("IIDX Hard")]
-        IIDX_HD = 5,
+        IIDX_HD = 35,
 
         [Description("LR2 Hard")]
-        LR2_HD = 6,
+        LR2_HD = 36,
 
         [Description("raja Hard")]
-        Raja_HD = 7,
+        Raja_HD = 37,
     }
 
     public enum EzEnumJudgePrecedence
@@ -91,17 +108,5 @@ namespace osu.Game.EzOsuGame.Configuration
 
         // [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.JUDGE_PRECEDENCE_SCORE))]
         // Score = 3,
-    }
-
-    /// <summary>
-    /// Osu 判定轨（OSL-013）。Lazer = 现行 Drawable/Shadow 语义；ClassicNative = stable 原生窗口/计分（进行中）。
-    /// </summary>
-    public enum EzEnumOsuJudgementTrack
-    {
-        [Description("Lazer")]
-        Lazer = 0,
-
-        [Description("Classic Native")]
-        ClassicNative = 1,
     }
 }

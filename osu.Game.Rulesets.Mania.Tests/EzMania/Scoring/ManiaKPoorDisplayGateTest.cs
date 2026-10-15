@@ -31,8 +31,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         [TestCase(EzEnumHealthMode.IIDX_HD, true, true)]
         public void TestPoorWindowFollowsHealthModeAndToggle(EzEnumHealthMode healthMode, bool poorToggle, bool expected)
         {
-            // hitmode 固定为 BMS 系列，用血量模式做唯一区分。
-            ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, healthMode, bmsPoorHitResultEnable: poorToggle));
+            // JudgeMode 固定为 BMS 系列，用血量模式做唯一区分。
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumJudgeMode.IIDX_HD, healthMode, bmsPoorHitResultEnable: poorToggle));
 
             var hitWindows = new ManiaHitWindows();
 
@@ -45,7 +45,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         [TestCase(EzEnumHealthMode.IIDX_HD, true, true)]
         public void TestWedgeMetricsFollowHealthMode(EzEnumHealthMode healthMode, bool poorToggle, bool expectedKPoor)
         {
-            ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, healthMode, bmsPoorHitResultEnable: poorToggle));
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumJudgeMode.IIDX_HD, healthMode, bmsPoorHitResultEnable: poorToggle));
 
             var ruleset = new ManiaRuleset();
             var beatmapInfo = new BeatmapInfo
@@ -68,11 +68,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         public void TestBakedWindowsFollowFrozenEnvironment()
         {
             // 本机当前设置：非 BMS 血量模式（+ 开关开），只看设置会得出「KPoor 不可用」。
-            ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer, bmsPoorHitResultEnable: true));
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer, bmsPoorHitResultEnable: true));
 
             var beatmap = createBeatmap();
 
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD, bmsPoorHitResultEnable: true);
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.IIDX_HD, EzEnumHealthMode.IIDX_HD, bmsPoorHitResultEnable: true);
             ManiaWindowBaker.AlignForLive(beatmap, environment);
 
             var windows = (ManiaHitWindows)beatmap.HitObjects[0].HitWindows;
@@ -89,11 +89,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         [Test]
         public void TestSimulationBakeKeepsPoorOnCurrentSettings()
         {
-            ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer, bmsPoorHitResultEnable: true));
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer, bmsPoorHitResultEnable: true));
 
             var beatmap = createBeatmap();
 
-            ManiaWindowBaker.Align(beatmap, EzEnumHitMode.Lazer);
+            ManiaWindowBaker.Align(beatmap, EzEnumJudgeMode.Lazer);
 
             var windows = (ManiaHitWindows)beatmap.HitObjects[0].HitWindows;
 
