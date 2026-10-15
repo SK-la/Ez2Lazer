@@ -548,6 +548,42 @@ namespace osu.Game.Rulesets.Mania.Tests
         }
 
         /// <summary>
+        /// [Ez] StableClassic 断连后重按同一条 LN：重按要刷新 <c>TimePress</c>（尾判的 <c>num2</c>），
+        /// 局内与 Session 必须同源，不得只在 Session 侧喂这条边沿。
+        /// </summary>
+        [Test]
+        public void TestFullScoreParity_StableClassicBrokenHoldRepress()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+
+            const double head = 1000;
+            const double tail = 3000;
+
+            var frames = new List<ReplayFrame>();
+
+            for (double time = head; time <= 1500; time += 100)
+                frames.Add(new ManiaReplayFrame(time, ManiaAction.Key1));
+
+            frames.Add(new ManiaReplayFrame(1600)); // 中途断连
+
+            for (double time = 1700; time <= 3400; time += 100)
+                frames.Add(new ManiaReplayFrame(time, ManiaAction.Key1)); // 重按并持过尾
+
+            frames.Add(new ManiaReplayFrame(3500));
+            frames.Add(new ManiaReplayFrame(4000, ManiaAction.Key2));
+            frames.Add(new ManiaReplayFrame(4100));
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                    new Note { StartTime = 4000, Column = 1 },
+                },
+                frames,
+                assertJudgedHitsComplete: true);
+        }
+
+        /// <summary>
         /// [Ez] StableClassic 按住过尾不松手：尾落在帧钟的 <c>EndTime + HitWindow50</c> 上，
         /// 局内同样必须收束，不得因「持过尾」而永不结算；同时与 Session 全量一致。
         /// </summary>
