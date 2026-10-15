@@ -487,7 +487,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
             // 取样必须先于路由判定：判定一落地，本次 note 即为「已判定」，触发源会改取「下一颗」或回退到
             // 「上一个已判定对象」，后者会把上一颗的键音再触发一次（同名键音被发声池打断后从头重播）。
-            if (keySoundPreviewMode != KeySoundPreviewMode.AutoPlayPlus)
+            // 只有「按键音预览」这一档在按键时取样：Off 不发声；AutoPlayPlus 的 note 音由物件自身时间轴发声，按键不得再来一次。
+            if (keySoundPreviewMode == KeySoundPreviewMode.AutoPreview)
                 sampleTriggerSource.Play();
 
             if (drawableRuleset?.ColumnRoutesInput == true)
