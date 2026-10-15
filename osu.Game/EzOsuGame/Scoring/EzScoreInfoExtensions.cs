@@ -73,19 +73,20 @@ namespace osu.Game.EzOsuGame.Scoring
         public static string GetHealthModeDisplayName(int healthMode) => getEnumDescription<EzEnumHealthMode>(healthMode);
 
         /// <summary>
-        /// 非 mania 成绩的 std 判定轨（OSL-013）。落库成绩按其嵌入的 <see cref="ScoreInfo.JudgeMode"/>（&gt;= 0 有效）；
-        /// 旧行（-1 未设置）回退当前配置。仅 Osu 规则集返回 true。
+        /// 非 mania 成绩的 std 判定轨（OSL-013）。语义同 <see cref="TryGetManiaGameplayModes"/>：
+        /// 档位以成绩嵌入的 <see cref="ScoreInfo.JudgeMode"/> 为准，存量负值（当初写入的 -1）按默认 Lazer
+        /// 处理，不视为"无模式"；故不要回读实时配置，否则同一成绩在重算与展示两处会得到不同档位。
+        /// 仅 Osu 规则集返回 true。
         /// </summary>
         public static bool TryGetStdGameplayMode(this ScoreInfo score, out int stdMode)
         {
-            stdMode = -1;
+            stdMode = score.JudgeMode;
 
-            if (score.Ruleset.ShortName != "osu")
+            if (score.Ruleset.OnlineID != 0)
                 return false;
 
-            stdMode = score.JudgeMode >= 0
-                ? score.JudgeMode
-                : (int)GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode);
+            if (stdMode < 0)
+                stdMode = (int)EzEnumJudgeMode.Lazer;
 
             return true;
         }

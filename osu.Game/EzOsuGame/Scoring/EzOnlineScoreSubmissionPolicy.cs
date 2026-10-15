@@ -69,15 +69,12 @@ namespace osu.Game.EzOsuGame.Scoring
                 return true;
             }
 
-            if (score.Ruleset.OnlineID == 0)
+            if (score.TryGetStdGameplayMode(out int stdJudgeMode))
             {
                 // osu! 轨：官方只理解 Lazer 判定轨，StableClassic 的窗口与计分是 Ez 自管语义（同 mania 口径）。
-                // 存量 -1（未设置）按 Lazer 处理，与 ForStored 解析、BDSP 豁免判据一致。
-                int judgeMode = score.JudgeMode >= 0 ? score.JudgeMode : (int)EzEnumJudgeMode.Lazer;
-
-                if (judgeMode != (int)EzEnumJudgeMode.Lazer)
+                if (stdJudgeMode != (int)EzEnumJudgeMode.Lazer)
                 {
-                    blockReason = $"JudgeMode={judgeMode} (Lazer required)";
+                    blockReason = $"JudgeMode={stdJudgeMode} (Lazer required)";
                     return false;
                 }
             }

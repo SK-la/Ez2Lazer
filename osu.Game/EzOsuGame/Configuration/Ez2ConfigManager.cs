@@ -416,6 +416,14 @@ namespace osu.Game.EzOsuGame.Configuration
                 };
             }
 
+            if (score != null && score.TryGetStdGameplayMode(out int stdMode))
+            {
+                return live with
+                {
+                    JudgeMode = (EzEnumJudgeMode)stdMode,
+                };
+            }
+
             if (rulesetId == 3)
             {
                 return live with
@@ -427,10 +435,10 @@ namespace osu.Game.EzOsuGame.Configuration
 
             if (rulesetId == 0)
             {
-                // ForStored：优先成绩嵌入的 JudgeMode（>= 0 有效；旧行 -1，回退 Lazer）。
+                // 无成绩但已知按 osu 解析：ForStored 不得回读实时判定轨。
                 return live with
                 {
-                    JudgeMode = score != null && score.JudgeMode >= 0 ? (EzEnumJudgeMode)score.JudgeMode : EzEnumJudgeMode.Lazer,
+                    JudgeMode = EzEnumJudgeMode.Lazer,
                 };
             }
 
