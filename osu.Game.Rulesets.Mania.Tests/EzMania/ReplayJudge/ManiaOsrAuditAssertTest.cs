@@ -38,12 +38,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
     ///             <b>Lazer Header</b>：冻结 osr 嵌入 Statistics / 分 / combo（解码 ≡ 嵌入）。
     ///         </item>
     ///         <item>
-    ///             <b>Lazer / Classic Session</b>：冻结<strong>现行</strong>
+    ///             <b>Lazer / Classic / StableClassic Session</b>：冻结<strong>现行</strong>
     ///             <see cref="ManiaReplaySession"/> 产出（与局内对齐后的 Session）；
     ///             与嵌入/stable 客户端数字可因整数帧与历史 LN 语义不同。
     ///         </item>
     ///     </list>
-    ///     套件：Hanatachi、PORTRAiT。Classic 主判定键门禁（不含 Ignore*）；Lazer Session 全量非零。
+    ///     套件：Hanatachi、PORTRAiT。Classic / StableClassic 主判定键门禁（不含 Ignore*）；Lazer Session 全量非零。
     ///     高难度 LN 闭环仍用 <see cref="OsrAuditTest" /> + GramNibelungen23（勿当金标）。
     /// </summary>
     [TestFixture]
@@ -190,6 +190,49 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 [HitResult.Perfect] = 4260,
             });
 
+        // StableClassic：stable 原生 classic 判定（Classic(38) 之外的 stable 对齐轨）的 Session 锚点。
+        // 与 osr 头（金标）的已知残差：
+        //  - 单键、长条的 Perfect/Great 计数已与头一致（长条已按帧钟到点判尾）。
+        //  - 连击已按 stable 的 Holding 每 100ms 涨一格实现，两张夹具的 MaxCombo 与头精确相等。
+        //  - 判定总数与总分仍有残差（Hanatachi 905613 / 头 904544，PORTRAiT 867543 / 头 871917），
+        //    来自判定计数口径与长条档位权值。
+        private static readonly AuditFixture stable_classic_hanatachi = new AuditFixture(
+            "StableClassic-Hanatachi",
+            "Resources/Testing/Replays/ManiaAudit-Classic-Hanatachi.osr",
+            "Resources/Testing/Beatmaps/ManiaAudit-Hanatachi.osu",
+            EzEnumJudgeMode.StableClassic,
+            "29278f227275b1720e995d532130710b",
+            904544,
+            1728,
+            0.9774174631810525,
+            ScoreRank.S,
+            null,
+            true,
+            new[] { "CL" },
+            new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 36,
+                [HitResult.Meh] = 10,
+                [HitResult.Ok] = 9,
+                [HitResult.Good] = 103,
+                [HitResult.Great] = 808,
+                [HitResult.Perfect] = 3423,
+            },
+            false,
+            false,
+            905613,
+            1728,
+            0.98074732285258603,
+            new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 40,
+                [HitResult.Meh] = 8,
+                [HitResult.Ok] = 7,
+                [HitResult.Good] = 105,
+                [HitResult.Great] = 808,
+                [HitResult.Perfect] = 3422,
+            });
+
         private static readonly AuditFixture classic_portrait = new AuditFixture(
             "Classic-PORTRAiT",
             "Resources/Testing/Replays/ManiaAudit-Classic-PORTRAiT.osr",
@@ -227,10 +270,53 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 [HitResult.Perfect] = 4411,
             });
 
+        private static readonly AuditFixture stable_classic_portrait = new AuditFixture(
+            "StableClassic-PORTRAiT",
+            "Resources/Testing/Replays/ManiaAudit-Classic-PORTRAiT.osr",
+            "Resources/Testing/Beatmaps/ManiaAudit-PORTRAiT.osu",
+            EzEnumJudgeMode.StableClassic,
+            "5737c0072e3c1319d95cf117b3f78648",
+            871917,
+            1340,
+            0.9669379597984128,
+            ScoreRank.S,
+            null,
+            true,
+            new[] { "CL" },
+            new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 38,
+                [HitResult.Meh] = 8,
+                [HitResult.Ok] = 15,
+                [HitResult.Good] = 190,
+                [HitResult.Great] = 1801,
+                [HitResult.Perfect] = 2476,
+            },
+            false,
+            false,
+            867543,
+            1340,
+            0.97335100117785633,
+            new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 40,
+                [HitResult.Meh] = 12,
+                [HitResult.Ok] = 15,
+                [HitResult.Good] = 188,
+                [HitResult.Great] = 1797,
+                [HitResult.Perfect] = 2476,
+            });
+
         public static IEnumerable<AuditFixture> ClassicFixtures()
         {
             yield return classic_hanatachi;
             yield return classic_portrait;
+        }
+
+        public static IEnumerable<AuditFixture> StableClassicFixtures()
+        {
+            yield return stable_classic_hanatachi;
+            yield return stable_classic_portrait;
         }
 
         [TestCaseSource(nameof(LazerFixtures))]
@@ -247,6 +333,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
         [TestCaseSource(nameof(ClassicFixtures))]
         public void AuditClassicSessionMatchesAnchor(AuditFixture fixture)
+        {
+            assertSessionMatchesAnchor(fixture);
+        }
+
+        [TestCaseSource(nameof(StableClassicFixtures))]
+        public void AuditStableClassicSessionMatchesAnchor(AuditFixture fixture)
         {
             assertSessionMatchesAnchor(fixture);
         }
@@ -275,7 +367,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             using (var stream = resources.GetStream(fixture.OsrResource))
                 score = decoder.Parse(stream);
 
-            // Classic：丢弃 Lazer 解码嵌入 Statistics/分数，只保留 Replay 帧；Mods/JudgeMode 按静态契约注入。
+            // Classic / StableClassic：丢弃 Lazer 解码嵌入 Statistics/分数，只保留 Replay 帧；Mods/JudgeMode 按静态契约注入。
             if (!fixture.AssertDecodedHeader)
                 prepareScoreForClassicSession(score, fixture);
 
@@ -522,6 +614,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 int exactBoundary = hitEvents.Count(ev =>
                 {
                     if (ev.Result != HitResult.Great || ev.HitObject?.HitWindows == null) return false;
+
                     bool tail = ev.HitObject is TailNote;
                     double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
                     return Math.Abs(j - (pWin + 0.5)) < 1e-9;
@@ -529,6 +622,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 int perfectAtP = hitEvents.Count(ev =>
                 {
                     if (ev.Result != HitResult.Perfect || ev.HitObject?.HitWindows == null) return false;
+
                     bool tail = ev.HitObject is TailNote;
                     double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
                     return Math.Abs(j - pWin) < 1e-9;
@@ -536,16 +630,16 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 sb.AppendLine($"  exact |j|=P+0.5 Great={exactBoundary}; exact |j|=P Perfect={perfectAtP}");
 
                 foreach (var e in hitEvents
-                                   .Where(ev => ev.Result == HitResult.Great && ev.HitObject?.HitWindows != null)
-                                   .Select(ev =>
-                                   {
-                                       bool tail = ev.HitObject is TailNote;
-                                       double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
-                                       return (ev, j, tail);
-                                   })
-                                   .Where(x => x.j > pWin && x.j <= pWin + 0.5)
-                                   .OrderBy(x => x.ev.HitObject!.StartTime)
-                                   .Take(15))
+                                  .Where(ev => ev.Result == HitResult.Great && ev.HitObject?.HitWindows != null)
+                                  .Select(ev =>
+                                  {
+                                      bool tail = ev.HitObject is TailNote;
+                                      double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
+                                      return (ev, j, tail);
+                                  })
+                                  .Where(x => x.j > pWin && x.j <= pWin + 0.5)
+                                  .OrderBy(x => x.ev.HitObject!.StartTime)
+                                  .Take(15))
                 {
                     string column = e.ev.HitObject is IHasColumn c ? c.Column.ToString() : "-";
                     sb.AppendLine($"    {kind(e.ev)}@{e.ev.HitObject!.StartTime:F3} col={column} off={e.ev.TimeOffset:R} j={e.j:R}");
@@ -629,11 +723,13 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             }
 
             double? sampleMissWindow = hitEvents.Select(ev => ev.HitObject?.HitWindows?.WindowFor(HitResult.Miss)).FirstOrDefault(w => w is > 0);
+
             if (sampleMissWindow is double missWindowMs)
             {
                 int mehAtMissEdge = hitEvents.Count(ev =>
                 {
                     if (ev.Result != HitResult.Meh || ev.HitObject?.HitWindows == null) return false;
+
                     bool tail = ev.HitObject is TailNote;
                     double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
                     return Math.Abs(j - missWindowMs) <= 1.0 || Math.Abs(j - (missWindowMs + 0.5)) < 1e-9;
@@ -641,6 +737,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 int missAtMissEdge = hitEvents.Count(ev =>
                 {
                     if (ev.Result != HitResult.Miss || ev.HitObject?.HitWindows == null) return false;
+
                     bool tail = ev.HitObject is TailNote;
                     double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
                     return Math.Abs(j - missWindowMs) <= 1.0 || Math.Abs(j - (missWindowMs + 0.5)) < 1e-9;
@@ -702,6 +799,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             // Head 命中但尾 Miss：典型「断连后未重臂 → 尾被动 Miss」；列出时刻便于对照回放。
             // sameColHit=同列在 (head,tail) 内命中其它物件（列路由占键 → 不应重臂）；none=期间无同列命中（若仍有空按应能重臂）。
             sb.AppendLine("hold HeadHit|TailMiss detail:");
+
             foreach (var hold in holds.OrderBy(h => h.StartTime))
             {
                 var headEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Head));
@@ -716,27 +814,27 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
                 string body = bodyEv.HitObject != null ? bodyEv.Result.ToString() : "none";
 
-                var sameColHits = hitEvents
-                    .Where(ev => ev.HitObject is IHasColumn hc
-                                 && hc.Column == hold.Column
-                                 && !ReferenceEquals(ev.HitObject, hold.Head)
-                                 && !ReferenceEquals(ev.HitObject, hold.Tail)
-                                 && !ReferenceEquals(ev.HitObject, hold.Body)
-                                 && !ReferenceEquals(ev.HitObject, hold)
-                                 && ev.HitObject!.StartTime > hold.StartTime - 200
-                                 && ev.HitObject.StartTime < hold.EndTime + 400)
-                    .Select(ev =>
-                    {
-                        string k = ev.HitObject switch
-                        {
-                            HeadNote => "Head",
-                            Note => "Note",
-                            _ => ev.HitObject!.GetType().Name,
-                        };
-                        double abs = ev.HitObject!.StartTime + ev.TimeOffset;
-                        return $"{k}@{ev.HitObject.StartTime:0.###}:{ev.Result}@t{abs:0.###}";
-                    })
-                    .ToArray();
+                string[] sameColHits = hitEvents
+                                       .Where(ev => ev.HitObject is IHasColumn hc
+                                                    && hc.Column == hold.Column
+                                                    && !ReferenceEquals(ev.HitObject, hold.Head)
+                                                    && !ReferenceEquals(ev.HitObject, hold.Tail)
+                                                    && !ReferenceEquals(ev.HitObject, hold.Body)
+                                                    && !ReferenceEquals(ev.HitObject, hold)
+                                                    && ev.HitObject!.StartTime > hold.StartTime - 200
+                                                    && ev.HitObject.StartTime < hold.EndTime + 400)
+                                       .Select(ev =>
+                                       {
+                                           string k = ev.HitObject switch
+                                           {
+                                               HeadNote => "Head",
+                                               Note => "Note",
+                                               _ => ev.HitObject!.GetType().Name,
+                                           };
+                                           double abs = ev.HitObject!.StartTime + ev.TimeOffset;
+                                           return $"{k}@{ev.HitObject.StartTime:0.###}:{ev.Result}@t{abs:0.###}";
+                                       })
+                                       .ToArray();
 
                 string routeTag = sameColHits.Length == 0 ? "nearCol=none" : $"nearCol={string.Join(',', sameColHits)}";
                 string repressTag = describeColumnRepress(replay, hold);
@@ -745,6 +843,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             }
 
             sb.AppendLine("Note Miss (|off|<80):");
+
             foreach (var ev in hitEvents.Where(e => e.HitObject is Note and not HeadNote and not TailNote && e.Result == HitResult.Miss)
                                         .OrderBy(e => e.HitObject!.StartTime))
             {
@@ -766,33 +865,33 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                     ? $"forceVia={laterHit.HitObject.GetType().Name}@{laterHit.HitObject.StartTime:0.###}"
                     : "forceVia=none";
 
-                var atPress = hitEvents
-                    .Where(x => x.HitObject is IHasColumn hc
-                                && hc.Column == note.Column
-                                && Math.Abs((x.HitObject!.StartTime + x.TimeOffset) - abs) < 0.75)
-                    .Select(x =>
-                    {
-                        string k = x.HitObject switch
-                        {
-                            HeadNote => "Head",
-                            TailNote => "Tail",
-                            Note => "Note",
-                            _ => x.HitObject!.GetType().Name,
-                        };
-                        return $"{k}@{x.HitObject!.StartTime:0.###}:{x.Result}";
-                    })
-                    .ToArray();
+                string[] atPress = hitEvents
+                                   .Where(x => x.HitObject is IHasColumn hc
+                                               && hc.Column == note.Column
+                                               && Math.Abs((x.HitObject!.StartTime + x.TimeOffset) - abs) < 0.75)
+                                   .Select(x =>
+                                   {
+                                       string k = x.HitObject switch
+                                       {
+                                           HeadNote => "Head",
+                                           TailNote => "Tail",
+                                           Note => "Note",
+                                           _ => x.HitObject!.GetType().Name,
+                                       };
+                                       return $"{k}@{x.HitObject!.StartTime:0.###}:{x.Result}";
+                                   })
+                                   .ToArray();
                 string atTag = atPress.Length == 0 ? "atPress=none" : $"atPress={string.Join(',', atPress)}";
 
-                var earlierUnhit = hitEvents
-                    .Where(x => x.HitObject is IHasColumn hc
-                                && hc.Column == note.Column
-                                && x.HitObject is Note
-                                && x.HitObject!.StartTime < note.StartTime
-                                && x.HitObject.StartTime > note.StartTime - missWin - 50
-                                && (x.Result == HitResult.Miss || !x.Result.IsHit()))
-                    .Select(x => $"{x.HitObject!.StartTime:0.###}:{x.Result}")
-                    .ToArray();
+                string[] earlierUnhit = hitEvents
+                                        .Where(x => x.HitObject is IHasColumn hc
+                                                    && hc.Column == note.Column
+                                                    && x.HitObject is Note
+                                                    && x.HitObject!.StartTime < note.StartTime
+                                                    && x.HitObject.StartTime > note.StartTime - missWin - 50
+                                                    && (x.Result == HitResult.Miss || !x.Result.IsHit()))
+                                        .Select(x => $"{x.HitObject!.StartTime:0.###}:{x.Result}")
+                                        .ToArray();
                 string lockTag = earlierUnhit.Length == 0 ? "prev=none" : $"prevMiss={string.Join(',', earlierUnhit)}";
 
                 sb.AppendLine($"  Note@{note.StartTime:0.###} col={note.Column} off={ev.TimeOffset:0.###} abs={abs:0.###} {forceTag} {atTag} {lockTag} {edges}");

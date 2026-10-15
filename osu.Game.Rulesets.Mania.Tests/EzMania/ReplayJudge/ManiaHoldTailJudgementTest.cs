@@ -126,12 +126,14 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         /// <summary>
         /// 断连后重按、再于尾部松手：局内 <c>DrawableHoldNote.OnPressed</c>（列路由未选中目标时仍执行）
         /// 会重新 <c>beginHoldAt</c> 重臂 holding，故松手时 <c>Tail.UpdateResult()</c> 判尾；
-        /// 此时 <c>Body.HasHoldBreak</c> 已为真 → 尾判由 Perfect 降级为 <b>Meh</b>（不断尾判、只降级）。
+        /// 此时 <c>Body.HasHoldBreak</c> 已为真 → 尾判降级：Lazer / Classic 封到 <b>Meh</b>，
+        /// stable classic 封到 <b>Good200</b>（stable 非 ScoreV2 分支的 <c>hasHoldBreak</c> 封顶是 67108864 = 200）。
         /// 与 <c>TestSceneHoldNoteInput.TestPressAtStartThenBreakThenRepressAndReleaseAtTail</c> 同口径。
         /// </summary>
-        [TestCase(EzEnumJudgeMode.Lazer)]
-        [TestCase(EzEnumJudgeMode.Classic)]
-        public void TestBreakThenRepressCapsTailToMeh(EzEnumJudgeMode judgeMode)
+        [TestCase(EzEnumJudgeMode.Lazer, HitResult.Meh)]
+        [TestCase(EzEnumJudgeMode.Classic, HitResult.Meh)]
+        [TestCase(EzEnumJudgeMode.StableClassic, HitResult.Good)]
+        public void TestBreakThenRepressCapsTailToMeh(EzEnumJudgeMode judgeMode, HitResult expected)
         {
             var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldWithInputs(
                 (1500, true), (2500, false), (3900, true), (4000, false));
@@ -143,7 +145,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             Assert.That(result.ScoreInfo.Statistics.TryGetValue(HitResult.ComboBreak, out int comboBreak) ? comboBreak : 0, Is.EqualTo(1));
 
             var tailEvent = result.ScoreInfo.HitEvents.Single(e => e.HitObject is TailNote);
-            Assert.That(tailEvent.Result, Is.EqualTo(HitResult.Meh));
+            Assert.That(tailEvent.Result, Is.EqualTo(expected));
         }
 
         /// <summary>
@@ -155,12 +157,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [TestCase(EzEnumJudgeMode.IIDX_HD)]
         public void TestRepeatedHoldBreakCountsEachRelease(EzEnumJudgeMode judgeMode)
         {
-            var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldWithInputs(RepeatedBreakInputs);
+            var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldWithInputs(repeated_break_inputs);
             var environment = ReplayJudgeTestConfig.Create(judgeMode, EzEnumHealthMode.Lazer);
 
             var result = ManiaReplaySession.Run(score, beatmap, environment);
 
-            Assert.That(result.ScoreInfo.Statistics.TryGetValue(HitResult.ComboBreak, out int comboBreak) ? comboBreak : 0, Is.EqualTo(RepeatedBreakCount));
+            Assert.That(result.ScoreInfo.Statistics.TryGetValue(HitResult.ComboBreak, out int comboBreak) ? comboBreak : 0, Is.EqualTo(repeated_break_count));
         }
 
         /// <summary>
@@ -171,7 +173,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [TestCase(EzEnumJudgeMode.Malody_E, EzEnumHealthMode.Lazer, 0)]
         public void TestRepeatedHoldBreakKeepsSingleForExcludedJudgeModes(EzEnumJudgeMode judgeMode, EzEnumHealthMode healthMode, int expected)
         {
-            var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldWithInputs(RepeatedBreakInputs);
+            var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldWithInputs(repeated_break_inputs);
             var environment = ReplayJudgeTestConfig.Create(judgeMode, healthMode);
 
             var result = ManiaReplaySession.Run(score, beatmap, environment);
@@ -180,7 +182,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         // 4 次提前松手（均在尾 4000 之前），末尾重新按住过尾收束。
-        private static readonly (double time, bool press)[] RepeatedBreakInputs =
+        private static readonly (double time, bool press)[] repeated_break_inputs =
         {
             (1500, true), (1650, false),
             (1800, true), (1950, false),
@@ -189,7 +191,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             (3800, true), (4100, false),
         };
 
-        private const int RepeatedBreakCount = 4;
+        private const int repeated_break_count = 4;
 
         /// <summary>
         /// 松手落点越过下一条 LN 的尾开始时间时，前一条尾仍须被判定，且不受 JudgePrecedence 影响
@@ -204,7 +206,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer, precedence);
 
             var tail = ManiaReplaySession.RunHitEvents(score, beatmap, environment)
-                                        .Single(e => e.HitObject is TailNote && Math.Abs(e.HitObject.StartTime - 1950) < 1);
+                                         .Single(e => e.HitObject is TailNote && Math.Abs(e.HitObject.StartTime - 1950) < 1);
 
             Assert.That(tail.Result, Is.Not.EqualTo(HitResult.Miss));
         }
@@ -220,17 +222,58 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             Assert.That(tailEvent.Result, Is.EqualTo(HitResult.Great));
         }
 
-        [Test]
-        public void TestClassicTailLateReleaseUsesClassicWindows()
+        [TestCase(EzEnumJudgeMode.Classic, HitResult.Great)]
+        [TestCase(EzEnumJudgeMode.StableClassic, HitResult.Perfect)]
+        public void TestClassicTailLateReleaseUsesClassicWindows(EzEnumJudgeMode judgeMode, HitResult expected)
         {
             var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldLateTailRelease(lateMs: 30);
-            var classicEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Classic, EzEnumHealthMode.Lazer);
+            var environment = ReplayJudgeTestConfig.Create(judgeMode, EzEnumHealthMode.Lazer);
 
-            var classicTail = ManiaReplaySession.RunHitEvents(score, beatmap, classicEnvironment).Single(e => e.HitObject is TailNote);
+            var tail = ManiaReplaySession.RunHitEvents(score, beatmap, environment).Single(e => e.HitObject is TailNote);
 
-            // 与 Lazer 共用同一套 tail 时序/offset 规则；仅窗口区间不同，故 30ms late 在 Classic 下仍判 Great。
-            Assert.That(classicTail.TimeOffset, Is.EqualTo(30).Within(0.01));
-            Assert.That(classicTail.Result, Is.EqualTo(HitResult.Great));
+            // Classic 与 Lazer 共用同一套 tail 时序/offset 规则，仅窗口区间不同，故 30ms late 判 Great；
+            // stable classic 长条按镜像偏差 num4 + num6 联合取档，30ms late 落在 300g*2.4 内，判 300g（Perfect）。
+            Assert.That(tail.TimeOffset, Is.EqualTo(30).Within(0.01));
+            Assert.That(tail.Result, Is.EqualTo(expected));
+        }
+
+        /// <summary>
+        /// 按住过尾不松手时，stable 的到点判尾会被 <c>HitCircleManiaLong.HitEnd</c> 推迟到
+        /// <c>EndTime + HitWindow50</c>（本谱 OD6 → 133ms），并取帧钟首个不早于阈值的帧落判。
+        /// </summary>
+        [TestCase(0, 140)]
+        [TestCase(5, 135)]
+        public void TestStableClassicHeldPastTailSettlesOnFrameClock(double framePhase, double expectedOffset)
+        {
+            var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldHeldPastTail(holdUntil: 6000, framePhase: framePhase);
+            var stableClassicEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+
+            var tail = beatmap.HitObjects.OfType<HoldNote>().Single().Tail;
+            var stableClassicTail = ManiaReplaySession.RunHitEvents(score, beatmap, stableClassicEnvironment).Single(e => e.HitObject is TailNote);
+
+            // 按住档不落在「已松手」档的 EndTime + HitWindow100（OD6 → 109ms）上。
+            Assert.That(stableClassicTail.TimeOffset, Is.GreaterThan(tail.HitWindows!.WindowFor(HitResult.Ok)));
+
+            // num2 落在段首、num3 = 落判帧钟 → num6 = 偏差；140/135 越出 200 窗（79*2）但仍在 100 窗（109*2）内 → 100。
+            Assert.That(stableClassicTail.TimeOffset, Is.EqualTo(expectedOffset).Within(0.01));
+            Assert.That(stableClassicTail.Result, Is.EqualTo(HitResult.Good));
+        }
+
+        /// <summary>
+        /// stable classic 长条持有期每 <c>JudgementMania.ComboIntv</c>（100ms）涨一格连击，
+        /// 节拍锚在按下时刻而不是帧时刻。
+        /// </summary>
+        [Test]
+        public void TestStableClassicHeldPastTailRaisesHoldComboPerInterval()
+        {
+            var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldHeldPastTail(holdUntil: 6000);
+            var stableClassicEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+
+            var result = ManiaReplaySession.Run(score, beatmap, stableClassicEnvironment);
+
+            // 帧钟 1500 起每 10ms 一帧、段末 4000：1600/1700/…/4000 共 25 格，
+            // 再加段末判尾命中 1 格；头（IgnoreHit）与 Body 不进连击。
+            Assert.That(result.ScoreInfo.MaxCombo, Is.EqualTo(26));
         }
 
         [Test]

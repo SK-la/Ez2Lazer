@@ -228,6 +228,41 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         /// <summary>
+        /// 单条 LN 全程按住直到 <paramref name="holdUntil"/>（不主动松手，解析器在末帧补一条 release），
+        /// 帧钟按 <paramref name="frameStep"/> 自 <c>head + framePhase</c> 铺开。
+        /// 用于 classic 到点判尾：stable 的尾判挂在帧循环上，落判时刻取帧钟首个越过阈值的帧。
+        /// </summary>
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateSingleHoldHeldPastTail(double holdUntil, double frameStep = 10, double framePhase = 0)
+        {
+            const double head = 1500;
+            const double tail = 4000;
+
+            var ruleset = new ManiaRuleset();
+            var hold = new HoldNote
+            {
+                StartTime = head,
+                Duration = tail - head,
+                Column = 0,
+            };
+
+            var beatmap = new TestBeatmap(ruleset.RulesetInfo)
+            {
+                HitObjects = new List<HitObject> { hold },
+                ControlPointInfo = new ControlPointInfo(),
+            };
+
+            foreach (var obj in beatmap.HitObjects)
+                obj.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+
+            var frames = new List<ReplayFrame>();
+
+            for (double time = head + framePhase; time <= holdUntil; time += frameStep)
+                frames.Add(new ManiaReplayFrame(time, ManiaAction.Key1));
+
+            return (createScore(ruleset, new Replay { Frames = frames }), beatmap, createEnvironment());
+        }
+
+        /// <summary>
         /// 两条先后 LN：松手落点已越过「后一条 LN 的尾开始时间」。
         /// 回归 Earliest 的 note-lock 阻挡检查曾被误用到松手路径，会把本应判定的前一条尾否决。
         /// </summary>
