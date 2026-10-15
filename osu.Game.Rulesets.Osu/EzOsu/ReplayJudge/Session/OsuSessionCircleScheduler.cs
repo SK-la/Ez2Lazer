@@ -56,6 +56,20 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
 
         public void ProcessPress(double time, Vector2 position, Action<PendingTarget, HitResult, double, Vector2?> apply)
         {
+            PendingTarget? target = FindAcceptableTarget(time, position);
+
+            if (target == null)
+                return;
+
+            double startOffset = time - target.HitObject.StartTime;
+            HitResult result = OsuCircleJudgement.ResultForPress(target.HitObject.HitWindows!, startOffset);
+            apply(target, result, time, position);
+            target.Judged = true;
+        }
+
+        /// <summary>最早的可判圆；无则 null。仅查询，不落判定。用于按键仲裁。</summary>
+        public PendingTarget? FindAcceptableTarget(double time, Vector2 position)
+        {
             foreach (var target in targets)
             {
                 if (target.Judged)
@@ -70,15 +84,13 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
                 if (!OsuCircleJudgement.IsInHitRadius(position, target.OsuTarget.StackedPosition, target.OsuTarget.Radius))
                     continue;
 
-                double startOffset = time - target.HitObject.StartTime;
-                HitResult result = OsuCircleJudgement.ResultForPress(target.HitObject.HitWindows!, startOffset);
-                if (result == HitResult.None)
+                if (OsuCircleJudgement.ResultForPress(target.HitObject.HitWindows!, time - target.HitObject.StartTime) == HitResult.None)
                     continue;
 
-                apply(target, result, time, position);
-                target.Judged = true;
-                return;
+                return target;
             }
+
+            return null;
         }
 
         public void ProcessExpiredMisses(double time, Action<PendingTarget, HitResult, double, Vector2?> apply)

@@ -46,6 +46,9 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
 
         public double EndTime => slider.EndTime;
 
+        /// <summary>滑条头起始时刻；按键仲裁按它排序。</summary>
+        public double HeadStartTime => head.StartTime;
+
         public static IReadOnlyList<OsuSessionSliderState> CreateAll(IBeatmap beatmap, CancellationToken cancellationToken)
         {
             var list = new List<OsuSessionSliderState>();
@@ -88,31 +91,42 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
             yield return slider.EndTime;
         }
 
-        public void ProcessHeadPress(double time, Vector2 position, OsuAction action, IReadOnlyList<OsuAction> pressedActions, JudgementApplier apply)
+        /// <summary>按键是否落在本滑条头上并可判；仅查询，不落判定。用于按键仲裁。</summary>
+        public bool CanAcceptHeadPress(double time, Vector2 position) => resolveHeadPressResult(time, position).HasValue;
+
+        public bool ProcessHeadPress(double time, Vector2 position, OsuAction action, IReadOnlyList<OsuAction> pressedActions, JudgementApplier apply)
         {
-            if (isJudged(head))
-                return;
+            HitResult? result = resolveHeadPressResult(time, position);
 
-            if (time < head.StartTime - headMissWindow || time > head.StartTime + headMissWindow)
-                return;
+            if (result == null)
+                return false;
 
-            if (!OsuCircleJudgement.IsInHitRadius(position, head.StackedPosition, head.Radius))
-                return;
-
-            double timeOffset = time - head.StartTime;
-            HitResult result = OsuCircleJudgement.MapClassicSliderHeadIfNeeded(
-                OsuCircleJudgement.ResultForPress(head.HitWindows!, timeOffset),
-                head.ClassicSliderBehaviour);
-
-            if (result == HitResult.None)
-                return;
-
-            if (result.IsHit())
+            if (result.Value.IsHit())
                 headHitAction = action;
 
-            applyJudgement(head, result, time, position, apply);
-            markJudged(head, result);
+            applyJudgement(head, result.Value, time, position, apply);
+            markJudged(head, result.Value);
             postProcessHeadJudgement(time, position, pressedActions, apply);
+            return true;
+        }
+
+        /// <summary>命中窗口 + 半径 + 判定窗三重前置校验；任一不成立返回 null。</summary>
+        private HitResult? resolveHeadPressResult(double time, Vector2 position)
+        {
+            if (isJudged(head))
+                return null;
+
+            if (time < head.StartTime - headMissWindow || time > head.StartTime + headMissWindow)
+                return null;
+
+            if (!OsuCircleJudgement.IsInHitRadius(position, head.StackedPosition, head.Radius))
+                return null;
+
+            HitResult result = OsuCircleJudgement.MapClassicSliderHeadIfNeeded(
+                OsuCircleJudgement.ResultForPress(head.HitWindows!, time - head.StartTime),
+                head.ClassicSliderBehaviour);
+
+            return result == HitResult.None ? null : result;
         }
 
         public void ProcessTime(double time, Vector2 cursorPosition, IReadOnlyList<OsuAction> pressedActions, JudgementApplier apply)

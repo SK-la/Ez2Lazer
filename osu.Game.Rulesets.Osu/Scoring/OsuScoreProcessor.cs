@@ -22,6 +22,12 @@ namespace osu.Game.Rulesets.Osu.Scoring
         /// </summary>
         public EzEnumJudgeMode? JudgementTrackOverride { get; set; }
 
+        /// <summary>
+        /// [Ez] 单次按键是否允许同时判定多个物件。默认 false，与实机一致（一次输入只落一个物件）。
+        /// 仅供 mod 等特殊路径在 Session 内标记；不参与环境解析、不落库、不上传。
+        /// </summary>
+        public bool AllowMultiJudgementPerPress { get; set; }
+
         private EzEnumJudgeMode stdJudgeMode => JudgementTrackOverride ?? EzEnumJudgeMode.Lazer;
 
         private readonly StableStdScoring stableScoring = new StableStdScoring();

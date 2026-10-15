@@ -11,6 +11,7 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Osu.Judgements;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Osu.Replays;
+using osu.Game.Rulesets.Osu.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osuTK;
@@ -49,6 +50,15 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
             var pressEdges = OsuReplayCursor.CollectPressEdges(frames);
             int nextPressIndex = 0;
 
+            // 实机语义：一次输入只落一个物件。特殊标记（mod 等）可放开为多判。
+            bool allowMultiJudgementPerPress = scoreProcessor is OsuScoreProcessor { AllowMultiJudgementPerPress: true };
+
+            void applySliderHead(HitObject hitObject, HitResult result, double judgementTime, Vector2? cursorPosition)
+                => applyJudgement(hitObject, result, judgementTime, cursorPosition, gameplayRate, inputOffset, scoreProcessor, timelineRecorder);
+
+            void applyCircle(OsuSessionCircleScheduler.PendingTarget target, HitResult result, double judgementTime, Vector2? hitPosition)
+                => applyJudgement(target.HitObject, result, judgementTime, hitPosition, gameplayRate, inputOffset, scoreProcessor, timelineRecorder);
+
             var simulationTimes = OsuReplayCursor.CollectSimulationTimes(
                 frames,
                 scheduler.CollectMissDeadlines(),
@@ -74,14 +84,37 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
                 {
                     var edge = pressEdges[nextPressIndex++];
 
-                    foreach (var slider in sliders)
+                    if (allowMultiJudgementPerPress)
                     {
-                        slider.ProcessHeadPress(edge.Time, edge.Position, edge.Action, cursor.GetPressedActions(), (hitObject, result, judgementTime, cursorPosition) =>
-                            applyJudgement(hitObject, result, judgementTime, cursorPosition, gameplayRate, inputOffset, scoreProcessor, timelineRecorder));
+                        foreach (var slider in sliders)
+                            slider.ProcessHeadPress(edge.Time, edge.Position, edge.Action, cursor.GetPressedActions(), applySliderHead);
+
+                        scheduler.ProcessPress(edge.Time, edge.Position, applyCircle);
+                        continue;
                     }
 
-                    scheduler.ProcessPress(edge.Time, edge.Position, (target, result, judgementTime, hitPosition) =>
-                        applyJudgement(target.HitObject, result, judgementTime, hitPosition, gameplayRate, inputOffset, scoreProcessor, timelineRecorder));
+                    // 单判：滑条头与圆共用候选集，取最早可判者。等价实机 StartTimeOrderedHitPolicy
+                    // ―― 前一物件未判时后续物件不可判，因此一次输入只会落在一个物件上。
+                    OsuSessionSliderState? sliderCandidate = null;
+
+                    foreach (var slider in sliders)
+                    {
+                        if (!slider.CanAcceptHeadPress(edge.Time, edge.Position))
+                            continue;
+
+                        if (sliderCandidate == null || slider.HeadStartTime < sliderCandidate.HeadStartTime)
+                            sliderCandidate = slider;
+                    }
+
+                    OsuSessionCircleScheduler.PendingTarget? circleCandidate = scheduler.FindAcceptableTarget(edge.Time, edge.Position);
+
+                    bool sliderWins = sliderCandidate != null
+                                      && (circleCandidate == null || sliderCandidate.HeadStartTime < circleCandidate.HitObject.StartTime);
+
+                    if (sliderWins)
+                        sliderCandidate!.ProcessHeadPress(edge.Time, edge.Position, edge.Action, cursor.GetPressedActions(), applySliderHead);
+                    else if (circleCandidate != null)
+                        scheduler.ProcessPress(edge.Time, edge.Position, applyCircle);
                 }
 
                 foreach (var slider in sliders)
