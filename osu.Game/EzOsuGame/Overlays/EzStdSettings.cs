@@ -15,6 +15,12 @@ namespace osu.Game.EzOsuGame.Overlays
     /// <summary>
     /// Ez Osu 设置：StdJudgeMode 判定轨与进阶偏移。
     /// </summary>
+    /// <remarks>
+    /// 判定与分数是两根独立的轴：判定轨只决定判定窗口与计分算法，总分刻度不随它变。
+    /// TODO(EZ): 分数刻度开关。现成「分数显示模式」(<c>OsuSetting.ScoreDisplayMode</c>) 的 Classic
+    /// 是把量化分按最小二乘拟合近似换算回 classic 刻度；后续应改为直接取 stable 分
+    /// （StableClassic 轨的 self-contained 原始总分 / <c>ScoreInfo.LegacyTotalScore</c>），不要拟合。
+    /// </remarks>
     public partial class EzStdSettings : EzEnvironmentSettingsSubsection
     {
         protected override LocalisableString Header => EzSettingsStrings.EZ_STD_SETTINGS_HEADER;
