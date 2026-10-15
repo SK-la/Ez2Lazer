@@ -245,6 +245,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             base.Update();
 
             ManiaEzDrawableJudgement.TryO2HoldUpdate(this);
+            ManiaEzDrawableJudgement.TryStableClassicSettleHeldTail(this);
 #if DEBUG
             ManiaJudgeHotPathTrace.RecordHoldUpdate();
 
@@ -466,6 +467,8 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
             if (ManiaEzDrawableJudgement.TryEz2AcHoldOnReleased(this))
                 return;
+
+            ManiaEzDrawableJudgement.NotifyStableClassicReleased(this);
 
             if (isHolding.Value)
             {

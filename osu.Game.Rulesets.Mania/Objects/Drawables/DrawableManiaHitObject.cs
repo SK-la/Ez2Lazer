@@ -94,9 +94,15 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             base.LoadComplete();
 
             drawableManiaRuleset ??= this.FindClosestParent<DrawableManiaRuleset>();
-            UsesEzJudgement = drawableManiaRuleset?.JudgementRound?.IsEzJudgeMode
-                              ?? (HitObject.HitWindows is ManiaHitWindows windows
-                                  && windows.ActiveJudgeMode is not (EzEnumJudgeMode.Lazer or EzEnumJudgeMode.Classic or EzEnumJudgeMode.StableClassic));
+
+            // 判定由 Ez 内核派发的档位（BMS / O2 / EZ2AC / Malody / StableClassic）由策略决定走不走内核；
+            // Lazer / Classic 没有策略，走 vanilla 判定。
+            var judgementRound = drawableManiaRuleset?.JudgementRound;
+
+            UsesEzJudgement = judgementRound != null
+                ? judgementRound.Strategy != null
+                : HitObject.HitWindows is ManiaHitWindows windows
+                  && windows.ActiveJudgeMode is not (EzEnumJudgeMode.Lazer or EzEnumJudgeMode.Classic or EzEnumJudgeMode.StableClassic);
             ColumnSchedulesAutoMiss = drawableManiaRuleset?.ColumnRoutesInput == true;
 
             Direction.BindValueChanged(OnDirectionChanged, true);
@@ -179,15 +185,18 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         /// <summary>
         /// 被动 miss：在通知 <see cref="ScoreProcessor"/> 前写入 stored TimeOffset（与 Session end-sweep 对齐）。
         /// </summary>
-        internal void EzApplyPassiveMissWithStoredOffset()
+        /// <param name="result">
+        /// 落判档位。默认 <see cref="HitResult.Miss"/>；StableClassic 的 LN 头压成 Ignore 档位时由调用方传入。
+        /// </param>
+        internal void EzApplyPassiveMissWithStoredOffset(HitResult result = HitResult.Miss)
         {
             ApplyResultWithStoredTiming(
-                static (r, _) =>
+                static (r, data) =>
                 {
-                    r.Type = HitResult.Miss;
+                    r.Type = data;
                     r.IsComboHit = false;
                 },
-                0,
+                result,
                 ManiaDrawableMissTiming.ResolveStoredOffset(this));
         }
 
