@@ -94,6 +94,15 @@ namespace osu.Game.Skinning
             {
                 resourceHitSamples = resources.AudioManager?.GetSampleStore(applyGlobalAdjustments: false);
 
+                if (resourceHitSamples != null)
+                {
+                    resourceHitSamples.PlaybackConcurrency = OsuGameBase.SAMPLE_CONCURRENCY;
+
+                    // osu-stable performs audio lookups in order of wav -> mp3 -> ogg.
+                    // The GetSampleStore() call above internally adds wav and mp3, so ogg is added at the end to ensure expected ordering.
+                    resourceHitSamples.AddExtension(@"ogg");
+                }
+
                 SkinInfo = skin.ToLive(resources.RealmAccess);
 
                 store.AddStore(new RealmBackedResourceStore<SkinInfo>(SkinInfo, resources.Files, resources.RealmAccess));
