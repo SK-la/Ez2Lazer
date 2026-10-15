@@ -510,6 +510,107 @@ namespace osu.Game.Rulesets.Mania.Tests
         }
 
         /// <summary>
+        /// [Ez] StableClassic 断连 LN（提早松手、不重按）：尾被动 Miss 仍须出判决，
+        /// 覆盖结算门闩——悬空不判会让局内 <c>HasCompleted</c> 永假，局内无法进入结算。
+        /// </summary>
+        /// <remarks>
+        /// 只断言结算门闩，不断言 live/Session 全量 parity：StableClassic 的 drawable 侧尚未接 stable 长条语义，
+        /// 局内与 Session 目前不一致（局内 HeadNote=Perfect、Session HeadNote=IgnoreHit）。见
+        /// <see cref="TestFullScoreParity_StableClassicLiveSessionDivergence"/>。门闩本身已成立，故不受该差异影响。
+        /// </remarks>
+        [Test]
+        public void TestFullScoreParity_StableClassicBrokenHoldNoRepress()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+
+            const double head = 1000;
+            const double tail = 3000;
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                    new Note { StartTime = 4000, Column = 1 },
+                },
+                new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(1500), // 提早松手 → 断连，尾被动 miss
+                    new ManiaReplayFrame(4000, ManiaAction.Key2),
+                    new ManiaReplayFrame(4100),
+                },
+                assertJudgedHitsComplete: true,
+                assertSessionParity: false);
+        }
+
+        /// <summary>
+        /// [Ez] StableClassic 按住过尾不松手：尾落在帧钟的 <c>EndTime + HitWindow50</c> 上，
+        /// 局内同样必须收束，不得因「持过尾」而永不结算。
+        /// </summary>
+        /// <remarks>同 <see cref="TestFullScoreParity_StableClassicBrokenHoldNoRepress"/>：只断言结算门闩。</remarks>
+        [Test]
+        public void TestFullScoreParity_StableClassicHeldPastTail()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+
+            const double head = 1000;
+            const double tail = 3000;
+
+            var frames = new List<ReplayFrame>();
+
+            // 100ms 帧钟铺到 3400，覆盖 EndTime + HitWindow50 的落判帧。
+            for (double time = head; time <= 3400; time += 100)
+                frames.Add(new ManiaReplayFrame(time, ManiaAction.Key1));
+
+            frames.Add(new ManiaReplayFrame(3500));
+            frames.Add(new ManiaReplayFrame(4000, ManiaAction.Key2));
+            frames.Add(new ManiaReplayFrame(4100));
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                    new Note { StartTime = 4000, Column = 1 },
+                },
+                frames,
+                assertJudgedHitsComplete: true,
+                assertSessionParity: false);
+        }
+
+        /// <summary>
+        /// [Ez] StableClassic 局内与 Session 的已知不一致（<b>当前失败，故挂起</b>）：drawable 侧没有
+        /// stable 长条语义的接入，局内跑的是 lazer 长条判定，Session 跑的是 stable 状态机。
+        /// 实测（head=1000 / tail=3000）：断连不重按 → 局内 <c>HeadNote:Perfect</c> + <c>TailNote:Miss</c>，
+        /// Session 只出 <c>IgnoreHit</c>(头) + <c>TailNote:Miss</c>；按住过尾不松手 → 局内
+        /// <c>Body:ComboBreak</c> + <c>TailNote:Miss</c>，Session 出 <c>TailNote:Ok</c>。
+        /// 局内 accuracy 也恒为 1：<see cref="Helper.JudgeModeHelper.GetBaseScoreForResult"/> 无 StableClassic 分支，
+        /// 落到 <c>default: return 0</c>，当前判定基分全 0。
+        /// </summary>
+        [Test]
+        [Ignore("StableClassic 的 drawable 侧尚未接 stable 长条语义；修复后去掉 Ignore")]
+        public void TestFullScoreParity_StableClassicLiveSessionDivergence()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+
+            const double head = 1000;
+            const double tail = 3000;
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                    new Note { StartTime = 4000, Column = 1 },
+                },
+                new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(1500),
+                    new ManiaReplayFrame(4000, ManiaAction.Key2),
+                    new ManiaReplayFrame(4100),
+                });
+        }
+
+        /// <summary>
         /// 一条长 LN 中途多次「按下—松开」：每次提前松手各计一次 ComboBreak（stable 语义）。
         /// 局内与 Session 必须同为 N 次且全量统计一致。
         /// </summary>
@@ -732,7 +833,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         }
 
         // P2-B: 完整 Score parity 测试（accuracy/score/statistics）
-        private void runFullScoreParityTest(List<ManiaHitObject> hitObjects, List<ReplayFrame> frames, bool assertJudgedHitsComplete = false)
+        private void runFullScoreParityTest(List<ManiaHitObject> hitObjects, List<ReplayFrame> frames, bool assertJudgedHitsComplete = false, bool assertSessionParity = true)
         {
             AddStep("configure environment", () => ReplayJudgeTestConfig.ApplyToGlobalConfig(parityEnvironment));
 
@@ -759,9 +860,9 @@ namespace osu.Game.Rulesets.Mania.Tests
             });
 
             // 玩家是异步加载的：ScoreProcessor 由 Player 的 [BackgroundDependencyLoader] load() 建出，
-            // 在此之前访问它会 NRE（本夹具当进程首个测试时必现）。LoadedBeatmapSuccessfully 为 true
-            // 即 load() 已跑到 ScoreProcessor 赋值之后。
-            AddUntilStep("wait for player", () => currentPlayer.LoadedBeatmapSuccessfully);
+            // 在此之前访问它会 NRE。LoadedBeatmapSuccessfully 先于 ScoreProcessor 赋值变 true（实测约半数复现），
+            // 故两者都要等。
+            AddUntilStep("wait for player", () => currentPlayer is { LoadedBeatmapSuccessfully: true, ScoreProcessor: not null });
             AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value);
 
             if (assertJudgedHitsComplete)
@@ -777,6 +878,9 @@ namespace osu.Game.Rulesets.Mania.Tests
             {
                 playableBeatmap = Beatmap.Value.GetPlayableBeatmap(new ManiaRuleset().RulesetInfo);
             });
+
+            if (!assertSessionParity)
+                return;
 
             AddAssert("session accuracy matches drawable", () =>
             {
@@ -864,9 +968,9 @@ namespace osu.Game.Rulesets.Mania.Tests
             });
 
             // 玩家是异步加载的：ScoreProcessor 由 Player 的 [BackgroundDependencyLoader] load() 建出，
-            // 在此之前访问它会 NRE（本夹具当进程首个测试时必现）。LoadedBeatmapSuccessfully 为 true
-            // 即 load() 已跑到 ScoreProcessor 赋值之后。
-            AddUntilStep("wait for player", () => currentPlayer.LoadedBeatmapSuccessfully);
+            // 在此之前访问它会 NRE。LoadedBeatmapSuccessfully 先于 ScoreProcessor 赋值变 true（实测约半数复现），
+            // 故两者都要等。
+            AddUntilStep("wait for player", () => currentPlayer is { LoadedBeatmapSuccessfully: true, ScoreProcessor: not null });
             AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value);
 
             AddAssert("replay result matches recalculated Now", () =>
