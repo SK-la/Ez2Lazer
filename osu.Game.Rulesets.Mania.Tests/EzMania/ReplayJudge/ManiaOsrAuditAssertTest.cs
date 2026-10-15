@@ -194,6 +194,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         // 与 osr 头（金标）的已知残差：
         //  - 单键、长条的 Perfect/Great 计数已与头一致（长条已按帧钟到点判尾）。
         //  - 连击已按 stable 的 Holding 每 100ms 涨一格实现，两张夹具的 MaxCombo 与头精确相等。
+        //  - LN 头绑定 IgnoreJudgement：整条 LN 只由尾出一枚档位，头不再多记一枚 Miss
+        //    （Hanatachi 从 40 降到 39，更贴近头的 36）。
         //  - 判定总数与总分仍有残差（Hanatachi 905613 / 头 904544，PORTRAiT 867543 / 头 871917），
         //    来自判定计数口径与长条档位权值。
         private static readonly AuditFixture stable_classic_hanatachi = new AuditFixture(
@@ -225,7 +227,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             0.98074732285258603,
             new Dictionary<HitResult, int>
             {
-                [HitResult.Miss] = 40,
+                [HitResult.Miss] = 39,
                 [HitResult.Meh] = 8,
                 [HitResult.Ok] = 7,
                 [HitResult.Good] = 105,

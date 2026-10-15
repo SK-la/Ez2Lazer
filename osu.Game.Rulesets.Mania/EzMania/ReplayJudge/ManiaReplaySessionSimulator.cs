@@ -548,12 +548,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                                 continue;
 
                             forced.Judged = true;
-                            forced.Result = HitResult.Miss;
+                            HitResult forcedResult = ResolveForcedMissResult(forced.Target, environment.JudgeMode);
+                            forced.Result = forcedResult;
                             double forcedOffset = ComputeStoredTimeOffset(input.Time, forced.Target);
                             ApplyFinalResult(
                                 scoreProcessor,
                                 forced.Target,
-                                HitResult.Miss,
+                                forcedResult,
                                 forcedOffset,
                                 input.Time,
                                 gameplayRate,
@@ -842,14 +843,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 }
 
                 state.Judged = true;
-                state.Result = HitResult.Miss;
 
-                // stable classic：LN 头不出判定，被动 Miss 也不落判——整条长条的唯一判定由尾给出。
-                if (state.Target is HeadNote && StableClassicJudgeModeJudgement.IsSelected(judgeMode))
-                {
-                    clearActiveHoldAfterPassiveMiss(state.Target, headByTail, activeHoldByColumn);
-                    continue;
-                }
+                HitResult missResult = ResolveForcedMissResult(state.Target, judgeMode);
+                state.Result = missResult;
 
                 double missEventTime = deadline;
                 double storedOffset = ResolveMissStoredOffset(state.Target, pressTimesByColumn, missEventTime);
@@ -857,7 +853,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 ApplyFinalResult(
                     scoreProcessor,
                     state.Target,
-                    HitResult.Miss,
+                    missResult,
                     storedOffset,
                     missEventTime,
                     gameplayRate,
@@ -1669,6 +1665,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         internal static double ComputeStoredTimeOffset(double eventTime, HitObject target)
             => eventTime - target.GetEndTime();
+
+        /// <summary>
+        /// 被动 / 强制 Miss 落判时该用的档位：StableClassic 的 LN 头绑定 <c>IgnoreJudgement</c>，
+        /// 只能落 Ignore 档位（与局内头判定的降级一致），否则统计里会多出一枚假的 Miss。
+        /// </summary>
+        internal static HitResult ResolveForcedMissResult(HitObject target, EzEnumJudgeMode judgeMode)
+            => target is HeadNote && StableClassicJudgeModeJudgement.IsSelected(judgeMode) ? HitResult.IgnoreMiss : HitResult.Miss;
 
         internal static double ResolveMissStoredOffset(
             HitObject target,
