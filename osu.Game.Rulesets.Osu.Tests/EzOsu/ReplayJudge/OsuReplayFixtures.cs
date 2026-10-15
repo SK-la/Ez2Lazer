@@ -7,8 +7,10 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Replays;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
+using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Osu.Replays;
 using osu.Game.Rulesets.Replays;
@@ -183,6 +185,56 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
             };
 
             var score = new Score { ScoreInfo = scoreInfo, Replay = replay };
+            var environment = GlobalConfigStore.EzConfig.ResolveEnvironment(ReplayRunPurpose.ForStored, scoreInfo);
+
+            return (score, beatmap, environment);
+        }
+
+        /// <summary>
+        /// note lock 对照：前一个圆尚未判定时点击后一个圆（输入落在后圆窗内）。
+        /// 两档输入都被 lazer 顺序策略放行（输入不早于前圆起拍）、被 CL 顺序策略挡下（前圆尚未判定）。
+        /// </summary>
+        /// <param name="classicNoteLock">挂 CL（ClassicNoteLock 默认开）走 LegacyHitPolicy，否则走 lazer 默认顺序策略。</param>
+        /// <param name="pressAtBlockerStart">true 按在前圆起拍（与前圆同刻），false 按在后圆起拍。</param>
+        public static (Score score, IBeatmap beatmap, IGameplayEnvironment environment) CreateNoteLockNextCircle(bool classicNoteLock, bool pressAtBlockerStart)
+        {
+            const double time_first_circle = 1500;
+            const double time_second_circle = 1600;
+
+            var ruleset = new OsuRuleset();
+            var testBeatmap = new TestBeatmap(ruleset.RulesetInfo)
+            {
+                HitObjects = new List<HitObject>
+                {
+                    new HitCircle { StartTime = time_first_circle, Position = new Vector2(256, 192) },
+                    new HitCircle { StartTime = time_second_circle, Position = new Vector2(350, 200) },
+                },
+            };
+
+            var beatmap = prepareBeatmap(ruleset, testBeatmap);
+            var second = (HitCircle)beatmap.HitObjects[1];
+            double pressTime = pressAtBlockerStart ? time_first_circle : time_second_circle;
+
+            var frames = new List<ReplayFrame>
+            {
+                new OsuReplayFrame(pressTime, second.StackedPosition, OsuAction.LeftButton),
+                new OsuReplayFrame(pressTime + 50, second.StackedPosition),
+            };
+
+            return createScore(ruleset, beatmap, frames, classicNoteLock);
+        }
+
+        private static (Score score, IBeatmap beatmap, IGameplayEnvironment environment) createScore(
+            OsuRuleset ruleset, IBeatmap beatmap, List<ReplayFrame> frames, bool classicNoteLock)
+        {
+            var scoreInfo = new ScoreInfo
+            {
+                Ruleset = ruleset.RulesetInfo,
+                BeatmapInfo = beatmap.BeatmapInfo,
+                Mods = classicNoteLock ? new Mod[] { new OsuModClassic() } : new Mod[0],
+            };
+
+            var score = new Score { ScoreInfo = scoreInfo, Replay = new Replay { Frames = frames } };
             var environment = GlobalConfigStore.EzConfig.ResolveEnvironment(ReplayRunPurpose.ForStored, scoreInfo);
 
             return (score, beatmap, environment);

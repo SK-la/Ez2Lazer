@@ -6,8 +6,7 @@ using NUnit.Framework;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge;
-using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
-using osu.Game.Rulesets.Osu.Scoring;
+using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
@@ -22,22 +21,29 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
         public void OneTimeSetUp() => GlobalConfigStore.EnsureInitialized();
 
         [Test]
-        public void ClassicNativeHitWindowsDifferFromLazerAtOd5()
+        public void StableHitWindowsFollowStableOdFormula()
         {
-            var classic = new OsuStableClassicHitWindows();
-            classic.SetDifficulty(5);
+            var stable = new StableStdHitWindows();
+            stable.SetDifficulty(5);
 
-            var lazer = new OsuHitWindows();
-            lazer.SetDifficulty(5);
+            // stable 半窗：300 = 80-6*OD，100 = 140-8*OD，50 = 200-10*OD，miss 固定 400。
+            Assert.That(stable.WindowFor(HitResult.Great), Is.EqualTo(50));
+            Assert.That(stable.WindowFor(HitResult.Ok), Is.EqualTo(100));
+            Assert.That(stable.WindowFor(HitResult.Meh), Is.EqualTo(150));
+            Assert.That(stable.WindowFor(HitResult.Miss), Is.EqualTo(400));
 
-            Assert.That(classic.WindowFor(HitResult.Ok), Is.Not.EqualTo(lazer.WindowFor(HitResult.Ok)));
-            Assert.That(classic.WindowFor(HitResult.Meh), Is.Not.EqualTo(lazer.WindowFor(HitResult.Meh)));
+            // 边界取严格小于：恰好压线落到下一档。
+            Assert.That(stable.ResultFor(49.9), Is.EqualTo(HitResult.Great));
+            Assert.That(stable.ResultFor(50), Is.EqualTo(HitResult.Ok));
+            Assert.That(stable.ResultFor(150), Is.EqualTo(HitResult.Miss));
+            Assert.That(stable.ResultFor(400), Is.EqualTo(HitResult.Miss));
+            Assert.That(stable.ResultFor(400.1), Is.EqualTo(HitResult.None));
         }
 
         [Test]
-        public void SessionLateTapDivergesBetweenLazerAndClassicNativeTracks()
+        public void SessionLateTapDivergesBetweenLazerAndClassicTracks()
         {
-            // 各轨独立 beatmap：StableClassic.ApplyHitWindowsToBeatmap 就地改窗。
+            // 各轨独立 beatmap：StableClassic.BindClassicSemanticsToBeatmap 就地改窗。
             var (scoreLazer, beatmapLazer, envBase) = OsuReplayFixtures.CreateSingleCircleLateTap(90);
             var (scoreClassic, beatmapClassic, _) = OsuReplayFixtures.CreateSingleCircleLateTap(90);
 
@@ -47,12 +53,12 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
             var lazer = OsuReplaySession.Run(scoreLazer, beatmapLazer, envLazer);
             var classic = OsuReplaySession.Run(scoreClassic, beatmapClassic, envClassic);
 
-            Assert.That(count(lazer.ScoreInfo.Statistics, HitResult.Ok), Is.EqualTo(1),
-                "OD5 +90ms：Lazer Ok 窗应接住");
-            Assert.That(count(classic.ScoreInfo.Statistics, HitResult.Meh), Is.EqualTo(1),
-                "OD5 +90ms：StableClassic Ok 半窗更紧 → Meh");
-            Assert.That(count(classic.ScoreInfo.Statistics, HitResult.Ok), Is.EqualTo(0));
-            Assert.That(classic.ScoreInfo.TotalScore, Is.Not.EqualTo(lazer.ScoreInfo.TotalScore));
+            // stable 判定窗与 lazer 同式（OD5 +90ms 落 Ok 窗）；两轨的分野在计分：
+            Assert.That(count(lazer.ScoreInfo.Statistics, HitResult.Ok), Is.EqualTo(1));
+            Assert.That(count(classic.ScoreInfo.Statistics, HitResult.Ok), Is.EqualTo(1));
+
+            // lazer 走 500k/500k 标准化曲线，stable 轨走纯 PeppyStars 累加，两者不该相等。
+            Assert.That(classic.ScoreInfo.TotalScore, Is.LessThan(lazer.ScoreInfo.TotalScore));
         }
 
         private static GameplayEnvironment withTrack(GameplayEnvironment env, EzEnumJudgeMode track)

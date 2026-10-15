@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -40,11 +41,38 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
             this.head = head;
             this.nestedInOrder = nestedInOrder;
             this.headMissWindow = headMissWindow;
+
+            double last = Math.Max(slider.EndTime, head.StartTime + headMissWindow);
+
+            foreach (var nested in nestedInOrder)
+            {
+                double nestedLast = nested is SliderTailCircle
+                    ? nested.StartTime + SliderEventGenerator.TAIL_LENIENCY
+                    : nested.StartTime;
+
+                if (nestedLast > last)
+                    last = nestedLast;
+            }
+
+            LastActiveTime = last;
         }
 
         public double StartTime => slider.StartTime;
 
         public double EndTime => slider.EndTime;
+
+        /// <summary>
+        /// 本滑条最后一个仍需参与模拟的时刻：主体结束、滑条头判定窗结束、各嵌套最晚开判时刻三者取大
+        /// （尾部额外加 <see cref="SliderEventGenerator.TAIL_LENIENCY"/>）。
+        /// 缺了它，短滑条的头或尾永远不会自动判定，整条滑条就永远停留在未判状态。
+        /// </summary>
+        public double LastActiveTime { get; }
+
+        /// <summary>滑条头起始时刻；按键仲裁按它排序。</summary>
+        public double HeadStartTime => head.StartTime;
+
+        /// <summary>note lock 定位用：滑条头是嵌套物件，以其父滑条定位容器序。</summary>
+        public HitObject ContainerObject => slider;
 
         public static IReadOnlyList<OsuSessionSliderState> CreateAll(IBeatmap beatmap, CancellationToken cancellationToken)
         {
@@ -86,38 +114,68 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
             }
 
             yield return slider.EndTime;
+            yield return LastActiveTime;
         }
 
-        public void ProcessHeadPress(double time, Vector2 position, OsuAction action, IReadOnlyList<OsuAction> pressedActions, JudgementApplier apply)
+        /// <summary>按键是否落在本滑条头上并可判；仅查询，不落判定。用于按键仲裁。</summary>
+        public bool CanAcceptHeadPress(double time, Vector2 position) => resolveHeadPressResult(time, position).HasValue;
+
+        public bool ProcessHeadPress(double time, Vector2 position, OsuAction action, IReadOnlyList<OsuAction> pressedActions, JudgementApplier apply)
         {
-            if (isJudged(head))
-                return;
+            HitResult? result = resolveHeadPressResult(time, position);
 
-            if (time < head.StartTime - headMissWindow || time > head.StartTime + headMissWindow)
-                return;
+            if (result == null)
+                return false;
 
-            if (!OsuCircleJudgement.IsInHitRadius(position, head.StackedPosition, head.Radius))
-                return;
-
-            double timeOffset = time - head.StartTime;
-            HitResult result = OsuCircleJudgement.MapClassicSliderHeadIfNeeded(
-                OsuCircleJudgement.ResultForPress(head.HitWindows!, timeOffset),
-                head.ClassicSliderBehaviour);
-
-            if (result == HitResult.None)
-                return;
-
-            if (result.IsHit())
+            if (result.Value.IsHit())
                 headHitAction = action;
 
-            applyJudgement(head, result, time, position, apply);
-            markJudged(head, result);
+            applyJudgement(head, result.Value, time, position, apply);
+            markJudged(head, result.Value);
             postProcessHeadJudgement(time, position, pressedActions, apply);
+            return true;
+        }
+
+        /// <summary>命中窗口 + 半径 + 判定窗三重前置校验；任一不成立返回 null。</summary>
+        private HitResult? resolveHeadPressResult(double time, Vector2 position)
+        {
+            if (isJudged(head))
+                return null;
+
+            if (time < head.StartTime - headMissWindow || time > head.StartTime + headMissWindow)
+                return null;
+
+            if (!OsuCircleJudgement.IsInHitRadius(position, head.StackedPosition, head.Radius))
+                return null;
+
+            HitResult result = OsuCircleJudgement.MapClassicSliderHeadIfNeeded(
+                OsuCircleJudgement.ResultForPress(head.HitWindows!, time - head.StartTime),
+                head.ClassicSliderBehaviour);
+
+            return result == HitResult.None ? null : result;
+        }
+
+        /// <summary>
+        /// note lock 抢拍：把尚未判定的头部立刻按过期结算（结果与自然过期一致，只有时刻提前）。
+        /// 之后再走正常 <see cref="ProcessTime"/>，嵌套物件仍按滑条状态机判。
+        /// </summary>
+        public bool ForceMissHead(double judgementTime, JudgementApplier apply)
+        {
+            if (isJudged(head))
+                return false;
+
+            applyHeadMiss(judgementTime, apply);
+            return true;
         }
 
         public void ProcessTime(double time, Vector2 cursorPosition, IReadOnlyList<OsuAction> pressedActions, JudgementApplier apply)
         {
             updateTracking(time, cursorPosition, pressedActions);
+
+            // 头部超时与嵌套判定在同一时刻发生时，必须先结算头部，否则嵌套（含尾）会被整轮跳过；
+            // 若该时刻正好是本滑条最后一个活跃时刻，嵌套就永远留在未判状态。
+            if (!isJudged(head) && time >= head.StartTime + headMissWindow)
+                applyHeadMiss(time, apply);
 
             if (isJudged(head))
             {
@@ -139,9 +197,6 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
                     tryJudgeNestedObject(nested, time - nested.StartTime, time, apply);
                 }
             }
-
-            if (!isJudged(head) && time >= head.StartTime + headMissWindow)
-                applyHeadMiss(time, apply);
 
             if (!sliderBodyJudged && isTailJudged() && time >= slider.EndTime)
                 applySliderBodyJudgement(time, apply);

@@ -69,6 +69,16 @@ namespace osu.Game.EzOsuGame.Scoring
                 return true;
             }
 
+            if (score.TryGetStdGameplayMode(out int stdJudgeMode))
+            {
+                // osu! 轨：官方只理解 Lazer 判定轨，StableClassic 的窗口与计分是 Ez 自管语义（同 mania 口径）。
+                if (stdJudgeMode != (int)EzEnumJudgeMode.Lazer)
+                {
+                    blockReason = $"JudgeMode={stdJudgeMode} (Lazer required)";
+                    return false;
+                }
+            }
+
             if (score.SessionOffsetPlusNonMania != 0)
             {
                 blockReason = $"SessionOffsetPlusNonMania={score.SessionOffsetPlusNonMania:0.####}";

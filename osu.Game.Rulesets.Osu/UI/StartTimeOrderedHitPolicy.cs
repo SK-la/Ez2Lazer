@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
+using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Osu.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
@@ -23,29 +25,22 @@ namespace osu.Game.Rulesets.Osu.UI
     {
         public IHitObjectContainer? HitObjectContainer { get; set; }
 
+        private readonly List<OsuNoteLockEntry> hitObjectsUpToTarget = new List<OsuNoteLockEntry>();
+
         public ClickAction CheckHittable(DrawableHitObject hitObject, double time, HitResult result)
         {
             if (HitObjectContainer == null)
                 throw new InvalidOperationException($"{nameof(HitObjectContainer)} should be set before {nameof(CheckHittable)} is called.");
 
-            DrawableHitObject? blockingObject = null;
+            hitObjectsUpToTarget.Clear();
 
             foreach (var obj in enumerateHitObjectsUpTo(hitObject.HitObject.StartTime))
-            {
-                if (hitObjectCanBlockFutureHits(obj))
-                    blockingObject = obj;
-            }
+                hitObjectsUpToTarget.Add(toEntry(obj));
 
-            if (blockingObject != null)
-            {
-                // A hit is disallowed if:
-                // 1. The last blocking hitobject has not yet been judged.
-                // 2. The current time is before the last hitobject's start time.
-                //
-                // Hits at exactly the same time as the blocking hitobject are allowed for maps that contain simultaneous hitobjects (e.g. /b/372245).
-                if (!blockingObject.Judged && time < blockingObject.HitObject.StartTime)
-                    return ClickAction.Shake;
-            }
+            ClickAction action = OsuNoteLockSelector.CheckTimeOrdered(hitObjectsUpToTarget, hitObject.HitObject.StartTime, time);
+
+            if (action != ClickAction.Hit)
+                return action;
 
             // Generally when the user has hit way too early.
             if (result == HitResult.None)
@@ -102,5 +97,14 @@ namespace osu.Game.Rulesets.Osu.UI
                 }
             }
         }
+
+        private static OsuNoteLockEntry toEntry(DrawableHitObject hitObject)
+            => new OsuNoteLockEntry(
+                hitObject.HitObject.StartTime,
+                hitObject.HitObject.GetEndTime(),
+                hitObject.Judged,
+                hitObject.AllJudged,
+                hitObject.HitObject is OsuHitObject osuHitObject ? osuHitObject.StackHeight : 0,
+                hitObjectCanBlockFutureHits(hitObject));
     }
 }

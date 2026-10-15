@@ -54,7 +54,22 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
             return targets.Select(t => t.HitObject.StartTime + t.MissWindow).Distinct().OrderBy(t => t).ToList();
         }
 
-        public void ProcessPress(double time, Vector2 position, Action<PendingTarget, HitResult, double, Vector2?> apply)
+        public bool ProcessPress(double time, Vector2 position, Action<PendingTarget, HitResult, double, Vector2?> apply)
+        {
+            PendingTarget? target = FindAcceptableTarget(time, position);
+
+            if (target == null)
+                return false;
+
+            double startOffset = time - target.HitObject.StartTime;
+            HitResult result = OsuCircleJudgement.ResultForPress(target.HitObject.HitWindows!, startOffset);
+            apply(target, result, time, position);
+            target.Judged = true;
+            return true;
+        }
+
+        /// <summary>最早的可判圆；无则 null。仅查询，不落判定。用于按键仲裁。</summary>
+        public PendingTarget? FindAcceptableTarget(double time, Vector2 position)
         {
             foreach (var target in targets)
             {
@@ -70,15 +85,13 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
                 if (!OsuCircleJudgement.IsInHitRadius(position, target.OsuTarget.StackedPosition, target.OsuTarget.Radius))
                     continue;
 
-                double startOffset = time - target.HitObject.StartTime;
-                HitResult result = OsuCircleJudgement.ResultForPress(target.HitObject.HitWindows!, startOffset);
-                if (result == HitResult.None)
+                if (OsuCircleJudgement.ResultForPress(target.HitObject.HitWindows!, time - target.HitObject.StartTime) == HitResult.None)
                     continue;
 
-                apply(target, result, time, position);
-                target.Judged = true;
-                return;
+                return target;
             }
+
+            return null;
         }
 
         public void ProcessExpiredMisses(double time, Action<PendingTarget, HitResult, double, Vector2?> apply)
@@ -94,6 +107,24 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
                 apply(target, HitResult.Miss, time, null);
                 target.Judged = true;
             }
+        }
+
+        /// <summary>
+        /// note lock 抢拍：把尚未判定的目标立刻结算为 Miss（对应 Drawable 的 <c>MissForcefully</c>，结果与过期窗一致，只有时刻提前）。
+        /// </summary>
+        public bool ForceMissTarget(HitObject hitObject, double judgementTime, Action<PendingTarget, HitResult, double, Vector2?> apply)
+        {
+            foreach (var target in targets)
+            {
+                if (target.Judged || !ReferenceEquals(target.HitObject, hitObject))
+                    continue;
+
+                apply(target, HitResult.Miss, judgementTime, null);
+                target.Judged = true;
+                return true;
+            }
+
+            return false;
         }
 
         public void FinalizeRemainingMisses(Action<PendingTarget, HitResult, double, Vector2?> apply)

@@ -5,6 +5,7 @@ using NUnit.Framework;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Osu;
 using osu.Game.Scoring;
 
 namespace osu.Game.Tests.EzOsuGame.Scoring
@@ -79,11 +80,41 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             Assert.That(EzOnlineScoreSubmissionPolicy.AllowsOfficialSubmission(score), Is.True);
         }
 
+        [Test]
+        public void TestBlocksNonLazerJudgeModeOnOsuTrack()
+        {
+            var score = createOsuScore((int)EzEnumJudgeMode.StableClassic);
+
+            Assert.That(EzOnlineScoreSubmissionPolicy.AllowsOfficialSubmission(score), Is.False);
+        }
+
+        [Test]
+        public void TestAllowsLazerOsuTrackWithDefaultSessionSettings()
+        {
+            var score = createOsuScore((int)EzEnumJudgeMode.Lazer);
+
+            Assert.That(EzOnlineScoreSubmissionPolicy.AllowsOfficialSubmission(score), Is.True);
+        }
+
+        [Test]
+        public void TestAllowsLegacyNegativeJudgeModeOnOsuTrack()
+        {
+            var score = createOsuScore(-1);
+
+            Assert.That(EzOnlineScoreSubmissionPolicy.AllowsOfficialSubmission(score), Is.True);
+        }
+
         private static ScoreInfo createManiaScore(int judgeMode, int healthMode) => new ScoreInfo
         {
             Ruleset = new ManiaRuleset().RulesetInfo,
             JudgeMode = judgeMode,
             HealthMode = healthMode,
+        };
+
+        private static ScoreInfo createOsuScore(int judgeMode) => new ScoreInfo
+        {
+            Ruleset = new OsuRuleset().RulesetInfo,
+            JudgeMode = judgeMode,
         };
     }
 }

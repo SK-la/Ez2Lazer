@@ -432,6 +432,11 @@ namespace osu.Game.Rulesets.Scoring
             updateScore();
         }
 
+        /// <summary>
+        /// [Ez] 规则集完全自管总分（例如 stable 原生 classic），总分不再乘以下游 <c>scoreMultiplier</c>。
+        /// </summary>
+        protected virtual bool TotalScoreIsSelfContained => false;
+
         private void updateScore()
         {
             AccuracyClassic.Value = ClassicMaxBaseScore > 0 ? ClassicBaseScore / ClassicMaxBaseScore : 1;
@@ -443,7 +448,9 @@ namespace osu.Game.Rulesets.Scoring
             double accuracyProgress = maximumAccuracyJudgementCount > 0 ? (double)currentAccuracyJudgementCount / maximumAccuracyJudgementCount : 1;
 
             TotalScoreWithoutMods.Value = (long)Math.Round(ComputeTotalScore(comboProgress, accuracyProgress, currentBonusPortion));
-            TotalScore.Value = (long)Math.Round(TotalScoreWithoutMods.Value * scoreMultiplier);
+            TotalScore.Value = TotalScoreIsSelfContained
+                ? TotalScoreWithoutMods.Value
+                : (long)Math.Round(TotalScoreWithoutMods.Value * scoreMultiplier);
         }
 
         private void updateRank()
@@ -485,7 +492,10 @@ namespace osu.Game.Rulesets.Scoring
             double comboProgress = maximumComboPortion > 0 ? currentComboPortion / maximumComboPortion : 1;
             double accuracyProgress = maximumAccuracyJudgementCount > 0 ? (double)currentAccuracyJudgementCount / maximumAccuracyJudgementCount : 1;
             double theoreticalWithoutMods = ComputeTheoreticalPerfectJudgedTotalScore(comboProgress, accuracyProgress, currentBonusPortion);
-            return (long)Math.Round(theoreticalWithoutMods * scoreMultiplier);
+
+            return TotalScoreIsSelfContained
+                ? (long)Math.Round(theoreticalWithoutMods)
+                : (long)Math.Round(theoreticalWithoutMods * scoreMultiplier);
         }
 
         /// <summary>
