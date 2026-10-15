@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -40,14 +41,38 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
             this.head = head;
             this.nestedInOrder = nestedInOrder;
             this.headMissWindow = headMissWindow;
+
+            double last = Math.Max(slider.EndTime, head.StartTime + headMissWindow);
+
+            foreach (var nested in nestedInOrder)
+            {
+                double nestedLast = nested is SliderTailCircle
+                    ? nested.StartTime + SliderEventGenerator.TAIL_LENIENCY
+                    : nested.StartTime;
+
+                if (nestedLast > last)
+                    last = nestedLast;
+            }
+
+            LastActiveTime = last;
         }
 
         public double StartTime => slider.StartTime;
 
         public double EndTime => slider.EndTime;
 
+        /// <summary>
+        /// 本滑条最后一个仍需参与模拟的时刻：主体结束、滑条头判定窗结束、各嵌套最晚开判时刻三者取大
+        /// （尾部额外加 <see cref="SliderEventGenerator.TAIL_LENIENCY"/>）。
+        /// 缺了它，短滑条的头或尾永远不会自动判定，整条滑条就永远停留在未判状态。
+        /// </summary>
+        public double LastActiveTime { get; }
+
         /// <summary>滑条头起始时刻；按键仲裁按它排序。</summary>
         public double HeadStartTime => head.StartTime;
+
+        /// <summary>note lock 定位用：滑条头是嵌套物件，以其父滑条定位容器序。</summary>
+        public HitObject ContainerObject => slider;
 
         public static IReadOnlyList<OsuSessionSliderState> CreateAll(IBeatmap beatmap, CancellationToken cancellationToken)
         {
@@ -89,6 +114,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
             }
 
             yield return slider.EndTime;
+            yield return LastActiveTime;
         }
 
         /// <summary>按键是否落在本滑条头上并可判；仅查询，不落判定。用于按键仲裁。</summary>
@@ -133,6 +159,11 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
         {
             updateTracking(time, cursorPosition, pressedActions);
 
+            // 头部超时与嵌套判定在同一时刻发生时，必须先结算头部，否则嵌套（含尾）会被整轮跳过；
+            // 若该时刻正好是本滑条最后一个活跃时刻，嵌套就永远留在未判状态。
+            if (!isJudged(head) && time >= head.StartTime + headMissWindow)
+                applyHeadMiss(time, apply);
+
             if (isJudged(head))
             {
                 foreach (var nested in nestedInOrder)
@@ -153,9 +184,6 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
                     tryJudgeNestedObject(nested, time - nested.StartTime, time, apply);
                 }
             }
-
-            if (!isJudged(head) && time >= head.StartTime + headMissWindow)
-                applyHeadMiss(time, apply);
 
             if (!sliderBodyJudged && isTailJudged() && time >= slider.EndTime)
                 applySliderBodyJudgement(time, apply);
