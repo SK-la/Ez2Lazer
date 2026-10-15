@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -70,8 +69,8 @@ namespace osu.Game.EzOsuGame.Overlays
                     Caption = EzSettingsStrings.HIT_MODE,
                     HintText = EzSettingsStrings.HIT_MODE_TOOLTIP,
                     Current = maniaJudgeModeBindable,
-                    // StableClassic 是给后续共享 classic 预留的档，现行 mania classic 仍是 Classic。
-                    Items = Enum.GetValues<EzEnumJudgeMode>().Where(m => m != EzEnumJudgeMode.StableClassic),
+                    // StableClassic 是共享的 stable 原生 classic；Classic 是 mania 私有的 Ez classic。
+                    Items = Enum.GetValues<EzEnumJudgeMode>(),
                 })
                 {
                     Keywords = new[] { "ez", "mania" }

@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.EzOsuGame.Configuration;
@@ -50,7 +49,7 @@ namespace osu.Game.EzOsuGame.Statistics
                 return new ScreenFooterButton[]
                 {
                     new EnumModeButton<EzEnumJudgeMode>(maniaJudgeMode, FontAwesome.Solid.Crosshairs, Strings.HIT_MODE,
-                        items: Enum.GetValues<EzEnumJudgeMode>().Where(m => m != EzEnumJudgeMode.StableClassic)),
+                        items: Enum.GetValues<EzEnumJudgeMode>()),
                     new EnumModeButton<EzEnumHealthMode>(maniaHealthMode, FontAwesome.Solid.Heartbeat, Strings.HEALTH_MODE),
                     new FooterButtonHitResultOffset(offsetMania),
                 };
