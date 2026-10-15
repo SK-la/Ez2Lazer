@@ -381,6 +381,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     return getLazerBaseScore(result);
 
                 case EzEnumJudgeMode.Classic:
+                // stable 原生 classic 与 mania 私有 Classic 同档位权重：300g / 300 都按 300 计。
+                // 缺此分支会让 stableScoring 之外的 accuracy 分子分母同时为 0（局内恒判 100%）。
+                case EzEnumJudgeMode.StableClassic:
                     return getClassicBaseScore(result);
 
                 case EzEnumJudgeMode.EZ2AC:
