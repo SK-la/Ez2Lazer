@@ -31,6 +31,16 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
         public ManiaBeatmap(StageDefinition defaultStage, int? originalTotalColumns = null)
         {
             Stages.Add(defaultStage);
+
+            // Mods that remove notes leave their audio behind as background sound; keep it panned to the column the
+            // note occupied instead of collapsing to the centre.
+            SamplePositionResolver = hitObject =>
+            {
+                if (hitObject is not ManiaHitObject maniaObject)
+                    return DetachedNoteSample.CENTRE;
+
+                return Math.Clamp((float)maniaObject.Column / Math.Max(1, TotalColumns), 0, 1);
+            };
         }
 
         public override IEnumerable<BeatmapStatistic> GetStatistics()

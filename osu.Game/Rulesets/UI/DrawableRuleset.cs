@@ -182,12 +182,18 @@ namespace osu.Game.Rulesets.UI
                 Children = new Drawable[]
                 {
                     FrameStableComponents,
-                    gameplayMixer.WithChild(KeyBindingInputManager
-                        .WithChildren(new Drawable[]
-                        {
-                            playfieldAdjustmentContainer.WithChild(Playfield),
-                            Overlays
-                        })),
+                    gameplayMixer.WithChildren(new Drawable[]
+                    {
+                        KeyBindingInputManager
+                            .WithChildren(new Drawable[]
+                            {
+                                playfieldAdjustmentContainer.WithChild(Playfield),
+                                Overlays
+                            }),
+                        // Samples kept by mods that removed the hit objects carrying them, played under the same
+                        // mixer as live notes (hitsound volume, pause handling).
+                        new DetachedSamplePlayer(Beatmap.DetachedSamples, gameplayMixer),
+                    }),
                 }
             };
 

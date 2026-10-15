@@ -646,8 +646,16 @@ namespace osu.Game.Rulesets.Objects.Drawables
         /// </summary>
         /// <param name="position">The lookup X position. Generally should be <see cref="SamplePlaybackPosition"/>.</param>
         protected double CalculateSamplePlaybackBalance(double position)
+            => CalculateSamplePlaybackBalance(position, positionalHitsoundsLevel.Value);
+
+        /// <summary>
+        /// Calculate a sample's balance from a 0..1 playfield position and the user's positional hitsounds setting.
+        /// </summary>
+        /// <param name="position">The lookup X position (0 for far-left, 0.5 for centre, 1 for far-right).</param>
+        /// <param name="positionalHitsoundsLevel">The user's positional hitsounds strength.</param>
+        public static double CalculateSamplePlaybackBalance(double position, double positionalHitsoundsLevel)
         {
-            float balanceAdjustAmount = positionalHitsoundsLevel.Value * 2;
+            double balanceAdjustAmount = positionalHitsoundsLevel * 2;
             double returnedValue = balanceAdjustAmount * (position - 0.5f);
 
             // Rounded to reduce the overhead of audio adjustments (which are currently bindable heavy).

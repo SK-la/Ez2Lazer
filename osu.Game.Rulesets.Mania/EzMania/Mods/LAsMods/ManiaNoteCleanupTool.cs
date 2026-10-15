@@ -691,7 +691,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         {
             StartTime = source.StartTime,
             Column = source.Column,
-            Samples = source.Samples?.ToList() ?? new List<HitSampleInfo>(),
+            // hold 的键音在 NodeSamples 里，转成 tap 后由 tap 承继头音，其余段落在原时间发声。
+            Samples = (source is HoldNote hold ? hold.GetNodeSamples(0) : source.Samples)?.ToList() ?? new List<HitSampleInfo>(),
         };
 
         private static HoldNote toHold(ManiaHitObject tap, double end) => new HoldNote

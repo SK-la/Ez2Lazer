@@ -346,11 +346,17 @@ namespace osu.Game.Beatmaps
 
             processor?.PostProcess();
 
+            // Mods below may remove or rewrite hit objects; remember what they carried so their audio survives as
+            // background sound instead of being lost with the object (see DetachedSampleLedger).
+            DetachedSampleLedger sampleLedger = mods.Any(m => m is IApplicableToBeatmap) ? DetachedSampleLedger.Capture(converted) : null;
+
             foreach (var mod in mods.OfType<IApplicableToBeatmap>())
             {
                 token.ThrowIfCancellationRequested();
                 mod.ApplyToBeatmap(converted);
             }
+
+            sampleLedger?.Settle(converted);
 
             return converted;
         }

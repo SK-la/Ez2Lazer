@@ -14,7 +14,7 @@ using osu.Game.IO.Serialization.Converters;
 
 namespace osu.Game.Beatmaps
 {
-    public class Beatmap<T> : IBeatmap<T>
+    public class Beatmap<T> : IBeatmap<T>, IDetachedSampleHost
         where T : HitObject
     {
         private BeatmapDifficulty difficulty = new BeatmapDifficulty();
@@ -70,6 +70,26 @@ namespace osu.Game.Beatmaps
 
         [JsonConverter(typeof(TypedListConverter<HitObject>))]
         public List<T> HitObjects { get; set; } = new List<T>();
+
+        /// <summary>
+        /// Samples that hit objects removed or rewritten by a mod carried, kept so their audio still sounds at its
+        /// original time.
+        /// </summary>
+        /// <remarks>
+        /// Populated by <see cref="DetachedSampleLedger"/> on the playable copy a mod operated on; not serialised.
+        /// </remarks>
+        [JsonIgnore]
+        public List<DetachedNoteSample> DetachedSamples { get; } = new List<DetachedNoteSample>();
+
+        /// <summary>
+        /// Maps a hit object to the 0..1 playfield position its samples should be panned to.
+        /// </summary>
+        /// <remarks>
+        /// Rulesets with a horizontally laid out playfield override this so detached samples keep the column the
+        /// object occupied; objects without a horizontal placement are centred.
+        /// </remarks>
+        [JsonIgnore]
+        public Func<HitObject, float> SamplePositionResolver { get; set; } = _ => DetachedNoteSample.CENTRE;
 
         IReadOnlyList<T> IBeatmap<T>.HitObjects => HitObjects;
 
