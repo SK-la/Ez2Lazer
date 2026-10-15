@@ -152,7 +152,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             yield return lazer_portrait;
         }
 
-        // Classic：Expected* = stable 二进制头旁证（本轨不做 Header 门禁）；Session* = 现行 Classic Session。
+        // Classic：Expected* = stable 原生量（Statistics / MaxCombo / LegacyTotalScore，见
+        // AuditClassicFixtureAnchorMatchesDecodedHeader）；ExpectedAccuracy 是解码后 lazer 迁移重算值，仅供记录，不作门禁。
         private static readonly AuditFixture classic_hanatachi = new AuditFixture(
             "Classic-Hanatachi",
             "Resources/Testing/Replays/ManiaAudit-Classic-Hanatachi.osr",
@@ -190,7 +191,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 [HitResult.Perfect] = 4260,
             });
 
-        // StableClassic：stable 原生 classic 判定（Classic(38) 之外的 stable 对齐轨）的 Session 锚点。
+        // StableClassic：stable 原生量锚点（同 Classic 行），Session* = 现行 StableClassic Session。
         // 与 osr 头（金标）的已知残差：
         //  - 单键、长条的 Perfect/Great 计数已与头一致（长条已按帧钟到点判尾）。
         //  - 连击已按 stable 的 Holding 每 100ms 涨一格实现，两张夹具的 MaxCombo 与头精确相等。
@@ -345,6 +346,58 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             assertSessionMatchesAnchor(fixture);
         }
 
+        [TestCaseSource(nameof(ClassicFixtures))]
+        public void AuditClassicFixtureAnchorMatchesDecodedHeader(AuditFixture fixture)
+        {
+            assertAnchorMatchesDecodedHeader(fixture);
+        }
+
+        [TestCaseSource(nameof(StableClassicFixtures))]
+        public void AuditStableClassicFixtureAnchorMatchesDecodedHeader(AuditFixture fixture)
+        {
+            assertAnchorMatchesDecodedHeader(fixture);
+        }
+
+        /// <summary>
+        /// 门禁口径自检：Classic / StableClassic 行的「头」锚点必须逐项等于 osr 解码头。
+        /// </summary>
+        /// <remarks>
+        /// 解码末段会跑 <c>StandardisedScoreMigrationTools.UpdateToLatestScoring</c>，<see cref="ScoreInfo.TotalScore"/>
+        /// 与 <see cref="ScoreInfo.Accuracy"/> 都是 <b>lazer 标准分迁移重算值</b>（mania 走
+        /// <c>150000·combo + 850000·acc^(2+2·acc)</c>，acc 用 Perfect=305 权重），<b>不是</b> stable 原生量，
+        /// 不能拿来当 stable 门禁。此处只钉 stable 原生三项：Statistics、MaxCombo、LegacyTotalScore。
+        /// </remarks>
+        private static void assertAnchorMatchesDecodedHeader(AuditFixture fixture)
+        {
+            assumeResourcesPresent(fixture);
+
+            var decoder = new HarnessScoreDecoder(fixture.BeatmapResource);
+            Score score;
+
+            using (var stream = resources.GetStream(fixture.OsrResource))
+                score = decoder.Parse(stream);
+
+            ScoreInfo info = score.ScoreInfo;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(info.IsLegacyScore, Is.True, "该夹具的头锚点取自 stable 原生量，要求 osr 走 legacy 解码路径");
+
+                Assert.That(
+                    info.LegacyTotalScore,
+                    Is.EqualTo((long?)fixture.ExpectedTotalScore),
+                    $"ExpectedTotalScore 应为 stable 原生分（LegacyTotalScore）；实际解码头 LegacyTotalScore={info.LegacyTotalScore}，"
+                    + $"迁移后 TotalScore={info.TotalScore}");
+
+                Assert.That(
+                    info.MaxCombo,
+                    Is.EqualTo(fixture.ExpectedMaxCombo),
+                    $"MaxCombo 锚点={fixture.ExpectedMaxCombo}，解码头={info.MaxCombo}");
+
+                assertStatisticsEqual(info.Statistics, fixture.ExpectedStatistics, false, null);
+            });
+        }
+
         private static void assertDecodedHeader(AuditFixture fixture)
         {
             Assume.That(fixture.AssertDecodedHeader, "本夹具不以解码 Header 为门禁");
@@ -435,7 +488,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
                 Assert.That(info.TotalScore, Is.EqualTo(expectedTotal), report);
                 Assert.That(info.MaxCombo, Is.EqualTo(expectedCombo), report);
-                // Classic Acc 权值可能暂不一致；Session 轨用实测冻结值，容差收紧到浮点噪声。
+                // 两侧锚点各自同源：Lazer 轨 ExpectedAccuracy 取自解码头，Classic / StableClassic 轨 SessionAccuracy
+                // 取自实测冻结（该轨 ExpectedAccuracy 的解码值已被 lazer 迁移改写，不作门禁）。
                 double accTolerance = afterSession || fixture.AssertDecodedHeader ? 1e-12 : 5e-3;
                 Assert.That(info.Accuracy, Is.EqualTo(expectedAcc).Within(accTolerance), report);
 
