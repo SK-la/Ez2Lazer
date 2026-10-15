@@ -4,12 +4,14 @@
 #nullable disable
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Bindings;
+using osu.Game.Audio;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
@@ -146,12 +148,21 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 return;
             }
 
-            // [Ez] mania 的 GetSamples() 就是 HitObject.Samples（ICollection），ToArray() 走精确长度快路径，
-            // 不再经过 Cast 迭代器。数组仍每次新建，因为 GameplayState.ApplySamples 靠引用不等触发绑定变更。
-            var samples = GetSamples().ToArray();
+            // [Ez] mania 的 GetSamples() 就是 HitObject.Samples（ICollection），可精确预分配、无需 Cast 迭代器。
+            // 显式构造 ISampleInfo[] 而不是协变转换：HitSampleInfo[] 传给 GameplayState.ApplySamples 后，
+            // 下游一旦写入就会抛 ArrayTypeMismatchException。数组仍每次新建，
+            // 因为 GameplayState.ApplySamples 靠引用不等触发绑定变更。
+            var hitSamples = GetSamples();
+            ICollection<HitSampleInfo> source = hitSamples as ICollection<HitSampleInfo> ?? hitSamples.ToArray();
 
-            if (samples.Length == 0)
+            if (source.Count == 0)
                 return;
+
+            var samples = new ISampleInfo[source.Count];
+            int index = 0;
+
+            foreach (var sample in source)
+                samples[index++] = sample;
 
             double balance = CalculateSamplePlaybackBalance(SamplePlaybackPosition);
 
