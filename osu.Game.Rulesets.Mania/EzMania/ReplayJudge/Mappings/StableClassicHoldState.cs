@@ -1,10 +1,12 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Game.Rulesets.Objects;
+
 namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
 {
     /// <summary>
-    /// osu!stable classic 长条持有态：整条 LN 只出一个判定，尾判需要稳定的「首次按下 / 首次有效松开」与断连标志。
+    /// osu!stable classic 长条持有态：整条 LN 只出一个判定，尾判需要稳定的「最近按下 / 首次有效松开」与断连标志。
     /// </summary>
     /// <remarks>
     /// 与 <see cref="Ez2AcHoldState"/> 同为 per-LN 状态，但语义不同：
@@ -20,12 +22,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
         public const double HOLD_COMBO_INTERVAL = 100;
 
         /// <summary>本段起点（stable <c>StartTime</c>）。</summary>
-        public double StartTime { get; }
+        public double StartTime { get; private set; }
 
         /// <summary>本段终点（stable <c>EndTime</c>）。</summary>
-        public double EndTime { get; }
+        public double EndTime { get; private set; }
 
-        /// <summary>首次按下时刻（stable <c>TimePress</c>）；从未按下为 <c>null</c>。</summary>
+        /// <summary>
+        /// 最近一次按下时刻（stable <c>TimePress</c>），每次「由松到按」的上升沿覆盖；从未按下为 <c>null</c>。
+        /// </summary>
         public double? TimePress { get; private set; }
 
         /// <summary>
@@ -46,17 +50,47 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
         /// </summary>
         private double holdComboBaseline;
 
+        /// <summary>本持有态当前所属的谱面条目；<c>null</c> 表示尚未换绑（见 <see cref="EnsureBoundTo"/>）。</summary>
+        private HitObjectLifetimeEntry? boundEntry;
+
         public StableClassicHoldState(double startTime, double endTime)
         {
             StartTime = startTime;
             EndTime = endTime;
         }
 
-        /// <summary>按下：只有首次按下写 <see cref="TimePress"/>（stable <c>TimePress</c> 不在重按时刷新）。</summary>
+        /// <summary>
+        /// 把持有态绑定到 <paramref name="entry"/> 这条 LN 上；换了条目就清空上一段的按下 / 松开 / 断连。
+        /// </summary>
+        /// <remarks>
+        /// 持有态按 <c>DrawableHoldNote</c> 实例缓存，而该实例由 <c>Column.RegisterPool</c> 池化复用，
+        /// 会顺序承载多条 LN。不换绑就会把上一条 LN 的 <see cref="TimePress"/> / <see cref="HasHoldBreak"/>
+        /// 带进下一条（该实例的 <c>HitObject</c> 已换，但状态还在），整段由此判错档。
+        /// </remarks>
+        public void EnsureBoundTo(HitObjectLifetimeEntry entry, double startTime, double endTime)
+        {
+            if (ReferenceEquals(boundEntry, entry))
+                return;
+
+            boundEntry = entry;
+            StartTime = startTime;
+            EndTime = endTime;
+
+            TimePress = null;
+            TimeRelease = null;
+            HasHoldBreak = false;
+            Pressed = false;
+            holdComboBaseline = 0;
+        }
+
+        /// <summary>按下：每次「由松到按」的上升沿都刷新 <see cref="TimePress"/>（stable 的按下分支只在未按住时进入）。</summary>
         public void OnPressed(double time)
         {
+            if (Pressed)
+                return;
+
             Pressed = true;
-            TimePress ??= time;
+            TimePress = time;
 
             // stable 在按下（含重按）把 lastScoreTime 设成当前时刻，节拍锚点因此随重按重排。
             holdComboBaseline = time;

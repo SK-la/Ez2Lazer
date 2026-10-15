@@ -81,7 +81,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             var classicHoldStates = new Dictionary<HoldNote, StableClassicHoldState>();
             var judgedTicks = new HashSet<HoldNoteTick>();
 
-            // stable 原生 classic：LN 头不出判定，尾判要用「首次按下 / 首次松开」而不是触发本次判定的那次边沿。
+            // stable 原生 classic：LN 头不出判定，尾判要用「最近按下 / 首次有效松开」而不是触发本次判定的那次边沿。
             bool stableClassic = StableClassicJudgeModeJudgement.IsSelected(environment.JudgeMode);
 
             // 对齐局内 Column.ProcessAutoMiss：越过 late miss 边界立刻被动 Miss，
@@ -208,7 +208,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                                 releaseColumns,
                                 holdByHead,
                                 holdStrategy,
-                                activeHoldByColumn);
+                                activeHoldByColumn,
+                                stableClassic ? classicHoldStates : null);
                         }
                     }
                 }
@@ -371,7 +372,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     bool headHit = target is TailNote tailNote && headByTail.TryGetValue(tailNote, out var linkedHead)
                                                                && headWasHit.TryGetValue(linkedHead, out bool wasHit) && wasHit;
 
-                    // stable classic 长条尾判需要本段起止与「首次按下 / 首次松开」时刻。
+                    // stable classic 长条尾判需要本段起止与「最近按下 / 首次有效松开」时刻。
                     StableClassicHoldState? classicState = null;
                     if (stableClassic && target is TailNote stableTail && headByTail.TryGetValue(stableTail, out var stableHead)
                         && holdByHead.TryGetValue(stableHead, out var stableHold))
@@ -602,7 +603,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     {
                         headWasHit[head] = rawIsHit;
 
-                        // stable classic：记首次按下时刻（尾判的 num2 与 StartWasHit）。
+                        // stable classic：喂按下边沿（尾判的 num2 与 StartWasHit）。
                         if (stableClassic && holdByHead.TryGetValue(head, out var classicPressedHold))
                             getStableClassicHoldState(classicHoldStates, classicPressedHold).OnPressed(input.Time);
 
@@ -899,7 +900,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         /// <summary>
         /// classic 长条到点判尾：stable 帧循环里 <c>HitCircleManiaLong.HitEnd()</c> 按
-        /// <see cref="StableClassicHoldState"/> 的首次按下 / 有效松开与按住标志取档，整条只出一个判定。
+        /// <see cref="StableClassicHoldState"/> 的最近按下 / 首次有效松开与按住标志取档，整条只出一个判定。
         /// 从未按下或从未有效松开（含提前松手断连）时 stable 的 <c>num3</c> 停在 0，早于
         /// <c>EndTime - HitWindow50</c>，落 Miss。
         /// </summary>
@@ -1317,6 +1318,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// <c>TryBeginHoldPress → beginHoldAt</c>（头已判定、尾未收束 → 重新 holding）。
         /// 列已路由到其它物件时 <c>ShouldSkipColumnRoutedPress</c> 为真，不会重臂。
         /// </summary>
+        /// <remarks>
+        /// 重臂也是 stable classic 的「按下边沿」判定点：stable 的 LN 直到被判定为止都是该列最早的未判物件，
+        /// 断连后的重按会刷新 <c>TimePress</c>（尾判的 <c>num2</c>）。不在此喂给会让持有态停在松手那一刻，
+        /// 尾判被拖到之后某次松手、按镜像规则落成 Miss。
+        /// </remarks>
         private static void tryRearmActiveHold(
             int column,
             double time,
@@ -1324,7 +1330,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             IReadOnlyDictionary<int, List<LaneTargetState>> releaseColumns,
             Dictionary<HeadNote, HoldNote> holdByHead,
             IManiaHoldJudgementStrategy holdStrategy,
-            Dictionary<int, HeadNote> activeHoldByColumn)
+            Dictionary<int, HeadNote> activeHoldByColumn,
+            Dictionary<HoldNote, StableClassicHoldState>? classicHoldStates)
         {
             if (!releaseColumns.TryGetValue(column, out var releaseStates))
                 return;
@@ -1370,7 +1377,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             }
 
             if (rearmed != null)
+            {
                 activeHoldByColumn[column] = rearmed;
+
+                if (classicHoldStates != null && holdByHead.TryGetValue(rearmed, out var rearmedHold))
+                    getStableClassicHoldState(classicHoldStates, rearmedHold).OnPressed(time);
+            }
         }
 
         /// <summary>

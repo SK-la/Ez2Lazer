@@ -102,6 +102,20 @@ namespace osu.Game.Rulesets.Mania.Tests
         public void TestJsonLazerPORTRAiTDrawableMatchesSession()
             => runDrawableParityFromJson("Resources/Testing/ReplayJson/Lazer-PORTRAiT.json", longWait: true);
 
+        /// <summary>
+        /// 真实全谱换 StableClassic 档：帧与 <see cref="TestJsonLazerHanatachiDrawableMatchesSession"/> 同源
+        /// （osr 整数 ms），只换判定档位，验局内 ≡ Session 是否仍然同源。
+        /// </summary>
+        [Test]
+        [Explicit("全谱 Visual ≈5–10min；手动跑 Drawable≡Session（LongUntilStep 10min）。")]
+        public void TestJsonStableClassicHanatachiDrawableMatchesSession()
+            => runDrawableParityFromJson("Resources/Testing/ReplayJson/StableClassic-Hanatachi.json", longWait: true);
+
+        [Test]
+        [Explicit("全谱 Visual ≈5–10min；手动跑 Drawable≡Session（LongUntilStep 10min）。")]
+        public void TestJsonStableClassicPORTRAiTDrawableMatchesSession()
+            => runDrawableParityFromJson("Resources/Testing/ReplayJson/StableClassic-PORTRAiT.json", longWait: true);
+
         [Test]
         public void TestLazerHoldDrawableMatchesSession()
         {
@@ -551,6 +565,10 @@ namespace osu.Game.Rulesets.Mania.Tests
         /// [Ez] StableClassic 断连后重按同一条 LN：重按要刷新 <c>TimePress</c>（尾判的 <c>num2</c>），
         /// 局内与 Session 必须同源，不得只在 Session 侧喂这条边沿。
         /// </summary>
+        /// <remarks>
+        /// 帧钟 10ms：stable classic 的尾判挂在帧钟上，落判时刻迟于 live 一个帧长就会换档，
+        /// 100ms 帧距会让局内/ Session 落在不同档（见 <see cref="TestFullScoreParity_StableClassicHeldPastTail"/>）。
+        /// </remarks>
         [Test]
         public void TestFullScoreParity_StableClassicBrokenHoldRepress()
         {
@@ -561,13 +579,12 @@ namespace osu.Game.Rulesets.Mania.Tests
 
             var frames = new List<ReplayFrame>();
 
-            for (double time = head; time <= 1500; time += 100)
-                frames.Add(new ManiaReplayFrame(time, ManiaAction.Key1));
-
-            frames.Add(new ManiaReplayFrame(1600)); // 中途断连
-
-            for (double time = 1700; time <= 3400; time += 100)
-                frames.Add(new ManiaReplayFrame(time, ManiaAction.Key1)); // 重按并持过尾
+            for (double time = head; time <= 3400; time += 10)
+            {
+                // 1510..1690 松手造成断连，1700 起重按并持过尾。
+                bool released = time >= 1510 && time <= 1690;
+                frames.Add(released ? new ManiaReplayFrame(time) : new ManiaReplayFrame(time, ManiaAction.Key1));
+            }
 
             frames.Add(new ManiaReplayFrame(3500));
             frames.Add(new ManiaReplayFrame(4000, ManiaAction.Key2));

@@ -96,7 +96,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             public BmsJudgeModeJudgement.BmsRouteState? BmsState { get; init; }
 
             /// <summary>
-            /// stable classic 的持有态（首次按下 / 有效松开 / 断连）。仅该档位使用，其余档位为 <c>null</c>。
+            /// stable classic 的持有态（最近按下 / 首次有效松开 / 断连）。仅该档位使用，其余档位为 <c>null</c>。
             /// </summary>
             public StableClassicHoldState? StableClassicState { get; init; }
         }

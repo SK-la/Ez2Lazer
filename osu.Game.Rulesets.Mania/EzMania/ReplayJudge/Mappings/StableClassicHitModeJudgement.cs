@@ -73,7 +73,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
             => LazerNoteJudgementReplica.Instance.RejudgeHitEvent(hitEvent, hitWindows);
 
         /// <summary>
-        /// 长条判定：整条只出一个档位，由 <see cref="HoldTailEvaluationContext.StableClassicState"/> 提供首次按下 / 松开与断连。
+        /// 长条判定：整条只出一个档位，由 <see cref="HoldTailEvaluationContext.StableClassicState"/> 提供最近按下 / 首次有效松开与断连。
         /// </summary>
         /// <remarks>
         /// 未记录的 <see cref="StableClassicHoldState.TimePress"/> 按 0 传给档位链（早于窗口的按下镜像到段末，即整段没接上）；

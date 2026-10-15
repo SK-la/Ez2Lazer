@@ -120,7 +120,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
         /// stable classic 长条判定（<c>HitCircleManiaLong</c> 的非 ScoreV2 分支）。
         /// </summary>
         /// <remarks>
-        /// stable 用 <b>首次</b> 按下 / 松开时刻，而不是触发本次判定的那次边沿：
+        /// stable 用 <b>最近</b> 按下 / <b>首次有效</b> 松开时刻，而不是触发本次判定的那次边沿：
         /// <list type="bullet">
         /// <item><c>num2</c>：早于 <c>StartTime - HitWindow50</c> 的按下镜像到段末（等于整段没接上），否则镜像到段首。</item>
         /// <item><c>num3</c>：按住时取当前时刻，否则取首次「不早于 <c>EndTime - HitWindow50</c>」的松开时刻并镜像到段末。</item>

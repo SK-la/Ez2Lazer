@@ -427,6 +427,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             if (headAlreadyJudged)
             {
                 ManiaEzDrawableJudgement.NotifyEz2AcRepress(this);
+                ManiaEzDrawableJudgement.NotifyStableClassicRepress(this);
                 return true;
             }
 
@@ -468,10 +469,12 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             if (ManiaEzDrawableJudgement.TryEz2AcHoldOnReleased(this))
                 return;
 
-            ManiaEzDrawableJudgement.NotifyStableClassicReleased(this);
-
             if (isHolding.Value)
             {
+                // 松手只作用于「此刻正按住的那条 LN」。同列的其它存活 LN（尚未按下的下一颗）也会收到这次
+                // 松开事件，若照记，会被当成提前松手记成断连（Session 侧只认列级 active hold）。
+                ManiaEzDrawableJudgement.NotifyStableClassicReleased(this);
+
                 Tail.UpdateResult();
                 EzTriggerBodyAfterTailRelease();
 

@@ -203,12 +203,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             => ez2ac_hold_states.GetValue(hold, _ => new Ez2AcHoldState());
 
         /// <summary>
-        /// stable classic 的 per-LN 持有态：尾判需要「首次按下 / 首次有效松开 / 断连」，同一条 LN 只出一个档位。
+        /// stable classic 的 per-LN 持有态：尾判需要「最近按下 / 首次有效松开 / 断连」，同一条 LN 只出一个档位。
         /// </summary>
+        /// <remarks>
+        /// 状态按 <see cref="DrawableHoldNote"/> 实例缓存，而该实例由对象池复用、会顺序承载多条 LN，
+        /// 故每次取用时按谱面条目换绑（见 <see cref="StableClassicHoldState.EnsureBoundTo"/>）。
+        /// </remarks>
         internal static StableClassicHoldState GetStableClassicHoldState(DrawableHoldNote hold)
-            => stable_classic_hold_states.GetValue(
+        {
+            var state = stable_classic_hold_states.GetValue(
                 hold,
                 _ => new StableClassicHoldState(hold.HitObject.StartTime, hold.HitObject.EndTime));
+
+            if (hold.Entry is { } entry)
+                state.EnsureBoundTo(entry, hold.HitObject.StartTime, hold.HitObject.EndTime);
+
+            return state;
+        }
 
         /// <summary>
         /// stable classic：松手。只有不早于 <c>EndTime - HitWindow50</c> 的松手算有效松开，更早的只标断连。
@@ -245,6 +256,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             hold.Tail.UpdateResult();
             hold.EzTryFinalizeAfterTailJudged();
+        }
+
+        /// <summary>
+        /// stable classic：头已判定后重按同一条 LN（断连后再抓）。stable 的按下分支只在未按住时进入，
+        /// 因此重按会刷新 <c>TimePress</c>（尾判的 <c>num2</c>）。
+        /// </summary>
+        internal static void NotifyStableClassicRepress(DrawableHoldNote hold)
+        {
+            var round = getJudgementRound(hold);
+
+            if (!StableClassicJudgeModeJudgement.IsSelected(round.Environment.JudgeMode))
+                return;
+
+            GetStableClassicHoldState(hold).OnPressed(hold.Time.Current);
         }
 
         /// <summary>头判定应用后同步 EZ2AC LN 状态机。</summary>
@@ -329,7 +354,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     {
                         NotifyEz2AcHeadJudged(hold, outcome.Result, wasHoldingBeforePress: false);
 
-                        // stable classic：只记首次按下时刻（尾判的时间基准），头本身的判定被压成 IgnoreHit。
+                        // stable classic：喂按下边沿（尾判的时间基准），头本身的判定被压成 IgnoreHit。
                         if (userTriggered && StableClassicJudgeModeJudgement.IsSelected(round.Environment.JudgeMode))
                             GetStableClassicHoldState(hold).OnPressed(drawable.Time.Current);
                     }
@@ -431,6 +456,19 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             if (round.Strategy == null)
                 return false;
+
+            // stable classic：尾判只在尾「可判」时发起（松手宽限同 lazer，即 HitWindows.ResultFor 会给档的范围）。
+            // stable 的 HitCircleManiaLong.HitEnd 由帧钟到点触发，过早的松手只记断连、不落判；不设这道 gate，
+            // `DrawableHoldNote.OnReleased` 的 `Tail.UpdateResult()` 会在提前松手那一刻当场判 Miss
+            // （Session 侧的同类松手有候选窗 gate，于是两侧同源破裂）。
+            if (StableClassicJudgeModeJudgement.IsSelected(round.Environment.JudgeMode)
+                && timeOffset < 0
+                && drawable.HitObject.HitWindows is { } tailWindows
+                && !ReferenceEquals(tailWindows, HitWindows.Empty)
+                && -timeOffset > tailWindows.WindowFor(HitResult.Miss) * TailNote.RELEASE_WINDOW_LENIENCE)
+            {
+                return false;
+            }
 
             var bmsState = round.Strategy is BmsJudgeModeJudgement ? GetBmsState(drawable) : null;
 

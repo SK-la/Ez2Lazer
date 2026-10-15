@@ -263,7 +263,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         private static void collectJudgementTargets(HitObject hitObject, List<LaneTargetState> targets, EzEnumJudgeMode judgeMode)
         {
             // [Ez] StableClassic 的 LN 头绑定 IgnoreJudgement（头本身不产生档位），但仍是判定目标：
-            // 局内要按它记「首次按下」并落一枚 IgnoreHit/IgnoreMiss 收束结算门闩，Session 必须同样收它，
+            // 局内要按它记「最近按下」并落一枚 IgnoreHit/IgnoreMiss 收束结算门闩，Session 必须同样收它，
             // 否则 OnPressed 永不触发 → 尾判按「从未按下」求值（持过尾被判 Miss），且统计缺头这一档。
             bool stableClassicHead = hitObject is HeadNote && StableClassicJudgeModeJudgement.IsSelected(judgeMode);
 

@@ -37,7 +37,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         public bool UsePressTimeBpmForJudgement { get; init; }
 
         /// <summary>
-        /// stable classic 长条的持有态（首次按下 / 松开、断连、段起止）；仅
+        /// stable classic 长条的持有态（最近按下 / 首次有效松开、断连、段起止）；仅
         /// <see cref="Mappings.StableClassicJudgeModeJudgement"/> 读取，其他实现为 <c>null</c>。
         /// </summary>
         public StableClassicHoldState? StableClassicState { get; init; }
