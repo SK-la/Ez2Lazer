@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
@@ -52,8 +53,31 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
             var pressEdges = OsuReplayCursor.CollectPressEdges(frames);
             int nextPressIndex = 0;
 
+            var slidersByContainer = sliders.ToDictionary(s => s.ContainerObject);
+            var forceMissTargets = new List<OsuNoteLockMissTarget>();
+
             // 实机语义：一次输入只落一个物件。特殊标记（mod 等）可放开为多判。
             bool allowMultiJudgementPerPress = scoreProcessor is OsuScoreProcessor { AllowMultiJudgementPerPress: true };
+
+            // lazer StartTimeOrderedHitPolicy.HandleHit：命中后立刻结算被抢拍的前序目标（滑条头交给所属滑条状态）。
+            void applyForceMisses(double targetStartTime, double time)
+            {
+                forceMissTargets.Clear();
+                noteLock.CollectForceMissTargets(targetStartTime, forceMissTargets);
+
+                foreach (var missTarget in forceMissTargets)
+                {
+                    if (missTarget.Target is SliderHeadCircle)
+                    {
+                        if (slidersByContainer.TryGetValue(missTarget.ContainerObject, out var sliderState))
+                            sliderState.ForceMissHead(time, applySliderHead);
+                    }
+                    else
+                    {
+                        scheduler.ForceMissTarget(missTarget.Target, time, applyCircle);
+                    }
+                }
+            }
 
             void applySliderHead(HitObject hitObject, HitResult result, double judgementTime, Vector2? cursorPosition)
                 => applyJudgement(hitObject, result, judgementTime, cursorPosition, gameplayRate, inputOffset, scoreProcessor, timelineRecorder, noteLock);
@@ -119,14 +143,16 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
                         if (noteLock.Check(sliderCandidate!.ContainerObject, sliderCandidate.HeadStartTime, edge.Time, targetIsNested: true) != ClickAction.Hit)
                             continue;
 
-                        sliderCandidate.ProcessHeadPress(edge.Time, edge.Position, edge.Action, cursor.GetPressedActions(), applySliderHead);
+                        if (sliderCandidate.ProcessHeadPress(edge.Time, edge.Position, edge.Action, cursor.GetPressedActions(), applySliderHead))
+                            applyForceMisses(sliderCandidate.HeadStartTime, edge.Time);
                     }
                     else if (circleCandidate != null)
                     {
                         if (noteLock.Check(circleCandidate.HitObject, circleCandidate.HitObject.StartTime, edge.Time, targetIsNested: false) != ClickAction.Hit)
                             continue;
 
-                        scheduler.ProcessPress(edge.Time, edge.Position, applyCircle);
+                        if (scheduler.ProcessPress(edge.Time, edge.Position, applyCircle))
+                            applyForceMisses(circleCandidate.HitObject.StartTime, edge.Time);
                     }
                 }
 

@@ -19,6 +19,24 @@ using osu.Game.Scoring;
 namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
 {
     /// <summary>
+    /// note lock 要求立刻结算的目标：抢拍时被跳过的旧物件（对应 Drawable <c>StartTimeOrderedHitPolicy.HandleHit</c> 里的 <c>MissForcefully</c>）。
+    /// </summary>
+    internal readonly struct OsuNoteLockMissTarget
+    {
+        public OsuNoteLockMissTarget(HitObject target, HitObject containerObject)
+        {
+            Target = target;
+            ContainerObject = containerObject;
+        }
+
+        /// <summary>需要立刻判 Miss 的物件（圆或其嵌套滑条头）。</summary>
+        public HitObject Target { get; }
+
+        /// <summary>目标所属的顶层物件（圆为其自身，滑条头为其父滑条），用于把滑条头交给对应滑条状态结算。</summary>
+        public HitObject ContainerObject { get; }
+    }
+
+    /// <summary>
     /// 无头 note lock 状态：把谱面按 Drawable 容器语义（顶层物件 + 滑条头这类可阻挡的嵌套圆）整理成
     /// <see cref="OsuNoteLockEntry"/>，交由 <see cref="OsuNoteLockSelector"/> 求解。
     /// </summary>
@@ -32,6 +50,9 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
         private sealed class ContainerEntry
         {
             public HitObject Object = null!;
+
+            /// <summary>本物件所属的顶层物件；顶层物件即其自身。</summary>
+            public HitObject ContainerObject = null!;
 
             /// <summary>本物件自身 + 参与判定的嵌套物件；全部判定即 <c>AllJudged</c>。</summary>
             public HitObject[] Required = null!;
@@ -88,6 +109,30 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
             return checkLegacy(containerObject, targetStartTime, time, targetIsNested);
         }
 
+        /// <summary>
+        /// lazer <c>StartTimeOrderedHitPolicy.HandleHit</c> 等价：命中某一物件后，该物件起拍之前仍未判定、
+        /// 且可阻挡后续输入的目标需要立刻判 Miss，而不是各自等过期窗。
+        /// CL 策略改为直接挡下输入本身，没有这一步。
+        /// </summary>
+        /// <param name="targetStartTime">本次命中的目标起始时刻。</param>
+        /// <param name="result">需要立刻结算的目标；调用方按 <see cref="OsuNoteLockMissTarget.Target"/> 类型派发。</param>
+        public void CollectForceMissTargets(double targetStartTime, List<OsuNoteLockMissTarget> result)
+        {
+            if (legacy)
+                return;
+
+            for (int i = 0; i < blockers.Count; i++)
+            {
+                var blocker = blockers[i];
+
+                if (blocker.StartTime >= targetStartTime)
+                    break;
+
+                if (!judged.Contains(blocker.Object))
+                    result.Add(new OsuNoteLockMissTarget(blocker.Object, blocker.ContainerObject));
+            }
+        }
+
         private ClickAction checkTimeOrdered(double targetStartTime, double time)
         {
             buffer.Clear();
@@ -133,6 +178,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
                 var entry = new ContainerEntry
                 {
                     Object = hitObject,
+                    ContainerObject = hitObject,
                     Required = collectRequired(hitObject),
                     StartTime = hitObject.StartTime,
                     EndTime = hitObject.GetEndTime(),
@@ -154,6 +200,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
                     var nestedEntry = new ContainerEntry
                     {
                         Object = nested,
+                        ContainerObject = hitObject,
                         Required = collectRequired(nested),
                         StartTime = nested.StartTime,
                         EndTime = nested.GetEndTime(),

@@ -155,6 +155,19 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
             return result == HitResult.None ? null : result;
         }
 
+        /// <summary>
+        /// note lock 抢拍：把尚未判定的头部立刻按过期结算（结果与自然过期一致，只有时刻提前）。
+        /// 之后再走正常 <see cref="ProcessTime"/>，嵌套物件仍按滑条状态机判。
+        /// </summary>
+        public bool ForceMissHead(double judgementTime, JudgementApplier apply)
+        {
+            if (isJudged(head))
+                return false;
+
+            applyHeadMiss(judgementTime, apply);
+            return true;
+        }
+
         public void ProcessTime(double time, Vector2 cursorPosition, IReadOnlyList<OsuAction> pressedActions, JudgementApplier apply)
         {
             updateTracking(time, cursorPosition, pressedActions);

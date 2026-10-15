@@ -76,9 +76,7 @@ namespace osu.Game.Rulesets.Osu.Tests
         {
             var (score, beatmap, environment) = OsuReplayFixtures.CreateNoteLockNextCircle(classicNoteLock, pressAtBlockerStart);
             parityEnvironment = withLazerTrack(environment);
-            // note lock 场景下 Drawable 命中后立刻 Miss 掉被抢拍的旧物件，Session 让旧物件走自己的过期窗，
-            // 两边 Miss 时刻不同（结果与计数一致），故只比结果序列。
-            runDrawableParityTest(score, beatmap, compareResultsOnly: true);
+            runDrawableParityTest(score, beatmap);
 
             // 断言场景本身有效：CL 挡下时后圆只能过期成 Miss，lazer 放行时输入真的落在后圆上。
             AddAssert("drawable note lock matches classic switch", () => lateCircleWasBlocked(drawableHitEvents) == classicNoteLock);
@@ -95,7 +93,7 @@ namespace osu.Game.Rulesets.Osu.Tests
         private static IGameplayEnvironment withLazerTrack(IGameplayEnvironment environment)
             => ((GameplayEnvironment)environment) with { JudgeMode = EzEnumJudgeMode.Lazer };
 
-        private void runDrawableParityTest(Score fixtureScore, IBeatmap beatmap, bool compareResultsOnly = false)
+        private void runDrawableParityTest(Score fixtureScore, IBeatmap beatmap)
         {
             AddStep("load player", () =>
             {
@@ -128,11 +126,7 @@ namespace osu.Game.Rulesets.Osu.Tests
             {
                 sessionHitEvents = OsuReplaySession.RunHitEvents(replayScore, playableBeatmap, parityEnvironment);
 
-                bool matched = compareResultsOnly
-                    ? OsuReplayParityHelper.AreHitResultSequencesEquivalent(drawableHitEvents, sessionHitEvents)
-                    : OsuReplayParityHelper.AreHitEventsEquivalent(drawableHitEvents, sessionHitEvents);
-
-                if (matched)
+                if (OsuReplayParityHelper.AreHitEventsEquivalent(drawableHitEvents, sessionHitEvents))
                     return true;
 
                 throw new AssertionException(
