@@ -16,13 +16,22 @@ namespace osu.Game.Rulesets.Mania.Edit.Scratch
         /// </summary>
         public const int MAIN_AUDIO_TRACK_NUMBER = 1;
 
+        /// <summary>
+        /// Upper bound on the number of tracks, guarding against runaway allocation.
+        /// </summary>
+        public const int MAX_TRACK_COUNT = 64;
+
         public BindableList<ScratchTrack> Tracks { get; } = new BindableList<ScratchTrack>();
 
         /// <summary>
         /// Appends an empty track to the right. The assigned number continues past the highest number currently in use.
         /// </summary>
-        public ScratchTrack Append()
+        /// <returns>The appended track, or <c>null</c> when <see cref="MAX_TRACK_COUNT"/> has been reached.</returns>
+        public ScratchTrack? Append()
         {
+            if (Tracks.Count >= MAX_TRACK_COUNT)
+                return null;
+
             var track = new ScratchTrack(nextNumber());
             Tracks.Add(track);
             return track;
