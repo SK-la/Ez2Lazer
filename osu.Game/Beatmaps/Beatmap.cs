@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Game.Audio;
 using osu.Game.Beatmaps.Timing;
 using osu.Game.Rulesets.Objects;
 using System.Collections.Generic;
@@ -90,6 +91,10 @@ namespace osu.Game.Beatmaps
         /// </remarks>
         [JsonIgnore]
         public Func<HitObject, float> SamplePositionResolver { get; set; } = _ => DetachedNoteSample.CENTRE;
+
+        /// <inheritdoc/>
+        [JsonIgnore]
+        public Func<HitObject, IEnumerable<(double Time, HitSampleInfo Sample)>> SampleTimelineResolver { get; set; } = DetachedSampleLedger.GetDefaultTimeline;
 
         IReadOnlyList<T> IBeatmap<T>.HitObjects => HitObjects;
 

@@ -1,7 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Threading;
+using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
@@ -14,7 +14,7 @@ namespace osu.Game.Tests.Beatmaps
         [Test]
         public void TestUntouchedBeatmapDetachesNothing()
         {
-            var beatmap = new Beatmap<HitObject>
+            var beatmap = new TestBeatmap
             {
                 HitObjects =
                 {
@@ -34,7 +34,7 @@ namespace osu.Game.Tests.Beatmaps
             var sample = new HitSampleInfo("key-a");
             var removed = new TestNote(1000, sample);
 
-            var beatmap = new Beatmap<HitObject>
+            var beatmap = new TestBeatmap
             {
                 HitObjects = { removed, new TestNote(2000, new HitSampleInfo("key-b")) },
                 SamplePositionResolver = _ => 0.25f,
@@ -53,15 +53,14 @@ namespace osu.Game.Tests.Beatmaps
         }
 
         [Test]
-        public void TestSampleTakenOverByReplacementIsNotDetached()
+        public void TestTailSampleOfAConvertedHoldIsKept()
         {
             var head = new HitSampleInfo("key-head");
             var tail = new HitSampleInfo("key-tail");
 
             var hold = new TestHold(1000, 2000, head, tail);
 
-            var beatmap = new Beatmap<HitObject> { HitObjects = { hold } };
-            applyDefaults(beatmap);
+            var beatmap = new TestBeatmap { HitObjects = { hold } };
 
             var ledger = DetachedSampleLedger.Capture(beatmap);
 
@@ -77,11 +76,31 @@ namespace osu.Game.Tests.Beatmaps
         }
 
         [Test]
+        public void TestRewrittenHoldTakingItsSamplesOverDetachesNothing()
+        {
+            var head = new HitSampleInfo("key-head");
+            var tail = new HitSampleInfo("key-tail");
+
+            var hold = new TestHold(1000, 2000, head, tail);
+
+            var beatmap = new TestBeatmap { HitObjects = { hold } };
+
+            var ledger = DetachedSampleLedger.Capture(beatmap);
+
+            // A mod rebuilds the hold at new times, carrying both node samples over.
+            beatmap.HitObjects[0] = new TestHold(1500, 2500, new HitSampleInfo("key-head"), new HitSampleInfo("key-tail"));
+
+            ledger.Settle(beatmap);
+
+            Assert.That(beatmap.DetachedSamples, Is.Empty);
+        }
+
+        [Test]
         public void TestSampleFollowsObjectMovedInTime()
         {
             var note = new TestNote(1000, new HitSampleInfo("key-a"));
 
-            var beatmap = new Beatmap<HitObject> { HitObjects = { note } };
+            var beatmap = new TestBeatmap { HitObjects = { note } };
 
             var ledger = DetachedSampleLedger.Capture(beatmap);
 
@@ -97,7 +116,7 @@ namespace osu.Game.Tests.Beatmaps
         {
             var removed = new TestNote(1000, new HitSampleInfo(HitSampleInfo.HIT_NORMAL));
 
-            var beatmap = new Beatmap<HitObject>
+            var beatmap = new TestBeatmap
             {
                 HitObjects = { removed, new TestNote(2000, new HitSampleInfo(HitSampleInfo.HIT_NORMAL)) },
             };
@@ -112,10 +131,19 @@ namespace osu.Game.Tests.Beatmaps
             Assert.That(beatmap.DetachedSamples[0].Time, Is.EqualTo(1000));
         }
 
-        private static void applyDefaults(IBeatmap beatmap)
+        private class TestBeatmap : Beatmap<HitObject>
         {
-            foreach (var hitObject in beatmap.HitObjects)
-                hitObject.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty, CancellationToken.None);
+            public TestBeatmap()
+            {
+                // Mirrors the mania ruleset: a hold note's segment samples sit in NodeSamples, at the head and tail.
+                SampleTimelineResolver = hitObject =>
+                {
+                    if (hitObject is TestHold hold)
+                        return hold.GetNodeTimeline();
+
+                    return DetachedSampleLedger.GetDefaultTimeline(hitObject);
+                };
+            }
         }
 
         private class TestNote : HitObject
@@ -127,29 +155,26 @@ namespace osu.Game.Tests.Beatmaps
             }
         }
 
-        /// <summary>
-        /// A hold whose head and tail each carry their own sample, as converted keysound charts do.
-        /// </summary>
         private class TestHold : HitObject
         {
             private readonly double endTime;
-            private readonly HitSampleInfo head;
-            private readonly HitSampleInfo tail;
+
+            public IList<IList<HitSampleInfo>> NodeSamples { get; }
 
             public TestHold(double startTime, double endTime, HitSampleInfo head, HitSampleInfo tail)
             {
                 StartTime = startTime;
                 this.endTime = endTime;
-                this.head = head;
-                this.tail = tail;
+                NodeSamples = new List<IList<HitSampleInfo>> { new List<HitSampleInfo> { head }, new List<HitSampleInfo> { tail } };
             }
 
-            protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
+            public IEnumerable<(double Time, HitSampleInfo Sample)> GetNodeTimeline()
             {
-                base.CreateNestedHitObjects(cancellationToken);
+                foreach (var sample in NodeSamples[0])
+                    yield return (StartTime, sample);
 
-                AddNested(new TestNote(StartTime, head));
-                AddNested(new TestNote(endTime, tail));
+                foreach (var sample in NodeSamples[1])
+                    yield return (endTime, sample);
             }
         }
     }

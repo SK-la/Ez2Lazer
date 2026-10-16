@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using osu.Game.Audio;
 using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Beatmaps
@@ -25,6 +26,22 @@ namespace osu.Game.Beatmaps
         /// <summary>
         /// Maps a hit object to the 0..1 playfield position its samples should be panned to.
         /// </summary>
-        Func<HitObject, float> SamplePositionResolver { get; }
+        Func<HitObject, float> SamplePositionResolver { get; set; }
+
+        /// <summary>
+        /// Enumerates the samples a hit object plays, paired with the time each plays at.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This is what lets the ledger see samples without depending on nested objects, which only exist once
+        /// <see cref="HitObject.ApplyDefaults"/> has run, and are never created on an object a mod removed before that.
+        /// Rulesets whose samples are spread over time (a hold note's head and tail) override the default timeline.
+        /// </para>
+        /// <para>
+        /// Implementations must be pure: the same object must produce the same pairs before and after the mods run,
+        /// since times are read on both sides to pair samples up.
+        /// </para>
+        /// </remarks>
+        Func<HitObject, IEnumerable<(double Time, HitSampleInfo Sample)>> SampleTimelineResolver { get; set; }
     }
 }

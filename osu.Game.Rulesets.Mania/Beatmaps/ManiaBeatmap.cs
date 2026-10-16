@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Mania.Objects;
@@ -41,6 +42,46 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
 
                 return Math.Clamp((float)maniaObject.Column / Math.Max(1, TotalColumns), 0, 1);
             };
+
+            // A hold note's head and tail samples live in NodeSamples, not in Samples, and must be reported at the
+            // time each sounds at. Reading them here rather than from nested objects is what allows the ledger to see
+            // them before ApplyDefaults has run, and on a hold note a mod removed.
+            SampleTimelineResolver = hitObject =>
+            {
+                if (hitObject is not HoldNote hold || hold.NodeSamples is not { Count: > 1 })
+                    return DetachedSampleLedger.GetDefaultTimeline(hitObject);
+
+                return enumerateHoldTimeline(hold);
+            };
+        }
+
+        private static IEnumerable<(double Time, HitSampleInfo Sample)> enumerateHoldTimeline(HoldNote hold)
+        {
+            var nodeSamples = hold.NodeSamples!;
+            double startTime = hold.StartTime;
+            double endTime = hold.EndTime;
+            int lastIndex = nodeSamples.Count - 1;
+
+            for (int i = 0; i <= lastIndex; i++)
+            {
+                // 本规则集的节点只在头尾实际发声；多出来的中间节点（osu 折返转来的 hold）按线性位置取时间。
+                double time = i == 0 ? startTime
+                    : i == lastIndex ? endTime
+                    : startTime + (endTime - startTime) * i / lastIndex;
+
+                foreach (var sample in nodeSamples[i])
+                    yield return (time, sample);
+            }
+
+            var auxiliary = hold.AuxiliarySamples;
+
+            for (int i = 0; i < auxiliary.Count; i++)
+            {
+                var sample = auxiliary[i];
+
+                if (!hold.Samples.Contains(sample))
+                    yield return (startTime, sample);
+            }
         }
 
         public override IEnumerable<BeatmapStatistic> GetStatistics()

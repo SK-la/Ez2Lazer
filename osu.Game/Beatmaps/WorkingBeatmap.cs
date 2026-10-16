@@ -297,6 +297,14 @@ namespace osu.Game.Beatmaps
             // Convert
             IBeatmap converted = converter.Convert(token);
 
+            // Mods below may remove or rewrite hit objects; remember what they carried so their audio survives as
+            // background sound instead of being lost with the object. This has to sit before the post-conversion mods,
+            // which is where the rewriting mods live, and reads sample times off the objects, so it does not depend on
+            // ApplyDefaults having created nested objects yet.
+            DetachedSampleLedger sampleLedger = mods.Any(m => m is IApplicableAfterBeatmapConversion or IApplicableToBeatmap)
+                ? DetachedSampleLedger.Capture(converted)
+                : null;
+
             // 应用转换后的Mod。如果Mod实现了IHasApplyOrder接口，则尊重它们的顺序（值较小的优先）。
             // 没有该接口的Mod默认为顺序0，以保持现有行为。
             // Apply conversion mods to the result
@@ -345,10 +353,6 @@ namespace osu.Game.Beatmaps
             }
 
             processor?.PostProcess();
-
-            // Mods below may remove or rewrite hit objects; remember what they carried so their audio survives as
-            // background sound instead of being lost with the object (see DetachedSampleLedger).
-            DetachedSampleLedger sampleLedger = mods.Any(m => m is IApplicableToBeatmap) ? DetachedSampleLedger.Capture(converted) : null;
 
             foreach (var mod in mods.OfType<IApplicableToBeatmap>())
             {
