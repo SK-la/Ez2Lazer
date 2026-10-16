@@ -19,6 +19,11 @@ namespace osu.Game.Storyboards.Drawables
         {
             info = sampleInfo;
             MinimumSampleVolume = DrawableHitObject.MINIMUM_SAMPLE_VOLUME;
+
+            // Playback resolves the sample definition of the removed object rather than the storyboard wrapper around
+            // it. A sample lookup reads the bank, suffix and beatmap-sample flags of the definition it is handed, so
+            // resolving the wrapper silently resolves a different sound (typically the skin's default hit sound).
+            Samples = new[] { sampleInfo.OriginalSample };
         }
 
         [BackgroundDependencyLoader]

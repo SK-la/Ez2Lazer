@@ -5,12 +5,15 @@
 
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
+using osu.Framework.Bindables;
+using osu.Framework.Graphics;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
@@ -189,6 +192,56 @@ namespace osu.Game.Tests.Gameplay
             AddAssert("volume unchanged", () => sample.Volume.Value == initialVolume);
 
             AddStep("restore default", () => hitsoundVolume.SetDefault());
+        }
+
+        /// <summary>
+        /// A detached sample stands in for a note that a mod removed, so it has to be resolved from the sample
+        /// definition of that note. Resolving the storyboard wrapper around it instead hides the bank, suffix and
+        /// beatmap-sample flags a lookup reads, silently yielding a different sound.
+        /// </summary>
+        [Test]
+        public void TestDetachedSampleResolvesNoteDefinition()
+        {
+            DetachedSampleSkin skin = null;
+            DrawableDetachedStoryboardSample sample = null;
+
+            AddStep("create detached sample", () =>
+            {
+                var info = new DetachedStoryboardSampleInfo(new HitSampleInfo("keysound", HitSampleInfo.BANK_SOFT, "2", 60, useBeatmapSamples: true), 0, 0.25, true);
+
+                var container = new SkinProvidingContainer(skin = new DetachedSampleSkin());
+                container.Add(sample = (DrawableDetachedStoryboardSample)info.CreateDrawable());
+
+                Add(container);
+            });
+
+            AddUntilStep("resolved", () => sample.IsLoaded);
+
+            AddAssert("lookup used the note's definition", () => skin.Lookups.Count > 0 && skin.Lookups.All(lookup => lookup is HitSampleInfo));
+        }
+
+        /// <summary>
+        /// Stands in for the type-sensitive dispatch a ruleset or beatmap skin performs: only a note's own sample
+        /// definition is recognised, so a wrapper around one resolves nothing.
+        /// </summary>
+        private class DetachedSampleSkin : ISkin
+        {
+            public readonly List<ISampleInfo> Lookups = new List<ISampleInfo>();
+
+            public Drawable GetDrawableComponent(ISkinComponentLookup lookup) => null;
+
+            public Texture GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT) => null;
+
+            public IBindable<TValue> GetConfig<TLookup, TValue>(TLookup lookup)
+                where TLookup : notnull
+                where TValue : notnull => null;
+
+            public ISample GetSample(ISampleInfo sampleInfo)
+            {
+                Lookups.Add(sampleInfo);
+
+                return sampleInfo is HitSampleInfo ? new SampleVirtual("keysound") : null;
+            }
         }
 
         private class TestHitsoundSampleInfo : StoryboardSampleInfo

@@ -42,6 +42,11 @@ namespace osu.Game.Storyboards
             Balance = balance;
         }
 
+        /// <summary>
+        /// The sample definition the removed object played, which is what playback resolves.
+        /// </summary>
+        internal ISampleInfo OriginalSample => sample;
+
         public override int Volume => sample.Volume;
 
         public override bool IsHitsound => isHitsound;
