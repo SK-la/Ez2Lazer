@@ -33,6 +33,21 @@ function Get-ChangedCsFiles {
     return $files
 }
 
+function Get-OwningProject {
+    param([string]$fullPath, [string]$root)
+
+    $dir = Split-Path -Parent $fullPath
+    while ($dir -and $dir.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) {
+        $csproj = Get-ChildItem -LiteralPath $dir -Filter '*.csproj' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($csproj) { return ($csproj.FullName.Substring($root.Length).TrimStart('\', '/') -replace '\\', '/') }
+
+        $parent = Split-Path -Parent $dir
+        if (-not $parent -or $parent -eq $dir) { break }
+        $dir = $parent
+    }
+    return $null
+}
+
 function Test-LineProtected {
     param([string]$text, [int]$lineNumber)
     $inBlock = $false
@@ -150,18 +165,31 @@ foreach ($file in $files) {
 }
 
 if (-not $TextOnly) {
-    $formatArgs = @('format', 'analyzers', 'osu.sln', '--diagnostics', 'IDE0005', '--verbosity', 'quiet')
+    # IDE0005 要在语义层面判断 using 是否真被使用，必须先加载工作区（依赖图地板约 25 秒）。
+    # 只传改动文件所属的项目，不加载整份 osu.sln；且必须用 `format style`——`format analyzers` 不处理 IDExxxx。
     $root = (Resolve-Path -LiteralPath $repoRoot).Path
+    $byProject = @{}
+
     foreach ($file in $files) {
         $full = (Resolve-Path -LiteralPath $file).Path
         if (-not $full.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { continue }
-        $relative = $full.Substring($root.Length).TrimStart('\', '/')
-        $formatArgs += '--include'
-        $formatArgs += ($relative -replace '\\', '/')
+        $project = Get-OwningProject $full $root
+        if (-not $project) { continue }
+        if (-not $byProject.ContainsKey($project)) { $byProject[$project] = New-Object System.Collections.Generic.List[string] }
+        $byProject[$project].Add(($full.Substring($root.Length).TrimStart('\', '/') -replace '\\', '/'))
     }
-    if ($formatArgs -contains '--include') {
+
+    foreach ($project in $byProject.Keys) {
+        $formatArgs = @('format', 'style', $project, '--diagnostics', 'IDE0005', '--verbosity', 'quiet')
+        foreach ($relative in $byProject[$project]) {
+            $formatArgs += '--include'
+            $formatArgs += $relative
+        }
         & dotnet @formatArgs
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+
+    if ($byProject.Count -gt 0) {
         foreach ($file in $files) {
             if (Repair-CsWhitespace $file) {
                 if (-not $changed.Contains($file)) { $changed.Add($file) }
