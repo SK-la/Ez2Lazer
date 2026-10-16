@@ -155,6 +155,52 @@ namespace osu.Game.Tests.Gameplay
             AddStep("restore default", () => config.GetBindable<bool>(OsuSetting.BeatmapHitsounds).SetDefault());
         }
 
+        [Test]
+        public void TestHitsoundClassifiedSampleFollowsHitsoundVolume()
+        {
+            DrawableStoryboardSample sample = null;
+            var hitsoundVolume = config.GetBindable<double>(OsuSetting.HitsoundVolume);
+
+            AddStep("create hitsound classified sample", () => Add(sample = new DrawableStoryboardSample(
+                new TestHitsoundSampleInfo("test-sample", 0, 1))));
+
+            AddUntilStep("volume follows hitsound volume", () => sample.Volume.Value == hitsoundVolume.Value);
+
+            AddStep("adjust hitsound volume", () => hitsoundVolume.Value = 0.13);
+            AddUntilStep("volume follows again", () => sample.Volume.Value == 0.13);
+
+            AddStep("restore default", () => hitsoundVolume.SetDefault());
+        }
+
+        [Test]
+        public void TestRegularSampleIgnoresHitsoundVolume()
+        {
+            DrawableStoryboardSample sample = null;
+            var hitsoundVolume = config.GetBindable<double>(OsuSetting.HitsoundVolume);
+            double initialVolume = 0;
+
+            AddStep("create regular sample", () => Add(sample = new DrawableStoryboardSample(
+                new StoryboardSampleInfo(StoryboardElementSource.Beatmap, "test-sample", 0, 1))));
+
+            AddUntilStep("loaded", () => sample.IsLoaded);
+            AddStep("record volume", () => initialVolume = sample.Volume.Value);
+
+            AddStep("adjust hitsound volume", () => hitsoundVolume.Value = 0.13);
+            AddAssert("volume unchanged", () => sample.Volume.Value == initialVolume);
+
+            AddStep("restore default", () => hitsoundVolume.SetDefault());
+        }
+
+        private class TestHitsoundSampleInfo : StoryboardSampleInfo
+        {
+            public TestHitsoundSampleInfo(string path, double time, int volume)
+                : base(StoryboardElementSource.Beatmap, path, time, volume)
+            {
+            }
+
+            public override bool IsHitsound => true;
+        }
+
         private class TestSkin : LegacySkin
         {
             public TestSkin(string resourceName, IStorageResourceProvider resources)

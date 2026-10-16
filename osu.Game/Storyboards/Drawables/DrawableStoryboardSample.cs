@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Game.Configuration;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Skinning;
 
@@ -30,6 +31,18 @@ namespace osu.Game.Storyboards.Drawables
 
         [Resolved]
         private IReadOnlyList<Mod>? mods { get; set; }
+
+        private Bindable<double>? hitsoundVolume;
+
+        [BackgroundDependencyLoader(true)]
+        private void load(OsuConfigManager? config)
+        {
+            // A sample classified as a hitsound resolves through the hitsound sample store, which deliberately omits
+            // the global sample adjustments the regular store applies. The hitsound volume chain therefore has to be
+            // applied here instead, or the audio would end up outside of volume control rather than under it.
+            if (sampleInfo.IsHitsound && config != null)
+                Volume.BindTo(hitsoundVolume = config.GetBindable<double>(OsuSetting.HitsoundVolume));
+        }
 
         protected override void SkinChanged(ISkinSource skin)
         {
@@ -90,6 +103,16 @@ namespace osu.Game.Storyboards.Drawables
             // we must not have a lifetime start in order to continue receiving updates and stop the sample above.
             LifetimeStart = double.MinValue;
             LifetimeEnd = sampleInfo.StartTime;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing && hitsoundVolume != null)
+                Volume.UnbindFrom(hitsoundVolume);
+
+            hitsoundVolume = null;
+
+            base.Dispose(isDisposing);
         }
     }
 }
