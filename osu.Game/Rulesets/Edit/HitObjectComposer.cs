@@ -53,6 +53,16 @@ namespace osu.Game.Rulesets.Edit
         /// </summary>
         protected virtual bool ApplyHorizontalCentering => true;
 
+        /// <summary>
+        /// Wraps the playfield content (playfield and blueprint layers) into the root drawable used inside <see cref="PlayfieldContentContainer"/>.
+        /// </summary>
+        /// <remarks>
+        /// Rulesets may return a different root, e.g. to enable horizontal scrolling of the playfield.
+        /// The default implementation returns <paramref name="defaultContent"/> unchanged.
+        /// </remarks>
+        /// <param name="defaultContent">The default content, containing the playfield and blueprint layers.</param>
+        protected virtual Drawable CreatePlayfieldContentRoot(Drawable defaultContent) => defaultContent;
+
         protected IRulesetConfigManager? Config { get; private set; }
 
         // Provides `Playfield`
@@ -146,15 +156,19 @@ namespace osu.Game.Rulesets.Edit
                     {
                         Name = "Playfield content",
                         RelativeSizeAxes = Axes.Y,
-                        Children = new Drawable[]
+                        Child = CreatePlayfieldContentRoot(new Container
                         {
-                            // layers below playfield
-                            drawableRulesetWrapper.CreatePlayfieldAdjustmentContainer().WithChild(LayerBelowRuleset),
-                            drawableRulesetWrapper,
-                            // layers above playfield
-                            drawableRulesetWrapper.CreatePlayfieldAdjustmentContainer()
-                                                  .WithChild(blueprintContainer = CreateBlueprintContainer())
-                        }
+                            RelativeSizeAxes = Axes.Both,
+                            Children = new Drawable[]
+                            {
+                                // layers below playfield
+                                drawableRulesetWrapper.CreatePlayfieldAdjustmentContainer().WithChild(LayerBelowRuleset),
+                                drawableRulesetWrapper,
+                                // layers above playfield
+                                drawableRulesetWrapper.CreatePlayfieldAdjustmentContainer()
+                                                      .WithChild(blueprintContainer = CreateBlueprintContainer())
+                            }
+                        })
                     },
                     new Container
                     {
@@ -167,7 +181,7 @@ namespace osu.Game.Rulesets.Edit
                                 Colour = colourProvider.Background5,
                                 RelativeSizeAxes = Axes.Both,
                             },
-                            LeftToolbox = new ExpandingToolboxContainer(TOOLBOX_CONTRACTED_SIZE_LEFT, 200)
+                            LeftToolbox = new ExpandingToolboxContainer(TOOLBOX_CONTRACTED_SIZE_LEFT, TOOLBOX_EXPANDED_SIZE_LEFT)
                             {
                                 Children = new Drawable[]
                                 {
@@ -252,7 +266,7 @@ namespace osu.Game.Rulesets.Edit
                                 Colour = colourProvider.Background5,
                                 RelativeSizeAxes = Axes.Both,
                             },
-                            RightToolbox = new ExpandingToolboxContainer(TOOLBOX_CONTRACTED_SIZE_RIGHT, 250)
+                            RightToolbox = new ExpandingToolboxContainer(TOOLBOX_CONTRACTED_SIZE_RIGHT, TOOLBOX_EXPANDED_SIZE_RIGHT)
                             {
                                 Child = new EditorToolboxGroup("inspector")
                                 {
@@ -527,6 +541,9 @@ namespace osu.Game.Rulesets.Edit
     {
         public const float TOOLBOX_CONTRACTED_SIZE_LEFT = 60;
         public const float TOOLBOX_CONTRACTED_SIZE_RIGHT = 120;
+
+        public const float TOOLBOX_EXPANDED_SIZE_LEFT = 200;
+        public const float TOOLBOX_EXPANDED_SIZE_RIGHT = 250;
 
         public readonly Ruleset Ruleset;
 
