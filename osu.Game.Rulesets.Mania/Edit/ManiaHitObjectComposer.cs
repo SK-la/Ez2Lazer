@@ -78,7 +78,8 @@ namespace osu.Game.Rulesets.Mania.Edit
 
         protected override BeatSnapGrid CreateBeatSnapGrid() => new ManiaBeatSnapGrid();
 
-        protected override Drawable CreatePlayfieldContentRoot(Drawable defaultContent) => new ManiaEditorPlayfieldContent(defaultContent);
+        protected override Drawable CreatePlayfieldContentRoot(Drawable defaultContent)
+            => new ManiaEditorPlayfieldContent(defaultContent, Playfield, TOOLBOX_EXPANDED_SIZE_RIGHT - TOOLBOX_CONTRACTED_SIZE_RIGHT);
 
         protected override IReadOnlyList<CompositionTool<ManiaAction>> CompositionTools => new CompositionTool<ManiaAction>[]
         {

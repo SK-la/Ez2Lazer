@@ -19,7 +19,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Scratch
     /// </remarks>
     public partial class ScratchTrackControls : CompositeDrawable
     {
-        private const float width = 40;
+        public const float WIDTH = 40;
         private const float button_size = 30;
 
         public Action? AddRequested { get; set; }
@@ -29,7 +29,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Scratch
         public ScratchTrackControls()
         {
             RelativeSizeAxes = Axes.Y;
-            Width = width;
+            Width = WIDTH;
         }
 
         [BackgroundDependencyLoader]

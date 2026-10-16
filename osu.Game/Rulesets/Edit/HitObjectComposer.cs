@@ -181,7 +181,7 @@ namespace osu.Game.Rulesets.Edit
                                 Colour = colourProvider.Background5,
                                 RelativeSizeAxes = Axes.Both,
                             },
-                            LeftToolbox = new ExpandingToolboxContainer(TOOLBOX_CONTRACTED_SIZE_LEFT, 200)
+                            LeftToolbox = new ExpandingToolboxContainer(TOOLBOX_CONTRACTED_SIZE_LEFT, TOOLBOX_EXPANDED_SIZE_LEFT)
                             {
                                 Children = new Drawable[]
                                 {
@@ -266,7 +266,7 @@ namespace osu.Game.Rulesets.Edit
                                 Colour = colourProvider.Background5,
                                 RelativeSizeAxes = Axes.Both,
                             },
-                            RightToolbox = new ExpandingToolboxContainer(TOOLBOX_CONTRACTED_SIZE_RIGHT, 250)
+                            RightToolbox = new ExpandingToolboxContainer(TOOLBOX_CONTRACTED_SIZE_RIGHT, TOOLBOX_EXPANDED_SIZE_RIGHT)
                             {
                                 Child = new EditorToolboxGroup("inspector")
                                 {
@@ -541,6 +541,9 @@ namespace osu.Game.Rulesets.Edit
     {
         public const float TOOLBOX_CONTRACTED_SIZE_LEFT = 60;
         public const float TOOLBOX_CONTRACTED_SIZE_RIGHT = 120;
+
+        public const float TOOLBOX_EXPANDED_SIZE_LEFT = 200;
+        public const float TOOLBOX_EXPANDED_SIZE_RIGHT = 250;
 
         public readonly Ruleset Ruleset;
 
