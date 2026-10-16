@@ -9,7 +9,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Edit;
@@ -35,6 +34,8 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
         private readonly ExtensionSnapGrid snapGrid = new ExtensionSnapGrid();
 
+        private (double start, double end)? selectionTimeRange;
+
         private FillFlowContainer<DrawableExtensionColumn> columnFlow = null!;
         private Drawable placeholder = null!;
 
@@ -49,6 +50,27 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
         [Resolved]
         private OsuColour colours { get; set; } = null!;
+
+        /// <summary>
+        /// Whether clicking empty column space creates notes.
+        /// </summary>
+        /// <remarks>
+        /// Also gates the hover feedback. Without that the beat lines and the placement preview would still be drawn
+        /// while the composer's selection tool is active, making the columns read as a placement surface even though
+        /// their blank space belongs to the playfield's selection box.
+        /// </remarks>
+        public Func<bool>? PlacementEnabled { get; set; }
+
+        /// <summary>
+        /// Whether the columns currently accept placement gestures.
+        /// </summary>
+        public bool CanPlace => PlacementEnabled?.Invoke() != false;
+
+        /// <summary>
+        /// Raised when the columns take a selection. The playfield and the columns never hold a selection at the same
+        /// time, so the owner drops the playfield's in response.
+        /// </summary>
+        public Action? SelectionTaken { get; set; }
 
         /// <summary>
         /// The playfield column whose scroll mapping and geometry the columns mirror, if the playfield is laid out.
@@ -76,9 +98,33 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         public bool IsInteracting { get; set; }
 
         /// <summary>
-        /// Beat divisor lines around <see cref="HoverTime"/>.
+        /// The beat divisor lines to draw on <paramref name="column"/>, or <c>null</c> when it should draw none.
         /// </summary>
-        internal IReadOnlyList<ExtensionSnapLine> SnapLines => snapGrid.Lines;
+        /// <remarks>
+        /// A selection draws its lines on every column; otherwise only the hovered column shows the cursor's lines.
+        /// </remarks>
+        internal IReadOnlyList<ExtensionSnapLine>? LinesFor(ExtensionColumn column)
+        {
+            if (selectionTimeRange != null)
+                return snapGrid.Lines;
+
+            return HoverColumn == column ? snapGrid.Lines : null;
+        }
+
+        /// <summary>
+        /// The time range whose beat lines the columns should show, when a selection owns them instead of the cursor.
+        /// </summary>
+        public (double start, double end)? SelectionTimeRange
+        {
+            set
+            {
+                if (value == selectionTimeRange)
+                    return;
+
+                selectionTimeRange = value;
+                snapGrid.Clear();
+            }
+        }
 
         public ExtensionArea(ExtensionColumnSet columnSet, ManiaPlayfield playfield)
         {
@@ -143,12 +189,41 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         public void ClearSelection() => columnSet.ClearSelection();
 
         /// <summary>
-        /// Selects the notes inside <paramref name="region"/>, deselecting the rest unless they are preserved.
+        /// Selects every note of <paramref name="column"/>.
         /// </summary>
-        public void UpdateBoxSelection(Quad region, HashSet<ExtensionNote>? preserve)
+        public void SelectAll(ExtensionColumn column)
+        {
+            NotifySelectionTaken();
+            columnSet.SelectAll(column);
+        }
+
+        /// <summary>
+        /// Selects every note across all columns.
+        /// </summary>
+        public void SelectAllNotes()
+        {
+            NotifySelectionTaken();
+            columnSet.SelectAll();
+        }
+
+        /// <summary>
+        /// Signals that the columns are taking a selection, so the owner can drop the playfield's.
+        /// </summary>
+        public void NotifySelectionTaken() => SelectionTaken?.Invoke();
+
+        /// <summary>
+        /// Removes every selected note.
+        /// </summary>
+        /// <returns>The number of notes removed.</returns>
+        public int RemoveSelected() => columnSet.RemoveSelected();
+
+        /// <summary>
+        /// Selects the notes whose centre time lies in the given band, deselecting the rest unless they are preserved.
+        /// </summary>
+        public void UpdateBoxSelection(double minTime, double maxTime, HashSet<ExtensionNote>? preserve)
         {
             foreach (var column in columnFlow)
-                column.UpdateBoxSelection(region, preserve);
+                column.UpdateBoxSelection(minTime, maxTime, preserve);
         }
 
         /// <summary>
@@ -244,17 +319,38 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
             var column = mouse == null ? null : DrawableColumnAt(mouse.Value);
 
             // The column's own controls (select-all) and the dock's scrollbar own their positions.
-            if (mouse == null || column == null || column.ContainsControl(mouse.Value) || TimeAt(mouse.Value) is not double time)
+            if (mouse != null && column != null && !column.ContainsControl(mouse.Value) && TimeAt(mouse.Value) is double time)
+            {
+                HoverColumn = column.Column;
+                IsHoveringNote = column.NoteAt(mouse.Value) != null;
+                HoverTime = beatSnapProvider.SnapTime(time);
+            }
+
+            updateGrid();
+        }
+
+        /// <summary>
+        /// Rebuilds the beat divisor lines, preferring a selection's band over the hovered time.
+        /// </summary>
+        /// <remarks>
+        /// The selection band outranks the cursor because the composer keeps the selection tool active while the columns
+        /// hold a selection, which already suppresses placement.
+        /// </remarks>
+        private void updateGrid()
+        {
+            if (selectionTimeRange is (double start, double end))
+            {
+                if (!snapGrid.IsValidForRange(start, end, beatDivisor.Value))
+                    snapGrid.RebuildForRange(start, end, editorBeatmap.ControlPointInfo, beatDivisor.Value, editorBeatmap.FixedGridEnabled.Value, colours);
+
+                return;
+            }
+
+            if (!CanPlace || HoverTime is not double snapped)
             {
                 snapGrid.Clear();
                 return;
             }
-
-            HoverColumn = column.Column;
-            IsHoveringNote = column.NoteAt(mouse.Value) != null;
-
-            double snapped = beatSnapProvider.SnapTime(time);
-            HoverTime = snapped;
 
             if (!snapGrid.IsValidFor(snapped, beatDivisor.Value))
                 snapGrid.Rebuild(snapped, editorBeatmap.ControlPointInfo, beatDivisor.Value, editorBeatmap.FixedGridEnabled.Value, colours);
@@ -297,7 +393,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
         private DrawableExtensionColumn createColumn(ExtensionColumn column) => new DrawableExtensionColumn(column, this)
         {
-            SelectAllRequested = () => columnSet.SelectAll(column),
+            SelectAllRequested = () => SelectAll(column),
         };
 
         protected override void Dispose(bool isDisposing)

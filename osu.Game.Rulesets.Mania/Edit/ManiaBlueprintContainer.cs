@@ -108,11 +108,32 @@ namespace osu.Game.Rulesets.Mania.Edit
 
         protected override bool OnClick(ClickEvent e)
         {
-            // An empty click beside the columns clears their selection along with the playfield's, mirroring DeselectAll().
-            if (!e.ControlPressed && isExtensionColumnsSelection(e.ScreenSpaceMousePosition))
-                Composer.PlayfieldContent!.ClearExtensionSelection();
+            // A plain click hands the selection to the region it lands in: the playfield's own selection is dropped by
+            // base.OnClick(), and the columns lose theirs here. Clicks on a column note never reach this handler —
+            // they are taken by the columns' own edit area — so a selected note survives them.
+            if (!e.ControlPressed)
+                Composer.PlayfieldContent?.ClearExtensionSelection();
 
             return base.OnClick(e);
+        }
+
+        protected override void SelectAll()
+        {
+            var content = Composer.PlayfieldContent;
+
+            // Ctrl+A acts on the region the pointer is over, the same way a selection box belongs to the region it starts in.
+            if (content != null)
+            {
+                Vector2? mouse = GetContainingInputManager()?.CurrentState.Mouse.Position;
+
+                if (content.SelectedExtensionNotes.Count > 0 || (mouse != null && content.ContainsExtensionColumns(mouse.Value)))
+                {
+                    content.SelectAllExtensionNotes();
+                    return;
+                }
+            }
+
+            base.SelectAll();
         }
 
         protected override bool TryMoveBlueprints(DragEvent e, IList<(SelectionBlueprint<HitObject> blueprint, Vector2[] originalSnapPositions)> blueprints)
@@ -160,7 +181,12 @@ namespace osu.Game.Rulesets.Mania.Edit
             // when the drag began) and never grows into the playfield, and the playfield box never reaches the columns.
             if (marqueeInExtensionColumns)
             {
-                Composer.PlayfieldContent?.UpdateExtensionSelection(DragBox.Box.ScreenSpaceDrawQuad, extensionSelectionBeforeDrag);
+                // Columns are picked by the drag's time band, mirroring the playfield's time-based box. The drag box's
+                // horizontal extent comes from the raw mouse path, so a mostly vertical drag would otherwise decide
+                // which columns are hit and drop the selection entirely.
+                if (DragBox is ScrollingDragBox scrollingDragBox)
+                    Composer.PlayfieldContent?.UpdateExtensionSelection(scrollingDragBox.MinTime, scrollingDragBox.MaxTime, extensionSelectionBeforeDrag);
+
                 return;
             }
 

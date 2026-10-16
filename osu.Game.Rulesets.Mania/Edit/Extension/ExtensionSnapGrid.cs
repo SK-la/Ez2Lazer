@@ -28,6 +28,8 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         public readonly List<ExtensionSnapLine> Lines = new List<ExtensionSnapLine>();
 
         private double builtForTime = double.NaN;
+        private double builtRangeStart = double.NaN;
+        private double builtRangeEnd = double.NaN;
         private int builtForDivisor;
 
         /// <summary>
@@ -35,23 +37,58 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         /// </summary>
         public bool IsValidFor(double referenceTime, int beatDivisor) => builtForTime == referenceTime && builtForDivisor == beatDivisor;
 
+        /// <summary>
+        /// Whether the current lines already describe the range [<paramref name="start"/>, <paramref name="end"/>].
+        /// </summary>
+        public bool IsValidForRange(double start, double end, int beatDivisor)
+            => builtRangeStart == start && builtRangeEnd == end && builtForDivisor == beatDivisor;
+
         public void Clear()
         {
             Lines.Clear();
             builtForTime = double.NaN;
+            builtRangeStart = double.NaN;
+            builtRangeEnd = double.NaN;
             builtForDivisor = 0;
         }
 
+        /// <summary>
+        /// Rebuilds the lines around a single reference time, as used while hovering the columns.
+        /// </summary>
         public void Rebuild(double referenceTime, ControlPointInfo controlPointInfo, int beatDivisor, bool fixedGrid, OsuColour colours)
+        {
+            builtForTime = referenceTime;
+            builtRangeStart = double.NaN;
+            builtRangeEnd = double.NaN;
+            builtForDivisor = beatDivisor;
+
+            build(referenceTime, referenceTime, controlPointInfo, beatDivisor, fixedGrid, colours);
+        }
+
+        /// <summary>
+        /// Rebuilds the lines across a time band, as used while a selection owns them.
+        /// </summary>
+        public void RebuildForRange(double start, double end, ControlPointInfo controlPointInfo, int beatDivisor, bool fixedGrid, OsuColour colours)
+        {
+            builtForTime = double.NaN;
+            builtRangeStart = start;
+            builtRangeEnd = end;
+            builtForDivisor = beatDivisor;
+
+            build(start, end, controlPointInfo, beatDivisor, fixedGrid, colours);
+        }
+
+        /// <summary>
+        /// Generates the divisor lines for [<paramref name="rangeStart"/>, <paramref name="rangeEnd"/>], with a
+        /// <see cref="visible_range"/> falloff on either side. A degenerate band reproduces the cursor's own lines.
+        /// </summary>
+        private void build(double rangeStart, double rangeEnd, ControlPointInfo controlPointInfo, int beatDivisor, bool fixedGrid, OsuColour colours)
         {
             Lines.Clear();
 
-            builtForTime = referenceTime;
-            builtForDivisor = beatDivisor;
-
             TimingControlPoint timingPoint = fixedGrid
                 ? controlPointInfo.TimingPoints.Count > 0 ? controlPointInfo.TimingPoints[0] : TimingControlPoint.DEFAULT
-                : controlPointInfo.TimingPointAt(referenceTime - visible_range);
+                : controlPointInfo.TimingPointAt(rangeStart - visible_range);
 
             if (timingPoint.BeatLength <= 0)
                 return;
@@ -60,13 +97,13 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
             int beat = 0;
 
             // Progress time until the visible range is reached.
-            while (time < referenceTime - visible_range && beat < max_line_count)
+            while (time < rangeStart - visible_range && beat < max_line_count)
             {
                 time += timingPoint.BeatLength / beatDivisor;
                 beat++;
             }
 
-            while (time < referenceTime + visible_range && Lines.Count < max_line_count)
+            while (time < rangeEnd + visible_range && Lines.Count < max_line_count)
             {
                 if (!fixedGrid)
                 {
@@ -82,7 +119,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
                 }
 
                 int divisor = BindableBeatDivisor.GetDivisorForBeatIndex(beat, beatDivisor);
-                double separation = Math.Abs(time - referenceTime);
+                double separation = time < rangeStart ? rangeStart - time : time > rangeEnd ? time - rangeEnd : 0;
 
                 Lines.Add(new ExtensionSnapLine(time, BindableBeatDivisor.GetColourFor(divisor, colours), (float)Math.Max(0, 1 - separation / visible_range)));
 

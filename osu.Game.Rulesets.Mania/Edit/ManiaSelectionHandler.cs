@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
@@ -25,6 +26,16 @@ namespace osu.Game.Rulesets.Mania.Edit
 
             SelectionBox.CanFlipX = canFlipX(selectedObjects);
             SelectionBox.CanFlipY = canFlipY(selectedObjects);
+        }
+
+        protected override void DeleteItems(IEnumerable<HitObject> items)
+        {
+            // The extension columns keep their own selection. While it is non-empty it owns the delete request — the two
+            // selections are mutually exclusive, so nothing playfield-side can be pending at the same time.
+            if (((ManiaHitObjectComposer)composer).PlayfieldContent?.DeleteExtensionSelection() == true)
+                return;
+
+            base.DeleteItems(items);
         }
 
         public override bool HandleMovement(MoveSelectionEvent<HitObject> moveEvent)

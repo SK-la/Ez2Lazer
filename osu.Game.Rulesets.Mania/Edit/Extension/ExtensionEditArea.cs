@@ -46,12 +46,6 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         private EditorBeatmap editorBeatmap { get; set; } = null!;
 
         /// <summary>
-        /// Whether clicking empty column space creates notes. Disabled while the selection tool is active, where the
-        /// same gesture belongs to the playfield's selection box.
-        /// </summary>
-        public Func<bool>? PlacementEnabled { get; set; }
-
-        /// <summary>
         /// Positions owned by another interactive element (the dock scrollbar) which must not receive extension input.
         /// </summary>
         public Func<Vector2, bool>? ExcludePosition { get; set; }
@@ -83,7 +77,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
             var column = area.ColumnAt(e.ScreenSpaceMousePosition);
 
-            if (column == null || PlacementEnabled?.Invoke() == false)
+            if (column == null || !area.CanPlace)
                 return false;
 
             columnSet.ClearSelection();
@@ -94,7 +88,8 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
         protected override bool OnMouseDown(MouseDownEvent e)
         {
-            if (e.Button != MouseButton.Right)
+            // The playfield's quick delete answers middle-click (or shift+right); the columns answer the same two.
+            if (e.Button != MouseButton.Right && e.Button != MouseButton.Middle)
                 return false;
 
             var note = area.NoteAt(e.ScreenSpaceMousePosition);
@@ -102,7 +97,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
             if (note == null)
                 return false;
 
-            // Right-clicking outside the selection deletes just that note, so a stray click never wipes a multi-selection.
+            // Deleting outside the selection removes just that note, so a stray click never wipes a multi-selection.
             if (!note.Selected.Value)
                 columnSet.ClearSelection();
 
@@ -122,7 +117,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
             // On a note this is a move; anywhere else it is a placement, which the selection tool leaves to the
             // playfield's selection box instead.
-            if (note == null && PlacementEnabled?.Invoke() == false)
+            if (note == null && !area.CanPlace)
                 return false;
 
             movingNotes.Clear();
@@ -170,28 +165,42 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
             if (draftColumn == null)
                 return;
 
-            double duration = snapTimeAt(e.ScreenSpaceMousePosition) - draftStartTime;
+            // Both drag directions grow a hold, keeping the press time as one end: snap quantisation otherwise makes the
+            // first events land exactly on the press time, and treating that as a cancelled gesture would abort the whole
+            // drag before it can extend.
+            double other = snapTimeAt(e.ScreenSpaceMousePosition);
+            double start = Math.Min(draftStartTime, other);
+            double duration = Math.Abs(other - draftStartTime);
 
             if (duration <= 0)
             {
-                cancelDraft();
+                if (draftNote != null)
+                {
+                    columnSet.RemoveNote(draftNote);
+                    draftNote = null;
+                }
+
                 return;
             }
 
             if (draftNote == null)
-                draftNote = columnSet.AddNote(draftColumn, draftStartTime, duration);
+                draftNote = columnSet.AddNote(draftColumn, start, duration);
             else
+            {
+                draftNote.Time = start;
                 draftNote.Duration = duration;
+            }
         }
 
         protected override void OnDragEnd(DragEndEvent e)
         {
             area.IsInteracting = false;
 
+            // A drag that grew into a hold keeps the draft that was built up; one that only tapped commits a new tap note.
             if (draftColumn != null && draftNote == null)
                 columnSet.AddNote(draftColumn, draftStartTime);
 
-            cancelDraft();
+            clearDraft();
 
             if (movingNotes.Count > 0)
                 dropSelection(e.ScreenSpaceMousePosition);
@@ -268,20 +277,19 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
         private void select(ExtensionNote note, bool additive)
         {
+            // Selecting a note hands the selection to the columns, which puts the composer in selection mode and drops
+            // the playfield's selection. Without that the next click on blank space would place another note.
+            area.NotifySelectionTaken();
+
             if (!additive)
                 columnSet.ClearSelection();
 
             note.Selected.Value = true;
         }
 
-        private void cancelDraft()
+        private void clearDraft()
         {
-            if (draftNote != null)
-            {
-                columnSet.RemoveNote(draftNote);
-                draftNote = null;
-            }
-
+            draftNote = null;
             draftColumn = null;
         }
 

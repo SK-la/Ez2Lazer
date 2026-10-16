@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.EzOsuGame.Localization;
@@ -133,7 +132,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         /// <summary>
         /// Selects the notes inside <paramref name="region"/>, deselecting the rest unless they are preserved.
         /// </summary>
-        public void UpdateBoxSelection(Quad region, IReadOnlyCollection<ExtensionNote>? preserve) => noteLayer.UpdateBoxSelection(region, preserve);
+        public void UpdateBoxSelection(double minTime, double maxTime, IReadOnlyCollection<ExtensionNote>? preserve) => noteLayer.UpdateBoxSelection(minTime, maxTime, preserve);
 
         /// <summary>
         /// Whether <paramref name="screenSpacePosition"/> is over a control of this column rather than its note area.

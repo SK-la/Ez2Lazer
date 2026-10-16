@@ -142,6 +142,20 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         }
 
         /// <summary>
+        /// Replaces the selection with every note across all columns.
+        /// </summary>
+        public void SelectAll()
+        {
+            ClearSelection();
+
+            foreach (var column in Columns)
+            {
+                foreach (var note in column.Notes)
+                    note.Selected.Value = true;
+            }
+        }
+
+        /// <summary>
         /// Replaces the selection with every note of <paramref name="column"/>.
         /// </summary>
         public void SelectAll(ExtensionColumn column)

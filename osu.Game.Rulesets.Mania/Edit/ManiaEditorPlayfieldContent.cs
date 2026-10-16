@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Primitives;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Localization;
@@ -63,7 +62,11 @@ namespace osu.Game.Rulesets.Mania.Edit
 
             RelativeSizeAxes = Axes.Both;
 
-            extensionArea = new ExtensionArea(columnSet, playfield);
+            extensionArea = new ExtensionArea(columnSet, playfield)
+            {
+                PlacementEnabled = () => !(selectToolActive?.Invoke() ?? false),
+                SelectionTaken = () => ExtensionSelectionTaken?.Invoke(),
+            };
 
             InternalChildren = new Drawable[]
             {
@@ -85,7 +88,6 @@ namespace osu.Game.Rulesets.Mania.Edit
                         new ExtensionEditArea(columnSet, extensionArea, playfield)
                         {
                             RelativeSizeAxes = Axes.Both,
-                            PlacementEnabled = () => !(selectToolActive?.Invoke() ?? false),
                             ExcludePosition = position => dockScrollContainer.IsOnScrollbar(position) || extensionArea.IsOnControl(position),
                         },
                         insertOverlay = new ExtensionColumnInsertOverlay(columnSet, extensionArea)
@@ -119,6 +121,14 @@ namespace osu.Game.Rulesets.Mania.Edit
         public bool ContainsExtensionColumns(Vector2 screenSpacePosition) => dockRegion.Contains(screenSpacePosition);
 
         /// <summary>
+        /// Raised when the extension columns take a selection, so the playfield's can be dropped.
+        /// </summary>
+        /// <remarks>
+        /// The two regions keep a single selection between them; see <see cref="ExtensionArea.SelectionTaken"/>.
+        /// </remarks>
+        public event Action? ExtensionSelectionTaken;
+
+        /// <summary>
         /// Whether a selection box starting at <paramref name="screenSpacePosition"/> belongs to the extension columns.
         /// </summary>
         /// <returns>
@@ -148,15 +158,34 @@ namespace osu.Game.Rulesets.Mania.Edit
         public IReadOnlyCollection<ExtensionNote> SelectedExtensionNotes => extensionArea.SelectedNotes;
 
         /// <summary>
+        /// Sets the time range whose beat lines the extension columns should show, or <c>null</c> to follow the cursor.
+        /// </summary>
+        public (double start, double end)? SelectionTimeRange
+        {
+            set => extensionArea.SelectionTimeRange = value;
+        }
+
+        /// <summary>
         /// Clears the extension column selection.
         /// </summary>
         public void ClearExtensionSelection() => extensionArea.ClearSelection();
 
         /// <summary>
-        /// Applies a screen-space selection box to the extension notes.
+        /// Selects every note across the extension columns.
         /// </summary>
-        /// <param name="preserve">Notes which were already selected when the drag started, kept regardless of the box.</param>
-        public void UpdateExtensionSelection(Quad region, HashSet<ExtensionNote>? preserve) => extensionArea.UpdateBoxSelection(region, preserve);
+        public void SelectAllExtensionNotes() => extensionArea.SelectAllNotes();
+
+        /// <summary>
+        /// Removes the notes currently selected across the extension columns.
+        /// </summary>
+        /// <returns>Whether any note was removed.</returns>
+        public bool DeleteExtensionSelection() => extensionArea.RemoveSelected() > 0;
+
+        /// <summary>
+        /// Applies a time band to the extension notes, deselecting the rest.
+        /// </summary>
+        /// <param name="preserve">Notes which were already selected when the drag started, kept regardless of the band.</param>
+        public void UpdateExtensionSelection(double minTime, double maxTime, HashSet<ExtensionNote>? preserve) => extensionArea.UpdateBoxSelection(minTime, maxTime, preserve);
 
         /// <summary>
         /// Hands <paramref name="hitObjects"/> over to the extension columns, dropping them on the column under
@@ -185,13 +214,13 @@ namespace osu.Game.Rulesets.Mania.Edit
         /// </summary>
         private void requestRemoveColumn(ExtensionColumn column)
         {
-            if (column.Notes.Count == 0)
+            if (column.Notes.Count == 0 || dialogOverlay == null)
             {
                 columnSet.Remove(column);
                 return;
             }
 
-            dialogOverlay?.Push(new ConfirmDialog(
+            dialogOverlay.Push(new ConfirmDialog(
                 LocalisableString.Format(EzEditorStrings.EXTENSION_COLUMN_REMOVE_WITH_NOTES, column.Number.Value, column.Notes.Count),
                 () => columnSet.Remove(column)));
         }
