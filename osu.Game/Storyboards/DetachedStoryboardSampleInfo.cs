@@ -3,7 +3,9 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Graphics;
 using osu.Game.Audio;
+using osu.Game.Storyboards.Drawables;
 
 namespace osu.Game.Storyboards
 {
@@ -45,5 +47,7 @@ namespace osu.Game.Storyboards
         public override bool IsHitsound => isHitsound;
 
         public override IEnumerable<string> LookupNames => sample.LookupNames;
+
+        public override Drawable CreateDrawable() => new DrawableDetachedStoryboardSample(this);
     }
 }

@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Audio;
@@ -13,7 +12,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Storyboards;
-using osu.Game.Storyboards.Drawables;
 
 namespace osu.Game.Rulesets.UI
 {
@@ -51,56 +49,19 @@ namespace osu.Game.Rulesets.UI
         [BackgroundDependencyLoader]
         private void load()
         {
-            // Balance is resolved once, exactly as a live note resolves it, because the object that was removed is the
-            // only thing that knew where the audio sat in the playfield.
             double positionalHitsoundsLevel = gameplaySettings.PositionalHitsoundsLevel.Value;
 
             foreach (var sample in samples)
             {
+                // Balance is resolved once, exactly as a live note resolves it, because the object that was removed is
+                // the only thing that knew where the audio sat in the playfield.
                 var info = new DetachedStoryboardSampleInfo(
                     sample.Sample,
                     sample.Time,
                     DrawableHitObject.CalculateSamplePlaybackBalance(sample.Position, positionalHitsoundsLevel),
                     isHitsound(sample.Sample));
 
-                AddInternal(new DrawableDetachedStoryboardSample(info));
-            }
-        }
-
-        private partial class DrawableDetachedStoryboardSample : DrawableStoryboardSample
-        {
-            private readonly DetachedStoryboardSampleInfo info;
-
-            [Resolved]
-            private OsuConfigManager config { get; set; } = null!;
-
-            public DrawableDetachedStoryboardSample(DetachedStoryboardSampleInfo sampleInfo)
-                : base(sampleInfo)
-            {
-                info = sampleInfo;
-                MinimumSampleVolume = DrawableHitObject.MINIMUM_SAMPLE_VOLUME;
-            }
-
-            private Bindable<double>? hitsoundVolume;
-
-            [BackgroundDependencyLoader]
-            private void load()
-            {
-                Balance.Value = info.Balance;
-
-                // Hitsound-classified audio follows the hitsound volume slider, the same as a note's own sample does.
-                if (info.IsHitsound)
-                    Volume.BindTo(hitsoundVolume = config.GetBindable<double>(OsuSetting.HitsoundVolume));
-            }
-
-            protected override void Dispose(bool isDisposing)
-            {
-                if (isDisposing && hitsoundVolume != null)
-                    Volume.UnbindFrom(hitsoundVolume);
-
-                hitsoundVolume = null;
-
-                base.Dispose(isDisposing);
+                AddInternal(info.CreateDrawable());
             }
         }
     }
