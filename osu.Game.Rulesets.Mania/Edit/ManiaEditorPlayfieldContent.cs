@@ -39,6 +39,11 @@ namespace osu.Game.Rulesets.Mania.Edit
                             Child = playfieldContent,
                         },
                         new ScratchArea(trackSet),
+                        new ScratchTrackControls
+                        {
+                            AddRequested = () => trackSet.Append(),
+                            RemoveRequested = () => trackSet.RemoveLast(),
+                        },
                     },
                 },
             };
