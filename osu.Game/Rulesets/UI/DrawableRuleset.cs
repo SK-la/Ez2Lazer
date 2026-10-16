@@ -182,12 +182,19 @@ namespace osu.Game.Rulesets.UI
                 Children = new Drawable[]
                 {
                     FrameStableComponents,
-                    gameplayMixer.WithChild(KeyBindingInputManager
-                        .WithChildren(new Drawable[]
-                        {
-                            playfieldAdjustmentContainer.WithChild(Playfield),
-                            Overlays
-                        })),
+                    gameplayMixer.WithChildren(new Drawable[]
+                    {
+                        KeyBindingInputManager
+                            .WithChildren(new Drawable[]
+                            {
+                                playfieldAdjustmentContainer.WithChild(Playfield),
+                                Overlays
+                            }),
+                    }),
+                    // Samples kept by mods that removed the hit objects carrying them. Deliberately outside the
+                    // gameplay mixer's own hierarchy: an element binds the mixer itself when it is a hitsound, so it
+                    // plays under the chain of the note it came from rather than the storyboard volume chain.
+                    new DetachedSampleTrack(Beatmap.DetachedSamples, Beatmap.DetachedSampleIsHitsound),
                 }
             };
 
