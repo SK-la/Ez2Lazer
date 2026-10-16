@@ -3,10 +3,9 @@
 
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
 using osu.Game.Graphics.Containers;
-using osu.Game.Graphics.Sprites;
+using osu.Game.Rulesets.Mania.Edit.Scratch;
 
 namespace osu.Game.Rulesets.Mania.Edit
 {
@@ -14,15 +13,11 @@ namespace osu.Game.Rulesets.Mania.Edit
     /// Hosts the mania editor playfield alongside the background scratch area, allowing horizontal scrolling
     /// when the combined width exceeds the available viewport.
     /// </summary>
-    /// <remarks>
-    /// POC: the scratch area currently renders placeholder columns only. Track data and interaction arrive in later steps.
-    /// </remarks>
     public partial class ManiaEditorPlayfieldContent : Container
     {
-        private const float scratch_column_width = 60;
+        private readonly ScratchTrackSet trackSet = new ScratchTrackSet();
 
         private readonly Container playfieldHost;
-        private readonly FillFlowContainer scratchColumns;
 
         public ManiaEditorPlayfieldContent(Drawable playfieldContent)
         {
@@ -43,18 +38,10 @@ namespace osu.Game.Rulesets.Mania.Edit
                             RelativeSizeAxes = Axes.Y,
                             Child = playfieldContent,
                         },
-                        scratchColumns = new FillFlowContainer
-                        {
-                            RelativeSizeAxes = Axes.Y,
-                            AutoSizeAxes = Axes.X,
-                            Direction = FillDirection.Horizontal,
-                        },
+                        new ScratchArea(trackSet),
                     },
                 },
             };
-
-            for (int i = 1; i <= 5; i++)
-                scratchColumns.Add(createPlaceholderColumn(i));
         }
 
         protected override void Update()
@@ -65,27 +52,6 @@ namespace osu.Game.Rulesets.Mania.Edit
             if (Parent != null)
                 playfieldHost.Width = Parent.DrawWidth;
         }
-
-        private static Drawable createPlaceholderColumn(int number) => new Container
-        {
-            RelativeSizeAxes = Axes.Y,
-            Width = scratch_column_width,
-            Children = new Drawable[]
-            {
-                new Box
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = Colour4.Black.Opacity(0.6f),
-                },
-                new OsuSpriteText
-                {
-                    Text = $"#{number}",
-                    Anchor = Anchor.TopCentre,
-                    Origin = Anchor.TopCentre,
-                    Margin = new MarginPadding { Top = 5 },
-                },
-            },
-        };
 
         private partial class HorizontalScrollContainer : OsuScrollContainer
         {
