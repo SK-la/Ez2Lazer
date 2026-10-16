@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mods;
@@ -32,16 +33,35 @@ namespace osu.Game.Storyboards.Drawables
         [Resolved]
         private IReadOnlyList<Mod>? mods { get; set; }
 
-        private Bindable<double>? hitsoundVolume;
+        [Resolved(canBeNull: true)]
+        private OsuConfigManager? config { get; set; }
 
-        [BackgroundDependencyLoader(true)]
-        private void load(OsuConfigManager? config)
+        private Bindable<double>? hitsoundVolume;
+        private IAdjustableAudioComponent? hitsoundChain;
+
+        /// <summary>
+        /// The audio component whose volume chain a hitsound-classified sample plays under, or <see langword="null"/>
+        /// to take the chain from the game-wide hitsound volume setting.
+        /// </summary>
+        /// <remarks>
+        /// A sample classified as a hitsound resolves through the hitsound sample store, which deliberately omits the
+        /// global sample adjustments the regular store applies, so its chain has to be applied from outside the store.
+        /// A sample hosted by gameplay instead plays under the mixer gameplay audio already goes through, which
+        /// carries the same setting along with adjustments a ruleset or mod applies to gameplay audio.
+        /// </remarks>
+        protected virtual IAdjustableAudioComponent? HitsoundVolumeChain => null;
+
+        protected override void LoadAsyncComplete()
         {
-            // A sample classified as a hitsound resolves through the hitsound sample store, which deliberately omits
-            // the global sample adjustments the regular store applies. The hitsound volume chain therefore has to be
-            // applied here instead, or the audio would end up outside of volume control rather than under it.
-            if (sampleInfo.IsHitsound && config != null)
-                Volume.BindTo(hitsoundVolume = config.GetBindable<double>(OsuSetting.HitsoundVolume));
+            base.LoadAsyncComplete();
+
+            if (sampleInfo.IsHitsound)
+            {
+                if (HitsoundVolumeChain is { } chain)
+                    BindAdjustments(hitsoundChain = chain);
+                else if (config != null)
+                    Volume.BindTo(hitsoundVolume = config.GetBindable<double>(OsuSetting.HitsoundVolume));
+            }
         }
 
         protected override void SkinChanged(ISkinSource skin)
@@ -107,10 +127,17 @@ namespace osu.Game.Storyboards.Drawables
 
         protected override void Dispose(bool isDisposing)
         {
-            if (isDisposing && hitsoundVolume != null)
-                Volume.UnbindFrom(hitsoundVolume);
+            if (isDisposing)
+            {
+                if (hitsoundVolume != null)
+                    Volume.UnbindFrom(hitsoundVolume);
+
+                if (hitsoundChain != null)
+                    UnbindAdjustments(hitsoundChain);
+            }
 
             hitsoundVolume = null;
+            hitsoundChain = null;
 
             base.Dispose(isDisposing);
         }

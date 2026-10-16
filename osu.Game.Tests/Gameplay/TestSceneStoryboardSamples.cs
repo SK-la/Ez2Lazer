@@ -20,6 +20,7 @@ using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Game.Audio;
+using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.IO;
@@ -218,6 +219,38 @@ namespace osu.Game.Tests.Gameplay
             AddUntilStep("resolved", () => sample.IsLoaded);
 
             AddAssert("lookup used the note's definition", () => skin.Lookups.Count > 0 && skin.Lookups.All(lookup => lookup is HitSampleInfo));
+        }
+
+        /// <summary>
+        /// A detached hitsound plays under the gameplay mixer the note played under, so an adjustment a ruleset or mod
+        /// applies to gameplay audio reaches it. Wired to the hitsound volume setting on its own, it would keep
+        /// sounding at full volume while the note it replaced was silenced.
+        /// </summary>
+        [Test]
+        public void TestDetachedHitsoundPlaysUnderGameplayMixer()
+        {
+            DrawableRuleset drawableRuleset = null;
+            DrawableDetachedStoryboardSample sample = null;
+            double volumeBeforeAdjustment = 0;
+
+            AddStep("create gameplay holding a detached sample", () =>
+            {
+                var ruleset = new OsuRuleset();
+                var beatmap = CreateWorkingBeatmap(ruleset.RulesetInfo).GetPlayableBeatmap(ruleset.RulesetInfo);
+
+                ((IDetachedSampleHost)beatmap).DetachedSamples.Add(new DetachedNoteSample(0, new HitSampleInfo(HitSampleInfo.HIT_NORMAL, volume: 60), DetachedNoteSample.CENTRE));
+
+                Add(drawableRuleset = ruleset.CreateDrawableRulesetWith(beatmap));
+            });
+
+            AddUntilStep("detached sample loaded", () => (sample = drawableRuleset.ChildrenOfType<DrawableDetachedStoryboardSample>().FirstOrDefault())?.IsLoaded == true);
+
+            AddUntilStep("sample plays on the mixer chain", () => sample.AggregateVolume.Value, () => Is.EqualTo(drawableRuleset.Audio.AggregateVolume.Value).Within(1e-6));
+
+            AddStep("record volume", () => volumeBeforeAdjustment = sample.AggregateVolume.Value);
+            AddStep("lower gameplay volume", () => drawableRuleset.Audio.AddAdjustment(AdjustableProperty.Volume, new BindableDouble(0.5)));
+
+            AddUntilStep("sample follows gameplay volume", () => sample.AggregateVolume.Value, () => Is.EqualTo(0.5 * volumeBeforeAdjustment).Within(1e-6));
         }
 
         /// <summary>

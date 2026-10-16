@@ -192,7 +192,8 @@ namespace osu.Game.Rulesets.UI
                             }),
                     }),
                     // Samples kept by mods that removed the hit objects carrying them. Deliberately outside the
-                    // gameplay mixer: each element picks its own volume chain from its hitsound classification.
+                    // gameplay mixer's own hierarchy: an element binds the mixer itself when it is a hitsound, so it
+                    // plays under the chain of the note it came from rather than the storyboard volume chain.
                     new DetachedSampleTrack(Beatmap.DetachedSamples, Beatmap.DetachedSampleIsHitsound),
                 }
             };
