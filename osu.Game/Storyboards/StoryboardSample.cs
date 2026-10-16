@@ -16,11 +16,11 @@ namespace osu.Game.Storyboards
 
         public double StartTime { get; }
 
-        public int Volume { get; }
+        public virtual int Volume { get; }
 
-        public bool IsHitsound => false;
+        public virtual bool IsHitsound => false;
 
-        public IEnumerable<string> LookupNames => new[]
+        public virtual IEnumerable<string> LookupNames => new[]
         {
             // Try first with the full name, then attempt with no path
             Path,
@@ -35,6 +35,6 @@ namespace osu.Game.Storyboards
             Volume = volume;
         }
 
-        public Drawable CreateDrawable() => new DrawableStoryboardSample(this);
+        public virtual Drawable CreateDrawable() => new DrawableStoryboardSample(this);
     }
 }

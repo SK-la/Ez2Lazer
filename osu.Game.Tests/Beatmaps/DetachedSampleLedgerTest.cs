@@ -3,9 +3,13 @@
 
 using System.Collections.Generic;
 using NUnit.Framework;
+using osu.Framework.Localisation;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Osu;
+using osu.Game.Rulesets.Osu.Objects;
 
 namespace osu.Game.Tests.Beatmaps
 {
@@ -129,6 +133,46 @@ namespace osu.Game.Tests.Beatmaps
 
             Assert.That(beatmap.DetachedSamples, Has.Count.EqualTo(1));
             Assert.That(beatmap.DetachedSamples[0].Time, Is.EqualTo(1000));
+        }
+
+        [Test]
+        public void TestSampleOfObjectRemovedByAfterConversionModIsDetached()
+        {
+            var removed = new HitCircle
+            {
+                StartTime = 1000,
+                Samples = new[] { new HitSampleInfo("key-removed") },
+            };
+
+            var beatmap = new Beatmap
+            {
+                HitObjects =
+                {
+                    removed,
+                    new HitCircle { StartTime = 2000, Samples = new[] { new HitSampleInfo("key-kept") } },
+                },
+            };
+
+            // The mods that rewrite hit objects are the post-conversion ones, so this also pins down where the
+            // snapshot has to sit in the pipeline.
+            var playable = new TestWorkingBeatmap(beatmap).GetPlayableBeatmap(new OsuRuleset().RulesetInfo, new Mod[] { new RemoveFirstObjectMod() });
+
+            var host = (IDetachedSampleHost)playable;
+
+            Assert.That(host.DetachedSamples, Has.Count.EqualTo(1));
+            Assert.That(host.DetachedSamples[0].Time, Is.EqualTo(1000));
+            Assert.That(host.DetachedSamples[0].Sample, Is.EqualTo(new HitSampleInfo("key-removed")));
+        }
+
+        private class RemoveFirstObjectMod : Mod, IApplicableAfterBeatmapConversion
+        {
+            public override string Name => "Remove first object";
+
+            public override string Acronym => "RFO";
+
+            public override LocalisableString Description => "Removes the first hit object.";
+
+            public void ApplyToBeatmap(IBeatmap beatmap) => ((Beatmap<OsuHitObject>)beatmap).HitObjects.RemoveAt(0);
         }
 
         private class TestBeatmap : Beatmap<HitObject>

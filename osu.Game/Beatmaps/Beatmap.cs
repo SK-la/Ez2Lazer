@@ -96,6 +96,16 @@ namespace osu.Game.Beatmaps
         [JsonIgnore]
         public Func<HitObject, IEnumerable<(double Time, HitSampleInfo Sample)>> SampleTimelineResolver { get; set; } = DetachedSampleLedger.GetDefaultTimeline;
 
+        /// <summary>
+        /// Whether a detached sample counts as a hitsound rather than plain background audio.
+        /// </summary>
+        /// <remarks>
+        /// Note audio is a hitsound by default: it is what the note sounded as, and rulesets that want the audio
+        /// treated as background instead can override this.
+        /// </remarks>
+        [JsonIgnore]
+        public Func<ISampleInfo, bool> DetachedSampleIsHitsound { get; set; } = _ => true;
+
         IReadOnlyList<T> IBeatmap<T>.HitObjects => HitObjects;
 
         IReadOnlyList<HitObject> IBeatmap.HitObjects => HitObjects;

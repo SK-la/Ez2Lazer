@@ -190,10 +190,10 @@ namespace osu.Game.Rulesets.UI
                                 playfieldAdjustmentContainer.WithChild(Playfield),
                                 Overlays
                             }),
-                        // Samples kept by mods that removed the hit objects carrying them, played under the same
-                        // mixer as live notes (hitsound volume, pause handling).
-                        new DetachedSamplePlayer(Beatmap.DetachedSamples, gameplayMixer),
                     }),
+                    // Samples kept by mods that removed the hit objects carrying them. Deliberately outside the
+                    // gameplay mixer: each element picks its own volume chain from its hitsound classification.
+                    new DetachedSampleTrack(Beatmap.DetachedSamples, Beatmap.DetachedSampleIsHitsound),
                 }
             };
 

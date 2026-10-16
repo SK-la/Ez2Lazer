@@ -43,5 +43,14 @@ namespace osu.Game.Beatmaps
         /// </para>
         /// </remarks>
         Func<HitObject, IEnumerable<(double Time, HitSampleInfo Sample)>> SampleTimelineResolver { get; set; }
+
+        /// <summary>
+        /// Whether one of <see cref="DetachedSamples"/> counts as a hitsound rather than plain background audio.
+        /// </summary>
+        /// <remarks>
+        /// This is what decides both how the sample is looked up and which volume chain it plays under, so a ruleset
+        /// whose note audio is a keysound can keep it sounding like the note it came from.
+        /// </remarks>
+        Func<ISampleInfo, bool> DetachedSampleIsHitsound { get; set; }
     }
 }
