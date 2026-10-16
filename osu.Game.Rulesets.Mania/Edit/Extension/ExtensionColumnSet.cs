@@ -1,0 +1,175 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using osu.Framework.Bindables;
+
+namespace osu.Game.Rulesets.Mania.Edit.Extension
+{
+    /// <summary>
+    /// Ordered, session-level collection of extension columns.
+    /// </summary>
+    public class ExtensionColumnSet
+    {
+        /// <summary>
+        /// Audio track number reserved for the main audio track.
+        /// </summary>
+        public const int MAIN_AUDIO_TRACK_NUMBER = 1;
+
+        /// <summary>
+        /// Upper bound on the number of columns, guarding against runaway allocation.
+        /// </summary>
+        public const int MAX_COLUMN_COUNT = 64;
+
+        public BindableList<ExtensionColumn> Columns { get; } = new BindableList<ExtensionColumn>();
+
+        /// <summary>
+        /// The rightmost column, if any.
+        /// </summary>
+        public ExtensionColumn? LastColumn => Columns.Count > 0 ? Columns[Columns.Count - 1] : null;
+
+        /// <summary>
+        /// Appends an empty column to the right.
+        /// </summary>
+        /// <returns>The appended column, or <c>null</c> when <see cref="MAX_COLUMN_COUNT"/> has been reached.</returns>
+        public ExtensionColumn? Append() => Insert(Columns.Count);
+
+        /// <summary>
+        /// Inserts an empty column at <paramref name="index"/>.
+        /// </summary>
+        /// <returns>The inserted column, or <c>null</c> when <see cref="MAX_COLUMN_COUNT"/> has been reached.</returns>
+        public ExtensionColumn? Insert(int index)
+        {
+            if (Columns.Count >= MAX_COLUMN_COUNT)
+                return null;
+
+            var column = new ExtensionColumn(index + 1);
+            Columns.Insert(Math.Clamp(index, 0, Columns.Count), column);
+            renumber();
+
+            return column;
+        }
+
+        /// <summary>
+        /// Removes <paramref name="column"/>, dropping its notes with it.
+        /// </summary>
+        /// <returns>Whether the column was removed.</returns>
+        public bool Remove(ExtensionColumn column)
+        {
+            if (!Columns.Remove(column))
+                return false;
+
+            renumber();
+            return true;
+        }
+
+        /// <summary>
+        /// Removes the rightmost column.
+        /// </summary>
+        /// <returns>Whether a column was removed.</returns>
+        public bool RemoveLast() => LastColumn != null && Remove(LastColumn);
+
+        /// <summary>
+        /// Adds a note to <paramref name="column"/>.
+        /// </summary>
+        public ExtensionNote AddNote(ExtensionColumn column, double time, double duration = 0)
+        {
+            var note = new ExtensionNote(time, duration);
+            Add(column, note);
+            return note;
+        }
+
+        /// <summary>
+        /// Takes ownership of <paramref name="note"/>, putting it on <paramref name="column"/>.
+        /// </summary>
+        public void Add(ExtensionColumn column, ExtensionNote note)
+        {
+            note.Column = column;
+            column.Notes.Add(note);
+        }
+
+        /// <summary>
+        /// Removes a note from its owning column.
+        /// </summary>
+        public bool RemoveNote(ExtensionNote note) => note.Column?.Notes.Remove(note) ?? false;
+
+        /// <summary>
+        /// Moves a note to <paramref name="target"/> at <paramref name="newTime"/>.
+        /// </summary>
+        /// <remarks>
+        /// The note keeps its identity (and therefore its definition changes with the destination).
+        /// </remarks>
+        public bool MoveNote(ExtensionNote note, ExtensionColumn target, double newTime)
+        {
+            if (note.Column == null)
+                return false;
+
+            note.Column.Notes.Remove(note);
+            note.Column = target;
+            note.Time = newTime;
+            target.Notes.Add(note);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Notes currently marked as selected, across all columns.
+        /// </summary>
+        public IEnumerable<ExtensionNote> SelectedNotes
+        {
+            get
+            {
+                foreach (var column in Columns)
+                {
+                    foreach (var note in column.Notes)
+                    {
+                        if (note.Selected.Value)
+                            yield return note;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Clears the selection.
+        /// </summary>
+        public void ClearSelection()
+        {
+            foreach (var note in SelectedNotes)
+                note.Selected.Value = false;
+        }
+
+        /// <summary>
+        /// Replaces the selection with every note of <paramref name="column"/>.
+        /// </summary>
+        public void SelectAll(ExtensionColumn column)
+        {
+            ClearSelection();
+
+            foreach (var note in column.Notes)
+                note.Selected.Value = true;
+        }
+
+        /// <summary>
+        /// Removes every selected note.
+        /// </summary>
+        /// <returns>The number of notes removed.</returns>
+        public int RemoveSelected()
+        {
+            var notes = SelectedNotes.ToArray();
+
+            foreach (var note in notes)
+                RemoveNote(note);
+
+            return notes.Length;
+        }
+
+        private void renumber()
+        {
+            for (int i = 0; i < Columns.Count; i++)
+                Columns[i].Number.Value = i + 1;
+        }
+    }
+}

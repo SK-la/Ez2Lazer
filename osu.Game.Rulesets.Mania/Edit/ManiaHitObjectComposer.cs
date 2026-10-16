@@ -79,7 +79,41 @@ namespace osu.Game.Rulesets.Mania.Edit
         protected override BeatSnapGrid CreateBeatSnapGrid() => new ManiaBeatSnapGrid();
 
         protected override Drawable CreatePlayfieldContentRoot(Drawable defaultContent)
-            => new ManiaEditorPlayfieldContent(defaultContent, Playfield, TOOLBOX_EXPANDED_SIZE_RIGHT - TOOLBOX_CONTRACTED_SIZE_RIGHT);
+            => playfieldContent = new ManiaEditorPlayfieldContent(defaultContent, Playfield, TOOLBOX_EXPANDED_SIZE_RIGHT - TOOLBOX_CONTRACTED_SIZE_RIGHT,
+                // The column controls and the playfield's selection box are both selection-mode concerns; the columns
+                // handle placement and their own notes themselves.
+                () => BlueprintContainer.CurrentTool is SelectTool);
+
+        private ManiaEditorPlayfieldContent? playfieldContent;
+
+        /// <summary>
+        /// The playfield content root, which also hosts the extension columns.
+        /// </summary>
+        internal ManiaEditorPlayfieldContent? PlayfieldContent => playfieldContent;
+
+        /// <summary>
+        /// Hands the current selection over to the extension columns, when a completed drag ended on them.
+        /// </summary>
+        /// <returns>Whether the objects were moved out of the playfield.</returns>
+        /// <remarks>
+        /// The removal joins the ongoing drag transaction, so editor undo brings the notes back to the playfield.
+        /// The extension notes created here are session state without history yet, so undo does not discard them again.
+        /// </remarks>
+        internal bool TryDropSelectionIntoExtensionColumns(Vector2 screenSpacePosition)
+        {
+            if (playfieldContent == null || !playfieldContent.ContainsExtensionColumns(screenSpacePosition))
+                return false;
+
+            var dropped = EditorBeatmap.SelectedHitObjects.OfType<ManiaHitObject>().ToArray();
+
+            if (dropped.Length == 0 || !playfieldContent.DropIntoExtensionColumns(dropped, screenSpacePosition))
+                return false;
+
+            foreach (var hitObject in dropped)
+                EditorBeatmap.Remove(hitObject);
+
+            return true;
+        }
 
         protected override IReadOnlyList<CompositionTool<ManiaAction>> CompositionTools => new CompositionTool<ManiaAction>[]
         {
