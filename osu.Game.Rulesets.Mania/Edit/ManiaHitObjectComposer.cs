@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -76,6 +77,8 @@ namespace osu.Game.Rulesets.Mania.Edit
             => new ManiaBlueprintContainer(this);
 
         protected override BeatSnapGrid CreateBeatSnapGrid() => new ManiaBeatSnapGrid();
+
+        protected override Drawable CreatePlayfieldContentRoot(Drawable defaultContent) => new ManiaEditorPlayfieldContent(defaultContent);
 
         protected override IReadOnlyList<CompositionTool<ManiaAction>> CompositionTools => new CompositionTool<ManiaAction>[]
         {

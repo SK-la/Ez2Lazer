@@ -53,6 +53,16 @@ namespace osu.Game.Rulesets.Edit
         /// </summary>
         protected virtual bool ApplyHorizontalCentering => true;
 
+        /// <summary>
+        /// Wraps the playfield content (playfield and blueprint layers) into the root drawable used inside <see cref="PlayfieldContentContainer"/>.
+        /// </summary>
+        /// <remarks>
+        /// Rulesets may return a different root, e.g. to enable horizontal scrolling of the playfield.
+        /// The default implementation returns <paramref name="defaultContent"/> unchanged.
+        /// </remarks>
+        /// <param name="defaultContent">The default content, containing the playfield and blueprint layers.</param>
+        protected virtual Drawable CreatePlayfieldContentRoot(Drawable defaultContent) => defaultContent;
+
         protected IRulesetConfigManager? Config { get; private set; }
 
         // Provides `Playfield`
@@ -146,15 +156,19 @@ namespace osu.Game.Rulesets.Edit
                     {
                         Name = "Playfield content",
                         RelativeSizeAxes = Axes.Y,
-                        Children = new Drawable[]
+                        Child = CreatePlayfieldContentRoot(new Container
                         {
-                            // layers below playfield
-                            drawableRulesetWrapper.CreatePlayfieldAdjustmentContainer().WithChild(LayerBelowRuleset),
-                            drawableRulesetWrapper,
-                            // layers above playfield
-                            drawableRulesetWrapper.CreatePlayfieldAdjustmentContainer()
-                                                  .WithChild(blueprintContainer = CreateBlueprintContainer())
-                        }
+                            RelativeSizeAxes = Axes.Both,
+                            Children = new Drawable[]
+                            {
+                                // layers below playfield
+                                drawableRulesetWrapper.CreatePlayfieldAdjustmentContainer().WithChild(LayerBelowRuleset),
+                                drawableRulesetWrapper,
+                                // layers above playfield
+                                drawableRulesetWrapper.CreatePlayfieldAdjustmentContainer()
+                                                      .WithChild(blueprintContainer = CreateBlueprintContainer())
+                            }
+                        })
                     },
                     new Container
                     {
