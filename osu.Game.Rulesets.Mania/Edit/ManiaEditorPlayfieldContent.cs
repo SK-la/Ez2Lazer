@@ -17,7 +17,7 @@ namespace osu.Game.Rulesets.Mania.Edit
     {
         private readonly ScratchTrackSet trackSet = new ScratchTrackSet();
 
-        private readonly Container playfieldHost;
+        private readonly HoverActivationContainer playfieldRegion;
 
         public ManiaEditorPlayfieldContent(Drawable playfieldContent)
         {
@@ -33,16 +33,30 @@ namespace osu.Game.Rulesets.Mania.Edit
                     Direction = FillDirection.Horizontal,
                     Children = new Drawable[]
                     {
-                        playfieldHost = new Container
+                        playfieldRegion = new HoverActivationContainer
                         {
                             RelativeSizeAxes = Axes.Y,
                             Child = playfieldContent,
                         },
-                        new ScratchArea(trackSet),
-                        new ScratchTrackControls
+                        new HoverActivationContainer
                         {
-                            AddRequested = () => trackSet.Append(),
-                            RemoveRequested = () => trackSet.RemoveLast(),
+                            RelativeSizeAxes = Axes.Y,
+                            AutoSizeAxes = Axes.X,
+                            Child = new FillFlowContainer
+                            {
+                                RelativeSizeAxes = Axes.Y,
+                                AutoSizeAxes = Axes.X,
+                                Direction = FillDirection.Horizontal,
+                                Children = new Drawable[]
+                                {
+                                    new ScratchArea(trackSet),
+                                    new ScratchTrackControls
+                                    {
+                                        AddRequested = () => trackSet.Append(),
+                                        RemoveRequested = () => trackSet.RemoveLast(),
+                                    },
+                                },
+                            },
                         },
                     },
                 },
@@ -53,9 +67,9 @@ namespace osu.Game.Rulesets.Mania.Edit
         {
             base.Update();
 
-            // The playfield keeps occupying the full viewport; the scratch area is appended to its right.
+            // The playfield keeps occupying the full viewport; the background area is appended to its right.
             if (Parent != null)
-                playfieldHost.Width = Parent.DrawWidth;
+                playfieldRegion.Width = Parent.DrawWidth;
         }
 
         private partial class HorizontalScrollContainer : OsuScrollContainer
