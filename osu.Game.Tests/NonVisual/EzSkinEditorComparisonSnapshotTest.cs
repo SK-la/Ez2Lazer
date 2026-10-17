@@ -7,6 +7,8 @@ using osu.Framework.Extensions;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit;
+using osu.Game.EzOsuGame.Edit.Note;
+using osu.Game.Rulesets.Mania;
 using osu.Game.Skinning;
 using osu.Game.Tests.Resources;
 
@@ -44,8 +46,71 @@ namespace osu.Game.Tests.NonVisual
             }
         }
 
-        [Test]
-        public void TestSkinIniDraftCaptureApplyWhenUnsupported()
+    [Test]
+    public void TestSnapshotPreviewRequestDoesNotTouchLiveConfig()
+    {
+        using var host = new CleanRunHeadlessGameHost();
+        var config = new Ez2ConfigManager(host.Storage);
+
+        double originalWidth = config.Get<double>(Ez2Setting.ColumnWidth);
+
+        try
+        {
+            var snapshot = new EzSkinEditorComparisonSnapshot();
+            snapshot.CaptureFrom(config);
+
+            double updatedWidth = originalWidth + 30;
+            config.GetBindable<double>(Ez2Setting.ColumnWidth).Value = updatedWidth;
+
+            var source = new ConfigSnapshotComparisonSource(config, snapshot, false, "1", new ManiaRuleset().RulesetInfo);
+            var request = source.GetSnapshotRequest(EzSkinEditorNoteCompareKind.Tap);
+
+            Assert.That(request.Width, Is.EqualTo(originalWidth));
+            Assert.That(request.Height, Is.EqualTo(snapshot.NotePreviewHeight));
+            Assert.That(request.NoteColour, Is.EqualTo(snapshot.NotePreviewColour));
+            Assert.That(config.Get<double>(Ez2Setting.ColumnWidth), Is.EqualTo(updatedWidth), "reading the snapshot must not write it back to the live config");
+        }
+        finally
+        {
+            config.GetBindable<double>(Ez2Setting.ColumnWidth).Value = originalWidth;
+        }
+    }
+
+    [Test]
+    public void TestDefaultSyncDoesNotRaiseValueChanged()
+    {
+        using var host = new CleanRunHeadlessGameHost();
+        var config = new Ez2ConfigManager(host.Storage);
+
+        double originalWidth = config.Get<double>(Ez2Setting.ColumnWidth);
+
+        try
+        {
+            var snapshot = new EzSkinEditorComparisonSnapshot();
+            snapshot.CaptureFrom(config);
+
+            var width = config.GetBindable<double>(Ez2Setting.ColumnWidth);
+            double updatedWidth = originalWidth + 25;
+            width.Value = updatedWidth;
+
+            int valueChanges = 0;
+            width.ValueChanged += _ => valueChanges++;
+
+            snapshot.SyncBindableDefaults(config);
+
+            Assert.That(valueChanges, Is.Zero, "syncing defaults must not write through the value");
+            Assert.That(width.Value, Is.EqualTo(updatedWidth));
+            Assert.That(width.Default, Is.EqualTo(originalWidth));
+        }
+        finally
+        {
+            config.GetBindable<double>(Ez2Setting.ColumnWidth).Value = originalWidth;
+            config.GetBindable<double>(Ez2Setting.ColumnWidth).Default = originalWidth;
+        }
+    }
+
+    [Test]
+    public void TestSkinIniDraftCaptureApplyWhenUnsupported()
         {
             using var host = new CleanRunHeadlessGameHost();
 
