@@ -237,7 +237,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         keyHeldByColumn[input.Column] = false;
 
                         // stable classic：TimeRelease 只在「不早于 EndTime - HitWindow50」的松手时写入；
-                        // 更早的松手只标 hold break（尾档最后封到 Meh），不更新 TimeRelease。
+                        // 更早的松手只标 hold break（尾档按 hasHoldBreak 封顶），不更新 TimeRelease。
                         if (stableClassic && activeHoldByColumn.TryGetValue(input.Column, out var classicReleasingHead)
                                           && holdByHead.TryGetValue(classicReleasingHead, out var classicReleasingHold))
                         {

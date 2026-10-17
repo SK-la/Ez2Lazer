@@ -125,14 +125,15 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
         /// <summary>
         /// 断连后重按、再于尾部松手：局内 <c>DrawableHoldNote.OnPressed</c>（列路由未选中目标时仍执行）
-        /// 会重新 <c>beginHoldAt</c> 重臂 holding，故松手时 <c>Tail.UpdateResult()</c> 判尾；
-        /// 此时 <c>Body.HasHoldBreak</c> 已为真 → 尾判降级：Lazer / Classic 封到 <b>Meh</b>，
-        /// stable classic 封到 <b>Good200</b>（stable 非 ScoreV2 分支的 <c>hasHoldBreak</c> 封顶是 67108864 = 200）。
+        /// 会重新 <c>beginHoldAt</c> 重臂 holding，故松手时 <c>Tail.UpdateResult()</c> 判尾。
+        /// stable 的三条档都落 <b>Meh</b>：<c>TimePress</c> 在每次按下边沿被覆盖成重按时刻，
+        /// 尾判的 <c>num4</c> 是「重按 − 头」（此例 2400ms），先掉出全部窗口；<c>hasHoldBreak</c> 的
+        /// 封顶只降不升，接不住已经低于下限的结果。
         /// 与 <c>TestSceneHoldNoteInput.TestPressAtStartThenBreakThenRepressAndReleaseAtTail</c> 同口径。
         /// </summary>
         [TestCase(EzEnumJudgeMode.Lazer, HitResult.Meh)]
         [TestCase(EzEnumJudgeMode.Classic, HitResult.Meh)]
-        [TestCase(EzEnumJudgeMode.StableClassic, HitResult.Good)]
+        [TestCase(EzEnumJudgeMode.StableClassic, HitResult.Meh)]
         public void TestBreakThenRepressCapsTailToMeh(EzEnumJudgeMode judgeMode, HitResult expected)
         {
             var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldWithInputs(
