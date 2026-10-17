@@ -77,6 +77,39 @@ namespace osu.Game.Tests.NonVisual
     }
 
     [Test]
+    public void TestDefaultSyncDoesNotRaiseValueChanged()
+    {
+        using var host = new CleanRunHeadlessGameHost();
+        var config = new Ez2ConfigManager(host.Storage);
+
+        double originalWidth = config.Get<double>(Ez2Setting.ColumnWidth);
+
+        try
+        {
+            var snapshot = new EzSkinEditorComparisonSnapshot();
+            snapshot.CaptureFrom(config);
+
+            var width = config.GetBindable<double>(Ez2Setting.ColumnWidth);
+            double updatedWidth = originalWidth + 25;
+            width.Value = updatedWidth;
+
+            int valueChanges = 0;
+            width.ValueChanged += _ => valueChanges++;
+
+            snapshot.SyncBindableDefaults(config);
+
+            Assert.That(valueChanges, Is.Zero, "syncing defaults must not write through the value");
+            Assert.That(width.Value, Is.EqualTo(updatedWidth));
+            Assert.That(width.Default, Is.EqualTo(originalWidth));
+        }
+        finally
+        {
+            config.GetBindable<double>(Ez2Setting.ColumnWidth).Value = originalWidth;
+            config.GetBindable<double>(Ez2Setting.ColumnWidth).Default = originalWidth;
+        }
+    }
+
+    [Test]
     public void TestSkinIniDraftCaptureApplyWhenUnsupported()
         {
             using var host = new CleanRunHeadlessGameHost();

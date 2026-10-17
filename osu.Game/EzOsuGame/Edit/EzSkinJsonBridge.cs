@@ -77,14 +77,14 @@ namespace osu.Game.EzOsuGame.Edit
             if (valueProperty == null || defaultProperty == null)
                 return;
 
-            object? previousValue = valueProperty.GetValue(bindable);
+            // Parse into a detached instance of the same bindable type. Parsing on the live bindable would write the value first and restore it
+            // afterwards, firing ValueChanged (and background saves) for every snapshotted setting just to update Default.
+            if (Activator.CreateInstance(bindable.GetType(), new[] { valueProperty.GetValue(bindable) }) is not IParseable parseable)
+                return;
 
-            if (bindable is IParseable parseable)
-                parseable.Parse(value, CultureInfo.InvariantCulture);
+            parseable.Parse(value, CultureInfo.InvariantCulture);
 
-            object? snapshotValue = valueProperty.GetValue(bindable);
-            defaultProperty.SetValue(bindable, snapshotValue);
-            valueProperty.SetValue(bindable, previousValue);
+            defaultProperty.SetValue(bindable, valueProperty.GetValue(parseable));
         }
 
         private static bool tryCaptureSetting(Ez2ConfigManager config, Ez2Setting setting, out string value)

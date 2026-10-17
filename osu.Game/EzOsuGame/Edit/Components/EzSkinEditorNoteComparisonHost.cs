@@ -1,7 +1,10 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using System.Collections.Generic;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
@@ -24,6 +27,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private Container snapshotContainer = null!;
         private EzSkinEditorNoteComparisonPane? livePane;
         private EzSkinEditorNoteComparisonPane? snapshotPane;
+
+        // The note edit session outlives scene switches, so bindings must be owned (and released) here.
+        private readonly List<IUnbindable> sessionBindings = new List<IUnbindable>();
 
         public EzSkinEditorNoteComparisonHost(EzSkinEditorSceneContext context)
         {
@@ -62,11 +68,33 @@ namespace osu.Game.EzOsuGame.Edit.Components
             if (context.NoteSession == null)
                 return;
 
-            context.NoteSession.VariantId.BindValueChanged(_ => refreshLivePane(), false);
-            context.NoteSession.Ruleset.BindValueChanged(_ => refreshLivePane(), false);
-            context.NoteSession.NoteColour.BindValueChanged(_ => applyLiveLayout(), false);
-            context.NoteSession.Width.BindValueChanged(_ => applyLiveLayout(), false);
-            context.NoteSession.Height.BindValueChanged(_ => applyLiveLayout(), false);
+            var session = context.NoteSession;
+
+            bindSession(session.VariantId, () => refreshLivePane());
+            bindSession(session.Ruleset, () => refreshLivePane());
+            bindSession(session.NoteColour, () => applyLiveLayout());
+            bindSession(session.Width, () => applyLiveLayout());
+            bindSession(session.Height, () => applyLiveLayout());
+        }
+
+        private void bindSession<T>(Bindable<T> source, Action onChanged)
+        {
+            var copy = source.GetBoundCopy();
+            copy.BindValueChanged(_ => onChanged());
+            sessionBindings.Add(copy);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                foreach (var binding in sessionBindings)
+                    binding.UnbindAll();
+
+                sessionBindings.Clear();
+            }
+
+            base.Dispose(isDisposing);
         }
 
         public void UpdateContext(EzSkinEditorSceneContext newContext)

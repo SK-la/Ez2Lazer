@@ -106,7 +106,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (context.Provider != null)
             {
-                if (!shouldRebuildPlayback($"virtual:{context.Provider.GetType().FullName}:{context.VirtualPreviewKeyCount}", context.Provider))
+                // Provider factories hand out a fresh instance per resolve and hold no state, so only the type and key count identify the playfield.
+                if (!shouldRebuildPlayback($"virtual:{context.Provider.GetType().FullName}:{context.VirtualPreviewKeyCount}", null))
                     return;
 
                 playbackContainer.Child = context.Provider.CreateDynamicPart(context.EditorSkin, context.VirtualPreviewKeyCount)
