@@ -280,6 +280,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 }),
             null);
 
+        // 计分改取已落定档位后，40 个 Miss 不再按同列最近按键的 stored offset 重判成命中（不再各送一次基础分），
+        // 该档总分从 867600 降到 866984，距锚点 -4933；旧上限 4317 是这份偏差被高估填平后的实测值。
         private static readonly AuditFixture stable_classic_portrait = new AuditFixture(
             "StableClassic-PORTRAiT",
             "Resources/Testing/Replays/ManiaAudit-Classic-PORTRAiT.osr",
@@ -306,7 +308,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             false,
             null,
             new SessionBound(
-                4317,
+                5000,
                 new Dictionary<HitResult, int>
                 {
                     [HitResult.Miss] = 2,

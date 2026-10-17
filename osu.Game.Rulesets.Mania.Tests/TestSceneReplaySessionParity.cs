@@ -668,6 +668,138 @@ namespace osu.Game.Rulesets.Mania.Tests
         }
 
         /// <summary>
+        /// [Ez] StableClassic 长条持有的 100ms 连击增量必须由局内产出：stable 的 <c>Holding</c> 每 100ms
+        /// 推一次 combo（不加分、不进判定计数），局内缺这一路时 MaxCombo 会少一大截。
+        /// </summary>
+        /// <remarks>
+        /// LN 结束时间刻意落在连击网格后 90ms（1000 按住 → 1100/1200/…/3000 共 20 枚），
+        /// 让最后一枚的容差远大于帧抖动；尾判在 3100 松手，两边都走镜像档位。
+        /// </remarks>
+        [Test]
+        public void TestFullScoreParity_StableClassicHoldComboTicks()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+
+            var hitObjects = new List<ManiaHitObject>
+            {
+                new HoldNote { StartTime = hold_start, Duration = hold_duration, Column = 0 },
+            };
+
+            var notes = new List<Note>();
+
+            for (int i = 0; i < 8; i++)
+            {
+                var note = new Note { StartTime = 4000 + i * 100, Column = i % 3 + 1 };
+                notes.Add(note);
+                hitObjects.Add(note);
+            }
+
+            runFullScoreParityTest(
+                hitObjects,
+                buildStableClassicHoldFrames(hitObjects, note => note == notes[3] ? 45 : 0, 4800),
+                assertJudgedHitsComplete: true,
+                overallDifficulty: 8,
+                expectedMaxCombo: 8 + hold_tick_count + 1);
+        }
+
+        /// <summary>
+        /// [Ez] StableClassic 持有增量把 combo 推过 384 之后，384 重置的落点必须局内与 Session 同点：
+        /// 少了增量会让重置晚到 20 个判定，TotalScore 与 MaxCombo 同时分叉。
+        /// </summary>
+        [Test]
+        public void TestFullScoreParity_StableClassicHoldComboTicksCrossComboBonus()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+
+            var hitObjects = new List<ManiaHitObject>
+            {
+                new HoldNote { StartTime = hold_start, Duration = hold_duration, Column = 0 },
+            };
+
+            // 每列每 240ms 一枚，远大于 OD8 的 Miss 窗（164ms），避免按键被路由到相邻物件。
+            // 每 5 枚偏 45ms（Good200）把 ComboAddition 压下去，使 384 重置真正改变分数。
+            for (int i = 0; i < 380; i++)
+                hitObjects.Add(new Note { StartTime = 4000 + i * 60, Column = i % 4 });
+
+            runFullScoreParityTest(
+                hitObjects,
+                buildStableClassicHoldFrames(hitObjects, note => note.StartTime % 300 == 0 ? 45 : 0, 4000 + 380 * 60 + 800),
+                assertJudgedHitsComplete: true,
+                overallDifficulty: 8,
+                expectedMaxCombo: 380 + hold_tick_count + 1,
+                longWait: true);
+        }
+
+        private const double hold_start = 1000;
+        private const double hold_end = 3090;
+        private const double hold_duration = hold_end - hold_start;
+        private const int hold_tick_count = 20;
+
+        /// <summary>
+        /// 帧源：按住段 + (物件时间 + 偏移) 的按下/松开边沿。边沿时刻各出一帧，避免相邻物件
+        /// 的松开与按下落进同一帧而被合并成一个持按（会吞掉后一个物件）。
+        /// </summary>
+        private static List<ReplayFrame> buildStableClassicHoldFrames(List<ManiaHitObject> hitObjects, Func<Note, double> offsetFor, double endTime)
+        {
+            var transitions = new List<(double time, ManiaAction action, bool press)>
+            {
+                (hold_start, ManiaAction.Key1, true),
+                (hold_end + 10, ManiaAction.Key1, false),
+            };
+
+            foreach (var note in hitObjects.OfType<Note>().Where(n => n is not HeadNote && n is not TailNote))
+            {
+                double pressTime = note.StartTime + offsetFor(note);
+                ManiaAction action = actionForColumn(note.Column);
+
+                transitions.Add((pressTime, action, true));
+                transitions.Add((pressTime + 20, action, false));
+            }
+
+            transitions.Sort((a, b) => a.time.CompareTo(b.time));
+
+            var times = new SortedSet<double>();
+
+            for (double time = 500; time <= endTime; time += 50)
+                times.Add(time);
+
+            foreach (var transition in transitions)
+                times.Add(transition.time);
+
+            var pressed = new HashSet<ManiaAction>();
+            var frames = new List<ReplayFrame>();
+            int cursor = 0;
+
+            foreach (double time in times)
+            {
+                while (cursor < transitions.Count && transitions[cursor].time <= time)
+                {
+                    var transition = transitions[cursor++];
+
+                    if (transition.press)
+                        pressed.Add(transition.action);
+                    else
+                        pressed.Remove(transition.action);
+                }
+
+                frames.Add(new ManiaReplayFrame(time, pressed.ToArray()));
+            }
+
+            return frames;
+        }
+
+        private static ManiaAction actionForColumn(int column)
+        {
+            switch (column)
+            {
+                case 0: return ManiaAction.Key1;
+                case 1: return ManiaAction.Key2;
+                case 2: return ManiaAction.Key3;
+                default: return ManiaAction.Key4;
+            }
+        }
+
+        /// <summary>
         /// 一条长 LN 中途多次「按下—松开」：每次提前松手各计一次 ComboBreak（stable 语义）。
         /// 局内与 Session 必须同为 N 次且全量统计一致。
         /// </summary>
@@ -890,7 +1022,14 @@ namespace osu.Game.Rulesets.Mania.Tests
         }
 
         // P2-B: 完整 Score parity 测试（accuracy/score/statistics）
-        private void runFullScoreParityTest(List<ManiaHitObject> hitObjects, List<ReplayFrame> frames, bool assertJudgedHitsComplete = false, bool assertSessionParity = true)
+        private void runFullScoreParityTest(
+            List<ManiaHitObject> hitObjects,
+            List<ReplayFrame> frames,
+            bool assertJudgedHitsComplete = false,
+            bool assertSessionParity = true,
+            double? overallDifficulty = null,
+            int? expectedMaxCombo = null,
+            bool longWait = false)
         {
             AddStep("configure environment", () => ReplayJudgeTestConfig.ApplyToGlobalConfig(parityEnvironment));
 
@@ -904,6 +1043,12 @@ namespace osu.Game.Rulesets.Mania.Tests
                         Ruleset = new ManiaRuleset().RulesetInfo,
                     },
                 };
+
+                if (overallDifficulty is double od)
+                {
+                    beatmap.BeatmapInfo.Difficulty = new BeatmapDifficulty { OverallDifficulty = (float)od };
+                    beatmap.Difficulty = beatmap.BeatmapInfo.Difficulty;
+                }
 
                 // 与 Session fixtures 一致：120 BPM，保证 EZ2AC LN 16 分 tick 网格对齐。
                 beatmap.ControlPointInfo.Add(0, new TimingControlPoint { BeatLength = 500 });
@@ -920,7 +1065,20 @@ namespace osu.Game.Rulesets.Mania.Tests
             // 在此之前访问它会 NRE。LoadedBeatmapSuccessfully 先于 ScoreProcessor 赋值变 true（实测约半数复现），
             // 故两者都要等。
             AddUntilStep("wait for player", () => currentPlayer is { LoadedBeatmapSuccessfully: true, ScoreProcessor: not null });
-            AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value);
+
+            if (longWait)
+            {
+                AddStep(new LongUntilStepButton
+                {
+                    Text = "wait for completion",
+                    IsSetupStep = false,
+                    CallStack = new StackTrace(1, true),
+                    TimeoutMilliseconds = 600_000,
+                    Assertion = () => currentPlayer.ScoreProcessor.HasCompleted.Value,
+                });
+            }
+            else
+                AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value);
 
             if (assertJudgedHitsComplete)
             {
@@ -964,6 +1122,32 @@ namespace osu.Game.Rulesets.Mania.Tests
 
                 throw new AssertionException(
                     $"drawable score={drawableScore} session score={sessionScore}");
+            });
+
+            if (expectedMaxCombo is int maxCombo)
+            {
+                AddAssert("drawable max combo matches expected", () =>
+                {
+                    int actual = currentPlayer.ScoreProcessor.HighestCombo.Value;
+
+                    if (actual == maxCombo)
+                        return true;
+
+                    throw new AssertionException($"drawable max combo={actual} expected={maxCombo}");
+                });
+            }
+
+            AddAssert("session max combo matches drawable", () =>
+            {
+                var sessionResult = ManiaReplaySession.Run(replayScore, playableBeatmap, parityEnvironment);
+                int drawableMaxCombo = currentPlayer.ScoreProcessor.HighestCombo.Value;
+                int sessionMaxCombo = sessionResult.ScoreInfo.MaxCombo;
+
+                if (drawableMaxCombo == sessionMaxCombo)
+                    return true;
+
+                throw new AssertionException(
+                    $"drawable max combo={drawableMaxCombo} session max combo={sessionMaxCombo}");
             });
 
             AddAssert("session statistics match drawable", () =>
