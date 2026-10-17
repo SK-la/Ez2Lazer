@@ -4,17 +4,19 @@
 using System;
 using NUnit.Framework;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
+using osu.Game.Rulesets.Mania.Mods;
+using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 {
     /// <summary>
-    /// <see cref="StableManiaScoring"/> 复刻 stable <c>ComboAddition</c> 状态机的回归：
+    /// <see cref="StableManiaScoring"/> 的连击加成状态机回归：
     /// 增益 / 减益、384 重置（判定与持有增量两条路径）、Miss 不给分。
     /// </summary>
     [TestFixture]
     public class ManiaStableClassicScoringTest
     {
-        private const double score_multiplier = StableManiaScoring.ScoreMax / 3.0;
+        private const double score_multiplier = StableManiaScoring.SCORE_MAX / 3.0;
 
         [Test]
         public void TestComboBonusResetsOnJudgement()
@@ -23,10 +25,10 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             scoring.Reset(score_multiplier);
 
             scoring.Apply(StableManiaJudgement.Good200, 0);
-            Assert.That(scoring.ComboAddition, Is.EqualTo(StableManiaScoring.ComboMulti - 8));
+            Assert.That(scoring.ComboAddition, Is.EqualTo(StableManiaScoring.COMBO_MULTI - 8));
 
-            scoring.Apply(StableManiaJudgement.Perfect300g, StableManiaScoring.ComboBonus);
-            Assert.That(scoring.ComboAddition, Is.EqualTo(StableManiaScoring.ComboMulti));
+            scoring.Apply(StableManiaJudgement.Perfect300g, StableManiaScoring.COMBO_BONUS);
+            Assert.That(scoring.ComboAddition, Is.EqualTo(StableManiaScoring.COMBO_MULTI));
         }
 
         [Test]
@@ -38,14 +40,14 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             scoring.Apply(StableManiaJudgement.Good200, 0);
             double decreased = scoring.ComboAddition;
 
-            scoring.ApplyHoldTick(StableManiaScoring.ComboBonus - 1);
+            scoring.ApplyHoldTick(StableManiaScoring.COMBO_BONUS - 1);
             Assert.That(scoring.ComboAddition, Is.EqualTo(decreased), "未到 384 不得重置");
 
-            scoring.ApplyHoldTick(StableManiaScoring.ComboBonus);
-            Assert.That(scoring.ComboAddition, Is.EqualTo(StableManiaScoring.ComboMulti), "持有增量跨过 384 同样重置");
+            scoring.ApplyHoldTick(StableManiaScoring.COMBO_BONUS);
+            Assert.That(scoring.ComboAddition, Is.EqualTo(StableManiaScoring.COMBO_MULTI), "持有增量跨过 384 同样重置");
 
             scoring.ApplyHoldTick(0);
-            Assert.That(scoring.ComboAddition, Is.EqualTo(StableManiaScoring.ComboMulti), "combo 0 不得触发重置");
+            Assert.That(scoring.ComboAddition, Is.EqualTo(StableManiaScoring.COMBO_MULTI), "combo 0 不得触发重置");
         }
 
         [Test]
@@ -58,13 +60,13 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             double afterHit = scoring.ComboAddition;
             double totalAfterHit = scoring.TotalScoreDouble;
 
-            scoring.ApplyHoldTick(StableManiaScoring.ComboBonus);
-            Assert.That(scoring.ComboAddition, Is.EqualTo(StableManiaScoring.ComboMulti));
+            scoring.ApplyHoldTick(StableManiaScoring.COMBO_BONUS);
+            Assert.That(scoring.ComboAddition, Is.EqualTo(StableManiaScoring.COMBO_MULTI));
             Assert.That(scoring.TotalScoreDouble, Is.EqualTo(totalAfterHit), "持有增量不加分");
 
             scoring.Revert();
 
-            Assert.That(scoring.ComboAddition, Is.EqualTo(StableManiaScoring.ComboMulti), "Revert 只回退最近一次判定");
+            Assert.That(scoring.ComboAddition, Is.EqualTo(StableManiaScoring.COMBO_MULTI), "Revert 只回退最近一次判定");
             Assert.That(scoring.TotalScoreDouble, Is.EqualTo(0).Within(1e-9));
         }
 
@@ -75,9 +77,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             scoring.Reset(score_multiplier);
 
             double expected = 0;
-            double comboAddition = StableManiaScoring.ComboMulti;
+            double comboAddition = StableManiaScoring.COMBO_MULTI;
 
-            (StableManiaJudgement judgement, int num4, int baseScore, int comboAtJudgement)[] sequence =
+            (StableManiaJudgement judgement, int comboWeight, int baseScore, int comboAtJudgement)[] sequence =
             {
                 (StableManiaJudgement.Perfect300g, 32, 320, 0),
                 (StableManiaJudgement.Great300, 32, 300, 1),
@@ -87,11 +89,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 (StableManiaJudgement.Miss, 0, 0, 0),
             };
 
-            foreach (var (judgement, num4, baseScore, comboAtJudgement) in sequence)
+            foreach (var (judgement, comboWeight, baseScore, comboAtJudgement) in sequence)
             {
                 comboAddition = nextComboAddition(comboAddition, judgement, comboAtJudgement);
-                expected += Math.Sqrt(comboAddition) * num4 * score_multiplier / StableManiaScoring.Score300g
-                            + baseScore * score_multiplier / StableManiaScoring.Score300g;
+                expected += Math.Sqrt(comboAddition) * comboWeight * score_multiplier / StableManiaScoring.SCORE300G
+                            + baseScore * score_multiplier / StableManiaScoring.SCORE300G;
 
                 scoring.Apply(judgement, comboAtJudgement);
 
@@ -110,7 +112,46 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             Assert.That(scoring.TotalScoreDouble, Is.EqualTo(0));
             Assert.That(scoring.Total, Is.EqualTo(0));
-            Assert.That(scoring.ComboAddition, Is.EqualTo(0), "stable 的 ComboAddition 夹在 [0, 100]");
+            Assert.That(scoring.ComboAddition, Is.EqualTo(0), "连击加成夹在 [0, 100]");
+        }
+
+        [Test]
+        public void TestPenaltyDividedByScoreIncreaseMultiplier()
+        {
+            const double divisor = 1.06;
+
+            var scoring = new StableManiaScoring();
+            scoring.Reset(score_multiplier, divisor);
+
+            scoring.Apply(StableManiaJudgement.Good200, 0);
+            Assert.That(scoring.ComboAddition, Is.EqualTo(StableManiaScoring.COMBO_MULTI - 8 / divisor).Within(1e-9));
+
+            // 增益不受除数影响。
+            scoring.Apply(StableManiaJudgement.Perfect300g, 0);
+            Assert.That(scoring.ComboAddition, Is.EqualTo(StableManiaScoring.COMBO_MULTI - 8 / divisor + 2).Within(1e-9));
+
+            scoring.Apply(StableManiaJudgement.Miss, 0);
+            Assert.That(scoring.ComboAddition, Is.EqualTo(0), "Miss 落回 -56/除数 后仍夹到 0");
+        }
+
+        [Test]
+        public void TestScoreIncreaseMultiplierOnlyCountsBonusMods()
+        {
+            Assert.That(StableManiaScoring.ScoreIncreaseMultiplier(Array.Empty<Mod>()), Is.EqualTo(1));
+
+            Assert.That(StableManiaScoring.ScoreIncreaseMultiplier(new Mod[] { new ManiaModHidden() }), Is.EqualTo(1.06).Within(1e-9));
+            Assert.That(StableManiaScoring.ScoreIncreaseMultiplier(new Mod[] { new ManiaModFadeIn() }), Is.EqualTo(1.06).Within(1e-9));
+            Assert.That(StableManiaScoring.ScoreIncreaseMultiplier(new Mod[] { new ManiaModFlashlight() }), Is.EqualTo(1.06).Within(1e-9));
+            Assert.That(StableManiaScoring.ScoreIncreaseMultiplier(new Mod[] { new ManiaModHardRock() }), Is.EqualTo(1.08).Within(1e-9));
+            Assert.That(StableManiaScoring.ScoreIncreaseMultiplier(new Mod[] { new ManiaModDoubleTime() }), Is.EqualTo(1.1).Within(1e-9));
+            Assert.That(StableManiaScoring.ScoreIncreaseMultiplier(new Mod[] { new ManiaModNightcore() }), Is.EqualTo(1.1).Within(1e-9));
+
+            Assert.That(
+                StableManiaScoring.ScoreIncreaseMultiplier(new Mod[] { new ManiaModHidden(), new ManiaModHardRock(), new ManiaModDoubleTime() }),
+                Is.EqualTo(1.06 * 1.08 * 1.1).Within(1e-9));
+
+            // 减益 / 无分 mod 不计入除数（它们只影响成绩乘数）。
+            Assert.That(StableManiaScoring.ScoreIncreaseMultiplier(new Mod[] { new ManiaModEasy(), new ManiaModNoFail(), new ManiaModHalfTime() }), Is.EqualTo(1));
         }
 
         [Test]
@@ -152,10 +193,10 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                     break;
             }
 
-            if (comboAtJudgement != 0 && comboAtJudgement % StableManiaScoring.ComboBonus == 0)
-                comboAddition = StableManiaScoring.ComboMulti;
+            if (comboAtJudgement != 0 && comboAtJudgement % StableManiaScoring.COMBO_BONUS == 0)
+                comboAddition = StableManiaScoring.COMBO_MULTI;
 
-            return Math.Max(0, Math.Min(comboAddition, StableManiaScoring.ComboMulti));
+            return Math.Max(0, Math.Min(comboAddition, StableManiaScoring.COMBO_MULTI));
         }
     }
 }

@@ -51,6 +51,36 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return (createScore(ruleset, replay), beatmap, createEnvironment());
         }
 
+        /// <summary>
+        /// 单键 + 一次带偏移的按下，用于观察晚侧窗口边界（本谱 OD6：100 窗 109ms、50 窗 133ms）。
+        /// </summary>
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateSingleNoteTap(double lateMs)
+        {
+            const double hitTime = 1000;
+
+            var ruleset = new ManiaRuleset();
+
+            var beatmap = new TestBeatmap(ruleset.RulesetInfo)
+            {
+                HitObjects = new List<HitObject> { new Note { StartTime = hitTime, Column = 0 } },
+                ControlPointInfo = new ControlPointInfo(),
+            };
+
+            foreach (var obj in beatmap.HitObjects)
+                obj.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+
+            var replay = new Replay
+            {
+                Frames = new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(hitTime + lateMs, ManiaAction.Key1),
+                    new ManiaReplayFrame(hitTime + lateMs + 50),
+                },
+            };
+
+            return (createScore(ruleset, replay), beatmap, createEnvironment());
+        }
+
         public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateSingleHoldPerfect()
         {
             const double head = 1500;
@@ -258,6 +288,41 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             for (double time = head + framePhase; time <= holdUntil; time += frameStep)
                 frames.Add(new ManiaReplayFrame(time, ManiaAction.Key1));
+
+            return (createScore(ruleset, new Replay { Frames = frames }), beatmap, createEnvironment());
+        }
+
+        /// <summary>
+        /// LN（列 1，从未按下）+ 两枚单键（列 0），帧钟 10ms 铺到 <paramref name="frameUntil"/>。
+        /// 用于观察 LN 的到点断连是否早于后续单键。
+        /// </summary>
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateUnpressedHoldWithNotes(
+            double holdStart, double holdEnd, double firstNote, double secondNote, double frameUntil)
+        {
+            var ruleset = new ManiaRuleset();
+
+            var beatmap = new TestBeatmap(ruleset.RulesetInfo)
+            {
+                HitObjects = new List<HitObject>
+                {
+                    new HoldNote { StartTime = holdStart, Duration = holdEnd - holdStart, Column = 1 },
+                    new Note { StartTime = firstNote, Column = 0 },
+                    new Note { StartTime = secondNote, Column = 0 },
+                },
+                ControlPointInfo = new ControlPointInfo(),
+            };
+
+            foreach (var obj in beatmap.HitObjects)
+                obj.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+
+            var frames = new List<ReplayFrame>();
+
+            for (double time = holdStart; time <= frameUntil; time += 10)
+            {
+                bool press = Math.Abs(time - firstNote) < 0.01 || Math.Abs(time - secondNote) < 0.01;
+
+                frames.Add(press ? new ManiaReplayFrame(time, ManiaAction.Key1) : new ManiaReplayFrame(time));
+            }
 
             return (createScore(ruleset, new Replay { Frames = frames }), beatmap, createEnvironment());
         }
