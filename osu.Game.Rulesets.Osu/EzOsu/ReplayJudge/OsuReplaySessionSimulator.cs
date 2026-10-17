@@ -20,6 +20,12 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
     /// </remarks>
     internal static class OsuReplaySessionSimulator
     {
+        // TODO(Ez live stable 影子)：与 mania 侧同步把 Session 改成可推进引擎（改造面与验收口径见
+        // ManiaReplaySessionSimulator.Simulate 头部的 TODO）。
+        //
+        // std 侧额外约束：stable 语义需要独立仿真谱面副本（EzScoreRacePlayableResolver.GetSessionReady），
+        // 且 BindClassicSemanticsToBeatmap 只能作用于副本，不能碰 live 实例；改造后
+        // OsuScoreProcessor 的 IStableScoreSource 转发目标换成引擎输出，StableAvailable 恒为 true。
         internal static void Simulate(
             Score score,
             IBeatmap beatmap,

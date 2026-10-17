@@ -4,8 +4,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.HUD;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
@@ -19,7 +21,7 @@ using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Scoring
 {
-    public partial class ManiaScoreProcessor : ScoreProcessor
+    public partial class ManiaScoreProcessor : ScoreProcessor, IStableScoreSource
     {
         private const double combo_base = 4;
         private double calOD = 8;
@@ -40,6 +42,16 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private readonly StableManiaScoring stableScoring = new StableManiaScoring();
 
         private bool isStableClassic => StableClassicJudgeModeJudgement.IsSelected(judgeMode);
+
+        private readonly BindableBool stableAvailable = new BindableBool();
+
+        public IBindable<double> StableAccuracy => AccuracyClassic;
+
+        public IBindable<long> StableScore => TotalScore;
+
+        public IBindable<int> StableMaxCombo => HighestCombo;
+
+        public IBindable<bool> StableAvailable => stableAvailable;
 
         /// <summary>
         /// stable classic 长条持有期的连击增量：每 100ms 一枚。
@@ -85,16 +97,29 @@ namespace osu.Game.Rulesets.Mania.Scoring
         }
 
         /// <summary>
+        /// 局内 stable 槽位只在判定档本身就是 StableClassic 时可显示；其它档没有等价的实时结果。
+        /// </summary>
+        /// <remarks>
+        /// TODO(Ez live stable 影子)：非 stable 档应转发 Session 可推进引擎的输出，届时这里改为恒 true。
+        /// 引擎改造面见 <c>ManiaReplaySessionSimulator.Simulate</c> 头部的 TODO。
+        /// </remarks>
+        private void refreshStableAvailability() => stableAvailable.Value = isStableClassic;
+
+
+        /// <summary>
         /// gameplay 入口（Player / 皮肤编辑器预览）冻结当前全局 JudgeMode。
         /// 必须在 <see cref="ScoreProcessor.ApplyBeatmap"/> 之前调用，否则全谱模拟与实际判定权重不一致。
         /// </summary>
         public override void ApplyEzGameplayEnvironment()
         {
             JudgeModeOverride ??= GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
+            refreshStableAvailability();
         }
 
         public override void ApplyBeatmap(IBeatmap beatmap)
         {
+            refreshStableAvailability();
+
             // Tail/Tick 的 Ignore 系 Judgement 必须在全谱模拟前绑定，否则 EZ2AC/Malody 会把官方尾 Perfect 计入 MaximumBaseScore。
             ManiaBeatmapBinding.BindJudgements(beatmap, judgeMode);
             base.ApplyBeatmap(beatmap);

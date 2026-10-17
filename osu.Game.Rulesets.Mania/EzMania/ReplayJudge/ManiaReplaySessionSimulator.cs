@@ -54,6 +54,29 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             public Dictionary<TailNote, HeadNote> HeadByTail { get; init; } = null!;
         }
 
+        // TODO(Ez live stable 影子)：把 Simulate 改成可推进的 Session 引擎。
+        //
+        // 动机：Simulate 是整段批处理——autoMissQueue 从完整 inputData.SortedFrameTimes 一次建表，
+        // autoMissCursor 单调推进，无法中途停。HUD 想在非 stable 档用「同一份实现」实时算 stable，
+        // 只能让它可推进；否则会出现第三份「这次按键命中哪个物件」的逻辑
+        // （live 用 ManiaLaneController.SelectPressEntry，Session 用自己的游标）。
+        //
+        // 改造面：主循环体（含 processInputEvent 局部函数）抽成方法、局部游标提成字段。至少涉及
+        // headWasHit、keyHeldByColumn、activeHoldByColumn、ez2AcHoldStates、judgedTicks、autoMissQueue、
+        // autoMissCursor 与 O2 BPM 缓存（O2JudgeModeExtension 的调用点）。
+        //
+        // 对外形态：AdvanceTo(double time) / ApplyInput(...) / ApplyFinalResult()，外加 rewind 用的
+        // ResetTo(double time) 或快照机制（现在是整盘重跑，live 后退必须能回退）。
+        //
+        // 最大障碍是 autoMissQueue：批处理从完整帧钟一次建表，增量要么按 deadline 入堆，要么允许「已建部分 + 追加」。
+        //
+        // 安全护栏：保留 Simulate 作为薄包装（循环调用上述方法），让现有全部审计 / parity 测试
+        // 直接成为重构的回归证据，而不是靠承诺。
+        //
+        // 接线点：改造完成后 ManiaScoreProcessor 把 IStableScoreSource 的转发目标换成引擎输出，
+        // StableAvailable 恒为 true；HUD 无需改动。
+        //
+        // 验收：曲终时引擎结果与整段 Simulate 逐字段相等；单事件摊还 O(1)；一次游玩内不重复构造谱面副本。
         internal static void Simulate(
             IBeatmap beatmap,
             IGameplayEnvironment environment,

@@ -398,12 +398,19 @@ namespace osu.Game.EzOsuGame.Configuration
         /// <summary>
         /// live 判定轨按规则集取：Mania/BMS 读 Mania 档，Osu 读 std 判定轨，其余默认 Lazer。
         /// </summary>
-        private EzEnumJudgeMode resolveLiveJudgeMode(int rulesetId) => rulesetId switch
+        private EzEnumJudgeMode resolveLiveJudgeMode(int rulesetId) => normalizeJudgeMode(rulesetId switch
         {
             3 => Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode),
             0 => Get<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode),
             _ => EzEnumJudgeMode.Lazer,
-        };
+        });
+
+        /// <summary>
+        /// 已保存配置里可能残留已淘汰的枚举值（例如 Mania Classic 的 38）。未定义值回退 StableClassic：
+        /// 留到下游会让窗口表落空、全判 Miss。只做内存回退，不改写已保存配置。
+        /// </summary>
+        private static EzEnumJudgeMode normalizeJudgeMode(EzEnumJudgeMode mode)
+            => Enum.IsDefined(mode) ? mode : EzEnumJudgeMode.StableClassic;
 
         private static GameplayEnvironment resolveStoredModes(GameplayEnvironment live, ScoreInfo? score, int rulesetId)
         {
