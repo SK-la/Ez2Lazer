@@ -247,6 +247,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             ManiaEzDrawableJudgement.TryO2HoldUpdate(this);
             // 先推帧钟增量、再同刻结算：结算会摘掉持有态，抢跑会吞掉长按的连击格。
             ManiaEzDrawableJudgement.TryStableClassicHoldComboTick(this);
+            ManiaEzDrawableJudgement.TryStableClassicHoldBreak(this);
             ManiaEzDrawableJudgement.TryStableClassicSettleHeldTail(this);
 #if DEBUG
             ManiaJudgeHotPathTrace.RecordHoldUpdate();

@@ -33,6 +33,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             /// <summary>classic 长条到点判尾——仍按住档（兜住已松手档被跳过的情况）。</summary>
             ClassicTailHeld = 2,
+
+            /// <summary>classic 长条断连档：过 <c>StartTime + HitWindow50</c> 仍从未按下时补一次 Body 断连。</summary>
+            ClassicHoldBreak = 3,
         }
 
         /// <summary>
@@ -45,6 +48,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             public Dictionary<HoldNote, StableClassicHoldState> HoldStates { get; init; } = null!;
 
             public Dictionary<HeadNote, bool> HeadWasHit { get; init; } = null!;
+
+            public Dictionary<HeadNote, HoldNote> HoldByHead { get; init; } = null!;
+
+            public Dictionary<TailNote, HeadNote> HeadByTail { get; init; } = null!;
         }
 
         internal static void Simulate(
@@ -86,7 +93,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             // 对齐局内 Column.ProcessAutoMiss：越过 late miss 边界立刻被动 Miss，
             // 否则未命中会拖到 end-sweep，中段 combo 不断 → MaxCombo 虚高。
-            var autoMissQueue = buildAutoMissQueue(pressColumns, releaseColumns, environment.JudgeMode, inputData.SortedFrameTimes);
+            var autoMissQueue = buildAutoMissQueue(pressColumns, releaseColumns, environment.JudgeMode, inputData.SortedFrameTimes, headByTail);
             int autoMissCursor = 0;
 
             // classic 持有期连击增量：stable 的 Holding 挂在帧循环上，逐帧消费 replay 帧钟。
@@ -98,6 +105,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     HoldStrategy = holdStrategy,
                     HoldStates = classicHoldStates,
                     HeadWasHit = headWasHit,
+                    HoldByHead = holdByHead,
+                    HeadByTail = headByTail,
                 }
                 : null;
 
@@ -236,8 +245,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     {
                         keyHeldByColumn[input.Column] = false;
 
-                        // stable classic：TimeRelease 只在「不早于 EndTime - HitWindow50」的松手时写入；
-                        // 更早的松手只标 hold break（尾档按 hasHoldBreak 封顶），不更新 TimeRelease。
+                        // stable classic：有效松开时间只在「不早于 EndTime - HitWindow50」的松手时写入；
+                        // 更早的松手只标断连（尾档按断连标志封顶），不更新有效松开时间。
                         if (stableClassic && activeHoldByColumn.TryGetValue(input.Column, out var classicReleasingHead)
                                           && holdByHead.TryGetValue(classicReleasingHead, out var classicReleasingHold))
                         {
@@ -507,7 +516,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         result = outcome.Result;
                     }
 
-                    // stable classic：LN 头不产生独立判定（<c>HitCircleManiaLong.HitStart</c> 保持返回 0，不进 OnHit），
+                    // stable classic：LN 头不产生独立判定，
                     // 因此落到 IgnoreHit：不计分、不计 combo、不进 acc；只保留「头有没有被按到」给尾判。
                     bool rawIsHit = result.IsHit();
 
@@ -603,7 +612,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     {
                         headWasHit[head] = rawIsHit;
 
-                        // stable classic：喂按下边沿（尾判的 num2 与 StartWasHit）。
+                        // stable classic：喂按下边沿（刷新尾判的按下基准）。
                         if (stableClassic && holdByHead.TryGetValue(head, out var classicPressedHold))
                             getStableClassicHoldState(classicHoldStates, classicPressedHold).OnPressed(input.Time);
 
@@ -703,7 +712,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             Dictionary<int, List<LaneTargetState>> pressColumns,
             Dictionary<int, List<LaneTargetState>> releaseColumns,
             EzEnumJudgeMode judgeMode,
-            IReadOnlyList<double> frameTimes)
+            IReadOnlyList<double> frameTimes,
+            Dictionary<TailNote, HeadNote> headByTail)
         {
             var queue = new List<(double Deadline, LaneTargetState State, AutoMissKind Kind)>();
 
@@ -713,7 +723,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             {
                 foreach (var state in list)
                 {
-                    if (stableClassic && tryAddClassicTailSettleEntries(queue, state, frameTimes))
+                    if (stableClassic && tryAddClassicTailSettleEntries(queue, state, frameTimes, headByTail))
                         continue;
 
                     queue.Add((GetSessionAutoMissDeadline(state.Target, judgeMode), state, AutoMissKind.Default));
@@ -725,20 +735,29 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         /// <summary>
-        /// classic 长条：stable 的尾判挂在帧循环的 <c>HitCircleManiaLong.HitEnd()</c> 上，整条只出一个档位，
-        /// 不是被动 Miss。已松手档取 <c>EndTime + HitWindow100</c>；仍按住档因 <c>HitEnd</c> 在
-        /// <c>Time &lt; EndTime + HitWindow50</c> 时直接返回 0，被推迟到 <c>EndTime + HitWindow50</c> 才落判。
-        /// 两档各排一条同源表项，按各自时刻的按住状态二选一。
+        /// classic 长条：尾判挂在帧循环上、到点触发，整条只出一个档位，不是被动 Miss。
+        /// 已松手档取 <c>EndTime + HitWindow100</c>；仍按住档在 <c>EndTime + HitWindow50</c> 之前不落判，
+        /// 被推迟到该时刻才结算。两档各排一条同源表项，按各自时刻的按住状态二选一。
+        /// 额外排一条断连档：过 <c>StartTime + HitWindow50</c> 仍从未按下即立即断连，不等尾结算。
         /// </summary>
         private static bool tryAddClassicTailSettleEntries(
             List<(double Deadline, LaneTargetState State, AutoMissKind Kind)> queue,
             LaneTargetState state,
-            IReadOnlyList<double> frameTimes)
+            IReadOnlyList<double> frameTimes,
+            Dictionary<TailNote, HeadNote> headByTail)
         {
             if (state.Target is not TailNote tail || tail.HitWindows is not ManiaHitWindows windows)
                 return false;
 
             double endTime = tail.GetEndTime();
+
+            if (headByTail.TryGetValue(tail, out var head))
+            {
+                queue.Add((
+                    resolveFrameClock(frameTimes, head.StartTime + (int)windows.WindowFor(HitResult.Meh)),
+                    state,
+                    AutoMissKind.ClassicHoldBreak));
+            }
 
             queue.Add((
                 resolveFrameClock(frameTimes, endTime + (int)windows.WindowFor(HitResult.Ok)),
@@ -753,7 +772,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         /// <summary>
-        /// stable 的到点判定比较的是帧钟 <c>AudioEngine.Time</c>，故取首个不早于阈值的 replay 帧；
+        /// 到点判定比较的是播放帧钟，故取首个不早于阈值的 replay 帧；
         /// 超出帧序列（如帧钟没覆盖到）时退回阈值本身，由收尾扫描按 raw 阈值落判。
         /// </summary>
         private static double resolveFrameClock(IReadOnlyList<double> frameTimes, double threshold)
@@ -781,6 +800,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             if (target.HitWindows == null || ReferenceEquals(target.HitWindows, HitWindows.Empty))
                 return target.GetEndTime();
+
+            // stable classic 的单键在 End + HitWindow100 就到点自动落 Miss，不等 Miss 窗。
+            if (target is Note and not HeadNote and not TailNote && StableClassicJudgeModeJudgement.IsSelected(judgeMode))
+                return target.GetEndTime() + target.HitWindows.WindowFor(HitResult.Ok);
 
             // Note/Head：与 GetAutoMissEvaluationTime 一致（晚侧 Miss 窗起开始被动 Miss）。
             // Tail：局内从 MissLate 起轮询，真正 Apply 在 !CanBeHit(offset/lenience) 时
@@ -835,6 +858,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     continue;
                 }
 
+                // classic 长条断连档只补 Body 断连，尾判仍由后面两条表项负责，故不能标 Judged。
+                if (kind == AutoMissKind.ClassicHoldBreak)
+                {
+                    if (classicTailSettle != null)
+                        tryApplyClassicHoldBreak(classicTailSettle, state, deadline, scoreProcessor, gameplayRate, timelineRecorder);
+
+                    continue;
+                }
+
                 if (kind != AutoMissKind.Default
                     && classicTailSettle != null
                     && trySettleClassicTailPassively(classicTailSettle, state, deadline, holdByHead, headByTail, scoreProcessor, gameplayRate, judgeMode, timelineRecorder))
@@ -885,6 +917,50 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             }
         }
 
+        /// <summary>
+        /// classic 长条断连：过 <c>StartTime + HitWindow50</c> 仍从未按下时立即断连并置断连标志，
+        /// 不等尾结算。
+        /// </summary>
+        /// <remarks>
+        /// 只落 Body 的 ComboBreak，不改尾判定态：LN 仍可重抓，尾档由断连标志封到 200。
+        /// 已按下过（含已提前松手断连）时由松手路径负责，这里不重复补判。
+        /// </remarks>
+        private static void tryApplyClassicHoldBreak(
+            ClassicTailSettleContext context,
+            LaneTargetState state,
+            double deadline,
+            ScoreProcessor scoreProcessor,
+            double gameplayRate,
+            ManiaReplayTimelineRecorder? timelineRecorder)
+        {
+            if (state.Target is not TailNote tail
+                || state.BodyJudged
+                || !context.HeadByTail.TryGetValue(tail, out var head)
+                || !context.HoldByHead.TryGetValue(head, out var hold)
+                || hold.Body == null)
+            {
+                return;
+            }
+
+            var classicState = getStableClassicHoldState(context.HoldStates, hold);
+
+            if (classicState.TimePress != null || classicState.Pressed || classicState.HasHoldBreak)
+                return;
+
+            classicState.MarkHoldBreak();
+            state.HoldBroken = true;
+            state.BodyJudged = true;
+
+            ApplyAuxiliaryResult(
+                scoreProcessor,
+                hold.Body,
+                HitResult.ComboBreak,
+                ComputeDrawableStoredTimeOffset(deadline, hold.Body),
+                deadline,
+                gameplayRate,
+                timelineRecorder);
+        }
+
         private static bool isClassicHoldStillPressed(
             ClassicTailSettleContext context,
             LaneTargetState state,
@@ -899,9 +975,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         /// <summary>
-        /// classic 长条到点判尾：stable 帧循环里 <c>HitCircleManiaLong.HitEnd()</c> 按
-        /// <see cref="StableClassicHoldState"/> 的最近按下 / 首次有效松开与按住标志取档，整条只出一个判定。
-        /// 从未按下或从未有效松开（含提前松手断连）时 stable 的 <c>num3</c> 停在 0，早于
+        /// classic 长条到点判尾：按 <see cref="StableClassicHoldState"/> 的最近按下 / 首次有效松开与按住标志取档，
+        /// 整条只出一个判定。从未按下或从未有效松开（含提前松手断连）时松开基准早于
         /// <c>EndTime - HitWindow50</c>，落 Miss。
         /// </summary>
         private static bool trySettleClassicTailPassively(
@@ -1319,8 +1394,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// 列已路由到其它物件时 <c>ShouldSkipColumnRoutedPress</c> 为真，不会重臂。
         /// </summary>
         /// <remarks>
-        /// 重臂也是 stable classic 的「按下边沿」判定点：stable 的 LN 直到被判定为止都是该列最早的未判物件，
-        /// 断连后的重按会刷新 <c>TimePress</c>（尾判的 <c>num2</c>）。不在此喂给会让持有态停在松手那一刻，
+        /// 重臂也是 stable classic 的「按下边沿」判定点：LN 直到被判定为止都是该列最早的未判物件，
+        /// 断连后的重按会刷新按下基准（尾判取档用）。不在此喂给会让持有态停在松手那一刻，
         /// 尾判被拖到之后某次松手、按镜像规则落成 Miss。
         /// </remarks>
         private static void tryRearmActiveHold(

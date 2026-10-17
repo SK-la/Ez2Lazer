@@ -42,15 +42,14 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private bool isStableClassic => StableClassicJudgeModeJudgement.IsSelected(judgeMode);
 
         /// <summary>
-        /// stable classic 长条持有期的连击增量（<c>HitCircleManiaLong.Holding</c> 的
-        /// <c>IncreaseScoreType</c> 7）。
+        /// stable classic 长条持有期的连击增量：每 100ms 一枚。
         /// </summary>
         /// <remarks>
         /// 只推 <see cref="ScoreProcessor.Combo"/> 与 <see cref="ScoreProcessor.HighestCombo"/>：
-        /// stable 该分支不给判定计数、不加分、不进 <c>HitEvents</c>，因此
+        /// 该分支不给判定计数、不加分、不进 <c>HitEvents</c>，因此
         /// <c>ScoreResultCounts</c> / acc / rank / <c>MaximumStatistics</c> 均不受影响。
         /// 增量数取决于实际按住时长（无法从谱面枚举），故也不进 <c>MaximumCombo</c>。
-        /// 在自增前按当前 combo 做 384 的 <c>ComboAddition</c> 重置，与 stable 同序。
+        /// 在自增前按当前 combo 做 384 的 <c>ComboAddition</c> 重置。
         /// </remarks>
         internal void ApplyClassicHoldCombo()
         {
@@ -82,7 +81,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             if (noteCount <= 0)
                 return 1;
 
-            return (double)StableManiaScoring.ScoreMax / noteCount * StableManiaScoring.ModMultiplier(Mods.Value);
+            return (double)StableManiaScoring.SCORE_MAX / noteCount * StableManiaScoring.ModMultiplier(Mods.Value);
         }
 
         /// <summary>
@@ -104,7 +103,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         protected override void Reset(bool storeResults)
         {
             base.Reset(storeResults);
-            stableScoring.Reset(stableScoreMultiplier());
+            stableScoring.Reset(stableScoreMultiplier(), StableManiaScoring.ScoreIncreaseMultiplier(Mods.Value));
         }
 
         public override void ResetFromReplayFrame(ReplayFrame frame)
@@ -115,8 +114,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             {
                 stableScoring.RestoreFrom(frame.Header.TotalScore);
 
-                if (frame.Header.Statistics != null)
-                    restoreClassicBaseScore(frame.Header.Statistics);
+                restoreClassicBaseScore(frame.Header.Statistics);
             }
 
             base.ResetFromReplayFrame(frame);
@@ -165,7 +163,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         // 换版必须同时给存量成绩定版本策略：算法一改，历史成绩与重算结果就会对不齐。
         protected override double ComputeTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
-            // stable 原生 classic：总分由 ComboAddition 状态机逐物件累加，不再走 combo/acc 曲线。
+            // stable 原生 classic：总分由 <c>ComboAddition</c> 状态机逐物件累加，不再走 combo/acc 曲线。
             if (isStableClassic)
                 return StableManiaScoring.Finalize(stableScoring.TotalScoreDouble);
 

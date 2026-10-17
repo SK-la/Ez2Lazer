@@ -13,40 +13,44 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
     /// <list type="bullet">
     /// <item>不驱动 tick（stable classic 长条没有 tick）；</item>
     /// <item>不可恢复——<see cref="HasHoldBreak"/> 一旦置位，终档永久封到 Good200；</item>
-    /// <item>头档不参与（stable <c>StartWasHit</c> 的封顶只存在于 ScoreV2 分支）。</item>
+    /// <item>头档不参与封顶。</item>
     /// </list>
     /// </remarks>
     public sealed class StableClassicHoldState
     {
-        /// <summary>持有期连击增量的节拍（stable <c>JudgementMania.ComboIntv</c>，毫秒）。</summary>
+        /// <summary>持有期连击增量的节拍（100ms）。</summary>
         public const double HOLD_COMBO_INTERVAL = 100;
 
-        /// <summary>本段起点（stable <c>StartTime</c>）。</summary>
+        /// <summary>本段起点（<c>StartTime</c>）。</summary>
         public double StartTime { get; private set; }
 
-        /// <summary>本段终点（stable <c>EndTime</c>）。</summary>
+        /// <summary>本段终点（<c>EndTime</c>）。</summary>
         public double EndTime { get; private set; }
 
         /// <summary>
-        /// 最近一次按下时刻（stable <c>TimePress</c>），每次「由松到按」的上升沿覆盖；从未按下为 <c>null</c>。
+        /// 最近一次按下时刻（<c>TimePress</c>），每次「由松到按」的上升沿覆盖；从未按下为 <c>null</c>。
         /// </summary>
         public double? TimePress { get; private set; }
 
         /// <summary>
-        /// 首次「不早于 <c>EndTime - HitWindow50</c>」的松开时刻（stable <c>TimeRelease</c>）；
+        /// 首次「不早于 <c>EndTime - HitWindow50</c>」的松开时刻（<c>TimeRelease</c>）；
         /// 更早的松手只记 <see cref="HasHoldBreak"/>，不写本值。从未有效松开为 <c>null</c>。
         /// </summary>
         public double? TimeRelease { get; private set; }
 
-        /// <summary>中途断连（stable <c>hasHoldBreak</c>）：终档封到 Good200，不可恢复。</summary>
+        /// <summary>中途断连：终档封到 Good200，不可恢复。</summary>
         public bool HasHoldBreak { get; private set; }
 
-        /// <summary>此刻是否按住（stable <c>Pressed</c>），决定判定时取当前时刻还是用 <see cref="TimeRelease"/>。</summary>
+        /// <summary>
+        /// 标记中途断连。由「该按下的时候没按」触发，不写 <see cref="TimePress"/> / <see cref="TimeRelease"/>。
+        /// </summary>
+        public void MarkHoldBreak() => HasHoldBreak = true;
+
+        /// <summary>此刻是否按住（<c>Pressed</c>），决定判定时取当前时刻还是用 <see cref="TimeRelease"/>。</summary>
         public bool Pressed { get; private set; }
 
         /// <summary>
-        /// 持有期连击增量的上一拍时刻（stable <c>HitCircleManiaLong.lastScoreTime</c>），
-        /// 时钟与 <see cref="StartTime"/> / <see cref="EndTime"/> 相同。
+        /// 持有期连击增量的上一拍时刻，时钟与 <see cref="StartTime"/> / <see cref="EndTime"/> 相同。
         /// </summary>
         private double holdComboBaseline;
 
@@ -83,7 +87,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
             holdComboBaseline = 0;
         }
 
-        /// <summary>按下：每次「由松到按」的上升沿都刷新 <see cref="TimePress"/>（stable 的按下分支只在未按住时进入）。</summary>
+        /// <summary>按下：每次「由松到按」的上升沿都刷新 <see cref="TimePress"/>（按下分支只在未按住时进入）。</summary>
         public void OnPressed(double time)
         {
             if (Pressed)
@@ -92,7 +96,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
             Pressed = true;
             TimePress = time;
 
-            // stable 在按下（含重按）把 lastScoreTime 设成当前时刻，节拍锚点因此随重按重排。
+            // 按下（含重按）把节拍锚点设成当前时刻，增量节拍因此随重按重排。
             holdComboBaseline = time;
         }
 

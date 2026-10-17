@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
+using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mania.UI;
@@ -149,7 +150,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     dueCount++;
 
                     if (evaluateResults)
-                        entry.Drawable.EvaluateColumnAutoMiss();
+                    {
+                        // stable classic 单键的到点 Miss 早于 CanBeHit 失效，必须直接落判。
+                        if (isStableClassicNotePastDeadline(entry.Drawable))
+                            entry.Drawable.EzApplyPassiveMissWithStoredOffset();
+                        else
+                            entry.Drawable.EvaluateColumnAutoMiss();
+                    }
                 }
             }
 
@@ -158,6 +165,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             return dueCount;
         }
+
+        private static bool isStableClassicNotePastDeadline(DrawableManiaHitObject drawable)
+            => drawable.HitObject.HitWindows is ManiaHitWindows { ActiveJudgeMode: EzEnumJudgeMode.StableClassic }
+               && drawable.HitObject is Note and not HeadNote and not TailNote;
 
         private void registerAutoMiss(DrawableHitObject drawable)
         {
@@ -252,7 +263,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         internal static double GetAutoMissEvaluationTime(DrawableManiaHitObject drawable)
         {
             if (drawable.HitObject.HitWindows is ManiaHitWindows windows)
+            {
+                // stable classic 的单键在 End + HitWindow100 就到点自动落 Miss，不等 Miss 窗。
+                if (windows.ActiveJudgeMode == EzEnumJudgeMode.StableClassic
+                    && drawable.HitObject is Note and not HeadNote and not TailNote)
+                {
+                    return drawable.HitObject.GetEndTime() + windows.WindowFor(HitResult.Ok);
+                }
+
                 return drawable.HitObject.GetEndTime() + windows.MissLateWindow;
+            }
 
             if (drawable is DrawableHoldNote)
                 return drawable.HitObject.GetEndTime();
