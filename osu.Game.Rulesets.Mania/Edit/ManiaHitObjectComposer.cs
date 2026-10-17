@@ -94,9 +94,13 @@ namespace osu.Game.Rulesets.Mania.Edit
 
         protected override Drawable CreatePlayfieldContentRoot(Drawable defaultContent)
             => PlayfieldContent = new ManiaEditorPlayfieldContent(defaultContent, Playfield, ScrollingInfo, TOOLBOX_EXPANDED_SIZE_RIGHT - TOOLBOX_CONTRACTED_SIZE_RIGHT,
-                // Placement and the playfield's selection box are tool-driven; the columns handle placement and their own
-                // notes themselves.
-                () => BlueprintContainer.CurrentTool is SelectTool,
+                // Placement follows the active composition tool, like the playfield: note -> taps, hold -> holds.
+                () => BlueprintContainer.CurrentTool switch
+                {
+                    NoteCompositionTool => ExtensionPlacementMode.Tap,
+                    HoldNoteCompositionTool => ExtensionPlacementMode.Hold,
+                    _ => ExtensionPlacementMode.None,
+                },
                 // Column insert/remove is its own mode, owned by the editor's switch rather than by the current tool.
                 () => columnEditState?.ColumnEditMode.Value == true);
 
@@ -183,11 +187,10 @@ namespace osu.Game.Rulesets.Mania.Edit
         {
             base.UpdateAfterChildren();
 
-            // The base class owns the grid's range for the playfield. The dock's contribution is pushed through a separate
-            // slot, because writing the same property from here would be overwritten by the base class earlier in the next
-            // frame, clearing the lines before they are ever drawn.
-            if (beatSnapGrid != null)
-                beatSnapGrid.OverrideTimeRange = extensionTimeRange();
+            // The dock draws its own beat lines (it cannot share the playfield's, which lives in a scaled space), so it
+            // only needs to be told which range owns them.
+            if (PlayfieldContent != null)
+                PlayfieldContent.ExtensionSelectionTimeRange = extensionSelectionTimeRange();
 
             // Leaving the selection tool drops the dock's selection, matching the playfield's own selection behaviour.
             if (PlayfieldContent != null && BlueprintContainer.CurrentTool is not SelectTool)
@@ -195,32 +198,25 @@ namespace osu.Game.Rulesets.Mania.Edit
         }
 
         /// <summary>
-        /// The time range the dock wants the snap grid to highlight: its selection, or the hover time while it accepts
-        /// placement.
+        /// The time range the dock's own beat lines should highlight, or <c>null</c> to leave them to the cursor.
         /// </summary>
-        private (double start, double end)? extensionTimeRange()
+        private (double start, double end)? extensionSelectionTimeRange()
         {
             var notes = PlayfieldContent?.ExtensionOverlay.SelectedNotes;
 
-            if (notes is { Count: > 0 })
+            if (notes is not { Count: > 0 })
+                return null;
+
+            double start = double.MaxValue;
+            double end = double.MinValue;
+
+            foreach (var note in notes)
             {
-                double start = double.MaxValue;
-                double end = double.MinValue;
-
-                foreach (var note in notes)
-                {
-                    start = Math.Min(start, note.Time);
-                    end = Math.Max(end, note.Time + note.Duration);
-                }
-
-                return (start, end);
+                start = Math.Min(start, note.Time);
+                end = Math.Max(end, note.Time + note.Duration);
             }
 
-            // Mirrors the playfield, where the hover line follows the snapped time under the cursor while placing.
-            if (PlayfieldContent?.PlacementHoverTime is double hover)
-                return (hover, hover);
-
-            return null;
+            return (start, end);
         }
 
         protected override void LoadComplete()
@@ -240,17 +236,6 @@ namespace osu.Game.Rulesets.Mania.Edit
             {
                 extensionStateContributor = new ExtensionColumnSetStateContributor(PlayfieldContent.ColumnSet);
                 handler.AddContributor(extensionStateContributor);
-            }
-
-            if (PlayfieldContent != null && beatSnapGrid != null)
-            {
-                foreach (var lane in PlayfieldContent.ExtensionLanes)
-                    beatSnapGrid.AddTarget(lane.LineContainer);
-
-                // Columns appear and disappear while the editor is open, so the grid follows them instead of being
-                // rebuilt or enumerated once.
-                PlayfieldContent.ExtensionLaneAdded += lane => beatSnapGrid?.AddTarget(lane.LineContainer);
-                PlayfieldContent.ExtensionLaneRemoved += lane => beatSnapGrid?.RemoveTarget(lane.LineContainer);
             }
 
             // Only a composer with extension columns shows the editor's column-edit switch.

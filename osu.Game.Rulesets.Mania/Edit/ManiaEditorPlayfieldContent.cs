@@ -46,7 +46,6 @@ namespace osu.Game.Rulesets.Mania.Edit
         private readonly ManiaPlayfield playfield;
         private readonly IScrollingInfo scrollingInfo;
         private readonly float rightReserve;
-        private readonly Func<bool>? selectToolActive;
 
         private readonly HoverActivationContainer playfieldRegion;
         private readonly HoverActivationContainer dockRegion;
@@ -68,26 +67,25 @@ namespace osu.Game.Rulesets.Mania.Edit
         /// The editor ruleset's scroll mapping. The dock sits beside the ruleset rather than inside it, so the mapping is
         /// re-provided here for the columns to use.
         /// </param>
-        /// <param name="selectToolActive">
-        /// Whether the composer's selection tool is active. It gates placement in the columns.
+        /// <param name="placementMode">
+        /// What a placement gesture in the columns should create, following the composer's active tool.
         /// </param>
         /// <param name="columnEditEnabled">
         /// Whether column-edit mode is on. It gates the columns' insert and remove controls, so they stay hidden until
         /// the editor's column-edit switch is turned on.
         /// </param>
         public ManiaEditorPlayfieldContent(Drawable playfieldContent, ManiaPlayfield playfield, IScrollingInfo scrollingInfo, float rightReserve,
-                                           Func<bool>? selectToolActive = null, Func<bool>? columnEditEnabled = null)
+                                           Func<ExtensionPlacementMode>? placementMode = null, Func<bool>? columnEditEnabled = null)
         {
             this.playfield = playfield;
             this.scrollingInfo = scrollingInfo;
             this.rightReserve = rightReserve;
-            this.selectToolActive = selectToolActive;
 
             RelativeSizeAxes = Axes.Both;
 
-            extensionArea = new ExtensionArea(ColumnSet)
+            extensionArea = new ExtensionArea(ColumnSet, playfield)
             {
-                PlacementEnabled = () => !(selectToolActive?.Invoke() ?? false),
+                PlacementMode = placementMode == null ? null : () => placementMode.Invoke(),
             };
 
             ExtensionOverlay = new ExtensionBlueprintContainer(ColumnSet, extensionArea, playfield)
@@ -146,31 +144,16 @@ namespace osu.Game.Rulesets.Mania.Edit
         }
 
         /// <summary>
-        /// The snapped time under the cursor while the columns accept placement, or <c>null</c>.
+        /// What a placement gesture in the columns creates right now.
         /// </summary>
-        internal double? PlacementHoverTime => extensionArea.PlacementHoverTime;
+        internal ExtensionPlacementMode PlacementMode => extensionArea.Mode;
 
         /// <summary>
-        /// The scrolling surfaces of the currently displayed columns.
+        /// The time range whose beat lines the columns should show, when their selection owns them.
         /// </summary>
-        internal IEnumerable<ExtensionLane> ExtensionLanes => extensionArea.Lanes;
-
-        /// <summary>
-        /// Raised when a column's scrolling surface becomes available.
-        /// </summary>
-        internal event Action<ExtensionLane>? ExtensionLaneAdded
+        internal (double start, double end)? ExtensionSelectionTimeRange
         {
-            add => extensionArea.LaneAdded += value;
-            remove => extensionArea.LaneAdded -= value;
-        }
-
-        /// <summary>
-        /// Raised when a column's scrolling surface is about to be dropped.
-        /// </summary>
-        internal event Action<ExtensionLane>? ExtensionLaneRemoved
-        {
-            add => extensionArea.LaneRemoved += value;
-            remove => extensionArea.LaneRemoved -= value;
+            set => extensionArea.SelectionTimeRange = value;
         }
 
         /// <summary>

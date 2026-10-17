@@ -20,19 +20,20 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
     /// The scrolling surface of a single extension column: renders its notes and beat lines, and maps times to positions.
     /// </summary>
     /// <remarks>
-    /// The mapping is taken from the editor's own <see cref="IScrollingInfo"/>, the same instance the playfield's columns
-    /// use, so positions match the playable objects without measuring or converting between screen spaces. Only the
-    /// surface's own height enters the calculation.
+    /// The surface's own height is copied from the playfield column it mirrors (see <see cref="DrawableExtensionColumn"/>),
+    /// so this mapping and the playfield's scrolling container produce the same screen positions for the same time.
     /// </remarks>
     public partial class ExtensionLane : CompositeDrawable
     {
         private const float preview_height = 8;
         private const float preview_opacity = 0.4f;
+        private const float grid_line_height = 1.5f;
 
         private readonly ExtensionColumn column;
         private readonly ExtensionArea area;
 
         private readonly Dictionary<ExtensionNote, DrawableExtensionNote> noteDrawables = new Dictionary<ExtensionNote, DrawableExtensionNote>();
+        private readonly List<Box> gridLineBoxes = new List<Box>();
 
         private readonly Container lineContainer;
         private readonly Container noteContainer;
@@ -47,7 +48,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         private EditorClock editorClock { get; set; } = null!;
 
         /// <summary>
-        /// The surface beat lines are drawn on. Registered with the editor's snap grid by the composer.
+        /// The surface beat lines are drawn on, below the notes.
         /// </summary>
         public Container LineContainer => lineContainer;
 
@@ -110,6 +111,12 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         }
 
         /// <summary>
+        /// The local height spanned by [<paramref name="startTime"/>, <paramref name="endTime"/>].
+        /// </summary>
+        public float LengthAt(double startTime, double endTime)
+            => Math.Abs(algorithm.Value.GetLength(startTime, endTime, timeRange.Value, DrawHeight));
+
+        /// <summary>
         /// The time at a local Y.
         /// </summary>
         public double TimeAt(float localY)
@@ -161,8 +168,49 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
             if (DrawHeight <= 0)
                 return;
 
+            updateGridLines();
             updateDraft();
             updatePreview();
+        }
+
+        /// <summary>
+        /// Re-renders the beat divisor lines supplied by the area, which decides whether the cursor or a selection owns them.
+        /// </summary>
+        private void updateGridLines()
+        {
+            IReadOnlyList<ExtensionSnapLine>? lines = area.LinesFor(column);
+            int count = lines?.Count ?? 0;
+
+            while (gridLineBoxes.Count < count)
+            {
+                var box = new Box
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Height = grid_line_height,
+                };
+
+                gridLineBoxes.Add(box);
+                lineContainer.Add(box);
+            }
+
+            for (int i = 0; i < gridLineBoxes.Count; i++)
+            {
+                var box = gridLineBoxes[i];
+
+                if (i >= count)
+                {
+                    if (box.Alpha != 0)
+                        box.Alpha = 0;
+
+                    continue;
+                }
+
+                var line = lines![i];
+
+                box.Y = OffsetAt(line.Time) - grid_line_height / 2;
+                box.Colour = line.Colour;
+                box.Alpha = line.Alpha;
+            }
         }
 
         private void updateDraft()

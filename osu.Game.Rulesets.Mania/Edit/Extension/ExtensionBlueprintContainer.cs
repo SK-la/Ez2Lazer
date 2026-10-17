@@ -32,6 +32,11 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
     {
         private const double minimum_hold_duration = 1;
 
+        /// <summary>
+        /// How close to a hold's end a press must land to grab its resize grip.
+        /// </summary>
+        private const float resize_grip_radius = 6;
+
         private readonly ExtensionColumnSet columnSet;
         private readonly ExtensionArea area;
         private readonly ManiaPlayfield playfield;
@@ -41,6 +46,10 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
         private ExtensionColumn? placementColumn;
         private double placementStartTime;
+
+        private ExtensionNote? resizeNote;
+        private ExtensionNoteEdge resizeEdge;
+        private double resizeFixedTime;
 
         [Resolved]
         private IBeatSnapProvider beatSnapProvider { get; set; } = null!;
@@ -163,6 +172,9 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
         protected override bool OnMouseDown(MouseDownEvent e)
         {
+            if (e.Button == MouseButton.Left && tryBeginResize(e.ScreenSpaceMouseDownPosition))
+                return true;
+
             if (e.Button == MouseButton.Left && tryBeginPlacement(e.ScreenSpaceMouseDownPosition))
                 return true;
 
@@ -171,6 +183,9 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
         protected override bool OnDragStart(DragStartEvent e)
         {
+            if (resizeNote != null)
+                return true;
+
             if (placementColumn != null)
             {
                 area.IsInteracting = true;
@@ -183,6 +198,12 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
         protected override void OnDrag(DragEvent e)
         {
+            if (resizeNote != null)
+            {
+                updateResize(e.ScreenSpaceMousePosition);
+                return;
+            }
+
             if (placementColumn != null)
             {
                 updateDraft(e.ScreenSpaceMousePosition);
@@ -195,8 +216,8 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         protected override void OnDragEnd(DragEndEvent e)
         {
             // Completion is handled on mouse up, which is the one event both a click and a drag end go through, so a
-            // placement cannot be committed twice and cannot be stranded when the release lands outside the dock.
-            if (placementColumn != null)
+            // placement or a resize cannot be committed twice and cannot be stranded when the release lands outside.
+            if (resizeNote != null || placementColumn != null)
                 return;
 
             base.OnDragEnd(e);
@@ -204,13 +225,102 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
         protected override void OnMouseUp(MouseUpEvent e)
         {
-            if (e.Button == MouseButton.Left && placementColumn != null)
+            if (e.Button != MouseButton.Left)
+            {
+                base.OnMouseUp(e);
+                return;
+            }
+
+            if (resizeNote != null)
+            {
+                endResize();
+                return;
+            }
+
+            if (placementColumn != null)
             {
                 commitPlacement(e.ScreenSpaceMousePosition);
                 return;
             }
 
             base.OnMouseUp(e);
+        }
+
+        #endregion
+
+        #region Resize
+
+        private enum ExtensionNoteEdge
+        {
+            Head,
+            Tail,
+        }
+
+        /// <summary>
+        /// Starts dragging the head or tail of an already selected hold, when the press lands on its grip.
+        /// </summary>
+        private bool tryBeginResize(Vector2 screenSpacePosition)
+        {
+            // Resizing edits an existing note, so it belongs to the selection tool like it does in the playfield.
+            if (area.Mode != ExtensionPlacementMode.None || !HasSelection)
+                return false;
+
+            var note = area.NoteAt(screenSpacePosition);
+
+            if (note?.Column == null || note.Duration <= 0 || !SelectedNotes.Contains(note))
+                return false;
+
+            if (area.LaneOf(note.Column) is not ExtensionLane lane || lane.DrawHeight <= 0)
+                return false;
+
+            float y = lane.ToLocalSpace(screenSpacePosition).Y;
+            float startY = lane.OffsetAt(note.Time);
+            float endY = lane.OffsetAt(note.Time + note.Duration);
+
+            // A note shorter than its two grips cannot say which end was grabbed.
+            if (Math.Abs(startY - endY) < resize_grip_radius * 3)
+                return false;
+
+            float headDistance = Math.Abs(y - startY);
+            float tailDistance = Math.Abs(y - endY);
+
+            if (Math.Min(headDistance, tailDistance) > resize_grip_radius)
+                return false;
+
+            resizeEdge = headDistance <= tailDistance ? ExtensionNoteEdge.Head : ExtensionNoteEdge.Tail;
+            resizeNote = note;
+            resizeFixedTime = resizeEdge == ExtensionNoteEdge.Head ? note.Time + note.Duration : note.Time;
+            area.IsInteracting = true;
+            changeHandler?.BeginChange();
+
+            return true;
+        }
+
+        private void updateResize(Vector2 screenSpacePosition)
+        {
+            if (resizeNote == null || area.TimeAt(screenSpacePosition) is not double time)
+                return;
+
+            double snapped = beatSnapProvider.SnapTime(time);
+
+            if (resizeEdge == ExtensionNoteEdge.Head)
+            {
+                double start = Math.Max(0, Math.Min(snapped, resizeFixedTime - minimum_hold_duration));
+                resizeNote.Time = start;
+                resizeNote.Duration = resizeFixedTime - start;
+            }
+            else
+                resizeNote.Duration = Math.Max(minimum_hold_duration, snapped - resizeFixedTime);
+        }
+
+        private void endResize()
+        {
+            if (resizeNote == null)
+                return;
+
+            resizeNote = null;
+            area.IsInteracting = false;
+            changeHandler?.EndChange();
         }
 
         #endregion
@@ -242,6 +352,13 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
             if (placementColumn == null)
                 return;
 
+            // Only holds grow with the drag; a tap stays on the pressed slot, like the playfield's note tool.
+            if (area.Mode != ExtensionPlacementMode.Hold)
+            {
+                area.Draft = null;
+                return;
+            }
+
             if (area.TimeAt(screenSpacePosition) is not double time)
                 return;
 
@@ -255,6 +372,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
             if (column == null)
                 return;
 
+            ExtensionPlacementMode mode = area.Mode;
             double? current = area.TimeAt(screenSpacePosition);
 
             placementColumn = null;
@@ -264,13 +382,11 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
             double start = placementStartTime;
             double end = current != null ? beatSnapProvider.SnapTime(current.Value) : start;
 
-            if (Math.Abs(end - start) < minimum_hold_duration)
-            {
+            // Mirrors the playfield's tools: the hold tool needs an actual length, while the note tool always places a tap.
+            if (mode == ExtensionPlacementMode.Hold && Math.Abs(end - start) >= minimum_hold_duration)
+                addNote(column, Math.Min(start, end), Math.Abs(end - start));
+            else
                 addNote(column, start, 0);
-                return;
-            }
-
-            addNote(column, Math.Min(start, end), Math.Abs(end - start));
         }
 
         private void addNote(ExtensionColumn column, double time, double duration)

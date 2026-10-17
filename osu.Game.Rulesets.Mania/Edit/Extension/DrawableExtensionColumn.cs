@@ -32,6 +32,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
         private readonly IconButton selectAllButton;
 
+        private readonly Container noteArea;
         private readonly Box background;
         private readonly Box mainAudioStrip;
         private readonly OsuSpriteText numberLabel;
@@ -61,12 +62,18 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
                     Height = 3,
                     Colour = Colour4.CornflowerBlue,
                 },
-                // Same padding as a playfield column applies around its hit objects, so both regions share the hit line
-                // and the same usable height without measuring each other.
-                new HitPositionPaddedContainer
+                // Same padded span as a playfield column (the note area is copied from its scrolling container in
+                // Update), so both regions share the hit line and the same usable height. The judgement line is a child
+                // of that span so it lands on the same edge the playfield draws its own on.
+                noteArea = new Container
                 {
-                    RelativeSizeAxes = Axes.Both,
-                    Child = Lane = new ExtensionLane(column, area),
+                    RelativeSizeAxes = Axes.X,
+                    Masking = true,
+                    Children = new Drawable[]
+                    {
+                        Lane = new ExtensionLane(column, area),
+                        new ManiaJudgementLine(),
+                    },
                 },
                 numberLabel = new OsuSpriteText
                 {
@@ -88,6 +95,36 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
             };
 
             column.Number.BindValueChanged(_ => updateNumber(), true);
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            // Copy the playfield column's scrolling container geometry. The playfield sits under its own scaling
+            // container while this column does not, so deriving the span independently makes the grid, notes and
+            // selection outlines drift apart the further they sit from the hit line.
+            var container = area.ReferenceColumn?.HitObjectContainer;
+
+            if (container == null || container.DrawHeight <= 0)
+            {
+                noteArea.Height = 0;
+                return;
+            }
+
+            var quad = container.ScreenSpaceDrawQuad.AABBFloat;
+
+            if (quad.Height <= 0)
+            {
+                noteArea.Height = 0;
+                return;
+            }
+
+            float top = ToLocalSpace(new Vector2(quad.Centre.X, quad.Top)).Y;
+            float bottom = ToLocalSpace(new Vector2(quad.Centre.X, quad.Bottom)).Y;
+
+            noteArea.Y = top;
+            noteArea.Height = bottom - top;
         }
 
         private void updateNumber()

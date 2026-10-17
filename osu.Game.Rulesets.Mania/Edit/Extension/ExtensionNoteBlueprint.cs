@@ -20,9 +20,12 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
     public partial class ExtensionNoteBlueprint : SelectionBlueprint<ExtensionNote>
     {
         private const float minimum_height = 8;
+        private const float handle_height = 6;
 
         private readonly ExtensionArea area;
         private readonly Container outline;
+        private readonly Box headHandle;
+        private readonly Box tailHandle;
 
         public ExtensionNoteBlueprint(ExtensionNote note, ExtensionArea area)
             : base(note)
@@ -36,11 +39,28 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
                 RelativeSizeAxes = Axes.Both,
                 Masking = true,
                 BorderThickness = 2,
-                Child = new Box
+                Children = new Drawable[]
                 {
-                    RelativeSizeAxes = Axes.Both,
-                    Alpha = 0,
-                    AlwaysPresent = true,
+                    new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Alpha = 0,
+                        AlwaysPresent = true,
+                    },
+                    // Resize grips for the hold's head and tail. They live inside the outline so the selection state
+                    // controls their visibility without per-frame alpha fights.
+                    headHandle = new Box
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        Height = handle_height,
+                        Colour = Colour4.Gold,
+                    },
+                    tailHandle = new Box
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        Height = handle_height,
+                        Colour = Colour4.Gold,
+                    },
                 },
             };
         }
@@ -77,6 +97,31 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
             Position = new Vector2(Math.Min(topLeft.X, bottomRight.X), Math.Min(topLeft.Y, bottomRight.Y));
             Size = new Vector2(Math.Max(1, Math.Abs(bottomRight.X - topLeft.X)), Math.Max(minimum_height, Math.Abs(bottomRight.Y - topLeft.Y)));
+
+            updateHandles(lane);
+        }
+
+        private void updateHandles(ExtensionLane lane)
+        {
+            bool hasEnds = Item.Duration > 0 && Size.Y >= handle_height * 3;
+
+            headHandle.Alpha = hasEnds ? 1 : 0;
+            tailHandle.Alpha = hasEnds ? 1 : 0;
+
+            if (!hasEnds)
+                return;
+
+            // The head sits at the start time, which is the low end of the note for an upward-scrolling column.
+            if (lane.ScrollsDown)
+            {
+                headHandle.Y = Size.Y - handle_height;
+                tailHandle.Y = 0;
+            }
+            else
+            {
+                headHandle.Y = 0;
+                tailHandle.Y = Size.Y - handle_height;
+            }
         }
     }
 }

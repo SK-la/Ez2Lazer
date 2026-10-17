@@ -29,41 +29,6 @@ namespace osu.Game.Screens.Edit.Compose.Components
         private const double visible_range = 750;
 
         /// <summary>
-        /// Draws the grid on an additional surface.
-        /// </summary>
-        /// <remarks>
-        /// Surfaces which only appear at runtime, such as the editor's extension columns, register here instead of being
-        /// enumerated once during load.
-        /// </remarks>
-        public void AddTarget(Container target)
-        {
-            if (targets.ContainsKey(target))
-                return;
-
-            var lineContainer = new ScrollingHitObjectContainer();
-
-            targets[target] = lineContainer;
-            grids.Add(lineContainer);
-            target.Add(lineContainer);
-
-            lineCache.Invalidate();
-        }
-
-        /// <summary>
-        /// Stops drawing the grid on <paramref name="target"/>.
-        /// </summary>
-        public void RemoveTarget(Container target)
-        {
-            if (!targets.Remove(target, out var lineContainer))
-                return;
-
-            grids.Remove(lineContainer);
-            lineContainer.Expire();
-
-            lineCache.Invalidate();
-        }
-
-        /// <summary>
         /// The range of time values of the current selection.
         /// </summary>
         public (double start, double end)? SelectionTimeRange
@@ -78,28 +43,6 @@ namespace osu.Game.Screens.Edit.Compose.Components
             }
         }
 
-        /// <summary>
-        /// A time range supplied by an external surface, taking precedence over <see cref="SelectionTimeRange"/>.
-        /// </summary>
-        /// <remarks>
-        /// Used by surfaces which own their own selection but render through this grid (e.g. the mania extension
-        /// columns). Setting this keeps the grid stable regardless of what the composing screen writes to
-        /// <see cref="SelectionTimeRange"/> every frame.
-        /// </remarks>
-        public (double start, double end)? OverrideTimeRange
-        {
-            set
-            {
-                if (value == overrideTimeRange)
-                    return;
-
-                overrideTimeRange = value;
-                lineCache.Invalidate();
-            }
-        }
-
-        private (double start, double end)? effectiveTimeRange => overrideTimeRange ?? selectionTimeRange;
-
         [Resolved]
         private EditorBeatmap beatmap { get; set; } = null!;
 
@@ -111,15 +54,11 @@ namespace osu.Game.Screens.Edit.Compose.Components
 
         private readonly List<ScrollingHitObjectContainer> grids = new List<ScrollingHitObjectContainer>();
 
-        private readonly Dictionary<Container, ScrollingHitObjectContainer> targets = new Dictionary<Container, ScrollingHitObjectContainer>();
-
         private readonly DrawablePool<DrawableGridLine> linesPool = new DrawablePool<DrawableGridLine>(50);
 
         private readonly Cached lineCache = new Cached();
 
         private (double start, double end)? selectionTimeRange;
-
-        private (double start, double end)? overrideTimeRange;
 
         [BackgroundDependencyLoader]
         private void load(HitObjectComposer composer)
@@ -155,10 +94,10 @@ namespace osu.Game.Screens.Edit.Compose.Components
             foreach (var grid in grids)
                 grid.Clear();
 
-            if (effectiveTimeRange == null)
+            if (selectionTimeRange == null)
                 return;
 
-            var range = effectiveTimeRange.Value;
+            var range = selectionTimeRange.Value;
 
             TimingControlPoint timingPoint;
             bool fixedMode = beatmap.FixedGridEnabled.Value;

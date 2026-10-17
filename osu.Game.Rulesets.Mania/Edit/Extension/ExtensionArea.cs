@@ -8,7 +8,10 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.Graphics;
 using osu.Game.Rulesets.Edit;
+using osu.Game.Rulesets.Mania.UI;
+using osu.Game.Screens.Edit;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Edit.Extension
@@ -24,6 +27,10 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         private const float placeholder_width = 24;
 
         private readonly ExtensionColumnSet columnSet;
+        private readonly ManiaPlayfield playfield;
+
+        private readonly ExtensionSnapGrid snapGrid = new ExtensionSnapGrid();
+        private (double start, double end)? selectionTimeRange;
 
         private FillFlowContainer<DrawableExtensionColumn> columnFlow = null!;
         private Drawable placeholder = null!;
@@ -33,21 +40,33 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         [Resolved]
         private IBeatSnapProvider beatSnapProvider { get; set; } = null!;
 
+        [Resolved]
+        private EditorBeatmap editorBeatmap { get; set; } = null!;
+
+        [Resolved]
+        private BindableBeatDivisor beatDivisor { get; set; } = null!;
+
+        [Resolved]
+        private OsuColour colours { get; set; } = null!;
+
         /// <summary>
-        /// Whether the columns accept placement gestures.
+        /// What the columns should create for a placement gesture, following the composer's active tool.
+        /// </summary>
+        public Func<ExtensionPlacementMode>? PlacementMode { get; set; }
+
+        public ExtensionPlacementMode Mode => PlacementMode?.Invoke() ?? ExtensionPlacementMode.None;
+
+        public bool CanPlace => Mode != ExtensionPlacementMode.None;
+
+        /// <summary>
+        /// The playfield column whose scrolling container the dock mirrors, if the playfield is laid out.
         /// </summary>
         /// <remarks>
-        /// Gates the placement preview as well: while the composer's selection tool is active, the dock's blank space
-        /// belongs to the playfield's selection box and must not read as a placement surface.
+        /// The playfield lives under its own scaling container while the dock does not, so the dock copies this column's
+        /// screen geometry and time mapping instead of deriving its own. Without it the grid, the notes and their
+        /// selection outlines drift further apart the further they sit from the hit line.
         /// </remarks>
-        public Func<bool>? PlacementEnabled { get; set; }
-
-        public bool CanPlace => PlacementEnabled?.Invoke() != false;
-
-        /// <summary>
-        /// The snapped time under the cursor while the columns accept placement, or <c>null</c>.
-        /// </summary>
-        internal double? PlacementHoverTime => CanPlace ? HoverTime : null;
+        public Column? ReferenceColumn { get; private set; }
 
         /// <summary>
         /// The column the cursor is over, or <c>null</c> when it is elsewhere.
@@ -75,6 +94,21 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         public (ExtensionColumn column, double start, double end)? Draft { get; set; }
 
         /// <summary>
+        /// The time range whose beat lines the columns should show, when a selection owns them instead of the cursor.
+        /// </summary>
+        public (double start, double end)? SelectionTimeRange
+        {
+            set
+            {
+                if (value == selectionTimeRange)
+                    return;
+
+                selectionTimeRange = value;
+                snapGrid.Clear();
+            }
+        }
+
+        /// <summary>
         /// Raised when a column's scrolling surface becomes available.
         /// </summary>
         public event Action<ExtensionLane>? LaneAdded;
@@ -84,9 +118,10 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         /// </summary>
         public event Action<ExtensionLane>? LaneRemoved;
 
-        public ExtensionArea(ExtensionColumnSet columnSet)
+        public ExtensionArea(ExtensionColumnSet columnSet, ManiaPlayfield playfield)
         {
             this.columnSet = columnSet;
+            this.playfield = playfield;
 
             RelativeSizeAxes = Axes.Y;
             AutoSizeAxes = Axes.X;
@@ -102,20 +137,55 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
                 Direction = FillDirection.Horizontal,
             };
 
-            InternalChildren = new Drawable[]
+            InternalChildren = new[]
             {
                 columnFlow,
                 placeholder = createPlaceholder(),
             };
 
             columnSet.Columns.BindCollectionChanged(onColumnsChanged, true);
+            editorBeatmap.ControlPointInfo.ControlPointsChanged += onControlPointsChanged;
         }
+
+        private void onControlPointsChanged() => snapGrid.Clear();
 
         protected override void Update()
         {
             base.Update();
 
+            ReferenceColumn = findReferenceColumn();
+
             updateHover();
+        }
+
+        /// <summary>
+        /// The beat lines the given column should draw, or <c>null</c> when it should draw none.
+        /// </summary>
+        /// <remarks>
+        /// A selection owns the lines across every column; otherwise only the hovered column shows the cursor's lines,
+        /// matching the playfield's grid.
+        /// </remarks>
+        internal IReadOnlyList<ExtensionSnapLine>? LinesFor(ExtensionColumn column)
+        {
+            if (selectionTimeRange != null)
+                return snapGrid.Lines;
+
+            return HoverColumn == column && CanPlace ? snapGrid.Lines : null;
+        }
+
+        private Column? findReferenceColumn()
+        {
+            foreach (var stage in playfield.Stages)
+            {
+                foreach (var column in stage.Columns)
+                {
+                    // Any drawn column has the geometry every column shares; the first laid-out one is enough.
+                    if (column.HitObjectContainer.DrawHeight > 0)
+                        return column;
+                }
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -126,7 +196,24 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         /// <summary>
         /// The time under <paramref name="screenSpacePosition"/>, or <c>null</c> outside the columns.
         /// </summary>
-        public double? TimeAt(Vector2 screenSpacePosition) => DrawableColumnAt(screenSpacePosition)?.TimeAt(screenSpacePosition);
+        public double? TimeAt(Vector2 screenSpacePosition) => DrawableColumnAt(screenSpacePosition)?.TimeAt(screenSpacePosition) ?? referenceTimeAt(screenSpacePosition);
+
+        /// <summary>
+        /// The time under <paramref name="screenSpacePosition"/> through the mirrored playfield column.
+        /// </summary>
+        /// <remarks>
+        /// Solved against the playfield's own scrolling container, so a press or drag snaps to exactly the time the
+        /// playable columns would report for that row.
+        /// </remarks>
+        private double? referenceTimeAt(Vector2 screenSpacePosition)
+        {
+            var column = ReferenceColumn;
+
+            if (column == null || column.HitObjectContainer.DrawHeight <= 0)
+                return null;
+
+            return column.TimeAtScreenSpacePosition(screenSpacePosition);
+        }
 
         /// <summary>
         /// Whether <paramref name="screenSpacePosition"/> is over a per-column control rather than the note area.
@@ -206,6 +293,31 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
                 IsHoveringNote = column.NoteAt(mouse.Value) != null;
                 HoverTime = beatSnapProvider.SnapTime(time);
             }
+
+            updateGrid();
+        }
+
+        /// <summary>
+        /// Rebuilds the beat divisor lines, preferring a selection's band over the hovered time.
+        /// </summary>
+        private void updateGrid()
+        {
+            if (selectionTimeRange is var (start, end))
+            {
+                if (!snapGrid.IsValidForRange(start, end, beatDivisor.Value))
+                    snapGrid.RebuildForRange(start, end, editorBeatmap.ControlPointInfo, beatDivisor.Value, editorBeatmap.FixedGridEnabled.Value, colours);
+
+                return;
+            }
+
+            if (!CanPlace || HoverTime is not double snapped)
+            {
+                snapGrid.Clear();
+                return;
+            }
+
+            if (!snapGrid.IsValidFor(snapped, beatDivisor.Value))
+                snapGrid.Rebuild(snapped, editorBeatmap.ControlPointInfo, beatDivisor.Value, editorBeatmap.FixedGridEnabled.Value, colours);
         }
 
         private Vector2? currentMousePosition()
@@ -247,6 +359,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         protected override void Dispose(bool isDisposing)
         {
             columnSet.Columns.CollectionChanged -= onColumnsChanged;
+            editorBeatmap.ControlPointInfo.ControlPointsChanged -= onControlPointsChanged;
 
             base.Dispose(isDisposing);
         }
