@@ -46,6 +46,8 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly JudgementContainer<DrawableManiaJudgement> judgements;
         private readonly JudgementPooler<DrawableManiaJudgement> judgementPooler;
 
+        private readonly ManiaJudgementLine judgementLine;
+
         private readonly Drawable barLineContainer;
 
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)
@@ -77,6 +79,11 @@ namespace osu.Game.Rulesets.Mania.UI
         /// Whether the stage panel may be shown at all. Stages used by the ruleset editor override this.
         /// </summary>
         protected virtual bool AllowStagePanel => true;
+
+        /// <summary>
+        /// Whether the JudgementLine should be shown.
+        /// </summary>
+        protected virtual bool ShowJudgementLine => false;
 
         public Stage(int firstColumnIndex, StageDefinition definition, ref ManiaAction columnStartAction)
         {
@@ -147,10 +154,19 @@ namespace osu.Game.Rulesets.Mania.UI
                         new HitPositionPaddedContainer
                         {
                             RelativeSizeAxes = Axes.Both,
-                            Child = judgements = new JudgementContainer<DrawableManiaJudgement>
+                            Children = new Drawable[]
                             {
-                                RelativeSizeAxes = Axes.Both,
-                            },
+                                judgements = new JudgementContainer<DrawableManiaJudgement>
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                },
+                                judgementLine = new ManiaJudgementLine
+                                {
+                                    // Always present so the playfield and the extension columns can show the same line;
+                                    // the editor enables it, gameplay keeps it invisible.
+                                    Alpha = ShowJudgementLine ? ManiaJudgementLine.LINE_ALPHA : 0,
+                                }
+                            }
                         },
                         topLevelContainer = new Container { RelativeSizeAxes = Axes.Both }
                     }

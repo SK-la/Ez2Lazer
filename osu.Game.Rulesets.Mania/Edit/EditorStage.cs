@@ -16,5 +16,6 @@ namespace osu.Game.Rulesets.Mania.Edit
         protected override Column CreateColumn(int index, bool isSpecial) => new EditorColumn(index, isSpecial);
 
         protected override bool AllowStagePanel => false;
+        protected override bool ShowJudgementLine => true;
     }
 }
