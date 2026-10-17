@@ -130,7 +130,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         public ExtensionNote? NoteAt(Vector2 screenSpacePosition) => noteLayer.NoteAt(screenSpacePosition);
 
         /// <summary>
-        /// Selects the notes inside <paramref name="region"/>, deselecting the rest unless they are preserved.
+        /// Selects the notes whose centre time lies in the given band, deselecting the rest unless they are preserved.
         /// </summary>
         public void UpdateBoxSelection(double minTime, double maxTime, IReadOnlyCollection<ExtensionNote>? preserve) => noteLayer.UpdateBoxSelection(minTime, maxTime, preserve);
 

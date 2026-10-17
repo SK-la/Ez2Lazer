@@ -255,10 +255,13 @@ namespace osu.Game.EzOsuGame.Localization
 
         #region Mania editor extension columns
 
+        public static readonly LocalisableString EXTENSION_COLUMN_EDIT_MODE = new EzLocalizationManager.EzLocalisableString(
+            "列编辑",
+            "Column edit");
+
         public static readonly LocalisableString EXTENSION_COLUMN_INSERT = new EzLocalizationManager.EzLocalisableString(
             "在此列右侧插入扩展列",
             "Insert an extension column after this column");
-
         public static readonly LocalisableString EXTENSION_COLUMN_REMOVE = new EzLocalizationManager.EzLocalisableString(
             "移除本列扩展列",
             "Remove this extension column");

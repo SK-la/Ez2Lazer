@@ -13,6 +13,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Edit;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.Edit;
 using osu.Game.Rulesets.Edit.Tools;
@@ -37,6 +38,9 @@ namespace osu.Game.Rulesets.Mania.Edit
 
         [Resolved]
         private EditorScreenWithTimeline? screenWithTimeline { get; set; }
+
+        [Resolved(CanBeNull = true)]
+        private EzEditorColumnEditState? columnEditState { get; set; }
 
         public ManiaHitObjectComposer(Ruleset ruleset)
             : base(ruleset)
@@ -85,9 +89,11 @@ namespace osu.Game.Rulesets.Mania.Edit
 
         protected override Drawable CreatePlayfieldContentRoot(Drawable defaultContent)
             => playfieldContent = new ManiaEditorPlayfieldContent(defaultContent, Playfield, TOOLBOX_EXPANDED_SIZE_RIGHT - TOOLBOX_CONTRACTED_SIZE_RIGHT,
-                // The column controls and the playfield's selection box are both selection-mode concerns; the columns
-                // handle placement and their own notes themselves.
-                () => BlueprintContainer.CurrentTool is SelectTool);
+                // Placement and the playfield's selection box are tool-driven; the columns handle placement and their own
+                // notes themselves.
+                () => BlueprintContainer.CurrentTool is SelectTool,
+                // Column insert/remove is its own mode, owned by the editor's switch rather than by the current tool.
+                () => columnEditState?.ColumnEditMode.Value == true);
 
         private ManiaEditorPlayfieldContent? playfieldContent;
 
@@ -222,6 +228,10 @@ namespace osu.Game.Rulesets.Mania.Edit
                 playfieldContent.ExtensionSelectionTaken += onExtensionSelectionTaken;
 
             EditorBeatmap.SelectedHitObjects.CollectionChanged += onPlayfieldSelectionChanged;
+
+            // Only a composer with extension columns shows the editor's column-edit switch.
+            if (columnEditState != null)
+                columnEditState.Available.Value = true;
         }
 
         private void onExtensionSelectionTaken()
@@ -243,6 +253,9 @@ namespace osu.Game.Rulesets.Mania.Edit
 
             if (EditorBeatmap.IsNotNull())
                 EditorBeatmap.SelectedHitObjects.CollectionChanged -= onPlayfieldSelectionChanged;
+
+            if (columnEditState != null)
+                columnEditState.Available.Value = false;
 
             base.Dispose(isDisposing);
         }

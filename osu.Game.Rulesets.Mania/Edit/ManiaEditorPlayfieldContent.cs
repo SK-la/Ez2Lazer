@@ -51,10 +51,15 @@ namespace osu.Game.Rulesets.Mania.Edit
         /// Screen-space width kept clear on the right for the composer's toolboxes.
         /// </param>
         /// <param name="selectToolActive">
-        /// Whether the composer's selection tool is active. It gates the column insert/remove controls and marks the
-        /// columns' blank space as shared with the playfield's selection box; see <see cref="ExtensionColumnInsertOverlay.Enabled"/>.
+        /// Whether the composer's selection tool is active. It gates placement in the columns and marks the columns'
+        /// blank space as shared with the playfield's selection box.
         /// </param>
-        public ManiaEditorPlayfieldContent(Drawable playfieldContent, ManiaPlayfield playfield, float rightReserve, Func<bool>? selectToolActive = null)
+        /// <param name="columnEditEnabled">
+        /// Whether column-edit mode is on. It gates the columns' insert and remove controls, so they stay hidden until
+        /// the editor's column-edit switch is turned on.
+        /// </param>
+        public ManiaEditorPlayfieldContent(Drawable playfieldContent, ManiaPlayfield playfield, float rightReserve, Func<bool>? selectToolActive = null,
+                                           Func<bool>? columnEditEnabled = null)
         {
             this.playfield = playfield;
             this.rightReserve = rightReserve;
@@ -92,7 +97,7 @@ namespace osu.Game.Rulesets.Mania.Edit
                         },
                         insertOverlay = new ExtensionColumnInsertOverlay(columnSet, extensionArea)
                         {
-                            Enabled = selectToolActive,
+                            Enabled = columnEditEnabled,
                             InsertRequested = index => columnSet.Insert(index),
                             RemoveRequested = requestRemoveColumn,
                         },

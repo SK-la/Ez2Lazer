@@ -38,8 +38,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         /// Whether the controls are available. Missing means always available.
         /// </summary>
         /// <remarks>
-        /// TODO: replace this proxy with a dedicated column-edit toggle in the editor's top-right corner, so the
-        /// controls are reachable without depending on the composer's current tool.
+        /// Bound to the editor's column-edit switch by the owner, so the controls are absent unless column-edit mode is on.
         /// </remarks>
         public Func<bool>? Enabled { get; set; }
 
@@ -97,7 +96,12 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         /// <summary>
         /// Whether one of the controls occupies <paramref name="screenSpacePosition"/>.
         /// </summary>
-        public bool OwnsInputAt(Vector2 screenSpacePosition) => insertButton.Contains(screenSpacePosition) || removeButton.Contains(screenSpacePosition);
+        /// <remarks>
+        /// Hidden controls do not own their position, otherwise they would block the dock's blank space even while
+        /// column-edit mode is off.
+        /// </remarks>
+        public bool OwnsInputAt(Vector2 screenSpacePosition)
+            => (Enabled?.Invoke() ?? true) && (insertButton.Contains(screenSpacePosition) || removeButton.Contains(screenSpacePosition));
 
         protected override void Update()
         {
