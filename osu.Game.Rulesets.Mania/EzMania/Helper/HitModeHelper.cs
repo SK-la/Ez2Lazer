@@ -64,7 +64,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         public (double early, double late) RangeKPR { get; private set; }
         public (double early, double late) RangeBD { get; private set; }
 
-        private EzEnumJudgeMode judgeMode = EzEnumJudgeMode.Classic;
+        private EzEnumJudgeMode judgeMode = EzEnumJudgeMode.Lazer;
 
         public EzEnumJudgeMode JudgeMode
         {
@@ -206,16 +206,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     Range000 = stable.Miss;
                     break;
 
-                case EzEnumJudgeMode.Classic:
-                    double invertedOd = Math.Clamp(10 - OverallDifficulty, 0, 10);
-                    Range305 = Math.Floor(16 * TotalMultiplier) + 0.5;
-                    Range300 = Math.Floor((34 + 3 * invertedOd) * TotalMultiplier) + 0.5;
-                    Range200 = Math.Floor((67 + 3 * invertedOd) * TotalMultiplier) + 0.5;
-                    Range100 = Math.Floor((97 + 3 * invertedOd) * TotalMultiplier) + 0.5;
-                    Range050 = Math.Floor((121 + 3 * invertedOd) * TotalMultiplier) + 0.5;
-                    Range000 = Math.Floor((158 + 3 * invertedOd) * TotalMultiplier) + 0.5;
-                    break;
-
                 case EzEnumJudgeMode.Lazer:
                     Range305 = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, perfect_window_range) * TotalMultiplier) + 0.5;
                     Range300 = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, great_window_range) * TotalMultiplier) + 0.5;
@@ -261,7 +251,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         public HitResult ResultFor(double timeOffset)
         {
-            if (judgeMode is EzEnumJudgeMode.Classic or EzEnumJudgeMode.StableClassic) return ResultForClassic(timeOffset);
+            if (judgeMode == EzEnumJudgeMode.StableClassic) return ResultForClassic(timeOffset);
 
             double absOffset = Math.Abs(timeOffset);
             if (absOffset <= Range305) return HitResult.Perfect;
@@ -336,38 +326,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         #region 分数
 
-        /// <summary>
-        /// Compute LN (long note) tail score given head and tail offsets using this helper's ranges.
-        /// </summary>
-        public double GetClassicLNScore(double head, double tail)
-        {
-            double invertedOd = Math.Clamp(10 - OverallDifficulty, 0, 10);
-            double r305 = Math.Floor(16 * TotalMultiplier) + 0.5;
-            double r300 = Math.Floor((34 + 3 * invertedOd) * TotalMultiplier) + 0.5;
-            double r200 = Math.Floor((67 + 3 * invertedOd) * TotalMultiplier) + 0.5;
-            double r100 = Math.Floor((97 + 3 * invertedOd) * TotalMultiplier) + 0.5;
-            double r050 = Math.Floor((121 + 3 * invertedOd) * TotalMultiplier) + 0.5;
-
-            double combined = head + tail;
-
-            (double range, double headFactor, double combinedFactor, double score)[] rules = new[]
-            {
-                (range: r305, headFactor: 1.2, combinedFactor: 2.4, score: 300.0),
-                (range: r300, headFactor: 1.1, combinedFactor: 2.2, score: 300),
-                (range: r200, headFactor: 1.0, combinedFactor: 2.0, score: 200),
-                (range: r100, headFactor: 1.0, combinedFactor: 2.0, score: 100),
-                (range: r050, headFactor: 1.0, combinedFactor: 2.0, score: 50),
-            };
-
-            foreach (var (range, headFactor, combinedFactor, score) in rules)
-            {
-                if (head < range * headFactor && combined < range * combinedFactor)
-                    return score;
-            }
-
-            return 0;
-        }
-
         private const int score_base = 300;
 
         /// <summary>
@@ -380,9 +338,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 case EzEnumJudgeMode.Lazer:
                     return getLazerBaseScore(result);
 
-                case EzEnumJudgeMode.Classic:
-                // stable 原生 classic 与 mania 私有 Classic 同档位权重：300g / 300 都按 300 计。
-                // 缺此分支会让 stableScoring 之外的 accuracy 分子分母同时为 0（局内恒判 100%）。
                 case EzEnumJudgeMode.StableClassic:
                     return getClassicBaseScore(result);
 
@@ -673,7 +628,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     return valid_results_malody;
 
                 case EzEnumJudgeMode.Lazer:
-                case EzEnumJudgeMode.Classic:
                 default:
                     return valid_results_lazer_classic;
             }

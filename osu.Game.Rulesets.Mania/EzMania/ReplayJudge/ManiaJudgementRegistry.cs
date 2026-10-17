@@ -48,6 +48,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// StableClassic 与 Classic 只借 Ez 的窗口与计分挂钩，单键语义仍是 lazer，故不在此列。
         /// </summary>
         public static bool IsEzJudgeMode(EzEnumJudgeMode judgeMode)
-            => judgeMode is not (EzEnumJudgeMode.Lazer or EzEnumJudgeMode.Classic or EzEnumJudgeMode.StableClassic);
+            => judgeMode is not (EzEnumJudgeMode.Lazer or EzEnumJudgeMode.StableClassic);
     }
 }

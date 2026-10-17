@@ -105,7 +105,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
         /// </remarks>
         private void refreshStableAvailability() => stableAvailable.Value = isStableClassic;
 
-
         /// <summary>
         /// gameplay 入口（Player / 皮肤编辑器预览）冻结当前全局 JudgeMode。
         /// 必须在 <see cref="ScoreProcessor.ApplyBeatmap"/> 之前调用，否则全谱模拟与实际判定权重不一致。
@@ -152,14 +151,14 @@ namespace osu.Game.Rulesets.Mania.Scoring
         /// </summary>
         private void restoreClassicBaseScore(IReadOnlyDictionary<HitResult, int> statistics)
         {
-            int perfect = JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
+            int perfect = JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.StableClassic, HitResult.Perfect);
             int judged = 0;
             long baseScore = 0;
 
             foreach (var (result, count) in statistics)
             {
                 judged += count;
-                baseScore += (long)count * JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, result);
+                baseScore += (long)count * JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.StableClassic, result);
             }
 
             ClassicMaxBaseScore = (double)judged * perfect;
@@ -192,14 +191,14 @@ namespace osu.Game.Rulesets.Mania.Scoring
             if (isStableClassic)
                 return StableManiaScoring.Finalize(stableScoring.TotalScoreDouble);
 
-            if (IsLegacyScore || judgeMode == EzEnumJudgeMode.Classic)
+            if (IsLegacyScore)
             {
                 return 150000 * comboProgress
                        + 850000 * Math.Pow(AccuracyClassic.Value, 2 + 2 * AccuracyClassic.Value) * accuracyProgress
                        + bonusPortion;
             }
 
-            if (judgeMode != EzEnumJudgeMode.Lazer && judgeMode != EzEnumJudgeMode.Classic)
+            if (judgeMode != EzEnumJudgeMode.Lazer)
             {
                 // 满分制：TotalScore = 已获得 ex / 整谱最大 ex，从 0 随判定累积（非已判子集 acc 反算）
                 return 1_000_000 * MinimumAccuracy.Value;
@@ -215,14 +214,14 @@ namespace osu.Game.Rulesets.Mania.Scoring
             if (isStableClassic)
                 return MAX_SCORE * StableManiaScoring.ModMultiplier(Mods.Value);
 
-            if (IsLegacyScore || judgeMode == EzEnumJudgeMode.Classic)
+            if (IsLegacyScore)
             {
                 return 150000 * comboProgress
                        + 850000 * accuracyProgress
                        + bonusPortion;
             }
 
-            if (judgeMode != EzEnumJudgeMode.Lazer && judgeMode != EzEnumJudgeMode.Classic)
+            if (judgeMode != EzEnumJudgeMode.Lazer)
             {
                 var stats = GetScoreProcessorStatistics();
                 double maximumBaseScoreOnChart = MinimumAccuracy.Value > 0 ? stats.BaseScore / MinimumAccuracy.Value : 0;
@@ -324,38 +323,10 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         protected override void ApplyScoreChange(JudgementResult judgement)
         {
-            if (isStableClassic)
-            {
-                applyStableClassicScoreChange(judgement, judgement.ComboAtJudgement);
-                UpdateScoreClassic();
+            if (!isStableClassic)
                 return;
-            }
 
-            var hitWindows = new JudgeModeHelper(EzEnumJudgeMode.Classic)
-            {
-                OverallDifficulty = calOD
-            };
-            double offset = Math.Abs(judgement.TimeOffset);
-            var result = hitWindows.ResultForClassic(offset);
-            var hitObject = (ManiaHitObject)judgement.HitObject;
-
-            if (hitObject is HeadNote)
-            {
-                headOffsets[hitObject.Column] = offset;
-            }
-            else if (hitObject is TailNote)
-            {
-                ClassicMaxBaseScore += JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
-                ClassicBaseScore += hitWindows.GetClassicLNScore(headOffsets[hitObject.Column], offset);
-
-                headOffsets[hitObject.Column] = 0;
-            }
-            else if (hitObject is Note)
-            {
-                ClassicMaxBaseScore += JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
-                ClassicBaseScore += JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, result);
-            }
-
+            applyStableClassicScoreChange(judgement, judgement.ComboAtJudgement);
             UpdateScoreClassic();
         }
 
@@ -380,42 +351,12 @@ namespace osu.Game.Rulesets.Mania.Scoring
             stableScoring.Apply(StableClassicJudgeModeJudgement.FromHitResult(judgement.Type), comboAtJudgement);
         }
 
-        private readonly double[] headOffsets = new double[18];
-
         protected override void RemoveScoreChange(JudgementResult judgement)
         {
-            if (isStableClassic)
-            {
-                removeStableClassicScoreChange(judgement);
-                UpdateScoreClassic();
+            if (!isStableClassic)
                 return;
-            }
 
-            var hitWindows = new JudgeModeHelper(EzEnumJudgeMode.Classic)
-            {
-                OverallDifficulty = calOD
-            };
-            double offset = Math.Abs(judgement.TimeOffset);
-            var result = hitWindows.ResultForClassic(offset);
-            var hitObject = (ManiaHitObject)judgement.HitObject;
-
-            if (hitObject is HeadNote)
-            {
-                headOffsets[hitObject.Column] = offset;
-            }
-            else if (hitObject is TailNote)
-            {
-                ClassicMaxBaseScore -= JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
-                ClassicBaseScore -= hitWindows.GetClassicLNScore(headOffsets[hitObject.Column], offset);
-
-                headOffsets[hitObject.Column] = 0;
-            }
-            else if (hitObject is Note)
-            {
-                ClassicMaxBaseScore -= JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
-                ClassicBaseScore -= JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, result);
-            }
-
+            removeStableClassicScoreChange(judgement);
             UpdateScoreClassic();
         }
 

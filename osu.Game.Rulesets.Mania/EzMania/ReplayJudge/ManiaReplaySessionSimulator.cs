@@ -1603,7 +1603,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         private static bool usesTailReleaseLenience(EzEnumJudgeMode judgeMode)
-            => judgeMode is EzEnumJudgeMode.Lazer or EzEnumJudgeMode.Classic or EzEnumJudgeMode.StableClassic;
+            => judgeMode is EzEnumJudgeMode.Lazer or EzEnumJudgeMode.StableClassic;
 
         private static double resolveSimulationBpm(IBeatmap beatmap, double time, EzEnumJudgeMode judgeMode)
         {

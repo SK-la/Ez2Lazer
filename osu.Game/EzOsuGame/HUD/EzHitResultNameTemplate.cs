@@ -39,7 +39,6 @@ namespace osu.Game.EzOsuGame.HUD
                     return getMalodyName(result);
 
                 case EzEnumJudgeMode.Lazer:
-                case EzEnumJudgeMode.Classic:
                 default:
                     return getLazerName(result);
             }

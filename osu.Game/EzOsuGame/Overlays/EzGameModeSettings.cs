@@ -69,7 +69,7 @@ namespace osu.Game.EzOsuGame.Overlays
                     Caption = EzSettingsStrings.HIT_MODE,
                     HintText = EzSettingsStrings.HIT_MODE_TOOLTIP,
                     Current = maniaJudgeModeBindable,
-                    // StableClassic 是共享的 stable 原生 classic；Classic 是 mania 私有的 Ez classic。
+                    // StableClassic 是共享的 stable 原生 classic。
                     Items = Enum.GetValues<EzEnumJudgeMode>(),
                 })
                 {
