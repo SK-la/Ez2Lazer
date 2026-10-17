@@ -17,6 +17,7 @@ using osu.Game.EzOsuGame.Edit;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.Edit;
 using osu.Game.Rulesets.Edit.Tools;
+using osu.Game.Rulesets.Mania.Edit.Extension;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
@@ -41,6 +42,11 @@ namespace osu.Game.Rulesets.Mania.Edit
 
         [Resolved(CanBeNull = true)]
         private EzEditorColumnEditState? columnEditState { get; set; }
+
+        [Resolved(CanBeNull = true)]
+        private IEditorChangeHandler? changeHandler { get; set; }
+
+        private ExtensionColumnSetStateContributor? extensionStateContributor;
 
         public ManiaHitObjectComposer(Ruleset ruleset)
             : base(ruleset)
@@ -229,6 +235,14 @@ namespace osu.Game.Rulesets.Mania.Edit
 
             EditorBeatmap.SelectedHitObjects.CollectionChanged += onPlayfieldSelectionChanged;
 
+            // The columns live outside the encoded beatmap, so they contribute their own block to the shared snapshots
+            // and every undo step restores both regions together.
+            if (changeHandler is EditorChangeHandler handler && playfieldContent != null)
+            {
+                extensionStateContributor = new ExtensionColumnSetStateContributor(playfieldContent.ColumnSet);
+                handler.AddContributor(extensionStateContributor);
+            }
+
             // Only a composer with extension columns shows the editor's column-edit switch.
             if (columnEditState != null)
                 columnEditState.Available.Value = true;
@@ -248,6 +262,9 @@ namespace osu.Game.Rulesets.Mania.Edit
 
         protected override void Dispose(bool isDisposing)
         {
+            if (extensionStateContributor != null && changeHandler is EditorChangeHandler handler)
+                handler.RemoveContributor(extensionStateContributor);
+
             if (playfieldContent.IsNotNull())
                 playfieldContent.ExtensionSelectionTaken -= onExtensionSelectionTaken;
 

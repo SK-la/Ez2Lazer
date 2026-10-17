@@ -34,6 +34,11 @@ namespace osu.Game.Rulesets.Mania.Edit
 
         private readonly ExtensionColumnSet columnSet = new ExtensionColumnSet();
 
+        /// <summary>
+        /// The columns this content hosts. Their notes are session state, contributing their own block to undo snapshots.
+        /// </summary>
+        internal ExtensionColumnSet ColumnSet => columnSet;
+
         private readonly ManiaPlayfield playfield;
         private readonly float rightReserve;
         private readonly Func<bool>? selectToolActive;
