@@ -2,15 +2,14 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Rulesets.Mania.UI.Components;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Edit.Extension
@@ -31,13 +30,16 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
         private readonly ExtensionArea area;
 
-        private readonly Container noteArea;
-        private readonly ExtensionNoteLayer noteLayer;
         private readonly IconButton selectAllButton;
 
         private readonly Box background;
         private readonly Box mainAudioStrip;
         private readonly OsuSpriteText numberLabel;
+
+        /// <summary>
+        /// The scrolling surface this column's notes are drawn on.
+        /// </summary>
+        public readonly ExtensionLane Lane;
 
         public DrawableExtensionColumn(ExtensionColumn column, ExtensionArea area)
         {
@@ -59,11 +61,12 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
                     Height = 3,
                     Colour = Colour4.CornflowerBlue,
                 },
-                noteArea = new Container
+                // Same padding as a playfield column applies around its hit objects, so both regions share the hit line
+                // and the same usable height without measuring each other.
+                new HitPositionPaddedContainer
                 {
-                    RelativeSizeAxes = Axes.X,
-                    Masking = true,
-                    Child = noteLayer = new ExtensionNoteLayer(column, area),
+                    RelativeSizeAxes = Axes.Both,
+                    Child = Lane = new ExtensionLane(column, area),
                 },
                 numberLabel = new OsuSpriteText
                 {
@@ -87,34 +90,6 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
             column.Number.BindValueChanged(_ => updateNumber(), true);
         }
 
-        protected override void Update()
-        {
-            base.Update();
-
-            // The note area copies the playfield container's geometry, so that the column's notes are laid out by the very
-            // same scroll mapping as the playable ones (the layers map time through that container).
-            var container = area.ReferenceColumn?.HitObjectContainer;
-
-            if (container == null)
-            {
-                noteArea.Height = 0;
-                return;
-            }
-
-            var quad = container.ScreenSpaceDrawQuad.AABBFloat;
-
-            if (quad.Height <= 0)
-            {
-                noteArea.Height = 0;
-                return;
-            }
-
-            float top = ToLocalSpace(new Vector2(quad.Centre.X, quad.Top)).Y;
-
-            noteArea.Y = top;
-            noteArea.Height = ToLocalSpace(new Vector2(quad.Centre.X, quad.Bottom)).Y - top;
-        }
-
         private void updateNumber()
         {
             bool isMainAudio = Column.Number.Value == ExtensionColumnSet.MAIN_AUDIO_TRACK_NUMBER;
@@ -128,12 +103,12 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         /// <summary>
         /// The note rendered under <paramref name="screenSpacePosition"/>, if any.
         /// </summary>
-        public ExtensionNote? NoteAt(Vector2 screenSpacePosition) => noteLayer.NoteAt(screenSpacePosition);
+        public ExtensionNote? NoteAt(Vector2 screenSpacePosition) => Lane.NoteAt(screenSpacePosition);
 
         /// <summary>
-        /// Selects the notes the given box covers, deselecting the rest unless they are preserved.
+        /// The time under <paramref name="screenSpacePosition"/>, or <c>null</c> before the column is laid out.
         /// </summary>
-        public void UpdateBoxSelection(Quad selectionQuad, HashSet<ExtensionNote>? preserve) => noteLayer.UpdateBoxSelection(selectionQuad, preserve);
+        public double? TimeAt(Vector2 screenSpacePosition) => Lane.TimeAt(screenSpacePosition);
 
         /// <summary>
         /// Whether <paramref name="screenSpacePosition"/> is over a control of this column rather than its note area.

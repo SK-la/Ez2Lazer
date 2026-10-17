@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Primitives;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Localization;
@@ -16,6 +15,8 @@ using osu.Game.Overlays.Dialog;
 using osu.Game.Rulesets.Mania.Edit.Extension;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.UI;
+using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Screens.Edit;
 using osuTK;
 using osuTK.Input;
 
@@ -32,14 +33,18 @@ namespace osu.Game.Rulesets.Mania.Edit
     {
         private const float dock_gap = 8;
 
-        private readonly ExtensionColumnSet columnSet = new ExtensionColumnSet();
-
         /// <summary>
         /// The columns this content hosts. Their notes are session state, contributing their own block to undo snapshots.
         /// </summary>
-        internal ExtensionColumnSet ColumnSet => columnSet;
+        internal ExtensionColumnSet ColumnSet { get; } = new ExtensionColumnSet();
+
+        /// <summary>
+        /// The dock's interaction overlay, which owns placement and selection of extension notes.
+        /// </summary>
+        internal ExtensionBlueprintContainer ExtensionOverlay { get; }
 
         private readonly ManiaPlayfield playfield;
+        private readonly IScrollingInfo scrollingInfo;
         private readonly float rightReserve;
         private readonly Func<bool>? selectToolActive;
 
@@ -53,30 +58,41 @@ namespace osu.Game.Rulesets.Mania.Edit
         [Resolved(CanBeNull = true)]
         private IDialogOverlay? dialogOverlay { get; set; }
 
+        [Resolved(CanBeNull = true)]
+        private IEditorChangeHandler? changeHandler { get; set; }
+
         /// <param name="rightReserve">
         /// Screen-space width kept clear on the right for the composer's toolboxes.
         /// </param>
+        /// <param name="scrollingInfo">
+        /// The editor ruleset's scroll mapping. The dock sits beside the ruleset rather than inside it, so the mapping is
+        /// re-provided here for the columns to use.
+        /// </param>
         /// <param name="selectToolActive">
-        /// Whether the composer's selection tool is active. It gates placement in the columns and marks the columns'
-        /// blank space as shared with the playfield's selection box.
+        /// Whether the composer's selection tool is active. It gates placement in the columns.
         /// </param>
         /// <param name="columnEditEnabled">
         /// Whether column-edit mode is on. It gates the columns' insert and remove controls, so they stay hidden until
         /// the editor's column-edit switch is turned on.
         /// </param>
-        public ManiaEditorPlayfieldContent(Drawable playfieldContent, ManiaPlayfield playfield, float rightReserve, Func<bool>? selectToolActive = null,
-                                           Func<bool>? columnEditEnabled = null)
+        public ManiaEditorPlayfieldContent(Drawable playfieldContent, ManiaPlayfield playfield, IScrollingInfo scrollingInfo, float rightReserve,
+                                           Func<bool>? selectToolActive = null, Func<bool>? columnEditEnabled = null)
         {
             this.playfield = playfield;
+            this.scrollingInfo = scrollingInfo;
             this.rightReserve = rightReserve;
             this.selectToolActive = selectToolActive;
 
             RelativeSizeAxes = Axes.Both;
 
-            extensionArea = new ExtensionArea(columnSet, playfield)
+            extensionArea = new ExtensionArea(ColumnSet)
             {
                 PlacementEnabled = () => !(selectToolActive?.Invoke() ?? false),
-                SelectionTaken = () => ExtensionSelectionTaken?.Invoke(),
+            };
+
+            ExtensionOverlay = new ExtensionBlueprintContainer(ColumnSet, extensionArea, playfield)
+            {
+                OwnsInputAt = ownsExtensionInput,
             };
 
             InternalChildren = new Drawable[]
@@ -96,20 +112,23 @@ namespace osu.Game.Rulesets.Mania.Edit
                             RelativeSizeAxes = Axes.Both,
                             Child = extensionArea,
                         },
-                        new ExtensionEditArea(columnSet, extensionArea, playfield)
-                        {
-                            RelativeSizeAxes = Axes.Both,
-                            ExcludePosition = position => dockScrollContainer.IsOnScrollbar(position) || extensionArea.IsOnControl(position),
-                        },
-                        insertOverlay = new ExtensionColumnInsertOverlay(columnSet, extensionArea)
+                        ExtensionOverlay,
+                        insertOverlay = new ExtensionColumnInsertOverlay(ColumnSet, extensionArea)
                         {
                             Enabled = columnEditEnabled,
-                            InsertRequested = index => columnSet.Insert(index),
+                            InsertRequested = requestInsertColumn,
                             RemoveRequested = requestRemoveColumn,
                         },
                     },
                 },
             };
+        }
+
+        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
+        {
+            var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
+            dependencies.CacheAs<IScrollingInfo>(scrollingInfo);
+            return dependencies;
         }
 
         protected override void Update()
@@ -127,82 +146,58 @@ namespace osu.Game.Rulesets.Mania.Edit
         }
 
         /// <summary>
+        /// The snapped time under the cursor while the columns accept placement, or <c>null</c>.
+        /// </summary>
+        internal double? PlacementHoverTime => extensionArea.PlacementHoverTime;
+
+        /// <summary>
+        /// The scrolling surfaces of the currently displayed columns.
+        /// </summary>
+        internal IEnumerable<ExtensionLane> ExtensionLanes => extensionArea.Lanes;
+
+        /// <summary>
+        /// Raised when a column's scrolling surface becomes available.
+        /// </summary>
+        internal event Action<ExtensionLane>? ExtensionLaneAdded
+        {
+            add => extensionArea.LaneAdded += value;
+            remove => extensionArea.LaneAdded -= value;
+        }
+
+        /// <summary>
+        /// Raised when a column's scrolling surface is about to be dropped.
+        /// </summary>
+        internal event Action<ExtensionLane>? ExtensionLaneRemoved
+        {
+            add => extensionArea.LaneRemoved += value;
+            remove => extensionArea.LaneRemoved -= value;
+        }
+
+        /// <summary>
         /// Whether <paramref name="screenSpacePosition"/> lies inside the extension column dock.
         /// </summary>
         public bool ContainsExtensionColumns(Vector2 screenSpacePosition) => dockRegion.Contains(screenSpacePosition);
 
         /// <summary>
-        /// Raised when the extension columns take a selection, so the playfield's can be dropped.
+        /// Whether the dock's interaction overlay should claim <paramref name="screenSpacePosition"/>.
         /// </summary>
         /// <remarks>
-        /// The two regions keep a single selection between them; see <see cref="ExtensionArea.SelectionTaken"/>.
+        /// The single place where dock input is split between interaction, the column controls and the dock's scrollbar.
+        /// The playfield's container asks the same question, so only one region ever answers for a position.
         /// </remarks>
-        public event Action? ExtensionSelectionTaken;
-
-        /// <summary>
-        /// Whether a selection box starting at <paramref name="screenSpacePosition"/> belongs to the extension columns.
-        /// </summary>
-        /// <returns>
-        /// <c>null</c> when the position is not over the dock at all and the caller's own answer applies.
-        /// </returns>
-        /// <remarks>
-        /// The columns keep their notes and their own controls, and a placement tool owns the whole dock; what the
-        /// playfield shares is the dock's blank space, so that a selection box may start there.
-        /// </remarks>
-        public bool? SelectionBoxStartsInExtensionColumns(Vector2 screenSpacePosition)
+        private bool ownsExtensionInput(Vector2 screenSpacePosition)
         {
             if (!dockRegion.Contains(screenSpacePosition))
-                return null;
-
-            if (extensionArea.OwnsNoteAt(screenSpacePosition)
-                || extensionArea.IsOnControl(screenSpacePosition)
-                || insertOverlay.OwnsInputAt(screenSpacePosition)
-                || dockScrollContainer.IsOnScrollbar(screenSpacePosition))
                 return false;
 
-            return selectToolActive?.Invoke() ?? false;
+            if (extensionArea.IsOnControl(screenSpacePosition))
+                return false;
+
+            if (insertOverlay.OwnsInputAt(screenSpacePosition))
+                return false;
+
+            return !dockScrollContainer.IsOnScrollbar(screenSpacePosition);
         }
-
-        /// <summary>
-        /// The notes currently selected across the extension columns.
-        /// </summary>
-        public IReadOnlyCollection<ExtensionNote> SelectedExtensionNotes => extensionArea.SelectedNotes;
-
-        /// <summary>
-        /// Sets the time range whose beat lines the extension columns should show, or <c>null</c> to follow the cursor.
-        /// </summary>
-        public (double start, double end)? SelectionTimeRange
-        {
-            set => extensionArea.SelectionTimeRange = value;
-        }
-
-        /// <summary>
-        /// The screen-space horizontal extent of the extension columns, used to widen their selection box.
-        /// </summary>
-        public (float left, float right)? ExtensionColumnsScreenSpaceBounds => extensionArea.ColumnScreenSpaceBounds;
-
-        /// <summary>
-        /// Clears the extension column selection.
-        /// </summary>
-        public void ClearExtensionSelection() => extensionArea.ClearSelection();
-
-        /// <summary>
-        /// Selects every note across the extension columns.
-        /// </summary>
-        public void SelectAllExtensionNotes() => extensionArea.SelectAllNotes();
-
-        /// <summary>
-        /// Removes the notes currently selected across the extension columns.
-        /// </summary>
-        /// <returns>Whether any note was removed.</returns>
-        public bool DeleteExtensionSelection() => extensionArea.RemoveSelected() > 0;
-
-        /// <summary>
-        /// Applies a selection box to the extension notes, deselecting the rest.
-        /// </summary>
-        /// <param name="selectionQuad">The box's screen-space rectangle.</param>
-        /// <param name="preserve">Notes which were already selected when the drag started, kept regardless of the box.</param>
-        public void UpdateExtensionSelection(Quad selectionQuad, HashSet<ExtensionNote>? preserve) => extensionArea.UpdateBoxSelection(selectionQuad, preserve);
 
         /// <summary>
         /// Hands <paramref name="hitObjects"/> over to the extension columns, dropping them on the column under
@@ -221,9 +216,16 @@ namespace osu.Game.Rulesets.Mania.Edit
                 return false;
 
             foreach (var hitObject in hitObjects)
-                columnSet.Add(column.Column, ExtensionNoteConversion.ToExtensionNote(hitObject));
+                ColumnSet.Add(column.Column, ExtensionNoteConversion.ToExtensionNote(hitObject));
 
             return true;
+        }
+
+        private void requestInsertColumn(int index)
+        {
+            changeHandler?.BeginChange();
+            ColumnSet.Insert(index);
+            changeHandler?.EndChange();
         }
 
         /// <summary>
@@ -233,13 +235,20 @@ namespace osu.Game.Rulesets.Mania.Edit
         {
             if (column.Notes.Count == 0 || dialogOverlay == null)
             {
-                columnSet.Remove(column);
+                removeColumn(column);
                 return;
             }
 
             dialogOverlay.Push(new ConfirmDialog(
                 LocalisableString.Format(EzEditorStrings.EXTENSION_COLUMN_REMOVE_WITH_NOTES, column.Number.Value, column.Notes.Count),
-                () => columnSet.Remove(column)));
+                () => removeColumn(column)));
+        }
+
+        private void removeColumn(ExtensionColumn column)
+        {
+            changeHandler?.BeginChange();
+            ColumnSet.Remove(column);
+            changeHandler?.EndChange();
         }
 
         /// <summary>

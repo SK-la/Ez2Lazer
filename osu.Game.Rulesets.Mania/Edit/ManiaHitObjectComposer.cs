@@ -21,7 +21,6 @@ using osu.Game.Rulesets.Mania.Edit.Extension;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Edit;
@@ -94,36 +93,34 @@ namespace osu.Game.Rulesets.Mania.Edit
         private ManiaBeatSnapGrid? beatSnapGrid;
 
         protected override Drawable CreatePlayfieldContentRoot(Drawable defaultContent)
-            => playfieldContent = new ManiaEditorPlayfieldContent(defaultContent, Playfield, TOOLBOX_EXPANDED_SIZE_RIGHT - TOOLBOX_CONTRACTED_SIZE_RIGHT,
+            => PlayfieldContent = new ManiaEditorPlayfieldContent(defaultContent, Playfield, ScrollingInfo, TOOLBOX_EXPANDED_SIZE_RIGHT - TOOLBOX_CONTRACTED_SIZE_RIGHT,
                 // Placement and the playfield's selection box are tool-driven; the columns handle placement and their own
                 // notes themselves.
                 () => BlueprintContainer.CurrentTool is SelectTool,
                 // Column insert/remove is its own mode, owned by the editor's switch rather than by the current tool.
                 () => columnEditState?.ColumnEditMode.Value == true);
 
-        private ManiaEditorPlayfieldContent? playfieldContent;
-
         /// <summary>
         /// The playfield content root, which also hosts the extension columns.
         /// </summary>
-        internal ManiaEditorPlayfieldContent? PlayfieldContent => playfieldContent;
+        internal ManiaEditorPlayfieldContent? PlayfieldContent { get; private set; }
 
         /// <summary>
         /// Hands the current selection over to the extension columns, when a completed drag ended on them.
         /// </summary>
         /// <returns>Whether the objects were moved out of the playfield.</returns>
         /// <remarks>
-        /// The removal joins the ongoing drag transaction, so editor undo brings the notes back to the playfield.
-        /// The extension notes created here are session state without history yet, so undo does not discard them again.
+        /// The removal joins the ongoing drag transaction, so editor undo brings the notes back to the playfield and takes
+        /// the extension notes out again, because the dock's state is part of the same snapshot.
         /// </remarks>
         internal bool TryDropSelectionIntoExtensionColumns(Vector2 screenSpacePosition)
         {
-            if (playfieldContent == null || !playfieldContent.ContainsExtensionColumns(screenSpacePosition))
+            if (PlayfieldContent == null || !PlayfieldContent.ContainsExtensionColumns(screenSpacePosition))
                 return false;
 
             var dropped = EditorBeatmap.SelectedHitObjects.OfType<ManiaHitObject>().ToArray();
 
-            if (dropped.Length == 0 || !playfieldContent.DropIntoExtensionColumns(dropped, screenSpacePosition))
+            if (dropped.Length == 0 || !PlayfieldContent.DropIntoExtensionColumns(dropped, screenSpacePosition))
                 return false;
 
             foreach (var hitObject in dropped)
@@ -186,42 +183,44 @@ namespace osu.Game.Rulesets.Mania.Edit
         {
             base.UpdateAfterChildren();
 
-            // The columns' beat lines mirror the playfield's, so a selection on either side lights up both.
-            var range = activeSelectionTimeRange();
+            // The base class owns the grid's range for the playfield. The dock's contribution is pushed through a separate
+            // slot, because writing the same property from here would be overwritten by the base class earlier in the next
+            // frame, clearing the lines before they are ever drawn.
+            if (beatSnapGrid != null)
+                beatSnapGrid.OverrideTimeRange = extensionTimeRange();
 
-            if (playfieldContent != null)
-                playfieldContent.SelectionTimeRange = range;
-
-            if (range is not null && beatSnapGrid != null)
-                beatSnapGrid.SelectionTimeRange = range;
+            // Leaving the selection tool drops the dock's selection, matching the playfield's own selection behaviour.
+            if (PlayfieldContent != null && BlueprintContainer.CurrentTool is not SelectTool)
+                PlayfieldContent.ExtensionOverlay.ClearSelection();
         }
 
         /// <summary>
-        /// The time range currently selected, across the playfield and the extension columns.
+        /// The time range the dock wants the snap grid to highlight: its selection, or the hover time while it accepts
+        /// placement.
         /// </summary>
-        /// <remarks>
-        /// The two regions never hold a selection at the same time, so the playfield's wins whenever it is non-empty.
-        /// </remarks>
-        private (double start, double end)? activeSelectionTimeRange()
+        private (double start, double end)? extensionTimeRange()
         {
-            if (EditorBeatmap.SelectedHitObjects.Count > 0)
-                return (EditorBeatmap.SelectedHitObjects.Min(h => h.StartTime), EditorBeatmap.SelectedHitObjects.Max(h => h.GetEndTime()));
+            var notes = PlayfieldContent?.ExtensionOverlay.SelectedNotes;
 
-            var notes = playfieldContent?.SelectedExtensionNotes;
-
-            if (notes is not { Count: > 0 })
-                return null;
-
-            double start = double.MaxValue;
-            double end = double.MinValue;
-
-            foreach (var note in notes)
+            if (notes is { Count: > 0 })
             {
-                start = Math.Min(start, note.Time);
-                end = Math.Max(end, note.Time + note.Duration);
+                double start = double.MaxValue;
+                double end = double.MinValue;
+
+                foreach (var note in notes)
+                {
+                    start = Math.Min(start, note.Time);
+                    end = Math.Max(end, note.Time + note.Duration);
+                }
+
+                return (start, end);
             }
 
-            return (start, end);
+            // Mirrors the playfield, where the hover line follows the snapped time under the cursor while placing.
+            if (PlayfieldContent?.PlacementHoverTime is double hover)
+                return (hover, hover);
+
+            return null;
         }
 
         protected override void LoadComplete()
@@ -230,26 +229,39 @@ namespace osu.Game.Rulesets.Mania.Edit
 
             // Selection belongs to one region at a time. The columns report when they take it; the playfield is
             // observed through its own selection list, which also covers selections made without a click on it.
-            if (playfieldContent != null)
-                playfieldContent.ExtensionSelectionTaken += onExtensionSelectionTaken;
+            if (PlayfieldContent != null)
+                PlayfieldContent.ExtensionOverlay.SelectionChanged += onExtensionSelectionChanged;
 
             EditorBeatmap.SelectedHitObjects.CollectionChanged += onPlayfieldSelectionChanged;
 
             // The columns live outside the encoded beatmap, so they contribute their own block to the shared snapshots
             // and every undo step restores both regions together.
-            if (changeHandler is EditorChangeHandler handler && playfieldContent != null)
+            if (changeHandler is EditorChangeHandler handler && PlayfieldContent != null)
             {
-                extensionStateContributor = new ExtensionColumnSetStateContributor(playfieldContent.ColumnSet);
+                extensionStateContributor = new ExtensionColumnSetStateContributor(PlayfieldContent.ColumnSet);
                 handler.AddContributor(extensionStateContributor);
             }
 
+            if (PlayfieldContent != null && beatSnapGrid != null)
+            {
+                foreach (var lane in PlayfieldContent.ExtensionLanes)
+                    beatSnapGrid.AddTarget(lane.LineContainer);
+
+                // Columns appear and disappear while the editor is open, so the grid follows them instead of being
+                // rebuilt or enumerated once.
+                PlayfieldContent.ExtensionLaneAdded += lane => beatSnapGrid?.AddTarget(lane.LineContainer);
+                PlayfieldContent.ExtensionLaneRemoved += lane => beatSnapGrid?.RemoveTarget(lane.LineContainer);
+            }
+
             // Only a composer with extension columns shows the editor's column-edit switch.
-            if (columnEditState != null)
-                columnEditState.Available.Value = true;
+            columnEditState?.Available.Value = true;
         }
 
-        private void onExtensionSelectionTaken()
+        private void onExtensionSelectionChanged()
         {
+            if (PlayfieldContent?.ExtensionOverlay.HasSelection != true)
+                return;
+
             SetSelectTool();
             EditorBeatmap.SelectedHitObjects.Clear();
         }
@@ -257,7 +269,7 @@ namespace osu.Game.Rulesets.Mania.Edit
         private void onPlayfieldSelectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             if (EditorBeatmap.SelectedHitObjects.Count > 0)
-                playfieldContent?.ClearExtensionSelection();
+                PlayfieldContent?.ExtensionOverlay.ClearSelection();
         }
 
         protected override void Dispose(bool isDisposing)
@@ -265,14 +277,13 @@ namespace osu.Game.Rulesets.Mania.Edit
             if (extensionStateContributor != null && changeHandler is EditorChangeHandler handler)
                 handler.RemoveContributor(extensionStateContributor);
 
-            if (playfieldContent.IsNotNull())
-                playfieldContent.ExtensionSelectionTaken -= onExtensionSelectionTaken;
+            if (PlayfieldContent.IsNotNull())
+                PlayfieldContent.ExtensionOverlay.SelectionChanged -= onExtensionSelectionChanged;
 
             if (EditorBeatmap.IsNotNull())
                 EditorBeatmap.SelectedHitObjects.CollectionChanged -= onPlayfieldSelectionChanged;
 
-            if (columnEditState != null)
-                columnEditState.Available.Value = false;
+            columnEditState?.Available.Value = false;
 
             base.Dispose(isDisposing);
         }

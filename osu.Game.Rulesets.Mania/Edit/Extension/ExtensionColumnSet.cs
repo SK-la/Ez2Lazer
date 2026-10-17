@@ -1,9 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Bindables;
 
 namespace osu.Game.Rulesets.Mania.Edit.Extension
@@ -53,7 +50,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
                 return null;
 
             var column = new ExtensionColumn(index + 1);
-            Columns.Insert(Math.Clamp(index, 0, Columns.Count), column);
+            Columns.Insert(System.Math.Clamp(index, 0, Columns.Count), column);
 
             return column;
         }
@@ -111,72 +108,6 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
             target.Notes.Add(note);
 
             return true;
-        }
-
-        /// <summary>
-        /// Notes currently marked as selected, across all columns.
-        /// </summary>
-        public IEnumerable<ExtensionNote> SelectedNotes
-        {
-            get
-            {
-                foreach (var column in Columns)
-                {
-                    foreach (var note in column.Notes)
-                    {
-                        if (note.Selected.Value)
-                            yield return note;
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Clears the selection.
-        /// </summary>
-        public void ClearSelection()
-        {
-            foreach (var note in SelectedNotes)
-                note.Selected.Value = false;
-        }
-
-        /// <summary>
-        /// Replaces the selection with every note across all columns.
-        /// </summary>
-        public void SelectAll()
-        {
-            ClearSelection();
-
-            foreach (var column in Columns)
-            {
-                foreach (var note in column.Notes)
-                    note.Selected.Value = true;
-            }
-        }
-
-        /// <summary>
-        /// Replaces the selection with every note of <paramref name="column"/>.
-        /// </summary>
-        public void SelectAll(ExtensionColumn column)
-        {
-            ClearSelection();
-
-            foreach (var note in column.Notes)
-                note.Selected.Value = true;
-        }
-
-        /// <summary>
-        /// Removes every selected note.
-        /// </summary>
-        /// <returns>The number of notes removed.</returns>
-        public int RemoveSelected()
-        {
-            var notes = SelectedNotes.ToArray();
-
-            foreach (var note in notes)
-                RemoveNote(note);
-
-            return notes.Length;
         }
 
         private void renumber()
