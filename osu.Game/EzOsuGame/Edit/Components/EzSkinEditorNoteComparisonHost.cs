@@ -14,6 +14,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 {
     /// <summary>
     /// Shared live vs snapshot note comparison for Note and Size scenes. Each side shows Note and LN together.
+    /// Panes are reused across refresh so a single setting change only touches the drawables it actually has to.
     /// </summary>
     public partial class EzSkinEditorNoteComparisonHost : Container
     {
@@ -88,7 +89,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (source == null)
             {
-                liveContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_NOTE_PREVIEW_NOT_AVAILABLE);
+                showPlaceholder(liveContainer, EzEditorStrings.PLACEHOLDER_NOTE_PREVIEW_NOT_AVAILABLE);
                 livePane = null;
                 return;
             }
@@ -97,12 +98,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (profile == null)
             {
-                liveContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_NOTE_RULESET_NOT_SUPPORTED);
+                showPlaceholder(liveContainer, EzEditorStrings.PLACEHOLDER_NOTE_RULESET_NOT_SUPPORTED);
                 livePane = null;
                 return;
             }
 
-            livePane = attachPane(liveContainer);
+            livePane = getOrCreatePane(liveContainer, livePane);
             livePane.Apply(context.EditorSkin, profile, source.GetLiveRequest);
         }
 
@@ -112,7 +113,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (source == null)
             {
-                snapshotContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_NOTE_PREVIEW_NOT_AVAILABLE);
+                showPlaceholder(snapshotContainer, EzEditorStrings.PLACEHOLDER_NOTE_PREVIEW_NOT_AVAILABLE);
                 snapshotPane = null;
                 return;
             }
@@ -121,12 +122,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (profile == null)
             {
-                snapshotContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_NOTE_RULESET_NOT_SUPPORTED);
+                showPlaceholder(snapshotContainer, EzEditorStrings.PLACEHOLDER_NOTE_RULESET_NOT_SUPPORTED);
                 snapshotPane = null;
                 return;
             }
 
-            snapshotPane = attachPane(snapshotContainer);
+            snapshotPane = getOrCreatePane(snapshotContainer, snapshotPane);
             snapshotPane.Apply(context.EditorSkin, profile, source.GetSnapshotRequest);
         }
 
@@ -143,11 +144,22 @@ namespace osu.Game.EzOsuGame.Edit.Components
             livePane.Apply(context.EditorSkin, profile, context.NoteComparisonSource.GetLiveRequest);
         }
 
-        private static EzSkinEditorNoteComparisonPane attachPane(Container container)
+        private static EzSkinEditorNoteComparisonPane getOrCreatePane(Container container, EzSkinEditorNoteComparisonPane? current)
         {
+            if (current != null && container.Child == current)
+                return current;
+
             var pane = new EzSkinEditorNoteComparisonPane();
             container.Child = pane;
             return pane;
+        }
+
+        private static void showPlaceholder(Container container, LocalisableString text)
+        {
+            if (container.Child is OsuSpriteText sprite && sprite.Text.Equals(text))
+                return;
+
+            container.Child = createPlaceholder(text);
         }
 
         private static OsuSpriteText createPlaceholder(LocalisableString text) => new OsuSpriteText

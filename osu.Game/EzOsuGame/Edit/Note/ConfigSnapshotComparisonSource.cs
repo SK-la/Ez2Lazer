@@ -34,6 +34,6 @@ namespace osu.Game.EzOsuGame.Edit.Note
             EzSkinEditorNotePreviewRequestFactory.FromConfig(config, useEzNoteVariants, compareKind, variantId, ruleset);
 
         public EzSkinEditorNotePreviewRequest GetSnapshotRequest(EzSkinEditorNoteCompareKind compareKind) =>
-            EzSkinEditorNotePreviewRequestFactory.FromDocument(snapshot.Document, config, useEzNoteVariants, compareKind, variantId, ruleset);
+            EzSkinEditorNotePreviewRequestFactory.FromSnapshot(snapshot, useEzNoteVariants, compareKind, variantId, ruleset);
     }
 }

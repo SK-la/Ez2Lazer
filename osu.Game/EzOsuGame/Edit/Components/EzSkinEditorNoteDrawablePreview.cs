@@ -94,7 +94,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
             foreach (var edge in hitboxBorderEdges)
                 edge.Colour = request.NoteColour;
 
-            string drawableKey = $"{request.CompareKind}:{request.UseEzNoteVariants}:{request.VariantId}:{request.Part}:{request.Width:F2}:{request.Height:F2}";
+            // Skin type and ruleset participate in the key so a reused pane still rebuilds when the source changes,
+            // while width/height changes only invalidate the side whose values actually moved.
+            string drawableKey = $"{request.CompareKind}:{request.UseEzNoteVariants}:{request.VariantId}:{request.Part}:{request.Width:F2}:{request.Height:F2}"
+                                 + $":{request.Ruleset?.OnlineID ?? -1}:{pendingSkin.GetType().Name}";
 
             if (drawableKey == loadedDrawableKey)
                 return;
