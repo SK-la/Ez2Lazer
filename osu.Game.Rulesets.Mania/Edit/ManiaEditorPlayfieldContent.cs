@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Primitives;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Localization;
@@ -192,10 +193,11 @@ namespace osu.Game.Rulesets.Mania.Edit
         public bool DeleteExtensionSelection() => extensionArea.RemoveSelected() > 0;
 
         /// <summary>
-        /// Applies a time band to the extension notes, deselecting the rest.
+        /// Applies a selection box to the extension notes, deselecting the rest.
         /// </summary>
-        /// <param name="preserve">Notes which were already selected when the drag started, kept regardless of the band.</param>
-        public void UpdateExtensionSelection(double minTime, double maxTime, HashSet<ExtensionNote>? preserve) => extensionArea.UpdateBoxSelection(minTime, maxTime, preserve);
+        /// <param name="selectionQuad">The box's screen-space rectangle.</param>
+        /// <param name="preserve">Notes which were already selected when the drag started, kept regardless of the box.</param>
+        public void UpdateExtensionSelection(Quad selectionQuad, HashSet<ExtensionNote>? preserve) => extensionArea.UpdateBoxSelection(selectionQuad, preserve);
 
         /// <summary>
         /// Hands <paramref name="hitObjects"/> over to the extension columns, dropping them on the column under

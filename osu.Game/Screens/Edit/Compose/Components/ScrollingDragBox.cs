@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Framework.Graphics.Primitives;
 using osu.Framework.Input.Events;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
@@ -26,6 +27,15 @@ namespace osu.Game.Screens.Edit.Compose.Components
         /// owner widen it to the region the box actually selects in, so what is drawn matches what is selected.
         /// </remarks>
         public Func<(float left, float right)?>? HorizontalExtent { get; set; }
+
+        /// <summary>
+        /// The screen-space rectangle the box currently covers.
+        /// </summary>
+        /// <remarks>
+        /// This is the drawn rectangle, so a region can select by what it visually covers instead of deriving a band
+        /// from the pointer path and getting a slightly different answer.
+        /// </remarks>
+        public Quad SelectionQuad => Box.ScreenSpaceDrawQuad;
 
         private double? startTime;
 

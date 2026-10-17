@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.EzOsuGame.Localization;
@@ -130,9 +131,9 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         public ExtensionNote? NoteAt(Vector2 screenSpacePosition) => noteLayer.NoteAt(screenSpacePosition);
 
         /// <summary>
-        /// Selects the notes whose centre time lies in the given band, deselecting the rest unless they are preserved.
+        /// Selects the notes the given box covers, deselecting the rest unless they are preserved.
         /// </summary>
-        public void UpdateBoxSelection(double minTime, double maxTime, IReadOnlyCollection<ExtensionNote>? preserve) => noteLayer.UpdateBoxSelection(minTime, maxTime, preserve);
+        public void UpdateBoxSelection(Quad selectionQuad, HashSet<ExtensionNote>? preserve) => noteLayer.UpdateBoxSelection(selectionQuad, preserve);
 
         /// <summary>
         /// Whether <paramref name="screenSpacePosition"/> is over a control of this column rather than its note area.

@@ -4,10 +4,10 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.UI.Scrolling;
@@ -106,29 +106,24 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         private ScrollingHitObjectContainer? referenceContainer => area.ReferenceColumn?.HitObjectContainer as ScrollingHitObjectContainer;
 
         /// <summary>
-        /// Selects the notes whose centre time lies in the given band, deselecting the rest unless they are preserved.
+        /// Selects the notes the given box covers, deselecting the rest unless they are preserved.
         /// </summary>
         /// <remarks>
-        /// Matching the playfield's selection box, the band is decided by time alone. The drag box's horizontal extent
-        /// is a raw artefact of the mouse path, so a mostly vertical drag would otherwise hit almost no columns.
+        /// Decided by the drawn rectangle against each note's drawn rectangle, the same way the playfield's own box
+        /// decides. Deriving a time band from the pointer instead needs the box to overshoot a note's head by its own
+        /// height, because a note occupies times earlier than the time its head sits on.
         /// <paramref name="preserve"/> holds the notes which were already selected when an additive drag began.
         /// </remarks>
-        public void UpdateBoxSelection(double minTime, double maxTime, IReadOnlyCollection<ExtensionNote>? preserve)
+        public void UpdateBoxSelection(Quad selectionQuad, HashSet<ExtensionNote>? preserve)
         {
             foreach (var visual in noteVisuals.Values)
             {
-                bool selected = (visual.Body.Alpha > 0 && isInsideBand(visual.Note, minTime, maxTime))
+                bool selected = (visual.Body.Alpha > 0 && selectionQuad.Contains(visual.Body.ScreenSpaceDrawQuad.Centre))
                                 || preserve?.Contains(visual.Note) == true;
 
                 if (visual.Note.Selected.Value != selected)
                     visual.Note.Selected.Value = selected;
             }
-        }
-
-        private static bool isInsideBand(ExtensionNote note, double minTime, double maxTime)
-        {
-            double centre = note.Time + note.Duration / 2;
-            return centre >= minTime && centre <= maxTime;
         }
 
         /// <summary>

@@ -199,11 +199,10 @@ namespace osu.Game.Rulesets.Mania.Edit
             // when the drag began) and never grows into the playfield, and the playfield box never reaches the columns.
             if (marqueeInExtensionColumns)
             {
-                // Columns are picked by the drag's time band, mirroring the playfield's time-based box. The drag box's
-                // horizontal extent comes from the raw mouse path, so a mostly vertical drag would otherwise decide
-                // which columns are hit and drop the selection entirely.
+                // Columns are selected by the box's drawn rectangle against each note's drawn rectangle, the same way
+                // the playfield's own box decides. Its horizontal extent was widened to the columns when the drag began.
                 if (DragBox is ScrollingDragBox scrollingDragBox)
-                    Composer.PlayfieldContent?.UpdateExtensionSelection(scrollingDragBox.MinTime, scrollingDragBox.MaxTime, extensionSelectionBeforeDrag);
+                    Composer.PlayfieldContent?.UpdateExtensionSelection(scrollingDragBox.SelectionQuad, extensionSelectionBeforeDrag);
 
                 return;
             }
