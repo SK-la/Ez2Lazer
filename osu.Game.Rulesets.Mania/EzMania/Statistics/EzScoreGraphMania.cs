@@ -171,18 +171,47 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         {
             var info = CommittedNowScore?.ScoreInfo;
 
+            // Now 只有 Session 重算这一个来源：尚无结果时保持 0，不用成绩自身的数值顶替。
+            if (info == null)
+            {
+                NowCounts = new Dictionary<HitResult, int>();
+                NowAccuracy = 0;
+                NowScore = 0;
+                return;
+            }
+
             // Debounce 前的拖动预览仍走 HitEvent 偏移重判；Session 提交后直接使用其完整重算结果。
-            if (info == null || offsetPlusMania.Value != CommittedSessionOffset)
+            if (offsetPlusMania.Value != CommittedSessionOffset)
             {
                 RecalculateNowFromDisplayEvents();
                 return;
             }
 
-            NowCounts = extractDisplayCounts(info.Statistics);
-            NowAccuracy = info.Accuracy;
-            NowScore = info.TotalScore;
+            var now = CreateSessionNowSnapshot(info, currentJudgeMode).Value;
+
+            NowCounts = now.Counts;
+            NowAccuracy = now.Accuracy;
+            NowScore = now.Score;
             logDiffIfMismatch(info);
         }
+
+        /// <summary>
+        /// Now 列的取值快照：唯一来源是 Session 的 <see cref="ScoreInfo"/>。
+        /// </summary>
+        /// <returns>无 Session 结果时返回 <see langword="null"/>，由调用方保持 0。</returns>
+        /// <remarks>
+        /// 三项必须同源：stable classic 的总分由 combo 状态机累加，不能用 acc 反投影出分数，
+        /// 也不能混入成绩自身的 acc / 统计。
+        /// </remarks>
+        internal static SessionNowSnapshot? CreateSessionNowSnapshot(ScoreInfo? sessionInfo, EzEnumJudgeMode judgeMode)
+        {
+            if (sessionInfo == null)
+                return null;
+
+            return new SessionNowSnapshot(sessionInfo.Accuracy, sessionInfo.TotalScore, ExtractDisplayCounts(sessionInfo.Statistics, judgeMode));
+        }
+
+        internal readonly record struct SessionNowSnapshot(double Accuracy, long Score, Dictionary<HitResult, int> Counts);
 
         /// <summary>
         /// 按当前 JudgeMode 的基分权重计算 NowAccuracy 和 NowScore。

@@ -1019,6 +1019,12 @@ namespace osu.Game.Rulesets.Mania.Tests
                 throw new AssertionException(
                     $"drawable=[{ManiaReplayParityHelper.DescribeHitEvents(drawableHitEvents)}] session=[{ManiaReplayParityHelper.DescribeHitEvents(sessionEvents)}]");
             });
+
+            AddAssert("results score (p) matches session (n)", () =>
+            {
+                var sessionResult = ManiaReplaySession.Run(replayScore, playableBeatmap, parityEnvironment);
+                return assertPopulatedScoreMatches(sessionResult.ScoreInfo);
+            });
         }
 
         // P2-B: 完整 Score parity 测试（accuracy/score/statistics）
@@ -1097,33 +1103,6 @@ namespace osu.Game.Rulesets.Mania.Tests
             if (!assertSessionParity)
                 return;
 
-            AddAssert("session accuracy matches drawable", () =>
-            {
-                var sessionResult = ManiaReplaySession.Run(replayScore, playableBeatmap, parityEnvironment);
-                double drawableAccuracy = currentPlayer.ScoreProcessor.Accuracy.Value;
-                double sessionAccuracy = sessionResult.ScoreInfo.Accuracy;
-
-                const double tolerance = 1e-6;
-                if (Math.Abs(drawableAccuracy - sessionAccuracy) < tolerance)
-                    return true;
-
-                throw new AssertionException(
-                    $"drawable accuracy={drawableAccuracy:F8} session accuracy={sessionAccuracy:F8}");
-            });
-
-            AddAssert("session total score matches drawable", () =>
-            {
-                var sessionResult = ManiaReplaySession.Run(replayScore, playableBeatmap, parityEnvironment);
-                long drawableScore = currentPlayer.ScoreProcessor.TotalScore.Value;
-                long sessionScore = sessionResult.ScoreInfo.TotalScore;
-
-                if (drawableScore == sessionScore)
-                    return true;
-
-                throw new AssertionException(
-                    $"drawable score={drawableScore} session score={sessionScore}");
-            });
-
             if (expectedMaxCombo is int maxCombo)
             {
                 AddAssert("drawable max combo matches expected", () =>
@@ -1137,50 +1116,76 @@ namespace osu.Game.Rulesets.Mania.Tests
                 });
             }
 
-            AddAssert("session max combo matches drawable", () =>
+            AddAssert("results score (p) matches session (n)", () =>
             {
                 var sessionResult = ManiaReplaySession.Run(replayScore, playableBeatmap, parityEnvironment);
-                int drawableMaxCombo = currentPlayer.ScoreProcessor.HighestCombo.Value;
-                int sessionMaxCombo = sessionResult.ScoreInfo.MaxCombo;
+                return assertPopulatedScoreMatches(sessionResult.ScoreInfo);
+            });
+        }
 
-                if (drawableMaxCombo == sessionMaxCombo)
-                    return true;
+        /// <summary>
+        /// 结算页的 p（成绩卡）来自局内 <see cref="ScoreProcessor.PopulateScore"/>，n（Score Graph Now）来自 Session 的
+        /// <see cref="ScoreInfo"/>。两者必须逐字段相等，否则结算页会出现 p ≠ n。
+        /// </summary>
+        /// <remarks>
+        /// 不能拿 <c>ScoreProcessor.Accuracy.Value</c> 比：StableClassic 的 <c>ManiaScoreProcessor.PopulateScore</c>
+        /// 会把 <see cref="ScoreInfo.Accuracy"/> 覆盖成 <c>AccuracyClassic</c>、把总分换成 combo 状态机结果，
+        /// 而 <c>Accuracy.Value</c> 仍是 lazer 口径，两边量的不是同一个数。
+        /// </remarks>
+        private bool assertPopulatedScoreMatches(ScoreInfo sessionInfo)
+        {
+            var populated = new ScoreInfo { Ruleset = new ManiaRuleset().RulesetInfo };
+            currentPlayer.ScoreProcessor.PopulateScore(populated);
 
+            const double tolerance = 1e-6;
+
+            if (Math.Abs(populated.Accuracy - sessionInfo.Accuracy) >= tolerance)
+            {
                 throw new AssertionException(
-                    $"drawable max combo={drawableMaxCombo} session max combo={sessionMaxCombo}");
-            });
+                    $"p accuracy={populated.Accuracy:F8} n accuracy={sessionInfo.Accuracy:F8}");
+            }
 
-            AddAssert("session statistics match drawable", () =>
+            if (populated.TotalScore != sessionInfo.TotalScore)
             {
-                var sessionResult = ManiaReplaySession.Run(replayScore, playableBeatmap, parityEnvironment);
-                var drawableStats = currentPlayer.ScoreProcessor.Statistics;
-                var sessionStats = sessionResult.ScoreInfo.Statistics;
+                throw new AssertionException(
+                    $"p total score={populated.TotalScore} n total score={sessionInfo.TotalScore}");
+            }
 
-                // 比较所有 HitResult 的计数（排除 IgnoreHit，因为 Session 不产生此结果）
-                foreach (var kvp in drawableStats)
+            if (populated.Combo != sessionInfo.Combo)
+            {
+                throw new AssertionException(
+                    $"p combo={populated.Combo} n combo={sessionInfo.Combo}");
+            }
+
+            if (populated.MaxCombo != sessionInfo.MaxCombo)
+            {
+                throw new AssertionException(
+                    $"p max combo={populated.MaxCombo} n max combo={sessionInfo.MaxCombo}");
+            }
+
+            if (populated.Rank != sessionInfo.Rank)
+            {
+                throw new AssertionException(
+                    $"p rank={populated.Rank} n rank={sessionInfo.Rank}");
+            }
+
+            foreach (var result in Enum.GetValues<HitResult>())
+            {
+                // Session 路径不记录 IgnoreHit/IgnoreMiss（与既有 hit event 比对口径一致）。
+                if (result is HitResult.IgnoreHit or HitResult.IgnoreMiss)
+                    continue;
+
+                int p = populated.Statistics.GetValueOrDefault(result);
+                int n = sessionInfo.Statistics.GetValueOrDefault(result);
+
+                if (p != n)
                 {
-                    if (kvp.Key == HitResult.IgnoreHit || kvp.Key == HitResult.IgnoreMiss)
-                        continue; // Session 路径不记录 IgnoreHit/IgnoreMiss
-
-                    if (!sessionStats.TryGetValue(kvp.Key, out int sessionCount) || sessionCount != kvp.Value)
-                    {
-                        throw new AssertionException(
-                            $"statistics mismatch for {kvp.Key}: drawable={kvp.Value} session={sessionStats.GetValueOrDefault(kvp.Key, 0)}");
-                    }
+                    throw new AssertionException(
+                        $"p {result}={p} n {result}={n}");
                 }
+            }
 
-                // 检查 session 是否有额外的统计项
-                foreach (var kvp in sessionStats)
-                {
-                    if (!drawableStats.ContainsKey(kvp.Key) && kvp.Value != 0)
-                    {
-                        throw new AssertionException(
-                            $"session has extra statistic {kvp.Key}={kvp.Value} not in drawable");
-                    }
-                }
-
-                return true;
-            });
+            return true;
         }
 
         private void runReplayAfterRecalcParityTest((Score score, IBeatmap beatmap, GameplayEnvironment environment) fixture)
