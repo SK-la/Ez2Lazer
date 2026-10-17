@@ -382,6 +382,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 EzSettingsProfile.LOCAL_PROFILE_SECTION_CAREER,
                 new EzLocalProfileCareerBody(rulesetStats, snapshot.GradeCounts.Where(g => g.RulesetId == rulesetId))));
 
+            // osu Track: Career + Skills + Drill only (no Insights / Mode Data / Trends).
+            if (trackMode && !mania)
+            {
+                var skillsHost = createDeferredSectionHost();
+                contentFlow.Add(new EzLocalProfileSection(EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_SKILLS, skillsHost));
+
+                var drillHostOsuTrack = createDeferredSectionHost();
+                contentFlow.Add(new EzLocalProfileSection(EzSettingsProfile.LOCAL_PROFILE_SECTION_SCORE_DRILL, drillHostOsuTrack));
+
+                beginDeferredTrackSkillsLoad(token, rulesetId, player, trackPresenter!, skillsHost, drillHostOsuTrack);
+                return;
+            }
+
             if (!mania)
             {
                 contentFlow.Add(new EzLocalProfileSection(
@@ -460,6 +473,40 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                         drillHostMania.Child = new EzLocalProfileScoreDrillPanel(currentDrillScore, drillSearchQuery, drills, profileService.LoadKpsList);
                     }, 0);
+                }, 0);
+            }), token);
+        }
+
+        private void beginDeferredTrackSkillsLoad(
+            CancellationToken token,
+            int rulesetId,
+            string player,
+            IEzTrackSkillsPresenter presenter,
+            Container skillsHost,
+            Container drillHost)
+        {
+            Task.Run(() => profileService.LoadDrillScores(rulesetId, player), token).ContinueWith(task => Schedule(() =>
+            {
+                if (token.IsCancellationRequested || task.IsCanceled)
+                    return;
+
+                if (task.IsFaulted)
+                {
+                    skillsHost.Child = createLoadFailedHint();
+                    drillHost.Child = createLoadFailedHint();
+                    return;
+                }
+
+                var drills = task.GetResultSafely();
+
+                skillsHost.Child = new EzLocalProfileTrackSkillsBody(player, presenter, currentDrillScore, drills);
+
+                Scheduler.AddDelayed(() =>
+                {
+                    if (token.IsCancellationRequested)
+                        return;
+
+                    drillHost.Child = new EzLocalProfileScoreDrillPanel(currentDrillScore, drillSearchQuery, drills, profileService.LoadKpsList);
                 }, 0);
             }), token);
         }

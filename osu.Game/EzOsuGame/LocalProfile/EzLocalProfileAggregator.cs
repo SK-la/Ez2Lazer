@@ -290,12 +290,21 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public Dictionary<string, List<EzSkillPlayRow>> CollectManiaPlayRows(
             IReadOnlyCollection<string> usernames,
             CancellationToken cancellationToken = default)
+            => CollectPlayRows(EzLocalProfileConstants.MANIA_RULESET_ID, usernames, cancellationToken);
+
+        /// <summary>
+        /// Plays for one ruleset OnlineID, reduced to <see cref="EzSkillPlayRow"/> — one Realm pass.
+        /// </summary>
+        public Dictionary<string, List<EzSkillPlayRow>> CollectPlayRows(
+            int rulesetOnlineId,
+            IReadOnlyCollection<string> usernames,
+            CancellationToken cancellationToken = default)
         {
             var includeSet = new HashSet<string>(usernames.Select(normaliseUsername), StringComparer.Ordinal);
-            var maniaPlaysByUser = new Dictionary<string, List<EzSkillPlayRow>>(StringComparer.Ordinal);
+            var playsByUser = new Dictionary<string, List<EzSkillPlayRow>>(StringComparer.Ordinal);
 
             if (includeSet.Count == 0)
-                return maniaPlaysByUser;
+                return playsByUser;
 
             realm.Run(r =>
             {
@@ -303,7 +312,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (score.Ruleset.OnlineID != EzLocalProfileConstants.MANIA_RULESET_ID)
+                    if (score.Ruleset.OnlineID != rulesetOnlineId)
                         continue;
 
                     string username = normaliseUsername(score.RealmUser.Username);
@@ -313,14 +322,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     if (score.BeatmapInfo == null)
                         continue;
 
-                    if (!maniaPlaysByUser.TryGetValue(username, out var list))
-                        maniaPlaysByUser[username] = list = new List<EzSkillPlayRow>();
+                    if (!playsByUser.TryGetValue(username, out var list))
+                        playsByUser[username] = list = new List<EzSkillPlayRow>();
 
                     list.Add(new EzSkillPlayRow(score.ID, score.BeatmapHash, score.Date, score.Accuracy, score.Passed, score.Rank));
                 }
             });
 
-            return maniaPlaysByUser;
+            return playsByUser;
         }
 
         /// <summary>
