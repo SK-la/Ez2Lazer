@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
     /// </summary>
     /// <param name="SortedFrameTimes">
     /// replay 帧钟（含帧偏置），升序。stable 的被动判定挂在引擎帧循环上（如 classic 长条到点判尾取
-    /// <c>AudioEngine.Time >= EndTime + HitWindow100</c>），只有边沿时刻不足以还原，故与边沿并列保留。
+    /// <c>帧钟 &gt;= EndTime + HitWindow100</c>），只有边沿时刻不足以还原，故与边沿并列保留。
     /// </param>
     internal sealed record ManiaReplayInputData(
         List<ManiaReplayInputEvent> SortedEvents,

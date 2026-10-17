@@ -126,9 +126,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         /// <summary>
         /// 断连后重按、再于尾部松手：局内 <c>DrawableHoldNote.OnPressed</c>（列路由未选中目标时仍执行）
         /// 会重新 <c>beginHoldAt</c> 重臂 holding，故松手时 <c>Tail.UpdateResult()</c> 判尾。
-        /// stable 的三条档都落 <b>Meh</b>：<c>TimePress</c> 在每次按下边沿被覆盖成重按时刻，
-        /// 尾判的 <c>num4</c> 是「重按 − 头」（此例 2400ms），先掉出全部窗口；<c>hasHoldBreak</c> 的
-        /// 封顶只降不升，接不住已经低于下限的结果。
+        /// stable 的三条档都落 <b>Meh</b>：按下基准在每次按下边沿被覆盖成重按时刻，
+        /// 尾判的按下误差是「重按 − 头」（此例 2400ms），先掉出全部窗口；断连封顶只降不升，
+        /// 接不住已经低于下限的结果。
         /// 与 <c>TestSceneHoldNoteInput.TestPressAtStartThenBreakThenRepressAndReleaseAtTail</c> 同口径。
         /// </summary>
         [TestCase(EzEnumJudgeMode.Lazer, HitResult.Meh)]
@@ -233,14 +233,56 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var tail = ManiaReplaySession.RunHitEvents(score, beatmap, environment).Single(e => e.HitObject is TailNote);
 
             // Classic 与 Lazer 共用同一套 tail 时序/offset 规则，仅窗口区间不同，故 30ms late 判 Great；
-            // stable classic 长条按镜像偏差 num4 + num6 联合取档，30ms late 落在 300g*2.4 内，判 300g（Perfect）。
+            // stable classic 长条按「按下误差 + 合计误差」联合取档，30ms late 落在 300g*2.4 内，判 300g（Perfect）。
             Assert.That(tail.TimeOffset, Is.EqualTo(30).Within(0.01));
             Assert.That(tail.Result, Is.EqualTo(expected));
         }
 
         /// <summary>
-        /// 按住过尾不松手时，stable 的到点判尾会被 <c>HitCircleManiaLong.HitEnd</c> 推迟到
-        /// <c>EndTime + HitWindow50</c>（本谱 OD6 → 133ms），并取帧钟首个不早于阈值的帧落判。
+        /// 从未按下：过 <c>StartTime + HitWindow50</c> 立即断连，只落 Body ComboBreak，尾仍留到
+        /// <c>EndTime + HitWindow100</c> 判 Miss。断连早于后续单键，故那条单键的连击从 1 起算。
+        /// </summary>
+        [Test]
+        public void TestStableClassicNeverPressedBreaksAtStartWindow()
+        {
+            var (score, beatmap, _) = LazerTapReplayFixtures.CreateUnpressedHoldWithNotes(
+                holdStart: 1500, holdEnd: 4000, firstNote: 1550, secondNote: 2500, frameUntil: 4300);
+
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+            var result = ManiaReplaySession.Run(score, beatmap, environment);
+
+            var bodyEvents = result.ScoreInfo.HitEvents.Where(e => e.HitObject is HoldNoteBody).ToList();
+            Assert.That(bodyEvents, Has.Count.EqualTo(1), "LN 只补一次 Body 断连");
+            Assert.That(bodyEvents[0].Result, Is.EqualTo(HitResult.ComboBreak));
+
+            // 断连落在 1550 与 2500 之间：后一枚单键重新从 1 起算，中间没有跨过断连的连击。
+            Assert.That(result.ScoreInfo.MaxCombo, Is.EqualTo(1));
+
+            var tailEvent = result.ScoreInfo.HitEvents.Single(e => e.HitObject is TailNote);
+            Assert.That(tailEvent.Result, Is.EqualTo(HitResult.Miss));
+        }
+
+        /// <summary>
+        /// 晚于 <c>StartTime + HitWindow50</c> 才按下：断连已在到点帧发生，重抓不撤销断连，
+        /// 尾档由按下误差（重抓 − 头）掉档并由断连标志封顶。
+        /// </summary>
+        [Test]
+        public void TestStableClassicLatePressStillBreaksAtStartWindow()
+        {
+            var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldWithInputs((1650, false), (1700, true), (4000, false));
+            var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+
+            var result = ManiaReplaySession.Run(score, beatmap, environment);
+
+            Assert.That(result.ScoreInfo.Statistics.TryGetValue(HitResult.ComboBreak, out int comboBreak) ? comboBreak : 0, Is.EqualTo(1));
+
+            var tailEvent = result.ScoreInfo.HitEvents.Single(e => e.HitObject is TailNote);
+            Assert.That(tailEvent.Result, Is.EqualTo(HitResult.Meh));
+        }
+
+        /// <summary>
+        /// 按住过尾不松手时，到点判尾被推迟到 <c>EndTime + HitWindow50</c>
+        /// （本谱 OD6 → 133ms），并取帧钟首个不早于阈值的帧落判。
         /// </summary>
         [TestCase(0, 140)]
         [TestCase(5, 135)]
@@ -255,14 +297,14 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             // 按住档不落在「已松手」档的 EndTime + HitWindow100（OD6 → 109ms）上。
             Assert.That(stableClassicTail.TimeOffset, Is.GreaterThan(tail.HitWindows!.WindowFor(HitResult.Ok)));
 
-            // num2 落在段首、num3 = 落判帧钟 → num6 = 偏差；140/135 越出 200 窗（79*2）但仍在 100 窗（109*2）内 → 100。
+            // 按下基准落在段首、松开基准 = 落判帧钟 → 合计误差 = 偏差；
+            // 140/135 越出 200 窗（79*2）但仍在 100 窗（109*2）内 → 100。
             Assert.That(stableClassicTail.TimeOffset, Is.EqualTo(expectedOffset).Within(0.01));
             Assert.That(stableClassicTail.Result, Is.EqualTo(HitResult.Good));
         }
 
         /// <summary>
-        /// stable classic 长条持有期每 <c>JudgementMania.ComboIntv</c>（100ms）涨一格连击，
-        /// 节拍锚在按下时刻而不是帧时刻。
+        /// stable classic 长条持有期每 100ms 涨一格连击，节拍锚在按下时刻而不是帧时刻。
         /// </summary>
         [Test]
         public void TestStableClassicHeldPastTailRaisesHoldComboPerInterval()

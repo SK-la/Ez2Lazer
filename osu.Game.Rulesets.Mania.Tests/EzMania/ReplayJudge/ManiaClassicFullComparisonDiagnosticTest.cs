@@ -149,7 +149,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
                 sb.AppendLine($"  col={ln.Column} start={ln.Start} end={ln.End} len={ln.End - ln.Start} | " +
                               $"press={(ln.TimePress == 0 ? "-" : (ln.TimePress - ln.Start).ToString())} release={(ln.TimeRelease == 0 ? "-" : (ln.TimeRelease - ln.End).ToString())} | " +
-                              $"presses={ln.Presses} releases={ln.Releases} break={ln.HasHoldBreak} startHit={ln.StartWasHit} | " +
+                              $"presses={ln.Presses} releases={ln.Releases} break={ln.HasHoldBreak} startHit={ln.StartHit} | " +
                               $"ref={ln.Result} session={sessionResult}");
             }
 
@@ -211,8 +211,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         /// <summary>
-        /// <c>HitObjectManagerMania.Update</c> + <c>HitCircleMania</c> / <c>HitCircleManiaLong</c>（非 ScoreV2 分支）的逐步复刻。
-        /// 按列跑 stable 的物件循环：单键与长条共用 <c>array[column]</c> 路由、到点结算与 Holding。
+        /// 按列跑物件的参考状态机：单键与长条共用列路由、到点结算与持有增量。
         /// </summary>
         private sealed class StableReferenceSimulation
         {
@@ -287,7 +286,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 foreach (var frame in frames)
                     clock.Add(((int)Math.Round(frame.Time + frameTimeOffset), frame.Actions.ToList()));
 
-                // stable 的 HitObjectManagerMania.Update 以帧为外层：同一帧内逐列推进列状态机，
+                // stable 的列状态机以帧为外层：同一帧内逐列推进，
                 // 共享同一个 Combo/断连计数。列循环不能外提，否则断连在列间重排，MaxCombo 会偏小。
                 int[] columns = objects.Select(o => o.Column).Distinct().OrderBy(c => c).ToArray();
                 var columnObjects = columns.Select(c => objects.Where(o => o.Column == c).OrderBy(o => o.Order).ToList()).ToArray();
@@ -330,7 +329,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                     if (routed || time < o.Start - windows.Miss)
                         continue;
 
-                    // stable 非 ScoreV2：EndTime + HitWindow100 到点结算。
+                    // EndTime + HitWindow100 到点结算。
                     if (time >= o.End + (int)windows.Ok100)
                     {
                         evaluate(o, time);
@@ -346,8 +345,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                                 o.Presses++;
                                 o.Pressed = true;
                                 o.TimePress = time;
-                                o.StartWasHit = true;
-                                o.LastScoreTime = time;
+                                o.StartHit = true;
+                                o.HoldTickBaseline = time;
                                 routed = true;
                             }
                         }
@@ -382,18 +381,18 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             private void holding(Obj o, int now)
             {
-                if (o.LastScoreTime == -1 || now > o.End || now < o.Start)
+                if (o.HoldTickBaseline == -1 || now > o.End || now < o.Start)
                     return;
 
-                if (now - o.LastScoreTime >= 100)
+                if (now - o.HoldTickBaseline >= 100)
                 {
-                    o.LastScoreTime += 100;
+                    o.HoldTickBaseline += 100;
                     HoldIncrements++;
                     applyValue(7);
                 }
             }
 
-            /// <summary>stable <c>Ruleset.IncreaseScoreHit</c> 的连击处理：正值 +1，其余清零。</summary>
+            /// <summary>连击处理：正值 +1（7 为持有增量），其余清零。</summary>
             private void applyValue(int value)
             {
                 if (value > 0)
@@ -484,27 +483,27 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
                 o.IsHit = true;
 
-                int num2 = o.TimePress < o.Start - (int)windows.Meh50
+                int pressBaseline = o.TimePress < o.Start - (int)windows.Meh50
                     ? o.End - 1
                     : (o.TimePress >= o.Start ? o.TimePress : o.Start + (o.Start - o.TimePress));
-                int num3 = o.Pressed
+                int releaseBaseline = o.Pressed
                     ? now
                     : (o.TimeRelease <= o.End ? o.TimeRelease : o.End - (o.TimeRelease - o.End));
 
-                if (num3 < o.End - (int)windows.Meh50)
+                if (releaseBaseline < o.End - (int)windows.Meh50)
                     o.Judgement = StableManiaJudgement.Miss;
                 else
                 {
-                    int num4 = Math.Abs(num2 - o.Start);
-                    int num6 = num4 + Math.Abs(num3 - o.End);
+                    int pressError = Math.Abs(pressBaseline - o.Start);
+                    int combinedError = pressError + Math.Abs(releaseBaseline - o.End);
 
-                    if (num4 <= windows.Perfect300g * 1.2 && num6 <= windows.Perfect300g * 2.4)
+                    if (pressError <= windows.Perfect300g * 1.2 && combinedError <= windows.Perfect300g * 2.4)
                         o.Judgement = StableManiaJudgement.Perfect300g;
-                    else if (num4 <= windows.Great300 * 1.1 && num6 <= windows.Great300 * 2.2)
+                    else if (pressError <= windows.Great300 * 1.1 && combinedError <= windows.Great300 * 2.2)
                         o.Judgement = StableManiaJudgement.Great300;
-                    else if (num4 <= windows.Good200 && num6 <= windows.Good200 * 2)
+                    else if (pressError <= windows.Good200 && combinedError <= windows.Good200 * 2)
                         o.Judgement = StableManiaJudgement.Good200;
-                    else if (num4 <= windows.Ok100 && num6 <= windows.Ok100 * 2)
+                    else if (pressError <= windows.Ok100 && combinedError <= windows.Ok100 * 2)
                         o.Judgement = StableManiaJudgement.Ok100;
                     else
                         o.Judgement = StableManiaJudgement.Meh50;
@@ -545,9 +544,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 public int TimeRelease;
                 public int Presses;
                 public int Releases;
-                public int LastScoreTime = -1;
+                public int HoldTickBaseline = -1;
                 public bool Pressed;
-                public bool StartWasHit;
+                public bool StartHit;
                 public bool IsMissing;
                 public bool IsHit;
                 public bool HasHoldBreak;

@@ -237,12 +237,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         /// <summary>
-        /// stable classic 长条持有期的连击增量（stable <c>HitCircleManiaLong.Holding</c> 的
-        /// <c>IncreaseScoreHit(7)</c>）：每 100ms 一枚，只推 combo，不加分、不进判定计数。
+        /// stable classic 长条持有期的连击增量：每 100ms 一枚，只推 combo，不加分、不进判定计数。
         /// </summary>
         /// <remarks>
         /// 局内与 <see cref="ManiaReplaySessionSimulator"/> 必须同源，否则总分只在 Session 侧多出增量。
-        /// 帧钟与 <c>StableClassicHoldState</c> 共用；后退时直接返回，由 <c>ResetFromReplayFrame</c> 重建累加器。
+        /// 帧钟与 <see cref="StableClassicHoldState"/> 共用；后退时直接返回，由 <c>ResetFromReplayFrame</c> 重建累加器。
         /// </remarks>
         internal static void TryStableClassicHoldComboTick(DrawableHoldNote hold)
         {
@@ -260,7 +259,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         /// <summary>
-        /// stable classic：按住不松时尾在 <c>EndTime + HitWindow50</c> 到点落判（stable 在该时刻把
+        /// stable classic：按住不松时尾在 <c>EndTime + HitWindow50</c> 到点落判（该时刻把
         /// <c>TimeRelease</c> 写成当前时刻）。父 Hold 的收束仍交给 <c>DrawableHoldNote</c>。
         /// </summary>
         internal static void TryStableClassicSettleHeldTail(DrawableHoldNote hold)
@@ -283,8 +282,43 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         /// <summary>
-        /// stable classic：头已判定后重按同一条 LN（断连后再抓）。stable 的按下分支只在未按住时进入，
-        /// 因此重按会刷新 <c>TimePress</c>（尾判的 <c>num2</c>）。
+        /// stable classic：过 <c>StartTime + HitWindow50</c> 仍从未按下时立即断连。
+        /// </summary>
+        /// <remarks>
+        /// 只落 Body 的 ComboBreak 并置断连标志，尾判仍由尾结算负责，LN 可继续重抓。
+        /// 已按下过（含已提前松手断连）时不补判，避免与松手路径重复发断连。
+        /// </remarks>
+        internal static void TryStableClassicHoldBreak(DrawableHoldNote hold)
+        {
+            // 每帧调用：只读已缓存的 round，未缓存时不做判定（与 TryStableClassicSettleHeldTail 同）。
+            if (hold.EzDrawableManiaRuleset?.JudgementRound is not { } round
+                || !StableClassicJudgeModeJudgement.IsSelected(round.Environment.JudgeMode))
+                return;
+
+            if (hold.Tail.AllJudged || hold.Body.AllJudged)
+                return;
+
+            var state = GetStableClassicHoldState(hold);
+
+            if (state.TimePress != null || state.Pressed || state.HasHoldBreak)
+                return;
+
+            double breakTime = hold.Head.HitObject.StartTime + (hold.Tail.HitObject.HitWindows?.WindowFor(HitResult.Meh) ?? 0);
+
+            if (hold.Time.Current < breakTime)
+                return;
+
+            // 实时持有态：同一次松手可能同时经 Column 与 Hold 结算，缓存 bindable 会读到旧值。
+            if (hold.Result.IsHolding(hold.Time.Current))
+                return;
+
+            state.MarkHoldBreak();
+            hold.Body.TriggerResult(false);
+        }
+
+        /// <summary>
+        /// stable classic：头已判定后重按同一条 LN（断连后再抓）。按下分支只在未按住时进入，
+        /// 因此重按会刷新 <c>TimePress</c>（尾判的按下基准）。
         /// </summary>
         internal static void NotifyStableClassicRepress(DrawableHoldNote hold)
         {
@@ -482,7 +516,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 return false;
 
             // stable classic：尾判只在尾「可判」时发起（松手宽限同 lazer，即 HitWindows.ResultFor 会给档的范围）。
-            // stable 的 HitCircleManiaLong.HitEnd 由帧钟到点触发，过早的松手只记断连、不落判；不设这道 gate，
+            // 到点判尾由帧钟触发，过早的松手只记断连、不落判；不设这道 gate，
             // `DrawableHoldNote.OnReleased` 的 `Tail.UpdateResult()` 会在提前松手那一刻当场判 Miss
             // （Session 侧的同类松手有候选窗 gate，于是两侧同源破裂）。
             if (StableClassicJudgeModeJudgement.IsSelected(round.Environment.JudgeMode)
@@ -548,9 +582,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         /// <summary>
-        /// stable classic：LN 头不产生独立判定（stable <c>HitCircleManiaLong.HitStart</c> 返回 0，不进 OnHit），
-        /// 压成 <see cref="HitResult.IgnoreHit"/> / <see cref="HitResult.IgnoreMiss"/> —— 不计分、不计 combo、
-        /// 不进 acc，持有态另由 <see cref="StableClassicHoldState"/> 承担。头档封顶只存在于 ScoreV2 分支，此档不参与。
+        /// stable classic：LN 头不产生独立判定，压成 <see cref="HitResult.IgnoreHit"/> / <see cref="HitResult.IgnoreMiss"/> ——
+        /// 不计分、不计 combo、不进 acc，持有态另由 <see cref="StableClassicHoldState"/> 承担。
         /// </summary>
         /// <remarks>
         /// 头绑定的是 <see cref="IgnoreJudgement"/>，落 [IgnoreMiss, IgnoreHit] 之外的结果会被计分器校验拒绝，

@@ -9,7 +9,7 @@ using osu.Game.Rulesets.Scoring;
 namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
 {
     /// <summary>
-    /// osu!stable mania 判定档位（classic，非 ScoreV2）。
+    /// osu!stable mania 判定档位（classic）。
     /// 与 lazer 的 <see cref="HitResult"/> 不同：300g / 300 分值不同（320 / 300）。
     /// </summary>
     public enum StableManiaJudgement
@@ -77,8 +77,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
         /// </summary>
         /// <remarks>
         /// 未记录的 <see cref="StableClassicHoldState.TimePress"/> 按 0 传给档位链（早于窗口的按下镜像到段末，即整段没接上）；
-        /// 未记录的 <see cref="StableClassicHoldState.TimeRelease"/> 按本次求值时刻传入——stable 在同一帧
-        /// <c>TimeRelease == 0 &amp;&amp; Time &gt;= EndTime - HitWindow50</c> 时就会把 <c>TimeRelease</c> 写成当前时刻。
+        /// 未记录的 <see cref="StableClassicHoldState.TimeRelease"/> 按本次求值时刻传入——按住跨过
+        /// <c>EndTime - HitWindow50</c> 后即视为有效松开。
         /// 缺 <see cref="HoldTailEvaluationContext.StableClassicState"/> 时无从取这两个时刻，按 Miss 处理。
         /// </remarks>
         public HitResult EvaluateTail(in HoldTailEvaluationContext context)

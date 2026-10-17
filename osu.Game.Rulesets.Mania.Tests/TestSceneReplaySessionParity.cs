@@ -562,7 +562,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         }
 
         /// <summary>
-        /// [Ez] StableClassic 断连后重按同一条 LN：重按要刷新 <c>TimePress</c>（尾判的 <c>num2</c>），
+        /// [Ez] StableClassic 断连后重按同一条 LN：重按要刷新按下基准（尾判取档用），
         /// 局内与 Session 必须同源，不得只在 Session 侧喂这条边沿。
         /// </summary>
         /// <remarks>
@@ -596,6 +596,27 @@ namespace osu.Game.Rulesets.Mania.Tests
                     new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
                     new Note { StartTime = 4000, Column = 1 },
                 },
+                frames,
+                assertJudgedHitsComplete: true);
+        }
+
+        /// <summary>
+        /// [Ez] StableClassic 单键的到点 Miss 边界是 <c>EndTime + HitWindow100</c>（不是 50 窗）：
+        /// 落在边界之后、50 窗之内的按下在局内与 Session 两边都必须已被动判成 Miss。
+        /// </summary>
+        [Test]
+        public void TestFullScoreParity_StableClassicTapPastWindow100()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+
+            var frames = new List<ReplayFrame>();
+
+            // OD5：100 窗 112ms、50 窗 136ms。1130 的按下只可能落在「已被动 Miss」之后。
+            for (double time = 900; time <= 1300; time += 10)
+                frames.Add(time == 1130 ? new ManiaReplayFrame(time, ManiaAction.Key1) : new ManiaReplayFrame(time));
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject> { new Note { StartTime = 1000, Column = 0 } },
                 frames,
                 assertJudgedHitsComplete: true);
         }
@@ -668,6 +689,41 @@ namespace osu.Game.Rulesets.Mania.Tests
         }
 
         /// <summary>
+        /// [Ez] StableClassic 整条 LN 从未按下：过 <c>StartTime + HitWindow50</c> 即断连，
+        /// 断连早于后续单键，故那条单键的连击从 1 起算；局内与 Session 必须一致。
+        /// </summary>
+        [Test]
+        public void TestFullScoreParity_StableClassicUnpressedHoldBreaksEarly()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+
+            const double head = 1000;
+            const double tail = 3000;
+
+            var frames = new List<ReplayFrame>();
+
+            for (double time = head; time <= 3900; time += 10)
+            {
+                bool press = time == 1050 || time == 2500;
+                frames.Add(press ? new ManiaReplayFrame(time, ManiaAction.Key2) : new ManiaReplayFrame(time));
+            }
+
+            frames.Add(new ManiaReplayFrame(3920));
+            frames.Add(new ManiaReplayFrame(3960));
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                    new Note { StartTime = 1050, Column = 1 },
+                    new Note { StartTime = 2500, Column = 1 },
+                },
+                frames,
+                assertJudgedHitsComplete: true,
+                expectedMaxCombo: 1);
+        }
+
+        /// <summary>
         /// [Ez] StableClassic 长条持有的 100ms 连击增量必须由局内产出：stable 的 <c>Holding</c> 每 100ms
         /// 推一次 combo（不加分、不进判定计数），局内缺这一路时 MaxCombo 会少一大截。
         /// </summary>
@@ -717,7 +773,7 @@ namespace osu.Game.Rulesets.Mania.Tests
             };
 
             // 每列每 240ms 一枚，远大于 OD8 的 Miss 窗（164ms），避免按键被路由到相邻物件。
-            // 每 5 枚偏 45ms（Good200）把 ComboAddition 压下去，使 384 重置真正改变分数。
+            // 每 5 枚偏 45ms（Good200）把连击加成压下去，使 384 重置真正改变分数。
             for (int i = 0; i < 380; i++)
                 hitObjects.Add(new Note { StartTime = 4000 + i * 60, Column = i % 4 });
 
@@ -793,8 +849,11 @@ namespace osu.Game.Rulesets.Mania.Tests
             switch (column)
             {
                 case 0: return ManiaAction.Key1;
+
                 case 1: return ManiaAction.Key2;
+
                 case 2: return ManiaAction.Key3;
+
                 default: return ManiaAction.Key4;
             }
         }
@@ -966,11 +1025,11 @@ namespace osu.Game.Rulesets.Mania.Tests
                     IsSetupStep = false,
                     CallStack = new StackTrace(1, true),
                     TimeoutMilliseconds = 600_000,
-                    Assertion = () => currentPlayer.ScoreProcessor.HasCompleted.Value == true,
+                    Assertion = () => currentPlayer.ScoreProcessor.HasCompleted.Value,
                 });
             }
             else
-                AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value == true);
+                AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value);
 
             AddStep("capture drawable hit events", () =>
             {

@@ -365,6 +365,27 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             Assert.That(resultScore.ScoreInfo.MaxCombo, Is.GreaterThanOrEqualTo(1 + hold.Ticks.Count));
         }
 
+        /// <summary>
+        /// stable classic 的单键在 <c>EndTime + HitWindow100</c> 就到点落 Miss：
+        /// 晚于该边界（但仍在本档 50 窗内）的按下只能看到已被动判过的 Miss，不能再拿 50。
+        /// </summary>
+        [Test]
+        public void TestStableClassicTapNotePastWindow100IsPassiveMiss()
+        {
+            var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleNoteTap(lateMs: 120);
+
+            var stableClassicEvent = ManiaReplaySession
+                                     .RunHitEvents(score, beatmap, ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer))
+                                     .Single(e => e.HitObject is Note);
+
+            var lazerEvent = ManiaReplaySession
+                             .RunHitEvents(score, beatmap, ReplayJudgeTestConfig.Create(EzEnumJudgeMode.Lazer, EzEnumHealthMode.Lazer))
+                             .Single(e => e.HitObject is Note);
+
+            Assert.That(stableClassicEvent.Result, Is.EqualTo(HitResult.Miss));
+            Assert.That(lazerEvent.Result, Is.EqualTo(HitResult.Meh));
+        }
+
         [Test]
         public void TestEz2AcHoldEarlyReleaseDoesNotComboBreak()
         {

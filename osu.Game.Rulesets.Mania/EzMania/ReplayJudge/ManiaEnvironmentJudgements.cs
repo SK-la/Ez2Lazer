@@ -37,7 +37,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         public static Judgement CreateForHeadNote(EzEnumJudgeMode judgeMode)
         {
-            // stable classic：LN 头不产生独立判定（stable HitCircleManiaLong.HitStart 返回 0，不进 OnHit）。
+            // stable classic：LN 头不产生独立判定。
             // 绑定 Ignore 档位，drawable 才能把结果落成 IgnoreHit —— 落在 Judgement 的
             // [MinResult, MaxResult] 之外会被 ManiaEzDrawableJudgement.SanitizeResult 降级成 Miss。
             if (StableClassicJudgeModeJudgement.IsSelected(judgeMode))
