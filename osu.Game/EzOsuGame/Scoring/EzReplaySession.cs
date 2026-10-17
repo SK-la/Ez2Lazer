@@ -115,19 +115,27 @@ namespace osu.Game.EzOsuGame.Scoring
 
         protected static GameplayEnvironment ResolveEnvironment(ReplayRunRequest request)
         {
+            GameplayEnvironment environment;
+
             if (request.Purpose == ReplayRunPurpose.ForLive)
             {
-                var environment = GlobalConfigStore.EzConfig.ResolveEnvironment(
+                var live = GlobalConfigStore.EzConfig.ResolveEnvironment(
                     request.Purpose,
                     request.Score.ScoreInfo,
                     ignoreOffset: !request.IncludeGlobalManiaOffset);
 
-                return request.IncludeGlobalManiaOffset
-                    ? environment with { ApplyInputOffsetViaReplayFrameShift = true }
-                    : environment;
+                environment = request.IncludeGlobalManiaOffset
+                    ? live with { ApplyInputOffsetViaReplayFrameShift = true }
+                    : live;
+            }
+            else
+            {
+                environment = GlobalConfigStore.EzConfig.ResolveEnvironment(request.Purpose, request.Score.ScoreInfo);
             }
 
-            return GlobalConfigStore.EzConfig.ResolveEnvironment(request.Purpose, request.Score.ScoreInfo);
+            return request.JudgeModeOverride is { } judgeMode
+                ? environment with { JudgeMode = judgeMode }
+                : environment;
         }
 
         protected static GameplayEnvironment ResolveEnvironment(Score score, ReplayRunPurpose purpose)

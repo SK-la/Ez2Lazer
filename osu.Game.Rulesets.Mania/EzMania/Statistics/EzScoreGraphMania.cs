@@ -40,7 +40,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         private readonly IReadOnlyList<HitEvent>? originalHitEventsOverride;
 
         private readonly ManiaHitWindows hitWindowsNow = new ManiaHitWindows();
-        private readonly JudgeModeHelper hitWindowsV1 = new JudgeModeHelper(EzEnumJudgeMode.Classic);
 
         private Bindable<EzEnumJudgeMode> judgeModeBindable = null!;
         private Bindable<EzEnumHealthMode> healthModeBindable = null!;
@@ -61,7 +60,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             : base(score, beatmap, new ManiaHitWindows())
         {
             hitWindowsNow.SetDifficulty(OD);
-            hitWindowsV1.OverallDifficulty = OD;
             originalAccuracy = score.Accuracy;
             originalTotalScore = score.TotalScore;
 
@@ -293,12 +291,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             }
         }
 
-        protected override IReadOnlyList<HitEvent> GetV1HitEvents()
-        {
-            // Classic 路线固定使用原始基础事件，不受当前 JudgeMode 可见结果集合影响。
-            return applyFakeOffsetToEvents(getEffectiveOriginalHitEvents().Where(e => e.Result.IsBasic()));
-        }
-
         [BackgroundDependencyLoader]
         private void load()
         {
@@ -357,11 +349,35 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             return hitWindowsNow.WindowFor(result);
         }
 
-        protected override HitResult RecalculateV1Result(HitEvent hitEvent)
+        protected override void CalculateV1Accuracy()
         {
-            HitResult result = hitWindowsV1.ResultFor(hitEvent.TimeOffset);
-            return result == HitResult.None ? HitResult.Miss : result;
+            var v1 = CreateV1Snapshot(V1SessionScore?.ScoreInfo);
+
+            V1Accuracy = v1.Accuracy;
+            V1Score = v1.Score;
+            V1Counts = v1.Counts;
         }
+
+        /// <summary>
+        /// V1 列的三项取值；无 Session 结果为 0，不用成绩自身的数值顶替。
+        /// </summary>
+        internal static SessionNowSnapshot CreateV1Snapshot(ScoreInfo? sessionInfo)
+            => sessionInfo == null
+                ? SessionNowSnapshot.Zero()
+                : new SessionNowSnapshot(sessionInfo.Accuracy, sessionInfo.TotalScore, ExtractDisplayCounts(sessionInfo.Statistics, EzEnumJudgeMode.StableClassic));
+
+        /// <summary>
+        /// V1 列用同一份 replay、同一套仿真器，只把判定档位换成 stable 原生 classic。
+        /// </summary>
+        /// <remarks>
+        /// 成绩本身就是 StableClassic 时该请求与 Now 的缓存键完全一致，不会产生第二次计算。
+        /// </remarks>
+        protected override ReplayRunRequest? CreateV1RunRequest(Score score)
+            => new ReplayRunRequest(score, Beatmap, ReplayRunPurpose.ForLive)
+            {
+                IncludeGlobalManiaOffset = true,
+                JudgeModeOverride = EzEnumJudgeMode.StableClassic,
+            };
 
         /// <summary>Session 基准判定已产出；fake offset 重判由 <see cref="GetDisplayResult"/> 负责。</summary>
         protected override HitResult RecalculateNowResult(HitEvent hitEvent) => hitEvent.Result;
@@ -453,6 +469,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         private void onReplayConfigChanged()
         {
             ReplaySessionScore = null;
+            V1SessionScore = null;
             LastApplyOffset = 0;
             InvalidateTextUi();
             Refresh();
