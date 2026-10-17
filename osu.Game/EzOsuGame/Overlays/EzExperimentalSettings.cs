@@ -35,7 +35,8 @@ namespace osu.Game.EzOsuGame.Overlays
                           EzLocalProfileService? localProfileService,
                           EzLocalProfileOnlinePullService? onlinePullService,
                           RulesetStore? rulesetStore,
-                          EzExternalRulesetManagerDialog? externalRulesetManager)
+                          EzExternalRulesetManagerDialog? externalRulesetManager,
+                          EzBeatmapPoolManagerDialog? beatmapPoolManager)
         {
             EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, skillStore, dialogOverlay, notifications, localProfileService?.Store);
 
@@ -53,6 +54,14 @@ namespace osu.Game.EzOsuGame.Overlays
                 TooltipText = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_TOOLTIP,
                 Keywords = new[] { "online", "bp", "most played", "osr", "下载", "拉取", "线上", "成绩", "谱面", "回放" },
                 Action = () => requestOnlinePull(onlinePullService, localProfileService, rulesetStore, dialogOverlay, notifications),
+            });
+
+            Add(new SettingsButtonV2
+            {
+                Text = EzSettingsStrings.BEATMAP_POOL_MANAGER,
+                TooltipText = EzSettingsStrings.BEATMAP_POOL_MANAGER_TOOLTIP,
+                Keywords = new[] { "beatmap", "pool", "external", "path", "songs", "rebuild", "外部", "谱面", "路径", "重建" },
+                Action = () => beatmapPoolManager?.ShowManager(),
             });
 
             Add(new SettingsButtonV2
