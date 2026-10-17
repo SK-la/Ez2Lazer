@@ -38,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
     ///             <b>Lazer Header</b>：冻结 osr 嵌入 Statistics / 分 / combo（解码 ≡ 嵌入）。
     ///         </item>
     ///         <item>
-    ///             <b>Lazer / Classic Session</b>：冻结<strong>现行</strong>
+    ///             <b>Lazer Session</b>：冻结<strong>现行</strong>
     ///             <see cref="ManiaReplaySession"/> 产出（与局内对齐后的 Session），精确比对。
     ///         </item>
     ///         <item>
@@ -47,7 +47,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
     ///             与嵌入/stable 客户端数字可因整数帧与历史 LN 语义不同。
     ///         </item>
     ///     </list>
-    ///     套件：Hanatachi、PORTRAiT。Classic / StableClassic 主判定键门禁（不含 Ignore*）；Lazer Session 全量非零。
+    ///     套件：Hanatachi、PORTRAiT。StableClassic 主判定键门禁（不含 Ignore*）；Lazer Session 全量非零。
     ///     高难度 LN 闭环仍用 <see cref="OsrAuditTest" /> + GramNibelungen23（勿当金标）。
     /// </summary>
     [TestFixture]
@@ -160,50 +160,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             yield return lazer_portrait;
         }
 
-        // Classic：Expected* = stable 原生量（Statistics / MaxCombo / LegacyTotalScore，见
-        // AuditClassicFixtureAnchorMatchesDecodedHeader）；ExpectedAccuracy 是解码后 lazer 迁移重算值，仅供记录，不作门禁。
-        private static readonly AuditFixture classic_hanatachi = new AuditFixture(
-            "Classic-Hanatachi",
-            "Resources/Testing/Replays/ManiaAudit-Classic-Hanatachi.osr",
-            "Resources/Testing/Beatmaps/ManiaAudit-Hanatachi.osu",
-            EzEnumJudgeMode.Classic,
-            "29278f227275b1720e995d532130710b",
-            904544,
-            1728,
-            0.9774174631810525,
-            ScoreRank.S,
-            null,
-            true,
-            new[] { "CL" },
-            new Dictionary<HitResult, int>
-            {
-                [HitResult.Miss] = 36,
-                [HitResult.Meh] = 10,
-                [HitResult.Ok] = 9,
-                [HitResult.Good] = 103,
-                [HitResult.Great] = 808,
-                [HitResult.Perfect] = 3423,
-            },
-            false,
-            false,
-            new SessionAnchor(
-                905608,
-                1925,
-                0.9778267793703296,
-                new Dictionary<HitResult, int>
-                {
-                    [HitResult.Miss] = 49,
-                    [HitResult.Meh] = 14,
-                    [HitResult.Ok] = 16,
-                    [HitResult.Good] = 148,
-                    [HitResult.Great] = 955,
-                    [HitResult.Perfect] = 4260,
-                }),
-            null);
-
-        // StableClassic：锚点同 Classic 行（stable 原生量）。本档仍在向锚点收敛，故门禁只钉「距锚点的差距上限」：
+        // StableClassic：本档仍在向锚点收敛，故门禁只钉「距锚点的差距上限」：
         // 上限取当前实测差距，更近通过、更远失败。残差来源与后续收敛项记在
         // .cursor/plans/classic_源码差异审计_8edfa732.plan.md；收敛后把上限整体归零即可。
+        // Expected* = stable 原生量（Statistics / MaxCombo / LegacyTotalScore，见
+        // AuditStableClassicFixtureAnchorMatchesDecodedHeader）；ExpectedAccuracy 是解码后 lazer 迁移重算值，仅供记录，不作门禁。
         private static readonly AuditFixture stable_classic_hanatachi = new AuditFixture(
             "StableClassic-Hanatachi",
             "Resources/Testing/Replays/ManiaAudit-Classic-Hanatachi.osr",
@@ -240,45 +201,6 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                     [HitResult.Great] = 0,
                     [HitResult.Perfect] = 1,
                 }));
-
-        private static readonly AuditFixture classic_portrait = new AuditFixture(
-            "Classic-PORTRAiT",
-            "Resources/Testing/Replays/ManiaAudit-Classic-PORTRAiT.osr",
-            "Resources/Testing/Beatmaps/ManiaAudit-PORTRAiT.osu",
-            EzEnumJudgeMode.Classic,
-            "5737c0072e3c1319d95cf117b3f78648",
-            871917,
-            1340,
-            0.9669379597984128,
-            ScoreRank.S,
-            null,
-            true,
-            new[] { "CL" },
-            new Dictionary<HitResult, int>
-            {
-                [HitResult.Miss] = 38,
-                [HitResult.Meh] = 8,
-                [HitResult.Ok] = 15,
-                [HitResult.Good] = 190,
-                [HitResult.Great] = 1801,
-                [HitResult.Perfect] = 2476,
-            },
-            false,
-            false,
-            new SessionAnchor(
-                892585,
-                1328,
-                0.9742125538182642,
-                new Dictionary<HitResult, int>
-                {
-                    [HitResult.Miss] = 60,
-                    [HitResult.Meh] = 20,
-                    [HitResult.Ok] = 33,
-                    [HitResult.Good] = 273,
-                    [HitResult.Great] = 2558,
-                    [HitResult.Perfect] = 4411,
-                }),
-            null);
 
         // 计分改取已落定档位后，40 个 Miss 不再按同列最近按键的 stored offset 重判成命中（不再各送一次基础分），
         // 该档总分从 867600 降到 866984，距锚点 -4933；旧上限 4317 是这份偏差被高估填平后的实测值。
@@ -319,12 +241,6 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                     [HitResult.Perfect] = 0,
                 }));
 
-        public static IEnumerable<AuditFixture> ClassicFixtures()
-        {
-            yield return classic_hanatachi;
-            yield return classic_portrait;
-        }
-
         public static IEnumerable<AuditFixture> StableClassicFixtures()
         {
             yield return stable_classic_hanatachi;
@@ -343,22 +259,10 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             assertSessionMatchesAnchor(fixture);
         }
 
-        [TestCaseSource(nameof(ClassicFixtures))]
-        public void AuditClassicSessionMatchesAnchor(AuditFixture fixture)
-        {
-            assertSessionMatchesAnchor(fixture);
-        }
-
         [TestCaseSource(nameof(StableClassicFixtures))]
         public void AuditStableClassicSessionMatchesAnchor(AuditFixture fixture)
         {
             assertSessionMatchesAnchor(fixture);
-        }
-
-        [TestCaseSource(nameof(ClassicFixtures))]
-        public void AuditClassicFixtureAnchorMatchesDecodedHeader(AuditFixture fixture)
-        {
-            assertAnchorMatchesDecodedHeader(fixture);
         }
 
         [TestCaseSource(nameof(StableClassicFixtures))]
@@ -368,7 +272,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         /// <summary>
-        /// 门禁口径自检：Classic / StableClassic 行的「头」锚点必须逐项等于 osr 解码头。
+        /// 门禁口径自检：StableClassic 行的「头」锚点必须逐项等于 osr 解码头。
         /// </summary>
         /// <remarks>
         /// 解码末段会跑 <c>StandardisedScoreMigrationTools.UpdateToLatestScoring</c>，<see cref="ScoreInfo.TotalScore"/>
@@ -431,7 +335,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             using (var stream = resources.GetStream(fixture.OsrResource))
                 score = decoder.Parse(stream);
 
-            // Classic / StableClassic：丢弃 Lazer 解码嵌入 Statistics/分数，只保留 Replay 帧；Mods/JudgeMode 按静态契约注入。
+            // StableClassic：丢弃 Lazer 解码嵌入 Statistics/分数，只保留 Replay 帧；Mods/JudgeMode 按静态契约注入。
             if (!fixture.AssertDecodedHeader)
                 prepareScoreForClassicSession(score, fixture);
 
@@ -504,7 +408,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
                 Assert.That(info.TotalScore, Is.EqualTo(expectedTotal), report);
                 Assert.That(info.MaxCombo, Is.EqualTo(expectedCombo), report);
-                // 两侧锚点各自同源：Lazer 轨 ExpectedAccuracy 取自解码头，Classic / StableClassic 轨 SessionAccuracy
+                // 两侧锚点各自同源：Lazer 轨 ExpectedAccuracy 取自解码头，StableClassic 轨 SessionAccuracy
                 // 取自实测冻结（该轨 ExpectedAccuracy 的解码值已被 lazer 迁移改写，不作门禁）。
                 double accTolerance = afterSession || fixture.AssertDecodedHeader ? 1e-12 : 5e-3;
                 Assert.That(info.Accuracy, Is.EqualTo(expectedAcc).Within(accTolerance), report);
@@ -578,7 +482,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             string? report)
         {
             // assertFullNonZero：Lazer 全量非零对账（含 Ignore*/ComboBreak）。
-            // 否则只对 expected 键（Classic 用户主判定；未给的辅判不门禁）。
+            // 否则只对 expected 键（StableClassic 用户主判定；未给的辅判不门禁）。
             var keys = assertFullNonZero
                 ? expected.Keys.Union(actual.Keys).Where(k => actual.GetValueOrDefault(k) != 0 || expected.GetValueOrDefault(k) != 0).OrderBy(k => k).ToArray()
                 : expected.Keys.OrderBy(k => k).ToArray();

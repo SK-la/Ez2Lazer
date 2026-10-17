@@ -1631,6 +1631,12 @@ namespace osu.Game.Database
         }
 
         /// <summary>
+        /// ez 11 重排把 Mania 的 Classic 判定档挪到了 38。该枚举成员已淘汰，38 只剩「这行成绩需要按
+        /// classic 语义重算」的标记含义；迁移 pass 按字面量选行，不依赖枚举成员存在。
+        /// </summary>
+        internal const int LEGACY_CLASSIC_JUDGE_MODE = 38;
+
+        /// <summary>
         /// ez 11 重排前（0..9）的判定档旧值 → 新枚举值。负值（未设置）保持。
         /// </summary>
         internal static int RemapEzJudgeMode(int oldValue) => oldValue switch
@@ -1644,7 +1650,7 @@ namespace osu.Game.Database
             5 => (int)EzEnumJudgeMode.Raja_NM,
             6 => (int)EzEnumJudgeMode.Malody_E,
             7 => (int)EzEnumJudgeMode.Malody_B,
-            8 => (int)EzEnumJudgeMode.Classic,
+            8 => LEGACY_CLASSIC_JUDGE_MODE,
             9 => (int)EzEnumJudgeMode.StableClassic,
             _ => oldValue,
         };

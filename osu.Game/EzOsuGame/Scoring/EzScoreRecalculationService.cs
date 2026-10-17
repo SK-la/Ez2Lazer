@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring.Bonus;
 using osu.Game.Scoring;
 
@@ -93,6 +94,63 @@ namespace osu.Game.EzOsuGame.Scoring
             }
 
             scoreManager.ApplyEzSessionRecalculation(scoreInfo, result.Score.ScoreInfo, purpose, result.ResolvedEnvironment!);
+        }
+
+        /// <summary>
+        /// 用钉死的判定档重算一条 mania 成绩并写回 Realm。
+        /// </summary>
+        /// <remarks>
+        /// <para>非标准入口，常规重算必须走 <see cref="RecalculateAsync"/>。</para>
+        /// <para>不读任何用户设置，档位由调用方钉死，结果与机器、配置无关。</para>
+        /// <para>
+        /// 不复用 <see cref="RecalculateAsync"/> 的回退链：对非官方判定语义的成绩（例如迁移中的 38），
+        /// 无 replay / 谱面缺失时回落到 <see cref="ScoreManager.Recalculate"/> 等于用官方算法重写 Ez 语义成绩。
+        /// 这些情况下本方法直接返回 <see langword="false"/> 且不写 Realm，由调用方下次重试。
+        /// </para>
+        /// <para>
+        /// 走 <see cref="ReplayRunPurpose.ForLive"/>，写回时会把 <paramref name="judgeMode"/> 落进成绩，
+        /// 因此同一行重复调用幂等。
+        /// </para>
+        /// </remarks>
+        /// <returns>已重算并写回 Realm 时为 <see langword="true"/>；无法重算时为 <see langword="false"/>。</returns>
+        internal static async Task<bool> RecalculateWithPinnedJudgeModeAsync(
+            ScoreManager scoreManager,
+            BeatmapManager beatmapManager,
+            IEzReplaySession replaySession,
+            ScoreInfo scoreInfo,
+            EzEnumJudgeMode judgeMode,
+            CancellationToken cancellationToken = default)
+        {
+            if (scoreInfo.Ruleset.OnlineID != 3)
+                return false;
+
+            var databasedScore = scoreManager.GetScore(scoreInfo);
+
+            if (databasedScore?.Replay == null || databasedScore.Replay.Frames.Count == 0)
+                return false;
+
+            var workingBeatmap = beatmapManager.GetWorkingBeatmap(scoreInfo.BeatmapInfo);
+
+            if (workingBeatmap is DummyWorkingBeatmap)
+                return false;
+
+            var playableBeatmap = workingBeatmap.GetPlayableBeatmap(scoreInfo.Ruleset, scoreInfo.Mods);
+
+            if (playableBeatmap.HitObjects.Count == 0)
+                return false;
+
+            var result = await replaySession.RunRequestAsync(
+                new ReplayRunRequest(databasedScore.DeepClone(), playableBeatmap, ReplayRunPurpose.ForLive)
+                {
+                    EnvironmentOverride = GameplayEnvironment.ForMigration(judgeMode)
+                },
+                cancellationToken).ConfigureAwait(false);
+
+            if (result.WasCancelled || !result.IsValidReplay || result.Score.ScoreInfo == null || result.ResolvedEnvironment == null)
+                return false;
+
+            scoreManager.ApplyEzSessionRecalculation(scoreInfo, result.Score.ScoreInfo, ReplayRunPurpose.ForLive, result.ResolvedEnvironment);
+            return true;
         }
 
         /// <summary>

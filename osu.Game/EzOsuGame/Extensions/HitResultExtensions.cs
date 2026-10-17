@@ -34,8 +34,7 @@ namespace osu.Game.EzOsuGame.Extensions
             switch (judgeMode)
             {
                 case EzEnumJudgeMode.Lazer:
-                case EzEnumJudgeMode.Classic:
-                    // Lazer 和 Classic 使用默认名称
+                    // Lazer 使用默认名称
                     return string.Empty;
 
                 case EzEnumJudgeMode.O2Jam:

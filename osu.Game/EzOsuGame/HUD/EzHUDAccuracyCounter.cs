@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.ComponentModel;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -69,6 +70,11 @@ namespace osu.Game.EzOsuGame.HUD
         private readonly PercentageCounter[] accuracyCounters = new PercentageCounter[4];
         private readonly Bindable<EzAccuracyDisplayMode>[] accuracyDisplays;
         private readonly OsuSpriteText[] text = new OsuSpriteText[4];
+        private readonly Action<ValueChangedEvent<bool>>?[] stableAvailabilityHandlers = new Action<ValueChangedEvent<bool>>?[4];
+        private readonly Action<ValueChangedEvent<double>>?[] stableValueHandlers = new Action<ValueChangedEvent<double>>?[4];
+
+        /// <summary>规则集自管的 stable 结果源；未实现的规则集为 null，Stable 槽位隐藏。</summary>
+        private IStableScoreSource? stableSource;
 
         // public EzScoreText[] Text = new EzScoreText[4];
 
@@ -140,11 +146,15 @@ namespace osu.Game.EzOsuGame.HUD
         {
             base.LoadComplete();
 
+            stableSource = scoreProcessor as IStableScoreSource;
+
             for (int i = 0; i < 4; i++)
             {
                 int index = i;
                 accuracyDisplays[i].BindValueChanged(mode =>
                 {
+                    unbindStableAvailability(index);
+                    unbindStableValue(index);
                     accuracyCounters[index].Current.UnbindBindings();
                     accuracyCounters[index].ClearTransforms();
 
@@ -175,14 +185,10 @@ namespace osu.Game.EzOsuGame.HUD
                             break;
 
                         case EzAccuracyDisplayMode.Classic:
-                            // 只切换显示绑定。AccuracyClassic 由 ScoreProcessor.ApplyScoreChange 无条件维护
-                            // （见 ScoreProcessor.cs 的 UpdateScoreClassic），与本档位无关；这里一旦改
-                            // scoreProcessor.IsLegacyScore，就等于用显示设置去改 TotalScore 计分口径。
-                            accuracyCounters[index].Current.UnbindBindings();
-                            accuracyCounters[index].Current.BindTo(scoreProcessor.AccuracyClassic);
-                            accuracyCounters[index].Show();
-                            text[index].Text = mode.NewValue.GetLocalisableDescription();
-                            text[index].Show();
+                            // 可用性随局内判定档变化，必须订阅而不是加载时一次性判断：
+                            // ApplyEzGameplayEnvironment 与 HUD 的加载时序不应成为隐含依赖。
+                            // TODO(Ez live stable 影子)：非 stable 档暂时隐藏，等 Session 可推进引擎。
+                            bindStableSlot(index);
                             break;
 
                         case EzAccuracyDisplayMode.None:
@@ -193,6 +199,62 @@ namespace osu.Game.EzOsuGame.HUD
                     }
                 }, true);
             }
+        }
+
+        private void bindStableSlot(int index)
+        {
+            if (stableSource == null)
+            {
+                applyStableSlotAvailability(index, false);
+                return;
+            }
+
+            Action<ValueChangedEvent<bool>> handler = _ => applyStableSlotAvailability(index, stableSource.StableAvailable.Value);
+            stableAvailabilityHandlers[index] = handler;
+            stableSource.StableAvailable.ValueChanged += handler;
+
+            applyStableSlotAvailability(index, stableSource.StableAvailable.Value);
+        }
+
+        private void unbindStableAvailability(int index)
+        {
+            if (stableAvailabilityHandlers[index] is not { } handler)
+                return;
+
+            stableSource?.StableAvailable.ValueChanged -= handler;
+            stableAvailabilityHandlers[index] = null;
+        }
+
+        private void applyStableSlotAvailability(int index, bool available)
+        {
+            unbindStableValue(index);
+
+            if (!available)
+            {
+                accuracyCounters[index].Current.UnbindBindings();
+                accuracyCounters[index].Hide();
+                text[index].Hide();
+                return;
+            }
+
+            // 结果源按接口暴露 IBindable，而 RollingCounter.Current 只接受具体 Bindable，
+            // 因此这里用显式订阅而不是 BindTo，并在切换槽位时解绑。
+            Action<ValueChangedEvent<double>> handler = v => accuracyCounters[index].Current.Value = v.NewValue;
+            stableValueHandlers[index] = handler;
+            stableSource!.StableAccuracy.BindValueChanged(handler, true);
+
+            accuracyCounters[index].Show();
+            text[index].Text = EzAccuracyDisplayMode.Classic.GetLocalisableDescription();
+            text[index].Show();
+        }
+
+        private void unbindStableValue(int index)
+        {
+            if (stableValueHandlers[index] is not { } handler)
+                return;
+
+            stableSource?.StableAccuracy.ValueChanged -= handler;
+            stableValueHandlers[index] = null;
         }
 
         protected override void OnNewJudgement(JudgementResult judgement)
@@ -227,7 +289,7 @@ namespace osu.Game.EzOsuGame.HUD
         [LocalisableDescription(typeof(GameplayAccuracyCounterStrings), nameof(GameplayAccuracyCounterStrings.AccuracyDisplayModeMin))]
         MinimumAchievable,
 
-        [Description("Mania V1")]
+        [Description("Stable")]
         Classic,
 
         [Description("None")]

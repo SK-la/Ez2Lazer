@@ -13,7 +13,7 @@ namespace osu.Game.Rulesets.Mania.Tests
     [TestFixture]
     public class JudgePrecedenceRoutingRegressionTest
     {
-        [TestCase(EzEnumJudgeMode.Classic)]
+        [TestCase(EzEnumJudgeMode.StableClassic)]
         [TestCase(EzEnumJudgeMode.EZ2AC)]
         [TestCase(EzEnumJudgeMode.O2Jam)]
         [TestCase(EzEnumJudgeMode.Malody_B)]
@@ -48,7 +48,7 @@ namespace osu.Game.Rulesets.Mania.Tests
             Assert.That(selected, Is.Not.Null);
         }
 
-        [TestCase(EzEnumJudgeMode.Classic)]
+        [TestCase(EzEnumJudgeMode.StableClassic)]
         [TestCase(EzEnumJudgeMode.EZ2AC)]
         [TestCase(EzEnumJudgeMode.O2Jam)]
         [TestCase(EzEnumJudgeMode.Malody_B)]

@@ -34,7 +34,7 @@ namespace osu.Game.Tests.Database
         [TestCase(5, (int)EzEnumJudgeMode.Raja_NM)]
         [TestCase(6, (int)EzEnumJudgeMode.Malody_E)]
         [TestCase(7, (int)EzEnumJudgeMode.Malody_B)]
-        [TestCase(8, (int)EzEnumJudgeMode.Classic)]
+        [TestCase(8, RealmAccess.LEGACY_CLASSIC_JUDGE_MODE)]
         [TestCase(9, (int)EzEnumJudgeMode.StableClassic)]
         public void TestRemapEzJudgeMode(int oldValue, int expected) => Assert.That(RealmAccess.RemapEzJudgeMode(oldValue), Is.EqualTo(expected));
 

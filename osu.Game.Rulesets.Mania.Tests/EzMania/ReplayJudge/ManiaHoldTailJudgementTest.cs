@@ -90,10 +90,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         /// <summary>
         /// 头命中后中途松手（远早于尾窗）：局内 <c>Column.OnReleased</c> → <c>EzTriggerBodyAfterTailRelease</c>
         /// （尾未判、<c>isEarlyHoldRelease()</c>）→ Body ComboBreak；尾保持未判，交由 auto-miss 收束。
-        /// Lazer 与 Classic 共用 <see cref="CommonHoldJudgementStrategy"/>，行为必须一致。
+        /// Lazer 走 <see cref="CommonHoldJudgementStrategy"/>。
         /// </summary>
         [TestCase(EzEnumJudgeMode.Lazer)]
-        [TestCase(EzEnumJudgeMode.Classic)]
         public void TestEarlyHoldReleaseBreaksComboWithoutJudgingTail(EzEnumJudgeMode judgeMode)
         {
             var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldReleaseAt(releaseTime: 2500);
@@ -111,7 +110,6 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         /// 尾窗内松手：局内先判尾（命中原生结果，头已命中且未断连故不降级）后写 Body IgnoreHit。
         /// </summary>
         [TestCase(EzEnumJudgeMode.Lazer)]
-        [TestCase(EzEnumJudgeMode.Classic)]
         public void TestReleaseInsideTailWindowJudgesTailWithoutComboBreak(EzEnumJudgeMode judgeMode)
         {
             var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldReleaseAt(releaseTime: 3950);
@@ -132,7 +130,6 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         /// 与 <c>TestSceneHoldNoteInput.TestPressAtStartThenBreakThenRepressAndReleaseAtTail</c> 同口径。
         /// </summary>
         [TestCase(EzEnumJudgeMode.Lazer, HitResult.Meh)]
-        [TestCase(EzEnumJudgeMode.Classic, HitResult.Meh)]
         [TestCase(EzEnumJudgeMode.StableClassic, HitResult.Meh)]
         public void TestBreakThenRepressCapsTailToMeh(EzEnumJudgeMode judgeMode, HitResult expected)
         {
@@ -151,10 +148,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
         /// <summary>
         /// 单条 LN 中途多次「按下—松开」：stable 语义下每次提前松手都各计一次 ComboBreak。
-        /// 覆盖 Lazer / Classic / BMS（<see cref="IManiaHoldJudgementStrategy.AllowsRepeatedHoldBreak"/> 为真）。
+        /// 覆盖 Lazer / BMS（<see cref="IManiaHoldJudgementStrategy.AllowsRepeatedHoldBreak"/> 为真）。
         /// </summary>
         [TestCase(EzEnumJudgeMode.Lazer)]
-        [TestCase(EzEnumJudgeMode.Classic)]
         [TestCase(EzEnumJudgeMode.IIDX_HD)]
         public void TestRepeatedHoldBreakCountsEachRelease(EzEnumJudgeMode judgeMode)
         {
@@ -223,16 +219,14 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             Assert.That(tailEvent.Result, Is.EqualTo(HitResult.Great));
         }
 
-        [TestCase(EzEnumJudgeMode.Classic, HitResult.Great)]
         [TestCase(EzEnumJudgeMode.StableClassic, HitResult.Perfect)]
-        public void TestClassicTailLateReleaseUsesClassicWindows(EzEnumJudgeMode judgeMode, HitResult expected)
+        public void TestStableClassicTailLateReleaseUsesStableWindows(EzEnumJudgeMode judgeMode, HitResult expected)
         {
             var (score, beatmap, _) = LazerTapReplayFixtures.CreateSingleHoldLateTailRelease(lateMs: 30);
             var environment = ReplayJudgeTestConfig.Create(judgeMode, EzEnumHealthMode.Lazer);
 
             var tail = ManiaReplaySession.RunHitEvents(score, beatmap, environment).Single(e => e.HitObject is TailNote);
 
-            // Classic 与 Lazer 共用同一套 tail 时序/offset 规则，仅窗口区间不同，故 30ms late 判 Great；
             // stable classic 长条按「按下误差 + 合计误差」联合取档，30ms late 落在 300g*2.4 内，判 300g（Perfect）。
             Assert.That(tail.TimeOffset, Is.EqualTo(30).Within(0.01));
             Assert.That(tail.Result, Is.EqualTo(expected));

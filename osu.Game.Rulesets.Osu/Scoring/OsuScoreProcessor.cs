@@ -3,8 +3,10 @@
 
 using System;
 using System.Collections.Generic;
+using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.HUD;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
@@ -15,7 +17,7 @@ using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Osu.Scoring
 {
-    public partial class OsuScoreProcessor : ScoreProcessor
+    public partial class OsuScoreProcessor : ScoreProcessor, IStableScoreSource
     {
         /// <summary>
         /// gameplay 开局冻结的判定轨；空则按 Lazer。禁止在无头路径回读全局配置。
@@ -34,6 +36,25 @@ namespace osu.Game.Rulesets.Osu.Scoring
 
         private bool isStableClassic => stdJudgeMode == EzEnumJudgeMode.StableClassic;
 
+        private readonly BindableBool stableAvailable = new BindableBool();
+
+        public IBindable<double> StableAccuracy => AccuracyClassic;
+
+        public IBindable<long> StableScore => TotalScoreWithoutMods;
+
+        public IBindable<int> StableMaxCombo => HighestCombo;
+
+        public IBindable<bool> StableAvailable => stableAvailable;
+
+        /// <summary>
+        /// 局内 stable 槽位只在判定轨本身就是 StableClassic 时可显示；其它档没有等价的实时结果。
+        /// </summary>
+        /// <remarks>
+        /// TODO(Ez live stable 影子)：非 stable 档应转发 Session 可推进引擎的输出，届时这里改为恒 true。
+        /// 引擎改造面见 <c>OsuReplaySessionSimulator</c> 头部的 TODO。
+        /// </remarks>
+        private void refreshStableAvailability() => stableAvailable.Value = isStableClassic;
+
         /// <summary>
         /// stable 总分自带 mod 倍率，不能再被下游 <c>scoreMultiplier</c> 乘一次。
         /// </summary>
@@ -47,6 +68,7 @@ namespace osu.Game.Rulesets.Osu.Scoring
         public override void ApplyEzGameplayEnvironment()
         {
             JudgementTrackOverride ??= GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode);
+            refreshStableAvailability();
 
             if (OsuStableClassicScoring.ShouldUseLegacyScoreAlgorithm(stdJudgeMode))
                 IsLegacyScore = true;
@@ -54,6 +76,8 @@ namespace osu.Game.Rulesets.Osu.Scoring
 
         public override void ApplyBeatmap(IBeatmap beatmap)
         {
+            refreshStableAvailability();
+
             // 判定窗与 classic 滑条语义必须在全谱模拟（base.ApplyBeatmap 内部的 SimulateAutoplay）前绑定。
             if (isStableClassic)
                 OsuStableClassicScoring.BindClassicSemanticsToBeatmap(beatmap);

@@ -37,7 +37,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
 
         /// <summary>
         /// 是否走 stable 原生 classic 实现（判定策略选择的唯一判定点）。
-        /// 注意与 mania 私有的 <see cref="EzEnumJudgeMode.Classic"/>（Ez 自有 classic）区分。
         /// </summary>
         public static bool IsSelected(EzEnumJudgeMode judgeMode) => judgeMode == EzEnumJudgeMode.StableClassic;
 

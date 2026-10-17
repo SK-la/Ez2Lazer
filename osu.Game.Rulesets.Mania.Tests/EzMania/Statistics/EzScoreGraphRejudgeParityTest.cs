@@ -11,7 +11,6 @@ using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Replays;
-using osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
@@ -20,6 +19,7 @@ using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mania.Scoring;
+using osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Replays;
@@ -51,7 +51,6 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         };
 
         [TestCase(EzEnumJudgeMode.Lazer)]
-        [TestCase(EzEnumJudgeMode.Classic)]
         [TestCase(EzEnumJudgeMode.EZ2AC)]
         [TestCase(EzEnumJudgeMode.O2Jam)]
         [TestCase(EzEnumJudgeMode.IIDX_HD)]
@@ -79,7 +78,6 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
 
         [TestCase(EzEnumJudgeMode.EZ2AC)]
         [TestCase(EzEnumJudgeMode.Lazer)]
-        [TestCase(EzEnumJudgeMode.Classic)]
         [TestCase(EzEnumJudgeMode.O2Jam)]
         [TestCase(EzEnumJudgeMode.IIDX_HD)]
         [TestCase(EzEnumJudgeMode.LR2_HD)]

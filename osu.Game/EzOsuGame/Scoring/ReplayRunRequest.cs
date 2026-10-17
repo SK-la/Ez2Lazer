@@ -25,6 +25,11 @@ namespace osu.Game.EzOsuGame.Scoring
         /// </remarks>
         public EzEnumJudgeMode? JudgeModeOverride { get; init; }
 
+        /// <summary>
+        /// 非 null 时完全替代按 <see cref="Purpose"/> 解析的环境（数据迁移用）。
+        /// </summary>
+        public GameplayEnvironment? EnvironmentOverride { get; init; }
+
         public ReplayRunRequest(Score score, IBeatmap beatmap, ReplayRunPurpose purpose)
         {
             Score = score;

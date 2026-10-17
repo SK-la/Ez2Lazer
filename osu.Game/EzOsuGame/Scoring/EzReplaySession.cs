@@ -115,6 +115,9 @@ namespace osu.Game.EzOsuGame.Scoring
 
         protected static GameplayEnvironment ResolveEnvironment(ReplayRunRequest request)
         {
+            if (request.EnvironmentOverride != null)
+                return request.EnvironmentOverride;
+
             GameplayEnvironment environment;
 
             if (request.Purpose == ReplayRunPurpose.ForLive)

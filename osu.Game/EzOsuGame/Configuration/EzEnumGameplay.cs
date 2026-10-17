@@ -55,9 +55,6 @@ namespace osu.Game.EzOsuGame.Configuration
 
         [Description("Malody B Judge")]
         Malody_B = 37,
-
-        [Description("")]
-        Classic = 38,
     }
 
     public enum EzEnumHealthMode

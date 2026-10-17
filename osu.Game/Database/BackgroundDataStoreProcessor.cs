@@ -534,6 +534,10 @@ namespace osu.Game.Database
                     // Note that the previous method will also update these on a fresh run.
                     processBeatmapsWithMissingObjectCounts();
 
+                    // [Ez] 淘汰 Classic 判定档的数据驱动 pass：每次启动都跑，不绑版本号、不绑 stamp。
+                    // 选行条件本身就是「未完成」标记，无 replay / 谱面缺失的行原样保留，下次启动自动重试。
+                    recalculateLegacyClassicScores();
+
                     // [Ez] Skip full score-upgrade table scans when a prior clean pass left a matching stamp.
                     var scoreScanSnapshot = readScoreScanSnapshot();
 
@@ -1839,6 +1843,82 @@ namespace osu.Game.Database
             }
 
             completeNotification(notification, processedCount, scoreIds.Count, failedCount);
+        }
+
+        /// <summary>
+        /// [Ez] 把残留的 38（旧 Mania Classic 判定档）按规范化环境重放成 StableClassic(1)。
+        /// </summary>
+        /// <remarks>
+        /// 只调用 <see cref="EzScoreRecalculationService.RecalculateWithPinnedJudgeModeAsync"/>：无 replay / 谱面缺失时
+        /// 不回落到官方算法（那会用官方语义重写 Ez 成绩），下一轮启动继续尝试。
+        /// 另记 <c>JudgeMode == 8</c> 的残余条数：非 Ez 模式库不会执行 <c>case 11</c>，8 会留下，需要可见。
+        /// </remarks>
+        private void recalculateLegacyClassicScores()
+        {
+            const int legacy_judge_mode = RealmAccess.LEGACY_CLASSIC_JUDGE_MODE;
+
+            List<Guid> idList = realmAccess.Run(r => r.All<ScoreInfo>()
+                                                      .Where(s => s.JudgeMode == legacy_judge_mode)
+                                                      .AsEnumerable()
+                                                      // Realm 不支持嵌套属性谓词，规则集与删除标记在物化后判断。
+                                                      .Where(s => s.Ruleset.OnlineID == 3 && !s.DeletePending)
+                                                      .Select(s => s.ID)
+                                                      .ToList());
+
+            int leftoverPreRemap = realmAccess.Run(r => r.All<ScoreInfo>().Where(s => s.JudgeMode == 8).Count());
+
+            if (leftoverPreRemap > 0)
+                Logger.Log($"{leftoverPreRemap} score(s) still carry the pre-v11 judge mode 8; the v11 migration has not run on this database.");
+
+            if (idList.Count == 0)
+                return;
+
+            Logger.Log($"Found {idList.Count} legacy Mania Classic (38) score(s); replaying into StableClassic.");
+
+            if (ezReplaySession == null)
+            {
+                Logger.Log("Replay session unavailable; deferring legacy Classic score migration to next launch.");
+                return;
+            }
+
+            const int batch_size = 500;
+
+            int processedCount = 0;
+            int failedCount = 0;
+
+            for (int i = 0; i < idList.Count; i += batch_size)
+            {
+                sleepIfRequired();
+
+                foreach (var id in idList.Skip(i).Take(batch_size))
+                {
+                    try
+                    {
+                        ScoreInfo? score = realmAccess.Run(r => r.Find<ScoreInfo>(id)?.Detach());
+
+                        if (score == null)
+                            continue;
+
+                        if (EzScoreRecalculationService.RecalculateWithPinnedJudgeModeAsync(
+                                scoreManager, beatmapManager, ezReplaySession, score, EzEnumJudgeMode.StableClassic)
+                            .GetAwaiter().GetResult())
+                            ++processedCount;
+                        else
+                            ++failedCount;
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        throw;
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Log($"Failed to migrate legacy Classic score {id}: {e}");
+                        ++failedCount;
+                    }
+                }
+            }
+
+            Logger.Log($"Legacy Classic score migration finished: converted={processedCount}, deferred={failedCount}.");
         }
 
         /// <summary>
