@@ -33,6 +33,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
 
         public double TotalScoreDouble => totalScoreDouble;
 
+        /// <summary>当前 <c>ComboAddition</c>（0..<see cref="ComboMulti"/>），供诊断与测试读取。</summary>
+        public double ComboAddition => comboAddition;
+
         public void Reset(double scoreMultiplier)
         {
             comboAddition = ComboMulti;
@@ -98,6 +101,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
 
             totalScoreDouble += delta;
             undoStates.Add((previous, delta));
+        }
+
+        /// <summary>
+        /// 长条持有期的连击增量（stable <c>IncreaseScoreHit(7)</c>）：只推进 combo，不加分、不进判定计数。
+        /// </summary>
+        /// <remarks>
+        /// stable 的 384 重置对 value 7 同样生效，且用的是<strong>自增前</strong>的 combo，
+        /// 故调用方须在 <c>ScoreProcessor.Combo</c> 自增之前调用本方法。
+        /// 增量不产生判定结果，故不进 undo 栈；跳帧由 <see cref="RestoreFrom"/> 整体重建。
+        /// </remarks>
+        /// <param name="comboAtTick">本拍增量之前的 combo（stable 的 <c>CurrentCombo</c>）。</param>
+        public void ApplyHoldTick(int comboAtTick)
+        {
+            if (comboAtTick != 0 && comboAtTick % ComboBonus == 0)
+                comboAddition = ComboMulti;
         }
 
         /// <summary>回退最近一次 <see cref="Apply"/>（rewind / revert）。</summary>

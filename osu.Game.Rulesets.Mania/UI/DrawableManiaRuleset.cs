@@ -29,10 +29,12 @@ using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Replays;
+using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Scoring;
@@ -96,6 +98,9 @@ namespace osu.Game.Rulesets.Mania.UI
         private RealmAccess realm { get; set; } = null!;
 
         [Resolved(canBeNull: true)]
+        private ScoreProcessor? scoreProcessor { get; set; }
+
+        [Resolved(canBeNull: true)]
         private GameplayState? gameplayState { get; set; }
 
         private readonly Bindable<EzEnumJudgeMode> judgeModeBindable = new Bindable<EzEnumJudgeMode>();
@@ -119,6 +124,15 @@ namespace osu.Game.Rulesets.Mania.UI
         /// 本局冻结的判定上下文；热路径读取此实例，禁止再解析全局配置。
         /// </summary>
         public ManiaJudgementRound? JudgementRound { get; private set; }
+
+        /// <summary>
+        /// stable classic 长条持有期连击增量的落点；仅局内且档位为 stable classic 时非空。
+        /// </summary>
+        /// <remarks>
+        /// 皮肤预览、编辑器等无 <see cref="ScoreProcessor"/> 的场景为 <c>null</c>。
+        /// </remarks>
+        internal ManiaScoreProcessor? StableClassicComboProcessor
+            => JudgementRound?.Environment.JudgeMode == EzEnumJudgeMode.StableClassic ? scoreProcessor as ManiaScoreProcessor : null;
 
         /// <summary>
         /// 进局时确认的主 BPM 拍长（ms）。由 <see cref="EzBeatmapSpeedTracker.ResolveBeatLength"/> 在 loading 时计算一次，之后不再更新。

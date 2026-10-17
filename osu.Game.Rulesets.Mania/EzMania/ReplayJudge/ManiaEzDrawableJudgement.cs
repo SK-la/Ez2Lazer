@@ -20,6 +20,7 @@ using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 {
@@ -233,6 +234,29 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             double releaseWindow = hold.Tail.HitObject.HitWindows?.WindowFor(HitResult.Meh) ?? 0;
             GetStableClassicHoldState(hold).OnReleased(hold.Time.Current, releaseWindow);
+        }
+
+        /// <summary>
+        /// stable classic 长条持有期的连击增量（stable <c>HitCircleManiaLong.Holding</c> 的
+        /// <c>IncreaseScoreHit(7)</c>）：每 100ms 一枚，只推 combo，不加分、不进判定计数。
+        /// </summary>
+        /// <remarks>
+        /// 局内与 <see cref="ManiaReplaySessionSimulator"/> 必须同源，否则总分只在 Session 侧多出增量。
+        /// 帧钟与 <c>StableClassicHoldState</c> 共用；后退时直接返回，由 <c>ResetFromReplayFrame</c> 重建累加器。
+        /// </remarks>
+        internal static void TryStableClassicHoldComboTick(DrawableHoldNote hold)
+        {
+            if (hold.EzDrawableManiaRuleset is not { JudgementRound: { } round, StableClassicComboProcessor: { } processor })
+                return;
+
+            if (!StableClassicJudgeModeJudgement.IsSelected(round.Environment.JudgeMode))
+                return;
+
+            if ((hold.Clock as IGameplayClock)?.IsRewinding == true)
+                return;
+
+            if (GetStableClassicHoldState(hold).TryAdvanceHoldComboTick(hold.Time.Current))
+                processor.ApplyClassicHoldCombo();
         }
 
         /// <summary>

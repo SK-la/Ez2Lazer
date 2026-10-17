@@ -50,22 +50,19 @@ namespace osu.Game.Rulesets.Mania.Scoring
         /// stable 该分支不给判定计数、不加分、不进 <c>HitEvents</c>，因此
         /// <c>ScoreResultCounts</c> / acc / rank / <c>MaximumStatistics</c> 均不受影响。
         /// 增量数取决于实际按住时长（无法从谱面枚举），故也不进 <c>MaximumCombo</c>。
+        /// 在自增前按当前 combo 做 384 的 <c>ComboAddition</c> 重置，与 stable 同序。
         /// </remarks>
         internal void ApplyClassicHoldCombo()
         {
             if (IsSimulating)
                 return;
 
+            stableScoring.ApplyHoldTick(Combo.Value);
             Combo.Value++;
             HighestCombo.Value = Math.Max(HighestCombo.Value, Combo.Value);
         }
 
         protected override bool TotalScoreIsSelfContained => isStableClassic;
-
-        private StableManiaWindows stableWindows => StableManiaWindows.Create(
-            calOD,
-            StableManiaScoring.WindowMultiplier(Mods.Value),
-            Beatmap.Value?.BeatmapInfo.Ruleset.OnlineID != 3);
 
         private double stableScoreMultiplier()
         {
@@ -304,6 +301,13 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         protected override void ApplyScoreChange(JudgementResult judgement)
         {
+            if (isStableClassic)
+            {
+                applyStableClassicScoreChange(judgement, judgement.ComboAtJudgement);
+                UpdateScoreClassic();
+                return;
+            }
+
             var hitWindows = new JudgeModeHelper(EzEnumJudgeMode.Classic)
             {
                 OverallDifficulty = calOD
@@ -319,18 +323,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             else if (hitObject is TailNote)
             {
                 ClassicMaxBaseScore += JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
-
-                if (isStableClassic)
-                {
-                    // 尾已经带着 stable classic 档位落地（StableClassicJudgeModeJudgement），计分侧直接复用，
-                    // 否则统计、acc、总分三处会各算一遍、又各自分叉。
-                    ClassicBaseScore += JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, judgement.Type);
-                    stableScoring.Apply(StableClassicJudgeModeJudgement.FromHitResult(judgement.Type), judgement.ComboAtJudgement);
-                }
-                else
-                {
-                    ClassicBaseScore += hitWindows.GetClassicLNScore(headOffsets[hitObject.Column], offset);
-                }
+                ClassicBaseScore += hitWindows.GetClassicLNScore(headOffsets[hitObject.Column], offset);
 
                 headOffsets[hitObject.Column] = 0;
             }
@@ -338,18 +331,43 @@ namespace osu.Game.Rulesets.Mania.Scoring
             {
                 ClassicMaxBaseScore += JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
                 ClassicBaseScore += JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, result);
-
-                if (isStableClassic)
-                    stableScoring.Apply(stableWindows.Judge(offset), judgement.ComboAtJudgement);
             }
 
             UpdateScoreClassic();
+        }
+
+        /// <summary>
+        /// stable classic 的计分 / classic 准确率都取<strong>已落定</strong>的判定档位。
+        /// </summary>
+        /// <remarks>
+        /// 不能用 <c>TimeOffset</c> 重判：被动 / 强制 Miss 的 stored offset 来自同列最近一次按键，
+        /// 偏移小时按窗口重判会得回 300g，于是 Miss 照样加基础分、还把 <c>ComboAddition</c> 加 2；
+        /// 列内从未按过键时偏移为 0，更是必然判成 300g。
+        /// </remarks>
+        private void applyStableClassicScoreChange(JudgementResult judgement, int comboAtJudgement)
+        {
+            var hitObject = judgement.HitObject;
+
+            // LN 头在 stable 里不进计分（也没有独立档位），头判定被绑定成 Ignore。
+            if (hitObject is not Note || hitObject is HeadNote)
+                return;
+
+            ClassicMaxBaseScore += JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.StableClassic, HitResult.Perfect);
+            ClassicBaseScore += JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.StableClassic, judgement.Type);
+            stableScoring.Apply(StableClassicJudgeModeJudgement.FromHitResult(judgement.Type), comboAtJudgement);
         }
 
         private readonly double[] headOffsets = new double[18];
 
         protected override void RemoveScoreChange(JudgementResult judgement)
         {
+            if (isStableClassic)
+            {
+                removeStableClassicScoreChange(judgement);
+                UpdateScoreClassic();
+                return;
+            }
+
             var hitWindows = new JudgeModeHelper(EzEnumJudgeMode.Classic)
             {
                 OverallDifficulty = calOD
@@ -365,16 +383,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             else if (hitObject is TailNote)
             {
                 ClassicMaxBaseScore -= JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
-
-                if (isStableClassic)
-                {
-                    ClassicBaseScore -= JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, judgement.Type);
-                    stableScoring.Revert();
-                }
-                else
-                {
-                    ClassicBaseScore -= hitWindows.GetClassicLNScore(headOffsets[hitObject.Column], offset);
-                }
+                ClassicBaseScore -= hitWindows.GetClassicLNScore(headOffsets[hitObject.Column], offset);
 
                 headOffsets[hitObject.Column] = 0;
             }
@@ -382,12 +391,20 @@ namespace osu.Game.Rulesets.Mania.Scoring
             {
                 ClassicMaxBaseScore -= JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, HitResult.Perfect);
                 ClassicBaseScore -= JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, result);
-
-                if (isStableClassic)
-                    stableScoring.Revert();
             }
 
             UpdateScoreClassic();
+        }
+
+        /// <summary><see cref="applyStableClassicScoreChange"/> 的逆操作（rewind / revert）。</summary>
+        private void removeStableClassicScoreChange(JudgementResult judgement)
+        {
+            if (judgement.HitObject is not Note || judgement.HitObject is HeadNote)
+                return;
+
+            ClassicMaxBaseScore -= JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.StableClassic, HitResult.Perfect);
+            ClassicBaseScore -= JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.StableClassic, judgement.Type);
+            stableScoring.Revert();
         }
     }
 }
