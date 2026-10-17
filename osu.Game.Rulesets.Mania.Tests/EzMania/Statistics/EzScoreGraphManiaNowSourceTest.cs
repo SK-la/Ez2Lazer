@@ -23,17 +23,14 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
         [TearDown]
         public void TearDown() => ReplayJudgeTestConfig.ResetGlobalConfig();
 
-        [TestCase(EzEnumJudgeMode.Lazer)]
-        [TestCase(EzEnumJudgeMode.Classic)]
-        [TestCase(EzEnumJudgeMode.StableClassic)]
-        [TestCase(EzEnumJudgeMode.EZ2AC)]
-        [TestCase(EzEnumJudgeMode.O2Jam)]
-        [TestCase(EzEnumJudgeMode.IIDX_HD)]
-        [TestCase(EzEnumJudgeMode.Malody_E)]
-        public void TestNoSessionYieldsNoSnapshot(EzEnumJudgeMode judgeMode)
+        [Test]
+        public void TestNoSessionYieldsZeroSnapshot()
         {
-            Assert.That(EzScoreGraphMania.CreateSessionNowSnapshot(null, judgeMode), Is.Null,
-                "无 Session 时 Now 必须保持 0，不能回落到成绩自身数值");
+            var zero = EzScoreGraphMania.SessionNowSnapshot.Zero();
+
+            Assert.That(zero.Accuracy, Is.Zero, "无 Session 时 Now 必须保持 0，不能回落到成绩自身数值");
+            Assert.That(zero.Score, Is.Zero);
+            Assert.That(zero.Counts, Is.Empty);
         }
 
         [Test]
@@ -53,11 +50,10 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
 
             var snapshot = EzScoreGraphMania.CreateSessionNowSnapshot(sessionInfo, EzEnumJudgeMode.StableClassic);
 
-            Assert.That(snapshot, Is.Not.Null);
-            Assert.That(snapshot.Value.Accuracy, Is.EqualTo(0.5));
-            Assert.That(snapshot.Value.Score, Is.EqualTo(42), "总分必须原样取 Session，不能按 acc 反投影");
-            Assert.That(snapshot.Value.Counts.GetValueOrDefault(HitResult.Perfect), Is.EqualTo(3));
-            Assert.That(snapshot.Value.Counts.GetValueOrDefault(HitResult.Miss), Is.EqualTo(1));
+            Assert.That(snapshot.Accuracy, Is.EqualTo(0.5));
+            Assert.That(snapshot.Score, Is.EqualTo(42), "总分必须原样取 Session，不能按 acc 反投影");
+            Assert.That(snapshot.Counts.GetValueOrDefault(HitResult.Perfect), Is.EqualTo(3));
+            Assert.That(snapshot.Counts.GetValueOrDefault(HitResult.Miss), Is.EqualTo(1));
         }
 
         [Test]
@@ -74,7 +70,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
                 },
             };
 
-            var snapshot = EzScoreGraphMania.CreateSessionNowSnapshot(sessionInfo, EzEnumJudgeMode.StableClassic).Value;
+            var snapshot = EzScoreGraphMania.CreateSessionNowSnapshot(sessionInfo, EzEnumJudgeMode.StableClassic);
 
             Assert.That(sessionInfo.HitEvents, Is.Empty, "本用例不提供 HitEvents");
             Assert.That(snapshot.Counts.Values.Sum(), Is.EqualTo(3), "计数取 Session 的 Statistics，不重跑判定");
@@ -87,7 +83,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
             var environment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
 
             var sessionInfo = ManiaReplaySession.Run(score, beatmap, environment).ScoreInfo;
-            var snapshot = EzScoreGraphMania.CreateSessionNowSnapshot(sessionInfo, EzEnumJudgeMode.StableClassic).Value;
+            var snapshot = EzScoreGraphMania.CreateSessionNowSnapshot(sessionInfo, EzEnumJudgeMode.StableClassic);
 
             Assert.That(snapshot.Accuracy, Is.EqualTo(sessionInfo.Accuracy));
             Assert.That(snapshot.Score, Is.EqualTo(sessionInfo.TotalScore));

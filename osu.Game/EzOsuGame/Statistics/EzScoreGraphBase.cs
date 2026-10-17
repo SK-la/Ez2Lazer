@@ -66,12 +66,19 @@ namespace osu.Game.EzOsuGame.Statistics
         protected IEzReplaySession ReplaySession { get; private set; } = null!;
 
         // Graph-UX: 双轨刷新状态管理
-        // displayOffset 由 RefreshDisplayOnly 管理（拖动时），RefreshFromService 成功后重置为 0
-        protected Score? CommittedNowScore;
+        /// <summary>
+        /// 当前 ReplaySession 运行结果的 Score（包含临时 ManiaOffsetPlus），用于在图表中显示已提交的 Now 统计。
+        /// </summary>
+        protected Score? ReplaySessionScore;
+
+        /// <summary>
+        /// 当前图表展示使用的 offset（仅用于 UI 展示，未提交到 Session）。
+        /// displayOffset 由 RefreshDisplayOnly 管理（拖动时），RefreshFromService 成功后重置为 0。
+        /// </summary>
         protected double DisplayOffset;
 
         /// <summary>上次 Session 完成时的 offset（来自 <see cref="ReplayRunResult.ResolvedEnvironment"/>）。</summary>
-        protected double CommittedSessionOffset;
+        protected double LastApplyOffset;
 
         // Debounce 控制 — offset 拖动时仅展示，落定后触发 Session
         private CancellationTokenSource? debounceCancellation;
@@ -117,7 +124,7 @@ namespace osu.Game.EzOsuGame.Statistics
         /// </summary>
         protected IReadOnlyList<HitEvent> GetDisplayEventsWithOffset()
         {
-            var baseEvents = CommittedNowScore?.ScoreInfo.HitEvents ?? OriginalHitEvents;
+            var baseEvents = ReplaySessionScore?.ScoreInfo.HitEvents ?? OriginalHitEvents;
 
 #pragma warning disable IDE0046 // displayOffset == 0 的简化写法
             if (DisplayOffset == 0)
@@ -169,14 +176,14 @@ namespace osu.Game.EzOsuGame.Statistics
         /// </summary>
         protected virtual void CalculateV1Accuracy()
         {
-            var v1ScoreProcessor = Score.Ruleset.CreateInstance().CreateScoreProcessor();
+            var v1Sp = Score.Ruleset.CreateInstance().CreateScoreProcessor();
 
             // 必须在 ApplyBeatmap() 前设置 Legacy 标记：
             // ManiaScoreProcessor 会在 ApplyBeatmap() 内缓存 judgeMode，
             // 若顺序反了就会把当前 JudgeMode 当成 V1 路线，导致 classic 结果随 JudgeMode 改变。
-            v1ScoreProcessor.IsLegacyScore = true;
-            v1ScoreProcessor.ApplyBeatmap(Beatmap);
-            v1ScoreProcessor.Mods.Value = Score.Mods;
+            v1Sp.IsLegacyScore = true;
+            v1Sp.ApplyBeatmap(Beatmap);
+            v1Sp.Mods.Value = Score.Mods;
 
             var v1Counts = new Dictionary<HitResult, int>();
 
@@ -184,15 +191,15 @@ namespace osu.Game.EzOsuGame.Statistics
             {
                 var recalculated = RecalculateV1Result(hitEvent);
                 v1Counts[recalculated] = v1Counts.GetValueOrDefault(recalculated, 0) + 1;
-                v1ScoreProcessor.ApplyResult(new JudgementResult(hitEvent.HitObject, hitEvent.HitObject.CreateJudgement())
+                v1Sp.ApplyResult(new JudgementResult(hitEvent.HitObject, hitEvent.HitObject.CreateJudgement())
                 {
                     Type = recalculated,
                     TimeOffset = hitEvent.TimeOffset
                 });
             }
 
-            double accuracy = v1ScoreProcessor.AccuracyClassic.Value;
-            long totalScore = v1ScoreProcessor.TotalScoreWithoutMods.Value;
+            double accuracy = v1Sp.AccuracyClassic.Value;
+            long totalScore = v1Sp.TotalScoreWithoutMods.Value;
 
             // Logger.Log($"[V1 ScoreProcessor] {accuracy * 100:F2}%, Score: {totalScore / 10000}w", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
@@ -463,7 +470,7 @@ namespace osu.Game.EzOsuGame.Statistics
         {
             DisplayOffset = fakeOffset;
 
-            if (CommittedNowScore == null)
+            if (ReplaySessionScore == null)
                 RecalculateNowFromDisplayEvents();
 
             UpdateText();
@@ -490,8 +497,8 @@ namespace osu.Game.EzOsuGame.Statistics
                 if (!result.IsValidReplay)
                     return;
 
-                CommittedNowScore = result.Score;
-                CommittedSessionOffset = result.ResolvedEnvironment?.OffsetPlusMania ?? 0;
+                ReplaySessionScore = result.Score;
+                LastApplyOffset = result.ResolvedEnvironment?.OffsetPlusMania ?? 0;
                 DisplayOffset = 0;
 
                 Schedule(Refresh);
@@ -502,8 +509,8 @@ namespace osu.Game.EzOsuGame.Statistics
             }
             catch
             {
-                CommittedNowScore = null;
-                CommittedSessionOffset = 0;
+                ReplaySessionScore = null;
+                LastApplyOffset = 0;
                 Schedule(Refresh);
             }
         }
@@ -627,7 +634,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
             for (int i = 0; i < sampleCount; i++)
             {
-                double ratio = sampleCount == 1 ? 0 : i / (double)(sampleCount - 1);
+                double ratio = i / (double)(sampleCount - 1);
                 double time = minTime + timeRange * ratio;
                 double boundary = UpdateBoundary(result, time);
                 float x = (float)(ratio * availableWidth);

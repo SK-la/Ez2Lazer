@@ -101,9 +101,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                     return null;
 
                 var precise = new ManiaReplaySessionService()
-                    .RunHitEventsAsync(scoreForBridge, beatmap)
-                    .GetAwaiter()
-                    .GetResult();
+                              .RunHitEventsAsync(scoreForBridge, beatmap)
+                              .GetAwaiter()
+                              .GetResult();
 
                 if (precise is { Count: > 0 })
                     return precise;
@@ -123,7 +123,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         protected override IReadOnlyList<HitEvent> FilterHitEvents()
         {
-            if (CommittedNowScore?.ScoreInfo.HitEvents is { } sessionEvents)
+            if (ReplaySessionScore?.ScoreInfo.HitEvents is { } sessionEvents)
                 return filterForCurrentJudgeMode(sessionEvents);
 
             return Array.Empty<HitEvent>();
@@ -153,7 +153,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         private IReadOnlyList<HitEvent> applyFakeOffsetToEvents(IEnumerable<HitEvent> events)
         {
             var list = events.ToList();
-            double delta = offsetPlusMania.Value - CommittedSessionOffset;
+            double delta = offsetPlusMania.Value - LastApplyOffset;
 
             if (delta == 0)
                 return list;
@@ -169,25 +169,27 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         protected override void CalculateNowAccuracy()
         {
-            var info = CommittedNowScore?.ScoreInfo;
+            var info = ReplaySessionScore?.ScoreInfo;
 
             // Now 只有 Session 重算这一个来源：尚无结果时保持 0，不用成绩自身的数值顶替。
             if (info == null)
             {
-                NowCounts = new Dictionary<HitResult, int>();
-                NowAccuracy = 0;
-                NowScore = 0;
+                var zero = SessionNowSnapshot.Zero();
+
+                NowCounts = zero.Counts;
+                NowAccuracy = zero.Accuracy;
+                NowScore = zero.Score;
                 return;
             }
 
             // Debounce 前的拖动预览仍走 HitEvent 偏移重判；Session 提交后直接使用其完整重算结果。
-            if (offsetPlusMania.Value != CommittedSessionOffset)
+            if (offsetPlusMania.Value != LastApplyOffset)
             {
                 RecalculateNowFromDisplayEvents();
                 return;
             }
 
-            var now = CreateSessionNowSnapshot(info, currentJudgeMode).Value;
+            var now = CreateSessionNowSnapshot(info, currentJudgeMode);
 
             NowCounts = now.Counts;
             NowAccuracy = now.Accuracy;
@@ -196,22 +198,24 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         }
 
         /// <summary>
-        /// Now 列的取值快照：唯一来源是 Session 的 <see cref="ScoreInfo"/>。
+        /// 把 Session 的 <see cref="ScoreInfo"/> 投影成 Now 列的三项数值。
         /// </summary>
-        /// <returns>无 Session 结果时返回 <see langword="null"/>，由调用方保持 0。</returns>
         /// <remarks>
         /// 三项必须同源：stable classic 的总分由 combo 状态机累加，不能用 acc 反投影出分数，
-        /// 也不能混入成绩自身的 acc / 统计。
+        /// 也不能混入成绩自身的 acc / 统计。调用方负责区分「尚无 Session 结果」。
         /// </remarks>
-        internal static SessionNowSnapshot? CreateSessionNowSnapshot(ScoreInfo? sessionInfo, EzEnumJudgeMode judgeMode)
+        internal static SessionNowSnapshot CreateSessionNowSnapshot(ScoreInfo sessionInfo, EzEnumJudgeMode judgeMode)
         {
-            if (sessionInfo == null)
-                return null;
-
             return new SessionNowSnapshot(sessionInfo.Accuracy, sessionInfo.TotalScore, ExtractDisplayCounts(sessionInfo.Statistics, judgeMode));
         }
 
-        internal readonly record struct SessionNowSnapshot(double Accuracy, long Score, Dictionary<HitResult, int> Counts);
+        /// <summary>
+        /// Now 列的三项取值；<see cref="Zero"/> 表示尚无 Session 结果。
+        /// </summary>
+        internal readonly record struct SessionNowSnapshot(double Accuracy, long Score, Dictionary<HitResult, int> Counts)
+        {
+            public static SessionNowSnapshot Zero() => new SessionNowSnapshot(0, 0, new Dictionary<HitResult, int>());
+        }
 
         /// <summary>
         /// 按当前 JudgeMode 的基分权重计算 NowAccuracy 和 NowScore。
@@ -393,7 +397,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         /// </summary>
         protected override HitResult GetDisplayResult(HitEvent hitEvent)
         {
-            if (offsetPlusMania.Value == CommittedSessionOffset)
+            if (offsetPlusMania.Value == LastApplyOffset)
                 return hitEvent.Result;
 
             if (currentJudgeMode == EzEnumJudgeMode.O2Jam)
@@ -439,17 +443,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         /// </summary>
         internal static IReadOnlyList<HitResult> GetOrderedStatHitResults(EzEnumJudgeMode judgeMode)
             => JudgeModeHelper.GetJudgeModeValidHitResults(judgeMode)
-                            .Where(r => r is not (HitResult.IgnoreHit or HitResult.IgnoreMiss))
-                            .OrderBy(r => r.GetIndexForOrderedDisplay())
-                            .ToList();
+                              .Where(r => r is not (HitResult.IgnoreHit or HitResult.IgnoreMiss))
+                              .OrderBy(r => r.GetIndexForOrderedDisplay())
+                              .ToList();
 
         /// <summary>
         /// JudgeMode / 重判相关配置变更：清空 Session 缓存，即时 rejudge 展示，并异步重跑 Session。
         /// </summary>
         private void onReplayConfigChanged()
         {
-            CommittedNowScore = null;
-            CommittedSessionOffset = 0;
+            ReplaySessionScore = null;
+            LastApplyOffset = 0;
             InvalidateTextUi();
             Refresh();
             _ = RefreshFromService();
