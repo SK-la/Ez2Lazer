@@ -72,21 +72,28 @@ namespace osu.Game.Rulesets.Mania.Tests
         }
 
         /// <summary>
-        /// [Ez] StableClassic 与 Classic 同档位权重。该表缺分支时每个判定基分都是 0，
-        /// 局内 <c>ScoreProcessor.Accuracy</c> 的分子分母同为 0，会恒判 100%。
+        /// [Ez] StableClassic 的基础分表：300g 与 300 都按 300 计。
+        /// 该表缺分支时每个判定基分都是 0，局内 <c>ScoreProcessor.Accuracy</c> 的分子分母同为 0，会恒判 100%。
         /// </summary>
         [Test]
-        public void TestStableClassicUsesClassicWeights()
+        public void TestStableClassicUsesStableWeights()
         {
-            foreach (var result in new[] { HitResult.Perfect, HitResult.Great, HitResult.Good, HitResult.Ok, HitResult.Meh, HitResult.Miss })
+            var expected = new Dictionary<HitResult, int>
+            {
+                [HitResult.Perfect] = 300,
+                [HitResult.Great] = 300,
+                [HitResult.Good] = 200,
+                [HitResult.Ok] = 100,
+                [HitResult.Meh] = 50,
+                [HitResult.Miss] = 0,
+            };
+
+            foreach (var (result, value) in expected)
             {
                 Assert.That(JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.StableClassic, result),
-                    Is.EqualTo(JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, result)),
-                    () => $"{result} 应使用 classic 档位权重");
+                    Is.EqualTo(value),
+                    () => $"{result} 应使用 stable classic 档位权重");
             }
-
-            // 与 Classic 同值不足以说明没落到 default:0，故再钉一个非零值。
-            Assert.That(JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.StableClassic, HitResult.Perfect), Is.EqualTo(300));
         }
     }
 }
