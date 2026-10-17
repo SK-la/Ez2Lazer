@@ -25,6 +25,13 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
         public BindableList<ExtensionColumn> Columns { get; } = new BindableList<ExtensionColumn>();
 
+        public ExtensionColumnSet()
+        {
+            // Subscribed here, before any renderer binds, so the numbers are already positional by the time the columns
+            // rebuild their labels; that leaves no path which can add or remove a column without renumbering.
+            Columns.BindCollectionChanged((_, _) => renumber(), true);
+        }
+
         /// <summary>
         /// The rightmost column, if any.
         /// </summary>
@@ -47,7 +54,6 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
             var column = new ExtensionColumn(index + 1);
             Columns.Insert(Math.Clamp(index, 0, Columns.Count), column);
-            renumber();
 
             return column;
         }
@@ -56,14 +62,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         /// Removes <paramref name="column"/>, dropping its notes with it.
         /// </summary>
         /// <returns>Whether the column was removed.</returns>
-        public bool Remove(ExtensionColumn column)
-        {
-            if (!Columns.Remove(column))
-                return false;
-
-            renumber();
-            return true;
-        }
+        public bool Remove(ExtensionColumn column) => Columns.Remove(column);
 
         /// <summary>
         /// Removes the rightmost column.

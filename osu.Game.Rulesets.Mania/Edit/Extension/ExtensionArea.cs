@@ -9,6 +9,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Edit;
@@ -218,12 +219,12 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         public int RemoveSelected() => columnSet.RemoveSelected();
 
         /// <summary>
-        /// Selects the notes whose centre time lies in the given band, deselecting the rest unless they are preserved.
+        /// Selects the notes the given box covers, deselecting the rest unless they are preserved.
         /// </summary>
-        public void UpdateBoxSelection(double minTime, double maxTime, HashSet<ExtensionNote>? preserve)
+        public void UpdateBoxSelection(Quad selectionQuad, HashSet<ExtensionNote>? preserve)
         {
             foreach (var column in columnFlow)
-                column.UpdateBoxSelection(minTime, maxTime, preserve);
+                column.UpdateBoxSelection(selectionQuad, preserve);
         }
 
         /// <summary>
@@ -246,6 +247,34 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
                 return null;
 
             return column.TimeAtScreenSpacePosition(screenSpacePosition);
+        }
+
+        /// <summary>
+        /// The screen-space horizontal extent of the columns, or <c>null</c> before they are laid out.
+        /// </summary>
+        public (float left, float right)? ColumnScreenSpaceBounds
+        {
+            get
+            {
+                if (columnFlow.Count == 0)
+                    return null;
+
+                float left = float.MaxValue;
+                float right = float.MinValue;
+
+                foreach (var column in columnFlow)
+                {
+                    var quad = column.ScreenSpaceDrawQuad.AABBFloat;
+
+                    if (quad.Width <= 0)
+                        continue;
+
+                    left = Math.Min(left, quad.Left);
+                    right = Math.Max(right, quad.Right);
+                }
+
+                return left <= right ? (left, right) : null;
+            }
         }
 
         /// <summary>
@@ -367,26 +396,13 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
         private void onColumnsChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
-            switch (e.Action)
-            {
-                case NotifyCollectionChangedAction.Add:
-                    for (int i = 0; i < e.NewItems!.Count; i++)
-                        columnFlow.Insert(e.NewStartingIndex + i, createColumn((ExtensionColumn)e.NewItems[i]!));
-                    break;
+            // Rebuilt wholesale rather than spliced. Column numbers are positional, so the drawables must mirror
+            // Columns exactly; incremental adds/removes can leave the flow ordered by insertion history, which makes
+            // the labels read out of order even though the numbers themselves are contiguous.
+            columnFlow.Clear();
 
-                case NotifyCollectionChangedAction.Remove:
-                    for (int i = 0; i < e.OldItems!.Count; i++)
-                        columnFlow.Remove(columnFlow[e.OldStartingIndex], true);
-                    break;
-
-                default:
-                    columnFlow.Clear();
-
-                    foreach (var column in columnSet.Columns)
-                        columnFlow.Add(createColumn(column));
-
-                    break;
-            }
+            foreach (var column in columnSet.Columns)
+                columnFlow.Add(createColumn(column));
 
             placeholder.Alpha = columnSet.Columns.Count == 0 ? 1 : 0;
         }
