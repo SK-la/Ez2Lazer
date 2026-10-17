@@ -78,6 +78,11 @@ namespace osu.Game.Rulesets.Mania.UI
         /// </summary>
         protected virtual bool AllowStagePanel => true;
 
+        /// <summary>
+        /// Whether the JudgementLine should be shown.
+        /// </summary>
+        protected virtual bool ShowJudgementLine => false;
+
         public Stage(int firstColumnIndex, StageDefinition definition, ref ManiaAction columnStartAction)
         {
             this.firstColumnIndex = firstColumnIndex;
@@ -147,10 +152,21 @@ namespace osu.Game.Rulesets.Mania.UI
                         new HitPositionPaddedContainer
                         {
                             RelativeSizeAxes = Axes.Both,
-                            Child = judgements = new JudgementContainer<DrawableManiaJudgement>
+                            Children = new Drawable[]
                             {
-                                RelativeSizeAxes = Axes.Both,
-                            },
+                                judgements = new JudgementContainer<DrawableManiaJudgement>
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                },
+                                new Box
+                                {
+                                    Anchor = Anchor.CentreLeft,
+                                    RelativeSizeAxes = Axes.X,
+                                    Height = 1,
+                                    Colour = Colour4.White,
+                                    Alpha = ShowJudgementLine ? 0.9f : 0
+                                }
+                            }
                         },
                         topLevelContainer = new Container { RelativeSizeAxes = Axes.Both }
                     }
