@@ -129,6 +129,10 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         {
             base.Update();
 
+            // Mirrors the playfield: a plain right click deletes while a placement tool is active and opens the context
+            // menu under the selection tool.
+            handler?.RightClickAlwaysQuickDeletes = area.Mode != ExtensionPlacementMode.None;
+
             if (!needsSync)
                 return;
 

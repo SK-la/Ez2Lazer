@@ -9,6 +9,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.Graphics;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Rulesets.UI.Scrolling.Algorithms;
 using osu.Game.Screens.Edit;
@@ -25,9 +26,19 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
     /// </remarks>
     public partial class ExtensionLane : CompositeDrawable
     {
-        private const float preview_height = 8;
-        private const float preview_opacity = 0.4f;
+        /// <summary>
+        /// Height of the placement highlight. Equal to the least note height so the highlight marks exactly the slot the
+        /// note will occupy; only its shape and colour distinguish it from a placed note.
+        /// </summary>
+        private const float preview_height = 6;
+
+        private const float draft_opacity = 0.5f;
         private const float grid_line_height = 1.5f;
+
+        /// <summary>
+        /// The least height a note is drawn with, so that a tap or a very short hold stays visible.
+        /// </summary>
+        public const float MINIMUM_NOTE_HEIGHT = 10;
 
         private readonly ExtensionColumn column;
         private readonly ExtensionArea area;
@@ -35,10 +46,9 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         private readonly Dictionary<ExtensionNote, DrawableExtensionNote> noteDrawables = new Dictionary<ExtensionNote, DrawableExtensionNote>();
         private readonly List<Box> gridLineBoxes = new List<Box>();
 
-        private readonly Container lineContainer;
         private readonly Container noteContainer;
         private readonly Box draftBox;
-        private readonly Box previewBox;
+        private readonly Circle previewPiece;
 
         private IBindable<double> timeRange = null!;
         private IBindable<ScrollingDirection> direction = null!;
@@ -50,7 +60,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         /// <summary>
         /// The surface beat lines are drawn on, below the notes.
         /// </summary>
-        public Container LineContainer => lineContainer;
+        public Container LineContainer { get; }
 
         /// <summary>
         /// Whether time advances towards the bottom of the surface.
@@ -66,7 +76,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
             InternalChildren = new Drawable[]
             {
-                lineContainer = new Container { RelativeSizeAxes = Axes.Both },
+                LineContainer = new Container { RelativeSizeAxes = Axes.Both },
                 noteContainer = new Container
                 {
                     RelativeSizeAxes = Axes.Both,
@@ -76,27 +86,30 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
                         {
                             RelativeSizeAxes = Axes.X,
                             Height = preview_height,
-                            Colour = Colour4.White.Opacity(preview_opacity),
                             Alpha = 0,
                         },
                     },
                 },
-                previewBox = new Box
+                // Mirrors the playfield's placement piece: a yellow highlight instead of a note silhouette, so the cursor's
+                // slot never reads as a note that is already there.
+                previewPiece = new Circle
                 {
                     RelativeSizeAxes = Axes.X,
                     Height = preview_height,
-                    Colour = Colour4.White.Opacity(preview_opacity),
                     Alpha = 0,
                 },
             };
         }
 
         [BackgroundDependencyLoader]
-        private void load(IScrollingInfo scrollingInfo)
+        private void load(IScrollingInfo scrollingInfo, OsuColour colours)
         {
             timeRange = scrollingInfo.TimeRange.GetBoundCopy();
             direction = scrollingInfo.Direction.GetBoundCopy();
             algorithm = scrollingInfo.Algorithm.GetBoundCopy();
+
+            previewPiece.Colour = colours.Yellow;
+            draftBox.Colour = colours.Yellow;
 
             column.Notes.BindCollectionChanged(onNotesChanged, true);
         }
@@ -111,10 +124,28 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         }
 
         /// <summary>
-        /// The local height spanned by [<paramref name="startTime"/>, <paramref name="endTime"/>].
+        /// The local top edge and height of a note starting at <paramref name="time"/> with <paramref name="duration"/>.
         /// </summary>
-        public float LengthAt(double startTime, double endTime)
-            => Math.Abs(algorithm.Value.GetLength(startTime, endTime, timeRange.Value, DrawHeight));
+        /// <remarks>
+        /// Placed the way the playfield places its own drawables: the note's hit edge sits on its start row and the body
+        /// extends towards the side the note arrives from. A tap or a very short hold therefore grows away from the row
+        /// instead of straddling it, which keeps the note, its beat line and its selection outline on the same row.
+        /// </remarks>
+        public (float top, float height) SpanOf(double time, double duration)
+        {
+            float head = OffsetAt(time);
+            float tail = OffsetAt(time + duration);
+
+            float top = Math.Min(head, tail);
+            float height = Math.Max(head, tail) - top;
+
+            if (height >= MINIMUM_NOTE_HEIGHT)
+                return (top, height);
+
+            return ScrollsDown
+                ? (head - MINIMUM_NOTE_HEIGHT, minimum_note_height: MINIMUM_NOTE_HEIGHT)
+                : (head, minimum_note_height: MINIMUM_NOTE_HEIGHT);
+        }
 
         /// <summary>
         /// The time at a local Y.
@@ -190,7 +221,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
                 };
 
                 gridLineBoxes.Add(box);
-                lineContainer.Add(box);
+                LineContainer.Add(box);
             }
 
             for (int i = 0; i < gridLineBoxes.Count; i++)
@@ -223,12 +254,13 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
                 return;
             }
 
-            float startY = OffsetAt(draft.start);
-            float endY = OffsetAt(draft.end);
+            var span = SpanOf(draft.start, draft.end - draft.start);
 
-            draftBox.Y = Math.Min(startY, endY);
-            draftBox.Height = Math.Max(preview_height, Math.Abs(endY - startY));
-            draftBox.Alpha = 1;
+            draftBox.Y = span.top;
+            draftBox.Height = span.height;
+
+            if (draftBox.Alpha != draft_opacity)
+                draftBox.Alpha = draft_opacity;
         }
 
         private void updatePreview()
@@ -242,16 +274,19 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
             if (!show)
             {
-                if (previewBox.Alpha != 0)
-                    previewBox.Alpha = 0;
+                if (previewPiece.Alpha != 0)
+                    previewPiece.Alpha = 0;
 
                 return;
             }
 
-            previewBox.Y = OffsetAt(time!.Value) - preview_height;
+            var span = SpanOf(time!.Value, 0);
 
-            if (previewBox.Alpha != 1)
-                previewBox.Alpha = 1;
+            // Centred on the slot the note would occupy, like the playfield's placement piece is offset by half a note.
+            previewPiece.Y = span.top + span.height / 2 - preview_height / 2;
+
+            if (previewPiece.Alpha != 1)
+                previewPiece.Alpha = 1;
         }
 
         private void onNotesChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -259,12 +294,12 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
             switch (e.Action)
             {
                 case NotifyCollectionChangedAction.Add:
-                    foreach (var item in e.NewItems!)
+                    foreach (object item in e.NewItems!)
                         addNote((ExtensionNote)item!);
                     break;
 
                 case NotifyCollectionChangedAction.Remove:
-                    foreach (var item in e.OldItems!)
+                    foreach (object item in e.OldItems!)
                         removeNote((ExtensionNote)item!);
                     break;
 

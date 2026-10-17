@@ -6,8 +6,10 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Input.Events;
 using osu.Game.Screens.Edit;
 using osu.Game.Screens.Edit.Compose.Components;
+using osuTK.Input;
 
 namespace osu.Game.Rulesets.Mania.Edit.Extension
 {
@@ -27,6 +29,23 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
         public ExtensionSelectionHandler(ExtensionColumnSet columnSet)        {
             this.columnSet = columnSet;
+        }
+
+        /// <summary>
+        /// Whether right click deletes even when shift is not held.
+        /// </summary>
+        /// <remarks>
+        /// The playfield sets this while a placement tool is active and clears it for the selection tool, so that a plain
+        /// right click deletes while placing but opens the context menu while selecting. The dock mirrors it.
+        /// </remarks>
+        public bool RightClickAlwaysQuickDeletes { get; set; }
+
+        protected override bool ShouldQuickDelete(MouseButtonEvent e)
+        {
+            if (RightClickAlwaysQuickDeletes && e.Button == MouseButton.Right)
+                return true;
+
+            return base.ShouldQuickDelete(e);
         }
 
         public void DeleteSelection() => DeleteSelected();

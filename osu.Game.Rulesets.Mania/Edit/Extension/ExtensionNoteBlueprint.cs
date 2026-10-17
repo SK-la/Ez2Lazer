@@ -19,7 +19,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
     /// </remarks>
     public partial class ExtensionNoteBlueprint : SelectionBlueprint<ExtensionNote>
     {
-        private const float minimum_height = 8;
+        private const float minimum_height = ExtensionLane.MINIMUM_NOTE_HEIGHT;
         private const float handle_height = 6;
 
         private readonly ExtensionArea area;
@@ -79,21 +79,10 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
             if (Parent == null || Item.Column == null || area.LaneOf(Item.Column) is not ExtensionLane lane || lane.Parent == null)
                 return;
 
-            float startY = lane.OffsetAt(Item.Time);
-            float endY = lane.OffsetAt(Item.Time + Item.Duration);
+            var span = lane.SpanOf(Item.Time, Item.Duration);
 
-            float top = Math.Min(startY, endY);
-            float bottom = Math.Max(startY, endY);
-
-            if (bottom - top < minimum_height)
-            {
-                float padding = (minimum_height - (bottom - top)) / 2;
-                top -= padding;
-                bottom += padding;
-            }
-
-            Vector2 topLeft = Parent.ToLocalSpace(lane.ToScreenSpace(new Vector2(0, top)));
-            Vector2 bottomRight = Parent.ToLocalSpace(lane.ToScreenSpace(new Vector2(lane.DrawWidth, bottom)));
+            Vector2 topLeft = Parent.ToLocalSpace(lane.ToScreenSpace(new Vector2(0, span.top)));
+            Vector2 bottomRight = Parent.ToLocalSpace(lane.ToScreenSpace(new Vector2(lane.DrawWidth, span.top + span.height)));
 
             Position = new Vector2(Math.Min(topLeft.X, bottomRight.X), Math.Min(topLeft.Y, bottomRight.Y));
             Size = new Vector2(Math.Max(1, Math.Abs(bottomRight.X - topLeft.X)), Math.Max(minimum_height, Math.Abs(bottomRight.Y - topLeft.Y)));

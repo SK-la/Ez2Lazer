@@ -20,9 +20,9 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
     /// </remarks>
     public partial class DrawableExtensionNote : CompositeDrawable
     {
-        private const float minimum_height = 8;
-        private const float body_opacity = 0.45f;
-        private const float tail_opacity = 0.25f;
+        private const float minimum_height = ExtensionLane.MINIMUM_NOTE_HEIGHT;
+        private const float body_opacity = 0.75f;
+        private const float tail_opacity = 0.45f;
 
         public readonly ExtensionNote Note;
 
@@ -62,16 +62,12 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         {
             base.Update();
 
-            float startY = lane.OffsetAt(Note.Time);
-            float endY = lane.OffsetAt(Note.Time + Note.Duration);
+            var span = lane.SpanOf(Note.Time, Note.Duration);
 
-            float top = Math.Min(startY, endY);
-            float bottom = Math.Max(startY, endY);
-            float height = Math.Max(minimum_height, bottom - top);
+            Y = span.top;
+            Height = span.height;
 
-            Y = top;
-            Height = height;
-
+            float height = span.height;
             float endHeight = Note.Duration > 0 ? Math.Min(minimum_height, height * 0.5f) : 0;
 
             if (lane.ScrollsDown)
