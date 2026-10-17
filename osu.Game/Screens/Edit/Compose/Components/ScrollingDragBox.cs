@@ -5,6 +5,7 @@ using System;
 using osu.Framework.Input.Events;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
+using osuTK;
 
 namespace osu.Game.Screens.Edit.Compose.Components
 {
@@ -16,6 +17,15 @@ namespace osu.Game.Screens.Edit.Compose.Components
         public double MinTime { get; private set; }
 
         public double MaxTime { get; private set; }
+
+        /// <summary>
+        /// Optional screen-space horizontal extent forced onto the box.
+        /// </summary>
+        /// <remarks>
+        /// A time-based box on its own keeps the pointer's horizontal extent, which is a raw path artefact; this lets the
+        /// owner widen it to the region the box actually selects in, so what is drawn matches what is selected.
+        /// </remarks>
+        public Func<(float left, float right)?>? HorizontalExtent { get; set; }
 
         private double? startTime;
 
@@ -52,6 +62,15 @@ namespace osu.Game.Screens.Edit.Compose.Components
                     Box.X = Math.Min(startPos.X, endPos.X);
                     Box.Width = Math.Max(startPos.X, endPos.X) - Box.X;
                     break;
+            }
+
+            if (HorizontalExtent?.Invoke() is (float left, float right))
+            {
+                float localLeft = ToLocalSpace(new Vector2(left, 0)).X;
+                float localRight = ToLocalSpace(new Vector2(right, 0)).X;
+
+                Box.X = Math.Min(localLeft, localRight);
+                Box.Width = Math.Abs(localRight - localLeft);
             }
         }
 

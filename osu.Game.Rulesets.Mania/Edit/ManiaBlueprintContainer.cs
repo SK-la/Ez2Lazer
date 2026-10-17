@@ -59,6 +59,15 @@ namespace osu.Game.Rulesets.Mania.Edit
             && SelectionHandler.SelectedBlueprints.Any(b => b is HoldNoteSelectionBlueprint hold && hold.IsHandleAt(screenSpacePos));
 
         /// <summary>
+        /// Whether the press that started the current gesture was handed to a hold's end handle rather than this container.
+        /// </summary>
+        /// <remarks>
+        /// Decided once on press. Selecting a hold switches the tool to selection, so re-deciding on drag start would
+        /// swallow the drag of a press that landed on the head of a not-yet-selected hold.
+        /// </remarks>
+        private bool holdHandleDragDeferred;
+
+        /// <summary>
         /// Whether this container takes positional input at <paramref name="screenSpacePos"/>.
         /// </summary>
         /// <remarks>
@@ -71,10 +80,9 @@ namespace osu.Game.Rulesets.Mania.Edit
 
         protected override bool OnMouseDown(MouseDownEvent e)
         {
-            if (e.Button == MouseButton.Left && shouldDeferHoldHandleDrag(e.ScreenSpaceMouseDownPosition))
-                return false;
+            holdHandleDragDeferred = e.Button == MouseButton.Left && shouldDeferHoldHandleDrag(e.ScreenSpaceMouseDownPosition);
 
-            return base.OnMouseDown(e);
+            return holdHandleDragDeferred ? false : base.OnMouseDown(e);
         }
 
         protected override bool OnDragStart(DragStartEvent e)
@@ -85,14 +93,24 @@ namespace osu.Game.Rulesets.Mania.Edit
             if (e.ControlPressed)
                 extensionSelectionBeforeDrag.UnionWith(Composer.PlayfieldContent?.SelectedExtensionNotes ?? Array.Empty<ExtensionNote>());
 
-            if (shouldDeferHoldHandleDrag(e.ScreenSpaceMouseDownPosition))
+            if (holdHandleDragDeferred)
+            {
+                holdHandleDragDeferred = false;
                 return false;
+            }
+
+            // An extension marquee selects by time band across every column, so its box is widened to the columns; the
+            // playfield's box keeps the pointer's own extent.
+            bool extensionMarquee = isExtensionColumnsSelection(e.ScreenSpaceMouseDownPosition);
+
+            if (DragBox is ScrollingDragBox scrollingDragBox)
+                scrollingDragBox.HorizontalExtent = extensionMarquee ? () => Composer.PlayfieldContent?.ExtensionColumnsScreenSpaceBounds : null;
 
             if (!base.OnDragStart(e))
                 return false;
 
             // A box belongs to the region it started in, so starting one drops the other region's selection.
-            if (isExtensionColumnsSelection(e.ScreenSpaceMouseDownPosition))
+            if (extensionMarquee)
             {
                 marqueeInExtensionColumns = true;
                 DeselectAll();

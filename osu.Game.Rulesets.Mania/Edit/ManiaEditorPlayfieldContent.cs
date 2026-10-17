@@ -171,6 +171,11 @@ namespace osu.Game.Rulesets.Mania.Edit
         }
 
         /// <summary>
+        /// The screen-space horizontal extent of the extension columns, used to widen their selection box.
+        /// </summary>
+        public (float left, float right)? ExtensionColumnsScreenSpaceBounds => extensionArea.ColumnScreenSpaceBounds;
+
+        /// <summary>
         /// Clears the extension column selection.
         /// </summary>
         public void ClearExtensionSelection() => extensionArea.ClearSelection();
