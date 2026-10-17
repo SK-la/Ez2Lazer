@@ -85,6 +85,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         private FillFlowContainer pillContainer = null!;
 
         private Container backgroundContainer = null!;
+        private Container container = null!;
 
         private bool rebuildScheduled;
         private bool layoutScheduled;
@@ -101,24 +102,33 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         {
             Masking = true;
 
-            InternalChild = backgroundContainer = new Container
+            InternalChild = container = new Container
             {
                 Masking = true,
                 CornerRadius = 8,
-                Alpha = BackgroundAlpha.Value,
                 Children = new Drawable[]
                 {
-                    new Box
+                    backgroundContainer = new Container
                     {
+                        Masking = true,
+                        CornerRadius = 8,
                         RelativeSizeAxes = Axes.Both,
-                        Colour = Color4.Black,
-                        Alpha = 0.7f,
-                    },
-                    new Box
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                        Colour = Color4.White,
-                        Alpha = 0.3f,
+                        Alpha = BackgroundAlpha.Value,
+                        Children = new Drawable[]
+                        {
+                            new Box
+                            {
+                                RelativeSizeAxes = Axes.Both,
+                                Colour = Color4.Black,
+                                Alpha = 0.7f,
+                            },
+                            new Box
+                            {
+                                RelativeSizeAxes = Axes.Both,
+                                Colour = Color4.White,
+                                Alpha = 0.3f,
+                            },
+                        }
                     },
                     pillContainer = new FillFlowContainer
                     {
@@ -176,7 +186,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             const float main_axis = max_pill_count * pill_slot_size + (max_pill_count - 1) * pill_spacing;
             const float cross_axis = pill_slot_size;
 
-            backgroundContainer.Size = PillFillDirection.Value == FillDirection.Vertical
+            container.Size = PillFillDirection.Value == FillDirection.Vertical
                 ? new Vector2(cross_axis, main_axis) + new Vector2(background_padding * 2)
                 : new Vector2(main_axis, cross_axis) + new Vector2(background_padding * 2);
         }
