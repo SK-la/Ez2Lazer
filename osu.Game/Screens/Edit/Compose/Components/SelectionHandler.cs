@@ -206,6 +206,11 @@ namespace osu.Game.Screens.Edit.Compose.Components
             switch (e.Action)
             {
                 case PlatformAction.Delete:
+                    // An empty selection must not consume the key, otherwise sibling selection handlers (e.g. the
+                    // extension columns in the mania editor) never receive it.
+                    if (SelectedItems.Count == 0)
+                        return false;
+
                     DeleteSelected();
                     return true;
             }

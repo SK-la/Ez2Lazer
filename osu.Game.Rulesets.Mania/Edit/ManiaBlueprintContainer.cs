@@ -46,20 +46,59 @@ namespace osu.Game.Rulesets.Mania.Edit
             CurrentTool is SelectTool
             && SelectionHandler.SelectedBlueprints.Any(b => b is HoldNoteSelectionBlueprint hold && hold.IsHandleAt(screenSpacePos));
 
+        /// <summary>
+        /// Whether the press that started the current gesture was handed to a hold's end handle rather than this container.
+        /// </summary>
+        /// <remarks>
+        /// Decided once on press. Selecting a hold switches the tool to selection, so re-deciding on drag start would
+        /// swallow the drag of a press that landed on the head of a not-yet-selected hold.
+        /// </remarks>
+        private bool holdHandleDragDeferred;
+
+        /// <summary>
+        /// Whether this container takes positional input at <paramref name="screenSpacePos"/>.
+        /// </summary>
+        /// <remarks>
+        /// The dock answers for its own positions through its overlay, so this container declines everything inside it. That
+        /// is the only place the two regions split input; neither duplicates the other's interaction logic.
+        /// </remarks>
+        public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)
+            => Composer.PlayfieldContent?.ContainsExtensionColumns(screenSpacePos) != true && base.ReceivePositionalInputAt(screenSpacePos);
+
         protected override bool OnMouseDown(MouseDownEvent e)
         {
-            if (e.Button == MouseButton.Left && shouldDeferHoldHandleDrag(e.ScreenSpaceMouseDownPosition))
-                return false;
+            holdHandleDragDeferred = e.Button == MouseButton.Left && shouldDeferHoldHandleDrag(e.ScreenSpaceMouseDownPosition);
 
-            return base.OnMouseDown(e);
+            return !holdHandleDragDeferred && base.OnMouseDown(e);
         }
 
         protected override bool OnDragStart(DragStartEvent e)
         {
-            if (shouldDeferHoldHandleDrag(e.ScreenSpaceMouseDownPosition))
+            if (holdHandleDragDeferred)
+            {
+                holdHandleDragDeferred = false;
                 return false;
+            }
 
             return base.OnDragStart(e);
+        }
+
+        protected override void SelectAll()
+        {
+            var content = Composer.PlayfieldContent;
+
+                Vector2? mouse = GetContainingInputManager()?.CurrentState.Mouse.Position;
+
+                // Ctrl+A acts on the region the pointer is over, matching the playfield's own behaviour of acting on what is
+                // in front of the user rather than on a hidden selection. A dock selection left behind by earlier work
+                // must not redirect the playfield's Ctrl+A.
+                if (content != null && mouse != null && content.ContainsExtensionColumns(mouse.Value))
+                {
+                    content.ExtensionOverlay.SelectAllNotes();
+                    return;
+                }
+
+            base.SelectAll();
         }
 
         protected override bool TryMoveBlueprints(DragEvent e, IList<(SelectionBlueprint<HitObject> blueprint, Vector2[] originalSnapPositions)> blueprints)
@@ -76,7 +115,29 @@ namespace osu.Game.Rulesets.Mania.Edit
             bool moved = SelectionHandler.HandleMovement(new MoveSelectionEvent<HitObject>(referenceBlueprint, result.ScreenSpacePosition - referenceBlueprint.ScreenSpaceSelectionPoint));
             if (moved)
                 ApplySnapResultTime(result, referenceBlueprint.Item.StartTime);
+
+            dragPosition = e.ScreenSpaceMousePosition;
+
             return moved;
+        }
+
+        private Vector2? dragPosition;
+
+        /// <summary>
+        /// Called whenever a drag operation completes, before any change transaction is committed.
+        /// </summary>
+        protected override void DragOperationCompleted()
+        {
+            base.DragOperationCompleted();
+
+            var position = dragPosition;
+            dragPosition = null;
+
+            if (position == null)
+                return;
+
+            // A drop inside the extension columns crosses over to them; anything else stays a plain playfield move.
+            Composer.TryDropSelectionIntoExtensionColumns(position.Value);
         }
     }
 }

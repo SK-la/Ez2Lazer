@@ -32,10 +32,14 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Configuration;
 using osu.Game.Database;
-using osu.Game.EzOsuGame.Localization;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame.Edit;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.Graphics;
 using osu.Game.Graphics.Cursor;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Input.Bindings;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
@@ -59,6 +63,7 @@ using osu.Game.Screens.Edit.Timing;
 using osu.Game.Screens.Edit.Verify;
 using osu.Game.Screens.OnlinePlay;
 using osu.Game.Users;
+using osuTK;
 using osuTK.Input;
 using WebCommonStrings = osu.Game.Resources.Localisation.Web.CommonStrings;
 
@@ -210,6 +215,12 @@ namespace osu.Game.Screens.Edit
         [Cached]
         public readonly EditorClipboard Clipboard = new EditorClipboard();
 
+        /// <summary>
+        /// Shared with the ruleset composer so the column-edit switch and the extension columns' controls agree.
+        /// </summary>
+        [Cached]
+        public readonly EzEditorColumnEditState ColumnEditState = new EzEditorColumnEditState();
+
         [Cached]
         private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Aquamarine);
 
@@ -225,6 +236,10 @@ namespace osu.Game.Screens.Edit
         private Bindable<bool> editorTimelineShowBreaks;
         private Bindable<bool> editorTimelineShowTicks;
         private Bindable<bool> editorContractSidebars;
+
+        private EditorMenuBar menuBar;
+        private FillFlowContainer columnEditSwitch;
+        private EditorMenuBar.DrawableEditorBarMenuItem lastMenuBarItem;
 
         /// <summary>
         /// This controls the opacity of components like the timelines, sidebars, etc.
@@ -376,7 +391,7 @@ namespace osu.Game.Screens.Edit
                         Height = 40,
                         Children = new Drawable[]
                         {
-                            new EditorMenuBar
+                            menuBar = new EditorMenuBar
                             {
                                 Anchor = Anchor.CentreLeft,
                                 Origin = Anchor.CentreLeft,
@@ -474,6 +489,31 @@ namespace osu.Game.Screens.Edit
                                     },
                                 }
                             },
+                            columnEditSwitch = new FillFlowContainer
+                            {
+                                Anchor = Anchor.CentreLeft,
+                                Origin = Anchor.CentreLeft,
+                                AutoSizeAxes = Axes.Both,
+                                Direction = FillDirection.Horizontal,
+                                Spacing = new Vector2(10, 0),
+                                Alpha = 0,
+                                Children = new Drawable[]
+                                {
+                                    new OsuSpriteText
+                                    {
+                                        Anchor = Anchor.CentreLeft,
+                                        Origin = Anchor.CentreLeft,
+                                        Text = EzEditorStrings.EXTENSION_COLUMN_EDIT_MODE,
+                                        Font = OsuFont.GetFont(size: 13),
+                                    },
+                                    new SwitchButton
+                                    {
+                                        Anchor = Anchor.CentreLeft,
+                                        Origin = Anchor.CentreLeft,
+                                        Current = ColumnEditState.ColumnEditMode,
+                                    },
+                                },
+                            },
                             screenSwitcher = new EditorScreenSwitcherControl
                             {
                                 Anchor = Anchor.BottomRight,
@@ -501,6 +541,7 @@ namespace osu.Game.Screens.Edit
         {
             base.LoadComplete();
             setUpClipboardActionAvailability();
+            setUpColumnEditSwitch();
 
             Mode.Value = isNewBeatmap ? EditorScreenMode.SongSetup : EditorScreenMode.Compose;
             Mode.BindValueChanged(onModeChanged, true);
@@ -633,6 +674,46 @@ namespace osu.Game.Screens.Edit
             clock.ProcessFrame();
 
             discardChangesMenuItem.Action.Disabled = !HasUnsavedChanges;
+
+            updateColumnEditSwitchPosition();
+        }
+
+        /// <summary>
+        /// Shows the column-edit switch only while the ruleset provides extension columns.
+        /// </summary>
+        private void setUpColumnEditSwitch()
+        {
+            ColumnEditState.Available.BindValueChanged(v =>
+            {
+                columnEditSwitch.Alpha = v.NewValue ? 1 : 0;
+
+                // Leaving a ruleset must not carry the mode into the next composer.
+                if (!v.NewValue)
+                    ColumnEditState.ColumnEditMode.Value = false;
+            }, true);
+        }
+
+        /// <summary>
+        /// Keeps the switch immediately right of the last top-level menu item, whose width depends on the language.
+        /// </summary>
+        private void updateColumnEditSwitchPosition()
+        {
+            if (columnEditSwitch.Alpha == 0 || columnEditSwitch.Parent == null)
+                return;
+
+            // Resolved lazily and only re-resolved when the bar rebuilds its items, to keep this off the per-frame path.
+            if (lastMenuBarItem == null || lastMenuBarItem.Parent == null)
+                lastMenuBarItem = menuBar.ChildrenOfType<EditorMenuBar.DrawableEditorBarMenuItem>().LastOrDefault();
+
+            if (lastMenuBarItem == null)
+                return;
+
+            float right = lastMenuBarItem.ScreenSpaceDrawQuad.AABBFloat.Right;
+
+            if (right <= 0)
+                return;
+
+            columnEditSwitch.X = columnEditSwitch.Parent.ToLocalSpace(new Vector2(right, 0)).X + 16;
         }
 
         public bool OnPressed(KeyBindingPressEvent<PlatformAction> e)

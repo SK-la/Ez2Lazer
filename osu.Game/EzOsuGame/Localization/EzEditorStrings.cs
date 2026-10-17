@@ -253,6 +253,29 @@ namespace osu.Game.EzOsuGame.Localization
 
         #endregion
 
+        #region Mania editor extension columns
+
+        public static readonly LocalisableString EXTENSION_COLUMN_EDIT_MODE = new EzLocalizationManager.EzLocalisableString(
+            "列编辑",
+            "Column edit");
+
+        public static readonly LocalisableString EXTENSION_COLUMN_INSERT = new EzLocalizationManager.EzLocalisableString(
+            "在此列右侧插入扩展列",
+            "Insert an extension column after this column");
+        public static readonly LocalisableString EXTENSION_COLUMN_REMOVE = new EzLocalizationManager.EzLocalisableString(
+            "移除本列扩展列",
+            "Remove this extension column");
+
+        public static readonly LocalisableString EXTENSION_COLUMN_SELECT_ALL_NOTES = new EzLocalizationManager.EzLocalisableString(
+            "全选本列 note",
+            "Select every note on this column");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTENSION_COLUMN_REMOVE_WITH_NOTES = new EzLocalizationManager.EzLocalisableString(
+            "扩展列 #{0} 有 {1} 个 note，移除该列会连同 note 一起删除。",
+            "Extension column #{0} holds {1} note(s); removing it also removes them.");
+
+        #endregion
+
         #region Scene bar and tabs
 
         public static readonly LocalisableString SCENE_LIBRARY_LABEL = new EzLocalizationManager.EzLocalisableString("场景", "Scenes");
