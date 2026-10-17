@@ -94,6 +94,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             public long FrameStableId { get; init; }
 
             public BmsJudgeModeJudgement.BmsRouteState? BmsState { get; init; }
+
+            /// <summary>
+            /// stable classic 的持有态（最近按下 / 首次有效松开 / 断连）。仅该档位使用，其余档位为 <c>null</c>。
+            /// </summary>
+            public StableClassicHoldState? StableClassicState { get; init; }
         }
 
         public readonly struct HoldTailEvaluationResult
@@ -124,7 +129,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             var round = request.Round;
             var strategy = round.Strategy;
 
-            if (strategy == null || !round.IsEzJudgeMode)
+            if (strategy == null)
                 return NoteEvaluationResult.NotHandled;
 
             if (strategy is BmsJudgeModeJudgement bms)
@@ -189,7 +194,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             var round = request.Round;
             var strategy = round.Strategy;
 
-            if (strategy == null || !round.IsEzJudgeMode)
+            if (strategy == null)
                 return HoldTailEvaluationResult.Unhandled;
 
             if (strategy is MalodyJudgeModeJudgement)
@@ -286,6 +291,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 EventTime = request.EventTime,
                 Bpm = round.O2PressBpm,
                 PillModeEnabled = round.PillModeEnabled,
+                StableClassicState = request.StableClassicState,
             });
 
             if (genericResult == HitResult.None)

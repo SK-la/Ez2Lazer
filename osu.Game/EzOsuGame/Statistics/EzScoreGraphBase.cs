@@ -66,12 +66,28 @@ namespace osu.Game.EzOsuGame.Statistics
         protected IEzReplaySession ReplaySession { get; private set; } = null!;
 
         // Graph-UX: 双轨刷新状态管理
-        // displayOffset 由 RefreshDisplayOnly 管理（拖动时），RefreshFromService 成功后重置为 0
-        protected Score? CommittedNowScore;
+        /// <summary>
+        /// 当前 ReplaySession 运行结果的 Score（包含临时 ManiaOffsetPlus），用于在图表中显示已提交的 Now 统计。
+        /// </summary>
+        protected Score? ReplaySessionScore;
+
+        /// <summary>
+        /// V1 列专用的 Session 结果：同一份 replay，判定档位由 <see cref="CreateV1RunRequest"/> 钉死。
+        /// </summary>
+        /// <remarks>
+        /// 只能取 Session 输出，不能由 <c>ScoreInfo.HitEvents</c> 反推——auto miss 的 stored offset 不是按键时刻，
+        /// 长条档位需要头尾两时刻，持有期连击增量也不在 events 里。
+        /// </remarks>
+        protected Score? V1SessionScore;
+
+        /// <summary>
+        /// 当前图表展示使用的 offset（仅用于 UI 展示，未提交到 Session）。
+        /// displayOffset 由 RefreshDisplayOnly 管理（拖动时），RefreshFromService 成功后重置为 0。
+        /// </summary>
         protected double DisplayOffset;
 
         /// <summary>上次 Session 完成时的 offset（来自 <see cref="ReplayRunResult.ResolvedEnvironment"/>）。</summary>
-        protected double CommittedSessionOffset;
+        protected double LastApplyOffset;
 
         // Debounce 控制 — offset 拖动时仅展示，落定后触发 Session
         private CancellationTokenSource? debounceCancellation;
@@ -117,7 +133,7 @@ namespace osu.Game.EzOsuGame.Statistics
         /// </summary>
         protected IReadOnlyList<HitEvent> GetDisplayEventsWithOffset()
         {
-            var baseEvents = CommittedNowScore?.ScoreInfo.HitEvents ?? OriginalHitEvents;
+            var baseEvents = ReplaySessionScore?.ScoreInfo.HitEvents ?? OriginalHitEvents;
 
 #pragma warning disable IDE0046 // displayOffset == 0 的简化写法
             if (DisplayOffset == 0)
@@ -169,30 +185,35 @@ namespace osu.Game.EzOsuGame.Statistics
         /// </summary>
         protected virtual void CalculateV1Accuracy()
         {
-            var v1ScoreProcessor = Score.Ruleset.CreateInstance().CreateScoreProcessor();
+            var v1Sp = Score.Ruleset.CreateInstance().CreateScoreProcessor();
 
-            // 必须在 ApplyBeatmap() 前设置 Legacy 标记：
-            // ManiaScoreProcessor 会在 ApplyBeatmap() 内缓存 judgeMode，
-            // 若顺序反了就会把当前 JudgeMode 当成 V1 路线，导致 classic 结果随 JudgeMode 改变。
-            v1ScoreProcessor.IsLegacyScore = true;
-            v1ScoreProcessor.ApplyBeatmap(Beatmap);
-            v1ScoreProcessor.Mods.Value = Score.Mods;
+            // 必须在 ApplyBeatmap() 前设置 Legacy 标记与 Mods：
+            // ManiaScoreProcessor 在 ApplyBeatmap() 内缓存 judgeMode 与 stable 分值倍率，
+            // 顺序反了会把当前 JudgeMode 当成 V1 路线，且 mod 倍率不会生效。
+            v1Sp.IsLegacyScore = true;
+            v1Sp.Mods.Value = Score.Mods;
+            v1Sp.ApplyBeatmap(Beatmap);
 
             var v1Counts = new Dictionary<HitResult, int>();
 
             foreach (var hitEvent in GetV1HitEvents())
             {
                 var recalculated = RecalculateV1Result(hitEvent);
+
+                // None 表示该事件在 V1 路线里不构成判定（例如 stable 的长条头）。
+                if (recalculated == HitResult.None)
+                    continue;
+
                 v1Counts[recalculated] = v1Counts.GetValueOrDefault(recalculated, 0) + 1;
-                v1ScoreProcessor.ApplyResult(new JudgementResult(hitEvent.HitObject, hitEvent.HitObject.CreateJudgement())
+                v1Sp.ApplyResult(new JudgementResult(hitEvent.HitObject, hitEvent.HitObject.CreateJudgement())
                 {
                     Type = recalculated,
                     TimeOffset = hitEvent.TimeOffset
                 });
             }
 
-            double accuracy = v1ScoreProcessor.AccuracyClassic.Value;
-            long totalScore = v1ScoreProcessor.TotalScoreWithoutMods.Value;
+            double accuracy = v1Sp.AccuracyClassic.Value;
+            long totalScore = v1Sp.TotalScoreWithoutMods.Value;
 
             // Logger.Log($"[V1 ScoreProcessor] {accuracy * 100:F2}%, Score: {totalScore / 10000}w", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
@@ -457,13 +478,18 @@ namespace osu.Game.EzOsuGame.Statistics
             => new ReplayRunRequest(score, Beatmap, ReplayRunPurpose.ForLive);
 
         /// <summary>
+        /// V1 列专用的 Session 请求（判定档位钉死）。返回 null 表示该规则集没有 V1 投影。
+        /// </summary>
+        protected virtual ReplayRunRequest? CreateV1RunRequest(Score score) => null;
+
+        /// <summary>
         /// 轻量重绘：拖动时仅更新 scatter/health，Now 数字等 debounce Session。
         /// </summary>
         protected void RefreshDisplayOnly(double fakeOffset)
         {
             DisplayOffset = fakeOffset;
 
-            if (CommittedNowScore == null)
+            if (ReplaySessionScore == null)
                 RecalculateNowFromDisplayEvents();
 
             UpdateText();
@@ -490,9 +516,11 @@ namespace osu.Game.EzOsuGame.Statistics
                 if (!result.IsValidReplay)
                     return;
 
-                CommittedNowScore = result.Score;
-                CommittedSessionOffset = result.ResolvedEnvironment?.OffsetPlusMania ?? 0;
+                ReplaySessionScore = result.Score;
+                LastApplyOffset = result.ResolvedEnvironment?.OffsetPlusMania ?? 0;
                 DisplayOffset = 0;
+
+                V1SessionScore = await runV1SessionAsync(inputScore).ConfigureAwait(false);
 
                 Schedule(Refresh);
             }
@@ -502,10 +530,23 @@ namespace osu.Game.EzOsuGame.Statistics
             }
             catch
             {
-                CommittedNowScore = null;
-                CommittedSessionOffset = 0;
+                ReplaySessionScore = null;
+                V1SessionScore = null;
+                LastApplyOffset = 0;
                 Schedule(Refresh);
             }
+        }
+
+        /// <summary>
+        /// 跑 V1 列专用的 Session。请求键与 Now 相同的场合（成绩本身就是该档位）会直接命中缓存，不产生额外计算。
+        /// </summary>
+        private async Task<Score?> runV1SessionAsync(Score inputScore)
+        {
+            if (CreateV1RunRequest(inputScore.DeepClone()) is not { } request)
+                return null;
+
+            var result = await ReplaySession.RunRequestAsync(request).ConfigureAwait(false);
+            return result.IsValidReplay ? result.Score : null;
         }
 
         /// <summary>
@@ -627,7 +668,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
             for (int i = 0; i < sampleCount; i++)
             {
-                double ratio = sampleCount == 1 ? 0 : i / (double)(sampleCount - 1);
+                double ratio = i / (double)(sampleCount - 1);
                 double time = minTime + timeRange * ratio;
                 double boundary = UpdateBoundary(result, time);
                 float x = (float)(ratio * availableWidth);

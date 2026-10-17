@@ -35,6 +35,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             return new IgnoreJudgement();
         }
 
+        public static Judgement CreateForHeadNote(EzEnumJudgeMode judgeMode)
+        {
+            // stable classic：LN 头不产生独立判定（stable HitCircleManiaLong.HitStart 返回 0，不进 OnHit）。
+            // 绑定 Ignore 档位，drawable 才能把结果落成 IgnoreHit —— 落在 Judgement 的
+            // [MinResult, MaxResult] 之外会被 ManiaEzDrawableJudgement.SanitizeResult 降级成 Miss。
+            if (StableClassicJudgeModeJudgement.IsSelected(judgeMode))
+                return new IgnoreJudgement();
+
+            return new ManiaJudgement();
+        }
+
         public static void ApplyToBeatmap(IBeatmap beatmap, EzEnumJudgeMode judgeMode)
         {
             // EZ2AC 的 16 分 tick 必须在判定绑定之前补齐：ManiaScoreProcessor 的全谱模拟按嵌套物件算
@@ -63,6 +74,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             switch (hitObject)
             {
+                case HeadNote:
+                    if (StableClassicJudgeModeJudgement.IsSelected(judgeMode))
+                        hitObject.SetJudgement(CreateForHeadNote(judgeMode));
+
+                    break;
+
                 case TailNote:
                     hitObject.SetJudgement(CreateForTailNote(judgeMode));
                     break;

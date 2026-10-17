@@ -70,5 +70,23 @@ namespace osu.Game.Rulesets.Mania.Tests
                     () => $"{result} 应使用 EZ2AC 权重表");
             }
         }
+
+        /// <summary>
+        /// [Ez] StableClassic 与 Classic 同档位权重。该表缺分支时每个判定基分都是 0，
+        /// 局内 <c>ScoreProcessor.Accuracy</c> 的分子分母同为 0，会恒判 100%。
+        /// </summary>
+        [Test]
+        public void TestStableClassicUsesClassicWeights()
+        {
+            foreach (var result in new[] { HitResult.Perfect, HitResult.Great, HitResult.Good, HitResult.Ok, HitResult.Meh, HitResult.Miss })
+            {
+                Assert.That(JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.StableClassic, result),
+                    Is.EqualTo(JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.Classic, result)),
+                    () => $"{result} 应使用 classic 档位权重");
+            }
+
+            // 与 Classic 同值不足以说明没落到 default:0，故再钉一个非零值。
+            Assert.That(JudgeModeHelper.GetBaseScoreForResult(EzEnumJudgeMode.StableClassic, HitResult.Perfect), Is.EqualTo(300));
+        }
     }
 }

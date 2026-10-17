@@ -102,6 +102,20 @@ namespace osu.Game.Rulesets.Mania.Tests
         public void TestJsonLazerPORTRAiTDrawableMatchesSession()
             => runDrawableParityFromJson("Resources/Testing/ReplayJson/Lazer-PORTRAiT.json", longWait: true);
 
+        /// <summary>
+        /// 真实全谱换 StableClassic 档：帧与 <see cref="TestJsonLazerHanatachiDrawableMatchesSession"/> 同源
+        /// （osr 整数 ms），只换判定档位，验局内 ≡ Session 是否仍然同源。
+        /// </summary>
+        [Test]
+        [Explicit("全谱 Visual ≈5–10min；手动跑 Drawable≡Session（LongUntilStep 10min）。")]
+        public void TestJsonStableClassicHanatachiDrawableMatchesSession()
+            => runDrawableParityFromJson("Resources/Testing/ReplayJson/StableClassic-Hanatachi.json", longWait: true);
+
+        [Test]
+        [Explicit("全谱 Visual ≈5–10min；手动跑 Drawable≡Session（LongUntilStep 10min）。")]
+        public void TestJsonStableClassicPORTRAiTDrawableMatchesSession()
+            => runDrawableParityFromJson("Resources/Testing/ReplayJson/StableClassic-PORTRAiT.json", longWait: true);
+
         [Test]
         public void TestLazerHoldDrawableMatchesSession()
         {
@@ -510,6 +524,282 @@ namespace osu.Game.Rulesets.Mania.Tests
         }
 
         /// <summary>
+        /// [Ez] StableClassic 断连 LN（提早松手、不重按）：尾仍须出判决且与 Session 全量一致，
+        /// 覆盖结算门闩——悬空不判会让局内 <c>HasCompleted</c> 永假，局内无法进入结算。
+        /// </summary>
+        /// <remarks>
+        /// 帧钟按 100ms 铺满：stable classic 的尾判挂在帧钟上（<c>EndTime + HitWindow100</c>），
+        /// 稀疏帧（如只在按键边沿取帧）会把这枚尾判压到下一枚帧，从而与后一个物件的落判顺序互换，
+        /// 总分随之不同——那是帧密度造成的，不是判定语义的差异。
+        /// </remarks>
+        [Test]
+        public void TestFullScoreParity_StableClassicBrokenHoldNoRepress()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+
+            const double head = 1000;
+            const double tail = 3000;
+
+            var frames = new List<ReplayFrame>();
+
+            for (double time = head; time <= 1500; time += 100)
+                frames.Add(new ManiaReplayFrame(time, ManiaAction.Key1));
+
+            for (double time = 1600; time <= 3900; time += 100)
+                frames.Add(new ManiaReplayFrame(time));
+
+            frames.Add(new ManiaReplayFrame(4000, ManiaAction.Key2));
+            frames.Add(new ManiaReplayFrame(4100));
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                    new Note { StartTime = 4000, Column = 1 },
+                },
+                frames,
+                assertJudgedHitsComplete: true);
+        }
+
+        /// <summary>
+        /// [Ez] StableClassic 断连后重按同一条 LN：重按要刷新 <c>TimePress</c>（尾判的 <c>num2</c>），
+        /// 局内与 Session 必须同源，不得只在 Session 侧喂这条边沿。
+        /// </summary>
+        /// <remarks>
+        /// 帧钟 10ms：stable classic 的尾判挂在帧钟上，落判时刻迟于 live 一个帧长就会换档，
+        /// 100ms 帧距会让局内/ Session 落在不同档（见 <see cref="TestFullScoreParity_StableClassicHeldPastTail"/>）。
+        /// </remarks>
+        [Test]
+        public void TestFullScoreParity_StableClassicBrokenHoldRepress()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+
+            const double head = 1000;
+            const double tail = 3000;
+
+            var frames = new List<ReplayFrame>();
+
+            for (double time = head; time <= 3400; time += 10)
+            {
+                // 1510..1690 松手造成断连，1700 起重按并持过尾。
+                bool released = time >= 1510 && time <= 1690;
+                frames.Add(released ? new ManiaReplayFrame(time) : new ManiaReplayFrame(time, ManiaAction.Key1));
+            }
+
+            frames.Add(new ManiaReplayFrame(3500));
+            frames.Add(new ManiaReplayFrame(4000, ManiaAction.Key2));
+            frames.Add(new ManiaReplayFrame(4100));
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                    new Note { StartTime = 4000, Column = 1 },
+                },
+                frames,
+                assertJudgedHitsComplete: true);
+        }
+
+        /// <summary>
+        /// [Ez] StableClassic 按住过尾不松手：尾落在帧钟的 <c>EndTime + HitWindow50</c> 上，
+        /// 局内同样必须收束，不得因「持过尾」而永不结算；同时与 Session 全量一致。
+        /// </summary>
+        [Test]
+        public void TestFullScoreParity_StableClassicHeldPastTail()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+
+            const double head = 1000;
+            const double tail = 3000;
+
+            var frames = new List<ReplayFrame>();
+
+            // 10ms 帧钟铺到 3400：stable classic 的尾判挂在帧钟上（EndTime + HitWindow50），
+            // 落判时刻迟于 live 一个帧长就会换档（Good → Ok），故帧钟要与局内渲染步长同量级。
+            for (double time = head; time <= 3400; time += 10)
+                frames.Add(new ManiaReplayFrame(time, ManiaAction.Key1));
+
+            frames.Add(new ManiaReplayFrame(3500));
+            frames.Add(new ManiaReplayFrame(4000, ManiaAction.Key2));
+            frames.Add(new ManiaReplayFrame(4100));
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                    new Note { StartTime = 4000, Column = 1 },
+                },
+                frames,
+                assertJudgedHitsComplete: true);
+        }
+
+        /// <summary>
+        /// [Ez] StableClassic 整条 LN 从未按下：头尾都不给分，但仍须各出判决（头 IgnoreMiss、尾 Miss），
+        /// 否则局内结算门闩永不成立；局内与 Session 的 acc / 总分必须一致。
+        /// </summary>
+        /// <remarks>
+        /// 头的判定被压成 <see cref="HitResult.IgnoreMiss"/>（stable 的 LN 头不进 OnHit），
+        /// 故这里也在守「头绑定 IgnoreJudgement 之后，被动 Miss 不得再落 <see cref="HitResult.Miss"/>」。
+        /// </remarks>
+        [Test]
+        public void TestFullScoreParity_StableClassicHeadNeverPressed()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+
+            const double head = 1000;
+            const double tail = 3000;
+
+            var frames = new List<ReplayFrame>();
+
+            for (double time = head; time <= 3900; time += 100)
+                frames.Add(new ManiaReplayFrame(time));
+
+            frames.Add(new ManiaReplayFrame(4000, ManiaAction.Key2));
+            frames.Add(new ManiaReplayFrame(4100));
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                    new Note { StartTime = 4000, Column = 1 },
+                },
+                frames,
+                assertJudgedHitsComplete: true);
+        }
+
+        /// <summary>
+        /// [Ez] StableClassic 长条持有的 100ms 连击增量必须由局内产出：stable 的 <c>Holding</c> 每 100ms
+        /// 推一次 combo（不加分、不进判定计数），局内缺这一路时 MaxCombo 会少一大截。
+        /// </summary>
+        /// <remarks>
+        /// LN 结束时间刻意落在连击网格后 90ms（1000 按住 → 1100/1200/…/3000 共 20 枚），
+        /// 让最后一枚的容差远大于帧抖动；尾判在 3100 松手，两边都走镜像档位。
+        /// </remarks>
+        [Test]
+        public void TestFullScoreParity_StableClassicHoldComboTicks()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+
+            var hitObjects = new List<ManiaHitObject>
+            {
+                new HoldNote { StartTime = hold_start, Duration = hold_duration, Column = 0 },
+            };
+
+            var notes = new List<Note>();
+
+            for (int i = 0; i < 8; i++)
+            {
+                var note = new Note { StartTime = 4000 + i * 100, Column = i % 3 + 1 };
+                notes.Add(note);
+                hitObjects.Add(note);
+            }
+
+            runFullScoreParityTest(
+                hitObjects,
+                buildStableClassicHoldFrames(hitObjects, note => note == notes[3] ? 45 : 0, 4800),
+                assertJudgedHitsComplete: true,
+                overallDifficulty: 8,
+                expectedMaxCombo: 8 + hold_tick_count + 1);
+        }
+
+        /// <summary>
+        /// [Ez] StableClassic 持有增量把 combo 推过 384 之后，384 重置的落点必须局内与 Session 同点：
+        /// 少了增量会让重置晚到 20 个判定，TotalScore 与 MaxCombo 同时分叉。
+        /// </summary>
+        [Test]
+        public void TestFullScoreParity_StableClassicHoldComboTicksCrossComboBonus()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumJudgeMode.StableClassic, EzEnumHealthMode.Lazer);
+
+            var hitObjects = new List<ManiaHitObject>
+            {
+                new HoldNote { StartTime = hold_start, Duration = hold_duration, Column = 0 },
+            };
+
+            // 每列每 240ms 一枚，远大于 OD8 的 Miss 窗（164ms），避免按键被路由到相邻物件。
+            // 每 5 枚偏 45ms（Good200）把 ComboAddition 压下去，使 384 重置真正改变分数。
+            for (int i = 0; i < 380; i++)
+                hitObjects.Add(new Note { StartTime = 4000 + i * 60, Column = i % 4 });
+
+            runFullScoreParityTest(
+                hitObjects,
+                buildStableClassicHoldFrames(hitObjects, note => note.StartTime % 300 == 0 ? 45 : 0, 4000 + 380 * 60 + 800),
+                assertJudgedHitsComplete: true,
+                overallDifficulty: 8,
+                expectedMaxCombo: 380 + hold_tick_count + 1,
+                longWait: true);
+        }
+
+        private const double hold_start = 1000;
+        private const double hold_end = 3090;
+        private const double hold_duration = hold_end - hold_start;
+        private const int hold_tick_count = 20;
+
+        /// <summary>
+        /// 帧源：按住段 + (物件时间 + 偏移) 的按下/松开边沿。边沿时刻各出一帧，避免相邻物件
+        /// 的松开与按下落进同一帧而被合并成一个持按（会吞掉后一个物件）。
+        /// </summary>
+        private static List<ReplayFrame> buildStableClassicHoldFrames(List<ManiaHitObject> hitObjects, Func<Note, double> offsetFor, double endTime)
+        {
+            var transitions = new List<(double time, ManiaAction action, bool press)>
+            {
+                (hold_start, ManiaAction.Key1, true),
+                (hold_end + 10, ManiaAction.Key1, false),
+            };
+
+            foreach (var note in hitObjects.OfType<Note>().Where(n => n is not HeadNote && n is not TailNote))
+            {
+                double pressTime = note.StartTime + offsetFor(note);
+                ManiaAction action = actionForColumn(note.Column);
+
+                transitions.Add((pressTime, action, true));
+                transitions.Add((pressTime + 20, action, false));
+            }
+
+            transitions.Sort((a, b) => a.time.CompareTo(b.time));
+
+            var times = new SortedSet<double>();
+
+            for (double time = 500; time <= endTime; time += 50)
+                times.Add(time);
+
+            foreach (var transition in transitions)
+                times.Add(transition.time);
+
+            var pressed = new HashSet<ManiaAction>();
+            var frames = new List<ReplayFrame>();
+            int cursor = 0;
+
+            foreach (double time in times)
+            {
+                while (cursor < transitions.Count && transitions[cursor].time <= time)
+                {
+                    var transition = transitions[cursor++];
+
+                    if (transition.press)
+                        pressed.Add(transition.action);
+                    else
+                        pressed.Remove(transition.action);
+                }
+
+                frames.Add(new ManiaReplayFrame(time, pressed.ToArray()));
+            }
+
+            return frames;
+        }
+
+        private static ManiaAction actionForColumn(int column)
+        {
+            switch (column)
+            {
+                case 0: return ManiaAction.Key1;
+                case 1: return ManiaAction.Key2;
+                case 2: return ManiaAction.Key3;
+                default: return ManiaAction.Key4;
+            }
+        }
+
+        /// <summary>
         /// 一条长 LN 中途多次「按下—松开」：每次提前松手各计一次 ComboBreak（stable 语义）。
         /// 局内与 Session 必须同为 N 次且全量统计一致。
         /// </summary>
@@ -729,10 +1019,23 @@ namespace osu.Game.Rulesets.Mania.Tests
                 throw new AssertionException(
                     $"drawable=[{ManiaReplayParityHelper.DescribeHitEvents(drawableHitEvents)}] session=[{ManiaReplayParityHelper.DescribeHitEvents(sessionEvents)}]");
             });
+
+            AddAssert("results score (p) matches session (n)", () =>
+            {
+                var sessionResult = ManiaReplaySession.Run(replayScore, playableBeatmap, parityEnvironment);
+                return assertPopulatedScoreMatches(sessionResult.ScoreInfo);
+            });
         }
 
         // P2-B: 完整 Score parity 测试（accuracy/score/statistics）
-        private void runFullScoreParityTest(List<ManiaHitObject> hitObjects, List<ReplayFrame> frames, bool assertJudgedHitsComplete = false)
+        private void runFullScoreParityTest(
+            List<ManiaHitObject> hitObjects,
+            List<ReplayFrame> frames,
+            bool assertJudgedHitsComplete = false,
+            bool assertSessionParity = true,
+            double? overallDifficulty = null,
+            int? expectedMaxCombo = null,
+            bool longWait = false)
         {
             AddStep("configure environment", () => ReplayJudgeTestConfig.ApplyToGlobalConfig(parityEnvironment));
 
@@ -747,6 +1050,12 @@ namespace osu.Game.Rulesets.Mania.Tests
                     },
                 };
 
+                if (overallDifficulty is double od)
+                {
+                    beatmap.BeatmapInfo.Difficulty = new BeatmapDifficulty { OverallDifficulty = (float)od };
+                    beatmap.Difficulty = beatmap.BeatmapInfo.Difficulty;
+                }
+
                 // 与 Session fixtures 一致：120 BPM，保证 EZ2AC LN 16 分 tick 网格对齐。
                 beatmap.ControlPointInfo.Add(0, new TimingControlPoint { BeatLength = 500 });
                 beatmap.ControlPointInfo.Add(0, new EffectControlPoint { ScrollSpeed = 0.1f });
@@ -759,10 +1068,23 @@ namespace osu.Game.Rulesets.Mania.Tests
             });
 
             // 玩家是异步加载的：ScoreProcessor 由 Player 的 [BackgroundDependencyLoader] load() 建出，
-            // 在此之前访问它会 NRE（本夹具当进程首个测试时必现）。LoadedBeatmapSuccessfully 为 true
-            // 即 load() 已跑到 ScoreProcessor 赋值之后。
-            AddUntilStep("wait for player", () => currentPlayer.LoadedBeatmapSuccessfully);
-            AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value);
+            // 在此之前访问它会 NRE。LoadedBeatmapSuccessfully 先于 ScoreProcessor 赋值变 true（实测约半数复现），
+            // 故两者都要等。
+            AddUntilStep("wait for player", () => currentPlayer is { LoadedBeatmapSuccessfully: true, ScoreProcessor: not null });
+
+            if (longWait)
+            {
+                AddStep(new LongUntilStepButton
+                {
+                    Text = "wait for completion",
+                    IsSetupStep = false,
+                    CallStack = new StackTrace(1, true),
+                    TimeoutMilliseconds = 600_000,
+                    Assertion = () => currentPlayer.ScoreProcessor.HasCompleted.Value,
+                });
+            }
+            else
+                AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value);
 
             if (assertJudgedHitsComplete)
             {
@@ -778,64 +1100,92 @@ namespace osu.Game.Rulesets.Mania.Tests
                 playableBeatmap = Beatmap.Value.GetPlayableBeatmap(new ManiaRuleset().RulesetInfo);
             });
 
-            AddAssert("session accuracy matches drawable", () =>
+            if (!assertSessionParity)
+                return;
+
+            if (expectedMaxCombo is int maxCombo)
             {
-                var sessionResult = ManiaReplaySession.Run(replayScore, playableBeatmap, parityEnvironment);
-                double drawableAccuracy = currentPlayer.ScoreProcessor.Accuracy.Value;
-                double sessionAccuracy = sessionResult.ScoreInfo.Accuracy;
-
-                const double tolerance = 1e-6;
-                if (Math.Abs(drawableAccuracy - sessionAccuracy) < tolerance)
-                    return true;
-
-                throw new AssertionException(
-                    $"drawable accuracy={drawableAccuracy:F8} session accuracy={sessionAccuracy:F8}");
-            });
-
-            AddAssert("session total score matches drawable", () =>
-            {
-                var sessionResult = ManiaReplaySession.Run(replayScore, playableBeatmap, parityEnvironment);
-                long drawableScore = currentPlayer.ScoreProcessor.TotalScore.Value;
-                long sessionScore = sessionResult.ScoreInfo.TotalScore;
-
-                if (drawableScore == sessionScore)
-                    return true;
-
-                throw new AssertionException(
-                    $"drawable score={drawableScore} session score={sessionScore}");
-            });
-
-            AddAssert("session statistics match drawable", () =>
-            {
-                var sessionResult = ManiaReplaySession.Run(replayScore, playableBeatmap, parityEnvironment);
-                var drawableStats = currentPlayer.ScoreProcessor.Statistics;
-                var sessionStats = sessionResult.ScoreInfo.Statistics;
-
-                // 比较所有 HitResult 的计数（排除 IgnoreHit，因为 Session 不产生此结果）
-                foreach (var kvp in drawableStats)
+                AddAssert("drawable max combo matches expected", () =>
                 {
-                    if (kvp.Key == HitResult.IgnoreHit || kvp.Key == HitResult.IgnoreMiss)
-                        continue; // Session 路径不记录 IgnoreHit/IgnoreMiss
+                    int actual = currentPlayer.ScoreProcessor.HighestCombo.Value;
 
-                    if (!sessionStats.TryGetValue(kvp.Key, out int sessionCount) || sessionCount != kvp.Value)
-                    {
-                        throw new AssertionException(
-                            $"statistics mismatch for {kvp.Key}: drawable={kvp.Value} session={sessionStats.GetValueOrDefault(kvp.Key, 0)}");
-                    }
-                }
+                    if (actual == maxCombo)
+                        return true;
 
-                // 检查 session 是否有额外的统计项
-                foreach (var kvp in sessionStats)
-                {
-                    if (!drawableStats.ContainsKey(kvp.Key) && kvp.Value != 0)
-                    {
-                        throw new AssertionException(
-                            $"session has extra statistic {kvp.Key}={kvp.Value} not in drawable");
-                    }
-                }
+                    throw new AssertionException($"drawable max combo={actual} expected={maxCombo}");
+                });
+            }
 
-                return true;
+            AddAssert("results score (p) matches session (n)", () =>
+            {
+                var sessionResult = ManiaReplaySession.Run(replayScore, playableBeatmap, parityEnvironment);
+                return assertPopulatedScoreMatches(sessionResult.ScoreInfo);
             });
+        }
+
+        /// <summary>
+        /// 结算页的 p（成绩卡）来自局内 <see cref="ScoreProcessor.PopulateScore"/>，n（Score Graph Now）来自 Session 的
+        /// <see cref="ScoreInfo"/>。两者必须逐字段相等，否则结算页会出现 p ≠ n。
+        /// </summary>
+        /// <remarks>
+        /// 不能拿 <c>ScoreProcessor.Accuracy.Value</c> 比：StableClassic 的 <c>ManiaScoreProcessor.PopulateScore</c>
+        /// 会把 <see cref="ScoreInfo.Accuracy"/> 覆盖成 <c>AccuracyClassic</c>、把总分换成 combo 状态机结果，
+        /// 而 <c>Accuracy.Value</c> 仍是 lazer 口径，两边量的不是同一个数。
+        /// </remarks>
+        private bool assertPopulatedScoreMatches(ScoreInfo sessionInfo)
+        {
+            var populated = new ScoreInfo { Ruleset = new ManiaRuleset().RulesetInfo };
+            currentPlayer.ScoreProcessor.PopulateScore(populated);
+
+            const double tolerance = 1e-6;
+
+            if (Math.Abs(populated.Accuracy - sessionInfo.Accuracy) >= tolerance)
+            {
+                throw new AssertionException(
+                    $"p accuracy={populated.Accuracy:F8} n accuracy={sessionInfo.Accuracy:F8}");
+            }
+
+            if (populated.TotalScore != sessionInfo.TotalScore)
+            {
+                throw new AssertionException(
+                    $"p total score={populated.TotalScore} n total score={sessionInfo.TotalScore}");
+            }
+
+            if (populated.Combo != sessionInfo.Combo)
+            {
+                throw new AssertionException(
+                    $"p combo={populated.Combo} n combo={sessionInfo.Combo}");
+            }
+
+            if (populated.MaxCombo != sessionInfo.MaxCombo)
+            {
+                throw new AssertionException(
+                    $"p max combo={populated.MaxCombo} n max combo={sessionInfo.MaxCombo}");
+            }
+
+            if (populated.Rank != sessionInfo.Rank)
+            {
+                throw new AssertionException(
+                    $"p rank={populated.Rank} n rank={sessionInfo.Rank}");
+            }
+
+            foreach (var result in Enum.GetValues<HitResult>())
+            {
+                // Session 路径不记录 IgnoreHit/IgnoreMiss（与既有 hit event 比对口径一致）。
+                if (result is HitResult.IgnoreHit or HitResult.IgnoreMiss)
+                    continue;
+
+                int p = populated.Statistics.GetValueOrDefault(result);
+                int n = sessionInfo.Statistics.GetValueOrDefault(result);
+
+                if (p != n)
+                {
+                    throw new AssertionException(
+                        $"p {result}={p} n {result}={n}");
+                }
+            }
+
+            return true;
         }
 
         private void runReplayAfterRecalcParityTest((Score score, IBeatmap beatmap, GameplayEnvironment environment) fixture)
@@ -864,9 +1214,9 @@ namespace osu.Game.Rulesets.Mania.Tests
             });
 
             // 玩家是异步加载的：ScoreProcessor 由 Player 的 [BackgroundDependencyLoader] load() 建出，
-            // 在此之前访问它会 NRE（本夹具当进程首个测试时必现）。LoadedBeatmapSuccessfully 为 true
-            // 即 load() 已跑到 ScoreProcessor 赋值之后。
-            AddUntilStep("wait for player", () => currentPlayer.LoadedBeatmapSuccessfully);
+            // 在此之前访问它会 NRE。LoadedBeatmapSuccessfully 先于 ScoreProcessor 赋值变 true（实测约半数复现），
+            // 故两者都要等。
+            AddUntilStep("wait for player", () => currentPlayer is { LoadedBeatmapSuccessfully: true, ScoreProcessor: not null });
             AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value);
 
             AddAssert("replay result matches recalculated Now", () =>

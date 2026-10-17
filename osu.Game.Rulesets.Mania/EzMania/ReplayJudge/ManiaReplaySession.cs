@@ -10,6 +10,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
@@ -108,7 +109,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             double gameplayRate = ModUtils.CalculateRateWithMods(resolvedMods);
             recorder?.RecordInitial(scoreProcessor, gameplayRate);
 
-            var targets = buildTargets(beatmap);
+            var targets = buildTargets(beatmap, simulationEnvironment.JudgeMode);
 
             var holdByHead = new Dictionary<HeadNote, HoldNote>();
             var headByTail = new Dictionary<TailNote, HeadNote>();
@@ -204,13 +205,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     continue;
 
                 state.Judged = true;
-                state.Result = HitResult.Miss;
+
+                HitResult forcedResult = ManiaReplaySessionSimulator.ResolveForcedMissResult(state.Target, judgeMode);
+                state.Result = forcedResult;
 
                 double missEventTime = ManiaReplaySessionSimulator.ResolveMissEventTime(state.Target, pressTimesByColumn);
                 ManiaReplaySessionSimulator.ApplyFinalResult(
                     scoreProcessor,
                     state.Target,
-                    HitResult.Miss,
+                    forcedResult,
                     ManiaReplaySessionSimulator.ResolveMissStoredOffset(state.Target, pressTimesByColumn),
                     missEventTime,
                     gameplayRate,
@@ -236,12 +239,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             }
         }
 
-        private static List<LaneTargetState> buildTargets(IBeatmap beatmap)
+        private static List<LaneTargetState> buildTargets(IBeatmap beatmap, EzEnumJudgeMode judgeMode)
         {
             var targets = new List<LaneTargetState>();
 
             foreach (var hitObject in beatmap.HitObjects)
-                collectJudgementTargets(hitObject, targets);
+                collectJudgementTargets(hitObject, targets, judgeMode);
 
             targets.Sort((a, b) =>
             {
@@ -257,17 +260,22 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             return targets;
         }
 
-        private static void collectJudgementTargets(HitObject hitObject, List<LaneTargetState> targets)
+        private static void collectJudgementTargets(HitObject hitObject, List<LaneTargetState> targets, EzEnumJudgeMode judgeMode)
         {
+            // [Ez] StableClassic 的 LN 头绑定 IgnoreJudgement（头本身不产生档位），但仍是判定目标：
+            // 局内要按它记「最近按下」并落一枚 IgnoreHit/IgnoreMiss 收束结算门闩，Session 必须同样收它，
+            // 否则 OnPressed 永不触发 → 尾判按「从未按下」求值（持过尾被判 Miss），且统计缺头这一档。
+            bool stableClassicHead = hitObject is HeadNote && StableClassicJudgeModeJudgement.IsSelected(judgeMode);
+
             if (hitObject.HitWindows != null
                 && !ReferenceEquals(hitObject.HitWindows, HitWindows.Empty)
-                && hitObject.Judgement.MaxResult != HitResult.IgnoreHit)
+                && (stableClassicHead || hitObject.Judgement.MaxResult != HitResult.IgnoreHit))
             {
                 targets.Add(new LaneTargetState(hitObject));
             }
 
             foreach (var nested in hitObject.NestedHitObjects)
-                collectJudgementTargets(nested, targets);
+                collectJudgementTargets(nested, targets, judgeMode);
         }
 
         private static void buildColumnMaps(

@@ -40,7 +40,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         private readonly IReadOnlyList<HitEvent>? originalHitEventsOverride;
 
         private readonly ManiaHitWindows hitWindowsNow = new ManiaHitWindows();
-        private readonly JudgeModeHelper hitWindowsV1 = new JudgeModeHelper(EzEnumJudgeMode.Classic);
 
         private Bindable<EzEnumJudgeMode> judgeModeBindable = null!;
         private Bindable<EzEnumHealthMode> healthModeBindable = null!;
@@ -61,7 +60,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             : base(score, beatmap, new ManiaHitWindows())
         {
             hitWindowsNow.SetDifficulty(OD);
-            hitWindowsV1.OverallDifficulty = OD;
             originalAccuracy = score.Accuracy;
             originalTotalScore = score.TotalScore;
 
@@ -101,9 +99,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                     return null;
 
                 var precise = new ManiaReplaySessionService()
-                    .RunHitEventsAsync(scoreForBridge, beatmap)
-                    .GetAwaiter()
-                    .GetResult();
+                              .RunHitEventsAsync(scoreForBridge, beatmap)
+                              .GetAwaiter()
+                              .GetResult();
 
                 if (precise is { Count: > 0 })
                     return precise;
@@ -123,7 +121,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         protected override IReadOnlyList<HitEvent> FilterHitEvents()
         {
-            if (CommittedNowScore?.ScoreInfo.HitEvents is { } sessionEvents)
+            if (ReplaySessionScore?.ScoreInfo.HitEvents is { } sessionEvents)
                 return filterForCurrentJudgeMode(sessionEvents);
 
             return Array.Empty<HitEvent>();
@@ -153,7 +151,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         private IReadOnlyList<HitEvent> applyFakeOffsetToEvents(IEnumerable<HitEvent> events)
         {
             var list = events.ToList();
-            double delta = offsetPlusMania.Value - CommittedSessionOffset;
+            double delta = offsetPlusMania.Value - LastApplyOffset;
 
             if (delta == 0)
                 return list;
@@ -169,19 +167,52 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         protected override void CalculateNowAccuracy()
         {
-            var info = CommittedNowScore?.ScoreInfo;
+            var info = ReplaySessionScore?.ScoreInfo;
+
+            // Now 只有 Session 重算这一个来源：尚无结果时保持 0，不用成绩自身的数值顶替。
+            if (info == null)
+            {
+                var zero = SessionNowSnapshot.Zero();
+
+                NowCounts = zero.Counts;
+                NowAccuracy = zero.Accuracy;
+                NowScore = zero.Score;
+                return;
+            }
 
             // Debounce 前的拖动预览仍走 HitEvent 偏移重判；Session 提交后直接使用其完整重算结果。
-            if (info == null || offsetPlusMania.Value != CommittedSessionOffset)
+            if (offsetPlusMania.Value != LastApplyOffset)
             {
                 RecalculateNowFromDisplayEvents();
                 return;
             }
 
-            NowCounts = extractDisplayCounts(info.Statistics);
-            NowAccuracy = info.Accuracy;
-            NowScore = info.TotalScore;
+            var now = CreateSessionNowSnapshot(info, currentJudgeMode);
+
+            NowCounts = now.Counts;
+            NowAccuracy = now.Accuracy;
+            NowScore = now.Score;
             logDiffIfMismatch(info);
+        }
+
+        /// <summary>
+        /// 把 Session 的 <see cref="ScoreInfo"/> 投影成 Now 列的三项数值。
+        /// </summary>
+        /// <remarks>
+        /// 三项必须同源：stable classic 的总分由 combo 状态机累加，不能用 acc 反投影出分数，
+        /// 也不能混入成绩自身的 acc / 统计。调用方负责区分「尚无 Session 结果」。
+        /// </remarks>
+        internal static SessionNowSnapshot CreateSessionNowSnapshot(ScoreInfo sessionInfo, EzEnumJudgeMode judgeMode)
+        {
+            return new SessionNowSnapshot(sessionInfo.Accuracy, sessionInfo.TotalScore, ExtractDisplayCounts(sessionInfo.Statistics, judgeMode));
+        }
+
+        /// <summary>
+        /// Now 列的三项取值；<see cref="Zero"/> 表示尚无 Session 结果。
+        /// </summary>
+        internal readonly record struct SessionNowSnapshot(double Accuracy, long Score, Dictionary<HitResult, int> Counts)
+        {
+            public static SessionNowSnapshot Zero() => new SessionNowSnapshot(0, 0, new Dictionary<HitResult, int>());
         }
 
         /// <summary>
@@ -260,12 +291,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             }
         }
 
-        protected override IReadOnlyList<HitEvent> GetV1HitEvents()
-        {
-            // Classic 路线固定使用原始基础事件，不受当前 JudgeMode 可见结果集合影响。
-            return applyFakeOffsetToEvents(getEffectiveOriginalHitEvents().Where(e => e.Result.IsBasic()));
-        }
-
         [BackgroundDependencyLoader]
         private void load()
         {
@@ -324,11 +349,35 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             return hitWindowsNow.WindowFor(result);
         }
 
-        protected override HitResult RecalculateV1Result(HitEvent hitEvent)
+        protected override void CalculateV1Accuracy()
         {
-            HitResult result = hitWindowsV1.ResultFor(hitEvent.TimeOffset);
-            return result == HitResult.None ? HitResult.Miss : result;
+            var v1 = CreateV1Snapshot(V1SessionScore?.ScoreInfo);
+
+            V1Accuracy = v1.Accuracy;
+            V1Score = v1.Score;
+            V1Counts = v1.Counts;
         }
+
+        /// <summary>
+        /// V1 列的三项取值；无 Session 结果为 0，不用成绩自身的数值顶替。
+        /// </summary>
+        internal static SessionNowSnapshot CreateV1Snapshot(ScoreInfo? sessionInfo)
+            => sessionInfo == null
+                ? SessionNowSnapshot.Zero()
+                : new SessionNowSnapshot(sessionInfo.Accuracy, sessionInfo.TotalScore, ExtractDisplayCounts(sessionInfo.Statistics, EzEnumJudgeMode.StableClassic));
+
+        /// <summary>
+        /// V1 列用同一份 replay、同一套仿真器，只把判定档位换成 stable 原生 classic。
+        /// </summary>
+        /// <remarks>
+        /// 成绩本身就是 StableClassic 时该请求与 Now 的缓存键完全一致，不会产生第二次计算。
+        /// </remarks>
+        protected override ReplayRunRequest? CreateV1RunRequest(Score score)
+            => new ReplayRunRequest(score, Beatmap, ReplayRunPurpose.ForLive)
+            {
+                IncludeGlobalManiaOffset = true,
+                JudgeModeOverride = EzEnumJudgeMode.StableClassic,
+            };
 
         /// <summary>Session 基准判定已产出；fake offset 重判由 <see cref="GetDisplayResult"/> 负责。</summary>
         protected override HitResult RecalculateNowResult(HitEvent hitEvent) => hitEvent.Result;
@@ -364,7 +413,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         /// </summary>
         protected override HitResult GetDisplayResult(HitEvent hitEvent)
         {
-            if (offsetPlusMania.Value == CommittedSessionOffset)
+            if (offsetPlusMania.Value == LastApplyOffset)
                 return hitEvent.Result;
 
             if (currentJudgeMode == EzEnumJudgeMode.O2Jam)
@@ -410,17 +459,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         /// </summary>
         internal static IReadOnlyList<HitResult> GetOrderedStatHitResults(EzEnumJudgeMode judgeMode)
             => JudgeModeHelper.GetJudgeModeValidHitResults(judgeMode)
-                            .Where(r => r is not (HitResult.IgnoreHit or HitResult.IgnoreMiss))
-                            .OrderBy(r => r.GetIndexForOrderedDisplay())
-                            .ToList();
+                              .Where(r => r is not (HitResult.IgnoreHit or HitResult.IgnoreMiss))
+                              .OrderBy(r => r.GetIndexForOrderedDisplay())
+                              .ToList();
 
         /// <summary>
         /// JudgeMode / 重判相关配置变更：清空 Session 缓存，即时 rejudge 展示，并异步重跑 Session。
         /// </summary>
         private void onReplayConfigChanged()
         {
-            CommittedNowScore = null;
-            CommittedSessionOffset = 0;
+            ReplaySessionScore = null;
+            V1SessionScore = null;
+            LastApplyOffset = 0;
             InvalidateTextUi();
             Refresh();
             _ = RefreshFromService();

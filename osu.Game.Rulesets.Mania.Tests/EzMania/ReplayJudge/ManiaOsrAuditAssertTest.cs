@@ -39,11 +39,15 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
     ///         </item>
     ///         <item>
     ///             <b>Lazer / Classic Session</b>：冻结<strong>现行</strong>
-    ///             <see cref="ManiaReplaySession"/> 产出（与局内对齐后的 Session）；
+    ///             <see cref="ManiaReplaySession"/> 产出（与局内对齐后的 Session），精确比对。
+    ///         </item>
+    ///         <item>
+    ///             <b>StableClassic Session</b>：仍在向 stable 原生锚点收敛，故只钉<strong>距锚点的差距上限</strong>
+    ///             （<see cref="SessionBound"/>）：更近通过、更远失败，收敛后不必重钉断言。
     ///             与嵌入/stable 客户端数字可因整数帧与历史 LN 语义不同。
     ///         </item>
     ///     </list>
-    ///     套件：Hanatachi、PORTRAiT。Classic 主判定键门禁（不含 Ignore*）；Lazer Session 全量非零。
+    ///     套件：Hanatachi、PORTRAiT。Classic / StableClassic 主判定键门禁（不含 Ignore*）；Lazer Session 全量非零。
     ///     高难度 LN 闭环仍用 <see cref="OsrAuditTest" /> + GramNibelungen23（勿当金标）。
     /// </summary>
     [TestFixture]
@@ -87,21 +91,23 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             },
             true,
             true,
-            919507,
-            3451,
-            0.9799073387917894,
-            new Dictionary<HitResult, int>
-            {
-                [HitResult.Miss] = 17,
-                [HitResult.Meh] = 12,
-                [HitResult.Ok] = 21,
-                [HitResult.Good] = 147,
-                [HitResult.Great] = 1073,
-                [HitResult.Perfect] = 4172,
-                [HitResult.IgnoreMiss] = 6,
-                [HitResult.IgnoreHit] = 2091,
-                [HitResult.ComboBreak] = 9,
-            });
+            new SessionAnchor(
+                919507,
+                3451,
+                0.9799073387917894,
+                new Dictionary<HitResult, int>
+                {
+                    [HitResult.Miss] = 17,
+                    [HitResult.Meh] = 12,
+                    [HitResult.Ok] = 21,
+                    [HitResult.Good] = 147,
+                    [HitResult.Great] = 1073,
+                    [HitResult.Perfect] = 4172,
+                    [HitResult.IgnoreMiss] = 6,
+                    [HitResult.IgnoreHit] = 2091,
+                    [HitResult.ComboBreak] = 9,
+                }),
+            null);
 
         private static readonly AuditFixture lazer_portrait = new AuditFixture(
             "Lazer-PORTRAiT",
@@ -130,21 +136,23 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             },
             true,
             true,
-            874701,
-            892,
-            0.971189444004859,
-            new Dictionary<HitResult, int>
-            {
-                [HitResult.Miss] = 60,
-                [HitResult.Meh] = 24,
-                [HitResult.Ok] = 36,
-                [HitResult.Good] = 208,
-                [HitResult.Great] = 2198,
-                [HitResult.Perfect] = 4829,
-                [HitResult.IgnoreMiss] = 27,
-                [HitResult.IgnoreHit] = 5594,
-                [HitResult.ComboBreak] = 33,
-            });
+            new SessionAnchor(
+                874701,
+                892,
+                0.971189444004859,
+                new Dictionary<HitResult, int>
+                {
+                    [HitResult.Miss] = 60,
+                    [HitResult.Meh] = 24,
+                    [HitResult.Ok] = 36,
+                    [HitResult.Good] = 208,
+                    [HitResult.Great] = 2198,
+                    [HitResult.Perfect] = 4829,
+                    [HitResult.IgnoreMiss] = 27,
+                    [HitResult.IgnoreHit] = 5594,
+                    [HitResult.ComboBreak] = 33,
+                }),
+            null);
 
         public static IEnumerable<AuditFixture> LazerFixtures()
         {
@@ -152,7 +160,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             yield return lazer_portrait;
         }
 
-        // Classic：Expected* = stable 二进制头旁证（本轨不做 Header 门禁）；Session* = 现行 Classic Session。
+        // Classic：Expected* = stable 原生量（Statistics / MaxCombo / LegacyTotalScore，见
+        // AuditClassicFixtureAnchorMatchesDecodedHeader）；ExpectedAccuracy 是解码后 lazer 迁移重算值，仅供记录，不作门禁。
         private static readonly AuditFixture classic_hanatachi = new AuditFixture(
             "Classic-Hanatachi",
             "Resources/Testing/Replays/ManiaAudit-Classic-Hanatachi.osr",
@@ -177,18 +186,60 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             },
             false,
             false,
-            905608,
-            1925,
-            0.9778267793703296,
+            new SessionAnchor(
+                905608,
+                1925,
+                0.9778267793703296,
+                new Dictionary<HitResult, int>
+                {
+                    [HitResult.Miss] = 49,
+                    [HitResult.Meh] = 14,
+                    [HitResult.Ok] = 16,
+                    [HitResult.Good] = 148,
+                    [HitResult.Great] = 955,
+                    [HitResult.Perfect] = 4260,
+                }),
+            null);
+
+        // StableClassic：锚点同 Classic 行（stable 原生量）。本档仍在向锚点收敛，故门禁只钉「距锚点的差距上限」：
+        // 上限取当前实测差距，更近通过、更远失败。残差来源与后续收敛项记在
+        // .cursor/plans/classic_源码差异审计_8edfa732.plan.md；收敛后把上限整体归零即可。
+        private static readonly AuditFixture stable_classic_hanatachi = new AuditFixture(
+            "StableClassic-Hanatachi",
+            "Resources/Testing/Replays/ManiaAudit-Classic-Hanatachi.osr",
+            "Resources/Testing/Beatmaps/ManiaAudit-Hanatachi.osu",
+            EzEnumJudgeMode.StableClassic,
+            "29278f227275b1720e995d532130710b",
+            904544,
+            1728,
+            0.9774174631810525,
+            ScoreRank.S,
+            null,
+            true,
+            new[] { "CL" },
             new Dictionary<HitResult, int>
             {
-                [HitResult.Miss] = 49,
-                [HitResult.Meh] = 14,
-                [HitResult.Ok] = 16,
-                [HitResult.Good] = 148,
-                [HitResult.Great] = 955,
-                [HitResult.Perfect] = 4260,
-            });
+                [HitResult.Miss] = 36,
+                [HitResult.Meh] = 10,
+                [HitResult.Ok] = 9,
+                [HitResult.Good] = 103,
+                [HitResult.Great] = 808,
+                [HitResult.Perfect] = 3423,
+            },
+            false,
+            false,
+            null,
+            new SessionBound(
+                369,
+                new Dictionary<HitResult, int>
+                {
+                    [HitResult.Miss] = 2,
+                    [HitResult.Meh] = 0,
+                    [HitResult.Ok] = 2,
+                    [HitResult.Good] = 1,
+                    [HitResult.Great] = 0,
+                    [HitResult.Perfect] = 1,
+                }));
 
         private static readonly AuditFixture classic_portrait = new AuditFixture(
             "Classic-PORTRAiT",
@@ -214,23 +265,70 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             },
             false,
             false,
-            892585,
-            1328,
-            0.9742125538182642,
+            new SessionAnchor(
+                892585,
+                1328,
+                0.9742125538182642,
+                new Dictionary<HitResult, int>
+                {
+                    [HitResult.Miss] = 60,
+                    [HitResult.Meh] = 20,
+                    [HitResult.Ok] = 33,
+                    [HitResult.Good] = 273,
+                    [HitResult.Great] = 2558,
+                    [HitResult.Perfect] = 4411,
+                }),
+            null);
+
+        // 计分改取已落定档位后，40 个 Miss 不再按同列最近按键的 stored offset 重判成命中（不再各送一次基础分），
+        // 该档总分从 867600 降到 866984，距锚点 -4933；旧上限 4317 是这份偏差被高估填平后的实测值。
+        private static readonly AuditFixture stable_classic_portrait = new AuditFixture(
+            "StableClassic-PORTRAiT",
+            "Resources/Testing/Replays/ManiaAudit-Classic-PORTRAiT.osr",
+            "Resources/Testing/Beatmaps/ManiaAudit-PORTRAiT.osu",
+            EzEnumJudgeMode.StableClassic,
+            "5737c0072e3c1319d95cf117b3f78648",
+            871917,
+            1340,
+            0.9669379597984128,
+            ScoreRank.S,
+            null,
+            true,
+            new[] { "CL" },
             new Dictionary<HitResult, int>
             {
-                [HitResult.Miss] = 60,
-                [HitResult.Meh] = 20,
-                [HitResult.Ok] = 33,
-                [HitResult.Good] = 273,
-                [HitResult.Great] = 2558,
-                [HitResult.Perfect] = 4411,
-            });
+                [HitResult.Miss] = 38,
+                [HitResult.Meh] = 8,
+                [HitResult.Ok] = 15,
+                [HitResult.Good] = 190,
+                [HitResult.Great] = 1801,
+                [HitResult.Perfect] = 2476,
+            },
+            false,
+            false,
+            null,
+            new SessionBound(
+                5000,
+                new Dictionary<HitResult, int>
+                {
+                    [HitResult.Miss] = 2,
+                    [HitResult.Meh] = 3,
+                    [HitResult.Ok] = 0,
+                    [HitResult.Good] = 1,
+                    [HitResult.Great] = 4,
+                    [HitResult.Perfect] = 0,
+                }));
 
         public static IEnumerable<AuditFixture> ClassicFixtures()
         {
             yield return classic_hanatachi;
             yield return classic_portrait;
+        }
+
+        public static IEnumerable<AuditFixture> StableClassicFixtures()
+        {
+            yield return stable_classic_hanatachi;
+            yield return stable_classic_portrait;
         }
 
         [TestCaseSource(nameof(LazerFixtures))]
@@ -249,6 +347,64 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void AuditClassicSessionMatchesAnchor(AuditFixture fixture)
         {
             assertSessionMatchesAnchor(fixture);
+        }
+
+        [TestCaseSource(nameof(StableClassicFixtures))]
+        public void AuditStableClassicSessionMatchesAnchor(AuditFixture fixture)
+        {
+            assertSessionMatchesAnchor(fixture);
+        }
+
+        [TestCaseSource(nameof(ClassicFixtures))]
+        public void AuditClassicFixtureAnchorMatchesDecodedHeader(AuditFixture fixture)
+        {
+            assertAnchorMatchesDecodedHeader(fixture);
+        }
+
+        [TestCaseSource(nameof(StableClassicFixtures))]
+        public void AuditStableClassicFixtureAnchorMatchesDecodedHeader(AuditFixture fixture)
+        {
+            assertAnchorMatchesDecodedHeader(fixture);
+        }
+
+        /// <summary>
+        /// 门禁口径自检：Classic / StableClassic 行的「头」锚点必须逐项等于 osr 解码头。
+        /// </summary>
+        /// <remarks>
+        /// 解码末段会跑 <c>StandardisedScoreMigrationTools.UpdateToLatestScoring</c>，<see cref="ScoreInfo.TotalScore"/>
+        /// 与 <see cref="ScoreInfo.Accuracy"/> 都是 <b>lazer 标准分迁移重算值</b>（mania 走
+        /// <c>150000·combo + 850000·acc^(2+2·acc)</c>，acc 用 Perfect=305 权重），<b>不是</b> stable 原生量，
+        /// 不能拿来当 stable 门禁。此处只钉 stable 原生三项：Statistics、MaxCombo、LegacyTotalScore。
+        /// </remarks>
+        private static void assertAnchorMatchesDecodedHeader(AuditFixture fixture)
+        {
+            assumeResourcesPresent(fixture);
+
+            var decoder = new HarnessScoreDecoder(fixture.BeatmapResource);
+            Score score;
+
+            using (var stream = resources.GetStream(fixture.OsrResource))
+                score = decoder.Parse(stream);
+
+            ScoreInfo info = score.ScoreInfo;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(info.IsLegacyScore, Is.True, "该夹具的头锚点取自 stable 原生量，要求 osr 走 legacy 解码路径");
+
+                Assert.That(
+                    info.LegacyTotalScore,
+                    Is.EqualTo((long?)fixture.ExpectedTotalScore),
+                    $"ExpectedTotalScore 应为 stable 原生分（LegacyTotalScore）；实际解码头 LegacyTotalScore={info.LegacyTotalScore}，"
+                    + $"迁移后 TotalScore={info.TotalScore}");
+
+                Assert.That(
+                    info.MaxCombo,
+                    Is.EqualTo(fixture.ExpectedMaxCombo),
+                    $"MaxCombo 锚点={fixture.ExpectedMaxCombo}，解码头={info.MaxCombo}");
+
+                assertStatisticsEqual(info.Statistics, fixture.ExpectedStatistics, false, null);
+            });
         }
 
         private static void assertDecodedHeader(AuditFixture fixture)
@@ -275,7 +431,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             using (var stream = resources.GetStream(fixture.OsrResource))
                 score = decoder.Parse(stream);
 
-            // Classic：丢弃 Lazer 解码嵌入 Statistics/分数，只保留 Replay 帧；Mods/JudgeMode 按静态契约注入。
+            // Classic / StableClassic：丢弃 Lazer 解码嵌入 Statistics/分数，只保留 Replay 帧；Mods/JudgeMode 按静态契约注入。
             if (!fixture.AssertDecodedHeader)
                 prepareScoreForClassicSession(score, fixture);
 
@@ -329,10 +485,17 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
         private static void assertAgainstAnchor(ScoreInfo info, AuditFixture fixture, string? report, bool afterSession)
         {
-            long expectedTotal = afterSession ? fixture.SessionTotalScore : fixture.ExpectedTotalScore;
-            int expectedCombo = afterSession ? fixture.SessionMaxCombo : fixture.ExpectedMaxCombo;
-            double expectedAcc = afterSession ? fixture.SessionAccuracy : fixture.ExpectedAccuracy;
-            var expectedStats = afterSession ? fixture.SessionStatistics : fixture.ExpectedStatistics;
+            if (afterSession && fixture.SessionBound is { } bound)
+            {
+                assertSessionWithinBound(info, fixture, bound, report);
+                return;
+            }
+
+            // afterSession 且声明了差距上限的夹具已在上面返回；此处 afterSession ⇒ SessionAnchor 非空。
+            long expectedTotal = afterSession ? fixture.SessionAnchor!.TotalScore : fixture.ExpectedTotalScore;
+            int expectedCombo = afterSession ? fixture.SessionAnchor!.MaxCombo : fixture.ExpectedMaxCombo;
+            double expectedAcc = afterSession ? fixture.SessionAnchor!.Accuracy : fixture.ExpectedAccuracy;
+            var expectedStats = afterSession ? fixture.SessionAnchor!.Statistics : fixture.ExpectedStatistics;
 
             Assert.Multiple(() =>
             {
@@ -341,7 +504,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
                 Assert.That(info.TotalScore, Is.EqualTo(expectedTotal), report);
                 Assert.That(info.MaxCombo, Is.EqualTo(expectedCombo), report);
-                // Classic Acc 权值可能暂不一致；Session 轨用实测冻结值，容差收紧到浮点噪声。
+                // 两侧锚点各自同源：Lazer 轨 ExpectedAccuracy 取自解码头，Classic / StableClassic 轨 SessionAccuracy
+                // 取自实测冻结（该轨 ExpectedAccuracy 的解码值已被 lazer 迁移改写，不作门禁）。
                 double accTolerance = afterSession || fixture.AssertDecodedHeader ? 1e-12 : 5e-3;
                 Assert.That(info.Accuracy, Is.EqualTo(expectedAcc).Within(accTolerance), report);
 
@@ -363,6 +527,47 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 }
 
                 assertStatisticsEqual(info.Statistics, expectedStats, fixture.AssertFullNonZeroStatistics, report);
+            });
+        }
+
+        /// <summary>
+        /// 收敛档的门禁：逐项比对现行 Session 与解码头（stable 原生量）的差距，不得超过 <see cref="SessionBound"/>。
+        /// </summary>
+        private static void assertSessionWithinBound(ScoreInfo info, AuditFixture fixture, SessionBound bound, string? report)
+        {
+            Assert.Multiple(() =>
+            {
+                if (fixture.ExpectedBeatmapMd5 != null)
+                    Assert.That(info.BeatmapInfo?.MD5Hash, Is.EqualTo(fixture.ExpectedBeatmapMd5), report);
+
+                Assert.That(
+                    Math.Abs(info.TotalScore - fixture.ExpectedTotalScore),
+                    Is.LessThanOrEqualTo(bound.TotalScoreGap),
+                    $"总分距解码头 {fixture.ExpectedTotalScore} 差 {info.TotalScore - fixture.ExpectedTotalScore}，超过上限 {bound.TotalScoreGap}{report}");
+
+                Assert.That(info.MaxCombo, Is.EqualTo(fixture.ExpectedMaxCombo), report);
+
+                foreach (var (result, gap) in bound.StatisticGaps.OrderBy(kv => kv.Key))
+                {
+                    int actual = info.Statistics.GetValueOrDefault(result);
+                    int expected = fixture.ExpectedStatistics.GetValueOrDefault(result);
+
+                    Assert.That(
+                        Math.Abs(actual - expected),
+                        Is.LessThanOrEqualTo(gap),
+                        $"{result} 距解码头 {expected} 差 {actual - expected}，超过上限 {gap}{report}");
+                }
+
+                if (fixture.ExpectedRank is ScoreRank rank)
+                    Assert.That(info.Rank, Is.EqualTo(rank), report);
+
+                if (fixture.ExpectedIsLegacy is bool legacy)
+                    Assert.That(info.IsLegacyScore, Is.EqualTo(legacy), report);
+
+                Assert.That(
+                    info.Mods.Select(m => m.Acronym).OrderBy(a => a).ToArray(),
+                    Is.EqualTo(fixture.ExpectedModAcronyms.OrderBy(a => a).ToArray()),
+                    report);
             });
         }
 
@@ -398,21 +603,33 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             sb.AppendLine($"judgeMode: {fixture.JudgeMode}");
             sb.AppendLine($"env: JudgeMode={fixture.JudgeMode} HealthMode=Lazer JudgePrecedence=Earliest OffsetPlusMania=0");
             sb.AppendLine($"header-anchor: acc={fixture.ExpectedAccuracy:R} total={fixture.ExpectedTotalScore} combo={fixture.ExpectedMaxCombo}");
-            sb.AppendLine($"session-anchor: acc={fixture.SessionAccuracy:R} total={fixture.SessionTotalScore} combo={fixture.SessionMaxCombo}");
+
+            if (fixture.SessionAnchor is { } anchor)
+                sb.AppendLine($"session-anchor: acc={anchor.Accuracy:R} total={anchor.TotalScore} combo={anchor.MaxCombo}");
+
+            if (fixture.SessionBound is { } bound)
+                sb.AppendLine($"session-bound: totalGap<={bound.TotalScoreGap} statsGap={string.Join(",", bound.StatisticGaps.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value}"))}");
+
             sb.AppendLine($"session: acc={score.ScoreInfo.Accuracy:R} rank={score.ScoreInfo.Rank} total={score.ScoreInfo.TotalScore} combo={score.ScoreInfo.MaxCombo}");
             sb.AppendLine($"session mods: {string.Join(",", score.ScoreInfo.Mods.Select(m => m.Acronym))}");
             sb.AppendLine($"session stats: {string.Join(", ", score.ScoreInfo.Statistics.Where(kv => kv.Value != 0).OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value}"))}");
-            sb.AppendLine("delta (session − session-anchor):");
 
-            foreach (var key in fixture.SessionStatistics.Keys.OrderBy(k => k))
+            // 比较基线：有冻结锚点的档比锚点，只钉上限的档比解码头（stable 原生量）。
+            long baselineTotal = fixture.SessionAnchor?.TotalScore ?? fixture.ExpectedTotalScore;
+            int baselineCombo = fixture.SessionAnchor?.MaxCombo ?? fixture.ExpectedMaxCombo;
+            IReadOnlyDictionary<HitResult, int> baselineStats = fixture.SessionAnchor?.Statistics ?? fixture.ExpectedStatistics;
+
+            sb.AppendLine($"delta (session − {(fixture.SessionAnchor != null ? "session-anchor" : "header-anchor")}):");
+
+            foreach (var key in baselineStats.Keys.OrderBy(k => k))
             {
-                int delta = score.ScoreInfo.Statistics.GetValueOrDefault(key) - fixture.SessionStatistics[key];
+                int delta = score.ScoreInfo.Statistics.GetValueOrDefault(key) - baselineStats[key];
                 if (delta != 0)
                     sb.AppendLine($"  {key}: {delta:+#;-#;0}");
             }
 
-            long scoreDelta = score.ScoreInfo.TotalScore - fixture.SessionTotalScore;
-            int comboDelta = score.ScoreInfo.MaxCombo - fixture.SessionMaxCombo;
+            long scoreDelta = score.ScoreInfo.TotalScore - baselineTotal;
+            int comboDelta = score.ScoreInfo.MaxCombo - baselineCombo;
             if (scoreDelta != 0)
                 sb.AppendLine($"  TotalScore: {scoreDelta:+#;-#;0}");
             if (comboDelta != 0)
@@ -522,6 +739,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 int exactBoundary = hitEvents.Count(ev =>
                 {
                     if (ev.Result != HitResult.Great || ev.HitObject?.HitWindows == null) return false;
+
                     bool tail = ev.HitObject is TailNote;
                     double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
                     return Math.Abs(j - (pWin + 0.5)) < 1e-9;
@@ -529,6 +747,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 int perfectAtP = hitEvents.Count(ev =>
                 {
                     if (ev.Result != HitResult.Perfect || ev.HitObject?.HitWindows == null) return false;
+
                     bool tail = ev.HitObject is TailNote;
                     double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
                     return Math.Abs(j - pWin) < 1e-9;
@@ -536,16 +755,16 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 sb.AppendLine($"  exact |j|=P+0.5 Great={exactBoundary}; exact |j|=P Perfect={perfectAtP}");
 
                 foreach (var e in hitEvents
-                                   .Where(ev => ev.Result == HitResult.Great && ev.HitObject?.HitWindows != null)
-                                   .Select(ev =>
-                                   {
-                                       bool tail = ev.HitObject is TailNote;
-                                       double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
-                                       return (ev, j, tail);
-                                   })
-                                   .Where(x => x.j > pWin && x.j <= pWin + 0.5)
-                                   .OrderBy(x => x.ev.HitObject!.StartTime)
-                                   .Take(15))
+                                  .Where(ev => ev.Result == HitResult.Great && ev.HitObject?.HitWindows != null)
+                                  .Select(ev =>
+                                  {
+                                      bool tail = ev.HitObject is TailNote;
+                                      double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
+                                      return (ev, j, tail);
+                                  })
+                                  .Where(x => x.j > pWin && x.j <= pWin + 0.5)
+                                  .OrderBy(x => x.ev.HitObject!.StartTime)
+                                  .Take(15))
                 {
                     string column = e.ev.HitObject is IHasColumn c ? c.Column.ToString() : "-";
                     sb.AppendLine($"    {kind(e.ev)}@{e.ev.HitObject!.StartTime:F3} col={column} off={e.ev.TimeOffset:R} j={e.j:R}");
@@ -629,11 +848,13 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             }
 
             double? sampleMissWindow = hitEvents.Select(ev => ev.HitObject?.HitWindows?.WindowFor(HitResult.Miss)).FirstOrDefault(w => w is > 0);
+
             if (sampleMissWindow is double missWindowMs)
             {
                 int mehAtMissEdge = hitEvents.Count(ev =>
                 {
                     if (ev.Result != HitResult.Meh || ev.HitObject?.HitWindows == null) return false;
+
                     bool tail = ev.HitObject is TailNote;
                     double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
                     return Math.Abs(j - missWindowMs) <= 1.0 || Math.Abs(j - (missWindowMs + 0.5)) < 1e-9;
@@ -641,6 +862,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 int missAtMissEdge = hitEvents.Count(ev =>
                 {
                     if (ev.Result != HitResult.Miss || ev.HitObject?.HitWindows == null) return false;
+
                     bool tail = ev.HitObject is TailNote;
                     double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
                     return Math.Abs(j - missWindowMs) <= 1.0 || Math.Abs(j - (missWindowMs + 0.5)) < 1e-9;
@@ -702,6 +924,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             // Head 命中但尾 Miss：典型「断连后未重臂 → 尾被动 Miss」；列出时刻便于对照回放。
             // sameColHit=同列在 (head,tail) 内命中其它物件（列路由占键 → 不应重臂）；none=期间无同列命中（若仍有空按应能重臂）。
             sb.AppendLine("hold HeadHit|TailMiss detail:");
+
             foreach (var hold in holds.OrderBy(h => h.StartTime))
             {
                 var headEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Head));
@@ -716,27 +939,27 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
                 string body = bodyEv.HitObject != null ? bodyEv.Result.ToString() : "none";
 
-                var sameColHits = hitEvents
-                    .Where(ev => ev.HitObject is IHasColumn hc
-                                 && hc.Column == hold.Column
-                                 && !ReferenceEquals(ev.HitObject, hold.Head)
-                                 && !ReferenceEquals(ev.HitObject, hold.Tail)
-                                 && !ReferenceEquals(ev.HitObject, hold.Body)
-                                 && !ReferenceEquals(ev.HitObject, hold)
-                                 && ev.HitObject!.StartTime > hold.StartTime - 200
-                                 && ev.HitObject.StartTime < hold.EndTime + 400)
-                    .Select(ev =>
-                    {
-                        string k = ev.HitObject switch
-                        {
-                            HeadNote => "Head",
-                            Note => "Note",
-                            _ => ev.HitObject!.GetType().Name,
-                        };
-                        double abs = ev.HitObject!.StartTime + ev.TimeOffset;
-                        return $"{k}@{ev.HitObject.StartTime:0.###}:{ev.Result}@t{abs:0.###}";
-                    })
-                    .ToArray();
+                string[] sameColHits = hitEvents
+                                       .Where(ev => ev.HitObject is IHasColumn hc
+                                                    && hc.Column == hold.Column
+                                                    && !ReferenceEquals(ev.HitObject, hold.Head)
+                                                    && !ReferenceEquals(ev.HitObject, hold.Tail)
+                                                    && !ReferenceEquals(ev.HitObject, hold.Body)
+                                                    && !ReferenceEquals(ev.HitObject, hold)
+                                                    && ev.HitObject!.StartTime > hold.StartTime - 200
+                                                    && ev.HitObject.StartTime < hold.EndTime + 400)
+                                       .Select(ev =>
+                                       {
+                                           string k = ev.HitObject switch
+                                           {
+                                               HeadNote => "Head",
+                                               Note => "Note",
+                                               _ => ev.HitObject!.GetType().Name,
+                                           };
+                                           double abs = ev.HitObject!.StartTime + ev.TimeOffset;
+                                           return $"{k}@{ev.HitObject.StartTime:0.###}:{ev.Result}@t{abs:0.###}";
+                                       })
+                                       .ToArray();
 
                 string routeTag = sameColHits.Length == 0 ? "nearCol=none" : $"nearCol={string.Join(',', sameColHits)}";
                 string repressTag = describeColumnRepress(replay, hold);
@@ -745,6 +968,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             }
 
             sb.AppendLine("Note Miss (|off|<80):");
+
             foreach (var ev in hitEvents.Where(e => e.HitObject is Note and not HeadNote and not TailNote && e.Result == HitResult.Miss)
                                         .OrderBy(e => e.HitObject!.StartTime))
             {
@@ -766,33 +990,33 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                     ? $"forceVia={laterHit.HitObject.GetType().Name}@{laterHit.HitObject.StartTime:0.###}"
                     : "forceVia=none";
 
-                var atPress = hitEvents
-                    .Where(x => x.HitObject is IHasColumn hc
-                                && hc.Column == note.Column
-                                && Math.Abs((x.HitObject!.StartTime + x.TimeOffset) - abs) < 0.75)
-                    .Select(x =>
-                    {
-                        string k = x.HitObject switch
-                        {
-                            HeadNote => "Head",
-                            TailNote => "Tail",
-                            Note => "Note",
-                            _ => x.HitObject!.GetType().Name,
-                        };
-                        return $"{k}@{x.HitObject!.StartTime:0.###}:{x.Result}";
-                    })
-                    .ToArray();
+                string[] atPress = hitEvents
+                                   .Where(x => x.HitObject is IHasColumn hc
+                                               && hc.Column == note.Column
+                                               && Math.Abs((x.HitObject!.StartTime + x.TimeOffset) - abs) < 0.75)
+                                   .Select(x =>
+                                   {
+                                       string k = x.HitObject switch
+                                       {
+                                           HeadNote => "Head",
+                                           TailNote => "Tail",
+                                           Note => "Note",
+                                           _ => x.HitObject!.GetType().Name,
+                                       };
+                                       return $"{k}@{x.HitObject!.StartTime:0.###}:{x.Result}";
+                                   })
+                                   .ToArray();
                 string atTag = atPress.Length == 0 ? "atPress=none" : $"atPress={string.Join(',', atPress)}";
 
-                var earlierUnhit = hitEvents
-                    .Where(x => x.HitObject is IHasColumn hc
-                                && hc.Column == note.Column
-                                && x.HitObject is Note
-                                && x.HitObject!.StartTime < note.StartTime
-                                && x.HitObject.StartTime > note.StartTime - missWin - 50
-                                && (x.Result == HitResult.Miss || !x.Result.IsHit()))
-                    .Select(x => $"{x.HitObject!.StartTime:0.###}:{x.Result}")
-                    .ToArray();
+                string[] earlierUnhit = hitEvents
+                                        .Where(x => x.HitObject is IHasColumn hc
+                                                    && hc.Column == note.Column
+                                                    && x.HitObject is Note
+                                                    && x.HitObject!.StartTime < note.StartTime
+                                                    && x.HitObject.StartTime > note.StartTime - missWin - 50
+                                                    && (x.Result == HitResult.Miss || !x.Result.IsHit()))
+                                        .Select(x => $"{x.HitObject!.StartTime:0.###}:{x.Result}")
+                                        .ToArray();
                 string lockTag = earlierUnhit.Length == 0 ? "prev=none" : $"prevMiss={string.Join(',', earlierUnhit)}";
 
                 sb.AppendLine($"  Note@{note.StartTime:0.###} col={note.Column} off={ev.TimeOffset:0.###} abs={abs:0.###} {forceTag} {atTag} {lockTag} {edges}");
@@ -857,6 +1081,27 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             TestContext.WriteLine(report);
         }
 
+        /// <summary>
+        /// 现行 Session 的冻结锚点：已与解码头逐项对齐的档用它做精确门禁。
+        /// </summary>
+        public sealed record SessionAnchor(
+            long TotalScore,
+            int MaxCombo,
+            double Accuracy,
+            IReadOnlyDictionary<HitResult, int> Statistics);
+
+        /// <summary>
+        /// 仍在向解码头收敛的档的门禁上限：只钉现行 Session 与解码头（stable 原生量）的差距。
+        /// </summary>
+        /// <remarks>
+        /// 逐项钉死现行输出会让每次「更接近 stable」的改动都被判红、必须重钉断言。改钉差距后
+        /// 更近通过、更远失败。<see cref="StatisticGaps"/> 未列出的键按 0 处理（要求精确相等）。
+        /// 解码头 <c>Accuracy</c> 已被 lazer 迁移重算，不是 stable 原生量，故不入门禁。
+        /// </remarks>
+        public sealed record SessionBound(
+            long TotalScoreGap,
+            IReadOnlyDictionary<HitResult, int> StatisticGaps);
+
         public sealed record AuditFixture(
             string Name,
             string OsrResource,
@@ -873,10 +1118,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             IReadOnlyDictionary<HitResult, int> ExpectedStatistics,
             bool AssertFullNonZeroStatistics,
             bool AssertDecodedHeader,
-            long SessionTotalScore,
-            int SessionMaxCombo,
-            double SessionAccuracy,
-            IReadOnlyDictionary<HitResult, int> SessionStatistics)
+            SessionAnchor? SessionAnchor,
+            SessionBound? SessionBound)
         {
             public override string ToString()
             {
