@@ -6,6 +6,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Input.Events;
+using osu.Game.Rulesets.Edit.Tools;
 using osu.Game.Rulesets.Mania.Edit.Blueprints.Components;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
@@ -96,12 +97,23 @@ namespace osu.Game.Rulesets.Mania.Edit.Blueprints
         internal bool IsHandleAt(Vector2 screenSpacePos) =>
             head.ReceivePositionalInputAt(screenSpacePos) || tail.ReceivePositionalInputAt(screenSpacePos);
 
+        /// <summary>
+        /// Whether a press at <paramref name="screenSpacePos"/> should adjust an end of the hold rather than act on the note.
+        /// </summary>
+        /// <remarks>
+        /// Only an already selected hold takes its ends. Otherwise a press falls through to the blueprint container, which
+        /// selects the note — a short hold's end pieces cover its whole body, so claiming them unconditionally would make
+        /// such a hold unselectable. Ends are also left alone outside the select tool, where a drag means placement.
+        /// </remarks>
+        private bool isHandleGrabbableAt(Vector2 screenSpacePos) =>
+            IsSelected && positionSnapProvider?.BlueprintContainer.CurrentTool is SelectTool && IsHandleAt(screenSpacePos);
+
         protected override bool OnMouseDown(MouseDownEvent e) =>
-            IsHandleAt(e.ScreenSpaceMouseDownPosition);
+            isHandleGrabbableAt(e.ScreenSpaceMouseDownPosition);
 
         protected override bool OnDragStart(DragStartEvent e)
         {
-            if (!IsHandleAt(e.ScreenSpaceMouseDownPosition))
+            if (!isHandleGrabbableAt(e.ScreenSpaceMouseDownPosition))
                 return false;
 
             changeHandler?.BeginChange();

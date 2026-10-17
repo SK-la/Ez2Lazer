@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Input.Events;
 using osu.Game.Rulesets.Edit;
+using osu.Game.Rulesets.Edit.Tools;
 using osu.Game.Rulesets.Mania.Edit.Blueprints;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
@@ -42,7 +43,8 @@ namespace osu.Game.Rulesets.Mania.Edit
         protected sealed override DragBox CreateDragBox() => new ScrollingDragBox(Composer.Playfield);
 
         private bool shouldDeferHoldHandleDrag(Vector2 screenSpacePos) =>
-            SelectionHandler.SelectedBlueprints.Any(b => b is HoldNoteSelectionBlueprint hold && hold.IsHandleAt(screenSpacePos));
+            CurrentTool is SelectTool
+            && SelectionHandler.SelectedBlueprints.Any(b => b is HoldNoteSelectionBlueprint hold && hold.IsHandleAt(screenSpacePos));
 
         protected override bool OnMouseDown(MouseDownEvent e)
         {
