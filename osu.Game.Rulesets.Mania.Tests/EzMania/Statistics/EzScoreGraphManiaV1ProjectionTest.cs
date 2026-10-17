@@ -151,12 +151,13 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
             var v1 = EzScoreGraphMania.CreateV1Snapshot(pinned.Score.ScoreInfo);
 
             // 固定样本的金标：后续解耦 / 删 Classic 分支时这些数值必须逐位不变。
+            // 上游 mania 判定机制调整（tap late miss / LN early break / 断连罚除子）会改变这些值，届时需整体重基线。
             Assert.Multiple(() =>
             {
-                Assert.That(v1.Accuracy, Is.EqualTo(0.5), "V1 accuracy golden");
-                Assert.That(v1.Score, Is.EqualTo(366105L), "V1 total score golden");
+                Assert.That(v1.Accuracy, Is.EqualTo(0.4722222222222222), "V1 accuracy golden");
+                Assert.That(v1.Score, Is.EqualTo(348434L), "V1 total score golden");
                 Assert.That(describeCounts(v1.Counts),
-                    Is.EqualTo("Miss=4,Meh=2,Good=1,Great=2,Perfect=3,IgnoreMiss=3,IgnoreHit=7,ComboBreak=2"),
+                    Is.EqualTo("Miss=6,Good=1,Great=2,Perfect=3,IgnoreMiss=3,IgnoreHit=7,ComboBreak=2"),
                     "V1 counts golden");
             });
         }
