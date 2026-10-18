@@ -188,6 +188,16 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
                 ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = v;
                 rebuildField();
             });
+            AddToggleStep("hold masking", v =>
+            {
+                ManiaDenseScrollAblation.DisableHoldMasking = !v;
+                rebuildField();
+            });
+            AddToggleStep("hold proxies", v =>
+            {
+                ManiaDenseScrollAblation.DisableHoldProxies = !v;
+                rebuildField();
+            });
 
             AddStep("restart scene", rebuildField);
             AddStep("log sample now", () => logSample("manual"));
@@ -281,6 +291,58 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
                 ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = true;
                 setPreset(10, 20, 700, 0.5);
             });
+        }
+
+        /// <summary>
+        /// LN 结构消融：在列级路由口径下分别关掉掩码与两个 proxy，定位 5–6 倍结构成本落在哪一层。
+        /// </summary>
+        [Test]
+        public void TestHoldStructureAblation()
+        {
+            for (int round = 1; round <= 2; round++)
+            {
+                int r = round;
+
+                samplePreset($"struct r{r} tap", () =>
+                {
+                    ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = true;
+                    ManiaDenseScrollAblation.DisableHoldMasking = false;
+                    ManiaDenseScrollAblation.DisableHoldProxies = false;
+                    setPreset(10, 20, 700, 0);
+                });
+
+                samplePreset($"struct r{r} hold baseline", () =>
+                {
+                    ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = true;
+                    ManiaDenseScrollAblation.DisableHoldMasking = false;
+                    ManiaDenseScrollAblation.DisableHoldProxies = false;
+                    setPreset(10, 20, 700, 0.5);
+                });
+
+                samplePreset($"struct r{r} hold no masking", () =>
+                {
+                    ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = true;
+                    ManiaDenseScrollAblation.DisableHoldMasking = true;
+                    ManiaDenseScrollAblation.DisableHoldProxies = false;
+                    setPreset(10, 20, 700, 0.5);
+                });
+
+                samplePreset($"struct r{r} hold no proxies", () =>
+                {
+                    ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = true;
+                    ManiaDenseScrollAblation.DisableHoldMasking = false;
+                    ManiaDenseScrollAblation.DisableHoldProxies = true;
+                    setPreset(10, 20, 700, 0.5);
+                });
+
+                samplePreset($"struct r{r} hold no masking no proxies", () =>
+                {
+                    ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = true;
+                    ManiaDenseScrollAblation.DisableHoldMasking = true;
+                    ManiaDenseScrollAblation.DisableHoldProxies = true;
+                    setPreset(10, 20, 700, 0.5);
+                });
+            }
         }
 
         private void samplePreset(string label, Action apply)

@@ -25,16 +25,26 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
         /// </summary>
         public static bool ForceColumnRoutedAutoMiss;
 
+        /// <summary>LN 的掩码容器不启用 <c>Masking</c>，用于量化每帧掩码更新的占比。</summary>
+        public static bool DisableHoldMasking;
+
+        /// <summary>LN 不创建 body / tail 的掩码代理，用于量化每条 LN 两个 proxy 的占比。</summary>
+        public static bool DisableHoldProxies;
+
         public static void Reset()
         {
             DisableColumnWatcherSubscriptions = false;
             DisablePerFrameLayoutWrites = false;
             ForceColumnRoutedAutoMiss = false;
+            DisableHoldMasking = false;
+            DisableHoldProxies = false;
         }
 #else
         public const bool DisableColumnWatcherSubscriptions = false;
         public const bool DisablePerFrameLayoutWrites = false;
         public const bool ForceColumnRoutedAutoMiss = false;
+        public const bool DisableHoldMasking = false;
+        public const bool DisableHoldProxies = false;
 
         public static void Reset()
         {

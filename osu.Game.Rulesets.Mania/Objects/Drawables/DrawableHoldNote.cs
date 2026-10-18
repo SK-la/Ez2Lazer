@@ -14,9 +14,7 @@ using osu.Framework.Input.Events;
 using osu.Game.Audio;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
-#if DEBUG
 using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
-#endif
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Judgements;
 using osu.Game.Rulesets.Mania.Skinning.Default;
@@ -108,7 +106,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                             Child = maskedContents = new Container
                             {
                                 RelativeSizeAxes = Axes.Both,
-                                Masking = true,
+                                Masking = !ManiaDenseScrollAblation.DisableHoldMasking,
                             }
                         },
                         headContainer = new Container<DrawableHoldNoteHead> { RelativeSizeAxes = Axes.Both }
@@ -131,11 +129,14 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 }
             });
 
-            maskedContents.AddRange(new[]
+            if (!ManiaDenseScrollAblation.DisableHoldProxies)
             {
-                bodyPiece.CreateProxy(),
-                tailContainer.CreateProxy(),
-            });
+                maskedContents.AddRange(new[]
+                {
+                    bodyPiece.CreateProxy(),
+                    tailContainer.CreateProxy(),
+                });
+            }
         }
 
         protected override void LoadComplete()
