@@ -26,6 +26,11 @@ namespace osu.Game.EzOsuGame
 
         private readonly bool useColumnWidth;
 
+        /// <summary>
+        /// 该键数是否声明了按列宽缩放。为 <c>false</c> 时 <see cref="SetColumnWidths"/> 不起作用。
+        /// </summary>
+        public bool UsesColumnWidth => useColumnWidth;
+
         public EzStageKeyLayer(IReadOnlyList<Drawable?> bases, IReadOnlyList<Drawable?> presses, IReadOnlyList<IBindable<bool>?> pressed, bool useColumnWidth = false)
         {
             this.useColumnWidth = useColumnWidth;

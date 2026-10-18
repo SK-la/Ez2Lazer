@@ -127,7 +127,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         // 按键图宽度跟随列宽：列宽来自 ColumnFlow 的实测布局，避免再算一份列宽。
         private void updateKeyWidths()
         {
-            if (keyLayer == null)
+            if (keyLayer == null || !keyLayer.UsesColumnWidth)
                 return;
 
             stage ??= this.FindClosestParent<Stage>();
