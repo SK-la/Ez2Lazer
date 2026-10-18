@@ -21,9 +21,20 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement
         public static HitResult ResultForPress(HitWindows hitWindows, double timeOffset)
             => hitWindows.ResultFor(timeOffset);
 
-        /// <summary>对齐 Drawable <c>!CanBeHit</c> 自动 Miss 的半窗（LowestSuccessful，osu 为 Meh）。</summary>
+        /// <summary>
+        /// 对齐 <see cref="HitWindows.CanBeHit"/> 的自动 Miss 半窗：取允许的最低成功档（osu 标准为 Meh）。
+        /// 不直接写死 Meh，避免自定义判定窗（只允许部分档位）在取窗时抛异常。
+        /// </summary>
         public static double AutoMissWindow(HitWindows hitWindows)
-            => hitWindows.WindowFor(HitResult.Meh);
+        {
+            for (var result = HitResult.Meh; result <= HitResult.Perfect; ++result)
+            {
+                if (hitWindows.IsHitResultAllowed(result))
+                    return hitWindows.WindowFor(result);
+            }
+
+            return 0;
+        }
 
         public static bool IsInHitRadius(Vector2 cursorPosition, Vector2 stackedPosition, double radius)
             => Vector2.Distance(cursorPosition, stackedPosition) <= radius;
