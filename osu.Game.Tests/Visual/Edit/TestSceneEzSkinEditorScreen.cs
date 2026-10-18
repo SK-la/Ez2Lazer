@@ -184,6 +184,27 @@ namespace osu.Game.Tests.Visual.Edit
         }
 
         [Test]
+        public void TestSizeScenePseudoTailToggleDoesNotThrow()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Size);
+
+            AddUntilStep("two comparison panes", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>().Count() == 2);
+
+            var gradient = ezConfig.GetBindable<bool>(Ez2Setting.ManiaLNGradientEnable);
+            bool original = gradient.Value;
+
+            for (int i = 0; i < 6; i++)
+                AddStep($"toggle pseudo tail #{i}", () => gradient.Value = !gradient.Value);
+
+            AddWaitStep("let preview settle", 3);
+
+            AddUntilStep("comparison panes still present", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>().Count() == 2);
+            AddStep("restore pseudo tail", () => gradient.Value = original);
+        }
+
+        [Test]
         public void TestColourSceneVirtualPreviewFollowsKeyMode()
         {
             AddStep("load screen", loadScreen);

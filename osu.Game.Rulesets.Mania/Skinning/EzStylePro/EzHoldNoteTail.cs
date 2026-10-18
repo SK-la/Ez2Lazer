@@ -26,6 +26,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private Drawable? tailDrawable;
 
+        // Clipping container for the full-note fallback. Cached so layout never reads the single-child property while it is empty.
+        private Container? topHalfMask;
+
         private IBindable<double> tailAlpha = null!;
 
         private bool gradient;
@@ -64,10 +67,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void UpdateTexture()
         {
+            useNoteTopHalfLayout = false;
+            topHalfMask = null;
+
             if (gradient)
                 return;
-
-            useNoteTopHalfLayout = false;
 
             tailDrawable = Factory.CreateAnimation(TailName);
 
@@ -108,7 +112,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 MainContainer.Origin = Anchor.TopCentre;
                 MainContainer.RelativeSizeAxes = Axes.X;
                 MainContainer.Masking = true;
-                MainContainer.Child = new Container
+                MainContainer.Child = topHalfMask = new Container
                 {
                     Anchor = Anchor.TopCentre,
                     Origin = Anchor.TopCentre,
@@ -131,11 +135,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             Height = NoteHeight;
 
-            if (useNoteTopHalfLayout && MainContainer.Child is Container c)
+            if (useNoteTopHalfLayout && topHalfMask != null)
             {
                 MainContainer.Height = NoteHeight / 2;
-                c.Height = NoteHeight;
-                // c.Y = -NoteHeight / 2;
+                topHalfMask.Height = NoteHeight;
+                // topHalfMask.Y = -NoteHeight / 2;
             }
         }
 
