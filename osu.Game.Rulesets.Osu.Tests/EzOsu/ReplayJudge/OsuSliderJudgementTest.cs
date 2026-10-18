@@ -8,6 +8,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
+using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Beatmaps;
@@ -100,10 +101,10 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
 
             Assert.Multiple(() =>
             {
-                Assert.That(OsuSliderJudgement.WasTrackingAtDueTime(tickAt(due), null, 1000, 1000), Is.False, "从未跟踪");
-                Assert.That(OsuSliderJudgement.WasTrackingAtDueTime(tickAt(due), due - 1, 1000, 1000), Is.True, "到期前开始跟踪");
-                Assert.That(OsuSliderJudgement.WasTrackingAtDueTime(tickAt(due), due, 1000, 1000), Is.True, "到期瞬间开始跟踪也算");
-                Assert.That(OsuSliderJudgement.WasTrackingAtDueTime(tickAt(due), due + 1, 1000, 1000), Is.False, "过期后重新接上不能补判");
+                Assert.That(StableClassicSliderRules.WasTrackingAtDueTime(null, due), Is.False, "从未跟踪");
+                Assert.That(StableClassicSliderRules.WasTrackingAtDueTime(due - 1, due), Is.True, "到期前开始跟踪");
+                Assert.That(StableClassicSliderRules.WasTrackingAtDueTime(due, due), Is.True, "到期瞬间开始跟踪也算");
+                Assert.That(StableClassicSliderRules.WasTrackingAtDueTime(due + 1, due), Is.False, "过期后重新接上不能补判");
             });
         }
 

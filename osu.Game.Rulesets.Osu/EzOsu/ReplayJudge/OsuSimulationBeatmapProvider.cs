@@ -7,7 +7,7 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
-using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
+using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
 using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
@@ -64,8 +64,8 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
 
         private static void bindForSimulation(IBeatmap beatmap, EzEnumJudgeMode judgeMode)
         {
-            if (OsuStableClassicScoring.ShouldUseLegacyScoreAlgorithm(judgeMode))
-                OsuStableClassicScoring.BindClassicSemanticsToBeatmap(beatmap);
+            if (OsuStableClassic.IsActive(judgeMode))
+                OsuStableClassic.BindSemantics(beatmap);
         }
 
         /// <remarks>

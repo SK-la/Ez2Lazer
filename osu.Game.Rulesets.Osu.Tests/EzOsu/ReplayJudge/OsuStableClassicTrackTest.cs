@@ -43,7 +43,7 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
         [Test]
         public void SessionLateTapDivergesBetweenLazerAndClassicTracks()
         {
-            // 各轨独立 beatmap：StableClassic.BindClassicSemanticsToBeatmap 就地改窗。
+            // 各轨独立 beatmap：OsuStableClassic.BindSemantics 就地改窗。
             var (scoreLazer, beatmapLazer, envBase) = OsuReplayFixtures.CreateSingleCircleLateTap(90);
             var (scoreClassic, beatmapClassic, _) = OsuReplayFixtures.CreateSingleCircleLateTap(90);
 

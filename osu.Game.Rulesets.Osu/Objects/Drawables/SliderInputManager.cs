@@ -13,6 +13,7 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
+using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
 using osu.Game.Screens.Play;
 using osuTK;
 
@@ -178,7 +179,9 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
 
             bool hit = Tracking;
 
-            if (classic && !OsuSliderJudgement.WasTrackingAtDueTime(nestedObject.HitObject, TrackingStartTime, sliderHitObject.StartTime, sliderHitObject.Duration))
+            if (classic && !StableClassicSliderRules.WasTrackingAtDueTime(
+                    TrackingStartTime,
+                    OsuSliderJudgement.NestedDueTime(nestedObject.HitObject, sliderHitObject.StartTime, sliderHitObject.Duration)))
                 hit = false;
 
             // 默认轨保留 lazer 的尾点宽限：到期时没跟踪也先不落判，等跟踪或等到截止时刻。
@@ -300,7 +303,7 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
 
             // stable classic 只要求「有任意按键按住」：换了手指、或另一键先按着，都继续算跟踪。
             if (slider.HitObject.ClassicSliderBehaviour)
-                return true;
+                return StableClassicSliderRules.AcceptsAnyTrackingKey(action);
 
             OsuAction? hitAction = getInitialHitAction();
 

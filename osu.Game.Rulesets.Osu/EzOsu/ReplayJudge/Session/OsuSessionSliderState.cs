@@ -9,6 +9,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
+using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Scoring;
 using osuTK;
@@ -274,7 +275,9 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
             bool hit;
 
             if (slider.ClassicSliderBehaviour)
-                hit = OsuSliderJudgement.WasTrackingAtDueTime(nestedObject, trackingStartTime, slider.StartTime, slider.Duration);
+                hit = StableClassicSliderRules.WasTrackingAtDueTime(
+                    trackingStartTime,
+                    OsuSliderJudgement.NestedDueTime(nestedObject, slider.StartTime, slider.Duration));
             else
                 hit = tracking;
 
@@ -348,7 +351,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
                 return false;
 
             if (slider.ClassicSliderBehaviour)
-                return true;
+                return StableClassicSliderRules.AcceptsAnyTrackingKey(action);
 
             if (headHitAction.HasValue && (!timeToAcceptAnyKeyAfter.HasValue || time <= timeToAcceptAnyKeyAfter.Value))
                 return action == headHitAction;

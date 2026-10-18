@@ -202,7 +202,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.StableClassic
 
                 case HitCircle:
                 case Spinner:
-                    int value = hitValueFor(result);
+                    int value = BaseScoreForResult(result);
 
                     countByResult(result);
 
@@ -213,7 +213,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.StableClassic
                 case Slider:
                     countByResult(result);
 
-                    score = new HitScore(hitValueFor(result), applyComboMultiplier: true, affectsCombo: false, increaseCombo: false, isBonus: false);
+                    score = new HitScore(BaseScoreForResult(result), applyComboMultiplier: true, affectsCombo: false, increaseCombo: false, isBonus: false);
                     return true;
 
                 default:
@@ -246,7 +246,10 @@ namespace osu.Game.Rulesets.Osu.EzOsu.StableClassic
             }
         }
 
-        private static int hitValueFor(HitResult result)
+        /// <summary>
+        /// classic 档位分值：圆圈 / 滑条 / 转盘主体按 300 / 100 / 50 / 0 计，tick 与 bonus 不计入准确率。
+        /// </summary>
+        public static int BaseScoreForResult(HitResult result)
         {
             switch (result)
             {
@@ -296,6 +299,13 @@ namespace osu.Game.Rulesets.Osu.EzOsu.StableClassic
 
             return LegacyRulesetExtensions.CalculateDifficultyPeppyStars(beatmap.BeatmapInfo.Difficulty, objectCount, drainLength);
         }
+
+        /// <summary>
+        /// 已判定区间全 Perfect 时应达到的总分：stable 的乘区次序无法从帧头 / 进度反推，
+        /// 退化为按已判定比例线性投影到满分。
+        /// </summary>
+        public static double ProjectPerfectJudged(long maximumTotalScore, int judgedHits, int maximumJudgements)
+            => maximumTotalScore * (double)judgedHits / Math.Max(1, maximumJudgements);
 
         /// <summary>stable <c>ModManager.ScoreMultiplier</c>（std classic，非 ScoreV2）。</summary>
         public static double ModMultiplierFor(IReadOnlyList<Mod> mods)

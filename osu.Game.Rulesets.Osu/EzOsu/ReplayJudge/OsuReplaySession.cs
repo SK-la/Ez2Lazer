@@ -8,7 +8,7 @@ using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
+using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
 using osu.Game.Rulesets.Osu.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -84,7 +84,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
             if (scoreProcessor is OsuScoreProcessor osuSp)
                 osuSp.JudgementTrackOverride = environment.JudgeMode;
 
-            if (score.ScoreInfo.IsLegacyScore || OsuStableClassicScoring.ShouldUseLegacyScoreAlgorithm(environment.JudgeMode))
+            if (score.ScoreInfo.IsLegacyScore || OsuStableClassic.IsActive(environment.JudgeMode))
                 scoreProcessor.IsLegacyScore = true;
 
             // StableClassic 窗口在 OsuScoreProcessor.ApplyBeatmap 内注入（与 live Drawable 同路）。

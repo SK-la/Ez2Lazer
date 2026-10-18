@@ -7,6 +7,7 @@ using System.Linq;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
+using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Osu.Scoring;
 using osu.Game.Rulesets.Scoring;
@@ -55,7 +56,7 @@ namespace osu.Game.Rulesets.Osu.UI
                 precedingObjects.Add(toEntry(aliveObjects[i]));
 
             // 「紧邻叠堆」先于「本次结果本身不可命中」：与判定结果无关的输入拦截。
-            ClickAction stackAction = OsuNoteLockSelector.CheckLegacyPrevious(index > 0 ? toEntry(aliveObjects[index - 1]) : null);
+            ClickAction stackAction = StableClassicNoteLock.CheckPrevious(index > 0 ? toEntry(aliveObjects[index - 1]) : null);
 
             if (stackAction != ClickAction.Hit)
                 return stackAction;
@@ -63,7 +64,7 @@ namespace osu.Game.Rulesets.Osu.UI
             if (result == HitResult.None)
                 return ClickAction.Shake;
 
-            return OsuNoteLockSelector.CheckLegacyOrder(precedingObjects, hitObject.HitObject.StartTime, time, hittableRange);
+            return StableClassicNoteLock.CheckOrder(precedingObjects, hitObject.HitObject.StartTime, time, hittableRange);
         }
 
         private static OsuNoteLockEntry toEntry(DrawableHitObject hitObject)

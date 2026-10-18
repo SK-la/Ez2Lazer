@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.Osu.UI;
 
@@ -40,11 +39,12 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement
     }
 
     /// <summary>
-    /// osu! note lock 求解（与 Drawable 解耦）：把 <c>StartTimeOrderedHitPolicy</c> 与 <c>LegacyHitPolicy</c>
-    /// 中「该输入此刻能否命中该物件」抽成纯函数，供无头 Session 与 Drawable 共用同一份语义。
+    /// lazer 默认 note lock 求解（与 Drawable 解耦）：把 <c>StartTimeOrderedHitPolicy</c> 中
+    /// 「该输入此刻能否命中该物件」抽成纯函数，供无头 Session 与 Drawable 共用同一份语义。
     /// </summary>
     /// <remarks>
-    /// 两个策略里「本次结果本身为 <c>HitResult.None</c>」的分支由调用方先行判定（那属于判窗而非 note lock），
+    /// classic 侧（<c>LegacyHitPolicy</c>）的判定在 <see cref="StableClassic.StableClassicNoteLock"/>；
+    /// 「本次结果本身为 <c>HitResult.None</c>」的分支由调用方先行判定（那属于判窗而非 note lock），
     /// 故此处只表达顺序/可达性约束。
     /// </remarks>
     public static class OsuNoteLockSelector
@@ -76,48 +76,6 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement
                 return ClickAction.Shake;
 
             return ClickAction.Hit;
-        }
-
-        /// <summary>
-        /// classic <c>LegacyHitPolicy</c> 第一步：紧邻的前一个物件仍在叠堆且未全部判定时忽略输入。
-        /// </summary>
-        /// <param name="previousObject">target 在容器中的紧邻前一个物件；target 为嵌套物件（滑条头）时传 <c>null</c>。</param>
-        public static ClickAction CheckLegacyPrevious(OsuNoteLockEntry? previousObject)
-        {
-            // 叠堆里点后面的物件不是「抢拍」，只是点到了别的高度，所以忽略而不是弹回。
-            if (previousObject is { } previous && previous.StackHeight > 0 && !previous.AllJudged)
-                return ClickAction.Ignore;
-
-            return ClickAction.Hit;
-        }
-
-        /// <summary>
-        /// classic <c>LegacyHitPolicy</c> 第二步：任何更早的未判物件若已结束（3ms 容差之外）则挡下，
-        /// 否则按 <paramref name="hittableRange"/> 判时间可达性。
-        /// </summary>
-        /// <param name="precedingObjects">参与顺序判定的存活物件，按容器顺序；目标在容器中定位不到时（嵌套物件）传整张存活列表。</param>
-        /// <param name="targetStartTime">目标物件的起始时刻。</param>
-        /// <param name="time">本次输入时刻。</param>
-        /// <param name="hittableRange">允许命中的时间半径。</param>
-        public static ClickAction CheckLegacyOrder(
-            IReadOnlyList<OsuNoteLockEntry> precedingObjects,
-            double targetStartTime,
-            double time,
-            double hittableRange)
-        {
-            for (int i = 0; i < precedingObjects.Count; i++)
-            {
-                var entry = precedingObjects[i];
-
-                if (entry.AllJudged)
-                    continue;
-
-                // 3ms 额外宽容，抵消未对齐物件。
-                if (entry.EndTime + 3 < targetStartTime)
-                    return ClickAction.Shake;
-            }
-
-            return Math.Abs(targetStartTime - time) < hittableRange ? ClickAction.Hit : ClickAction.Shake;
         }
     }
 }
