@@ -6,30 +6,20 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
-using osu.Framework.Audio;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Statistics;
 using osu.Framework.Testing;
 using osu.Framework.Timing;
-using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Diagnostics;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
-using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Scoring;
-using osu.Game.Rulesets.UI.Scrolling;
-using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osu.Game.Tests.Visual;
-using osuTK;
 
 #if DEBUG
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
@@ -65,7 +55,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
         private readonly ManualClock manualClock = new ManualClock();
         private readonly FramedClock playfieldClock;
 
-        private DenseScrollField? field;
+        private ManiaDenseScrollField? field;
         private OsuSpriteText? summaryText;
 
         private int columnCount = 10;
@@ -83,6 +73,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
         private int lastGen1;
         private int lastGen2;
         private long lastFrames;
+        private long frameSamples;
+        private double updateMsSum;
+        private double drawMsSum;
 
         public TestSceneManiaDenseScrollCost()
         {
@@ -125,6 +118,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
 
             if (field == null)
                 return;
+
+            // 单帧 ElapsedFrameTime 抖动大，采样窗口内累加后取平均。
+            frameSamples++;
+            updateMsSum += host.UpdateThread.Clock.ElapsedFrameTime;
+            drawMsSum += host.DrawThread?.Clock.ElapsedFrameTime ?? 0;
 
             if (field.Time.Current < nextLogAt)
                 return;
@@ -191,6 +189,59 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
         }
 
         [Test]
+        public void TestCalibrationSweep()
+        {
+            // 标定顺序 1-3：先核对最重档，再分别扫密度和驻留；最后叠加 hold、皮肤和两个订阅/布局消融。
+            samplePreset("calib 10col 20kps 700ms tap", () => setPreset(10, 20, 700, 0));
+            samplePreset("calib 10col 10kps 700ms tap", () => setPreset(10, 10, 700, 0));
+            samplePreset("calib 10col 15kps 700ms tap", () => setPreset(10, 15, 700, 0));
+            samplePreset("calib 10col 20kps 300ms tap", () => setPreset(10, 20, 300, 0));
+            samplePreset("calib 10col 20kps 500ms tap", () => setPreset(10, 20, 500, 0));
+            samplePreset("calib 10col 20kps 700ms 50% hold", () => setPreset(10, 20, 700, 0.5));
+            samplePreset("calib 4col 20kps 700ms tap", () => setPreset(4, 20, 700, 0));
+            samplePreset("calib 16col 20kps 700ms tap", () => setPreset(16, 20, 700, 0));
+            samplePreset("calib skin ez2", () => setPreset(10, 20, 700, 0, Ez2Skin.CreateInfo()));
+            samplePreset("calib skin ez pro", () => setPreset(10, 20, 700, 0, EzStyleProSkin.CreateInfo()));
+            samplePreset("calib skin triangles (restore)", () => setPreset(10, 20, 700, 0, TrianglesSkin.CreateInfo()));
+
+            // ColumnWatcher 与每帧布局写入只存在于 Ez 皮肤组件，消融必须在 Ez2 下测。
+            samplePreset("calib ez2 baseline a", () => setPreset(10, 20, 700, 0, Ez2Skin.CreateInfo()));
+            samplePreset("calib ez2 no column watcher subscriptions", () =>
+            {
+                ManiaDenseScrollAblation.DisableColumnWatcherSubscriptions = true;
+                setPreset(10, 20, 700, 0, Ez2Skin.CreateInfo());
+            });
+            samplePreset("calib ez2 baseline b", () =>
+            {
+                ManiaDenseScrollAblation.DisableColumnWatcherSubscriptions = false;
+                setPreset(10, 20, 700, 0, Ez2Skin.CreateInfo());
+            });
+            samplePreset("calib ez2 no per-frame layout writes", () =>
+            {
+                ManiaDenseScrollAblation.DisablePerFrameLayoutWrites = true;
+                setPreset(10, 20, 700, 0, Ez2Skin.CreateInfo());
+            });
+            samplePreset("calib ez2 baseline c", () =>
+            {
+                ManiaDenseScrollAblation.DisablePerFrameLayoutWrites = false;
+                setPreset(10, 20, 700, 0, Ez2Skin.CreateInfo());
+            });
+        }
+
+        private void samplePreset(string label, Action apply)
+        {
+            AddStep(label, apply);
+
+            // 每个配置取三次，便于在分析时用中位数压掉测试宿主自身的抖动。
+            for (int i = 1; i <= 3; i++)
+            {
+                int sampleIndex = i;
+                AddUntilStep($"{label} warm {sampleIndex}", () => field != null && field.Time.Current > 4000 + sampleIndex * 1000);
+                AddStep($"{label} log {sampleIndex}", () => logSample($"{label} #{sampleIndex}"));
+            }
+        }
+
+        [Test]
         public void TestAliveCountMatchesDensityFormula()
         {
             AddStep("settle at 20 KPS / 700 ms / 10 columns", () => setPreset(10, 20, 700, 0));
@@ -221,6 +272,17 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
             perColumnKps = kps;
             dwellMs = dwell;
             holdRatio = holds;
+            rebuildField();
+        }
+
+        private void setPreset(int columns, double kps, double dwell, double holds, SkinInfo info)
+        {
+            columnCount = columns;
+            perColumnKps = kps;
+            dwellMs = dwell;
+            holdRatio = holds;
+            skinInfo = info;
+            skins.CurrentSkinInfo.Value = skins.GetSkin(info).SkinInfo;
             rebuildField();
         }
 
@@ -257,7 +319,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
 
             manualClock.CurrentTime = 0;
 
-            field = new DenseScrollField(
+            field = new ManiaDenseScrollField(
                 new ManiaDenseScrollWorkload
                 {
                     ColumnCount = columnCount,
@@ -279,6 +341,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
             lastGen1 = GC.CollectionCount(1);
             lastGen2 = GC.CollectionCount(2);
             lastFrames = 0;
+            frameSamples = 0;
+            updateMsSum = 0;
+            drawMsSum = 0;
 
             logSample("spawn");
         }
@@ -305,8 +370,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
             lastGen2 = gen2;
             lastFrames = field.SimulatedFrames;
 
-            double updateMs = host.UpdateThread.Clock.ElapsedFrameTime;
-            double drawMs = host.DrawThread?.Clock.ElapsedFrameTime ?? 0;
+            int samples = (int)Math.Max(1, frameSamples);
+            double updateMs = updateMsSum / samples;
+            double drawMs = drawMsSum / samples;
+            frameSamples = 0;
+            updateMsSum = 0;
+            drawMsSum = 0;
             long fboRedraw = GlobalStatistics.Get<long>("Draw", "FBORedraw").Value;
 
             int drawableNotes = this.ChildrenOfType<DrawableNote>().Count();
@@ -328,183 +397,6 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
                 summaryText.Text = line.Replace(' ', '\n');
 
             Logger.Log($"[DENSE-SCROLL] {line}", LoggingTarget.Runtime, LogLevel.Important);
-        }
-
-        /// <summary>
-        /// 真实 drawable 的滚动字段：列 + 滚动容器 + 流式生成 note。
-        /// </summary>
-        private partial class DenseScrollField : Container
-        {
-            public ManiaDenseScrollWorkload Workload { get; }
-            public IReadOnlyList<Column> Columns => columns;
-            public long SimulatedFrames { get; private set; }
-
-            public int AliveNoteCount
-            {
-                get
-                {
-                    int count = 0;
-
-                    foreach (var column in columns)
-                        count += column.HitObjectContainer.AliveObjects.Count();
-
-                    return count;
-                }
-            }
-
-            /// <summary>被动 Miss 的窗口：note 在滚动窗口结束后还要留到这时才会被移除。</summary>
-            public double PassiveMissTailMs
-            {
-                get
-                {
-                    var note = this.ChildrenOfType<DrawableNote>().FirstOrDefault();
-                    return note?.HitObject.HitWindows?.WindowFor(HitResult.Miss) ?? 0;
-                }
-            }
-
-            private readonly ISkin skin;
-            private readonly List<Column> columns = new List<Column>();
-            private readonly double[] nextStart;
-            private readonly ManiaBeatmap beatmap;
-
-            public DenseScrollField(ManiaDenseScrollWorkload workload, ISkin skin, FramedClock clock)
-            {
-                Workload = workload;
-                Workload.Validate();
-
-                this.skin = skin;
-
-                beatmap = new ManiaBeatmap(new StageDefinition(workload.ColumnCount))
-                {
-                    BeatmapInfo = new BeatmapInfo
-                    {
-                        Ruleset = new ManiaRuleset().RulesetInfo,
-                        Difficulty = new BeatmapDifficulty(),
-                    },
-                };
-
-                Clock = clock;
-
-                nextStart = new double[workload.ColumnCount];
-
-                var columnFlow = new FillFlowContainer
-                {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    RelativeSizeAxes = Axes.Y,
-                    AutoSizeAxes = Axes.X,
-                    Direction = FillDirection.Horizontal,
-                    Spacing = new Vector2(8, 0),
-                };
-
-                var transformed = new ManiaRuleset().CreateSkinTransformer(skin, beatmap) ?? skin;
-
-                AddInternal(new SkinProvidingContainer(transformed)
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Child = columnFlow,
-                });
-
-                for (int i = 0; i < workload.ColumnCount; i++)
-                {
-                    var column = new Column(i, false)
-                    {
-                        Anchor = Anchor.Centre,
-                        Origin = Anchor.Centre,
-                        Height = 0.85f,
-                    };
-
-                    columns.Add(column);
-
-                    columnFlow.Add(new ScrollingTestContainer(ScrollingDirection.Down)
-                    {
-                        Anchor = Anchor.Centre,
-                        Origin = Anchor.Centre,
-                        RelativeSizeAxes = Axes.Y,
-                        AutoSizeAxes = Axes.X,
-                        TimeRange = workload.DwellMs,
-                        Child = column,
-                    });
-
-                    nextStart[i] = workload.GetNextStartTime(i, 0);
-                }
-            }
-
-            protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
-            {
-                var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
-                dependencies.Cache(new StageDefinition(Workload.ColumnCount));
-                // Ez2 / EzPro 的 key area 和 hit target 需要 IGameplayClock 做 beat phase 推进。
-                dependencies.CacheAs<IGameplayClock>(new SimulatedGameplayClock((IFrameBasedClock)Clock));
-                return dependencies;
-            }
-
-            protected override void Update()
-            {
-                base.Update();
-
-                SimulatedFrames++;
-
-                double now = Time.Current;
-                double limit = now + Workload.DwellMs + Workload.IntervalMs;
-
-                for (int column = 0; column < columns.Count; column++)
-                {
-                    double start = nextStart[column];
-
-                    while (start <= limit)
-                    {
-                        spawn(column, start);
-                        start += Workload.IntervalMs;
-                    }
-
-                    nextStart[column] = start;
-                }
-            }
-
-            private void spawn(int column, double startTimeMs)
-            {
-                if (Workload.IsHoldAt(column, startTimeMs))
-                    columns[column].Add(Workload.CreateHoldNote(column, startTimeMs));
-                else
-                    columns[column].Add(Workload.CreateNote(column, startTimeMs));
-            }
-        }
-        /// <summary>
-        /// 只提供时间推进的 <see cref="IGameplayClock"/>：皮肤用它推进 beat phase，不参与判定。
-        /// </summary>
-        private class SimulatedGameplayClock : IGameplayClock
-        {
-            private readonly IFrameBasedClock clock;
-            private readonly AudioAdjustments adjustments = new AudioAdjustments();
-            private readonly BindableBool isPaused = new BindableBool();
-
-            public SimulatedGameplayClock(IFrameBasedClock clock)
-            {
-                this.clock = clock;
-            }
-
-            public double CurrentTime => clock.CurrentTime;
-            public double Rate => clock.Rate;
-            public bool IsRunning => clock.IsRunning;
-            public bool IsRewinding => false;
-            public double ElapsedFrameTime => clock.ElapsedFrameTime;
-            public double FramesPerSecond => clock.FramesPerSecond;
-            public FrameTimeInfo TimeInfo => clock.TimeInfo;
-            public double StartTime => 0;
-            public double GameplayStartTime => 0;
-            public IBindable<bool> IsPaused => isPaused;
-            public IEnumerable<double> NonGameplayAdjustments => Array.Empty<double>();
-            public IAdjustableAudioComponent AdjustmentsFromMods => adjustments;
-
-            public double TrueGameplayRate
-            {
-                set => adjustments.Tempo.Value = value;
-            }
-
-            public void ProcessFrame()
-            {
-            }
         }
     }
 }
