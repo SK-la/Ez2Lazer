@@ -198,6 +198,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
                 ManiaDenseScrollAblation.DisableHoldProxies = !v;
                 rebuildField();
             });
+            AddToggleStep("split hold visual", v =>
+            {
+                ManiaDenseScrollAblation.SplitHoldVisual = v;
+                rebuildField();
+            });
 
             AddStep("restart scene", rebuildField);
             AddStep("log sample now", () => logSample("manual"));
@@ -343,6 +348,49 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
                     setPreset(10, 20, 700, 0.5);
                 });
             }
+        }
+
+        /// <summary>
+        /// LN 视觉拆分：head / body / tail 三段改由一个合成 drawable 绘制，判定框只保留判定。
+        /// </summary>
+        [Test]
+        public void TestSplitHoldVisual()
+        {
+            for (int round = 1; round <= 2; round++)
+            {
+                int r = round;
+
+                samplePreset($"split r{r} hold baseline", () =>
+                {
+                    ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = true;
+                    ManiaDenseScrollAblation.SplitHoldVisual = false;
+                    setPreset(10, 20, 700, 0.5);
+                });
+
+                samplePreset($"split r{r} hold composite visual", () =>
+                {
+                    ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = true;
+                    ManiaDenseScrollAblation.SplitHoldVisual = true;
+                    setPreset(10, 20, 700, 0.5);
+                });
+
+                AddUntilStep($"split r{r} holds loaded", () => this.ChildrenOfType<DrawableHoldNote>().Any());
+
+                AddAssert($"split r{r} head carries no visual", () =>
+                    this.ChildrenOfType<DrawableHoldNoteHead>().All(h => !h.ChildrenOfType<SkinnableDrawable>().Any()));
+
+                AddAssert($"split r{r} tail carries no visual", () =>
+                    this.ChildrenOfType<DrawableHoldNoteTail>().All(t => !t.ChildrenOfType<SkinnableDrawable>().Any()));
+
+                AddAssert($"split r{r} composite draws three pieces", () =>
+                    this.ChildrenOfType<DrawableHoldNote>().All(h => h.ChildrenOfType<SkinnableDrawable>().Count() == 3));
+            }
+
+            AddStep("restore legacy visual", () =>
+            {
+                ManiaDenseScrollAblation.SplitHoldVisual = false;
+                rebuildField();
+            });
         }
 
         private void samplePreset(string label, Action apply)

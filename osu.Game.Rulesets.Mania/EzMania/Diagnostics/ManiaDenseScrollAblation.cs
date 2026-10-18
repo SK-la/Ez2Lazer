@@ -31,6 +31,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
         /// <summary>LN 不创建 body / tail 的掩码代理，用于量化每条 LN 两个 proxy 的占比。</summary>
         public static bool DisableHoldProxies;
 
+        /// <summary>
+        /// LN 的三段像素改由一个合成 drawable 绘制，head / body / tail 判定框不再带视觉。
+        /// 切换需要重建 drawable 才能生效。
+        /// </summary>
+        public static bool SplitHoldVisual;
+
         public static void Reset()
         {
             DisableColumnWatcherSubscriptions = false;
@@ -38,6 +44,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
             ForceColumnRoutedAutoMiss = false;
             DisableHoldMasking = false;
             DisableHoldProxies = false;
+            SplitHoldVisual = false;
         }
 #else
         public const bool DisableColumnWatcherSubscriptions = false;
@@ -45,6 +52,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
         public const bool ForceColumnRoutedAutoMiss = false;
         public const bool DisableHoldMasking = false;
         public const bool DisableHoldProxies = false;
+        public const bool SplitHoldVisual = false;
 
         public static void Reset()
         {

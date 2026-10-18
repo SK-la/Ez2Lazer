@@ -95,15 +95,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.Argon
 
         private void hitObjectApplied(DrawableHitObject drawableHitObject)
         {
-            var holdNoteTail = (DrawableHoldNoteTail)drawableHitObject;
+            var holdNote = drawableHitObject as DrawableHoldNote
+                           ?? ((DrawableHoldNoteTail)drawableHitObject).HoldNote;
 
             hittingLayer.Recycle();
 
             hittingLayer.AccentColour.UnbindBindings();
-            hittingLayer.AccentColour.BindTo(holdNoteTail.HoldNote.AccentColour);
+            hittingLayer.AccentColour.BindTo(holdNote.AccentColour);
 
             hittingLayer.IsHitting.UnbindBindings();
-            ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNoteTail.HoldNote.IsHolding);
+            ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNote.IsHolding);
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)

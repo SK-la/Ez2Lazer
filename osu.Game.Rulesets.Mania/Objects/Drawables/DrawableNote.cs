@@ -10,12 +10,12 @@ using osu.Framework.Graphics;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
-using osu.Game.Graphics;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.Configuration;
-using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
+using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Edit;
@@ -39,6 +39,12 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         protected virtual ManiaSkinComponents Component => ManiaSkinComponents.Note;
 
+        /// <summary>
+        /// Whether this object draws its own skin component. Hold-note judgement boxes turn this off so the
+        /// hold's composite visual owns the pixels.
+        /// </summary>
+        protected virtual bool HasNoteVisual => true;
+
         private Drawable headPiece;
 
         public DrawableNote()
@@ -57,12 +63,20 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
             rulesetConfig?.BindWith(ManiaRulesetSetting.TimingBasedNoteColouring, configTimingBasedNoteColouring);
 
-            AddInternal(headPiece = new SkinnableDrawable(new ManiaSkinComponentLookup(Component), _ => new DefaultNotePiece())
-            {
-                RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y
-            });
+            if (!HasNoteVisual)
+                return;
+
+            headPiece = CreateNoteVisual();
+
+            if (headPiece != null)
+                AddInternal(headPiece);
         }
+
+        protected virtual Drawable CreateNoteVisual() => new SkinnableDrawable(new ManiaSkinComponentLookup(Component), _ => new DefaultNotePiece())
+        {
+            RelativeSizeAxes = Axes.X,
+            AutoSizeAxes = Axes.Y
+        };
 
         protected override void LoadComplete()
         {
@@ -82,7 +96,8 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
             base.OnDirectionChanged(e);
 
-            headPiece.Anchor = headPiece.Origin = e.NewValue == ScrollingDirection.Up ? Anchor.TopCentre : Anchor.BottomCentre;
+            if (headPiece != null)
+                headPiece.Anchor = headPiece.Origin = e.NewValue == ScrollingDirection.Up ? Anchor.TopCentre : Anchor.BottomCentre;
         }
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)

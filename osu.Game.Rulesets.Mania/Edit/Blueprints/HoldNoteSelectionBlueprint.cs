@@ -68,10 +68,10 @@ namespace osu.Game.Rulesets.Mania.Edit.Blueprints
         {
             base.Update();
 
-            head.Height = EditHoldNoteEndPiece.GetInteractionHeight(DrawableObject.Head.DrawHeight);
+            head.Height = EditHoldNoteEndPiece.GetInteractionHeight(DrawableObject.HeadLength);
             head.Y = HitObjectContainer.PositionAtTime(HitObject.Head.StartTime, HitObject.StartTime);
 
-            float tailInteractionHeight = EditHoldNoteEndPiece.GetInteractionHeight(DrawableObject.Tail.DrawHeight);
+            float tailInteractionHeight = EditHoldNoteEndPiece.GetInteractionHeight(DrawableObject.TailLength);
             tail.Height = tailInteractionHeight;
             tail.Y = HitObjectContainer.PositionAtTime(HitObject.Tail.StartTime, HitObject.StartTime);
             Height = HitObjectContainer.LengthAtTime(HitObject.StartTime, HitObject.EndTime) + tailInteractionHeight;

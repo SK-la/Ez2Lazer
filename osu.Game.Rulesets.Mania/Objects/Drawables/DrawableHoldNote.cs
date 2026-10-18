@@ -17,7 +17,9 @@ using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Judgements;
+using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.Skinning.Default;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -59,10 +61,44 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         public DrawableHoldNoteTail Tail => tailContainer.Child;
         public DrawableHoldNoteBody Body => bodyContainer.Child;
 
+        /// <summary>Head judgement box, or <c>null</c> while the hold is between apply and free.</summary>
+        internal DrawableHoldNoteHead HeadOrNull => headContainer.Any() ? headContainer.Child : null;
+
+        /// <summary>Tail judgement box, or <c>null</c> while the hold is between apply and free.</summary>
+        internal DrawableHoldNoteTail TailOrNull => tailContainer.Any() ? tailContainer.Child : null;
+
+        /// <summary>
+        /// Length of the drawn head. Falls back to the head judgement box when the composite visual is disabled.
+        /// </summary>
+        public float HeadLength => visual?.HeadLength ?? Head.DrawHeight;
+
+        /// <summary>
+        /// Length of the drawn tail. Falls back to the tail judgement box when the composite visual is disabled.
+        /// </summary>
+        public float TailLength => visual?.TailLength ?? Tail.DrawHeight;
+
         private Container<DrawableHoldNoteHead> headContainer;
         private Container<DrawableHoldNoteTail> tailContainer;
         private Container<DrawableHoldNoteBody> bodyContainer;
         private Container<DrawableHoldNoteTick> tickContainer;
+
+        /// <summary>
+        /// Owns the head / body / tail pixels when <see cref="ManiaDenseScrollAblation.SplitHoldVisual"/> is enabled.
+        /// </summary>
+        private HoldNoteVisual visual;
+
+        private HoldNoteTailMaskSource tailMaskSource;
+
+        [Resolved(canBeNull: true)]
+        private IEzSkinInfo ezSkinInfo { get; set; }
+
+        /// <summary>
+        /// Pseudo-tail geometry shared by the composite visual and the skin body pieces.
+        /// </summary>
+        internal HoldNoteTailMaskSource TailMaskSource => tailMaskSource ??= new HoldNoteTailMaskSource(
+            this.FindClosestParent<Column>(),
+            this.FindClosestParent<DrawableManiaRuleset>(),
+            ezSkinInfo);
 
         private PausableSkinnableSound slidingSample;
 
@@ -91,6 +127,32 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         [BackgroundDependencyLoader]
         private void load()
         {
+            slidingSample = new PausableSkinnableSound
+            {
+                Looping = true,
+                MinimumSampleVolume = MINIMUM_SAMPLE_VOLUME,
+            };
+
+            headContainer = new Container<DrawableHoldNoteHead> { RelativeSizeAxes = Axes.Both };
+            tailContainer = new Container<DrawableHoldNoteTail> { RelativeSizeAxes = Axes.Both };
+            bodyContainer = new Container<DrawableHoldNoteBody> { RelativeSizeAxes = Axes.Both };
+            tickContainer = new Container<DrawableHoldNoteTick> { RelativeSizeAxes = Axes.Both };
+
+            if (ManiaDenseScrollAblation.SplitHoldVisual)
+            {
+                AddRangeInternal(new Drawable[]
+                {
+                    headContainer,
+                    bodyContainer,
+                    tickContainer,
+                    tailContainer,
+                    visual = new HoldNoteVisual(this),
+                    slidingSample,
+                });
+
+                return;
+            }
+
             Container maskedContents;
 
             AddRangeInternal(new Drawable[]
@@ -109,11 +171,11 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                                 Masking = !ManiaDenseScrollAblation.DisableHoldMasking,
                             }
                         },
-                        headContainer = new Container<DrawableHoldNoteHead> { RelativeSizeAxes = Axes.Both }
+                        headContainer
                     }
                 },
-                bodyContainer = new Container<DrawableHoldNoteBody> { RelativeSizeAxes = Axes.Both },
-                tickContainer = new Container<DrawableHoldNoteTick> { RelativeSizeAxes = Axes.Both },
+                bodyContainer,
+                tickContainer,
                 bodyPiece = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.HoldNoteBody), _ => new DefaultBodyPiece
                 {
                     RelativeSizeAxes = Axes.Both,
@@ -121,12 +183,8 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 {
                     RelativeSizeAxes = Axes.X
                 },
-                tailContainer = new Container<DrawableHoldNoteTail> { RelativeSizeAxes = Axes.Both },
-                slidingSample = new PausableSkinnableSound
-                {
-                    Looping = true,
-                    MinimumSampleVolume = MINIMUM_SAMPLE_VOLUME,
-                }
+                tailContainer,
+                slidingSample,
             });
 
             if (!ManiaDenseScrollAblation.DisableHoldProxies)
@@ -149,6 +207,12 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         protected override void OnApply()
         {
             base.OnApply();
+
+            if (visual != null)
+            {
+                visual.OnHoldApplied();
+                return;
+            }
 
             sizingContainer.Size = Vector2.One;
         }
@@ -211,6 +275,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
             base.OnDirectionChanged(e);
 
+            if (visual != null)
+                return;
+
             if (e.NewValue == ScrollingDirection.Up)
             {
                 bodyPiece.Anchor = bodyPiece.Origin = Anchor.TopLeft;
@@ -238,7 +305,11 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             // (see `LegacyBodyPiece` and related machinations with `lightContainer` being added at column level)
             isHolding.Value = Result.IsHolding(Time.Current);
             missingStartTime.Value = null;
-            (bodyPiece.Drawable as IHoldNoteBody)?.Recycle();
+
+            if (visual != null)
+                visual.Recycle();
+            else
+                (bodyPiece.Drawable as IHoldNoteBody)?.Recycle();
         }
 
         protected override void Update()
@@ -265,6 +336,12 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 missingStartTime.Value ??= Tail.Result.TimeAbsolute;
 
             isHolding.Value = Result.IsHolding(Time.Current);
+
+            if (visual != null)
+            {
+                visual.UpdateLayout();
+                return;
+            }
 
             // Pad the full size container so its contents (i.e. the masking container) reach under the tail.
             // This is required for the tail to not be masked away, since it lies outside the bounds of the hold note.

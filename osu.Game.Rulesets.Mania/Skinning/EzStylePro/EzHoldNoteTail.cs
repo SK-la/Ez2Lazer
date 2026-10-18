@@ -3,13 +3,10 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Rulesets.Mania.Objects.Drawables;
-using osu.Game.Rulesets.Objects.Drawables;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
@@ -22,8 +19,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override bool ShowSeparators => false;
 
-        private readonly EzHoldNoteHittingLayer hittingLayer = new EzHoldNoteHittingLayer();
-
         private Drawable? tailDrawable;
 
         // Clipping container for the full-note fallback. Cached so layout never reads the single-child property while it is empty.
@@ -34,11 +29,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private bool gradient;
         private bool useNoteTopHalfLayout;
 
-        [Resolved]
-        private DrawableHitObject? drawableObject { get; set; }
-
         [BackgroundDependencyLoader(true)]
-        private void load(DrawableHitObject? drawableObject, IEzSkinInfo ezSkinInfo, Ez2ConfigManager ezConfig)
+        private void load(IEzSkinInfo ezSkinInfo, Ez2ConfigManager ezConfig)
         {
             RelativeSizeAxes = Axes.X;
             FillMode = FillMode.Fill;
@@ -60,9 +52,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             tailAlpha = ezSkinInfo.HoldTailAlpha;
             tailAlpha.BindValueChanged(_ => OnColourChanged(), true);
-
-            if (drawableObject != null)
-                drawableObject.HitObjectApplied += hitObjectApplied;
         }
 
         protected override void UpdateTexture()
@@ -153,19 +142,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 NoteColor);
         }
 
-        private void hitObjectApplied(DrawableHitObject drawableHitObject)
-        {
-            var holdNoteTail = (DrawableHoldNoteTail)drawableHitObject;
-
-            ((IBindable<bool>)hittingLayer.IsHitting).UnbindBindings();
-            ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNoteTail.HoldNote.IsHolding);
-        }
-
         protected override void Dispose(bool isDisposing)
         {
-            if (drawableObject.IsNotNull())
-                drawableObject.HitObjectApplied -= hitObjectApplied;
-
             tailDrawable = null;
             base.Dispose(isDisposing);
         }

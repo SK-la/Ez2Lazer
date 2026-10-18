@@ -7,9 +7,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
 using osu.Game.EzOsuGame.Configuration;
-#if DEBUG
 using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
-#endif
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Scoring;
@@ -28,6 +26,8 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         public readonly IBindable<double?> MissingStartTime = new Bindable<double?>();
 
         protected override ManiaSkinComponents Component => ManiaSkinComponents.HoldNoteTail;
+
+        protected override bool HasNoteVisual => !ManiaDenseScrollAblation.SplitHoldVisual;
 
         protected internal DrawableHoldNote HoldNote => (DrawableHoldNote)ParentHitObject;
 

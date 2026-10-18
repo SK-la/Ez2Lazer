@@ -22,11 +22,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         {
             base.LoadComplete();
 
-            missingStartTime.BindTo(((DrawableHoldNoteHead)drawableObject).MissingStartTime);
+            missingStartTime.BindTo(resolveHoldNote().MissingStartTime);
             missingStartTime.BindValueChanged(onMissingStartTimeChanged, true);
 
             drawableObject.ApplyCustomUpdateState += onApplyCustomUpdateState;
         }
+
+        /// <summary>
+        /// The piece may be hosted by the head judgement box (legacy path) or by the hold's composite visual.
+        /// </summary>
+        private DrawableHoldNote resolveHoldNote()
+            => drawableObject as DrawableHoldNote ?? ((DrawableHoldNoteHead)drawableObject).ParentHold;
 
         private void onMissingStartTimeChanged(ValueChangedEvent<double?> startTime)
             => applyMissingDim();

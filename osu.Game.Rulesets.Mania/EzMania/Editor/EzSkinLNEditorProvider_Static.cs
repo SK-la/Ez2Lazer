@@ -16,6 +16,7 @@ using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.UI;
@@ -69,6 +70,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             DrawableHitObject drawable = isHold
                 ? new DrawableHoldNote((HoldNote)hitObject)
                 : new DrawableNote((Note)hitObject);
+
+            // The composite visual places all three hold segments itself, so the preview needs a real height.
+            if (isHold && ManiaDenseScrollAblation.SplitHoldVisual)
+                drawable.RelativeSizeAxes = Axes.Both;
 
             return new SkinProvidingContainer(transformedSkin)
             {
@@ -146,6 +151,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             protected override void Update()
             {
                 base.Update();
+
+                // The composite visual positions the hold segments; only the legacy path needs manual offsets.
+                if (ManiaDenseScrollAblation.SplitHoldVisual)
+                    return;
 
                 foreach (var obj in content.OfType<DrawableHitObject>())
                 {

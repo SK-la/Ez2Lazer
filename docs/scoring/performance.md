@@ -151,3 +151,19 @@
 - 掩码容器与两个 proxy 不是可测主因。LN 相对 tap 的增量随嵌套 drawable 数（head / tail / body 及各自皮肤组件）线性增长，属结构本身的性质，不是某一处热点。
 - 若还要继续压 LN，只能从「减少每条 LN 的 drawable 数」入手，这会改视觉结构，需要单独评审。
 
+#### LN 视觉拆分 A/B
+
+`ManiaDenseScrollAblation.SplitHoldVisual` 把 head / body / tail 的像素集中到一个合成 drawable（`HoldNoteVisual`），三个判定框只保留判定、不再挂皮肤子树；伪面尾的掩码距离由 hold 上的 `HoldNoteTailMaskSource` 统一算一次。
+
+同一口径（列级路由开，10 列 × 20 KPS × 700 ms，50% hold），交替两轮、每轮 3 次取中位数：
+
+| 变体 | 第 1 轮 updMs | 第 2 轮 updMs | alloc/frame |
+|------|---------------|---------------|-------------|
+| 旧路径（各 DHO 自带视觉） | 7.27 | 5.75 | 523 / 405 KiB |
+| 合成视觉 | 8.32 | 7.25 | 418 / 417 KiB |
+
+- update 差异落在同配置跨轮的抖动区间（5.3–11.7 ms）内，没有可归因收益；alloc 的跨轮差异（404–523 KiB）同样来自采样点，不是结构差异。
+- 拆分不减少 LN 的 drawable 数量：皮肤组件从 head / tail DHO 移到合成类下，节点总数与每帧成本基本不变；判定框仍是 4 个 `DrawableHitObject`。
+- 结论：该开关保持关闭（默认旧路径）。保留它只作为「LN 绘制集中在一处」的结构整理，等有按列批绘之类的独立需求再在其上做。
+- 这条也反证了上一节的判断：真正决定 LN 成本的是嵌套 `DrawableHitObject` 的个数，不是皮肤节点挂在哪一层。
+
