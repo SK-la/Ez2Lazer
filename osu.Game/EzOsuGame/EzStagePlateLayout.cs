@@ -105,6 +105,21 @@ namespace osu.Game.EzOsuGame
                 }
             }
         }
+
+        #region 图层默认顺序
+
+        // layout 未声明 order 时的兜底。数值对齐 Unity prefab 里的 m_SortingOrder。
+        public const int ORDER_BACK = 2;
+        public const int ORDER_BODY = 10;
+        public const int ORDER_OVER_OBJECT = 12;
+        public const int ORDER_KEYS = 11;
+        public const int ORDER_GROOVE_LIGHT = 12;
+        public const int ORDER_METER = 12;
+        public const int ORDER_CHARACTER = 13;
+        public const int ORDER_DIGITS = 14;
+        public const int ORDER_JUDGEMENT_LINE = 14;
+
+        #endregion
     }
 
     /// <summary>
@@ -129,6 +144,17 @@ namespace osu.Game.EzOsuGame
 
         [JsonPropertyName("rotation")]
         public float Rotation { get; set; }
+
+        /// <summary>
+        /// 图层顺序，取自 Unity SpriteRenderer 的 <c>m_SortingOrder</c>：数值越大越靠前。
+        /// 未声明时用该槽位的默认值。
+        /// </summary>
+        /// <remarks>
+        /// 各舞台的层级并不统一（例如 GrooveLight 在 10~15 之间都有），所以顺序必须来自数据，
+        /// 不能写死一套固定的绘制先后。
+        /// </remarks>
+        [JsonPropertyName("order")]
+        public int? Order { get; set; }
 
         // 旋转支点。缺省时绕 (x, y) 自身旋转。
         [JsonPropertyName("pivotX")]

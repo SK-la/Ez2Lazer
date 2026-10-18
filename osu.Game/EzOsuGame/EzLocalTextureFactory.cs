@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -391,14 +392,28 @@ namespace osu.Game.EzOsuGame
             string basePath = $"Stage/{stageName.Value}/Stage";
             string? keyFolder = ResolveStageKeyFolder(resource.ListSubdirectories(basePath), columnCount);
 
-            addPlateSprite(container, layout.Back, $"{basePath}/BlackPanel");
+            // 先收集再按 order 排序：Unity 的层级来自 m_SortingOrder，各舞台并不统一，
+            // 固定绘制先后会让角色、光效之类的附加图盖住数字。
+            var layers = new List<(int Order, Drawable Drawable)>();
+
+            void place(Drawable? drawable, int order)
+            {
+                if (drawable != null)
+                    layers.Add((order, drawable));
+            }
+
+            place(addPlateSprite(layout.Back, $"{basePath}/BlackPanel"), layout.Back?.Order ?? EzStagePlateLayout.ORDER_BACK);
 
             Vector2 bodySize = Vector2.Zero;
+            int bodyOrder = layout.Body?.Order ?? EzStagePlateLayout.ORDER_BODY;
 
             if (keyFolder != null)
-                addPlateSprite(container, layout.Body, $"{basePath}/{keyFolder}/Body", out bodySize);
+                place(addPlateSprite(layout.Body, $"{basePath}/{keyFolder}/Body", out bodySize), bodyOrder);
 
-            addPlateSprite(container, layout.GrooveLight, $"{basePath}/GrooveLight");
+            // 按键与数字都要能在 Body 之后，序号来自 layout；这里先算出来供后面复用。
+            int keyOrder = layout.GetKeys(columnCount)?.FirstOrDefault()?.Order ?? EzStagePlateLayout.ORDER_KEYS;
+
+            place(addPlateSprite(layout.GrooveLight, $"{basePath}/GrooveLight"), layout.GrooveLight?.Order ?? EzStagePlateLayout.ORDER_GROOVE_LIGHT);
 
             if (layout.Meter != null)
             {
@@ -406,10 +421,12 @@ namespace osu.Game.EzOsuGame
                 Drawable? bright = createPlateDrawable($"{basePath}/GrooveGaugeLight", layout.Meter.Bright);
 
                 if (gauge != null || bright != null)
-                    container.Add(applyRotation(new EzStageGrooveMeter(layout.Meter, gauge, bright), layout.Meter));
+                    place(applyRotation(new EzStageGrooveMeter(layout.Meter, gauge, bright), layout.Meter),
+                          layout.Meter.Order ?? EzStagePlateLayout.ORDER_METER);
             }
 
-            addPlateSprite(container, layout.OverObject, plateTexturePath(basePath, layout.OverObject, $"{stageName.Value}_OverObject/{stageName.Value}_OverObject"));
+            place(addPlateSprite(layout.OverObject, plateTexturePath(basePath, layout.OverObject, $"{stageName.Value}_OverObject/{stageName.Value}_OverObject")),
+                  layout.OverObject?.Order ?? EzStagePlateLayout.ORDER_OVER_OBJECT);
 
             if (layout.Parts != null)
             {
@@ -418,30 +435,40 @@ namespace osu.Game.EzOsuGame
                     if (string.IsNullOrEmpty(part.Path))
                         continue;
 
-                    addPlateSprite(container, part, $"{basePath}/{part.Path}");
+                    place(addPlateSprite(part, $"{basePath}/{part.Path}"), part.Order ?? EzStagePlateLayout.ORDER_OVER_OBJECT);
                 }
             }
 
-            addPlateCounter(container, layout.Score, EzStagePlateCounter.Source.Score);
-            addPlateCounter(container, layout.Combo, EzStagePlateCounter.Source.MaxCombo);
+            place(createPlateCounter(layout.Score, EzStagePlateCounter.Source.Score), layout.Score?.Order ?? EzStagePlateLayout.ORDER_DIGITS);
+            place(createPlateCounter(layout.Combo, EzStagePlateCounter.Source.MaxCombo), layout.Combo?.Order ?? EzStagePlateLayout.ORDER_DIGITS);
 
-            mountKeys(container, layout, keyFolder, basePath, columnCount, keyState);
+            place(mountKeys(layout, keyFolder, basePath, columnCount, keyState), keyOrder);
 
             if (layout.Character != null)
             {
-                bool placed = false;
+                Drawable? character = null;
 
                 if (!string.IsNullOrEmpty(layout.Character.Path))
-                    placed = addPlateSprite(container, layout.Character, $"{basePath}/{layout.Character.Path}", out _) != null;
+                    character = addPlateSprite(layout.Character, $"{basePath}/{layout.Character.Path}");
 
-                if (!placed && keyFolder != null)
-                    placed = addPlateSprite(container, layout.Character, $"{basePath}/{keyFolder}/Character", out _) != null;
+                if (character == null && keyFolder != null)
+                    character = addPlateSprite(layout.Character, $"{basePath}/{keyFolder}/Character");
 
-                if (!placed)
-                    addPlateSprite(container, layout.Character, $"{basePath}/Character_overlayer");
+                character ??= addPlateSprite(layout.Character, $"{basePath}/Character_overlayer");
+
+                place(character, layout.Character.Order ?? EzStagePlateLayout.ORDER_CHARACTER);
             }
 
-            mountJudgementLine(container, layout.JudgementLine, basePath, bodySize);
+            // 判定线的偏移决定整块舞台板的上移量，必须在加子项前算出来。
+            Drawable? judgementLine = createJudgementLine(layout.JudgementLine, basePath, bodySize, out float judgementLineOffset);
+
+            if (judgementLineOffset != 0)
+                container.Y = -judgementLineOffset;
+
+            place(judgementLine, layout.JudgementLine?.Order ?? EzStagePlateLayout.ORDER_JUDGEMENT_LINE);
+
+            // OrderBy 是稳定排序：同层的部件保持上面写死的先后。
+            container.AddRange(layers.OrderBy(l => l.Order).Select(l => l.Drawable));
 
             return container;
         }
@@ -470,15 +497,15 @@ namespace osu.Game.EzOsuGame
         }
 
         /// <summary>
-        /// 挂按键贴图。位置与文件名全部来自 stage layout；该键数没有声明时整层不画，
+        /// 构造按键层。位置与文件名全部来自 stage layout；该键数没有声明时整层不画，
         /// 因此缺美术的回退组合不会画到错误的位置上。
         /// </summary>
-        private void mountKeys(Container plate, EzStagePlateLayout layout, string? keyFolder, string basePath, int columnCount, EzStageKeyState? keyState)
+        private Drawable? mountKeys(EzStagePlateLayout layout, string? keyFolder, string basePath, int columnCount, EzStageKeyState? keyState)
         {
             IReadOnlyList<EzStagePlateKey>? keys = layout.GetKeys(columnCount);
 
             if (keys == null || keyFolder == null)
-                return;
+                return null;
 
             var bases = new List<Drawable?>(keys.Count);
             var presses = new List<Drawable?>(keys.Count);
@@ -495,7 +522,7 @@ namespace osu.Game.EzOsuGame
                 pressed.Add(keyState?.GetPressed(i));
             }
 
-            plate.Add(new EzStageKeyLayer(bases, presses, pressed));
+            return new EzStageKeyLayer(bases, presses, pressed);
         }
 
         // 文件名由 layout 给出，且只是前缀：帧序号不在数据里，按前缀把该列所有帧一起取出来。
@@ -645,28 +672,24 @@ namespace osu.Game.EzOsuGame
         }
 
         /// <summary>
-        /// 把判定线贴图挂到舞台板上，并把舞台板整体上移，使板子的 (0, 0) 落在判定线上。
-        /// 外部只需把该原点放到游戏判定线位置再缩放；缩放支点就是判定线，列宽不会再改变两者的相对位置。
+        /// 构造判定线贴图。<paramref name="lineOffset"/> 是判定线相对 Body 中心的偏移，
+        /// 舞台板要整体上移该值，使其 (0, 0) 正好落在判定线上。
         /// </summary>
-        private void mountJudgementLine(Container plate, EzStagePlateJudgementLine? piece, string basePath, Vector2 bodySize)
+        private Drawable? createJudgementLine(EzStagePlateJudgementLine? piece, string basePath, Vector2 bodySize, out float lineOffset)
         {
             // ratio 相对 Body 底边，用 Body 的实际绘制高度换算，因此不受 store 缩放与源图分辨率影响。
             // 舞台没有声明 judgementLine 时无从得知判定线位置，退化为以板中心为锚点。
-            float judgementLineY = piece != null && bodySize.Y > 0
+            lineOffset = piece != null && bodySize.Y > 0
                 ? EzStagePlacement.GetJudgementLineOffset(bodySize.Y, piece.Ratio)
                 : 0;
-
-            // 板子保持零尺寸：子项坐标因此以板的位置为原点，和其它 stage 组件共用同一套坐标系。
-            // 一旦给板子尺寸，子项原点会移到左上角，所有坐标都要再补半个板宽高。
-            plate.Y = -judgementLineY;
 
             // 舞台自带优先，缺失时用 EzResources/JudgementLine 里选中的那张；两者都没有就不画。
             List<Texture> frames = loadStageJudgementFrames(piece, basePath);
 
             if (frames.Count == 0)
-                return;
+                return null;
 
-            var position = new Vector2(-(piece?.X ?? 0), judgementLineY);
+            var position = new Vector2(-(piece?.X ?? 0), lineOffset);
 
             // 贴图按自身显示尺寸绘制，随舞台板一起缩放；这与旧 EzJudgementLine 的视觉一致。
             Vector2 size = frames[0].DisplaySize;
@@ -701,7 +724,7 @@ namespace osu.Game.EzOsuGame
                 drawable = animation;
             }
 
-            plate.Add(drawable);
+            return drawable;
         }
 
         /// <summary>
@@ -871,18 +894,19 @@ namespace osu.Game.EzOsuGame
             return $"{basePath}/{relative}";
         }
 
-        private static void addPlateCounter(Container parent, EzStagePlateDigits? digits, EzStagePlateCounter.Source source)
+        private static Drawable? createPlateCounter(EzStagePlateDigits? digits, EzStagePlateCounter.Source source)
         {
             if (digits == null || !digits.Enabled || digits.Digits <= 0)
-                return;
+                return null;
 
-            parent.Add(new EzStagePlateCounter(digits, source));
+            return new EzStagePlateCounter(digits, source);
         }
 
-        private bool addPlateSprite(Container parent, EzStagePlateSprite? piece, string texturePath)
-            => addPlateSprite(parent, piece, texturePath, out _) != null;
+        private Drawable? addPlateSprite(EzStagePlateSprite? piece, string texturePath)
+            => addPlateSprite(piece, texturePath, out _);
 
-        private Drawable? addPlateSprite(Container parent, EzStagePlateSprite? piece, string texturePath, out Vector2 contentSize)
+        // 返回已套上旋转的 drawable（加入容器用）；contentSize 供 Body 之类需要度量尺寸的地方使用。
+        private Drawable? addPlateSprite(EzStagePlateSprite? piece, string texturePath, out Vector2 contentSize)
         {
             contentSize = Vector2.Zero;
 
@@ -891,11 +915,7 @@ namespace osu.Game.EzOsuGame
 
             Drawable? drawable = createPlateDrawable(texturePath, piece, out contentSize);
 
-            if (drawable == null)
-                return null;
-
-            parent.Add(applyRotation(drawable, piece));
-            return drawable;
+            return drawable == null ? null : applyRotation(drawable, piece);
         }
 
         private Drawable? createPlateDrawable(string texturePath, EzStagePlateSprite? piece)
