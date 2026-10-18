@@ -292,6 +292,9 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            if (JudgementKernelDriven)
+                return;
+
             if (userTriggered || !TailCircle.Judged || Time.Current < HitObject.EndTime)
                 return;
 

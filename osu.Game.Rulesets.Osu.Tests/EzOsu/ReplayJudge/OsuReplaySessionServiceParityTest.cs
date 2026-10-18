@@ -7,6 +7,7 @@ using NUnit.Framework;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge;
+using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
@@ -68,6 +69,24 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
 
             Assert.That(second.ScoreInfo.TotalScore, Is.EqualTo(first.ScoreInfo.TotalScore));
             Assert.That(second.ScoreInfo.HitEvents.Count, Is.EqualTo(first.ScoreInfo.HitEvents.Count));
+        }
+
+        /// <summary>
+        /// 掉帧不影响判定：抽帧到 200ms 后，判定序列与 10ms 帧序列逐字段相等。
+        /// </summary>
+        [TestCase(200)]
+        [TestCase(50)]
+        public void TestDroppedFramesMatchDenseFrames(double interval)
+        {
+            var (score, beatmap, environment) = OsuReplayFixtures.CreateSliderTrackingWithTicks();
+
+            var dense = OsuReplaySession.RunHitEvents(score.DeepClone(), beatmap, environment);
+            var dropped = OsuReplaySession.RunHitEvents(OsuReplayParityHelper.WithDroppedFrames(score.DeepClone(), interval), beatmap, environment);
+
+            Assert.That(dense.Count(e => e.HitObject is SliderTick && e.Result.IsHit()), Is.GreaterThanOrEqualTo(2));
+
+            Assert.That(OsuReplayParityHelper.AreHitEventsEquivalent(dense, dropped), Is.True,
+                $"dense=[{OsuReplayParityHelper.DescribeHitEvents(dense)}] dropped=[{OsuReplayParityHelper.DescribeHitEvents(dropped)}]");
         }
 
         /// <summary>

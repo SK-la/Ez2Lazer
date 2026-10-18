@@ -4,23 +4,24 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Utils;
+using osu.Game.Replays;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Osu.Objects;
+using osu.Game.Rulesets.Osu.Replays;
+using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Scoring;
 using osuTK;
 
 namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
 {
     internal static class OsuReplayParityHelper
     {
-        /// <summary>输入判定的命中时刻来自 replay 帧，两条路径应完全一致，只留亚帧余量。</summary>
-        private const double input_time_offset_tolerance = 12;
+        /// <summary>内核在事件时刻落判，Drawable 与 Session 必须逐字段一致；只留浮点比较余量。</summary>
+        private const double input_time_offset_tolerance = 0.01;
 
-        /// <summary>
-        /// 非输入判定（过期 Miss、滑条 tick/尾、转盘 tick）由 Drawable 在帧回调里结算，Session 用解析时刻，
-        /// 最多差一帧多，故只框住量级。
-        /// </summary>
-        private const double frame_time_offset_tolerance = 32;
+        /// <summary>非输入判定（过期 Miss、滑条 tick/尾、转盘 tick）同样由内核按 deadline 落判，容差与输入一致。</summary>
+        private const double frame_time_offset_tolerance = 0.01;
 
         public static bool AreHitEventsEquivalent(IReadOnlyList<HitEvent> expected, IReadOnlyList<HitEvent> actual)
         {
@@ -41,6 +42,41 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
 
         public static string DescribeHitEvents(IReadOnlyList<HitEvent> hitEvents)
             => string.Join(", ", orderedJudgementEvents(hitEvents).Select(describeHitEvent));
+
+        /// <summary>
+        /// 按固定间隔抽帧模拟掉帧，保留按键状态发生变化的首帧，避免按键边沿被抽掉。
+        /// </summary>
+        public static Score WithDroppedFrames(Score score, double interval)
+        {
+            var frames = score.Replay!.Frames;
+            var kept = new List<ReplayFrame>(frames.Count);
+
+            ReplayFrame? last = null;
+
+            foreach (var frame in frames)
+            {
+                if (last != null && actionsEqual(last, frame) && frame.Time - last.Time < interval)
+                    continue;
+
+                kept.Add(frame);
+                last = frame;
+            }
+
+            if (frames.Count > 0 && kept.Count > 0 && !ReferenceEquals(kept[kept.Count - 1], frames[frames.Count - 1]))
+                kept.Add(frames[frames.Count - 1]);
+
+            score.Replay = new Replay { Frames = kept };
+            return score;
+        }
+
+        private static bool actionsEqual(ReplayFrame a, ReplayFrame b)
+        {
+            // 只有 osu 帧带按键集合；其他帧类型一律视为状态变化，宁可少抽帧。
+            if (a is not OsuReplayFrame first || b is not OsuReplayFrame second)
+                return false;
+
+            return first.Actions.SequenceEqual(second.Actions);
+        }
 
         /// <summary>判定结果序列（过滤 <c>Ignore*</c>，按容器序）。</summary>
         public static IEnumerable<HitResult> OrderedJudgementResults(IReadOnlyList<HitEvent> hitEvents)

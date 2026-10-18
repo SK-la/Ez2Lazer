@@ -114,6 +114,50 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
         }
 
         /// <summary>
+        /// 沿直线滑条持续跟踪：采样点共线，位置按时间线性插值，判定只取决于采样时刻而非采样密度，
+        /// 因此同一份 replay 抽帧后应产出同一判定序列。
+        /// </summary>
+        public static (Score score, IBeatmap beatmap, IGameplayEnvironment environment) CreateSliderTrackingWithTicks()        {
+            const double time_slider_start = 1500;
+            const float slider_path_length = 600;
+            const double frame_interval = 10;
+
+            var ruleset = new OsuRuleset();
+            var testBeatmap = new TestBeatmap(ruleset.RulesetInfo)
+            {
+                HitObjects = new List<HitObject>
+                {
+                    new Slider
+                    {
+                        StartTime = time_slider_start,
+                        Position = new Vector2(100, 192),
+                        SliderVelocityMultiplier = 0.5f,
+                        Path = new SliderPath(PathType.LINEAR, new[]
+                        {
+                            Vector2.Zero,
+                            new Vector2(slider_path_length, 0),
+                        }),
+                    },
+                },
+            };
+
+            var beatmap = prepareBeatmap(ruleset, testBeatmap);
+            var slider = (Slider)beatmap.HitObjects[0];
+
+            var frames = new List<ReplayFrame>();
+
+            for (double time = slider.StartTime; time <= slider.EndTime; time += frame_interval)
+            {
+                double progress = (time - slider.StartTime) / slider.Duration;
+                frames.Add(new OsuReplayFrame(time, slider.StackedPosition + slider.CurvePositionAt(progress), OsuAction.LeftButton));
+            }
+
+            frames.Add(new OsuReplayFrame(slider.EndTime + 50, slider.StackedPosition + slider.CurvePositionAt(1)));
+
+            return createScore(ruleset, beatmap, frames, classicNoteLock: false);
+        }
+
+        /// <summary>
         /// 对齐 <see cref="SpinFramesGenerator"/> 单方向 360° 旋转（1 tick）。
         /// </summary>
         public static (Score score, IBeatmap beatmap, IGameplayEnvironment environment) CreateSpinnerSingleSpin()

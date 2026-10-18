@@ -832,6 +832,13 @@ namespace osu.Game.Rulesets.Objects.Drawables
         /// to apply a result, so that it can remain a `static` delegate and thus not allocate.
         /// </param>
         protected void ApplyResult<T>(Action<JudgementResult, T> application, T state)
+            => ApplyResult(application, state, Time.Current);
+
+        /// <summary>
+        /// Applies the <see cref="Result"/> of this <see cref="DrawableHitObject"/> using an explicit raw time.
+        /// Used by kernel-driven judgement so the authoritative event time is preserved instead of the frame clock.
+        /// </summary>
+        protected void ApplyResult<T>(Action<JudgementResult, T> application, T state, double rawTime)
         {
             if (Result.HasResult)
                 throw new InvalidOperationException("Cannot apply result on a hitobject that already has a result.");
@@ -849,7 +856,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
                     $"{GetType().ReadableName()} applied an invalid hit result (was: {Result.Type}, expected: [{Result.Judgement.MinResult} ... {Result.Judgement.MaxResult}]).");
             }
 
-            Result.RawTime = Time.Current;
+            Result.RawTime = rawTime;
             Result.GameplayRate = (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate;
 
             // 已命中后不应再触发自动播样。
