@@ -66,5 +66,19 @@ namespace osu.Game.EzOsuGame.Overlays
                 Commit = key => bindable.Value = key
             };
         }
+
+        public static EzResourcePickerDescriptor ForJudgementLine(Storage storage, Bindable<string> bindable)
+        {
+            var items = EzResourceDiscovery.ListJudgementLineCandidates(storage);
+
+            return new EzResourcePickerDescriptor
+            {
+                Title = @"JudgementLine",
+                Category = EzResourcePickerCategory.JudgementLine,
+                Items = items,
+                CurrentKey = bindable.Value,
+                Commit = key => bindable.Value = key
+            };
+        }
     }
 }

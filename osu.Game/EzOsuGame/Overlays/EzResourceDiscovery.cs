@@ -57,6 +57,46 @@ namespace osu.Game.EzOsuGame.Overlays
             return list;
         }
 
+        /// <summary>
+        /// <c>EzResources/JudgementLine</c> 下可选的判定线名。<c>JudgementLine_air.png</c> 记为 <c>air</c>，
+        /// 不带前缀的 <c>air.png</c> 同样记为 <c>air</c>。
+        /// </summary>
+        public static IReadOnlyList<string> ListJudgementLineCandidates(Storage storage)
+        {
+            var list = new List<string>();
+
+            try
+            {
+                string path = storage.GetFullPath(EzModifyPath.JUDGEMENT_LINE_PATH);
+
+                if (!Directory.Exists(path))
+                    return list;
+
+                foreach (string file in Directory.GetFiles(path))
+                {
+                    if (!Path.GetExtension(file).Equals(".png", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    string name = Path.GetFileNameWithoutExtension(file);
+
+                    if (name.StartsWith(judgement_line_prefix, StringComparison.OrdinalIgnoreCase))
+                        name = name[judgement_line_prefix.Length..];
+
+                    if (!string.IsNullOrEmpty(name))
+                        list.Add(name);
+                }
+
+                list.Sort(StringComparer.OrdinalIgnoreCase);
+            }
+            catch
+            {
+            }
+
+            return list;
+        }
+
+        internal const string judgement_line_prefix = "JudgementLine_";
+
         private static List<string> listSubdirectories(Storage storage, string relativePath)
         {
             var list = new List<string>();
@@ -94,6 +134,9 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 case EzResourcePickerCategory.Stage:
                     return tryStagePreview(provider, key);
+
+                case EzResourcePickerCategory.JudgementLine:
+                    return provider.Get($"JudgementLine/{judgement_line_prefix}{key}", EzTextureUsage.Large);
 
                 default:
                     return null;

@@ -21,6 +21,7 @@ namespace osu.Game.EzOsuGame.Edit
             Ez2Setting.StageBackground,
             Ez2Setting.StageBackgroundColour,
             Ez2Setting.ColumnLightName,
+            Ez2Setting.JudgementLineName,
 
             // Stage
             Ez2Setting.ManiaPseudo3DRotation,

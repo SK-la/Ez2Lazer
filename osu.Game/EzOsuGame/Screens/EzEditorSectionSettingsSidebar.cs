@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit.Settings;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Overlays.Settings;
@@ -41,9 +42,11 @@ namespace osu.Game.EzOsuGame.Screens
         private readonly List<string> availableNoteSets = new List<string>();
         private readonly List<string> availableStageSets = new List<string>();
         private readonly List<string> availableGameThemes = new List<string>();
+        private readonly List<string> availableJudgementLines = new List<string>();
         private Bindable<string> nameOfNote = null!;
         private Bindable<string> nameOfStage = null!;
         private Bindable<string> nameOfGameTheme = null!;
+        private Bindable<string> nameOfJudgementLine = null!;
         private SettingsDropdown<string>? gameThemeDropdown;
 
         [BackgroundDependencyLoader]
@@ -56,6 +59,13 @@ namespace osu.Game.EzOsuGame.Screens
             nameOfNote = ezSkinConfig.GetBindable<string>(Ez2Setting.NoteSetName);
             nameOfStage = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
             nameOfGameTheme = ezSkinConfig.GetBindable<string>(Ez2Setting.GameThemeName);
+            nameOfJudgementLine = ezSkinConfig.GetBindable<string>(Ez2Setting.JudgementLineName);
+
+            availableJudgementLines.AddRange(new[] { string.Empty });
+            availableJudgementLines.AddRange(EzResourceDiscovery.ListJudgementLineCandidates(storage));
+
+            if (!string.IsNullOrEmpty(nameOfJudgementLine.Value) && !availableJudgementLines.Contains(nameOfJudgementLine.Value))
+                availableJudgementLines.Add(nameOfJudgementLine.Value);
             EzGameThemeCandidates.Refresh(storage);
             EzGameThemeCandidates.EnsureInitialSelection(nameOfGameTheme);
             refreshGameThemeDropdownItems();
@@ -103,6 +113,14 @@ namespace osu.Game.EzOsuGame.Screens
                         TooltipText = EzSkinStrings.NOTE_SET_TOOLTIP,
                         Current = nameOfNote,
                         Items = availableNoteSets,
+                    },
+                    new EzOptionalStringDropdown
+                    {
+                        LabelText = EzSkinStrings.JUDGEMENT_LINE_NAME,
+                        TooltipText = EzSkinStrings.JUDGEMENT_LINE_NAME_TOOLTIP,
+                        EmptyLabel = EzSkinStrings.JUDGEMENT_LINE_NONE,
+                        Current = nameOfJudgementLine,
+                        Items = availableJudgementLines,
                     },
                     new SettingsEnumDropdown<ColumnWidthStyle>
                     {
@@ -207,6 +225,7 @@ namespace osu.Game.EzOsuGame.Screens
 
             nameOfNote.BindValueChanged(e => ezSkinConfig.SetValue(Ez2Setting.NoteSetName, e.NewValue));
             nameOfStage.BindValueChanged(e => ezSkinConfig.SetValue(Ez2Setting.StageName, e.NewValue));
+            nameOfJudgementLine.BindValueChanged(e => ezSkinConfig.SetValue(Ez2Setting.JudgementLineName, e.NewValue));
             nameOfGameTheme.BindValueChanged(e =>
             {
                 ezSkinConfig.SetValue(Ez2Setting.GameThemeName, e.NewValue);

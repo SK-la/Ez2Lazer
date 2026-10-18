@@ -24,6 +24,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         private readonly List<string> availableNoteSets = new List<string>();
         private readonly List<string> availableStageSets = new List<string>();
         private readonly List<string> availableGameThemes = new List<string>();
+        private readonly List<string> availableJudgementLines = new List<string>();
 
         private SettingsDropdown<string>? gameThemeDropdown;
         private Bindable<string>? nameOfGameTheme;
@@ -50,9 +51,16 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 
             var nameOfNote = ezSkinConfig.GetBindable<string>(Ez2Setting.NoteSetName);
             var nameOfStage = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
+            var nameOfJudgementLine = ezSkinConfig.GetBindable<string>(Ez2Setting.JudgementLineName);
 
             ensureDropdownItems(nameOfNote, availableNoteSets);
             ensureDropdownItems(nameOfStage, availableStageSets);
+
+            availableJudgementLines.Add(string.Empty);
+            availableJudgementLines.AddRange(EzResourceDiscovery.ListJudgementLineCandidates(storage));
+
+            if (!string.IsNullOrEmpty(nameOfJudgementLine.Value) && !availableJudgementLines.Contains(nameOfJudgementLine.Value))
+                availableJudgementLines.Add(nameOfJudgementLine.Value);
 
             nameOfGameTheme = ezSkinConfig.GetBindable<string>(Ez2Setting.GameThemeName);
             EzGameThemeCandidates.Refresh(storage);
@@ -96,6 +104,14 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                     TooltipText = EzSkinStrings.NOTE_SET_TOOLTIP,
                     Current = nameOfNote,
                     Items = availableNoteSets,
+                },
+                new EzOptionalStringDropdown
+                {
+                    LabelText = EzSkinStrings.JUDGEMENT_LINE_NAME,
+                    TooltipText = EzSkinStrings.JUDGEMENT_LINE_NAME_TOOLTIP,
+                    EmptyLabel = EzSkinStrings.JUDGEMENT_LINE_NONE,
+                    Current = nameOfJudgementLine,
+                    Items = availableJudgementLines,
                 },
             };
         }

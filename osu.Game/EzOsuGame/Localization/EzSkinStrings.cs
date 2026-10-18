@@ -37,6 +37,18 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString NOTE_SET = new EzLocalizationManager.EzLocalisableString(
             "[EzPro] Note Set", "[EzPro] Note Set");
 
+        public static readonly LocalisableString JUDGEMENT_LINE_NAME = new EzLocalizationManager.EzLocalisableString(
+            "[EzPro] 判定线贴图", "[EzPro] Judgement Line");
+
+        public static readonly LocalisableString JUDGEMENT_LINE_NAME_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "覆盖舞台判定线贴图，取自本地 EzResources/JudgementLine/，贴图底边对齐判定线。"
+            + "\n留空时只用各 stage layout 里定义的判定线；优先用 Stage 目录自带的 layout 指定的图。",
+            "Overrides the stage judgement line image from local EzResources/JudgementLine/; the image's bottom edge aligns with the judgement line."
+            + "\nLeave empty to use only the line declared by each stage layout; Stage-local images take precedence.");
+
+        public static readonly LocalisableString JUDGEMENT_LINE_NONE = new EzLocalizationManager.EzLocalisableString(
+            "（不覆盖）", "(no override)");
+
         public static readonly LocalisableString VISUAL_PICKER_GAME_THEME_BUTTON = new EzLocalizationManager.EzLocalisableString(
             "大图选择：全局纹理主题", "Visual picker: global GameTheme");
 

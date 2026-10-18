@@ -29,6 +29,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
 
         private Bindable<string> stageName = null!;
+        private Bindable<string> judgementLineName = null!;
         private ISkinSource skinSource = null!;
         private int columnCount;
 
@@ -67,6 +68,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             direction.BindTo(scrollingInfo.Direction);
 
             stageName = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
+            judgementLineName = ezSkinConfig.GetBindable<string>(Ez2Setting.JudgementLineName);
         }
 
         private static int playableKeyCount(IBeatmap beatmap, StageDefinition stageDefinition)
@@ -87,6 +89,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             base.LoadComplete();
 
             stageName.BindValueChanged(_ => OnSkinChanged(), true);
+
+            // 判定线贴图名变化只需要换图，不必重建整块舞台板。
+            judgementLineName.BindValueChanged(_ => OnSkinChanged());
 
             // 判定线位置与舞台板缩放原点绑定：任一输入变化都要重算，否则会出现只在启动时对齐的情况。
             hitPosition.BindValueChanged(_ => updatePosition(), true);

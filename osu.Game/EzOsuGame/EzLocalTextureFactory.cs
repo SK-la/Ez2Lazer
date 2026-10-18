@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Overlays;
 using osuTK;
 
 namespace osu.Game.EzOsuGame
@@ -38,6 +39,7 @@ namespace osu.Game.EzOsuGame
         private readonly Bindable<string> stageName = new Bindable<string>();
         private readonly Bindable<string> noteSetName = new Bindable<string>();
         private readonly Bindable<string> gameThemeName = new Bindable<string>();
+        private readonly Bindable<string> judgementLineName = new Bindable<string>();
 
         private readonly BindableBool colorSettingsEnabled = new BindableBool(true);
         private readonly Bindable<Colour4> columnTypeA = new Bindable<Colour4>();
@@ -81,6 +83,7 @@ namespace osu.Game.EzOsuGame
 
             ezConfig.BindWith(Ez2Setting.NoteSetName, noteSetName);
             ezConfig.BindWith(Ez2Setting.StageName, stageName);
+            ezConfig.BindWith(Ez2Setting.JudgementLineName, judgementLineName);
             gameThemeName.BindTo(ezConfig.GetBindable<string>(Ez2Setting.GameThemeName));
 
             ezConfig.BindWith(Ez2Setting.ColumnWidth, columnWidth);
@@ -440,25 +443,22 @@ namespace osu.Game.EzOsuGame
         private void mountJudgementLine(Container plate, EzStagePlateJudgementLine? piece, string basePath, Vector2 bodySize)
         {
             // ratio 相对 Body 底边，用 Body 的实际绘制高度换算，因此不受 store 缩放与源图分辨率影响。
-            // 没有 Body 的舞台退化为以板中心为锚点：那种舞台本就没有可用于对齐的美术。
-            float judgementLineY = bodySize.Y > 0
-                ? EzStagePlacement.GetJudgementLineOffset(bodySize.Y, piece?.Ratio ?? EzStagePlateJudgementLine.DEFAULT_RATIO)
+            // 舞台没有声明 judgementLine 时无从得知判定线位置，退化为以板中心为锚点。
+            float judgementLineY = piece != null && bodySize.Y > 0
+                ? EzStagePlacement.GetJudgementLineOffset(bodySize.Y, piece.Ratio)
                 : 0;
 
             // 板子保持零尺寸：子项坐标因此以板的位置为原点，和其它 stage 组件共用同一套坐标系。
             // 一旦给板子尺寸，子项原点会移到左上角，所有坐标都要再补半个板宽高。
             plate.Y = -judgementLineY;
 
-            if (piece == null)
-                return;
-
-            string path = string.IsNullOrWhiteSpace(piece.Path) ? "JudgementLine" : piece.Path!.Trim().Trim('/');
-            var frames = loadStageComponentFrames($"{basePath}/{path}");
+            // 舞台自带优先，缺失时用 EzResources/JudgementLine 里选中的那张；两者都没有就不画。
+            List<Texture> frames = loadStageJudgementFrames(piece, basePath);
 
             if (frames.Count == 0)
                 return;
 
-            var position = new Vector2(-piece.X, judgementLineY);
+            var position = new Vector2(-(piece?.X ?? 0), judgementLineY);
 
             // 贴图按自身显示尺寸绘制，随舞台板一起缩放；这与旧 EzJudgementLine 的视觉一致。
             Vector2 size = frames[0].DisplaySize;
@@ -486,7 +486,7 @@ namespace osu.Game.EzOsuGame
                     Position = position,
                     Size = size,
                     Loop = true,
-                    DefaultFrameLength = piece.FrameLength,
+                    DefaultFrameLength = piece?.FrameLength ?? 66,
                 };
 
                 animation.AddFrames(frames);
@@ -494,6 +494,43 @@ namespace osu.Game.EzOsuGame
             }
 
             plate.Add(drawable);
+        }
+
+        /// <summary>
+        /// 判定线帧：舞台目录里声明的那张优先，其次 <c>EzResources/JudgementLine</c> 当前选中的那张。
+        /// </summary>
+        private List<Texture> loadStageJudgementFrames(EzStagePlateJudgementLine? piece, string basePath)
+        {
+            string? stagePath = piece?.Path?.Trim().Trim('/');
+
+            if (!string.IsNullOrEmpty(stagePath))
+                stagePath = $"{basePath}/{stagePath}";
+            else if (piece != null)
+                stagePath = $"{basePath}/JudgementLine";
+
+            if (stagePath != null)
+            {
+                List<Texture> stageFrames = loadStageComponentFrames(stagePath);
+
+                if (stageFrames.Count > 0)
+                    return stageFrames;
+            }
+
+            string name = judgementLineName.Value?.Trim() ?? string.Empty;
+
+            if (name.Length == 0)
+                return new List<Texture>();
+
+            if (name.StartsWith(EzResourceDiscovery.judgement_line_prefix, StringComparison.OrdinalIgnoreCase))
+                name = name[EzResourceDiscovery.judgement_line_prefix.Length..];
+
+            if (name.Length == 0)
+                return new List<Texture>();
+
+            List<Texture> frames = loadStageComponentFrames($"JudgementLine/{EzResourceDiscovery.judgement_line_prefix}{name}");
+
+            // 不带前缀的 {name}.png 也接受，与资源选择列表的口径一致。
+            return frames.Count > 0 ? frames : loadStageComponentFrames($"JudgementLine/{name}");
         }
 
         private EzStagePlateLayout? getPlateLayout()

@@ -8,5 +8,6 @@ namespace osu.Game.EzOsuGame.Overlays
         GameTheme,
         NoteSet,
         Stage,
+        JudgementLine,
     }
 }

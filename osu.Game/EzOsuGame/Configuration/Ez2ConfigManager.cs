@@ -195,6 +195,9 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.StageBackgroundColour, Colour4.White);
             SetDefault(Ez2Setting.ColumnLightName, "EzColumnLight");
 
+            // 默认不覆盖：各 stage layout 里的 judgementLine 决定画哪张，这里留空。
+            SetDefault(Ez2Setting.JudgementLineName, string.Empty);
+
             SetDefault(Ez2Setting.ColumnWidthStyle, ColumnWidthStyle.EzSkinOnly);
             SetDefault(Ez2Setting.ColumnWidth, 76, 5, 400.0, 1.0);
             SetDefault(Ez2Setting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
@@ -1214,6 +1217,12 @@ namespace osu.Game.EzOsuGame.Configuration
         /// 整段都没有则不加载。内置资源只在 <c>EzColumnLight</c> 仍找不到时使用。
         /// </summary>
         ColumnLightName,
+
+        /// <summary>
+        /// 判定线贴图名（不含 <c>JudgementLine_</c> 前缀与后缀），对应 <c>EzResources/JudgementLine</c>。
+        /// 空字符串表示不额外覆盖，只用 stage layout 里各自定义的那张。
+        /// </summary>
+        JudgementLineName,
 
         ColumnWidth,
         SpecialFactor,
