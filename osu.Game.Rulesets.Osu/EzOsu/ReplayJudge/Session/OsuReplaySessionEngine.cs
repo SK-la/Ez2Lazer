@@ -9,11 +9,15 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Osu.EzOsu.Judgement;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
+using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
 using osu.Game.Rulesets.Osu.Judgements;
+using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Rulesets.Osu.Objects;
+using osu.Game.Rulesets.Osu.Objects.Drawables;
 using osu.Game.Rulesets.Osu.Replays;
 using osu.Game.Rulesets.Osu.Scoring;
-using osu.Game.Rulesets.Osu.UI;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osuTK;
@@ -21,10 +25,18 @@ using osuTK;
 namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
 {
     /// <summary>
-    /// Osu Session 判定主循环（Mapping）：replay 事件时钟 → Session 状态 → 一遍 <see cref="JudgementProcessor.ApplyResult"/>。
+    /// Session 驱动：把 replay 转成采样源与输入事件，喂给 <see cref="OsuJudgementKernel"/>，
+    /// 再把内核判定写回 <see cref="ScoreProcessor"/>。判定状态全部在内核里，这里不持有。
     /// </summary>
     internal static class OsuReplaySessionEngine
     {
+        private sealed class SpinnerRuntime
+        {
+            public Spinner Spinner = null!;
+            public SpinnerSpinHistory History = new SpinnerSpinHistory();
+            public float? LastAngle;
+        }
+
         internal static void Run(
             Score score,
             IBeatmap beatmap,
@@ -36,181 +48,168 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
         {
             ArgumentNullException.ThrowIfNull(score.Replay);
 
-            // REGISTRY §1.7b：replay 帧已是有效输入；ForStored/分析路径 Resolve 后多为 0。
-            // 禁止把 OffsetPlus 再叠进下方 ResultForPress / 滑条头窗（相对帧会判两次）。
             double inputOffset = environment.OffsetPlusNonMania;
 
             var frames = score.Replay.Frames.OfType<OsuReplayFrame>().OrderBy(f => f.Time).ToList();
 
-            if (frames.Count == 0)
-                return;
+            var samples = new OsuReplaySampleSource(frames);
+            var settings = createSettings(score, environment, scoreProcessor);
+            var kernel = new OsuJudgementKernel(beatmap, settings, samples);
 
-            var cursor = new OsuReplayCursor(frames);
-            var scheduler = OsuSessionCircleScheduler.Create(beatmap, cancellationToken);
-            var sliders = OsuSessionSliderState.CreateAll(beatmap, cancellationToken);
-            var spinners = OsuSessionSpinnerState.CreateAll(beatmap, cancellationToken);
-            var noteLock = OsuSessionNoteLock.Create(beatmap, score, environment, cancellationToken);
-            var pressEdges = OsuReplayCursor.CollectPressEdges(frames);
-            int nextPressIndex = 0;
+            kernel.Judged += judgement => applyJudgement(judgement, gameplayRate, inputOffset, scoreProcessor, timelineRecorder);
 
-            var slidersByContainer = sliders.ToDictionary(s => s.ContainerObject);
-            var forceMissTargets = new List<OsuNoteLockMissTarget>();
-
-            // 实机语义：一次输入只落一个物件。特殊标记（mod 等）可放开为多判。
-            bool allowMultiJudgementPerPress = scoreProcessor is OsuScoreProcessor { AllowMultiJudgementPerPress: true };
-
-            // lazer StartTimeOrderedHitPolicy.HandleHit：命中后立刻结算被抢拍的前序目标（滑条头交给所属滑条状态）。
-            void applyForceMisses(double targetStartTime, double time)
-            {
-                forceMissTargets.Clear();
-                noteLock.CollectForceMissTargets(targetStartTime, forceMissTargets);
-
-                foreach (var missTarget in forceMissTargets)
-                {
-                    if (missTarget.Target is SliderHeadCircle)
-                    {
-                        if (slidersByContainer.TryGetValue(missTarget.ContainerObject, out var sliderState))
-                            sliderState.ForceMissHead(time, applySliderHead);
-                    }
-                    else
-                    {
-                        scheduler.ForceMissTarget(missTarget.Target, time, applyCircle);
-                    }
-                }
-            }
-
-            void applySliderHead(HitObject hitObject, HitResult result, double judgementTime, Vector2? cursorPosition)
-                => applyJudgement(hitObject, result, judgementTime, cursorPosition, gameplayRate, inputOffset, scoreProcessor, timelineRecorder, noteLock);
-
-            void applyCircle(OsuSessionCircleScheduler.PendingTarget target, HitResult result, double judgementTime, Vector2? hitPosition)
-                => applyJudgement(target.HitObject, result, judgementTime, hitPosition, gameplayRate, inputOffset, scoreProcessor, timelineRecorder, noteLock);
-
-            var simulationTimes = OsuReplayCursor.CollectSimulationTimes(
-                frames,
-                scheduler.CollectMissDeadlines(),
-                sliders.Select(s => s.CollectSimulationTimes()).Concat(spinners.Select(s => s.CollectSimulationTimes())));
+            var spinners = beatmap.HitObjects.OfType<Spinner>()
+                                  .Select(s => new SpinnerRuntime { Spinner = s })
+                                  .ToList();
 
             timelineRecorder?.RecordInitial(scoreProcessor, gameplayRate);
 
-            double previousTime = simulationTimes.Count > 0 ? Math.Min(0, simulationTimes[0] - 1) : 0;
+            var pressEdges = OsuReplayCursor.CollectPressEdges(frames);
+            int frameIndex = 0;
+            int pressIndex = 0;
+            double? previousTime = null;
 
-            foreach (double time in simulationTimes)
+            while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                foreach (var spinner in spinners)
+                double? nextFrame = frameIndex < frames.Count ? frames[frameIndex].Time : null;
+                double? nextPress = pressIndex < pressEdges.Count ? pressEdges[pressIndex].Time : null;
+                double? nextDeadline = kernel.NextDeadline;
+
+                double? step = min(nextFrame, nextPress);
+
+                if (nextDeadline is double deadline && deadline > (previousTime ?? double.NegativeInfinity) && (step == null || deadline < step))
+                    step = deadline;
+
+                if (step == null || step <= (previousTime ?? double.NegativeInfinity))
+                    break;
+
+                double time = step.Value;
+
+                if (previousTime is double previous)
+                    progressSpinners(spinners, previous, time, gameplayRate, samples, kernel);
+
+                // 同一时刻先处理输入，再结算到期目标（与旧引擎 previousTime -> 输入 -> 到期一致）。
+                kernel.AdvanceBefore(time);
+
+                while (frameIndex < frames.Count && frames[frameIndex].Time <= time)
+                    frameIndex++;
+
+                while (pressIndex < pressEdges.Count && pressEdges[pressIndex].Time <= time)
                 {
-                    spinner.ProcessRotationInterval(previousTime, time, frames, gameplayRate, (hitObject, result, judgementTime, cursorPosition, configure) =>
-                        applyJudgement(hitObject, result, judgementTime, cursorPosition, gameplayRate, inputOffset, scoreProcessor, timelineRecorder, noteLock, configure));
+                    var edge = pressEdges[pressIndex++];
+                    kernel.ApplyInput(new OsuInputEvent(edge.Time, edge.Action, edge.Position, OsuInputKind.Press));
                 }
 
-                cursor.Seek(time);
-
-                while (nextPressIndex < pressEdges.Count && pressEdges[nextPressIndex].Time <= time)
-                {
-                    var edge = pressEdges[nextPressIndex++];
-
-                    if (allowMultiJudgementPerPress)
-                    {
-                        foreach (var slider in sliders)
-                            slider.ProcessHeadPress(edge.Time, edge.Position, edge.Action, cursor.GetPressedActions(), applySliderHead);
-
-                        scheduler.ProcessPress(edge.Time, edge.Position, applyCircle);
-                        continue;
-                    }
-
-                    // 单判：滑条头与圆共用候选集，取最早可判者。等价实机 StartTimeOrderedHitPolicy
-                    // ―― 前一物件未判时后续物件不可判，因此一次输入只会落在一个物件上。
-                    OsuSessionSliderState? sliderCandidate = null;
-
-                    foreach (var slider in sliders)
-                    {
-                        if (!slider.CanAcceptHeadPress(edge.Time, edge.Position))
-                            continue;
-
-                        if (sliderCandidate == null || slider.HeadStartTime < sliderCandidate.HeadStartTime)
-                            sliderCandidate = slider;
-                    }
-
-                    OsuSessionCircleScheduler.PendingTarget? circleCandidate = scheduler.FindAcceptableTarget(edge.Time, edge.Position);
-
-                    bool sliderWins = sliderCandidate != null
-                                      && (circleCandidate == null || sliderCandidate.HeadStartTime < circleCandidate.HitObject.StartTime);
-
-                    if (sliderWins)
-                    {
-                        // note lock 挡下的输入不落判定（实机等价 Shake/Ignore）：目标随后按常规过期成 Miss。
-                        if (noteLock.Check(sliderCandidate!.ContainerObject, sliderCandidate.HeadStartTime, edge.Time, targetIsNested: true) != ClickAction.Hit)
-                            continue;
-
-                        if (sliderCandidate.ProcessHeadPress(edge.Time, edge.Position, edge.Action, cursor.GetPressedActions(), applySliderHead))
-                            applyForceMisses(sliderCandidate.HeadStartTime, edge.Time);
-                    }
-                    else if (circleCandidate != null)
-                    {
-                        if (noteLock.Check(circleCandidate.HitObject, circleCandidate.HitObject.StartTime, edge.Time, targetIsNested: false) != ClickAction.Hit)
-                            continue;
-
-                        if (scheduler.ProcessPress(edge.Time, edge.Position, applyCircle))
-                            applyForceMisses(circleCandidate.HitObject.StartTime, edge.Time);
-                    }
-                }
-
-                foreach (var slider in sliders)
-                {
-                    // 非活跃滑条跳过：避免「每帧 × 全图滑条」二次放大。
-                    if (time < slider.StartTime || time > slider.LastActiveTime + 1)
-                        continue;
-
-                    slider.ProcessTime(time, cursor.Position, cursor.GetPressedActions(), (hitObject, result, judgementTime, cursorPosition) =>
-                        applyJudgement(hitObject, result, judgementTime, cursorPosition, gameplayRate, inputOffset, scoreProcessor, timelineRecorder, noteLock));
-                }
-
-                scheduler.ProcessExpiredMisses(time, (target, result, judgementTime, hitPosition) =>
-                    applyJudgement(target.HitObject, result, judgementTime, hitPosition, gameplayRate, inputOffset, scoreProcessor, timelineRecorder, noteLock));
-
-                foreach (var spinner in spinners)
-                {
-                    spinner.ProcessEnd(time, (hitObject, result, judgementTime, cursorPosition, configure) =>
-                        applyJudgement(hitObject, result, judgementTime, cursorPosition, gameplayRate, inputOffset, scoreProcessor, timelineRecorder, noteLock, configure));
-                }
+                kernel.AdvanceTo(time);
 
                 previousTime = time;
             }
 
-            scheduler.FinalizeRemainingMisses((target, result, judgementTime, hitPosition) =>
-                applyJudgement(target.HitObject, result, judgementTime, hitPosition, gameplayRate, inputOffset, scoreProcessor, timelineRecorder, noteLock));
+            kernel.FinalizeRun();
+        }
+
+        private static OsuJudgementKernelSettings createSettings(Score score, IGameplayEnvironment environment, ScoreProcessor scoreProcessor)
+        {
+            bool useLegacy = OsuStableClassic.IsActive(environment.JudgeMode)
+                             || score.ScoreInfo.Mods.OfType<OsuModClassic>().Any(m => m.ClassicNoteLock.Value);
+
+            double range = OsuHitWindows.MISS_WINDOW - (score.ScoreInfo.Mods.OfType<OsuModAutopilot>().Any() ? 200 : 0);
+
+            return new OsuJudgementKernelSettings
+            {
+                UseLegacyNoteLock = useLegacy,
+                HittableRange = range,
+                AllowMultiJudgementPerPress = scoreProcessor is OsuScoreProcessor { AllowMultiJudgementPerPress: true },
+            };
+        }
+
+        private static void progressSpinners(
+            IReadOnlyList<SpinnerRuntime> spinners,
+            double fromTime,
+            double toTime,
+            double gameplayRate,
+            OsuReplaySampleSource samples,
+            OsuJudgementKernel kernel)
+        {
+            if (toTime <= fromTime)
+                return;
+
+            for (int i = 0; i < spinners.Count; i++)
+            {
+                var runtime = spinners[i];
+                Spinner spinner = runtime.Spinner;
+
+                if (fromTime >= spinner.EndTime || toTime <= spinner.StartTime)
+                    continue;
+
+                double sampleStart = Math.Max(fromTime, spinner.StartTime);
+                double sampleEnd = Math.Min(toTime, spinner.EndTime);
+
+                if (sampleEnd <= sampleStart)
+                    continue;
+
+                bool tracking = samples.IsPressedAt(OsuAction.LeftButton, sampleEnd) || samples.IsPressedAt(OsuAction.RightButton, sampleEnd);
+
+                float angleAtEnd = computeAngle(samples.PositionAt(sampleEnd), spinner.StackedPosition);
+
+                if (runtime.LastAngle == null)
+                    runtime.LastAngle = computeAngle(samples.PositionAt(sampleStart), spinner.StackedPosition);
+
+                float angleAtStart = runtime.LastAngle.Value;
+                runtime.LastAngle = angleAtEnd;
+
+                if (tracking)
+                {
+                    float delta = OsuSpinnerJudgement.NormaliseRotationDelta(angleAtStart, angleAtEnd, gameplayRate);
+                    runtime.History.ReportDelta(sampleEnd, delta);
+                }
+
+                kernel.TrackSpinner(spinner, runtime.History, tracking, sampleEnd);
+            }
+        }
+
+        private static float computeAngle(Vector2 cursorPosition, Vector2 spinnerCentre)
+        {
+            Vector2 relative = cursorPosition - spinnerCentre;
+            return -float.RadiansToDegrees(MathF.Atan2(relative.X, relative.Y));
+        }
+
+        private static double? min(double? a, double? b)
+        {
+            if (a == null) return b;
+            if (b == null) return a;
+            return Math.Min(a.Value, b.Value);
         }
 
         private static void applyJudgement(
-            HitObject hitObject,
-            HitResult result,
-            double judgementClockTime,
-            Vector2? cursorPositionAtHit,
+            in OsuJudgementEvent judgement,
             double gameplayRate,
             double inputOffset,
             ScoreProcessor scoreProcessor,
-            OsuReplayTimelineRecorder? timelineRecorder,
-            OsuSessionNoteLock noteLock,
-            Action<JudgementResult>? configureResult = null)
+            OsuReplayTimelineRecorder? timelineRecorder)
         {
-            JudgementResult judgementResult = createJudgementResult(hitObject, hitObject.Judgement);
-            judgementResult.Type = result;
+            JudgementResult result = createJudgementResult(judgement.Target, judgement.Target.Judgement);
+            result.Type = judgement.Result;
 
-            if (judgementResult is OsuHitCircleJudgementResult circleResult)
-                circleResult.CursorPositionAtHit = cursorPositionAtHit;
+            if (result is OsuHitCircleJudgementResult circleResult)
+                circleResult.CursorPositionAtHit = judgement.CursorPosition;
 
-            configureResult?.Invoke(judgementResult);
+            if (result is OsuSpinnerJudgementResult spinnerResult)
+            {
+                if (judgement.TotalRotation is float rotation)
+                    spinnerResult.History.ReportDelta(judgement.Target.StartTime, rotation);
 
-            // note lock 需要全局已判集合：顶层 + 滑条头/tick/尾 + 转盘 tick 与主体都从这里过一遍。
-            noteLock.MarkJudged(hitObject);
+                spinnerResult.TimeStarted = judgement.SpinnerTimeStarted;
+                spinnerResult.TimeCompleted = judgement.SpinnerTimeCompleted;
+            }
 
-            // HitEvent.TimeOffset 元数据：可带 env offset。判窗已在 Scheduler/Slider 用裸帧时刻算完 Result，此处不得再改 Type。
-            double timeOffset = Math.Min(judgementClockTime - hitObject.GetEndTime() + inputOffset, hitObject.MaximumJudgementOffset);
-            JudgementResultTimingHelper.ApplyTiming(judgementResult, timeOffset, gameplayRate);
-            scoreProcessor.ApplyResult(judgementResult);
+            double timeOffset = Math.Min(judgement.Time - judgement.Target.GetEndTime() + inputOffset, judgement.Target.MaximumJudgementOffset);
+            JudgementResultTimingHelper.ApplyTiming(result, timeOffset, gameplayRate);
+            scoreProcessor.ApplyResult(result);
 
-            timelineRecorder?.Record(scoreProcessor, judgementClockTime, gameplayRate);
+            timelineRecorder?.Record(scoreProcessor, judgement.Time, gameplayRate);
         }
 
         private static JudgementResult createJudgementResult(HitObject hitObject, osu.Game.Rulesets.Judgements.Judgement judgement)
