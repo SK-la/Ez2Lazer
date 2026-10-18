@@ -250,6 +250,9 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            if (JudgementKernelDriven)
+                return;
+
             if (Time.Current < HitObject.StartTime) return;
 
             if (Progress >= 1)
@@ -332,6 +335,13 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
 
         private void updateBonusScore()
         {
+            // 内核激活时 tick 判定由内核产出，这里只同步展示用的完成圈数。
+            if (JudgementKernelDriven)
+            {
+                completedFullSpins.Value = Result.History.CompletedSpins;
+                return;
+            }
+
             if (ticks.Count == 0)
                 return;
 

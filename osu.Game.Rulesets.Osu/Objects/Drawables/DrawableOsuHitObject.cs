@@ -13,6 +13,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Primitives;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Osu.EzOsu.Judgement;
 using osu.Game.Rulesets.Osu.Judgements;
 using osu.Game.Rulesets.Osu.Scoring;
 using osu.Game.Rulesets.Osu.UI;
@@ -140,6 +141,36 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
         /// Causes this <see cref="DrawableOsuHitObject"/> to get missed, disregarding all conditions in implementations of <see cref="DrawableHitObject.CheckForResult"/>.
         /// </summary>
         public void MissForcefully() => ApplyMinResult();
+
+        /// <summary>
+        /// 内核驱动时 Drawable 不再自行判定；该标志在首次读取时从所属 <see cref="OsuPlayfield"/> 解析。
+        /// </summary>
+        internal bool JudgementKernelDriven => this.FindClosestParent<OsuPlayfield>()?.JudgementKernelActive == true;
+
+        /// <summary>
+        /// 应用由 <see cref="OsuJudgementKernel"/> 产出的权威判定，保留内核事件时刻。
+        /// </summary>
+        internal void ApplyKernelResult(in OsuJudgementEvent judgement, bool applySpinnerHistory = false)
+            => ApplyResult(static (result, state) => applyKernelResult(result, state), (judgement, applySpinnerHistory), judgement.Time);
+
+        private static void applyKernelResult(JudgementResult result, (OsuJudgementEvent judgement, bool applySpinnerHistory) state)
+        {
+            OsuJudgementEvent judgement = state.judgement;
+
+            result.Type = judgement.Result;
+
+            if (result is OsuHitCircleJudgementResult circleResult)
+                circleResult.CursorPositionAtHit = judgement.CursorPosition;
+
+            if (result is OsuSpinnerJudgementResult spinnerResult)
+            {
+                if (state.applySpinnerHistory && judgement.TotalRotation is float rotation)
+                    spinnerResult.History.ReportDelta(judgement.Target.StartTime, rotation);
+
+                spinnerResult.TimeStarted = judgement.SpinnerTimeStarted;
+                spinnerResult.TimeCompleted = judgement.SpinnerTimeCompleted;
+            }
+        }
 
         // ReSharper disable once FunctionRecursiveOnAllPaths (TODO: remove after fixed https://youtrack.jetbrains.com/issue/RIDER-135036/Incorrect-recursive-on-all-execution-paths-inspection)
         private RectangleF parentScreenSpaceRectangle => ((DrawableOsuHitObject)ParentHitObject)?.parentScreenSpaceRectangle ?? Parent!.ScreenSpaceDrawQuad.AABBFloat;

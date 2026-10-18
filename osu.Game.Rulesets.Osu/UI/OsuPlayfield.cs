@@ -10,12 +10,14 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Objects.Legacy;
 using osu.Game.Rulesets.Osu.Beatmaps;
 using osu.Game.Rulesets.Osu.Configuration;
+using osu.Game.Rulesets.Osu.EzOsu.Judgement.Live;
 using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
 using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Rulesets.Osu.Objects;
@@ -37,6 +39,23 @@ namespace osu.Game.Rulesets.Osu.UI
         private readonly ProxyContainer approachCircles;
         private readonly ProxyContainer spinnerProxies;
         private readonly JudgementContainer<DrawableOsuJudgement> judgementLayer;
+
+        private OsuKernelDrawableAdapter? kernelAdapter;
+
+        /// <summary>本 playfield 是否由统一判定内核驱动。</summary>
+        internal bool JudgementKernelActive => kernelAdapter != null;
+
+        /// <summary>
+        /// 把 Drawable 已分发到的按下交给内核判定。返回 <see langword="false"/> 表示内核未启用，调用方应走原有自查。
+        /// </summary>
+        internal bool TryKernelPress(DrawableOsuHitObject drawable, OsuAction action)
+        {
+            if (kernelAdapter == null)
+                return false;
+
+            kernelAdapter.TryPress(drawable, action);
+            return true;
+        }
 
         private readonly JudgementPooler<DrawableOsuJudgement> judgementPooler;
 
@@ -144,7 +163,7 @@ namespace osu.Game.Rulesets.Osu.UI
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuRulesetConfigManager? config, IBeatmap? beatmap, ScoreProcessor? scoreProcessor)
+        private void load(OsuRulesetConfigManager? config, IBeatmap? beatmap, ScoreProcessor? scoreProcessor, Ez2ConfigManager? ezConfig)
         {
             config?.BindWith(OsuRulesetSetting.PlayfieldBorderStyle, playfieldBorder.PlayfieldBorderStyle);
 
@@ -152,6 +171,15 @@ namespace osu.Game.Rulesets.Osu.UI
             // 只认判定档，不认经典 mod。
             if (scoreProcessor is OsuScoreProcessor osuScoreProcessor && OsuStableClassic.IsActive(osuScoreProcessor.JudgeMode))
                 OsuStableClassic.ApplyLiveRules(this, osuScoreProcessor.Mods.Value.Any(m => m is OsuModAutopilot));
+
+            // 内核必须在 drawable 创建前就位：drawable 依赖 playfield 的 JudgementKernelActive 关闭自查。
+            if (scoreProcessor is OsuScoreProcessor kernelScoreProcessor && beatmap != null)
+            {
+                AddInternal(kernelAdapter = new OsuKernelDrawableAdapter(this, beatmap, kernelScoreProcessor, ezConfig));
+
+                if (hitPolicy is LegacyHitPolicy legacyHitPolicy)
+                    legacyHitPolicy.KernelQuery = (hitObject, time) => kernelAdapter.CheckHittable(hitObject, time);
+            }
 
             var osuBeatmap = (OsuBeatmap?)beatmap;
 
@@ -205,8 +233,9 @@ namespace osu.Game.Rulesets.Osu.UI
 
         private void onNewResult(DrawableHitObject judgedObject, JudgementResult result)
         {
-            // Hitobjects that block future hits should miss previous hitobjects if they're hit out-of-order.
-            hitPolicy.HandleHit(judgedObject);
+            // 内核驱动时 note lock 与强制 Miss 都由内核完成，Drawable 侧不再二次仲裁。
+            if (!JudgementKernelActive)
+                hitPolicy.HandleHit(judgedObject);
 
             if (!judgedObject.DisplayResult || !DisplayJudgements.Value)
                 return;

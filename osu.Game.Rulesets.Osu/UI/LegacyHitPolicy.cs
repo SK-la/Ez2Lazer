@@ -25,6 +25,11 @@ namespace osu.Game.Rulesets.Osu.UI
     {
         public IHitObjectContainer? HitObjectContainer { get; set; }
 
+        /// <summary>
+        /// 内核驱动时的顺序/叠堆查询；非 <see langword="null"/> 时本策略退化为薄查询层。
+        /// </summary>
+        public Func<HitObject, double, ClickAction>? KernelQuery { get; set; }
+
         private readonly double hittableRange;
         private readonly List<OsuNoteLockEntry> precedingObjects = new List<OsuNoteLockEntry>();
 
@@ -39,6 +44,16 @@ namespace osu.Game.Rulesets.Osu.UI
 
         public virtual ClickAction CheckHittable(DrawableHitObject hitObject, double time, HitResult result)
         {
+            if (KernelQuery != null)
+            {
+                ClickAction kernelAction = KernelQuery(hitObject.HitObject, time);
+
+                if (kernelAction != ClickAction.Hit)
+                    return kernelAction;
+
+                return result == HitResult.None ? ClickAction.Shake : ClickAction.Hit;
+            }
+
             if (HitObjectContainer == null)
                 throw new InvalidOperationException($"{nameof(HitObjectContainer)} should be set before {nameof(CheckHittable)} is called.");
 

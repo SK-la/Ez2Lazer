@@ -74,7 +74,7 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
                         HitArea = new HitReceptor
                         {
                             CanBeHit = () => !AllJudged,
-                            Hit = () => UpdateResult(true)
+                            Hit = ReportKernelPress
                         },
                         shakeContainer = new ShakeContainer
                         {
@@ -135,8 +135,22 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
 
         public override void Shake() => shakeContainer.Shake();
 
+        /// <summary>
+        /// 内核驱动时把按下交给内核（时间语义由适配器解析）；非内核时保持原有的自查判定。
+        /// </summary>
+        private void ReportKernelPress()
+        {
+            OsuPlayfield? playfield = this.FindClosestParent<OsuPlayfield>();
+
+            if (playfield == null || !playfield.TryKernelPress(this, HitAction ?? OsuAction.LeftButton))
+                UpdateResult(true);
+        }
+
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            if (JudgementKernelDriven)
+                return;
+
             Debug.Assert(HitObject.HitWindows != null);
 
             if (!userTriggered)
@@ -297,8 +311,8 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
 
                         if (IsHovered)
                         {
-                            Hit();
                             HitAction ??= e.Action;
+                            Hit();
                             return true;
                         }
 
