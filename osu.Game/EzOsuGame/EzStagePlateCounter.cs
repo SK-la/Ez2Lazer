@@ -54,10 +54,9 @@ namespace osu.Game.EzOsuGame
             int count = layout.Digits > max_places ? max_places : layout.Digits;
             places = new Sprite[count];
 
-            // Unity 把静态旋转放在数字组根节点上，数字绕该节点转。这里用一个容器还原：
-            // 容器摆在支点、带上旋转，数字写相对支点的偏移。旋转为 0 时支点取零，位置与旧行为一致。
-            bool rotated = layout.Rotation != 0;
-            Vector2 pivot = rotated ? layout.ToOsuPivot() : Vector2.Zero;
+            // 数字组绕支点转，数字写相对支点的偏移。没有声明 pivot 时支点就是自身位置，
+            // 与旧行为逐像素一致（此时旋转为 0，或绕个位数字转）。
+            Vector2 pivot = layout.ToOsuPivot();
 
             var digits = new Container
             {
@@ -73,7 +72,7 @@ namespace osu.Game.EzOsuGame
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Position = EzStagePlateSprite.ToOsu(layout.X + place * layout.Spacing, layout.Y) - pivot,
+                    Position = EzStagePlateElement.ToOsu(layout.X + place * layout.Spacing, layout.Y) - pivot,
                 };
             }
 

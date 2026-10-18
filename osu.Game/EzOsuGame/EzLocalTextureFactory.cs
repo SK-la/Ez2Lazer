@@ -406,7 +406,7 @@ namespace osu.Game.EzOsuGame
                 Drawable? bright = createPlateDrawable($"{basePath}/GrooveGaugeLight", layout.Meter.Bright);
 
                 if (gauge != null || bright != null)
-                    container.Add(new EzStageGrooveMeter(layout.Meter, gauge, bright));
+                    container.Add(applyRotation(new EzStageGrooveMeter(layout.Meter, gauge, bright), layout.Meter));
             }
 
             addPlateSprite(container, layout.OverObject, plateTexturePath(basePath, layout.OverObject, $"{stageName.Value}_OverObject/{stageName.Value}_OverObject"));
@@ -447,6 +447,29 @@ namespace osu.Game.EzOsuGame
         }
 
         /// <summary>
+        /// 把静态旋转套在部件外面：容器摆在支点，部件改写成相对支点的偏移。
+        /// 旋转为 0 时不加任何层级，渲染路径与旧行为一致。
+        /// </summary>
+        private static Drawable applyRotation(Drawable drawable, EzStagePlateElement element)
+        {
+            if (!element.HasRotation)
+                return drawable;
+
+            Vector2 pivot = element.ToOsuPivot();
+            drawable.Position = element.ToOsuPosition() - pivot;
+
+            // 用零尺寸的锚点容器：它自身不能被裁剪判定丢掉，否则支点移出屏幕时子项会整块消失。
+            return new EzStageAnchorContainer
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Position = pivot,
+                Rotation = element.Rotation,
+                Child = drawable,
+            };
+        }
+
+        /// <summary>
         /// 挂按键贴图。位置与文件名全部来自 stage layout；该键数没有声明时整层不画，
         /// 因此缺美术的回退组合不会画到错误的位置上。
         /// </summary>
@@ -465,10 +488,10 @@ namespace osu.Game.EzOsuGame
             for (int i = 0; i < keys.Count; i++)
             {
                 EzStagePlateKey key = keys[i];
-                var position = EzStagePlateSprite.ToOsu(key.X, key.Y);
+                var position = key.ToOsuPosition();
 
-                bases.Add(createKeyDrawable(basePath, keyFolder, "keybase", key.Base, position));
-                presses.Add(createKeyDrawable(basePath, keyFolder, "keypress", key.Press, position));
+                bases.Add(createKeyDrawable(basePath, keyFolder, "keybase", key.Path, position, key));
+                presses.Add(createKeyDrawable(basePath, keyFolder, "keypress", key.PressPath, position, key));
                 pressed.Add(keyState?.GetPressed(i));
             }
 
@@ -477,7 +500,7 @@ namespace osu.Game.EzOsuGame
 
         // 文件名由 layout 给出，且只是前缀：帧序号不在数据里，按前缀把该列所有帧一起取出来。
         // 先查该键数自己的目录；派生排列（7/9/10 复用 5 张图）的时候源图在别的目录，再逐个回退。
-        private Drawable? createKeyDrawable(string basePath, string? keyFolder, string folder, string? stem, Vector2 position)
+        private Drawable? createKeyDrawable(string basePath, string? keyFolder, string folder, string? stem, Vector2 position, EzStagePlateKey key)
         {
             if (string.IsNullOrWhiteSpace(stem))
                 return null;
@@ -521,7 +544,7 @@ namespace osu.Game.EzOsuGame
                 drawable = animation;
             }
 
-            return drawable;
+            return applyRotation(drawable, key);
         }
 
         private double keyFrameLength => 1000.0 / StageKeyPressFps;
@@ -871,7 +894,7 @@ namespace osu.Game.EzOsuGame
             if (drawable == null)
                 return null;
 
-            parent.Add(drawable);
+            parent.Add(applyRotation(drawable, piece));
             return drawable;
         }
 
