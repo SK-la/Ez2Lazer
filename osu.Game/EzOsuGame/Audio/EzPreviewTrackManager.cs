@@ -26,6 +26,9 @@ namespace osu.Game.EzOsuGame.Audio
     /// 调度谱面 note 音效与 storyboard 样本。BGM 循环与预览起点由 SongSelect 调用
     /// <see cref="IWorkingBeatmap.PrepareTrackForPreview"/> 配置；本类不负责主音乐轨。
     /// </summary>
+    /// <remarks>
+    /// note 音效只播谱面自身的键音：皮肤兜底的默认命中音与 whistle / clap / finish 附加层都不属于 note 音，预览里不发声。
+    /// </remarks>
     public partial class EzPreviewTrackManager : CompositeDrawable
     {
         public BindableBool EnabledBindable { get; } = new BindableBool();
@@ -274,14 +277,19 @@ namespace osu.Game.EzOsuGame.Audio
 
             void schedule(HitObject ho)
             {
-                if (ho.Samples.Any() && ho.StartTime >= windowStart && ho.StartTime <= windowEnd)
+                if (ho.StartTime >= windowStart && ho.StartTime <= windowEnd)
                 {
-                    sampleScheduler.ScheduledHitSounds.Add(new ScheduledHitSound
+                    var samples = collectNoteSamples(ho.Samples);
+
+                    if (samples.Length > 0)
                     {
-                        Time = ho.StartTime,
-                        Samples = ho.Samples.ToArray(),
-                        HasTriggered = false
-                    });
+                        sampleScheduler.ScheduledHitSounds.Add(new ScheduledHitSound
+                        {
+                            Time = ho.StartTime,
+                            Samples = samples,
+                            HasTriggered = false
+                        });
+                    }
                 }
 
                 foreach (var n in ho.NestedHitObjects)
@@ -349,7 +357,7 @@ namespace osu.Game.EzOsuGame.Audio
 
                     foreach (var info in hs.Samples)
                     {
-                        if (!info.UseBeatmapSamples)
+                        if (!isNoteSample(info))
                             continue;
 
                         string? key = getHitSampleCacheKey(info);
@@ -660,10 +668,54 @@ namespace osu.Game.EzOsuGame.Audio
 
         private static string? getHitSampleCacheKey(HitSampleInfo info)
         {
-            if (!info.UseBeatmapSamples)
+            if (!isNoteSample(info))
                 return null;
 
             return info.LookupNames.FirstOrDefault() ?? info.Name;
+        }
+
+        /// <summary>
+        /// 只有 note 自身携带的谱面音效算预览键音：皮肤兜底的默认命中音与命中音附加层都不发声。
+        /// </summary>
+        /// <remarks>
+        /// <see cref="HitSampleInfo.UseBeatmapSamples"/> 为 false 的样本只能从皮肤解析（例如没有自定义音效的
+        /// note 落到 <c>normal-hitnormal</c>），预览不播这类皮肤音效；whistle / clap / finish 是叠加在
+        /// note 上的附加层，也不是 note 自身的键音。
+        /// </remarks>
+        private static bool isNoteSample(HitSampleInfo info)
+        {
+            if (!info.UseBeatmapSamples)
+                return false;
+
+            return info.Name is not (HitSampleInfo.HIT_WHISTLE or HitSampleInfo.HIT_CLAP or HitSampleInfo.HIT_FINISH);
+        }
+
+        /// <summary>
+        /// 取出物件样本中的 note 键音；没有则返回空数组，避免为空物件建立调度条目。
+        /// </summary>
+        private static HitSampleInfo[] collectNoteSamples(IList<HitSampleInfo> samples)
+        {
+            int count = 0;
+
+            for (int i = 0; i < samples.Count; i++)
+            {
+                if (isNoteSample(samples[i]))
+                    count++;
+            }
+
+            if (count == 0)
+                return Array.Empty<HitSampleInfo>();
+
+            var result = new HitSampleInfo[count];
+            int index = 0;
+
+            for (int i = 0; i < samples.Count; i++)
+            {
+                if (isNoteSample(samples[i]))
+                    result[index++] = samples[i];
+            }
+
+            return result;
         }
 
         private ISample? resolveHitSample(HitSampleInfo info)
