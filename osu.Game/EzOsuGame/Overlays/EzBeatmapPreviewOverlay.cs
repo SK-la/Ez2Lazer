@@ -948,8 +948,6 @@ namespace osu.Game.EzOsuGame.Overlays
                 // 清理所有引用
                 playableBeatmap = null;
                 currentRuleset = null;
-                sharedPreviewModeConfig.UnbindAll();
-                maniaPreviewModeConfig.UnbindAll();
             }
         }
 
