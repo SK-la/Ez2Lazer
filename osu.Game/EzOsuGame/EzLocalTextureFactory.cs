@@ -364,7 +364,9 @@ namespace osu.Game.EzOsuGame
 
         public Container CreateStage(int columnCount)
         {
-            var container = new Container
+            // 舞台板的 (0, 0) 是判定线：EzStageAnchorContainer 保持零尺寸，子项沿用 layout 的绝对坐标，
+            // 外层把这个原点放到游戏判定线位置再缩放，因此列宽与画布缩放都不会移动判定线。
+            var container = new EzStageAnchorContainer
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
@@ -443,10 +445,8 @@ namespace osu.Game.EzOsuGame
                 ? EzStagePlacement.GetJudgementLineOffset(bodySize.Y, piece?.Ratio ?? EzStagePlateJudgementLine.DEFAULT_RATIO)
                 : 0;
 
-            // 板子按 Body 的实际绘制尺寸给包围盒，子项定位与裁剪都以它为界。
-            if (bodySize.Y > 0)
-                plate.Size = bodySize;
-
+            // 板子保持零尺寸：子项坐标因此以板的位置为原点，和其它 stage 组件共用同一套坐标系。
+            // 一旦给板子尺寸，子项原点会移到左上角，所有坐标都要再补半个板宽高。
             plate.Y = -judgementLineY;
 
             if (piece == null)
@@ -458,8 +458,10 @@ namespace osu.Game.EzOsuGame
             if (frames.Count == 0)
                 return;
 
-            var size = new Vector2(frames[0].DisplayWidth, frames[0].DisplayHeight);
             var position = new Vector2(-piece.X, judgementLineY);
+
+            // 贴图按自身显示尺寸绘制，随舞台板一起缩放；这与旧 EzJudgementLine 的视觉一致。
+            Vector2 size = frames[0].DisplaySize;
 
             Drawable drawable;
 

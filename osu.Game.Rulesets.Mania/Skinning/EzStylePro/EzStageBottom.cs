@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     public partial class EzStageBottom : CompositeDrawable
     {
         private readonly LayoutValue layout = new LayoutValue(Invalidation.DrawSize);
-        private readonly Container sprite;
+        private readonly EzStageAnchorContainer sprite;
 
         private readonly IBindable<double> hitPosition = new Bindable<double>();
         private readonly IBindable<bool> globalHitPosition = new Bindable<bool>();
@@ -46,9 +46,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
 
-            InternalChild = sprite = new Container
+            InternalChild = sprite = new EzStageAnchorContainer
             {
-                // 尺寸保持 0：缩放以该容器的位置为支点，而这个位置就是判定线。
+                // 零尺寸：缩放以该容器的位置为支点，而这个位置就是判定线。
                 // 不设 AutoSize，否则支点会变成子项包围盒的中心，判定线又会随列宽漂移。
                 RelativeSizeAxes = Axes.None,
                 Anchor = Anchor.Centre,
