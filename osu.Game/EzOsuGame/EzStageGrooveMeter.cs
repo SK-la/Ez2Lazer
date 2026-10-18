@@ -31,7 +31,7 @@ namespace osu.Game.EzOsuGame
 
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
-            Position = EzStagePlateSprite.ToOsu(meter.X, meter.Y);
+            Position = meter.ToOsuPosition();
         }
 
         [BackgroundDependencyLoader]

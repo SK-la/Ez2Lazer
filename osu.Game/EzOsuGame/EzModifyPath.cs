@@ -14,6 +14,11 @@ namespace osu.Game.EzOsuGame
         public const string PANEL_PATH = @"EzResources/Panel";
         public const string COLUMN_PATH = @"EzResources/ColumnLight";
         public const string GAME_THEME_PATH = @"EzResources/GameTheme";
+
+        /// <summary>
+        /// 舞台判定线贴图，文件名形如 <c>JudgementLine_{name}.png</c>，不带后缀的 <c>{name}.png</c> 也接受。
+        /// </summary>
+        public const string JUDGEMENT_LINE_PATH = @"EzResources/JudgementLine";
         public const string FULL_COMBO = @"EzResources/Modify/FullCombo";
 
         public const string VIDEO_PATH = @"EzResources/Video";

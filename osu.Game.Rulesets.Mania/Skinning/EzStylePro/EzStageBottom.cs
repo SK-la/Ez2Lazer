@@ -4,13 +4,16 @@
 using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
+using osu.Framework.Extensions.ObjectExtensions;using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Layout;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania;
+using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Skinning;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -18,11 +21,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     public partial class EzStageBottom : CompositeDrawable
     {
         private readonly LayoutValue layout = new LayoutValue(Invalidation.DrawSize);
-        private readonly Container sprite;
+        private readonly EzStageAnchorContainer sprite;
 
-        private readonly IBindable<double> hitPositonBindable = new Bindable<double>();
+        private readonly IBindable<double> hitPosition = new Bindable<double>();
+        private readonly IBindable<bool> globalHitPosition = new Bindable<bool>();
+        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
 
         private Bindable<string> stageName = null!;
+        private Bindable<string> judgementLineName = null!;
+
+        [Resolved(CanBeNull = true)]
+        private EzStageKeyState? keyState { get; set; }
+        private ISkinSource skinSource = null!;
         private int columnCount;
 
         [Resolved]
@@ -39,21 +49,28 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
 
-            InternalChild = sprite = new Container
+            InternalChild = sprite = new EzStageAnchorContainer
             {
+                // 零尺寸：缩放以该容器的位置为支点，而这个位置就是判定线。
+                // 不设 AutoSize，否则支点会变成子项包围盒的中心，判定线又会随列宽漂移。
                 RelativeSizeAxes = Axes.None,
-                FillMode = FillMode.Fill,
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
             };
         }
 
         [BackgroundDependencyLoader]
-        private void load(IEzSkinInfo ezSkinInfo, StageDefinition stageDefinition, IBeatmap beatmap)
+        private void load(IEzSkinInfo ezSkinInfo, StageDefinition stageDefinition, IBeatmap beatmap, ISkinSource skin, IScrollingInfo scrollingInfo)
         {
             columnCount = playableKeyCount(beatmap, stageDefinition);
-            hitPositonBindable.BindTo(ezSkinInfo.HitPosition);
+            skinSource = skin;
+
+            hitPosition.BindTo(ezSkinInfo.HitPosition);
+            globalHitPosition.BindTo(ezSkinInfo.HitPositionGlobalEnable);
+            direction.BindTo(scrollingInfo.Direction);
+
             stageName = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
+            judgementLineName = ezSkinConfig.GetBindable<string>(Ez2Setting.JudgementLineName);
         }
 
         private static int playableKeyCount(IBeatmap beatmap, StageDefinition stageDefinition)
@@ -74,42 +91,34 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             base.LoadComplete();
 
             stageName.BindValueChanged(_ => OnSkinChanged(), true);
-            hitPositonBindable.BindValueChanged(_ => updatePosition());
 
+            // 判定线贴图名变化只需要换图，不必重建整块舞台板。
+            judgementLineName.BindValueChanged(_ => OnSkinChanged());
+
+            // 判定线位置与舞台板缩放原点绑定：任一输入变化都要重算，否则会出现只在启动时对齐的情况。
+            hitPosition.BindValueChanged(_ => updatePosition(), true);
+            globalHitPosition.BindValueChanged(_ => updatePosition(), true);
+            direction.BindValueChanged(_ => updatePosition(), true);
+
+            skinSource.SourceChanged += updatePosition;
             factory.OnNoteSizeChanged += updatePosition;
         }
 
         private void OnSkinChanged()
         {
             sprite.Clear();
-
-            sprite.Add(factory.CreateStage(columnCount));
-
-            // var judgeLine = new EzJudgementLine();
-            // sprite.Add(judgeLine);
-            // invalidateLayout();
+            sprite.Add(factory.CreateStage(columnCount, keyState));
             updatePosition();
         }
 
         private void updatePosition()
         {
-            // Logger.Log($"Updating position with DrawWidth: {DrawWidth}, HitPosition: {hitPositonBindable.Value}");
-            float actualPanelWidth = DrawWidth;
-            float scale = actualPanelWidth / 412.0f;
+            // 舞台板原点就是 layout 里的判定线，所以这里只需把原点放到游戏判定线上再缩放。
+            // 缩放围绕零尺寸容器的支点进行，列宽改变不会移动判定线。
+            float hitPositionValue = ManiaPlayfieldLayoutHelper.GetHitPosition(skinSource, globalHitPosition.Value, hitPosition.Value);
 
-            sprite.Scale = new Vector2(scale);
-
-            // 以后加入Hint后，还要下调第一个值。
-            sprite.Y = 285f - 384f * scale + ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
-
-            // 计算纹理高度和位置
-            // float textureHeight = sprite.Child.Height * scale;
-            // float textureTopY = DrawHeight + sprite.Y - textureHeight / 2;
-
-            // 当纹理顶部低于屏幕顶部时隐藏
-            // sprite.Alpha = textureTopY != 0
-            //     ? 1
-            //     : 0;
+            sprite.Scale = new Vector2(EzStagePlacement.GetStageScale(DrawWidth, factory.StageDesignWidth));
+            sprite.Y = EzStagePlacement.GetHitLineOffset(DrawHeight, hitPositionValue, direction.Value);
         }
 
         protected override void Update()
@@ -123,13 +132,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             }
         }
 
-        private void invalidateLayout() => layout.Invalidate();
-
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
 
             factory.OnNoteSizeChanged -= updatePosition;
+
+            if (skinSource.IsNotNull())
+                skinSource.SourceChanged -= updatePosition;
         }
     }
 }

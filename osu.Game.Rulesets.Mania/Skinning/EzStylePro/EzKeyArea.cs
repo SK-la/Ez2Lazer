@@ -1,181 +1,54 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.EzOsuGame;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Skinning.Legacy;
 using osu.Game.Rulesets.Mania.UI;
-using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
+    /// <summary>
+    /// 按键输入入口。按键贴图由舞台板绘制（见 EzStageKeyLayer），这里只把按下状态写进
+    /// <see cref="EzStageKeyState"/>，因此视觉与 Body、血条共用同一套舞台坐标和缩放。
+    /// </summary>
     public partial class EzKeyArea : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
-        private IBindable<double> hitPositonBindable = null!;
-        private Bindable<Vector2> noteSizeBindable = null!;
-        private Bindable<string> stageNameBindable = null!;
-
-        private readonly Container sprite;
-        private Drawable? upSprite;
-        private Drawable? downSprite;
-
-        // protected virtual bool IsKeyPress => true;
-        // protected virtual bool UseColorization => true;
-
-        // [Resolved]
-        // private IBeatmap beatmap { get; set; } = null!;
-        //
-        // [Resolved]
-        // private IGameplayClock gameplayClock { get; set; } = null!;
+        private Bindable<bool>? pressed;
+        private int releaseVersion;
 
         [Resolved]
         private Column column { get; set; } = null!;
 
-        [Resolved]
-        private StageDefinition stageDefinition { get; set; } = null!;
-
-        [Resolved]
-        private EzLocalTextureFactory factory { get; set; } = null!;
-
-        [Resolved]
-        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
-
-        // private double bpm;
-        // private double beatInterval;
-        private int keyMode;
-        private int columnIndex;
+        [Resolved(CanBeNull = true)]
+        private EzStageKeyState? keyState { get; set; }
 
         public EzKeyArea()
         {
-            RelativeSizeAxes = Axes.Both;
-
-            sprite = new Container
-            {
-                Anchor = Anchor.TopCentre,
-                Origin = Anchor.TopCentre,
-                RelativeSizeAxes = Axes.X,
-                FillMode = FillMode.Stretch,
-            };
-        }
-
-        [BackgroundDependencyLoader]
-        private void load(Column column, IEzSkinInfo ezSkinInfo)
-        {
-            keyMode = stageDefinition.Columns;
-            columnIndex = column.Index;
-
-            stageNameBindable = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
-            hitPositonBindable = ezSkinInfo.HitPosition;
-            noteSizeBindable = column.EzNoteSizeBindable;
-
-            // bpm = beatmap.Beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
-            // beatInterval = 60000 / bpm * 64;
-
-            bool isFreeSize = EzProHelper.FREE_SIZE_STAGES.Contains(stageNameBindable.Value);
-
-            if (isFreeSize)
-            {
-                sprite.RelativeSizeAxes = Axes.None;
-                sprite.AutoSizeAxes = Axes.Both;
-                sprite.Scale = new Vector2(2f);
-                AddInternal(sprite);
-            }
-            else
-            {
-                column.TopLevelContainer.Add(sprite);
-            }
-
-            loadAnimation();
+            // 该组件不绘制任何内容，但仍需参与输入：IsPresent 依赖 Alpha > 0，
+            // 因此不能把 Alpha 设为 0，否则按键事件会被直接跳过。
+            RelativeSizeAxes = Axes.None;
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            stageNameBindable.BindValueChanged(_ => loadAnimation(), true);
-            hitPositonBindable.BindValueChanged(_ => OnConfigChanged(), true);
-            noteSizeBindable.BindValueChanged(_ => OnConfigChanged(), true);
-        }
-
-        protected virtual string KeySuffix
-        {
-            get
-            {
-                var type = column.EzNoteTypeBindable.Value;
-
-                switch (type)
-                {
-                    case EzColumnType.A:
-                        return "0";
-
-                    case EzColumnType.B:
-                        return "1";
-
-                    case EzColumnType.S:
-                    case EzColumnType.P:
-                    case EzColumnType.E:
-                        return "2";
-
-                    default:
-                        return "0";
-                }
-            }
-        }
-
-        private void loadAnimation()
-        {
-            (upSprite as TextureAnimation)?.ClearFrames();
-            (downSprite as TextureAnimation)?.ClearFrames();
-
-            upSprite = factory.CreateStageKeys("KeyBase", KeySuffix);
-            downSprite = factory.CreateStageKeys("KeyPress", KeySuffix);
-
-            // upSprite.DefaultFrameLength = beatInterval;
-            // downSprite.DefaultFrameLength = beatInterval;
-            if (downSprite != null)
-                downSprite.Alpha = 0;
-
-            sprite.Clear();
-            sprite.Add(upSprite ?? Empty());
-            sprite.Add(downSprite ?? Empty());
-
-            OnConfigChanged();
-        }
-
-        private void OnConfigChanged()
-        {
-            float actualPanelWidth = noteSizeBindable.Value.X;
-            float baseWidth = 410f / keyMode;
-            float newScale = 2f * (actualPanelWidth / baseWidth);
-            float newY = 768f - (float)hitPositonBindable.Value + 2f;
-
-            // 只在值实际改变时更新
-            if (MathF.Abs(sprite.Scale.X - newScale) > 0.001f)
-            {
-                sprite.Scale = new Vector2(newScale, newScale);
-            }
-
-            if (MathF.Abs(sprite.Y - newY) > 0.001f)
-            {
-                sprite.Y = newY;
-            }
+            pressed = keyState?.GetPressed(column.Index) as Bindable<bool>;
         }
 
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
         {
-            if (e.Action == column.Action.Value)
+            if (pressed != null && e.Action == column.Action.Value)
             {
-                upSprite?.FadeTo(0);
-                downSprite?.FadeTo(1);
+                // 取消上一次释放留下的延时回落，避免快速重按时被旧回调熄掉。
+                releaseVersion++;
+                pressed.Value = true;
             }
 
             return false;
@@ -183,11 +56,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         public void OnReleased(KeyBindingReleaseEvent<ManiaAction> e)
         {
-            if (e.Action == column.Action.Value)
+            if (e.Action != column.Action.Value)
+                return;
+
+            // 与旧实现一致：底图延迟一点恢复，按下图先淡出。
+            int version = ++releaseVersion;
+
+            Scheduler.AddDelayed(() =>
             {
-                upSprite?.Delay(LegacyHitExplosion.FADE_IN_DURATION).FadeTo(1);
-                downSprite?.Delay(LegacyHitExplosion.FADE_IN_DURATION).FadeTo(0);
-            }
+                if (pressed != null && version == releaseVersion)
+                    pressed.Value = false;
+            }, LegacyHitExplosion.FADE_IN_DURATION);
         }
     }
 }

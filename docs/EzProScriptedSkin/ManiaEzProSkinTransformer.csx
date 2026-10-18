@@ -212,9 +212,6 @@ public class ManiaEzProSkinTransformer : SkinTransformer
 
                     case ManiaSkinComponents.StageBackground:
                         return new EzStageBottom();
-
-                    case ManiaSkinComponents.StageForeground:
-                        return new EzJudgementLine();
                 }
 
                 break;

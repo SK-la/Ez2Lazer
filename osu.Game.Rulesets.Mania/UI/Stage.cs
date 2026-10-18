@@ -9,6 +9,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Logging;
+using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -35,6 +36,12 @@ namespace osu.Game.Rulesets.Mania.UI
     {
         [Cached]
         public readonly StageDefinition Definition;
+
+        /// <summary>
+        /// 每列按键的按下状态。舞台板上的按键贴图读它，输入仍由各列的 <see cref="EzKeyArea"/> 写入。
+        /// </summary>
+        [Cached]
+        public readonly EzStageKeyState KeyState;
 
         public const float COLUMN_SPACING = 1;
 
@@ -89,6 +96,7 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             this.firstColumnIndex = firstColumnIndex;
             Definition = definition;
+            KeyState = new EzStageKeyState(ManiaPlayfieldLayoutHelper.GetDisplayColumnCount(definition));
 
             Name = "Stage";
 
