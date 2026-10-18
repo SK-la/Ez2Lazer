@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -65,6 +66,27 @@ namespace osu.Game.EzOsuGame
         /// </summary>
         public const float DEFAULT_KEY_PRESS_FPS = 3.75f;
 
+        /// <summary>
+        /// 按键位置，键为键数（"4"、"5"…）。
+        /// </summary>
+        /// <remarks>
+        /// 整幅画布型美术（一张图里已按列画好）在 prefab 里各列 x 都是 0，因此这里也全是 0；
+        /// 小块平铺型则记录每列中心。两种形态都靠这一组坐标定位，绘制时不再按列宽二次缩放。
+        /// </remarks>
+        [JsonPropertyName("keys")]
+        public Dictionary<string, List<EzStagePlateKey>>? Keys { get; set; }
+
+        /// <summary>
+        /// 某键数的按键槽位；未声明时返回 <c>null</c>。
+        /// </summary>
+        public IReadOnlyList<EzStagePlateKey>? GetKeys(int keyMode)
+        {
+            if (Keys == null || !Keys.TryGetValue(keyMode.ToString(CultureInfo.InvariantCulture), out List<EzStagePlateKey>? keys))
+                return null;
+
+            return keys.Count > 0 ? keys : null;
+        }
+
         public static EzStagePlateLayout? TryLoad(EzResourceStore resource, string stageName)
         {
             using (Stream? stream = resource.GetEzResourceStream($"Stage/{stageName}/Stage/layout.json"))
@@ -115,6 +137,34 @@ namespace osu.Game.EzOsuGame
         public double FrameMs { get; set; }
 
         public double FrameLength => FrameMs > 0 ? FrameMs : 66;
+    }
+
+    /// <summary>
+    /// 一列的按键槽位。坐标与其它 stage 组件同一套（Unity X，绘制时取反）。
+    /// </summary>
+    internal sealed class EzStagePlateKey
+    {
+        [JsonPropertyName("x")]
+        public float X { get; set; }
+
+        [JsonPropertyName("y")]
+        public float Y { get; set; }
+
+        /// <summary>
+        /// 该列的底图名前缀（不含扩展名与帧序号），如 <c>1KeyBase</c>。
+        /// </summary>
+        /// <remarks>
+        /// 不记录帧序号：同一列的 <c>{前缀}_0</c>、<c>{前缀}_1</c>… 由取图逻辑按前缀试探补齐，
+        /// 因此增删帧、改帧序号宽度都不需要改 layout。
+        /// </remarks>
+        [JsonPropertyName("base")]
+        public string? Base { get; set; }
+
+        /// <summary>
+        /// 该列的按下图文件名，规则同 <see cref="Base"/>。
+        /// </summary>
+        [JsonPropertyName("press")]
+        public string? Press { get; set; }
     }
 
     internal sealed class EzStagePlateMeter

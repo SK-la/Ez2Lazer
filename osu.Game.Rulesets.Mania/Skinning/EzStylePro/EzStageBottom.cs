@@ -4,8 +4,7 @@
 using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.ObjectExtensions;
-using osu.Framework.Graphics;
+using osu.Framework.Extensions.ObjectExtensions;using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Layout;
 using osu.Game.Beatmaps;
@@ -30,6 +29,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private Bindable<string> stageName = null!;
         private Bindable<string> judgementLineName = null!;
+
+        [Resolved(CanBeNull = true)]
+        private EzStageKeyState? keyState { get; set; }
         private ISkinSource skinSource = null!;
         private int columnCount;
 
@@ -105,7 +107,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private void OnSkinChanged()
         {
             sprite.Clear();
-            sprite.Add(factory.CreateStage(columnCount));
+            sprite.Add(factory.CreateStage(columnCount, keyState));
             updatePosition();
         }
 

@@ -367,6 +367,14 @@ namespace osu.Game.EzOsuGame
 
         public Container CreateStage(int columnCount)
         {
+            return CreateStage(columnCount, null);
+        }
+
+        /// <summary>
+        /// 构造舞台板。<paramref name="keyState"/> 为每列的按下状态，用于驱动按键贴图。
+        /// </summary>
+        public Container CreateStage(int columnCount, EzStageKeyState? keyState)
+        {
             // 舞台板的 (0, 0) 是判定线：EzStageAnchorContainer 保持零尺寸，子项沿用 layout 的绝对坐标，
             // 外层把这个原点放到游戏判定线位置再缩放，因此列宽与画布缩放都不会移动判定线。
             var container = new EzStageAnchorContainer
@@ -417,6 +425,8 @@ namespace osu.Game.EzOsuGame
             addPlateCounter(container, layout.Score, EzStagePlateCounter.Source.Score);
             addPlateCounter(container, layout.Combo, EzStagePlateCounter.Source.MaxCombo);
 
+            mountKeys(container, layout, keyFolder, basePath, columnCount, keyState);
+
             if (layout.Character != null)
             {
                 bool placed = false;
@@ -434,6 +444,181 @@ namespace osu.Game.EzOsuGame
             mountJudgementLine(container, layout.JudgementLine, basePath, bodySize);
 
             return container;
+        }
+
+        /// <summary>
+        /// 挂按键贴图。位置与文件名全部来自 stage layout；该键数没有声明时整层不画，
+        /// 因此缺美术的回退组合不会画到错误的位置上。
+        /// </summary>
+        private void mountKeys(Container plate, EzStagePlateLayout layout, string? keyFolder, string basePath, int columnCount, EzStageKeyState? keyState)
+        {
+            IReadOnlyList<EzStagePlateKey>? keys = layout.GetKeys(columnCount);
+
+            if (keys == null || keyFolder == null)
+                return;
+
+            var bases = new List<Drawable?>(keys.Count);
+            var presses = new List<Drawable?>(keys.Count);
+            var pressed = new List<IBindable<bool>?>(keys.Count);
+
+            // 键图目录名与 Body 相同（_8key），文件直接放在 keybase / keypress 下。
+            for (int i = 0; i < keys.Count; i++)
+            {
+                EzStagePlateKey key = keys[i];
+                var position = EzStagePlateSprite.ToOsu(key.X, key.Y);
+
+                bases.Add(createKeyDrawable(basePath, keyFolder, "keybase", key.Base, position));
+                presses.Add(createKeyDrawable(basePath, keyFolder, "keypress", key.Press, position));
+                pressed.Add(keyState?.GetPressed(i));
+            }
+
+            plate.Add(new EzStageKeyLayer(bases, presses, pressed));
+        }
+
+        // 文件名由 layout 给出，且只是前缀：帧序号不在数据里，按前缀把该列所有帧一起取出来。
+        // 先查该键数自己的目录；派生排列（7/9/10 复用 5 张图）的时候源图在别的目录，再逐个回退。
+        private Drawable? createKeyDrawable(string basePath, string? keyFolder, string folder, string? stem, Vector2 position)
+        {
+            if (string.IsNullOrWhiteSpace(stem))
+                return null;
+
+            List<Texture> frames = loadKeyFrames(basePath, keyFolder, folder, keyPrefixOf(stem.Trim()));
+
+            if (frames.Count == 0)
+                return null;
+
+            // 键图按源图像素绘制：纹理池按 @2x 处理（scaleAdjust=2），只对舞台板贴图合适；
+            // 键图是 1x 资源，必须还原这一半，否则会变成半大小。旧 EzKeyArea 的 ×2 就是干这个的。
+            Vector2 size = frames[0].DisplaySize * frames[0].ScaleAdjust;
+
+            Drawable drawable;
+
+            if (frames.Count == 1)
+            {
+                drawable = new Sprite
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Position = position,
+                    Size = size,
+                    Texture = frames[0],
+                };
+            }
+            else
+            {
+                var animation = new TextureAnimation
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    RelativeSizeAxes = Axes.None,
+                    Position = position,
+                    Size = size,
+                    Loop = true,
+                    DefaultFrameLength = keyFrameLength,
+                };
+
+                animation.AddFrames(frames);
+                drawable = animation;
+            }
+
+            return drawable;
+        }
+
+        private double keyFrameLength => 1000.0 / StageKeyPressFps;
+
+        // 去掉结尾的帧序号，得到这一列帧序列的公共前缀。layout 只存前缀，这里兼容早期带序号的数据。
+        private static string keyPrefixOf(string stem)
+        {
+            int end = stem.Length;
+
+            while (end > 0 && char.IsAsciiDigit(stem[end - 1]))
+                end--;
+
+            if (end == stem.Length || end == 0)
+                return stem;
+
+            char separator = stem[end - 1];
+
+            return separator is '_' or '-' ? stem[..(end - 1)] : stem;
+        }
+
+        // 先查该键数的目录，再逐个看其它键数目录；帧序列按序号排序后交给 store 加载。
+        private List<Texture> loadKeyFrames(string basePath, string? keyFolder, string folder, string prefix)
+        {
+            if (keyFolder != null)
+            {
+                List<Texture> preferred = resource.LoadStageFramesFromKeys(resolveKeyFrameKeys($"{basePath}/{keyFolder}/{folder}", prefix));
+
+                if (preferred.Count > 0)
+                    return preferred;
+            }
+
+            foreach (string candidate in resource.ListSubdirectories(basePath))
+            {
+                if (candidate == keyFolder || !candidate.EndsWith("key", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                List<Texture> frames = resource.LoadStageFramesFromKeys(resolveKeyFrameKeys($"{basePath}/{candidate}/{folder}", prefix));
+
+                if (frames.Count > 0)
+                    return frames;
+            }
+
+            return new List<Texture>();
+        }
+
+        // 目录里的实际帧：前缀相同、后接 _ 或 - 与数字的文件，按数字升序。
+        private IReadOnlyList<string> resolveKeyFrameKeys(string directory, string prefix)
+        {
+            var matches = new List<(int Index, string Key)>();
+
+            foreach (string key in resource.ListImageKeys(directory))
+            {
+                string stem = EzResourcePath.Stem(EzResourcePath.FileName(key));
+
+                if (!tryGetFrameIndex(stem, prefix, out int index))
+                    continue;
+
+                matches.Add((index, key));
+            }
+
+            if (matches.Count == 0)
+                return Array.Empty<string>();
+
+            matches.Sort((a, b) => a.Index.CompareTo(b.Index));
+
+            string[] keys = new string[matches.Count];
+
+            for (int i = 0; i < matches.Count; i++)
+                keys[i] = matches[i].Key;
+
+            return keys;
+        }
+
+        private static bool tryGetFrameIndex(string stem, string prefix, out int index)
+        {
+            index = 0;
+
+            if (stem.Equals(prefix, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (stem.Length <= prefix.Length + 1 || !stem.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            char separator = stem[prefix.Length];
+
+            if (separator is not ('_' or '-'))
+                return false;
+
+            ReadOnlySpan<char> digits = stem.AsSpan(prefix.Length + 1);
+
+            foreach (char c in digits)
+            {
+                if (!char.IsAsciiDigit(c))
+                    return false;
+            }
+
+            return int.TryParse(digits, out index);
         }
 
         /// <summary>

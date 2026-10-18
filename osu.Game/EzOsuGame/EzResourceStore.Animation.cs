@@ -143,6 +143,34 @@ namespace osu.Game.EzOsuGame
             return frames;
         }
 
+        /// <summary>
+        /// 按已解析好的取像键加载帧：多帧走 <see cref="EzTextureUsage.AnimationSafe"/>，
+        /// 单帧走 <see cref="EzTextureUsage.Large"/>（单图不能进 AnimationSafe 池被当帧释放）。
+        /// </summary>
+        public List<Texture> LoadStageFramesFromKeys(IReadOnlyList<string> keys)
+        {
+            if (keys.Count == 0)
+                return new List<Texture>();
+
+            if (keys.Count == 1)
+            {
+                Texture? single = Get(keys[0], EzTextureUsage.Large);
+                return single != null ? new List<Texture>(1) { single } : new List<Texture>();
+            }
+
+            var frames = new List<Texture>(keys.Count);
+
+            foreach (string key in keys)
+            {
+                Texture? texture = Get(key, EzTextureUsage.AnimationSafe);
+
+                if (texture != null)
+                    frames.Add(texture);
+            }
+
+            return frames;
+        }
+
         #endregion
 
         #region 层1 内部查询
