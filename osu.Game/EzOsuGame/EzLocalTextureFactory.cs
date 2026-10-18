@@ -544,6 +544,19 @@ namespace osu.Game.EzOsuGame
         }
 
         /// <summary>
+        /// 当前舞台的按键动画帧率（keybase 与 keypress 共用），由 stage layout 的 <c>keyPressFps</c> 声明；
+        /// 未声明或非正数时为 <see cref="EzStagePlateLayout.DEFAULT_KEY_PRESS_FPS"/>（与旧固定帧长等价）。
+        /// </summary>
+        public float StageKeyPressFps
+        {
+            get
+            {
+                float fps = getPlateLayout()?.KeyPressFps ?? 0;
+                return fps > 0 ? fps : EzStagePlateLayout.DEFAULT_KEY_PRESS_FPS;
+            }
+        }
+
+        /// <summary>
         /// 当前舞台的设计宽度，由 stage layout 声明；未声明或非法时为 <see cref="EzStagePlacement.DEFAULT_DESIGN_WIDTH"/>。
         /// </summary>
         public float StageDesignWidth
@@ -800,11 +813,20 @@ namespace osu.Game.EzOsuGame
                 Origin = Anchor.TopCentre,
                 RelativeSizeAxes = Axes.None,
                 FillMode = FillMode.Stretch,
-                DefaultFrameLength = default_frame_length * 4,
+                DefaultFrameLength = getStageKeyFrameLength(component),
             };
             animation.AddFrames(frames);
 
             return animation;
+        }
+
+        // keybase / keypress 的帧长由 stage layout 的 keyPressFps 决定，两者共用同一速率。
+        private double getStageKeyFrameLength(string component)
+        {
+            if (component != "KeyPress" && component != "KeyBase")
+                return default_frame_length * 4;
+
+            return 1000.0 / StageKeyPressFps;
         }
 
         // keybase/keypress 四条路径的尝试与「累计为空才吃单图」属皮肤编排，留在工厂；单条路径的帧解析交给层2。

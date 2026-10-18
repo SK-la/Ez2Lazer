@@ -53,6 +53,18 @@ namespace osu.Game.EzOsuGame
         [JsonPropertyName("designWidth")]
         public float DesignWidth { get; set; } = EzStagePlacement.DEFAULT_DESIGN_WIDTH;
 
+        /// <summary>
+        /// 按键动画（keybase 与 keypress）的播放帧率。缺省或非正数时用
+        /// <see cref="DEFAULT_KEY_PRESS_FPS"/>，与旧固定帧长一致。
+        /// </summary>
+        [JsonPropertyName("keyPressFps")]
+        public float KeyPressFps { get; set; }
+
+        /// <summary>
+        /// 旧实现给按键动画的固定帧长是 <c>1000 / 60 * 4 * 4</c> 毫秒，换算成 3.75 FPS。
+        /// </summary>
+        public const float DEFAULT_KEY_PRESS_FPS = 3.75f;
+
         public static EzStagePlateLayout? TryLoad(EzResourceStore resource, string stageName)
         {
             using (Stream? stream = resource.GetEzResourceStream($"Stage/{stageName}/Stage/layout.json"))
