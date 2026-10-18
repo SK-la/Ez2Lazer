@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -10,6 +11,8 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -172,6 +175,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
         // Registers a `StageDefinition`, `ManiaBeatmap` and `Column` so hit-object drawables resolve correctly.
         internal sealed partial class PreviewDependencyContainer : Container
         {
+            // Matches FastNoteBase.UnitHeight: DrawWidth * 0.5f * scale.
+            private const float fast_note_unit_height_factor = 0.5f;
+
             private readonly Container content;
             protected override Container<Drawable> Content => content;
 
@@ -180,11 +186,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             private readonly Column columnDependency;
             private readonly PreviewGameplayClock gameplayClockDependency = new PreviewGameplayClock();
             private readonly ManualClock previewClock = new ManualClock();
+            private readonly EzSkinEditorNotePreviewRequest? previewRequest;
 
-            public PreviewDependencyContainer(int keyCount, int column, ManiaAction action, bool isSpecial = false)
+            [Resolved(CanBeNull = true)]
+            private Ez2ConfigManager? ezConfig { get; set; }
+
+            public PreviewDependencyContainer(int keyCount, int column, ManiaAction action, bool isSpecial = false, EzSkinEditorNotePreviewRequest? previewRequest = null)
             {
                 RelativeSizeAxes = Axes.Both;
                 Clock = new FramedClock(previewClock);
+
+                this.previewRequest = previewRequest;
 
                 stageDefinition = new StageDefinition(keyCount);
                 beatmapDependency = new ManiaBeatmap(stageDefinition);
@@ -219,7 +231,37 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
                 dependencies.CacheAs(beatmapDependency);
                 dependencies.Cache(columnDependency);
                 dependencies.CacheAs<IBindable<ManiaAction>>(columnDependency.Action);
+
+                // Note skins derive their height from the column width times this scale. Give the preview a scoped copy so
+                // the drawn note follows the request instead of the live config (the shared bindables stay untouched).
+                if (previewRequest is { } request && ezConfig != null)
+                {
+                    var skinInfo = new EzSkinInfo(ezConfig);
+
+                    if (request.Width > 0)
+                        skinInfo.NoteHeightScaleToWidth.Value = request.Height / (request.Width * fast_note_unit_height_factor);
+
+                    dependencies.CacheAs<IEzSkinInfo>(skinInfo);
+                }
+
                 return dependencies;
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+
+                if (previewRequest is not { } request)
+                    return;
+
+                // Replace the preview column's shared note bindables with request-scoped copies. Only this throwaway column
+                // is affected, and the column's own listeners are not needed for a static preview.
+                columnDependency.EzNoteSizeBindable = new Bindable<Vector2>(new Vector2((float)request.Width, (float)request.Height));
+                columnDependency.ColorSettingsEnabledBindable = new Bindable<bool>(true);
+                columnDependency.EzNoteColourBindable = new Bindable<Colour4>(request.NoteColour);
+
+                if (request.UseEzNoteVariants && Enum.TryParse(request.VariantId, out EzColumnType type))
+                    columnDependency.EzNoteTypeBindable = new Bindable<EzColumnType>(type);
             }
 
             protected override void Update()

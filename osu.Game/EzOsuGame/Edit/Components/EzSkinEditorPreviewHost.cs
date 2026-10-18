@@ -14,6 +14,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// <summary>
     /// Hosts the virtual playback scene. With comparison enabled (size scene),
     /// playback is on the left and Note/LN static preview is on the right.
+    /// Children are reused when a refresh does not change what they are built from, so setting changes stay cheap.
     /// </summary>
     public partial class EzSkinEditorPreviewHost : Container
     {
@@ -21,6 +22,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private Container playbackContainer = null!;
         private Container comparisonContainer = null!;
+
+        private string? playbackToken;
+        private object? playbackSource;
+        private EzSkinEditorNoteComparisonHost? comparisonHost;
 
         public EzSkinEditorPreviewHost(EzSkinEditorSceneContext context)
         {
@@ -80,6 +85,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             if (context.AllowBeatmapPreview && context.PreviewSource == EzSkinEditorPreviewSource.Beatmap)
             {
+                if (!shouldRebuildPlayback("beatmap", context.PreviewBeatmap))
+                    return;
+
                 playbackContainer.Child = new EzSkinEditorBeatmapPreviewHost(context).With(d =>
                 {
                     d.RelativeSizeAxes = Axes.Both;
@@ -89,30 +97,64 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (context.VirtualPreviewKeyCount <= 0)
             {
+                if (!shouldRebuildPlayback("none", null))
+                    return;
+
                 playbackContainer.Child = createPlaceholder(EzEditorStrings.SELECT_KEY_MODE_FIRST);
                 return;
             }
 
             if (context.Provider != null)
             {
+                // Provider factories hand out a fresh instance per resolve and hold no state, so only the type and key count identify the playfield.
+                if (!shouldRebuildPlayback($"virtual:{context.Provider.GetType().FullName}:{context.VirtualPreviewKeyCount}", null))
+                    return;
+
                 playbackContainer.Child = context.Provider.CreateDynamicPart(context.EditorSkin, context.VirtualPreviewKeyCount)
                     .With(d => d.RelativeSizeAxes = Axes.Both);
+                return;
             }
-            else
-            {
-                playbackContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_VIRTUAL_PLAYFIELD_NOT_SUPPORTED);
-            }
+
+            if (!shouldRebuildPlayback("unsupported", null))
+                return;
+
+            playbackContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_VIRTUAL_PLAYFIELD_NOT_SUPPORTED);
+        }
+
+        /// <summary>
+        /// Playback is rebuilt only when what it is built from changes. Setting changes reach the playfield through its own
+        /// bindables, so recreating it per tick would only add allocation and layout churn.
+        /// </summary>
+        private bool shouldRebuildPlayback(string token, object? source)
+        {
+            if (playbackToken == token && ReferenceEquals(playbackSource, source))
+                return false;
+
+            playbackToken = token;
+            playbackSource = source;
+            return true;
         }
 
         private void populateComparison()
         {
             if (context.NoteComparisonSource == null)
             {
-                comparisonContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_COMPARISON_NOT_SUPPORTED);
+                comparisonHost = null;
+
+                if (comparisonContainer.Child is not OsuSpriteText)
+                    comparisonContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_COMPARISON_NOT_SUPPORTED);
+
                 return;
             }
 
-            comparisonContainer.Child = new EzSkinEditorNoteComparisonHost(context);
+            if (comparisonHost != null && comparisonContainer.Child == comparisonHost)
+            {
+                comparisonHost.UpdateContext(context);
+                return;
+            }
+
+            comparisonHost = new EzSkinEditorNoteComparisonHost(context);
+            comparisonContainer.Child = comparisonHost;
         }
 
         private static OsuSpriteText createPlaceholder(LocalisableString text) => new OsuSpriteText

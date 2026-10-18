@@ -2,13 +2,11 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.UI;
-using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
@@ -23,10 +21,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         protected EzLocalTextureFactory Factory { get; private set; } = null!;
 
-        private IBindable<bool> enabledColorBindable = null!;
-        private IBindable<Colour4> noteColourBindable = null!;
-        private IBindable<Vector2> noteSizeBindable = null!;
-        private IBindable<EzColumnType> noteTypeBindable = null!;
+        // Read through the column instead of caching the shared bindables: a drawable that stores a shared bindable in a field
+        // would unbind it from everyone else when disposed (see Drawable.UnbindAllBindables).
+        private bool ColorizationEnabled => Column.ColorSettingsEnabledBindable.Value;
+
+        private Colour4 ColumnNoteColour => Column.EzNoteColourBindable.Value;
+
+        private EzColumnType ColumnNoteType => Column.EzNoteTypeBindable.Value;
 
         protected Container MainContainer { get; private set; } = null!;
         private Container? lineContainer;
@@ -42,12 +43,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             };
             AddInternal(MainContainer); //允许多个子元素
 
-            noteTypeBindable = Column.EzNoteTypeBindable;
-            noteSizeBindable = Column.EzNoteSizeBindable;
-
-            enabledColorBindable = Column.ColorSettingsEnabledBindable;
-            noteColourBindable = Column.EzNoteColourBindable;
-
             if (ShowSeparators) createSeparators();
         }
 
@@ -59,14 +54,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             Scheduler.AddOnce(OnLoadChanged);
         }
 
-        protected float NoteHeight => noteSizeBindable.Value.Y;
+        protected float NoteHeight => Column.EzNoteSizeBindable.Value.Y;
 
         protected Colour4 NoteColor
         {
             get
             {
-                if (enabledColorBindable.Value && UseColorization && !Column.ConfigTimingBasedNoteColouring)
-                    return noteColourBindable.Value;
+                if (ColorizationEnabled && UseColorization && !Column.ConfigTimingBasedNoteColouring)
+                    return ColumnNoteColour;
 
                 return Colour4.White;
             }
@@ -80,9 +75,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             get
             {
-                if ((enabledColorBindable.Value && UseColorization) || !UseColorization || Column.ConfigTimingBasedNoteColouring) return "white";
+                if ((ColorizationEnabled && UseColorization) || !UseColorization || Column.ConfigTimingBasedNoteColouring) return "white";
 
-                return noteTypeBindable.Value switch
+                return ColumnNoteType switch
                 {
                     EzColumnType.A => "white",
                     EzColumnType.B => "blue",
@@ -104,7 +99,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected void OnLoadChanged()
         {
-            if (!IsLoaded)
+            // Stale instances can still be reached by global config subscriptions after they leave the scene graph.
+            if (!IsAlive || IsDisposed)
                 return;
 
             MainContainer.Clear();

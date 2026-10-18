@@ -107,6 +107,7 @@ namespace osu.Game.EzOsuGame.Edit
         private bool noteSnapshotInitialized;
         private Guid noteSnapshotSkinId;
         private bool configPreviewRefreshBound;
+        private bool previewRefreshScheduled;
 
         /// <summary>
         /// 框架把 <c>GetBindable</c> 返回的绑定副本只登记为 WeakReference；副本若无强引用会被 GC 回收，订阅会静默失效。
@@ -511,7 +512,7 @@ namespace osu.Game.EzOsuGame.Edit
                 SkinJsonSession = SkinJsonSession,
                 PreviewState = PreviewState,
                 RequestSceneRefresh = refreshScene,
-                RequestPreviewRefresh = () => Schedule(refreshPreviewContent),
+                RequestPreviewRefresh = requestPreviewRefresh,
                 CommitSkinIni = commitSkinIni,
                 AllowBeatmapPreview = allowBeatmapPreview,
                 UseVirtualComparisonPreview = useVirtualComparisonPreview,
@@ -1176,9 +1177,27 @@ namespace osu.Game.EzOsuGame.Edit
             // 绑定副本必须由本屏幕持有：框架只登记 WeakReference，副本被 GC 回收后订阅会静默失效。
             foreach (var setting in EzSkinJsonSettingCatalog.All)
             {
-                if (EzSkinJsonBridge.BindSettingValueChanged(ezSkinConfig, setting, () => Schedule(refreshPreviewContent)) is IBindable bindable)
+                if (EzSkinJsonBridge.BindSettingValueChanged(ezSkinConfig, setting, requestPreviewRefresh) is IBindable bindable)
                     retainedBindingCopies.Add(bindable);
             }
+        }
+
+        /// <summary>
+        /// Coalesces repeated preview refresh requests within a frame. Dragging a slider produces one change per tick;
+        /// rebuilding the scene tree for each of them is both wasteful and unbounded under snapshot comparison.
+        /// </summary>
+        private void requestPreviewRefresh()
+        {
+            if (previewRefreshScheduled)
+                return;
+
+            previewRefreshScheduled = true;
+
+            Schedule(() =>
+            {
+                previewRefreshScheduled = false;
+                refreshPreviewContent();
+            });
         }
 
         private void refreshPreviewContent()

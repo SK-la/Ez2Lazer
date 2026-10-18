@@ -1,7 +1,10 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using System.Collections.Generic;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
@@ -14,6 +17,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 {
     /// <summary>
     /// Shared live vs snapshot note comparison for Note and Size scenes. Each side shows Note and LN together.
+    /// Panes are reused across refresh so a single setting change only touches the drawables it actually has to.
     /// </summary>
     public partial class EzSkinEditorNoteComparisonHost : Container
     {
@@ -23,6 +27,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private Container snapshotContainer = null!;
         private EzSkinEditorNoteComparisonPane? livePane;
         private EzSkinEditorNoteComparisonPane? snapshotPane;
+
+        // The note edit session outlives scene switches, so bindings must be owned (and released) here.
+        private readonly List<IUnbindable> sessionBindings = new List<IUnbindable>();
 
         public EzSkinEditorNoteComparisonHost(EzSkinEditorSceneContext context)
         {
@@ -61,11 +68,33 @@ namespace osu.Game.EzOsuGame.Edit.Components
             if (context.NoteSession == null)
                 return;
 
-            context.NoteSession.VariantId.BindValueChanged(_ => refreshLivePane(), false);
-            context.NoteSession.Ruleset.BindValueChanged(_ => refreshLivePane(), false);
-            context.NoteSession.NoteColour.BindValueChanged(_ => applyLiveLayout(), false);
-            context.NoteSession.Width.BindValueChanged(_ => applyLiveLayout(), false);
-            context.NoteSession.Height.BindValueChanged(_ => applyLiveLayout(), false);
+            var session = context.NoteSession;
+
+            bindSession(session.VariantId, () => refreshLivePane());
+            bindSession(session.Ruleset, () => refreshLivePane());
+            bindSession(session.NoteColour, () => applyLiveLayout());
+            bindSession(session.Width, () => applyLiveLayout());
+            bindSession(session.Height, () => applyLiveLayout());
+        }
+
+        private void bindSession<T>(Bindable<T> source, Action onChanged)
+        {
+            var copy = source.GetBoundCopy();
+            copy.BindValueChanged(_ => onChanged());
+            sessionBindings.Add(copy);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                foreach (var binding in sessionBindings)
+                    binding.UnbindAll();
+
+                sessionBindings.Clear();
+            }
+
+            base.Dispose(isDisposing);
         }
 
         public void UpdateContext(EzSkinEditorSceneContext newContext)
@@ -88,7 +117,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (source == null)
             {
-                liveContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_NOTE_PREVIEW_NOT_AVAILABLE);
+                showPlaceholder(liveContainer, EzEditorStrings.PLACEHOLDER_NOTE_PREVIEW_NOT_AVAILABLE);
                 livePane = null;
                 return;
             }
@@ -97,12 +126,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (profile == null)
             {
-                liveContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_NOTE_RULESET_NOT_SUPPORTED);
+                showPlaceholder(liveContainer, EzEditorStrings.PLACEHOLDER_NOTE_RULESET_NOT_SUPPORTED);
                 livePane = null;
                 return;
             }
 
-            livePane = attachPane(liveContainer);
+            livePane = getOrCreatePane(liveContainer, livePane);
             livePane.Apply(context.EditorSkin, profile, source.GetLiveRequest);
         }
 
@@ -112,7 +141,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (source == null)
             {
-                snapshotContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_NOTE_PREVIEW_NOT_AVAILABLE);
+                showPlaceholder(snapshotContainer, EzEditorStrings.PLACEHOLDER_NOTE_PREVIEW_NOT_AVAILABLE);
                 snapshotPane = null;
                 return;
             }
@@ -121,12 +150,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (profile == null)
             {
-                snapshotContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_NOTE_RULESET_NOT_SUPPORTED);
+                showPlaceholder(snapshotContainer, EzEditorStrings.PLACEHOLDER_NOTE_RULESET_NOT_SUPPORTED);
                 snapshotPane = null;
                 return;
             }
 
-            snapshotPane = attachPane(snapshotContainer);
+            snapshotPane = getOrCreatePane(snapshotContainer, snapshotPane);
             snapshotPane.Apply(context.EditorSkin, profile, source.GetSnapshotRequest);
         }
 
@@ -143,11 +172,22 @@ namespace osu.Game.EzOsuGame.Edit.Components
             livePane.Apply(context.EditorSkin, profile, context.NoteComparisonSource.GetLiveRequest);
         }
 
-        private static EzSkinEditorNoteComparisonPane attachPane(Container container)
+        private static EzSkinEditorNoteComparisonPane getOrCreatePane(Container container, EzSkinEditorNoteComparisonPane? current)
         {
+            if (current != null && container.Child == current)
+                return current;
+
             var pane = new EzSkinEditorNoteComparisonPane();
             container.Child = pane;
             return pane;
+        }
+
+        private static void showPlaceholder(Container container, LocalisableString text)
+        {
+            if (container.Child is OsuSpriteText sprite && sprite.Text.Equals(text))
+                return;
+
+            container.Child = createPlaceholder(text);
         }
 
         private static OsuSpriteText createPlaceholder(LocalisableString text) => new OsuSpriteText

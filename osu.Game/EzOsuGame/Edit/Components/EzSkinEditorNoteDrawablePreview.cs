@@ -94,7 +94,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
             foreach (var edge in hitboxBorderEdges)
                 edge.Colour = request.NoteColour;
 
-            string drawableKey = $"{request.CompareKind}:{request.UseEzNoteVariants}:{request.VariantId}:{request.Part}:{request.Width:F2}:{request.Height:F2}";
+            // Skin type, ruleset and every value baked into the note drawable (size, colour, variant) participate in the
+            // key: the ruleset preview reads these once at build time, so a changed value has to rebuild the pane.
+            string drawableKey = $"{request.CompareKind}:{request.UseEzNoteVariants}:{request.VariantId}:{request.Part}:{request.Width:F2}:{request.Height:F2}:{request.NoteColour.ToHex()}"
+                                 + $":{request.Ruleset?.OnlineID ?? -1}:{pendingSkin.GetType().Name}";
 
             if (drawableKey == loadedDrawableKey)
                 return;

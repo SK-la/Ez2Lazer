@@ -18,9 +18,9 @@ using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Localisation;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Settings;
-using osu.Game.Localisation;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.EzMania.Editor;
 using osu.Game.Rulesets.Mania.UI;
@@ -147,6 +147,61 @@ namespace osu.Game.Tests.Visual.Edit
                        && comparisonHost != null
                        && comparisonHost.ScreenSpaceDrawQuad.Centre.X > preview.ScreenSpaceDrawQuad.Centre.X;
             });
+        }
+
+        [Test]
+        public void TestSizeSceneColumnWidthChangeKeepsSnapshotBaseline()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Size);
+
+            AddUntilStep("two comparison panes", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>().Count() == 2);
+
+            double baselineWidth = 0;
+            AddStep("read snapshot baseline", () => baselineWidth = editorScreen.ComparisonSnapshotForTesting.NotePreviewWidth);
+
+            EzSkinEditorNoteComparisonPane[] panes = null!;
+            AddStep("capture panes", () => panes = editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>().ToArray());
+
+            double originalWidth = 0;
+            double targetWidth = 0;
+
+            AddStep("drag column width", () =>
+            {
+                originalWidth = ezConfig.Get<double>(Ez2Setting.ColumnWidth);
+                targetWidth = originalWidth + 25;
+                ezConfig.GetBindable<double>(Ez2Setting.ColumnWidth).Value = targetWidth;
+            });
+
+            AddUntilStep("live value kept", () => ezConfig.Get<double>(Ez2Setting.ColumnWidth) == targetWidth);
+            AddWaitStep("allow refresh", 3);
+
+            AddAssert("snapshot baseline unchanged", () => editorScreen.ComparisonSnapshotForTesting.NotePreviewWidth == baselineWidth);
+            AddAssert("panes reused", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>().ToArray(), () => Is.EquivalentTo(panes));
+
+            AddStep("restore column width", () => ezConfig.GetBindable<double>(Ez2Setting.ColumnWidth).Value = originalWidth);
+        }
+
+        [Test]
+        public void TestSizeScenePseudoTailToggleDoesNotThrow()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Size);
+
+            AddUntilStep("two comparison panes", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>().Count() == 2);
+
+            var gradient = ezConfig.GetBindable<bool>(Ez2Setting.ManiaLNGradientEnable);
+            bool original = gradient.Value;
+
+            for (int i = 0; i < 6; i++)
+                AddStep($"toggle pseudo tail #{i}", () => gradient.Value = !gradient.Value);
+
+            AddWaitStep("let preview settle", 3);
+
+            AddUntilStep("comparison panes still present", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>().Count() == 2);
+            AddStep("restore pseudo tail", () => gradient.Value = original);
         }
 
         [Test]
