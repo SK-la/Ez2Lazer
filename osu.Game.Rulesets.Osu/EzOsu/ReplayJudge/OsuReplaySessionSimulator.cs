@@ -24,7 +24,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
         // ManiaReplaySessionSimulator.Simulate 头部的 TODO）。
         //
         // std 侧额外约束：stable 语义需要独立仿真谱面副本（EzScoreRacePlayableResolver.GetSessionReady），
-        // 且 BindClassicSemanticsToBeatmap 只能作用于副本，不能碰 live 实例；改造后
+        // 且 OsuStableClassic.BindSemantics 只能作用于副本，不能碰 live 实例；改造后
         // OsuScoreProcessor 的 IStableScoreSource 转发目标换成引擎输出，StableAvailable 恒为 true。
         internal static void Simulate(
             Score score,

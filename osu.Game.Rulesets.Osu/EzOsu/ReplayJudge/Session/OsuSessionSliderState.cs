@@ -9,6 +9,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
+using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Scoring;
 using osuTK;
@@ -30,6 +31,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
         private readonly Dictionary<HitObject, HitResult> results = new Dictionary<HitObject, HitResult>();
 
         private bool tracking;
+        private double? trackingStartTime;
         private OsuAction? headHitAction;
         private double? timeToAcceptAnyKeyAfter;
         private readonly List<OsuAction> lastPressedActions = new List<OsuAction>();
@@ -46,9 +48,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
 
             foreach (var nested in nestedInOrder)
             {
-                double nestedLast = nested is SliderTailCircle
-                    ? nested.StartTime + SliderEventGenerator.TAIL_LENIENCY
-                    : nested.StartTime;
+                double nestedLast = OsuSliderJudgement.NestedDueTime(nested, slider.StartTime, slider.Duration);
 
                 if (nestedLast > last)
                     last = nestedLast;
@@ -106,11 +106,15 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
 
             foreach (var nested in nestedInOrder)
             {
-                yield return nested.StartTime;
+                // 每个评分点的到期时刻都要有一拍：命中与否取决于「到期那一刻」的跟踪状态，
+                // 用之后任意一拍的跟踪状态补判会多给 tick（stable 是逐帧按序消耗评分点）。
+                yield return OsuSliderJudgement.NestedDueTime(nested, slider.StartTime, slider.Duration);
 
-                // Tail 在 StartTime+TAIL_LENIENCY 才开判；无 1ms 密采样时必须显式打点。
-                if (nested is SliderTailCircle)
-                    yield return nested.StartTime + SliderEventGenerator.TAIL_LENIENCY;
+                // 默认轨的尾点宽限要到截止时刻才结算，缺这一拍尾点会悬空。
+                double deadline = OsuSliderJudgement.NestedDeadline(nested, slider.ClassicSliderBehaviour, slider.StartTime, slider.Duration);
+
+                if (deadline > OsuSliderJudgement.NestedDueTime(nested, slider.StartTime, slider.Duration))
+                    yield return deadline;
             }
 
             yield return slider.EndTime;
@@ -148,9 +152,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
             if (!OsuCircleJudgement.IsInHitRadius(position, head.StackedPosition, head.Radius))
                 return null;
 
-            HitResult result = OsuCircleJudgement.MapClassicSliderHeadIfNeeded(
-                OsuCircleJudgement.ResultForPress(head.HitWindows!, time - head.StartTime),
-                head.ClassicSliderBehaviour);
+            HitResult result = OsuCircleJudgement.JudgeSliderHeadPress(head.HitWindows!, time - head.StartTime, head.ClassicSliderBehaviour);
 
             return result == HitResult.None ? null : result;
         }
@@ -177,29 +179,32 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
             if (!isJudged(head) && time >= head.StartTime + headMissWindow)
                 applyHeadMiss(time, apply);
 
-            if (isJudged(head))
+            // stable 逐帧按序消耗评分点：滑条头判没判不影响 tick / tail 的归属，故这里不以头部已判为前提。
+            foreach (var nested in nestedInOrder)
+            {
+                if (isJudged(nested))
+                    continue;
+
+                if (!OsuSliderJudgement.IsNestedDue(nested, time, slider.StartTime, slider.Duration))
+                    continue;
+
+                tryJudgeNestedObject(nested, time, apply);
+            }
+
+            // 兜底：采样缺失时尾部可能一直没落判，此时按未命中结算尾部再算主体，避免整条滑条悬空。
+            if (!sliderBodyJudged && time >= slider.EndTime)
             {
                 foreach (var nested in nestedInOrder)
                 {
                     if (isJudged(nested))
                         continue;
 
-                    if (nested is SliderTailCircle)
-                    {
-                        if (time < nested.StartTime + SliderEventGenerator.TAIL_LENIENCY)
-                            continue;
-                    }
-                    else if (time < nested.StartTime)
-                    {
-                        continue;
-                    }
-
-                    tryJudgeNestedObject(nested, time - nested.StartTime, time, apply);
+                    tryJudgeNestedObject(nested, time, apply);
                 }
-            }
 
-            if (!sliderBodyJudged && isTailJudged() && time >= slider.EndTime)
-                applySliderBodyJudgement(time, apply);
+                if (!sliderBodyJudged)
+                    applySliderBodyJudgement(time, apply);
+            }
         }
 
         private void applyHeadMiss(double judgementTime, JudgementApplier apply)
@@ -216,6 +221,14 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
 
             if (!isMouseInFollowArea(cursorPosition, time, expanded: true))
                 return;
+
+            // classic 档按「评分点到期那一刻的跟踪状态」逐点消费：晚判的滑条头不能回头补判
+            // 已经到期的 tick / repeat / tail。
+            if (slider.ClassicSliderBehaviour)
+            {
+                updateTracking(time, cursorPosition, pressedActions);
+                return;
+            }
 
             bool allTicksInRange = true;
 
@@ -248,18 +261,31 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
             updateTracking(time, cursorPosition, pressedActions, forceValidPosition: allTicksInRange || isMouseInFollowArea(cursorPosition, time, expanded: false));
         }
 
-        private void tryJudgeNestedObject(HitObject nestedObject, double startOffset, double judgementTime, JudgementApplier apply)
+        private void tryJudgeNestedObject(HitObject nestedObject, double judgementTime, JudgementApplier apply)
         {
-            if (!OsuSliderJudgement.CanJudgeNestedAtOffset(nestedObject, startOffset, isJudged, nestedInOrder))
+            if (!OsuSliderJudgement.ArePrerequisitesJudged(nestedObject, isJudged, nestedInOrder))
                 return;
 
-            if (!isJudged(head))
+            // 默认轨沿用 lazer 的「头部已判才给嵌套」语义；classic 档按 stable 逐帧消费评分点，不看头部。
+            if (!slider.ClassicSliderBehaviour && !isJudged(head))
                 return;
 
-            if (tracking)
-                applyNestedForcefully(nestedObject, hit: true, judgementTime, apply);
-            else if (startOffset >= 0)
-                applyNestedForcefully(nestedObject, hit: false, judgementTime, apply);
+            bool hit;
+
+            if (slider.ClassicSliderBehaviour)
+            {
+                hit = StableClassicSliderRules.WasTrackingAtDueTime(
+                    trackingStartTime,
+                    OsuSliderJudgement.NestedDueTime(nestedObject, slider.StartTime, slider.Duration));
+            }
+            else
+                hit = tracking;
+
+            // 默认轨保留 lazer 的尾点宽限：到期时没跟踪也先不落判，等跟踪或等到截止时刻。
+            if (!hit && !OsuSliderJudgement.IsNestedSettled(nestedObject, judgementTime, slider.ClassicSliderBehaviour, slider.StartTime, slider.Duration))
+                return;
+
+            applyNestedForcefully(nestedObject, hit, judgementTime, apply);
         }
 
         private void applyNestedForcefully(HitObject nestedObject, bool hit, double judgementTime, JudgementApplier apply)
@@ -307,17 +333,30 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
 
             bool allJudged = nestedInOrder.All(isJudged) && sliderBodyJudged;
 
+            bool wasTracking = tracking;
+
             tracking = (!allJudged || time <= slider.EndTime)
                        && isValidTrackingPosition
                        && validTrackingAction;
+
+            if (tracking && !wasTracking)
+                trackingStartTime = time;
+            else if (!tracking)
+                trackingStartTime = null;
         }
 
         private bool isValidTrackingAction(OsuAction action, double time)
         {
+            if (action != OsuAction.LeftButton && action != OsuAction.RightButton)
+                return false;
+
+            if (slider.ClassicSliderBehaviour)
+                return StableClassicSliderRules.AcceptsAnyTrackingKey(action);
+
             if (headHitAction.HasValue && (!timeToAcceptAnyKeyAfter.HasValue || time <= timeToAcceptAnyKeyAfter.Value))
                 return action == headHitAction;
 
-            return action is OsuAction.LeftButton or OsuAction.RightButton;
+            return true;
         }
 
         private bool isMouseInFollowArea(Vector2 cursorPosition, double time, bool expanded)
@@ -340,12 +379,6 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
                 slider.StartTime,
                 slider.Duration,
                 slider.Radius);
-
-        private bool isTailJudged()
-        {
-            var tail = nestedInOrder.LastOrDefault(o => o is SliderTailCircle);
-            return tail == null || isJudged(tail);
-        }
 
         private bool isJudged(HitObject hitObject) => judged.Contains(hitObject);
 

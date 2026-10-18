@@ -295,32 +295,15 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
             if (userTriggered || !TailCircle.Judged || Time.Current < HitObject.EndTime)
                 return;
 
-            if (HitObject.ClassicSliderBehaviour)
+            ApplyResult(static (r, slider) =>
             {
-                ApplyResult(static (r, drawable) =>
-                {
-                    var slider = (Slider)drawable.HitObject;
-                    r.Type = OsuSliderJudgement.BodyResultFromNestedHits(
-                        slider.ClassicSliderBehaviour,
-                        drawable.NestedHitObjects.Count,
-                        drawable.NestedHitObjects.Count(h => h.IsHit),
-                        r.Judgement.MaxResult,
-                        r.Judgement.MinResult);
-                });
-            }
-            else
-            {
-                ApplyResult(static (r, drawable) =>
-                {
-                    var slider = (Slider)drawable.HitObject;
-                    r.Type = OsuSliderJudgement.BodyResultFromNestedHits(
-                        slider.ClassicSliderBehaviour,
-                        drawable.NestedHitObjects.Count,
-                        drawable.NestedHitObjects.Count(h => h.Result.IsHit),
-                        r.Judgement.MaxResult,
-                        r.Judgement.MinResult);
-                });
-            }
+                r.Type = OsuSliderJudgement.BodyResultFromNestedHits(
+                    slider.HitObject.ClassicSliderBehaviour,
+                    slider.NestedHitObjects.Count,
+                    slider.NestedHitObjects.Count(h => h.IsHit),
+                    r.Judgement.MaxResult,
+                    r.Judgement.MinResult);
+            }, this);
         }
 
         public override void PlaySamples()

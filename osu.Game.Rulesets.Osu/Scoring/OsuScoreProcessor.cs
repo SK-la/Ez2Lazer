@@ -1,14 +1,13 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
 using osu.Game.Rulesets.Osu.Judgements;
 using osu.Game.Rulesets.Replays;
@@ -32,9 +31,14 @@ namespace osu.Game.Rulesets.Osu.Scoring
 
         private EzEnumJudgeMode stdJudgeMode => JudgementTrackOverride ?? EzEnumJudgeMode.Lazer;
 
+        /// <summary>
+        /// 本局冻结的判定轨；未冻结时按 Lazer，与全谱模拟使用同一口径。
+        /// </summary>
+        public EzEnumJudgeMode JudgeMode => stdJudgeMode;
+
         private readonly StableStdScoring stableScoring = new StableStdScoring();
 
-        private bool isStableClassic => stdJudgeMode == EzEnumJudgeMode.StableClassic;
+        private bool isStableClassic => OsuStableClassic.IsActive(stdJudgeMode);
 
         private readonly BindableBool stableAvailable = new BindableBool();
 
@@ -70,7 +74,7 @@ namespace osu.Game.Rulesets.Osu.Scoring
             JudgementTrackOverride ??= GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode);
             refreshStableAvailability();
 
-            if (OsuStableClassicScoring.ShouldUseLegacyScoreAlgorithm(stdJudgeMode))
+            if (OsuStableClassic.IsActive(stdJudgeMode))
                 IsLegacyScore = true;
         }
 
@@ -79,8 +83,9 @@ namespace osu.Game.Rulesets.Osu.Scoring
             refreshStableAvailability();
 
             // 判定窗与 classic 滑条语义必须在全谱模拟（base.ApplyBeatmap 内部的 SimulateAutoplay）前绑定。
-            if (isStableClassic)
-                OsuStableClassicScoring.BindClassicSemanticsToBeatmap(beatmap);
+            // 共享 cache 实例对所有消费者只读：就地绑定会把本档窗口泄漏到其它判定档，故跳过（仿真走按档隔离的副本）。
+            if (isStableClassic && !EzPlayableBeatmapCache.IsSharedInstance(beatmap))
+                OsuStableClassic.BindSemantics(beatmap);
 
             base.ApplyBeatmap(beatmap);
         }
@@ -99,26 +104,7 @@ namespace osu.Game.Rulesets.Osu.Scoring
         /// classic 准确率只认圆圈 / 滑条 / 转盘主体：tick 与 bonus 不占分子也不占分母。
         /// </summary>
         public override int GetBaseScoreForResult(HitResult result)
-        {
-            if (!isStableClassic)
-                return base.GetBaseScoreForResult(result);
-
-            switch (result)
-            {
-                case HitResult.Great:
-                case HitResult.Perfect:
-                    return 300;
-
-                case HitResult.Ok:
-                    return 100;
-
-                case HitResult.Meh:
-                    return 50;
-
-                default:
-                    return 0;
-            }
-        }
+            => isStableClassic ? StableStdScoring.BaseScoreForResult(result) : base.GetBaseScoreForResult(result);
 
         protected override double ComputeTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
@@ -130,9 +116,8 @@ namespace osu.Game.Rulesets.Osu.Scoring
 
         protected override double ComputeTheoreticalPerfectJudgedTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
-            // stable 的乘区次序无法从帧头/进度反推，退化为按已判定比例线性投影到满分。
             if (isStableClassic)
-                return MaximumTotalScore * (double)JudgedHits / Math.Max(1, MaximumJudgements);
+                return StableStdScoring.ProjectPerfectJudged(MaximumTotalScore, JudgedHits, MaximumJudgements);
 
             return base.ComputeTheoreticalPerfectJudgedTotalScore(comboProgress, accuracyProgress, bonusPortion);
         }

@@ -120,7 +120,7 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
             }
         }
 
-        protected override void CheckForResult(bool userTriggered, double timeOffset) => DrawableSlider!.SliderInputManager.TryJudgeNestedObject(this, timeOffset);
+        protected override void CheckForResult(bool userTriggered, double timeOffset) => DrawableSlider!.SliderInputManager.TryJudgeNestedObject(this);
 
         protected override void OnApply()
         {

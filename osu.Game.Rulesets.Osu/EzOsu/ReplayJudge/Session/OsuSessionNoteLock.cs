@@ -9,6 +9,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
+using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
 using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Osu.Scoring;
@@ -38,7 +39,8 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
 
     /// <summary>
     /// 无头 note lock 状态：把谱面按 Drawable 容器语义（顶层物件 + 滑条头这类可阻挡的嵌套圆）整理成
-    /// <see cref="OsuNoteLockEntry"/>，交由 <see cref="OsuNoteLockSelector"/> 求解。
+    /// <see cref="OsuNoteLockEntry"/>，交由 <see cref="OsuNoteLockSelector"/>（lazer）或
+    /// <see cref="StableClassicNoteLock"/>（classic）求解。
     /// </summary>
     /// <remarks>
     /// 判定轨为 <see cref="EzEnumJudgeMode.StableClassic"/>（或带 CL 且未关 classic note lock）时走
@@ -80,7 +82,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
 
         public static OsuSessionNoteLock Create(IBeatmap beatmap, Score score, IGameplayEnvironment environment, CancellationToken cancellationToken)
         {
-            bool useLegacy = environment.JudgeMode == EzEnumJudgeMode.StableClassic;
+            bool useLegacy = OsuStableClassic.IsActive(environment.JudgeMode);
 
             if (!useLegacy && score.ScoreInfo.Mods.OfType<OsuModClassic>().Any(m => m.ClassicNoteLock.Value))
                 useLegacy = true;
@@ -154,7 +156,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
                 return ClickAction.Hit;
 
             // 与 LegacyHitPolicy 同序：先叠堆忽略，再顺序/可达性。
-            ClickAction previousAction = OsuNoteLockSelector.CheckLegacyPrevious(!targetIsNested && index > 0 ? toEntry(topLevel[index - 1]) : null);
+            ClickAction previousAction = StableClassicNoteLock.CheckPrevious(!targetIsNested && index > 0 ? toEntry(topLevel[index - 1]) : null);
 
             if (previousAction != ClickAction.Hit)
                 return previousAction;
@@ -164,7 +166,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
             for (int i = 0; i < index; i++)
                 buffer.Add(toEntry(topLevel[i]));
 
-            return OsuNoteLockSelector.CheckLegacyOrder(buffer, targetStartTime, time, hittableRange);
+            return StableClassicNoteLock.CheckOrder(buffer, targetStartTime, time, hittableRange);
         }
 
         private void build(IBeatmap beatmap, CancellationToken cancellationToken)
