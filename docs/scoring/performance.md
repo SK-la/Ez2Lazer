@@ -70,4 +70,24 @@
 | `BenchmarkManiaLaneHotPath` / `ManiaLaneHotPathMicroBenchTest` | 判定热路径下限（每列 10 / 15 / 20 KPS，无 drawable） |
 | `BenchmarkManiaReplaySession` | 4K 离线 replay；`PerColumnKps` 派生全局间隔，另保留 80 ms 低密度参考组 |
 | `TestSceneManiaHoldDrawCost`（DEBUG） | LN 绘制消融；hold 数与间距按每列 KPS × 驻留派生 |
+| `ManiaDenseScrollAllocTest` | CI 守卫：10 列 × 20 KPS × 700 ms 纯 tap；只断言存活数、池 excess 与每帧分配量级 |
+
+### 标定结果（10 列，DEBUG 场景，固定 1/60 s 模拟步长）
+
+`TestSceneManiaDenseScrollCost.TestCalibrationSweep` 每个配置取 3 次样本，更新耗时取中位数。数值是测试宿主上的 update 帧时，不是 GPU 帧时，只用于同机排序与回归对比。
+
+| 配置 | 存活 | update ms | alloc/frame |
+|------|------|-----------|-------------|
+| 每列 10 KPS × 700 ms | 95 | 1.2 | 89 KiB |
+| 每列 15 KPS × 700 ms | 138 | 1.2 | 124 KiB |
+| 每列 20 KPS × 700 ms | 181 | 3.0 | 115 KiB |
+| 每列 20 KPS × 300 ms | 101 | 1.1 | 102 KiB |
+| 每列 20 KPS × 500 ms | 141 | 1.3 | 131 KiB |
+| 每列 20 KPS × 700 ms，50% hold | 221 | 9.8（4.5 倍） | 353 KiB（2.8 倍） |
+| 4 列 × 20 KPS × 700 ms | 73 | 0.5 | 44 KiB |
+| 16 列 × 20 KPS × 700 ms | 253 | 1.7 | 145 KiB |
+
+- 成本增量排序：hold/LN > 皮肤组件（Ez2 / EzPro 约为 Triangles 的 1.3–2 倍）> 列数 / 密度 > 池扩张（全部配置 excess = 0，只有预热期扩容）。
+- `ColumnWatcher` 订阅与 Ez2/EzPro 每帧布局写入在 Ez2 皮肤下关闭后，update 与分配都落在相邻基线的抖动区间内，没有可归因收益；皮肤订阅框架不列为当前优先项。
+- 每列 20 KPS × 700 ms 的 10 列池会从初始 10 扩到约 19/列后复用；`DrawableNote` 池 190 个，仍低于每列上限 50。
 
