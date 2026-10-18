@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Input;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Timing;
@@ -169,7 +170,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.Judgement.Live
             if (inputManager == null)
                 return 0;
 
-            return EzSubFrameCorrection.GetCorrectionMs(osu.Framework.Input.InputManager.EzSubFrameTimestamp, rate);
+            return EzSubFrameCorrection.GetCorrectionMs(InputManager.EzSubFrameTimestamp, rate);
         }
 
         private void syncSpinners(double time)
@@ -242,8 +243,10 @@ namespace osu.Game.Rulesets.Osu.EzOsu.Judgement.Live
             if (kernel != null)
                 kernel.Judged -= onJudged;
 
-            kernel = new OsuJudgementKernel(beatmap, createSettings(), samples);
-            kernel.LiveArbitration = arbitrate;
+            kernel = new OsuJudgementKernel(beatmap, createSettings(), samples)
+            {
+                LiveArbitration = arbitrate,
+            };
             kernel.Judged += onJudged;
         }
 
