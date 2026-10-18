@@ -54,11 +54,12 @@ namespace osu.Game.EzOsuGame
             int count = layout.Digits > max_places ? max_places : layout.Digits;
             places = new Sprite[count];
 
-            // 数字组绕支点转，数字写相对支点的偏移。没有声明 pivot 时支点就是自身位置，
-            // 与旧行为逐像素一致（此时旋转为 0，或绕个位数字转）。
+            // 整组数字装在一个容器里：容器摆在旋转支点上并带旋转，各位数字只写相对支点的偏移。
+            // 旋转为 0 时支点就是个位位置，容器与旧行为逐像素一致。
+            // 必须用 EzStageAnchorContainer：普通零尺寸容器的包围盒是一个点，默认裁剪判定会把整组数字一起剪掉。
             Vector2 pivot = layout.ToOsuPivot();
 
-            var digits = new Container
+            var number = new EzStageAnchorContainer
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
@@ -72,12 +73,13 @@ namespace osu.Game.EzOsuGame
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Position = EzStagePlateElement.ToOsu(layout.X + place * layout.Spacing, layout.Y) - pivot,
+                    RelativeSizeAxes = Axes.None,
+                    Position = EzStagePlacement.GetDigitPosition(layout, place) - pivot,
                 };
             }
 
-            digits.AddRange(places);
-            InternalChild = digits;
+            number.AddRange(places);
+            InternalChild = number;
         }
 
         protected override void LoadComplete()

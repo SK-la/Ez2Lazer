@@ -1,9 +1,11 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using NUnit.Framework;
 using osu.Game.EzOsuGame;
 using osu.Game.Rulesets.UI.Scrolling;
+using osuTK;
 
 namespace osu.Game.Tests.NonVisual.EzOsuGame
 {
@@ -37,6 +39,48 @@ namespace osu.Game.Tests.NonVisual.EzOsuGame
         {
             Assert.That(EzStagePlacement.GetStageScale(624, 0), Is.EqualTo(624 / EzStagePlacement.DEFAULT_DESIGN_WIDTH));
             Assert.That(EzStagePlacement.GetStageScale(624, -412), Is.EqualTo(624 / EzStagePlacement.DEFAULT_DESIGN_WIDTH));
+        }
+
+        [Test]
+        public void TestDigitsAreSpacedByLayoutSpacing()
+        {
+            // Kings 分数：个位在 (-204, -412.5)，间距 20，7 位。
+            var digits = new EzStagePlateDigits { X = -204, Y = -412.5f, Digits = 7, Spacing = 20 };
+
+            for (int place = 0; place < digits.Digits; place++)
+            {
+                var expected = new Vector2(204 + place * -20, 412.5f);
+                Assert.That(EzStagePlacement.GetDigitPosition(digits, place), Is.EqualTo(expected), $"place={place}");
+            }
+        }
+
+        [Test]
+        public void TestDigitsInsideRotatedGroupStayDistinct()
+        {
+            // 带旋转时，数字写的是「相对支点的偏移」，旋转后彼此仍必须分开，不能叠在同一处。
+            var digits = new EzStagePlateDigits { X = -204, Y = -412.5f, Digits = 7, Spacing = 20, Rotation = 9.5f, PivotX = -204, PivotY = 23.5f };
+
+            Vector2 pivot = digits.ToOsuPivot();
+            var positions = new Vector2[digits.Digits];
+
+            for (int place = 0; place < digits.Digits; place++)
+                positions[place] = rotate(EzStagePlacement.GetDigitPosition(digits, place) - pivot, digits.Rotation) + pivot;
+
+            for (int place = 1; place < positions.Length; place++)
+                Assert.That(Vector2.Distance(positions[place], positions[place - 1]), Is.EqualTo(20).Within(0.001f), $"place={place}");
+
+            // 支点固定不动。
+            Assert.That(positions[0], Is.Not.EqualTo(positions[1]));
+        }
+
+        // osu 的 Rotation 是屏幕上顺时针为正。
+        private static Vector2 rotate(Vector2 v, float degrees)
+        {
+            float radians = float.DegreesToRadians(degrees);
+            float cos = MathF.Cos(radians);
+            float sin = MathF.Sin(radians);
+
+            return new Vector2(v.X * cos - v.Y * sin, v.X * sin + v.Y * cos);
         }
 
         [Test]

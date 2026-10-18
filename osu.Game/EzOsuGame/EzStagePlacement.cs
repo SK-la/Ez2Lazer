@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Game.Rulesets.UI.Scrolling;
+using osuTK;
 
 namespace osu.Game.EzOsuGame
 {
@@ -37,5 +38,14 @@ namespace osu.Game.EzOsuGame
         /// </summary>
         public static float GetHitLineOffset(float drawHeight, float hitPosition, ScrollingDirection direction)
             => direction == ScrollingDirection.Up ? hitPosition - drawHeight / 2 : drawHeight / 2 - hitPosition;
+
+        /// <summary>
+        /// 数字组第 <paramref name="place"/> 位（0 为个位）在 osu 坐标里的位置。
+        /// </summary>
+        /// <remarks>
+        /// 坐标是源图像素，高一位在 <c>x + spacing</c>（layout 的 X 已是取反后的值，因此屏幕上是往左）。
+        /// </remarks>
+        internal static Vector2 GetDigitPosition(EzStagePlateDigits digits, int place)
+            => EzStagePlateElement.ToOsu(digits.X + place * digits.Spacing, digits.Y);
     }
 }
