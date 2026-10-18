@@ -61,9 +61,7 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
         {
             Debug.Assert(HitObject != null);
 
-            return OsuCircleJudgement.MapClassicSliderHeadIfNeeded(
-                base.ResultFor(timeOffset),
-                HitObject.ClassicSliderBehaviour);
+            return OsuCircleJudgement.JudgeSliderHeadPress(HitObject.HitWindows, timeOffset, HitObject.ClassicSliderBehaviour);
         }
 
         public override void Shake()

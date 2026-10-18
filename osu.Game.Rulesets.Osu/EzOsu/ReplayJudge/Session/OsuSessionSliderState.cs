@@ -152,9 +152,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
             if (!OsuCircleJudgement.IsInHitRadius(position, head.StackedPosition, head.Radius))
                 return null;
 
-            HitResult result = OsuCircleJudgement.MapClassicSliderHeadIfNeeded(
-                OsuCircleJudgement.ResultForPress(head.HitWindows!, time - head.StartTime),
-                head.ClassicSliderBehaviour);
+            HitResult result = OsuCircleJudgement.JudgeSliderHeadPress(head.HitWindows!, time - head.StartTime, head.ClassicSliderBehaviour);
 
             return result == HitResult.None ? null : result;
         }
@@ -275,9 +273,11 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
             bool hit;
 
             if (slider.ClassicSliderBehaviour)
+            {
                 hit = StableClassicSliderRules.WasTrackingAtDueTime(
                     trackingStartTime,
                     OsuSliderJudgement.NestedDueTime(nestedObject, slider.StartTime, slider.Duration));
+            }
             else
                 hit = tracking;
 

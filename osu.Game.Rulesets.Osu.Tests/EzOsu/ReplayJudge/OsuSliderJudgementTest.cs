@@ -160,12 +160,12 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
         [Test]
         public void TestTickDeadlineIsItsOwnTimeInBothModes()
         {
-            const double startTime = 1250;
+            const double start_time = 1250;
 
             Assert.Multiple(() =>
             {
-                Assert.That(OsuSliderJudgement.NestedDeadline(tickAt(startTime), true, 1000, 1000), Is.EqualTo(startTime));
-                Assert.That(OsuSliderJudgement.NestedDeadline(tickAt(startTime), false, 1000, 1000), Is.EqualTo(startTime));
+                Assert.That(OsuSliderJudgement.NestedDeadline(tickAt(start_time), true, 1000, 1000), Is.EqualTo(start_time));
+                Assert.That(OsuSliderJudgement.NestedDeadline(tickAt(start_time), false, 1000, 1000), Is.EqualTo(start_time));
             });
         }
 
@@ -180,6 +180,38 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
         }
 
         private static SliderTick tickAt(double startTime) => new SliderTick { StartTime = startTime };
+
+        [Test]
+        public void TestSliderHeadPressIsSingleSourceForTickMapping()
+        {
+            var windows = new StableStdHitWindows();
+            windows.SetDifficulty(8);
+
+            double great = windows.WindowFor(HitResult.Great);
+            double ok = windows.WindowFor(HitResult.Ok);
+            double meh = windows.WindowFor(HitResult.Meh);
+
+            Assert.Multiple(() =>
+            {
+                // classic 把 300 / 100 / 50 压成同一个 tick 命中，非 classic 原样透出档位。
+                Assert.That(OsuCircleJudgement.JudgeSliderHeadPress(windows, great - 0.5, true), Is.EqualTo(HitResult.LargeTickHit));
+                Assert.That(OsuCircleJudgement.JudgeSliderHeadPress(windows, great - 0.5, false), Is.EqualTo(HitResult.Great));
+
+                Assert.That(OsuCircleJudgement.JudgeSliderHeadPress(windows, great + 0.5, true), Is.EqualTo(HitResult.LargeTickHit));
+                Assert.That(OsuCircleJudgement.JudgeSliderHeadPress(windows, great + 0.5, false), Is.EqualTo(HitResult.Ok));
+
+                Assert.That(OsuCircleJudgement.JudgeSliderHeadPress(windows, ok + 0.5, true), Is.EqualTo(HitResult.LargeTickHit));
+                Assert.That(OsuCircleJudgement.JudgeSliderHeadPress(windows, ok + 0.5, false), Is.EqualTo(HitResult.Meh));
+
+                // 超出最低成功窗：classic 落 tick 未命中，非 classic 落 Miss。
+                Assert.That(OsuCircleJudgement.JudgeSliderHeadPress(windows, meh + 0.5, true), Is.EqualTo(HitResult.LargeTickMiss));
+                Assert.That(OsuCircleJudgement.JudgeSliderHeadPress(windows, meh + 0.5, false), Is.EqualTo(HitResult.Miss));
+
+                // 连 miss 窗都超出：两条路径都用 None 表示「此刻尚不可判」，不能提前落 Miss。
+                Assert.That(OsuCircleJudgement.JudgeSliderHeadPress(windows, StableStdHitWindows.MISS_WINDOW + 1, true), Is.EqualTo(HitResult.None));
+                Assert.That(OsuCircleJudgement.JudgeSliderHeadPress(windows, StableStdHitWindows.MISS_WINDOW + 1, false), Is.EqualTo(HitResult.None));
+            });
+        }
 
         private static Slider createSlider(double duration, int repeats, bool classic)
         {

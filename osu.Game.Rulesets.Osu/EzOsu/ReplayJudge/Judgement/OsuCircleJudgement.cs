@@ -32,13 +32,22 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement
         public static HitResult MapClassicSliderHead(HitResult windowResult)
             => windowResult.IsHit() ? HitResult.LargeTickHit : HitResult.LargeTickMiss;
 
-        /// <summary>Drawable 路径保留 <see cref="HitResult.None"/>（尚未可判）；Session 请先 <see cref="ResultForPress"/>。</summary>
-        public static HitResult MapClassicSliderHeadIfNeeded(HitResult windowResult, bool classicSliderBehaviour)
+        // Drawable / Session 共用：命中窗内任意有效 hit → LargeTickHit，窗外的 None 原样透出（尚未可判）。
+        private static HitResult mapClassicSliderHeadIfNeeded(HitResult windowResult, bool classicSliderBehaviour)
         {
             if (!classicSliderBehaviour || windowResult == HitResult.None)
                 return windowResult;
 
             return MapClassicSliderHead(windowResult);
         }
+
+        /// <summary>
+        /// 滑条头按下的唯一判定入口：Drawable 与 Session 都必须从这里取类型，避免两条路径的窗口映射分叉。
+        /// </summary>
+        /// <param name="hitWindows">滑条头自身的判定窗；classic 档为 stable 窗，经典 mod 为普通窗。</param>
+        /// <param name="timeOffset">按下时刻相对滑条头起始时刻的裸帧偏移。</param>
+        /// <param name="classicSliderBehaviour">滑条头是否按 tick 入账；未命中窗口时返回 <see cref="HitResult.None"/> 表示尚不可判。</param>
+        public static HitResult JudgeSliderHeadPress(HitWindows hitWindows, double timeOffset, bool classicSliderBehaviour)
+            => mapClassicSliderHeadIfNeeded(hitWindows.ResultFor(timeOffset), classicSliderBehaviour);
     }
 }
