@@ -72,7 +72,8 @@ namespace osu.Game.EzOsuGame
         /// </summary>
         /// <remarks>
         /// 整幅画布型美术（一张图里已按列画好）在 prefab 里各列 x 都是 0，因此这里也全是 0；
-        /// 小块平铺型则记录每列中心。两种形态都靠这一组坐标定位，绘制时不再按列宽二次缩放。
+        /// 小块平铺型则记录每列中心。两种形态都靠这一组坐标定位。
+        /// 声明了 <see cref="KeysColumnWidth"/> 的键数，按键图宽度由列宽覆盖，不按源图尺寸。
         /// </remarks>
         [JsonPropertyName("keys")]
         public Dictionary<string, List<EzStagePlateKey>>? Keys { get; set; }
@@ -106,6 +107,24 @@ namespace osu.Game.EzOsuGame
                 }
             }
         }
+
+        /// <summary>
+        /// 各键数的按键是否按列宽缩放。键为键数（"7"、"9"…），值为 <c>true</c> 时该键数的按键图宽度跟随列宽。
+        /// </summary>
+        /// <remarks>
+        /// 派生键数（7/9/10）借用别的键数目录的按键图，源图按源键数的间距做成，直接绘制会挤在一起。
+        /// 未声明或为 <c>false</c> 时保持源图像素尺寸。
+        /// </remarks>
+        [JsonPropertyName("keysColumnWidth")]
+        public Dictionary<string, bool>? KeysColumnWidth { get; set; }
+
+        /// <summary>
+        /// 该键数的按键图是否按列宽缩放；layout 未声明时为 <c>false</c>。
+        /// </summary>
+        public bool UsesColumnWidth(int keyMode)
+            => KeysColumnWidth != null
+               && KeysColumnWidth.TryGetValue(keyMode.ToString(CultureInfo.InvariantCulture), out bool enabled)
+               && enabled;
 
         #region 图层默认顺序
 

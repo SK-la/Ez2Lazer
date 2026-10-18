@@ -375,7 +375,15 @@ namespace osu.Game.EzOsuGame
         /// 构造舞台板。<paramref name="keyState"/> 为每列的按下状态，用于驱动按键贴图。
         /// </summary>
         public Container CreateStage(int columnCount, EzStageKeyState? keyState)
+            => CreateStage(columnCount, keyState, out _);
+
+        /// <summary>
+        /// 构造舞台板，并给出按键层供调用方按列宽调整尺寸（layout 声明了 <c>keysColumnWidth</c> 时）。
+        /// </summary>
+        public Container CreateStage(int columnCount, EzStageKeyState? keyState, out EzStageKeyLayer? keyLayer)
         {
+            keyLayer = null;
+
             // 舞台板的 (0, 0) 是判定线：EzStageAnchorContainer 保持零尺寸，子项沿用 layout 的绝对坐标，
             // 外层把这个原点放到游戏判定线位置再缩放，因此列宽与画布缩放都不会移动判定线。
             var container = new EzStageAnchorContainer
@@ -421,8 +429,10 @@ namespace osu.Game.EzOsuGame
                 Drawable? bright = createPlateDrawable($"{basePath}/GrooveGaugeLight", layout.Meter.Bright);
 
                 if (gauge != null || bright != null)
+                {
                     place(applyRotation(new EzStageGrooveMeter(layout.Meter, gauge, bright), layout.Meter),
-                          layout.Meter.Order ?? EzStagePlateLayout.ORDER_METER);
+                        layout.Meter.Order ?? EzStagePlateLayout.ORDER_METER);
+                }
             }
 
             place(addPlateSprite(layout.OverObject, plateTexturePath(basePath, layout.OverObject, $"{stageName.Value}_OverObject/{stageName.Value}_OverObject")),
@@ -442,7 +452,8 @@ namespace osu.Game.EzOsuGame
             place(createPlateCounter(layout.Score, EzStagePlateCounter.Source.Score), layout.Score?.Order ?? EzStagePlateLayout.ORDER_DIGITS);
             place(createPlateCounter(layout.Combo, EzStagePlateCounter.Source.MaxCombo), layout.Combo?.Order ?? EzStagePlateLayout.ORDER_DIGITS);
 
-            place(mountKeys(layout, keyFolder, basePath, columnCount, keyState), keyOrder);
+            keyLayer = mountKeys(layout, keyFolder, basePath, columnCount, keyState);
+            place(keyLayer, keyOrder);
 
             if (layout.Character != null)
             {
@@ -500,7 +511,7 @@ namespace osu.Game.EzOsuGame
         /// 构造按键层。位置与文件名全部来自 stage layout；该键数没有声明时整层不画，
         /// 因此缺美术的回退组合不会画到错误的位置上。
         /// </summary>
-        private Drawable? mountKeys(EzStagePlateLayout layout, string? keyFolder, string basePath, int columnCount, EzStageKeyState? keyState)
+        private EzStageKeyLayer? mountKeys(EzStagePlateLayout layout, string? keyFolder, string basePath, int columnCount, EzStageKeyState? keyState)
         {
             IReadOnlyList<EzStagePlateKey>? keys = layout.GetKeys(columnCount);
 
@@ -522,7 +533,7 @@ namespace osu.Game.EzOsuGame
                 pressed.Add(keyState?.GetPressed(i));
             }
 
-            return new EzStageKeyLayer(bases, presses, pressed);
+            return new EzStageKeyLayer(bases, presses, pressed, layout.UsesColumnWidth(columnCount));
         }
 
         // 文件名由 layout 给出，且只是前缀：帧序号不在数据里，按前缀把该列所有帧一起取出来。

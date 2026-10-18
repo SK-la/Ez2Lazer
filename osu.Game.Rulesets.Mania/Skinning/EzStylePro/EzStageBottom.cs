@@ -12,6 +12,7 @@ using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Skinning;
 using osuTK;
@@ -26,6 +27,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private readonly IBindable<double> hitPosition = new Bindable<double>();
         private readonly IBindable<bool> globalHitPosition = new Bindable<bool>();
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
+
+        private EzStageKeyLayer? keyLayer;
+        private Stage? stage;
+        private float[] keyWidths = Array.Empty<float>();
+        private float[] appliedKeyWidths = Array.Empty<float>();
 
         private Bindable<string> stageName = null!;
         private Bindable<string> judgementLineName = null!;
@@ -107,8 +113,60 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private void OnSkinChanged()
         {
             sprite.Clear();
-            sprite.Add(factory.CreateStage(columnCount, keyState));
+            sprite.Add(factory.CreateStage(columnCount, keyState, out keyLayer));
+            resetKeyWidths();
             updatePosition();
+        }
+
+        private void resetKeyWidths()
+        {
+            appliedKeyWidths = Array.Empty<float>();
+            keyWidths = Array.Empty<float>();
+        }
+
+        // 按键图宽度跟随列宽：列宽来自 ColumnFlow 的实测布局，避免再算一份列宽。
+        private void updateKeyWidths()
+        {
+            if (keyLayer == null)
+                return;
+
+            stage ??= this.FindClosestParent<Stage>();
+
+            Column[]? columns = stage?.Columns;
+
+            if (columns == null || columns.Length == 0)
+                return;
+
+            float scale = sprite.Scale.X;
+
+            if (!(scale > 0))
+                return;
+
+            if (keyWidths.Length != columns.Length)
+            {
+                keyWidths = new float[columns.Length];
+                appliedKeyWidths = new float[columns.Length];
+
+                for (int i = 0; i < appliedKeyWidths.Length; i++)
+                    appliedKeyWidths[i] = float.NaN;
+            }
+
+            bool changed = false;
+
+            for (int i = 0; i < columns.Length; i++)
+            {
+                // 列宽是屏幕坐标，layout 坐标要按舞台缩放还原。
+                keyWidths[i] = columns[i].DrawWidth / scale;
+
+                if (keyWidths[i] != appliedKeyWidths[i])
+                    changed = true;
+            }
+
+            if (!changed)
+                return;
+
+            Array.Copy(keyWidths, appliedKeyWidths, keyWidths.Length);
+            keyLayer.SetColumnWidths(keyWidths);
         }
 
         private void updatePosition()
@@ -130,6 +188,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 updatePosition();
                 layout.Validate();
             }
+
+            updateKeyWidths();
         }
 
         protected override void Dispose(bool isDisposing)
