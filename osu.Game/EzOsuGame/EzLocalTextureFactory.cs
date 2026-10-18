@@ -694,7 +694,7 @@ namespace osu.Game.EzOsuGame
                 ? EzStagePlacement.GetJudgementLineOffset(bodySize.Y, piece.Ratio)
                 : 0;
 
-            // 舞台自带优先，缺失时用 EzResources/JudgementLine 里选中的那张；两者都没有就不画。
+            // 下拉选中的图优先；留空时才退回舞台 layout 声明的判定线；两者都没有就不画。
             List<Texture> frames = loadStageJudgementFrames(piece, basePath);
 
             if (frames.Count == 0)
@@ -739,10 +739,30 @@ namespace osu.Game.EzOsuGame
         }
 
         /// <summary>
-        /// 判定线帧：舞台目录里声明的那张优先，其次 <c>EzResources/JudgementLine</c> 当前选中的那张。
+        /// 判定线帧：<c>EzResources/JudgementLine</c> 当前选中的那张优先，留空时才用舞台目录里声明的图。
         /// </summary>
         private List<Texture> loadStageJudgementFrames(EzStagePlateJudgementLine? piece, string basePath)
         {
+            string name = judgementLineName.Value?.Trim() ?? string.Empty;
+
+            if (name.Length > 0)
+            {
+                if (name.StartsWith(EzResourceDiscovery.judgement_line_prefix, StringComparison.OrdinalIgnoreCase))
+                    name = name[EzResourceDiscovery.judgement_line_prefix.Length..];
+
+                if (name.Length > 0)
+                {
+                    List<Texture> overrideFrames = loadStageComponentFrames($"JudgementLine/{EzResourceDiscovery.judgement_line_prefix}{name}");
+
+                    // 不带前缀的 {name}.png 也接受，与资源选择列表的口径一致。
+                    if (overrideFrames.Count == 0)
+                        overrideFrames = loadStageComponentFrames($"JudgementLine/{name}");
+
+                    if (overrideFrames.Count > 0)
+                        return overrideFrames;
+                }
+            }
+
             string? stagePath = piece?.Path?.Trim().Trim('/');
 
             if (!string.IsNullOrEmpty(stagePath))
@@ -750,29 +770,7 @@ namespace osu.Game.EzOsuGame
             else if (piece != null)
                 stagePath = $"{basePath}/JudgementLine";
 
-            if (stagePath != null)
-            {
-                List<Texture> stageFrames = loadStageComponentFrames(stagePath);
-
-                if (stageFrames.Count > 0)
-                    return stageFrames;
-            }
-
-            string name = judgementLineName.Value?.Trim() ?? string.Empty;
-
-            if (name.Length == 0)
-                return new List<Texture>();
-
-            if (name.StartsWith(EzResourceDiscovery.judgement_line_prefix, StringComparison.OrdinalIgnoreCase))
-                name = name[EzResourceDiscovery.judgement_line_prefix.Length..];
-
-            if (name.Length == 0)
-                return new List<Texture>();
-
-            List<Texture> frames = loadStageComponentFrames($"JudgementLine/{EzResourceDiscovery.judgement_line_prefix}{name}");
-
-            // 不带前缀的 {name}.png 也接受，与资源选择列表的口径一致。
-            return frames.Count > 0 ? frames : loadStageComponentFrames($"JudgementLine/{name}");
+            return stagePath != null ? loadStageComponentFrames(stagePath) : new List<Texture>();
         }
 
         private EzStagePlateLayout? getPlateLayout()

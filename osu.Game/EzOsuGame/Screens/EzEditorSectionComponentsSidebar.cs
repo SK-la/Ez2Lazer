@@ -13,9 +13,11 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Events;
+using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
@@ -41,7 +43,7 @@ namespace osu.Game.EzOsuGame.Screens
         private EzResourceStore resources { get; set; } = null!;
 
         private FillFlowContainer cardFlow = null!;
-        private readonly Bindable<string> componentType = new Bindable<string>("Note");
+        private readonly Bindable<EzEditorComponentType> componentType = new Bindable<EzEditorComponentType>(EzEditorComponentType.Note);
 
         public EzEditorSectionComponentsSidebar()
             : base("Ez Pro Skin") { }
@@ -51,11 +53,13 @@ namespace osu.Game.EzOsuGame.Screens
         private Bindable<string>? panelName;
         private Bindable<string>? gameThemeName;
         private Bindable<string>? columnLightName;
+        private Bindable<string>? judgementLineName;
         private bool ezSkinBindingsBound;
 
         private readonly List<string> availableNoteSets = new List<string>();
         private readonly List<string> availableStageSets = new List<string>();
         private readonly List<string> availablePanels = new List<string>();
+        private readonly List<string> availableJudgementLines = new List<string>();
         private readonly List<string> availableColumnLights = new List<string>();
 
         [BackgroundDependencyLoader]
@@ -72,11 +76,10 @@ namespace osu.Game.EzOsuGame.Screens
                 Spacing = new Vector2(10),
                 Children = new Drawable[]
                 {
-                    new SettingsDropdown<string>
+                    new SettingsEnumDropdown<EzEditorComponentType>
                     {
-                        LabelText = "组件类型",
+                        LabelText = EzSkinStrings.COMPONENT_TYPE_LABEL,
                         Current = componentType,
-                        Items = new[] { "Note", "Stage", "Panel", "EarlyLate", "Judgement", "Combo", "ColumnLight" }
                     },
                     new Box
                     {
@@ -99,6 +102,7 @@ namespace osu.Game.EzOsuGame.Screens
             stageName!.BindValueChanged(_ => rebuildVisualLists());
             panelName!.BindValueChanged(_ => rebuildVisualLists());
             gameThemeName!.BindValueChanged(_ => rebuildVisualLists());
+            judgementLineName!.BindValueChanged(_ => rebuildVisualLists());
             columnLightName!.BindValueChanged(_ => rebuildVisualLists());
             componentType.BindValueChanged(_ => rebuildVisualLists());
             EzGameThemeCandidates.Refresh(storage);
@@ -126,6 +130,7 @@ namespace osu.Game.EzOsuGame.Screens
             panelName ??= ezConfig.GetBindable<string>(Ez2Setting.StageBackground);
             gameThemeName ??= ezConfig.GetBindable<string>(Ez2Setting.GameThemeName);
             columnLightName ??= ezConfig.GetBindable<string>(Ez2Setting.ColumnLightName);
+            judgementLineName ??= ezConfig.GetBindable<string>(Ez2Setting.JudgementLineName);
 
             if (ezSkinBindingsBound)
                 return;
@@ -135,6 +140,7 @@ namespace osu.Game.EzOsuGame.Screens
             panelName.BindValueChanged(v => ezConfig.SetValue(Ez2Setting.StageBackground, v.NewValue));
             gameThemeName.BindValueChanged(v => ezConfig.SetValue(Ez2Setting.GameThemeName, v.NewValue));
             columnLightName.BindValueChanged(v => ezConfig.SetValue(Ez2Setting.ColumnLightName, v.NewValue));
+            judgementLineName.BindValueChanged(v => ezConfig.SetValue(Ez2Setting.JudgementLineName, v.NewValue));
             ezSkinBindingsBound = true;
         }
 
@@ -149,6 +155,13 @@ namespace osu.Game.EzOsuGame.Screens
             availableStageSets.AddRange(listSubdirs(EzModifyPath.STAGE_PATH));
             availablePanels.AddRange(EzResourceDiscovery.ListPanelImages(storage));
             availableColumnLights.AddRange(EzResourceDiscovery.ListColumnSets(storage));
+
+            // 空串代表「不覆盖」，与 EzSkinEditorTextureSettingsSection 的下拉口径一致。
+            availableJudgementLines.Add(string.Empty);
+            availableJudgementLines.AddRange(EzResourceDiscovery.ListJudgementLineCandidates(storage));
+
+            if (!string.IsNullOrEmpty(judgementLineName!.Value) && !availableJudgementLines.Contains(judgementLineName.Value))
+                availableJudgementLines.Add(judgementLineName.Value);
         }
 
         private IEnumerable<string> listSubdirs(string relativePath)
@@ -170,27 +183,31 @@ namespace osu.Game.EzOsuGame.Screens
 
             switch (componentType.Value)
             {
-                case "Stage":
+                case EzEditorComponentType.Stage:
                     populateStageCards();
                     break;
 
-                case "Panel":
+                case EzEditorComponentType.Panel:
                     populatePanelCards();
                     break;
 
-                case "EarlyLate":
+                case EzEditorComponentType.EarlyLate:
                     populateThemeCards(EzHudThemeSlot.EarlyLate, theme => namedPreview($"GameTheme/{theme}/Early"), shownTheme(EzHudThemeSlot.EarlyLate));
                     break;
 
-                case "judgement":
+                case EzEditorComponentType.Judgement:
                     populateThemeCards(EzHudThemeSlot.Judgement, theme => namedPreview($"GameTheme/{theme}/judgement/Kool"), shownTheme(EzHudThemeSlot.Judgement));
                     break;
 
-                case "combo":
+                case EzEditorComponentType.Combo:
                     populateThemeCards(EzHudThemeSlot.Combo, theme => namedPreview($"GameTheme/{theme}/combo/Title"), shownTheme(EzHudThemeSlot.Combo));
                     break;
 
-                case "ColumnLight":
+                case EzEditorComponentType.JudgementLine:
+                    populateJudgementLineCards();
+                    break;
+
+                case EzEditorComponentType.ColumnLight:
                     populateColumnLightCards();
                     break;
 
@@ -285,6 +302,27 @@ namespace osu.Game.EzOsuGame.Screens
             }
         }
 
+        private void populateJudgementLineCards()
+        {
+            foreach (string name in availableJudgementLines)
+            {
+                cardFlow.Add(new VisualTextureItem(
+                    string.IsNullOrEmpty(name) ? EzSkinStrings.JUDGEMENT_LINE_NONE : name,
+                    createJudgementLinePreview(name),
+                    () => judgementLineName!.Value = name,
+                    () => judgementLineName!.Value == name));
+            }
+        }
+
+        private Texture? createJudgementLinePreview(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return null;
+
+            return resources.Get($"JudgementLine/{EzResourceDiscovery.judgement_line_prefix}{name}", EzTextureUsage.Large)
+                   ?? resources.Get($"JudgementLine/{name}", EzTextureUsage.Large);
+        }
+
         private Texture? namedPreview(string path)
             => resources.Get(path, EzTextureUsage.Large) ?? firstFolderImage(path);
 
@@ -329,14 +367,14 @@ namespace osu.Game.EzOsuGame.Screens
 
         private partial class VisualTextureItem : CompositeDrawable
         {
-            private readonly string name;
+            private readonly LocalisableString name;
             private readonly Texture? preview;
             private readonly Action onClick;
             private readonly Func<bool> isSelected;
 
             private Box selectedBox = null!;
 
-            public VisualTextureItem(string name, Texture? preview, Action onClick, Func<bool> isSelected)
+            public VisualTextureItem(LocalisableString name, Texture? preview, Action onClick, Func<bool> isSelected)
             {
                 this.name = name;
                 this.preview = preview;

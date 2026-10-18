@@ -42,12 +42,39 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString JUDGEMENT_LINE_NAME_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "覆盖舞台判定线贴图，取自本地 EzResources/JudgementLine/，贴图底边对齐判定线。"
-            + "\n留空时只用各 stage layout 里定义的判定线；优先用 Stage 目录自带的 layout 指定的图。",
+            + "\n留空时用各 stage layout 里定义的判定线；选择后覆盖 layout 指定的图。",
             "Overrides the stage judgement line image from local EzResources/JudgementLine/; the image's bottom edge aligns with the judgement line."
-            + "\nLeave empty to use only the line declared by each stage layout; Stage-local images take precedence.");
+            + "\nLeave empty to use the line declared by each stage layout; a selection overrides the layout image.");
 
         public static readonly LocalisableString JUDGEMENT_LINE_NONE = new EzLocalizationManager.EzLocalisableString(
             "（不覆盖）", "(no override)");
+
+        public static readonly LocalisableString COMPONENT_TYPE_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "组件类型", "Component type");
+
+        public static readonly LocalisableString COMPONENT_TYPE_NOTE = new EzLocalizationManager.EzLocalisableString(
+            "Note", "Note");
+
+        public static readonly LocalisableString COMPONENT_TYPE_STAGE = new EzLocalizationManager.EzLocalisableString(
+            "Stage", "Stage");
+
+        public static readonly LocalisableString COMPONENT_TYPE_PANEL = new EzLocalizationManager.EzLocalisableString(
+            "Panel", "Panel");
+
+        public static readonly LocalisableString COMPONENT_TYPE_EARLY_LATE = new EzLocalizationManager.EzLocalisableString(
+            "Early/Late", "Early/Late");
+
+        public static readonly LocalisableString COMPONENT_TYPE_JUDGEMENT = new EzLocalizationManager.EzLocalisableString(
+            "Judgement", "Judgement");
+
+        public static readonly LocalisableString COMPONENT_TYPE_COMBO = new EzLocalizationManager.EzLocalisableString(
+            "Combo", "Combo");
+
+        public static readonly LocalisableString COMPONENT_TYPE_JUDGEMENT_LINE = new EzLocalizationManager.EzLocalisableString(
+            "JudgementLine", "JudgementLine");
+
+        public static readonly LocalisableString COMPONENT_TYPE_COLUMN_LIGHT = new EzLocalizationManager.EzLocalisableString(
+            "ColumnLight", "ColumnLight");
 
         public static readonly LocalisableString VISUAL_PICKER_GAME_THEME_BUTTON = new EzLocalizationManager.EzLocalisableString(
             "大图选择：全局纹理主题", "Visual picker: global GameTheme");
