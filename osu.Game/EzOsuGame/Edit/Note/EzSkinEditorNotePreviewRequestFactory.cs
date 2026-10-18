@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Framework.Graphics;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets;
 
@@ -23,10 +24,15 @@ namespace osu.Game.EzOsuGame.Edit.Note
                 Ruleset = ruleset,
                 Part = exportPart,
                 VariantId = variantId,
-                NoteColour = config.GetColumnColorByType(EzColumnType.A),
+                NoteColour = resolveConfigNoteColour(config),
                 Width = config.Get<double>(Ez2Setting.ColumnWidth),
                 Height = Math.Max(1, config.Get<double>(Ez2Setting.ColumnWidth) * config.Get<double>(Ez2Setting.NoteHeightScaleToWidth)),
             };
+
+        private static Colour4 resolveConfigNoteColour(Ez2ConfigManager config) =>
+            config.Get<bool>(Ez2Setting.ColorSettingsEnabled)
+                ? config.GetColumnColorByType(EzColumnType.A)
+                : Colour4.White;
 
         /// <summary>
         /// Builds a request from values captured in <paramref name="snapshot"/> only. Never reads or writes the live config:

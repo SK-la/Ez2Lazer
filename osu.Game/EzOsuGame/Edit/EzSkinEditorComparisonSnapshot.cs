@@ -45,7 +45,9 @@ namespace osu.Game.EzOsuGame.Edit
             double width = config.Get<double>(Ez2Setting.ColumnWidth);
             NotePreviewWidth = width;
             NotePreviewHeight = Math.Max(1, width * config.Get<double>(Ez2Setting.NoteHeightScaleToWidth));
-            NotePreviewColour = config.GetColumnColorByType(EzColumnType.A);
+            NotePreviewColour = config.Get<bool>(Ez2Setting.ColorSettingsEnabled)
+                ? config.GetColumnColorByType(EzColumnType.A)
+                : Colour4.White;
         }
 
         public void ApplyTo(Ez2ConfigManager config, EzSkinIniSession? skinIniSession = null)

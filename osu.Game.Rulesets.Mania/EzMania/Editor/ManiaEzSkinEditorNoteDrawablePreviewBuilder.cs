@@ -43,7 +43,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             return new SkinProvidingContainer(transformedSkin)
             {
                 RelativeSizeAxes = Axes.Both,
-                Child = new EzSkinLNEditorProvider.PreviewDependencyContainer(preview_key_count, 0, ManiaAction.Key1)
+                Child = new EzSkinLNEditorProvider.PreviewDependencyContainer(preview_key_count, 0, ManiaAction.Key1, previewRequest: request)
                 {
                     RelativeSizeAxes = Axes.Both,
                     Child = hitDrawable,
