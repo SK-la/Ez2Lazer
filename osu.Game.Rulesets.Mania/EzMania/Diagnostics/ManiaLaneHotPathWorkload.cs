@@ -21,10 +21,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
     {
         public int Keys { get; init; } = 10;
 
-        /// <summary>全键盘峰值按键吞吐（键次/秒）。10 列齐按 chord 的周期 = Keys*1000/PeakKps ms。</summary>
-        public int PeakKps { get; init; } = 50;
+        /// <summary>
+        /// 每列每秒按键数（标定口径：10 / 15 / 20）。全键盘合计 = <see cref="Keys"/> × 本值。
+        /// </summary>
+        public int PerColumnKps { get; init; } = 10;
 
-        /// <summary>每列同时存活的叠 LN/note（进 miss 窗重叠区）。</summary>
+        /// <summary>全键盘合计按键吞吐（键次/秒），由 <see cref="PerColumnKps"/> 派生。</summary>
+        public int PeakKps => Keys * PerColumnKps;
+
+        /// <summary>每列同时存活的叠 LN/note（进 miss 窗重叠区）。与滚动驻留无关。</summary>
         public int ConcurrentAlivePerColumn { get; init; } = 8;
 
         public int DurationMs { get; init; } = 2000;
@@ -46,8 +51,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
         {
             if (Keys < 1)
                 throw new ArgumentOutOfRangeException(nameof(Keys));
-            if (PeakKps < 1)
-                throw new ArgumentOutOfRangeException(nameof(PeakKps));
+            if (PerColumnKps < 1)
+                throw new ArgumentOutOfRangeException(nameof(PerColumnKps));
 
             var lanes = new ManiaLaneController[Keys];
             var pressHistories = new List<double>[Keys];
@@ -60,7 +65,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
                 var lane = new ManiaLaneController();
                 lane.ConfigureMissCollection(JudgeMode, overallDifficulty: 8);
                 lane.SetPoorEnabled(PoorEnabled);
-                pressHistories[col] = new List<double>(PeakKps);
+                pressHistories[col] = new List<double>(PerColumnKps);
 
                 for (int i = 0; i < ConcurrentAlivePerColumn; i++)
                 {
@@ -72,7 +77,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
                 lanes[col] = lane;
             }
 
-            int chordIntervalMs = Math.Max(1, (int)Math.Round(Keys * 1000.0 / PeakKps));
+            int chordIntervalMs = Math.Max(1, (int)Math.Round(1000.0 / PerColumnKps));
             int nextChordAt = 0;
 
             int frames = 0;
@@ -124,6 +129,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
                 autoMissDueVisits,
                 selectCalls,
                 Keys,
+                PerColumnKps,
                 PeakKps,
                 ConcurrentAlivePerColumn,
                 Precedence,
@@ -168,6 +174,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
                 dueVisits,
                 selectPressCalls: 0,
                 keys: 0,
+                perColumnKps: 0,
                 peakKps: 0,
                 concurrentAlivePerColumn: objectCount,
                 EzEnumJudgePrecedence.Earliest,
@@ -213,6 +220,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
         public int AutoMissDueVisits { get; }
         public int SelectPressCalls { get; }
         public int Keys { get; }
+        public int PerColumnKps { get; }
         public int PeakKps { get; }
         public int ConcurrentAlivePerColumn { get; }
         public EzEnumJudgePrecedence Precedence { get; }
@@ -235,6 +243,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
             int autoMissDueVisits,
             int selectPressCalls,
             int keys,
+            int perColumnKps,
             int peakKps,
             int concurrentAlivePerColumn,
             EzEnumJudgePrecedence precedence,
@@ -250,6 +259,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
             AutoMissDueVisits = autoMissDueVisits;
             SelectPressCalls = selectPressCalls;
             Keys = keys;
+            PerColumnKps = perColumnKps;
             PeakKps = peakKps;
             ConcurrentAlivePerColumn = concurrentAlivePerColumn;
             Precedence = precedence;
@@ -260,7 +270,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
         }
 
         public override string ToString()
-            => $"keys={Keys} peakKps={PeakKps} alive/col={ConcurrentAlivePerColumn} prec={Precedence} "
+            => $"keys={Keys} perColKps={PerColumnKps} peakKps={PeakKps} alive/col={ConcurrentAlivePerColumn} prec={Precedence} "
                + $"bmsFb={AllowBmsFallbackToEarliest} poor={PoorEnabled} "
                + $"elapsed={ElapsedMilliseconds}ms frames={FrameCount} presses={PressCount} "
                + $"autoMissPolls={AutoMissQueuePolls} dueVisits={AutoMissDueVisits} (~{DueVisitsPerPoll:F2}/poll) select={SelectPressCalls} "

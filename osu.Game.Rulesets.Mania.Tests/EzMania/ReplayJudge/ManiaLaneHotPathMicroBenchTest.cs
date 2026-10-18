@@ -9,18 +9,19 @@ using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 {
     /// <summary>
-    /// DRAWABLE-MICRO-BENCH：10 列叠 LN；PeakKps × 每列存活密度扫描。
+    /// DRAWABLE-MICRO-BENCH：10 列叠 LN；每列 KPS（10 / 15 / 20）× 每列存活密度扫描。
     /// </summary>
     [TestFixture]
     public class ManiaLaneHotPathMicroBenchTest
     {
+        [TestCase(10, 8)]
+        [TestCase(15, 8)]
         [TestCase(20, 8)]
-        [TestCase(100, 8)]
-        [TestCase(100, 24)]
-        [TestCase(100, 40)]
-        public void TestTenKeyDenseLnPeakKpsAndAliveSweep(int peakKps, int alivePerColumn)
+        [TestCase(20, 24)]
+        [TestCase(20, 40)]
+        public void TestTenKeyDenseLnPerColumnKpsAndAliveSweep(int perColumnKps, int alivePerColumn)
         {
-            var result = run(peakKps, alivePerColumn, EzEnumJudgePrecedence.Combo);
+            var result = run(perColumnKps, alivePerColumn, EzEnumJudgePrecedence.Combo);
             TestContext.WriteLine(result.ToString());
 
             Assert.That(result.FrameCount, Is.EqualTo(2000));
@@ -30,30 +31,30 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         [Test]
-        public void TestPeakKpsScaleIsNearLinearOnSelectCalls()
+        public void TestPerColumnKpsScaleIsNearLinearOnSelectCalls()
         {
             var results = new Dictionary<int, ManiaLaneHotPathWorkloadResult>();
 
-            foreach (int kps in new[] { 20, 50, 100 })
+            foreach (int kps in new[] { 10, 15, 20 })
             {
                 results[kps] = run(kps, alivePerColumn: 24, EzEnumJudgePrecedence.Combo);
                 TestContext.WriteLine(results[kps].ToString());
             }
 
-            double ratio50 = (double)results[50].PressCount / results[20].PressCount;
-            double ratio100 = (double)results[100].PressCount / results[20].PressCount;
+            double ratio15 = (double)results[15].PressCount / results[10].PressCount;
+            double ratio20 = (double)results[20].PressCount / results[10].PressCount;
 
-            Assert.That(ratio50, Is.EqualTo(2.5).Within(0.2));
-            Assert.That(ratio100, Is.EqualTo(5.0).Within(0.3));
-            Assert.That(results[100].ElapsedMilliseconds, Is.LessThan(results[20].ElapsedMilliseconds * 8 + 100),
-                $"Non-linear blow-up: {results[20]} | {results[100]}");
+            Assert.That(ratio15, Is.EqualTo(1.5).Within(0.15));
+            Assert.That(ratio20, Is.EqualTo(2.0).Within(0.2));
+            Assert.That(results[20].ElapsedMilliseconds, Is.LessThan(results[10].ElapsedMilliseconds * 5 + 100),
+                $"Non-linear blow-up: {results[10]} | {results[20]}");
         }
 
         [Test]
         public void TestAliveDensityDoesNotBlowUpAllocPerPress()
         {
-            var light = run(100, alivePerColumn: 8, EzEnumJudgePrecedence.Combo);
-            var heavy = run(100, alivePerColumn: 40, EzEnumJudgePrecedence.Combo);
+            var light = run(20, alivePerColumn: 8, EzEnumJudgePrecedence.Combo);
+            var heavy = run(20, alivePerColumn: 40, EzEnumJudgePrecedence.Combo);
             TestContext.WriteLine($"light: {light}");
             TestContext.WriteLine($"heavy: {heavy}");
 
@@ -68,9 +69,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [TestCase(EzEnumJudgePrecedence.Earliest)]
         [TestCase(EzEnumJudgePrecedence.Combo)]
         [TestCase(EzEnumJudgePrecedence.Duration)]
-        public void TestPrecedenceVariantsAt100KpsDense(EzEnumJudgePrecedence precedence)
+        public void TestPrecedenceVariantsAt20KpsDense(EzEnumJudgePrecedence precedence)
         {
-            var result = run(100, alivePerColumn: 40, precedence);
+            var result = run(20, alivePerColumn: 40, precedence);
             TestContext.WriteLine(result.ToString());
             Assert.That(result.ElapsedMilliseconds, Is.LessThan(5_000), result.ToString());
         }
@@ -78,11 +79,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public void TestBmsPoorSelectFlagsDoNotBlowUpAlloc()
         {
-            var baseline = run(100, 40, EzEnumJudgePrecedence.Combo);
+            var baseline = run(20, 40, EzEnumJudgePrecedence.Combo);
             var bms = new ManiaLaneHotPathWorkload
             {
                 Keys = 10,
-                PeakKps = 100,
+                PerColumnKps = 20,
                 ConcurrentAlivePerColumn = 40,
                 AliveSpacingMs = 12,
                 DurationMs = 2000,
@@ -113,11 +114,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             Assert.That(result.AllocatedBytes, Is.LessThan(64_000), result.ToString());
         }
 
-        private static ManiaLaneHotPathWorkloadResult run(int peakKps, int alivePerColumn, EzEnumJudgePrecedence precedence)
+        private static ManiaLaneHotPathWorkloadResult run(int perColumnKps, int alivePerColumn, EzEnumJudgePrecedence precedence)
             => new ManiaLaneHotPathWorkload
             {
                 Keys = 10,
-                PeakKps = peakKps,
+                PerColumnKps = perColumnKps,
                 ConcurrentAlivePerColumn = alivePerColumn,
                 AliveSpacingMs = 12,
                 DurationMs = 2000,

@@ -48,4 +48,26 @@
 
 ## 4. Bench 入口
 
-`BenchmarkManiaLaneHotPath` / `ManiaLaneHotPathMicroBenchTest`；`BenchmarkManiaReplaySession`；Hold 消融仅 Debug。
+### 密度口径（Mania 同类测试统一）
+
+| 项 | 标定值 |
+|----|--------|
+| 每列 KPS | 10 / 15 / 20 |
+| 画面驻留（`IScrollingInfo.TimeRange`） | 300 / 500 / 700 ms |
+| 每列瞬时存活数 | 每列 KPS × 驻留秒数（10→3/5/7，15→4.5/7.5/10.5，20→6/10/14） |
+| 全键盘合计 KPS | 每列 KPS × 列数（4 列 40/60/80，10 列 100/150/200，16 列 160/240/320） |
+
+- 入口参数是 `ManiaDenseScrollWorkload.PerColumnKps`；`PeakKps` 只是 `Keys × PerColumnKps` 的派生值。
+- `ManiaLaneHotPathWorkload.ConcurrentAlivePerColumn` 是「判定窗重叠区里的未判定条数」，不是滚动驻留数，因此不套 300–700 ms。
+- 每列存活最多 14 个，远低于 `Column` 每列 50 的池上限；池 excess 只用于排除，不作为预期主因。
+
+### 入口
+
+| 入口 | 覆盖 |
+|------|------|
+| `BenchmarkManiaDenseScroll` | headless、固定 1/60 s 步长；列数 / 每列 KPS / 驻留 / tap-vs-hold；update 线程时间与分配 |
+| `TestSceneManiaDenseScrollCost`（DEBUG） | 真实 drawable + 皮肤；每秒输出 `[DENSE-SCROLL]`，含池占用、GC、判定计数与消融开关 |
+| `BenchmarkManiaLaneHotPath` / `ManiaLaneHotPathMicroBenchTest` | 判定热路径下限（每列 10 / 15 / 20 KPS，无 drawable） |
+| `BenchmarkManiaReplaySession` | 4K 离线 replay；`PerColumnKps` 派生全局间隔，另保留 80 ms 低密度参考组 |
+| `TestSceneManiaHoldDrawCost`（DEBUG） | LN 绘制消融；hold 数与间距按每列 KPS × 驻留派生 |
+

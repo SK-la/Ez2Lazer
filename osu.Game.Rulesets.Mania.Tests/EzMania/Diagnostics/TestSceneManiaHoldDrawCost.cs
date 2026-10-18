@@ -42,11 +42,18 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
     public partial class TestSceneManiaHoldDrawCost : ManiaInputTestScene
     {
         private const int column_count = 4;
-        private const int holds_per_column = 3;
-        private const double hold_duration = 4000;
-        private const double hold_spacing = 500;
         private const double spawn_lead_ms = 200;
         private const double log_interval_ms = 1000;
+        private const double long_hold_duration = 4000;
+
+        // 密度口径与 ManiaDenseScrollWorkload 一致：每列 KPS × 驻留。
+        private double perColumnKps = 20;
+        private double dwellMs = 700;
+        private bool longHolds;
+
+        private int HoldsPerColumn => Math.Max(1, (int)Math.Round(perColumnKps * dwellMs / 1000.0));
+        private double HoldSpacing => 1000.0 / perColumnKps;
+        private double HoldDuration => longHolds ? long_hold_duration : dwellMs * 0.85;
 
         [Cached(typeof(IReadOnlyList<Mod>))]
         private IReadOnlyList<Mod> mods { get; set; } = Array.Empty<Mod>();
@@ -60,6 +67,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
         private readonly ManualClock manualClock = new ManualClock();
         private readonly FramedClock playfieldClock;
         private readonly List<Column> columns = new List<Column>();
+        private readonly List<ScrollingTestContainer> scrollContainers = new List<ScrollingTestContainer>();
         private bool freezeClock;
         private bool simulateHolding;
 
@@ -170,6 +178,18 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
         public void TestInteractiveAblation()
         {
             AddStep("spawn dense holds", spawnHolds);
+            AddStep("density 10 KPS / 300 ms", () => setDensity(10, 300));
+            AddStep("density 10 KPS / 500 ms", () => setDensity(10, 500));
+            AddStep("density 10 KPS / 700 ms", () => setDensity(10, 700));
+            AddStep("density 15 KPS / 500 ms", () => setDensity(15, 500));
+            AddStep("density 20 KPS / 300 ms", () => setDensity(20, 300));
+            AddStep("density 20 KPS / 500 ms", () => setDensity(20, 500));
+            AddStep("density 20 KPS / 700 ms", () => setDensity(20, 700));
+            AddToggleStep("long hold body (4s)", v =>
+            {
+                longHolds = v;
+                spawnHolds();
+            });
             AddToggleStep("freeze clock", v => freezeClock = v);
             AddToggleStep("simulate holding", v => simulateHolding = v);
             AddToggleStep("disable subtraction stroke", toggleSubtractionStroke);
@@ -185,7 +205,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
         public void TestHoldEndsStayOutOfNonPositionalQueue()
         {
             AddStep("spawn dense holds", spawnHolds);
-            AddUntilStep("holds loaded", () => this.ChildrenOfType<DrawableHoldNote>().Count() == column_count * holds_per_column);
+            AddUntilStep("holds loaded", () => this.ChildrenOfType<DrawableHoldNote>().Count() == column_count * HoldsPerColumn);
             AddAssert("parent hold still accepts non-positional input", () =>
                 this.ChildrenOfType<DrawableHoldNote>().All(h => h.HandleNonPositionalInput));
             AddAssert("head excluded from non-positional input", () =>
@@ -201,7 +221,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
         {
             AddStep("enable hold-end enqueue", () => ManiaHoldAblation.EnqueueHoldEnds = true);
             AddStep("spawn dense holds", spawnHolds);
-            AddUntilStep("holds loaded", () => this.ChildrenOfType<DrawableHoldNote>().Count() == column_count * holds_per_column);
+            AddUntilStep("holds loaded", () => this.ChildrenOfType<DrawableHoldNote>().Count() == column_count * HoldsPerColumn);
             AddAssert("head requeued", () =>
                 this.ChildrenOfType<DrawableHoldNoteHead>().Any()
                 && this.ChildrenOfType<DrawableHoldNoteHead>().All(h => h.HandleNonPositionalInput));
@@ -223,6 +243,18 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
                 spawnHolds();
             });
             AddUntilStep("ticks gone", () => !this.ChildrenOfType<DrawableHoldNoteTick>().Any());
+        }
+
+        private void setDensity(int kps, double dwell)
+        {
+            perColumnKps = kps;
+            dwellMs = dwell;
+
+            foreach (var container in scrollContainers)
+                container.TimeRange = dwell;
+
+            spawnHolds();
+            logSample($"density={kps}kps/{dwell}ms");
         }
 
         private void toggleSubtractionStroke(bool disabled)
@@ -272,13 +304,13 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
 
             for (int col = 0; col < columns.Count; col++)
             {
-                for (int i = 0; i < holds_per_column; i++)
+                for (int i = 0; i < HoldsPerColumn; i++)
                 {
                     var obj = new HoldNote
                     {
                         Column = col,
-                        StartTime = firstHead + i * hold_spacing,
-                        Duration = hold_duration
+                        StartTime = firstHead + i * HoldSpacing,
+                        Duration = HoldDuration
                     };
                     obj.ApplyDefaults(new ControlPointInfo(), new BeatmapDifficulty());
                     columns[col].Add(new DrawableHoldNote(obj)
@@ -330,7 +362,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
             int queueTails = this.ChildrenOfType<DrawableHoldNoteTail>().Count(t => t.HandleNonPositionalInput);
 
             string line =
-                $"variant={variant} holds={holdCount} ticks={tickCount} bodies={bodyPieces} " +
+                $"variant={variant} density={perColumnKps:0.##}kps/{dwellMs:0}ms holds={holdCount} holdsPerCol={HoldsPerColumn} " +
+                $"holdDur={HoldDuration:0}ms ticks={tickCount} bodies={bodyPieces} " +
                 $"queue(head/tail)={queueHeads}/{queueTails} freeze={(freezeClock ? "on" : "off")} holding={(simulateHolding ? "on" : "off")} " +
                 $"stroke={(ManiaHoldAblation.DisableSubtractionStroke ? "off" : "on")} " +
                 $"tickScan={(ManiaHoldAblation.DisableHoldTickScan ? "off" : "on")} " +
@@ -362,15 +395,18 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
 
             columns.Add(column);
 
-            return new ScrollingTestContainer(ScrollingDirection.Down)
+            var scrollContainer = new ScrollingTestContainer(ScrollingDirection.Down)
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 AutoSizeAxes = Axes.X,
                 RelativeSizeAxes = Axes.Y,
-                TimeRange = 2000,
+                TimeRange = dwellMs,
                 Child = column
             };
+
+            scrollContainers.Add(scrollContainer);
+            return scrollContainer;
         }
     }
 }

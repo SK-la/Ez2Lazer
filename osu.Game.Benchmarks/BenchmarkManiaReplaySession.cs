@@ -20,15 +20,22 @@ namespace osu.Game.Benchmarks
 {
     /// <summary>
     /// P2-B: ManiaReplaySessionService 性能基准测试
-    /// BENCH-KPS：含高密度 jack（80ms × 4K）与三档 JudgePrecedence 场景。
+    /// BENCH-KPS：按标定的每列 10 / 15 / 20 KPS 生成 4K 谱面（全局间隔 = 1000 / (每列 KPS × 列数)），
+    /// 另保留 80 ms 间距（每列约 3.1 KPS）作为低密度参考组。三档 JudgePrecedence 都跑。
     /// </summary>
     public class BenchmarkManiaReplaySession : BenchmarkTest
     {
+        private const int column_count = 4;
+        private const int note_count = 400;
+
         private ManiaReplaySessionService sessionService = null!;
         private IBeatmap beatmap = null!;
         private IBeatmap jackBeatmap = null!;
         private Score score = null!;
         private Score jackScore = null!;
+
+        [Params(10, 15, 20)]
+        public int PerColumnKps { get; set; }
 
         [Params(EzEnumJudgePrecedence.Earliest, EzEnumJudgePrecedence.Combo, EzEnumJudgePrecedence.Duration)]
         public EzEnumJudgePrecedence BenchPrecedence { get; set; }
@@ -37,9 +44,12 @@ namespace osu.Game.Benchmarks
         {
             base.SetUp();
 
+            // 每列 KPS 是标定入口；全局 note 间隔由列数派生。
+            double standardSpacingMs = 1000.0 / (PerColumnKps * column_count);
+
             sessionService = new ManiaReplaySessionService();
-            beatmap = createTestBeatmap(noteSpacingMs: 500, noteCount: 200);
-            jackBeatmap = createTestBeatmap(noteSpacingMs: 80, noteCount: 400);
+            beatmap = createTestBeatmap(noteSpacingMs: standardSpacingMs, noteCount: note_count);
+            jackBeatmap = createTestBeatmap(noteSpacingMs: 80, noteCount: note_count);
             score = createTestScore(beatmap);
             jackScore = createTestScore(jackBeatmap);
 
@@ -73,7 +83,8 @@ namespace osu.Game.Benchmarks
         }
 
         /// <summary>
-        /// 高密度 jack：80ms 间距 4K，约 90 KPS 量级 Session 吞吐基线。
+        /// 低密度参考：80 ms 全局间距 × 4K，即每列约 3.1 KPS，约 12.5 KPS 合计。
+        /// 低于标定下限（每列 10 KPS），只用于对照。
         /// </summary>
         [Benchmark]
         public async Task<Score> BenchmarkJackRunAsync()
@@ -111,7 +122,7 @@ namespace osu.Game.Benchmarks
             ).ConfigureAwait(true);
         }
 
-        private static IBeatmap createTestBeatmap(int noteSpacingMs, int noteCount)
+        private static IBeatmap createTestBeatmap(double noteSpacingMs, int noteCount)
         {
             var ruleset = new ManiaRuleset();
             var beatmap = new Beatmap
