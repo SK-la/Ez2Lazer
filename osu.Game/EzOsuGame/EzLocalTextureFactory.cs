@@ -115,6 +115,8 @@ namespace osu.Game.EzOsuGame
 
             onColumnTypeChangedHandler = onColumnTypeChanged;
             ezConfig.ColumnTypeChanged += onColumnTypeChangedHandler;
+
+            resource.ResourceCachesInvalidated += onResourceCachesInvalidated;
         }
 
         #region 事件发布
@@ -123,10 +125,18 @@ namespace osu.Game.EzOsuGame
         public event Action? OnNoteSizeChanged;
         public event Action? OnNoteColourChanged;
 
-        private void scheduleTextureRefresh()
+        private void scheduleTextureRefresh(bool forceRatioRecalculate = false)
         {
-            // 纹理名或轨道尺寸相关设置变化时，立即重算尺寸，避免 note 先用旧尺寸渲染一帧。
-            GetRatio(forceRecalculate: true);
+            // 尺寸设置变化只需用当前比例重算高度；比例只取决于 note set 的首帧像素，不必每帧重算。
+            GetRatio(forceRatioRecalculate);
+            refreshNoteSizeBindables();
+            OnNoteSizeChanged?.Invoke();
+        }
+
+        // 资源池被清空（换图、新增帧）后，旧的像素比例不再可信，重算并让所有列尺寸跟着刷新。
+        private void onResourceCachesInvalidated()
+        {
+            note_ratio_cache.Clear();
             refreshNoteSizeBindables();
             OnNoteSizeChanged?.Invoke();
         }
@@ -144,7 +154,8 @@ namespace osu.Game.EzOsuGame
         {
             noteSetName.BindValueChanged(_ =>
             {
-                scheduleTextureRefresh();
+                // note set 换了，首帧像素可能整体变化，比例必须重算。
+                scheduleTextureRefresh(forceRatioRecalculate: true);
                 OnNoteDrawableChanged?.Invoke();
             });
         }
@@ -718,6 +729,8 @@ namespace osu.Game.EzOsuGame
         {
             if (isDisposing)
             {
+                resource.ResourceCachesInvalidated -= onResourceCachesInvalidated;
+
                 if (onColumnTypeChangedHandler != null)
                     ezConfig.ColumnTypeChanged -= onColumnTypeChangedHandler;
             }

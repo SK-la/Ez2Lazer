@@ -285,6 +285,11 @@ namespace osu.Game.EzOsuGame
         #region 工具方法
 
         /// <summary>
+        /// 纹理池清空后触发，供上层丢弃自己持有的像素派生缓存（如 note 比例）。
+        /// </summary>
+        internal event Action? ResourceCachesInvalidated;
+
+        /// <summary>
         /// 丢弃层1 目录索引与层2 帧解析缓存，使新放进 <c>EzResources</c> 的图（含新增帧）重新可见。
         /// </summary>
         /// <remarks>
@@ -298,8 +303,13 @@ namespace osu.Game.EzOsuGame
             directoryIndex.Invalidate();
             frameSets.Clear();
 
+            // 比例来自首帧像素，图换了旧值就不再可信。
+            note_ratio_cache.Clear();
+
             animationSafeStore.ClearCache();
             largeTextureStore.ClearCache();
+
+            ResourceCachesInvalidated?.Invoke();
         }
 
         /// <summary>

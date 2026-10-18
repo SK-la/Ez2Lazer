@@ -246,6 +246,34 @@ namespace osu.Game.Tests.EzOsuGame.Textures
             AddAssert("失效后新帧可见", () => expect(new[] { 800, 801 }, "Late/Entry"));
         }
 
+        [Test]
+        public void RatioRecalculatesAfterInvalidation()
+        {
+            AddStep("准备资源", createResourceStore);
+
+            EzLocalTextureFactory? factory = null;
+
+            AddStep("写入 note set 与 10x20 首帧", () =>
+            {
+                ezConfig!.SetValue(Ez2Setting.NoteSetName, "ratiotest");
+                writePng("EzResources/note/ratiotest/whitenote/000.png", 10, 20);
+            });
+
+            AddStep("创建工厂", () => factory = new EzLocalTextureFactory(ezConfig!, resources!));
+
+            AddAssert("比例取自首帧像素", () => factory!.GetRatio(), () => Is.EqualTo(2f).Within(0.001f));
+
+            AddStep("换图并失效", () =>
+            {
+                writePng("EzResources/note/ratiotest/whitenote/000.png", 10, 5);
+                resources!.InvalidateResourceCaches();
+            });
+
+            AddAssert("失效后按新图重算", () => factory!.GetRatio(), () => Is.EqualTo(0.5f).Within(0.001f));
+
+            AddStep("释放工厂", () => factory!.Dispose());
+        }
+
         /// <summary>断言某路径解析出的帧宽（即帧序）；便于把「取到哪几帧」写成一行。</summary>
         private bool expect(int[] expectedWidths, string path, int startIndex = 0, int maxFrames = 240, string? template = null, bool allowSingleFallback = true)
         {
@@ -281,9 +309,11 @@ namespace osu.Game.Tests.EzOsuGame.Textures
             resources = new EzResourceStore(ezConfig, renderer, Audio, LocalStorage, null!);
         }
 
-        private void writePng(string path, int size)
+        private void writePng(string path, int size) => writePng(path, size, size);
+
+        private void writePng(string path, int width, int height)
         {
-            using var image = new Image<Rgba32>(size, size);
+            using var image = new Image<Rgba32>(width, height);
             using var stream = LocalStorage.GetStream(path, FileAccess.Write);
             image.SaveAsPng(stream);
         }

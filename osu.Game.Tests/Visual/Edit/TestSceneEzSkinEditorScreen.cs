@@ -23,6 +23,7 @@ using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.EzMania.Editor;
+using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Screens.Edit.Components.Menus;
 using osu.Game.Skinning;
@@ -202,6 +203,52 @@ namespace osu.Game.Tests.Visual.Edit
 
             AddUntilStep("comparison panes still present", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>().Count() == 2);
             AddStep("restore pseudo tail", () => gradient.Value = original);
+        }
+
+        [Test]
+        public void TestSizeSceneColumnWidthRebuildsLiveNoteOnly()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Size);
+
+            AddUntilStep("two comparison panes", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>().Count() == 2);
+            AddUntilStep("note drawables laid out", () => editorScreen.ChildrenOfType<EzNote>().Any(n => n.DrawHeight > 0));
+
+            EzSkinEditorNoteComparisonPane livePane = null!;
+            EzSkinEditorNoteComparisonPane snapshotPane = null!;
+
+            AddStep("capture panes left to right", () =>
+            {
+                var panes = editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>()
+                                    .OrderBy(p => p.ScreenSpaceDrawQuad.Centre.X)
+                                    .ToArray();
+
+                livePane = panes[0];
+                snapshotPane = panes[1];
+            });
+
+            float liveHeight = 0;
+            float snapshotHeight = 0;
+
+            AddStep("measure note heights", () =>
+            {
+                liveHeight = livePane.ChildrenOfType<EzNote>().Max(n => n.DrawHeight);
+                snapshotHeight = snapshotPane.ChildrenOfType<EzNote>().Max(n => n.DrawHeight);
+            });
+
+            double originalWidth = 0;
+
+            AddStep("widen column", () =>
+            {
+                originalWidth = ezConfig.Get<double>(Ez2Setting.ColumnWidth);
+                ezConfig.GetBindable<double>(Ez2Setting.ColumnWidth).Value = originalWidth + 25;
+            });
+
+            AddUntilStep("live note follows width", () => livePane.ChildrenOfType<EzNote>().Max(n => n.DrawHeight) > liveHeight);
+            AddAssert("snapshot note keeps baseline", () => snapshotPane.ChildrenOfType<EzNote>().Max(n => n.DrawHeight), () => Is.EqualTo(snapshotHeight).Within(0.5f));
+
+            AddStep("restore column width", () => ezConfig.GetBindable<double>(Ez2Setting.ColumnWidth).Value = originalWidth);
         }
 
         [Test]
