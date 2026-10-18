@@ -74,7 +74,7 @@
 
 ### 标定结果（10 列，DEBUG 场景，固定 1/60 s 模拟步长）
 
-`TestSceneManiaDenseScrollCost.TestCalibrationSweep` 每个配置取 3 次样本，更新耗时取中位数。数值是测试宿主上的 update 帧时，不是 GPU 帧时，只用于同机排序与回归对比。
+`TestSceneManiaDenseScrollCost.TestCalibrationSweep` 每个配置取 3 次样本，更新耗时取中位数。数值是测试宿主上的 update 帧时，不是 GPU 帧时，只用于同机排序与回归对比。DEBUG 构建的 `alloc/frame` 含调试路径开销，量级比 Release 高一个数量级，只能做同构 A/B，不要和全矩阵的 `KiB/帧` 直接比。
 
 | 配置 | 存活 | update ms | alloc/frame |
 |------|------|-----------|-------------|
@@ -116,8 +116,10 @@
 | 16 | 0 | 16.8 | 16.6 | 17.2 | 24.9 | 25.0 | 25.7 | 33.3 | 33.3 | 34.6 |
 | 16 | 50% | 67.9 | 66.5 | 68.8 | 102.2 | 104.3 | 103.1 | 135.1 | 134.4 | 140.4 |
 
-- tap 组的分配只随「列数 × 每列 KPS」增长，与驻留几乎无关：每帧分配的来源是判定与输入取样，不是滚动窗口长度。
+- tap 组的分配随「列数 × 每列 KPS」线性增长，与驻留无关：同一 KPS 下 300 / 500 / 700 ms 三格的 `KiB/帧` 完全相同（10 列 10 KPS 均为 623 KiB，15 KPS 均为 935，20 KPS 均为 1247）。折算下来 tap 每条 note 约 6.2 KiB，hold 每条约 25 KiB，所以表里的 `KiB/帧` 实际是「每秒生成的 note 数 × 单条生成成本」，不是稳态每帧的常驻分配。
+- hold 的分配是 tap 的约 4 倍，来源是每条 LN 多出的 head / tail / body 三个嵌套 drawable、两个 proxy 与对应皮肤组件；要降分配只能降单条 LN 的生成成本，与驻留长度无关。
 - hold 组在同样存活数下是 tap 的 4–12 倍 update、4 倍分配；16 列 × 20 KPS × 700 ms、50% hold 单帧 update 13.3 ms，已占 60 FPS 帧预算的 80%。这是本机数据里唯一逼近预算的组合。
 - 16 列的 tap 单格在 15/700 与 20/700 偏高，与 10 列同格的线性外推不符，属 short job 抖动（该格 StdDev 达 8–21 ms），不作为结论。
-- 每列 20 KPS × 700 ms 的 10 列池会从初始 10 扩到约 19/列后复用；`DrawableNote` 池 190 个，仍低于每列上限 50。
+- 本基准的场景里没有 `DrawableManiaRuleset`，每条存活 drawable 都在 `UpdateAfterChildren` 里按帧走 `UpdateResult(false)`；列级路由的实战路径（`ColumnRoutesInput`）只在到期时轮询。因此这里的绝对 ms 和 hold/tap 倍率偏悲观，用于同机比较与回归，不外推到实战绝对值。
+- 池：每列 20 KPS × 700 ms 的 10 列池会从初始 10 扩到约 19/列后复用；`DrawableNote` 池 190 个，仍低于每列上限 50。
 
