@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania;
+using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
@@ -104,12 +105,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         protected override void Update()
         {
             base.Update();
-            Height = DrawWidth;
-            // NoteHeight = columnWidth;
-            // NoteHeight = (float)config.Get<double>(ManiaRulesetSetting.ColumnWidth);
-            // specialFactor = (float)config.Get<double>(ManiaRulesetSetting.SpecialFactor);
 
-            iconContainer.Size = new Vector2(DrawWidth / NoteHeight * 0.7f);
+            if (!ManiaDenseScrollAblation.DisablePerFrameLayoutWrites)
+            {
+                Height = DrawWidth;
+                // NoteHeight = columnWidth;
+                // NoteHeight = (float)config.Get<double>(ManiaRulesetSetting.ColumnWidth);
+                // specialFactor = (float)config.Get<double>(ManiaRulesetSetting.SpecialFactor);
+
+                iconContainer.Size = new Vector2(DrawWidth / NoteHeight * 0.7f);
+            }
         }
 
         protected virtual Drawable CreateIcon() => new Container

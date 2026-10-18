@@ -6,6 +6,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -50,7 +51,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.LoadComplete();
 
-            ColumnWatcher.GetOrCreate(Column).Add(this);
+            if (!ManiaDenseScrollAblation.DisableColumnWatcherSubscriptions)
+                ColumnWatcher.GetOrCreate(Column).Add(this);
+
             Scheduler.AddOnce(OnLoadChanged);
         }
 
@@ -155,7 +158,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void Dispose(bool isDisposing)
         {
-            if (isDisposing)
+            if (isDisposing && !ManiaDenseScrollAblation.DisableColumnWatcherSubscriptions)
                 ColumnWatcher.Remove(Column, this);
             base.Dispose(isDisposing);
         }

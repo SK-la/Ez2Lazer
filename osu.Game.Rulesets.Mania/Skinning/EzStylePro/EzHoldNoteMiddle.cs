@@ -8,6 +8,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Mania.Skinning.Legacy;
@@ -204,6 +205,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.Update();
 
+            if (!ManiaDenseScrollAblation.DisablePerFrameLayoutWrites)
+                updateLayout();
+        }
+
+        private void updateLayout()
+        {
             if (MainContainer.Children.Count == 0)
                 return;
 

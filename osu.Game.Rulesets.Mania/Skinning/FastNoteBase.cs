@@ -6,6 +6,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania.Skinning
@@ -75,7 +76,8 @@ namespace osu.Game.Rulesets.Mania.Skinning
         {
             base.LoadComplete();
 
-            ColumnWatcher.GetOrCreate(Column).Add(this);
+            if (!ManiaDenseScrollAblation.DisableColumnWatcherSubscriptions)
+                ColumnWatcher.GetOrCreate(Column).Add(this);
 
             // 在 LoadComplete 订阅：子类覆写的该属性可能依赖其自身 [Resolved]（构造/load 期间未必已注入）。
             builtInColourTemplateSwitch = BuiltInColourTemplateSwitch?.GetBoundCopy();
@@ -135,7 +137,9 @@ namespace osu.Game.Rulesets.Mania.Skinning
         {
             if (isDisposing)
             {
-                ColumnWatcher.Remove(Column, this);
+                if (!ManiaDenseScrollAblation.DisableColumnWatcherSubscriptions)
+                    ColumnWatcher.Remove(Column, this);
+
                 builtInColourTemplateSwitch?.UnbindAll();
             }
 
