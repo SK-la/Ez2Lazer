@@ -16,16 +16,16 @@ using osu.Game.Extensions;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.EzMania;
 using osu.Game.Rulesets.Mania.EzMania.Audio;
 using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
+using osu.Game.Rulesets.Mania.EzMania.Input;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
-using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.Configuration;
-using osu.Game.Rulesets.Mania.EzMania.Input;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Skinning;
@@ -121,6 +121,11 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved(canBeNull: true)]
         private DrawableManiaRuleset? drawableRuleset { get; set; }
 
+        /// <summary>
+        /// 是否走列级输入路由与到期落判。标定场景没有 <see cref="DrawableManiaRuleset"/> 时可经消融开关强制打开。
+        /// </summary>
+        internal bool ColumnRoutesInput => drawableRuleset?.ColumnRoutesInput == true || ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss;
+
         internal ManiaLaneController LaneController { get; private set; } = null!;
 
         private double pressHistoryRetentionMs = 120_000;
@@ -163,7 +168,7 @@ namespace osu.Game.Rulesets.Mania.UI
             => new LaneTrackingScrollingHitObjectContainer(this);
 
         internal void RegisterLaneDrawable(DrawableHitObject drawable)
-            => LaneController.Register(drawable, drawableRuleset?.ColumnRoutesInput == true);
+            => LaneController.Register(drawable, ColumnRoutesInput);
 
         internal void UnregisterLaneDrawable(DrawableHitObject drawable) => LaneController.Unregister(drawable);
 
@@ -278,7 +283,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
         protected override void Update()
         {
-            if (drawableRuleset?.ColumnRoutesInput == true)
+            if (ColumnRoutesInput)
                 LaneController.EnableAutoMissScheduling();
 
             base.Update();
@@ -288,7 +293,7 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             base.UpdateAfterChildren();
 
-            if (drawableRuleset?.ColumnRoutesInput == true)
+            if (ColumnRoutesInput)
                 LaneController.ProcessAutoMiss(Time.Current);
         }
 
@@ -347,7 +352,7 @@ namespace osu.Game.Rulesets.Mania.UI
             maniaObject.AccentColour.BindTo(AccentColour);
             maniaObject.CheckHittable = (d, time) =>
             {
-                LaneController.RegisterIfNeeded(d, drawableRuleset?.ColumnRoutesInput == true);
+                LaneController.RegisterIfNeeded(d, ColumnRoutesInput);
                 resolvePressRouting(out var precedence);
                 return isHittable(d, time, precedence);
             };
@@ -491,11 +496,11 @@ namespace osu.Game.Rulesets.Mania.UI
             if (keySoundPreviewMode == KeySoundPreviewMode.AutoPreview)
                 sampleTriggerSource.Play();
 
-            if (drawableRuleset?.ColumnRoutesInput == true)
+            if (ColumnRoutesInput)
             {
                 columnRoutedPressTarget = null;
 
-                if (drawableRuleset.JudgementRound is { IsO2Jam: true } round)
+                if (drawableRuleset?.JudgementRound is { IsO2Jam: true } round)
                     round.NotifyO2InputAt(time);
 
                 resolvePressRouting(out var precedence);
@@ -514,7 +519,7 @@ namespace osu.Game.Rulesets.Mania.UI
             if (e.Action != Action.Value)
                 return;
 
-            if (drawableRuleset?.ColumnRoutesInput != true)
+            if (!ColumnRoutesInput)
                 return;
 
             var activeHold = LaneController.ActiveHold;
@@ -522,7 +527,7 @@ namespace osu.Game.Rulesets.Mania.UI
             if (activeHold == null || !activeHold.IsHolding.Value)
                 return;
 
-            var round = drawableRuleset.JudgementRound;
+            var round = drawableRuleset?.JudgementRound;
 
             if (round != null)
                 ManiaEzDrawableJudgement.TryColumnHoldTailRelease(activeHold, Time.Current, round);

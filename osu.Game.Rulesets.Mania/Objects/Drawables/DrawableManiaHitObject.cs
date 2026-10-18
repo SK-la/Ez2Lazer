@@ -13,6 +13,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Input.Bindings;
 using osu.Game.Audio;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Scoring;
@@ -103,7 +104,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 ? judgementRound.Strategy != null
                 : HitObject.HitWindows is ManiaHitWindows windows
                   && windows.ActiveJudgeMode is not (EzEnumJudgeMode.Lazer or EzEnumJudgeMode.StableClassic);
-            ColumnSchedulesAutoMiss = drawableManiaRuleset?.ColumnRoutesInput == true;
+            ColumnSchedulesAutoMiss = drawableManiaRuleset?.ColumnRoutesInput == true || ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss;
 
             Direction.BindValueChanged(OnDirectionChanged, true);
         }

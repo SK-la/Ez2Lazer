@@ -183,6 +183,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
             AddToggleStep("per-frame layout writes", v => ManiaDenseScrollAblation.DisablePerFrameLayoutWrites = !v);
             AddToggleStep("subtraction stroke", v => ManiaHoldAblation.DisableSubtractionStroke = !v);
             AddToggleStep("hold tick scan", v => ManiaHoldAblation.DisableHoldTickScan = !v);
+            AddToggleStep("column-routed auto miss", v =>
+            {
+                ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = v;
+                rebuildField();
+            });
 
             AddStep("restart scene", rebuildField);
             AddStep("log sample now", () => logSample("manual"));
@@ -225,6 +230,56 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
             {
                 ManiaDenseScrollAblation.DisablePerFrameLayoutWrites = false;
                 setPreset(10, 20, 700, 0, Ez2Skin.CreateInfo());
+            });
+        }
+
+        /// <summary>
+        /// 列级路由口径：开 <c>ForceColumnRoutedAutoMiss</c> 后到期由 <c>LaneController</c> 落判，
+        /// 每条 drawable 不再每帧走 <c>UpdateResult(false)</c>，用于量化该轮询在标定里的占比。
+        /// </summary>
+        [Test]
+        public void TestColumnRoutedAutoMiss()
+        {
+            // 交替取样：先跑的配置会吃到 JIT / 池预热，单次 A/B 会把预热算进 off 组。
+            samplePreset("route off a 10col 20kps 700ms tap", () =>
+            {
+                ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = false;
+                setPreset(10, 20, 700, 0);
+            });
+            samplePreset("route on a 10col 20kps 700ms tap", () =>
+            {
+                ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = true;
+                setPreset(10, 20, 700, 0);
+            });
+            samplePreset("route off b 10col 20kps 700ms tap", () =>
+            {
+                ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = false;
+                setPreset(10, 20, 700, 0);
+            });
+            samplePreset("route on b 10col 20kps 700ms tap", () =>
+            {
+                ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = true;
+                setPreset(10, 20, 700, 0);
+            });
+            samplePreset("route off a 10col 20kps 700ms 50% hold", () =>
+            {
+                ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = false;
+                setPreset(10, 20, 700, 0.5);
+            });
+            samplePreset("route on a 10col 20kps 700ms 50% hold", () =>
+            {
+                ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = true;
+                setPreset(10, 20, 700, 0.5);
+            });
+            samplePreset("route off b 10col 20kps 700ms 50% hold", () =>
+            {
+                ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = false;
+                setPreset(10, 20, 700, 0.5);
+            });
+            samplePreset("route on b 10col 20kps 700ms 50% hold", () =>
+            {
+                ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss = true;
+                setPreset(10, 20, 700, 0.5);
             });
         }
 

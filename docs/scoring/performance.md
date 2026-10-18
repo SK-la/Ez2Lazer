@@ -120,6 +120,19 @@
 - hold 的分配是 tap 的约 4 倍，来源是每条 LN 多出的 head / tail / body 三个嵌套 drawable、两个 proxy 与对应皮肤组件；要降分配只能降单条 LN 的生成成本，与驻留长度无关。
 - hold 组在同样存活数下是 tap 的 4–12 倍 update、4 倍分配；16 列 × 20 KPS × 700 ms、50% hold 单帧 update 13.3 ms，已占 60 FPS 帧预算的 80%。这是本机数据里唯一逼近预算的组合。
 - 16 列的 tap 单格在 15/700 与 20/700 偏高，与 10 列同格的线性外推不符，属 short job 抖动（该格 StdDev 达 8–21 ms），不作为结论。
-- 本基准的场景里没有 `DrawableManiaRuleset`，每条存活 drawable 都在 `UpdateAfterChildren` 里按帧走 `UpdateResult(false)`；列级路由的实战路径（`ColumnRoutesInput`）只在到期时轮询。因此这里的绝对 ms 和 hold/tap 倍率偏悲观，用于同机比较与回归，不外推到实战绝对值。
+- 本基准的场景里没有 `DrawableManiaRuleset`，每条存活 drawable 都在 `UpdateAfterChildren` 里按帧走 `UpdateResult(false)`；列级路由的实战路径（`ColumnRoutesInput`）只在到期时轮询。下面给出这条轮询的实测占比。
 - 池：每列 20 KPS × 700 ms 的 10 列池会从初始 10 扩到约 19/列后复用；`DrawableNote` 池 190 个，仍低于每列上限 50。
+
+#### 列级路由口径（DEBUG 场景，交替 A/B）
+
+`ManiaDenseScrollAblation.ForceColumnRoutedAutoMiss` 让没有 `DrawableManiaRuleset` 的场景也走列级路由：到期由 `LaneController.ProcessAutoMiss` 落判，每条 drawable 不再每帧轮询。10 列 × 20 KPS × 700 ms，off / on 交替各两组，每组 3 次取中位数：
+
+| 组 | tap off | tap on | 50% hold off | 50% hold on |
+|----|---------|--------|--------------|-------------|
+| a | 2.49 | 1.50 | 10.58 | 9.53 |
+| b | 1.73 | 1.34 | 10.08 | 8.26 |
+
+- 每帧轮询约占 tap 的 30%、hold 的 15–20%。tap 掉得更多是因为它只有 1 个 drawable 在轮询，LN 是 4 个，轮询成本被淹没在结构成本里。
+- 去掉轮询后 hold / tap 仍是 5–6 倍：LN 的增量主要来自嵌套 drawable 数量与掩码容器，不是判定轮询。
+- 因此全矩阵的绝对值偏保守，但 hold > tap、密度 > 驻留的排序不变。
 
