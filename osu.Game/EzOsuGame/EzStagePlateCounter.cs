@@ -54,30 +54,27 @@ namespace osu.Game.EzOsuGame
             int count = layout.Digits > max_places ? max_places : layout.Digits;
             places = new Sprite[count];
 
-            // 数字组绕支点转，数字写相对支点的偏移。没有声明 pivot 时支点就是自身位置，
-            // 与旧行为逐像素一致（此时旋转为 0，或绕个位数字转）。
+            // 整组绕支点转：每位数字自己带 rotation，位置由「未旋转位置绕支点旋转」算出。
+            // 不用容器承载旋转 —— 零尺寸容器靠父级旋转在部分情况下会让整组叠到一起，
+            // 逐位旋转的几何等价，且每位数字各自按自身包围盒参与裁剪，更稳。
             Vector2 pivot = layout.ToOsuPivot();
-
-            var digits = new Container
-            {
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre,
-                Position = pivot,
-                Rotation = layout.Rotation,
-            };
+            float rotation = layout.ToScreenRotation();
 
             for (int place = 0; place < count; place++)
             {
+                Vector2 target = EzStagePlacement.RotateAbout(EzStagePlacement.GetDigitPosition(layout, place), pivot, rotation);
+
                 places[place] = new Sprite
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Position = EzStagePlateElement.ToOsu(layout.X + place * layout.Spacing, layout.Y) - pivot,
+                    RelativeSizeAxes = Axes.None,
+                    Position = target,
+                    Rotation = rotation,
                 };
             }
 
-            digits.AddRange(places);
-            InternalChild = digits;
+            InternalChildren = places;
         }
 
         protected override void LoadComplete()

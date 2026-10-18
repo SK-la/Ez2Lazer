@@ -7,6 +7,7 @@ using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using osu.Framework.Graphics;
 using osuTK;
 
 namespace osu.Game.EzOsuGame
@@ -127,7 +128,6 @@ namespace osu.Game.EzOsuGame
     /// </summary>
     /// <remarks>
     /// 坐标与 Body 同一套：GLB 像素、Y 朝上，绘制时 X、Y 都取反。
-    /// <see cref="Rotation"/> 是屏幕上的角度，顺时针为正（Unity 的 Z 轴是逆时针，导出时已取反）。
     /// 旋转默认绕该部件自身的位置，需要绕别的点时用 <see cref="PivotX"/> / <see cref="PivotY"/>。
     /// </remarks>
     internal class EzStagePlateElement
@@ -142,6 +142,9 @@ namespace osu.Game.EzOsuGame
         [JsonPropertyName("y")]
         public float Y { get; set; }
 
+        /// <summary>
+        /// 静态旋转，单位为度，屏幕上顺时针为正（与 <see cref="Drawable.Rotation"/> 一致）。
+        /// </summary>
         [JsonPropertyName("rotation")]
         public float Rotation { get; set; }
 
@@ -165,6 +168,11 @@ namespace osu.Game.EzOsuGame
 
         [JsonIgnore]
         public bool HasRotation => Rotation != 0;
+
+        /// <summary>
+        /// 该部件在屏幕上应使用的旋转角（与 <see cref="Rotation"/> 同义，直接取用）。
+        /// </summary>
+        public float ToScreenRotation() => Rotation;
 
         public static Vector2 ToOsu(float x, float y) => new Vector2(-x, -y);
 
