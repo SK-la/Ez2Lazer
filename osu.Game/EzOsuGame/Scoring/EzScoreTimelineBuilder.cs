@@ -92,8 +92,10 @@ namespace osu.Game.EzOsuGame.Scoring
                     }
 
                     // Race Mania 传 null shared → AttachBeatmaps → provider GetBound（隔离 + 转谱 cache）。
-                    // 显式 shared（同 Mod 复用的 session-ready / 测试夹具）时不挂 provider，以免盖掉调用方实例。
-                    if (sharedPlayableBeatmap == null)
+                    // Osu 同理：无论是否传了 shared，都挂 provider，让 Session 在按 JudgeMode 隔离的副本上绑定判定语义
+                    // （shared 实例可能被多个判定档共用，就地绑定会串扰）。
+                    // 显式 shared（同 Mod 复用的 session-ready / 测试夹具）对其它模式不挂 provider，以免盖掉调用方实例。
+                    if (sharedPlayableBeatmap == null || timelineMode == EzScoreRaceGhostTimelineMode.OsuSession)
                         session.AttachBeatmaps(beatmaps);
 
                     // 本方法已在 Service 的后台 Task.Run 中串行执行；直接同步运行，

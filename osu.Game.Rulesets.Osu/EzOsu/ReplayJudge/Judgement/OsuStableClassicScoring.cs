@@ -44,6 +44,11 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement
             if (hitObject is Slider slider)
                 slider.ClassicSliderBehaviour = true;
 
+            // 判定对象缓存了按 classic 分支创建的结果（滑条主体、滑条头、滑条尾的档位都取决于
+            // ClassicSliderBehaviour）。转换期间可能已被创建过，这里必须丢弃，否则主体会被当成 Ignore 判档，
+            // 既不进准确率分母也不进最大分。
+            hitObject.ResetJudgement();
+
             foreach (var nested in hitObject.NestedHitObjects)
                 applyRecursive(nested, overallDifficulty);
         }
