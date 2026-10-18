@@ -13,14 +13,11 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
 {
     internal static class OsuReplayParityHelper
     {
-        /// <summary>输入判定的命中时刻来自 replay 帧，两条路径应完全一致，只留亚帧余量。</summary>
-        private const double input_time_offset_tolerance = 12;
+        /// <summary>内核在事件时刻落判，Drawable 与 Session 必须逐字段一致；只留浮点比较余量。</summary>
+        private const double input_time_offset_tolerance = 0.01;
 
-        /// <summary>
-        /// 非输入判定（过期 Miss、滑条 tick/尾、转盘 tick）由 Drawable 在帧回调里结算，Session 用解析时刻，
-        /// 最多差一帧多，故只框住量级。
-        /// </summary>
-        private const double frame_time_offset_tolerance = 32;
+        /// <summary>非输入判定（过期 Miss、滑条 tick/尾、转盘 tick）同样由内核按 deadline 落判，容差与输入一致。</summary>
+        private const double frame_time_offset_tolerance = 0.01;
 
         public static bool AreHitEventsEquivalent(IReadOnlyList<HitEvent> expected, IReadOnlyList<HitEvent> actual)
         {
