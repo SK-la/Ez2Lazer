@@ -9,6 +9,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Scoring;
+using osuTK;
 
 namespace osu.Game.EzOsuGame
 {
@@ -27,7 +28,6 @@ namespace osu.Game.EzOsuGame
         private readonly Source source;
         private readonly Sprite[] places;
         private readonly Texture?[] glyphs = new Texture?[10];
-
         private long shownValue;
         private string? digitBase;
         private Bindable<string>? stageName;
@@ -54,17 +54,31 @@ namespace osu.Game.EzOsuGame
             int count = layout.Digits > max_places ? max_places : layout.Digits;
             places = new Sprite[count];
 
+            // Unity 把静态旋转放在数字组根节点上，数字绕该节点转。这里用一个容器还原：
+            // 容器摆在支点、带上旋转，数字写相对支点的偏移。旋转为 0 时支点取零，位置与旧行为一致。
+            bool rotated = layout.Rotation != 0;
+            Vector2 pivot = rotated ? layout.ToOsuPivot() : Vector2.Zero;
+
+            var digits = new Container
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Position = pivot,
+                Rotation = layout.Rotation,
+            };
+
             for (int place = 0; place < count; place++)
             {
                 places[place] = new Sprite
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Position = EzStagePlateSprite.ToOsu(layout.X + place * layout.Spacing, layout.Y),
+                    Position = EzStagePlateSprite.ToOsu(layout.X + place * layout.Spacing, layout.Y) - pivot,
                 };
             }
 
-            InternalChildren = places;
+            digits.AddRange(places);
+            InternalChild = digits;
         }
 
         protected override void LoadComplete()

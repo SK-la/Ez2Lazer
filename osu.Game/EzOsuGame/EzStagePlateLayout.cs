@@ -219,7 +219,30 @@ namespace osu.Game.EzOsuGame
         [JsonPropertyName("spacing")]
         public float Spacing { get; set; }
 
+        /// <summary>
+        /// 数字组的静态旋转，单位为度，正值在屏幕上顺时针（与 UnityEngine 的 Z 轴方向相反）。
+        /// </summary>
+        /// <remarks>
+        /// Unity 把旋转定义在数字组的根节点上，十个数字继承同一角度并绕该节点转动。
+        /// 这里存的旋转以 <see cref="PivotX"/> / <see cref="PivotY"/> 为支点，而不是绕个位数字转，
+        /// 否则整组会平移到别处（Kings 的连击偏 7°，支点差 442 像素，误差约 54 像素）。
+        /// </remarks>
+        [JsonPropertyName("rotation")]
+        public float Rotation { get; set; }
+
+        /// <summary>
+        /// 旋转支点，与 <see cref="X"/> / <see cref="Y"/> 同一坐标系（同一套取反规则）。旋转为 0 时忽略。
+        /// </summary>
+        [JsonPropertyName("pivotX")]
+        public float PivotX { get; set; }
+
+        /// <inheritdoc cref="PivotX"/>
+        [JsonPropertyName("pivotY")]
+        public float PivotY { get; set; }
+
         public Vector2 ToOsuPosition() => EzStagePlateSprite.ToOsu(X, Y);
+
+        public Vector2 ToOsuPivot() => EzStagePlateSprite.ToOsu(PivotX, PivotY);
     }
 
     internal sealed class EzStagePlateSprite
