@@ -691,8 +691,8 @@ namespace osu.Game.EzOsuGame
 
             var position = new Vector2(-(piece?.X ?? 0), lineOffset);
 
-            // 贴图按自身显示尺寸绘制，随舞台板一起缩放；这与旧 EzJudgementLine 的视觉一致。
-            Vector2 size = frames[0].DisplaySize;
+            // 与其它部件同一套单位：源图像素。
+            Vector2 size = new Vector2(frames[0].Width, frames[0].Height);
 
             Drawable drawable;
 
@@ -933,8 +933,11 @@ namespace osu.Game.EzOsuGame
             if (frames.Count == 0)
                 return null;
 
-            // 首帧的显示尺寸就是 drawable 铺开后的尺寸；动画在布局前 Height 还是 0，所以这里按帧取。
-            contentSize = new Vector2(frames[0].DisplayWidth, frames[0].DisplayHeight);
+            // 统一到源图像素：layout 的坐标、spacing、designWidth 都以它为单位。
+            // 纹理池会按 scaleAdjust 折算显示尺寸，而 Large 池的拷贝构造不复制该值，
+            // 于是单帧与多帧会得到两种尺寸；这里显式还原，整个舞台板只用一种单位。
+            Vector2 size = new Vector2(frames[0].Width, frames[0].Height);
+            contentSize = size;
 
             BlendingParameters blending = piece.IsAdditive ? BlendingParameters.Additive : BlendingParameters.Inherit;
 
@@ -945,6 +948,7 @@ namespace osu.Game.EzOsuGame
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
                     Position = piece.ToOsuPosition(),
+                    Size = size,
                     Texture = frames[0],
                     Blending = blending,
                 };
@@ -963,7 +967,9 @@ namespace osu.Game.EzOsuGame
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
+                RelativeSizeAxes = Axes.None,
                 Position = piece.ToOsuPosition(),
+                Size = size,
                 Loop = piece.Loop,
                 DefaultFrameLength = piece.FrameLength,
                 Blending = blending,

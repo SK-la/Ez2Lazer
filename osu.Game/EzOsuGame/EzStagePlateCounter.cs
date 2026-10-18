@@ -158,7 +158,18 @@ namespace osu.Game.EzOsuGame
 
             for (int place = 0; place < places.Length; place++)
             {
-                places[place].Texture = glyphs[value % 10];
+                Texture? glyph = glyphs[value % 10];
+
+                if (places[place].Texture != glyph)
+                {
+                    places[place].Texture = glyph;
+
+                    // 字形池带 scaleAdjust，默认尺寸只有源图一半；layout 的 spacing 是源图像素，
+                    // 所以这里按源图像素显式给尺寸，否则数字会整体缩小一半。
+                    if (glyph != null)
+                        places[place].Size = glyph.DisplaySize * glyph.ScaleAdjust;
+                }
+
                 value /= 10;
             }
         }
