@@ -16,9 +16,12 @@ using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Objects.Legacy;
 using osu.Game.Rulesets.Osu.Beatmaps;
 using osu.Game.Rulesets.Osu.Configuration;
+using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
+using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Osu.Objects.Drawables;
 using osu.Game.Rulesets.Osu.Objects.Drawables.Connections;
+using osu.Game.Rulesets.Osu.Scoring;
 using osu.Game.Rulesets.Osu.UI.Cursor;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
@@ -92,6 +95,12 @@ namespace osu.Game.Rulesets.Osu.UI
 
         private IHitPolicy hitPolicy;
 
+        /// <summary>
+        /// 是否启用 stable note lock 的 Drawable 侧：已判中的滑条头遮挡其下方物件，直到整条滑条判完。
+        /// 只由判定档置位，与经典 mod 无关。
+        /// </summary>
+        public bool BlockInputUnderSliderHeads { get; set; }
+
         public IHitPolicy HitPolicy
         {
             get => hitPolicy;
@@ -106,6 +115,9 @@ namespace osu.Game.Rulesets.Osu.UI
         protected override void OnNewDrawableHitObject(DrawableHitObject drawable)
         {
             ((DrawableOsuHitObject)drawable).CheckHittable = hitPolicy.CheckHittable;
+
+            if (BlockInputUnderSliderHeads && drawable is DrawableSliderHead head)
+                StableClassicNoteLock.BlockInputUnderSliderHead(head);
 
             Debug.Assert(!drawable.IsLoaded, $"Already loaded {nameof(DrawableHitObject)} is added to {nameof(OsuPlayfield)}");
             drawable.OnLoadComplete += onDrawableHitObjectLoaded;
@@ -132,9 +144,14 @@ namespace osu.Game.Rulesets.Osu.UI
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuRulesetConfigManager? config, IBeatmap? beatmap)
+        private void load(OsuRulesetConfigManager? config, IBeatmap? beatmap, ScoreProcessor? scoreProcessor)
         {
             config?.BindWith(OsuRulesetSetting.PlayfieldBorderStyle, playfieldBorder.PlayfieldBorderStyle);
+
+            // 判定档是 stable 输入机制的开关：note lock 必须在任何 drawable 创建前定好，因此放在 pools 之前。
+            // 只认判定档，不认经典 mod。
+            if (scoreProcessor is OsuScoreProcessor osuScoreProcessor && OsuStableClassic.IsActive(osuScoreProcessor.JudgeMode))
+                OsuStableClassic.ApplyLiveRules(this, osuScoreProcessor.Mods.Value.Any(m => m is OsuModAutopilot));
 
             var osuBeatmap = (OsuBeatmap?)beatmap;
 

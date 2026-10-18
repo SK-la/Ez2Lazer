@@ -31,6 +31,11 @@ namespace osu.Game.Rulesets.Osu.Scoring
 
         private EzEnumJudgeMode stdJudgeMode => JudgementTrackOverride ?? EzEnumJudgeMode.Lazer;
 
+        /// <summary>
+        /// 本局冻结的判定轨；未冻结时按 Lazer，与全谱模拟使用同一口径。
+        /// </summary>
+        public EzEnumJudgeMode JudgeMode => stdJudgeMode;
+
         private readonly StableStdScoring stableScoring = new StableStdScoring();
 
         private bool isStableClassic => OsuStableClassic.IsActive(stdJudgeMode);

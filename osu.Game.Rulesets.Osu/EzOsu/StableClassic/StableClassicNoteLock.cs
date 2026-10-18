@@ -4,6 +4,8 @@
 using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
+using osu.Game.Rulesets.Osu.Objects.Drawables;
+using osu.Game.Rulesets.Osu.Scoring;
 using osu.Game.Rulesets.Osu.UI;
 
 namespace osu.Game.Rulesets.Osu.EzOsu.StableClassic
@@ -20,6 +22,18 @@ namespace osu.Game.Rulesets.Osu.EzOsu.StableClassic
     {
         /// <summary>结束时刻比较的额外宽容，抵消未对齐物件。</summary>
         private const double END_TIME_TOLERANCE = 3;
+
+        /// <summary>
+        /// classic note lock 的可命中半径：以 miss 窗为界，Autopilot 下收窄 200 ms。
+        /// </summary>
+        public static double HittableRange(bool autopilot) => OsuHitWindows.MISS_WINDOW - (autopilot ? 200 : 0);
+
+        /// <summary>
+        /// note lock 的 Drawable 侧：已判中的滑条头遮挡其下方物件，直到整条滑条判完。
+        /// 让重叠物件在滑条期间拿不到输入，与叠堆/顺序检查互补。
+        /// </summary>
+        public static void BlockInputUnderSliderHead(DrawableSliderHead head)
+            => head.HitArea.CanBeHit = () => !head.DrawableSlider.AllJudged;
 
         /// <summary>紧邻的前一个物件仍在叠堆且未全部判定时忽略输入（点到别的高度，不是抢拍）。</summary>
         /// <param name="previousObject">目标在容器中的紧邻前一个物件；目标为嵌套物件（滑条头）时传 <c>null</c>。</param>

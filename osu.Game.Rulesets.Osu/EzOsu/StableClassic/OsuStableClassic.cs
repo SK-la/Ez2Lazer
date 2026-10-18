@@ -1,10 +1,12 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Osu.Objects;
+using osu.Game.Rulesets.Osu.UI;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Osu.EzOsu.StableClassic
@@ -23,7 +25,8 @@ namespace osu.Game.Rulesets.Osu.EzOsu.StableClassic
     /// <item>局内计分挂钩：<c>Scoring/OsuScoreProcessor</c>。</item>
     /// </list>
     /// 上游字段 <see cref="Slider.ClassicSliderBehaviour"/> 同时被经典 mod（<c>OsuModClassic</c>）写入，
-    /// 因此字段留在上游，本目录只解释它的语义。
+    /// 因此字段留在上游，本目录只解释它的语义。经典 mod 是独立开关，不是本档的前置条件：
+    /// 本档生效时，即使没挂经典 mod 或经典 mod 关掉了对应选项，判定窗、滑条、note lock、计分也全部按 stable 口径运行。
     /// </remarks>
     public static class OsuStableClassic
     {
@@ -61,6 +64,21 @@ namespace osu.Game.Rulesets.Osu.EzOsu.StableClassic
 
             foreach (var nested in hitObject.NestedHitObjects)
                 applyRecursive(nested, overallDifficulty);
+        }
+
+        /// <summary>
+        /// 把 stable 判定所需的 Drawable 侧规则装到本局：classic note lock 与滑条头遮挡。
+        /// </summary>
+        /// <remarks>
+        /// 只由判定档触发，与经典 mod 无关；经典 mod 的同一套设置随后应用也不会改变结果。
+        /// 只覆盖判定相关的输入拦截；血量、淡出、尾音等表现仍由各自设置与 mod 决定。
+        /// </remarks>
+        public static void ApplyLiveRules(OsuPlayfield playfield, bool autopilot)
+        {
+            ArgumentNullException.ThrowIfNull(playfield);
+
+            playfield.HitPolicy = new LegacyHitPolicy(StableClassicNoteLock.HittableRange(autopilot));
+            playfield.BlockInputUnderSliderHeads = true;
         }
     }
 }
