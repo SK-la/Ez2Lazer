@@ -18,6 +18,8 @@ namespace osu.Game.Rulesets.Mania.UI.Components
     /// the bottom edge, and when they scroll upwards it is the top edge. The surface therefore has to be the hit object
     /// area itself — a <see cref="HitPositionPaddedContainer"/> on the playfield, or a surface already limited to the hit
     /// objects' span (the editor's extension columns) — rather than the full column.
+    /// This is a plain 1px line for the editor and for skins without artwork; Ez stage judgement lines are drawn from
+    /// the stage layout instead.
     /// </remarks>
     public partial class ManiaJudgementLine : CompositeDrawable
     {
@@ -48,8 +50,6 @@ namespace osu.Game.Rulesets.Mania.UI.Components
         {
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(d => placeAtHitPosition(d.NewValue), true);
-
-            // TODO: 以后实现自定义贴图，JudgementLine。
         }
 
         private void placeAtHitPosition(ScrollingDirection scrollingDirection)

@@ -25,6 +25,10 @@ namespace osu.Game.EzOsuGame
         [JsonPropertyName("meter")]
         public EzStagePlateMeter? Meter { get; set; }
 
+        // 判定线贴图。Y 不在这里给，由 ratio 换算，见 EzStagePlateJudgementLine。
+        [JsonPropertyName("judgementLine")]
+        public EzStagePlateJudgementLine? JudgementLine { get; set; }
+
         [JsonPropertyName("overObject")]
         public EzStagePlateSprite? OverObject { get; set; }
 
@@ -42,6 +46,12 @@ namespace osu.Game.EzOsuGame
         // 固定槽位之外的图，按 path 加载，不按皮肤名分支。
         [JsonPropertyName("parts")]
         public List<EzStagePlateSprite>? Parts { get; set; }
+
+        /// <summary>
+        /// 舞台贴图的设计宽度。列宽到舞台缩放以此为准，允许自制舞台用其它宽度。
+        /// </summary>
+        [JsonPropertyName("designWidth")]
+        public float DesignWidth { get; set; } = EzStagePlacement.DEFAULT_DESIGN_WIDTH;
 
         public static EzStagePlateLayout? TryLoad(EzResourceStore resource, string stageName)
         {
@@ -61,6 +71,38 @@ namespace osu.Game.EzOsuGame
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// 舞台判定线。贴图底边贴合该位置，位置由 <see cref="Ratio"/> 在 Body 图内的归一化高度决定。
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Ratio"/> 从 Body 图底边往上量，0 是底边、1 是顶边，与 Body 的分辨率无关。
+    /// 它同时是舞台板的缩放锚点：舞台按命中判定线摆放后，任何列宽/缩放都不再移动这条线。
+    /// </remarks>
+    internal sealed class EzStagePlateJudgementLine
+    {
+        /// <summary>
+        /// 246 / 1080：Ez2ON 舞台图中底边到判定线的实测比例。layout 未给出时为该值。
+        /// </summary>
+        public const float DEFAULT_RATIO = 246f / 1080f;
+
+        // 相对 Stage/{舞台名}/Stage。缺省 JudgementLine。
+        [JsonPropertyName("path")]
+        public string? Path { get; set; }
+
+        // 与其它 stage 组件同一坐标系（Unity X，绘制时取反）。
+        [JsonPropertyName("x")]
+        public float X { get; set; }
+
+        [JsonPropertyName("ratio")]
+        public float Ratio { get; set; } = DEFAULT_RATIO;
+
+        // 多帧时的帧间隔（毫秒）。缺省沿用舞台动画的 66。
+        [JsonPropertyName("frameMs")]
+        public double FrameMs { get; set; }
+
+        public double FrameLength => FrameMs > 0 ? FrameMs : 66;
     }
 
     internal sealed class EzStagePlateMeter

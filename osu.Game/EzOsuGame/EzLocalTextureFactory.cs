@@ -380,8 +380,10 @@ namespace osu.Game.EzOsuGame
 
             addPlateSprite(container, layout.Back, $"{basePath}/BlackPanel");
 
+            Vector2 bodySize = Vector2.Zero;
+
             if (keyFolder != null)
-                addPlateSprite(container, layout.Body, $"{basePath}/{keyFolder}/Body");
+                addPlateSprite(container, layout.Body, $"{basePath}/{keyFolder}/Body", out bodySize);
 
             addPlateSprite(container, layout.GrooveLight, $"{basePath}/GrooveLight");
 
@@ -415,16 +417,81 @@ namespace osu.Game.EzOsuGame
                 bool placed = false;
 
                 if (!string.IsNullOrEmpty(layout.Character.Path))
-                    placed = addPlateSprite(container, layout.Character, $"{basePath}/{layout.Character.Path}");
+                    placed = addPlateSprite(container, layout.Character, $"{basePath}/{layout.Character.Path}", out _) != null;
 
                 if (!placed && keyFolder != null)
-                    placed = addPlateSprite(container, layout.Character, $"{basePath}/{keyFolder}/Character");
+                    placed = addPlateSprite(container, layout.Character, $"{basePath}/{keyFolder}/Character", out _) != null;
 
                 if (!placed)
                     addPlateSprite(container, layout.Character, $"{basePath}/Character_overlayer");
             }
 
+            mountJudgementLine(container, layout.JudgementLine, basePath, bodySize);
+
             return container;
+        }
+
+        /// <summary>
+        /// 把判定线贴图挂到舞台板上，并把舞台板整体上移，使板子的 (0, 0) 落在判定线上。
+        /// 外部只需把该原点放到游戏判定线位置再缩放；缩放支点就是判定线，列宽不会再改变两者的相对位置。
+        /// </summary>
+        private void mountJudgementLine(Container plate, EzStagePlateJudgementLine? piece, string basePath, Vector2 bodySize)
+        {
+            // ratio 相对 Body 底边，用 Body 的实际绘制高度换算，因此不受 store 缩放与源图分辨率影响。
+            // 没有 Body 的舞台退化为以板中心为锚点：那种舞台本就没有可用于对齐的美术。
+            float judgementLineY = bodySize.Y > 0
+                ? EzStagePlacement.GetJudgementLineOffset(bodySize.Y, piece?.Ratio ?? EzStagePlateJudgementLine.DEFAULT_RATIO)
+                : 0;
+
+            // 板子按 Body 的实际绘制尺寸给包围盒，子项定位与裁剪都以它为界。
+            if (bodySize.Y > 0)
+                plate.Size = bodySize;
+
+            plate.Y = -judgementLineY;
+
+            if (piece == null)
+                return;
+
+            string path = string.IsNullOrWhiteSpace(piece.Path) ? "JudgementLine" : piece.Path!.Trim().Trim('/');
+            var frames = loadStageComponentFrames($"{basePath}/{path}");
+
+            if (frames.Count == 0)
+                return;
+
+            var size = new Vector2(frames[0].DisplayWidth, frames[0].DisplayHeight);
+            var position = new Vector2(-piece.X, judgementLineY);
+
+            Drawable drawable;
+
+            if (frames.Count == 1)
+            {
+                drawable = new Sprite
+                {
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
+                    Position = position,
+                    Size = size,
+                    Texture = frames[0],
+                };
+            }
+            else
+            {
+                var animation = new TextureAnimation
+                {
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
+                    RelativeSizeAxes = Axes.None,
+                    Position = position,
+                    Size = size,
+                    Loop = true,
+                    DefaultFrameLength = piece.FrameLength,
+                };
+
+                animation.AddFrames(frames);
+                drawable = animation;
+            }
+
+            plate.Add(drawable);
         }
 
         private EzStagePlateLayout? getPlateLayout()
@@ -435,6 +502,18 @@ namespace osu.Game.EzOsuGame
             plateLayoutStage = stageName.Value;
             plateLayout = EzStagePlateLayout.TryLoad(resource, stageName.Value);
             return plateLayout;
+        }
+
+        /// <summary>
+        /// 当前舞台的设计宽度，由 stage layout 声明；未声明或非法时为 <see cref="EzStagePlacement.DEFAULT_DESIGN_WIDTH"/>。
+        /// </summary>
+        public float StageDesignWidth
+        {
+            get
+            {
+                float width = getPlateLayout()?.DesignWidth ?? EzStagePlacement.DEFAULT_DESIGN_WIDTH;
+                return width > 0 ? width : EzStagePlacement.DEFAULT_DESIGN_WIDTH;
+            }
         }
 
         internal const int MAX_STAGE_KEYS = 18;
@@ -541,21 +620,31 @@ namespace osu.Game.EzOsuGame
         }
 
         private bool addPlateSprite(Container parent, EzStagePlateSprite? piece, string texturePath)
-        {
-            if (piece == null)
-                return false;
+            => addPlateSprite(parent, piece, texturePath, out _) != null;
 
-            Drawable? drawable = createPlateDrawable(texturePath, piece);
+        private Drawable? addPlateSprite(Container parent, EzStagePlateSprite? piece, string texturePath, out Vector2 contentSize)
+        {
+            contentSize = Vector2.Zero;
+
+            if (piece == null)
+                return null;
+
+            Drawable? drawable = createPlateDrawable(texturePath, piece, out contentSize);
 
             if (drawable == null)
-                return false;
+                return null;
 
             parent.Add(drawable);
-            return true;
+            return drawable;
         }
 
         private Drawable? createPlateDrawable(string texturePath, EzStagePlateSprite? piece)
+            => createPlateDrawable(texturePath, piece, out _);
+
+        private Drawable? createPlateDrawable(string texturePath, EzStagePlateSprite? piece, out Vector2 contentSize)
         {
+            contentSize = Vector2.Zero;
+
             if (piece == null)
                 return null;
 
@@ -563,6 +652,9 @@ namespace osu.Game.EzOsuGame
 
             if (frames.Count == 0)
                 return null;
+
+            // 首帧的显示尺寸就是 drawable 铺开后的尺寸；动画在布局前 Height 还是 0，所以这里按帧取。
+            contentSize = new Vector2(frames[0].DisplayWidth, frames[0].DisplayHeight);
 
             BlendingParameters blending = piece.IsAdditive ? BlendingParameters.Additive : BlendingParameters.Inherit;
 
