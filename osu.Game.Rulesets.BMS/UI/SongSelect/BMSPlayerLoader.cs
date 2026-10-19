@@ -19,6 +19,7 @@ using osu.Game.Rulesets.BMS.Configuration;
 using osu.Game.Rulesets.BMS.Localization;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Screens;
+using osu.Game.Screens.Footer;
 using osu.Game.Screens.Play;
 using osuTK;
 using osuTK.Graphics;
@@ -32,8 +33,6 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
     public partial class BMSPlayerLoader : OsuScreen
     {
         public override bool DisallowExternalBeatmapRulesetChanges => true;
-
-        protected override bool InitialBackButtonVisibility => false;
 
         private readonly BMSWorkingBeatmap workingBeatmap;
         private readonly BMSGameplayRoute? gameplayRouteOverride;
@@ -65,6 +64,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         {
             this.workingBeatmap = workingBeatmap;
             this.gameplayRouteOverride = gameplayRouteOverride;
+
+            FooterContent.Value = ScreenFooterContent.Legacy(showBackButton: false);
         }
 
         [BackgroundDependencyLoader]

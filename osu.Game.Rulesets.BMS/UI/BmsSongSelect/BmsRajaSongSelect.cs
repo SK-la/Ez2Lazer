@@ -96,9 +96,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         public BmsBmsSongSelect()
         {
             lampStore = new BmsLampStore(lampScheme);
-        }
 
-        public override bool ShowFooter => true;
+            FooterContent.Value = ScreenFooterContent.Argon(leftButtons: CreateFooterButtons);
+        }
 
         [BackgroundDependencyLoader]
         private void load()
@@ -255,7 +255,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             return base.OnKeyDown(e);
         }
 
-        public override IReadOnlyList<ScreenFooterButton> CreateFooterButtons()
+        public virtual IReadOnlyList<ScreenFooterButton> CreateFooterButtons()
         {
             return new[]
             {

@@ -7,10 +7,10 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
-using osu.Framework.Development;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
+using osu.Framework.Development;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
@@ -19,24 +19,24 @@ using osu.Framework.Input.Events;
 using osu.Framework.Screens;
 using osu.Framework.Utils;
 using osu.Game.Audio;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Screens.Rotation;
+using osu.Game.EzOsuGame.Statistics;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Statistics;
-using osu.Game.EzOsuGame.Screens.Rotation;
-using osu.Game.EzOsuGame.UI;
 using osu.Game.Localisation;
 using osu.Game.Online.Placeholders;
 using osu.Game.Overlays;
 using osu.Game.Scoring;
 using osu.Game.Screens.Footer;
 using osu.Game.Screens.Play;
-using osu.Game.Tests.Visual;
 using osu.Game.Screens.Ranking.Expanded.Accuracy;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
+using osu.Game.Tests.Visual;
 
 namespace osu.Game.Screens.Ranking
 {
@@ -99,6 +99,8 @@ namespace osu.Game.Screens.Ranking
             Score = score;
 
             SelectedScore.Value = score;
+
+            FooterContent.Value = ScreenFooterContent.Argon(leftButtons: CreateFooterButtons);
         }
 
         [BackgroundDependencyLoader]
@@ -188,9 +190,7 @@ namespace osu.Game.Screens.Ranking
             }
         }
 
-        public override bool ShowFooter => true;
-
-        public override IReadOnlyList<ScreenFooterButton> CreateFooterButtons()
+        public virtual IReadOnlyList<ScreenFooterButton> CreateFooterButtons()
         {
             var buttons = new List<ScreenFooterButton>();
 

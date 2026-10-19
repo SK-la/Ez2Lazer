@@ -12,7 +12,5 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
             : base(createPlayer)
         {
         }
-
-        public override bool ShowFooter => !QuickRestart;
     }
 }

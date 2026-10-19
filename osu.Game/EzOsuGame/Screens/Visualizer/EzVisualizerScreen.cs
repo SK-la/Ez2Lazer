@@ -13,6 +13,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
 using osu.Game.Overlays.Music;
+using osu.Game.Screens.Footer;
 using osu.Game.Screens.Play;
 using osuTK;
 using osuTK.Graphics;
@@ -26,7 +27,10 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
 
         public override bool? AllowGlobalTrackControl => true;
 
-        protected override bool InitialBackButtonVisibility => false;
+        public EzVisualizerScreen()
+        {
+            FooterContent.Value = ScreenFooterContent.Legacy(showBackButton: false);
+        }
 
         /// <summary>
         /// Slightly larger than the legacy back button so the cursor can move onto it without hiding.
@@ -101,8 +105,15 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
             bool nearBackCorner = mouse.X <= quad.TopLeft.X + back_reveal_size.X
                                   && mouse.Y >= quad.BottomLeft.Y - back_reveal_size.Y;
 
-            if (BackButtonVisibility.Value != nearBackCorner)
-                BackButtonVisibility.Value = nearBackCorner;
+            setBackButtonVisibility(nearBackCorner);
+        }
+
+        private void setBackButtonVisibility(bool visible)
+        {
+            if (FooterContent.Value.BackButton == visible)
+                return;
+
+            FooterContent.Value = FooterContent.Value with { BackButton = visible };
         }
 
         public override void OnEntering(ScreenTransitionEvent e)
@@ -123,7 +134,7 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
         public override bool OnExiting(ScreenExitEvent e)
         {
             playlist.Hide();
-            BackButtonVisibility.Value = false;
+            setBackButtonVisibility(false);
 
             this.FadeOut(250, Easing.OutQuint);
 
