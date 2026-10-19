@@ -456,6 +456,23 @@ namespace osu.Game.EzOsuGame.Configuration
         }
 
         /// <summary>
+        /// 列宽风格换算到单列宽度时的系数：全局总宽度按 <c>10 / keyMode</c> 摊到每列，其余风格为 1。
+        /// </summary>
+        /// <remarks>
+        /// 实际列宽由 <c>ManiaPlayfieldLayoutHelper.CalculateColumnSize</c> 应用该系数；note 尺寸等按同一条规则换算，
+        /// 否则宽度随风格变化而高度不变，note 会被压扁。
+        /// </remarks>
+        public float GetColumnWidthStyleScale(int keyMode)
+        {
+            if (keyMode <= 0)
+                return 1;
+
+            return Get<ColumnWidthStyle>(Ez2Setting.ColumnWidthStyle) == ColumnWidthStyle.GlobalTotalWidth
+                ? 10f / keyMode
+                : 1f;
+        }
+
+        /// <summary>
         /// 获取列宽
         /// </summary>
         /// <param name="keyMode">总key数</param>

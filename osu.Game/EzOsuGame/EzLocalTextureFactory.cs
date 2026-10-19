@@ -36,6 +36,7 @@ namespace osu.Game.EzOsuGame
         private readonly BindableDouble columnWidth = new BindableDouble();
         private readonly BindableDouble specialFactor = new BindableDouble();
         private readonly BindableDouble noteHeightScaleToWidth = new BindableDouble();
+        private readonly Bindable<ColumnWidthStyle> columnWidthStyle = new Bindable<ColumnWidthStyle>();
 
         private readonly Bindable<string> stageName = new Bindable<string>();
         private readonly Bindable<string> noteSetName = new Bindable<string>();
@@ -88,6 +89,7 @@ namespace osu.Game.EzOsuGame
             gameThemeName.BindTo(ezConfig.GetBindable<string>(Ez2Setting.GameThemeName));
 
             ezConfig.BindWith(Ez2Setting.ColumnWidth, columnWidth);
+            ezConfig.BindWith(Ez2Setting.ColumnWidthStyle, columnWidthStyle);
             ezConfig.BindWith(Ez2Setting.SpecialFactor, specialFactor);
             ezConfig.BindWith(Ez2Setting.NoteHeightScaleToWidth, noteHeightScaleToWidth);
 
@@ -158,6 +160,7 @@ namespace osu.Game.EzOsuGame
             columnWidth.BindValueChanged(_ => scheduleTextureRefresh());
             specialFactor.BindValueChanged(_ => scheduleTextureRefresh());
             noteHeightScaleToWidth.BindValueChanged(_ => scheduleTextureRefresh());
+            columnWidthStyle.BindValueChanged(_ => scheduleTextureRefresh());
         }
 
         private void initializeColourEvents()
@@ -245,6 +248,11 @@ namespace osu.Game.EzOsuGame
             bool isSpecialColumn = !cacheKey.NoSpecial && ezConfig.IsSpecialColumnFast(cacheKey.KeyMode, cacheKey.ColumnIndex);
             float ratio = GetRatio();
             float x = (float)(columnWidth.Value * (isSpecialColumn ? specialFactor.Value : 1.0));
+
+            // 列宽风格可能改写实际列宽（全局总宽度按 10 / keyMode 摊到每列）。note 高度由宽度推导，
+            // 不跟着换算就会在风格切换后压扁。
+            x *= ezConfig.GetColumnWidthStyleScale(cacheKey.KeyMode);
+
             float y = (float)noteHeightScaleToWidth.Value * ratio * x;
             return new Vector2(x, y);
         }
