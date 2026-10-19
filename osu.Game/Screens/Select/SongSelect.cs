@@ -32,12 +32,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Carousel;
-using osu.Game.Graphics.Containers;
-using osu.Game.Graphics.Cursor;
-using osu.Game.Graphics.UserInterface;
-using osu.Game.Input.Bindings;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Layout;
@@ -46,6 +40,12 @@ using osu.Game.EzOsuGame.Overlays;
 using osu.Game.EzOsuGame.Pets;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Carousel;
+using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.Cursor;
+using osu.Game.Graphics.UserInterface;
+using osu.Game.Input.Bindings;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
@@ -142,8 +142,6 @@ namespace osu.Game.Screens.Select
 
         public override bool? ApplyModTrackAdjustments => true;
 
-        public override bool ShowFooter => true;
-
         private Sample? errorSample;
 
         [Resolved]
@@ -195,6 +193,11 @@ namespace osu.Game.Screens.Select
         private CancellationTokenSource? previewPlayableCancellation;
 
         private IDisposable? modSelectOverlayRegistration;
+
+        protected SongSelect()
+        {
+            FooterContent.Value = ScreenFooterContent.Argon(leftButtons: CreateFooterButtons);
+        }
 
         [BackgroundDependencyLoader]
         private void load(AudioManager audio, OsuConfigManager config, Ez2ConfigManager ezConfig)
@@ -409,7 +412,7 @@ namespace osu.Game.Screens.Select
         /// </summary>
         protected abstract void OnStart();
 
-        public override IReadOnlyList<ScreenFooterButton> CreateFooterButtons()
+        public virtual IReadOnlyList<ScreenFooterButton> CreateFooterButtons()
         {
             footerButtonMods = new FooterButtonMods(modSelectOverlay)
             {
