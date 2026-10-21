@@ -196,6 +196,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.Dispose(isDisposing);
 
+            // 加载被中途取消时 [Resolved] 还没注入，也就从未订阅过。
+            if (!IsLoaded)
+                return;
+
             factory.OnNoteSizeChanged -= updatePosition;
 
             if (skinSource.IsNotNull())

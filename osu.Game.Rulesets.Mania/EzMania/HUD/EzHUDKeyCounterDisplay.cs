@@ -217,15 +217,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
         protected override void Dispose(bool isDisposing)
         {
-            if (isDisposing)
-            {
-                // 加载被中途取消时 [Resolved] 还没注入，也就从未订阅过。
-                ezSkinConfig?.ColumnTypeChanged -= updateWidth;
-
-                skin?.SourceChanged -= onSkinChanged;
-            }
-
             base.Dispose(isDisposing);
+
+            // 加载被中途取消时 [Resolved] 还没注入，也就从未订阅过。
+            if (!IsLoaded)
+                return;
+
+            ezSkinConfig.ColumnTypeChanged -= updateWidth;
+            skin.SourceChanged -= onSkinChanged;
         }
 
         public bool UsesFixedAnchor { get; set; }
