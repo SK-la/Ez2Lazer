@@ -6,8 +6,8 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
-using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Material;
 using osu.Game.Graphics;
 using osu.Game.Screens.Select;
 using osuTK;
@@ -18,7 +18,7 @@ namespace osu.Game.EzOsuGame.UI
     /// Song-select wedge background: OFF = classic <see cref="WedgeBackground"/> (M);
     /// ON = blur + dark veil (N), classic wedge fully hidden.
     /// </summary>
-    public partial class EzSongSelectWedgeBackground : InputBlockingContainer, IAcrylicBackdropConsumer
+    public partial class EzSongSelectWedgeBackground : InputBlockingContainer, IMaterialBackdropConsumer
     {
         public float StartAlpha { get; init; } = 0.9f;
 
@@ -26,18 +26,18 @@ namespace osu.Game.EzOsuGame.UI
 
         public float WidthForGradient { get; init; } = 0.3f;
 
-        public bool WantsAcrylicCapture => acrylicUiEnabled.Value;
+        public bool WantsMaterialCapture => acrylicUiEnabled.Value;
 
         private AcrylicBackdropDrawable acrylicBackdrop = null!;
         private Box darkVeil = null!;
         private WedgeBackground wedgeBackground = null!;
-        private EzAcrylicCaptureController? captureController;
+        private EzMaterialCaptureController? captureController;
 
         private Bindable<bool> acrylicUiEnabled = null!;
         private Bindable<double> acrylicUiBlurStrength = null!;
 
         [Resolved(canBeNull: true)]
-        private IAcrylicCaptureRegistrar? acrylicCaptureRegistrar { get; set; }
+        private IMaterialCaptureRegistrar? materialCaptureRegistrar { get; set; }
 
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig, IRenderer renderer)
@@ -70,7 +70,7 @@ namespace osu.Game.EzOsuGame.UI
                 },
             };
 
-            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, acrylicBackdrop, renderer);
+            captureController = new EzMaterialCaptureController(materialCaptureRegistrar, acrylicBackdrop, renderer);
         }
 
         protected override void LoadComplete()
@@ -78,12 +78,12 @@ namespace osu.Game.EzOsuGame.UI
             base.LoadComplete();
 
             // N = blur (via Sync) + darkVeil; M = classic wedgeBackground.
-            EzAcrylicOverlayAlpha.BindExclusive(wedgeBackground, darkVeil, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindExclusive(wedgeBackground, darkVeil, acrylicUiEnabled);
             acrylicUiEnabled.BindValueChanged(_ => syncAcrylicState(), true);
             acrylicUiBlurStrength.BindValueChanged(_ => syncAcrylicState(), true);
         }
 
-        public void SyncAcrylicCaptureState()
+        public void SyncMaterialCaptureState()
             => syncAcrylicState();
 
         private void syncAcrylicState()

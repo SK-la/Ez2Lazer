@@ -53,7 +53,7 @@ namespace osu.Game.Screens.Footer
         private readonly List<OverlayContainer> overlays = new List<OverlayContainer>();
 
         private Box background = null!;
-        private EzAcrylicPanelBackground footerAcrylic = null!;
+        private EzMaterialPanelBackground footerMaterial = null!;
         private Bindable<bool> acrylicUiEnabled = null!;
         private FillFlowContainer<ScreenFooterButton> buttonsFlow = null!;
         private Container overlayContentContainer = null!;
@@ -96,9 +96,9 @@ namespace osu.Game.Screens.Footer
                     Children = new Drawable[]
                     {
                         // N: frosted glass — cool FooterVeil so blur reads (not same hue as solid M).
-                        footerAcrylic = new EzAcrylicPanelBackground(EzUIStyleV1.FooterVeil)
+                        footerMaterial = new EzMaterialPanelBackground(EzUIStyleV1.FooterVeil)
                         {
-                            AcrylicCaptureVisible = true,
+                            MaterialCaptureVisible = true,
                         },
                         // M: classic solid fill.
                         background = new Box
@@ -175,7 +175,7 @@ namespace osu.Game.Screens.Footer
             base.LoadComplete();
 
             // ON: hide M, show N. OFF: hide N, show M.
-            EzAcrylicOverlayAlpha.BindExclusive(background, footerAcrylic, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindExclusive(background, footerMaterial, acrylicUiEnabled);
         }
 
         private ScheduledDelegate? changeLogoDepthDelegate;
@@ -364,7 +364,7 @@ namespace osu.Game.Screens.Footer
 
             background.FadeColour(colourProvider.Background5, 150, Easing.OutQuint);
             // Light scheme wash only — keep frost readable (do not retint to opaque Background5).
-            footerAcrylic.TintBox.FadeColour(colourProvider.Background5.Opacity(EzUIStyleV1.FooterSchemeTintAlpha), 150, Easing.OutQuint);
+            footerMaterial.TintBox.FadeColour(colourProvider.Background5.Opacity(EzUIStyleV1.FooterSchemeTintAlpha), 150, Easing.OutQuint);
 
             foreach (var button in buttonsFlow)
                 button.UpdateDisplay();

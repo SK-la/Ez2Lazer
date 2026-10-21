@@ -39,13 +39,13 @@ using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
-using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Background.Pixiv;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Material;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.EzOsuGame.Performance;
 using osu.Game.EzOsuGame.Pets;
@@ -262,7 +262,7 @@ namespace osu.Game
 
         private ScreenStackFooter screenStackFooter;
 
-        private AcrylicCaptureScope acrylicCaptureScope;
+        private MaterialCaptureScope materialCaptureScope;
         private Container screenCaptureContent;
 
         private readonly string[] args;
@@ -1172,7 +1172,7 @@ namespace osu.Game
                                 backReceptor = new ScreenFooter.BackReceptor(),
                                 // Footer / Mod overlays sit outside ScreenStack but must share the same
                                 // offscreen buffer so AcrylicBackdropDrawable can sample song-select chrome.
-                                acrylicCaptureScope = new AcrylicCaptureScope(screenCaptureContent = new Container
+                                materialCaptureScope = new MaterialCaptureScope(screenCaptureContent = new Container
                                 {
                                     RelativeSizeAxes = Axes.Both,
                                     Children = new Drawable[]
@@ -1224,7 +1224,7 @@ namespace osu.Game
                 new ConfineMouseTracker(),
             });
 
-            Dependencies.CacheAs<IAcrylicCaptureRegistrar>(acrylicCaptureScope);
+            Dependencies.CacheAs<IMaterialCaptureRegistrar>(materialCaptureScope);
 
             // Load volume overlay before anything else, so users can adjust volume as soon as feasible after startup.
             loadComponentSingleFile(volume = new VolumeOverlay(), leftFloatingOverlayContent.Add, true);

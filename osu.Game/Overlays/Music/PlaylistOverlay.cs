@@ -48,7 +48,7 @@ namespace osu.Game.Overlays.Music
         private FilterControl filter = null!;
         private Playlist list = null!;
         private Box classicBackground = null!;
-        private EzAcrylicPanelBackground acrylicBackground = null!;
+        private EzMaterialPanelBackground materialBackground = null!;
         private Bindable<bool> acrylicUiEnabled = null!;
 
         [BackgroundDependencyLoader]
@@ -72,9 +72,9 @@ namespace osu.Game.Overlays.Music
                     },
                     Children = new Drawable[]
                     {
-                        acrylicBackground = new EzAcrylicPanelBackground(EzUIStyleV1.FooterVeil)
+                        materialBackground = new EzMaterialPanelBackground(EzUIStyleV1.FooterVeil)
                         {
-                            AcrylicCaptureVisible = false,
+                            MaterialCaptureVisible = false,
                         },
                         classicBackground = new Box
                         {
@@ -123,7 +123,7 @@ namespace osu.Game.Overlays.Music
             list.RowData.BindTo(filteredSets);
             beatmap.BindValueChanged(working => SelectedSet.Value = working.NewValue.BeatmapSetInfo.ToLive(realm), true);
 
-            EzAcrylicOverlayAlpha.BindExclusive(classicBackground, acrylicBackground, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindExclusive(classicBackground, materialBackground, acrylicUiEnabled);
         }
 
         private void applyFilter(FilterCriteria criteria)
@@ -206,8 +206,8 @@ namespace osu.Game.Overlays.Music
 
         private void setAcrylicCaptureVisible(bool visible)
         {
-            acrylicBackground.AcrylicCaptureVisible = visible;
-            acrylicBackground.SyncAcrylicCaptureState();
+            materialBackground.MaterialCaptureVisible = visible;
+            materialBackground.SyncMaterialCaptureState();
         }
 
         public void ItemSelected(Live<BeatmapSetInfo> beatmapSet)

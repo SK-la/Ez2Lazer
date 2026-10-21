@@ -101,7 +101,7 @@ namespace osu.Game.Screens.Menu
             private ButtonAreaBackgroundState state;
 
             private readonly Box classicBackground;
-            private readonly EzAcrylicPanelBackground acrylicBackground;
+            private readonly EzMaterialPanelBackground materialBackground;
             private Bindable<bool> acrylicUiEnabled;
 
             public ButtonAreaBackground()
@@ -113,9 +113,9 @@ namespace osu.Game.Screens.Menu
 
                 Children = new Drawable[]
                 {
-                    acrylicBackground = new EzAcrylicPanelBackground(EzUIStyleV1.FooterVeil)
+                    materialBackground = new EzMaterialPanelBackground(EzUIStyleV1.FooterVeil)
                     {
-                        AcrylicCaptureVisible = false,
+                        MaterialCaptureVisible = false,
                     },
                     classicBackground = new Box
                     {
@@ -135,7 +135,7 @@ namespace osu.Game.Screens.Menu
             {
                 base.LoadComplete();
 
-                EzAcrylicOverlayAlpha.BindExclusive(classicBackground, acrylicBackground, acrylicUiEnabled);
+                EzMaterialOverlayAlpha.BindExclusive(classicBackground, materialBackground, acrylicUiEnabled);
             }
 
             public ButtonAreaBackgroundState State
@@ -185,8 +185,8 @@ namespace osu.Game.Screens.Menu
 
             private void setAcrylicCaptureVisible(bool visible)
             {
-                acrylicBackground.AcrylicCaptureVisible = visible;
-                acrylicBackground.SyncAcrylicCaptureState();
+                materialBackground.MaterialCaptureVisible = visible;
+                materialBackground.SyncMaterialCaptureState();
             }
 
             [CanBeNull]

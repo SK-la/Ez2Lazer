@@ -77,7 +77,7 @@ namespace osu.Game.Overlays.Mods
             var acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
 
             Box pageDim;
-            EzAcrylicPanelBackground pageAcrylic;
+            EzMaterialPanelBackground pageMaterial;
 
             Child = TopLevelContent = new Container
             {
@@ -89,9 +89,9 @@ namespace osu.Game.Overlays.Mods
                         RelativeSizeAxes = Axes.Both,
                         Children = new Drawable[]
                         {
-                            pageAcrylic = new EzAcrylicPanelBackground(EzUIStyleV1.ModPageVeil)
+                            pageMaterial = new EzMaterialPanelBackground(EzUIStyleV1.ModPageVeil)
                             {
-                                AcrylicCaptureVisible = true,
+                                MaterialCaptureVisible = true,
                             },
                             pageDim = new Box
                             {
@@ -119,7 +119,7 @@ namespace osu.Game.Overlays.Mods
                 }
             };
 
-            EzAcrylicOverlayAlpha.BindExclusive(pageDim, pageAcrylic, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindExclusive(pageDim, pageMaterial, acrylicUiEnabled);
         }
 
         public VisibilityContainer? DisplayedFooterContent { get; private set; }

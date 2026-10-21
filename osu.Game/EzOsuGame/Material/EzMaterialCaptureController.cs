@@ -5,21 +5,21 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Rendering;
 using osuTK;
 
-namespace osu.Game.EzOsuGame.Acrylic
+namespace osu.Game.EzOsuGame.Material
 {
     /// <summary>
     /// Shared acquire/release logic for <see cref="AcrylicBackdropDrawable"/> consumers.
     /// D3D11, Metal, Vulkan, and desktop OpenGL sample a shared backbuffer blur and do not acquire the fullscreen capture.
-    /// Deferred renderers still acquire <see cref="IAcrylicCaptureRegistrar"/>.
+    /// Deferred renderers still acquire <see cref="IMaterialCaptureRegistrar"/>.
     /// </summary>
-    internal sealed class EzAcrylicCaptureController
+    internal sealed class EzMaterialCaptureController
     {
-        private readonly IAcrylicCaptureRegistrar? registrar;
+        private readonly IMaterialCaptureRegistrar? registrar;
         private readonly AcrylicBackdropDrawable acrylicBackdrop;
         private readonly IRenderer? renderer;
         private bool captureAcquired;
 
-        public EzAcrylicCaptureController(IAcrylicCaptureRegistrar? registrar, AcrylicBackdropDrawable acrylicBackdrop, IRenderer? renderer = null)
+        public EzMaterialCaptureController(IMaterialCaptureRegistrar? registrar, AcrylicBackdropDrawable acrylicBackdrop, IRenderer? renderer = null)
         {
             this.registrar = registrar;
             this.acrylicBackdrop = acrylicBackdrop;

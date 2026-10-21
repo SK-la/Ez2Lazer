@@ -64,7 +64,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly FramedClock framedPreviewClock;
         private readonly Bindable<EzBeatmapPreviewMode> previewMode = new Bindable<EzBeatmapPreviewMode>();
 
-        private readonly EzAcrylicPanelBackground panelBackground;
+        private readonly EzMaterialPanelBackground panelBackground;
         private readonly Container panelContainer;
         private readonly Container stageViewport;
         private readonly Container stageScaleContainer;
@@ -180,7 +180,7 @@ namespace osu.Game.EzOsuGame.Overlays
                         RelativeSizeAxes = Axes.Both,
                         Children = new Drawable[]
                         {
-                            panelBackground = new EzAcrylicPanelBackground(Color4.Black.Opacity(panel_background_focus_opacity)),
+                            panelBackground = new EzMaterialPanelBackground(Color4.Black.Opacity(panel_background_focus_opacity)),
                             loadTimeText = new OsuSpriteText
                             {
                                 Text = "Load Time: 0ms",
@@ -365,8 +365,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
             expanded = true;
             ExpandedState.Value = true;
-            panelBackground.AcrylicCaptureVisible = true;
-            panelBackground.SyncAcrylicCaptureState();
+            panelBackground.MaterialCaptureVisible = true;
+            panelBackground.SyncMaterialCaptureState();
 
             if (drawableRuleset == null && playableBeatmap != null && currentRuleset != null)
                 selectionDirty = true;
@@ -390,8 +390,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
             expanded = false;
             ExpandedState.Value = false;
-            panelBackground.AcrylicCaptureVisible = false;
-            panelBackground.SyncAcrylicCaptureState();
+            panelBackground.MaterialCaptureVisible = false;
+            panelBackground.SyncMaterialCaptureState();
             heightResizeActive = false;
             widthResizeActive = false;
             selectionLoadInProgress = false;
@@ -520,8 +520,8 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 expanded = false;
                 ExpandedState.Value = false;
-                panelBackground.AcrylicCaptureVisible = false;
-                panelBackground.SyncAcrylicCaptureState();
+                panelBackground.MaterialCaptureVisible = false;
+                panelBackground.SyncMaterialCaptureState();
             }
 
             selectionLoadInProgress = false;

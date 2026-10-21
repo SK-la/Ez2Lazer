@@ -12,7 +12,7 @@ using osu.Game.Screens.Backgrounds;
 using osuTK;
 using BackgroundDrawable = osu.Game.Graphics.Backgrounds.Background;
 
-namespace osu.Game.EzOsuGame.Acrylic
+namespace osu.Game.EzOsuGame.Material
 {
     /// <summary>
     /// 惰性 Acrylic 承载层：默认直绘子树；有活跃消费者时切换为全分辨率 <see cref="BufferedContainer"/>，
@@ -25,15 +25,15 @@ namespace osu.Game.EzOsuGame.Acrylic
     /// D3D11, Metal, Vulkan, and desktop OpenGL copy the swapchain instead of entering this scope.
     /// Deferred keeps this capture: its recorded frame has no swapchain pixels to copy until it executes.
     /// </remarks>
-    [Cached(typeof(IAcrylicCaptureRegistrar))]
-    public partial class AcrylicCaptureScope : CompositeDrawable, IAcrylicCaptureRegistrar
+    [Cached(typeof(IMaterialCaptureRegistrar))]
+    public partial class MaterialCaptureScope : CompositeDrawable, IMaterialCaptureRegistrar
     {
         private int captureRefCount;
         private int mutationGeneration;
         private readonly Drawable capturedContent;
         private BufferedContainer? activeBuffer;
 
-        public AcrylicCaptureScope(Drawable content)
+        public MaterialCaptureScope(Drawable content)
         {
             RelativeSizeAxes = Axes.Both;
             capturedContent = content;

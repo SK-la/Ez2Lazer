@@ -15,8 +15,8 @@ using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
-using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Material;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
@@ -45,14 +45,14 @@ namespace osu.Game.EzOsuGame.HUD
     /// BMS 风格三柱分数对比：当前局 + 两条按对比条件选出的参考柱。
     /// 服务注册时 ghost 柱绑定 timeline processor；未注册时展示 ScoreInfo 静态终值。
     /// </summary>
-    public partial class EzHUDScoreCompareBars : EzHUDScoreRaceComponent, ISerialisableDrawable, IAcrylicBackdropConsumer
+    public partial class EzHUDScoreCompareBars : EzHUDScoreRaceComponent, ISerialisableDrawable, IMaterialBackdropConsumer
     {
         private const float backdrop_blur_strength = 16;
         private const int static_ghost_query_limit = 10;
 
         public bool UsesFixedAnchor { get; set; }
 
-        public bool WantsAcrylicCapture => BackgroundVisible.Value && BackdropBlurEnabled.Value;
+        public bool WantsMaterialCapture => BackgroundVisible.Value && BackdropBlurEnabled.Value;
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION1_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION1_DESCRIPTION))]
         public Bindable<EzScoreRaceMetric> CompareCondition1Setting { get; } = new Bindable<EzScoreRaceMetric>(EzScoreRaceMetric.Accuracy);
@@ -102,7 +102,7 @@ namespace osu.Game.EzOsuGame.HUD
         private readonly Container backgroundLayer;
         private Container barsContainer = null!;
         private readonly CompareBar[] bars = new CompareBar[3];
-        private EzAcrylicCaptureController? captureController;
+        private EzMaterialCaptureController? captureController;
 
         private EzScoreRaceTimelineScoreProcessor? ghostProcessor1;
         private EzScoreRaceTimelineScoreProcessor? ghostProcessor2;
@@ -123,7 +123,7 @@ namespace osu.Game.EzOsuGame.HUD
         private OsuColour colours { get; set; } = null!;
 
         [Resolved(canBeNull: true)]
-        private IAcrylicCaptureRegistrar? acrylicCaptureRegistrar { get; set; }
+        private IMaterialCaptureRegistrar? materialCaptureRegistrar { get; set; }
 
         [Resolved]
         private IRenderer renderer { get; set; } = null!;
@@ -157,7 +157,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected override void LoadComplete()
         {
-            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, acrylicBackdrop, renderer);
+            captureController = new EzMaterialCaptureController(materialCaptureRegistrar, acrylicBackdrop, renderer);
 
             barsContainer = new Container
             {
@@ -177,7 +177,7 @@ namespace osu.Game.EzOsuGame.HUD
             base.LoadComplete();
 
             BackgroundVisible.BindValueChanged(_ => updateBackgroundVisibility(), true);
-            BackdropBlurEnabled.BindValueChanged(_ => SyncAcrylicCaptureState(), true);
+            BackdropBlurEnabled.BindValueChanged(_ => SyncMaterialCaptureState(), true);
 
             CompareCondition1Setting.BindValueChanged(_ => refreshGhostBars(), true);
             CompareCondition2Setting.BindValueChanged(_ => refreshGhostBars(), true);
@@ -188,7 +188,7 @@ namespace osu.Game.EzOsuGame.HUD
             layoutBars();
         }
 
-        public void SyncAcrylicCaptureState() => captureController?.Sync(WantsAcrylicCapture, backdrop_blur_strength);
+        public void SyncMaterialCaptureState() => captureController?.Sync(WantsMaterialCapture, backdrop_blur_strength);
 
         protected override void Update()
         {
@@ -524,7 +524,7 @@ namespace osu.Game.EzOsuGame.HUD
         private void updateBackgroundVisibility()
         {
             backgroundLayer.Alpha = BackgroundVisible.Value ? 1 : 0;
-            SyncAcrylicCaptureState();
+            SyncMaterialCaptureState();
         }
 
         private Color4 getBarColour(EzScoreRaceMetric metric = default, bool isCurrent = false)

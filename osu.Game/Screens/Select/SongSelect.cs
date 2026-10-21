@@ -357,7 +357,7 @@ namespace osu.Game.Screens.Select
 
             LoadComponent(modSelectOverlay = CreateModSelectOverlay());
 
-            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(rightGradientBackground, ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled));
+            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(rightGradientBackground, ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled));
 
             acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
             acrylicUiEnabled.BindValueChanged(_ =>

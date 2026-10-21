@@ -8,7 +8,7 @@ namespace osu.Game.EzOsuGame.UI
 {
     /// <summary>
     /// Acrylic glass (N) appearance constants only — tune for hot reload.
-    /// Classic chrome (M) is never half-alpha; use <see cref="UI.EzAcrylicOverlayAlpha.BindExclusive"/>.
+    /// Classic chrome (M) is never half-alpha; use <see cref="EzMaterialOverlayAlpha.BindExclusive"/>.
     /// </summary>
     public static class EzUIStyleV1
     {

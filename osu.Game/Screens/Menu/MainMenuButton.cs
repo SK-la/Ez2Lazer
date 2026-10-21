@@ -8,22 +8,22 @@ using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.UI;
-using osu.Game.Graphics.Sprites;
-using osuTK;
-using osuTK.Graphics;
-using osuTK.Input;
-using osu.Framework.Extensions.Color4Extensions;
-using osu.Game.Graphics.Containers;
 using osu.Framework.Graphics.Effects;
+using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
+using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.Sprites;
+using osuTK;
+using osuTK.Graphics;
+using osuTK.Input;
 
 namespace osu.Game.Screens.Menu
 {
@@ -70,7 +70,7 @@ namespace osu.Game.Screens.Menu
 
         private readonly Container background;
         private readonly Drawable backgroundContent;
-        private readonly EzAcrylicPanelBackground acrylicBackground;
+        private readonly EzMaterialPanelBackground materialBackground;
         private readonly Box boxHoverLayer;
         private readonly SpriteIcon icon;
 
@@ -119,9 +119,9 @@ namespace osu.Game.Screens.Menu
                     Origin = Anchor.Centre,
                     Children = new Drawable[]
                     {
-                        acrylicBackground = new EzAcrylicPanelBackground(colour.Opacity(EzUIStyleV1.MENU_BUTTON_TINT_ALPHA), EzUIStyleV1.PanelFrameBufferScale)
+                        materialBackground = new EzMaterialPanelBackground(colour.Opacity(EzUIStyleV1.MENU_BUTTON_TINT_ALPHA), EzUIStyleV1.PanelFrameBufferScale)
                         {
-                            AcrylicCaptureVisible = false,
+                            MaterialCaptureVisible = false,
                             RelativeSizeAxes = Axes.Y,
                             Anchor = Anchor.Centre,
                             Origin = Anchor.Centre,
@@ -201,13 +201,13 @@ namespace osu.Game.Screens.Menu
             // (which can exceed the [0;1] range during interpolation).
             backgroundContent.Width = 2 * initialSize.X;
             backgroundContent.Shear = -background.Shear;
-            acrylicBackground.Width = backgroundContent.Width;
-            acrylicBackground.Shear = backgroundContent.Shear;
+            materialBackground.Width = backgroundContent.Width;
+            materialBackground.Shear = backgroundContent.Shear;
 
             animateState();
             FinishTransforms(true);
 
-            EzAcrylicOverlayAlpha.BindExclusive(backgroundContent, acrylicBackground, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindExclusive(backgroundContent, materialBackground, acrylicUiEnabled);
             acrylicUiEnabled.BindValueChanged(_ => updateAcrylicChrome(), true);
         }
 
@@ -219,8 +219,8 @@ namespace osu.Game.Screens.Menu
 
         private void syncAcrylicCapture()
         {
-            acrylicBackground.AcrylicCaptureVisible = State == ButtonState.Expanded;
-            acrylicBackground.SyncAcrylicCaptureState();
+            materialBackground.MaterialCaptureVisible = State == ButtonState.Expanded;
+            materialBackground.SyncMaterialCaptureState();
         }
 
         private bool rightward;

@@ -9,8 +9,8 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
-using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Material;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
@@ -21,10 +21,10 @@ using osuTK.Graphics;
 namespace osu.Game.EzOsuGame.HUD
 {
     /// <summary>
-    /// 可皮肤化的圆角背景框。虚化由本组件自行向 <see cref="IAcrylicCaptureRegistrar"/> 声明需求，
+    /// 可皮肤化的圆角背景框。虚化由本组件自行向 <see cref="IMaterialCaptureRegistrar"/> 声明需求，
     /// 使用 <see cref="AcrylicBackdropDrawable"/> 真穿透采样 OsuScreenStack 内已绘制内容。
     /// </summary>
-    public partial class EzBoxElement : CompositeDrawable, ISerialisableDrawable, IAcrylicBackdropConsumer
+    public partial class EzBoxElement : CompositeDrawable, ISerialisableDrawable, IMaterialBackdropConsumer
     {
         public bool UsesFixedAnchor { get; set; }
 
@@ -67,14 +67,14 @@ namespace osu.Game.EzOsuGame.HUD
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(new Color4(1f, 1f, 1f, 0.12f));
 
-        public bool WantsAcrylicCapture => BlurEnabled.Value && BlurStrength.Value > 0;
+        public bool WantsMaterialCapture => BlurEnabled.Value && BlurStrength.Value > 0;
 
         private readonly AcrylicBackdropDrawable acrylicBackdrop;
         private readonly Box tintBox;
-        private EzAcrylicCaptureController? captureController;
+        private EzMaterialCaptureController? captureController;
 
         [Resolved(canBeNull: true)]
-        private IAcrylicCaptureRegistrar? acrylicCaptureRegistrar { get; set; }
+        private IMaterialCaptureRegistrar? captureRegistrar { get; set; }
 
         [Resolved]
         private IRenderer renderer { get; set; } = null!;
@@ -104,17 +104,17 @@ namespace osu.Game.EzOsuGame.HUD
         {
             base.LoadComplete();
 
-            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, acrylicBackdrop, renderer);
+            captureController = new EzMaterialCaptureController(captureRegistrar, acrylicBackdrop, renderer);
 
             BoxWidth.BindValueChanged(v => Width = v.NewValue, true);
             BoxHeight.BindValueChanged(v => Height = v.NewValue, true);
             AccentColour.BindValueChanged(v => tintBox.Colour = v.NewValue, true);
-            BlurEnabled.BindValueChanged(_ => SyncAcrylicCaptureState(), true);
-            BlurStrength.BindValueChanged(_ => SyncAcrylicCaptureState(), true);
+            BlurEnabled.BindValueChanged(_ => SyncMaterialCaptureState(), true);
+            BlurStrength.BindValueChanged(_ => SyncMaterialCaptureState(), true);
         }
 
-        public void SyncAcrylicCaptureState()
-            => captureController?.Sync(WantsAcrylicCapture, BlurStrength.Value);
+        public void SyncMaterialCaptureState()
+            => captureController?.Sync(WantsMaterialCapture, BlurStrength.Value);
 
         protected override void Update()
         {

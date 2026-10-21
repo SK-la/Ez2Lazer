@@ -141,8 +141,8 @@ namespace osu.Game.Screens.Select
             };
 
             // Glass N is on Panel parent; hide classic layers when acrylic is on.
-            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(gradientBackground, acrylicUiEnabled);
-            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(darkOverlays, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(gradientBackground, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(darkOverlays, acrylicUiEnabled);
         }
 
         protected override void LoadComplete()

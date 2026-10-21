@@ -17,23 +17,23 @@ using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
+using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.Configuration;
-using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Beatmaps;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.UI;
-using osu.Game.Screens.Select.Filter;
-using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Screens.Select.Filter;
 using osuTK;
 
 namespace osu.Game.Screens.Select
@@ -309,7 +309,7 @@ namespace osu.Game.Screens.Select
             };
 
             // Glass N lives on Panel; hide classic M overlays when acrylic is on.
-            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(colourOverlays, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(colourOverlays, acrylicUiEnabled);
         }
 
         protected override void LoadComplete()

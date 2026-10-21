@@ -16,15 +16,15 @@ using osu.Framework.Localisation;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Carousel;
-using osu.Game.Graphics.Containers;
-using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Carousel;
+using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
@@ -313,7 +313,7 @@ namespace osu.Game.Screens.Select
             };
 
             // Cover art is skipped under acrylic; the dim layer is only useful over panel sprites.
-            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(backgroundDim, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(backgroundDim, acrylicUiEnabled);
         }
 
         protected override void LoadComplete()

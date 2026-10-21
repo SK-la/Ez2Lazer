@@ -14,12 +14,12 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.UI;
 using osu.Game.Overlays;
 using osuTK;
 using osuTK.Graphics;
@@ -151,7 +151,7 @@ namespace osu.Game.Screens.Select
                 }
             };
 
-            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(colourOverlays, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(colourOverlays, acrylicUiEnabled);
         }
 
         protected override void LoadComplete()

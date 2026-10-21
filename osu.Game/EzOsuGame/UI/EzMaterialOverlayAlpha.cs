@@ -9,7 +9,7 @@ namespace osu.Game.EzOsuGame.UI
     /// <summary>
     /// Acrylic UI switch helpers: classic M vs glass N are mutually exclusive (never half-alpha M).
     /// </summary>
-    public static class EzAcrylicOverlayAlpha
+    public static class EzMaterialOverlayAlpha
     {
         /// <summary>
         /// ON: hide classic M, show glass N. OFF: hide N, show M.

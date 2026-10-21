@@ -7,8 +7,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
-using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Material;
 using osuTK;
 using osuTK.Graphics;
 
@@ -16,36 +16,36 @@ namespace osu.Game.EzOsuGame.UI
 {
     /// <summary>
     /// Acrylic glass panel (N): blur backdrop + tint. Visibility is owned by the host via
-    /// <see cref="EzAcrylicOverlayAlpha.BindExclusive"/> (do not half-alpha classic M over this).
+    /// <see cref="EzMaterialOverlayAlpha.BindExclusive"/> (do not half-alpha classic M over this).
     /// </summary>
-    public partial class EzAcrylicPanelBackground : Container, IAcrylicBackdropConsumer
+    public partial class EzMaterialPanelBackground : Container, IMaterialBackdropConsumer
     {
         /// <summary>
         /// Host panel is in a state that should sample capture (e.g. preview expanded).
         /// </summary>
-        public bool AcrylicCaptureVisible { get; set; }
+        public bool MaterialCaptureVisible { get; set; }
 
-        public bool WantsAcrylicCapture => (acrylicUiEnabled.Value) && AcrylicCaptureVisible;
+        public bool WantsMaterialCapture => (acrylicUiEnabled.Value) && MaterialCaptureVisible;
 
         public Box TintBox { get; private set; }
 
         private readonly Vector2 frameBufferScale;
 
         private AcrylicBackdropDrawable? acrylicBackdrop;
-        private EzAcrylicCaptureController? captureController;
+        private EzMaterialCaptureController? captureController;
 
         private Bindable<bool> acrylicUiEnabled = null!;
         private Bindable<double> acrylicUiBlurStrength = null!;
 
         [Resolved(canBeNull: true)]
-        private IAcrylicCaptureRegistrar? acrylicCaptureRegistrar { get; set; }
+        private IMaterialCaptureRegistrar? materialCaptureRegistrar { get; set; }
 
         [Resolved]
         private IRenderer renderer { get; set; } = null!;
 
         /// <param name="initialTint">Veil colour drawn over the blurred backdrop.</param>
         /// <param name="frameBufferScale">Optional downscale for the blur pass (panels use 0.5).</param>
-        public EzAcrylicPanelBackground(Color4 initialTint, Vector2? frameBufferScale = null)
+        public EzMaterialPanelBackground(Color4 initialTint, Vector2? frameBufferScale = null)
         {
             RelativeSizeAxes = Axes.Both;
             this.frameBufferScale = frameBufferScale ?? Vector2.One;
@@ -74,12 +74,12 @@ namespace osu.Game.EzOsuGame.UI
             acrylicUiBlurStrength.BindValueChanged(_ => syncAcrylicState(), true);
         }
 
-        public void SyncAcrylicCaptureState()
+        public void SyncMaterialCaptureState()
             => syncAcrylicState();
 
         private void syncAcrylicState()
         {
-            if (WantsAcrylicCapture)
+            if (WantsMaterialCapture)
             {
                 ensureBackdrop();
                 captureController?.Sync(true, (float)acrylicUiBlurStrength.Value);
@@ -103,7 +103,7 @@ namespace osu.Game.EzOsuGame.UI
             };
 
             AddInternal(acrylicBackdrop);
-            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, acrylicBackdrop, renderer);
+            captureController = new EzMaterialCaptureController(materialCaptureRegistrar, acrylicBackdrop, renderer);
         }
 
         private void releaseBackdrop()

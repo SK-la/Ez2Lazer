@@ -16,12 +16,12 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.UI;
 using osu.Game.Overlays;
 using osuTK;
 using osuTK.Graphics;
@@ -51,9 +51,9 @@ namespace osu.Game.Screens.Select
 
         /// <summary>
         /// Full-bleed acrylic glass (N). Visibility is driven by <see cref="acrylicUiEnabled"/>;
-        /// subclasses hide classic colour overlays via <see cref="EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic"/>.
+        /// subclasses hide classic colour overlays via <see cref="EzMaterialOverlayAlpha.BindHiddenWhenAcrylic"/>.
         /// </summary>
-        protected EzAcrylicPanelBackground PanelGlass { get; private set; } = null!;
+        protected EzMaterialPanelBackground PanelGlass { get; private set; } = null!;
 
         public Container TopLevelContent { get; private set; } = null!;
 
@@ -127,11 +127,11 @@ namespace osu.Game.Screens.Select
                 {
                     // Full-bleed under accent strip + Content so Content's left corner radius
                     // reveals the same glass (no (| crescent seam against a strip-only background).
-                    PanelGlass = new EzAcrylicPanelBackground(EzUIStyleV1.PanelVeil, EzUIStyleV1.PanelFrameBufferScale)
+                    PanelGlass = new EzMaterialPanelBackground(EzUIStyleV1.PanelVeil, EzUIStyleV1.PanelFrameBufferScale)
                     {
                         // Capture starts in PrepareForUse. The carousel pool constructs every panel up front;
                         // leaving this on would pin a blur framebuffer for each card ever shown.
-                        AcrylicCaptureVisible = false,
+                        MaterialCaptureVisible = false,
                         Alpha = 0,
                     },
                     backgroundContainer = new Container
@@ -377,8 +377,8 @@ namespace osu.Game.Screens.Select
             updateXOffset(animated: false);
             updateSelectedState(animated: false);
 
-            PanelGlass.AcrylicCaptureVisible = true;
-            PanelGlass.SyncAcrylicCaptureState();
+            PanelGlass.MaterialCaptureVisible = true;
+            PanelGlass.SyncMaterialCaptureState();
 
             this.FadeIn(DURATION, Easing.OutQuint);
         }
@@ -394,8 +394,8 @@ namespace osu.Game.Screens.Select
 
             // Each card owns three blur textures (source, horizontal, full). Drop them on return
             // so selecting another set does not keep the previous cards' framebuffers.
-            PanelGlass.AcrylicCaptureVisible = false;
-            PanelGlass.SyncAcrylicCaptureState();
+            PanelGlass.MaterialCaptureVisible = false;
+            PanelGlass.SyncMaterialCaptureState();
         }
 
         protected override bool OnClick(ClickEvent e)
