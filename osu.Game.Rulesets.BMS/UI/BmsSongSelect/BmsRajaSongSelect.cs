@@ -570,19 +570,20 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
 
         protected override void Dispose(bool isDisposing)
         {
-            if (isDisposing)
-            {
-                cancelBackgroundWork();
-                screenWorkCts?.Dispose();
-                screenWorkCts = null;
-
-                navigator.Changed -= onSelectionChanged;
-
-                shell.RequestPlay -= tryStartSelectedChart;
-                shell.RequestOpenDownload -= openSelectedChartDownload;
-            }
-
             base.Dispose(isDisposing);
+
+            // 加载被中途取消时依赖、导航器和 shell 都还没建起来。
+            if (!IsLoaded)
+                return;
+
+            cancelBackgroundWork();
+            screenWorkCts?.Dispose();
+            screenWorkCts = null;
+
+            navigator.Changed -= onSelectionChanged;
+
+            shell.RequestPlay -= tryStartSelectedChart;
+            shell.RequestOpenDownload -= openSelectedChartDownload;
         }
 
         private void rebuildBarContext()
