@@ -202,7 +202,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                             return new EzHoldNoteTail();
                         // return Drawable.Empty();
 
-                        case ManiaSkinComponents.StageBackground:
+                        case ManiaSkinComponents.StageForeground:
                             return new EzStageBottom();
                     }
 
