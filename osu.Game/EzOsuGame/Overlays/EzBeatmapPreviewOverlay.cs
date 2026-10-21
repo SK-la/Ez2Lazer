@@ -23,6 +23,7 @@ using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
@@ -55,8 +56,6 @@ namespace osu.Game.EzOsuGame.Overlays
         private static readonly Color4 resize_border_idle_colour = new Color4(255, 255, 255, 64);
         private static readonly Color4 resize_border_hover_colour = new Color4(255, 255, 255, 128);
 
-        private const float dynamic_preview_duration = 10000;
-        private const float dynamic_preview_repeat_delay = 500;
         private const int change_debounce = 50;
         private const int panel_transition_duration = 160;
 
@@ -96,11 +95,11 @@ namespace osu.Game.EzOsuGame.Overlays
         private double playbackStartTime;
         private double beatmapMinTime;
         private double beatmapMaxTime;
-        private double nextDynamicLoopStartTime;
         private double lastLoadTimeMs;
         private double lastSelectionEventTime;
         private double lastDisplayedLoadTimeMs = -1;
         private double lastProgressDisplayTime = double.MinValue;
+        private double lastAppliedTimelineEndTime = -1;
 
         private float lastAppliedPanelWidth = -1;
         private float lastAppliedPanelHeight = -1;
@@ -126,6 +125,9 @@ namespace osu.Game.EzOsuGame.Overlays
 
         [Resolved(CanBeNull = true)]
         private ISkin? skin { get; set; }
+
+        [Resolved(CanBeNull = true)]
+        private MusicController? musicController { get; set; }
 
         private IBeatmap? playableBeatmap;
         private RulesetInfo? currentRuleset;
@@ -395,7 +397,6 @@ namespace osu.Game.EzOsuGame.Overlays
             heightResizeActive = false;
             widthResizeActive = false;
             selectionLoadInProgress = false;
-            nextDynamicLoopStartTime = 0;
             previewClock.Stop();
             cancelScheduledSelectionLoad();
             cancelPendingLoad();
@@ -610,11 +611,9 @@ namespace osu.Game.EzOsuGame.Overlays
             previewClock.Stop();
             previewClock.Seek(playbackStartTime);
 
-            if (dynamicMode)
-            {
-                nextDynamicLoopStartTime = Time.Current;
+            // 动态模式以音乐控制器为时间源；音乐轨尚未加载时退回自由时钟。
+            if (dynamicMode && !syncPreviewClockToMusic())
                 previewClock.Start();
-            }
 
             updateProgressDisplay(previewClock.CurrentTime);
             setStateText(string.Empty);
@@ -738,31 +737,11 @@ namespace osu.Game.EzOsuGame.Overlays
 
             if (dynamicMode && drawableRuleset != null)
             {
-                if (previewClock.IsRunning)
-                {
-                    double elapsed = previewClock.CurrentTime - playbackStartTime;
+                // 由音乐轨位置驱动 ruleset 时钟：音乐暂停则预览冻结，绕回 PreviewTime 时画面同步归位。
+                syncPreviewClockToMusic();
 
-                    if (elapsed >= dynamic_preview_duration)
-                    {
-                        previewClock.Stop();
-                        previewClock.Seek(playbackStartTime);
-                        nextDynamicLoopStartTime = Time.Current + dynamic_preview_repeat_delay;
-                    }
-                }
-                else if (Time.Current >= nextDynamicLoopStartTime)
-                {
-                    previewClock.Seek(playbackStartTime);
-                    previewClock.Start();
-                }
-            }
-
-            if (!timeline.Seeking && dynamicMode && previewClock.IsRunning)
-            {
-                if (previewClock.CurrentTime - lastProgressDisplayTime >= 16)
-                {
+                if (!timeline.Seeking && Math.Abs(previewClock.CurrentTime - lastProgressDisplayTime) >= 16)
                     updateProgressDisplay(previewClock.CurrentTime);
-                    lastProgressDisplayTime = previewClock.CurrentTime;
-                }
             }
         }
 
@@ -1062,16 +1041,18 @@ namespace osu.Game.EzOsuGame.Overlays
             if (preserveDynamicPlayback && dynamicMode && drawableRuleset != null)
             {
                 playbackStartTime = clamped;
-                nextDynamicLoopStartTime = 0;
                 previewClock.Seek(clamped);
                 previewClock.Start();
             }
             else
             {
-                nextDynamicLoopStartTime = 0;
                 previewClock.Stop();
                 previewClock.Seek(clamped);
             }
+
+            // 动态模式的拖动与滚动同时移动音乐轨，预览时钟会在下一帧跟随音乐轨归位。
+            if (dynamicMode)
+                seekMusicTo(clamped);
 
             if (scrollMode)
                 syncScrollRendererFromTime(clamped);
@@ -1088,6 +1069,41 @@ namespace osu.Game.EzOsuGame.Overlays
             }
 
             seekTo(time, dynamicMode);
+        }
+
+        /// <summary>
+        /// 用音乐控制器当前轨的位置驱动预览时钟。音乐轨不可用时返回 <c>false</c>，调用方退回自由时钟。
+        /// </summary>
+        private bool syncPreviewClockToMusic()
+        {
+            if (musicController == null || !musicController.TrackLoaded)
+                return false;
+
+            var track = musicController.CurrentTrack;
+
+            if (track.IsRunning != previewClock.IsRunning)
+            {
+                if (track.IsRunning)
+                    previewClock.Start();
+                else
+                    previewClock.Stop();
+            }
+
+            previewClock.Seek(track.CurrentTime);
+            return true;
+        }
+
+        /// <summary>
+        /// 把预览位置写回音乐轨。不经过 <see cref="MusicController.SeekTo"/> 的调度，拖动时可以逐帧跟随。
+        /// </summary>
+        private void seekMusicTo(double time)
+        {
+            if (musicController == null || !musicController.TrackLoaded || !musicController.AllowTrackControl.Value)
+                return;
+
+            var track = musicController.CurrentTrack;
+            double length = track.Length;
+            track.Seek(length > 0 ? Math.Clamp(time, 0, length) : Math.Max(0, time));
         }
 
         private void syncScrollRendererFromTime(double time)
@@ -1134,20 +1150,44 @@ namespace osu.Game.EzOsuGame.Overlays
             if (fullMapMode)
                 return;
 
-            if (beatmapMaxTime <= beatmapMinTime)
+            double endTime = getProgressEndTime();
+
+            if (endTime <= beatmapMinTime)
             {
                 timeline.EndTime = 1;
                 timeline.CurrentTime = 0;
                 progressText.Text = "00:00.000";
                 lastProgressDisplayTime = 0;
+                lastAppliedTimelineEndTime = 1;
                 return;
             }
 
-            double clamped = Math.Clamp(time, beatmapMinTime, beatmapMaxTime);
-            timeline.EndTime = beatmapMaxTime;
+            double clamped = Math.Clamp(time, beatmapMinTime, endTime);
+
+            if (endTime != lastAppliedTimelineEndTime)
+            {
+                timeline.EndTime = endTime;
+                lastAppliedTimelineEndTime = endTime;
+            }
+
             timeline.CurrentTime = clamped;
             progressText.Text = formatTime(clamped);
             lastProgressDisplayTime = clamped;
+        }
+
+        /// <summary>
+        /// 动态模式的进度条按音乐轨长度铺满，音频绕回 PreviewTime 时进度同步回到循环起点。
+        /// </summary>
+        private double getProgressEndTime()
+        {
+            if (dynamicMode && musicController != null && musicController.TrackLoaded)
+            {
+                // 没有音频的谱面会拿到极短的虚拟轨；与谱面长度取大值避免进度条被压扁。
+                double length = musicController.CurrentTrack.Length;
+                return length > beatmapMinTime ? Math.Max(beatmapMaxTime, length) : beatmapMaxTime;
+            }
+
+            return beatmapMaxTime;
         }
 
         private void disposePreviewResources()
@@ -1324,7 +1364,6 @@ namespace osu.Game.EzOsuGame.Overlays
             setFullMapFocusState(false);
             updatePreviewControlsLayout();
 
-            nextDynamicLoopStartTime = 0;
             previewClock.Stop();
 
             if (customManiaStaticMode && expanded && playableBeatmap != null)
@@ -1348,8 +1387,11 @@ namespace osu.Game.EzOsuGame.Overlays
 
             playbackStartTime = Math.Clamp(previewClock.CurrentTime, beatmapMinTime, beatmapMaxTime);
             previewClock.Seek(playbackStartTime);
-            previewClock.Start();
-            updateProgressDisplay(playbackStartTime);
+
+            if (!syncPreviewClockToMusic())
+                previewClock.Start();
+
+            updateProgressDisplay(previewClock.CurrentTime);
         }
 
         private void updatePreviewModeButtons()
