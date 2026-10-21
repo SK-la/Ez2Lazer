@@ -191,6 +191,10 @@ namespace osu.Game.Screens.Select
         private EzBeatmapPreviewOverlay ezBeatmapPreviewOverlay = null!;
         private ModSettingChangeTracker? previewOverlayModSettingTracker;
         private CancellationTokenSource? previewPlayableCancellation;
+        private ScheduledDelegate? previewModReloadDebounce;
+
+        // Mod 设置拖动滑块会连续触发变更；等手停下来再转谱，避免每帧重建 DrawableRuleset。
+        private const int preview_mod_reload_debounce = 220;
 
         private IDisposable? modSelectOverlayRegistration;
 
@@ -351,6 +355,8 @@ namespace osu.Game.Screens.Select
                     RelativeSizeAxes = Axes.Both,
                     Depth = float.MinValue,
                     DefaultPanelRightEdgeInScreenSpace = () => titleWedge.ScreenSpaceDrawQuad.AABBFloat.Right,
+                    ActiveMods = Mods,
+                    OpenModSelect = () => modSelectOverlay.Show(),
                 },
                 modSpeedHotkeyHandler = new ModSpeedHotkeyHandler(),
             });
@@ -875,7 +881,7 @@ namespace osu.Game.Screens.Select
 
             Beatmap.BindValueChanged(updateVariousState, true);
             Ruleset.BindValueChanged(updateBeatmapPreviewSelection);
-            Mods.BindValueChanged(updatePreviewSelectionFromModsChange);
+            Mods.BindValueChanged(updatePreviewSelectionFromModsChange, true);
         }
 
         private void updateVariousState(ValueChangedEvent<WorkingBeatmap> e)
@@ -904,14 +910,26 @@ namespace osu.Game.Screens.Select
             if (e.NewValue.Any())
             {
                 previewOverlayModSettingTracker = new ModSettingChangeTracker(e.NewValue);
-                previewOverlayModSettingTracker.SettingChanged += _ => Scheduler.AddOnce(() => updateBeatmapPreviewSelection(forceReload: true));
+                previewOverlayModSettingTracker.SettingChanged += _ => Scheduler.AddOnce(schedulePreviewSelectionReload);
             }
 
-            updateBeatmapPreviewSelection();
+            schedulePreviewSelectionReload();
+        }
+
+        private void schedulePreviewSelectionReload()
+        {
+            previewModReloadDebounce?.Cancel();
+            previewModReloadDebounce = Scheduler.AddDelayed(() =>
+            {
+                previewModReloadDebounce = null;
+                updateBeatmapPreviewSelection(forceReload: true);
+            }, preview_mod_reload_debounce);
         }
 
         private void updateBeatmapPreviewSelection(bool forceReload = false)
         {
+            cancelScheduledPreviewSelectionReload();
+
             if (!this.IsCurrentScreen())
                 return;
 
@@ -944,6 +962,12 @@ namespace osu.Game.Screens.Select
             }, token);
         }
 
+        private void cancelScheduledPreviewSelectionReload()
+        {
+            previewModReloadDebounce?.Cancel();
+            previewModReloadDebounce = null;
+        }
+
         private void onLeavingScreen()
         {
             EzDisplayTagAltHighlight.Reset();
@@ -961,6 +985,8 @@ namespace osu.Game.Screens.Select
 
             previewOverlayModSettingTracker?.Dispose();
             previewOverlayModSettingTracker = null;
+
+            cancelScheduledPreviewSelectionReload();
 
             previewPlayableCancellation?.Cancel();
             previewPlayableCancellation?.Dispose();
