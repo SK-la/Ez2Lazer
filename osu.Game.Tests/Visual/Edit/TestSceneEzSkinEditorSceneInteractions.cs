@@ -61,7 +61,7 @@ namespace osu.Game.Tests.Visual.Edit
         {
             runSceneInteraction(EzSkinEditorSceneType.Size);
             AddUntilStep("comparison panes still present", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>().Count() == 2);
-            AddAssert("sidebar group present", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() >= 1);
+            AddAssert("sidebar group present", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Any());
         }
 
         [Test]

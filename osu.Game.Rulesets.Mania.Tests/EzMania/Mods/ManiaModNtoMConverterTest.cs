@@ -63,16 +63,16 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
 
             Assert.That(beatmap.HitObjects, Is.Not.Empty, "前置条件：本用例的源谱面必须转换出 note");
 
-            Assert.That(beatmap.HitObjects, Has.All.Matches<ManiaHitObject>(h => h.Column >= 0 && h.Column < target_keys),
+            Assert.That(beatmap.HitObjects, Has.All.Matches<ManiaHitObject>(h => h != null && h.Column >= 0 && h.Column < target_keys),
                         "输出列号必须落在目标列数内");
 
-            Assert.That(beatmap.HitObjects, Has.All.Matches<ManiaHitObject>(h => sourceStartTimes.Contains(h.StartTime)),
+            Assert.That(beatmap.HitObjects, Has.All.Matches<ManiaHitObject>(h => h != null && sourceStartTimes.Contains(h.StartTime)),
                         "输出时间必须来自源谱面（本 mod 只改列）");
 
             var occupied = new HashSet<(int column, double startTime)>();
 
             foreach (var hitObject in beatmap.HitObjects)
-                Assert.That(occupied.Add(((int)hitObject.Column, hitObject.StartTime)), "同一列同一时刻不应出现两个对象");
+                Assert.That(occupied.Add((hitObject.Column, hitObject.StartTime)), "同一列同一时刻不应出现两个对象");
         }
 
         private static ManiaBeatmap convert(Scenario scenario)
@@ -118,8 +118,13 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
         /// </summary>
         private static ManiaBeatmap createChart(int keys)
         {
-            var beatmap = new ManiaBeatmap(new StageDefinition(keys));
-            beatmap.Difficulty.CircleSize = keys;
+            var beatmap = new ManiaBeatmap(new StageDefinition(keys))
+            {
+                Difficulty =
+                {
+                    CircleSize = keys,
+                },
+            };
 
             List<ManiaHitObject> objects = beatmap.HitObjects;
 

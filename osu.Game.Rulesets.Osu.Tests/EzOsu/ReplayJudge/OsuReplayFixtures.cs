@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
@@ -117,7 +118,8 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
         /// 沿直线滑条持续跟踪：采样点共线，位置按时间线性插值，判定只取决于采样时刻而非采样密度，
         /// 因此同一份 replay 抽帧后应产出同一判定序列。
         /// </summary>
-        public static (Score score, IBeatmap beatmap, IGameplayEnvironment environment) CreateSliderTrackingWithTicks()        {
+        public static (Score score, IBeatmap beatmap, IGameplayEnvironment environment) CreateSliderTrackingWithTicks()
+        {
             const double time_slider_start = 1500;
             const float slider_path_length = 600;
             const double frame_interval = 10;
@@ -275,7 +277,7 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
             {
                 Ruleset = ruleset.RulesetInfo,
                 BeatmapInfo = beatmap.BeatmapInfo,
-                Mods = classicNoteLock ? new Mod[] { new OsuModClassic() } : new Mod[0],
+                Mods = classicNoteLock ? new Mod[] { new OsuModClassic() } : Array.Empty<Mod>(),
             };
 
             var score = new Score { ScoreInfo = scoreInfo, Replay = new Replay { Frames = frames } };

@@ -519,8 +519,8 @@ INSERT INTO songs (folder_path, title, artist, genre, last_modified_ticks) VALUE
                 Assert.Multiple(() =>
                 {
                     Assert.That(filtered.Items, Has.Count.EqualTo(25));
-                    Assert.That(filtered.Items, Has.All.Matches<BmsChartSummary>(item => item.Title.Contains("needle", StringComparison.OrdinalIgnoreCase)));
-                    Assert.That(filtered.Items, Has.All.Matches<BmsChartSummary>(item => item.KeyCount == 7));
+                    Assert.That(filtered.Items, Has.All.Matches<BmsChartSummary>(item => item != null && item.Title.Contains("needle", StringComparison.OrdinalIgnoreCase)));
+                    Assert.That(filtered.Items, Has.All.Matches<BmsChartSummary>(item => item != null && item.KeyCount == 7));
                     Assert.That(repository.GetChildFolders(@"E:\bms\bulk", null, 2), Has.Count.EqualTo(2));
                     Assert.That(wrappedRandom, Is.Not.Null);
                     Assert.That(wrappedRandom!.FileName, Is.EqualTo("001000.bms"));

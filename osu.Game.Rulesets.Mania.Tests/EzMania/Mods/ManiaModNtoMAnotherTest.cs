@@ -68,7 +68,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
             createMod().ApplyToBeatmap(beatmap);
 
             Assert.That(beatmap.HitObjects, Is.Not.Empty, "正常谱面必须仍有输出");
-            Assert.That(beatmap.HitObjects, Has.All.Matches<ManiaHitObject>(h => h.Column >= 0 && h.Column < target_keys));
+            Assert.That(beatmap.HitObjects, Has.All.Matches<ManiaHitObject>(h => h != null && h.Column >= 0 && h.Column < target_keys));
         }
 
         private static ManiaBeatmap createBeatmap()
