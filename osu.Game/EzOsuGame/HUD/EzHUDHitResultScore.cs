@@ -115,8 +115,11 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved]
         private EzResourceStore resources { get; set; } = null!;
 
+        /// <summary>预热登记用的服务；只有进图会话期间登记才生效。</summary>
         [Resolved]
         private EzGameplayWarmUpService warmUpService { get; set; } = null!;
+
+        private bool warmUpRegistered;
 
         [Resolved]
         private ScoreProcessor processor { get; set; } = null!;
@@ -145,6 +148,7 @@ namespace osu.Game.EzOsuGame.HUD
             // 在 BDL（而不是 LoadComplete）里登记：PlayerLoader 门控是在 Player 达到 `Ready` 时取快照的，
             // 而 LoadComplete 跑在 `Ready` 之后，那时登记就已经晚了一帧、会被漏掉。
             warmUpService.Register(this);
+            warmUpRegistered = true;
 
             themeName = ezConfig.GetBindable<string>(Ez2Setting.GameThemeName);
             themeName.BindValueChanged(e =>
@@ -714,15 +718,20 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected override void Dispose(bool isDisposing)
         {
-            processor.NewJudgement -= processorNewJudgement;
+            base.Dispose(isDisposing);
 
-            if (isDisposing)
+            // 登记发生在 BDL；加载被取消时 BDL 可能没跑到那一行。
+            if (warmUpRegistered)
                 warmUpService.Unregister(this);
+
+            // 订阅发生在 LoadComplete。
+            if (!IsLoaded)
+                return;
+
+            processor.NewJudgement -= processorNewJudgement;
 
             if (gameplayClockContainer != null)
                 gameplayClockContainer.OnSeek -= Clear;
-
-            base.Dispose(isDisposing);
         }
     }
 }

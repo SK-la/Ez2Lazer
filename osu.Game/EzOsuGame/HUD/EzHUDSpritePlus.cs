@@ -80,6 +80,8 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved]
         private EzGameplayWarmUpService warmUpService { get; set; } = null!;
 
+        private bool warmUpRegistered;
+
         /// <summary>
         /// The beat length and rate the beat-synced playback follows, taken from the shared tracker: it resolves the
         /// timing section being played (or the selection, in song select) and the rate the music is actually played
@@ -108,6 +110,7 @@ namespace osu.Game.EzOsuGame.HUD
             // 在 BDL（而不是 LoadComplete）里登记：PlayerLoader 门控是在 Player 达到 `Ready` 时取快照的，
             // 而 LoadComplete 跑在 `Ready` 之后，那时登记就已经晚了一帧、会被漏掉。
             warmUpService.Register(this);
+            warmUpRegistered = true;
 
             AddInternal(speedTracker = new EzBeatmapSpeedTracker());
 
@@ -247,10 +250,11 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected override void Dispose(bool isDisposing)
         {
-            if (isDisposing)
-                warmUpService.Unregister(this);
-
             base.Dispose(isDisposing);
+
+            // 登记发生在 BDL；加载被取消时 BDL 可能没跑到那一行。
+            if (warmUpRegistered)
+                warmUpService.Unregister(this);
         }
 
         private void applyVisualSettings()

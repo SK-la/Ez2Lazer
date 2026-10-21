@@ -85,13 +85,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         protected override void Dispose(bool isDisposing)
         {
-            if (isDisposing)
-            {
-                skins.ScriptedSkinsCatalogUpdated -= refreshSkinsList;
-                realmSubscription?.Dispose();
-            }
-
             base.Dispose(isDisposing);
+
+            // 加载被中途取消时 [Resolved] 还没注入，也就从未订阅过。
+            if (!IsLoaded)
+                return;
+
+            skins.ScriptedSkinsCatalogUpdated -= refreshSkinsList;
+            realmSubscription?.Dispose();
         }
 
         private partial class SkinListPopover : OsuPopover

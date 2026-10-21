@@ -458,6 +458,10 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
         {
             base.Dispose(isDisposing);
 
+            // 订阅发生在 BDL，手牌也是那时创建的。
+            if (!IsLoaded)
+                return;
+
             playerHand.SelectionChanged -= onCardSelectionChanged;
             playerHand.StateChanged -= enforceSingleActivePreview;
         }

@@ -100,15 +100,19 @@ namespace osu.Game.EzOsuGame.Screens.Play
 
         protected override void Dispose(bool isDisposing)
         {
-            if (isDisposing)
-            {
-                game.ScreenStack.ScreenPushed -= onScreenChanged;
-                game.ScreenStack.ScreenExited -= onScreenChanged;
-                skinManager.SourceChanged -= onSkinSourceChanged;
+            // 预热宿主还挂在树上，先让它在 tree 仍有效时收尾。
+            if (IsLoaded)
                 cancelWarmUp();
-            }
 
             base.Dispose(isDisposing);
+
+            // 订阅发生在 LoadComplete。
+            if (!IsLoaded)
+                return;
+
+            game.ScreenStack.ScreenPushed -= onScreenChanged;
+            game.ScreenStack.ScreenExited -= onScreenChanged;
+            skinManager.SourceChanged -= onSkinSourceChanged;
         }
 
         /// <summary>

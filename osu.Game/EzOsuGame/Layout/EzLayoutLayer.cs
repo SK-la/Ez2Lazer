@@ -84,15 +84,16 @@ namespace osu.Game.EzOsuGame.Layout
 
         protected override void Dispose(bool isDisposing)
         {
+            base.Dispose(isDisposing);
+
             unbindPendingPlayer();
 
-            if (game.ScreenStack != null)
-            {
-                game.ScreenStack.ScreenPushed -= onScreenChanged;
-                game.ScreenStack.ScreenExited -= onScreenChanged;
-            }
+            // 订阅发生在 LoadComplete。
+            if (!IsLoaded)
+                return;
 
-            base.Dispose(isDisposing);
+            game.ScreenStack.ScreenPushed -= onScreenChanged;
+            game.ScreenStack.ScreenExited -= onScreenChanged;
         }
 
         public IEnumerable<EzLayoutContainer> LayoutContainers => InternalChildren.OfType<EzLayoutContainer>();
