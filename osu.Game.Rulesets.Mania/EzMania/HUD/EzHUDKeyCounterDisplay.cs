@@ -41,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         private Vector2 appliedContainerSize;
         private float appliedStageOffsetFraction;
 
-        [Resolved]
+        [Resolved(canBeNull: true)]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         [Resolved(canBeNull: true)]
@@ -50,7 +50,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         [Resolved]
         private InputCountController controller { get; set; } = null!;
 
-        [Resolved]
+        [Resolved(canBeNull: true)]
         private ISkinSource skin { get; set; } = null!;
 
         [Resolved]
@@ -219,9 +219,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         {
             if (isDisposing)
             {
-                ezSkinConfig.ColumnTypeChanged -= updateWidth;
-                skin.SourceChanged -= onSkinChanged;
+                // 加载被中途取消时 [Resolved] 还没注入，也就从未订阅过。
+                ezSkinConfig?.ColumnTypeChanged -= updateWidth;
+
+                skin?.SourceChanged -= onSkinChanged;
             }
+
+            base.Dispose(isDisposing);
         }
 
         public bool UsesFixedAnchor { get; set; }
