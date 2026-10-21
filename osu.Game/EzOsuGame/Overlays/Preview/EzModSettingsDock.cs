@@ -46,6 +46,8 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
         private readonly Container body;
         private readonly Container handleContainer;
+        private readonly Container handleVisual;
+        private readonly ClickableContainer handleInput;
         private readonly EzMaterialPanelBackground background;
         private readonly EzMaterialPanelBackground handleBackground;
         private readonly OsuScrollContainer scroll;
@@ -53,6 +55,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         private readonly OsuSpriteText emptyText;
 
         private IBindable<IReadOnlyList<Mod>>? mods;
+        private bool handleRevealed;
 
         /// <summary>
         /// 侧边栏是否已展开。展开时 <see cref="Drawable.Width"/> 为 <see cref="BODY_WIDTH"/>，收起时为 <see cref="HANDLE_WIDTH"/>。
@@ -187,17 +190,22 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                         }
                     }
                 },
+                // 收起时整条右侧窄带都是把手的热区，鼠标靠近才浮出可见的把手。
                 handleContainer = new Container
                 {
                     Width = HANDLE_WIDTH,
-                    Height = handle_height,
+                    RelativeSizeAxes = Axes.Y,
                     Anchor = Anchor.TopLeft,
                     Origin = Anchor.TopLeft,
                     Children = new Drawable[]
                     {
-                        new Container
+                        handleVisual = new Container
                         {
-                            RelativeSizeAxes = Axes.Both,
+                            Width = HANDLE_WIDTH,
+                            Height = handle_height,
+                            Anchor = Anchor.TopLeft,
+                            Origin = Anchor.TopLeft,
+                            Alpha = 0,
                             Masking = true,
                             CornerRadius = EzUIStyleV1.CORNER_RADIUS_CHIP,
                             Children = new Drawable[]
@@ -213,7 +221,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                                 }
                             }
                         },
-                        new ClickableContainer
+                        handleInput = new ClickableContainer
                         {
                             RelativeSizeAxes = Axes.Both,
                             Action = Expand,
@@ -240,15 +248,17 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             IsExpanded = true;
             Width = BODY_WIDTH;
 
+            setHandleRevealed(false);
+            // 收起态的热区不再需要，Alpha 归零同时让整块失去焦点与输入。
             handleContainer.ClearTransforms();
-            handleContainer.FadeOut(reveal_duration / 2f, Easing.OutQuint);
+            handleContainer.Alpha = 0;
 
             body.ClearTransforms();
             body.FadeIn(reveal_duration, Easing.OutQuint);
         }
 
         /// <summary>
-        /// 收起侧边栏，只保留展开把手。
+        /// 收起侧边栏，只保留展开把手的热区。
         /// </summary>
         public void Collapse()
         {
@@ -257,15 +267,39 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
             IsExpanded = false;
 
+            // 立即恢复热区，鼠标本来就停在把手位置时下一帧就会浮出可见把手。
+            handleContainer.ClearTransforms();
+            handleContainer.Alpha = 1;
+
             body.ClearTransforms();
             body.FadeOut(reveal_duration, Easing.OutQuint).Finally(_ =>
             {
                 if (!IsExpanded)
                     Width = HANDLE_WIDTH;
             });
+        }
 
-            handleContainer.ClearTransforms();
-            handleContainer.FadeIn(reveal_duration, Easing.OutQuint);
+        protected override void Update()
+        {
+            base.Update();
+
+            if (IsExpanded)
+                return;
+
+            var inputManager = GetContainingInputManager();
+            setHandleRevealed(inputManager != null && handleInput.ReceivePositionalInputAt(inputManager.CurrentState.Mouse.Position));
+        }
+
+        /// <summary>
+        /// 把手平时隐藏，只在鼠标靠近把手热区时浮出。
+        /// </summary>
+        private void setHandleRevealed(bool revealed)
+        {
+            if (handleRevealed == revealed)
+                return;
+
+            handleRevealed = revealed;
+            handleVisual.FadeTo(revealed ? 1 : 0, revealed ? 120 : 200, Easing.OutQuint);
         }
 
         private void onModsChanged(ValueChangedEvent<IReadOnlyList<Mod>> _) => rebuild();
