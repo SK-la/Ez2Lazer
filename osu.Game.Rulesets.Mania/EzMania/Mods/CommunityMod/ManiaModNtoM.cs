@@ -21,7 +21,7 @@ using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
-    public class ManiaModNtoM : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IEzApplyOrder, IApplicableToBeatmapConverter
+    public class ManiaModNtoM : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IEzApplyOrder, IEzColumnCountMod
     {
         public override string Name => "Nk to Mk Converter";
 
@@ -76,16 +76,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public int ApplyOrder => ApplyOrderIndex.Value;
 
-        public void ApplyToBeatmapConverter(IBeatmapConverter converter)
-        {
-            var mbc = (ManiaBeatmapConverter)converter;
-
-            float keys = mbc.TotalColumns;
-
-            if (keys > 9 || Key.Value <= keys) return;
-
-            mbc.TargetColumns = Key.Value;
-        }
+        public int ResolveColumnCount(int currentColumns) => currentColumns is > 0 and <= 9 && Key.Value > currentColumns ? Key.Value : currentColumns;
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
@@ -95,11 +86,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
             var maniaBeatmap = (ManiaBeatmap)beatmap;
 
-            // 这里必须是「转换前的源谱键数」，不能用 ResolveColumnCount()：ApplyToBeatmapConverter 已把
-            // TargetColumns 改成 Key.Value，stages 反映的是目标列数，用它会让下面的扩展分支直接变成死路径。
-            int keys = (int)maniaBeatmap.Difficulty.CircleSize;
+            // 读当前列数并按 ApplyOrder 处理，参考 PS：排在前面（ApplyOrder 更小）的改键 mod 已把列数写好，
+            // 这里再用转换阶段的目标列数或元数据快照就会与它脱节。
+            int keys = maniaBeatmap.ResolveColumnCount();
 
-            if (keys > 9 || Key.Value <= keys) return;
+            if (keys <= 0 || keys > 9 || Key.Value <= keys) return;
+
+            // 目标列数先行落地：下面的 CleanupObjects 以 beatmap.TotalColumns 作为列数基线。
+            maniaBeatmap.SetColumnCount(Key.Value);
 
             var newObjects = new List<ManiaHitObject>();
 

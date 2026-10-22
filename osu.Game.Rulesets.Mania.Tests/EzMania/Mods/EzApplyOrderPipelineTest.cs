@@ -7,6 +7,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
 using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
@@ -16,7 +17,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
 {
     /// <summary>
     /// 转换顺序：转换器阶段与后转换阶段都要按 <see cref="IEzApplyOrder"/> 执行，
-    /// 且下游 mod 能读到上游改过的列数。
+    /// 且排在后面的 mod 能读到前面（如 PS）改过的列数。
     /// </summary>
     [TestFixture]
     public class EzApplyOrderPipelineTest
@@ -101,6 +102,58 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
 
             Assert.That(beatmap.TotalColumns, Is.EqualTo(8));
             Assert.That(beatmap.HitObjects.All(h => h.Column < 8), Is.True);
+        }
+
+        /// <summary>
+        /// NTM 属于改键 mod，读的是排在前面（如 PS）之后的列数；谁排在后面谁决定最终列数。
+        /// </summary>
+        [Test]
+        public void TestNtoMFollowsApplyOrder()
+        {
+            var ruleset = new ManiaRuleset().RulesetInfo;
+
+            var ps = new ManiaModPatternShift { KeyCount = { Value = 6 }, Seed = { Value = 1 } };
+            var ntm = new ManiaModNtoM { Key = { Value = 8 }, ApplyOrderIndex = { Value = 10 } };
+            ps.ApplyOrderIndex.Value = 0;
+
+            var ntmLast = (ManiaBeatmap)createManiaWorkingBeatmap(7).GetPlayableBeatmap(ruleset, new Mod[] { ps, ntm });
+            Assert.That(ntmLast.TotalColumns, Is.EqualTo(8), "NTM 在后：应把 PS 的 6 列扩成 8");
+
+            ps.ApplyOrderIndex.Value = 50;
+            ntm.ApplyOrderIndex.Value = 10;
+
+            var psLast = (ManiaBeatmap)createManiaWorkingBeatmap(7).GetPlayableBeatmap(ruleset, new Mod[] { ps, ntm });
+            Assert.That(psLast.TotalColumns, Is.EqualTo(6), "PS 在后：应把 NTM 的 8 列重建为 6");
+        }
+
+        /// <summary>
+        /// NtoMAnother 与 NTM 同源，同样按 ApplyOrder 处理前面（如 PS）设置的列数。
+        /// </summary>
+        [Test]
+        public void TestNtoMAnotherFollowsApplyOrder()
+        {
+            var ruleset = new ManiaRuleset().RulesetInfo;
+
+            var ps = new ManiaModPatternShift { KeyCount = { Value = 6 }, Seed = { Value = 1 } };
+            var another = new ManiaModNtoMAnother { Key = { Value = 8 }, ApplyOrderIndex = { Value = 10 } };
+
+            var beatmap = (ManiaBeatmap)createManiaWorkingBeatmap(7).GetPlayableBeatmap(ruleset, new Mod[] { ps, another });
+
+            Assert.That(beatmap.TotalColumns, Is.EqualTo(8));
+            Assert.That(beatmap.HitObjects.All(h => h.Column < 8), Is.True);
+        }
+
+        /// <summary>
+        /// 选歌键数也要认出 NTM / NtoMAnother 的目标列数。
+        /// </summary>
+        [Test]
+        public void TestDisplayColumnCountIncludesNtoMMods()
+        {
+            var ruleset = new ManiaRuleset();
+            var beatmapInfo = new BeatmapInfo(ruleset.RulesetInfo, new BeatmapDifficulty { CircleSize = 7 });
+
+            Assert.That(ruleset.GetKeyCount(beatmapInfo, new Mod[] { new ManiaModNtoM { Key = { Value = 8 } } }), Is.EqualTo(8));
+            Assert.That(ruleset.GetKeyCount(beatmapInfo, new Mod[] { new ManiaModNtoMAnother { Key = { Value = 9 } } }), Is.EqualTo(9));
         }
 
         private static TestWorkingBeatmap createManiaWorkingBeatmap(int columns)
