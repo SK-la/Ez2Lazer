@@ -16,16 +16,16 @@ using osu.Game.Extensions;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.EzMania;
 using osu.Game.Rulesets.Mania.EzMania.Audio;
 using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
+using osu.Game.Rulesets.Mania.EzMania.Input;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
-using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.Configuration;
-using osu.Game.Rulesets.Mania.EzMania.Input;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Skinning;
@@ -161,6 +161,16 @@ namespace osu.Game.Rulesets.Mania.UI
 
         protected override ScrollingHitObjectContainer CreateScrollingHitObjectContainer()
             => new LaneTrackingScrollingHitObjectContainer(this);
+
+        /// <summary>
+        /// Mounts an overlay playfield above this column's own notes, inside the same hit object area so both share the
+        /// hit position padding and the scroll length.
+        /// </summary>
+        internal void MountReplayInputNoteOverlay(Playfield overlay)
+        {
+            HitObjectArea.Add(overlay);
+            AddNested(overlay);
+        }
 
         internal void RegisterLaneDrawable(DrawableHitObject drawable)
             => LaneController.Register(drawable, drawableRuleset?.ColumnRoutesInput == true);

@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
@@ -12,6 +13,7 @@ using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Input;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
+using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
@@ -25,6 +27,7 @@ using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.EzMania;
+using osu.Game.Rulesets.Mania.EzMania.ReplayInputNotes;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
@@ -43,7 +46,6 @@ using osu.Game.Skinning;
 using osuTK.Input;
 
 #if DEBUG
-using osu.Framework.Logging;
 using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 #endif
 
@@ -102,6 +104,19 @@ namespace osu.Game.Rulesets.Mania.UI
 
         [Resolved(canBeNull: true)]
         private GameplayState? gameplayState { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private IEzReplaySession? replaySession { get; set; }
+
+        /// <summary>
+        /// Replay input note overlay state, shared with the columns and the replay sidebar section.
+        /// </summary>
+        public EzReplayInputNoteModel ReplayInputNotes { get; } = new EzReplayInputNoteModel();
+
+        private bool replayInputNoteResultsRequested;
+        private bool replayInputNoteLayersCreated;
+        private int replayInputNoteVersion = -1;
+        private readonly List<EzReplayInputNotePlayfield> replayInputNoteOverlays = new List<EzReplayInputNotePlayfield>();
 
         private readonly Bindable<EzEnumJudgeMode> judgeModeBindable = new Bindable<EzEnumJudgeMode>();
         private EzEnumJudgeMode gameplayJudgeMode;
@@ -172,7 +187,7 @@ namespace osu.Game.Rulesets.Mania.UI
         }
 
         [BackgroundDependencyLoader]
-        private void load(ISkinSource source)
+        private void load(ISkinSource source, ReplayPlayer? replayPlayer)
         {
             currentSkin = source;
             currentSkin.SourceChanged += onSkinChange;
@@ -244,11 +259,118 @@ namespace osu.Game.Rulesets.Mania.UI
 
             if (ManiaHoldTailMask.IsEnabled(HoldTailMaskLevel) && DynamicHoldTailMask)
                 FrameStableComponents.Add(HoldTailSpeedTracker = new EzBeatmapSpeedTracker());
+
+            setupReplayInputNotes(replayPlayer);
+        }
+
+        /// <summary>
+        /// Enables the input note overlay for score replays only; local play and autoplay playback keep a clean playfield.
+        /// </summary>
+        private void setupReplayInputNotes(ReplayPlayer? replayPlayer)
+        {
+            if (replayPlayer?.Score == null || Mods.OfType<ModAutoplay>().Any())
+                return;
+
+            var score = replayPlayer.Score;
+
+            ReplayInputNotes.Load(score.Replay, Beatmap);
+
+            if (!ReplayInputNotes.Enabled)
+                return;
+
+            replayPlayer.AddSettings(new EzReplayInputNoteSettingsGroup(ReplayInputNotes));
+            ReplayInputNotes.ShowOverlay.BindValueChanged(_ => ensureReplayInputNoteResults(score), true);
+            ReplayInputNotes.ColourByHitResult.BindValueChanged(_ => ensureReplayInputNoteResults(score), true);
+            ReplayInputNotes.OnlyJudgedNotes.BindValueChanged(_ => ensureReplayInputNoteResults(score), true);
+        }
+
+        /// <summary>
+        /// Mounts one overlay playfield per column. Runs after the playfield's columns are loaded, so each overlay attaches
+        /// to a live hit object area and receives the same scrolling info the column's own notes use.
+        /// </summary>
+        private void createReplayInputNoteLayers()
+        {
+            if (!ReplayInputNotes.Enabled || replayInputNoteLayersCreated)
+                return;
+
+            replayInputNoteLayersCreated = true;
+
+            foreach (var stage in Playfield.Stages)
+            {
+                foreach (var column in stage.Columns)
+                {
+                    var overlay = new EzReplayInputNotePlayfield(ReplayInputNotes, column.Index);
+                    column.MountReplayInputNoteOverlay(overlay);
+                    replayInputNoteOverlays.Add(overlay);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Pushes the model's current notes into the overlays whenever the model rebuilt them (mode switch, results applied).
+        /// </summary>
+        private void refreshReplayInputNoteOverlays()
+        {
+            if (replayInputNoteOverlays.Count == 0 || ReplayInputNotes.Version == replayInputNoteVersion)
+                return;
+
+            replayInputNoteVersion = ReplayInputNotes.Version;
+
+            foreach (var overlay in replayInputNoteOverlays)
+                overlay.SetNotes(ReplayInputNotes.NotesFor(overlay.Column));
+        }
+
+        private void ensureReplayInputNoteResults(Score score)
+        {
+            if (replayInputNoteResultsRequested)
+                return;
+
+            // Hidden overlay needs no judgements: keep the request pending so it can still run when re-enabled.
+            if (!ReplayInputNotes.ShowOverlay.Value)
+                return;
+
+            if (!ReplayInputNotes.ColourByHitResult.Value && !ReplayInputNotes.OnlyJudgedNotes.Value)
+                return;
+
+            replayInputNoteResultsRequested = true;
+
+            if (replaySession == null)
+            {
+                ReplayInputNotes.ApplyResults(Array.Empty<HitEvent>());
+                return;
+            }
+
+            var session = replaySession;
+            var beatmap = Beatmap;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var events = await session.RunHitEventsAsync(score, beatmap, ReplayRunPurpose.ForLive).ConfigureAwait(false);
+
+                    Schedule(() => ReplayInputNotes.ApplyResults(events));
+                }
+                catch (OperationCanceledException)
+                {
+                    // Replay exited or the beatmap went away; the overlay simply stays uncoloured.
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Replay exited while the session was running.
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Replay input note results unavailable: {e}", LoggingTarget.Runtime, LogLevel.Important);
+                }
+            });
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
+            createReplayInputNoteLayers();
 
             gameplayJudgeMode = judgeModeBindable.Value;
 
@@ -382,6 +504,7 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             base.Update();
             updateTimeRange();
+            refreshReplayInputNoteOverlays();
         }
 
         private ScheduledDelegate? pendingSkinChange;

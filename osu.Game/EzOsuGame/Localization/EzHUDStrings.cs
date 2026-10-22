@@ -199,6 +199,27 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString PAUSE_FORCE_RESULTS_LABEL = new EzLocalizationManager.EzLocalisableString("强制进入结算", "Force results");
         public static readonly LocalisableString PAUSE_FORCE_RESULTS_HOLDING = new EzLocalizationManager.EzLocalisableString("按住 2 秒…", "Hold for 2 seconds…");
 
+        // Replay input note overlay
+        public static readonly LocalisableString REPLAY_INPUT_NOTE_TITLE = new EzLocalizationManager.EzLocalisableString("回放按键", "Replay Input Notes");
+
+        public static readonly LocalisableString REPLAY_INPUT_NOTE_ENABLED_LABEL = new EzLocalizationManager.EzLocalisableString("启用覆盖层", "Enable overlay");
+
+        public static readonly LocalisableString REPLAY_INPUT_NOTE_ENABLED_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "总开关。关闭后不绘制任何回放按键 note，谱面本身不受影响。",
+            "Master switch. When off, no replay input notes are drawn; the beatmap itself is unaffected.");
+
+        public static readonly LocalisableString REPLAY_INPUT_NOTE_COLOUR_LABEL = new EzLocalizationManager.EzLocalisableString("关联 HitResult 颜色", "Colour by hit result");
+
+        public static readonly LocalisableString REPLAY_INPUT_NOTE_COLOUR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "按键按本次判定着色；未命中任何物件的按键显示为灰色；命中 LN 时区分头部与其余部分。",
+            "Colour presses by their judgement; presses that hit nothing are grey, and LN presses distinguish the head from the rest.");
+
+        public static readonly LocalisableString REPLAY_INPUT_NOTE_ONLY_JUDGED_LABEL = new EzLocalizationManager.EzLocalisableString("仅显示 note 判定按键", "Only show judged notes");
+
+        public static readonly LocalisableString REPLAY_INPUT_NOTE_ONLY_JUDGED_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "只绘制命中物件的按键，忽略空按与 ignore 判定；普通 note 使用扩展列 note 样式，LN 仍按按住时长绘制。",
+            "Only draw presses that hit an object, dropping stray presses and ignored judgements; plain notes use the extension note style, LNs keep the held duration.");
+
         // EzHUDDynamicSpeedDisplay
         public static readonly LocalisableString DYNAMIC_SPEED_SHOW_LINE_LABEL = new EzLocalizationManager.EzLocalisableString("显示速度折线", "Show Speed Line");
 
