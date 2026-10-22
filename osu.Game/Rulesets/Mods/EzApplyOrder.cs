@@ -12,7 +12,7 @@ namespace osu.Game.Rulesets.Mods
     public static class EzApplyOrder
     {
         /// <summary>
-        /// 未实现 <see cref="IEzApplyOrder"/> 的 mod 使用的顺序值。
+        /// 未实现 <see cref="IEzApplyOrder"/> 的 mod 使用的顺序值。负数排它之前，正数排它之后。
         /// </summary>
         public const int DEFAULT_ORDER = 0;
 

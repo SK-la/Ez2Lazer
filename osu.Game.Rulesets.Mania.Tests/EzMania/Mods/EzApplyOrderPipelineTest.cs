@@ -51,9 +51,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
             var working = createManiaWorkingBeatmap(7);
 
             var probe = new ColumnProbeMod { ApplyOrderIndex = { Value = 0 } };
-            var ps = new ManiaModPatternShift { KeyCount = { Value = 6 }, Seed = { Value = 1 } };
+            var ps = new ManiaModPatternShift { KeyCount = { Value = 6 }, Seed = { Value = 1 }, ApplyOrderIndex = { Value = 10 } };
 
-            // 顺序都是 0，稳定排序保持入参顺序：探针先读，PS 后改。
+            // 探针排在 PS 之前，读到的必须是源谱键数；PS 在转换器阶段不该已经改过列数。
             working.GetPlayableBeatmap(new ManiaRuleset().RulesetInfo, new Mod[] { probe, ps });
 
             Assert.That(probe.ObservedColumns, Is.EqualTo(7), "PS 之前应仍是源谱键数");
@@ -71,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
             var ps = new ManiaModPatternShift { KeyCount = { Value = 6 } };
             var n2n = new ManiaModKrrN2Nc { TargetKeys = { Value = 8 } };
 
-            // 默认：PS(0) 先，N2N(100) 后。
+            // 默认：PS(-20) 先，N2N(-10) 后。
             Assert.That(ruleset.GetKeyCount(beatmapInfo, new Mod[] { ps, n2n }), Is.EqualTo(8));
 
             // 交换顺序：N2N(10) 先，PS(50) 后。

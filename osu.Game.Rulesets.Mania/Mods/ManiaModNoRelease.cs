@@ -2,11 +2,15 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
@@ -18,7 +22,7 @@ using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.Mania.Mods
 {
-    public partial class ManiaModNoRelease : Mod, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>
+    public partial class ManiaModNoRelease : Mod, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>, IEzApplyOrder
     {
         public override string Name => "No Release";
 
@@ -29,6 +33,26 @@ namespace osu.Game.Rulesets.Mania.Mods
         public override IconUsage? Icon => OsuIcon.ModNoRelease;
 
         public override ModType Type => ModType.DifficultyReduction;
+
+        /// <summary>
+        /// 释放窗口改写属于谱面成型后的后处理：排在转键与内容 mod 之后，才不会让前面生成的 LN 被提前改写。
+        /// </summary>
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
+        {
+            MinValue = 0,
+            MaxValue = 100
+        };
+
+        public int ApplyOrder => ApplyOrderIndex.Value;
+
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
+            }
+        }
 
         public override Type[] IncompatibleMods => new[] { typeof(ManiaModHoldOff), typeof(ManiaModInvert) };
 

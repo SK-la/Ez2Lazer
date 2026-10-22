@@ -2,22 +2,25 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Bindables;
+using osu.Framework.Graphics.Sprites;
+using osu.Framework.Localisation;
+using osu.Framework.Utils;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.Graphics;
+using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
 using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
-using osu.Framework.Graphics.Sprites;
-using System.Collections.Generic;
-using osu.Framework.Localisation;
-using osu.Framework.Utils;
-using osu.Game.Graphics;
-using osu.Game.Rulesets.Mania.Beatmaps;
 
 namespace osu.Game.Rulesets.Mania.Mods
 {
-    public class ManiaModHoldOff : Mod, IApplicableAfterBeatmapConversion
+    public class ManiaModHoldOff : Mod, IApplicableAfterBeatmapConversion, IEzApplyOrder
     {
         public override string Name => "Hold Off";
 
@@ -28,6 +31,26 @@ namespace osu.Game.Rulesets.Mania.Mods
         public override IconUsage? Icon => OsuIcon.ModHoldOff;
 
         public override ModType Type => ModType.Conversion;
+
+        /// <summary>
+        /// LN 拆除属于谱面成型后的后处理：排在转键与内容 mod 之后，才不会让前面生成的 LN 被提前摊平。
+        /// </summary>
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
+        {
+            MinValue = 0,
+            MaxValue = 100
+        };
+
+        public int ApplyOrder => ApplyOrderIndex.Value;
+
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
+            }
+        }
 
         public override Type[] IncompatibleMods => new[]
         {
