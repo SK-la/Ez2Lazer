@@ -14,21 +14,21 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania.Mods.ModHelp;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
-using osu.Game.EzOsuGame.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 {
-    public class ManiaModPatternShift : Mod, IApplicableAfterBeatmapConversion, IApplicableToBeatmapConverter, IHasSeed, IEzApplyOrder
+    public class ManiaModPatternShift : Mod, IApplicableAfterBeatmapConversion, IApplicableToBeatmapConverter, IHasSeed, IEzApplyOrder, IEzColumnCountMod
     {
         private const double min_column_spacing_ms = 8;
 
-        private static readonly int[] DENSE_SUBDIVISIONS = [2, 4, 8, 16];
-        private static readonly int[] SPARSE_SUBDIVISIONS = [2, 4, 8];
+        private static readonly int[] dense_subdivisions = [2, 4, 8, 16];
+        private static readonly int[] sparse_subdivisions = [2, 4, 8];
 
         public override string Name => "Pattern Shift";
 
@@ -99,13 +99,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
-        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(-20)
         {
-            MinValue = 0,
+            MinValue = -100,
             MaxValue = 100
         };
 
         public int ApplyOrder => ApplyOrderIndex.Value;
+
+        public int ResolveColumnCount(int currentColumns) => Math.Clamp(KeyCount.Value, 2, ManiaRuleset.MAX_STAGE_KEYS);
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
@@ -125,8 +127,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         public void ApplyToBeatmapConverter(IBeatmapConverter converter)
         {
-            if (converter is ManiaBeatmapConverter maniaConverter)
-                maniaConverter.TargetColumns = Math.Clamp(KeyCount.Value, 2, ManiaRuleset.MAX_STAGE_KEYS);
+            if (converter is not ManiaBeatmapConverter maniaConverter)
+                return;
+
+            // mania 源的谱面进转换器时列数已经是它自己的键数，这里再改会越过 ApplyOrder 抢在其它后转换 mod 之前生效
+            // （例如把 N2N 排在 PS 之前时，N2N 仍会读到 PS 的列数）。跨规则集转换则必须在这里给出目标列数，
+            // 否则 7K 等默认映射会先落键，PS 只能从那份粗映射起步。
+            if (maniaConverter.IsForCurrentRuleset)
+                return;
+
+            maniaConverter.TargetColumns = Math.Clamp(KeyCount.Value, 2, ManiaRuleset.MAX_STAGE_KEYS);
         }
 
         public void ApplyToBeatmap(IBeatmap beatmap)
@@ -521,7 +531,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     var tp = beatmap.ControlPointInfo.TimingPointAt(anchor.StartTime);
                     double beatLength = tp.BeatLength;
 
-                    int subdiv = DENSE_SUBDIVISIONS[rng.Next(DENSE_SUBDIVISIONS.Length)];
+                    int subdiv = dense_subdivisions[rng.Next(dense_subdivisions.Length)];
 
                     double offset = (rng.NextDouble() - 0.5) * (beatLength / subdiv) * (1.0 + 0.5 * (1.0 - osc.Next()));
                     double newTime = Math.Max(0, anchor.StartTime + offset);
@@ -569,7 +579,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                             double t = left + (osc.Next() * 0.75 + 0.125) * gap; // biased away from edges
 
                             // snap to a subdivision of local beat
-                            int subdiv = SPARSE_SUBDIVISIONS[rng.Next(SPARSE_SUBDIVISIONS.Length)];
+                            int subdiv = sparse_subdivisions[rng.Next(sparse_subdivisions.Length)];
                             double step = localBeat / subdiv;
                             double snapped = Math.Round(t / step) * step;
 
@@ -663,9 +673,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             if (maniaBeatmap.HitObjects.Count == 0 && !Regenerate.Value)
                 return;
 
-            maniaBeatmap.Stages.Clear();
-            maniaBeatmap.Stages.Add(new StageDefinition(targetColumns));
-            maniaBeatmap.Difficulty.CircleSize = targetColumns;
+            maniaBeatmap.SetColumnCount(targetColumns);
 
             double snap(double time)
             {

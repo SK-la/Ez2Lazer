@@ -13,15 +13,15 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
-using osu.Game.EzOsuGame.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
-    public class ManiaModNtoMAnother : Mod, IApplicableToBeatmapConverter, IApplicableAfterBeatmapConversion, IHasSeed, IEzApplyOrder
+    public class ManiaModNtoMAnother : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IEzApplyOrder, IEzColumnCountMod
     {
         public const double INTERVAL = 50;
 
@@ -117,27 +117,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
-        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(0)
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(-10)
         {
-            MinValue = 0,
+            MinValue = -100,
             MaxValue = 100
         };
 
         public int ApplyOrder => ApplyOrderIndex.Value;
 
-        public void ApplyToBeatmapConverter(IBeatmapConverter converter)
-        {
-            var mbc = (ManiaBeatmapConverter)converter;
-
-            float keys = mbc.TotalColumns;
-
-            if (keys > 9 || Key.Value <= keys)
-            {
-                return;
-            }
-
-            mbc.TargetColumns = Key.Value;
-        }
+        public int ResolveColumnCount(int currentColumns) => currentColumns is > 0 and <= 9 && Key.Value > currentColumns ? Key.Value : currentColumns;
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
@@ -146,19 +134,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
             var maniaBeatmap = (ManiaBeatmap)beatmap;
 
-            int keys = (int)maniaBeatmap.Difficulty.CircleSize;
-
-            int blank = BlankColumn.Value;
-
-            if (blank > Key.Value - keys)
-            {
-                blank = Key.Value - keys;
-            }
+            // 读当前列数并按 ApplyOrder 处理，参考 PS：排在前面（ApplyOrder 更小）的改键 mod 结果才是这一步的输入。
+            int keys = maniaBeatmap.ResolveColumnCount();
 
             if (keys <= 0 || keys > 9 || Key.Value <= keys)
             {
                 return;
             }
+
+            int blank = Math.Min(BlankColumn.Value, Key.Value - keys);
+
+            // 与 NtoM 同理：目标列数先落地，后续列清理按它取列数基线。
+            maniaBeatmap.SetColumnCount(Key.Value);
 
             var newObjects = new List<ManiaHitObject>();
 

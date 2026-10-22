@@ -25,6 +25,29 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
         public int TotalColumns => Stages.Sum(g => g.Columns);
 
         /// <summary>
+        /// 当前实际列数：以 <see cref="Stages"/> 为准，stages 缺失时回落到 <see cref="Beatmap{T}.Difficulty"/> 的 CircleSize。
+        /// </summary>
+        /// <remarks>
+        /// 后转换 mod 只就地改写 <see cref="Beatmap{T}.Difficulty"/> 与 <see cref="Stages"/>，
+        /// 不会写回 <c>BeatmapInfo.Difficulty</c>（那是转换开始时克隆的源谱快照）。
+        /// 判断「排在前面按 ApplyOrder 跑过的改键 mod（如 PS）之后还剩几列」必须走这里，读元数据会拿到源谱键数。
+        /// </remarks>
+        public int ResolveColumnCount() => TotalColumns > 0 ? TotalColumns : (int)Math.Round(Difficulty.CircleSize);
+
+        /// <summary>
+        /// 把谱面改成单 stage 的 <paramref name="columns"/> 列，并同步 <see cref="Beatmap{T}.Difficulty"/> 的 CircleSize。
+        /// </summary>
+        /// <remarks>
+        /// 两个字段必须一起写：只写 stages 会让读 CircleSize 的代码拿到旧键数，只写 CircleSize 会让读 TotalColumns 的代码拿到旧列数。
+        /// </remarks>
+        public void SetColumnCount(int columns)
+        {
+            Stages.Clear();
+            Stages.Add(new StageDefinition(columns));
+            Difficulty.CircleSize = columns;
+        }
+
+        /// <summary>
         /// Creates a new <see cref="ManiaBeatmap"/>.
         /// </summary>
         /// <param name="defaultStage">The initial stages.</param>

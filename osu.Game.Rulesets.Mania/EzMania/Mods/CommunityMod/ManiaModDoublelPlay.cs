@@ -67,6 +67,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         {
             var maniaBeatmap = (ManiaBeatmap)beatmap;
 
+            // 与 NtoM 同理：这里要的是转换前的源谱键数，stages 已被 ApplyToBeatmapConverter 改成 8。
             int keys = (int)maniaBeatmap.Difficulty.CircleSize;
 
             if (keys != 4)

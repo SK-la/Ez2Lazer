@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using NUnit.Framework;
 using osu.Game.Beatmaps.ControlPoints;
@@ -183,6 +184,69 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
                 Assert.DoesNotThrow(() => KrrN2NcConverter.Transform(beatmap, new KrrOptions { TargetKeys = targetKeys, Seed = 1 }));
                 Assert.That(beatmap.HitObjects, Is.Empty, $"目标键数 {targetKeys}：空谱面不应被补出 note");
             }
+        }
+
+        /// <summary>
+        /// 参考 PS：改键 mod 只写实例上的 Difficulty / stages，不会写回转换开始时克隆的 BeatmapInfo.Difficulty。
+        /// 这里按元数据里的旧键数建矩阵就会被错误压缩，targetKeys 恰等于旧键数时还会整段跳过；转换必须以当前键数为准。
+        /// </summary>
+        [Test]
+        public void TestUsesLiveCircleSizeNotBeatmapInfoSnapshot()
+        {
+            var beatmap = new ManiaBeatmap(new StageDefinition(6));
+
+            // 转换流程在 BeatmapInfo 赋值时会把 Difficulty 克隆一份出去，元数据与实例从此各自独立；
+            // 这里复现那一层分离，再模拟「元数据是源谱键数 4、PS 已把实例改成 6」。
+            beatmap.BeatmapInfo = beatmap.BeatmapInfo.Clone();
+            beatmap.BeatmapInfo.Difficulty.CircleSize = 4;
+            beatmap.Difficulty.CircleSize = 6;
+
+            beatmap.BeatmapInfo.BPM = 120;
+            beatmap.ControlPointInfo.Add(0, new TimingControlPoint { BeatLength = 500 });
+
+            for (int column = 0; column < 6; column++)
+                beatmap.HitObjects.Add(new Note { StartTime = 1000 + column * 100, Column = column });
+
+            KrrN2NcConverter.Transform(beatmap, new KrrOptions
+            {
+                TargetKeys = 6,
+                MaxKeys = 6,
+                MinKeys = 0,
+                BeatSpeed = 4,
+                Seed = 114514,
+            });
+
+            Assert.That(beatmap.HitObjects, Has.Count.EqualTo(6), "目标键数等于当前键数时应直接跳过，不应按元数据里的旧键数重建");
+            Assert.That(beatmap.HitObjects.Select(h => h.Column), Is.EqualTo(new[] { 0, 1, 2, 3, 4, 5 }));
+        }
+
+        /// <summary>
+        /// CircleSize 是每 stage 的键数，双 stage 谱面的总列数是两段之和；按 CS 建矩阵会把高列全部压到低列。
+        /// </summary>
+        [Test]
+        public void TestDualStageUsesTotalColumns()
+        {
+            var beatmap = new ManiaBeatmap(new StageDefinition(4));
+            beatmap.Stages.Add(new StageDefinition(4));
+            beatmap.BeatmapInfo = beatmap.BeatmapInfo.Clone();
+            beatmap.BeatmapInfo.Difficulty.CircleSize = 4;
+            beatmap.Difficulty.CircleSize = 4;
+            beatmap.BeatmapInfo.BPM = 120;
+            beatmap.ControlPointInfo.Add(0, new TimingControlPoint { BeatLength = 500 });
+
+            for (int column = 0; column < 8; column++)
+                beatmap.HitObjects.Add(new Note { StartTime = 1000 + column * 100, Column = column });
+
+            KrrN2NcConverter.Transform(beatmap, new KrrOptions
+            {
+                TargetKeys = 8,
+                MaxKeys = 8,
+                MinKeys = 0,
+                BeatSpeed = 4,
+                Seed = 114514,
+            });
+
+            Assert.That(beatmap.HitObjects.Select(h => h.Column), Is.EqualTo(new[] { 0, 1, 2, 3, 4, 5, 6, 7 }));
         }
 
         private static string serialise(ManiaBeatmap beatmap)

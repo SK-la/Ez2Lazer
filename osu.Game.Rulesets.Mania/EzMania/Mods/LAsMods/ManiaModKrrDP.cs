@@ -15,7 +15,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 {
-    public class ManiaModKrrDP : Mod, IApplicableAfterBeatmapConversion, IEzApplyOrder
+    public class ManiaModKrrDP : Mod, IApplicableAfterBeatmapConversion, IEzApplyOrder, IEzColumnCountMod
     {
         public override string Name => "Krr DP Converter";
         public override string Acronym => "KDP";
@@ -83,13 +83,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         };
 
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
-        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(-10)
         {
-            MinValue = 0,
+            MinValue = -100,
             MaxValue = 100
         };
 
         public int ApplyOrder => ApplyOrderIndex.Value;
+
+        public int ResolveColumnCount(int currentColumns) => Math.Clamp(resolveFinalKeys(currentColumns) ?? currentColumns, 1, 18);
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
@@ -131,13 +133,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
             var maniaBeatmap = (ManiaBeatmap)beatmap;
-            originalKeys = (int)maniaBeatmap.Difficulty.CircleSize;
+            originalKeys = maniaBeatmap.ResolveColumnCount();
 
-            if (EnableModifyKeys.Value)
-                finalKeys = TargetKeys.Value * 2;
-            else if (originalKeys <= 9)
-                finalKeys = originalKeys * 2;
-            else return;
+            if (resolveFinalKeys(originalKeys) is not int target)
+                return;
+
+            finalKeys = target;
 
             var options = new KrrDpOptions
             {
@@ -157,9 +158,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             KrrDpConverter.Transform(maniaBeatmap, options);
 
             finalKeys = Math.Clamp(finalKeys, 1, 18);
-            maniaBeatmap.Stages.Clear();
-            maniaBeatmap.Stages.Add(new StageDefinition(finalKeys));
-            maniaBeatmap.Difficulty.CircleSize = finalKeys;
+            maniaBeatmap.SetColumnCount(finalKeys);
+        }
+
+        /// <summary>
+        /// 本 mod 之后的列数；无法处理（非 DP 谱面且未指定键数）时返回 null。
+        /// </summary>
+        private int? resolveFinalKeys(int originalKeys)
+        {
+            if (EnableModifyKeys.Value)
+                return TargetKeys.Value * 2;
+
+            return originalKeys <= 9 ? originalKeys * 2 : null;
         }
     }
 

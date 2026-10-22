@@ -11,11 +11,11 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
-using osu.Game.EzOsuGame.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 {
@@ -168,7 +168,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 if (maniaBeatmap == null) return;
 
                 // 获取总键数 1~18
-                int totalKeys = (int)maniaBeatmap.Difficulty.CircleSize;
+                int totalKeys = maniaBeatmap.ResolveColumnCount();
                 if (totalKeys < 1 || totalKeys > 18) return;
 
                 // 初始化随机器

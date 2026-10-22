@@ -22,7 +22,7 @@ using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
-    public partial class ManiaModReleaseAdjust : Mod, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>
+    public partial class ManiaModReleaseAdjust : Mod, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>, IEzApplyOrder
     {
         public override string Name => "Release Adjust";
 
@@ -48,6 +48,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             Precision = 10,
         };
 
+        /// <summary>
+        /// 释放偏移属于谱面成型后的后处理：排在转键与内容 mod 之后，才不会让前面生成的 LN 被提前改写。
+        /// </summary>
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
+        {
+            MinValue = 0,
+            MaxValue = 100
+        };
+
+        public int ApplyOrder => ApplyOrderIndex.Value;
+
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
             var maniaBeatmap = (ManiaBeatmap)beatmap;
@@ -69,6 +81,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             get
             {
                 yield return ("Offset", $"{ReleaseOffset.Value}ms");
+                yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
             }
         }
 

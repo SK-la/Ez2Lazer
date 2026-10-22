@@ -1,19 +1,19 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Game.Rulesets.Mania.Objects;
 using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
-using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Mania.Beatmaps.Patterns;
 using osu.Game.Rulesets.Mania.Beatmaps.Patterns.Legacy;
+using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Legacy;
+using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring.Legacy;
 using osu.Game.Utils;
 using osuTK;
@@ -102,11 +102,21 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
 
             if (mods != null)
             {
-                foreach (var m in mods.OfType<IApplicableToBeatmapConverter>())
+                foreach (var m in EzApplyOrder.Sort(mods.OfType<IApplicableToBeatmapConverter>()))
                     m.ApplyToBeatmapConverter(converter);
             }
 
-            return converter.TotalColumns;
+            int columns = converter.TotalColumns;
+
+            // 转换器阶段之后的改键 mod 不参与上面的 TotalColumns，只能按 ApplyOrder 逐个推算；
+            // 否则选歌键数会停在源谱列数，与实际游玩到的谱面不一致。
+            if (mods != null)
+            {
+                foreach (var m in EzApplyOrder.Sort(mods.OfType<IEzColumnCountMod>()))
+                    columns = m.ResolveColumnCount(columns);
+            }
+
+            return columns;
         }
 
         public override bool CanConvert() => Beatmap.HitObjects.All(h => h is IHasXPosition);

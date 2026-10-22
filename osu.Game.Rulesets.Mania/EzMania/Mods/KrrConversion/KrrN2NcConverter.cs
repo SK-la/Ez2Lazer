@@ -44,7 +44,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
             int speedIndex = options?.BeatSpeed ?? 4;
             int seedValue = options?.Seed ?? KrrConversionHelper.ComputeSeedFromBeatmap(beatmap);
 
-            int originalKeys = (int)beatmap.BeatmapInfo.Difficulty.CircleSize;
+            // 当前键数以 stages 为准，参考 PS：排在前面按 ApplyOrder 跑过的改键 mod 只写 Difficulty / Stages，
+            // 读 BeatmapInfo.Difficulty 会拿到转换开始时的源谱快照；CircleSize 只是每 stage 的键数。
+            int originalKeys = beatmap.ResolveColumnCount();
             if (originalKeys == targetKeys) return;
 
             var rng = new Random(seedValue);
@@ -456,7 +458,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
             var newMatrix = new NoteMatrix(rows, targetKeys);
 
             // 原实现每行都 new int[targetKeys]：缓冲搬到循环外，每行显式重置成 EMPTY 即可。
-            var tempRow = new int[targetKeys];
+            int[] tempRow = new int[targetKeys];
 
             for (int i = 0; i < rows; i++)
             {
@@ -509,16 +511,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
                 Span<int> orgColIndexRow = stackalloc int[stack_buffer_limit];
 
                 fillDeleteMark(newMatrixSpan, markSpan, timeAxis, endTimeIndexAxis, beatLengthAxis, orgColIndexAxis, targetKeys,
-                               endTimeTempRow, convertTimePointRow, orgColIndexRow);
+                    endTimeTempRow, convertTimePointRow, orgColIndexRow);
             }
             else
             {
                 int[] heapBuffers = new int[targetKeys * 3];
 
                 fillDeleteMark(newMatrixSpan, markSpan, timeAxis, endTimeIndexAxis, beatLengthAxis, orgColIndexAxis, targetKeys,
-                               heapBuffers.AsSpan(0, targetKeys),
-                               heapBuffers.AsSpan(targetKeys, targetKeys),
-                               heapBuffers.AsSpan(targetKeys * 2, targetKeys));
+                    heapBuffers.AsSpan(0, targetKeys),
+                    heapBuffers.AsSpan(targetKeys, targetKeys),
+                    heapBuffers.AsSpan(targetKeys * 2, targetKeys));
             }
 
             return mark;
@@ -867,7 +869,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
                 columnList.Add((i, weight, risk));
             }
 
-            columnList.Sort(columnComparer);
+            columnList.Sort(column_comparer);
 
             var result = new List<int>(Math.Min(colsToRemove, columnList.Count));
 
@@ -880,7 +882,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
         /// <summary>
         /// 与原来的 <c>List.Sort(comparison)</c> 语义一致（权重优先，其次风险），只是把比较委托从每次调用改成静态字段。
         /// </summary>
-        private static readonly Comparison<(int index, int weight, double risk)> columnComparer = (a, b) =>
+        private static readonly Comparison<(int index, int weight, double risk)> column_comparer = (a, b) =>
         {
             int weightComparison = a.weight.CompareTo(b.weight);
 
@@ -1089,7 +1091,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
 
             return true;
         }
-
 
         private static bool isPositionAvailableForEmptyRow(NoteMatrix matrix,
                                                            Span<int> timeAxis,

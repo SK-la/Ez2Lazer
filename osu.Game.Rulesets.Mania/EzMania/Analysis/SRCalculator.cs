@@ -76,7 +76,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 
             ManiaBeatmap maniaBeatmap = (ManiaBeatmap)beatmap;
             // Prefer TotalColumns (reflects keymods / conversion output) over CS.
-            int keyCount = Math.Max(1, maniaBeatmap.TotalColumns > 0 ? maniaBeatmap.TotalColumns : (int)Math.Round(maniaBeatmap.BeatmapInfo.Difficulty.CircleSize));
+            int keyCount = Math.Max(1, maniaBeatmap.TotalColumns > 0 ? maniaBeatmap.TotalColumns : (int)Math.Round(maniaBeatmap.Difficulty.CircleSize));
 
             double sr = XxySRCalculateCore(maniaBeatmap, keyCount, clockRate);
             stopwatch.Stop();
@@ -183,7 +183,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             var longNotes = notes.Where(n => n.IsLongNote).ToList();
             var longNotesByTails = longNotes.OrderBy(n => n.TailTime).ToList();
 
-            double od = maniaBeatmap.BeatmapInfo.Difficulty.OverallDifficulty;
+            double od = maniaBeatmap.Difficulty.OverallDifficulty;
             double x = computeHitLeniency(od);
 
             int maxHead = notes.Max(n => n.HeadTime);
@@ -281,7 +281,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 
         internal static EzManiaSR4PatternSnapshot CalculateSR4PatternSnapshot(ManiaBeatmap maniaBeatmap, double clockRate = 1.0)
         {
-            int keyCount = Math.Max(1, maniaBeatmap.TotalColumns > 0 ? maniaBeatmap.TotalColumns : (int)Math.Round(maniaBeatmap.BeatmapInfo.Difficulty.CircleSize));
+            int keyCount = Math.Max(1, maniaBeatmap.TotalColumns > 0 ? maniaBeatmap.TotalColumns : (int)Math.Round(maniaBeatmap.Difficulty.CircleSize));
             double[]? cross = CrossMatrixProvider.GetMatrix(keyCount);
 
             if (cross == null)
@@ -341,7 +341,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             var longNotes = notes.Where(n => n.IsLongNote).ToList();
             var longNotesByTails = longNotes.OrderBy(n => n.TailTime).ToList();
 
-            double x = computeHitLeniency(maniaBeatmap.BeatmapInfo.Difficulty.OverallDifficulty);
+            double x = computeHitLeniency(maniaBeatmap.Difficulty.OverallDifficulty);
             int maxHead = notes.Max(n => n.HeadTime);
             int maxTail = longNotes.Count > 0 ? longNotes.Max(n => n.TailTime) : maxHead;
             int totalTime = Math.Max(maxHead, maxTail) + 1;
