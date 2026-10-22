@@ -220,6 +220,35 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
             Assert.That(beatmap.HitObjects.Select(h => h.Column), Is.EqualTo(new[] { 0, 1, 2, 3, 4, 5 }));
         }
 
+        /// <summary>
+        /// CircleSize 是每 stage 的键数，双 stage 谱面的总列数是两段之和；按 CS 建矩阵会把高列全部压到低列。
+        /// </summary>
+        [Test]
+        public void TestDualStageUsesTotalColumns()
+        {
+            var beatmap = new ManiaBeatmap(new StageDefinition(4));
+            beatmap.Stages.Add(new StageDefinition(4));
+            beatmap.BeatmapInfo = beatmap.BeatmapInfo.Clone();
+            beatmap.BeatmapInfo.Difficulty.CircleSize = 4;
+            beatmap.Difficulty.CircleSize = 4;
+            beatmap.BeatmapInfo.BPM = 120;
+            beatmap.ControlPointInfo.Add(0, new TimingControlPoint { BeatLength = 500 });
+
+            for (int column = 0; column < 8; column++)
+                beatmap.HitObjects.Add(new Note { StartTime = 1000 + column * 100, Column = column });
+
+            KrrN2NcConverter.Transform(beatmap, new KrrOptions
+            {
+                TargetKeys = 8,
+                MaxKeys = 8,
+                MinKeys = 0,
+                BeatSpeed = 4,
+                Seed = 114514,
+            });
+
+            Assert.That(beatmap.HitObjects.Select(h => h.Column), Is.EqualTo(new[] { 0, 1, 2, 3, 4, 5, 6, 7 }));
+        }
+
         private static string serialise(ManiaBeatmap beatmap)
         {
             var builder = new StringBuilder();

@@ -44,7 +44,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
             int speedIndex = options?.BeatSpeed ?? 4;
             int seedValue = options?.Seed ?? KrrConversionHelper.ComputeSeedFromBeatmap(beatmap);
 
-            int originalKeys = (int)beatmap.Difficulty.CircleSize;
+            // 当前键数以 stages 为准：CircleSize 是每 stage 的键数，DP 谱面下与总列数不一致。
+            int originalKeys = beatmap.TotalColumns > 0 ? beatmap.TotalColumns : (int)Math.Round(beatmap.Difficulty.CircleSize);
             if (originalKeys == targetKeys) return;
 
             var rng = new Random(seedValue);
