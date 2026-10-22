@@ -1,38 +1,36 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Rendering;
-using osuTK;
 
 namespace osu.Game.EzOsuGame.Material
 {
     /// <summary>
-    /// Shared acquire/release logic for <see cref="AcrylicBackdropDrawable"/> consumers.
+    /// Shared acquire/release logic for <see cref="EzMaterialContainer"/>.
     /// D3D11, Metal, Vulkan, and desktop OpenGL sample a shared backbuffer blur and do not acquire the fullscreen capture.
     /// Deferred renderers still acquire <see cref="IMaterialCaptureRegistrar"/>.
     /// </summary>
     internal sealed class EzMaterialCaptureController
     {
         private readonly IMaterialCaptureRegistrar? registrar;
-        private readonly AcrylicBackdropDrawable acrylicBackdrop;
         private readonly IRenderer? renderer;
         private bool captureAcquired;
 
-        public EzMaterialCaptureController(IMaterialCaptureRegistrar? registrar, AcrylicBackdropDrawable acrylicBackdrop, IRenderer? renderer = null)
+        public EzMaterialCaptureController(IMaterialCaptureRegistrar? registrar, IRenderer? renderer = null)
         {
             this.registrar = registrar;
-            this.acrylicBackdrop = acrylicBackdrop;
             this.renderer = renderer;
         }
 
-        public void Sync(bool wantsCapture, float blurStrength)
-        {
-            acrylicBackdrop.BlurSigma = new Vector2(blurStrength);
+        /// <summary>
+        /// 材质是否可以安全地采样下层内容：能拷后缓冲、无需承载层，或承载层已就绪。
+        /// </summary>
+        public bool CanDraw => renderer?.SupportsBackbufferRegionCopy == true || registrar == null || captureAcquired;
 
+        public void Sync(bool wantsCapture)
+        {
             if (!wantsCapture)
             {
-                acrylicBackdrop.EffectEnabled = false;
                 releaseCapture();
                 return;
             }
@@ -41,7 +39,6 @@ namespace osu.Game.EzOsuGame.Material
             if (renderer?.SupportsBackbufferRegionCopy == true)
             {
                 releaseCapture();
-                acrylicBackdrop.EffectEnabled = true;
                 return;
             }
 
@@ -50,8 +47,6 @@ namespace osu.Game.EzOsuGame.Material
                 registrar.AcquireCapture();
                 captureAcquired = true;
             }
-
-            acrylicBackdrop.EffectEnabled = captureAcquired || registrar == null;
         }
 
         private void releaseCapture()
@@ -65,7 +60,6 @@ namespace osu.Game.EzOsuGame.Material
 
         public void Dispose()
         {
-            acrylicBackdrop.EffectEnabled = false;
             releaseCapture();
         }
     }

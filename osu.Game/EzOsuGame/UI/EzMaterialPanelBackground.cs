@@ -5,7 +5,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Material;
@@ -15,115 +14,72 @@ using osuTK.Graphics;
 namespace osu.Game.EzOsuGame.UI
 {
     /// <summary>
-    /// Acrylic glass panel (N): blur backdrop + tint. Visibility is owned by the host via
-    /// <see cref="EzMaterialOverlayAlpha.BindExclusive"/> (do not half-alpha classic M over this).
+    /// 穿透材质面板：材质（毛玻璃 / 液态玻璃）由 <see cref="EzMaterialContainer"/> 决定，其上叠一层染色。
+    /// 可见性由宿主通过 <see cref="EzMaterialOverlayAlpha.BindExclusive"/> 与 <see cref="MaterialCaptureVisible"/> 控制。
     /// </summary>
     public partial class EzMaterialPanelBackground : Container, IMaterialBackdropConsumer
     {
         /// <summary>
-        /// Host panel is in a state that should sample capture (e.g. preview expanded).
+        /// 宿主当前是否处于需要采样下层的状态（如预览展开）。
         /// </summary>
-        public bool MaterialCaptureVisible { get; set; }
+        public bool MaterialCaptureVisible
+        {
+            get => materialContainer.MaterialVisible;
+            set => materialContainer.MaterialVisible = value;
+        }
 
-        public bool WantsMaterialCapture => materialUiMode.Value != EzMaterialUiMode.Default && MaterialCaptureVisible;
+        public bool WantsMaterialCapture => materialContainer.WantsMaterialCapture;
+
+        /// <summary>
+        /// 液态玻璃的圆角半径（屏幕像素）。未设置时按直角处理。
+        /// </summary>
+        public float MaterialCornerRadius
+        {
+            get => materialContainer.GlassCornerRadius;
+            set => materialContainer.GlassCornerRadius = value;
+        }
 
         public Box TintBox { get; private set; }
 
-        private readonly Vector2 frameBufferScale;
+        private readonly EzMaterialContainer materialContainer;
 
-        private AcrylicBackdropDrawable? acrylicBackdrop;
-        private EzMaterialCaptureController? captureController;
+        private Bindable<double> materialUiBlur = null!;
 
-        private Bindable<EzMaterialUiMode> materialUiMode = null!;
-        private Bindable<double> acrylicUiBlurStrength = null!;
-
-        [Resolved(canBeNull: true)]
-        private IMaterialCaptureRegistrar? materialCaptureRegistrar { get; set; }
-
-        [Resolved]
-        private IRenderer renderer { get; set; } = null!;
-
-        /// <param name="initialTint">Veil colour drawn over the blurred backdrop.</param>
+        /// <param name="initialTint">Veil colour drawn over the material.</param>
         /// <param name="frameBufferScale">Optional downscale for the blur pass (panels use 0.5).</param>
         public EzMaterialPanelBackground(Color4 initialTint, Vector2? frameBufferScale = null)
         {
             RelativeSizeAxes = Axes.Both;
-            this.frameBufferScale = frameBufferScale ?? Vector2.One;
 
-            // Backdrop is created only while capture is wanted. Pooled song-select cards otherwise
-            // keep one raw slice plus the horizontal and full blur textures after they leave the screen.
-            InternalChild = TintBox = new Box
+            InternalChildren = new Drawable[]
             {
-                RelativeSizeAxes = Axes.Both,
-                Colour = initialTint,
+                materialContainer = new EzMaterialContainer
+                {
+                    Depth = 1,
+                    FrameBufferScale = frameBufferScale ?? Vector2.One,
+                },
+                TintBox = new Box
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Colour = initialTint,
+                },
             };
         }
 
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
         {
-            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
-            acrylicUiBlurStrength = ezConfig.GetBindable<double>(Ez2Setting.MaterialUiBlur);
+            materialUiBlur = ezConfig.GetBindable<double>(Ez2Setting.MaterialUiBlur);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            materialUiMode.BindValueChanged(_ => syncAcrylicState(), true);
-            acrylicUiBlurStrength.BindValueChanged(_ => syncAcrylicState(), true);
+            materialUiBlur.BindValueChanged(blur => materialContainer.BlurSigma = new Vector2((float)blur.NewValue), true);
         }
 
         public void SyncMaterialCaptureState()
-            => syncAcrylicState();
-
-        private void syncAcrylicState()
-        {
-            if (WantsMaterialCapture)
-            {
-                ensureBackdrop();
-                captureController?.Sync(true, (float)acrylicUiBlurStrength.Value);
-                return;
-            }
-
-            releaseBackdrop();
-        }
-
-        private void ensureBackdrop()
-        {
-            if (acrylicBackdrop != null)
-                return;
-
-            acrylicBackdrop = new AcrylicBackdropDrawable
-            {
-                RelativeSizeAxes = Axes.Both,
-                Depth = 1,
-                EffectEnabled = false,
-                FrameBufferScale = frameBufferScale,
-            };
-
-            AddInternal(acrylicBackdrop);
-            captureController = new EzMaterialCaptureController(materialCaptureRegistrar, acrylicBackdrop, renderer);
-        }
-
-        private void releaseBackdrop()
-        {
-            captureController?.Dispose();
-            captureController = null;
-
-            if (acrylicBackdrop == null)
-                return;
-
-            RemoveInternal(acrylicBackdrop, true);
-            acrylicBackdrop = null;
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-                captureController?.Dispose();
-
-            base.Dispose(isDisposing);
-        }
+            => materialContainer.SyncMaterialCaptureState();
     }
 }

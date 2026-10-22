@@ -170,14 +170,14 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_UI_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "选择选歌面板、footer、菜单按钮与 HUD 背板的穿透材质。"
-            + "\n毛玻璃：只做穿透模糊。液态玻璃：额外带边缘折射与高光，目前只在 HUD 框、分数对比柱与主菜单 logo 生效。"
+            + "\n毛玻璃：只做穿透模糊。液态玻璃：额外带边缘折射与高光。"
             + "\n默认：恢复经典不透明样式。非默认档位会启用全屏 capture 缓冲，仅建议在选歌界面使用。",
             "Backdrop material for song select panels, footer, menu buttons and HUD backdrops."
-            + "\nAcrylic: blur only. Liquid glass: adds edge refraction and highlights, currently on HUD boxes, score compare bars and the main menu logo only."
+            + "\nAcrylic: blur only. Liquid glass: adds edge refraction and highlights."
             + "\nDefault: restores the classic opaque chrome. Any other mode allocates a full-screen capture buffer while visible on song select.");
 
         public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_UI_BLUR =
-            new EzLocalizationManager.EzLocalisableString("毛玻璃虚化强度", "Acrylic blur strength");
+            new EzLocalizationManager.EzLocalisableString("穿透材质虚化强度", "Backdrop material blur strength");
 
         public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_UI_BLUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "穿透材质的模糊强度。材质为关闭时不生效。",

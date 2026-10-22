@@ -132,6 +132,7 @@ namespace osu.Game.Screens.Select
                         // Capture starts in PrepareForUse. The carousel pool constructs every panel up front;
                         // leaving this on would pin a blur framebuffer for each card ever shown.
                         MaterialCaptureVisible = false,
+                        MaterialCornerRadius = CORNER_RADIUS,
                         Alpha = 0,
                     },
                     backgroundContainer = new Container
