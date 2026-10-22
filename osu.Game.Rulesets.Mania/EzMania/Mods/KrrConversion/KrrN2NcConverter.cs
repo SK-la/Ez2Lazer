@@ -44,7 +44,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
             int speedIndex = options?.BeatSpeed ?? 4;
             int seedValue = options?.Seed ?? KrrConversionHelper.ComputeSeedFromBeatmap(beatmap);
 
-            int originalKeys = (int)beatmap.BeatmapInfo.Difficulty.CircleSize;
+            int originalKeys = (int)beatmap.Difficulty.CircleSize;
             if (originalKeys == targetKeys) return;
 
             var rng = new Random(seedValue);
@@ -1089,7 +1089,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
 
             return true;
         }
-
 
         private static bool isPositionAvailableForEmptyRow(NoteMatrix matrix,
                                                            Span<int> timeAxis,
