@@ -264,6 +264,34 @@ namespace osu.Game.EzOsuGame.Statistics
         protected virtual double GetInitialHealth() => 1.0;
 
         /// <summary>
+        /// 血量推演使用的事件集合。默认与散点展示集合一致；
+        /// 派生类可补回不参与散点（例如 Poor）但会改变血量的事件。
+        /// </summary>
+        protected virtual IReadOnlyList<HitEvent> GetHealthHitEvents() => GetDisplayHitEvents();
+
+        /// <summary>
+        /// 逐事件推演血量，返回与 <paramref name="sortedEvents"/> 下标一一对应的血量值（0..1）。
+        /// </summary>
+        /// <remarks>
+        /// 默认按 <see cref="GetDisplayHealthIncrease"/> 逐条累加；派生类可覆写以直接复用规则集的真实血量处理器。
+        /// </remarks>
+        protected virtual IReadOnlyList<float> ComputeHealthSeries(IReadOnlyList<HitEvent> sortedEvents)
+        {
+            var healthValues = new float[sortedEvents.Count];
+            double currentHealth = GetInitialHealth();
+
+            for (int i = 0; i < sortedEvents.Count; i++)
+            {
+                var hitEvent = sortedEvents[i];
+                double increase = GetDisplayHealthIncrease(hitEvent, GetDisplayResult(hitEvent), currentHealth);
+                currentHealth = Math.Clamp(currentHealth + increase, 0, 1);
+                healthValues[i] = (float)currentHealth;
+            }
+
+            return healthValues;
+        }
+
+        /// <summary>
         /// 图表血量推演使用的单次血量变化。
         /// 默认使用 Judgement 的血量变化逻辑，规则集可覆写以对齐自定义血量模式。
         /// </summary>
@@ -375,7 +403,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
             var sortedHitEvents = GetDisplayHitEvents().OrderBy(e => e.HitObject.StartTime).ToList();
 
-            drawHealthLine(sortedHitEvents, applyOffset: false);
+            drawHealthLine();
             drawPointsGraph(sortedHitEvents, applyOffset: false);
         }
 
@@ -610,53 +638,41 @@ namespace osu.Game.EzOsuGame.Statistics
             var displayEvents = GetDisplayHitEvents().OrderBy(e => e.HitObject.StartTime).ToList();
             drawPointsGraph(displayEvents, applyOffset: false);
 
-            drawHealthLine(displayEvents, applyOffset: false);
+            drawHealthLine();
         }
 
-        private void drawHealthLine(List<HitEvent> sortedHitEvents, bool applyOffset)
+        private void drawHealthLine()
         {
-            List<Vector2> healthPoints = new List<Vector2>();
-            double currentHealth = GetInitialHealth();
+            var healthEvents = GetHealthHitEvents().OrderBy(e => e.HitObject.StartTime).ToList();
+
+            if (healthEvents.Count < 2)
+                return;
+
+            var healthValues = ComputeHealthSeries(healthEvents);
+
+            List<Vector2> healthPoints = new List<Vector2>(healthEvents.Count);
 
             float availableWidth = DrawWidth - LeftMarginConst - RightMarginConst;
 
-            foreach (var e in sortedHitEvents)
+            for (int i = 0; i < healthEvents.Count; i++)
             {
-                // applyOffset 时需要创建带 offset 的临时 HitEvent 来获取 displayResult
-                HitEvent displayEvent = applyOffset
-                    ? new HitEvent(
-                        e.TimeOffset + DisplayOffset,
-                        e.GameplayRate,
-                        e.Result,
-                        e.HitObject,
-                        e.LastHitObject,
-                        e.Position)
-                    : e;
-
-                var displayResult = GetDisplayResult(displayEvent);
-                double healthIncrease = GetDisplayHealthIncrease(displayEvent, displayResult, currentHealth);
-                currentHealth = Math.Clamp(currentHealth + healthIncrease, 0, 1);
-
-                double time = e.HitObject.StartTime;
+                double time = healthEvents[i].HitObject.StartTime;
                 float xPosition = timeRange > 0 ? (float)((time - minTime) / timeRange) : 0;
                 float x = xPosition * availableWidth;
-                float y = (float)((1 - currentHealth) * DrawHeight);
+                float y = (float)((1 - healthValues[i]) * DrawHeight);
 
                 healthPoints.Add(new Vector2(x, y));
             }
 
-            if (healthPoints.Count > 1)
+            graphContainer.Add(new Path
             {
-                graphContainer.Add(new Path
-                {
-                    Anchor = Anchor.TopLeft,
-                    Origin = Anchor.TopLeft,
-                    PathRadius = 1,
-                    Colour = Color4.Red,
-                    Alpha = 0.3f,
-                    Vertices = healthPoints.ToArray()
-                });
-            }
+                Anchor = Anchor.TopLeft,
+                Origin = Anchor.TopLeft,
+                PathRadius = 1,
+                Colour = Color4.Red,
+                Alpha = 0.3f,
+                Vertices = healthPoints.ToArray()
+            });
         }
 
         private void drawBoundaryLine(HitResult result, bool isNegative)

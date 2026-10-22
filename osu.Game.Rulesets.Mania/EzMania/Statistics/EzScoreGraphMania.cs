@@ -15,6 +15,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Statistics;
+using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Replicas;
@@ -487,62 +488,87 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             return eventsForExtent.Max(e => e.HitObject.StartTime) - eventsForExtent.Min(e => e.HitObject.StartTime);
         }
 
-        // TODO: 缺少血量计算工具
-        protected override double GetDisplayHealthIncrease(HitEvent hitEvent, HitResult displayResult, double currentHealth)
+        /// <summary>
+        /// 血量事件：Poor(KPoor) 不参与散点但会扣血，必须计入；
+        /// 长条本体与父级长条的结果是 IgnoreHit / ComboBreak，血量变化为 0，会被 <c>IsBasic</c> 自然排除。
+        /// </summary>
+        protected override IReadOnlyList<HitEvent> GetHealthHitEvents()
         {
-            if (currentHealthMode == EzEnumHealthMode.Lazer)
-                return base.GetDisplayHealthIncrease(hitEvent, displayResult, currentHealth);
+            if (ReplaySessionScore?.ScoreInfo.HitEvents is not { } sessionEvents)
+                return Array.Empty<HitEvent>();
 
-            if (currentHealthMode is EzEnumHealthMode.O2JamEasy or EzEnumHealthMode.O2JamNormal or EzEnumHealthMode.O2JamHard)
+            return applyFakeOffsetToEvents(sessionEvents.Where(e => e.Result.IsBasic()));
+        }
+
+        /// <summary>
+        /// 用真实 <see cref="ManiaHealthProcessor"/> 逐事件推演血量，
+        /// 与游戏同源：血量档行号、Lazer 公式、低血量折扣、clamp 全部走同一份实现。
+        /// </summary>
+        protected override IReadOnlyList<float> ComputeHealthSeries(IReadOnlyList<HitEvent> sortedEvents)
+            => simulateHealth(getHealthProcessor(), healthResults, sortedEvents, GetDisplayResult);
+
+        private ManiaHealthProcessor? healthProcessor;
+        private EzEnumHealthMode healthProcessorMode;
+        private readonly List<JudgementResult> healthResults = new List<JudgementResult>();
+
+        /// <summary>
+        /// 血量档切换或首次使用时重建处理器。
+        /// </summary>
+        /// <remarks>
+        /// 处理器复用 + 结果回滚，而不是每次重绘重建：Lazer 档的 <see cref="ManiaHealthProcessor"/> 初始化会跑
+        /// legacy 回血系数迭代，按拖动频率重建会让长谱面拖动明显掉帧。
+        /// </remarks>
+        private ManiaHealthProcessor getHealthProcessor()
+        {
+            if (healthProcessor != null && healthProcessorMode == currentHealthMode)
+                return healthProcessor;
+
+            healthResults.Clear();
+            healthProcessorMode = currentHealthMode;
+            healthProcessor = new ManiaHealthProcessor(Beatmap.HitObjects.Count > 0 ? Beatmap.HitObjects[0].StartTime : 0);
+            healthProcessor.SetActiveHealthMode(currentHealthMode);
+            healthProcessor.ApplyBeatmap(Beatmap);
+
+            return healthProcessor;
+        }
+
+        /// <summary>
+        /// 无头推演血量：从满血开始按事件顺序喂真实处理器，返回每个事件后的血量。
+        /// </summary>
+        internal static IReadOnlyList<float> SimulateHealth(IBeatmap beatmap, EzEnumHealthMode healthMode, IReadOnlyList<HitEvent> sortedEvents, Func<HitEvent, HitResult> resolveResult)
+        {
+            var processor = new ManiaHealthProcessor(beatmap.HitObjects.Count > 0 ? beatmap.HitObjects[0].StartTime : 0);
+            processor.SetActiveHealthMode(healthMode);
+            processor.ApplyBeatmap(beatmap);
+
+            return simulateHealth(processor, new List<JudgementResult>(), sortedEvents, resolveResult);
+        }
+
+        private static IReadOnlyList<float> simulateHealth(ManiaHealthProcessor processor, List<JudgementResult> appliedResults, IReadOnlyList<HitEvent> sortedEvents, Func<HitEvent, HitResult> resolveResult)
+        {
+            // 回滚上一轮结果，把处理器恢复到满血，避免重复跑 ApplyBeatmap。
+            for (int i = appliedResults.Count - 1; i >= 0; i--)
+                processor.RevertResult(appliedResults[i]);
+
+            appliedResults.Clear();
+
+            var healthValues = new float[sortedEvents.Count];
+
+            for (int i = 0; i < sortedEvents.Count; i++)
             {
-                if (hitEvent.HitObject is HoldNoteBody)
-                    return 0;
+                var hitEvent = sortedEvents[i];
+                var result = new JudgementResult(hitEvent.HitObject, hitEvent.HitObject.CreateJudgement())
+                {
+                    Type = resolveResult(hitEvent)
+                };
+
+                processor.ApplyResult(result);
+                appliedResults.Add(result);
+
+                healthValues[i] = (float)processor.Health.Value;
             }
 
-            int row = (int)currentHealthMode;
-            row = Math.Clamp(row, 0, HealthModeHelper.HEALTH_MODE_MAP.GetLength(0) - 1);
-
-            double increase = displayResult switch
-            {
-                HitResult.Perfect => HealthModeHelper.HEALTH_MODE_MAP[row, 0],
-                HitResult.Great => HealthModeHelper.HEALTH_MODE_MAP[row, 1],
-                HitResult.Good => HealthModeHelper.HEALTH_MODE_MAP[row, 2],
-                HitResult.Ok => HealthModeHelper.HEALTH_MODE_MAP[row, 3],
-                HitResult.Meh => HealthModeHelper.HEALTH_MODE_MAP[row, 4],
-                HitResult.Miss => HealthModeHelper.HEALTH_MODE_MAP[row, 5],
-                HitResult.Poor => HealthModeHelper.HEALTH_MODE_MAP[row, 6],
-                _ => 0
-            };
-
-            if (increase < 0 && currentHealth <= 0.5)
-            {
-                if (currentHealthMode == EzEnumHealthMode.IIDX_HD)
-                {
-                    if (currentHealth <= 0.3)
-                        increase *= 0.5;
-                }
-                else if (currentHealthMode == EzEnumHealthMode.LR2_HD)
-                {
-                    if (currentHealth <= 0.3)
-                        increase *= 0.6;
-                }
-                else if (currentHealthMode == EzEnumHealthMode.Raja_HD)
-                {
-                    if (currentHealth <= 0.3)
-                    {
-                        increase *= 0.6;
-                    }
-                    else if (currentHealth < 0.5)
-                    {
-                        double t = (currentHealth - 0.3) / 0.2;
-                        double discount = 0.6 + t * 0.4;
-                        increase *= discount;
-                    }
-                }
-            }
-
-            double scaled = Math.Clamp(increase, -0.2, 0.2);
-            return Math.Abs(scaled) < 1e-6 ? 0 : scaled;
+            return healthValues;
         }
 
         protected override void UpdateDisplay()

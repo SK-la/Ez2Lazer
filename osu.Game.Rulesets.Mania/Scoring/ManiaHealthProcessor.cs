@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         /// </remarks>
         public EzEnumHealthMode ActiveHealthMode { get; private set; } = EzEnumHealthMode.Lazer;
 
-        private int row = switchHealthMode(EzEnumHealthMode.Lazer);
+        private int row = HealthModeHelper.GetRow(EzEnumHealthMode.Lazer);
 
         public ManiaHealthProcessor(double drainStartTime)
             : base(drainStartTime)
@@ -34,8 +34,17 @@ namespace osu.Game.Rulesets.Mania.Scoring
         /// </summary>
         public override void ApplyEzGameplayEnvironment()
         {
-            ActiveHealthMode = GlobalConfigStore.EzConfig.Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
-            row = switchHealthMode(ActiveHealthMode);
+            SetActiveHealthMode(GlobalConfigStore.EzConfig.Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode));
+        }
+
+        /// <summary>
+        /// 注入血量档。无头路径（成绩图表用同一份 replay 推演血量）直接调用，不读全局配置。
+        /// </summary>
+        /// <remarks>必须在 <see cref="JudgementProcessor.ApplyBeatmap"/> 之前调用。</remarks>
+        internal void SetActiveHealthMode(EzEnumHealthMode healthMode)
+        {
+            ActiveHealthMode = healthMode;
+            row = HealthModeHelper.GetRow(healthMode);
         }
 
         protected override double ComputeDrainRate()
@@ -192,16 +201,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
 
             return scaled;
-        }
-
-        private static int switchHealthMode(EzEnumHealthMode mode)
-        {
-            int idx = (int)mode;
-
-            if (idx < 0 || idx >= HealthModeHelper.HEALTH_MODE_MAP.GetLength(0))
-                idx = 0;
-
-            return idx;
         }
     }
 }

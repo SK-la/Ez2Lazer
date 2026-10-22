@@ -30,6 +30,25 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             { 0.0015, 0.0012, 0.0003, 0, -0.05, -0.10, -0.05 }, // raja Hard
         };
 
+        /// <summary>
+        /// 血量档 → <see cref="HEALTH_MODE_MAP"/> 行号。
+        /// </summary>
+        /// <remarks>
+        /// 枚举值不是行号：Mania 私有档编码为 31+，必须显式映射，不能把枚举强转当作行号。
+        /// </remarks>
+        public static int GetRow(EzEnumHealthMode healthMode) => healthMode switch
+        {
+            EzEnumHealthMode.StableClassic => 1,
+            EzEnumHealthMode.O2JamEasy => 1,
+            EzEnumHealthMode.O2JamNormal => 2,
+            EzEnumHealthMode.O2JamHard => 3,
+            EzEnumHealthMode.Ez2Ac => 4,
+            EzEnumHealthMode.IIDX_HD => 5,
+            EzEnumHealthMode.LR2_HD => 6,
+            EzEnumHealthMode.Raja_HD => 7,
+            _ => 0,
+        };
+
         public static bool IsBMSHealthMode(EzEnumHealthMode judgeMode)
         {
             return judgeMode == EzEnumHealthMode.IIDX_HD ||
