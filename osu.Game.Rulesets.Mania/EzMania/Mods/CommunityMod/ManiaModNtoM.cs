@@ -68,7 +68,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         public Bindable<int?> Seed { get; } = new Bindable<int?>(114514);
 
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
-        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(0)
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(10)
         {
             MinValue = 0,
             MaxValue = 100

@@ -30,7 +30,7 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
                                    IApplicableFailOverride,
                                    IEzApplyOrder
     {
-        public override string Name => "Loop Play Clip (No Fail)";
+        public override string Name => "Loop Play Clip";
 
         public override string Acronym => "LP";
         public override LocalisableString Description => LoopPlayClipStrings.LOOP_PLAY_CLIP_DESCRIPTION;
@@ -153,10 +153,10 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
         public Bindable<int?> Seed { get; } = new Bindable<int?>(114514);
 
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
-        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(500)
         {
-            MinValue = 0,
-            MaxValue = 100
+            MinValue = 100,
+            MaxValue = 1000
         };
 
         public int ApplyOrder => ApplyOrderIndex.Value;

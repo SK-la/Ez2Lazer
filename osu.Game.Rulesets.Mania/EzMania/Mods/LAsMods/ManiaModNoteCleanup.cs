@@ -77,7 +77,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
         public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(1000)
         {
-            MinValue = 0,
+            MinValue = 100,
             MaxValue = 1000,
         };
 
