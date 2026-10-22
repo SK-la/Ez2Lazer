@@ -13,11 +13,11 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
-using osu.Game.EzOsuGame.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
@@ -146,6 +146,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
             var maniaBeatmap = (ManiaBeatmap)beatmap;
 
+            // 与 NtoM 同理：这里要的是转换前的源谱键数，stages 已被 ApplyToBeatmapConverter 改成目标列数。
             int keys = (int)maniaBeatmap.Difficulty.CircleSize;
 
             int blank = BlankColumn.Value;

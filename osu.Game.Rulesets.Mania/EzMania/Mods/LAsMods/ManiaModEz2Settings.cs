@@ -99,7 +99,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         {
             this.beatmap = beatmap;
             var maniaBeatmap = (ManiaBeatmap)beatmap;
-            int keys = (int)maniaBeatmap.Difficulty.CircleSize;
+            int keys = maniaBeatmap.ResolveColumnCount();
 
             if (HealthScratch.Value)
             {

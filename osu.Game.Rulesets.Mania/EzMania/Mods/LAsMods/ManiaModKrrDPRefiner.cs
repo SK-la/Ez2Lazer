@@ -11,11 +11,11 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
-using osu.Game.EzOsuGame.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 {
@@ -465,7 +465,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             try
             {
                 var maniaBeatmap = (ManiaBeatmap)beatmap;
-                int totalColumns = (int)maniaBeatmap.Difficulty.CircleSize;
+                int totalColumns = maniaBeatmap.ResolveColumnCount();
 
                 // 只处理14k和16k
                 if (totalColumns != 14 && totalColumns != 16)

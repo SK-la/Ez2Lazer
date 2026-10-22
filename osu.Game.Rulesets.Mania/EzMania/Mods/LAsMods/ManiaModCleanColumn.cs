@@ -117,14 +117,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             try
             {
                 var maniaBeatmap = (ManiaBeatmap)beatmap;
-                keys1 = (int)maniaBeatmap.Difficulty.CircleSize;
+                keys1 = maniaBeatmap.ResolveColumnCount();
 
                 // 处理自定义列重排
                 if (EnableCustomReorder.Value && !string.IsNullOrWhiteSpace(CustomReorderColumn.Value) && !customReorderApplied)
                 {
                     Logger.Log($"[ManiaModCleanColumn] Calling applyCustomReorder with reorderRule: {CustomReorderColumn.Value}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                     applyCustomReorder(maniaBeatmap, CustomReorderColumn.Value, keys1);
-                    keys2 = (int)maniaBeatmap.Difficulty.CircleSize;
+                    keys2 = maniaBeatmap.ResolveColumnCount();
                     customReorderApplied = true;
                 }
 
@@ -465,9 +465,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 // 更新谱面总列数以匹配重排后的列数，避免难度计算中基于 TotalColumns 分配数组时发生越界
                 try
                 {
-                    beatmap.Stages.Clear();
-                    beatmap.Stages.Add(new StageDefinition(reorderRule.Length));
-                    beatmap.Difficulty.CircleSize = reorderRule.Length;
+                    beatmap.SetColumnCount(reorderRule.Length);
                     Logger.Log($"[ManiaModCleanColumn] Updated beatmap stages and Difficulty.CircleSize to {reorderRule.Length}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 }
                 catch (Exception ex)
