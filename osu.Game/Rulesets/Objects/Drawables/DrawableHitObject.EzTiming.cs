@@ -12,7 +12,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
     public abstract partial class DrawableHitObject
     {
         /// <summary>
-        /// 与 <see cref="ApplyResult{T}"/> 相同，但在触发 <see cref="OnNewResult"/> 前写入 stored <paramref name="timeOffset"/>。
+        /// 与 ApplyResult 相同，但在触发 <see cref="OnNewResult"/> 前写入 stored <paramref name="timeOffset"/>。
         /// </summary>
         protected void ApplyResultWithStoredTiming<T>(Action<JudgementResult, T> application, T state, double timeOffset)
         {

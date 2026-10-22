@@ -982,7 +982,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
         /// Checks if a scoring result has occurred for this <see cref="DrawableHitObject"/>.
         /// </summary>
         /// <remarks>
-        /// If a scoring result has occurred, this method must invoke <see cref="ApplyResult{T}"/> to update the result and notify responders.
+        /// If a scoring result has occurred, this method must invoke ApplyResult to update the result and notify responders.
         /// </remarks>
         /// <param name="userTriggered">Whether the user triggered this check.</param>
         /// <param name="timeOffset">The offset from the end time of the <see cref="HitObject"/> at which this check occurred.

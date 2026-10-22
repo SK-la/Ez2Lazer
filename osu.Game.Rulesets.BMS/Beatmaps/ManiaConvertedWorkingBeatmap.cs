@@ -5,7 +5,8 @@ using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
 using osu.Game.Beatmaps;
-using osu.Game.Rulesets.BMS.Audio;using osu.Game.Rulesets.BMS.Objects;
+using osu.Game.Rulesets.BMS.Audio;
+using osu.Game.Rulesets.BMS.Objects;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
@@ -167,7 +168,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             // 改写 note 的 mod 全部落在这一段里，它们的键音要在原时间继续发声。挂钩点必须早于本段，
             // 且样本时刻从物件本身读取，因此不依赖 ApplyDefaults 生成的嵌套物件。
-            DetachedSampleLedger sampleLedger = mods.Any(m => m is IApplicableAfterBeatmapConversion)
+            DetachedSampleLedger? sampleLedger = mods.Any(m => m is IApplicableAfterBeatmapConversion)
                 ? DetachedSampleLedger.Capture(playable)
                 : null;
 
