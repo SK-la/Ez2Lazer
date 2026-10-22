@@ -23,14 +23,14 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             AddRange(new Drawable[]
             {
-                new SettingsItemV2(new FormCheckBox
+                new SettingsItemV2(new FormEnumDropdown<EzMaterialUiMode>
                 {
                     Caption = EzSettingsStrings.MATERIAL_UI_MODE,
                     HintText = EzSettingsStrings.MATERIAL_UI_MODE_TOOLTIP,
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled),
+                    Current = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode),
                 })
                 {
-                    Keywords = new[] { "acrylic", "glass", "blur", "song select", "ui", "毛玻璃" }
+                    Keywords = new[] { "acrylic", "glass", "blur", "song select", "ui", "毛玻璃", "液态玻璃" }
                 },
                 new SettingsButtonV2
                 {
@@ -43,7 +43,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Caption = EzSettingsStrings.MATERIAL_UI_BLUR,
                     HintText = EzSettingsStrings.MATERIAL_UI_BLUR_TOOLTIP,
-                    Current = ezConfig.GetBindable<double>(Ez2Setting.AcrylicUiBlurStrength),
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.MaterialUiBlur),
                     KeyboardStep = 1,
                 })
                 {

@@ -26,14 +26,14 @@ namespace osu.Game.EzOsuGame.UI
 
         public float WidthForGradient { get; init; } = 0.3f;
 
-        public bool WantsMaterialCapture => acrylicUiEnabled.Value;
+        public bool WantsMaterialCapture => materialUiMode.Value != EzMaterialUiMode.Default;
 
         private AcrylicBackdropDrawable acrylicBackdrop = null!;
         private Box darkVeil = null!;
         private WedgeBackground wedgeBackground = null!;
         private EzMaterialCaptureController? captureController;
 
-        private Bindable<bool> acrylicUiEnabled = null!;
+        private Bindable<EzMaterialUiMode> materialUiMode = null!;
         private Bindable<double> acrylicUiBlurStrength = null!;
 
         [Resolved(canBeNull: true)]
@@ -44,8 +44,8 @@ namespace osu.Game.EzOsuGame.UI
         {
             RelativeSizeAxes = Axes.Both;
 
-            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
-            acrylicUiBlurStrength = ezConfig.GetBindable<double>(Ez2Setting.AcrylicUiBlurStrength);
+            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
+            acrylicUiBlurStrength = ezConfig.GetBindable<double>(Ez2Setting.MaterialUiBlur);
 
             InternalChildren = new Drawable[]
             {
@@ -78,8 +78,8 @@ namespace osu.Game.EzOsuGame.UI
             base.LoadComplete();
 
             // N = blur (via Sync) + darkVeil; M = classic wedgeBackground.
-            EzMaterialOverlayAlpha.BindExclusive(wedgeBackground, darkVeil, acrylicUiEnabled);
-            acrylicUiEnabled.BindValueChanged(_ => syncAcrylicState(), true);
+            EzMaterialOverlayAlpha.BindExclusive(wedgeBackground, darkVeil, materialUiMode);
+            materialUiMode.BindValueChanged(_ => syncAcrylicState(), true);
             acrylicUiBlurStrength.BindValueChanged(_ => syncAcrylicState(), true);
         }
 
@@ -88,7 +88,7 @@ namespace osu.Game.EzOsuGame.UI
 
         private void syncAcrylicState()
         {
-            captureController?.Sync(acrylicUiEnabled.Value, (float)acrylicUiBlurStrength.Value);
+            captureController?.Sync(materialUiMode.Value != EzMaterialUiMode.Default, (float)acrylicUiBlurStrength.Value);
         }
 
         protected override void Dispose(bool isDisposing)

@@ -102,7 +102,7 @@ namespace osu.Game.Screens.Menu
 
             private readonly Box classicBackground;
             private readonly EzMaterialPanelBackground materialBackground;
-            private Bindable<bool> acrylicUiEnabled;
+            private Bindable<EzMaterialUiMode> materialUiMode = null!;
 
             public ButtonAreaBackground()
             {
@@ -128,14 +128,14 @@ namespace osu.Game.Screens.Menu
             [BackgroundDependencyLoader]
             private void load(Ez2ConfigManager ezConfig)
             {
-                acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+                materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
             }
 
             protected override void LoadComplete()
             {
                 base.LoadComplete();
 
-                EzMaterialOverlayAlpha.BindExclusive(classicBackground, materialBackground, acrylicUiEnabled);
+                EzMaterialOverlayAlpha.BindExclusive(classicBackground, materialBackground, materialUiMode);
             }
 
             public ButtonAreaBackgroundState State

@@ -187,7 +187,7 @@ namespace osu.Game.EzOsuGame.Performance
             osu(OsuSetting.MenuParallaxScale, 0f, lockWhileActive: false),
 
             // 每帧一次全屏毛玻璃 pass。
-            ez(Ez2Setting.AcrylicUiEnabled, false),
+            ez(Ez2Setting.MaterialUiMode, EzMaterialUiMode.Default),
             // 服务实例仍在，但会 no-op，不再做元数据查询与 timeline 构建。
             ez(Ez2Setting.EzScoreRaceServiceEnabled, false),
         };

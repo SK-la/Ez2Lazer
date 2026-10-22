@@ -44,7 +44,7 @@ namespace osu.Game.Screens.Select
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
-        private Bindable<bool> acrylicUiEnabled = null!;
+        private Bindable<EzMaterialUiMode> materialUiMode = null!;
         private Box backgroundBorder = null!;
 
         [BackgroundDependencyLoader]
@@ -52,7 +52,7 @@ namespace osu.Game.Screens.Select
         {
             Height = HEIGHT;
 
-            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
 
             Icon = iconContainer = new Container
             {
@@ -139,7 +139,7 @@ namespace osu.Game.Screens.Select
                 },
             };
 
-            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(colourOverlays, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(colourOverlays, materialUiMode);
         }
 
         protected override void LoadComplete()
@@ -153,7 +153,7 @@ namespace osu.Game.Screens.Select
         {
             base.Update();
 
-            ApplyAcrylicIconStripBackground(backgroundBorder, acrylicUiEnabled.Value, colourProvider.Highlight1);
+            ApplyAcrylicIconStripBackground(backgroundBorder, EzMaterialOverlayAlpha.IsEnabled(materialUiMode.Value), colourProvider.Highlight1);
         }
 
         private void onExpanded()

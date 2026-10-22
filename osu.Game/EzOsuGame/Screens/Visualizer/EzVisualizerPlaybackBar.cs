@@ -55,7 +55,7 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
 
         private readonly Bindable<MusicLoopMode> loopMode = new Bindable<MusicLoopMode>();
         private Bindable<bool> allowTrackControl = null!;
-        private Bindable<bool> acrylicUiEnabled = null!;
+        private Bindable<EzMaterialUiMode> materialUiMode = null!;
         private bool setInFavourites;
 
         [Resolved]
@@ -88,7 +88,7 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
         {
-            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
 
             InternalChildren = new[]
             {
@@ -211,7 +211,7 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
             loopMode.BindTo(musicController.LoopMode);
             loopMode.BindValueChanged(_ => updateLoopButton(), true);
 
-            EzMaterialOverlayAlpha.BindExclusive(classicBackground, materialBackground, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindExclusive(classicBackground, materialBackground, materialUiMode);
 
             visualizerScreen?.PlaylistState.BindValueChanged(s =>
                 playlistButton.FadeColour(s.NewValue == Visibility.Visible ? colours.Yellow : Color4.White, 200, Easing.OutQuint), true);

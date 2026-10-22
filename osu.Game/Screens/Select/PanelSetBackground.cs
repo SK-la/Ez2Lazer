@@ -35,7 +35,7 @@ namespace osu.Game.Screens.Select
 
         private double timeSinceUnpool;
 
-        private Bindable<bool> acrylicUiEnabled = null!;
+        private Bindable<EzMaterialUiMode> materialUiMode = null!;
         private Box gradientBackground = null!;
         private FillFlowContainer darkOverlays = null!;
 
@@ -96,7 +96,7 @@ namespace osu.Game.Screens.Select
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider colourProvider, Ez2ConfigManager ezConfig)
         {
-            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
 
             InternalChildren = new Drawable[]
             {
@@ -141,17 +141,17 @@ namespace osu.Game.Screens.Select
             };
 
             // Glass N is on Panel parent; hide classic layers when acrylic is on.
-            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(gradientBackground, acrylicUiEnabled);
-            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(darkOverlays, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(gradientBackground, materialUiMode);
+            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(darkOverlays, materialUiMode);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            acrylicUiEnabled.BindValueChanged(e =>
+            materialUiMode.BindValueChanged(e =>
             {
-                if (e.NewValue)
+                if (EzMaterialOverlayAlpha.IsEnabled(e.NewValue))
                 {
                     // Penetrate to the global song-select background — drop panel cover art.
                     loadCancellation?.Cancel();
@@ -172,7 +172,7 @@ namespace osu.Game.Screens.Select
         private void loadContentIfRequired()
         {
             // Acrylic UI: skip panel cover textures and let the backdrop blur sample the global background.
-            if (acrylicUiEnabled.Value)
+            if (EzMaterialOverlayAlpha.IsEnabled(materialUiMode.Value))
                 return;
 
             // A load is already in progress if the cancellation token is non-null.
@@ -210,7 +210,7 @@ namespace osu.Game.Screens.Select
                 FillMode = FillMode.Fill,
             }, s =>
             {
-                if (acrylicUiEnabled.Value)
+                if (EzMaterialOverlayAlpha.IsEnabled(materialUiMode.Value))
                 {
                     s.Expire();
                     return;

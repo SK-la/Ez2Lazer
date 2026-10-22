@@ -133,8 +133,8 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.QuickRotationCandidateCount, 5, 3, 6);
 
             SetDefault(Ez2Setting.StoryboardAutoVideoSize, false);
-            SetDefault(Ez2Setting.AcrylicUiEnabled, false);
-            SetDefault(Ez2Setting.AcrylicUiBlurStrength, 16.0, 0.0, 40.0, 1.0);
+            SetDefault(Ez2Setting.MaterialUiMode, EzMaterialUiMode.Default);
+            SetDefault(Ez2Setting.MaterialUiBlur, 16.0, 0.0, 40.0, 1.0);
             SetDefault(Ez2Setting.UiFontDefault, string.Empty);
             SetDefault(Ez2Setting.UiFontDefaultLocalized, string.Empty);
             SetDefault(Ez2Setting.UiFontTitleAlternate, string.Empty);
@@ -1111,8 +1111,12 @@ namespace osu.Game.EzOsuGame.Configuration
         QuickRotationCandidateCount,
 
         StoryboardAutoVideoSize,
-        AcrylicUiEnabled,
-        AcrylicUiBlurStrength,
+
+        /// <summary>
+        /// 穿透容器的材质：关闭 / 毛玻璃 / 液态玻璃。
+        /// </summary>
+        MaterialUiMode,
+        MaterialUiBlur,
 
         /// <summary>English / Latin system font for default UI (empty = built-in Torus BMFont).</summary>
         UiFontDefault,

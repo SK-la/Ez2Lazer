@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.UI
         /// </summary>
         public bool MaterialCaptureVisible { get; set; }
 
-        public bool WantsMaterialCapture => (acrylicUiEnabled.Value) && MaterialCaptureVisible;
+        public bool WantsMaterialCapture => materialUiMode.Value != EzMaterialUiMode.Default && MaterialCaptureVisible;
 
         public Box TintBox { get; private set; }
 
@@ -34,7 +34,7 @@ namespace osu.Game.EzOsuGame.UI
         private AcrylicBackdropDrawable? acrylicBackdrop;
         private EzMaterialCaptureController? captureController;
 
-        private Bindable<bool> acrylicUiEnabled = null!;
+        private Bindable<EzMaterialUiMode> materialUiMode = null!;
         private Bindable<double> acrylicUiBlurStrength = null!;
 
         [Resolved(canBeNull: true)]
@@ -62,15 +62,15 @@ namespace osu.Game.EzOsuGame.UI
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
         {
-            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
-            acrylicUiBlurStrength = ezConfig.GetBindable<double>(Ez2Setting.AcrylicUiBlurStrength);
+            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
+            acrylicUiBlurStrength = ezConfig.GetBindable<double>(Ez2Setting.MaterialUiBlur);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            acrylicUiEnabled.BindValueChanged(_ => syncAcrylicState(), true);
+            materialUiMode.BindValueChanged(_ => syncAcrylicState(), true);
             acrylicUiBlurStrength.BindValueChanged(_ => syncAcrylicState(), true);
         }
 

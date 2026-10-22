@@ -20,6 +20,8 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
 using osu.Game.Collections;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Sprites;
@@ -27,7 +29,6 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets;
 using osuTK;
 using osuTK.Graphics;
@@ -58,7 +59,7 @@ namespace osu.Game.Screens.Select
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
-        private Bindable<bool> acrylicUiEnabled = null!;
+        private Bindable<EzMaterialUiMode> materialUiMode = null!;
 
         [Resolved]
         private BeatmapSetOverlay? beatmapOverlay { get; set; }
@@ -97,7 +98,7 @@ namespace osu.Game.Screens.Select
         {
             Height = HEIGHT;
 
-            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
 
             Icon = chevronIcon = new Container
             {
@@ -179,7 +180,7 @@ namespace osu.Game.Screens.Select
             base.LoadComplete();
 
             Expanded.BindValueChanged(_ => onExpanded(), true);
-            acrylicUiEnabled.BindValueChanged(_ => onExpanded());
+            materialUiMode.BindValueChanged(_ => onExpanded());
             KeyboardSelected.BindValueChanged(k => KeyboardSelected.Value = k.NewValue, true);
         }
 
@@ -188,13 +189,13 @@ namespace osu.Game.Screens.Select
             base.Update();
 
             // Keep accent strip width in sync while the chevron icon animates open/closed.
-            if (acrylicUiEnabled.Value)
+            if (EzMaterialOverlayAlpha.IsEnabled(materialUiMode.Value))
                 ApplyAcrylicIconStripBackground(chevronBackground, true, colourProvider.Highlight1);
         }
 
         private void onExpanded()
         {
-            bool acrylic = acrylicUiEnabled.Value;
+            bool acrylic = EzMaterialOverlayAlpha.IsEnabled(materialUiMode.Value);
 
             // Cancel size/alpha fades before retargeting — a FadeIn started while still full-bleed white
             // is what washed the whole set card under acrylic.

@@ -74,7 +74,7 @@ namespace osu.Game.Screens.Menu
         private readonly Box boxHoverLayer;
         private readonly SpriteIcon icon;
 
-        private Bindable<bool> acrylicUiEnabled = null!;
+        private Bindable<EzMaterialUiMode> materialUiMode = null!;
 
         private static readonly EdgeEffectParameters classic_edge_effect = new EdgeEffectParameters
         {
@@ -207,14 +207,14 @@ namespace osu.Game.Screens.Menu
             animateState();
             FinishTransforms(true);
 
-            EzMaterialOverlayAlpha.BindExclusive(backgroundContent, materialBackground, acrylicUiEnabled);
-            acrylicUiEnabled.BindValueChanged(_ => updateAcrylicChrome(), true);
+            EzMaterialOverlayAlpha.BindExclusive(backgroundContent, materialBackground, materialUiMode);
+            materialUiMode.BindValueChanged(_ => updateAcrylicChrome(), true);
         }
 
         private void updateAcrylicChrome()
         {
             // Drop shadows flicker on the blur pass.
-            background.EdgeEffect = acrylicUiEnabled.Value ? new EdgeEffectParameters() : classic_edge_effect;
+            background.EdgeEffect = EzMaterialOverlayAlpha.IsEnabled(materialUiMode.Value) ? new EdgeEffectParameters() : classic_edge_effect;
         }
 
         private void syncAcrylicCapture()
@@ -276,7 +276,7 @@ namespace osu.Game.Screens.Menu
         [BackgroundDependencyLoader]
         private void load(AudioManager audio, Ez2ConfigManager ezConfig)
         {
-            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
 
             sampleHover = audio.Samples.Get(@"Menu/button-hover");
             sampleClick = audio.Samples.Get(!string.IsNullOrEmpty(sampleName) ? $@"Menu/{sampleName}" : @"UI/button-select");
