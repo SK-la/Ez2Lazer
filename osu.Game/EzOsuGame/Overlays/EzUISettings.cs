@@ -25,8 +25,8 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzSettingsStrings.ACRYLIC_UI_ENABLED,
-                    HintText = EzSettingsStrings.ACRYLIC_UI_ENABLED_TOOLTIP,
+                    Caption = EzSettingsStrings.MATERIAL_UI_MODE,
+                    HintText = EzSettingsStrings.MATERIAL_UI_MODE_TOOLTIP,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled),
                 })
                 {
@@ -41,8 +41,8 @@ namespace osu.Game.EzOsuGame.Overlays
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = EzSettingsStrings.ACRYLIC_UI_BLUR_STRENGTH,
-                    HintText = EzSettingsStrings.ACRYLIC_UI_BLUR_STRENGTH_TOOLTIP,
+                    Caption = EzSettingsStrings.MATERIAL_UI_BLUR,
+                    HintText = EzSettingsStrings.MATERIAL_UI_BLUR_TOOLTIP,
                     Current = ezConfig.GetBindable<double>(Ez2Setting.AcrylicUiBlurStrength),
                     KeyboardStep = 1,
                 })

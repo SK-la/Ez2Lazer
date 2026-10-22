@@ -53,11 +53,11 @@ namespace osu.Game.EzOsuGame.HUD
             Precision = 0.01f
         };
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BOX_ELEMENT_BLUR_LABEL), nameof(EzHUDStrings.BOX_ELEMENT_BLUR_DESCRIPTION))]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BACKDROP_BLUR_LABEL), nameof(EzHUDStrings.BACKDROP_BLUR_DESCRIPTION))]
         public BindableBool BlurEnabled { get; } = new BindableBool(true);
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BOX_ELEMENT_BLUR_STRENGTH_LABEL), nameof(EzHUDStrings.BOX_ELEMENT_BLUR_STRENGTH_DESCRIPTION))]
-        public BindableNumber<float> BlurStrength { get; } = new BindableNumber<float>(16)
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BLUR_STRENGTH_LABEL), nameof(EzHUDStrings.BLUR_STRENGTH_DESCRIPTION))]
+        public BindableNumber<float> Blur { get; } = new BindableNumber<float>(16)
         {
             MinValue = 0,
             MaxValue = 40,
@@ -67,7 +67,7 @@ namespace osu.Game.EzOsuGame.HUD
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(new Color4(1f, 1f, 1f, 0.12f));
 
-        public bool WantsMaterialCapture => BlurEnabled.Value && BlurStrength.Value > 0;
+        public bool WantsMaterialCapture => BlurEnabled.Value && Blur.Value > 0;
 
         private readonly AcrylicBackdropDrawable acrylicBackdrop;
         private readonly Box tintBox;
@@ -110,11 +110,11 @@ namespace osu.Game.EzOsuGame.HUD
             BoxHeight.BindValueChanged(v => Height = v.NewValue, true);
             AccentColour.BindValueChanged(v => tintBox.Colour = v.NewValue, true);
             BlurEnabled.BindValueChanged(_ => SyncMaterialCaptureState(), true);
-            BlurStrength.BindValueChanged(_ => SyncMaterialCaptureState(), true);
+            Blur.BindValueChanged(_ => SyncMaterialCaptureState(), true);
         }
 
         public void SyncMaterialCaptureState()
-            => captureController?.Sync(WantsMaterialCapture, BlurStrength.Value);
+            => captureController?.Sync(WantsMaterialCapture, Blur.Value);
 
         protected override void Update()
         {

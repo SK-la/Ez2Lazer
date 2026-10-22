@@ -91,7 +91,7 @@ namespace osu.Game.EzOsuGame.HUD
             Precision = 0.01f,
         };
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_BACKDROP_BLUR_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_BACKDROP_BLUR_DESCRIPTION))]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BACKDROP_BLUR_LABEL), nameof(EzHUDStrings.BACKDROP_BLUR_DESCRIPTION))]
         public BindableBool BackdropBlurEnabled { get; } = new BindableBool(false);
 
         private const float bar_spacing = 4;

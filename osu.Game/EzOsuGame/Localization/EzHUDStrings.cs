@@ -62,6 +62,20 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString ALPHA_LABEL = new EzLocalizationManager.EzLocalisableString("透明度", "Alpha");
         public static readonly LocalisableString ALPHA_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("组件的透明度值", "The alpha value of this component.");
 
+        public static readonly LocalisableString BLUR_STRENGTH_LABEL = new EzLocalizationManager.EzLocalisableString("虚化强度", "Blur Strength");
+
+        public static readonly LocalisableString BLUR_STRENGTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "背景虚化的模糊强度。设为 0 等效于关闭虚化。",
+            "Blur strength for the backdrop effect. A value of 0 is equivalent to disabling blur.");
+
+        public static readonly LocalisableString BACKDROP_BLUR_LABEL = new EzLocalizationManager.EzLocalisableString("穿透虚化", "Backdrop Blur");
+
+        public static readonly LocalisableString BACKDROP_BLUR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "开启后虚化下方已绘制内容（壁纸、选歌 UI、游戏 HUD/playfield 等）。"
+            + "\n不含 footer、Logo、设置/通知浮层；关闭或强度为 0 时不声明离屏承载层、无额外 GPU 开销。",
+            "When enabled, acrylic-blurs content already rendered within OsuScreenStack beneath the box (wallpaper, song select UI, gameplay HUD/playfield, etc.)."
+            + "\nExcludes footer, logo, and global settings/notification overlays; no offscreen buffer when disabled or strength is 0.");
+
         // EzComO2JamPillUI
         public static readonly LocalisableString PILL_SPRITE_LABEL = new EzLocalizationManager.EzLocalisableString("药丸图标", "Pill Sprite");
         public static readonly LocalisableString PILL_SPRITE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择药丸图标的样式", "Select the pill sprite style.");
@@ -77,20 +91,6 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString BOX_ELEMENT_HEIGHT_LABEL = new EzLocalizationManager.EzLocalisableString("高度", "Height");
         public static readonly LocalisableString BOX_ELEMENT_HEIGHT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("背景框的高度", "The height of the background box.");
-
-        public static readonly LocalisableString BOX_ELEMENT_BLUR_LABEL = new EzLocalizationManager.EzLocalisableString("背景虚化", "Backdrop Blur");
-
-        public static readonly LocalisableString BOX_ELEMENT_BLUR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "开启后真穿透虚化框下方 OsuScreenStack 内已绘制内容（壁纸、选歌 UI、游戏 HUD/playfield 等）。"
-            + "\n不含 footer、Logo、设置/通知浮层；关闭或强度为 0 时不声明离屏承载层、无额外 GPU 开销。",
-            "When enabled, acrylic-blurs content already rendered within OsuScreenStack beneath the box (wallpaper, song select UI, gameplay HUD/playfield, etc.)."
-            + "\nExcludes footer, logo, and global settings/notification overlays; no offscreen buffer when disabled or strength is 0.");
-
-        public static readonly LocalisableString BOX_ELEMENT_BLUR_STRENGTH_LABEL = new EzLocalizationManager.EzLocalisableString("虚化强度", "Blur Strength");
-
-        public static readonly LocalisableString BOX_ELEMENT_BLUR_STRENGTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "背景虚化的模糊强度。设为 0 等效于关闭虚化。",
-            "Blur strength for the backdrop effect. A value of 0 is equivalent to disabling blur.");
 
         // EzHUDAccuracyCounter
         public static readonly LocalisableString FILL_DIRECTION_LABEL = new EzLocalizationManager.EzLocalisableString("排列方向", "Fill Direction");
@@ -260,12 +260,6 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString SCORE_COMPARE_BACKGROUND_VISIBLE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
             "显示整块圆角背景框（不含单柱分区底色）。",
             "Show a single rounded background behind all bars (not per-bar track colours).");
-
-        public static readonly LocalisableString SCORE_COMPARE_BACKDROP_BLUR_LABEL = new EzLocalizationManager.EzLocalisableString("穿透虚化", "Backdrop Blur");
-
-        public static readonly LocalisableString SCORE_COMPARE_BACKDROP_BLUR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "开启后真穿透虚化背景框下方 OsuScreenStack 内已绘制内容；关闭时仅显示半透明底色。",
-            "When enabled, acrylic-blurs content rendered within OsuScreenStack beneath the background; when disabled, only the tint is shown.");
 
         public static readonly LocalisableString SCORE_RACE_MOD_FILTER_LABEL = new EzLocalizationManager.EzLocalisableString("Mod 过滤", "Mod Filter");
         public static readonly LocalisableString SCORE_RACE_MOD_FILTER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("对比成绩的 Mod 范围", "Which mod combinations to include when selecting scores.");
