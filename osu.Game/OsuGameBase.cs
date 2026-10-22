@@ -650,7 +650,7 @@ namespace osu.Game
             AddFont(Resources, @"Fonts/Noto/Noto-Thai");
 
             // Emoji glyph fallback order (empty FontName scan): system colour emoji → packaged
-            // Twemoji / NotoColorEmoji → BMFont Noto-Emoji → mono outline.
+            // Twemoji / NotoColorEmoji → BMFont Noto-Emoji (monochrome).
             EzUiFontBootstrap.RegisterSystemEmojiFallback(this, Ez2ConfigManager);
 
             const string twemoji = @"Fonts/Twemoji/Twemoji.Mozilla";
@@ -688,21 +688,6 @@ namespace osu.Game
             catch
             {
                 // Silent BMFont hole-fill when system / outline colour sources miss a codepoint.
-            }
-
-            // Outline (monochrome) Noto Emoji covers codepoints missing from colour sources.
-            const string mono_emoji = @"Fonts/Noto_Emoji/static/NotoEmoji-Regular";
-
-            if (resourcesContainFont(mono_emoji))
-            {
-                try
-                {
-                    AddOutlineFont(Resources, mono_emoji);
-                }
-                catch
-                {
-                    // Optional wider emoji coverage; safe to skip.
-                }
             }
 
             AddFont(Resources, @"Fonts/Venera/Venera-Light");
