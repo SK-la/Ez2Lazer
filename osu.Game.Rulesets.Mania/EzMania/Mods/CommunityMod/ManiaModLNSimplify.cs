@@ -70,7 +70,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         public BindableBool Len { get; set; } = new BindableBool(true);
 
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
-        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(50)
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(60)
         {
             MinValue = 0,
             MaxValue = 100
