@@ -30,7 +30,7 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
         /// <remarks>
         /// 后转换 mod 只就地改写 <see cref="Beatmap{T}.Difficulty"/> 与 <see cref="Stages"/>，
         /// 不会写回 <c>BeatmapInfo.Difficulty</c>（那是转换开始时克隆的源谱快照）。
-        /// 判断「上游 mod 之后还剩几列」必须走这里，读元数据会拿到源谱键数。
+        /// 判断「排在前面按 ApplyOrder 跑过的改键 mod（如 PS）之后还剩几列」必须走这里，读元数据会拿到源谱键数。
         /// </remarks>
         public int ResolveColumnCount() => TotalColumns > 0 ? TotalColumns : (int)Math.Round(Difficulty.CircleSize);
 

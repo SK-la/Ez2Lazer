@@ -187,7 +187,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
         }
 
         /// <summary>
-        /// 上游改键 mod（PS 等）只写实例上的 Difficulty / stages，不会写回转换开始时克隆的 BeatmapInfo.Difficulty。
+        /// 参考 PS：改键 mod 只写实例上的 Difficulty / stages，不会写回转换开始时克隆的 BeatmapInfo.Difficulty。
         /// 这里按元数据里的旧键数建矩阵就会被错误压缩，targetKeys 恰等于旧键数时还会整段跳过；转换必须以当前键数为准。
         /// </summary>
         [Test]
@@ -196,7 +196,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
             var beatmap = new ManiaBeatmap(new StageDefinition(6));
 
             // 转换流程在 BeatmapInfo 赋值时会把 Difficulty 克隆一份出去，元数据与实例从此各自独立；
-            // 这里复现那一层分离，再模拟「元数据是源谱键数 4、上游改键 mod 已把实例改成 6」。
+            // 这里复现那一层分离，再模拟「元数据是源谱键数 4、PS 已把实例改成 6」。
             beatmap.BeatmapInfo = beatmap.BeatmapInfo.Clone();
             beatmap.BeatmapInfo.Difficulty.CircleSize = 4;
             beatmap.Difficulty.CircleSize = 6;

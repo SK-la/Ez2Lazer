@@ -172,7 +172,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 ? DetachedSampleLedger.Capture(playable)
                 : null;
 
-            foreach (var mod in mods.OfType<IApplicableAfterBeatmapConversion>())
+            foreach (var mod in EzApplyOrder.Sort(mods.OfType<IApplicableAfterBeatmapConversion>()))
             {
                 token.ThrowIfCancellationRequested();
                 mod.ApplyToBeatmap(playable);
