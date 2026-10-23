@@ -83,14 +83,19 @@ namespace osu.Game.EzOsuGame.Screens.Menu
         //     applyLinkedFill();
         // }
 
+        protected override void Update()
+        {
+            base.Update();
+
+            updateMaterialVisibility();
+        }
+
         private void apply()
         {
             // 亚克力风格是 logo 自己的设置。全局材质为默认（不干预）时据此保持亚克力，
             // 全局为亚克力/液态玻璃时由全局覆盖。单色与透明风格不涉及材质。
             material.OwnMode = EzMaterialUiMode.Acrylic;
-            material.MaterialVisible = style.Value == EzLogoBackdropStyle.Acrylic;
             material.BlurSigma = new Vector2((float)blur.Value);
-            material.SyncMaterialCaptureState();
 
             bool solidLook = style.Value == EzLogoBackdropStyle.Solid;
             ShowDecorations.Value = solidLook;
@@ -103,6 +108,40 @@ namespace osu.Game.EzOsuGame.Screens.Menu
             else
             {
                 fill.Alpha = 0;
+            }
+
+            updateMaterialVisibility();
+        }
+
+        /// <summary>
+        /// 亚克力风格要申请整屏捕获。logo 是全局缓存的单实例，离开主菜单只是淡出而非移除，
+        /// 因此必须按实际可见性释放捕获；否则进过一次主菜单后，后续所有界面
+        /// （包括 gameplay 的 note 与数字）都会一直留在离屏缓冲里被重采样。
+        /// </summary>
+        private void updateMaterialVisibility()
+        {
+            bool visible = style != null
+                           && style.Value == EzLogoBackdropStyle.Acrylic
+                           && isEffectivelyVisible;
+
+            if (material.MaterialVisible == visible)
+                return;
+
+            material.MaterialVisible = visible;
+            material.SyncMaterialCaptureState();
+        }
+
+        private bool isEffectivelyVisible
+        {
+            get
+            {
+                for (Drawable? d = this; d != null; d = d.Parent)
+                {
+                    if (!d.IsPresent || d.Alpha <= 0)
+                        return false;
+                }
+
+                return true;
             }
         }
 
