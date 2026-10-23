@@ -90,10 +90,12 @@ namespace osu.Game.EzOsuGame.Material
         {
             get
             {
-                EzMaterialUiMode global = materialUiMode?.Value ?? EzMaterialUiMode.Default;
+                // 没有配置源时（例如独立测试场景）沿用 Acrylic，保持既有行为。
+                if (materialUiMode == null)
+                    return EzMaterialUiMode.Acrylic;
 
                 // 全局默认表示不干预，交给宿主自己的设置。
-                return global == EzMaterialUiMode.Default ? ownMode : global;
+                return materialUiMode.Value == EzMaterialUiMode.Default ? ownMode : materialUiMode.Value;
             }
         }
 
