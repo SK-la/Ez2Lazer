@@ -80,6 +80,15 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "glass", "tint", "colour", "液态玻璃", "染色" }
                 },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzSettingsStrings.MATERIAL_GLASS_EDGE_SATURATION,
+                    HintText = EzSettingsStrings.MATERIAL_GLASS_EDGE_SATURATION_TOOLTIP,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.MaterialGlassEdgeSaturation),
+                })
+                {
+                    Keywords = new[] { "glass", "saturation", "edge", "液态玻璃", "饱和" }
+                },
             };
 
             var materialMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);

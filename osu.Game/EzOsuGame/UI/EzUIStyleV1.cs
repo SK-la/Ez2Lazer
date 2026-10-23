@@ -13,16 +13,19 @@ namespace osu.Game.EzOsuGame.UI
     public static class EzUIStyleV1
     {
         /// <summary>Cool dark veil over blurred backdrop (wedges / preview).</summary>
-        public static readonly Color4 Veil = new Color4(8 / 255f, 10 / 255f, 14 / 255f, 0.40f);
+        public static readonly Color4 Veil = new Color4(8 / 255f, 10 / 255f, 14 / 255f, 0.20f);
 
         /// <summary>Full-page mod / sheared overlay veil.</summary>
-        public static readonly Color4 ModPageVeil = new Color4(6 / 255f, 8 / 255f, 12 / 255f, 0.50f);
+        public static readonly Color4 ModPageVeil = new Color4(6 / 255f, 8 / 255f, 12 / 255f, 0.28f);
 
-        /// <summary>Carousel panel veil — dark enough that bright song-select BGs do not wash cards.</summary>
-        public static readonly Color4 PanelVeil = new Color4(5 / 255f, 7 / 255f, 11 / 255f, 0.72f);
+        /// <summary>
+        /// Carousel panel veil. Kept light: the veil sits under the material, and a heavy veil
+        /// flattens whatever the edge refraction pulls in, leaving only a glowing rim.
+        /// </summary>
+        public static readonly Color4 PanelVeil = new Color4(5 / 255f, 7 / 255f, 11 / 255f, 0.28f);
 
         /// <summary>Footer glass veil — cool dark so blur stays readable (not the same hue as solid Background5).</summary>
-        public static readonly Color4 FooterVeil = new Color4(8 / 255f, 10 / 255f, 14 / 255f, 0.50f);
+        public static readonly Color4 FooterVeil = new Color4(8 / 255f, 10 / 255f, 14 / 255f, 0.24f);
 
         /// <summary>
         /// Light scheme wash on the frosted footer TintBox. Kept low so blur is not masked
@@ -36,7 +39,7 @@ namespace osu.Game.EzOsuGame.UI
         /// <summary>
         /// Main-menu button glass tint strength. The hue is the button accent; kept low so the blur stays visible.
         /// </summary>
-        public const float MENU_BUTTON_TINT_ALPHA = 0.55f;
+        public const float MENU_BUTTON_TINT_ALPHA = 0.35f;
 
         /// <summary>Tier A: 大表面（卡片 / Wedge / 顶栏）。</summary>
         public const float CORNER_RADIUS_WEDGE = 10f;

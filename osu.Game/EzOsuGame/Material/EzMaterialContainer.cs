@@ -35,8 +35,9 @@ namespace osu.Game.EzOsuGame.Material
         private Bindable<double>? glassEdgeHighlight;
         private Bindable<double>? glassInnerShadow;
         private Bindable<double>? glassTintStrength;
+        private Bindable<double>? glassEdgeSaturation;
 
-        private Vector2 blurSigma = new Vector2(16);
+        private Vector2 blurSigma = new Vector2(4);
 
         private float cornerRadius;
 
@@ -185,6 +186,7 @@ namespace osu.Game.EzOsuGame.Material
 
             glass.Material = glass.Material with { CornerRadius = cornerRadius, Tint = tint };
         }
+
         [BackgroundDependencyLoader(true)]
         private void load(Ez2ConfigManager? ezConfig)
         {
@@ -206,6 +208,7 @@ namespace osu.Game.EzOsuGame.Material
             glassEdgeHighlight = ezConfig.GetBindable<double>(Ez2Setting.MaterialGlassEdgeHighlight);
             glassInnerShadow = ezConfig.GetBindable<double>(Ez2Setting.MaterialGlassInnerShadow);
             glassTintStrength = ezConfig.GetBindable<double>(Ez2Setting.MaterialGlassTintStrength);
+            glassEdgeSaturation = ezConfig.GetBindable<double>(Ez2Setting.MaterialGlassEdgeSaturation);
 
             glassRefractionDepth.BindValueChanged(_ => applyGlassParameters());
             glassRefractionStrength.BindValueChanged(_ => applyGlassParameters());
@@ -213,6 +216,7 @@ namespace osu.Game.EzOsuGame.Material
             glassEdgeHighlight.BindValueChanged(_ => applyGlassParameters());
             glassInnerShadow.BindValueChanged(_ => applyGlassParameters());
             glassTintStrength.BindValueChanged(_ => applyGlassParameters());
+            glassEdgeSaturation.BindValueChanged(_ => applyGlassParameters());
 
             applyGlassParameters();
 
@@ -248,6 +252,9 @@ namespace osu.Game.EzOsuGame.Material
 
             if (glassTintStrength != null)
                 material.TintStrength = (float)glassTintStrength.Value;
+
+            if (glassEdgeSaturation != null)
+                material.EdgeSaturation = (float)glassEdgeSaturation.Value;
 
             glass.Material = material;
         }

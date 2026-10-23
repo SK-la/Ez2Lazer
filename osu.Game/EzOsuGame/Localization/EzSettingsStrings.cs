@@ -180,8 +180,8 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("穿透材质虚化强度", "Backdrop material blur strength");
 
         public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_UI_BLUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "穿透材质的模糊强度。材质为关闭时不生效。",
-            "Blur strength for backdrop materials. Has no effect when the material is off.");
+            "穿透材质的模糊强度。过大时模糊图内没有可被折射的细节，边缘折射会看不见。",
+            "Blur strength for backdrop materials. Too high leaves no detail for the edge refraction to bend, so refraction stops being visible.");
 
         public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_REFRACTION_DEPTH =
             new EzLocalizationManager.EzLocalisableString("液态玻璃折射带宽度", "Glass refraction band width");
@@ -224,6 +224,13 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_TINT_STRENGTH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "玻璃本体染色权重。0 表示只做折射与高光，颜色交给面板遮罩。",
             "Weight of the glass tint. 0 leaves refraction and highlights only, letting the panel veil supply the colour.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_EDGE_SATURATION =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃边缘饱和", "Glass edge saturation");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_EDGE_SATURATION_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "边缘带的饱和度提升量，制造厚玻璃的体积感。0 表示不改变饱和度。",
+            "Extra saturation along the edge band, giving the glass its thickness. 0 leaves saturation unchanged.");
 
         public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_MODIFY =
             new EzLocalizationManager.EzLocalisableString("修改字体", "Modify fonts");
