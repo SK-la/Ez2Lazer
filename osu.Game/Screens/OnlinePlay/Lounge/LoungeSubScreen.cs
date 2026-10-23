@@ -23,6 +23,7 @@ using osu.Game.Configuration;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Input;
+using osu.Game.Localisation;
 using osu.Game.Online.API;
 using osu.Game.Online.Rooms;
 using osu.Game.Overlays;
@@ -31,7 +32,6 @@ using osu.Game.Screens.OnlinePlay.Lounge.Components;
 using osu.Game.Users;
 using osuTK;
 using osuTK.Graphics;
-using osu.Game.Localisation;
 
 namespace osu.Game.Screens.OnlinePlay.Lounge
 {
@@ -394,7 +394,9 @@ namespace osu.Game.Screens.OnlinePlay.Lounge
                 // ID must be unset as we use this as a marker for whether this is a client-side (not-yet-created) room or not.
                 r.RoomID = null;
 
-                // Null out dates because end date is not supported client-side and the settings overlay will populate a duration.
+                // Null out these because host and start/end date is not supported client-side and the settings overlay will populate a duration.
+                r.Host = null;
+                r.StartDate = null;
                 r.EndDate = null;
                 r.Duration = null;
 

@@ -25,7 +25,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Screens.Footer
 {
-    public partial class ScreenFooterButton : OsuClickableContainer, IKeyBindingHandler<GlobalAction>
+    public partial class ScreenFooterButton : OsuClickableContainer, IKeyBindingHandler<GlobalAction>, IScreenFooterButton
     {
         public const float CORNER_RADIUS = EzUIStyleV1.CORNER_RADIUS_FOOTER;
 
