@@ -74,7 +74,7 @@ namespace osu.Game.Overlays.Mods
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
         {
-            var acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+            var materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
 
             Box pageDim;
             EzMaterialPanelBackground pageMaterial;
@@ -119,7 +119,7 @@ namespace osu.Game.Overlays.Mods
                 }
             };
 
-            EzMaterialOverlayAlpha.BindExclusive(pageDim, pageMaterial, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindExclusive(pageDim, pageMaterial, materialUiMode);
         }
 
         public VisibilityContainer? DisplayedFooterContent { get; private set; }

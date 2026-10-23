@@ -2,11 +2,9 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
@@ -21,8 +19,8 @@ using osuTK.Graphics;
 namespace osu.Game.EzOsuGame.HUD
 {
     /// <summary>
-    /// 可皮肤化的圆角背景框。虚化由本组件自行向 <see cref="IMaterialCaptureRegistrar"/> 声明需求，
-    /// 使用 <see cref="AcrylicBackdropDrawable"/> 真穿透采样 OsuScreenStack 内已绘制内容。
+    /// 可皮肤化的圆角背景框。材质由 <see cref="EzMaterialContainer"/> 按档位切换，
+    /// 通过 <see cref="IMaterialCaptureRegistrar"/> 声明捕获需求。
     /// </summary>
     public partial class EzBoxElement : CompositeDrawable, ISerialisableDrawable, IMaterialBackdropConsumer
     {
@@ -53,11 +51,11 @@ namespace osu.Game.EzOsuGame.HUD
             Precision = 0.01f
         };
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BOX_ELEMENT_BLUR_LABEL), nameof(EzHUDStrings.BOX_ELEMENT_BLUR_DESCRIPTION))]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BACKDROP_BLUR_LABEL), nameof(EzHUDStrings.BACKDROP_BLUR_DESCRIPTION))]
         public BindableBool BlurEnabled { get; } = new BindableBool(true);
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BOX_ELEMENT_BLUR_STRENGTH_LABEL), nameof(EzHUDStrings.BOX_ELEMENT_BLUR_STRENGTH_DESCRIPTION))]
-        public BindableNumber<float> BlurStrength { get; } = new BindableNumber<float>(16)
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BLUR_STRENGTH_LABEL), nameof(EzHUDStrings.BLUR_STRENGTH_DESCRIPTION))]
+        public BindableNumber<float> Blur { get; } = new BindableNumber<float>(16)
         {
             MinValue = 0,
             MaxValue = 40,
@@ -67,17 +65,10 @@ namespace osu.Game.EzOsuGame.HUD
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(new Color4(1f, 1f, 1f, 0.12f));
 
-        public bool WantsMaterialCapture => BlurEnabled.Value && BlurStrength.Value > 0;
+        public bool WantsMaterialCapture => materialBackdrop.WantsMaterialCapture;
 
-        private readonly AcrylicBackdropDrawable acrylicBackdrop;
+        private readonly EzMaterialContainer materialBackdrop;
         private readonly Box tintBox;
-        private EzMaterialCaptureController? captureController;
-
-        [Resolved(canBeNull: true)]
-        private IMaterialCaptureRegistrar? captureRegistrar { get; set; }
-
-        [Resolved]
-        private IRenderer renderer { get; set; } = null!;
 
         public EzBoxElement()
         {
@@ -86,12 +77,7 @@ namespace osu.Game.EzOsuGame.HUD
 
             InternalChildren = new Drawable[]
             {
-                acrylicBackdrop = new AcrylicBackdropDrawable
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    EffectEnabled = false,
-                    FrameBufferScale = Vector2.One,
-                },
+                materialBackdrop = new EzMaterialContainer(),
                 tintBox = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
@@ -104,31 +90,27 @@ namespace osu.Game.EzOsuGame.HUD
         {
             base.LoadComplete();
 
-            captureController = new EzMaterialCaptureController(captureRegistrar, acrylicBackdrop, renderer);
-
             BoxWidth.BindValueChanged(v => Width = v.NewValue, true);
             BoxHeight.BindValueChanged(v => Height = v.NewValue, true);
             AccentColour.BindValueChanged(v => tintBox.Colour = v.NewValue, true);
             BlurEnabled.BindValueChanged(_ => SyncMaterialCaptureState(), true);
-            BlurStrength.BindValueChanged(_ => SyncMaterialCaptureState(), true);
+            Blur.BindValueChanged(_ => SyncMaterialCaptureState(), true);
         }
 
         public void SyncMaterialCaptureState()
-            => captureController?.Sync(WantsMaterialCapture, BlurStrength.Value);
+        {
+            materialBackdrop.MaterialVisible = BlurEnabled.Value && Blur.Value > 0;
+            materialBackdrop.BlurSigma = new Vector2(Blur.Value);
+            materialBackdrop.SyncMaterialCaptureState();
+        }
 
         protected override void Update()
         {
             base.Update();
 
-            base.CornerRadius = CornerRadius.Value * Math.Min(DrawWidth, DrawHeight);
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-                captureController?.Dispose();
-
-            base.Dispose(isDisposing);
+            float effectiveCornerRadius = CornerRadius.Value * Math.Min(DrawWidth, DrawHeight);
+            base.CornerRadius = effectiveCornerRadius;
+            materialBackdrop.GlassCornerRadius = effectiveCornerRadius;
         }
     }
 }

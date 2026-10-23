@@ -4,7 +4,6 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Material;
@@ -16,7 +15,7 @@ namespace osu.Game.EzOsuGame.UI
 {
     /// <summary>
     /// Song-select wedge background: OFF = classic <see cref="WedgeBackground"/> (M);
-    /// ON = blur + dark veil (N), classic wedge fully hidden.
+    /// ON = material + dark veil (N), classic wedge fully hidden.
     /// </summary>
     public partial class EzSongSelectWedgeBackground : InputBlockingContainer, IMaterialBackdropConsumer
     {
@@ -26,77 +25,67 @@ namespace osu.Game.EzOsuGame.UI
 
         public float WidthForGradient { get; init; } = 0.3f;
 
-        public bool WantsMaterialCapture => acrylicUiEnabled.Value;
+        public bool WantsMaterialCapture => materialContainer.WantsMaterialCapture;
 
-        private AcrylicBackdropDrawable acrylicBackdrop = null!;
+        private EzMaterialContainer materialContainer = null!;
         private Box darkVeil = null!;
         private WedgeBackground wedgeBackground = null!;
-        private EzMaterialCaptureController? captureController;
 
-        private Bindable<bool> acrylicUiEnabled = null!;
-        private Bindable<double> acrylicUiBlurStrength = null!;
-
-        [Resolved(canBeNull: true)]
-        private IMaterialCaptureRegistrar? materialCaptureRegistrar { get; set; }
+        private Bindable<EzMaterialUiMode> materialUiMode = null!;
+        private Bindable<double> materialUiBlur = null!;
 
         [BackgroundDependencyLoader]
-        private void load(Ez2ConfigManager ezConfig, IRenderer renderer)
+        private void load(Ez2ConfigManager ezConfig)
         {
             RelativeSizeAxes = Axes.Both;
 
-            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
-            acrylicUiBlurStrength = ezConfig.GetBindable<double>(Ez2Setting.AcrylicUiBlurStrength);
+            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
+            materialUiBlur = ezConfig.GetBindable<double>(Ez2Setting.MaterialUiBlur);
 
             InternalChildren = new Drawable[]
             {
-                acrylicBackdrop = new AcrylicBackdropDrawable
+                materialContainer = new EzMaterialContainer
                 {
-                    RelativeSizeAxes = Axes.Both,
-                    EffectEnabled = false,
+                    Depth = 1,
                     FrameBufferScale = Vector2.One,
                 },
                 darkVeil = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
+                    // 遮罩在材质之下，否则会盖掉边缘折射与高光。
+                    Depth = 2,
                     Colour = EzUIStyleV1.Veil,
                     Alpha = 0,
                 },
                 wedgeBackground = new WedgeBackground
                 {
                     RelativeSizeAxes = Axes.Both,
+                    Depth = 0,
                     StartAlpha = StartAlpha,
                     FinalAlpha = FinalAlpha,
                     WidthForGradient = WidthForGradient,
                 },
             };
-
-            captureController = new EzMaterialCaptureController(materialCaptureRegistrar, acrylicBackdrop, renderer);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            // N = blur (via Sync) + darkVeil; M = classic wedgeBackground.
-            EzMaterialOverlayAlpha.BindExclusive(wedgeBackground, darkVeil, acrylicUiEnabled);
-            acrylicUiEnabled.BindValueChanged(_ => syncAcrylicState(), true);
-            acrylicUiBlurStrength.BindValueChanged(_ => syncAcrylicState(), true);
+            // N = material + darkVeil; M = classic wedgeBackground.
+            EzMaterialOverlayAlpha.BindExclusive(wedgeBackground, darkVeil, materialUiMode);
+            materialUiMode.BindValueChanged(_ => syncMaterialState(), true);
+            materialUiBlur.BindValueChanged(_ => syncMaterialState(), true);
         }
 
         public void SyncMaterialCaptureState()
-            => syncAcrylicState();
+            => syncMaterialState();
 
-        private void syncAcrylicState()
+        private void syncMaterialState()
         {
-            captureController?.Sync(acrylicUiEnabled.Value, (float)acrylicUiBlurStrength.Value);
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-                captureController?.Dispose();
-
-            base.Dispose(isDisposing);
+            materialContainer.MaterialVisible = true;
+            materialContainer.BlurSigma = new Vector2((float)materialUiBlur.Value);
+            materialContainer.SyncMaterialCaptureState();
         }
     }
 }

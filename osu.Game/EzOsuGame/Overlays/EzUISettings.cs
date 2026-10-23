@@ -21,33 +21,106 @@ namespace osu.Game.EzOsuGame.Overlays
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
         {
-            AddRange(new Drawable[]
+            // 液态玻璃专属项：只在对应档位下出现，避免在亚克力/默认档留一堆无效滑条。
+            SettingsItemV2[] glassItems =
             {
-                new SettingsItemV2(new FormCheckBox
+                new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = EzSettingsStrings.ACRYLIC_UI_ENABLED,
-                    HintText = EzSettingsStrings.ACRYLIC_UI_ENABLED_TOOLTIP,
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled),
+                    Caption = EzSettingsStrings.MATERIAL_GLASS_REFRACTION_DEPTH,
+                    HintText = EzSettingsStrings.MATERIAL_GLASS_REFRACTION_DEPTH_TOOLTIP,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.MaterialGlassRefractionDepth),
+                    KeyboardStep = 1,
                 })
                 {
-                    Keywords = new[] { "acrylic", "glass", "blur", "song select", "ui", "毛玻璃" }
+                    Keywords = new[] { "glass", "refraction", "depth", "液态玻璃", "折射" }
                 },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzSettingsStrings.MATERIAL_GLASS_REFRACTION_STRENGTH,
+                    HintText = EzSettingsStrings.MATERIAL_GLASS_REFRACTION_STRENGTH_TOOLTIP,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.MaterialGlassRefractionStrength),
+                    KeyboardStep = 1,
+                })
+                {
+                    Keywords = new[] { "glass", "refraction", "liquid glass", "液态玻璃", "折射" }
+                },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzSettingsStrings.MATERIAL_GLASS_CHROMATIC,
+                    HintText = EzSettingsStrings.MATERIAL_GLASS_CHROMATIC_TOOLTIP,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.MaterialGlassChromatic),
+                })
+                {
+                    Keywords = new[] { "glass", "chromatic", "dispersion", "液态玻璃", "色散" }
+                },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzSettingsStrings.MATERIAL_GLASS_EDGE_HIGHLIGHT,
+                    HintText = EzSettingsStrings.MATERIAL_GLASS_EDGE_HIGHLIGHT_TOOLTIP,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.MaterialGlassEdgeHighlight),
+                })
+                {
+                    Keywords = new[] { "glass", "highlight", "rim", "液态玻璃", "高光" }
+                },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzSettingsStrings.MATERIAL_GLASS_INNER_SHADOW,
+                    HintText = EzSettingsStrings.MATERIAL_GLASS_INNER_SHADOW_TOOLTIP,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.MaterialGlassInnerShadow),
+                })
+                {
+                    Keywords = new[] { "glass", "shadow", "inner", "液态玻璃", "内阴影" }
+                },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzSettingsStrings.MATERIAL_GLASS_TINT_STRENGTH,
+                    HintText = EzSettingsStrings.MATERIAL_GLASS_TINT_STRENGTH_TOOLTIP,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.MaterialGlassTintStrength),
+                })
+                {
+                    Keywords = new[] { "glass", "tint", "colour", "液态玻璃", "染色" }
+                },
+            };
+
+            var materialMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
+
+            materialMode.BindValueChanged(mode =>
+            {
+                foreach (var item in glassItems)
+                    item.CanBeShown.Value = mode.NewValue == EzMaterialUiMode.LiquidGlass;
+            }, true);
+
+            Add(new SettingsItemV2(new FormEnumDropdown<EzMaterialUiMode>
+            {
+                Caption = EzSettingsStrings.MATERIAL_UI_MODE,
+                HintText = EzSettingsStrings.MATERIAL_UI_MODE_TOOLTIP,
+                Current = materialMode,
+            })
+            {
+                Keywords = new[] { "acrylic", "glass", "blur", "song select", "ui", "毛玻璃", "液态玻璃" }
+            });
+
+            Add(new SettingsItemV2(new FormSliderBar<double>
+            {
+                Caption = EzSettingsStrings.MATERIAL_UI_BLUR,
+                HintText = EzSettingsStrings.MATERIAL_UI_BLUR_TOOLTIP,
+                Current = ezConfig.GetBindable<double>(Ez2Setting.MaterialUiBlur),
+                KeyboardStep = 1,
+            })
+            {
+                Keywords = new[] { "acrylic", "blur", "strength", "song select", "ui", "虚化" }
+            });
+
+            AddRange(glassItems);
+
+            AddRange(new Drawable[]
+            {
                 new SettingsButtonV2
                 {
                     Text = EzSettingsStrings.UI_FONT_MODIFY,
                     TooltipText = EzSettingsStrings.UI_FONT_MODIFY_TOOLTIP,
                     Action = () => fontOverlay?.ShowFromSettings(),
                     Keywords = new[] { "font", "typeface", "ui", "system", "字体" }
-                },
-                new SettingsItemV2(new FormSliderBar<double>
-                {
-                    Caption = EzSettingsStrings.ACRYLIC_UI_BLUR_STRENGTH,
-                    HintText = EzSettingsStrings.ACRYLIC_UI_BLUR_STRENGTH_TOOLTIP,
-                    Current = ezConfig.GetBindable<double>(Ez2Setting.AcrylicUiBlurStrength),
-                    KeyboardStep = 1,
-                })
-                {
-                    Keywords = new[] { "acrylic", "blur", "strength", "song select", "ui", "虚化" }
                 },
                 new SettingsItemV2(new FormEnumDropdown<EzNotificationBehaviour>
                 {

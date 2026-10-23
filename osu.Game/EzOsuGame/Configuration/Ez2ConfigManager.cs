@@ -133,8 +133,14 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.QuickRotationCandidateCount, 5, 3, 6);
 
             SetDefault(Ez2Setting.StoryboardAutoVideoSize, false);
-            SetDefault(Ez2Setting.AcrylicUiEnabled, false);
-            SetDefault(Ez2Setting.AcrylicUiBlurStrength, 16.0, 0.0, 40.0, 1.0);
+            SetDefault(Ez2Setting.MaterialUiMode, EzMaterialUiMode.LiquidGlass);
+            SetDefault(Ez2Setting.MaterialUiBlur, 10.0, 0.0, 40.0, 1.0);
+            SetDefault(Ez2Setting.MaterialGlassRefractionDepth, 20.0, 0.0, 60.0, 1.0);
+            SetDefault(Ez2Setting.MaterialGlassRefractionStrength, 10.0, 0.0, 24.0, 0.5);
+            SetDefault(Ez2Setting.MaterialGlassChromatic, 0.3, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.MaterialGlassEdgeHighlight, 0.2, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.MaterialGlassInnerShadow, 0.2, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.MaterialGlassTintStrength, 0.2, 0.0, 1.0, 0.01);
             SetDefault(Ez2Setting.UiFontDefault, string.Empty);
             SetDefault(Ez2Setting.UiFontDefaultLocalized, string.Empty);
             SetDefault(Ez2Setting.UiFontTitleAlternate, string.Empty);
@@ -1111,8 +1117,42 @@ namespace osu.Game.EzOsuGame.Configuration
         QuickRotationCandidateCount,
 
         StoryboardAutoVideoSize,
-        AcrylicUiEnabled,
-        AcrylicUiBlurStrength,
+
+        /// <summary>
+        /// 穿透容器的材质：关闭 / 毛玻璃 / 液态玻璃。
+        /// </summary>
+        MaterialUiMode,
+        MaterialUiBlur,
+
+        /// <summary>
+        /// 液态玻璃边缘折射带宽度（屏幕像素）。越小越像薄玻璃，过渡越硬。
+        /// </summary>
+        MaterialGlassRefractionDepth,
+
+        /// <summary>
+        /// 液态玻璃边缘折射的最大位移（屏幕像素）。
+        /// </summary>
+        MaterialGlassRefractionStrength,
+
+        /// <summary>
+        /// 液态玻璃 R/G/B 三通道折射位移差，产生色散。
+        /// </summary>
+        MaterialGlassChromatic,
+
+        /// <summary>
+        /// 液态玻璃朝光侧边缘高光强度。
+        /// </summary>
+        MaterialGlassEdgeHighlight,
+
+        /// <summary>
+        /// 液态玻璃背光侧内阴影强度。
+        /// </summary>
+        MaterialGlassInnerShadow,
+
+        /// <summary>
+        /// 液态玻璃染色混合权重。
+        /// </summary>
+        MaterialGlassTintStrength,
 
         /// <summary>English / Latin system font for default UI (empty = built-in Torus BMFont).</summary>
         UiFontDefault,

@@ -50,7 +50,7 @@ namespace osu.Game.Screens.Select
         private SelectionGlowPulser selectionGlowPulser = null!;
 
         /// <summary>
-        /// Full-bleed acrylic glass (N). Visibility is driven by <see cref="acrylicUiEnabled"/>;
+        /// Full-bleed acrylic glass (N). Visibility is driven by <see cref="materialUiMode"/>;
         /// subclasses hide classic colour overlays via <see cref="EzMaterialOverlayAlpha.BindHiddenWhenAcrylic"/>.
         /// </summary>
         protected EzMaterialPanelBackground PanelGlass { get; private set; } = null!;
@@ -105,12 +105,12 @@ namespace osu.Game.Screens.Select
         [Resolved]
         private BeatmapCarousel? carousel { get; set; }
 
-        private Bindable<bool> acrylicUiEnabled = null!;
+        private Bindable<EzMaterialUiMode> materialUiMode = null!;
 
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider colourProvider, OsuColour colours, Ez2ConfigManager ezConfig)
         {
-            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
             Anchor = Anchor.TopRight;
             Origin = Anchor.TopRight;
 
@@ -132,6 +132,7 @@ namespace osu.Game.Screens.Select
                         // Capture starts in PrepareForUse. The carousel pool constructs every panel up front;
                         // leaving this on would pin a blur framebuffer for each card ever shown.
                         MaterialCaptureVisible = false,
+                        MaterialCornerRadius = CORNER_RADIUS,
                         Alpha = 0,
                     },
                     backgroundContainer = new Container
@@ -195,7 +196,7 @@ namespace osu.Game.Screens.Select
             selectionGlowPulser.GlowTarget = TopLevelContent;
             selectionGlowPulser.GetGlowColour = () => accentColour ?? Color4Extensions.FromHex(@"4EBFFF");
             // Acrylic-only outer glow pulse; classic UI uses PulsatingBox instead.
-            selectionGlowPulser.ShouldPulse = () => acrylicUiEnabled.Value && (Expanded.Value || Selected.Value);
+            selectionGlowPulser.ShouldPulse = () => EzMaterialOverlayAlpha.IsEnabled(materialUiMode.Value) && (Expanded.Value || Selected.Value);
         }
 
         public partial class PulsatingBox : BeatSyncedContainer
@@ -355,10 +356,10 @@ namespace osu.Game.Screens.Select
             }, true);
 
             // ON: show glass N. OFF: hide N. Classic overlays are hidden separately per-subclass.
-            acrylicUiEnabled.BindValueChanged(e =>
+            materialUiMode.BindValueChanged(e =>
             {
                 PanelGlass.ClearTransforms();
-                PanelGlass.Alpha = e.NewValue ? 1f : 0f;
+                PanelGlass.Alpha = EzMaterialOverlayAlpha.IsEnabled(e.NewValue) ? 1f : 0f;
                 updateSelectedState(animated: false);
             }, true);
         }
@@ -423,7 +424,7 @@ namespace osu.Game.Screens.Select
             bool selectedOrExpanded = Expanded.Value || Selected.Value;
             double duration = animated ? DURATION : 0;
 
-            if (acrylicUiEnabled.Value)
+            if (EzMaterialOverlayAlpha.IsEnabled(materialUiMode.Value))
             {
                 // Acrylic: hollow outer glow on selection; no drop shadows (they flicker on blur).
                 selectionLayer.FadeOut(animated ? 200 : 0, Easing.OutQuint);
@@ -580,7 +581,7 @@ namespace osu.Game.Screens.Select
         {
             // Under acrylic, keep selection feedback to the hollow outer rim only —
             // a full-panel white flash reads as the whole card brightening.
-            if (acrylicUiEnabled.Value)
+            if (EzMaterialOverlayAlpha.IsEnabled(materialUiMode.Value))
                 return;
 
             activationFlash.FadeOutFromOne(1000, Easing.OutQuint);

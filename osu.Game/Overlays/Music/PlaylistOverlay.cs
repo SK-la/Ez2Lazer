@@ -49,13 +49,13 @@ namespace osu.Game.Overlays.Music
         private Playlist list = null!;
         private Box classicBackground = null!;
         private EzMaterialPanelBackground materialBackground = null!;
-        private Bindable<bool> acrylicUiEnabled = null!;
+        private Bindable<EzMaterialUiMode> materialUiMode = null!;
 
         [BackgroundDependencyLoader]
         private void load(OsuColour colours, Bindable<WorkingBeatmap> beatmap, Ez2ConfigManager ezConfig)
         {
             this.beatmap.BindTo(beatmap);
-            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
 
             Children = new Drawable[]
             {
@@ -123,7 +123,7 @@ namespace osu.Game.Overlays.Music
             list.RowData.BindTo(filteredSets);
             beatmap.BindValueChanged(working => SelectedSet.Value = working.NewValue.BeatmapSetInfo.ToLive(realm), true);
 
-            EzMaterialOverlayAlpha.BindExclusive(classicBackground, materialBackground, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindExclusive(classicBackground, materialBackground, materialUiMode);
         }
 
         private void applyFilter(FilterCriteria criteria)

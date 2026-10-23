@@ -54,7 +54,7 @@ namespace osu.Game.Screens.Footer
 
         private Box background = null!;
         private EzMaterialPanelBackground footerMaterial = null!;
-        private Bindable<bool> acrylicUiEnabled = null!;
+        private Bindable<EzMaterialUiMode> materialUiMode = null!;
         private FillFlowContainer<ScreenFooterButton> buttonsFlow = null!;
         private Container overlayContentContainer = null!;
         private Container<ScreenFooterButton> hiddenButtonsContainer = null!;
@@ -86,7 +86,7 @@ namespace osu.Game.Screens.Footer
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
         {
-            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
 
             InternalChildren = new Drawable[]
             {
@@ -175,7 +175,7 @@ namespace osu.Game.Screens.Footer
             base.LoadComplete();
 
             // ON: hide M, show N. OFF: hide N, show M.
-            EzMaterialOverlayAlpha.BindExclusive(background, footerMaterial, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindExclusive(background, footerMaterial, materialUiMode);
         }
 
         private ScheduledDelegate? changeLogoDepthDelegate;

@@ -165,21 +165,65 @@ namespace osu.Game.EzOsuGame.Localization
             "每轮抽卡界面展示的谱面数量（3–6）。",
             "Number of beatmap cards shown each pick round (3–6).");
 
-        public static readonly EzLocalizationManager.EzLocalisableString ACRYLIC_UI_ENABLED =
-            new EzLocalizationManager.EzLocalisableString("毛玻璃 UI", "Acrylic UI");
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_UI_MODE =
+            new EzLocalizationManager.EzLocalisableString("穿透材质", "Backdrop material");
 
-        public static readonly EzLocalizationManager.EzLocalisableString ACRYLIC_UI_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "开启后，选歌界面的 Wedge、过滤器、谱面预览等面板背景将使用穿透虚化（采样当前屏幕内容）。"
-            + "\n会启用全屏 capture 缓冲，仅建议在选歌界面使用。",
-            "When enabled, song select wedge, filter, and beatmap preview panel backgrounds use true backdrop acrylic blur."
-            + "\nEnables a full-screen capture buffer while any acrylic panel is visible on song select.");
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_UI_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "选择选歌面板、footer、菜单按钮与 HUD 背板的穿透材质。"
+            + "\n毛玻璃：只做穿透模糊。液态玻璃：额外带边缘折射与高光。"
+            + "\n默认：恢复经典不透明样式。非默认档位会启用全屏 capture 缓冲，仅建议在选歌界面使用。",
+            "Backdrop material for song select panels, footer, menu buttons and HUD backdrops."
+            + "\nAcrylic: blur only. Liquid glass: adds edge refraction and highlights."
+            + "\nDefault: restores the classic opaque chrome. Any other mode allocates a full-screen capture buffer while visible on song select.");
 
-        public static readonly EzLocalizationManager.EzLocalisableString ACRYLIC_UI_BLUR_STRENGTH =
-            new EzLocalizationManager.EzLocalisableString("毛玻璃虚化强度", "Acrylic blur strength");
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_UI_BLUR =
+            new EzLocalizationManager.EzLocalisableString("穿透材质虚化强度", "Backdrop material blur strength");
 
-        public static readonly EzLocalizationManager.EzLocalisableString ACRYLIC_UI_BLUR_STRENGTH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "选歌界面毛玻璃面板的模糊强度。总开关关闭时不生效。",
-            "Blur strength for song select acrylic panels. Has no effect when acrylic UI is disabled.");
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_UI_BLUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "穿透材质的模糊强度。材质为关闭时不生效。",
+            "Blur strength for backdrop materials. Has no effect when the material is off.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_REFRACTION_DEPTH =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃折射带宽度", "Glass refraction band width");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_REFRACTION_DEPTH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "从边缘往内的折射过渡宽度（屏幕像素）。越小越像薄玻璃，边缘转折越硬。",
+            "How far the refraction transition reaches inward from the edge, in screen pixels. Smaller reads as thinner glass with a harder edge.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_REFRACTION_STRENGTH =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃折射强度", "Glass refraction strength");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_REFRACTION_STRENGTH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "边缘采样的最大位移（屏幕像素）。0 关闭折射。",
+            "Maximum edge sample displacement in screen pixels. 0 disables refraction.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_CHROMATIC =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃色散", "Glass chromatic dispersion");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_CHROMATIC_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "R/G/B 三通道折射位移差。越大边缘彩边越明显。",
+            "Difference in refraction displacement between R/G/B. Higher shows more colour fringing at the edge.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_EDGE_HIGHLIGHT =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃边缘高光", "Glass edge highlight");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_EDGE_HIGHLIGHT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "朝光侧边缘的增亮强度。",
+            "Brightness added along the edge facing the light.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_INNER_SHADOW =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃内阴影", "Glass inner shadow");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_INNER_SHADOW_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "背光侧边缘的压暗强度。",
+            "Darkening along the edge facing away from the light.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_TINT_STRENGTH =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃染色强度", "Glass tint strength");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_TINT_STRENGTH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "玻璃本体染色权重。0 表示只做折射与高光，颜色交给面板遮罩。",
+            "Weight of the glass tint. 0 leaves refraction and highlights only, letting the panel veil supply the colour.");
 
         public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_MODIFY =
             new EzLocalizationManager.EzLocalisableString("修改字体", "Modify fonts");

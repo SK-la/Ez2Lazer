@@ -11,7 +11,6 @@ using osu.Framework.Extensions;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
@@ -52,7 +51,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         public bool UsesFixedAnchor { get; set; }
 
-        public bool WantsMaterialCapture => BackgroundVisible.Value && BackdropBlurEnabled.Value;
+        public bool WantsMaterialCapture => materialBackdrop.WantsMaterialCapture;
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION1_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION1_DESCRIPTION))]
         public Bindable<EzScoreRaceMetric> CompareCondition1Setting { get; } = new Bindable<EzScoreRaceMetric>(EzScoreRaceMetric.Accuracy);
@@ -91,18 +90,17 @@ namespace osu.Game.EzOsuGame.HUD
             Precision = 0.01f,
         };
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_BACKDROP_BLUR_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_BACKDROP_BLUR_DESCRIPTION))]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BACKDROP_BLUR_LABEL), nameof(EzHUDStrings.BACKDROP_BLUR_DESCRIPTION))]
         public BindableBool BackdropBlurEnabled { get; } = new BindableBool(false);
 
         private const float bar_spacing = 4;
         private const float label_area_height = 36;
         private const float container_padding = 6;
 
-        private readonly AcrylicBackdropDrawable acrylicBackdrop;
+        private readonly EzMaterialContainer materialBackdrop;
         private readonly Container backgroundLayer;
         private Container barsContainer = null!;
         private readonly CompareBar[] bars = new CompareBar[3];
-        private EzMaterialCaptureController? captureController;
 
         private EzScoreRaceTimelineScoreProcessor? ghostProcessor1;
         private EzScoreRaceTimelineScoreProcessor? ghostProcessor2;
@@ -122,12 +120,6 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved]
         private OsuColour colours { get; set; } = null!;
 
-        [Resolved(canBeNull: true)]
-        private IMaterialCaptureRegistrar? materialCaptureRegistrar { get; set; }
-
-        [Resolved]
-        private IRenderer renderer { get; set; } = null!;
-
         public EzHUDScoreCompareBars()
         {
             Width = 3 * BarWidth.Value + 2 * bar_spacing + container_padding * 2;
@@ -140,12 +132,7 @@ namespace osu.Game.EzOsuGame.HUD
                 Alpha = 0,
                 Children = new Drawable[]
                 {
-                    acrylicBackdrop = new AcrylicBackdropDrawable
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                        EffectEnabled = false,
-                        FrameBufferScale = Vector2.One,
-                    },
+                    materialBackdrop = new EzMaterialContainer(),
                     new Box
                     {
                         RelativeSizeAxes = Axes.Both,
@@ -157,8 +144,6 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected override void LoadComplete()
         {
-            captureController = new EzMaterialCaptureController(materialCaptureRegistrar, acrylicBackdrop, renderer);
-
             barsContainer = new Container
             {
                 RelativeSizeAxes = Axes.Both,
@@ -188,14 +173,21 @@ namespace osu.Game.EzOsuGame.HUD
             layoutBars();
         }
 
-        public void SyncMaterialCaptureState() => captureController?.Sync(WantsMaterialCapture, backdrop_blur_strength);
+        public void SyncMaterialCaptureState()
+        {
+            materialBackdrop.MaterialVisible = BackgroundVisible.Value && BackdropBlurEnabled.Value;
+            materialBackdrop.BlurSigma = new Vector2(backdrop_blur_strength);
+            materialBackdrop.SyncMaterialCaptureState();
+        }
 
         protected override void Update()
         {
             base.Update();
 
             updateCurrentAndTheoreticalBars();
-            base.CornerRadius = CornerRadius.Value * Math.Min(DrawWidth, DrawHeight);
+            float effectiveCornerRadius = CornerRadius.Value * Math.Min(DrawWidth, DrawHeight);
+            base.CornerRadius = effectiveCornerRadius;
+            materialBackdrop.GlassCornerRadius = effectiveCornerRadius;
 
             if (passiveMode)
                 return;
@@ -311,7 +303,6 @@ namespace osu.Game.EzOsuGame.HUD
 
                 ghostProcessor1?.Dispose();
                 ghostProcessor2?.Dispose();
-                captureController?.Dispose();
             }
 
             base.Dispose(isDisposing);

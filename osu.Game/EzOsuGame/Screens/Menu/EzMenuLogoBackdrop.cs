@@ -5,10 +5,10 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Material;
+using osuTK;
 
 namespace osu.Game.EzOsuGame.Screens.Menu
 {
@@ -17,9 +17,7 @@ namespace osu.Game.EzOsuGame.Screens.Menu
         public readonly Bindable<bool> ShowDecorations = new Bindable<bool>(true);
 
         private readonly Box fill;
-        private readonly AcrylicBackdropDrawable acrylic;
-
-        private EzMaterialCaptureController? capture;
+        private readonly EzMaterialContainer material;
 
         private Bindable<EzLogoBackdropStyle> style = null!;
         private Bindable<Colour4> solidColour = null!;
@@ -34,11 +32,9 @@ namespace osu.Game.EzOsuGame.Screens.Menu
 
             InternalChildren = new Drawable[]
             {
-                acrylic = new AcrylicBackdropDrawable
+                material = new EzMaterialContainer
                 {
-                    RelativeSizeAxes = Axes.Both,
                     Depth = 1,
-                    EffectEnabled = false,
                 },
                 fill = new Box
                 {
@@ -49,10 +45,8 @@ namespace osu.Game.EzOsuGame.Screens.Menu
         }
 
         [BackgroundDependencyLoader(true)]
-        private void load(Ez2ConfigManager? ezConfig, IMaterialCaptureRegistrar? registrar, EzLogoBackdropSampler? backdropSampler, IRenderer renderer)
+        private void load(Ez2ConfigManager? ezConfig, EzLogoBackdropSampler? backdropSampler)
         {
-            capture = new EzMaterialCaptureController(registrar, acrylic, renderer);
-
             if (ezConfig == null)
                 return;
 
@@ -90,7 +84,9 @@ namespace osu.Game.EzOsuGame.Screens.Menu
         {
             bool acrylicOn = style.Value == EzLogoBackdropStyle.Acrylic;
 
-            capture?.Sync(acrylicOn, (float)blur.Value);
+            material.MaterialVisible = acrylicOn;
+            material.BlurSigma = new Vector2((float)blur.Value);
+            material.SyncMaterialCaptureState();
             ShowDecorations.Value = style.Value == EzLogoBackdropStyle.Solid;
 
             switch (style.Value)
@@ -117,13 +113,5 @@ namespace osu.Game.EzOsuGame.Screens.Menu
         //     fill.Colour = colour;
         //     fill.Alpha = (float)opacity.Value;
         // }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-                capture?.Dispose();
-
-            base.Dispose(isDisposing);
-        }
     }
 }

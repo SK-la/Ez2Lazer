@@ -47,14 +47,14 @@ namespace osu.Game.Screens.Select
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
-        private Bindable<bool> acrylicUiEnabled = null!;
+        private Bindable<EzMaterialUiMode> materialUiMode = null!;
 
         [BackgroundDependencyLoader]
         private void load()
         {
             Height = PanelGroup.HEIGHT;
 
-            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
 
             Icon = iconContainer = new Container
             {
@@ -149,7 +149,7 @@ namespace osu.Game.Screens.Select
                 }
             };
 
-            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(colourOverlays, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(colourOverlays, materialUiMode);
         }
 
         protected override void LoadComplete()
@@ -227,7 +227,7 @@ namespace osu.Game.Screens.Select
         {
             base.Update();
 
-            ApplyAcrylicIconStripBackground(backgroundBorder, acrylicUiEnabled.Value, AccentColour ?? colourProvider.Highlight1);
+            ApplyAcrylicIconStripBackground(backgroundBorder, EzMaterialOverlayAlpha.IsEnabled(materialUiMode.Value), AccentColour ?? colourProvider.Highlight1);
 
             // Move the count pill in the opposite direction to keep it pinned to the screen regardless of the X position of TopLevelContent.
             countPill.X = -TopLevelContent.X;

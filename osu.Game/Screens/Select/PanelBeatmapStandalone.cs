@@ -83,7 +83,7 @@ namespace osu.Game.Screens.Select
 
         private string? scratchText;
 
-        private Bindable<bool> acrylicUiEnabled = null!;
+        private Bindable<EzMaterialUiMode> materialUiMode = null!;
 
         private bool supportsEzAnalysis => EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value);
 
@@ -124,7 +124,7 @@ namespace osu.Game.Screens.Select
         {
             Height = HEIGHT;
 
-            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
 
             Icon = difficultyIcon = new ConstrainedIconContainer
             {
@@ -313,7 +313,7 @@ namespace osu.Game.Screens.Select
             };
 
             // Cover art is skipped under acrylic; the dim layer is only useful over panel sprites.
-            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(backgroundDim, acrylicUiEnabled);
+            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(backgroundDim, materialUiMode);
         }
 
         protected override void LoadComplete()
@@ -557,7 +557,7 @@ namespace osu.Game.Screens.Select
             AccentColour = diffColour;
             // spreadDisplay.Current.Colour = starColour;
 
-            ApplyAcrylicIconStripBackground(backgroundBorder, acrylicUiEnabled.Value, diffColour);
+            ApplyAcrylicIconStripBackground(backgroundBorder, EzMaterialOverlayAlpha.IsEnabled(materialUiMode.Value), diffColour);
             difficultyIcon.Colour = starRatingDisplay.DisplayedDifficultyTextColour;
         }
 

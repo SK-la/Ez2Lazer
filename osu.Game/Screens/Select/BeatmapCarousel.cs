@@ -25,20 +25,20 @@ using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Carousel;
-using osu.Game.Graphics.UserInterface;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Online.API;
-using osu.Game.Rulesets;
-using osu.Game.Screens.Select.Filter;
-using osu.Game.Rulesets.Mods;
-using osu.Game.Scoring;
-using Realms;
-
+using osu.Game.EzOsuGame.UI;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Carousel;
 // ReSharper disable RedundantUsingDirective
 using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics.UserInterface;
+using osu.Game.Online.API;
+using osu.Game.Rulesets;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Scoring;
+using osu.Game.Screens.Select.Filter;
+using Realms;
 
 namespace osu.Game.Screens.Select
 {
@@ -62,7 +62,7 @@ namespace osu.Game.Screens.Select
         private IBindableList<BeatmapSetInfo> detachedBeatmaps = null!;
         private Bindable<bool> ezAnalysisFilter = null!;
         private Bindable<bool> ezAnalysisSqliteEnabled = null!; // PP 等 sqlite 消费端；不 gate xxy SR
-        private Bindable<bool> acrylicUiEnabled = null!;
+        private Bindable<EzMaterialUiMode> materialUiMode = null!;
         private IBindable<int> activeSongsBranchVersion = null!;
         private readonly AsyncLocal<Dictionary<Guid, double>?> operationDifficultyCache = new AsyncLocal<Dictionary<Guid, double>?>();
         private readonly AsyncLocal<Dictionary<Guid, double>?> operationPpCache = new AsyncLocal<Dictionary<Guid, double>?>();
@@ -124,7 +124,7 @@ namespace osu.Game.Screens.Select
             }
 
             // Ez: acrylic uses a hairline gap; classic overlapping -SPACING when acrylic is off.
-            return acrylicUiEnabled is { Value: true } ? 1f : -SPACING;
+            return EzMaterialOverlayAlpha.IsEnabled(materialUiMode.Value) ? 1f : -SPACING;
         }
 
         public BeatmapCarousel()
@@ -176,7 +176,7 @@ namespace osu.Game.Screens.Select
             loadSamples(audio);
             ezAnalysisFilter = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisFilter);
             ezAnalysisSqliteEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
-            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
             config.BindWith(OsuSetting.RandomSelectAlgorithm, randomAlgorithm);
         }
 
@@ -302,7 +302,7 @@ namespace osu.Game.Screens.Select
             base.LoadComplete();
             detachedBeatmaps.BindCollectionChanged(beatmapSetsChanged, true);
 
-            acrylicUiEnabled.BindValueChanged(_ => InvalidateSelectionLayout());
+            materialUiMode.BindValueChanged(_ => InvalidateSelectionLayout());
 
             activeSongsBranchVersion = ezAnalysisCache.ActiveSongsBranchVersion.GetBoundCopy();
             activeSongsBranchVersion.BindValueChanged(_ =>
