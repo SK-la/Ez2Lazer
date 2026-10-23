@@ -135,17 +135,17 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.StoryboardAutoVideoSize, false);
             SetDefault(Ez2Setting.MaterialUiMode, EzMaterialUiMode.LiquidGlass);
 
-            // 以下默认值对齐苹果液态玻璃：轻磨砂、窄而强的边缘透镜、极轻色散、明亮窄镜面、
+            // 以下默认值的液态玻璃：轻磨砂、窄而强的边缘透镜、极轻色散、明亮窄镜面、
             // 低染色高通透。模糊核半径约为 2.15σ，σ=6 时核半径 ~13px，折射强度 14 的位移
             // 比值约 1.1，边缘弯折才看得见；σ 再大就会把可折射的细节抹平。
-            SetDefault(Ez2Setting.MaterialUiBlur, 6.0, 0.0, 40.0, 1.0);
-            SetDefault(Ez2Setting.MaterialGlassRefractionDepth, 22.0, 0.0, 60.0, 1.0);
-            SetDefault(Ez2Setting.MaterialGlassRefractionStrength, 14.0, 0.0, 24.0, 0.5);
-            SetDefault(Ez2Setting.MaterialGlassChromatic, 0.1, 0.0, 1.0, 0.01);
-            SetDefault(Ez2Setting.MaterialGlassEdgeHighlight, 0.55, 0.0, 1.0, 0.01);
-            SetDefault(Ez2Setting.MaterialGlassInnerShadow, 0.25, 0.0, 1.0, 0.01);
-            SetDefault(Ez2Setting.MaterialGlassTintStrength, 0.5, 0.0, 1.0, 0.01);
-            SetDefault(Ez2Setting.MaterialGlassEdgeSaturation, 0.45, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.MaterialUiBlur, 8.0, 0.0, 40.0, 1.0);
+            SetDefault(Ez2Setting.MaterialGlassRefractionDepth, 20.0, 0.0, 60.0, 1.0);
+            SetDefault(Ez2Setting.MaterialGlassRefractionStrength, 10.0, 0.0, 24.0, 0.5);
+            SetDefault(Ez2Setting.MaterialGlassChromatic, 0.25, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.MaterialGlassEdgeHighlight, 0.2, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.MaterialGlassInnerShadow, 0.2, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.MaterialGlassTintStrength, 0.25, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.MaterialGlassEdgeSaturation, 0.5, 0.0, 1.0, 0.01);
             SetDefault(Ez2Setting.UiFontDefault, string.Empty);
             SetDefault(Ez2Setting.UiFontDefaultLocalized, string.Empty);
             SetDefault(Ez2Setting.UiFontTitleAlternate, string.Empty);
