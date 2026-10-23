@@ -44,6 +44,8 @@ namespace osu.Game.EzOsuGame.Material
 
         private bool materialVisible;
 
+        private EzMaterialUiMode ownMode = EzMaterialUiMode.Default;
+
         [Resolved(canBeNull: true)]
         private IMaterialCaptureRegistrar? registrar { get; set; }
 
@@ -68,9 +70,37 @@ namespace osu.Game.EzOsuGame.Material
         }
 
         /// <summary>
-        /// 当前档位是否为非默认。宿主可据此跳过采样之外的相关开销。
+        /// 宿主自己的档位。全局档位为默认（不干预）时使用它；全局为非默认时由全局覆盖。
+        /// 自带材质选项的宿主（如主菜单 logo 背板的亚克力风格）据此保持自身设置不被全局关闭牵连。
         /// </summary>
-        public bool MaterialEnabled => (materialUiMode?.Value ?? EzMaterialUiMode.Acrylic) != EzMaterialUiMode.Default;
+        public EzMaterialUiMode OwnMode
+        {
+            get => ownMode;
+            set
+            {
+                if (ownMode == value)
+                    return;
+
+                ownMode = value;
+                applyMaterialState();
+            }
+        }
+
+        private EzMaterialUiMode resolvedMode
+        {
+            get
+            {
+                EzMaterialUiMode global = materialUiMode?.Value ?? EzMaterialUiMode.Default;
+
+                // 全局默认表示不干预，交给宿主自己的设置。
+                return global == EzMaterialUiMode.Default ? ownMode : global;
+            }
+        }
+
+        /// <summary>
+        /// 当前生效档位是否为非默认。宿主可据此跳过采样之外的相关开销。
+        /// </summary>
+        public bool MaterialEnabled => resolvedMode != EzMaterialUiMode.Default;
 
         public bool WantsMaterialCapture => MaterialEnabled && MaterialVisible;
 
@@ -222,7 +252,7 @@ namespace osu.Game.EzOsuGame.Material
 
         private void applyMaterialState()
         {
-            EzMaterialUiMode mode = materialUiMode?.Value ?? EzMaterialUiMode.Acrylic;
+            EzMaterialUiMode mode = resolvedMode;
             bool wants = mode != EzMaterialUiMode.Default && MaterialVisible;
 
             acrylic.BlurSigma = blurSigma;
