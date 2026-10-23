@@ -7,6 +7,7 @@ using osu.Framework.Development;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Screens;
+using osu.Framework.Threading;
 using osu.Game.Screens;
 using osu.Game.Screens.Backgrounds;
 using osuTK;
@@ -33,6 +34,15 @@ namespace osu.Game.EzOsuGame.Material
         private readonly Drawable capturedContent;
         private BufferedContainer? activeBuffer;
 
+        /// <summary>
+        /// 释放后延迟拆除的窗口。界面切换时「上一屏释放、下一屏申请」常常紧邻发生，
+        /// 立即拆除会让整棵子树反复重挂父级，每次都重建全屏 FBO 并遍历树刷新背景虚化，
+        /// 表现为进出主菜单/选歌的卡顿。留一段窗口把成对操作合并掉。
+        /// </summary>
+        private const double release_delay = 400;
+
+        private ScheduledDelegate? pendingDeactivation;
+
         public MaterialCaptureScope(Drawable content)
         {
             RelativeSizeAxes = Axes.Both;
@@ -45,6 +55,7 @@ namespace osu.Game.EzOsuGame.Material
             if (captureRefCount++ > 0)
                 return;
 
+            cancelPendingDeactivation();
             invokeCaptureMutation(activateCapture);
         }
 
@@ -56,7 +67,31 @@ namespace osu.Game.EzOsuGame.Material
             if (--captureRefCount > 0)
                 return;
 
-            invokeCaptureMutation(deactivateCapture);
+            scheduleDeactivation();
+        }
+
+        private void scheduleDeactivation()
+        {
+            cancelPendingDeactivation();
+
+            if (activeBuffer == null)
+                return;
+
+            pendingDeactivation = Scheduler.AddDelayed(() =>
+            {
+                pendingDeactivation = null;
+
+                if (captureRefCount > 0)
+                    return;
+
+                invokeCaptureMutation(deactivateCapture);
+            }, release_delay);
+        }
+
+        private void cancelPendingDeactivation()
+        {
+            pendingDeactivation?.Cancel();
+            pendingDeactivation = null;
         }
 
         private void invokeCaptureMutation(Action mutation)
@@ -160,6 +195,8 @@ namespace osu.Game.EzOsuGame.Material
             {
                 // Dispose may run off the update thread (e.g. app shutdown). Do not reparent
                 // children here — CompositeDrawable will cascade-dispose InternalChildren.
+                pendingDeactivation?.Cancel();
+                pendingDeactivation = null;
                 mutationGeneration++;
                 captureRefCount = 0;
                 activeBuffer = null;
