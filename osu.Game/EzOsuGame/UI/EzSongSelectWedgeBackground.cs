@@ -46,17 +46,21 @@ namespace osu.Game.EzOsuGame.UI
             {
                 materialContainer = new EzMaterialContainer
                 {
+                    Depth = 1,
                     FrameBufferScale = Vector2.One,
                 },
                 darkVeil = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
+                    // 遮罩在材质之下，否则会盖掉边缘折射与高光。
+                    Depth = 2,
                     Colour = EzUIStyleV1.Veil,
                     Alpha = 0,
                 },
                 wedgeBackground = new WedgeBackground
                 {
                     RelativeSizeAxes = Axes.Both,
+                    Depth = 0,
                     StartAlpha = StartAlpha,
                     FinalAlpha = FinalAlpha,
                     WidthForGradient = WidthForGradient,

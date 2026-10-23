@@ -45,7 +45,7 @@ namespace osu.Game.EzOsuGame.UI
 
         private Bindable<double> materialUiBlur = null!;
 
-        /// <param name="initialTint">Veil colour drawn over the material.</param>
+        /// <param name="initialTint">Veil colour laid under the material, so it is part of what the glass samples.</param>
         /// <param name="frameBufferScale">Optional downscale for the blur pass (panels use 0.5).</param>
         public EzMaterialPanelBackground(Color4 initialTint, Vector2? frameBufferScale = null)
         {
@@ -61,6 +61,9 @@ namespace osu.Game.EzOsuGame.UI
                 TintBox = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
+                    // 遮罩画在材质之前：压在材质之上会吃掉边缘折射与高光。模糊是线性运算，
+                    // 先染色再模糊与先模糊再染色的底色基本一致，所以视觉底色不变。
+                    Depth = 2,
                     Colour = initialTint,
                 },
             };
