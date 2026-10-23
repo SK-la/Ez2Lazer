@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -26,11 +25,16 @@ namespace osu.Game.EzOsuGame.Material
         private readonly AcrylicBackdropDrawable acrylic;
         private readonly LiquidGlassDrawable glass;
 
-        private static readonly HashSet<string> logged_diagnostics = new HashSet<string>();
-
         private EzMaterialCaptureController? captureController;
 
         private Bindable<EzMaterialUiMode>? materialUiMode;
+
+        private Bindable<double>? glassRefractionDepth;
+        private Bindable<double>? glassRefractionStrength;
+        private Bindable<double>? glassChromatic;
+        private Bindable<double>? glassEdgeHighlight;
+        private Bindable<double>? glassInnerShadow;
+        private Bindable<double>? glassTintStrength;
 
         private Vector2 blurSigma = new Vector2(16);
 
@@ -107,7 +111,7 @@ namespace osu.Game.EzOsuGame.Material
                     return;
 
                 cornerRadius = value;
-                glass.Material = glass.Material with { CornerRadius = cornerRadius };
+                applyGlassParameters();
             }
         }
 
@@ -123,7 +127,7 @@ namespace osu.Game.EzOsuGame.Material
                     return;
 
                 tint = value;
-                glass.Material = glass.Material with { Tint = tint };
+                applyGlassParameters();
             }
         }
 
@@ -149,20 +153,72 @@ namespace osu.Game.EzOsuGame.Material
 
             glass.Material = glass.Material with { CornerRadius = cornerRadius, Tint = tint };
         }
-
         [BackgroundDependencyLoader(true)]
         private void load(Ez2ConfigManager? ezConfig)
         {
             captureController = new EzMaterialCaptureController(registrar, renderer);
-            materialUiMode = ezConfig?.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode).GetBoundCopy();
 
-            if (materialUiMode != null)
-                materialUiMode.BindValueChanged(_ => applyMaterialState(), true);
-            else
+            // 必须直接持有 GetBindable 的弱绑定副本：再套一层 GetBoundCopy 后中间层无人强引用，
+            // 被 GC 后绑定静默失效，档位切换不再通知到容器。
+            materialUiMode = ezConfig?.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
+
+            if (ezConfig == null)
+            {
                 applyMaterialState();
+                return;
+            }
+
+            glassRefractionDepth = ezConfig.GetBindable<double>(Ez2Setting.MaterialGlassRefractionDepth);
+            glassRefractionStrength = ezConfig.GetBindable<double>(Ez2Setting.MaterialGlassRefractionStrength);
+            glassChromatic = ezConfig.GetBindable<double>(Ez2Setting.MaterialGlassChromatic);
+            glassEdgeHighlight = ezConfig.GetBindable<double>(Ez2Setting.MaterialGlassEdgeHighlight);
+            glassInnerShadow = ezConfig.GetBindable<double>(Ez2Setting.MaterialGlassInnerShadow);
+            glassTintStrength = ezConfig.GetBindable<double>(Ez2Setting.MaterialGlassTintStrength);
+
+            glassRefractionDepth.BindValueChanged(_ => applyGlassParameters());
+            glassRefractionStrength.BindValueChanged(_ => applyGlassParameters());
+            glassChromatic.BindValueChanged(_ => applyGlassParameters());
+            glassEdgeHighlight.BindValueChanged(_ => applyGlassParameters());
+            glassInnerShadow.BindValueChanged(_ => applyGlassParameters());
+            glassTintStrength.BindValueChanged(_ => applyGlassParameters());
+
+            applyGlassParameters();
+
+            materialUiMode!.BindValueChanged(_ => applyMaterialState(), true);
         }
 
         public void SyncMaterialCaptureState() => applyMaterialState();
+
+        /// <summary>
+        /// 把配置项与宿主形状合进玻璃参数。圆角由宿主给出，其余取自设置。
+        /// </summary>
+        private void applyGlassParameters()
+        {
+            LiquidGlassMaterial material = glass.Material;
+
+            material.CornerRadius = cornerRadius;
+            material.Tint = tint;
+
+            if (glassRefractionDepth != null)
+                material.RefractionDepth = (float)glassRefractionDepth.Value;
+
+            if (glassRefractionStrength != null)
+                material.RefractionStrength = (float)glassRefractionStrength.Value;
+
+            if (glassChromatic != null)
+                material.ChromaticStrength = (float)glassChromatic.Value;
+
+            if (glassEdgeHighlight != null)
+                material.EdgeHighlight = (float)glassEdgeHighlight.Value;
+
+            if (glassInnerShadow != null)
+                material.InnerShadow = (float)glassInnerShadow.Value;
+
+            if (glassTintStrength != null)
+                material.TintStrength = (float)glassTintStrength.Value;
+
+            glass.Material = material;
+        }
 
         private void applyMaterialState()
         {
@@ -175,10 +231,6 @@ namespace osu.Game.EzOsuGame.Material
             captureController?.Sync(wants);
 
             bool draw = wants && (captureController?.CanDraw ?? true);
-
-            string diagKey = $"{Parent?.GetType().Name}|{mode}|{MaterialVisible}|{registrar == null}|{renderer.SupportsBackbufferRegionCopy}|{captureController?.CanDraw}|{draw}|{DrawSize}";
-            if (logged_diagnostics.Add(diagKey))
-                Framework.Logging.Logger.Log($"[EzMaterial] {diagKey}", level: Framework.Logging.LogLevel.Important);
 
             acrylic.EffectEnabled = draw && mode == EzMaterialUiMode.Acrylic;
             glass.EffectEnabled = draw && mode == EzMaterialUiMode.LiquidGlass;

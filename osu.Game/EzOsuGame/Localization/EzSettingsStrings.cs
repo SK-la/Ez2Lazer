@@ -183,6 +183,48 @@ namespace osu.Game.EzOsuGame.Localization
             "穿透材质的模糊强度。材质为关闭时不生效。",
             "Blur strength for backdrop materials. Has no effect when the material is off.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_REFRACTION_DEPTH =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃折射带宽度", "Glass refraction band width");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_REFRACTION_DEPTH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "从边缘往内的折射过渡宽度（屏幕像素）。越小越像薄玻璃，边缘转折越硬。",
+            "How far the refraction transition reaches inward from the edge, in screen pixels. Smaller reads as thinner glass with a harder edge.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_REFRACTION_STRENGTH =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃折射强度", "Glass refraction strength");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_REFRACTION_STRENGTH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "边缘采样的最大位移（屏幕像素）。0 关闭折射。",
+            "Maximum edge sample displacement in screen pixels. 0 disables refraction.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_CHROMATIC =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃色散", "Glass chromatic dispersion");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_CHROMATIC_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "R/G/B 三通道折射位移差。越大边缘彩边越明显。",
+            "Difference in refraction displacement between R/G/B. Higher shows more colour fringing at the edge.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_EDGE_HIGHLIGHT =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃边缘高光", "Glass edge highlight");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_EDGE_HIGHLIGHT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "朝光侧边缘的增亮强度。",
+            "Brightness added along the edge facing the light.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_INNER_SHADOW =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃内阴影", "Glass inner shadow");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_INNER_SHADOW_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "背光侧边缘的压暗强度。",
+            "Darkening along the edge facing away from the light.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_TINT_STRENGTH =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃染色强度", "Glass tint strength");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_TINT_STRENGTH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "玻璃本体染色权重。0 表示只做折射与高光，颜色交给面板遮罩。",
+            "Weight of the glass tint. 0 leaves refraction and highlights only, letting the panel veil supply the colour.");
+
         public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_MODIFY =
             new EzLocalizationManager.EzLocalisableString("修改字体", "Modify fonts");
 
