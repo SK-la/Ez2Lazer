@@ -63,12 +63,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
     {
         public static IEzTrackSkillsPresenter? Create(EzSkillProfile? profile, EzSkillProvider provider)
         {
-            if (profile == null)
+            if (profile == null || provider == null)
                 return null;
 
             return profile.DefaultPlayerSystemId switch
             {
                 EzSkillSystems.PLAYER_SSR => new ManiaTrackSkillsPresenter(provider),
+                EzSkillSystems.PLAYER_PPPLUS => new OsuTrackSkillsPresenter(provider),
                 _ => null,
             };
         }
