@@ -14,6 +14,7 @@ using osu.Game.Beatmaps.Formats;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Database;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.IO.Legacy;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Replays;
@@ -240,6 +241,10 @@ namespace osu.Game.Scoring.Legacy
             }
 
             if (!score.IsLegacyScore)
+                return;
+
+            // Without stable difficulty attributes there is no max combo to pad the statistics against.
+            if (!EzStableDifficultyCompatibility.CanCalculate(workingBeatmap.Beatmap))
                 return;
 
 #pragma warning disable CS0618

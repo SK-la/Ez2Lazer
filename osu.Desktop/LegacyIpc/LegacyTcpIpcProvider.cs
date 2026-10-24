@@ -8,6 +8,7 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Catch;
 using osu.Game.Rulesets.Mania;
@@ -78,6 +79,10 @@ namespace osu.Desktop.LegacyIpc
                         WorkingBeatmap beatmap = new FlatWorkingBeatmap(req.BeatmapFile);
                         var ruleset = beatmap.BeatmapInfo.Ruleset.CreateInstance();
                         Mod[] mods = ruleset.ConvertFromLegacyMods((LegacyMods)req.Mods).ToArray();
+
+                        // stable reports no difficulty for maps its difficulty calculation rejects.
+                        if (!EzStableDifficultyCompatibility.CanCalculate(beatmap))
+                            return new LegacyIpcDifficultyCalculationResponse();
 
                         return new LegacyIpcDifficultyCalculationResponse
                         {

@@ -25,7 +25,14 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             performancePoints = 0;
 
-            PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
+            IWorkingBeatmap working = beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo);
+
+            // stable aborts difficulty (and therefore performance) calculation on values it refuses to process, so such
+            // maps are worth 0 rather than whatever the out-of-range values would produce.
+            if (!EzStableDifficultyCompatibility.CanCalculate(working))
+                return true;
+
+            PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(working);
             IBeatmap analysisBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -41,8 +48,12 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             xxySr = 0;
 
-            IBeatmap analysisBeatmap = EzPlayableBeatmapCache.GetShared(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo), lookup.Ruleset, lookup.OrderedMods,
-                cancellationToken);
+            IWorkingBeatmap working = beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo);
+
+            if (!EzStableDifficultyCompatibility.CanCalculate(working))
+                return true;
+
+            IBeatmap analysisBeatmap = EzPlayableBeatmapCache.GetShared(working, lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -67,6 +78,9 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             xxySr = 0;
 
+            if (!EzStableDifficultyCompatibility.CanCalculate(playable))
+                return true;
+
             if (!EzXxyStarRatingSupport.SupportsBeatmap(playable, ruleset))
                 return false;
 
@@ -88,11 +102,15 @@ namespace osu.Game.EzOsuGame.Analysis
 
         /// <summary>
         /// Computes baseline NoMod xxy SR for persisting to <see cref="BeatmapInfo.XxyStarRating"/>.
-        /// Returns -1 when unsupported or failed, 0 for empty beatmaps.
+        /// Returns -1 when unsupported or failed, 0 for empty or unratable beatmaps.
         /// </summary>
         public static double ComputeBaselineXxyStarRatingForRealm(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
         {
             var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
+
+            // stable rates these maps 0; persisting 0 also keeps the background backfill from retrying them forever.
+            if (!EzStableDifficultyCompatibility.CanCalculate(working))
+                return 0;
 
             if (!EzXxyStarRatingSupport.SupportsBeatmap(working.Beatmap, beatmapInfo.Ruleset))
                 return -1;
@@ -110,7 +128,16 @@ namespace osu.Game.EzOsuGame.Analysis
         public static bool TryComputeXxySrAndPp(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
                                                 out double? xxySr, out double? pp)
         {
-            PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
+            IWorkingBeatmap working = beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo);
+
+            if (!EzStableDifficultyCompatibility.CanCalculate(working))
+            {
+                xxySr = 0;
+                pp = 0;
+                return true;
+            }
+
+            PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(working);
             IBeatmap analysisBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -266,6 +293,13 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             xxySr = null;
 
+            // stable reports no difficulty for such maps; report 0 rather than a rating derived from values it rejects.
+            if (!EzStableDifficultyCompatibility.CanCalculate(analysisBeatmap))
+            {
+                xxySr = 0;
+                return true;
+            }
+
             if (!EzXxyStarRatingSupport.SupportsBeatmap(analysisBeatmap, lookup.Ruleset))
                 return false;
 
@@ -286,6 +320,10 @@ namespace osu.Game.EzOsuGame.Analysis
         private static double? tryComputePerfectPp(PlayableCachedWorkingBeatmap playableWorkingBeatmap, IBeatmap analysisBeatmap,
                                                    in EzAnalysisLookupCache lookup, CancellationToken cancellationToken)
         {
+            // No stable difficulty, so no meaningful performance to report.
+            if (!EzStableDifficultyCompatibility.CanCalculate(analysisBeatmap))
+                return 0;
+
             var ruleset = lookup.Ruleset.CreateInstance();
 
             var performanceCalculator = ruleset.CreatePerformanceCalculator();

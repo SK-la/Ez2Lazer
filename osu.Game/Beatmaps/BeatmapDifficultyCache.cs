@@ -218,6 +218,10 @@ namespace osu.Game.Beatmaps
 
         public Task<List<TimedDifficultyAttributes>> GetTimedDifficultyAttributesAsync(IWorkingBeatmap beatmap, Ruleset ruleset, Mod[] mods, CancellationToken cancellationToken = default)
         {
+            // stable has no difficulty data at all for such maps, so there is no difficulty curve to report either.
+            if (!EzStableDifficultyCompatibility.CanCalculate(beatmap))
+                return Task.FromResult(new List<TimedDifficultyAttributes>());
+
             return Task.Factory.StartNew(() => ruleset.CreateDifficultyCalculator(beatmap).CalculateTimed(mods, cancellationToken),
                 cancellationToken,
                 TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously,
@@ -328,6 +332,12 @@ namespace osu.Game.Beatmaps
                 Debug.Assert(ruleset != null);
 
                 PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(key.BeatmapInfo));
+
+                // stable reports no difficulty for maps whose values its difficulty calculation rejects. Mirror that
+                // instead of deriving a rating (and performance) from those values.
+                if (!EzStableDifficultyCompatibility.CanCalculate(workingBeatmap))
+                    return new StarDifficulty(0, (beatmapInfo as IBeatmapOnlineInfo)?.MaxCombo ?? 0);
+
                 IBeatmap playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset.RulesetInfo, key.OrderedMods, cancellationToken);
 
                 var difficulty = ruleset.CreateDifficultyCalculator(workingBeatmap).Calculate(key.OrderedMods, cancellationToken);
