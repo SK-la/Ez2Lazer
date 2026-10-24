@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -154,12 +154,7 @@ namespace osu.Game.Rulesets.Catch.Objects
         public SliderPath Path
         {
             get => path;
-            set
-            {
-                path.ControlPoints.Clear();
-                path.ControlPoints.AddRange(value.ControlPoints.Select(c => new PathControlPoint(c.Position, c.Type)));
-                path.ExpectedDistance.Value = value.ExpectedDistance.Value;
-            }
+            set => path.CopyFrom(value);
         }
 
         public double Distance => Path.Distance;

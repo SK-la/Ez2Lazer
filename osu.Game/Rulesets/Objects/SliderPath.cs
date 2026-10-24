@@ -36,10 +36,98 @@ namespace osu.Game.Rulesets.Objects
         /// </summary>
         public bool HasValidLengthForPlacement => Precision.DefinitelyBigger(Distance, 0, 1);
 
+        // Positions and types are the canonical storage; the PathControlPoint objects are only built when a caller
+        // actually enumerates or mutates them. Aspire maps carry millions of control points in a single slider, and
+        // materialising one object per point costs more than the geometry itself.
+        private readonly List<Vector2> controlPointPositions = new List<Vector2>();
+        private readonly List<PathType?> controlPointTypes = new List<PathType?>();
+
+        private BindableList<PathControlPoint>? materialisedControlPoints;
+
         /// <summary>
         /// The control points of the path.
         /// </summary>
-        public readonly BindableList<PathControlPoint> ControlPoints = new BindableList<PathControlPoint>();
+        /// <remarks>
+        /// Enumerating, binding to, or mutating this list materialises one <see cref="PathControlPoint"/> per point.
+        /// Reading geometry through <see cref="SliderPath"/> itself does not.
+        /// </remarks>
+        public BindableList<PathControlPoint> ControlPoints => materialisedControlPoints ??= materialiseControlPoints();
+
+        private int controlPointCount => materialisedControlPoints?.Count ?? controlPointPositions.Count;
+
+        private Vector2 controlPointPosition(int index) => materialisedControlPoints != null ? materialisedControlPoints[index].Position : controlPointPositions[index];
+
+        private PathType? controlPointType(int index) => materialisedControlPoints != null ? materialisedControlPoints[index].Type : controlPointTypes[index];
+
+        private BindableList<PathControlPoint> materialiseControlPoints()
+        {
+            var points = new BindableList<PathControlPoint>();
+            var materialised = new PathControlPoint[controlPointPositions.Count];
+
+            for (int i = 0; i < controlPointPositions.Count; i++)
+                materialised[i] = new PathControlPoint(controlPointPositions[i], controlPointTypes[i]);
+
+            points.AddRange(materialised);
+
+            // Subscribed before the collection handler is attached so that a point mutated in place still invalidates
+            // the path; later additions are subscribed by the handler instead.
+            foreach (var point in materialised)
+                point.Changed += invalidate;
+
+            points.CollectionChanged += onControlPointsChanged;
+            return points;
+        }
+
+        private void onControlPointsChanged(object? sender, NotifyCollectionChangedEventArgs args)
+        {
+            switch (args.Action)
+            {
+                case NotifyCollectionChangedAction.Add:
+                    Debug.Assert(args.NewItems != null);
+
+                    foreach (object? newItem in args.NewItems)
+                        ((PathControlPoint)newItem).Changed += invalidate;
+
+                    break;
+
+                case NotifyCollectionChangedAction.Reset:
+                case NotifyCollectionChangedAction.Remove:
+                    Debug.Assert(args.OldItems != null);
+
+                    foreach (object? oldItem in args.OldItems)
+                        ((PathControlPoint)oldItem).Changed -= invalidate;
+                    break;
+            }
+
+            invalidate();
+        }
+
+        /// <summary>
+        /// Replaces this path's geometry with <paramref name="source"/>'s, without building <see cref="PathControlPoint"/> objects.
+        /// </summary>
+        public void CopyFrom(SliderPath source)
+        {
+            controlPointPositions.Clear();
+            controlPointTypes.Clear();
+
+            if (source.materialisedControlPoints != null)
+            {
+                foreach (var point in source.materialisedControlPoints)
+                {
+                    controlPointPositions.Add(point.Position);
+                    controlPointTypes.Add(point.Type);
+                }
+            }
+            else
+            {
+                controlPointPositions.AddRange(source.controlPointPositions);
+                controlPointTypes.AddRange(source.controlPointTypes);
+            }
+
+            materialisedControlPoints = null;
+            ExpectedDistance.Value = source.ExpectedDistance.Value;
+            invalidate();
+        }
 
         private readonly List<Vector2> calculatedPath = new List<Vector2>();
         private readonly List<double> cumulativeLength = new List<double>();
@@ -67,30 +155,6 @@ namespace osu.Game.Rulesets.Objects
         public SliderPath()
         {
             ExpectedDistance.ValueChanged += _ => invalidate();
-
-            ControlPoints.CollectionChanged += (_, args) =>
-            {
-                switch (args.Action)
-                {
-                    case NotifyCollectionChangedAction.Add:
-                        Debug.Assert(args.NewItems != null);
-
-                        foreach (object? newItem in args.NewItems)
-                            ((PathControlPoint)newItem).Changed += invalidate;
-
-                        break;
-
-                    case NotifyCollectionChangedAction.Reset:
-                    case NotifyCollectionChangedAction.Remove:
-                        Debug.Assert(args.OldItems != null);
-
-                        foreach (object? oldItem in args.OldItems)
-                            ((PathControlPoint)oldItem).Changed -= invalidate;
-                        break;
-                }
-
-                invalidate();
-            };
         }
 
         /// <summary>
@@ -103,13 +167,29 @@ namespace osu.Game.Rulesets.Objects
         public SliderPath(PathControlPoint[] controlPoints, double? expectedDistance = null)
             : this()
         {
-            ControlPoints.AddRange(controlPoints);
+            foreach (var point in controlPoints)
+            {
+                controlPointPositions.Add(point.Position);
+                controlPointTypes.Add(point.Type);
+            }
+
             ExpectedDistance.Value = expectedDistance;
+            invalidate();
         }
 
         public SliderPath(PathType type, Vector2[] controlPoints, double? expectedDistance = null)
-            : this(controlPoints.Select((c, i) => new PathControlPoint(c, i == 0 ? type : null)).ToArray(), expectedDistance)
+            : this()
         {
+            controlPointPositions.AddRange(controlPoints);
+
+            foreach (var _ in controlPoints)
+                controlPointTypes.Add(null);
+
+            if (controlPointTypes.Count > 0)
+                controlPointTypes[0] = type;
+
+            ExpectedDistance.Value = expectedDistance;
+            invalidate();
         }
 
         /// <summary>
@@ -290,23 +370,25 @@ namespace osu.Game.Rulesets.Objects
             segmentEnds.Clear();
             optimisedLength = 0;
 
-            if (ControlPoints.Count == 0)
+            int count = controlPointCount;
+
+            if (count == 0)
                 return;
 
-            Vector2[] vertices = new Vector2[ControlPoints.Count];
-            for (int i = 0; i < ControlPoints.Count; i++)
-                vertices[i] = ControlPoints[i].Position;
+            Vector2[] vertices = new Vector2[count];
+            for (int i = 0; i < count; i++)
+                vertices[i] = controlPointPosition(i);
 
             int start = 0;
 
-            for (int i = 0; i < ControlPoints.Count; i++)
+            for (int i = 0; i < count; i++)
             {
-                if (ControlPoints[i].Type == null && i < ControlPoints.Count - 1)
+                if (controlPointType(i) == null && i < count - 1)
                     continue;
 
                 // The current vertex ends the segment
                 var segmentVertices = vertices.AsSpan().Slice(start, i - start + 1);
-                var segmentType = ControlPoints[start].Type ?? PathType.LINEAR;
+                var segmentType = controlPointType(start) ?? PathType.LINEAR;
 
                 // No need to calculate path when there is only 1 vertex
                 if (segmentVertices.Length == 1)
