@@ -96,6 +96,8 @@ namespace osu.Game.Beatmaps.Formats
 
             flushPendingPoints();
 
+            beatmap.ExceedsStableDifficultyLimits = parser.ExceedsStableDifficultyLimits;
+
             // Objects may be out of order *only* if a user has manually edited an .osu file.
             // Unfortunately there are ranked maps in this state (example: https://osu.ppy.sh/s/594828).
             // OrderBy is used to guarantee that the parsing order of hitobjects with equal start times is maintained (stably-sorted)

@@ -43,6 +43,22 @@ namespace osu.Game.Rulesets.Objects.Legacy
         /// </summary>
         private ConvertHitObject? lastObject;
 
+        /// <summary>
+        /// Path control point coordinates beyond this are rejected by osu!stable's difficulty calculation.
+        /// </summary>
+        public const float STABLE_PATH_COORDINATE_LIMIT = 65536;
+
+        /// <summary>
+        /// Slider lengths beyond this are rejected by osu!stable's difficulty calculation.
+        /// </summary>
+        public const double STABLE_SLIDER_LENGTH_LIMIT = int.MaxValue;
+
+        /// <summary>
+        /// Whether any parsed hitobject carries a value that osu!stable loads for gameplay but refuses to process when
+        /// calculating difficulty. Aspire maps rely on that split: they are playable, but their star rating is 0.
+        /// </summary>
+        public bool ExceedsStableDifficultyLimits { get; private set; }
+
         internal ConvertHitObjectParser(double offset, int formatVersion)
         {
             this.offset = offset;
@@ -54,8 +70,16 @@ namespace osu.Game.Rulesets.Objects.Legacy
             string[] split = text.Split(',');
 
             // compare: https://github.com/peppy/osu-stable-reference/blob/baa8705f782c0de2b10a7387d78014c61c8b17fb/osu!/GameplayElements/HitObjectManager_LoadSave.cs#L837-L838
-            float x = Math.Clamp(Parsing.ParseFloat(split[0], Parsing.MAX_COORDINATE_VALUE), 0, 512);
-            float y = Math.Clamp(Parsing.ParseFloat(split[1], Parsing.MAX_COORDINATE_VALUE), 0, 512);
+            // [Ez] parse without the coordinate cap: osu!stable clamps these to the playfield for gameplay, and only its
+            // difficulty calculation rejects values beyond STABLE_PATH_COORDINATE_LIMIT.
+            float rawX = Parsing.ParseFloat(split[0], float.MaxValue);
+            float rawY = Parsing.ParseFloat(split[1], float.MaxValue);
+
+            if (Math.Abs(rawX) > STABLE_PATH_COORDINATE_LIMIT || Math.Abs(rawY) > STABLE_PATH_COORDINATE_LIMIT)
+                ExceedsStableDifficultyLimits = true;
+
+            float x = Math.Clamp(rawX, 0, 512);
+            float y = Math.Clamp(rawY, 0, 512);
 
             Vector2 pos = formatVersion >= LegacyBeatmapEncoder.FIRST_LAZER_VERSION
                 ? new Vector2(x, y)
@@ -101,6 +125,8 @@ namespace osu.Game.Rulesets.Objects.Legacy
                     length = Math.Max(0, Parsing.ParseDouble(split[7], double.MaxValue));
                     if (length == 0)
                         length = null;
+                    else if (length > STABLE_SLIDER_LENGTH_LIMIT)
+                        ExceedsStableDifficultyLimits = true;
                 }
 
                 if (split.Length > 10)
@@ -346,6 +372,9 @@ namespace osu.Game.Rulesets.Objects.Legacy
                 // [Ez] Aspire maps place control points far outside the playfield; parse without the coordinate cap.
                 float x = Parsing.ParseFloat(vertexSplit[0], float.MaxValue);
                 float y = Parsing.ParseFloat(vertexSplit[1], float.MaxValue);
+
+                if (Math.Abs(x) > STABLE_PATH_COORDINATE_LIMIT || Math.Abs(y) > STABLE_PATH_COORDINATE_LIMIT)
+                    ExceedsStableDifficultyLimits = true;
 
                 Vector2 pos = formatVersion >= LegacyBeatmapEncoder.FIRST_LAZER_VERSION
                     ? new Vector2(x, y)
