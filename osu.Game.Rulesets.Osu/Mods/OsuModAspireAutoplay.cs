@@ -30,6 +30,15 @@ namespace osu.Game.Rulesets.Osu.Mods
     /// </remarks>
     public class OsuModAspireAutoplay : ModAutoplay, IApplicableAfterBeatmapConversion, IEzApplyOrder
     {
+        /// <summary>
+        /// How far past the last hitobject a slider may still end and be considered part of the map.
+        /// </summary>
+        /// <remarks>
+        /// Generous enough for a slider that legitimately runs to the end of the audio, while excluding the sliders
+        /// aspire maps use to reach days or years past the map.
+        /// </remarks>
+        public const double END_TIME_MARGIN = 60_000;
+
         public override string Name => "Aspire Autoplay";
 
         public override string Acronym => "AA";
@@ -41,7 +50,7 @@ namespace osu.Game.Rulesets.Osu.Mods
         public override Type[] IncompatibleMods => base.IncompatibleMods.Concat(new[] { typeof(ModAutoplay) }).ToArray();
 
         /// <summary>
-        /// Applied before other conversion mods so replacements of <see cref="Slider"/> keep the flag.
+        /// Applied before other conversion mods so replacements of <see cref="Slider"/> keep the limit.
         /// </summary>
         public int ApplyOrder => -1;
 
@@ -50,8 +59,18 @@ namespace osu.Game.Rulesets.Osu.Mods
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
-            foreach (var slider in beatmap.HitObjects.OfType<Slider>())
-                slider.CollapseUnrepresentableDuration = true;
+            var sliders = beatmap.HitObjects.OfType<Slider>().ToList();
+
+            if (sliders.Count == 0)
+                return;
+
+            // Sliders that outlast the map collapse, so the autoplay replay stays proportional to the map rather than
+            // to durations measured in days. Everything else keeps its literal duration.
+            double lastStartTime = beatmap.HitObjects.Max(h => h.StartTime);
+            double limit = lastStartTime + END_TIME_MARGIN;
+
+            foreach (var slider in sliders)
+                slider.EndTimeLimit = limit;
         }
     }
 }

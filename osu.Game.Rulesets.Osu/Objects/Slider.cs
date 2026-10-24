@@ -1,4 +1,4 @@
-// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 #nullable disable
@@ -86,45 +86,45 @@ namespace osu.Game.Rulesets.Osu.Objects
         /// </summary>
         public double SpanDuration => Duration / this.SpanCount();
 
-        private bool collapseUnrepresentableDuration;
+        private double? endTimeLimit;
 
         /// <summary>
-        /// Whether a duration that cannot be represented on the timeline should collapse to zero.
+        /// The latest end time this slider may have before its duration is treated as unrepresentable and collapses to zero.
+        /// <see langword="null"/> keeps the literal duration.
         /// </summary>
         /// <remarks>
-        /// osu!stable derives a slider's end time from the author-set length as a 32-bit integer, so a length that
-        /// overflows that range yields no usable end time at all, and such sliders effectively do not exist in
-        /// gameplay. Aspire maps carry such lengths deliberately, but keeping the value would leave the object alive
-        /// for astronomically long and force a path approximation covering hundreds of thousands of control points.
+        /// Aspire maps carry slider lengths that put the end time days or years beyond the map itself. osu!stable stores
+        /// end times as 32-bit integers, so such lengths yield no usable end time there and the sliders effectively do
+        /// not exist. Reproducing that here also keeps an object from staying alive for an unbounded time while forcing
+        /// a path approximation over hundreds of thousands of control points.
         /// </remarks>
-        public bool CollapseUnrepresentableDuration
+        public double? EndTimeLimit
         {
-            get => collapseUnrepresentableDuration;
+            get => endTimeLimit;
             set
             {
-                if (collapseUnrepresentableDuration == value)
+                if (endTimeLimit == value)
                     return;
 
-                collapseUnrepresentableDuration = value;
+                endTimeLimit = value;
                 endPositionCache.Invalidate();
                 updateNestedPositions();
             }
         }
 
-        private bool isDurationCollapsed => collapseUnrepresentableDuration && getTotalDuration() <= 0;
+        private bool isDurationCollapsed => endTimeLimit != null && getTotalDuration() <= 0;
 
         /// <summary>
         /// The duration of all spans.
         /// </summary>
         /// <remarks>
-        /// Without <see cref="CollapseUnrepresentableDuration"/> this is exactly the legacy expression, whatever the
-        /// resulting value.
+        /// Without <see cref="EndTimeLimit"/> this is exactly the legacy expression, whatever the resulting value.
         /// </remarks>
         private double getTotalDuration()
         {
             int spanCount = this.SpanCount();
 
-            if (!collapseUnrepresentableDuration || Velocity <= 0)
+            if (endTimeLimit is not double limit || Velocity <= 0)
                 return spanCount * Path.Distance / Velocity;
 
             // Check the author-set length first: it bounds the real distance and costs nothing, whereas Path.Distance
@@ -140,7 +140,7 @@ namespace osu.Game.Rulesets.Osu.Objects
             {
                 double duration = spanCount * distance / Velocity;
 
-                return double.IsFinite(duration) && duration >= 0 && StartTime + duration <= int.MaxValue;
+                return double.IsFinite(duration) && duration >= 0 && StartTime + duration <= limit;
             }
         }
 
@@ -288,12 +288,24 @@ namespace osu.Game.Rulesets.Osu.Objects
         }
 
         /// <summary>
-        /// The only events a collapsed slider produces: a head and a tail at the start time.
+        /// The only events a collapsed slider produces: a head and a tail, both at the slider's start time.
         /// </summary>
-        protected static IEnumerable<SliderEventDescriptor> CreateDegenerateEvents()
+        protected IEnumerable<SliderEventDescriptor> CreateDegenerateEvents()
         {
-            yield return new SliderEventDescriptor { Type = SliderEventType.Head };
-            yield return new SliderEventDescriptor { Type = SliderEventType.Tail };
+            yield return new SliderEventDescriptor
+            {
+                Type = SliderEventType.Head,
+                Time = StartTime,
+                SpanStartTime = StartTime,
+            };
+
+            yield return new SliderEventDescriptor
+            {
+                Type = SliderEventType.Tail,
+                Time = StartTime,
+                SpanStartTime = StartTime,
+                SpanIndex = this.SpanCount() - 1,
+            };
         }
 
         private void updateNestedPositions()
