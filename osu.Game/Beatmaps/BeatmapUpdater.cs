@@ -10,7 +10,6 @@ using osu.Framework.Platform;
 using osu.Framework.Threading;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.Online.API;
 using osu.Game.Rulesets.Objects.Types;
 
@@ -66,34 +65,18 @@ namespace osu.Game.Beatmaps
                     difficultyCache.Invalidate(beatmap, working.BeatmapInfo);
                     ezAnalysisCache.Invalidate(beatmap, working.BeatmapInfo);
 
-                    bool canRate = EzStableDifficultyCompatibility.CanCalculate(working);
+                    var ruleset = working.BeatmapInfo.Ruleset.CreateInstance();
+                    var calculator = ruleset.CreateDifficultyCalculator(working);
 
-                    if (canRate)
-                    {
-                        var ruleset = working.BeatmapInfo.Ruleset.CreateInstance();
-                        var calculator = ruleset.CreateDifficultyCalculator(working);
-
-                        beatmap.StarRating = calculator.Calculate().StarRating;
-                    }
-                    else
-                        beatmap.StarRating = 0;
-
+                    beatmap.StarRating = calculator.Calculate().StarRating;
                     beatmap.UpdateStatisticsFromBeatmap(working.Beatmap);
 
                     var tagSummary = EzBeatmapTagParser.Parse(working);
                     beatmap.HasVideo = tagSummary.HasVideo;
                     beatmap.HasStoryboard = tagSummary.HasStoryboard;
 
-                    if (canRate)
-                    {
-                        updateXxyStarRating(beatmap);
-                        updatePerformancePoints(beatmap, working);
-                    }
-                    else
-                    {
-                        beatmap.XxyStarRating = 0;
-                        beatmap.PerformancePoints = 0;
-                    }
+                    updateXxyStarRating(beatmap);
+                    updatePerformancePoints(beatmap, working);
                 }
 
                 // And invalidate again afterwards as re-fetching the most up-to-date database metadata will be required.

@@ -21,7 +21,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Database;
 using osu.Game.EzOsuGame.Scoring;
@@ -943,22 +942,13 @@ namespace osu.Game.Database
                 try
                 {
                     var working = beatmapManager.GetWorkingBeatmap(beatmap);
-                    double starRating;
+                    var ruleset = getRuleset(working.BeatmapInfo.Ruleset);
 
-                    // A map stable refuses to rate counts as 0 stars here as well, rather than an enormous value derived
-                    // from values its difficulty calculation rejects.
-                    if (EzStableDifficultyCompatibility.CanCalculate(working))
-                    {
-                        var ruleset = getRuleset(working.BeatmapInfo.Ruleset);
+                    Debug.Assert(ruleset != null);
 
-                        Debug.Assert(ruleset != null);
+                    var calculator = ruleset.CreateDifficultyCalculator(working);
 
-                        var calculator = ruleset.CreateDifficultyCalculator(working);
-                        starRating = calculator.Calculate().StarRating;
-                    }
-                    else
-                        starRating = 0;
-
+                    double starRating = calculator.Calculate().StarRating;
                     realmAccess.Write(r =>
                     {
                         if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)

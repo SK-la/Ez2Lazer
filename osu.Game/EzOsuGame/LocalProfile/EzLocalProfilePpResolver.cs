@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Scoring;
@@ -135,11 +134,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
             try
             {
                 var working = beatmapManager.GetWorkingBeatmap(score.BeatmapInfo);
-
-                // No stable difficulty, hence no stable performance to show for this map.
-                if (!EzStableDifficultyCompatibility.CanCalculate(working))
-                    return null;
-
                 return ruleset.CreateDifficultyCalculator(working).Calculate(score.Mods);
             }
             catch (Exception ex)

@@ -63,11 +63,6 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
                                                         CancellationToken cancellationToken)
         {
             var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-
-            // stable reports no difficulty for such maps, and there is nothing meaningful to balance against.
-            if (!EzStableDifficultyCompatibility.CanCalculate(working))
-                return 0;
-
             var rulesetInstance = ruleset.CreateInstance();
             var rateMods = createRateModsForMeasurement(rulesetInstance, speed, mods).ToArray();
             return rulesetInstance.CreateDifficultyCalculator(working).Calculate(rateMods, cancellationToken).StarRating;

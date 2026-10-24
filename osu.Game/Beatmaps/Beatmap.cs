@@ -10,13 +10,12 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.Beatmaps.Timing;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.IO.Serialization.Converters;
 using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Beatmaps
 {
-    public class Beatmap<T> : IBeatmap<T>, IDetachedSampleHost, IStableDifficultyLimitReport
+    public class Beatmap<T> : IBeatmap<T>, IDetachedSampleHost
         where T : HitObject
     {
         private BeatmapDifficulty difficulty = new BeatmapDifficulty();
@@ -72,13 +71,6 @@ namespace osu.Game.Beatmaps
 
         [JsonConverter(typeof(TypedListConverter<HitObject>))]
         public List<T> HitObjects { get; set; } = new List<T>();
-
-        /// <summary>
-        /// Whether the source beatmap carries values that osu!stable loads for gameplay but refuses to process when
-        /// calculating difficulty. Such maps have no star rating or performance points in stable.
-        /// </summary>
-        [JsonIgnore]
-        public bool ExceedsStableDifficultyLimits { get; set; }
 
         /// <summary>
         /// Samples that hit objects removed or rewritten by a mod carried, kept so their audio still sounds at its

@@ -9,7 +9,6 @@ using System.Linq;
 using System.Threading;
 using osu.Framework.Lists;
 using osu.Game.Beatmaps.Timing;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Objects;
 
@@ -88,7 +87,6 @@ namespace osu.Game.Beatmaps
             beatmap.Bookmarks = original.Bookmarks;
             beatmap.SliderVelocityPresets = original.SliderVelocityPresets;
             beatmap.BeatmapVersion = original.BeatmapVersion;
-            beatmap.ExceedsStableDifficultyLimits = (original as IStableDifficultyLimitReport)?.ExceedsStableDifficultyLimits ?? false;
 
             return beatmap;
         }

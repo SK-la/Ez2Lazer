@@ -1129,54 +1129,6 @@ SliderTickRate:1
         }
 
         [Test]
-        public void TestSliderBeyondStableLimitsIsFlagged()
-        {
-            const string contents = @"osu file format v14
-
-[General]
-AudioFilename: audio.mp3
-Mode: 0
-
-[Metadata]
-Title:beyond range
-Artist:beyond range
-Creator:beyond range
-Version:beyond range
-
-[Difficulty]
-HPDrainRate:5
-CircleSize:4
-OverallDifficulty:5
-ApproachRate:5
-SliderMultiplier:1.4
-SliderTickRate:1
-
-[TimingPoints]
-0,500,4,2,0,60,1,0
-
-[HitObjects]
-256,192,1000,6,0,L|50000000:50000000,1,1000000000
-";
-
-            var decoded = decode(contents);
-
-            Assert.That(decoded.HitObjects, Has.Count.EqualTo(1));
-            Assert.That(decoded.ExceedsStableDifficultyLimits, Is.True);
-        }
-
-        [Test]
-        public void TestOrdinaryBeatmapDoesNotExceedStableLimits()
-        {
-            using var resStream = TestResources.OpenResource("Soleily - Renatus (Gamu) [Insane].osu");
-            using var stream = new LineBufferedReader(resStream);
-
-            var decoded = new LegacyBeatmapDecoder { ApplyOffsets = false }.Decode(stream);
-
-            Assert.That(decoded.HitObjects, Is.Not.Empty);
-            Assert.That(decoded.ExceedsStableDifficultyLimits, Is.False);
-        }
-
-        [Test]
         public void TestSkipHitObjectsKeepsHeaders()
         {
             const string contents = @"osu file format v14
