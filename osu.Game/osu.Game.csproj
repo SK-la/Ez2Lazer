@@ -41,6 +41,11 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <!-- Realm 只把 Fody 作为传递依赖带入，而 Fody 的编织目标位于 build/ 下，传递依赖不会导入它。
+         一旦还原记录里丢掉该资产，编织会静默不执行，产物运行期才报 Realm 错误。显式引用可保证导入。 -->
+    <PackageReference Include="Fody" Version="6.9.1">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="Realm" Version="20.1.0"/>
     <PackageReference Include="ez2lazer.Framework" Version="[$(Ez2LazerFrameworkVersion)]" Condition="'$(UseEz2LazerLocalFrameworkProject)' != 'true'"/>
     <PackageReference Include="ez2lazer.Game.Resources" Version="[$(Ez2LazerGameResourcesVersion)]" Condition="'$(UseEz2LazerLocalResourcesProject)' != 'true'"/>
@@ -77,6 +82,14 @@
     <!-- Licence/provenance notes are not runtime payload. -->
     <EmbeddedResource Remove="Resources\EzSkills\NOTICE.md" />
   </ItemGroup>
+  <!-- Fody 的编织目标来自 Fody 包的 build/ 目录；一旦还原记录丢失该资源，编织会静默不执行，
+       产物在运行期才报 Realm 错误。$(FodyAssembly) 只在 Fody.targets 被导入时存在，用它提前拦截。 -->
+  <Target Name="ValidateEzFodyImport"
+          BeforeTargets="BeforeBuild"
+          Condition="'$(DisableFody)' != 'true' and '$(DesignTimeBuild)' != 'true' and Exists('$(MSBuildProjectDirectory)\FodyWeavers.xml')">
+    <Error Condition="'$(FodyAssembly)' == ''"
+           Text="Fody.targets 未被导入，$(AssemblyName) 不会被编织，Realm 会在运行期报错。请删除 osu.Game\obj 后重新还原并构建。" />
+  </Target>
   <Target Name="ValidateEz2LazerSiblingProjects" BeforeTargets="BeforeBuild">
     <Error Condition="'$(UseEz2LazerLocalFrameworkProject)' == 'true' and !Exists('$(Ez2LazerFrameworkProjectPath)')" Text="Missing sibling directory ez2lazer-framework. Please clone https://github.com/SK-la/ez2lazer-framework into $(MSBuildThisFileDirectory)..\..\ez2lazer-framework, or disable UseEz2LazerLocalFrameworkProject to rely on NuGet." />
     <Error Condition="'$(UseEz2LazerLocalResourcesProject)' == 'true' and !Exists('$(Ez2LazerResourcesProjectPath)')" Text="Missing sibling directory ez2lazer-resources. Please clone https://github.com/SK-la/ez2lazer-resources into $(MSBuildThisFileDirectory)..\..\ez2lazer-resources, or disable UseEz2LazerLocalResourcesProject to rely on NuGet." />
