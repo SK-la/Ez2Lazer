@@ -23,6 +23,7 @@ using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Input;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
@@ -68,7 +69,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly Bindable<EzBeatmapPreviewMode> previewMode = new Bindable<EzBeatmapPreviewMode>();
 
         private readonly EzMaterialPanelBackground panelBackground;
-        private readonly Container panelContainer;
+        private readonly PreviewPanelContainer panelContainer;
         private readonly EzModSettingsDock settingsDock;
         private readonly Container stageViewport;
         private readonly Container stageScaleContainer;
@@ -189,7 +190,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             InternalChildren = new Drawable[]
             {
-                panelContainer = new Container
+                panelContainer = new PreviewPanelContainer
                 {
                     Anchor = Anchor.BottomLeft,
                     Origin = Anchor.BottomLeft,
@@ -1565,6 +1566,13 @@ namespace osu.Game.EzOsuGame.Overlays
 
             if (maniaStaticRenderer is StaticFullMapPreviewRenderer fullMapRenderer)
                 fullMapRenderer.SetZoom(focused);
+        }
+
+        // 预览面板区域自行处理 Alt+滚轮（调整疏密），不让全局音量调整抢走。
+        private partial class PreviewPanelContainer : Container, IBlockGlobalAltScrollVolume
+        {
+            // ScrollAdjustsVolume 只检查悬浮链里的 Drawable，纯 Container 不进队列就不会被识别。
+            public override bool HandlePositionalInput => true;
         }
     }
 }
