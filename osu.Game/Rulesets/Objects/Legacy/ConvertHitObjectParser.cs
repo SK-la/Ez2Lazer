@@ -1,20 +1,20 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osuTK;
-using osu.Game.Rulesets.Objects.Types;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
-using osu.Game.Beatmaps.Formats;
-using osu.Game.Audio;
 using System.Linq;
 using osu.Framework.Utils;
+using osu.Game.Audio;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.Beatmaps.Formats;
 using osu.Game.Beatmaps.Legacy;
+using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Skinning;
 using osu.Game.Utils;
-using System.Buffers;
+using osuTK;
 
 namespace osu.Game.Rulesets.Objects.Legacy
 {
@@ -97,7 +97,8 @@ namespace osu.Game.Rulesets.Objects.Legacy
 
                 if (split.Length > 7)
                 {
-                    length = Math.Max(0, Parsing.ParseDouble(split[7], Parsing.MAX_COORDINATE_VALUE));
+                    // [Ez] Aspire maps carry slider lengths far beyond the coordinate range; parse without the coordinate cap.
+                    length = Math.Max(0, Parsing.ParseDouble(split[7], double.MaxValue));
                     if (length == 0)
                         length = null;
                 }
@@ -342,9 +343,13 @@ namespace osu.Game.Rulesets.Objects.Legacy
             {
                 string[] vertexSplit = value.Split(':');
 
+                // [Ez] Aspire maps place control points far outside the playfield; parse without the coordinate cap.
+                float x = Parsing.ParseFloat(vertexSplit[0], float.MaxValue);
+                float y = Parsing.ParseFloat(vertexSplit[1], float.MaxValue);
+
                 Vector2 pos = formatVersion >= LegacyBeatmapEncoder.FIRST_LAZER_VERSION
-                    ? new Vector2(Parsing.ParseFloat(vertexSplit[0], Parsing.MAX_COORDINATE_VALUE), Parsing.ParseFloat(vertexSplit[1], Parsing.MAX_COORDINATE_VALUE))
-                    : new Vector2((int)Parsing.ParseFloat(vertexSplit[0], Parsing.MAX_COORDINATE_VALUE), (int)Parsing.ParseFloat(vertexSplit[1], Parsing.MAX_COORDINATE_VALUE));
+                    ? new Vector2(x, y)
+                    : new Vector2((int)x, (int)y);
                 pos -= startPos;
                 return pos;
             }
@@ -491,7 +496,9 @@ namespace osu.Game.Rulesets.Objects.Legacy
             // and *will* fail conversion mapping tests, but again, this is supposed to be a least-worst measure to prevent exploits.
             // it is also applied centrally to all rulesets rather than in specific ruleset converters because this failure scenario
             // translates across rulesets (osu! and catch are both affected).
-            if (Precision.AlmostEquals(path.Distance, 0))
+            // [Ez] only probe the path when there is a repeat to reset: for repeat-less sliders the branch below is a no-op,
+            // and evaluating `Distance` eagerly forces a full path approximation (aspire maps can carry millions of control points).
+            if (repeatCount > 0 && Precision.AlmostEquals(path.Distance, 0))
             {
                 repeatCount = 0;
                 nodeSamples = [nodeSamples[0], nodeSamples[^1]];

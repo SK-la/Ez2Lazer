@@ -1042,6 +1042,92 @@ Mode: 3
             }
         }
 
+        [Test]
+        public void TestSliderBeyondCoordinateRangeIsDecoded()
+        {
+            const string contents = @"osu file format v14
+
+[General]
+AudioFilename: audio.mp3
+Mode: 0
+
+[Metadata]
+Title:beyond range
+Artist:beyond range
+Creator:beyond range
+Version:beyond range
+
+[Difficulty]
+HPDrainRate:5
+CircleSize:4
+OverallDifficulty:5
+ApproachRate:5
+SliderMultiplier:1.4
+SliderTickRate:1
+
+[TimingPoints]
+0,500,4,2,0,60,1,0
+
+[HitObjects]
+256,192,1000,6,0,L|50000000:50000000,1,1000000000
+";
+
+            var decoder = new LegacyBeatmapDecoder { ApplyOffsets = false };
+
+            using (var stream = new LineBufferedReader(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(contents))))
+            {
+                var decoded = decoder.Decode(stream);
+
+                Assert.That(decoded.HitObjects, Has.Count.EqualTo(1));
+
+                var path = ((IHasPath)decoded.HitObjects[0]).Path;
+
+                Assert.That(path.ExpectedDistance.Value, Is.EqualTo(1000000000));
+                Assert.That(path.ControlPoints.Count, Is.GreaterThan(1));
+            }
+        }
+
+        [Test]
+        public void TestZeroLengthSliderRepeatsAreReset()
+        {
+            const string contents = @"osu file format v14
+
+[General]
+AudioFilename: audio.mp3
+Mode: 0
+
+[Metadata]
+Title:zero length
+Artist:zero length
+Creator:zero length
+Version:zero length
+
+[Difficulty]
+HPDrainRate:5
+CircleSize:4
+OverallDifficulty:5
+ApproachRate:5
+SliderMultiplier:1.4
+SliderTickRate:1
+
+[TimingPoints]
+0,500,4,2,0,60,1,0
+
+[HitObjects]
+256,192,1000,6,0,L|256:192,5,100
+";
+
+            var decoder = new LegacyBeatmapDecoder { ApplyOffsets = false };
+
+            using (var stream = new LineBufferedReader(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(contents))))
+            {
+                var decoded = decoder.Decode(stream);
+
+                Assert.That(decoded.HitObjects, Has.Count.EqualTo(1));
+                Assert.That(((IHasRepeats)decoded.HitObjects[0]).RepeatCount, Is.EqualTo(0));
+            }
+        }
+
         [TestCase(false)]
         [TestCase(true)]
         public void TestLegacyDefaultsPreserved(bool applyOffsets)
