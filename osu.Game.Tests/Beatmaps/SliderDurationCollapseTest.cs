@@ -135,6 +135,48 @@ namespace osu.Game.Tests.Beatmaps
             Assert.That(mod.ReplayGenerationEnabled, Is.False);
         }
 
+        [Test]
+        public void TestCoincidentSpinnersAreMerged()
+        {
+            var beatmap = new OsuBeatmap();
+
+            beatmap.HitObjects.Add(createZeroLengthSpinner(1_000));
+            beatmap.HitObjects.Add(createZeroLengthSpinner(1_000));
+            beatmap.HitObjects.Add(createZeroLengthSpinner(1_000));
+            beatmap.HitObjects.Add(createZeroLengthSpinner(2_000));
+
+            var realSpinner = createZeroLengthSpinner(3_000);
+            realSpinner.Duration = 500;
+            beatmap.HitObjects.Add(realSpinner);
+
+            new OsuModAspire().ApplyToBeatmap(beatmap);
+
+            Assert.That(beatmap.HitObjects, Has.Count.EqualTo(3));
+            Assert.That(beatmap.HitObjects.Count(h => h.StartTime == 1_000), Is.EqualTo(1));
+            Assert.That(beatmap.HitObjects.Count(h => h.StartTime == 2_000), Is.EqualTo(1));
+            // A spinner with a real duration must survive even when another starts at the same time.
+            Assert.That(beatmap.HitObjects.Count(h => h.StartTime == 3_000), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void TestDistinctSpinnersAreNotMerged()
+        {
+            var beatmap = new OsuBeatmap();
+
+            var first = createZeroLengthSpinner(1_000);
+            var second = createZeroLengthSpinner(1_000);
+            second.Position = new Vector2(100, 100);
+
+            beatmap.HitObjects.Add(first);
+            beatmap.HitObjects.Add(second);
+
+            new OsuModAspire().ApplyToBeatmap(beatmap);
+
+            Assert.That(beatmap.HitObjects, Has.Count.EqualTo(2));
+        }
+
+        private static Spinner createZeroLengthSpinner(double startTime) => new Spinner { StartTime = startTime, Duration = 0 };
+
         /// <summary>
         /// The author-set length that yields <paramref name="totalDuration"/> milliseconds over a single span.
         /// </summary>

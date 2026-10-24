@@ -11,7 +11,9 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Osu.Beatmaps;
 using osu.Game.Rulesets.Osu.Objects;
+using osuTK;
 
 namespace osu.Game.Rulesets.Osu.Mods
 {
@@ -77,6 +79,12 @@ namespace osu.Game.Rulesets.Osu.Mods
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
+            collapseOverlongSliders(beatmap);
+            removeCoincidentSpinners(beatmap);
+        }
+
+        private static void collapseOverlongSliders(IBeatmap beatmap)
+        {
             var sliders = beatmap.HitObjects.OfType<Slider>().ToList();
 
             if (sliders.Count == 0)
@@ -89,6 +97,43 @@ namespace osu.Game.Rulesets.Osu.Mods
 
             foreach (var slider in sliders)
                 slider.EndTimeLimit = limit;
+        }
+
+        /// <summary>
+        /// Drops spinners that are indistinguishable from one already in the beatmap.
+        /// </summary>
+        /// <remarks>
+        /// Aspire maps stack hundreds of spinners on a single timestamp - one beatmap in the wild places 579 of them on
+        /// the same millisecond, with identical end time and position. They overlap completely, so only one is ever
+        /// visible, yet every one of them allocates a drawable, and creating them all in the same frame is what makes
+        /// the map stall. Only zero-length spinners are considered: those require no spins at all, and a spinner with a
+        /// real duration is left alone.
+        /// </remarks>
+        private static void removeCoincidentSpinners(IBeatmap beatmap)
+        {
+            if (beatmap is not OsuBeatmap osuBeatmap)
+                return;
+
+            var seen = new HashSet<(double startTime, double endTime, Vector2 position, bool newCombo)>();
+            var kept = new List<OsuHitObject>(osuBeatmap.HitObjects.Count);
+            bool removed = false;
+
+            foreach (var hitObject in osuBeatmap.HitObjects)
+            {
+                if (hitObject is not Spinner spinner || spinner.EndTime > spinner.StartTime)
+                {
+                    kept.Add(hitObject);
+                    continue;
+                }
+
+                if (seen.Add((spinner.StartTime, spinner.EndTime, spinner.Position, spinner.NewCombo)))
+                    kept.Add(hitObject);
+                else
+                    removed = true;
+            }
+
+            if (removed)
+                osuBeatmap.HitObjects = kept;
         }
 
         public ModReplayData CreateReplayData(IBeatmap beatmap, IReadOnlyList<Mod> mods)
