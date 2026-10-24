@@ -1128,6 +1128,103 @@ SliderTickRate:1
             }
         }
 
+        [Test]
+        public void TestSliderBeyondStableLimitsIsFlagged()
+        {
+            const string contents = @"osu file format v14
+
+[General]
+AudioFilename: audio.mp3
+Mode: 0
+
+[Metadata]
+Title:beyond range
+Artist:beyond range
+Creator:beyond range
+Version:beyond range
+
+[Difficulty]
+HPDrainRate:5
+CircleSize:4
+OverallDifficulty:5
+ApproachRate:5
+SliderMultiplier:1.4
+SliderTickRate:1
+
+[TimingPoints]
+0,500,4,2,0,60,1,0
+
+[HitObjects]
+256,192,1000,6,0,L|50000000:50000000,1,1000000000
+";
+
+            var decoded = decode(contents);
+
+            Assert.That(decoded.HitObjects, Has.Count.EqualTo(1));
+            Assert.That(decoded.ExceedsStableDifficultyLimits, Is.True);
+        }
+
+        [Test]
+        public void TestOrdinaryBeatmapDoesNotExceedStableLimits()
+        {
+            using var resStream = TestResources.OpenResource("Soleily - Renatus (Gamu) [Insane].osu");
+            using var stream = new LineBufferedReader(resStream);
+
+            var decoded = new LegacyBeatmapDecoder { ApplyOffsets = false }.Decode(stream);
+
+            Assert.That(decoded.HitObjects, Is.Not.Empty);
+            Assert.That(decoded.ExceedsStableDifficultyLimits, Is.False);
+        }
+
+        [Test]
+        public void TestSkipHitObjectsKeepsHeaders()
+        {
+            const string contents = @"osu file format v14
+
+[General]
+AudioFilename: audio.mp3
+Mode: 0
+
+[Metadata]
+Title:header only
+Artist:header only
+Creator:header only
+Version:header only
+BeatmapSetID:123
+
+[Difficulty]
+HPDrainRate:5
+CircleSize:4
+OverallDifficulty:5
+ApproachRate:5
+SliderMultiplier:1.4
+SliderTickRate:1
+
+[TimingPoints]
+0,500,4,2,0,60,1,0
+
+[HitObjects]
+256,192,1000,1,0
+256,192,2000,1,0
+";
+
+            var decoder = new LegacyBeatmapDecoder { ApplyOffsets = false, SkipHitObjects = true };
+            var decoded = decode(contents, decoder);
+
+            Assert.That(decoded.HitObjects, Is.Empty);
+            Assert.That(decoded.Metadata.Title, Is.EqualTo("header only"));
+            Assert.That(decoded.BeatmapInfo.BeatmapSet?.OnlineID, Is.EqualTo(123));
+            Assert.That(decoded.ControlPointInfo.TimingPoints, Has.Count.EqualTo(1));
+        }
+
+        private static Beatmap decode(string contents, LegacyBeatmapDecoder? decoder = null)
+        {
+            decoder ??= new LegacyBeatmapDecoder { ApplyOffsets = false };
+
+            using var stream = new LineBufferedReader(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(contents)));
+            return decoder.Decode(stream);
+        }
+
         [TestCase(false)]
         [TestCase(true)]
         public void TestLegacyDefaultsPreserved(bool applyOffsets)
