@@ -7,15 +7,19 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
+using osu.Game.Rulesets.Osu;
+using osu.Game.Rulesets.Osu.Beatmaps;
+using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Rulesets.Osu.Objects;
 using osuTK;
 
 namespace osu.Game.Tests.Beatmaps
 {
     /// <summary>
-    /// Sliders whose duration cannot be represented on the timeline collapse to zero length. Aspire maps carry such
-    /// lengths deliberately, and keeping them would leave the object alive indefinitely while forcing a path
-    /// approximation over hundreds of thousands of control points.
+    /// Sliders whose duration cannot be represented on the timeline collapse to zero length, but only while
+    /// <see cref="Slider.CollapseUnrepresentableDuration"/> is enabled. Aspire maps carry such lengths deliberately, and
+    /// keeping them would leave the object alive indefinitely while forcing a path approximation over hundreds of
+    /// thousands of control points.
     /// </summary>
     [TestFixture]
     public class SliderDurationCollapseTest
@@ -40,6 +44,17 @@ namespace osu.Game.Tests.Beatmaps
             Assert.That(slider.TailCircle, Is.Not.Null);
             Assert.That(slider.TailCircle!.StartTime, Is.EqualTo(slider.StartTime));
             Assert.That(slider.TailCircle.Position, Is.EqualTo(slider.Position));
+            Assert.That(slider.EndPosition, Is.EqualTo(slider.Position));
+        }
+
+        [Test]
+        public void TestUnrepresentableLengthIsUnchangedWithoutOptIn()
+        {
+            var slider = createSlider(distanceForTotalDuration(int.MaxValue + 1e6), collapse: false);
+
+            Assert.That(slider.EndTime, Is.GreaterThan(slider.StartTime));
+            // The literal duration is kept rather than collapsed, even though it exceeds the representable range.
+            Assert.That(slider.SpanDuration, Is.GreaterThan(int.MaxValue));
         }
 
         [Test]
@@ -68,12 +83,51 @@ namespace osu.Game.Tests.Beatmaps
             Assert.That(slider.NestedHitObjects, Has.Count.EqualTo(2));
         }
 
+        [Test]
+        public void TestAspireModOptsSlidersIn()
+        {
+            var slider = createSlider(300, collapse: false);
+            var beatmap = new Beatmap { HitObjects = { slider } };
+
+            Assert.That(slider.CollapseUnrepresentableDuration, Is.False);
+
+            new OsuModAspireAutoplay().ApplyToBeatmap(beatmap);
+
+            Assert.That(slider.CollapseUnrepresentableDuration, Is.True);
+        }
+
+        [Test]
+        public void TestStrictTrackingKeepsOptIn()
+        {
+            var slider = createSlider(300);
+            var beatmap = new OsuBeatmap { HitObjects = { slider } };
+
+            Assert.That(slider.CollapseUnrepresentableDuration, Is.True);
+
+            new OsuModStrictTracking().ApplyToBeatmap(beatmap);
+
+            Assert.That(beatmap.HitObjects, Has.Count.EqualTo(1));
+            Assert.That(beatmap.HitObjects[0], Is.Not.SameAs(slider));
+            Assert.That(((Slider)beatmap.HitObjects[0]).CollapseUnrepresentableDuration, Is.True);
+        }
+
+        [Test]
+        public void TestAspireModIsAutomationAutoplay()
+        {
+            var mod = new OsuModAspireAutoplay();
+
+            Assert.That(mod.Acronym, Is.EqualTo("AA"));
+            Assert.That(mod.Type, Is.EqualTo(global::osu.Game.Rulesets.Mods.ModType.Automation));
+            Assert.That(mod.UserPlayable, Is.False);
+            Assert.That(new OsuRuleset().GetModsFor(global::osu.Game.Rulesets.Mods.ModType.Automation).OfType<OsuModAspireAutoplay>(), Is.Not.Empty);
+        }
+
         /// <summary>
         /// The author-set length that yields <paramref name="totalDuration"/> milliseconds over a single span.
         /// </summary>
         private static double distanceForTotalDuration(double totalDuration) => totalDuration * velocity;
 
-        private static Slider createSlider(double expectedDistance, int repeatCount = 0)
+        private static Slider createSlider(double expectedDistance, int repeatCount = 0, bool collapse = true)
         {
             var controlPoints = new ControlPointInfo();
             controlPoints.Add(0, new TimingControlPoint { BeatLength = beat_length });
@@ -88,6 +142,7 @@ namespace osu.Game.Tests.Beatmaps
             {
                 StartTime = 1000,
                 RepeatCount = repeatCount,
+                CollapseUnrepresentableDuration = collapse,
                 Path = new SliderPath(PathType.LINEAR, new[] { Vector2.Zero, new Vector2(100, 0) }, expectedDistance),
             };
 

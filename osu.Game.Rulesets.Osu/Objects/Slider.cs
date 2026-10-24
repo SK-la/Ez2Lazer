@@ -30,7 +30,7 @@ namespace osu.Game.Rulesets.Osu.Objects
         [JsonIgnore]
         public double Duration
         {
-            get => getTotalDuration();
+            get => EndTime - StartTime;
             set => throw new System.NotSupportedException($"Adjust via {nameof(RepeatCount)} instead"); // can be implemented if/when needed.
         }
 
@@ -38,7 +38,9 @@ namespace osu.Game.Rulesets.Osu.Objects
 
         private readonly Cached<Vector2> endPositionCache = new Cached<Vector2>();
 
-        public override Vector2 EndPosition => endPositionCache.IsValid ? endPositionCache.Value : endPositionCache.Value = Position + this.CurvePositionAt(1);
+        public override Vector2 EndPosition => endPositionCache.IsValid
+            ? endPositionCache.Value
+            : endPositionCache.Value = isDurationCollapsed ? Position : Position + this.CurvePositionAt(1);
 
         public Vector2 StackedPositionAt(double t) => StackedPosition + this.CurvePositionAt(t);
 
@@ -88,24 +90,47 @@ namespace osu.Game.Rulesets.Osu.Objects
         /// <summary>
         /// The length of one span of this <see cref="Slider"/>.
         /// </summary>
-        public double SpanDuration => getTotalDuration() / this.SpanCount();
+        public double SpanDuration => Duration / this.SpanCount();
+
+        private bool collapseUnrepresentableDuration;
 
         /// <summary>
-        /// The duration of all spans, collapsing to zero when it cannot be represented on a timeline.
+        /// Whether a duration that cannot be represented on the timeline should collapse to zero.
         /// </summary>
         /// <remarks>
         /// osu!stable derives a slider's end time from the author-set length as a 32-bit integer, so a length that
-        /// overflows that range yields no usable end time at all. Aspire maps carry such lengths deliberately; keeping
-        /// the value would leave the object alive for astronomically long and force a path approximation covering
-        /// hundreds of thousands of control points, so those sliders end where they start.
+        /// overflows that range yields no usable end time at all, and such sliders effectively do not exist in
+        /// gameplay. Aspire maps carry such lengths deliberately, but keeping the value would leave the object alive
+        /// for astronomically long and force a path approximation covering hundreds of thousands of control points.
+        /// </remarks>
+        public bool CollapseUnrepresentableDuration
+        {
+            get => collapseUnrepresentableDuration;
+            set
+            {
+                if (collapseUnrepresentableDuration == value)
+                    return;
+
+                collapseUnrepresentableDuration = value;
+                endPositionCache.Invalidate();
+                updateNestedPositions();
+            }
+        }
+
+        private bool isDurationCollapsed => collapseUnrepresentableDuration && getTotalDuration() <= 0;
+
+        /// <summary>
+        /// The duration of all spans.
+        /// </summary>
+        /// <remarks>
+        /// Without <see cref="CollapseUnrepresentableDuration"/> this is exactly the legacy expression, whatever the
+        /// resulting value.
         /// </remarks>
         private double getTotalDuration()
         {
             int spanCount = this.SpanCount();
 
-            // Velocity is only known once defaults are applied; before that the caller is expected to get the same
-            // degenerate value it always did.
-            if (Velocity <= 0)
+            if (!collapseUnrepresentableDuration || Velocity <= 0)
                 return spanCount * Path.Distance / Velocity;
 
             // Check the author-set length first: it bounds the real distance and costs nothing, whereas Path.Distance

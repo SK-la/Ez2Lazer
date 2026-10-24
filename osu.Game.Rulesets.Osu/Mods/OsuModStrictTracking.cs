@@ -112,6 +112,7 @@ namespace osu.Game.Rulesets.Osu.Mods
                 ComboOffset = original.ComboOffset;
                 TickDistanceMultiplier = original.TickDistanceMultiplier;
                 SliderVelocityMultiplier = original.SliderVelocityMultiplier;
+                CollapseUnrepresentableDuration = original.CollapseUnrepresentableDuration;
             }
 
             protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
