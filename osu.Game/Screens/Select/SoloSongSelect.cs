@@ -136,7 +136,7 @@ namespace osu.Game.Screens.Select
             {
                 Player player;
 
-                var replayGeneratingMod = Mods.Value.OfType<ICreateReplayData>().FirstOrDefault();
+                var replayGeneratingMod = Mods.Value.OfType<ICreateReplayData>().FirstOrDefault(m => m is not IConditionalReplayGeneration conditional || conditional.ReplayGenerationEnabled);
 
                 if (replayGeneratingMod != null)
                 {

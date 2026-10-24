@@ -91,9 +91,9 @@ namespace osu.Game.Tests.Beatmaps
 
             var beatmap = new OsuBeatmap { HitObjects = { beyondMap, normal } };
 
-            new OsuModAspireAutoplay().ApplyToBeatmap(beatmap);
+            new OsuModAspire().ApplyToBeatmap(beatmap);
 
-            double expectedLimit = 5_000 + OsuModAspireAutoplay.END_TIME_MARGIN;
+            double expectedLimit = 5_000 + OsuModAspire.END_TIME_MARGIN;
 
             Assert.That(beyondMap.EndTimeLimit, Is.EqualTo(expectedLimit));
             Assert.That(normal.EndTimeLimit, Is.EqualTo(expectedLimit));
@@ -113,14 +113,26 @@ namespace osu.Game.Tests.Beatmaps
         }
 
         [Test]
-        public void TestAspireModIsAutomationAutoplay()
+        public void TestAspireModIsPlayableAndTogglesAutoplay()
         {
-            var mod = new OsuModAspireAutoplay();
+            var mod = new OsuModAspire();
 
-            Assert.That(mod.Acronym, Is.EqualTo("AA"));
+            Assert.That(mod.Acronym, Is.EqualTo("ASP"));
             Assert.That(mod.Type, Is.EqualTo(global::osu.Game.Rulesets.Mods.ModType.Automation));
-            Assert.That(mod.UserPlayable, Is.False);
-            Assert.That(new OsuRuleset().GetModsFor(global::osu.Game.Rulesets.Mods.ModType.Automation).OfType<OsuModAspireAutoplay>(), Is.Not.Empty);
+            Assert.That(mod.UserPlayable, Is.True);
+            Assert.That(new OsuRuleset().GetModsFor(global::osu.Game.Rulesets.Mods.ModType.Automation).OfType<OsuModAspire>(), Is.Not.Empty);
+        }
+
+        [Test]
+        public void TestAutoplayToggleControlsReplayGeneration()
+        {
+            var mod = new OsuModAspire();
+
+            Assert.That(mod.Autoplay.Value, Is.True);
+            Assert.That(mod.ReplayGenerationEnabled, Is.True);
+
+            mod.Autoplay.Value = false;
+            Assert.That(mod.ReplayGenerationEnabled, Is.False);
         }
 
         /// <summary>
