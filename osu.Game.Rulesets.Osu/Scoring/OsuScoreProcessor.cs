@@ -40,7 +40,11 @@ namespace osu.Game.Rulesets.Osu.Scoring
 
         private bool isStableClassic => OsuStableClassic.IsActive(stdJudgeMode);
 
-        private readonly BindableBool stableAvailable = new BindableBool();
+        /// <summary>
+        /// std 的 stable 准确率在任何判定轨下都有值：非 StableClassic 档按同一套 stable 档位权重
+        /// 统计实际判定流，故局内槽位恒可用。
+        /// </summary>
+        private readonly BindableBool stableAvailable = new BindableBool(true);
 
         public IBindable<double> StableAccuracy => AccuracyClassic;
 
@@ -49,15 +53,6 @@ namespace osu.Game.Rulesets.Osu.Scoring
         public IBindable<int> StableMaxCombo => HighestCombo;
 
         public IBindable<bool> StableAvailable => stableAvailable;
-
-        /// <summary>
-        /// 局内 stable 槽位只在判定轨本身就是 StableClassic 时可显示；其它档没有等价的实时结果。
-        /// </summary>
-        /// <remarks>
-        /// TODO(Ez live stable 影子)：非 stable 档应转发 Session 可推进引擎的输出，届时这里改为恒 true。
-        /// 引擎改造面见 <c>OsuReplaySessionSimulator</c> 头部的 TODO。
-        /// </remarks>
-        private void refreshStableAvailability() => stableAvailable.Value = isStableClassic;
 
         /// <summary>
         /// stable 总分自带 mod 倍率，不能再被下游 <c>scoreMultiplier</c> 乘一次。
@@ -72,7 +67,6 @@ namespace osu.Game.Rulesets.Osu.Scoring
         public override void ApplyEzGameplayEnvironment()
         {
             JudgementTrackOverride ??= GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode);
-            refreshStableAvailability();
 
             if (OsuStableClassic.IsActive(stdJudgeMode))
                 IsLegacyScore = true;
@@ -80,8 +74,6 @@ namespace osu.Game.Rulesets.Osu.Scoring
 
         public override void ApplyBeatmap(IBeatmap beatmap)
         {
-            refreshStableAvailability();
-
             // 判定窗与 classic 滑条语义必须在全谱模拟（base.ApplyBeatmap 内部的 SimulateAutoplay）前绑定。
             // 共享 cache 实例对所有消费者只读：就地绑定会把本档窗口泄漏到其它判定档，故跳过（仿真走按档隔离的副本）。
             if (isStableClassic && !EzPlayableBeatmapCache.IsSharedInstance(beatmap))
@@ -131,7 +123,12 @@ namespace osu.Game.Rulesets.Osu.Scoring
                 stableScoring.RestoreFrom(frame.Header.Combo, frame.Header.MaxCombo, frame.Header.Statistics, frame.Header.TotalScore);
 
                 ClassicBaseScore = stableScoring.AccuracyPoints;
-                ClassicMaxBaseScore = stableScoring.JudgedCount * 300;
+                ClassicMaxBaseScore = stableScoring.JudgedCount * StableStdScoring.MaxBaseScore;
+            }
+            else if (frame.Header != null)
+            {
+                // 非 classic 轨也按帧头的判定计数重建 stable 准确率，否则跳帧后槽位会停在跳帧前的值。
+                restoreClassicAccuracy(frame.Header.Statistics);
             }
 
             base.ResetFromReplayFrame(frame);
@@ -139,20 +136,74 @@ namespace osu.Game.Rulesets.Osu.Scoring
 
         protected override void ApplyScoreChange(JudgementResult result)
         {
-            if (!isStableClassic)
+            if (isStableClassic)
+            {
+                stableScoring.Apply(result.HitObject, result.Type);
+                syncStableState();
                 return;
+            }
 
-            stableScoring.Apply(result.HitObject, result.Type);
-            syncStableState();
+            applyClassicAccuracyChange(result);
         }
 
         protected override void RemoveScoreChange(JudgementResult result)
         {
-            if (!isStableClassic)
+            if (isStableClassic)
+            {
+                stableScoring.Revert();
+                syncStableState();
+                return;
+            }
+
+            revertClassicAccuracyChange(result);
+        }
+
+        /// <summary>
+        /// 非 StableClassic 判定轨下的 stable 准确率：只认一次基础判定（圆圈 / 滑条 / 转盘），
+        /// tick、滑条尾与 bonus 不进分子分母，档位权重取 stable 的 300 / 100 / 50 / 0。
+        /// </summary>
+        /// <remarks>
+        /// 两轨的判定流不同，但每个物件都恰好产生一次基础判定，故分母口径一致：
+        /// classic 档的基础判定落在滑条主体上，Lazer 档落在滑条头上（主体是 Ignore）。
+        /// 这里只累加两个准确率字段，不建撤销栈；两字段都是可交换的求和，回退直接相减。
+        /// </remarks>
+        private void applyClassicAccuracyChange(JudgementResult result)
+        {
+            if (!result.Type.IsBasic() || !result.Type.AffectsAccuracy())
                 return;
 
-            stableScoring.Revert();
-            syncStableState();
+            ClassicMaxBaseScore += StableStdScoring.MaxBaseScore;
+            ClassicBaseScore += StableStdScoring.BaseScoreForResult(result.Type);
+        }
+
+        private void revertClassicAccuracyChange(JudgementResult result)
+        {
+            if (!result.Type.IsBasic() || !result.Type.AffectsAccuracy())
+                return;
+
+            ClassicMaxBaseScore -= StableStdScoring.MaxBaseScore;
+            ClassicBaseScore -= StableStdScoring.BaseScoreForResult(result.Type);
+        }
+
+        /// <summary>
+        /// 按帧头的判定计数重建 stable 准确率两个字段，口径与逐次累加一致。
+        /// </summary>
+        private void restoreClassicAccuracy(IReadOnlyDictionary<HitResult, int> statistics)
+        {
+            double baseScore = 0;
+            double maxBaseScore = 0;
+
+            foreach ((HitResult result, int count) in statistics)
+            {
+                if (!result.IsBasic() || !result.AffectsAccuracy())
+                    continue;
+
+                baseScore += (double)count * StableStdScoring.BaseScoreForResult(result);
+                maxBaseScore += (double)count * StableStdScoring.MaxBaseScore;
+            }
+
+            ClassicBaseScore = baseScore;
+            ClassicMaxBaseScore = maxBaseScore;
         }
 
         /// <summary>
@@ -167,7 +218,7 @@ namespace osu.Game.Rulesets.Osu.Scoring
             HighestCombo.Value = stableScoring.MaxCombo;
 
             ClassicBaseScore = stableScoring.AccuracyPoints;
-            ClassicMaxBaseScore = stableScoring.JudgedCount * 300;
+            ClassicMaxBaseScore = stableScoring.JudgedCount * StableStdScoring.MaxBaseScore;
         }
 
         public override ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results, bool useDefaultCutoffs = false)

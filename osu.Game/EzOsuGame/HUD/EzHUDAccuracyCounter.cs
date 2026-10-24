@@ -187,7 +187,8 @@ namespace osu.Game.EzOsuGame.HUD
                         case EzAccuracyDisplayMode.Classic:
                             // 可用性随局内判定档变化，必须订阅而不是加载时一次性判断：
                             // ApplyEzGameplayEnvironment 与 HUD 的加载时序不应成为隐含依赖。
-                            // TODO(Ez live stable 影子)：非 stable 档暂时隐藏，等 Session 可推进引擎。
+                            // osu 任何判定轨都可用（非 stable 档按 stable 档位权重统计实际判定）；
+                            // TODO(Ez live stable 影子)：mania 非 stable 档仍隐藏，等 Session 可推进引擎。
                             bindStableSlot(index);
                             break;
 

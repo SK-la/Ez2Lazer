@@ -33,6 +33,9 @@ namespace osu.Game.Rulesets.Osu.EzOsu.StableClassic
         private const int value_spinner_tick = 100;
         private const int value_spinner_bonus_tick = 1100;
 
+        /// <summary>一次基础判定的满分值，也是 stable 准确率分母的单个物件权重。</summary>
+        public const int MaxBaseScore = value_perfect;
+
         private readonly List<UndoState> undoStates = new List<UndoState>();
 
         private int combo;
