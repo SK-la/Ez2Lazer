@@ -3,10 +3,7 @@
 
 #nullable disable
 
-using osuTK;
-using osu.Game.Rulesets.Objects.Types;
 using System.Collections.Generic;
-using osu.Game.Rulesets.Objects;
 using System.Linq;
 using System.Threading;
 using JetBrains.Annotations;
@@ -17,20 +14,23 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Legacy;
+using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Osu.Judgements;
 using osu.Game.Rulesets.Scoring;
+using osuTK;
 
 namespace osu.Game.Rulesets.Osu.Objects
 {
     public class Slider : OsuHitObject, IHasPathWithRepeats, IHasSliderVelocity, IHasGenerateTicks
     {
-        public double EndTime => StartTime + this.SpanCount() * Path.Distance / Velocity;
+        public double EndTime => StartTime + getTotalDuration();
 
         [JsonIgnore]
         public double Duration
         {
-            get => EndTime - StartTime;
+            get => getTotalDuration();
             set => throw new System.NotSupportedException($"Adjust via {nameof(RepeatCount)} instead"); // can be implemented if/when needed.
         }
 
@@ -88,7 +88,42 @@ namespace osu.Game.Rulesets.Osu.Objects
         /// <summary>
         /// The length of one span of this <see cref="Slider"/>.
         /// </summary>
-        public double SpanDuration => Duration / this.SpanCount();
+        public double SpanDuration => getTotalDuration() / this.SpanCount();
+
+        /// <summary>
+        /// The duration of all spans, collapsing to zero when it cannot be represented on a timeline.
+        /// </summary>
+        /// <remarks>
+        /// osu!stable derives a slider's end time from the author-set length as a 32-bit integer, so a length that
+        /// overflows that range yields no usable end time at all. Aspire maps carry such lengths deliberately; keeping
+        /// the value would leave the object alive for astronomically long and force a path approximation covering
+        /// hundreds of thousands of control points, so those sliders end where they start.
+        /// </remarks>
+        private double getTotalDuration()
+        {
+            int spanCount = this.SpanCount();
+
+            // Velocity is only known once defaults are applied; before that the caller is expected to get the same
+            // degenerate value it always did.
+            if (Velocity <= 0)
+                return spanCount * Path.Distance / Velocity;
+
+            // Check the author-set length first: it bounds the real distance and costs nothing, whereas Path.Distance
+            // forces a full approximation of a path that may hold hundreds of thousands of control points.
+            if (Path.ExpectedDistance.Value is double expectedDistance && !isRepresentableDuration(expectedDistance))
+                return 0;
+
+            double distance = Path.Distance;
+
+            return isRepresentableDuration(distance) ? spanCount * distance / Velocity : 0;
+
+            bool isRepresentableDuration(double distance)
+            {
+                double duration = spanCount * distance / Velocity;
+
+                return double.IsFinite(duration) && duration >= 0 && StartTime + duration <= int.MaxValue;
+            }
+        }
 
         /// <summary>
         /// The computed velocity of this <see cref="Slider"/>. This is the amount of path distance travelled in 1 ms.
@@ -171,7 +206,13 @@ namespace osu.Game.Rulesets.Osu.Objects
         {
             base.CreateNestedHitObjects(cancellationToken);
 
-            var sliderEvents = SliderEventGenerator.Generate(StartTime, SpanDuration, Velocity, TickDistance, Path.Distance, this.SpanCount(), cancellationToken);
+            double spanDuration = SpanDuration;
+
+            // A slider whose duration collapsed (see getTotalDuration) has no time for ticks or repeats, and its path
+            // is exactly the shape we must avoid approximating. Only the head and tail exist, both at the start time.
+            var sliderEvents = spanDuration > 0
+                ? SliderEventGenerator.Generate(StartTime, spanDuration, Velocity, TickDistance, Path.Distance, this.SpanCount(), cancellationToken)
+                : CreateDegenerateEvents();
 
             foreach (var e in sliderEvents)
             {
@@ -204,7 +245,8 @@ namespace osu.Game.Rulesets.Osu.Objects
                         {
                             RepeatIndex = e.SpanIndex,
                             StartTime = e.Time,
-                            Position = EndPosition,
+                            // Reading EndPosition would approximate the entire path, so a collapsed slider stays where it starts.
+                            Position = spanDuration > 0 ? EndPosition : Position,
                             StackHeight = StackHeight,
                             ClassicSliderBehaviour = ClassicSliderBehaviour,
                         });
@@ -214,7 +256,7 @@ namespace osu.Game.Rulesets.Osu.Objects
                         AddNested(LastRepeat = new SliderRepeat(this)
                         {
                             RepeatIndex = e.SpanIndex,
-                            StartTime = StartTime + (e.SpanIndex + 1) * SpanDuration,
+                            StartTime = StartTime + (e.SpanIndex + 1) * spanDuration,
                             Position = Position + Path.PositionAt(e.PathProgress),
                             StackHeight = StackHeight,
                             PathProgress = e.PathProgress,
@@ -224,6 +266,15 @@ namespace osu.Game.Rulesets.Osu.Objects
             }
 
             UpdateNestedSamples();
+        }
+
+        /// <summary>
+        /// The only events a collapsed slider produces: a head and a tail at the start time.
+        /// </summary>
+        protected static IEnumerable<SliderEventDescriptor> CreateDegenerateEvents()
+        {
+            yield return new SliderEventDescriptor { Type = SliderEventType.Head };
+            yield return new SliderEventDescriptor { Type = SliderEventType.Tail };
         }
 
         private void updateNestedPositions()
