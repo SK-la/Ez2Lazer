@@ -44,6 +44,13 @@ namespace osu.Game.IO.Archives
         /// </summary>
         public long MaximumEntrySize { get; set; } = 100 * 1024 * 1024; // bytes
 
+        /// <summary>
+        /// Specifies the maximum permitted size of beatmap (<c>.osu</c>) entries in bytes.
+        /// Aspire maps may ship a single beatmap file beyond <see cref="MaximumEntrySize"/> while the remaining entries stay small,
+        /// so the beatmap file has its own, still bounded, limit.
+        /// </summary>
+        public long MaximumBeatmapEntrySize { get; set; } = 128 * 1024 * 1024; // bytes
+
         static ZipArchiveReader()
         {
             // Required to support rare code pages. Must run before any CP932 lookup, since static field
@@ -115,10 +122,12 @@ namespace osu.Game.IO.Archives
             if (entry == null)
                 return null;
 
+            long maximumSize = name.EndsWith(".osu", StringComparison.OrdinalIgnoreCase) ? MaximumBeatmapEntrySize : MaximumEntrySize;
+
             using (Stream s = entry.OpenEntryStream())
             {
-                if (entry.Size > MaximumEntrySize)
-                    throw new InsufficientMemoryException($@"Size of file ""{name}"" exceeds allowable limit of {MaximumEntrySize} bytes");
+                if (entry.Size > maximumSize)
+                    throw new InsufficientMemoryException($@"Size of file ""{name}"" exceeds allowable limit of {maximumSize} bytes");
 
                 if (entry.Size > 0)
                 {

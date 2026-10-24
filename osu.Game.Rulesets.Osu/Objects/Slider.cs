@@ -3,10 +3,7 @@
 
 #nullable disable
 
-using osuTK;
-using osu.Game.Rulesets.Objects.Types;
 using System.Collections.Generic;
-using osu.Game.Rulesets.Objects;
 using System.Linq;
 using System.Threading;
 using JetBrains.Annotations;
@@ -17,15 +14,18 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Legacy;
+using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Osu.Judgements;
 using osu.Game.Rulesets.Scoring;
+using osuTK;
 
 namespace osu.Game.Rulesets.Osu.Objects
 {
     public class Slider : OsuHitObject, IHasPathWithRepeats, IHasSliderVelocity, IHasGenerateTicks
     {
-        public double EndTime => StartTime + this.SpanCount() * Path.Distance / Velocity;
+        public double EndTime => StartTime + getTotalDuration();
 
         [JsonIgnore]
         public double Duration
@@ -38,7 +38,9 @@ namespace osu.Game.Rulesets.Osu.Objects
 
         private readonly Cached<Vector2> endPositionCache = new Cached<Vector2>();
 
-        public override Vector2 EndPosition => endPositionCache.IsValid ? endPositionCache.Value : endPositionCache.Value = Position + this.CurvePositionAt(1);
+        public override Vector2 EndPosition => endPositionCache.IsValid
+            ? endPositionCache.Value
+            : endPositionCache.Value = isDurationCollapsed ? Position : Position + this.CurvePositionAt(1);
 
         public Vector2 StackedPositionAt(double t) => StackedPosition + this.CurvePositionAt(t);
 
@@ -47,13 +49,7 @@ namespace osu.Game.Rulesets.Osu.Objects
         public SliderPath Path
         {
             get => path;
-            set
-            {
-                path.ControlPoints.Clear();
-                path.ControlPoints.AddRange(value.ControlPoints.Select(c => new PathControlPoint(c.Position, c.Type)));
-
-                path.ExpectedDistance.Value = value.ExpectedDistance.Value;
-            }
+            set => path.CopyFrom(value);
         }
 
         public double Distance => Path.Distance;
@@ -89,6 +85,64 @@ namespace osu.Game.Rulesets.Osu.Objects
         /// The length of one span of this <see cref="Slider"/>.
         /// </summary>
         public double SpanDuration => Duration / this.SpanCount();
+
+        private double? endTimeLimit;
+
+        /// <summary>
+        /// The latest end time this slider may have before its duration is treated as unrepresentable and collapses to zero.
+        /// <see langword="null"/> keeps the literal duration.
+        /// </summary>
+        /// <remarks>
+        /// Aspire maps carry slider lengths that put the end time days or years beyond the map itself. osu!stable stores
+        /// end times as 32-bit integers, so such lengths yield no usable end time there and the sliders effectively do
+        /// not exist. Reproducing that here also keeps an object from staying alive for an unbounded time while forcing
+        /// a path approximation over hundreds of thousands of control points.
+        /// </remarks>
+        public double? EndTimeLimit
+        {
+            get => endTimeLimit;
+            set
+            {
+                if (endTimeLimit == value)
+                    return;
+
+                endTimeLimit = value;
+                endPositionCache.Invalidate();
+                updateNestedPositions();
+            }
+        }
+
+        private bool isDurationCollapsed => endTimeLimit != null && getTotalDuration() <= 0;
+
+        /// <summary>
+        /// The duration of all spans.
+        /// </summary>
+        /// <remarks>
+        /// Without <see cref="EndTimeLimit"/> this is exactly the legacy expression, whatever the resulting value.
+        /// </remarks>
+        private double getTotalDuration()
+        {
+            int spanCount = this.SpanCount();
+
+            if (endTimeLimit is not double limit || Velocity <= 0)
+                return spanCount * Path.Distance / Velocity;
+
+            // Check the author-set length first: it bounds the real distance and costs nothing, whereas Path.Distance
+            // forces a full approximation of a path that may hold hundreds of thousands of control points.
+            if (Path.ExpectedDistance.Value is double expectedDistance && !isRepresentableDuration(expectedDistance))
+                return 0;
+
+            double distance = Path.Distance;
+
+            return isRepresentableDuration(distance) ? spanCount * distance / Velocity : 0;
+
+            bool isRepresentableDuration(double distance)
+            {
+                double duration = spanCount * distance / Velocity;
+
+                return double.IsFinite(duration) && duration >= 0 && StartTime + duration <= limit;
+            }
+        }
 
         /// <summary>
         /// The computed velocity of this <see cref="Slider"/>. This is the amount of path distance travelled in 1 ms.
@@ -171,7 +225,13 @@ namespace osu.Game.Rulesets.Osu.Objects
         {
             base.CreateNestedHitObjects(cancellationToken);
 
-            var sliderEvents = SliderEventGenerator.Generate(StartTime, SpanDuration, Velocity, TickDistance, Path.Distance, this.SpanCount(), cancellationToken);
+            double spanDuration = SpanDuration;
+
+            // A slider whose duration collapsed (see getTotalDuration) has no time for ticks or repeats, and its path
+            // is exactly the shape we must avoid approximating. Only the head and tail exist, both at the start time.
+            var sliderEvents = spanDuration > 0
+                ? SliderEventGenerator.Generate(StartTime, spanDuration, Velocity, TickDistance, Path.Distance, this.SpanCount(), cancellationToken)
+                : CreateDegenerateEvents();
 
             foreach (var e in sliderEvents)
             {
@@ -204,7 +264,8 @@ namespace osu.Game.Rulesets.Osu.Objects
                         {
                             RepeatIndex = e.SpanIndex,
                             StartTime = e.Time,
-                            Position = EndPosition,
+                            // Reading EndPosition would approximate the entire path, so a collapsed slider stays where it starts.
+                            Position = spanDuration > 0 ? EndPosition : Position,
                             StackHeight = StackHeight,
                             ClassicSliderBehaviour = ClassicSliderBehaviour,
                         });
@@ -214,7 +275,7 @@ namespace osu.Game.Rulesets.Osu.Objects
                         AddNested(LastRepeat = new SliderRepeat(this)
                         {
                             RepeatIndex = e.SpanIndex,
-                            StartTime = StartTime + (e.SpanIndex + 1) * SpanDuration,
+                            StartTime = StartTime + (e.SpanIndex + 1) * spanDuration,
                             Position = Position + Path.PositionAt(e.PathProgress),
                             StackHeight = StackHeight,
                             PathProgress = e.PathProgress,
@@ -224,6 +285,27 @@ namespace osu.Game.Rulesets.Osu.Objects
             }
 
             UpdateNestedSamples();
+        }
+
+        /// <summary>
+        /// The only events a collapsed slider produces: a head and a tail, both at the slider's start time.
+        /// </summary>
+        protected IEnumerable<SliderEventDescriptor> CreateDegenerateEvents()
+        {
+            yield return new SliderEventDescriptor
+            {
+                Type = SliderEventType.Head,
+                Time = StartTime,
+                SpanStartTime = StartTime,
+            };
+
+            yield return new SliderEventDescriptor
+            {
+                Type = SliderEventType.Tail,
+                Time = StartTime,
+                SpanStartTime = StartTime,
+                SpanIndex = this.SpanCount() - 1,
+            };
         }
 
         private void updateNestedPositions()

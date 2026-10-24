@@ -333,7 +333,13 @@ namespace osu.Game.Beatmaps
                     return null;
                 }
 
-                beatmap = Decoder.GetDecoder<Beatmap>(stream).Decode(stream);
+                var decoder = Decoder.GetDecoder<Beatmap>(stream);
+
+                // Only the set id is read here; the full decode happens once in createBeatmapDifficulties().
+                if (decoder is LegacyBeatmapDecoder legacyDecoder)
+                    legacyDecoder.SkipHitObjects = true;
+
+                beatmap = decoder.Decode(stream);
             }
 
             return new BeatmapSetInfo

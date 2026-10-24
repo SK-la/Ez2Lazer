@@ -112,11 +112,17 @@ namespace osu.Game.Rulesets.Osu.Mods
                 ComboOffset = original.ComboOffset;
                 TickDistanceMultiplier = original.TickDistanceMultiplier;
                 SliderVelocityMultiplier = original.SliderVelocityMultiplier;
+                EndTimeLimit = original.EndTimeLimit;
             }
 
             protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
             {
-                var sliderEvents = SliderEventGenerator.Generate(StartTime, SpanDuration, Velocity, TickDistance, Path.Distance, this.SpanCount(), cancellationToken);
+                double spanDuration = SpanDuration;
+
+                // Mirrors Slider: a collapsed slider has no ticks or repeats, and its path must not be approximated.
+                var sliderEvents = spanDuration > 0
+                    ? SliderEventGenerator.Generate(StartTime, spanDuration, Velocity, TickDistance, Path.Distance, this.SpanCount(), cancellationToken)
+                    : CreateDegenerateEvents();
 
                 foreach (var e in sliderEvents)
                 {
@@ -149,7 +155,7 @@ namespace osu.Game.Rulesets.Osu.Mods
                             {
                                 RepeatIndex = e.SpanIndex,
                                 StartTime = e.Time,
-                                Position = EndPosition,
+                                Position = spanDuration > 0 ? EndPosition : Position,
                                 StackHeight = StackHeight
                             });
                             break;
@@ -158,7 +164,7 @@ namespace osu.Game.Rulesets.Osu.Mods
                             AddNested(new SliderRepeat(this)
                             {
                                 RepeatIndex = e.SpanIndex,
-                                StartTime = StartTime + (e.SpanIndex + 1) * SpanDuration,
+                                StartTime = StartTime + (e.SpanIndex + 1) * spanDuration,
                                 Position = Position + Path.PositionAt(e.PathProgress),
                                 StackHeight = StackHeight,
                                 Scale = Scale,

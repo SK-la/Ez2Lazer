@@ -70,9 +70,15 @@ namespace osu.Game.Rulesets.Osu.Skinning
             Refresh();
         }
 
+        private bool isCollapsed => drawableSlider.HitObject?.SpanDuration is not > 0;
+
         public void UpdateProgress(double completionProgress)
         {
             if (drawableSlider.HitObject == null)
+                return;
+
+            // A collapsed slider has no body to reveal, and its path must never be approximated.
+            if (isCollapsed)
                 return;
 
             Slider slider = drawableSlider.HitObject;
@@ -104,9 +110,16 @@ namespace osu.Game.Rulesets.Osu.Skinning
             if (drawableSlider.HitObject == null)
                 return;
 
-            // Generate the entire curve
+            // Generate the entire curve, unless the slider collapsed to zero duration: its path can hold hundreds of
+            // thousands of control points while there is no time to traverse it. A single vertex keeps the drawable
+            // well-formed without approximating anything.
             CurrentCurve.Clear();
-            CurrentCurve.AddRange(drawableSlider.HitObject.Path.CalculatedPath);
+
+            if (isCollapsed)
+                CurrentCurve.Add(Vector2.Zero);
+            else
+                CurrentCurve.AddRange(drawableSlider.HitObject.Path.CalculatedPath);
+
             SetVertices(CurrentCurve);
 
             // Force the body to be the final path size to avoid excessive autosize computations
@@ -124,6 +137,9 @@ namespace osu.Game.Rulesets.Osu.Skinning
 
             SnakedStart = null;
             SnakedEnd = null;
+
+            if (isCollapsed)
+                return;
 
             setRange(lastSnakedStart, lastSnakedEnd);
         }
@@ -143,6 +159,9 @@ namespace osu.Game.Rulesets.Osu.Skinning
 
         private void setRange(double p0, double p1)
         {
+            if (isCollapsed)
+                return;
+
             if (p0 > p1)
                 (p0, p1) = (p1, p0);
 

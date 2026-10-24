@@ -61,6 +61,15 @@ namespace osu.Game.Beatmaps.Formats
         /// </summary>
         public bool ApplyOffsets = true;
 
+        /// <summary>
+        /// Whether hitobjects should be skipped entirely.
+        /// </summary>
+        /// <remarks>
+        /// Mirrors osu!stable's header-only read. Import uses this for metadata, so a large beatmap file is not fully
+        /// materialised twice; difficulty and gameplay always need the real objects.
+        /// </remarks>
+        public bool SkipHitObjects { get; set; }
+
         private readonly int offset;
 
         public LegacyBeatmapDecoder(int version = LATEST_VERSION)
@@ -606,6 +615,9 @@ namespace osu.Game.Beatmaps.Formats
 
         private void handleHitObject(string line)
         {
+            if (SkipHitObjects)
+                return;
+
             var obj = parser.Parse(line);
             obj.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
 
