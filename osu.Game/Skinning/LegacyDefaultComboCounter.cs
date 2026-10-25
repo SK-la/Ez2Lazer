@@ -6,6 +6,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Threading;
 using osu.Game.Rulesets.Scoring;
 using osuTK;
 
@@ -19,6 +20,11 @@ namespace osu.Game.Skinning
         public Bindable<int> Current { get; } = new BindableInt { MinValue = 0 };
 
         private uint scheduledPopOutCurrentId;
+
+        /// <summary>
+        /// The queued pop-out from the most recent combo increase, cancelled as soon as a newer one supersedes it.
+        /// </summary>
+        private ScheduledDelegate? pendingPopOut;
 
         private const double big_pop_out_duration = 300;
 
@@ -204,7 +210,7 @@ namespace osu.Game.Skinning
 
         private void onCountIncrement(int currentValue, int newValue)
         {
-            scheduledPopOutCurrentId++;
+            invalidatePendingPopOut();
 
             if (DisplayedCount < currentValue)
                 DisplayedCount++;
@@ -215,15 +221,32 @@ namespace osu.Game.Skinning
 
             uint newTaskId = scheduledPopOutCurrentId;
 
-            Scheduler.AddDelayed(delegate
+            pendingPopOut = Scheduler.AddDelayed(delegate
             {
                 scheduledPopOutSmall(newTaskId);
             }, big_pop_out_duration - 140);
         }
 
-        private void onCountRolling(int currentValue, int newValue)
+        /// <summary>
+        /// Marks any queued pop-out as superseded and drops it from the scheduler.
+        /// </summary>
+        /// <remarks>
+        /// A queued pop-out only acts when it still carries the current id, so a superseded one is already a no-op
+        /// when it runs. Removing it is therefore invisible, and it keeps a burst of combo increases from leaving
+        /// thousands of dead entries in the queue: a beatmap whose sliders carry thousands of repeats can raise the
+        /// combo thousands of times within one frame, and the queued entries pile up faster than they expire.
+        /// </remarks>
+        private void invalidatePendingPopOut()
         {
             scheduledPopOutCurrentId++;
+
+            pendingPopOut?.Cancel();
+            pendingPopOut = null;
+        }
+
+        private void onCountRolling(int currentValue, int newValue)
+        {
+            invalidatePendingPopOut();
 
             // Hides displayed count if was increasing from 0 to 1 but didn't finish
             if (currentValue == 0 && newValue == 0)
@@ -234,7 +257,7 @@ namespace osu.Game.Skinning
 
         private void onCountChange(int newValue)
         {
-            scheduledPopOutCurrentId++;
+            invalidatePendingPopOut();
 
             if (newValue == 0)
                 displayedCountSpriteText.FadeOut();
