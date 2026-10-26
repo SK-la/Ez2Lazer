@@ -64,9 +64,11 @@ namespace osu.Game.Rulesets.Osu.Scoring
         {
         }
 
-        public override void ApplyEzGameplayEnvironment()
+        public override void ApplyEzGameplayEnvironment(bool forceStableClassic = false)
         {
-            JudgementTrackOverride ??= GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode);
+            JudgementTrackOverride ??= forceStableClassic
+                ? EzEnumJudgeMode.StableClassic
+                : GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode);
 
             if (OsuStableClassic.IsActive(stdJudgeMode))
                 IsLegacyScore = true;

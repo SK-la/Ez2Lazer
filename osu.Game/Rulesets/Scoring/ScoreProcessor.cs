@@ -221,7 +221,10 @@ namespace osu.Game.Rulesets.Scoring
         /// 必须在 <see cref="ApplyBeatmap"/> 之前调用。
         /// 无头/转换路径（legacy 转换、后台升级、重算等）不得调用，以保持 ppy 上游官方行为。
         /// </summary>
-        public virtual void ApplyEzGameplayEnvironment()
+        /// <param name="forceStableClassic">
+        /// 本局强制使用 stable classic 判定档，覆盖已保存的设置。仅作用于本局内存，不写回配置。
+        /// </param>
+        public virtual void ApplyEzGameplayEnvironment(bool forceStableClassic = false)
         {
         }
 

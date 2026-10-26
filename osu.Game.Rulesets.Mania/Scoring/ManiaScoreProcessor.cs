@@ -109,9 +109,12 @@ namespace osu.Game.Rulesets.Mania.Scoring
         /// gameplay 入口（Player / 皮肤编辑器预览）冻结当前全局 JudgeMode。
         /// 必须在 <see cref="ScoreProcessor.ApplyBeatmap"/> 之前调用，否则全谱模拟与实际判定权重不一致。
         /// </summary>
-        public override void ApplyEzGameplayEnvironment()
+        public override void ApplyEzGameplayEnvironment(bool forceStableClassic = false)
         {
-            JudgeModeOverride ??= GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
+            JudgeModeOverride ??= forceStableClassic
+                ? EzEnumJudgeMode.StableClassic
+                : GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
+
             refreshStableAvailability();
         }
 
