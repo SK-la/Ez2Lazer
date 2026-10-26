@@ -2,9 +2,12 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using osu.Framework.Bindables;
 using osu.Framework.Utils;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Scoring
 {
@@ -30,6 +33,11 @@ namespace osu.Game.Rulesets.Scoring
         /// Whether this ScoreProcessor has already triggered the failed state.
         /// </summary>
         public bool HasFailed { get; private set; }
+
+        /// <summary>
+        /// List of <see cref="HealthValue"/>s which constitute a health graph.
+        /// </summary>
+        private List<HealthValue> healthGraph { get; } = new List<HealthValue>();
 
         /// <summary>
         /// Immediately triggers a failure for this HealthProcessor.
@@ -65,6 +73,7 @@ namespace osu.Game.Rulesets.Scoring
                 return;
 
             Health.Value += GetHealthIncreaseFor(result);
+            healthGraph.Add(new HealthValue(result.TimeAbsolute, Health.Value));
 
             if (meetsAnyFailCondition(result))
                 TriggerFailure();
@@ -78,6 +87,8 @@ namespace osu.Game.Rulesets.Scoring
                 return;
 
             Health.Value = result.HealthAtJudgement;
+            Debug.Assert(healthGraph.Count > 0);
+            healthGraph.RemoveAt(healthGraph.Count - 1);
         }
 
         /// <summary>
@@ -115,12 +126,18 @@ namespace osu.Game.Rulesets.Scoring
             return false;
         }
 
+        public void PopulateScore(ScoreInfo score)
+        {
+            score.HealthGraph = healthGraph;
+        }
+
         protected override void Reset(bool storeResults)
         {
             base.Reset(storeResults);
 
             Health.Value = 1;
             HasFailed = false;
+            healthGraph.Clear();
         }
     }
 }
