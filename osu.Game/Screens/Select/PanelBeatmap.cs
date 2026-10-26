@@ -527,7 +527,7 @@ namespace osu.Game.Screens.Select
                 starCounter.Current = (float)starDifficulty.NewValue.Stars;
 
                 ezDisplayKps.SetPp(EzPanelPerformancePoints.ResolvePanelPp(starDifficulty.NewValue, beatmap));
-            }, true);
+            });
         }
 
         protected override void Update()
