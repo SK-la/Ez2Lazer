@@ -9,11 +9,14 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Osu.Objects
 {
-    public class SliderTick : OsuHitObject
+    public class SliderTick : OsuHitObject, IStableUndrawnScoringPoint
     {
         public int SpanIndex { get; set; }
         public double SpanStartTime { get; set; }
         public double PathProgress { get; set; }
+
+        /// <inheritdoc />
+        public bool UndrawnUnderStableRules { get; set; }
 
         protected override void ApplyDefaultsToSelf(ControlPointInfo controlPointInfo, IBeatmapDifficultyInfo difficulty)
         {

@@ -36,13 +36,112 @@ namespace osu.Game.Rulesets.Objects
         /// </summary>
         public bool HasValidLengthForPlacement => Precision.DefinitelyBigger(Distance, 0, 1);
 
+        // 位置与类型才是权威存储；仅在调用方真正枚举或修改时才构建 PathControlPoint。
+        // Aspire 单滑条可有数百万控制点，为每个点物化一个对象比几何本身更贵。
+        private readonly List<Vector2> controlPointPositions = new List<Vector2>();
+        private readonly List<PathType?> controlPointTypes = new List<PathType?>();
+
+        private BindableList<PathControlPoint>? materialisedControlPoints;
+
         /// <summary>
         /// The control points of the path.
         /// </summary>
-        public readonly BindableList<PathControlPoint> ControlPoints = new BindableList<PathControlPoint>();
+        /// <remarks>
+        /// 枚举、绑定或修改此列表会为每个点物化一个 <see cref="PathControlPoint"/>。
+        /// 通过 <see cref="SliderPath"/> 本身读几何不会。
+        /// </remarks>
+        public BindableList<PathControlPoint> ControlPoints => materialisedControlPoints ??= materialiseControlPoints();
+
+        private int controlPointCount => materialisedControlPoints?.Count ?? controlPointPositions.Count;
+
+        private Vector2 controlPointPosition(int index) => materialisedControlPoints != null ? materialisedControlPoints[index].Position : controlPointPositions[index];
+
+        private PathType? controlPointType(int index) => materialisedControlPoints != null ? materialisedControlPoints[index].Type : controlPointTypes[index];
+
+        private BindableList<PathControlPoint> materialiseControlPoints()
+        {
+            var points = new BindableList<PathControlPoint>();
+            var materialised = new PathControlPoint[controlPointPositions.Count];
+
+            for (int i = 0; i < controlPointPositions.Count; i++)
+                materialised[i] = new PathControlPoint(controlPointPositions[i], controlPointTypes[i]);
+
+            points.AddRange(materialised);
+
+            // 在集合处理器挂上之前订阅，使就地修改的点仍能失效路径；后续添加由处理器订阅。
+            foreach (var point in materialised)
+                point.Changed += invalidate;
+
+            points.CollectionChanged += onControlPointsChanged;
+            return points;
+        }
+
+        private void onControlPointsChanged(object? sender, NotifyCollectionChangedEventArgs args)
+        {
+            switch (args.Action)
+            {
+                case NotifyCollectionChangedAction.Add:
+                    Debug.Assert(args.NewItems != null);
+
+                    foreach (object? newItem in args.NewItems)
+                        ((PathControlPoint)newItem).Changed += invalidate;
+
+                    break;
+
+                case NotifyCollectionChangedAction.Reset:
+                case NotifyCollectionChangedAction.Remove:
+                    Debug.Assert(args.OldItems != null);
+
+                    foreach (object? oldItem in args.OldItems)
+                        ((PathControlPoint)oldItem).Changed -= invalidate;
+                    break;
+            }
+
+            invalidate();
+        }
+
+        /// <summary>
+        /// 用 <paramref name="source"/> 的几何替换本路径，且不构建 <see cref="PathControlPoint"/> 对象。
+        /// </summary>
+        public void CopyFrom(SliderPath source)
+        {
+            controlPointPositions.Clear();
+            controlPointTypes.Clear();
+
+            if (source.materialisedControlPoints != null)
+            {
+                foreach (var point in source.materialisedControlPoints)
+                {
+                    controlPointPositions.Add(point.Position);
+                    controlPointTypes.Add(point.Type);
+                }
+            }
+            else
+            {
+                controlPointPositions.AddRange(source.controlPointPositions);
+                controlPointTypes.AddRange(source.controlPointTypes);
+            }
+
+            materialisedControlPoints = null;
+            ExpectedDistance.Value = source.ExpectedDistance.Value;
+            invalidate();
+        }
 
         private readonly List<Vector2> calculatedPath = new List<Vector2>();
         private readonly List<double> cumulativeLength = new List<double>();
+
+        /// <summary>
+        /// 到达 <c>calculatedPath[i + 1]</c> 的边是否为直线段。
+        /// osu!stable 对直线用 32px 绘制期接合阈值，曲线用 6px。
+        /// </summary>
+        private readonly List<bool> edgeStraight = new List<bool>();
+
+        /// <summary>
+        /// 该边是否为其控制点段的最后一条线。
+        /// osu!stable 总会发出这样一条线，因此接合不能跨段边界。
+        /// </summary>
+        private readonly List<bool> edgeForceEnd = new List<bool>();
+
         private readonly Cached pathCache = new Cached();
 
         /// <summary>
@@ -67,30 +166,6 @@ namespace osu.Game.Rulesets.Objects
         public SliderPath()
         {
             ExpectedDistance.ValueChanged += _ => invalidate();
-
-            ControlPoints.CollectionChanged += (_, args) =>
-            {
-                switch (args.Action)
-                {
-                    case NotifyCollectionChangedAction.Add:
-                        Debug.Assert(args.NewItems != null);
-
-                        foreach (object? newItem in args.NewItems)
-                            ((PathControlPoint)newItem).Changed += invalidate;
-
-                        break;
-
-                    case NotifyCollectionChangedAction.Reset:
-                    case NotifyCollectionChangedAction.Remove:
-                        Debug.Assert(args.OldItems != null);
-
-                        foreach (object? oldItem in args.OldItems)
-                            ((PathControlPoint)oldItem).Changed -= invalidate;
-                        break;
-                }
-
-                invalidate();
-            };
         }
 
         /// <summary>
@@ -103,13 +178,29 @@ namespace osu.Game.Rulesets.Objects
         public SliderPath(PathControlPoint[] controlPoints, double? expectedDistance = null)
             : this()
         {
-            ControlPoints.AddRange(controlPoints);
+            foreach (var point in controlPoints)
+            {
+                controlPointPositions.Add(point.Position);
+                controlPointTypes.Add(point.Type);
+            }
+
             ExpectedDistance.Value = expectedDistance;
+            invalidate();
         }
 
         public SliderPath(PathType type, Vector2[] controlPoints, double? expectedDistance = null)
-            : this(controlPoints.Select((c, i) => new PathControlPoint(c, i == 0 ? type : null)).ToArray(), expectedDistance)
+            : this()
         {
+            controlPointPositions.AddRange(controlPoints);
+
+            foreach (var _ in controlPoints)
+                controlPointTypes.Add(null);
+
+            if (controlPointTypes.Count > 0)
+                controlPointTypes[0] = type;
+
+            ExpectedDistance.Value = expectedDistance;
+            invalidate();
         }
 
         /// <summary>
@@ -183,11 +274,11 @@ namespace osu.Game.Rulesets.Objects
 
             path.Clear();
 
-            int i = 0;
+            // 二分而非从零扫描：身蛇行时每个可见滑条每帧都会跑，aspire 路径可有数十万顶点。
+            int i = indexOfDistance(d0);
 
-            for (; i < calculatedPath.Count && cumulativeLength[i] < d0; ++i)
-            {
-            }
+            if (i > 0 && cumulativeLength[i] > d0)
+                i--;
 
             path.Add(interpolateVertices(i, d0));
 
@@ -195,6 +286,81 @@ namespace osu.Game.Rulesets.Objects
                 path.Add(calculatedPath[i]);
 
             path.Add(interpolateVertices(i, d1));
+        }
+
+        /// <summary>
+        /// osu!stable 在两个进度值之间为身栅格化的折线。
+        /// </summary>
+        /// <remarks>
+        /// stable 走近似线段，顶点仍在当前锚点 6 显示像素内则跳过（直线段为 32），但控制点段的最后一条线总会发出。
+        /// 比较发生在 <c>FieldToDisplay</c> 之后，因此 <paramref name="pixelsPerUnit"/> 把它换回场地单位。
+        /// 球与评分距离仍用 <see cref="CalculatedPath"/>。
+        /// </remarks>
+        public void GetStableRasterPath(List<Vector2> destination, double p0, double p1, float pixelsPerUnit = 1)
+        {
+            ensureValid();
+            destination.Clear();
+
+            int count = calculatedPath.Count;
+
+            if (count == 0)
+                return;
+
+            if (count == 1 || edgeStraight.Count == 0)
+            {
+                destination.Add(calculatedPath[0]);
+                return;
+            }
+
+            double d0 = progressToDistance(p0);
+            double d1 = progressToDistance(p1);
+
+            if (d0 > d1)
+                (d0, d1) = (d1, d0);
+
+            int edgeCount = calculatedPath.Count - 1;
+            int first = 0;
+
+            while (first < edgeCount - 1 && cumulativeLength[first + 1] <= d0)
+                first++;
+
+            int last = first;
+
+            while (last < edgeCount - 1 && cumulativeLength[last + 1] < d1)
+                last++;
+
+            Vector2 anchorPos = cumulativeLength[first] >= d0 ? calculatedPath[first] : interpolateVertices(indexOfDistance(d0), d0);
+            bool started = false;
+
+            for (int edge = first; edge <= last; edge++)
+            {
+                bool isLast = edge == last;
+                Vector2 endPos = isLast && cumulativeLength[edge + 1] > d1
+                    ? interpolateVertices(indexOfDistance(d1), d1)
+                    : calculatedPath[edge + 1];
+
+                // 6 与 32 是显示像素。一场地单位一像素时与场地单位数值相同。
+                float pixelScale = pixelsPerUnit > 0 ? pixelsPerUnit : 1;
+                float threshold = (edgeStraight[edge] ? 32f : 6f) / pixelScale;
+                bool farther = Vector2.Distance(anchorPos, endPos) > threshold;
+                bool secondToLast = edge == last - 1;
+
+                // SliderOsu 画线，除非仍在阈值内、不是段末、也不是本趟倒数第二条线。
+                if (!farther && !isLast && !edgeForceEnd[edge] && !secondToLast)
+                    continue;
+
+                if (!started)
+                {
+                    destination.Add(anchorPos);
+                    started = true;
+                }
+
+                destination.Add(endPos);
+                anchorPos = endPos;
+            }
+
+            if (!started)
+                destination.Add(anchorPos);
         }
 
         /// <summary>
@@ -287,30 +453,37 @@ namespace osu.Game.Rulesets.Objects
         private void calculatePath()
         {
             calculatedPath.Clear();
+            edgeStraight.Clear();
+            edgeForceEnd.Clear();
             segmentEnds.Clear();
             optimisedLength = 0;
 
-            if (ControlPoints.Count == 0)
+            int count = controlPointCount;
+
+            if (count == 0)
                 return;
 
-            Vector2[] vertices = new Vector2[ControlPoints.Count];
-            for (int i = 0; i < ControlPoints.Count; i++)
-                vertices[i] = ControlPoints[i].Position;
+            Vector2[] vertices = new Vector2[count];
+            for (int i = 0; i < count; i++)
+                vertices[i] = controlPointPosition(i);
 
             int start = 0;
 
-            for (int i = 0; i < ControlPoints.Count; i++)
+            for (int i = 0; i < count; i++)
             {
-                if (ControlPoints[i].Type == null && i < ControlPoints.Count - 1)
+                if (controlPointType(i) == null && i < count - 1)
                     continue;
 
                 // The current vertex ends the segment
                 var segmentVertices = vertices.AsSpan().Slice(start, i - start + 1);
-                var segmentType = ControlPoints[start].Type ?? PathType.LINEAR;
+                var segmentType = controlPointType(start) ?? PathType.LINEAR;
+
+                // 两点曲线就是直线，stable 把每条线性线标成直线。绘制阈值不同，且每条线也结束自己的段。
+                bool straight = segmentType.Type == SplineType.Linear || segmentVertices.Length <= 2;
 
                 // No need to calculate path when there is only 1 vertex
                 if (segmentVertices.Length == 1)
-                    calculatedPath.Add(segmentVertices[0]);
+                    appendVertex(segmentVertices[0], straight, true);
                 else if (segmentVertices.Length > 1)
                 {
                     List<Vector2> subPath = calculateSubPath(segmentVertices, segmentType);
@@ -319,7 +492,7 @@ namespace osu.Game.Rulesets.Objects
                     bool skipFirst = calculatedPath.Count > 0 && subPath.Count > 0 && calculatedPath.Last() == subPath[0];
 
                     for (int j = skipFirst ? 1 : 0; j < subPath.Count; j++)
-                        calculatedPath.Add(subPath[j]);
+                        appendVertex(subPath[j], straight, straight || j == subPath.Count - 1);
                 }
 
                 if (i > 0)
@@ -331,6 +504,17 @@ namespace osu.Game.Rulesets.Objects
                 // Start the new segment at the current vertex
                 start = i;
             }
+        }
+
+        private void appendVertex(Vector2 vertex, bool straight, bool forceEnd)
+        {
+            if (calculatedPath.Count > 0)
+            {
+                edgeStraight.Add(straight);
+                edgeForceEnd.Add(forceEnd);
+            }
+
+            calculatedPath.Add(vertex);
         }
 
         private List<Vector2> calculateSubPath(ReadOnlySpan<Vector2> subControlPoints, PathType type)
@@ -465,6 +649,12 @@ namespace osu.Game.Rulesets.Objects
                     {
                         cumulativeLength.RemoveAt(cumulativeLength.Count - 1);
                         calculatedPath.RemoveAt(pathEndIndex--);
+
+                        if (edgeStraight.Count > 0)
+                        {
+                            edgeStraight.RemoveAt(edgeStraight.Count - 1);
+                            edgeForceEnd.RemoveAt(edgeForceEnd.Count - 1);
+                        }
                     }
                 }
 

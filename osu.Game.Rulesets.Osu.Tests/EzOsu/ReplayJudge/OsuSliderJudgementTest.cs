@@ -130,14 +130,16 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
             Slider slider = createSlider(duration: 1000, repeats: 1, classic: false);
             var tail = slider.NestedHitObjects.OfType<SliderTailCircle>().Single();
             var tick = slider.NestedHitObjects.OfType<SliderTick>().FirstOrDefault();
+            var lastScored = slider.LastScoredNested;
 
             Assert.Multiple(() =>
             {
-                Assert.That(OsuSliderJudgement.ArePrerequisitesJudged(tail, _ => false, slider.NestedHitObjects), Is.False);
-                Assert.That(OsuSliderJudgement.ArePrerequisitesJudged(tail, o => o is SliderTick or SliderRepeat, slider.NestedHitObjects), Is.True);
+                Assert.That(lastScored, Is.Not.Null);
+                Assert.That(OsuSliderJudgement.ArePrerequisitesJudged(tail, _ => false, lastScored), Is.False);
+                Assert.That(OsuSliderJudgement.ArePrerequisitesJudged(tail, o => o is SliderTick or SliderRepeat, lastScored), Is.True);
 
                 if (tick != null)
-                    Assert.That(OsuSliderJudgement.ArePrerequisitesJudged(tick, _ => false, slider.NestedHitObjects), Is.True);
+                    Assert.That(OsuSliderJudgement.ArePrerequisitesJudged(tick, _ => false, lastScored), Is.True);
             });
         }
 
