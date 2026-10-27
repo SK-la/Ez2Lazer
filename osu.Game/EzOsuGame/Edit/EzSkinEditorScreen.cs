@@ -58,6 +58,8 @@ namespace osu.Game.EzOsuGame.Edit
     /// </summary>
     public partial class EzSkinEditorScreen : OsuScreen
     {
+        public override bool HideOverlaysOnEnter => true;
+
         [Cached]
         private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Blue);
 
