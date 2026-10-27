@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -8,8 +9,8 @@ using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Screens.Play.HUD
 {
@@ -41,12 +42,12 @@ namespace osu.Game.Screens.Play.HUD
 
                 foreach (var h in objects)
                 {
-                    double endTime = h.GetEndTime();
+                    double endTime = h.GetPlayableEndTime();
 
                     Debug.Assert(endTime >= h.StartTime);
 
-                    int startRange = (int)((h.StartTime - firstHit) / interval);
-                    int endRange = (int)((endTime - firstHit) / interval);
+                    int startRange = Math.Clamp((int)((h.StartTime - firstHit) / interval), 0, display_granularity - 1);
+                    int endRange = Math.Clamp((int)((endTime - firstHit) / interval), 0, display_granularity - 1);
                     for (int i = startRange; i <= endRange; i++)
                         values[i]++;
                 }

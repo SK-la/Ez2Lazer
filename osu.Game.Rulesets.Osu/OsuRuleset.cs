@@ -14,11 +14,11 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
-using osu.Game.Graphics;
-using osu.Game.EzOsuGame.Mods.LAsMods;
 using osu.Game.EzOsuGame.Mods.CommunityMod;
+using osu.Game.EzOsuGame.Mods.LAsMods;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Statistics;
+using osu.Game.Graphics;
 using osu.Game.Localisation;
 using osu.Game.Localisation.Osu;
 using osu.Game.Overlays.Settings;
@@ -32,6 +32,7 @@ using osu.Game.Rulesets.Osu.Configuration;
 using osu.Game.Rulesets.Osu.Difficulty;
 using osu.Game.Rulesets.Osu.Edit;
 using osu.Game.Rulesets.Osu.Edit.Setup;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge;
 using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Osu.Replays;
@@ -39,7 +40,6 @@ using osu.Game.Rulesets.Osu.Scoring;
 using osu.Game.Rulesets.Osu.Skinning.Argon;
 using osu.Game.Rulesets.Osu.Skinning.Default;
 using osu.Game.Rulesets.Osu.Skinning.Legacy;
-using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge;
 using osu.Game.Rulesets.Osu.Statistics;
 using osu.Game.Rulesets.Osu.UI;
 using osu.Game.Rulesets.Replays.Types;
@@ -237,6 +237,7 @@ namespace osu.Game.Rulesets.Osu
                     return new Mod[]
                     {
                         new MultiMod(new OsuModAutoplay(), new OsuModCinema()),
+                        new OsuModAspire(),
                         new OsuModRelax(),
                         new OsuModAutopilot(),
                         new OsuModSpunOut(),

@@ -70,6 +70,10 @@ namespace osu.Game.Rulesets.Osu.EzOsu.Judgement
                     last = nestedLast;
             }
 
+            // stable 的 int 结束已关掉身窗。若跟踪到真实结束，本滑条永不离开活跃范围，后续滑条会一直留在每帧遍历里。
+            if (slider.RevealEndTimeWrapsUnderStableRules)
+                last = slider.StableRevealEndTime;
+
             LastActiveTime = last;
         }
 
@@ -410,7 +414,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.Judgement
 
         private bool tryJudgeNestedObject(HitObject nestedObject, double judgementTime)
         {
-            if (!OsuSliderJudgement.ArePrerequisitesJudged(nestedObject, isJudged, nestedInOrder))
+            if (!OsuSliderJudgement.ArePrerequisitesJudged(nestedObject, isJudged, lastScoredNested))
                 return false;
 
             if (!slider.ClassicSliderBehaviour && !isJudged(head))

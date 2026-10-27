@@ -78,6 +78,14 @@ namespace osu.Game.Beatmaps.ControlPoints
         }
 
         /// <summary>
+        /// 文件中写入的拍长，尚未施加普通游玩用的 0.6ms 下限。
+        /// </summary>
+        /// <remarks>
+        /// osu!stable 保留该值。Aspire 会将其还原到 <see cref="BeatLength"/>；其它游玩保留下限。
+        /// </remarks>
+        public double? ParsedBeatLength { get; set; }
+
+        /// <summary>
         /// The BPM at this control point.
         /// </summary>
         public double BPM => 60000 / BeatLength;
@@ -97,6 +105,7 @@ namespace osu.Game.Beatmaps.ControlPoints
             TimeSignature = ((TimingControlPoint)other).TimeSignature;
             OmitFirstBarLine = ((TimingControlPoint)other).OmitFirstBarLine;
             BeatLength = ((TimingControlPoint)other).BeatLength;
+            ParsedBeatLength = ((TimingControlPoint)other).ParsedBeatLength;
 
             base.CopyFrom(other);
         }

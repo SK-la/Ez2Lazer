@@ -112,11 +112,17 @@ namespace osu.Game.Rulesets.Osu.Mods
                 ComboOffset = original.ComboOffset;
                 TickDistanceMultiplier = original.TickDistanceMultiplier;
                 SliderVelocityMultiplier = original.SliderVelocityMultiplier;
+                LimitDurationToGeometry = original.LimitDurationToGeometry;
             }
 
             protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
             {
-                var sliderEvents = SliderEventGenerator.Generate(StartTime, SpanDuration, Velocity, TickDistance, Path.Distance, this.SpanCount(), cancellationToken);
+                double spanDuration = SpanDuration;
+
+                // 对齐 Slider：塌缩滑条没有 tick 或折返，且路径不得近似。
+                var sliderEvents = spanDuration > 0
+                    ? SliderEventGenerator.Generate(StartTime, spanDuration, Velocity, TickDistance, Path.Distance, this.SpanCount(), cancellationToken)
+                    : CreateDegenerateEvents();
 
                 foreach (var e in sliderEvents)
                 {
@@ -149,7 +155,7 @@ namespace osu.Game.Rulesets.Osu.Mods
                             {
                                 RepeatIndex = e.SpanIndex,
                                 StartTime = e.Time,
-                                Position = EndPosition,
+                                Position = spanDuration > 0 ? EndPosition : Position,
                                 StackHeight = StackHeight
                             });
                             break;
@@ -158,7 +164,7 @@ namespace osu.Game.Rulesets.Osu.Mods
                             AddNested(new SliderRepeat(this)
                             {
                                 RepeatIndex = e.SpanIndex,
-                                StartTime = StartTime + (e.SpanIndex + 1) * SpanDuration,
+                                StartTime = StartTime + (e.SpanIndex + 1) * spanDuration,
                                 Position = Position + Path.PositionAt(e.PathProgress),
                                 StackHeight = StackHeight,
                                 Scale = Scale,

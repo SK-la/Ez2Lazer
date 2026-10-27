@@ -1042,6 +1042,235 @@ Mode: 3
             }
         }
 
+        [Test]
+        public void TestSliderBeyondCoordinateRangeIsDecoded()
+        {
+            const string contents = @"osu file format v14
+
+[General]
+AudioFilename: audio.mp3
+Mode: 0
+
+[Metadata]
+Title:beyond range
+Artist:beyond range
+Creator:beyond range
+Version:beyond range
+
+[Difficulty]
+HPDrainRate:5
+CircleSize:4
+OverallDifficulty:5
+ApproachRate:5
+SliderMultiplier:1.4
+SliderTickRate:1
+
+[TimingPoints]
+0,500,4,2,0,60,1,0
+
+[HitObjects]
+256,192,1000,6,0,L|50000000:50000000,1,1000000000
+";
+
+            var decoder = new LegacyBeatmapDecoder { ApplyOffsets = false };
+
+            using (var stream = new LineBufferedReader(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(contents))))
+            {
+                var decoded = decoder.Decode(stream);
+
+                Assert.That(decoded.HitObjects, Has.Count.EqualTo(1));
+
+                var path = ((IHasPath)decoded.HitObjects[0]).Path;
+
+                Assert.That(path.ExpectedDistance.Value, Is.EqualTo(1000000000));
+                Assert.That(path.ControlPoints.Count, Is.GreaterThan(1));
+            }
+        }
+
+        [Test]
+        public void TestZeroLengthSliderRepeatsAreReset()
+        {
+            const string contents = @"osu file format v14
+
+[General]
+AudioFilename: audio.mp3
+Mode: 0
+
+[Metadata]
+Title:zero length
+Artist:zero length
+Creator:zero length
+Version:zero length
+
+[Difficulty]
+HPDrainRate:5
+CircleSize:4
+OverallDifficulty:5
+ApproachRate:5
+SliderMultiplier:1.4
+SliderTickRate:1
+
+[TimingPoints]
+0,500,4,2,0,60,1,0
+
+[HitObjects]
+256,192,1000,6,0,L|256:192,5,100
+";
+
+            var decoder = new LegacyBeatmapDecoder { ApplyOffsets = false };
+
+            using (var stream = new LineBufferedReader(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(contents))))
+            {
+                var decoded = decoder.Decode(stream);
+
+                Assert.That(decoded.HitObjects, Has.Count.EqualTo(1));
+                Assert.That(((IHasRepeats)decoded.HitObjects[0]).RepeatCount, Is.EqualTo(0));
+            }
+        }
+
+        [Test]
+        public void TestSliderBeyondStableLimitsIsFlagged()
+        {
+            const string contents = @"osu file format v14
+
+[General]
+AudioFilename: audio.mp3
+Mode: 0
+
+[Metadata]
+Title:beyond range
+Artist:beyond range
+Creator:beyond range
+Version:beyond range
+
+[Difficulty]
+HPDrainRate:5
+CircleSize:4
+OverallDifficulty:5
+ApproachRate:5
+SliderMultiplier:1.4
+SliderTickRate:1
+
+[TimingPoints]
+0,500,4,2,0,60,1,0
+
+[HitObjects]
+256,192,1000,6,0,L|50000000:50000000,1,1000000000
+";
+
+            var decoded = decode(contents);
+
+            Assert.That(decoded.HitObjects, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public void TestOrdinaryBeatmapDoesNotExceedStableLimits()
+        {
+            using var resStream = TestResources.OpenResource("Soleily - Renatus (Gamu) [Insane].osu");
+            using var stream = new LineBufferedReader(resStream);
+
+            var decoded = new LegacyBeatmapDecoder { ApplyOffsets = false }.Decode(stream);
+
+            Assert.That(decoded.HitObjects, Is.Not.Empty);
+        }
+
+        [Test]
+        public void TestSkipHitObjectsKeepsHeaders()
+        {
+            const string contents = @"osu file format v14
+
+[General]
+AudioFilename: audio.mp3
+Mode: 0
+
+[Metadata]
+Title:header only
+Artist:header only
+Creator:header only
+Version:header only
+BeatmapSetID:123
+
+[Difficulty]
+HPDrainRate:5
+CircleSize:4
+OverallDifficulty:5
+ApproachRate:5
+SliderMultiplier:1.4
+SliderTickRate:1
+
+[TimingPoints]
+0,500,4,2,0,60,1,0
+
+[HitObjects]
+256,192,1000,1,0
+256,192,2000,1,0
+";
+
+            var decoder = new LegacyBeatmapDecoder { ApplyOffsets = false, SkipHitObjects = true };
+            var decoded = decode(contents, decoder);
+
+            Assert.That(decoded.HitObjects, Is.Empty);
+            Assert.That(decoded.Metadata.Title, Is.EqualTo("header only"));
+            Assert.That(decoded.BeatmapInfo.BeatmapSet?.OnlineID, Is.EqualTo(123));
+            Assert.That(decoded.ControlPointInfo.TimingPoints, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public void TestMalformedTimingPointsAreStillLoaded()
+        {
+            // 取自 aspire 谱面的行：时间超出 32 位范围、拍号为负、
+            // 采样组未定义、音量为负。以前任一情况都会丢掉整条控制点，连同 timing 与滑条速度变更。
+            const string contents = @"osu file format v14
+
+[General]
+AudioFilename: audio.mp3
+Mode: 0
+
+[Metadata]
+Title:malformed timing
+Artist:malformed timing
+Creator:malformed timing
+Version:malformed timing
+
+[Difficulty]
+HPDrainRate:5
+CircleSize:4
+OverallDifficulty:5
+ApproachRate:5
+SliderMultiplier:1.4
+SliderTickRate:1
+
+[TimingPoints]
+-5162220307,307.692307692308,-2147483648,-1,100,-40,1,0
+0,-200,-2147483648,-1,8763,-40,0,0
+19692,-1E-298,-16,2,1,40,1,0
+19692,-0.5,-16,2,1,40,0,0
+19769,-1,-16,-2,1,-1024,0,0
+
+[HitObjects]
+256,192,1000,1,0
+";
+
+            var decoded = decode(contents);
+
+            // 五行都必须落成控制点，而不是被丢弃。
+            Assert.That(decoded.ControlPointInfo.TimingPoints, Is.Not.Empty);
+            Assert.That(decoded.ControlPointInfo.Groups, Is.Not.Empty);
+
+            // 拍长保留；辅助字段回退而非抛错。
+            Assert.That(decoded.ControlPointInfo.TimingPoints, Has.Some.Matches<osu.Game.Beatmaps.ControlPoints.TimingControlPoint>(p => Math.Abs(p.BeatLength - 307.692307692308) < 1e-9));
+            Assert.That(decoded.ControlPointInfo.TimingPoints.All(p => p.TimeSignature.Numerator > 0), Is.True);
+            Assert.That(decoded.HitObjects, Has.Count.EqualTo(1));
+        }
+
+        private static Beatmap decode(string contents, LegacyBeatmapDecoder? decoder = null)
+        {
+            decoder ??= new LegacyBeatmapDecoder { ApplyOffsets = false };
+
+            using var stream = new LineBufferedReader(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(contents)));
+            return decoder.Decode(stream);
+        }
+
         [TestCase(false)]
         [TestCase(true)]
         public void TestLegacyDefaultsPreserved(bool applyOffsets)

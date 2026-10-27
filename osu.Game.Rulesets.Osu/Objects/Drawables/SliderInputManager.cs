@@ -62,10 +62,19 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
         private Vector2? screenSpaceMousePosition;
         private readonly DrawableSlider slider;
 
+        /// <summary>
+        /// <see cref="Slider.LastScoredNested"/> 对应的 drawable，每个 hitobject 应用时解析一次。
+        /// </summary>
+        /// <remarks>
+        /// 在判定路径内查找会让每个嵌套物件每帧扫描整份嵌套列表：aspire 滑条可有数千折返，那是二次方并会卡死。
+        /// </remarks>
+        private DrawableHitObject? lastScoredNestedDrawable;
+
         public SliderInputManager(DrawableSlider slider)
         {
             this.slider = slider;
             this.slider.HitObjectApplied += resetState;
+            this.slider.HitObjectApplied += resolveLastScoredNestedDrawable;
         }
 
         /// <summary>
@@ -166,8 +175,8 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
 
             if (!OsuSliderJudgement.ArePrerequisitesJudged(
                     nestedObject.HitObject,
-                    isJudged: ho => slider.NestedHitObjects.FirstOrDefault(d => d.HitObject == ho)?.Judged == true,
-                    nestedInOrder: sliderHitObject.NestedHitObjects))
+                    isJudged: _ => lastScoredNestedDrawable?.Judged == true,
+                    lastScoredNested: sliderHitObject.LastScoredNested))
                 return;
 
             // stable 逐帧按序消耗评分点，滑条头判没判不影响 tick / tail 的归属；
@@ -314,6 +323,23 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
             return true;
         }
 
+        private void resolveLastScoredNestedDrawable(DrawableHitObject obj)
+        {
+            lastScoredNestedDrawable = null;
+
+            if (slider.HitObject?.LastScoredNested is not { } last)
+                return;
+
+            foreach (var nested in slider.NestedHitObjects)
+            {
+                if (nested.HitObject == last)
+                {
+                    lastScoredNestedDrawable = nested;
+                    return;
+                }
+            }
+        }
+
         private void resetState(DrawableHitObject obj)
         {
             Tracking = false;
@@ -328,6 +354,7 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
             base.Dispose(isDisposing);
 
             slider.HitObjectApplied -= resetState;
+            slider.HitObjectApplied -= resolveLastScoredNestedDrawable;
         }
     }
 }

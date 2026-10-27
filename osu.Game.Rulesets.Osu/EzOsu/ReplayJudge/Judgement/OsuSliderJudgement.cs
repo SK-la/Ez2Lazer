@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
@@ -79,13 +78,12 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement
         /// <summary>
         /// 尾部还要求前序 tick / repeat 已判：评分点按序消耗，尾点排在它们之后。
         /// </summary>
-        public static bool ArePrerequisitesJudged(HitObject nestedObject, Func<HitObject, bool> isJudged, IEnumerable<HitObject> nestedInOrder)
+        public static bool ArePrerequisitesJudged(HitObject nestedObject, Func<HitObject, bool> isJudged, HitObject? lastScoredNested)
         {
             if (nestedObject is not SliderTailCircle)
                 return true;
 
-            var lastTick = nestedInOrder.LastOrDefault(o => o is SliderTick or SliderRepeat);
-            return lastTick == null || isJudged(lastTick);
+            return lastScoredNested == null || isJudged(lastScoredNested);
         }
 
         public static float FollowRadius(double sliderRadius, bool expanded)

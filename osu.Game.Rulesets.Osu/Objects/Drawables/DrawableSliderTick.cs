@@ -8,6 +8,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Osu.Skinning;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -40,6 +41,23 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
             Size = OsuHitObject.OBJECT_DIMENSIONS;
             Origin = Anchor.Centre;
 
+            ScaleBindable.BindValueChanged(scale => scaleContainer?.Scale = new Vector2(scale.NewValue));
+        }
+
+        /// <summary>
+        /// 创建视觉，除非 stable 不绘制该点。
+        /// </summary>
+        /// <remarks>
+        /// 在首次应用时构建而非加载时：池化 drawable 加载时没有 hitobject，决定权在 hitobject。
+        /// </remarks>
+        private void ensureVisuals()
+        {
+            if (scaleContainer != null)
+                return;
+
+            if (HitObject is IStableUndrawnScoringPoint { UndrawnUnderStableRules: true })
+                return;
+
             AddInternal(scaleContainer = new SkinnableDrawable(new OsuSkinComponentLookup(OsuSkinComponents.SliderScorePoint), _ => new CircularContainer
             {
                 Masking = true,
@@ -59,14 +77,25 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
                 Origin = Anchor.Centre,
             });
 
-            ScaleBindable.BindValueChanged(scale => scaleContainer.Scale = new Vector2(scale.NewValue));
+            scaleContainer.Scale = new Vector2(ScaleBindable.Value);
         }
 
         protected override void OnApply()
         {
             base.OnApply();
 
-            Position = HitObject.Position - DrawableSlider.HitObject.Position;
+            ensureVisuals();
+
+            Vector2 alongPath = HitObject.Position - DrawableSlider.HitObject.Position;
+
+            if (!StableViewportBody.CanPlaceFieldPosition(alongPath))
+            {
+                Position = Vector2.Zero;
+                Alpha = 0;
+                return;
+            }
+
+            Position = alongPath;
         }
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)

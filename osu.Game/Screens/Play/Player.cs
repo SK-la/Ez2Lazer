@@ -336,8 +336,13 @@ namespace osu.Game.Screens.Play
                 dependencies.CacheAs(scrollingRuleset.ScrollingInfo);
 
             ScoreProcessor = ruleset.CreateScoreProcessor();
+
+            // [Ez] aspire 谱面按 stable 的规则游玩，判定档随之固定。只作用于本局的内存值，不写回配置：
+            // ApplyEzGameplayEnvironment 内部的 `??=` 会让这个强制值优先，退出对局后配置原样。
+            bool aspireBeatmap = gameplayMods.Any(m => m.Acronym == "ASP");
+
             // [Ez] 冻结当前全局游玩环境（JudgeMode 等）；必须先于 ApplyBeatmap 的全谱模拟。
-            ScoreProcessor.ApplyEzGameplayEnvironment();
+            ScoreProcessor.ApplyEzGameplayEnvironment(aspireBeatmap);
             ScoreProcessor.Mods.Value = gameplayMods;
             ScoreProcessor.ApplyBeatmap(playableBeatmap);
 
