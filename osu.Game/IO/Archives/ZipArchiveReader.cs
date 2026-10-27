@@ -44,6 +44,13 @@ namespace osu.Game.IO.Archives
         /// </summary>
         public long MaximumEntrySize { get; set; } = 100 * 1024 * 1024; // bytes
 
+        /// <summary>
+        /// 谱面（<c>.osu</c>）条目允许的最大字节数。
+        /// Aspire 谱可能有单个 .osu 超过 <see cref="MaximumEntrySize"/>，其余条目仍较小，
+        /// 因此谱面文件单独使用仍有上限的限制。
+        /// </summary>
+        public long MaximumBeatmapEntrySize { get; set; } = 128 * 1024 * 1024; // bytes
+
         static ZipArchiveReader()
         {
             // Required to support rare code pages. Must run before any CP932 lookup, since static field
@@ -115,10 +122,12 @@ namespace osu.Game.IO.Archives
             if (entry == null)
                 return null;
 
+            long maximumSize = name.EndsWith(".osu", StringComparison.OrdinalIgnoreCase) ? MaximumBeatmapEntrySize : MaximumEntrySize;
+
             using (Stream s = entry.OpenEntryStream())
             {
-                if (entry.Size > MaximumEntrySize)
-                    throw new InsufficientMemoryException($@"Size of file ""{name}"" exceeds allowable limit of {MaximumEntrySize} bytes");
+                if (entry.Size > maximumSize)
+                    throw new InsufficientMemoryException($@"Size of file ""{name}"" exceeds allowable limit of {maximumSize} bytes");
 
                 if (entry.Size > 0)
                 {
