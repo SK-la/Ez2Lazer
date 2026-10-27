@@ -21,11 +21,10 @@ using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Framework.Testing;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.EzOsuGame.ScriptedSkin;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
@@ -57,8 +56,6 @@ namespace osu.Game.Overlays.SkinEditor
 
         protected Drawable? TargetScreen;
 
-        protected OsuTextFlowContainer HeaderText = null!;
-
         private SkinEditorSceneLibrary sceneLibrary = null!;
 
         private Bindable<Skin> currentSkin = null!;
@@ -69,9 +66,6 @@ namespace osu.Game.Overlays.SkinEditor
 
         [Resolved]
         private SkinManager skins { get; set; } = null!;
-
-        [Resolved]
-        private OsuColour colours { get; set; } = null!;
 
         [Resolved]
         private RealmAccess realm { get; set; } = null!;
@@ -198,14 +192,11 @@ namespace osu.Game.Overlays.SkinEditor
                                                 createEzSettingsMenu(),
                                             }
                                         },
-                                        HeaderText = new OsuTextFlowContainer
+                                        new EzSkinEditorSkinDropdown
                                         {
-                                            TextAnchor = Anchor.TopRight,
-                                            Padding = new MarginPadding(5),
-                                            Anchor = Anchor.TopRight,
-                                            Origin = Anchor.TopRight,
-                                            AutoSizeAxes = Axes.X,
-                                            RelativeSizeAxes = Axes.Y,
+                                            Anchor = Anchor.CentreRight,
+                                            Origin = Anchor.CentreRight,
+                                            Margin = new MarginPadding { Right = 8 },
                                         },
                                     },
                                 },
@@ -501,21 +492,6 @@ namespace osu.Game.Overlays.SkinEditor
             if (skins.EnsureMutableSkin())
                 // Another skin changed event will arrive which will complete the process.
                 return;
-
-            HeaderText.Clear();
-
-            // Branding lives in EditorMenuBar; only show the active skin name here.
-            HeaderText.AddText(SkinEditorStrings.CurrentlyEditing, cp =>
-            {
-                cp.Font = OsuFont.Default.With(size: 12);
-                cp.Colour = colours.Yellow;
-            });
-
-            HeaderText.AddText($" {currentSkin.Value.SkinInfo}", cp =>
-            {
-                cp.Font = OsuFont.Default.With(size: 12, weight: FontWeight.Bold);
-                cp.Colour = colours.Yellow;
-            });
 
             updateExternalEditMenuState();
 
