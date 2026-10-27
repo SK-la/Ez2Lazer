@@ -201,6 +201,29 @@ namespace osu.Game.Overlays.SkinEditor
 
         public void PresentGameplay() => presentGameplay(false);
 
+        /// <summary>
+        /// Switch global ruleset (and a matching preview beatmap), then open / restart endless gameplay for skin editing.
+        /// </summary>
+        public void PresentGameplayForRuleset(RulesetInfo rulesetInfo)
+        {
+            if (ruleset is Bindable<RulesetInfo> writable && !writable.Disabled)
+                writable.Value = rulesetInfo;
+
+            if (!tryUseBeatmapForActiveRuleset())
+                return;
+
+            performer?.PerformFromScreen(screen =>
+            {
+                if (State.Value != Visibility.Visible)
+                    return;
+
+                if (screen is Player player)
+                    player.Exit();
+
+                Schedule(() => presentGameplay(false));
+            }, new[] { typeof(Player), typeof(SoloSongSelect) });
+        }
+
         private void presentGameplay(bool attemptedBeatmapSwitch)
         {
             performer?.PerformFromScreen(screen =>
