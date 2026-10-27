@@ -20,9 +20,9 @@ using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Edit;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
-using osu.Game.EzOsuGame.Edit;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -184,10 +184,12 @@ namespace osu.Game.Overlays.SkinEditor
         }
 
         /// <summary>
-        /// 直接进入全屏 EzSkinEditorScreen。
+        /// 关闭 HUD 皮肤编辑器并进入全屏 EzSkinEditorScreen。
         /// </summary>
         public void ToggleEzSkinEditor()
         {
+            Hide();
+
             performer?.PerformFromScreen(screen =>
             {
                 if (screen is EzSkinEditorScreen)

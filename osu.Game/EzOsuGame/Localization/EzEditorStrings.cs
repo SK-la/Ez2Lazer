@@ -284,6 +284,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SCENE_EZ_SKIN = new EzLocalizationManager.EzLocalisableString("Ez Skin", "Ez Skin");
 
+        public static readonly LocalisableString TOOLBAR_HUD_LAYER = new EzLocalizationManager.EzLocalisableString("HUD layer", "HUD layer");
+
         public static readonly LocalisableString TAB_APPEARANCE = new EzLocalizationManager.EzLocalisableString("外观", "Appearance");
 
         public static readonly LocalisableString TAB_SIZE = new EzLocalizationManager.EzLocalisableString("尺寸", "Size");

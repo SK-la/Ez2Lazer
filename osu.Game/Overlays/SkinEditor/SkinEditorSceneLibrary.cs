@@ -2,10 +2,13 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Screens;
+using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -19,11 +22,15 @@ namespace osu.Game.Overlays.SkinEditor
 {
     public partial class SkinEditorSceneLibrary : CompositeDrawable
     {
-        public const float HEIGHT = BUTTON_HEIGHT + padding * 2;
+        public const float HEIGHT = BUTTON_HEIGHT + 2;
 
         public const float BUTTON_HEIGHT = 40;
 
         private const float padding = 10;
+
+        public BindableBool HudLayerVisible => hudLayerToggle.Active;
+
+        private EzEditorHudLayerToggle hudLayerToggle = null!;
 
         [Resolved]
         private IPerformFromScreenRunner? performer { get; set; }
@@ -46,52 +53,79 @@ namespace osu.Game.Overlays.SkinEditor
                     RelativeSizeAxes = Axes.Both,
                     Colour = overlayColourProvider.Background6,
                 },
-                new OsuScrollContainer(Direction.Horizontal)
+                new GridContainer
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Children = new Drawable[]
+                    ColumnDimensions = new[]
                     {
-                        new FillFlowContainer
+                        new Dimension(),
+                        new Dimension(GridSizeMode.AutoSize),
+                    },
+                    Content = new[]
+                    {
+                        new Drawable[]
                         {
-                            Name = @"Scene library",
-                            AutoSizeAxes = Axes.X,
-                            RelativeSizeAxes = Axes.Y,
-                            Spacing = new Vector2(padding),
-                            Padding = new MarginPadding(padding),
-                            Direction = FillDirection.Horizontal,
-                            Children = new Drawable[]
+                            new OsuScrollContainer(Direction.Horizontal)
                             {
-                                new OsuSpriteText
+                                RelativeSizeAxes = Axes.Both,
+                                Children = new Drawable[]
                                 {
-                                    Text = SkinEditorStrings.SceneLibrary,
-                                    Anchor = Anchor.CentreLeft,
-                                    Origin = Anchor.CentreLeft,
-                                    Margin = new MarginPadding(10),
-                                },
-                                new SceneButton
-                                {
-                                    Text = SkinEditorStrings.SongSelect,
-                                    Anchor = Anchor.CentreLeft,
-                                    Origin = Anchor.CentreLeft,
-                                    Action = () => performer?.PerformFromScreen(screen =>
+                                    new FillFlowContainer
                                     {
-                                        if (screen is SongSelect)
-                                            return;
+                                        Name = @"Scene library",
+                                        AutoSizeAxes = Axes.X,
+                                        RelativeSizeAxes = Axes.Y,
+                                        Spacing = new Vector2(padding),
+                                        Padding = new MarginPadding { Horizontal = padding, Vertical = 1 },
+                                        Direction = FillDirection.Horizontal,
+                                        Children = new Drawable[]
+                                        {
+                                            new OsuSpriteText
+                                            {
+                                                Text = SkinEditorStrings.SceneLibrary,
+                                                Anchor = Anchor.CentreLeft,
+                                                Origin = Anchor.CentreLeft,
+                                                Margin = new MarginPadding { Horizontal = 10 },
+                                            },
+                                            new SceneButton
+                                            {
+                                                Text = SkinEditorStrings.SongSelect,
+                                                Anchor = Anchor.CentreLeft,
+                                                Origin = Anchor.CentreLeft,
+                                                Action = () => performer?.PerformFromScreen(screen =>
+                                                {
+                                                    if (screen is SongSelect)
+                                                        return;
 
-                                        screen.Push(new SoloSongSelect());
-                                    }, new[] { typeof(SongSelect) })
-                                },
-                                new SceneButton
-                                {
-                                    Text = SkinEditorStrings.Gameplay,
-                                    Anchor = Anchor.CentreLeft,
-                                    Origin = Anchor.CentreLeft,
-                                    Action = () => skinEditorOverlay?.PresentGameplay(),
-                                },
-                            }
+                                                    screen.Push(new SoloSongSelect());
+                                                }, new[] { typeof(SongSelect) })
+                                            },
+                                            new SceneButton
+                                            {
+                                                Text = SkinEditorStrings.Gameplay,
+                                                Anchor = Anchor.CentreLeft,
+                                                Origin = Anchor.CentreLeft,
+                                                Action = () => skinEditorOverlay?.PresentGameplay(),
+                                            },
+                                            new SceneButton
+                                            {
+                                                Text = EzEditorStrings.SCENE_EZ_SKIN,
+                                                Anchor = Anchor.CentreLeft,
+                                                Origin = Anchor.CentreLeft,
+                                                Width = 110,
+                                                Action = () => skinEditorOverlay?.ToggleEzSkinEditor(),
+                                            },
+                                        }
+                                    },
+                                }
+                            },
+                            hudLayerToggle = new EzEditorHudLayerToggle
+                            {
+                                Margin = new MarginPadding { Left = padding, Vertical = 1 },
+                            },
                         },
-                    }
-                }
+                    },
+                },
             };
         }
 
