@@ -6,6 +6,7 @@ using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Utils;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
@@ -16,11 +17,13 @@ using osuTK.Graphics;
 namespace osu.Game.EzOsuGame.Edit.Components
 {
     /// <summary>
-    /// Menu-bar playback cluster: play/pause + seekable progress (fixed width for header FillFlow).
+    /// Menu-bar playback cluster: play/pause + seekable progress.
+    /// Width grows with the menu bar but the left edge never crosses screen center
+    /// (when parented in a right-aligned header FillFlow with mode/skin siblings).
     /// </summary>
     public partial class EzSkinEditorPlaybackControls : Container
     {
-        public const float DEFAULT_WIDTH = 320;
+        private const float min_width = 180;
 
         private readonly ProgressBar timeline;
         private readonly IconButton playPauseButton;
@@ -35,7 +38,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public EzSkinEditorPlaybackControls()
         {
-            Width = DEFAULT_WIDTH;
+            Width = min_width;
             RelativeSizeAxes = Axes.Y;
 
             float controlHeight = EzUIStyleV1.SceneBarControlHeight();
@@ -73,6 +76,34 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             timeline.OnSeek = time => OnSeek?.Invoke(time);
             timeline.OnCommit = time => OnSeek?.Invoke(time);
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (Parent is not FillFlowContainer flow || flow.Parent == null)
+                return;
+
+            float barWidth = flow.Parent.DrawWidth;
+            if (barWidth <= 0)
+                return;
+
+            float trailing = flow.Padding.TotalHorizontal;
+
+            foreach (var child in flow.Children)
+            {
+                if (child == this || !child.IsPresent)
+                    continue;
+
+                trailing += child.LayoutSize.X + flow.Spacing.X;
+            }
+
+            // Right-aligned header: left edge at ≥ screen center ⇒ width ≤ half − siblings.
+            float target = Math.Max(min_width, barWidth * 0.5f - trailing);
+
+            if (!Precision.AlmostEquals(Width, target, 0.5f))
+                Width = target;
         }
 
         public void SetRange(double minTime, double maxTime)

@@ -250,7 +250,7 @@ namespace osu.Game.EzOsuGame.Edit
                                                 CanExportOsk = canExportOsk,
                                                 CanUseConfigSnapshot = () => sceneBar.CurrentScene.Value != EzSkinEditorSceneType.Note,
                                             },
-                                            // Right→left: skin, mode, progress+play (FillFlow LTR with CentreRight → skin rightmost).
+                                            // Ez-only (official menu has skin dropdown alone). Right→left: skin, mode, progress+play.
                                             new FillFlowContainer
                                             {
                                                 Name = @"Header controls",
@@ -259,7 +259,7 @@ namespace osu.Game.EzOsuGame.Edit
                                                 AutoSizeAxes = Axes.X,
                                                 RelativeSizeAxes = Axes.Y,
                                                 Direction = FillDirection.Horizontal,
-                                                Spacing = new Vector2(EzUIStyleV1.SCENE_BAR_BUTTON_SPACING),
+                                                Spacing = new Vector2(8),
                                                 Padding = new MarginPadding
                                                 {
                                                     Horizontal = 8,
