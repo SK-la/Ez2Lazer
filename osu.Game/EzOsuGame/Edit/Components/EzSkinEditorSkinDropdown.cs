@@ -43,6 +43,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public EzSkinEditorSkinDropdown()
         {
+            Anchor = Anchor.CentreLeft;
+            Origin = Anchor.CentreLeft;
             Width = DEFAULT_WIDTH;
         }
 

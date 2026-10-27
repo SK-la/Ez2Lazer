@@ -15,8 +15,13 @@ using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Edit.Components
 {
+    /// <summary>
+    /// Menu-bar playback cluster: play/pause + seekable progress (fixed width for header FillFlow).
+    /// </summary>
     public partial class EzSkinEditorPlaybackControls : Container
     {
+        public const float DEFAULT_WIDTH = 320;
+
         private readonly ProgressBar timeline;
         private readonly IconButton playPauseButton;
         private readonly OsuSpriteText progressText;
@@ -30,50 +35,39 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public EzSkinEditorPlaybackControls()
         {
-            RelativeSizeAxes = Axes.Both;
+            Width = DEFAULT_WIDTH;
+            RelativeSizeAxes = Axes.Y;
 
             float controlHeight = EzUIStyleV1.SceneBarControlHeight();
 
             Children = new Drawable[]
             {
+                playPauseButton = new IconButton
+                {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    Size = new Vector2(controlHeight),
+                    Icon = FontAwesome.Regular.PlayCircle,
+                    Action = () => OnPlayPauseClicked?.Invoke(),
+                },
                 new Container
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Padding = new MarginPadding
+                    Padding = new MarginPadding { Left = controlHeight + 8, Right = 72 },
+                    Child = timeline = new ProgressBar(true)
                     {
-                        Horizontal = 8,
-                        Vertical = EzUIStyleV1.SCENE_BAR_GAP,
+                        RelativeSizeAxes = Axes.Both,
+                        BackgroundColour = Color4.Black.Opacity(0.45f),
+                        FillColour = Color4.CornflowerBlue,
                     },
-                    Children = new Drawable[]
-                    {
-                        playPauseButton = new IconButton
-                        {
-                            Anchor = Anchor.CentreLeft,
-                            Origin = Anchor.CentreLeft,
-                            Size = new Vector2(controlHeight),
-                            Icon = FontAwesome.Regular.PlayCircle,
-                            Action = () => OnPlayPauseClicked?.Invoke(),
-                        },
-                        new Container
-                        {
-                            RelativeSizeAxes = Axes.Both,
-                            Padding = new MarginPadding { Left = controlHeight + 8, Right = 72 },
-                            Child = timeline = new ProgressBar(true)
-                            {
-                                RelativeSizeAxes = Axes.Both,
-                                BackgroundColour = Color4.Black.Opacity(0.45f),
-                                FillColour = Color4.CornflowerBlue,
-                            },
-                        },
-                        progressText = new OsuSpriteText
-                        {
-                            Anchor = Anchor.CentreRight,
-                            Origin = Anchor.CentreRight,
-                            Font = OsuFont.Default.With(size: 13, weight: FontWeight.SemiBold),
-                            Colour = Color4.White,
-                            Text = "00:00.000",
-                        },
-                    },
+                },
+                progressText = new OsuSpriteText
+                {
+                    Anchor = Anchor.CentreRight,
+                    Origin = Anchor.CentreRight,
+                    Font = OsuFont.Default.With(size: 13, weight: FontWeight.SemiBold),
+                    Colour = Color4.White,
+                    Text = "00:00.000",
                 },
             };
 

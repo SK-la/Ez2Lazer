@@ -278,7 +278,7 @@ namespace osu.Game.EzOsuGame.Localization
 
         #region Scene bar and tabs
 
-        public static readonly LocalisableString SCENE_LIBRARY_LABEL = new EzLocalizationManager.EzLocalisableString("场景", "Scenes");
+        public static readonly LocalisableString SCENE_LIBRARY_LABEL = new EzLocalizationManager.EzLocalisableString("场景库", "Scene library");
 
         public static readonly LocalisableString SCENE_EZ_HUD = new EzLocalizationManager.EzLocalisableString("Ez HUD", "Ez HUD");
 

@@ -30,8 +30,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public BindableBool HudLayerVisible => hudLayerToggle.Active;
 
-        public EzSkinEditorPlaybackControls PlaybackControls { get; private set; } = null!;
-
         private EzEditorHudLayerToggle hudLayerToggle = null!;
 
         private readonly Dictionary<EzSkinEditorSceneType, SceneTabButton> tabButtons = new Dictionary<EzSkinEditorSceneType, SceneTabButton>();
@@ -46,6 +44,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider overlayColourProvider)
         {
+            float gap = EzUIStyleV1.SCENE_BAR_GAP;
+
             InternalChildren = new Drawable[]
             {
                 new Box
@@ -58,7 +58,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
                     RelativeSizeAxes = Axes.Both,
                     ColumnDimensions = new[]
                     {
-                        new Dimension(GridSizeMode.AutoSize),
                         new Dimension(),
                         new Dimension(GridSizeMode.AutoSize),
                     },
@@ -68,11 +67,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
                         {
                             new FillFlowContainer
                             {
-                                Name = @"Ez scene library",
+                                Name = @"Ez Scene library",
                                 AutoSizeAxes = Axes.X,
                                 RelativeSizeAxes = Axes.Y,
                                 Spacing = new Vector2(EzUIStyleV1.SCENE_BAR_BUTTON_SPACING, 0),
-                                Padding = new MarginPadding { Horizontal = padding, Vertical = EzUIStyleV1.SCENE_BAR_GAP },
+                                Padding = new MarginPadding { Horizontal = padding, Vertical = gap },
                                 Direction = FillDirection.Horizontal,
                                 Children = buildSceneButtons()
                                            .Prepend(new OsuSpriteText
@@ -90,10 +89,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                            })
                                            .ToArray(),
                             },
-                            PlaybackControls = new EzSkinEditorPlaybackControls(),
                             hudLayerToggle = new EzEditorHudLayerToggle
                             {
-                                Margin = new MarginPadding { Left = padding, Top = EzUIStyleV1.SCENE_BAR_GAP },
+                                Margin = new MarginPadding { Left = padding, Top = gap, Right = padding },
                             },
                         },
                     },

@@ -25,6 +25,7 @@ using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays.Preview;
 using osu.Game.EzOsuGame.ScriptedSkin;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Cursor;
 using osu.Game.IO;
 using osu.Game.Overlays;
@@ -107,6 +108,7 @@ namespace osu.Game.EzOsuGame.Edit
         private EzSkinEditorSceneBar sceneBar = null!;
         private EzSkinEditorSidebar sidebar = null!;
         private EzSkinEditorTopToolbar topToolbar = null!;
+        private EzSkinEditorPlaybackControls playbackControls = null!;
 
         private EzSkinEditorBeatmapPicker? beatmapPicker;
 
@@ -248,17 +250,24 @@ namespace osu.Game.EzOsuGame.Edit
                                                 CanExportOsk = canExportOsk,
                                                 CanUseConfigSnapshot = () => sceneBar.CurrentScene.Value != EzSkinEditorSceneType.Note,
                                             },
+                                            // Right→left: skin, mode, progress+play (FillFlow LTR with CentreRight → skin rightmost).
                                             new FillFlowContainer
                                             {
                                                 Name = @"Header controls",
                                                 Anchor = Anchor.CentreRight,
                                                 Origin = Anchor.CentreRight,
-                                                AutoSizeAxes = Axes.Both,
+                                                AutoSizeAxes = Axes.X,
+                                                RelativeSizeAxes = Axes.Y,
                                                 Direction = FillDirection.Horizontal,
-                                                Spacing = new Vector2(8),
-                                                Padding = new MarginPadding { Horizontal = 8 },
+                                                Spacing = new Vector2(EzUIStyleV1.SCENE_BAR_BUTTON_SPACING),
+                                                Padding = new MarginPadding
+                                                {
+                                                    Horizontal = 8,
+                                                    Vertical = EzUIStyleV1.SCENE_BAR_GAP,
+                                                },
                                                 Children = new Drawable[]
                                                 {
+                                                    playbackControls = new EzSkinEditorPlaybackControls(),
                                                     topToolbar = new EzSkinEditorTopToolbar
                                                     {
                                                         PreviewSource = PreviewState.Source,
@@ -337,13 +346,13 @@ namespace osu.Game.EzOsuGame.Edit
             if (Math.Abs(source.CurrentTime - lastSceneBarProgressDisplayTime) < 16)
                 return;
 
-            sceneBar.PlaybackControls.SetCurrentTime(source.CurrentTime);
+            playbackControls.SetCurrentTime(source.CurrentTime);
             lastSceneBarProgressDisplayTime = source.CurrentTime;
         }
 
         private void bindSceneBarPlayback()
         {
-            var controls = sceneBar.PlaybackControls;
+            var controls = playbackControls;
             controls.OnSeek = seekSceneBarPlayback;
             controls.OnPlayPauseClicked = toggleBeatmapPlayback;
 
@@ -358,7 +367,7 @@ namespace osu.Game.EzOsuGame.Edit
         {
             getActiveScenePlaybackSource()?.Seek(time);
             lastSceneBarProgressDisplayTime = double.MinValue;
-            sceneBar.PlaybackControls.SetCurrentTime(time, seeking: true);
+            playbackControls.SetCurrentTime(time, seeking: true);
         }
 
         private void setBeatmapPlaybackPlaying(bool playing, bool updateMode = true)
@@ -372,14 +381,14 @@ namespace osu.Game.EzOsuGame.Edit
             }
 
             getActiveScenePlaybackSource()?.SetPlaying(playing);
-            sceneBar.PlaybackControls.SetPlaying(playing);
+            playbackControls.SetPlaying(playing);
             applyPreviewAudioPolicy();
             refreshSceneBarPlayback(playing);
         }
 
         private void refreshSceneBarPlayback(bool? playingOverride = null)
         {
-            var controls = sceneBar.PlaybackControls;
+            var controls = playbackControls;
             var source = getActiveScenePlaybackSource();
 
             if (source == null)

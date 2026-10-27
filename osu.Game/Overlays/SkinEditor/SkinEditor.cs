@@ -25,6 +25,7 @@ using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.EzOsuGame.ScriptedSkin;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
@@ -46,7 +47,7 @@ namespace osu.Game.Overlays.SkinEditor
     {
         public const double TRANSITION_DURATION = 300;
 
-        public const float MENU_HEIGHT = 40;
+        public const float MENU_HEIGHT = EzUIStyleV1.SCENE_BAR_HEIGHT;
 
         public readonly BindableList<ISerialisableDrawable> SelectedComponents = new BindableList<ISerialisableDrawable>();
 

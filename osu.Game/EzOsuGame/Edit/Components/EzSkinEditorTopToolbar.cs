@@ -7,8 +7,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Localization;
-using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets;
 using osuTK;
 
@@ -28,16 +26,16 @@ namespace osu.Game.EzOsuGame.Edit.Components
         public Bindable<RulesetInfo?>? Ruleset { get; set; }
 
         private EzSkinEditorBeatmapMenuButton beatmapButton = null!;
-        private LoopBeatmapButton? loopButton;
+        // private LoopBeatmapButton? loopButton;
 
         public EzSkinEditorTopToolbar()
         {
-            AutoSizeAxes = Axes.Both;
+            AutoSizeAxes = Axes.X;
+            RelativeSizeAxes = Axes.Y;
             Anchor = Anchor.CentreLeft;
             Origin = Anchor.CentreLeft;
             Direction = FillDirection.Horizontal;
             Spacing = new Vector2(8);
-            Padding = new MarginPadding { Horizontal = 8 };
         }
 
         [BackgroundDependencyLoader]
@@ -47,6 +45,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
             {
                 beatmapButton = new EzSkinEditorBeatmapMenuButton
                 {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
                     BeatmapPreviewRequested = ruleset => BeatmapPreviewRequested?.Invoke(ruleset),
                 },
             };
@@ -64,19 +64,20 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private void updateActiveState()
         {
-            syncRulesetSpecificButtons();
+            // Loop beatmap button temporarily disabled — keep loop off when ruleset cannot use it.
+            // syncRulesetSpecificButtons();
+            if (!isManiaLoopAvailable(Ruleset?.Value) && LoopBeatmap?.Value == true)
+                LoopBeatmap.Value = false;
 
             bool loop = LoopBeatmap?.Value == true;
             bool beatmapLoaded = PreviewSource?.Value == EzSkinEditorPreviewSource.Beatmap;
 
             beatmapButton.Active = beatmapLoaded && !loop;
 
-            loopButton?.Active = loop;
+            // loopButton?.Active = loop;
         }
 
-        /// <summary>
-        /// Add/remove ruleset-only controls. Placement among children can be adjusted later.
-        /// </summary>
+        /*
         private void syncRulesetSpecificButtons()
         {
             if (isManiaLoopAvailable(Ruleset?.Value))
@@ -107,6 +108,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             if (LoopBeatmap?.Value == true)
                 LoopBeatmap.Value = false;
         }
+        */
 
         /// <summary>
         /// Matches <see cref="SkinEditorProviderResolver.ResolveLoopProvider"/>:
@@ -115,6 +117,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private static bool isManiaLoopAvailable(RulesetInfo? ruleset) =>
             ruleset is null || ruleset.OnlineID == 3;
 
+        /*
         private partial class LoopBeatmapButton : SkinEditorSceneLibrary.SceneButton
         {
             public LoopBeatmapButton()
@@ -123,5 +126,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 Width = 110;
             }
         }
+        */
     }
 }
