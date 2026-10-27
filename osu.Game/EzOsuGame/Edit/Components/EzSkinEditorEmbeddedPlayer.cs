@@ -253,7 +253,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         double IEzSkinEditorScenePlaybackSource.CurrentTime => GameplayClock.CurrentTime;
 
-        bool IEzSkinEditorScenePlaybackSource.IsPlaying => GameplayClock.IsRunning;
+        // Prefer desiredPlaying: GameplayClock.Start() defers IsRunning via SchedulerAfterChildren.
+        bool IEzSkinEditorScenePlaybackSource.IsPlaying => desiredPlaying;
 
         public void DetachForRemount()
         {

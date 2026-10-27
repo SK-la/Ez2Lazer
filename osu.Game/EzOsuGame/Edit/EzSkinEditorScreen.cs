@@ -263,7 +263,6 @@ namespace osu.Game.EzOsuGame.Edit
                                                         PreviewMode = PreviewState.Mode,
                                                         LoopBeatmap = PreviewState.LoopBeatmap,
                                                         Ruleset = PreviewState.Ruleset,
-                                                        ToggleBeatmapPlaybackRequested = toggleBeatmapPlayback,
                                                         BeatmapPreviewRequested = selectBeatmapPreview,
                                                     },
                                                     new EzSkinEditorSkinDropdown
@@ -329,10 +328,11 @@ namespace osu.Game.EzOsuGame.Edit
 
             var source = getActiveScenePlaybackSource();
 
-            if (source == null || !source.IsPlaying)
+            if (source == null)
                 return;
 
-            if (source.CurrentTime - lastSceneBarProgressDisplayTime < 16)
+            // Match EzBeatmapPreviewOverlay: Abs so seek/loop backwards still refreshes.
+            if (Math.Abs(source.CurrentTime - lastSceneBarProgressDisplayTime) < 16)
                 return;
 
             sceneBar.PlaybackControls.SetCurrentTime(source.CurrentTime);
@@ -343,7 +343,7 @@ namespace osu.Game.EzOsuGame.Edit
         {
             var controls = sceneBar.PlaybackControls;
             controls.OnSeek = seekSceneBarPlayback;
-            controls.OnPlayStateChanged = setSceneBarPlaybackPlaying;
+            controls.OnPlayPauseClicked = toggleBeatmapPlayback;
 
             sceneBarPreviewModeBindable = PreviewState.Mode.GetBoundCopy();
             sceneBarPreviewModeBindable.BindValueChanged(mode =>
@@ -352,9 +352,12 @@ namespace osu.Game.EzOsuGame.Edit
             }, true);
         }
 
-        private void seekSceneBarPlayback(double time) => getActiveScenePlaybackSource()?.Seek(time);
-
-        private void setSceneBarPlaybackPlaying(bool playing) => setBeatmapPlaybackPlaying(playing);
+        private void seekSceneBarPlayback(double time)
+        {
+            getActiveScenePlaybackSource()?.Seek(time);
+            lastSceneBarProgressDisplayTime = double.MinValue;
+            sceneBar.PlaybackControls.SetCurrentTime(time, seeking: true);
+        }
 
         private void setBeatmapPlaybackPlaying(bool playing, bool updateMode = true)
         {
@@ -369,10 +372,10 @@ namespace osu.Game.EzOsuGame.Edit
             getActiveScenePlaybackSource()?.SetPlaying(playing);
             sceneBar.PlaybackControls.SetPlaying(playing);
             applyPreviewAudioPolicy();
-            refreshSceneBarPlayback();
+            refreshSceneBarPlayback(playing);
         }
 
-        private void refreshSceneBarPlayback()
+        private void refreshSceneBarPlayback(bool? playingOverride = null)
         {
             var controls = sceneBar.PlaybackControls;
             var source = getActiveScenePlaybackSource();
@@ -383,10 +386,13 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
+            bool playing = playingOverride ?? source.IsPlaying;
+
             controls.Alpha = 1;
             controls.SetRange(source.BeatmapMinTime, source.BeatmapMaxTime);
             controls.SetCurrentTime(source.CurrentTime);
-            controls.SetPlaying(source.IsPlaying);
+            lastSceneBarProgressDisplayTime = source.CurrentTime;
+            controls.SetPlaying(playing);
         }
 
         private IEzSkinEditorScenePlaybackSource? getActiveScenePlaybackSource()
@@ -467,7 +473,7 @@ namespace osu.Game.EzOsuGame.Edit
             if (appearanceBeatmapMode)
                 mountAppearanceEmbeddedPlayer();
 
-            Schedule(refreshSceneBarPlayback);
+            Schedule(() => refreshSceneBarPlayback());
             menuBar.RefreshMenuState();
         }
 
@@ -492,7 +498,9 @@ namespace osu.Game.EzOsuGame.Edit
             if (!PreviewState.HasBeatmapLoaded && !PreviewState.LoopBeatmap.Value)
                 return;
 
-            setBeatmapPlaybackPlaying(PreviewState.Mode.Value != EzBeatmapPreviewMode.Dynamic);
+            var source = getActiveScenePlaybackSource();
+            bool playing = source?.IsPlaying ?? PreviewState.Mode.Value == EzBeatmapPreviewMode.Dynamic;
+            setBeatmapPlaybackPlaying(!playing);
         }
 
         private void selectBeatmapPreview(RulesetInfo ruleset)
@@ -1282,13 +1290,13 @@ namespace osu.Game.EzOsuGame.Edit
             if (getSceneContent<EzSkinEditorPreviewHost>() is EzSkinEditorPreviewHost previewHost)
             {
                 previewHost.RefreshFromContext(sceneContext);
-                Schedule(refreshSceneBarPlayback);
+                Schedule(() => refreshSceneBarPlayback());
                 return;
             }
 
             var strategy = EzSkinEditorSceneRegistry.Get(sceneBar.CurrentScene.Value);
             sceneContentHost.Child = strategy.CreateSceneContent(sceneContext);
-            Schedule(refreshSceneBarPlayback);
+            Schedule(() => refreshSceneBarPlayback());
         }
 
         private void exportPreviewImage()
@@ -1408,6 +1416,7 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
 
             mountAppearanceEmbeddedPlayer();
+            PreviewState.ResumeBeatmapPlayback();
             embeddedPlayer?.Restart();
             refreshPreviewContent();
         }

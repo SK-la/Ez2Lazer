@@ -25,7 +25,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Action<double>? OnSeek { get; set; }
 
-        public Action<bool>? OnPlayStateChanged { get; set; }
+        /// <summary>Invoked when the play/pause control is clicked; host should toggle real playback state.</summary>
+        public Action? OnPlayPauseClicked { get; set; }
 
         public EzSkinEditorPlaybackControls()
         {
@@ -50,8 +51,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
                             Anchor = Anchor.CentreLeft,
                             Origin = Anchor.CentreLeft,
                             Size = new Vector2(controlHeight),
-                            Icon = FontAwesome.Regular.PauseCircle,
-                            Action = togglePlayPause,
+                            Icon = FontAwesome.Regular.PlayCircle,
+                            Action = () => OnPlayPauseClicked?.Invoke(),
                         },
                         new Container
                         {
@@ -99,13 +100,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             isPlaying = playing;
             playPauseButton.Icon = playing ? FontAwesome.Regular.PauseCircle : FontAwesome.Regular.PlayCircle;
-        }
-
-        private void togglePlayPause()
-        {
-            isPlaying = !isPlaying;
-            SetPlaying(isPlaying);
-            OnPlayStateChanged?.Invoke(isPlaying);
         }
 
         private static string formatTime(double time)

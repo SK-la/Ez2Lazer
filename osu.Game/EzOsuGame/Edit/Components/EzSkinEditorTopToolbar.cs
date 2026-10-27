@@ -16,8 +16,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
 {
     public partial class EzSkinEditorTopToolbar : FillFlowContainer
     {
-        public Action? ToggleBeatmapPlaybackRequested { get; set; }
-
         public Action<RulesetInfo>? BeatmapPreviewRequested { get; set; }
 
         public Bindable<EzSkinEditorPreviewSource>? PreviewSource { get; set; }
@@ -29,7 +27,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// <summary>Preview ruleset; drives which ruleset-specific buttons are present.</summary>
         public Bindable<RulesetInfo?>? Ruleset { get; set; }
 
-        private BeatmapPlaybackButton playbackButton = null!;
         private EzSkinEditorBeatmapMenuButton beatmapButton = null!;
         private LoopBeatmapButton? loopButton;
 
@@ -48,7 +45,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             Children = new Drawable[]
             {
-                playbackButton = new BeatmapPlaybackButton(),
                 beatmapButton = new EzSkinEditorBeatmapMenuButton
                 {
                     BeatmapPreviewRequested = ruleset => BeatmapPreviewRequested?.Invoke(ruleset),
@@ -59,8 +55,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
         protected override void LoadComplete()
         {
             base.LoadComplete();
-
-            playbackButton.Action = () => ToggleBeatmapPlaybackRequested?.Invoke();
 
             PreviewSource?.BindValueChanged(_ => updateActiveState(), true);
             PreviewMode?.BindValueChanged(_ => updateActiveState(), true);
@@ -74,11 +68,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             bool loop = LoopBeatmap?.Value == true;
             bool beatmapLoaded = PreviewSource?.Value == EzSkinEditorPreviewSource.Beatmap;
-            bool canPlayback = beatmapLoaded || loop;
-            bool playing = canPlayback && PreviewMode?.Value == EzBeatmapPreviewMode.Dynamic;
-
-            playbackButton.Enabled.Value = canPlayback;
-            playbackButton.ShowPausedState = canPlayback && !playing;
 
             beatmapButton.Active = beatmapLoaded && !loop;
 
@@ -125,20 +114,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// </summary>
         private static bool isManiaLoopAvailable(RulesetInfo? ruleset) =>
             ruleset is null || ruleset.OnlineID == 3;
-
-        private partial class BeatmapPlaybackButton : SkinEditorSceneLibrary.SceneButton
-        {
-            public bool ShowPausedState
-            {
-                set => Text = value ? EzEditorStrings.TOOLBAR_PLAY_BEATMAP : EzEditorStrings.TOOLBAR_PAUSE_BEATMAP;
-            }
-
-            public BeatmapPlaybackButton()
-            {
-                Text = EzEditorStrings.TOOLBAR_PAUSE_BEATMAP;
-                Width = 110;
-            }
-        }
 
         private partial class LoopBeatmapButton : SkinEditorSceneLibrary.SceneButton
         {
