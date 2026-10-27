@@ -138,9 +138,21 @@ namespace osu.Game.Rulesets.Osu.UI
             if (BlockInputUnderSliderHeads && drawable is DrawableSliderHead head)
                 StableClassicNoteLock.BlockInputUnderSliderHead(head);
 
+            if (UseStableViewportBodies && drawable is DrawableSlider slider)
+                slider.UseStableViewportBody = true;
+
             Debug.Assert(!drawable.IsLoaded, $"Already loaded {nameof(DrawableHitObject)} is added to {nameof(OsuPlayfield)}");
             drawable.OnLoadComplete += onDrawableHitObjectLoaded;
         }
+
+        /// <summary>
+        /// 滑条身是否像 osu!stable 一样栅格化到一张窗口大小的画布上。
+        /// </summary>
+        /// <remarks>
+        /// 仅 aspire 谱面与 stable classic 判定档走此路径；普通 lazer 游玩不受影响。
+        /// 从 score processor 解析一次，与判定档同源。
+        /// </remarks>
+        private bool UseStableViewportBodies { get; set; }
 
         private void onDrawableHitObjectLoaded(Drawable drawable)
         {
@@ -172,6 +184,14 @@ namespace osu.Game.Rulesets.Osu.UI
             if (scoreProcessor is OsuScoreProcessor osuScoreProcessor && OsuStableClassic.IsActive(osuScoreProcessor.JudgeMode))
                 OsuStableClassic.ApplyLiveRules(this, osuScoreProcessor.Mods.Value.Any(m => m is OsuModAutopilot));
 
+            // 滑条主体的绘制口径：aspire 谱面或 stable classic 判定档下按 stable 的方式绘制到一张窗口大小的画布上。
+            // 必须在 drawable 创建前定好，普通 lazer 游玩不受影响。
+            if (scoreProcessor is OsuScoreProcessor bodyScoreProcessor)
+            {
+                UseStableViewportBodies = OsuStableClassic.IsActive(bodyScoreProcessor.JudgeMode)
+                                          || bodyScoreProcessor.Mods.Value.Any(m => m is OsuModAspire);
+            }
+
             // 内核必须在 drawable 创建前就位：drawable 依赖 playfield 的 JudgementKernelActive 关闭自查。
             if (scoreProcessor is OsuScoreProcessor kernelScoreProcessor && beatmap != null)
             {
@@ -201,8 +221,19 @@ namespace osu.Game.Rulesets.Osu.UI
             RegisterPool<Slider, DrawableSlider>(20, 100);
             RegisterPool<SliderHeadCircle, DrawableSliderHead>(20, 100);
             RegisterPool<SliderTailCircle, DrawableSliderTail>(20, 100);
-            RegisterPool<SliderTick, DrawableSliderTick>(Math.Max(maxTicksOnOneSlider, 20), Math.Max(maxTicksOnOneSlider, 200));
-            RegisterPool<SliderRepeat, DrawableSliderRepeat>(Math.Max(maxRepeatsOnOneSlider, 20), Math.Max(maxRepeatsOnOneSlider, 200));
+
+            // 池的初始大小是预先创建多少实例，最大值只限制能长到多大。
+            // 两者都跟谱面最大折返数走时，一条有数千折返的滑条会在加载时、尚未绘制前就准备数千 drawable。
+            // 预热有限数量，需要时再增长。
+            const int pool_warmup_limit = 200;
+
+            RegisterPool<SliderTick, DrawableSliderTick>(
+                Math.Min(Math.Max(maxTicksOnOneSlider, 20), pool_warmup_limit),
+                Math.Max(maxTicksOnOneSlider, 200));
+
+            RegisterPool<SliderRepeat, DrawableSliderRepeat>(
+                Math.Min(Math.Max(maxRepeatsOnOneSlider, 20), pool_warmup_limit),
+                Math.Max(maxRepeatsOnOneSlider, 200));
 
             RegisterPool<Spinner, DrawableSpinner>(2, 20);
             RegisterPool<SpinnerTick, DrawableSpinnerTick>(10, 200);
@@ -274,10 +305,26 @@ namespace osu.Game.Rulesets.Osu.UI
                 : base(hitObject)
             {
                 // Prevent past objects in idles states from remaining alive as their end times are skipped in non-frame-stable contexts.
-                LifetimeEnd = HitObject.GetEndTime() + HitObject.HitWindows.WindowFor(HitResult.Miss);
+                applyEnd();
+
+                // 解析规则与 defaults 可能在条目已存在后才落地。stable 结束时刻要等速度已知。
+                hitObject.DefaultsApplied += _ => applyEnd();
             }
 
             protected override double InitialLifetimeOffset => ((OsuHitObject)HitObject).TimePreempt;
+
+            private void applyEnd()
+            {
+                // stable 结束变成 int.MinValue 的滑条已经结束。若 LifetimeEnd 留在真实结束，drawable 与其身缓冲
+                // 会一直留在更新列表直到谱面结束。
+                if (HitObject is Slider slider && slider.RevealEndTimeWrapsUnderStableRules)
+                {
+                    LifetimeEnd = slider.StableRevealEndTime;
+                    return;
+                }
+
+                LifetimeEnd = HitObject.GetEndTime() + HitObject.HitWindows.WindowFor(HitResult.Miss);
+            }
         }
     }
 }

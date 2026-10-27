@@ -8,9 +8,10 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.Objects.Drawables;
-using osu.Game.Rulesets.Objects.Types;
+using osu.Game.Rulesets.Osu.Skinning;
 using osu.Game.Rulesets.Osu.Skinning.Default;
 using osu.Game.Skinning;
+using osuTK;
 
 namespace osu.Game.Rulesets.Osu.Objects.Drawables
 {
@@ -64,11 +65,18 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
         public void UpdateProgress(double completionProgress)
         {
             Slider slider = drawableSlider.HitObject;
-            Position = slider.CurvePositionAt(completionProgress);
+            Vector2 position = slider.BallPositionAt(completionProgress);
+
+            // 超出视口的坐标不提交：游玩区不 mask，图元会卡住 GPU。球本身保留。
+            // 在此隐藏会去掉上一构建仍在屏上路径部分画出的球，且淡出不会把 alpha 加回来。
+            if (!StableViewportBody.CanPlaceFieldPosition(position))
+                return;
+
+            Position = position;
 
             // 0.1 / slider.Path.Distance is the additional progress needed to ensure the diff length is 0.1
             double checkDistance = 0.1 / slider.Path.Distance;
-            var diff = slider.CurvePositionAt(Math.Min(1 - checkDistance, completionProgress)) - slider.CurvePositionAt(Math.Min(1, completionProgress + checkDistance));
+            var diff = slider.BallPositionAt(Math.Min(1 - checkDistance, completionProgress)) - slider.BallPositionAt(Math.Min(1, completionProgress + checkDistance));
 
             // Ensure the value is substantially high enough to allow for Atan2 to get a valid angle.
             // Needed for when near completion, or in case of a very short slider.

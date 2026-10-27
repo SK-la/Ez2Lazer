@@ -10,6 +10,7 @@ using osu.Framework.Utils;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Osu.Configuration;
+using osu.Game.Rulesets.Osu.Skinning;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -120,6 +121,28 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
             }
         }
 
+        protected override void Update()
+        {
+            base.Update();
+
+            // Transform 在 OnApply 后淡入尾。stable 放不下的尾必须保持隐藏：
+            // 否则淡入会在卡住 GPU 的坐标提交它。
+            if (Slider != null && !StableViewportBody.CanPlaceFieldPosition(Slider.CurvePositionAt(HitObject.RepeatIndex % 2 == 0 ? 1 : 0)))
+                Alpha = 0;
+        }
+
+        private void placeAlongPath(Vector2 position)
+        {
+            if (!StableViewportBody.CanPlaceFieldPosition(position))
+            {
+                Position = Vector2.Zero;
+                Alpha = 0;
+                return;
+            }
+
+            Position = position;
+        }
+
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
             if (JudgementKernelDriven)
@@ -133,7 +156,7 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
             base.OnApply();
 
             if (Slider != null)
-                Position = Slider.CurvePositionAt(HitObject.RepeatIndex % 2 == 0 ? 1 : 0);
+                placeAlongPath(Slider.CurvePositionAt(HitObject.RepeatIndex % 2 == 0 ? 1 : 0));
         }
 
         #region FOR EDITOR USE ONLY, DO NOT USE FOR ANY OTHER PURPOSE

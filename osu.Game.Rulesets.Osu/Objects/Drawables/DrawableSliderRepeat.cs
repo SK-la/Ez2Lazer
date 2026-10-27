@@ -11,6 +11,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Utils;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Osu.Skinning;
 using osu.Game.Rulesets.Osu.Skinning.Default;
 using osu.Game.Skinning;
 using osuTK;
@@ -49,6 +50,24 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
             Origin = Anchor.Centre;
             Size = OsuHitObject.OBJECT_DIMENSIONS;
 
+            ScaleBindable.BindValueChanged(scale => scaleContainer?.Scale = new Vector2(scale.NewValue));
+        }
+
+        /// <summary>
+        /// 创建视觉，除非 stable 不绘制该点。
+        /// </summary>
+        /// <remarks>
+        /// 在首次应用时构建而非加载时：池化 drawable 加载时没有 hitobject，决定权在 hitobject。
+        /// Aspire 把数千折返叠进不足一单位，stable 一个都不画；若同一帧为每个都创建皮肤组件对就会卡死画面。
+        /// </remarks>
+        private void ensureVisuals()
+        {
+            if (scaleContainer != null)
+                return;
+
+            if (HitObject is IStableUndrawnScoringPoint { UndrawnUnderStableRules: true })
+                return;
+
             AddInternal(scaleContainer = new Container
             {
                 RelativeSizeAxes = Axes.Both,
@@ -70,14 +89,26 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
                 }
             });
 
-            ScaleBindable.BindValueChanged(scale => scaleContainer.Scale = new Vector2(scale.NewValue));
+            scaleContainer.Scale = new Vector2(ScaleBindable.Value);
         }
 
         protected override void OnApply()
         {
             base.OnApply();
 
-            Position = HitObject.Position - DrawableSlider.Position;
+            ensureVisuals();
+
+            Vector2 initial = HitObject.Position - DrawableSlider.Position;
+
+            if (!StableViewportBody.CanPlaceFieldPosition(initial))
+            {
+                Position = Vector2.Zero;
+                Alpha = 0;
+            }
+            else
+            {
+                Position = initial;
+            }
             hasRotation = false;
         }
 
@@ -92,6 +123,10 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
         protected override void UpdateInitialTransforms()
         {
             base.UpdateInitialTransforms();
+
+            // stable 不画的点没有可动画的部件。仍会判定所以会跑到这里；无此守卫 transform 会解引用空部件并拖垮帧。
+            if (scaleContainer == null)
+                return;
 
             ApplyRepeatFadeIn(CirclePiece, HitObject.TimeFadeIn);
             ApplyRepeatFadeIn(Arrow, 150);
@@ -129,7 +164,16 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
             bool isRepeatAtEnd = HitObject.RepeatIndex % 2 == 0;
             List<Vector2> curve = ((PlaySliderBody)DrawableSlider.Body.Drawable).CurrentCurve;
 
-            Position = isRepeatAtEnd ? end : start;
+            Vector2 alongPath = isRepeatAtEnd ? end : start;
+
+            if (!StableViewportBody.CanPlaceFieldPosition(alongPath))
+            {
+                Position = Vector2.Zero;
+                Alpha = 0;
+                return;
+            }
+
+            Position = alongPath;
 
             if (curve.Count < 2)
                 return;
