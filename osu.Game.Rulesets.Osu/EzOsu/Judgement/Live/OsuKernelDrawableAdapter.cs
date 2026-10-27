@@ -14,6 +14,7 @@ using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
 using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Rulesets.Osu.Objects.Drawables;
+using osu.Game.Rulesets.Osu.Replays;
 using osu.Game.Rulesets.Osu.Scoring;
 using osu.Game.Rulesets.Osu.UI;
 using osu.Game.Rulesets.Scoring;
@@ -100,6 +101,19 @@ namespace osu.Game.Rulesets.Osu.EzOsu.Judgement.Live
 
             if (inputManager == null)
                 return;
+
+            if (inputManager.ReplayInputHandler is OsuFramedReplayInputHandler replay)
+            {
+                samples.ReplayPositionAt = replay.PositionAt;
+                samples.ReplayIsPressedAt = (time, action) => replay.IsPressedAt(action, time);
+                samples.ReplayWasPressedAt = (time, action) => replay.WasPressedAt(action, time);
+            }
+            else
+            {
+                samples.ReplayPositionAt = null;
+                samples.ReplayIsPressedAt = null;
+                samples.ReplayWasPressedAt = null;
+            }
 
             double time = Time.Current + ezOffset;
 

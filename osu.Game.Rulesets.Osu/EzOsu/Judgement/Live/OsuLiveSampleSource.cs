@@ -34,6 +34,15 @@ namespace osu.Game.Rulesets.Osu.EzOsu.Judgement.Live
 
         public bool IsRewinding { get; set; }
 
+        /// <summary>
+        /// 设置后，截止时刻的采样取自回放，而非时钟碰巧停在的帧。
+        /// </summary>
+        public Func<double, Vector2>? ReplayPositionAt { get; set; }
+
+        public Func<double, OsuAction, bool>? ReplayIsPressedAt { get; set; }
+
+        public Func<double, OsuAction, bool>? ReplayWasPressedAt { get; set; }
+
         public void Record(double time, Vector2 position, bool left, bool right)
         {
             if (samples.Count > 0)
@@ -73,6 +82,9 @@ namespace osu.Game.Rulesets.Osu.EzOsu.Judgement.Live
 
         public Vector2 PositionAt(double time)
         {
+            if (ReplayPositionAt != null)
+                return ReplayPositionAt(time);
+
             int index = findIndex(time);
 
             if (index < 0)
@@ -94,6 +106,9 @@ namespace osu.Game.Rulesets.Osu.EzOsu.Judgement.Live
 
         public bool IsPressedAt(OsuAction action, double time)
         {
+            if (ReplayIsPressedAt != null)
+                return ReplayIsPressedAt(time, action);
+
             int index = findIndex(time);
 
             if (index < 0)
@@ -104,6 +119,9 @@ namespace osu.Game.Rulesets.Osu.EzOsu.Judgement.Live
 
         public bool WasPressedAt(OsuAction action, double time)
         {
+            if (ReplayWasPressedAt != null)
+                return ReplayWasPressedAt(time, action);
+
             int index = findIndex(time, strict: true);
 
             if (index < 0)

@@ -3,10 +3,7 @@
 
 #nullable disable
 
-using osuTK;
-using osu.Game.Rulesets.Objects.Types;
 using System.Collections.Generic;
-using osu.Game.Rulesets.Objects;
 using System.Linq;
 using System.Threading;
 using JetBrains.Annotations;
@@ -17,13 +14,16 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Legacy;
+using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Osu.Judgements;
 using osu.Game.Rulesets.Scoring;
+using osuTK;
 
 namespace osu.Game.Rulesets.Osu.Objects
 {
-    public class Slider : OsuHitObject, IHasPathWithRepeats, IHasSliderVelocity, IHasGenerateTicks
+    public class Slider : OsuHitObject, IHasPathWithRepeats, IHasSliderVelocity, IHasGenerateTicks, IExcludeEndTimeFromPlayableLength
     {
         public double EndTime => StartTime + this.SpanCount() * Path.Distance / Velocity;
 
@@ -41,6 +41,36 @@ namespace osu.Game.Rulesets.Osu.Objects
         public override Vector2 EndPosition => endPositionCache.IsValid ? endPositionCache.Value : endPositionCache.Value = Position + this.CurvePositionAt(1);
 
         public Vector2 StackedPositionAt(double t) => StackedPosition + this.CurvePositionAt(t);
+
+        /// <summary>
+        /// 球是否按 osu!stable 的映射放置，而非沿绘制曲线均匀行走。
+        /// </summary>
+        public bool UseStableBallPosition { get; set; }
+
+        /// <summary>
+        /// 谱面为该滑条声明的长度，独立于 <see cref="SliderPath.ExpectedDistance"/> 保留。
+        /// </summary>
+        public double? StableDeclaredDistance { get; set; }
+
+        /// <summary>
+        /// 滑条身是否保持完整绘制，而不随球经过而收缩。
+        /// </summary>
+        public bool SuppressSnakingOut { get; set; }
+
+        /// <summary>
+        /// 计算谱面可玩区域时是否排除本物件结束时间。
+        /// </summary>
+        public bool ExcludeEndTimeFromPlayableLength { get; set; }
+
+        /// <summary>
+        /// 与头/尾重叠的 tick 与折返是否像 osu!stable 一样不绘制。
+        /// </summary>
+        public bool HideOverlappingScoringPoints { get; set; }
+
+        /// <summary>
+        /// 时长是否限制为绘制几何长度（aspire / stable 解析口径）。
+        /// </summary>
+        public bool LimitDurationToGeometry { get; set; }
 
         private readonly SliderPath path = new SliderPath { OptimiseCatmull = true };
 

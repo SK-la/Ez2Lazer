@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Objects;
@@ -79,6 +80,81 @@ namespace osu.Game.Rulesets.Osu.EzOsu.StableClassic
 
             playfield.HitPolicy = new LegacyHitPolicy(StableClassicNoteLock.HittableRange(autopilot));
             playfield.BlockInputUnderSliderHeads = true;
+        }
+
+        /// <summary>
+        /// 就地绑定解析期规则：滑条的长度、时长、球位置与评分点生成全部按 stable 的口径。
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// 必须在 <c>IApplicableAfterBeatmapConversion</c> 阶段调用。这些规则决定嵌套对象怎么生成，而
+        /// <c>BindSemantics</c> 走的是 <c>ScoreProcessor.ApplyBeatmap</c>，那时嵌套对象已经建好，改标志位不会
+        /// 重建它们。
+        /// </para>
+        /// <para>
+        /// 因此本方法只能由能保证时序的调用方触发（aspire mod）。单开本判定档不会应用这些规则：判定窗与计分
+        /// 仍按本档运行，但滑条的解析口径保持上游默认。
+        /// </para>
+        /// </remarks>
+        public static void ApplyParsedRules(IBeatmap beatmap)
+        {
+            ArgumentNullException.ThrowIfNull(beatmap);
+
+            applyStableBeatLengths(beatmap);
+
+            foreach (var slider in beatmap.HitObjects.OfType<Slider>())
+            {
+                applySliderLength(slider);
+                slider.LimitDurationToGeometry = true;
+                slider.ExcludeEndTimeFromPlayableLength = true;
+                slider.SuppressSnakingOut = true;
+                slider.UseStableBallPosition = true;
+                slider.HideOverlappingScoringPoints = true;
+            }
+        }
+
+        /// <summary>
+        /// 还原被 0.6ms 下限替换掉的红线拍长。
+        /// </summary>
+        /// <remarks>
+        /// 必须在 <c>ApplyDefaults</c> 之前运行。滑条速度除以该拍长，因此下限会把近零红线变成持续数天的滑条。
+        /// </remarks>
+        private static void applyStableBeatLengths(IBeatmap beatmap)
+        {
+            foreach (var point in beatmap.ControlPointInfo.TimingPoints)
+            {
+                if (point.ParsedBeatLength is not double raw || !double.IsFinite(raw) || raw <= 0)
+                    continue;
+
+                if (raw < point.BeatLengthBindable.MinValue)
+                    point.BeatLengthBindable.MinValue = raw;
+
+                point.BeatLength = raw;
+            }
+        }
+
+        /// <summary>
+        /// 阻止作者设定长度延伸滑条路径，对齐 osu!stable。
+        /// </summary>
+        /// <remarks>
+        /// 路径会沿末段移动最后顶点以到达 <see cref="SliderPath.ExpectedDistance"/>，因此声明长度长于绘制曲线时
+        /// 会用直线替换曲线伸到声明终点。stable 从不延伸：按控制点建身，声明长度只用于截短。
+        /// 声明超过绘制时截到绘制距离即复现该行为；更短的声明长度仍照常截短。
+        /// </remarks>
+        private static void applySliderLength(Slider slider)
+        {
+            var path = slider.Path;
+            double drawn = path.CalculatedDistance;
+            double? declared = path.ExpectedDistance.Value;
+
+            // 路径不再使用声明长度后，球仍按声明长度放置，因此在下面赋值覆盖前先保留。
+            if (declared != null)
+                slider.StableDeclaredDistance = declared;
+
+            if (declared is not double value || value <= drawn)
+                return;
+
+            path.ExpectedDistance.Value = drawn;
         }
     }
 }
