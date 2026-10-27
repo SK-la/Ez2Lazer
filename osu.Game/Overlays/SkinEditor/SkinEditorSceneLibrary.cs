@@ -74,7 +74,7 @@ namespace osu.Game.Overlays.SkinEditor
                                         Name = @"Scene library",
                                         AutoSizeAxes = Axes.X,
                                         RelativeSizeAxes = Axes.Y,
-                                        Spacing = new Vector2(padding, 0),
+                                        Spacing = new Vector2(EzUIStyleV1.SCENE_BAR_BUTTON_SPACING, 0),
                                         Padding = new MarginPadding { Horizontal = padding, Vertical = gap },
                                         Direction = FillDirection.Horizontal,
                                         Children = new Drawable[]

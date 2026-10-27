@@ -71,7 +71,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                 Name = @"Ez scene library",
                                 AutoSizeAxes = Axes.X,
                                 RelativeSizeAxes = Axes.Y,
-                                Spacing = new Vector2(padding, 0),
+                                Spacing = new Vector2(EzUIStyleV1.SCENE_BAR_BUTTON_SPACING, 0),
                                 Padding = new MarginPadding { Horizontal = padding, Vertical = EzUIStyleV1.SCENE_BAR_GAP },
                                 Direction = FillDirection.Horizontal,
                                 Children = buildSceneButtons()
