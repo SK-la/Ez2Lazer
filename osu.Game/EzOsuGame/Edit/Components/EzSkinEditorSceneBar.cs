@@ -26,6 +26,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Bindable<EzSkinEditorSceneType> CurrentScene { get; } = new Bindable<EzSkinEditorSceneType>(EzSkinEditorSceneType.Appearance);
 
+        public Action? OpenEzHudEditorRequested { get; set; }
+
         public EzSkinEditorPlaybackControls PlaybackControls { get; private set; } = null!;
 
         private readonly Dictionary<EzSkinEditorSceneType, SceneTabButton> tabButtons = new Dictionary<EzSkinEditorSceneType, SceneTabButton>();
@@ -70,13 +72,23 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                 Spacing = new Vector2(padding),
                                 Padding = new MarginPadding(padding),
                                 Direction = FillDirection.Horizontal,
-                                Children = buildSceneButtons().Prepend(new OsuSpriteText
-                                {
-                                    Text = EzEditorStrings.SCENE_LIBRARY_LABEL,
-                                    Anchor = Anchor.CentreLeft,
-                                    Origin = Anchor.CentreLeft,
-                                    Margin = new MarginPadding(10),
-                                }).ToArray(),
+                                Children = buildSceneButtons()
+                                    .Prepend(new OsuSpriteText
+                                    {
+                                        Text = EzEditorStrings.SCENE_LIBRARY_LABEL,
+                                        Anchor = Anchor.CentreLeft,
+                                        Origin = Anchor.CentreLeft,
+                                        Margin = new MarginPadding(10),
+                                    })
+                                    .Append(new SkinEditorSceneLibrary.SceneButton
+                                    {
+                                        Text = EzEditorStrings.SCENE_EZ_HUD,
+                                        Anchor = Anchor.CentreLeft,
+                                        Origin = Anchor.CentreLeft,
+                                        Width = 110,
+                                        Action = () => OpenEzHudEditorRequested?.Invoke(),
+                                    })
+                                    .ToArray(),
                             },
                             PlaybackControls = new EzSkinEditorPlaybackControls
                             {

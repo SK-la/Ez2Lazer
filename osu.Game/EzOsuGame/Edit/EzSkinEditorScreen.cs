@@ -30,6 +30,7 @@ using osu.Game.IO;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Notifications;
+using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
 using osu.Game.Skinning;
@@ -91,6 +92,11 @@ namespace osu.Game.EzOsuGame.Edit
 
         [Resolved]
         private EzResourceStore resource { get; set; } = null!;
+
+        [Resolved(canBeNull: true)]
+        private SkinEditorOverlay? skinEditorOverlay { get; set; }
+
+        private bool openHudEditorAfterExit;
 
         private Container? backgroundContainer;
         private Container sceneContentHost = null!;
@@ -166,7 +172,17 @@ namespace osu.Game.EzOsuGame.Edit
         {
             persistEditorConfig();
             this.FadeOut(200, Easing.OutQuint);
-            return base.OnExiting(e);
+
+            bool blocking = base.OnExiting(e);
+
+            if (!blocking && openHudEditorAfterExit)
+            {
+                openHudEditorAfterExit = false;
+                skinEditorOverlay?.Show();
+                skinEditorOverlay?.PresentGameplay();
+            }
+
+            return blocking;
         }
 
         [BackgroundDependencyLoader]
@@ -244,6 +260,7 @@ namespace osu.Game.EzOsuGame.Edit
                                     sceneBar = new EzSkinEditorSceneBar
                                     {
                                         RelativeSizeAxes = Axes.X,
+                                        OpenEzHudEditorRequested = openEzHudEditor,
                                     },
                                 },
                                 new Drawable[]
@@ -1280,6 +1297,36 @@ namespace osu.Game.EzOsuGame.Edit
         {
             if (this.IsCurrentScreen())
                 ShowExitDialog();
+        }
+
+        private void openEzHudEditor()
+        {
+            if (!this.IsCurrentScreen())
+                return;
+
+            void proceed()
+            {
+                openHudEditorAfterExit = true;
+
+                if (this.IsCurrentScreen())
+                    this.Exit();
+            }
+
+            if (dialogOverlay == null || SkinIniSession?.IsDirty != true)
+            {
+                proceed();
+                return;
+            }
+
+            dialogOverlay.Push(new ConfirmDialog(EzEditorStrings.EXIT_CONFIRM_APPLY_TO_SKIN, () =>
+            {
+                applySettings();
+                proceed();
+            }, () =>
+            {
+                SkinIniSession?.Discard();
+                proceed();
+            }));
         }
 
         public void ShowExitDialog()
