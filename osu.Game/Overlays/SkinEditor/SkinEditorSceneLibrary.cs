@@ -9,6 +9,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Screens;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -22,10 +23,9 @@ namespace osu.Game.Overlays.SkinEditor
 {
     public partial class SkinEditorSceneLibrary : CompositeDrawable
     {
-        public const float HEIGHT = BUTTON_HEIGHT + 2;
+        public const float HEIGHT = EzUIStyleV1.SCENE_BAR_HEIGHT;
 
-        public const float BUTTON_HEIGHT = 40;
-
+        private const float gap = EzUIStyleV1.SCENE_BAR_GAP;
         private const float padding = 10;
 
         public BindableBool HudLayerVisible => hudLayerToggle.Active;
@@ -75,8 +75,8 @@ namespace osu.Game.Overlays.SkinEditor
                                         Name = @"Scene library",
                                         AutoSizeAxes = Axes.X,
                                         RelativeSizeAxes = Axes.Y,
-                                        Spacing = new Vector2(padding),
-                                        Padding = new MarginPadding { Horizontal = padding, Vertical = 1 },
+                                        Spacing = new Vector2(padding, 0),
+                                        Padding = new MarginPadding { Horizontal = padding, Vertical = gap },
                                         Direction = FillDirection.Horizontal,
                                         Children = new Drawable[]
                                         {
@@ -90,8 +90,6 @@ namespace osu.Game.Overlays.SkinEditor
                                             new SceneButton
                                             {
                                                 Text = SkinEditorStrings.SongSelect,
-                                                Anchor = Anchor.CentreLeft,
-                                                Origin = Anchor.CentreLeft,
                                                 Action = () => performer?.PerformFromScreen(screen =>
                                                 {
                                                     if (screen is SongSelect)
@@ -103,15 +101,11 @@ namespace osu.Game.Overlays.SkinEditor
                                             new SceneButton
                                             {
                                                 Text = SkinEditorStrings.Gameplay,
-                                                Anchor = Anchor.CentreLeft,
-                                                Origin = Anchor.CentreLeft,
                                                 Action = () => skinEditorOverlay?.PresentGameplay(),
                                             },
                                             new SceneButton
                                             {
                                                 Text = EzEditorStrings.SCENE_EZ_SKIN,
-                                                Anchor = Anchor.CentreLeft,
-                                                Origin = Anchor.CentreLeft,
                                                 Width = 110,
                                                 Action = () => skinEditorOverlay?.ToggleEzSkinEditor(),
                                             },
@@ -121,7 +115,7 @@ namespace osu.Game.Overlays.SkinEditor
                             },
                             hudLayerToggle = new EzEditorHudLayerToggle
                             {
-                                Margin = new MarginPadding { Left = padding, Vertical = 1 },
+                                Margin = new MarginPadding { Left = padding, Top = gap },
                             },
                         },
                     },
@@ -133,8 +127,12 @@ namespace osu.Game.Overlays.SkinEditor
         {
             public SceneButton()
             {
+                // TopLeft: Centre* origin sits on the flow baseline and gets clipped when the bar Masking=true
+                // (Ez scene bar), which looks like a downward offset.
+                Anchor = Anchor.TopLeft;
+                Origin = Anchor.TopLeft;
                 Width = 100;
-                Height = BUTTON_HEIGHT;
+                Height = EzUIStyleV1.SceneBarControlHeight();
             }
 
             [BackgroundDependencyLoader]

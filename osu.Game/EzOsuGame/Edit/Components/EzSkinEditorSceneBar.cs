@@ -10,6 +10,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
@@ -71,8 +72,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                 Name = @"Ez scene library",
                                 AutoSizeAxes = Axes.X,
                                 RelativeSizeAxes = Axes.Y,
-                                Spacing = new Vector2(padding),
-                                Padding = new MarginPadding { Horizontal = padding, Vertical = 1 },
+                                Spacing = new Vector2(padding, 0),
+                                Padding = new MarginPadding { Horizontal = padding, Vertical = EzUIStyleV1.SCENE_BAR_GAP },
                                 Direction = FillDirection.Horizontal,
                                 Children = buildSceneButtons()
                                            .Prepend(new OsuSpriteText
@@ -85,20 +86,15 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                            .Append(new SkinEditorSceneLibrary.SceneButton
                                            {
                                                Text = EzEditorStrings.SCENE_EZ_HUD,
-                                               Anchor = Anchor.CentreLeft,
-                                               Origin = Anchor.CentreLeft,
                                                Width = 110,
                                                Action = () => OpenEzHudEditorRequested?.Invoke(),
                                            })
                                            .ToArray(),
                             },
-                            PlaybackControls = new EzSkinEditorPlaybackControls
-                            {
-                                RelativeSizeAxes = Axes.Both,
-                            },
+                            PlaybackControls = new EzSkinEditorPlaybackControls(),
                             hudLayerToggle = new EzEditorHudLayerToggle
                             {
-                                Margin = new MarginPadding { Left = padding, Vertical = 1 },
+                                Margin = new MarginPadding { Left = padding, Top = EzUIStyleV1.SCENE_BAR_GAP },
                             },
                         },
                     },

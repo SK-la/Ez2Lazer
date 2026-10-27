@@ -3,6 +3,7 @@
 
 using osu.Framework.Graphics;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 
 namespace osu.Game.EzOsuGame.Edit.Components
@@ -14,9 +15,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
     {
         public EzEditorHudLayerToggle()
         {
-            Anchor = Anchor.CentreLeft;
-            Origin = Anchor.CentreLeft;
+            Anchor = Anchor.TopLeft;
+            Origin = Anchor.TopLeft;
             AutoSizeAxes = Axes.X;
+            Height = EzUIStyleV1.SceneBarControlHeight();
             Text = EzEditorStrings.TOOLBAR_HUD_LAYER;
             TextSize = 14;
             Active.Value = true;

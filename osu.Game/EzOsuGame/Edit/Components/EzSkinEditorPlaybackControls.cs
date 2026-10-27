@@ -6,9 +6,11 @@ using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Edit.Components
@@ -27,38 +29,39 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public EzSkinEditorPlaybackControls()
         {
-            RelativeSizeAxes = Axes.X;
-            Height = 48;
+            RelativeSizeAxes = Axes.Both;
+
+            float controlHeight = EzUIStyleV1.SceneBarControlHeight();
 
             Children = new Drawable[]
             {
                 new Container
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Padding = new MarginPadding { Horizontal = 8, Vertical = 6 },
+                    Padding = new MarginPadding
+                    {
+                        Horizontal = 8,
+                        Vertical = EzUIStyleV1.SCENE_BAR_GAP,
+                    },
                     Children = new Drawable[]
                     {
                         playPauseButton = new IconButton
                         {
                             Anchor = Anchor.CentreLeft,
                             Origin = Anchor.CentreLeft,
-                            Width = 32,
-                            Height = 32,
+                            Size = new Vector2(controlHeight),
                             Icon = FontAwesome.Regular.PauseCircle,
                             Action = togglePlayPause,
                         },
                         new Container
                         {
                             RelativeSizeAxes = Axes.Both,
-                            Padding = new MarginPadding { Left = 40, Right = 72 },
-                            Children = new Drawable[]
+                            Padding = new MarginPadding { Left = controlHeight + 8, Right = 72 },
+                            Child = timeline = new ProgressBar(true)
                             {
-                                timeline = new ProgressBar(true)
-                                {
-                                    RelativeSizeAxes = Axes.Both,
-                                    BackgroundColour = Color4.Black.Opacity(0.45f),
-                                    FillColour = Color4.CornflowerBlue,
-                                },
+                                RelativeSizeAxes = Axes.Both,
+                                BackgroundColour = Color4.Black.Opacity(0.45f),
+                                FillColour = Color4.CornflowerBlue,
                             },
                         },
                         progressText = new OsuSpriteText
