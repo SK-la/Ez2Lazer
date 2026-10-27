@@ -27,22 +27,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
     {
         public Action<RulesetInfo>? BeatmapPreviewRequested;
 
-        private bool active;
-
-        public bool Active
-        {
-            get => active;
-            set
-            {
-                active = value;
-                if (IsLoaded)
-                    updateColours();
-            }
-        }
-
-        private OsuColour colours = null!;
-        private OverlayColourProvider? colourProvider;
-
         [Resolved]
         private IRulesetStore rulesets { get; set; } = null!;
 
@@ -53,22 +37,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuColour colours, OverlayColourProvider? overlayColourProvider)
+        private void load()
         {
-            this.colours = colours;
-            colourProvider = overlayColourProvider;
             Action = this.ShowPopover;
-            updateColours();
         }
 
         public Popover GetPopover() => new BeatmapPreviewPopover(rulesets, BeatmapPreviewRequested);
-
-        private void updateColours()
-        {
-            BackgroundColour = active
-                ? colours.YellowDark
-                : colourProvider?.Background3 ?? colours.Blue3;
-        }
     }
 
     public partial class BeatmapPreviewPopover : OsuPopover

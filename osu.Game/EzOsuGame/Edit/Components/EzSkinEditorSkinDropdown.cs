@@ -29,7 +29,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// </summary>
     public partial class EzSkinEditorSkinDropdown : SkinEditorSceneLibrary.SceneButton, IHasPopover
     {
-        public const float DEFAULT_WIDTH = 200;
+        public new const float DEFAULT_WIDTH = 200;
 
         private readonly List<Live<SkinInfo>> dropdownItems = new List<Live<SkinInfo>>();
 
@@ -47,9 +47,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
         }
 
         [BackgroundDependencyLoader]
-        private void load(OverlayColourProvider? colourProvider, OsuColour colours)
+        private void load()
         {
-            BackgroundColour = colourProvider?.Background3 ?? colours.Blue3;
             Action = this.ShowPopover;
         }
 

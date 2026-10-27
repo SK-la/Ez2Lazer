@@ -9,7 +9,7 @@ using osu.Game.EzOsuGame.UserInterface;
 namespace osu.Game.EzOsuGame.Edit.Components
 {
     /// <summary>
-    /// Shared HUD-layer visibility toggle for editor scene bars.
+    /// HUD-layer visibility toggle for editor scene bars (footer chrome + toggle samples).
     /// </summary>
     public partial class EzEditorHudLayerToggle : EzToggleButton
     {
@@ -19,8 +19,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
             Origin = Anchor.TopLeft;
             AutoSizeAxes = Axes.X;
             Height = EzUIStyleV1.SceneBarControlHeight();
-            Text = EzEditorStrings.TOOLBAR_HUD_LAYER;
             TextSize = 14;
+            Text = EzEditorStrings.TOOLBAR_HUD_LAYER;
             Active.Value = true;
         }
     }

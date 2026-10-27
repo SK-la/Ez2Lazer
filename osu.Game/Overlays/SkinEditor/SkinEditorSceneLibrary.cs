@@ -10,10 +10,9 @@ using osu.Framework.Screens;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.UI;
-using osu.Game.Graphics;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Screens;
 using osu.Game.Screens.Select;
@@ -123,24 +122,9 @@ namespace osu.Game.Overlays.SkinEditor
             };
         }
 
-        public partial class SceneButton : OsuButton
+        /// <summary>Scene-bar action button; footer chrome via <see cref="EzSceneBarButton"/>.</summary>
+        public partial class SceneButton : EzSceneBarButton
         {
-            public SceneButton()
-            {
-                // TopLeft: Centre* origin sits on the flow baseline and gets clipped when the bar Masking=true
-                // (Ez scene bar), which looks like a downward offset.
-                Anchor = Anchor.TopLeft;
-                Origin = Anchor.TopLeft;
-                Width = 100;
-                Height = EzUIStyleV1.SceneBarControlHeight();
-            }
-
-            [BackgroundDependencyLoader]
-            private void load(OverlayColourProvider? overlayColourProvider, OsuColour colours)
-            {
-                BackgroundColour = overlayColourProvider?.Background3 ?? colours.Blue3;
-                Content.CornerRadius = 5;
-            }
         }
     }
 }

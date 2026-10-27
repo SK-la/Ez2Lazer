@@ -11,7 +11,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.UI;
-using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Overlays.SkinEditor;
@@ -136,42 +135,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             public EzSkinEditorSceneType SceneType { get; }
 
-            private bool active;
-
-            public bool Active
-            {
-                get => active;
-                set
-                {
-                    active = value;
-                    if (IsLoaded)
-                        updateColours();
-                }
-            }
-
-            private OsuColour colours = null!;
-            private OverlayColourProvider? colourProvider;
-
             public SceneTabButton(EzSkinEditorSceneType sceneType, string text, Action action)
             {
                 SceneType = sceneType;
                 Text = text;
                 Action = action;
-            }
-
-            [BackgroundDependencyLoader]
-            private void load(OsuColour colours, OverlayColourProvider? overlayColourProvider)
-            {
-                this.colours = colours;
-                colourProvider = overlayColourProvider;
-                updateColours();
-            }
-
-            private void updateColours()
-            {
-                BackgroundColour = active
-                    ? colours.YellowDark
-                    : colourProvider?.Background3 ?? colours.Blue3;
             }
         }
     }

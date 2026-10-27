@@ -8,8 +8,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.Graphics;
-using osu.Game.Overlays;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets;
 using osuTK;
@@ -140,52 +138,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 Text = EzEditorStrings.TOOLBAR_PAUSE_BEATMAP;
                 Width = 110;
             }
-
-            [BackgroundDependencyLoader]
-            private void load(OverlayColourProvider? overlayColourProvider, OsuColour colours)
-            {
-                BackgroundColour = overlayColourProvider?.Background3 ?? colours.Blue3;
-                Content.CornerRadius = 5;
-            }
         }
 
         private partial class LoopBeatmapButton : SkinEditorSceneLibrary.SceneButton
         {
-            private bool active;
-
-            public bool Active
-            {
-                get => active;
-                set
-                {
-                    active = value;
-                    if (IsLoaded)
-                        updateColours();
-                }
-            }
-
-            private OsuColour colours = null!;
-            private OverlayColourProvider? colourProvider;
-
             public LoopBeatmapButton()
             {
                 Text = EzEditorStrings.TOOLBAR_LOOP_BEATMAP;
                 Width = 110;
-            }
-
-            [BackgroundDependencyLoader]
-            private void load(OsuColour colours, OverlayColourProvider? overlayColourProvider)
-            {
-                this.colours = colours;
-                colourProvider = overlayColourProvider;
-                updateColours();
-            }
-
-            private void updateColours()
-            {
-                BackgroundColour = active
-                    ? colours.YellowDark
-                    : colourProvider?.Background3 ?? colours.Blue3;
             }
         }
     }
