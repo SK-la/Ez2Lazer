@@ -68,6 +68,7 @@ namespace osu.Game.Tests.Visual.Edit
         public void TestColourSceneInteractions()
         {
             runSceneInteraction(EzSkinEditorSceneType.Colour);
+            AddStep("enable loop chart", () => editorScreen.PreviewState.LoopBeatmap.Value = true);
             AddUntilStep("virtual playfield still present", () => editorScreen.ChildrenOfType<Column>().Any());
             AddAssert("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
         }

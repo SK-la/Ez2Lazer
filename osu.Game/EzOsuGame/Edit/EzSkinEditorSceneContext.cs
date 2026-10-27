@@ -48,9 +48,14 @@ namespace osu.Game.EzOsuGame.Edit
         public EzSkinEditorPreviewSource PreviewSource { get; init; } = EzSkinEditorPreviewSource.Static;
 
         /// <summary>
-        /// Beatmap preview is only shown in the appearance scene.
+        /// When true, <see cref="Components.EzSkinEditorPreviewHost"/> shows the selected ruleset beatmap.
         /// </summary>
         public bool AllowBeatmapPreview { get; init; }
+
+        /// <summary>
+        /// When true, playfield uses the built-in looping chart instead of a picked beatmap.
+        /// </summary>
+        public bool UseLoopBeatmap { get; init; }
 
         /// <summary>
         /// Size scene uses the virtual playfield on the left and Note/LN comparison on the right.

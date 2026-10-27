@@ -70,11 +70,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             var session = context.NoteSession;
 
-            bindSession(session.VariantId, () => refreshLivePane());
-            bindSession(session.Ruleset, () => refreshLivePane());
-            bindSession(session.NoteColour, () => applyLiveLayout());
-            bindSession(session.Width, () => applyLiveLayout());
-            bindSession(session.Height, () => applyLiveLayout());
+            bindSession(session.VariantId, refreshLivePane);
+            bindSession(session.Ruleset, refreshLivePane);
+            bindSession(session.NoteColour, applyLiveLayout);
+            bindSession(session.Width, applyLiveLayout);
+            bindSession(session.Height, applyLiveLayout);
         }
 
         private void bindSession<T>(Bindable<T> source, Action onChanged)
@@ -117,7 +117,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (source == null)
             {
-                showPlaceholder(liveContainer, EzEditorStrings.PLACEHOLDER_NOTE_PREVIEW_NOT_AVAILABLE);
+                showPlaceholder(liveContainer, EzEditorStrings.TOOLBAR_NOT_SUPPORTED);
                 livePane = null;
                 return;
             }
@@ -126,7 +126,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (profile == null)
             {
-                showPlaceholder(liveContainer, EzEditorStrings.PLACEHOLDER_NOTE_RULESET_NOT_SUPPORTED);
+                showPlaceholder(liveContainer, EzEditorStrings.TOOLBAR_NOT_SUPPORTED);
                 livePane = null;
                 return;
             }
@@ -141,7 +141,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (source == null)
             {
-                showPlaceholder(snapshotContainer, EzEditorStrings.PLACEHOLDER_NOTE_PREVIEW_NOT_AVAILABLE);
+                showPlaceholder(snapshotContainer, EzEditorStrings.TOOLBAR_NOT_SUPPORTED);
                 snapshotPane = null;
                 return;
             }
@@ -150,7 +150,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (profile == null)
             {
-                showPlaceholder(snapshotContainer, EzEditorStrings.PLACEHOLDER_NOTE_RULESET_NOT_SUPPORTED);
+                showPlaceholder(snapshotContainer, EzEditorStrings.TOOLBAR_NOT_SUPPORTED);
                 snapshotPane = null;
                 return;
             }

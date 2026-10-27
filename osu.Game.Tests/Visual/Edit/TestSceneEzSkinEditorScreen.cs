@@ -136,7 +136,7 @@ namespace osu.Game.Tests.Visual.Edit
             AddUntilStep("comparison grid visible", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Single().ChildrenOfType<GridContainer>().Any());
             AddUntilStep("at least one sidebar group", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Any());
             AddAssert("no comparison placeholder", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains("对比区") != true));
-            AddAssert("comparison preview supported", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains(EzEditorStrings.PLACEHOLDER_COMPARISON_NOT_SUPPORTED.ToString()) != true));
+            AddAssert("comparison preview supported", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains(EzEditorStrings.TOOLBAR_NOT_SUPPORTED.ToString()) != true));
             AddUntilStep("unified note comparison host visible", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonHost>().Any());
             AddUntilStep("playback and comparison are horizontal", () =>
             {
@@ -211,12 +211,12 @@ namespace osu.Game.Tests.Visual.Edit
             waitForScreenLoaded();
             AddAssert("mania preview provider registered", () => SkinEditorProviderRegistry.Get(3) != null);
             switchScene(EzSkinEditorSceneType.Colour);
+            AddStep("enable loop chart", () => editorScreen.PreviewState.LoopBeatmap.Value = true);
 
-            AddUntilStep("comparison grid visible", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Single().ChildrenOfType<GridContainer>().Any());
             AddUntilStep("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
-            AddAssert("comparison preview supported", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains(EzEditorStrings.PLACEHOLDER_COMPARISON_NOT_SUPPORTED.ToString()) != true));
+            AddAssert("comparison preview supported", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains(EzEditorStrings.TOOLBAR_NOT_SUPPORTED.ToString()) != true));
 
-            // Colour drives one full-width virtual playfield from the sidebar key mode; the unified note comparison is Size/Note only.
+            // Colour loop chart drives one full-width virtual playfield from the sidebar key mode; the unified note comparison is Size/Note only.
             AddUntilStep("virtual playfield has 4 columns", () => editorScreen.ChildrenOfType<Column>().Count() == 4);
             AddAssert("no note comparison host", () => !editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonHost>().Any());
 

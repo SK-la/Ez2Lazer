@@ -27,7 +27,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// <summary>
     /// In-editor beatmap preview using the same renderers as <see cref="Overlays.EzBeatmapPreviewOverlay"/>.
     /// </summary>
-    public partial class EzSkinEditorBeatmapPreviewHost : Container
+    public partial class EzSkinEditorBeatmapPreviewHost : Container, IEzSkinEditorScenePlaybackSource
     {
         private readonly EzSkinEditorSceneContext context;
 
@@ -53,6 +53,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
         public double CurrentTime => previewClock.CurrentTime;
 
         public bool HasActivePreview => playableBeatmap != null;
+
+        bool IEzSkinEditorScenePlaybackSource.IsActive => IsLoaded && !IsDisposed && HasActivePreview;
+
+        bool IEzSkinEditorScenePlaybackSource.IsPlaying => previewClock.IsRunning;
 
         public EzSkinEditorBeatmapPreviewHost(EzSkinEditorSceneContext context)
         {

@@ -23,6 +23,12 @@ namespace osu.Game.EzOsuGame.Edit
 
         public Bindable<int?> SuggestedKeyMode { get; } = new Bindable<int?>();
 
+        /// <summary>
+        /// When enabled, playfield scenes use the built-in looping chart (mania virtual LN preview).
+        /// Other rulesets are not implemented yet.
+        /// </summary>
+        public BindableBool LoopBeatmap { get; } = new BindableBool();
+
         public IWorkingBeatmap? PreviewBeatmap { get; private set; }
 
         public void SetStatic()
