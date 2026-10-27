@@ -294,6 +294,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString TAB_SKIN_INI = new EzLocalizationManager.EzLocalisableString("skin.ini", "skin.ini");
 
+        public static readonly LocalisableString TAB_SKIN_SPECIFIC = new EzLocalizationManager.EzLocalisableString("皮肤专用", "Skin-specific");
+
         public static readonly LocalisableString TAB_NOTE = new EzLocalizationManager.EzLocalisableString("Note", "Note");
 
         #endregion
@@ -306,9 +308,27 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString GROUP_SIZE = new EzLocalizationManager.EzLocalisableString("尺寸", "Size");
 
-        public static readonly LocalisableString GROUP_SKIN_SPECIFIC = new EzLocalizationManager.EzLocalisableString("皮肤专用", "Skin-specific");
-
         public static readonly LocalisableString GROUP_SCRIPTED_SKIN = new EzLocalizationManager.EzLocalisableString("脚本皮肤", "Scripted skin");
+
+        public static readonly LocalisableString GROUP_EZ_STYLE_PRO_SCOPED = new EzLocalizationManager.EzLocalisableString(
+            "EzStylePro 专用",
+            "EzStylePro-specific");
+
+        public static readonly LocalisableString GROUP_EZ2_SCOPED = new EzLocalizationManager.EzLocalisableString(
+            "Ez2 专用",
+            "Ez2-specific");
+
+        public static readonly LocalisableString GROUP_SBI_SCOPED = new EzLocalizationManager.EzLocalisableString(
+            "SbI 专用",
+            "SbI-specific");
+
+        public static readonly LocalisableString GROUP_SCRIPTED_SKIN_SCOPED = new EzLocalizationManager.EzLocalisableString(
+            "脚本皮肤专用",
+            "Scripted skin-specific");
+
+        public static readonly LocalisableString SCRIPTED_SKIN_SCOPED_PLACEHOLDER = new EzLocalizationManager.EzLocalisableString(
+            "脚本皮肤专用设置将在此加载（csx [SkinConfig] 反射与写回尚未实现）。当前可在「外观」场景的脚本皮肤组中编辑内存属性。",
+            "Scripted skin settings will load here (csx [SkinConfig] reflection and persistence are not implemented yet). Memory properties can still be edited under Appearance → Scripted skin.");
 
         public static readonly LocalisableString GROUP_BASE_COLOURS = new EzLocalizationManager.EzLocalisableString("基础颜色", "Base colours");
 

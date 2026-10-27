@@ -7,7 +7,6 @@ using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.Skinning;
 
 namespace osu.Game.EzOsuGame.Edit.Scenes
 {
@@ -20,9 +19,8 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
         public Drawable CreateSceneContent(EzSkinEditorSceneContext context) =>
             new EzSkinEditorPreviewHost(context);
 
-        public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context)
-        {
-            var groups = new List<EzSkinEditorSidebarGroupDefinition>
+        public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context) =>
+            new[]
             {
                 new EzSkinEditorSidebarGroupDefinition
                 {
@@ -30,20 +28,5 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
                     CreateContent = () => new EzSkinEditorSizeSettingsSection(),
                 },
             };
-
-            if (isSupportedSkin(context.EditorSkin))
-            {
-                groups.Add(new EzSkinEditorSidebarGroupDefinition
-                {
-                    Title = EzEditorStrings.GROUP_SKIN_SPECIFIC,
-                    CreateContent = () => new EzSkinEditorSkinSpecificSettingsSection(context.EditorSkin),
-                });
-            }
-
-            return groups;
-        }
-
-        private static bool isSupportedSkin(ISkin skin) =>
-            skin is EzStyleProSkin or Ez2Skin or SbISkin;
     }
 }

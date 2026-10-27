@@ -107,7 +107,6 @@ namespace osu.Game.EzOsuGame.Edit
         private EzSkinEditorMenuBar menuBar = null!;
         private EzSkinEditorSceneBar sceneBar = null!;
         private EzSkinEditorSidebar sidebar = null!;
-        private EzSkinEditorTopToolbar topToolbar = null!;
         private EzSkinEditorPlaybackControls playbackControls = null!;
 
         private EzSkinEditorBeatmapPicker? beatmapPicker;
@@ -268,7 +267,7 @@ namespace osu.Game.EzOsuGame.Edit
                                                 Children = new Drawable[]
                                                 {
                                                     playbackControls = new EzSkinEditorPlaybackControls(),
-                                                    topToolbar = new EzSkinEditorTopToolbar
+                                                    new EzSkinEditorTopToolbar
                                                     {
                                                         PreviewSource = PreviewState.Source,
                                                         PreviewMode = PreviewState.Mode,
@@ -418,7 +417,8 @@ namespace osu.Game.EzOsuGame.Edit
             if (scene is EzSkinEditorSceneType.Appearance
                          or EzSkinEditorSceneType.Size
                          or EzSkinEditorSceneType.Colour
-                         or EzSkinEditorSceneType.SkinIni)
+                         or EzSkinEditorSceneType.SkinIni
+                         or EzSkinEditorSceneType.SkinSpecific)
                 return sceneContentHost.ChildrenOfType<IEzSkinEditorScenePlaybackSource>().FirstOrDefault(s => s.IsActive);
 
             return null;
@@ -427,6 +427,13 @@ namespace osu.Game.EzOsuGame.Edit
         private void onSceneChanged(ValueChangedEvent<EzSkinEditorSceneType> change)
         {
             if (change.NewValue == EzSkinEditorSceneType.SkinIni && !isSkinIniSupported())
+            {
+                sceneBar.CurrentScene.Value = EzSkinEditorSceneType.Appearance;
+                return;
+            }
+
+            if (change.NewValue == EzSkinEditorSceneType.SkinSpecific
+                && EzSkinEditorSkinKindResolver.Resolve(skinManager.CurrentSkin.Value) == EzSkinEditorSkinKind.None)
             {
                 sceneBar.CurrentScene.Value = EzSkinEditorSceneType.Appearance;
                 return;
@@ -474,6 +481,7 @@ namespace osu.Game.EzOsuGame.Edit
             backgroundContainer.Child.RelativeSizeAxes = Axes.Both;
 
             ensureSkinIniSession();
+            ensureSkinSpecificSceneVisibility();
             ensureSkinJsonSession();
             ensureComparisonSnapshotForCurrentSkin();
             ensureNoteSnapshotForCurrentSkin();
@@ -545,7 +553,8 @@ namespace osu.Game.EzOsuGame.Edit
             bool supportsPlayfieldPreview = currentScene is EzSkinEditorSceneType.Appearance
                                                             or EzSkinEditorSceneType.Size
                                                             or EzSkinEditorSceneType.Colour
-                                                            or EzSkinEditorSceneType.SkinIni;
+                                                            or EzSkinEditorSceneType.SkinIni
+                                                            or EzSkinEditorSceneType.SkinSpecific;
 
             // PreviewHost scenes use the selected ruleset beatmap unless loop chart is on.
             bool allowBeatmapPreview = supportsPlayfieldPreview
@@ -605,6 +614,7 @@ namespace osu.Game.EzOsuGame.Edit
         {
             EzSkinEditorSceneType.Colour => getColourPreviewKeyMode(),
             EzSkinEditorSceneType.Size => 4,
+            EzSkinEditorSceneType.SkinSpecific => 4,
             _ => Math.Max(4, getCurrentKeyMode()),
         };
 
@@ -790,6 +800,18 @@ namespace osu.Game.EzOsuGame.Edit
         private void invalidateResourceCaches() => resource.InvalidateResourceCaches();
 
         private bool isSkinIniSupported() => EzSkinIniSupport.IsSupported(skinManager.CurrentSkinInfo.Value);
+
+        private void ensureSkinSpecificSceneVisibility()
+        {
+            // Use the equipped skin, not getEditorSkin() (which wraps unsupported skins as EzStylePro).
+            var kind = EzSkinEditorSkinKindResolver.Resolve(skinManager.CurrentSkin.Value);
+            bool visible = kind != EzSkinEditorSkinKind.None;
+
+            sceneBar.SetSceneVisible(EzSkinEditorSceneType.SkinSpecific, visible);
+
+            if (!visible && sceneBar.CurrentScene.Value == EzSkinEditorSceneType.SkinSpecific)
+                sceneBar.CurrentScene.Value = EzSkinEditorSceneType.Appearance;
+        }
 
         private void ensureSkinIniSession()
         {

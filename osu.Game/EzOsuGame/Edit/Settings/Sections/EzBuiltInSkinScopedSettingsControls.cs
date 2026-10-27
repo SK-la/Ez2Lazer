@@ -7,22 +7,20 @@ using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays.Settings;
-using osu.Game.Skinning;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 {
-    public partial class EzSkinEditorSkinSpecificSettingsSection : FillFlowContainer
+    /// <summary>
+    /// Shared built-in Ez skin controls. Each skin kind Provider wraps these in its own sidebar group.
+    /// </summary>
+    public partial class EzBuiltInSkinScopedSettingsControls : FillFlowContainer
     {
-        private readonly ISkin editorSkin;
-
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
-        public EzSkinEditorSkinSpecificSettingsSection(ISkin editorSkin)
+        public EzBuiltInSkinScopedSettingsControls()
         {
-            this.editorSkin = editorSkin;
-
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
             Direction = FillDirection.Vertical;
@@ -32,12 +30,6 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         [BackgroundDependencyLoader]
         private void load()
         {
-            if (!isSupportedSkin(editorSkin))
-            {
-                Alpha = 0;
-                return;
-            }
-
             Children = new Drawable[]
             {
                 new SettingsCheckbox
@@ -74,8 +66,5 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                 },
             };
         }
-
-        private static bool isSupportedSkin(ISkin skin) =>
-            skin is EzStyleProSkin or Ez2Skin or SbISkin;
     }
 }

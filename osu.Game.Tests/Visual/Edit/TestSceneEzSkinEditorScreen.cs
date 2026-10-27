@@ -8,6 +8,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Game.Database;
@@ -15,12 +16,14 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Note;
+using osu.Game.EzOsuGame.Edit.Settings.Sections;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Settings;
+using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.EzMania.Editor;
 using osu.Game.Rulesets.Mania.UI;
@@ -681,5 +684,59 @@ namespace osu.Game.Tests.Visual.Edit
                 return fileMenu.Items.OfType<EditorMenuItem>().First(i => i.Text.ToString() == EzEditorStrings.MENU_EXPORT_OSK.ToString()).Action.Disabled;
             });
         }
+
+        [Test]
+        public void TestSkinSpecificHiddenOnDefaultSkin()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            AddAssert("skin-specific tab hidden", () => findSkinSpecificTab().Alpha == 0);
+
+            AddStep("force skin-specific scene", () => editorScreen.CurrentScene.Value = EzSkinEditorSceneType.SkinSpecific);
+            AddUntilStep("bounced to appearance", () => editorScreen.CurrentScene.Value == EzSkinEditorSceneType.Appearance);
+        }
+
+        [Test]
+        public void TestSkinSpecificEzStyleProGroup() =>
+            runSkinSpecificScopedGroupTest(EzStyleProSkin.CreateInfo().ID, EzEditorStrings.GROUP_EZ_STYLE_PRO_SCOPED);
+
+        [Test]
+        public void TestSkinSpecificEz2Group() =>
+            runSkinSpecificScopedGroupTest(Ez2Skin.CreateInfo().ID, EzEditorStrings.GROUP_EZ2_SCOPED);
+
+        [Test]
+        public void TestSkinSpecificSbIGroup() =>
+            runSkinSpecificScopedGroupTest(SbISkin.CreateInfo().ID, EzEditorStrings.GROUP_SBI_SCOPED);
+
+        private void runSkinSpecificScopedGroupTest(Guid skinId, LocalisableString expectedGroupTitle)
+        {
+            AddStep("select built-in skin", () =>
+            {
+                var live = skinManager.Query(s => s.ID == skinId);
+                Assert.That(live, Is.Not.Null);
+                skinManager.CurrentSkinInfo.Value = live!;
+            });
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            AddAssert("skin-specific tab visible", () => findSkinSpecificTab().IsPresent);
+
+            switchScene(EzSkinEditorSceneType.SkinSpecific);
+
+            AddUntilStep("preview host visible", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Any());
+            AddUntilStep("one scoped sidebar group", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 1);
+
+            string expectedUpper = expectedGroupTitle.ToString().ToUpperInvariant();
+            AddAssert("group title matches skin", () =>
+                editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Single()
+                            .ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString() == expectedUpper));
+            AddAssert("built-in controls present", () => editorScreen.ChildrenOfType<EzBuiltInSkinScopedSettingsControls>().Any());
+        }
+
+        private SkinEditorSceneLibrary.SceneButton findSkinSpecificTab() =>
+            editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Single()
+                        .ChildrenOfType<SkinEditorSceneLibrary.SceneButton>()
+                        .Single(b => b.Text.ToString() == EzEditorStrings.TAB_SKIN_SPECIFIC.ToString());
     }
 }

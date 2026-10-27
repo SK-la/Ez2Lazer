@@ -29,8 +29,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private readonly IconButton playPauseButton;
         private readonly OsuSpriteText progressText;
 
-        private bool isPlaying;
-
         public Action<double>? OnSeek { get; set; }
 
         /// <summary>Invoked when the play/pause control is clicked; host should toggle real playback state.</summary>
@@ -123,7 +121,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public void SetPlaying(bool playing)
         {
-            isPlaying = playing;
             playPauseButton.Icon = playing ? FontAwesome.Regular.PauseCircle : FontAwesome.Regular.PlayCircle;
         }
 
