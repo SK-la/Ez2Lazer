@@ -278,7 +278,13 @@ namespace osu.Game.EzOsuGame.Localization
 
         #region Scene bar and tabs
 
-        public static readonly LocalisableString SCENE_LIBRARY_LABEL = new EzLocalizationManager.EzLocalisableString("场景", "Scenes");
+        public static readonly LocalisableString SCENE_LIBRARY_LABEL = new EzLocalizationManager.EzLocalisableString("场景库", "Scene library");
+
+        public static readonly LocalisableString SCENE_EZ_HUD = new EzLocalizationManager.EzLocalisableString("Ez HUD", "Ez HUD");
+
+        public static readonly LocalisableString SCENE_EZ_SKIN = new EzLocalizationManager.EzLocalisableString("Ez Skin", "Ez Skin");
+
+        public static readonly LocalisableString TOOLBAR_HUD_LAYER = new EzLocalizationManager.EzLocalisableString("HUD layer", "HUD layer");
 
         public static readonly LocalisableString TAB_APPEARANCE = new EzLocalizationManager.EzLocalisableString("外观", "Appearance");
 
@@ -380,25 +386,11 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString TOOLBAR_SELECT_MODE = new EzLocalizationManager.EzLocalisableString("选择模式", "Select mode");
 
-        public static readonly LocalisableString TOOLBAR_PREVIEW_NOT_SUPPORTED = new EzLocalizationManager.EzLocalisableString(
-            "预览尚未支持",
-            "Preview not supported yet");
+        public static readonly LocalisableString TOOLBAR_LOOP_BEATMAP = new EzLocalizationManager.EzLocalisableString("循环谱面", "Loop chart");
 
-        public static readonly LocalisableString PLACEHOLDER_VIRTUAL_PLAYFIELD_NOT_SUPPORTED = new EzLocalizationManager.EzLocalisableString(
-            "Virtual playfield not supported",
-            "Virtual playfield not supported");
-
-        public static readonly LocalisableString PLACEHOLDER_NOTE_PREVIEW_NOT_AVAILABLE = new EzLocalizationManager.EzLocalisableString(
-            "Note 预览不可用",
-            "Note preview not available");
-
-        public static readonly LocalisableString PLACEHOLDER_NOTE_RULESET_NOT_SUPPORTED = new EzLocalizationManager.EzLocalisableString(
-            "当前规则集暂不支持 Note 预览",
-            "Note preview is not supported for the selected ruleset");
-
-        public static readonly LocalisableString PLACEHOLDER_COMPARISON_NOT_SUPPORTED = new EzLocalizationManager.EzLocalisableString(
-            "Comparison preview not supported",
-            "Comparison preview not supported");
+        public static readonly LocalisableString TOOLBAR_NOT_SUPPORTED = new EzLocalizationManager.EzLocalisableString(
+            "尚未支持",
+            "Not supported yet");
 
         public static readonly LocalisableString PLACEHOLDER_BEATMAP_NOT_LOADED = new EzLocalizationManager.EzLocalisableString(
             "未加载谱面",

@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.Graphics;
 using osu.Game.Overlays;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Skinning;
@@ -25,9 +24,6 @@ namespace osu.Game.EzOsuGame.Layout
         private EzLayoutEditorOverlay editorOverlay { get; set; } = null!;
 
         [Resolved]
-        private OsuColour colours { get; set; } = null!;
-
-        [Resolved]
         private OnScreenDisplay? onScreenDisplay { get; set; }
 
         [Cached(typeof(ISkinComponentToolboxFilter))]
@@ -40,15 +36,7 @@ namespace osu.Game.EzOsuGame.Layout
 
         protected override void OnSkinChanged()
         {
-            HeaderText.Clear();
-            HeaderText.AddText(EzEditorStrings.LAYOUT_EDITOR_TITLE, cp => cp.Font = OsuFont.Default.With(size: 16));
-            HeaderText.NewLine();
-            HeaderText.AddText(EzEditorStrings.LAYOUT_EDITOR_SUBTITLE, cp =>
-            {
-                cp.Font = OsuFont.Default.With(size: 12);
-                cp.Colour = colours.Yellow;
-            });
-
+            // Menu bar right side shows EzSkinEditorSkinDropdown (base SkinEditor); only refresh targets here.
             Schedule(() =>
             {
                 HasBegunMutating = true;

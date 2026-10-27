@@ -10,7 +10,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.Graphics;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Overlays.SkinEditor;
@@ -26,7 +26,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Bindable<EzSkinEditorSceneType> CurrentScene { get; } = new Bindable<EzSkinEditorSceneType>(EzSkinEditorSceneType.Appearance);
 
-        public EzSkinEditorPlaybackControls PlaybackControls { get; private set; } = null!;
+        public Action? OpenEzHudEditorRequested { get; set; }
+
+        public BindableBool HudLayerVisible => hudLayerToggle.Active;
+
+        private EzEditorHudLayerToggle hudLayerToggle = null!;
 
         private readonly Dictionary<EzSkinEditorSceneType, SceneTabButton> tabButtons = new Dictionary<EzSkinEditorSceneType, SceneTabButton>();
 
@@ -40,7 +44,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider overlayColourProvider)
         {
-            const float skin_dropdown_area_width = EzSkinEditorSkinDropdown.DEFAULT_WIDTH + padding * 2;
+            float gap = EzUIStyleV1.SCENE_BAR_GAP;
 
             InternalChildren = new Drawable[]
             {
@@ -54,9 +58,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
                     RelativeSizeAxes = Axes.Both,
                     ColumnDimensions = new[]
                     {
-                        new Dimension(GridSizeMode.AutoSize),
                         new Dimension(),
-                        new Dimension(GridSizeMode.Absolute, skin_dropdown_area_width),
+                        new Dimension(GridSizeMode.AutoSize),
                     },
                     Content = new[]
                     {
@@ -64,29 +67,31 @@ namespace osu.Game.EzOsuGame.Edit.Components
                         {
                             new FillFlowContainer
                             {
-                                Name = @"Ez scene library",
+                                Name = @"Ez Scene library",
                                 AutoSizeAxes = Axes.X,
                                 RelativeSizeAxes = Axes.Y,
-                                Spacing = new Vector2(padding),
-                                Padding = new MarginPadding(padding),
+                                Spacing = new Vector2(EzUIStyleV1.SCENE_BAR_BUTTON_SPACING, 0),
+                                Padding = new MarginPadding { Horizontal = padding, Vertical = gap },
                                 Direction = FillDirection.Horizontal,
-                                Children = buildSceneButtons().Prepend(new OsuSpriteText
-                                {
-                                    Text = EzEditorStrings.SCENE_LIBRARY_LABEL,
-                                    Anchor = Anchor.CentreLeft,
-                                    Origin = Anchor.CentreLeft,
-                                    Margin = new MarginPadding(10),
-                                }).ToArray(),
+                                Children = buildSceneButtons()
+                                           .Prepend(new OsuSpriteText
+                                           {
+                                               Text = EzEditorStrings.SCENE_LIBRARY_LABEL,
+                                               Anchor = Anchor.CentreLeft,
+                                               Origin = Anchor.CentreLeft,
+                                               Margin = new MarginPadding { Horizontal = 10 },
+                                           })
+                                           .Append(new SkinEditorSceneLibrary.SceneButton
+                                           {
+                                               Text = EzEditorStrings.SCENE_EZ_HUD,
+                                               Width = 110,
+                                               Action = () => OpenEzHudEditorRequested?.Invoke(),
+                                           })
+                                           .ToArray(),
                             },
-                            PlaybackControls = new EzSkinEditorPlaybackControls
+                            hudLayerToggle = new EzEditorHudLayerToggle
                             {
-                                RelativeSizeAxes = Axes.Both,
-                            },
-                            new EzSkinEditorSkinDropdown
-                            {
-                                Anchor = Anchor.CentreRight,
-                                Origin = Anchor.CentreRight,
-                                Margin = new MarginPadding { Right = padding },
+                                Margin = new MarginPadding { Left = padding, Top = gap, Right = padding },
                             },
                         },
                     },
@@ -128,42 +133,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             public EzSkinEditorSceneType SceneType { get; }
 
-            private bool active;
-
-            public bool Active
-            {
-                get => active;
-                set
-                {
-                    active = value;
-                    if (IsLoaded)
-                        updateColours();
-                }
-            }
-
-            private OsuColour colours = null!;
-            private OverlayColourProvider? colourProvider;
-
             public SceneTabButton(EzSkinEditorSceneType sceneType, string text, Action action)
             {
                 SceneType = sceneType;
                 Text = text;
                 Action = action;
-            }
-
-            [BackgroundDependencyLoader]
-            private void load(OsuColour colours, OverlayColourProvider? overlayColourProvider)
-            {
-                this.colours = colours;
-                colourProvider = overlayColourProvider;
-                updateColours();
-            }
-
-            private void updateColours()
-            {
-                BackgroundColour = active
-                    ? colours.YellowDark
-                    : colourProvider?.Background3 ?? colours.Blue3;
             }
         }
     }

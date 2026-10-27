@@ -95,30 +95,30 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 return;
             }
 
-            if (context.VirtualPreviewKeyCount <= 0)
+            if (context.UseLoopBeatmap)
             {
-                if (!shouldRebuildPlayback("none", null))
+                if (context.Provider != null && context.VirtualPreviewKeyCount > 0)
+                {
+                    // Provider factories hand out a fresh instance per resolve and hold no state, so only the type and key count identify the playfield.
+                    if (!shouldRebuildPlayback($"virtual:{context.Provider.GetType().FullName}:{context.VirtualPreviewKeyCount}", null))
+                        return;
+
+                    playbackContainer.Child = context.Provider.CreateDynamicPart(context.EditorSkin, context.VirtualPreviewKeyCount)
+                                                     .With(d => d.RelativeSizeAxes = Axes.Both);
+                    return;
+                }
+
+                if (!shouldRebuildPlayback("loop-unsupported", context.PreviewRuleset))
                     return;
 
-                playbackContainer.Child = createPlaceholder(EzEditorStrings.SELECT_KEY_MODE_FIRST);
+                playbackContainer.Child = createPlaceholder(EzEditorStrings.TOOLBAR_NOT_SUPPORTED);
                 return;
             }
 
-            if (context.Provider != null)
-            {
-                // Provider factories hand out a fresh instance per resolve and hold no state, so only the type and key count identify the playfield.
-                if (!shouldRebuildPlayback($"virtual:{context.Provider.GetType().FullName}:{context.VirtualPreviewKeyCount}", null))
-                    return;
-
-                playbackContainer.Child = context.Provider.CreateDynamicPart(context.EditorSkin, context.VirtualPreviewKeyCount)
-                    .With(d => d.RelativeSizeAxes = Axes.Both);
-                return;
-            }
-
-            if (!shouldRebuildPlayback("unsupported", null))
+            if (!shouldRebuildPlayback("beatmap-missing", null))
                 return;
 
-            playbackContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_VIRTUAL_PLAYFIELD_NOT_SUPPORTED);
+            playbackContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_BEATMAP_NOT_LOADED);
         }
 
         /// <summary>
@@ -142,7 +142,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 comparisonHost = null;
 
                 if (comparisonContainer.Child is not OsuSpriteText)
-                    comparisonContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_COMPARISON_NOT_SUPPORTED);
+                    comparisonContainer.Child = createPlaceholder(EzEditorStrings.TOOLBAR_NOT_SUPPORTED);
 
                 return;
             }

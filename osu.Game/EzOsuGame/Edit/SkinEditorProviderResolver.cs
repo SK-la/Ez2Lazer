@@ -11,8 +11,6 @@ namespace osu.Game.EzOsuGame.Edit
 {
     public static class SkinEditorProviderResolver
     {
-        private const int mania_ruleset_online_id = 3;
-
         private const string mania_provider_type_name = "osu.Game.Rulesets.Mania.EzMania.Editor.EzSkinLNEditorProvider, osu.Game.Rulesets.Mania";
 
         /// <summary>
@@ -20,7 +18,7 @@ namespace osu.Game.EzOsuGame.Edit
         /// </summary>
         public static void EnsureDefaultProviderRegistered()
         {
-            if (SkinEditorProviderRegistry.Get(mania_ruleset_online_id) != null)
+            if (SkinEditorProviderRegistry.Get(3) != null)
                 return;
 
             ensureManiaProviderRegistered();
@@ -38,7 +36,21 @@ namespace osu.Game.EzOsuGame.Edit
             }
 
             // Default to mania for editor previews when no beatmap ruleset is available.
-            return SkinEditorProviderRegistry.Get(mania_ruleset_online_id) ?? ensureManiaProviderRegistered();
+            return SkinEditorProviderRegistry.Get(3) ?? ensureManiaProviderRegistered();
+        }
+
+        /// <summary>
+        /// Built-in looping chart provider. Only mania is implemented.
+        /// </summary>
+        public static ISkinEditorVirtualProvider? ResolveLoopProvider(int? rulesetOnlineId)
+        {
+            EnsureDefaultProviderRegistered();
+
+            // No ruleset selected yet → treat as mania (the only implemented loop chart).
+            if (rulesetOnlineId is null or 3)
+                return SkinEditorProviderRegistry.Get(3) ?? ensureManiaProviderRegistered();
+
+            return null;
         }
 
         private static ISkinEditorVirtualProvider? ensureManiaProviderRegistered()
@@ -64,7 +76,7 @@ namespace osu.Game.EzOsuGame.Edit
                 // best-effort: ruleset assembly may not be present in trimmed/test hosts
             }
 
-            return SkinEditorProviderRegistry.Get(mania_ruleset_online_id);
+            return SkinEditorProviderRegistry.Get(3);
         }
     }
 }

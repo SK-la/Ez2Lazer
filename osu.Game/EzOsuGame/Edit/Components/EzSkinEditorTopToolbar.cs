@@ -7,11 +7,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Localization;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Containers;
-using osu.Game.Overlays;
-using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets;
 using osuTK;
 
@@ -19,53 +14,41 @@ namespace osu.Game.EzOsuGame.Edit.Components
 {
     public partial class EzSkinEditorTopToolbar : FillFlowContainer
     {
-        public Action? ToggleBeatmapPlaybackRequested { get; set; }
-
         public Action<RulesetInfo>? BeatmapPreviewRequested { get; set; }
 
         public Bindable<EzSkinEditorPreviewSource>? PreviewSource { get; set; }
 
         public Bindable<EzBeatmapPreviewMode>? PreviewMode { get; set; }
 
-        private BeatmapPlaybackButton playbackButton = null!;
+        public BindableBool? LoopBeatmap { get; set; }
+
+        /// <summary>Preview ruleset; drives which ruleset-specific buttons are present.</summary>
+        public Bindable<RulesetInfo?>? Ruleset { get; set; }
+
         private EzSkinEditorBeatmapMenuButton beatmapButton = null!;
+        // private LoopBeatmapButton? loopButton;
 
         public EzSkinEditorTopToolbar()
         {
-            AutoSizeAxes = Axes.Both;
-            Anchor = Anchor.CentreRight;
-            Origin = Anchor.CentreRight;
+            AutoSizeAxes = Axes.X;
+            RelativeSizeAxes = Axes.Y;
+            Anchor = Anchor.CentreLeft;
+            Origin = Anchor.CentreLeft;
             Direction = FillDirection.Horizontal;
             Spacing = new Vector2(8);
-            Padding = new MarginPadding { Horizontal = 10, Vertical = 5 };
         }
 
         [BackgroundDependencyLoader]
-        private void load(OverlayColourProvider colourProvider)
+        private void load()
         {
             Children = new Drawable[]
             {
-                playbackButton = new BeatmapPlaybackButton(),
                 beatmapButton = new EzSkinEditorBeatmapMenuButton
                 {
-                    BeatmapPreviewRequested = ruleset => BeatmapPreviewRequested?.Invoke(ruleset),
-                },
-                new OsuTextFlowContainer
-                {
-                    TextAnchor = Anchor.CentreLeft,
                     Anchor = Anchor.CentreLeft,
                     Origin = Anchor.CentreLeft,
-                    AutoSizeAxes = Axes.Both,
-                    Margin = new MarginPadding { Left = 6 },
-                }.With(t =>
-                {
-                    t.AddText(@"Ez ", cp => cp.Font = OsuFont.TorusAlternate);
-                    t.AddText(@"Skin Editor", cp =>
-                    {
-                        cp.Font = OsuFont.TorusAlternate;
-                        cp.Colour = colourProvider.Highlight1;
-                    });
-                }),
+                    BeatmapPreviewRequested = ruleset => BeatmapPreviewRequested?.Invoke(ruleset),
+                },
             };
         }
 
@@ -73,42 +56,76 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             base.LoadComplete();
 
-            playbackButton.Action = () => ToggleBeatmapPlaybackRequested?.Invoke();
-
             PreviewSource?.BindValueChanged(_ => updateActiveState(), true);
             PreviewMode?.BindValueChanged(_ => updateActiveState(), true);
+            LoopBeatmap?.BindValueChanged(_ => updateActiveState(), true);
+            Ruleset?.BindValueChanged(_ => updateActiveState(), true);
         }
 
         private void updateActiveState()
         {
+            // Loop beatmap button temporarily disabled — keep loop off when ruleset cannot use it.
+            // syncRulesetSpecificButtons();
+            if (!isManiaLoopAvailable(Ruleset?.Value) && LoopBeatmap?.Value == true)
+                LoopBeatmap.Value = false;
+
+            bool loop = LoopBeatmap?.Value == true;
             bool beatmapLoaded = PreviewSource?.Value == EzSkinEditorPreviewSource.Beatmap;
-            bool playing = beatmapLoaded && PreviewMode?.Value == EzBeatmapPreviewMode.Dynamic;
 
-            playbackButton.Enabled.Value = beatmapLoaded;
-            playbackButton.ShowPausedState = beatmapLoaded && !playing;
+            beatmapButton.Active = beatmapLoaded && !loop;
 
-            beatmapButton.Active = beatmapLoaded;
+            // loopButton?.Active = loop;
         }
 
-        private partial class BeatmapPlaybackButton : SkinEditorSceneLibrary.SceneButton
+        /*
+        private void syncRulesetSpecificButtons()
         {
-            public bool ShowPausedState
-            {
-                set => Text = value ? EzEditorStrings.TOOLBAR_PLAY_BEATMAP : EzEditorStrings.TOOLBAR_PAUSE_BEATMAP;
-            }
+            if (isManiaLoopAvailable(Ruleset?.Value))
+                ensureLoopButton();
+            else
+                removeLoopButton();
+        }
 
-            public BeatmapPlaybackButton()
+        private void ensureLoopButton()
+        {
+            loopButton ??= new LoopBeatmapButton
             {
-                Text = EzEditorStrings.TOOLBAR_PAUSE_BEATMAP;
+                Action = () =>
+                {
+                    LoopBeatmap?.Value = !LoopBeatmap.Value;
+                },
+            };
+
+            if (loopButton.Parent != this)
+                Add(loopButton);
+        }
+
+        private void removeLoopButton()
+        {
+            if (loopButton?.Parent == this)
+                Remove(loopButton, false);
+
+            if (LoopBeatmap?.Value == true)
+                LoopBeatmap.Value = false;
+        }
+        */
+
+        /// <summary>
+        /// Matches <see cref="SkinEditorProviderResolver.ResolveLoopProvider"/>:
+        /// only mania is implemented; null ruleset defaults to mania.
+        /// </summary>
+        private static bool isManiaLoopAvailable(RulesetInfo? ruleset) =>
+            ruleset is null || ruleset.OnlineID == 3;
+
+        /*
+        private partial class LoopBeatmapButton : SkinEditorSceneLibrary.SceneButton
+        {
+            public LoopBeatmapButton()
+            {
+                Text = EzEditorStrings.TOOLBAR_LOOP_BEATMAP;
                 Width = 110;
             }
-
-            [BackgroundDependencyLoader]
-            private void load(OverlayColourProvider? overlayColourProvider, OsuColour colours)
-            {
-                BackgroundColour = overlayColourProvider?.Background3 ?? colours.Blue3;
-                Content.CornerRadius = 5;
-            }
         }
+        */
     }
 }

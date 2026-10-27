@@ -25,11 +25,11 @@ using Realms;
 namespace osu.Game.EzOsuGame.Edit.Components
 {
     /// <summary>
-    /// Skin selector anchored to the scene bar. Uses a popover so the list does not expand inline over the editor.
+    /// Skin selector for the editor menu bar (right side). Uses a popover so the list does not expand inline over the editor.
     /// </summary>
     public partial class EzSkinEditorSkinDropdown : SkinEditorSceneLibrary.SceneButton, IHasPopover
     {
-        public const float DEFAULT_WIDTH = 200;
+        public new const float DEFAULT_WIDTH = 200;
 
         private readonly List<Live<SkinInfo>> dropdownItems = new List<Live<SkinInfo>>();
 
@@ -43,13 +43,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public EzSkinEditorSkinDropdown()
         {
+            Anchor = Anchor.CentreLeft;
+            Origin = Anchor.CentreLeft;
             Width = DEFAULT_WIDTH;
         }
 
         [BackgroundDependencyLoader]
-        private void load(OverlayColourProvider? colourProvider, OsuColour colours)
+        private void load()
         {
-            BackgroundColour = colourProvider?.Background3 ?? colours.Blue3;
             Action = this.ShowPopover;
         }
 

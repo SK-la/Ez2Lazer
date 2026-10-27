@@ -60,5 +60,20 @@ namespace osu.Game.EzOsuGame.UI
         /// Footer height in pixels. This is the height of the footer bar at the bottom of the screen.
         /// </summary>
         public const int FOOTER_HEIGHT = 50;
+
+        /// <summary>Editor scene bar fixed height (skin / Ez skin editors).</summary>
+        public const float SCENE_BAR_HEIGHT = 43f;
+
+        /// <summary>No vertical gap between scene-bar chrome and controls.</summary>
+        public const float SCENE_BAR_GAP_NONE = 0f;
+
+        /// <summary>Default vertical gap on each side inside the scene bar (only non-zero option besides <see cref="SCENE_BAR_GAP_NONE"/>).</summary>
+        public const float SCENE_BAR_GAP = 1.5f;
+
+        /// <summary>Horizontal micro-spacing between scene-bar buttons (same value as <see cref="SCENE_BAR_GAP"/>).</summary>
+        public const float SCENE_BAR_BUTTON_SPACING = SCENE_BAR_GAP;
+
+        /// <summary>Control height for a scene-bar vertical gap (applied top and bottom).</summary>
+        public static float SceneBarControlHeight(float gap = SCENE_BAR_GAP) => SCENE_BAR_HEIGHT - gap * 2;
     }
 }

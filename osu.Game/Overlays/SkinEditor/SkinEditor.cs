@@ -13,18 +13,22 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
-using Web = osu.Game.Resources.Localisation.Web;
 using osu.Framework.Testing;
 using osu.Game.Database;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Containers;
+using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.EzOsuGame.HUD;
+using osu.Game.EzOsuGame.Screens;
+using osu.Game.EzOsuGame.ScriptedSkin;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Input.Bindings;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.OSD;
@@ -32,13 +36,11 @@ using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Edit;
 using osu.Game.Screens.Edit.Components;
 using osu.Game.Screens.Edit.Components.Menus;
-using osu.Game.EzOsuGame.HUD;
-using osu.Game.EzOsuGame.ScriptedSkin;
+using osu.Game.Screens.Play;
 using osu.Game.Skinning;
-using osu.Framework.Graphics.Cursor;
-using osu.Game.Input.Bindings;
-using osu.Game.EzOsuGame.Screens;
 using osu.Game.Utils;
+using osuTK;
+using Web = osu.Game.Resources.Localisation.Web;
 
 namespace osu.Game.Overlays.SkinEditor
 {
@@ -47,7 +49,7 @@ namespace osu.Game.Overlays.SkinEditor
     {
         public const double TRANSITION_DURATION = 300;
 
-        public const float MENU_HEIGHT = 40;
+        public const float MENU_HEIGHT = EzUIStyleV1.SCENE_BAR_HEIGHT;
 
         public readonly BindableList<ISerialisableDrawable> SelectedComponents = new BindableList<ISerialisableDrawable>();
 
@@ -57,19 +59,19 @@ namespace osu.Game.Overlays.SkinEditor
 
         protected Drawable? TargetScreen;
 
-        protected OsuTextFlowContainer HeaderText = null!;
+        private SkinEditorSceneLibrary sceneLibrary = null!;
+        private EzSkinEditorPlaybackControls playbackControls = null!;
+        private EzSkinEditorBeatmapMenuButton modeButton = null!;
 
         private Bindable<Skin> currentSkin = null!;
         private Bindable<string> clipboardContent = null!;
+        private double lastPlaybackProgressDisplayTime = double.MinValue;
 
         [Resolved]
         private OsuGame? game { get; set; }
 
         [Resolved]
         private SkinManager skins { get; set; } = null!;
-
-        [Resolved]
-        private OsuColour colours { get; set; } = null!;
 
         [Resolved]
         private RealmAccess realm { get; set; } = null!;
@@ -196,21 +198,46 @@ namespace osu.Game.Overlays.SkinEditor
                                                 createEzSettingsMenu(),
                                             }
                                         },
-                                        HeaderText = new OsuTextFlowContainer
+                                        new FillFlowContainer
                                         {
-                                            TextAnchor = Anchor.TopRight,
-                                            Padding = new MarginPadding(5),
-                                            Anchor = Anchor.TopRight,
-                                            Origin = Anchor.TopRight,
+                                            Name = @"Header controls",
+                                            Anchor = Anchor.CentreRight,
+                                            Origin = Anchor.CentreRight,
                                             AutoSizeAxes = Axes.X,
                                             RelativeSizeAxes = Axes.Y,
+                                            Direction = FillDirection.Horizontal,
+                                            Spacing = new Vector2(8),
+                                            Padding = new MarginPadding
+                                            {
+                                                Horizontal = 8,
+                                                Vertical = EzUIStyleV1.SCENE_BAR_GAP,
+                                            },
+                                            Children = new Drawable[]
+                                            {
+                                                playbackControls = new EzSkinEditorPlaybackControls
+                                                {
+                                                    OnSeek = seekGameplayPlayback,
+                                                    OnPlayPauseClicked = toggleGameplayPlayback,
+                                                },
+                                                modeButton = new EzSkinEditorBeatmapMenuButton
+                                                {
+                                                    Anchor = Anchor.CentreLeft,
+                                                    Origin = Anchor.CentreLeft,
+                                                    BeatmapPreviewRequested = ruleset => skinEditorOverlay?.PresentGameplayForRuleset(ruleset),
+                                                },
+                                                new EzSkinEditorSkinDropdown
+                                                {
+                                                    Anchor = Anchor.CentreLeft,
+                                                    Origin = Anchor.CentreLeft,
+                                                },
+                                            },
                                         },
                                     },
                                 },
                             },
                             new Drawable[]
                             {
-                                new SkinEditorSceneLibrary
+                                sceneLibrary = new SkinEditorSceneLibrary
                                 {
                                     RelativeSizeAxes = Axes.X,
                                 },
@@ -290,6 +317,8 @@ namespace osu.Game.Overlays.SkinEditor
             SelectedComponents.BindCollectionChanged((_, _) => Scheduler.AddOnce(populateSettings), true);
 
             SelectedTarget.BindValueChanged(targetChanged, true);
+
+            sceneLibrary.HudLayerVisible.BindValueChanged(_ => applyHudLayerVisibility(), true);
         }
 
         private async Task editExternally()
@@ -391,6 +420,7 @@ namespace osu.Game.Overlays.SkinEditor
         public void UpdateTargetScreen(Drawable targetScreen)
         {
             TargetScreen = targetScreen;
+            lastPlaybackProgressDisplayTime = double.MinValue;
 
             changeHandler?.Dispose();
 
@@ -400,6 +430,7 @@ namespace osu.Game.Overlays.SkinEditor
 
             Scheduler.AddOnce(loadBlueprintContainer);
             Scheduler.AddOnce(populateSettings);
+            Scheduler.AddOnce(refreshGameplayPlaybackControls);
 
             void loadBlueprintContainer()
             {
@@ -408,6 +439,73 @@ namespace osu.Game.Overlays.SkinEditor
                 if (!AvailableTargets.Any(t => t.Lookup.Equals(SelectedTarget.Value)))
                     SelectedTarget.SetDefault();
             }
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            var clock = getTargetGameplayClock();
+
+            if (clock == null)
+                return;
+
+            if (Math.Abs(clock.CurrentTime - lastPlaybackProgressDisplayTime) < 16)
+                return;
+
+            playbackControls.SetCurrentTime(clock.CurrentTime);
+            lastPlaybackProgressDisplayTime = clock.CurrentTime;
+            playbackControls.SetPlaying(!clock.IsPaused.Value);
+        }
+
+        private void refreshGameplayPlaybackControls()
+        {
+            var clock = getTargetGameplayClock();
+
+            if (clock == null || TargetScreen is not Player player)
+            {
+                playbackControls.Alpha = 0;
+                modeButton.Active = false;
+                return;
+            }
+
+            double maxTime = Math.Max(player.Beatmap.Value.BeatmapInfo.Length, 1);
+            playbackControls.Alpha = 1;
+            playbackControls.SetRange(0, maxTime);
+            playbackControls.SetCurrentTime(clock.CurrentTime);
+            playbackControls.SetPlaying(!clock.IsPaused.Value);
+            modeButton.Active = true;
+            lastPlaybackProgressDisplayTime = clock.CurrentTime;
+        }
+
+        private GameplayClockContainer? getTargetGameplayClock()
+        {
+            if (TargetScreen is not Player)
+                return null;
+
+            return TargetScreen.ChildrenOfType<GameplayClockContainer>().FirstOrDefault();
+        }
+
+        private void seekGameplayPlayback(double time)
+        {
+            var clock = getTargetGameplayClock();
+            clock?.Seek(time);
+            lastPlaybackProgressDisplayTime = double.MinValue;
+            playbackControls.SetCurrentTime(time, seeking: true);
+        }
+
+        private void toggleGameplayPlayback()
+        {
+            var clock = getTargetGameplayClock();
+            if (clock == null)
+                return;
+
+            if (clock.IsPaused.Value)
+                clock.Start();
+            else
+                clock.Stop();
+
+            playbackControls.SetPlaying(!clock.IsPaused.Value);
         }
 
         private void targetChanged(ValueChangedEvent<GlobalSkinnableContainerLookup?> target)
@@ -434,6 +532,7 @@ namespace osu.Game.Overlays.SkinEditor
                 skinComponentsContainer.OnComponentsLoaded += onComponentsLoaded;
 
             content.Child = new SkinBlueprintContainer(skinComponentsContainer);
+            applyHudLayerVisibility();
 
             var selectSections = new List<EditorSidebarSection>
             {
@@ -496,22 +595,6 @@ namespace osu.Game.Overlays.SkinEditor
             if (skins.EnsureMutableSkin())
                 // Another skin changed event will arrive which will complete the process.
                 return;
-
-            HeaderText.Clear();
-
-            HeaderText.AddText(SkinEditorStrings.SkinEditor, cp => cp.Font = OsuFont.Default.With(size: 16));
-            HeaderText.NewLine();
-            HeaderText.AddText(SkinEditorStrings.CurrentlyEditing, cp =>
-            {
-                cp.Font = OsuFont.Default.With(size: 12);
-                cp.Colour = colours.Yellow;
-            });
-
-            HeaderText.AddText($" {currentSkin.Value.SkinInfo}", cp =>
-            {
-                cp.Font = OsuFont.Default.With(size: 12, weight: FontWeight.Bold);
-                cp.Colour = colours.Yellow;
-            });
 
             updateExternalEditMenuState();
 
@@ -602,6 +685,16 @@ namespace osu.Game.Overlays.SkinEditor
         protected virtual SkinnableContainer? GetTarget(GlobalSkinnableContainerLookup? target)
         {
             return AvailableTargets.FirstOrDefault(c => c.Lookup.Equals(target));
+        }
+
+        private void applyHudLayerVisibility()
+        {
+            float alpha = sceneLibrary.HudLayerVisible.Value ? 1 : 0;
+
+            foreach (var target in AvailableTargets)
+                target.FadeTo(alpha, 200, Easing.OutQuint);
+
+            content?.FadeTo(alpha, 200, Easing.OutQuint);
         }
 
         protected virtual void RevertToDefault()

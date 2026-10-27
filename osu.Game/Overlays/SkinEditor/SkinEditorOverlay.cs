@@ -20,9 +20,9 @@ using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Edit;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
-using osu.Game.EzOsuGame.Edit;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -184,10 +184,12 @@ namespace osu.Game.Overlays.SkinEditor
         }
 
         /// <summary>
-        /// 直接进入全屏 EzSkinEditorScreen。
+        /// 关闭 HUD 皮肤编辑器并进入全屏 EzSkinEditorScreen。
         /// </summary>
         public void ToggleEzSkinEditor()
         {
+            Hide();
+
             performer?.PerformFromScreen(screen =>
             {
                 if (screen is EzSkinEditorScreen)
@@ -198,6 +200,29 @@ namespace osu.Game.Overlays.SkinEditor
         }
 
         public void PresentGameplay() => presentGameplay(false);
+
+        /// <summary>
+        /// Switch global ruleset (and a matching preview beatmap), then open / restart endless gameplay for skin editing.
+        /// </summary>
+        public void PresentGameplayForRuleset(RulesetInfo rulesetInfo)
+        {
+            if (ruleset is Bindable<RulesetInfo> writable && !writable.Disabled)
+                writable.Value = rulesetInfo;
+
+            if (!tryUseBeatmapForActiveRuleset())
+                return;
+
+            performer?.PerformFromScreen(screen =>
+            {
+                if (State.Value != Visibility.Visible)
+                    return;
+
+                if (screen is Player player)
+                    player.Exit();
+
+                Schedule(() => presentGameplay(false));
+            }, new[] { typeof(Player), typeof(SoloSongSelect) });
+        }
 
         private void presentGameplay(bool attemptedBeatmapSwitch)
         {
