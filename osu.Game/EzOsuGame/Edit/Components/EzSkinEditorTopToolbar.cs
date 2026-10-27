@@ -9,7 +9,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
-using osu.Game.Graphics.Containers;
 using osu.Game.Overlays;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets;
@@ -41,7 +40,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         }
 
         [BackgroundDependencyLoader]
-        private void load(OverlayColourProvider colourProvider)
+        private void load()
         {
             Children = new Drawable[]
             {
@@ -50,22 +49,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 {
                     BeatmapPreviewRequested = ruleset => BeatmapPreviewRequested?.Invoke(ruleset),
                 },
-                new OsuTextFlowContainer
-                {
-                    TextAnchor = Anchor.CentreLeft,
-                    Anchor = Anchor.CentreLeft,
-                    Origin = Anchor.CentreLeft,
-                    AutoSizeAxes = Axes.Both,
-                    Margin = new MarginPadding { Left = 6 },
-                }.With(t =>
-                {
-                    t.AddText(@"Ez ", cp => cp.Font = OsuFont.TorusAlternate);
-                    t.AddText(@"Skin Editor", cp =>
-                    {
-                        cp.Font = OsuFont.TorusAlternate;
-                        cp.Colour = colourProvider.Highlight1;
-                    });
-                }),
             };
         }
 
