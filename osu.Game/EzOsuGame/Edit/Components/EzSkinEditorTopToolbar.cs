@@ -38,11 +38,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
         public EzSkinEditorTopToolbar()
         {
             AutoSizeAxes = Axes.Both;
-            Anchor = Anchor.CentreRight;
-            Origin = Anchor.CentreRight;
+            Anchor = Anchor.CentreLeft;
+            Origin = Anchor.CentreLeft;
             Direction = FillDirection.Horizontal;
             Spacing = new Vector2(8);
-            Padding = new MarginPadding { Horizontal = 10, Vertical = 5 };
+            Padding = new MarginPadding { Horizontal = 8 };
         }
 
         [BackgroundDependencyLoader]

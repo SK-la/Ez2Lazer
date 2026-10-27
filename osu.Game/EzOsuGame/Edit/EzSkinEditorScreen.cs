@@ -34,6 +34,7 @@ using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
 using osu.Game.Skinning;
+using osuTK;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
@@ -245,14 +246,32 @@ namespace osu.Game.EzOsuGame.Edit
                                                 CanExportOsk = canExportOsk,
                                                 CanUseConfigSnapshot = () => sceneBar.CurrentScene.Value != EzSkinEditorSceneType.Note,
                                             },
-                                            topToolbar = new EzSkinEditorTopToolbar
+                                            new FillFlowContainer
                                             {
-                                                PreviewSource = PreviewState.Source,
-                                                PreviewMode = PreviewState.Mode,
-                                                LoopBeatmap = PreviewState.LoopBeatmap,
-                                                Ruleset = PreviewState.Ruleset,
-                                                ToggleBeatmapPlaybackRequested = toggleBeatmapPlayback,
-                                                BeatmapPreviewRequested = selectBeatmapPreview,
+                                                Name = @"Header controls",
+                                                Anchor = Anchor.CentreRight,
+                                                Origin = Anchor.CentreRight,
+                                                AutoSizeAxes = Axes.Both,
+                                                Direction = FillDirection.Horizontal,
+                                                Spacing = new Vector2(8),
+                                                Padding = new MarginPadding { Horizontal = 8 },
+                                                Children = new Drawable[]
+                                                {
+                                                    topToolbar = new EzSkinEditorTopToolbar
+                                                    {
+                                                        PreviewSource = PreviewState.Source,
+                                                        PreviewMode = PreviewState.Mode,
+                                                        LoopBeatmap = PreviewState.LoopBeatmap,
+                                                        Ruleset = PreviewState.Ruleset,
+                                                        ToggleBeatmapPlaybackRequested = toggleBeatmapPlayback,
+                                                        BeatmapPreviewRequested = selectBeatmapPreview,
+                                                    },
+                                                    new EzSkinEditorSkinDropdown
+                                                    {
+                                                        Anchor = Anchor.CentreLeft,
+                                                        Origin = Anchor.CentreLeft,
+                                                    },
+                                                },
                                             },
                                         },
                                     },

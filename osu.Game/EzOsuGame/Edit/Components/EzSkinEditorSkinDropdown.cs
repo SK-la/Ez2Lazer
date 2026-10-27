@@ -25,7 +25,7 @@ using Realms;
 namespace osu.Game.EzOsuGame.Edit.Components
 {
     /// <summary>
-    /// Skin selector anchored to the scene bar. Uses a popover so the list does not expand inline over the editor.
+    /// Skin selector for the editor menu bar (right side). Uses a popover so the list does not expand inline over the editor.
     /// </summary>
     public partial class EzSkinEditorSkinDropdown : SkinEditorSceneLibrary.SceneButton, IHasPopover
     {

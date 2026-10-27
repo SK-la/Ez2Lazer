@@ -28,7 +28,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Action? OpenEzHudEditorRequested { get; set; }
 
+        public BindableBool HudLayerVisible => hudLayerToggle.Active;
+
         public EzSkinEditorPlaybackControls PlaybackControls { get; private set; } = null!;
+
+        private EzEditorHudLayerToggle hudLayerToggle = null!;
 
         private readonly Dictionary<EzSkinEditorSceneType, SceneTabButton> tabButtons = new Dictionary<EzSkinEditorSceneType, SceneTabButton>();
 
@@ -42,8 +46,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider overlayColourProvider)
         {
-            const float skin_dropdown_area_width = EzSkinEditorSkinDropdown.DEFAULT_WIDTH + padding * 2;
-
             InternalChildren = new Drawable[]
             {
                 new Box
@@ -58,7 +60,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                     {
                         new Dimension(GridSizeMode.AutoSize),
                         new Dimension(),
-                        new Dimension(GridSizeMode.Absolute, skin_dropdown_area_width),
+                        new Dimension(GridSizeMode.AutoSize),
                     },
                     Content = new[]
                     {
@@ -70,7 +72,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                 AutoSizeAxes = Axes.X,
                                 RelativeSizeAxes = Axes.Y,
                                 Spacing = new Vector2(padding),
-                                Padding = new MarginPadding(padding),
+                                Padding = new MarginPadding { Horizontal = padding, Vertical = 1 },
                                 Direction = FillDirection.Horizontal,
                                 Children = buildSceneButtons()
                                            .Prepend(new OsuSpriteText
@@ -78,7 +80,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                                Text = EzEditorStrings.SCENE_LIBRARY_LABEL,
                                                Anchor = Anchor.CentreLeft,
                                                Origin = Anchor.CentreLeft,
-                                               Margin = new MarginPadding(10),
+                                               Margin = new MarginPadding { Horizontal = 10 },
                                            })
                                            .Append(new SkinEditorSceneLibrary.SceneButton
                                            {
@@ -94,11 +96,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
                             {
                                 RelativeSizeAxes = Axes.Both,
                             },
-                            new EzSkinEditorSkinDropdown
+                            hudLayerToggle = new EzEditorHudLayerToggle
                             {
-                                Anchor = Anchor.CentreRight,
-                                Origin = Anchor.CentreRight,
-                                Margin = new MarginPadding { Right = padding },
+                                Margin = new MarginPadding { Left = padding, Vertical = 1 },
                             },
                         },
                     },
