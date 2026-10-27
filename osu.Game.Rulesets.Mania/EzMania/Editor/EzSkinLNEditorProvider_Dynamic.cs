@@ -30,40 +30,66 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             };
         }
 
+        /// <summary>
+        /// One phrase from [HitObjects] (times relative to 750ms), 5K x→column, looped every <see cref="loop_pattern_period"/> ms.
+        /// Entry: (relativeStart, column, duration); duration 0 = tap.
+        /// </summary>
+        private static readonly (double time, int column, double duration)[] loop_pattern =
+        {
+            (0, 0, 0), (62.5, 1, 0), (125, 2, 0), (187.5, 3, 0),
+            (250, 0, 125), (250, 4, 0), (250, 0, 0),
+            (312.5, 1, 125), (312.5, 1, 0),
+            (375, 2, 125), (375, 2, 0),
+            (437.5, 3, 125), (437.5, 3, 0),
+            (500, 4, 125), (500, 4, 0),
+            (625, 0, 0), (687.5, 1, 0), (750, 2, 0),
+            (750, 0, 125), (812.5, 3, 0), (812.5, 1, 125),
+            (875, 4, 0), (875, 2, 125), (937.5, 3, 125),
+            (1000, 4, 125), (1000, 0, 0),
+            (1062.5, 1, 0), (1125, 2, 0), (1187.5, 3, 0), (1250, 4, 0),
+        };
+
+        private const double loop_pattern_period = 1250;
+        private const int loop_pattern_cycles = 8;
+
         private static ManiaBeatmap buildVirtualPreviewBeatmap(int keyCount)
         {
             var stageDefinition = new StageDefinition(keyCount);
             var beatmap = new ManiaBeatmap(stageDefinition);
-            const int spacing = preview_hold_duration;
-            int displayColumns = ManiaPlayfieldLayoutHelper.GetDisplayColumnCount(stageDefinition);
-            int cycleLength = spacing * displayColumns;
+            var controlPoints = new ControlPointInfo();
+            var difficulty = new BeatmapDifficulty();
 
-            for (int cycle = 0; cycle < 16; cycle++)
+            for (int cycle = 0; cycle < loop_pattern_cycles; cycle++)
             {
-                for (int column = 0; column < keyCount; column++)
+                double offset = cycle * loop_pattern_period;
+
+                foreach ((double time, int column, double duration) in loop_pattern)
                 {
+                    if (column >= keyCount)
+                        continue;
+
                     if (ManiaPlayfieldLayoutHelper.ShouldSkipBeatmapColumn(stageDefinition, column))
                         continue;
 
-                    double holdStart = cycle * cycleLength + (column + 1) * spacing;
-                    double noteStart = holdStart - spacing * 0.75;
+                    // Skip the period-boundary tap on non-first cycles — it coincides with the next phrase's t=0.
+                    if (cycle > 0 && time >= loop_pattern_period)
+                        continue;
 
-                    var note = new Note
-                    {
-                        Column = column,
-                        StartTime = noteStart,
-                    };
-                    note.ApplyDefaults(new ControlPointInfo(), new BeatmapDifficulty());
-                    beatmap.HitObjects.Add(note);
+                    ManiaHitObject hitObject = duration > 0
+                        ? new HoldNote
+                        {
+                            Column = column,
+                            StartTime = offset + time,
+                            Duration = duration,
+                        }
+                        : new Note
+                        {
+                            Column = column,
+                            StartTime = offset + time,
+                        };
 
-                    var hold = new HoldNote
-                    {
-                        Column = column,
-                        StartTime = holdStart,
-                        Duration = spacing * 0.9,
-                    };
-                    hold.ApplyDefaults(new ControlPointInfo(), new BeatmapDifficulty());
-                    beatmap.HitObjects.Add(hold);
+                    hitObject.ApplyDefaults(controlPoints, difficulty);
+                    beatmap.HitObjects.Add(hitObject);
                 }
             }
 
@@ -80,6 +106,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             private ManiaBeatmap previewBeatmap = null!;
             private double beatmapMinTime;
             private double beatmapMaxTime;
+            private double? pendingSeekTime;
 
             public VirtualPlayfieldPreview(int keyCount)
             {
@@ -93,7 +120,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             {
                 previewBeatmap = buildVirtualPreviewBeatmap(keyCount);
                 beatmapMinTime = 0;
-                beatmapMaxTime = Math.Max(previewBeatmap.GetLastObjectTime() + 1500, 1);
+                // Wrap on the phrase boundary (not last-object+padding) so playback is seamless/infinite.
+                beatmapMaxTime = loop_pattern_period * loop_pattern_cycles;
 
                 var ruleset = new ManiaRuleset();
                 Mod? autoplayMod = ruleset.GetAutoplayMod();
@@ -118,8 +146,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             {
                 base.Update();
 
-                if (playbackClock.IsRunning && playbackClock.CurrentTime >= beatmapMaxTime)
-                    playbackClock.Seek(beatmapMinTime);
+                if (!playbackClock.IsRunning)
+                    return;
+
+                // Infinite loop: jump back one full buffer when the clock reaches the end of materialised phrases.
+                double wrapAt = loop_pattern_period * loop_pattern_cycles;
+                double loopBack = loop_pattern_period * Math.Max(1, loop_pattern_cycles / 2);
+
+                while (playbackClock.CurrentTime >= wrapAt)
+                    playbackClock.Seek(playbackClock.CurrentTime - loopBack);
             }
 
             bool IEzSkinEditorScenePlaybackSource.IsActive => IsLoaded && !IsDisposed;
@@ -134,8 +169,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
 
             void IEzSkinEditorScenePlaybackSource.Seek(double time)
             {
-                double clamped = Math.Clamp(time, beatmapMinTime, beatmapMaxTime);
-                playbackClock.Seek(clamped);
+                double span = loop_pattern_period * loop_pattern_cycles;
+                double wrapped = time % span;
+                if (wrapped < 0)
+                    wrapped += span;
+
+                // ProgressBar fires seek every move; coalesce to one clock jump per frame.
+                pendingSeekTime = wrapped;
+                Scheduler.AddOnce(applyPendingSeek);
+            }
+
+            private void applyPendingSeek()
+            {
+                if (pendingSeekTime is not double time || IsDisposed)
+                    return;
+
+                pendingSeekTime = null;
+                playbackClock.Seek(time);
             }
 
             void IEzSkinEditorScenePlaybackSource.SetPlaying(bool playing)
