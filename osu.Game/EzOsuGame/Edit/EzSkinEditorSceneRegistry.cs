@@ -11,6 +11,7 @@ namespace osu.Game.EzOsuGame.Edit
     {
         public static IReadOnlyList<IEzSkinEditorSceneStrategy> All { get; } = new IEzSkinEditorSceneStrategy[]
         {
+            new SongSelectSceneStrategy(),
             new AppearanceSceneStrategy(),
             new SkinIniSceneStrategy(),
             new SkinSpecificSceneStrategy(),

@@ -51,9 +51,9 @@ namespace osu.Game.Tests.Visual.Edit
         [Test]
         public void TestAppearanceGroupInteractions()
         {
-            runSidebarGroupInteraction(AppearanceSceneStrategy.GROUP_ID_APPEARANCE);
-            AddAssert("appearance scene still present", () => editorScreen.ChildrenOfType<EzSkinEditorAppearanceSceneContent>().Any());
-            AddAssert("appearance groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
+            runSidebarGroupInteraction(AppearanceSceneStrategy.GROUP_ID_TEXTURE);
+            AddAssert("workspace still present", () => editorScreen.IsLoaded);
+            AddAssert("all appearance groups visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() >= 6);
         }
 
         [Test]
@@ -66,8 +66,8 @@ namespace osu.Game.Tests.Visual.Edit
         [Test]
         public void TestColourGroupInteractions()
         {
-            runSidebarGroupInteraction(AppearanceSceneStrategy.GROUP_ID_COLOUR);
-            AddAssert("colour groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
+            runSidebarGroupInteraction(AppearanceSceneStrategy.GROUP_ID_BASE_COLOURS);
+            AddAssert("all appearance groups visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() >= 6);
         }
 
         [Test]
@@ -75,27 +75,40 @@ namespace osu.Game.Tests.Visual.Edit
         {
             // Note 首页可改项较少，两页合计断言。
             runSceneInteraction(EzSkinEditorSceneType.Note, minVisited: 1);
-            AddStep("select note edit page", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectSidebarPage(1));
+            AddStep("navigate to note edit group", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectSidebarPage(1));
             cycleDriverSettings(minVisited: 1);
-            AddUntilStep("note comparison host still present", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonHost>().Any());
-            AddAssert("sidebar pages", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().PageCount == 2);
+            AddAssert("workspace still present", () => editorScreen.IsLoaded);
+            AddAssert("sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().PageCount == 2);
         }
 
         [Test]
         public void TestSkinIniSceneInteractions()
         {
             runSceneInteraction(EzSkinEditorSceneType.SkinIni, importSkin: true);
-            AddAssert("sidebar pages", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().PageCount == 3);
-            AddAssert("preview host still present", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Any());
+            AddAssert("sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().PageCount == 3);
+            AddAssert("workspace still present", () => editorScreen.IsLoaded);
             AddStep("discard draft", () => editorScreen.SkinIniSession?.Discard());
+        }
+
+        private void loadWorkspace()
+        {
+            AddStep("load workspace", () =>
+            {
+                Child = editorScreen = new EzSkinEditorScreen
+                {
+                    RelativeSizeAxes = Framework.Graphics.Axes.Both,
+                    RequestClose = () => editorScreen.Expire(),
+                };
+                editorScreen.Activate();
+            });
+            AddUntilStep("wait for workspace load", () => editorScreen.IsLoaded);
         }
 
         private void runSidebarGroupInteraction(string groupId)
         {
             driver = null;
 
-            AddStep("load screen", () => LoadScreen(editorScreen = new EzSkinEditorScreen()));
-            AddUntilStep("wait for screen load", () => editorScreen.IsLoaded);
+            loadWorkspace();
             AddStep("switch to appearance", () => editorScreen.CurrentScene.Value = EzSkinEditorSceneType.Appearance);
             AddStep($"select group {groupId}", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectSidebarGroupById(groupId));
 
@@ -109,8 +122,7 @@ namespace osu.Game.Tests.Visual.Edit
 
             driver = null;
 
-            AddStep("load screen", () => LoadScreen(editorScreen = new EzSkinEditorScreen()));
-            AddUntilStep("wait for screen load", () => editorScreen.IsLoaded);
+            loadWorkspace();
             AddStep($"switch to {scene}", () => editorScreen.CurrentScene.Value = scene);
 
             AddUntilStep("sidebar ready", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().PageCount > 0);

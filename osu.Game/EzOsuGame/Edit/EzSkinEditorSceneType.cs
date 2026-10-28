@@ -8,6 +8,7 @@ namespace osu.Game.EzOsuGame.Edit
     /// </summary>
     public enum EzSkinEditorSceneType
     {
+        SongSelect,
         Appearance,
         SkinIni,
         SkinSpecific,

@@ -1,31 +1,23 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Timing;
-using osu.Game.Beatmaps;
+using osu.Framework.Testing;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.Rulesets;
-using osu.Game.Rulesets.Mods;
-using osu.Game.Scoring;
+using osu.Game.Screens;
 using osu.Game.Screens.Play;
-using osu.Game.Screens.Play.HUD;
-using osu.Game.Screens.Play.HUD.ClicksPerSecond;
-using osu.Game.Screens.Play.HUD.JudgementCounter;
 using osu.Game.Skinning;
-using osu.Game.Storyboards;
 
 namespace osu.Game.EzOsuGame.Edit.Components
 {
     /// <summary>
-    /// Ez 皮肤编辑器 HUD 预览层。显隐跟顶栏 HUD layer 开关；
-    /// <see cref="InteractionEnabled"/> 为 false 时只读且不吃输入。
-    /// 须与游玩区同处 <c>ScalingMode.Gameplay</c> 宿主内。
+    /// Ez 皮肤编辑器 HUD 蓝图层。目标来自插拔进来的当前屏（及 Ez 图层），不再自建空 ScoreProcessor。
     /// </summary>
     public partial class EzSkinEditorHudLayer : CompositeDrawable
     {
@@ -39,22 +31,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public override bool PropagateNonPositionalInputSubTree => InteractionEnabled.Value;
 
-        // 与 HUDOverlay 相同：字段 [Cached] 供皮肤 HUD 组件解析。
-        [Cached]
-        private readonly JudgementCountController judgementCountController = new JudgementCountController();
-
-        [Cached]
-        private readonly ClicksPerSecondController clicksPerSecondController = new ClicksPerSecondController();
-
-        [Cached]
-        private readonly InputCountController inputCountController = new InputCountController();
-
-        private DependencyContainer dependencies = null!;
-        private Container rulesetHost = null!;
         private Container blueprintHost = null!;
-        private SkinnableContainer mainComponents = null!;
-        private RulesetInfo? ruleset;
         private SkinManager skins = null!;
+        private OsuScreen? liveScreen;
+        private EzLayoutLayer? layoutLayer;
+        private RulesetInfo? ruleset;
 
         public EzSkinEditorHudLayer()
         {
@@ -62,54 +43,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
             AlwaysPresent = true;
         }
 
-        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
-            => dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
-
         [BackgroundDependencyLoader]
-        private void load(IBindable<RulesetInfo> rulesetBindable, SkinManager skinManager)
+        private void load(SkinManager skinManager)
         {
             skins = skinManager;
-            // 无局内 Player：缓存最小游玩依赖，供默认 HUD 组件解析。
-            var rulesetInstance = rulesetBindable.Value.CreateInstance();
-            var emptyBeatmap = new Beatmap();
-            var scoreProcessor = rulesetInstance.CreateScoreProcessor();
-            scoreProcessor.ApplyEzGameplayEnvironment();
-            scoreProcessor.ApplyBeatmap(emptyBeatmap);
-            var healthProcessor = rulesetInstance.CreateHealthProcessor(0);
-            healthProcessor.ApplyEzGameplayEnvironment();
-            healthProcessor.ApplyBeatmap(emptyBeatmap);
-
-            dependencies.CacheAs(scoreProcessor);
-            dependencies.CacheAs(healthProcessor);
-            dependencies.CacheAs(new GameplayState(
-                emptyBeatmap,
-                rulesetInstance,
-                Array.Empty<Mod>(),
-                new Score(),
-                scoreProcessor,
-                healthProcessor,
-                new Storyboard(),
-                new Bindable<LocalUserPlayingState>()));
-
-            // 控制器须先于 SkinnableContainer 进入树，才能被 [Cached] 字段注入到子树。
-            InternalChild = new GameplayClockContainer(new StopwatchClock(true), applyOffsets: false, requireDecoupling: false)
-            {
-                Children = new Drawable[]
-                {
-                    scoreProcessor,
-                    healthProcessor,
-                    judgementCountController,
-                    clicksPerSecondController,
-                    inputCountController,
-                    mainComponents = new SkinnableContainer(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents))
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                        AlwaysPresent = true,
-                    },
-                    rulesetHost = new Container { RelativeSizeAxes = Axes.Both },
-                    blueprintHost = new Container { RelativeSizeAxes = Axes.Both },
-                },
-            };
+            InternalChild = blueprintHost = new Container { RelativeSizeAxes = Axes.Both };
         }
 
         protected override void LoadComplete()
@@ -118,23 +56,21 @@ namespace osu.Game.EzOsuGame.Edit.Components
             InteractionEnabled.BindValueChanged(_ => refreshBlueprints(), true);
         }
 
+        public void AttachLiveTargets(OsuScreen? screen, EzLayoutLayer? ezLayout)
+        {
+            liveScreen = screen;
+            layoutLayer = ezLayout;
+            refreshBlueprints();
+        }
+
+        public void DetachLiveTargets() => AttachLiveTargets(null, null);
+
         public void SetRuleset(RulesetInfo? newRuleset)
         {
             if (ruleset?.Equals(newRuleset) == true)
                 return;
 
             ruleset = newRuleset;
-            rulesetHost.Clear();
-
-            if (ruleset != null)
-            {
-                rulesetHost.Child = new SkinnableContainer(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, ruleset))
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    AlwaysPresent = true,
-                };
-            }
-
             refreshBlueprints();
         }
 
@@ -155,21 +91,31 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public IEnumerable<SkinnableContainer> EnumerateTargets()
         {
-            yield return mainComponents;
+            if (liveScreen is Player player && player.IsLoaded)
+            {
+                foreach (var c in player.ChildrenOfType<SkinnableContainer>())
+                    yield return c;
+            }
 
-            foreach (var c in rulesetHost.Children.OfType<SkinnableContainer>())
-                yield return c;
+            if (layoutLayer != null)
+            {
+                foreach (var c in layoutLayer.LayoutContainers.Where(c => c.Alpha > 0))
+                    yield return c;
+            }
         }
 
-        /// <summary>
-        /// 将当前 HUD 目标序列化写回当前皮肤并落盘。
-        /// </summary>
         public void PersistLayoutToCurrentSkin()
         {
             var skin = skins.CurrentSkin.Value;
 
             foreach (var target in EnumerateTargets())
             {
+                if (target is EzLayoutContainer ez)
+                {
+                    layoutLayer?.Store.Save(ez);
+                    continue;
+                }
+
                 if (target.ComponentsLoaded)
                     skin.UpdateDrawableTarget(target);
             }
