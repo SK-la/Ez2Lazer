@@ -2,16 +2,19 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
-using System.Linq;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
 
 namespace osu.Game.EzOsuGame.Edit.Scenes
 {
     /// <summary>
-    /// Skin-scoped settings for built-in Ez skins and scripted skins. Legacy skins stay on SkinIni.
+    /// 皮肤专用场景占位壳；实际专用设置在 Appearance 侧栏「专用」栏。
     /// </summary>
     public class SkinSpecificSceneStrategy : IEzSkinEditorSceneStrategy
     {
@@ -22,24 +25,36 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
         public Drawable CreateSceneContent(EzSkinEditorSceneContext context) =>
             new EzSkinEditorPreviewHost(context);
 
-        public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context)
-        {
-            var kind = EzSkinEditorSkinKindResolver.Resolve(context.ActualSkin);
+        public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context) =>
+            new[]
+            {
+                new EzSkinEditorSidebarGroupDefinition
+                {
+                    Title = EzEditorStrings.TAB_SKIN_SPECIFIC,
+                    CreateContent = () => new SkinSpecificScenePlaceholderSection(),
+                },
+            };
+    }
 
-            return EzSkinEditorSkinScopedGroupRegistry.For(kind)
-                                                     .Where(p => p.IsApplicable(context))
-                                                     .SelectMany(p => p.CreateGroups(context))
-                                                     .ToArray();
+    public partial class SkinSpecificScenePlaceholderSection : FillFlowContainer
+    {
+        public SkinSpecificScenePlaceholderSection()
+        {
+            RelativeSizeAxes = Axes.X;
+            AutoSizeAxes = Axes.Y;
+            Direction = FillDirection.Vertical;
+            Padding = new MarginPadding(8);
         }
 
-        public Drawable? CreateSidebarFooter(EzSkinEditorSceneContext context)
+        [BackgroundDependencyLoader]
+        private void load()
         {
-            var kind = EzSkinEditorSkinKindResolver.Resolve(context.ActualSkin);
-
-            return EzSkinEditorSkinScopedGroupRegistry.For(kind)
-                                                     .Where(p => p.IsApplicable(context))
-                                                     .Select(p => p.CreateSidebarFooter(context))
-                                                     .FirstOrDefault(f => f != null);
+            Child = new OsuSpriteText
+            {
+                RelativeSizeAxes = Axes.X,
+                Text = EzEditorStrings.SKIN_SPECIFIC_SCENE_PLACEHOLDER,
+                Font = OsuFont.Default.With(size: 14),
+            };
         }
     }
 }

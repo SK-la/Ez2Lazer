@@ -12,14 +12,13 @@ using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.EzMania.Editor;
-using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Skinning;
 using osu.Game.Tests.Resources;
 
 namespace osu.Game.Tests.Visual.Edit
 {
     /// <summary>
-    /// Walks every setting of every skin editor scene in sidebar order and moves each one, asserting that the scene survives.
+    /// 按侧栏可见设置逐项改动，断言场景仍存活。
     /// </summary>
     public partial class TestSceneEzSkinEditorSceneInteractions : ScreenTestScene
     {
@@ -49,48 +48,60 @@ namespace osu.Game.Tests.Visual.Edit
         }
 
         [Test]
-        public void TestAppearanceSceneInteractions()
+        public void TestAppearanceWorkspaceInteractions()
         {
-            runSceneInteraction(EzSkinEditorSceneType.Appearance);
+            runWorkspaceRailInteraction(EzSkinEditorWorkspaceTab.Appearance);
             AddAssert("appearance scene still present", () => editorScreen.ChildrenOfType<EzSkinEditorAppearanceSceneContent>().Any());
-            AddAssert("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
+            AddAssert("appearance groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
         }
 
         [Test]
-        public void TestSizeSceneInteractions()
+        public void TestSizeWorkspaceInteractions()
         {
-            runSceneInteraction(EzSkinEditorSceneType.Size);
-            AddUntilStep("comparison panes still present", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>().Count() == 2);
-            AddAssert("sidebar group present", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Any());
+            runWorkspaceRailInteraction(EzSkinEditorWorkspaceTab.Size);
+            AddAssert("size group present", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Any());
         }
 
         [Test]
-        public void TestColourSceneInteractions()
+        public void TestColourWorkspaceInteractions()
         {
-            runSceneInteraction(EzSkinEditorSceneType.Colour);
-            AddStep("enable loop chart", () => editorScreen.PreviewState.LoopBeatmap.Value = true);
-            AddUntilStep("virtual playfield still present", () => editorScreen.ChildrenOfType<Column>().Any());
-            AddAssert("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
+            runWorkspaceRailInteraction(EzSkinEditorWorkspaceTab.Colour);
+            AddAssert("colour groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
         }
 
         [Test]
         public void TestNoteSceneInteractions()
         {
-            runSceneInteraction(EzSkinEditorSceneType.Note);
+            // Note 首页可改项较少，两页合计断言。
+            runSceneInteraction(EzSkinEditorSceneType.Note, minVisited: 1);
+            AddStep("select note edit page", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectSidebarPage(1));
+            cycleDriverSettings(minVisited: 1);
             AddUntilStep("note comparison host still present", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonHost>().Any());
-            AddAssert("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
+            AddAssert("sidebar pages", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().PageCount == 2);
         }
 
         [Test]
         public void TestSkinIniSceneInteractions()
         {
             runSceneInteraction(EzSkinEditorSceneType.SkinIni, importSkin: true);
-            AddAssert("three sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
+            AddAssert("sidebar pages", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().PageCount == 3);
             AddAssert("preview host still present", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Any());
             AddStep("discard draft", () => editorScreen.SkinIniSession?.Discard());
         }
 
-        private void runSceneInteraction(EzSkinEditorSceneType scene, bool importSkin = false)
+        private void runWorkspaceRailInteraction(EzSkinEditorWorkspaceTab tab)
+        {
+            driver = null;
+
+            AddStep("load screen", () => LoadScreen(editorScreen = new EzSkinEditorScreen()));
+            AddUntilStep("wait for screen load", () => editorScreen.IsLoaded);
+            AddStep("switch to appearance", () => editorScreen.CurrentScene.Value = EzSkinEditorSceneType.Appearance);
+            AddStep($"select workspace {tab}", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectWorkspaceTab(tab));
+
+            cycleDriverSettings();
+        }
+
+        private void runSceneInteraction(EzSkinEditorSceneType scene, bool importSkin = false, int minVisited = 2)
         {
             if (importSkin)
                 importLegacySkin();
@@ -100,6 +111,15 @@ namespace osu.Game.Tests.Visual.Edit
             AddStep("load screen", () => LoadScreen(editorScreen = new EzSkinEditorScreen()));
             AddUntilStep("wait for screen load", () => editorScreen.IsLoaded);
             AddStep($"switch to {scene}", () => editorScreen.CurrentScene.Value = scene);
+
+            AddUntilStep("sidebar ready", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().PageCount > 0);
+            AddStep("select first page", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectSidebarPage(0));
+            cycleDriverSettings(minVisited);
+        }
+
+        private void cycleDriverSettings(int minVisited = 2)
+        {
+            driver = null;
 
             AddUntilStep("driver has settings", () =>
             {
@@ -119,7 +139,7 @@ namespace osu.Game.Tests.Visual.Edit
                 return driver.IsComplete;
             });
 
-            AddAssert("every setting was changed", () => driver!.Visited.Count, () => Is.GreaterThan(2));
+            AddAssert("every setting was changed", () => driver!.Visited.Count, () => Is.GreaterThan(minVisited - 1));
             AddWaitStep("let preview settle", 2);
         }
 

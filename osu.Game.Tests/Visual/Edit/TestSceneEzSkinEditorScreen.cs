@@ -6,7 +6,6 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Extensions;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
@@ -17,6 +16,7 @@ using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
@@ -24,7 +24,6 @@ using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.EzMania.Editor;
-using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Screens.Edit.Components.Menus;
 using osu.Game.Skinning;
 using osu.Game.Tests.Resources;
@@ -86,6 +85,9 @@ namespace osu.Game.Tests.Visual.Edit
 
         private void switchScene(EzSkinEditorSceneType scene) => AddStep($"switch to {scene}", () => editorScreen.CurrentScene.Value = scene);
 
+        private void selectWorkspaceTab(EzSkinEditorWorkspaceTab tab) =>
+            AddStep($"select workspace {tab}", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectWorkspaceTab(tab));
+
         private void importLegacySkin() => AddStep("import legacy skin", () =>
         {
             var imported = skinManager.Import(new ImportTask(TestResources.OpenResource(@"Archives/modified-ezSkin.osk"), "modified-ezSkin.osk")).GetResultSafely();
@@ -97,78 +99,114 @@ namespace osu.Game.Tests.Visual.Edit
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
-            switchScene(EzSkinEditorSceneType.Size);
+            switchScene(EzSkinEditorSceneType.Appearance);
+            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Appearance);
 
             AddUntilStep("menu bar visible", () => editorScreen.ChildrenOfType<EditorMenuBar>().Any());
             AddUntilStep("scene bar visible", () => editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Any());
             AddUntilStep("sidebar visible", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Any());
-            AddUntilStep("preview host visible", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Any());
+            AddUntilStep("workspace rail visible", () =>
+            {
+                var rail = editorScreen.ChildrenOfType<EzSkinEditorSidebarGroupRail>().SingleOrDefault();
+                return rail is { Alpha: > 0, DrawHeight: > 1, DrawWidth: > 1 };
+            });
             AddUntilStep("scene and sidebar are horizontal", () =>
             {
                 var sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().SingleOrDefault();
-                var preview = editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().SingleOrDefault();
+                return sidebar != null && sidebar.ScreenSpaceDrawQuad.Width > 0;
+            });
+            AddAssert("no size/colour scene tabs", () =>
+                !EzSkinEditorSceneRegistry.All.Any(s => s.SceneType.ToString() is "Size" or "Colour"));
+            AddAssert("hud shares gameplay scale host", () =>
+            {
+                var hud = editorScreen.ChildrenOfType<EzSkinEditorHudLayer>().SingleOrDefault();
+                if (hud == null)
+                    return false;
 
-                return sidebar != null && preview != null
-                                       && sidebar.ScreenSpaceDrawQuad.Width > 0
-                                       && sidebar.ScreenSpaceDrawQuad.TopLeft.X > preview.ScreenSpaceDrawQuad.TopLeft.X;
+                for (var p = hud.Parent; p != null; p = p.Parent)
+                {
+                    if (p is ScalingContainer)
+                        return true;
+                }
+
+                return false;
             });
         }
 
         [Test]
-        public void TestAppearanceSceneGroups()
+        public void TestAppearanceWorkspaceRails()
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.Appearance);
 
-            AddUntilStep("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
+            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Appearance);
+            AddUntilStep("appearance groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
             AddAssert("texture group present", () => editorScreen.ChildrenOfType<Dropdown<string>>().Any());
-            AddAssert("no comparison placeholder", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains("对比区") != true));
+            AddAssert("no skin-specific on appearance rail", () =>
+                !editorScreen.ChildrenOfType<EzStyleProSkinScopedSettingsControls>().Any()
+                && !editorScreen.ChildrenOfType<Ez2SkinScopedSettingsControls>().Any()
+                && !editorScreen.ChildrenOfType<SbISkinScopedSettingsControls>().Any());
+
+            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Size);
+            AddUntilStep("size group", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 1);
+
+            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Colour);
+            AddUntilStep("colour groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
         }
 
         [Test]
-        public void TestSizeSceneComparisonDrawables()
+        public void TestHudInteractionFollowsRailAndLayer()
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
-            AddAssert("mania preview provider registered", () => SkinEditorProviderRegistry.Get(3) != null);
-            switchScene(EzSkinEditorSceneType.Size);
+            switchScene(EzSkinEditorSceneType.Appearance);
 
-            AddUntilStep("comparison grid visible", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Single().ChildrenOfType<GridContainer>().Any());
-            AddUntilStep("at least one sidebar group", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Any());
-            AddAssert("no comparison placeholder", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains("对比区") != true));
-            AddAssert("comparison preview supported", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains(EzEditorStrings.TOOLBAR_NOT_SUPPORTED.ToString()) != true));
-            AddUntilStep("unified note comparison host visible", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonHost>().Any());
-            AddUntilStep("playback and comparison are horizontal", () =>
+            var sceneBar = (EzSkinEditorSceneBar)null!;
+            var hud = (EzSkinEditorHudLayer)null!;
+
+            AddStep("capture", () =>
             {
-                var preview = editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().SingleOrDefault();
-                var comparisonHost = editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonHost>().SingleOrDefault();
-
-                return preview != null
-                       && comparisonHost != null
-                       && comparisonHost.ScreenSpaceDrawQuad.Centre.X > preview.ScreenSpaceDrawQuad.Centre.X;
+                sceneBar = editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Single();
+                hud = editorScreen.ChildrenOfType<EzSkinEditorHudLayer>().Single();
             });
+
+            AddStep("enable hud layer", () => sceneBar.HudLayerVisible.Value = true);
+            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Hud);
+            AddAssert("interaction on", () => hud.InteractionEnabled.Value);
+            AddUntilStep("hud workspace section", () => editorScreen.ChildrenOfType<EzSkinEditorHudWorkspaceSection>().Any());
+            AddUntilStep("no-selection hint", () =>
+                editorScreen.ChildrenOfType<OsuSpriteText>()
+                            .Any(t => t.Text.ToString() == EzEditorStrings.SIDEBAR_HUD_NO_SELECTION.ToString()));
+
+            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Appearance);
+            AddAssert("interaction off off-rail", () => !hud.InteractionEnabled.Value);
+
+            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Hud);
+            AddStep("disable hud layer", () => sceneBar.HudLayerVisible.Value = false);
+            AddAssert("interaction off layer hidden", () => !hud.InteractionEnabled.Value);
+            AddUntilStep("layer-off hint", () =>
+                editorScreen.ChildrenOfType<OsuSpriteText>()
+                            .Any(t => t.Text.ToString() == EzEditorStrings.SIDEBAR_HUD_LAYER_OFF.ToString()));
         }
 
         [Test]
-        public void TestSizeSceneColumnWidthChangeKeepsSnapshotBaseline()
+        public void TestSizeWorkspaceColumnWidthKeepsSnapshotBaseline()
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
-            switchScene(EzSkinEditorSceneType.Size);
+            switchScene(EzSkinEditorSceneType.Appearance);
+            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Size);
 
-            AddUntilStep("two comparison panes", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>().Count() == 2);
+            AddUntilStep("size settings visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Any());
 
             double baselineWidth = 0;
             AddStep("read snapshot baseline", () => baselineWidth = editorScreen.ComparisonSnapshotForTesting.NotePreviewWidth);
 
-            EzSkinEditorNoteComparisonPane[] panes = null!;
-            AddStep("capture panes", () => panes = editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>().ToArray());
-
             double originalWidth = 0;
             double targetWidth = 0;
 
-            AddStep("drag column width", () =>
+            AddStep("change column width", () =>
             {
                 originalWidth = ezConfig.Get<double>(Ez2Setting.ColumnWidth);
                 targetWidth = originalWidth + 25;
@@ -176,53 +214,24 @@ namespace osu.Game.Tests.Visual.Edit
             });
 
             AddUntilStep("live value kept", () => ezConfig.Get<double>(Ez2Setting.ColumnWidth) == targetWidth);
-            AddWaitStep("allow refresh", 3);
-
             AddAssert("snapshot baseline unchanged", () => editorScreen.ComparisonSnapshotForTesting.NotePreviewWidth == baselineWidth);
-            AddAssert("panes reused", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>().ToArray(), () => Is.EquivalentTo(panes));
-
             AddStep("restore column width", () => ezConfig.GetBindable<double>(Ez2Setting.ColumnWidth).Value = originalWidth);
         }
 
         [Test]
-        public void TestSizeScenePseudoTailToggleDoesNotThrow()
+        public void TestSkinSpecificScenePlaceholder()
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
-            switchScene(EzSkinEditorSceneType.Size);
+            switchScene(EzSkinEditorSceneType.SkinSpecific);
 
-            AddUntilStep("two comparison panes", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>().Count() == 2);
-
-            var gradient = ezConfig.GetBindable<bool>(Ez2Setting.ManiaLNGradientEnable);
-            bool original = gradient.Value;
-
-            for (int i = 0; i < 6; i++)
-                AddStep($"toggle pseudo tail #{i}", () => gradient.Value = !gradient.Value);
-
-            AddWaitStep("let preview settle", 3);
-
-            AddUntilStep("comparison panes still present", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>().Count() == 2);
-            AddStep("restore pseudo tail", () => gradient.Value = original);
-        }
-
-        [Test]
-        public void TestColourSceneVirtualPreviewFollowsKeyMode()
-        {
-            AddStep("load screen", loadScreen);
-            waitForScreenLoaded();
-            AddAssert("mania preview provider registered", () => SkinEditorProviderRegistry.Get(3) != null);
-            switchScene(EzSkinEditorSceneType.Colour);
-            AddStep("enable loop chart", () => editorScreen.PreviewState.LoopBeatmap.Value = true);
-
-            AddUntilStep("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
-            AddAssert("comparison preview supported", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains(EzEditorStrings.TOOLBAR_NOT_SUPPORTED.ToString()) != true));
-
-            // Colour loop chart drives one full-width virtual playfield from the sidebar key mode; the unified note comparison is Size/Note only.
-            AddUntilStep("virtual playfield has 4 columns", () => editorScreen.ChildrenOfType<Column>().Count() == 4);
-            AddAssert("no note comparison host", () => !editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonHost>().Any());
-
-            AddStep("switch key mode to 7K", () => ezConfig.SetValue(Ez2Setting.ColumnTypeListSelect, 7));
-            AddUntilStep("virtual playfield follows to 7 columns", () => editorScreen.ChildrenOfType<Column>().Count() == 7);
+            AddUntilStep("placeholder text", () =>
+                editorScreen.ChildrenOfType<OsuSpriteText>()
+                            .Any(t => t.Text.ToString() == EzEditorStrings.SKIN_SPECIFIC_SCENE_PLACEHOLDER.ToString()));
+            AddAssert("no scoped settings on skin-specific scene", () =>
+                !editorScreen.ChildrenOfType<EzStyleProSkinScopedSettingsControls>().Any()
+                && !editorScreen.ChildrenOfType<Ez2SkinScopedSettingsControls>().Any()
+                && !editorScreen.ChildrenOfType<SbISkinScopedSettingsControls>().Any());
         }
 
         [Test]
@@ -235,7 +244,8 @@ namespace osu.Game.Tests.Visual.Edit
 
             AddUntilStep("playback only host", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Any());
             AddUntilStep("save footer button", () => editorScreen.ChildrenOfType<OsuButton>().Any(b => b.Text.ToString() == EzEditorStrings.SKIN_INI_SAVE_BUTTON.ToString()));
-            AddUntilStep("three sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
+            AddUntilStep("skin.ini pages", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().PageCount == 3);
+            AddUntilStep("sidebar group visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 1);
             AddUntilStep("skin.ini form fields visible", () => editorScreen.ChildrenOfType<SettingsTextBox>().Any());
             AddAssert("no placeholder copy", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains("M3 将在此") != true));
         }
@@ -248,7 +258,7 @@ namespace osu.Game.Tests.Visual.Edit
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.SkinIni);
 
-            AddUntilStep("sidebar groups loaded", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
+            AddUntilStep("sidebar group loaded", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 1);
 
             AddAssert("footer reserve height applied", () =>
             {
@@ -532,7 +542,8 @@ namespace osu.Game.Tests.Visual.Edit
             switchScene(EzSkinEditorSceneType.Note);
 
             AddUntilStep("note comparison host visible", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonHost>().Any());
-            AddUntilStep("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
+            AddUntilStep("note sidebar pages", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().PageCount == 2);
+            AddUntilStep("one sidebar group visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 1);
             AddAssert("mania note profile registered", () => EzSkinEditorNoteRulesetProfileRegistry.Get(3) != null);
         }
 
@@ -684,41 +695,45 @@ namespace osu.Game.Tests.Visual.Edit
         }
 
         [Test]
-        public void TestAppearanceSkinSpecificHiddenOnDefaultSkin()
+        public void TestSkinScopedRailHiddenOnDefaultSkin()
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.Appearance);
+            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Appearance);
 
-            AddUntilStep("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
-            AddAssert("no skin-specific controls", () =>
+            AddUntilStep("appearance groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
+            AddAssert("scoped rail not selected", () =>
+                editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().CurrentWorkspaceTab.Value
+                != EzSkinEditorWorkspaceTab.SkinScoped);
+            AddAssert("no skin-specific controls on appearance", () =>
                 !editorScreen.ChildrenOfType<EzStyleProSkinScopedSettingsControls>().Any()
                 && !editorScreen.ChildrenOfType<Ez2SkinScopedSettingsControls>().Any()
                 && !editorScreen.ChildrenOfType<SbISkinScopedSettingsControls>().Any());
         }
 
         [Test]
-        public void TestAppearanceSkinSpecificEzStylePro() =>
-            runAppearanceSkinScopedGroupTest(
+        public void TestSkinScopedRailEzStylePro() =>
+            runSkinScopedRailTest(
                 EzStyleProSkin.CreateInfo().ID,
                 () => editorScreen.ChildrenOfType<EzStyleProSkinScopedSettingsControls>().Any(),
                 expectHitTarget: true);
 
         [Test]
-        public void TestAppearanceSkinSpecificEz2() =>
-            runAppearanceSkinScopedGroupTest(
+        public void TestSkinScopedRailEz2() =>
+            runSkinScopedRailTest(
                 Ez2Skin.CreateInfo().ID,
                 () => editorScreen.ChildrenOfType<Ez2SkinScopedSettingsControls>().Any(),
                 expectHitTarget: true);
 
         [Test]
-        public void TestAppearanceSkinSpecificSbI() =>
-            runAppearanceSkinScopedGroupTest(
+        public void TestSkinScopedRailSbI() =>
+            runSkinScopedRailTest(
                 SbISkin.CreateInfo().ID,
                 () => editorScreen.ChildrenOfType<SbISkinScopedSettingsControls>().Any(),
                 expectHitTarget: false);
 
-        private void runAppearanceSkinScopedGroupTest(Guid skinId, Func<bool> controlsPresent, bool expectHitTarget)
+        private void runSkinScopedRailTest(Guid skinId, Func<bool> controlsPresent, bool expectHitTarget)
         {
             AddStep("select built-in skin", () =>
             {
@@ -729,16 +744,17 @@ namespace osu.Game.Tests.Visual.Edit
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.Appearance);
+            selectWorkspaceTab(EzSkinEditorWorkspaceTab.SkinScoped);
 
-            AddUntilStep("three sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
-
-            string expectedUpper = EzEditorStrings.GROUP_SKIN_SPECIFIC.ToString().ToUpperInvariant();
-            AddAssert("skin-specific group title", () =>
-                editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>()
-                            .Any(g => g.ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString() == expectedUpper)));
             AddUntilStep("scoped controls loaded", controlsPresent);
             AddAssert("hit-target controls", () =>
                 editorScreen.ChildrenOfType<EzHitTargetScopedSettingsControls>().Any() == expectHitTarget);
+
+            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Appearance);
+            AddAssert("no scoped controls on appearance rail", () =>
+                !editorScreen.ChildrenOfType<EzStyleProSkinScopedSettingsControls>().Any()
+                && !editorScreen.ChildrenOfType<Ez2SkinScopedSettingsControls>().Any()
+                && !editorScreen.ChildrenOfType<SbISkinScopedSettingsControls>().Any());
         }
     }
 }

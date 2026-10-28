@@ -18,6 +18,7 @@ using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Components;
@@ -26,6 +27,7 @@ using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays.Preview;
 using osu.Game.EzOsuGame.ScriptedSkin;
 using osu.Game.EzOsuGame.UI;
+using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Cursor;
 using osu.Game.IO;
 using osu.Game.Overlays;
@@ -102,13 +104,18 @@ namespace osu.Game.EzOsuGame.Edit
 
         private bool openHudEditorAfterExit;
 
+        private DependencyContainer dependencies = null!;
         private Container? backgroundContainer;
         private Container sceneContentHost = null!;
+        private ScalingContainer gameplayScaleHost = null!;
         private EzSkinEditorHudLayer hudLayer = null!;
         private EzSkinEditorMenuBar menuBar = null!;
         private EzSkinEditorSceneBar sceneBar = null!;
         private EzSkinEditorSidebar sidebar = null!;
         private EzSkinEditorPlaybackControls playbackControls = null!;
+
+        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
+            => dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
 
         private EzSkinEditorBeatmapPicker? beatmapPicker;
 
@@ -193,6 +200,10 @@ namespace osu.Game.EzOsuGame.Edit
         [BackgroundDependencyLoader]
         private void load()
         {
+            // 先构造并缓存，供侧栏 HUD 栏解析选中项。
+            hudLayer = new EzSkinEditorHudLayer();
+            dependencies.CacheAs(hudLayer);
+
             InternalChildren = new Drawable[]
             {
                 backgroundContainer = new Container { RelativeSizeAxes = Axes.Both },
@@ -308,14 +319,13 @@ namespace osu.Game.EzOsuGame.Edit
                                         {
                                             new Drawable[]
                                             {
-                                                new Container
+                                                // 游玩区与 HUD 共用 Gameplay letterbox；背景在宿主外不缩放。
+                                                gameplayScaleHost = new ScalingContainer(ScalingMode.Gameplay)
                                                 {
-                                                    RelativeSizeAxes = Axes.Both,
                                                     Children = new Drawable[]
                                                     {
                                                         sceneContentHost = new Container { RelativeSizeAxes = Axes.Both, Masking = true },
-                                                        // Visual-only HUD; Propagate*InputSubTree is false so scene content keeps receiving input.
-                                                        hudLayer = new EzSkinEditorHudLayer(),
+                                                        hudLayer,
                                                     },
                                                 },
                                                 sidebar = new EzSkinEditorSidebar(),
@@ -339,9 +349,23 @@ namespace osu.Game.EzOsuGame.Edit
             skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
             PreviewState.LoopBeatmap.BindValueChanged(_ => refreshScene());
             PreviewState.Ruleset.BindValueChanged(r => hudLayer.SetRuleset(r.NewValue), true);
-            sceneBar.HudLayerVisible.BindValueChanged(v => hudLayer.SetVisible(v.NewValue), true);
+            sceneBar.HudLayerVisible.BindValueChanged(v =>
+            {
+                hudLayer.SetVisible(v.NewValue);
+                updateHudInteraction();
+            }, true);
+            sidebar.CurrentWorkspaceTab.BindValueChanged(_ => updateHudInteraction(), true);
             bindConfigPreviewRefresh();
             bindSceneBarPlayback();
+        }
+
+        /// <summary>
+        /// HUD 栏且 HUD layer 开启时才允许蓝图拖选；否则只读预览。
+        /// </summary>
+        private void updateHudInteraction()
+        {
+            bool hudRail = sidebar.CurrentWorkspaceTab.Value == EzSkinEditorWorkspaceTab.Hud;
+            hudLayer.InteractionEnabled.Value = hudRail && sceneBar.HudLayerVisible.Value;
         }
 
         protected override void Update()
@@ -427,8 +451,6 @@ namespace osu.Game.EzOsuGame.Edit
                 return player;
 
             if (scene is EzSkinEditorSceneType.Appearance
-                         or EzSkinEditorSceneType.Size
-                         or EzSkinEditorSceneType.Colour
                          or EzSkinEditorSceneType.SkinIni
                          or EzSkinEditorSceneType.SkinSpecific)
                 return sceneContentHost.ChildrenOfType<IEzSkinEditorScenePlaybackSource>().FirstOrDefault(s => s.IsActive);
@@ -439,13 +461,6 @@ namespace osu.Game.EzOsuGame.Edit
         private void onSceneChanged(ValueChangedEvent<EzSkinEditorSceneType> change)
         {
             if (change.NewValue == EzSkinEditorSceneType.SkinIni && !isSkinIniSupported())
-            {
-                sceneBar.CurrentScene.Value = EzSkinEditorSceneType.Appearance;
-                return;
-            }
-
-            if (change.NewValue == EzSkinEditorSceneType.SkinSpecific
-                && EzSkinEditorSkinKindResolver.Resolve(skinManager.CurrentSkin.Value) == EzSkinEditorSkinKind.None)
             {
                 sceneBar.CurrentScene.Value = EzSkinEditorSceneType.Appearance;
                 return;
@@ -560,15 +575,14 @@ namespace osu.Game.EzOsuGame.Edit
             var currentScene = sceneBar.CurrentScene.Value;
 
             bool useLoopBeatmap = PreviewState.LoopBeatmap.Value;
-            bool useVirtualComparisonPreview = currentScene == EzSkinEditorSceneType.Size;
+            // Size/Colour 已并入 Appearance 五栏；本步关闭虚拟对比预览。
+            const bool useVirtualComparisonPreview = false;
             bool useNoteComparisonOnly = currentScene == EzSkinEditorSceneType.Note;
             bool supportsPlayfieldPreview = currentScene is EzSkinEditorSceneType.Appearance
-                                                            or EzSkinEditorSceneType.Size
-                                                            or EzSkinEditorSceneType.Colour
                                                             or EzSkinEditorSceneType.SkinIni
                                                             or EzSkinEditorSceneType.SkinSpecific;
 
-            // PreviewHost scenes use the selected ruleset beatmap unless loop chart is on.
+            // PreviewHost 场景在未开循环谱时用选中谱面预览。
             bool allowBeatmapPreview = supportsPlayfieldPreview
                                        && currentScene != EzSkinEditorSceneType.Appearance
                                        && !useLoopBeatmap
@@ -624,8 +638,6 @@ namespace osu.Game.EzOsuGame.Edit
 
         private int getLoopPreviewKeyCount(EzSkinEditorSceneType scene) => scene switch
         {
-            EzSkinEditorSceneType.Colour => getColourPreviewKeyMode(),
-            EzSkinEditorSceneType.Size => 4,
             EzSkinEditorSceneType.SkinSpecific => 4,
             _ => Math.Max(4, getCurrentKeyMode()),
         };
@@ -767,8 +779,9 @@ namespace osu.Game.EzOsuGame.Edit
             sceneContext = buildSceneContext();
 
             var strategy = EzSkinEditorSceneRegistry.Get(sceneBar.CurrentScene.Value);
+            var scene = sceneBar.CurrentScene.Value;
 
-            if (sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Appearance
+            if (scene == EzSkinEditorSceneType.Appearance
                 && !sceneContext.UseLoopBeatmap
                 && getSceneContent<EzSkinEditorAppearanceSceneContent>() is EzSkinEditorAppearanceSceneContent appearance)
             {
@@ -780,7 +793,15 @@ namespace osu.Game.EzOsuGame.Edit
                 sceneContentHost.Child = strategy.CreateSceneContent(sceneContext);
             }
 
-            sidebar.ApplyStrategy(strategy, sceneContext);
+            if (scene == EzSkinEditorSceneType.Appearance)
+            {
+                var kind = EzSkinEditorSkinKindResolver.Resolve(skinManager.CurrentSkin.Value);
+                sidebar.ApplyWorkspace(sceneContext, skinScopedAvailable: kind != EzSkinEditorSkinKind.None);
+            }
+            else
+                sidebar.ApplyStrategy(strategy, sceneContext);
+
+            updateHudInteraction();
         }
 
         private void detachEmbeddedPlayerFromHierarchy() => embeddedPlayer?.DetachForRemount();
@@ -788,6 +809,7 @@ namespace osu.Game.EzOsuGame.Edit
         private void applySettings()
         {
             ezSkinConfig.Save();
+            hudLayer.PersistLayoutToCurrentSkin();
 
             if (SkinIniSession is { IsSupported: true, IsDirty: true })
                 SkinIniSession.Commit();
@@ -815,14 +837,8 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void ensureSkinSpecificSceneVisibility()
         {
-            // Use the equipped skin, not getEditorSkin() (which wraps unsupported skins as EzStylePro).
-            var kind = EzSkinEditorSkinKindResolver.Resolve(skinManager.CurrentSkin.Value);
-            bool visible = kind != EzSkinEditorSkinKind.None;
-
-            sceneBar.SetSceneVisible(EzSkinEditorSceneType.SkinSpecific, visible);
-
-            if (!visible && sceneBar.CurrentScene.Value == EzSkinEditorSceneType.SkinSpecific)
-                sceneBar.CurrentScene.Value = EzSkinEditorSceneType.Appearance;
+            // 顶栏 SkinSpecific 为占位壳，始终可见；专用设置在 Appearance 侧栏「专用」栏。
+            sceneBar.SetSceneVisible(EzSkinEditorSceneType.SkinSpecific, true);
         }
 
         private void ensureSkinIniSession()
@@ -1057,12 +1073,6 @@ namespace osu.Game.EzOsuGame.Edit
                 return suggested;
 
             return ezSkinConfig.Get<int>(Ez2Setting.ColumnTypeListSelect);
-        }
-
-        private int getColourPreviewKeyMode()
-        {
-            int selected = ezSkinConfig.Get<int>(Ez2Setting.ColumnTypeListSelect);
-            return selected > 0 ? selected : 0;
         }
 
         private bool canExportOsk() => RuntimeInfo.IsDesktop
