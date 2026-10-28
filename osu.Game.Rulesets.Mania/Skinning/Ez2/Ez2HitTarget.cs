@@ -5,6 +5,9 @@ using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Platform;
+using osu.Framework.Timing;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Play;
@@ -14,6 +17,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
     public partial class Ez2HitTarget : Ez2NotePiece
     {
+        private readonly IBindable<double> hitTargetFloatFixed = new Bindable<double>();
+        private readonly IBindable<double> hitTargetAlpha = new Bindable<double>();
+
         private IBindable<ScrollingDirection> direction = null!;
 
         private double beatPhase;
@@ -27,21 +33,28 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         /// </summary>
         private EzBeatmapSpeedTracker speedTracker = null!;
 
+        private IFrameBasedClock? hostClock;
+
         [BackgroundDependencyLoader]
-        private void load(IScrollingInfo scrollingInfo)
+        private void load(IScrollingInfo scrollingInfo, IEzSkinInfo ezSkinInfo, GameHost host)
         {
             RelativeSizeAxes = Axes.X;
-            // Masking = true;
             Height = NoteHeight * NOTE_ACCENT_RATIO;
             CornerRadius = NoteHeight;
-            Alpha = 0.3f;
             Blending = BlendingParameters.Mixture;
             Colour = Color4.Gray;
+
+            // Host update clock keeps bobbing while gameplay is paused (same as EzStylePro).
+            hostClock = host.UpdateThread.Clock;
 
             direction = scrollingInfo.Direction;
             direction.BindValueChanged(onDirectionChanged, true);
 
             AddInternal(speedTracker = new EzBeatmapSpeedTracker());
+
+            hitTargetFloatFixed.BindTo(ezSkinInfo.HitTargetFloatFixed);
+            hitTargetAlpha.BindTo(ezSkinInfo.HitTargetAlpha);
+            hitTargetAlpha.BindValueChanged(v => Alpha = (float)v.NewValue, true);
         }
 
         protected override void Update()
@@ -54,29 +67,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             if (beatLength <= 0)
                 return;
 
-            // Elapsed time on the gameplay clock is already song time (it advances at the audible rate), so the beat
-            // length alone converts it into beats.
-            beatPhase = EzBeatmapSpeedTracker.AdvanceBeatPhase(beatPhase, gameplayClock.ElapsedFrameTime, beatLength);
+            beatPhase = hostClock != null
+                ? EzBeatmapSpeedTracker.AdvanceBeatPhase(beatPhase, hostClock.ElapsedFrameTime, beatLength, speedTracker.Rate.Value)
+                : EzBeatmapSpeedTracker.AdvanceBeatPhase(beatPhase, gameplayClock.ElapsedFrameTime, beatLength);
 
-            const double amplitude = 6.0;
-            Y = (float)(smoothSineWave(beatPhase) * amplitude);
+            double smoothValue = 0.3 * Math.Sin(beatPhase * 2 * Math.PI);
+            Y = (float)(smoothValue * hitTargetFloatFixed.Value);
         }
-
-        private double smoothSineWave(double t)
-        {
-            const double frequency = 1;
-            const double amplitude = 0.3;
-            return amplitude * Math.Sin(frequency * t * 2 * Math.PI);
-        }
-        //     double elasticValue = elasticEaseOut(progress);
-        //     Y = (float)(elasticValue * amplitude);
-        // }
-        //
-        // private double elasticEaseOut(double t) //弹性缓动函数
-        // {
-        //     double p = 0.3;
-        //     return Math.Pow(2, -10 * t) * Math.Sin((t - p / 4) * (2 * Math.PI) / p) + 1;
-        // }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
         {

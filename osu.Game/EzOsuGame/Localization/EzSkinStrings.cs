@@ -129,17 +129,18 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString HIT_POSITION_TOOLTIP = new EzLocalizationManager.EzLocalisableString("设置可视的判定线位置", "Set the visible hit position");
 
         public static readonly LocalisableString HIT_TARGET_ALPHA = new EzLocalizationManager.EzLocalisableString(
-            "[EzPro] 命中靶透明度", "[EzPro] Hit-Target Alpha");
+            "[Ez] 命中靶透明度", "[Ez] Hit-Target Alpha");
 
         public static readonly LocalisableString HIT_TARGET_ALPHA_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "设置Ez Style Pro皮肤中note命中靶的透明度, 可见判定线上与note一样的判定板",
-            "Set the transparency of the note Hit-Target in Ez Style Pro skin, making the hit plate on the hit position visible like the note");
+            "设置 EzStylePro / Ez2Circle 命中靶透明度，使判定线上可见与 note 类似的判定板。",
+            "Hit-target alpha for EzStylePro / Ez2Circle, so the plate on the hit position stays visible like a note.");
 
-        public static readonly LocalisableString HIT_TARGET_FLOAT_FIXED = new EzLocalizationManager.EzLocalisableString("[EzPro] 命中靶浮动修正", "[EzPro] Hit-Target Float Fixed");
+        public static readonly LocalisableString HIT_TARGET_FLOAT_FIXED = new EzLocalizationManager.EzLocalisableString(
+            "[Ez] 命中靶浮动修正", "[Ez] Hit-Target Float Fixed");
 
         public static readonly LocalisableString HIT_TARGET_FLOAT_FIXED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "设置Ez Style Pro皮肤中note命中靶, 修改浮动效果的正弦函数运动范围",
-            "Set the note Hit-Target in Ez Style Pro skin, modifying the sine function motion range of the floating effect");
+            "设置 EzStylePro / Ez2Circle 命中靶浮动幅度（正弦运动范围）。",
+            "Hit-target bob amplitude for EzStylePro / Ez2Circle (sine motion range).");
 
         public static readonly LocalisableString NOTE_HEIGHT_SCALE = new EzLocalizationManager.EzLocalisableString(
             "note 高度比例", "Note Height Scale");
