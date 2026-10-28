@@ -26,7 +26,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Bindable<EzSkinEditorSceneType> CurrentScene { get; } = new Bindable<EzSkinEditorSceneType>(EzSkinEditorSceneType.Appearance);
 
-        public Action? OpenEzHudEditorRequested { get; set; }
+        public Action? OpenOfficialHudEditorRequested { get; set; }
 
         public BindableBool HudLayerVisible => hudLayerToggle.Active;
 
@@ -83,9 +83,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                            })
                                            .Append(new SkinEditorSceneLibrary.SceneButton
                                            {
-                                               Text = EzEditorStrings.SCENE_EZ_HUD,
-                                               Width = 110,
-                                               Action = () => OpenEzHudEditorRequested?.Invoke(),
+                                               Text = EzEditorStrings.SCENE_OFFICIAL_HUD,
+                                               Width = 120,
+                                               Action = () => OpenOfficialHudEditorRequested?.Invoke(),
                                            })
                                            .ToArray(),
                             },

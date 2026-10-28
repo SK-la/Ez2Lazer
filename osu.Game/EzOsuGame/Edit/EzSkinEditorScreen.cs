@@ -291,7 +291,7 @@ namespace osu.Game.EzOsuGame.Edit
                                     sceneBar = new EzSkinEditorSceneBar
                                     {
                                         RelativeSizeAxes = Axes.X,
-                                        OpenEzHudEditorRequested = openEzHudEditor,
+                                        OpenOfficialHudEditorRequested = openOfficialHudEditor,
                                     },
                                 },
                                 new Drawable[]
@@ -1359,7 +1359,7 @@ namespace osu.Game.EzOsuGame.Edit
                 ShowExitDialog();
         }
 
-        private void openEzHudEditor()
+        private void openOfficialHudEditor()
         {
             if (!this.IsCurrentScreen())
                 return;

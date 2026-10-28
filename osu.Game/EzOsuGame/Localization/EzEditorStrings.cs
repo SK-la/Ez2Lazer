@@ -280,7 +280,7 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SCENE_LIBRARY_LABEL = new EzLocalizationManager.EzLocalisableString("场景库", "Scene library");
 
-        public static readonly LocalisableString SCENE_EZ_HUD = new EzLocalizationManager.EzLocalisableString("Ez HUD", "Ez HUD");
+        public static readonly LocalisableString SCENE_OFFICIAL_HUD = new EzLocalizationManager.EzLocalisableString("官方 HUD", "Official HUD");
 
         public static readonly LocalisableString SCENE_EZ_SKIN = new EzLocalizationManager.EzLocalisableString("Ez Skin", "Ez Skin");
 
