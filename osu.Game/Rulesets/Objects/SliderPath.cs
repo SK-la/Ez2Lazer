@@ -275,10 +275,8 @@ namespace osu.Game.Rulesets.Objects
             path.Clear();
 
             // 二分而非从零扫描：身蛇行时每个可见滑条每帧都会跑，aspire 路径可有数十万顶点。
+            // 下标是第一个累积长度达到 d0 的顶点，与 interpolateVertices 的约定相同，不能再退一格。
             int i = indexOfDistance(d0);
-
-            if (i > 0 && cumulativeLength[i] > d0)
-                i--;
 
             path.Add(interpolateVertices(i, d0));
 

@@ -206,6 +206,27 @@ namespace osu.Game.Tests.Beatmaps
             Assert.That(range[^1].X, Is.EqualTo(path.PositionAt(1).X).Within(0.01f));
         }
 
+        [Test]
+        public void TestGetPathToProgressStartTracksPosition()
+        {
+            var path = new SliderPath(PathType.LINEAR, new[]
+            {
+                Vector2.Zero,
+                new Vector2(100, 0),
+                new Vector2(100, 100),
+            });
+            var range = new List<Vector2>();
+
+            foreach (double progress in new[] { 0.25, 0.5, 0.75 })
+            {
+                path.GetPathToProgress(range, progress, 1);
+                Vector2 ball = path.PositionAt(progress);
+
+                Assert.That(range[0].X, Is.EqualTo(ball.X).Within(0.01f));
+                Assert.That(range[0].Y, Is.EqualTo(ball.Y).Within(0.01f));
+            }
+        }
+
         private static Spinner createZeroLengthSpinner(double startTime) => new Spinner { StartTime = startTime, Duration = 0 };
 
         /// <summary>
