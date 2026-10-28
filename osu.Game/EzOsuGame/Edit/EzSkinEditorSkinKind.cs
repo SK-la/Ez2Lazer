@@ -4,7 +4,7 @@
 namespace osu.Game.EzOsuGame.Edit
 {
     /// <summary>
-    /// Skin family for the SkinSpecific editor scene. Legacy skins stay on the SkinIni scene.
+    /// Skin family for Appearance 「皮肤专用」 dynamic settings. Legacy skins have no scoped group.
     /// </summary>
     public enum EzSkinEditorSkinKind
     {

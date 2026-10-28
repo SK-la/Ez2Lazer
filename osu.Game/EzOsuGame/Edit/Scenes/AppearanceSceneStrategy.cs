@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Edit.Components;
@@ -21,8 +22,9 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
                 ? new EzSkinEditorPreviewHost(context)
                 : new EzSkinEditorAppearanceSceneContent(context);
 
-        public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context) =>
-            new[]
+        public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context)
+        {
+            var groups = new List<EzSkinEditorSidebarGroupDefinition>
             {
                 new EzSkinEditorSidebarGroupDefinition
                 {
@@ -34,11 +36,22 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
                     Title = EzEditorStrings.GROUP_STAGE,
                     CreateContent = () => new EzSkinEditorStageSettingsSection(),
                 },
-                new EzSkinEditorSidebarGroupDefinition
-                {
-                    Title = EzEditorStrings.GROUP_SCRIPTED_SKIN,
-                    CreateContent = () => new EzSkinEditorScriptedSkinSettingsSection(),
-                },
             };
+
+            var kind = EzSkinEditorSkinKindResolver.Resolve(context.ActualSkin);
+
+            // One Appearance group: all dedicated settings for the equipped code/scripted skin.
+            groups.AddRange(
+                EzSkinEditorSkinScopedGroupRegistry.For(kind)
+                                                  .Where(p => p.IsApplicable(context))
+                                                  .SelectMany(p => p.CreateGroups(context))
+                                                  .Select(g => new EzSkinEditorSidebarGroupDefinition
+                                                  {
+                                                      Title = EzEditorStrings.GROUP_SKIN_SPECIFIC,
+                                                      CreateContent = g.CreateContent,
+                                                  }));
+
+            return groups;
+        }
     }
 }

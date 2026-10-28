@@ -7,7 +7,7 @@ using osu.Framework.Graphics;
 namespace osu.Game.EzOsuGame.Edit
 {
     /// <summary>
-    /// Supplies sidebar groups for one skin kind in the SkinSpecific scene.
+    /// Supplies Appearance 「皮肤专用」 content for one skin kind.
     /// Register implementations in <see cref="EzSkinEditorSkinScopedGroupRegistry"/>.
     /// </summary>
     public interface IEzSkinEditorSkinScopedGroupProvider

@@ -12,14 +12,14 @@ using osuTK;
 namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 {
     /// <summary>
-    /// Shared built-in Ez skin controls. Each skin kind Provider wraps these in its own sidebar group.
+    /// LN gradient / tail controls shared by EzStylePro and SbI scoped providers.
     /// </summary>
-    public partial class EzBuiltInSkinScopedSettingsControls : FillFlowContainer
+    public partial class EzBuiltInLnScopedSettingsControls : FillFlowContainer
     {
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
-        public EzBuiltInSkinScopedSettingsControls()
+        public EzBuiltInLnScopedSettingsControls()
         {
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
@@ -57,12 +57,6 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                     TooltipText = EzSkinStrings.LN_TAIL_ALPHA_TOOLTIP,
                     Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha),
                     KeyboardStep = 0.1f,
-                },
-                new SettingsSlider<double>
-                {
-                    LabelText = EzSkinStrings.NOTE_TRACK_LINE,
-                    TooltipText = EzSkinStrings.NOTE_TRACK_LINE_TOOLTIP,
-                    Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteTrackLineHeight),
                 },
             };
         }

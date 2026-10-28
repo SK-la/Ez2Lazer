@@ -64,20 +64,6 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                 },
                 new SettingsSlider<double>
                 {
-                    LabelText = EzSkinStrings.HIT_TARGET_FLOAT_FIXED,
-                    TooltipText = EzSkinStrings.HIT_TARGET_FLOAT_FIXED_TOOLTIP,
-                    Current = ezSkinConfig.GetBindable<double>(Ez2Setting.HitTargetFloatFixed),
-                    KeyboardStep = 0.1f,
-                },
-                new SettingsSlider<double>
-                {
-                    LabelText = EzSkinStrings.HIT_TARGET_ALPHA,
-                    TooltipText = EzSkinStrings.HIT_TARGET_ALPHA_TOOLTIP,
-                    Current = ezSkinConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha),
-                    KeyboardStep = 0.01f,
-                },
-                new SettingsSlider<double>
-                {
                     LabelText = EzSkinStrings.NOTE_HEIGHT_SCALE,
                     TooltipText = EzSkinStrings.NOTE_HEIGHT_SCALE_TOOLTIP,
                     Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth),

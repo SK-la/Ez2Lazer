@@ -29,6 +29,8 @@ namespace osu.Game.EzOsuGame.Edit
 
             protected abstract LocalisableString GroupTitle { get; }
 
+            protected abstract Drawable CreateContent();
+
             public bool IsApplicable(EzSkinEditorSceneContext context) =>
                 EzSkinEditorSkinKindResolver.Resolve(context.ActualSkin) == Kind;
 
@@ -38,7 +40,7 @@ namespace osu.Game.EzOsuGame.Edit
                     new EzSkinEditorSidebarGroupDefinition
                     {
                         Title = GroupTitle,
-                        CreateContent = () => new EzBuiltInSkinScopedSettingsControls(),
+                        CreateContent = CreateContent,
                     },
                 };
         }
@@ -48,6 +50,8 @@ namespace osu.Game.EzOsuGame.Edit
             public override EzSkinEditorSkinKind Kind => EzSkinEditorSkinKind.EzStylePro;
 
             protected override LocalisableString GroupTitle => EzEditorStrings.GROUP_EZ_STYLE_PRO_SCOPED;
+
+            protected override Drawable CreateContent() => new EzStyleProSkinScopedSettingsControls();
         }
 
         private sealed class Ez2SkinScopedGroupProvider : BuiltInSkinScopedGroupProviderBase
@@ -55,6 +59,8 @@ namespace osu.Game.EzOsuGame.Edit
             public override EzSkinEditorSkinKind Kind => EzSkinEditorSkinKind.Ez2;
 
             protected override LocalisableString GroupTitle => EzEditorStrings.GROUP_EZ2_SCOPED;
+
+            protected override Drawable CreateContent() => new Ez2SkinScopedSettingsControls();
         }
 
         private sealed class SbISkinScopedGroupProvider : BuiltInSkinScopedGroupProviderBase
@@ -62,6 +68,8 @@ namespace osu.Game.EzOsuGame.Edit
             public override EzSkinEditorSkinKind Kind => EzSkinEditorSkinKind.SbI;
 
             protected override LocalisableString GroupTitle => EzEditorStrings.GROUP_SBI_SCOPED;
+
+            protected override Drawable CreateContent() => new SbISkinScopedSettingsControls();
         }
 
         private sealed class ScriptedSkinScopedGroupProvider : IEzSkinEditorSkinScopedGroupProvider
@@ -77,11 +85,11 @@ namespace osu.Game.EzOsuGame.Edit
                     new EzSkinEditorSidebarGroupDefinition
                     {
                         Title = EzEditorStrings.GROUP_SCRIPTED_SKIN_SCOPED,
-                        CreateContent = () => new ScriptedSkinScopedPlaceholderSection(),
+                        CreateContent = () => new EzSkinEditorScriptedSkinSettingsSection(),
                     },
                 };
 
-            // Future: [SkinConfig] reflection UI + csx write-back footer can live here.
+            // Future: [SkinConfig] csx write-back footer can live here.
             public Drawable? CreateSidebarFooter(EzSkinEditorSceneContext context) => null;
         }
     }

@@ -53,7 +53,7 @@ namespace osu.Game.Tests.Visual.Edit
         {
             runSceneInteraction(EzSkinEditorSceneType.Appearance);
             AddAssert("appearance scene still present", () => editorScreen.ChildrenOfType<EzSkinEditorAppearanceSceneContent>().Any());
-            AddAssert("three sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
+            AddAssert("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
         }
 
         [Test]
