@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 #nullable disable
@@ -20,7 +20,6 @@ using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
@@ -70,7 +69,7 @@ namespace osu.Game.Overlays.Settings.Sections
         private bool restoringPersistedConfig;
 
         [BackgroundDependencyLoader(permitNulls: true)]
-        private void load([CanBeNull] SkinEditorOverlay skinEditor, [CanBeNull] EzLayoutEditorOverlay ezLayoutEditor)
+        private void load([CanBeNull] SkinEditorOverlay skinEditor)
         {
             enableScriptedSkinsBindable = new Bindable<bool>(ezConfig.Get<bool>(Ez2Setting.EnableScriptedSkins));
 
@@ -101,12 +100,6 @@ namespace osu.Game.Overlays.Settings.Sections
                 {
                     Text = SkinSettingsStrings.SkinLayoutEditor,
                     Action = () => skinEditor?.ToggleVisibility(),
-                },
-                new SettingsButtonV2
-                {
-                    Text = EzEditorStrings.SETTINGS_LAYOUT_EDITOR_BUTTON,
-                    TooltipText = EzEditorStrings.SETTINGS_LAYOUT_EDITOR_BUTTON_TOOLTIP,
-                    Action = () => ezLayoutEditor?.ToggleVisibility(),
                 },
                 new SettingsButtonV2
                 {
