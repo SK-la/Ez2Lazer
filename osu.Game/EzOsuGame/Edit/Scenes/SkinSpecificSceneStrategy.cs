@@ -14,7 +14,7 @@ using osu.Game.Graphics.Sprites;
 namespace osu.Game.EzOsuGame.Edit.Scenes
 {
     /// <summary>
-    /// 皮肤专用场景占位壳；实际专用设置在 Appearance 侧栏「专用」栏。
+    /// 皮肤专用场景占位壳；实际专用设置在 Appearance 场景侧栏的「专用」分组。
     /// </summary>
     public class SkinSpecificSceneStrategy : IEzSkinEditorSceneStrategy
     {

@@ -354,18 +354,18 @@ namespace osu.Game.EzOsuGame.Edit
                 hudLayer.SetVisible(v.NewValue);
                 updateHudInteraction();
             }, true);
-            sidebar.CurrentWorkspaceTab.BindValueChanged(_ => updateHudInteraction(), true);
+            sidebar.SelectedGroupId.BindValueChanged(_ => updateHudInteraction(), true);
             bindConfigPreviewRefresh();
             bindSceneBarPlayback();
         }
 
         /// <summary>
-        /// HUD 栏且 HUD layer 开启时才允许蓝图拖选；否则只读预览。
+        /// 选中 HUD 分组且 HUD layer 开启时才允许蓝图拖选；否则只读预览。
         /// </summary>
         private void updateHudInteraction()
         {
-            bool hudRail = sidebar.CurrentWorkspaceTab.Value == EzSkinEditorWorkspaceTab.Hud;
-            hudLayer.InteractionEnabled.Value = hudRail && sceneBar.HudLayerVisible.Value;
+            bool hudGroup = sidebar.SelectedGroupId.Value == Scenes.AppearanceSceneStrategy.GROUP_ID_HUD;
+            hudLayer.InteractionEnabled.Value = hudGroup && sceneBar.HudLayerVisible.Value;
         }
 
         protected override void Update()
@@ -793,14 +793,7 @@ namespace osu.Game.EzOsuGame.Edit
                 sceneContentHost.Child = strategy.CreateSceneContent(sceneContext);
             }
 
-            if (scene == EzSkinEditorSceneType.Appearance)
-            {
-                var kind = EzSkinEditorSkinKindResolver.Resolve(skinManager.CurrentSkin.Value);
-                sidebar.ApplyWorkspace(sceneContext, skinScopedAvailable: kind != EzSkinEditorSkinKind.None);
-            }
-            else
-                sidebar.ApplyStrategy(strategy, sceneContext);
-
+            sidebar.ApplyStrategy(strategy, sceneContext);
             updateHudInteraction();
         }
 

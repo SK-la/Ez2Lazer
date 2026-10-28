@@ -6,6 +6,7 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Extensions;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
@@ -14,6 +15,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Note;
+using osu.Game.EzOsuGame.Edit.Scenes;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Containers;
@@ -85,8 +87,8 @@ namespace osu.Game.Tests.Visual.Edit
 
         private void switchScene(EzSkinEditorSceneType scene) => AddStep($"switch to {scene}", () => editorScreen.CurrentScene.Value = scene);
 
-        private void selectWorkspaceTab(EzSkinEditorWorkspaceTab tab) =>
-            AddStep($"select workspace {tab}", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectWorkspaceTab(tab));
+        private void selectSidebarGroup(string groupId) =>
+            AddStep($"select group {groupId}", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectSidebarGroupById(groupId));
 
         private void importLegacySkin() => AddStep("import legacy skin", () =>
         {
@@ -100,12 +102,12 @@ namespace osu.Game.Tests.Visual.Edit
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.Appearance);
-            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Appearance);
+            selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_APPEARANCE);
 
             AddUntilStep("menu bar visible", () => editorScreen.ChildrenOfType<EditorMenuBar>().Any());
             AddUntilStep("scene bar visible", () => editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Any());
             AddUntilStep("sidebar visible", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Any());
-            AddUntilStep("workspace rail visible", () =>
+            AddUntilStep("sidebar group rail visible", () =>
             {
                 var rail = editorScreen.ChildrenOfType<EzSkinEditorSidebarGroupRail>().SingleOrDefault();
                 return rail is { Alpha: > 0, DrawHeight: > 1, DrawWidth: > 1 };
@@ -140,19 +142,20 @@ namespace osu.Game.Tests.Visual.Edit
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.Appearance);
 
-            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Appearance);
-            AddUntilStep("appearance groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
+            selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_APPEARANCE);
+            // 外层分组标题 + 贴图/舞台两个内层 SettingsGroup
+            AddUntilStep("appearance groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
             AddAssert("texture group present", () => editorScreen.ChildrenOfType<Dropdown<string>>().Any());
-            AddAssert("no skin-specific on appearance rail", () =>
+            AddAssert("no skin-specific on appearance group", () =>
                 !editorScreen.ChildrenOfType<EzStyleProSkinScopedSettingsControls>().Any()
                 && !editorScreen.ChildrenOfType<Ez2SkinScopedSettingsControls>().Any()
                 && !editorScreen.ChildrenOfType<SbISkinScopedSettingsControls>().Any());
 
-            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Size);
+            selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_SIZE);
             AddUntilStep("size group", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 1);
 
-            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Colour);
-            AddUntilStep("colour groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
+            selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_COLOUR);
+            AddUntilStep("colour groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
         }
 
         [Test]
@@ -172,17 +175,17 @@ namespace osu.Game.Tests.Visual.Edit
             });
 
             AddStep("enable hud layer", () => sceneBar.HudLayerVisible.Value = true);
-            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Hud);
+            selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_HUD);
             AddAssert("interaction on", () => hud.InteractionEnabled.Value);
             AddUntilStep("hud workspace section", () => editorScreen.ChildrenOfType<EzSkinEditorHudWorkspaceSection>().Any());
             AddUntilStep("no-selection hint", () =>
                 editorScreen.ChildrenOfType<OsuSpriteText>()
                             .Any(t => t.Text.ToString() == EzEditorStrings.SIDEBAR_HUD_NO_SELECTION.ToString()));
 
-            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Appearance);
-            AddAssert("interaction off off-rail", () => !hud.InteractionEnabled.Value);
+            selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_APPEARANCE);
+            AddAssert("interaction off off-group", () => !hud.InteractionEnabled.Value);
 
-            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Hud);
+            selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_HUD);
             AddStep("disable hud layer", () => sceneBar.HudLayerVisible.Value = false);
             AddAssert("interaction off layer hidden", () => !hud.InteractionEnabled.Value);
             AddUntilStep("layer-off hint", () =>
@@ -196,7 +199,7 @@ namespace osu.Game.Tests.Visual.Edit
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.Appearance);
-            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Size);
+            selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_SIZE);
 
             AddUntilStep("size settings visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Any());
 
@@ -444,9 +447,27 @@ namespace osu.Game.Tests.Visual.Edit
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
 
+            float gameplayWidthBefore = 0;
+            AddStep("capture gameplay width", () =>
+                gameplayWidthBefore = editorScreen.ChildrenOfType<ScalingContainer>().First(c => c.Parent is GridContainer).DrawWidth);
+
             AddStep("unpin sidebar", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().Pinned.Value = false);
             AddStep("collapse sidebar", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().ExpandedState.Value = false);
-            AddUntilStep("sidebar contracted", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().DrawWidth <= EzSkinEditorSidebar.CONTRACTED_WIDTH + 1);
+
+            // 布局只占轨宽；收起只藏设置面板，游戏区宽度与导航轨均不变。
+            AddUntilStep("content panel hidden", () =>
+            {
+                var sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single();
+                return sidebar.ExpandedState.Value == false
+                       && sidebar.DrawWidth <= EzSkinEditorSidebarGroupRail.WIDTH + 1;
+            });
+            AddAssert("rail still present", () =>
+                editorScreen.ChildrenOfType<EzSkinEditorSidebarGroupRail>().Single().IsPresent);
+            AddAssert("gameplay width unchanged", () =>
+            {
+                float after = editorScreen.ChildrenOfType<ScalingContainer>().First(c => c.Parent is GridContainer).DrawWidth;
+                return Math.Abs(after - gameplayWidthBefore) < 1;
+            });
         }
 
         [Test]
@@ -700,12 +721,12 @@ namespace osu.Game.Tests.Visual.Edit
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.Appearance);
-            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Appearance);
+            selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_APPEARANCE);
 
-            AddUntilStep("appearance groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
-            AddAssert("scoped rail not selected", () =>
-                editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().CurrentWorkspaceTab.Value
-                != EzSkinEditorWorkspaceTab.SkinScoped);
+            AddUntilStep("appearance groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
+            AddAssert("scoped group not selected", () =>
+                editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectedGroupId.Value
+                != AppearanceSceneStrategy.GROUP_ID_SKIN_SCOPED);
             AddAssert("no skin-specific controls on appearance", () =>
                 !editorScreen.ChildrenOfType<EzStyleProSkinScopedSettingsControls>().Any()
                 && !editorScreen.ChildrenOfType<Ez2SkinScopedSettingsControls>().Any()
@@ -744,14 +765,14 @@ namespace osu.Game.Tests.Visual.Edit
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.Appearance);
-            selectWorkspaceTab(EzSkinEditorWorkspaceTab.SkinScoped);
+            selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_SKIN_SCOPED);
 
             AddUntilStep("scoped controls loaded", controlsPresent);
             AddAssert("hit-target controls", () =>
                 editorScreen.ChildrenOfType<EzHitTargetScopedSettingsControls>().Any() == expectHitTarget);
 
-            selectWorkspaceTab(EzSkinEditorWorkspaceTab.Appearance);
-            AddAssert("no scoped controls on appearance rail", () =>
+            selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_APPEARANCE);
+            AddAssert("no scoped controls on appearance group", () =>
                 !editorScreen.ChildrenOfType<EzStyleProSkinScopedSettingsControls>().Any()
                 && !editorScreen.ChildrenOfType<Ez2SkinScopedSettingsControls>().Any()
                 && !editorScreen.ChildrenOfType<SbISkinScopedSettingsControls>().Any());

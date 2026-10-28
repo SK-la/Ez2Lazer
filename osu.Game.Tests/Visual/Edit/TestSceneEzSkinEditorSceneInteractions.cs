@@ -10,6 +10,7 @@ using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.EzOsuGame.Edit.Scenes;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.EzMania.Editor;
 using osu.Game.Skinning;
@@ -48,25 +49,25 @@ namespace osu.Game.Tests.Visual.Edit
         }
 
         [Test]
-        public void TestAppearanceWorkspaceInteractions()
+        public void TestAppearanceGroupInteractions()
         {
-            runWorkspaceRailInteraction(EzSkinEditorWorkspaceTab.Appearance);
+            runSidebarGroupInteraction(AppearanceSceneStrategy.GROUP_ID_APPEARANCE);
             AddAssert("appearance scene still present", () => editorScreen.ChildrenOfType<EzSkinEditorAppearanceSceneContent>().Any());
-            AddAssert("appearance groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
+            AddAssert("appearance groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
         }
 
         [Test]
-        public void TestSizeWorkspaceInteractions()
+        public void TestSizeGroupInteractions()
         {
-            runWorkspaceRailInteraction(EzSkinEditorWorkspaceTab.Size);
+            runSidebarGroupInteraction(AppearanceSceneStrategy.GROUP_ID_SIZE);
             AddAssert("size group present", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Any());
         }
 
         [Test]
-        public void TestColourWorkspaceInteractions()
+        public void TestColourGroupInteractions()
         {
-            runWorkspaceRailInteraction(EzSkinEditorWorkspaceTab.Colour);
-            AddAssert("colour groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
+            runSidebarGroupInteraction(AppearanceSceneStrategy.GROUP_ID_COLOUR);
+            AddAssert("colour groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
         }
 
         [Test]
@@ -89,14 +90,14 @@ namespace osu.Game.Tests.Visual.Edit
             AddStep("discard draft", () => editorScreen.SkinIniSession?.Discard());
         }
 
-        private void runWorkspaceRailInteraction(EzSkinEditorWorkspaceTab tab)
+        private void runSidebarGroupInteraction(string groupId)
         {
             driver = null;
 
             AddStep("load screen", () => LoadScreen(editorScreen = new EzSkinEditorScreen()));
             AddUntilStep("wait for screen load", () => editorScreen.IsLoaded);
             AddStep("switch to appearance", () => editorScreen.CurrentScene.Value = EzSkinEditorSceneType.Appearance);
-            AddStep($"select workspace {tab}", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectWorkspaceTab(tab));
+            AddStep($"select group {groupId}", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectSidebarGroupById(groupId));
 
             cycleDriverSettings();
         }

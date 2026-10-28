@@ -428,6 +428,36 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SIDEBAR_PIN_LABEL = new EzLocalizationManager.EzLocalisableString("固定显示", "Pin sidebar");
 
+        public static readonly LocalisableString SIDEBAR_TAB_HUD = new EzLocalizationManager.EzLocalisableString("HUD", "HUD");
+
+        public static readonly LocalisableString SIDEBAR_TAB_APPEARANCE = new EzLocalizationManager.EzLocalisableString("外观", "Appearance");
+
+        public static readonly LocalisableString SIDEBAR_TAB_SIZE = new EzLocalizationManager.EzLocalisableString("尺寸", "Size");
+
+        public static readonly LocalisableString SIDEBAR_TAB_COLOUR = new EzLocalizationManager.EzLocalisableString("颜色", "Colour");
+
+        public static readonly LocalisableString SIDEBAR_TAB_SKIN_SCOPED = new EzLocalizationManager.EzLocalisableString("专用", "Scoped");
+
+        public static readonly LocalisableString SIDEBAR_HUD_PLACEHOLDER = new EzLocalizationManager.EzLocalisableString(
+            "开启 HUD layer，并在预览中选中组件以编辑设置。",
+            "Turn on HUD layer, then select a component in the preview to edit its settings.");
+
+        public static readonly LocalisableString SIDEBAR_HUD_LAYER_OFF = new EzLocalizationManager.EzLocalisableString(
+            "请先打开顶栏 HUD layer。",
+            "Turn on the HUD layer toggle in the scene bar first.");
+
+        public static readonly LocalisableString SIDEBAR_HUD_NO_SELECTION = new EzLocalizationManager.EzLocalisableString(
+            "在预览中点击 HUD 组件以选中并显示设置。",
+            "Click a HUD component in the preview to select it and show settings.");
+
+        public static readonly LocalisableString SIDEBAR_SKIN_SCOPED_EMPTY = new EzLocalizationManager.EzLocalisableString(
+            "当前皮肤没有专用设置。",
+            "This skin has no scoped settings.");
+
+        public static readonly LocalisableString SKIN_SPECIFIC_SCENE_PLACEHOLDER = new EzLocalizationManager.EzLocalisableString(
+            "皮肤专用场景布局预留。请在主工作区侧栏「专用」中编辑设置。",
+            "Skin-specific scene layout is reserved. Edit settings under the workspace 「Scoped」 sidebar tab.");
+
         #endregion
 
         #region Skin.ini editor

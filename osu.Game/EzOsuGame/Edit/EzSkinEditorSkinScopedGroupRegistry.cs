@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Edit.Scenes;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
 using osu.Game.EzOsuGame.Localization;
 
@@ -39,6 +40,7 @@ namespace osu.Game.EzOsuGame.Edit
                 {
                     new EzSkinEditorSidebarGroupDefinition
                     {
+                        Id = AppearanceSceneStrategy.GROUP_ID_SKIN_SCOPED,
                         Title = GroupTitle,
                         CreateContent = CreateContent,
                     },
