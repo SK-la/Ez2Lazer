@@ -104,6 +104,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         private Container? backgroundContainer;
         private Container sceneContentHost = null!;
+        private EzSkinEditorHudLayer hudLayer = null!;
         private EzSkinEditorMenuBar menuBar = null!;
         private EzSkinEditorSceneBar sceneBar = null!;
         private EzSkinEditorSidebar sidebar = null!;
@@ -307,7 +308,16 @@ namespace osu.Game.EzOsuGame.Edit
                                         {
                                             new Drawable[]
                                             {
-                                                sceneContentHost = new Container { RelativeSizeAxes = Axes.Both, Masking = true },
+                                                new Container
+                                                {
+                                                    RelativeSizeAxes = Axes.Both,
+                                                    Children = new Drawable[]
+                                                    {
+                                                        sceneContentHost = new Container { RelativeSizeAxes = Axes.Both, Masking = true },
+                                                        // Visual-only HUD; Propagate*InputSubTree is false so scene content keeps receiving input.
+                                                        hudLayer = new EzSkinEditorHudLayer(),
+                                                    },
+                                                },
                                                 sidebar = new EzSkinEditorSidebar(),
                                             },
                                         },
@@ -328,6 +338,8 @@ namespace osu.Game.EzOsuGame.Edit
             sceneBar.CurrentScene.BindValueChanged(onSceneChanged, true);
             skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
             PreviewState.LoopBeatmap.BindValueChanged(_ => refreshScene());
+            PreviewState.Ruleset.BindValueChanged(r => hudLayer.SetRuleset(r.NewValue), true);
+            sceneBar.HudLayerVisible.BindValueChanged(v => hudLayer.SetVisible(v.NewValue), true);
             bindConfigPreviewRefresh();
             bindSceneBarPlayback();
         }
