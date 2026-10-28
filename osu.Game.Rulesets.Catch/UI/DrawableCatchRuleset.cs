@@ -37,7 +37,8 @@ namespace osu.Game.Rulesets.Catch.UI
         private void load()
         {
             // With relax mod, input maps directly to x position and left/right buttons are not used.
-            if (!Mods.Any(m => m is ModRelax))
+            // Touch move mods position the catcher directly as well, so the button-mapping touch mapper is not added.
+            if (!Mods.Any(m => m is ModRelax or ModTouchBase))
                 KeyBindingInputManager.Add(new CatchTouchInputMapper());
         }
 

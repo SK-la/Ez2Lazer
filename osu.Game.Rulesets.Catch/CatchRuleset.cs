@@ -11,17 +11,17 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
-using osu.Game.Graphics;
-using osu.Game.EzOsuGame.Mods.LAsMods;
 using osu.Game.EzOsuGame.Mods.CommunityMod;
+using osu.Game.EzOsuGame.Mods.LAsMods;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Graphics;
 using osu.Game.Localisation;
 using osu.Game.Localisation.Catch;
-using osu.Game.Rulesets.Catch.EzCatch.ReplayJudge;
 using osu.Game.Rulesets.Catch.Beatmaps;
 using osu.Game.Rulesets.Catch.Difficulty;
 using osu.Game.Rulesets.Catch.Edit;
 using osu.Game.Rulesets.Catch.Edit.Setup;
+using osu.Game.Rulesets.Catch.EzCatch.ReplayJudge;
 using osu.Game.Rulesets.Catch.Mods;
 using osu.Game.Rulesets.Catch.Objects;
 using osu.Game.Rulesets.Catch.Replays;
@@ -143,6 +143,7 @@ namespace osu.Game.Rulesets.Catch
                         new ModNiceBPM(),
                         new ModReconcile(),
                         new UniversalLoopPlayClip(),
+                        new CatchModTouchMove(),
                     };
 
                 case ModType.CommunityMod:
