@@ -366,7 +366,7 @@ namespace osu.Game.EzOsuGame.Edit
         /// </summary>
         private void updateHudInteraction()
         {
-            bool hudGroup = sidebar.SelectedGroupId.Value == Scenes.AppearanceSceneStrategy.GROUP_ID_HUD;
+            bool hudGroup = sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Gameplay;
             hudLayer.InteractionEnabled.Value = hudGroup && sceneBar.HudLayerVisible.Value;
         }
 

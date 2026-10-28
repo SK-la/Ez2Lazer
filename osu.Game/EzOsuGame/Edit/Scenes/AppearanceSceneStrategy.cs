@@ -8,11 +8,11 @@ using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
 using osu.Game.EzOsuGame.Localization;
+
 namespace osu.Game.EzOsuGame.Edit.Scenes
 {
     public class AppearanceSceneStrategy : IEzSkinEditorSceneStrategy
     {
-        public const string GROUP_ID_HUD = "hud";
         public const string GROUP_ID_TEXTURE = "texture";
         public const string GROUP_ID_STAGE = "stage";
         public const string GROUP_ID_SIZE = "size";
@@ -35,12 +35,6 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
 
             var groups = new List<EzSkinEditorSidebarGroupDefinition>
             {
-                new EzSkinEditorSidebarGroupDefinition
-                {
-                    Id = GROUP_ID_HUD,
-                    Title = EzEditorStrings.SIDEBAR_TAB_HUD,
-                    CreateContent = () => new EzSkinEditorHudWorkspaceSection(),
-                },
                 new EzSkinEditorSidebarGroupDefinition
                 {
                     Id = GROUP_ID_TEXTURE,
