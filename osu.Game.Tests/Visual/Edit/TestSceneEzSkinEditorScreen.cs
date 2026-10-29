@@ -149,9 +149,7 @@ namespace osu.Game.Tests.Visual.Edit
             AddUntilStep("all appearance groups visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() >= 5);
             AddAssert("texture group present", () => editorScreen.ChildrenOfType<Dropdown<string>>().Any());
             AddAssert("no skin-specific on appearance group", () =>
-                !editorScreen.ChildrenOfType<EzStyleProSkinScopedSettingsControls>().Any()
-                && !editorScreen.ChildrenOfType<Ez2SkinScopedSettingsControls>().Any()
-                && !editorScreen.ChildrenOfType<SbISkinScopedSettingsControls>().Any());
+                !editorScreen.ChildrenOfType<EzBuiltInSkinScopedSettingsControls>().Any());
 
             selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_SIZE);
             AddUntilStep("size group remains visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 5);
@@ -233,9 +231,7 @@ namespace osu.Game.Tests.Visual.Edit
                 editorScreen.ChildrenOfType<OsuSpriteText>()
                             .Any(t => t.Text.ToString() == EzEditorStrings.SKIN_SPECIFIC_SCENE_PLACEHOLDER.ToString()));
             AddAssert("no scoped settings on skin-specific scene", () =>
-                !editorScreen.ChildrenOfType<EzStyleProSkinScopedSettingsControls>().Any()
-                && !editorScreen.ChildrenOfType<Ez2SkinScopedSettingsControls>().Any()
-                && !editorScreen.ChildrenOfType<SbISkinScopedSettingsControls>().Any());
+                !editorScreen.ChildrenOfType<EzBuiltInSkinScopedSettingsControls>().Any());
         }
 
         [Test]
@@ -726,33 +722,31 @@ namespace osu.Game.Tests.Visual.Edit
                 editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectedGroupId.Value
                 != AppearanceSceneStrategy.GROUP_ID_SKIN_SCOPED);
             AddAssert("no skin-specific controls on appearance", () =>
-                !editorScreen.ChildrenOfType<EzStyleProSkinScopedSettingsControls>().Any()
-                && !editorScreen.ChildrenOfType<Ez2SkinScopedSettingsControls>().Any()
-                && !editorScreen.ChildrenOfType<SbISkinScopedSettingsControls>().Any());
+                !editorScreen.ChildrenOfType<EzBuiltInSkinScopedSettingsControls>().Any());
         }
 
         [Test]
         public void TestSkinScopedRailEzStylePro() =>
             runSkinScopedRailTest(
                 EzStyleProSkin.CreateInfo().ID,
-                () => editorScreen.ChildrenOfType<EzStyleProSkinScopedSettingsControls>().Any(),
+                EzSkinEditorSkinKind.EzStylePro,
                 expectHitTarget: true);
 
         [Test]
         public void TestSkinScopedRailEz2() =>
             runSkinScopedRailTest(
                 Ez2Skin.CreateInfo().ID,
-                () => editorScreen.ChildrenOfType<Ez2SkinScopedSettingsControls>().Any(),
+                EzSkinEditorSkinKind.Ez2,
                 expectHitTarget: true);
 
         [Test]
         public void TestSkinScopedRailSbI() =>
             runSkinScopedRailTest(
                 SbISkin.CreateInfo().ID,
-                () => editorScreen.ChildrenOfType<SbISkinScopedSettingsControls>().Any(),
+                EzSkinEditorSkinKind.SbI,
                 expectHitTarget: false);
 
-        private void runSkinScopedRailTest(Guid skinId, Func<bool> controlsPresent, bool expectHitTarget)
+        private void runSkinScopedRailTest(Guid skinId, EzSkinEditorSkinKind kind, bool expectHitTarget)
         {
             AddStep("select built-in skin", () =>
             {
@@ -765,14 +759,17 @@ namespace osu.Game.Tests.Visual.Edit
             switchScene(EzSkinEditorSceneType.Appearance);
             selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_SKIN_SCOPED);
 
-            AddUntilStep("scoped controls loaded", controlsPresent);
+            AddUntilStep("scoped controls loaded", () =>
+                editorScreen.ChildrenOfType<EzBuiltInSkinScopedSettingsControls>().Any(c => c.Kind == kind));
             AddAssert("hit-target controls", () =>
-                editorScreen.ChildrenOfType<EzHitTargetScopedSettingsControls>().Any() == expectHitTarget);
+                editorScreen.ChildrenOfType<SettingsSlider<double>>()
+                            .Any(s => s.LabelText.ToString() == EzSkinStrings.HIT_TARGET_ALPHA.ToString()) == expectHitTarget);
 
             selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_TEXTURE);
             AddAssert("texture group selected", () =>
                 editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectedGroupId.Value == AppearanceSceneStrategy.GROUP_ID_TEXTURE);
-            AddAssert("scoped controls remain visible", controlsPresent);
+            AddAssert("scoped controls remain visible", () =>
+                editorScreen.ChildrenOfType<EzBuiltInSkinScopedSettingsControls>().Any(c => c.Kind == kind));
         }
     }
 }

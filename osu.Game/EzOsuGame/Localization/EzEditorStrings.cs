@@ -308,25 +308,9 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString GROUP_SIZE = new EzLocalizationManager.EzLocalisableString("尺寸", "Size");
 
-        public static readonly LocalisableString GROUP_SKIN_SPECIFIC = new EzLocalizationManager.EzLocalisableString("皮肤专用", "Skin-specific");
+        public static readonly LocalisableString GROUP_SKIN_SPECIFIC = new EzLocalizationManager.EzLocalisableString("专用", "Specific");
 
         public static readonly LocalisableString GROUP_SCRIPTED_SKIN = new EzLocalizationManager.EzLocalisableString("脚本皮肤", "Scripted skin");
-
-        public static readonly LocalisableString GROUP_EZ_STYLE_PRO_SCOPED = new EzLocalizationManager.EzLocalisableString(
-            "EzStylePro 专用",
-            "EzStylePro-specific");
-
-        public static readonly LocalisableString GROUP_EZ2_SCOPED = new EzLocalizationManager.EzLocalisableString(
-            "Ez2 专用",
-            "Ez2-specific");
-
-        public static readonly LocalisableString GROUP_SBI_SCOPED = new EzLocalizationManager.EzLocalisableString(
-            "SbI 专用",
-            "SbI-specific");
-
-        public static readonly LocalisableString GROUP_SCRIPTED_SKIN_SCOPED = new EzLocalizationManager.EzLocalisableString(
-            "脚本皮肤专用",
-            "Scripted skin-specific");
 
         public static readonly LocalisableString GROUP_BASE_COLOURS = new EzLocalizationManager.EzLocalisableString("基础颜色", "Base colours");
 

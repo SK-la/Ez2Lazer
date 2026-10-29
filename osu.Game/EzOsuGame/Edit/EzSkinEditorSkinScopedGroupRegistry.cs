@@ -3,8 +3,6 @@
 
 using System.Collections.Generic;
 using System.Linq;
-using osu.Framework.Graphics;
-using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Edit.Scenes;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
 using osu.Game.EzOsuGame.Localization;
@@ -15,22 +13,26 @@ namespace osu.Game.EzOsuGame.Edit
     {
         public static IReadOnlyList<IEzSkinEditorSkinScopedGroupProvider> All { get; } = new IEzSkinEditorSkinScopedGroupProvider[]
         {
-            new EzStyleProSkinScopedGroupProvider(),
-            new Ez2SkinScopedGroupProvider(),
-            new SbISkinScopedGroupProvider(),
-            new ScriptedSkinScopedGroupProvider(),
+            new SkinScopedGroupProvider(EzSkinEditorSkinKind.EzStylePro),
+            new SkinScopedGroupProvider(EzSkinEditorSkinKind.Ez2),
+            new SkinScopedGroupProvider(EzSkinEditorSkinKind.SbI),
+            new SkinScopedGroupProvider(EzSkinEditorSkinKind.Scripted),
         };
 
         public static IEnumerable<IEzSkinEditorSkinScopedGroupProvider> For(EzSkinEditorSkinKind kind) =>
             All.Where(p => p.Kind == kind);
 
-        private abstract class BuiltInSkinScopedGroupProviderBase : IEzSkinEditorSkinScopedGroupProvider
+        /// <summary>
+        /// 皮肤专用分组。所有皮肤种类共用同一导航标题与稳定 Id，差异只在分组内容。
+        /// </summary>
+        private sealed class SkinScopedGroupProvider : IEzSkinEditorSkinScopedGroupProvider
         {
-            public abstract EzSkinEditorSkinKind Kind { get; }
+            public SkinScopedGroupProvider(EzSkinEditorSkinKind kind)
+            {
+                Kind = kind;
+            }
 
-            protected abstract LocalisableString GroupTitle { get; }
-
-            protected abstract Drawable CreateContent();
+            public EzSkinEditorSkinKind Kind { get; }
 
             public bool IsApplicable(EzSkinEditorSceneContext context) =>
                 EzSkinEditorSkinKindResolver.Resolve(context.ActualSkin) == Kind;
@@ -41,58 +43,12 @@ namespace osu.Game.EzOsuGame.Edit
                     new EzSkinEditorSidebarGroupDefinition
                     {
                         Id = AppearanceSceneStrategy.GROUP_ID_SKIN_SCOPED,
-                        Title = GroupTitle,
-                        CreateContent = CreateContent,
+                        Title = EzEditorStrings.GROUP_SKIN_SPECIFIC,
+                        CreateContent = () => Kind == EzSkinEditorSkinKind.Scripted
+                            ? new EzSkinEditorScriptedSkinSettingsSection()
+                            : new EzBuiltInSkinScopedSettingsControls(Kind),
                     },
                 };
-        }
-
-        private sealed class EzStyleProSkinScopedGroupProvider : BuiltInSkinScopedGroupProviderBase
-        {
-            public override EzSkinEditorSkinKind Kind => EzSkinEditorSkinKind.EzStylePro;
-
-            protected override LocalisableString GroupTitle => EzEditorStrings.GROUP_EZ_STYLE_PRO_SCOPED;
-
-            protected override Drawable CreateContent() => new EzStyleProSkinScopedSettingsControls();
-        }
-
-        private sealed class Ez2SkinScopedGroupProvider : BuiltInSkinScopedGroupProviderBase
-        {
-            public override EzSkinEditorSkinKind Kind => EzSkinEditorSkinKind.Ez2;
-
-            protected override LocalisableString GroupTitle => EzEditorStrings.GROUP_EZ2_SCOPED;
-
-            protected override Drawable CreateContent() => new Ez2SkinScopedSettingsControls();
-        }
-
-        private sealed class SbISkinScopedGroupProvider : BuiltInSkinScopedGroupProviderBase
-        {
-            public override EzSkinEditorSkinKind Kind => EzSkinEditorSkinKind.SbI;
-
-            protected override LocalisableString GroupTitle => EzEditorStrings.GROUP_SBI_SCOPED;
-
-            protected override Drawable CreateContent() => new SbISkinScopedSettingsControls();
-        }
-
-        private sealed class ScriptedSkinScopedGroupProvider : IEzSkinEditorSkinScopedGroupProvider
-        {
-            public EzSkinEditorSkinKind Kind => EzSkinEditorSkinKind.Scripted;
-
-            public bool IsApplicable(EzSkinEditorSceneContext context) =>
-                EzSkinEditorSkinKindResolver.Resolve(context.ActualSkin) == Kind;
-
-            public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateGroups(EzSkinEditorSceneContext context) =>
-                new[]
-                {
-                    new EzSkinEditorSidebarGroupDefinition
-                    {
-                        Title = EzEditorStrings.GROUP_SCRIPTED_SKIN_SCOPED,
-                        CreateContent = () => new EzSkinEditorScriptedSkinSettingsSection(),
-                    },
-                };
-
-            // Future: [SkinConfig] csx write-back footer can live here.
-            public Drawable? CreateSidebarFooter(EzSkinEditorSceneContext context) => null;
         }
     }
 }

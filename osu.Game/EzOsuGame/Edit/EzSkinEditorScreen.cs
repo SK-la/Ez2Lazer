@@ -701,8 +701,8 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void ensureSkinSpecificSceneVisibility()
         {
-            // 顶栏 SkinSpecific 为占位壳，始终可见；专用设置在 Appearance 侧栏「专用」栏。
-            sceneBar.SetSceneVisible(EzSkinEditorSceneType.SkinSpecific, true);
+            // 顶栏 SkinSpecific 为占位壳，按钮已隐藏；专用设置在 Appearance 侧栏「皮肤专用」栏。
+            sceneBar.SetSceneVisible(EzSkinEditorSceneType.SkinSpecific, false);
         }
 
         private void ensureSkinIniSession()
