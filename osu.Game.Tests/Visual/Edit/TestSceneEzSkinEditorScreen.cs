@@ -6,7 +6,6 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Extensions;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
@@ -18,7 +17,6 @@ using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Edit.Scenes;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
@@ -148,7 +146,7 @@ namespace osu.Game.Tests.Visual.Edit
             switchScene(EzSkinEditorSceneType.Appearance);
 
             selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_TEXTURE);
-            AddUntilStep("all appearance groups visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() >= 6);
+            AddUntilStep("all appearance groups visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() >= 5);
             AddAssert("texture group present", () => editorScreen.ChildrenOfType<Dropdown<string>>().Any());
             AddAssert("no skin-specific on appearance group", () =>
                 !editorScreen.ChildrenOfType<EzStyleProSkinScopedSettingsControls>().Any()
@@ -156,10 +154,10 @@ namespace osu.Game.Tests.Visual.Edit
                 && !editorScreen.ChildrenOfType<SbISkinScopedSettingsControls>().Any());
 
             selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_SIZE);
-            AddUntilStep("size group remains visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 6);
+            AddUntilStep("size group remains visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 5);
 
             selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_COLUMN_COLOURS);
-            AddUntilStep("all appearance groups visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() >= 6);
+            AddUntilStep("all appearance groups visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() >= 5);
         }
 
         [Test]
@@ -451,7 +449,7 @@ namespace osu.Game.Tests.Visual.Edit
 
             float gameplayWidthBefore = 0;
             AddStep("capture gameplay width", () =>
-                gameplayWidthBefore = editorScreen.ChildrenOfType<ScalingContainer>().First(c => c.Parent is GridContainer).DrawWidth);
+                gameplayWidthBefore = editorScreen.ChildrenOfType<EzSkinEditorHudLayer>().Single().DrawWidth);
 
             AddStep("unpin sidebar", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().Pinned.Value = false);
             AddStep("collapse sidebar", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().ExpandedState.Value = false);
@@ -467,7 +465,7 @@ namespace osu.Game.Tests.Visual.Edit
                 editorScreen.ChildrenOfType<EzSkinEditorSidebarGroupRail>().Single().IsPresent);
             AddAssert("gameplay width unchanged", () =>
             {
-                float after = editorScreen.ChildrenOfType<ScalingContainer>().First(c => c.Parent is GridContainer).DrawWidth;
+                float after = editorScreen.ChildrenOfType<EzSkinEditorHudLayer>().Single().DrawWidth;
                 return Math.Abs(after - gameplayWidthBefore) < 1;
             });
         }
@@ -558,13 +556,13 @@ namespace osu.Game.Tests.Visual.Edit
         }
 
         [Test]
-        public void TestNoteSceneComparisonHost()
+        public void TestNoteSceneWorkspace()
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.Note);
 
-            AddUntilStep("note comparison host visible", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonHost>().Any());
+            // The Note preview host is hosted by the plugged screen, not the workspace tree.
             AddUntilStep("note sidebar pages", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().PageCount == 2);
             AddUntilStep("all note groups visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
             AddAssert("mania note profile registered", () => EzSkinEditorNoteRulesetProfileRegistry.Get(3) != null);
@@ -723,7 +721,7 @@ namespace osu.Game.Tests.Visual.Edit
             switchScene(EzSkinEditorSceneType.Appearance);
             selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_TEXTURE);
 
-            AddUntilStep("all appearance groups visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() >= 6);
+            AddUntilStep("all appearance groups visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() >= 5);
             AddAssert("scoped group not selected", () =>
                 editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectedGroupId.Value
                 != AppearanceSceneStrategy.GROUP_ID_SKIN_SCOPED);

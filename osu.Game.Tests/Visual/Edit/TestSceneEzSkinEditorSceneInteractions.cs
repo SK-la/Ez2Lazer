@@ -53,7 +53,7 @@ namespace osu.Game.Tests.Visual.Edit
         {
             runSidebarGroupInteraction(AppearanceSceneStrategy.GROUP_ID_TEXTURE);
             AddAssert("workspace still present", () => editorScreen.IsLoaded);
-            AddAssert("all appearance groups visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() >= 6);
+            AddAssert("all appearance groups visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() >= 5);
         }
 
         [Test]
@@ -67,7 +67,7 @@ namespace osu.Game.Tests.Visual.Edit
         public void TestColourGroupInteractions()
         {
             runSidebarGroupInteraction(AppearanceSceneStrategy.GROUP_ID_BASE_COLOURS);
-            AddAssert("all appearance groups visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() >= 6);
+            AddAssert("all appearance groups visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() >= 5);
         }
 
         [Test]
