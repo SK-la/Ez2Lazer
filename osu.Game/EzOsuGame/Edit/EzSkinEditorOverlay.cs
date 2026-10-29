@@ -19,6 +19,7 @@ using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
+using osu.Game.Overlays;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
@@ -76,6 +77,9 @@ namespace osu.Game.EzOsuGame.Edit
         [Resolved]
         private SkinManager skinManager { get; set; } = null!;
 
+        [Resolved]
+        private MusicController musicController { get; set; } = null!;
+
         private EzSkinEditorBeatmapPicker? beatmapPicker;
 
         protected override bool BlockNonPositionalInput => true;
@@ -112,6 +116,7 @@ namespace osu.Game.EzOsuGame.Edit
                 {
                     RequestClose = Hide,
                     OpenOfficialHudEditor = openOfficialHudEditor,
+                    BeatmapPreviewRequested = PresentBeatmapForRuleset,
                 };
                 LoadComponentAsync(Workspace, loaded =>
                 {
@@ -179,7 +184,6 @@ namespace osu.Game.EzOsuGame.Edit
         private void initializeSceneCoordinator(EzSkinEditorScreen workspace)
         {
             sceneCoordinator = new EzSkinEditorSceneCoordinator(scalingContainer, workspace, layoutLayer, updateScreenSizing, canPresentScene, () => game.ScreenStack.CurrentScreen, enterSongSelect, enterGameplay);
-            workspace.SceneRequested = scene => sceneCoordinator?.RequestScene(scene, game.ScreenStack.CurrentScreen as OsuScreen);
             workspace.SceneApplied = scene => sceneCoordinator?.Present(scene, game.ScreenStack.CurrentScreen as OsuScreen);
             workspace.CanPresentScene = canPresentScene;
             sceneCoordinator.BeginSession(sessionTarget);
@@ -242,6 +246,34 @@ namespace osu.Game.EzOsuGame.Edit
 
                 screen.Push(new EzEditorEndlessPlayer(autoplay.CreateScoreFromReplayData));
             }, new[] { typeof(Player), typeof(SoloSongSelect), typeof(MainMenu) });
+        }
+
+        /// <summary>
+        /// Switches the global ruleset and the picked preview beatmap, then rebuilds the editor scene so the
+        /// plugged gameplay screen restarts on the newly picked chart.
+        /// The visible preview is a real <see cref="Player"/> bound to the global beatmap, so
+        /// <see cref="IPerformFromScreenRunner"/> first steps back to song select / main menu (exiting any
+        /// running gameplay) before the switch is applied.
+        /// </summary>
+        private void PresentBeatmapForRuleset(RulesetInfo rulesetInfo, WorkingBeatmap workingBeatmap)
+        {
+            performer?.PerformFromScreen(_ =>
+            {
+                if (State.Value != Visibility.Visible)
+                    return;
+
+                if (ruleset is Bindable<RulesetInfo> writableRuleset)
+                    writableRuleset.Value = rulesetInfo;
+
+                if (beatmap is Bindable<WorkingBeatmap> writableBeatmap)
+                    writableBeatmap.Value = workingBeatmap;
+
+                musicController.Stop();
+
+                // Re-presents the scene so gameplay restarts on the new chart. The sidebar and HUD layer are
+                // not rebuilt: they follow the shared PreviewState and are unaffected by the chart switch.
+                Workspace?.RefreshPreviewScene();
+            }, new[] { typeof(SoloSongSelect), typeof(MainMenu) });
         }
 
         private void updateScreenSizing()

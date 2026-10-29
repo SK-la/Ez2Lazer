@@ -3,9 +3,7 @@
 
 using System.Collections.Generic;
 using System.Linq;
-using osu.Framework.Graphics;
 using osu.Framework.Localisation;
-using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
 using osu.Game.EzOsuGame.Localization;
 
@@ -23,11 +21,6 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
         public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.Appearance;
 
         public LocalisableString TabTitle => EzEditorStrings.TAB_APPEARANCE;
-
-        public Drawable CreateSceneContent(EzSkinEditorSceneContext context) =>
-            context.UseLoopBeatmap
-                ? new EzSkinEditorPreviewHost(context)
-                : new EzSkinEditorAppearanceSceneContent(context);
 
         public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context)
         {

@@ -7,6 +7,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.Rulesets;
@@ -145,20 +146,15 @@ namespace osu.Game.EzOsuGame.Edit.Components
         }
 
         /// <summary>
-        /// Ez 布局层中属于当前场景的容器。仅 HUD 场景（游戏中 / 选歌）有可编辑目标，
-        /// 其他场景不建蓝图。
+        /// Ez 布局层中属于当前场景的容器。可编辑目标由 <see cref="EzSkinEditorSceneRegistry"/> 解析，
+        /// 本层不再自行维护场景到目标的映射。
         /// </summary>
         public IEnumerable<EzLayoutContainer> EnumerateTargets()
         {
             if (layoutLayer == null)
                 yield break;
 
-            GlobalSkinnableContainers? wanted = scene switch
-            {
-                EzSkinEditorSceneType.Gameplay => GlobalSkinnableContainers.MainHUDComponents,
-                EzSkinEditorSceneType.SongSelect => GlobalSkinnableContainers.SongSelect,
-                _ => null,
-            };
+            GlobalSkinnableContainers? wanted = EzSkinEditorSceneRegistry.ResolveLayoutTarget(scene);
 
             if (wanted == null)
                 yield break;
@@ -189,7 +185,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private void updateGameplaySkinLayer()
         {
-            HUDOverlay? overlay = liveScreen is Player player ? player.ChildrenOfType<HUDOverlay>().FirstOrDefault() : null;
+            // 只认当前屏：退场中的 Player 仍能被 ChildrenOfType 找到，但屏幕退场会走
+            // UnbindAllBindablesSubTree，连同我们从 ShowHud 租的 lease 一并归还；再写就会抛「已归还」。
+            HUDOverlay? overlay = liveScreen is Player player && player.IsCurrentScreen()
+                ? player.ChildrenOfType<HUDOverlay>().FirstOrDefault()
+                : null;
 
             if (!ReferenceEquals(boundHudOverlay, overlay))
             {

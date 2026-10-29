@@ -50,15 +50,6 @@ namespace osu.Game.EzOsuGame.Edit
             desiredScene = workspace.CurrentScene.Value;
         }
 
-        public void RequestScene(EzSkinEditorSceneType scene, OsuScreen? target)
-        {
-            if (!sceneIsAvailable(scene))
-                return;
-
-            desiredScene = scene;
-            workspace.ApplyCoordinatedScene(scene);
-        }
-
         public void BeginSession(OsuScreen? target)
         {
             desiredScene = EzSkinEditorSceneRegistry.ResolveCurrentScene(target);

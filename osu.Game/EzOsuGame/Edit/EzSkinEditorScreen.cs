@@ -62,11 +62,16 @@ namespace osu.Game.EzOsuGame.Edit
 
         public Action? OpenOfficialHudEditor { get; set; }
 
-        public Action<EzSkinEditorSceneType>? SceneRequested { get; set; }
-
         public Action<EzSkinEditorSceneType>? SceneApplied { get; set; }
 
         public Func<EzSkinEditorSceneType, bool>? CanPresentScene { get; set; }
+
+        /// <summary>
+        /// Raised when the user picks a preview mode. The workspace only resolves which beatmap to use;
+        /// the owning overlay switches the global ruleset/beatmap and re-presents the scene, because the
+        /// visible preview is a real gameplay screen bound to those globals, not this workspace's state.
+        /// </summary>
+        public Action<RulesetInfo, WorkingBeatmap>? BeatmapPreviewRequested { get; set; }
 
         [Cached]
         private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Blue);
@@ -303,7 +308,7 @@ namespace osu.Game.EzOsuGame.Edit
                                     sceneBar = new EzSkinEditorSceneBar
                                     {
                                         RelativeSizeAxes = Axes.X,
-                                        SceneRequested = scene => SceneRequested?.Invoke(scene),
+                                        SceneRequested = scene => sceneBar.CurrentScene.Value = scene,
                                         OpenOfficialHudEditorRequested = () => OpenOfficialHudEditor?.Invoke(),
                                     },
                                 },
@@ -369,8 +374,7 @@ namespace osu.Game.EzOsuGame.Edit
         /// </summary>
         private void updateHudInteraction()
         {
-            bool sceneSupportsHud = EzSkinEditorSceneRegistry.Get(sceneBar.CurrentScene.Value).SupportsHudLayer;
-            hudLayer.InteractionEnabled.Value = sceneSupportsHud && sceneBar.HudLayerVisible.Value;
+            hudLayer.InteractionEnabled.Value = EzSkinEditorSceneRegistry.SupportsHudLayer(sceneBar.CurrentScene.Value) && sceneBar.HudLayerVisible.Value;
         }
 
         protected override void Update()
@@ -456,9 +460,11 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void onSceneChanged(ValueChangedEvent<EzSkinEditorSceneType> change)
         {
+            // CurrentScene is the single request source; a scene the editor cannot present reverts it
+            // so the bar and coordinator never diverge.
             if (CanPresentScene?.Invoke(change.NewValue) == false)
             {
-                SceneRequested?.Invoke(change.OldValue);
+                sceneBar.CurrentScene.Value = change.OldValue;
                 return;
             }
 
@@ -473,6 +479,17 @@ namespace osu.Game.EzOsuGame.Edit
         }
 
         public void PopulateSettings() => refreshScene();
+
+        /// <summary>
+        /// Re-presents the current scene after the preview beatmap/ruleset changed, without rebuilding the
+        /// sidebar or the HUD layer. Only the plugged gameplay screen depends on the preview selection;
+        /// sidebar sections bind to the shared <see cref="PreviewState"/> and follow it live.
+        /// </summary>
+        internal void RefreshPreviewScene()
+        {
+            SceneApplied?.Invoke(sceneBar.CurrentScene.Value);
+            Schedule(() => refreshSceneBarPlayback());
+        }
 
         public void ApplySettings() => applySettings();
 
@@ -543,7 +560,7 @@ namespace osu.Game.EzOsuGame.Edit
             if (beatmapPicker == null)
                 return;
 
-            if (!beatmapPicker.TryPickRandom(ruleset, out var workingBeatmap))
+            if (!beatmapPicker.TryPickRandom(ruleset, out var workingBeatmap) || workingBeatmap is not WorkingBeatmap picked)
             {
                 notifications?.Post(new SimpleNotification
                 {
@@ -552,9 +569,10 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
-            musicController.Stop();
-            PreviewState.SetBeatmap(workingBeatmap!, ruleset, EzBeatmapPreviewModes.GetAppearanceLoadMode(ruleset));
-            refreshScene();
+            // The visible preview is the real gameplay screen, which renders the global beatmap; updating
+            // this workspace's PreviewState alone changes nothing on screen. The overlay owns the switch.
+            PreviewState.SetBeatmap(picked, ruleset, EzBeatmapPreviewModes.GetAppearanceLoadMode(ruleset));
+            BeatmapPreviewRequested?.Invoke(ruleset, picked);
         }
 
         private EzSkinEditorSceneContext buildSceneContext()
@@ -1036,12 +1054,6 @@ namespace osu.Game.EzOsuGame.Edit
         private void refreshNoteComparisonSnapshotPane() => Schedule(refreshPreviewContent);
 
         private void refreshNoteComparisonLivePane() => Schedule(refreshPreviewContent);
-
-        private bool tryGetNoteComparisonHost(out EzSkinEditorNoteComparisonHost noteHost)
-        {
-            noteHost = null!;
-            return false;
-        }
 
         private void exportNotePreview()
         {

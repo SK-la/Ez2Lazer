@@ -55,6 +55,22 @@ namespace osu.Game.Tests.Visual.Edit
             AddAssert("song select maps to song select", () => EzSkinEditorSceneRegistry.ResolveCurrentScene(typeof(SoloSongSelect)) == EzSkinEditorSceneType.SongSelect);
         }
 
+        [Test]
+        public void TestSceneRegistryIsSingleHudCapabilitySource()
+        {
+            AddAssert("gameplay supports hud", () => EzSkinEditorSceneRegistry.SupportsHudLayer(EzSkinEditorSceneType.Gameplay));
+            AddAssert("song select supports hud", () => EzSkinEditorSceneRegistry.SupportsHudLayer(EzSkinEditorSceneType.SongSelect));
+            AddAssert("appearance has no hud", () => !EzSkinEditorSceneRegistry.SupportsHudLayer(EzSkinEditorSceneType.Appearance));
+            AddAssert("note has no hud", () => !EzSkinEditorSceneRegistry.SupportsHudLayer(EzSkinEditorSceneType.Note));
+
+            AddAssert("gameplay targets main hud", () =>
+                EzSkinEditorSceneRegistry.ResolveLayoutTarget(EzSkinEditorSceneType.Gameplay) == GlobalSkinnableContainers.MainHUDComponents);
+            AddAssert("song select targets song select layout", () =>
+                EzSkinEditorSceneRegistry.ResolveLayoutTarget(EzSkinEditorSceneType.SongSelect) == GlobalSkinnableContainers.SongSelect);
+            AddAssert("appearance has no layout target", () =>
+                EzSkinEditorSceneRegistry.ResolveLayoutTarget(EzSkinEditorSceneType.Appearance) == null);
+        }
+
         [SetUpSteps]
         public override void SetUpSteps()
         {

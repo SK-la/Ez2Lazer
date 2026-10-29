@@ -2,8 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
-using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Localization;
@@ -21,9 +19,6 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
         public LocalisableString TabTitle => SkinEditorStrings.SongSelect;
 
         public bool SupportsHudLayer => true;
-
-        public Drawable CreateSceneContent(EzSkinEditorSceneContext context) =>
-            new Container { RelativeSizeAxes = Axes.Both };
 
         public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context) => new[]
         {
