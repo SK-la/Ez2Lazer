@@ -32,6 +32,7 @@ namespace osu.Game.EzOsuGame.Edit
         private readonly Container gameplayHost = new Container { RelativeSizeAxes = Axes.Both };
         private EzSkinEditorSceneType desiredScene;
         private Player? boundPlayer;
+        private SongSelect? boundSongSelect;
 
         private Drawable? hiddenStoryboard;
         private float previousStoryboardAlpha;
@@ -85,7 +86,12 @@ namespace osu.Game.EzOsuGame.Edit
         public void Tick(OsuScreen? current)
         {
             if (desiredScene == EzSkinEditorSceneType.SongSelect)
+            {
+                if (current is SongSelect songSelect && songSelect.IsLoaded && !ReferenceEquals(boundSongSelect, songSelect))
+                    bindSongSelect(songSelect);
+
                 return;
+            }
 
             if (current is Player player && player.IsLoaded && !ReferenceEquals(boundPlayer, player))
                 bindGameplay(player);
@@ -99,6 +105,7 @@ namespace osu.Game.EzOsuGame.Edit
         {
             restorePlayerChrome();
             boundPlayer = null;
+            boundSongSelect = null;
             workspace.SetSceneHost(null);
             scalingContainer.SetCustomRect(null);
         }
@@ -115,6 +122,7 @@ namespace osu.Game.EzOsuGame.Edit
             {
                 restorePlayerChrome();
                 boundPlayer = null;
+                boundSongSelect = null;
                 workspace.BindHudToTarget(null, layoutLayer);
                 enterGameplay();
             }
@@ -123,6 +131,7 @@ namespace osu.Game.EzOsuGame.Edit
         private void bindGameplay(Player player)
         {
             boundPlayer = player;
+            boundSongSelect = null;
 
             // Gameplay may have pushed its own beatmap background before the editor opened.
             player.DetachOwnedBackground();
@@ -146,11 +155,26 @@ namespace osu.Game.EzOsuGame.Edit
             restorePlayerChrome();
             boundPlayer = null;
             workspace.SetSceneHost(null);
-            workspace.BindHudToTarget(null, layoutLayer);
             updateScreenSizing();
 
-            if (getCurrentScreen() is not SongSelect)
+            if (getCurrentScreen() is SongSelect songSelect && songSelect.IsLoaded)
+                bindSongSelect(songSelect);
+            else
+            {
+                boundSongSelect = null;
+                workspace.BindHudToTarget(null, layoutLayer);
                 enterSongSelect();
+            }
+        }
+
+        private void bindSongSelect(SongSelect songSelect)
+        {
+            boundSongSelect = songSelect;
+
+            // The skin layer HUD is only reached for temporary visibility; only the Ez layout
+            // container contributes editable targets.
+            workspace.BindHudToTarget(songSelect, layoutLayer);
+            updateScreenSizing();
         }
 
         private void restorePlayerChrome()

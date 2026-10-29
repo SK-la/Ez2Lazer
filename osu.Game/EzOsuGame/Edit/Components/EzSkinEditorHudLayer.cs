@@ -12,12 +12,14 @@ using osu.Game.EzOsuGame.Layout;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
 using osu.Game.Screens.Play;
+using osu.Game.Screens.Select;
 using osu.Game.Skinning;
 
 namespace osu.Game.EzOsuGame.Edit.Components
 {
     /// <summary>
-    /// Ez 皮肤编辑器 HUD 蓝图层。目标来自插拔进来的当前屏（及 Ez 图层），不再自建空 ScoreProcessor。
+    /// Ez 皮肤编辑器 HUD 蓝图层。只把 Ez 布局层（<see cref="EzLayoutLayer"/>）的容器作为可编辑目标，
+    /// 皮肤层 HUD 只在 layer 开关下临时显隐，既不建蓝图也不写回皮肤。
     /// </summary>
     public partial class EzSkinEditorHudLayer : CompositeDrawable
     {
@@ -27,7 +29,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         public readonly BindableBool InteractionEnabled = new BindableBool();
 
         /// <summary>
-        /// HUD layer 开关本身：控制蓝图显示隐藏。
+        /// HUD layer 开关本身：临时控制 Ez 布局层与皮肤层 HUD 的显示隐藏。
         /// </summary>
         public readonly BindableBool LayerVisible = new BindableBool(true);
 
@@ -40,10 +42,17 @@ namespace osu.Game.EzOsuGame.Edit.Components
         public override bool PropagateNonPositionalInputSubTree => InteractionEnabled.Value;
 
         private Container blueprintHost = null!;
-        private SkinManager skins = null!;
-        private OsuScreen? liveScreen;
         private EzLayoutLayer? layoutLayer;
+        private OsuScreen? liveScreen;
+        private EzSkinEditorSceneType scene = EzSkinEditorSceneType.Gameplay;
         private RulesetInfo? ruleset;
+
+        private HUDOverlay? boundHudOverlay;
+        private LeasedBindable<bool>? leasedShowHud;
+
+        private SkinnableContainer? boundSongSelectSkinLayer;
+        private float rememberedSongSelectSkinAlpha = 1;
+        private bool? appliedSongSelectSkinHidden;
 
         public EzSkinEditorHudLayer()
         {
@@ -52,24 +61,35 @@ namespace osu.Game.EzOsuGame.Edit.Components
         }
 
         [BackgroundDependencyLoader]
-        private void load(SkinManager skinManager)
+        private void load()
         {
-            skins = skinManager;
             InternalChild = blueprintHost = new Container { RelativeSizeAxes = Axes.Both };
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            LayerVisible.BindValueChanged(_ => refreshBlueprints(), true);
+            LayerVisible.BindValueChanged(_ =>
+            {
+                updateLayoutLayerVisibility();
+                updateSkinLayerVisibility();
+                refreshBlueprints();
+            }, true);
         }
 
-        public void AttachLiveTargets(OsuScreen? screen, EzLayoutLayer? ezLayout)
+        /// <summary>
+        /// Binds the editor HUD to a scene. Only <paramref name="ezLayout"/> contributes editable targets;
+        /// <paramref name="screen"/> is used to reach the skin layer HUD for temporary visibility only.
+        /// </summary>
+        public void Apply(EzSkinEditorSceneType scene, OsuScreen? screen, EzLayoutLayer? ezLayout)
         {
             if (!ReferenceEquals(layoutLayer, ezLayout))
             {
                 if (layoutLayer != null)
+                {
                     layoutLayer.LayoutTargetsChanged -= onLayoutTargetsChanged;
+                    layoutLayer.EditorHidden = false;
+                }
 
                 layoutLayer = ezLayout;
 
@@ -77,11 +97,15 @@ namespace osu.Game.EzOsuGame.Edit.Components
                     layoutLayer.LayoutTargetsChanged += onLayoutTargetsChanged;
             }
 
+            this.scene = scene;
             liveScreen = screen;
+
+            updateLayoutLayerVisibility();
+            updateSkinLayerVisibility();
             refreshBlueprints();
         }
 
-        public void DetachLiveTargets() => AttachLiveTargets(null, null);
+        public void DetachLiveTargets() => Apply(scene, null, null);
 
         private void onLayoutTargetsChanged()
         {
@@ -120,38 +144,130 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 blueprintHost.Add(new EzSkinEditorHudBlueprintContainer(target, selectedComponents, PersistLayoutToCurrentSkin));
         }
 
-        public IEnumerable<SkinnableContainer> EnumerateTargets()
+        /// <summary>
+        /// Ez 布局层中属于当前场景的容器。仅 HUD 场景（游戏中 / 选歌）有可编辑目标，
+        /// 其他场景不建蓝图。
+        /// </summary>
+        public IEnumerable<EzLayoutContainer> EnumerateTargets()
         {
-            if (liveScreen is Player player && player.IsLoaded)
-            {
-                foreach (var c in player.ChildrenOfType<SkinnableContainer>())
-                    yield return c;
-            }
+            if (layoutLayer == null)
+                yield break;
 
-            if (layoutLayer != null)
+            GlobalSkinnableContainers? wanted = scene switch
             {
-                foreach (var c in layoutLayer.LayoutContainers.Where(c => c.Alpha > 0))
-                    yield return c;
-            }
+                EzSkinEditorSceneType.Gameplay => GlobalSkinnableContainers.MainHUDComponents,
+                EzSkinEditorSceneType.SongSelect => GlobalSkinnableContainers.SongSelect,
+                _ => null,
+            };
+
+            if (wanted == null)
+                yield break;
+
+            foreach (var container in layoutLayer.LayoutContainers.Where(c => c.Lookup.Lookup == wanted))
+                yield return container;
         }
 
         public void PersistLayoutToCurrentSkin()
         {
-            var skin = skins.CurrentSkin.Value;
-
             foreach (var target in EnumerateTargets())
-            {
-                if (target is EzLayoutContainer ez)
-                {
-                    layoutLayer?.Store.Save(ez);
-                    continue;
-                }
+                layoutLayer?.Store.Save(target);
+        }
 
-                if (target.ComponentsLoaded)
-                    skin.UpdateDrawableTarget(target);
+        private void updateLayoutLayerVisibility()
+        {
+            layoutLayer?.EditorHidden = !LayerVisible.Value;
+        }
+
+        /// <summary>
+        /// 皮肤层 HUD 只临时跟随 layer 开关显隐；不写回皮肤，也不进入蓝图。
+        /// </summary>
+        private void updateSkinLayerVisibility()
+        {
+            updateGameplaySkinLayer();
+            updateSongSelectSkinLayer();
+        }
+
+        private void updateGameplaySkinLayer()
+        {
+            HUDOverlay? overlay = liveScreen is Player player ? player.ChildrenOfType<HUDOverlay>().FirstOrDefault() : null;
+
+            if (!ReferenceEquals(boundHudOverlay, overlay))
+            {
+                leasedShowHud?.Return();
+                leasedShowHud = null;
+                boundHudOverlay = overlay;
             }
 
-            skins.Save(skin);
+            if (overlay == null)
+                return;
+
+            // ShowHud 同时是显隐与输入的总闸；lease 期间配置与「按住显示 HUD」都不会把它改回来。
+            if (leasedShowHud != null)
+            {
+                leasedShowHud.Value = LayerVisible.Value;
+                return;
+            }
+
+            // 已被其他机制接管（例如 cinema / 无 HUD 规则集）时不要插手。
+            if (overlay.ShowHud.Disabled)
+                return;
+
+            leasedShowHud = overlay.ShowHud.BeginLease(true);
+            leasedShowHud.Value = LayerVisible.Value;
+        }
+
+        private void updateSongSelectSkinLayer()
+        {
+            SkinnableContainer? container = liveScreen is SongSelect songSelect
+                ? songSelect.ChildrenOfType<SkinnableContainer>().FirstOrDefault(c => c.Lookup.Lookup == GlobalSkinnableContainers.SongSelect)
+                : null;
+
+            if (!ReferenceEquals(boundSongSelectSkinLayer, container))
+            {
+                if (boundSongSelectSkinLayer != null)
+                {
+                    boundSongSelectSkinLayer.Alpha = rememberedSongSelectSkinAlpha;
+                    appliedSongSelectSkinHidden = null;
+                }
+
+                boundSongSelectSkinLayer = container;
+                rememberedSongSelectSkinAlpha = container?.Alpha ?? 1;
+            }
+
+            if (container == null)
+                return;
+
+            bool hidden = !LayerVisible.Value;
+
+            if (appliedSongSelectSkinHidden == hidden)
+                return;
+
+            if (hidden)
+            {
+                rememberedSongSelectSkinAlpha = container.Alpha;
+                container.Alpha = 0;
+            }
+            else if (appliedSongSelectSkinHidden == true)
+                container.Alpha = rememberedSongSelectSkinAlpha;
+
+            appliedSongSelectSkinHidden = hidden;
+        }
+
+        private void releaseSkinLayer()
+        {
+            leasedShowHud?.Return();
+            leasedShowHud = null;
+            boundHudOverlay = null;
+
+            if (boundSongSelectSkinLayer != null)
+            {
+                if (appliedSongSelectSkinHidden == true)
+                    boundSongSelectSkinLayer.Alpha = rememberedSongSelectSkinAlpha;
+
+                boundSongSelectSkinLayer = null;
+            }
+
+            appliedSongSelectSkinHidden = null;
         }
 
         protected override void Dispose(bool isDisposing)
@@ -159,7 +275,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
             base.Dispose(isDisposing);
 
             if (layoutLayer != null)
+            {
                 layoutLayer.LayoutTargetsChanged -= onLayoutTargetsChanged;
+                layoutLayer.EditorHidden = false;
+            }
+
+            releaseSkinLayer();
         }
     }
 }

@@ -163,11 +163,11 @@ namespace osu.Game.Tests.Visual.Edit
         }
 
         [Test]
-        public void TestHudInteractionFollowsRailAndLayer()
+        public void TestHudInteractionFollowsSceneAndLayer()
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
-            switchScene(EzSkinEditorSceneType.Appearance);
+            switchScene(EzSkinEditorSceneType.Gameplay);
 
             var sceneBar = (EzSkinEditorSceneBar)null!;
             var hud = (EzSkinEditorHudLayer)null!;
@@ -179,19 +179,18 @@ namespace osu.Game.Tests.Visual.Edit
             });
 
             AddStep("enable hud layer", () => sceneBar.HudLayerVisible.Value = true);
-            selectSidebarGroup(GameplaySceneStrategy.GROUP_ID_HUD);
-            AddAssert("interaction on", () => hud.InteractionEnabled.Value);
+            AddUntilStep("gameplay interaction on", () => hud.InteractionEnabled.Value);
             AddUntilStep("hud workspace section", () => editorScreen.ChildrenOfType<EzSkinEditorHudWorkspaceSection>().Any());
             AddUntilStep("no-selection hint", () =>
                 editorScreen.ChildrenOfType<OsuSpriteText>()
                             .Any(t => t.Text.ToString() == EzEditorStrings.SIDEBAR_HUD_NO_SELECTION.ToString()));
 
-            selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_TEXTURE);
-            AddAssert("interaction off off-group", () => !hud.InteractionEnabled.Value);
+            switchScene(EzSkinEditorSceneType.Appearance);
+            AddUntilStep("appearance interaction off", () => !hud.InteractionEnabled.Value);
 
-            selectSidebarGroup(GameplaySceneStrategy.GROUP_ID_HUD);
+            switchScene(EzSkinEditorSceneType.Gameplay);
             AddStep("disable hud layer", () => sceneBar.HudLayerVisible.Value = false);
-            AddAssert("interaction off layer hidden", () => !hud.InteractionEnabled.Value);
+            AddUntilStep("interaction off layer hidden", () => !hud.InteractionEnabled.Value);
             AddUntilStep("layer-off hint", () =>
                 editorScreen.ChildrenOfType<OsuSpriteText>()
                             .Any(t => t.Text.ToString() == EzEditorStrings.SIDEBAR_HUD_LAYER_OFF.ToString()));

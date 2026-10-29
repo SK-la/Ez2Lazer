@@ -196,7 +196,7 @@ namespace osu.Game.EzOsuGame.Edit
         {
             hudTargetScreen = screen;
             layoutLayer = ezLayout;
-            hudLayer.AttachLiveTargets(screen, ezLayout);
+            hudLayer.Apply(sceneBar.CurrentScene.Value, screen, ezLayout);
         }
 
         [BackgroundDependencyLoader]
@@ -353,14 +353,13 @@ namespace osu.Game.EzOsuGame.Edit
             PreviewState.Ruleset.BindValueChanged(r =>
             {
                 hudLayer.SetRuleset(r.NewValue);
-                hudLayer.AttachLiveTargets(hudTargetScreen, layoutLayer);
+                hudLayer.Apply(sceneBar.CurrentScene.Value, hudTargetScreen, layoutLayer);
             }, true);
             sceneBar.HudLayerVisible.BindValueChanged(v =>
             {
                 hudLayer.SetVisible(v.NewValue);
                 updateHudInteraction();
             }, true);
-            sidebar.SelectedGroupId.BindValueChanged(_ => updateHudInteraction(), true);
             bindConfigPreviewRefresh();
             bindSceneBarPlayback();
         }
@@ -668,7 +667,7 @@ namespace osu.Game.EzOsuGame.Edit
             var strategy = EzSkinEditorSceneRegistry.Get(sceneBar.CurrentScene.Value);
             sidebar.ApplyStrategy(strategy, sceneContext);
             updateHudInteraction();
-            hudLayer.AttachLiveTargets(hudTargetScreen, layoutLayer);
+            hudLayer.Apply(sceneBar.CurrentScene.Value, hudTargetScreen, layoutLayer);
         }
 
         private void applySettings()
