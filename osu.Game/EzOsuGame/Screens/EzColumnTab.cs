@@ -5,20 +5,20 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
-using osu.Framework.Platform;
-using osu.Game.EzOsuGame.Edit.Settings;
-using osu.Game.EzOsuGame.Overlays;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit.Settings;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
@@ -102,7 +102,7 @@ namespace osu.Game.EzOsuGame.Screens
                     {
                         LabelText = EzColumnStrings.STAGE_BACKGROUND,
                         TooltipText = EzColumnStrings.STAGE_BACKGROUND_TOOLTIP,
-                        EmptyLabel = EzColumnStrings.STAGE_BACKGROUND_NONE,
+                        EmptyLabel = "None",
                         Current = ezSkinConfig.GetBindable<string>(Ez2Setting.StageBackground),
                         Items = panelItems,
                     },

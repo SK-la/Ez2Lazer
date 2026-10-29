@@ -58,10 +58,6 @@ namespace osu.Game.EzOsuGame.Localization
             "Stage-Background",
             "Stage-Background");
 
-        public static readonly LocalisableString STAGE_BACKGROUND_NONE = new EzLocalizationManager.EzLocalisableString(
-            "无",
-            "None");
-
         public static readonly LocalisableString STAGE_BACKGROUND_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "从 EzResources/Panel 加载一张图，作为整段 Stage 的背景（不拆到各列）。"
             + "\n默认无。选中后按列总宽等比例缩放，图片底部对齐判定线，画在列虚化下面。列虚化大于 0 时，谱面背景和这张图一起被虚化；为 0 时按原图画。"

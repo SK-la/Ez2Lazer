@@ -59,6 +59,24 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             EzGameThemeCandidates.EnsureInitialSelection(nameOfGameTheme);
             refreshGameThemeDropdownItems();
 
+            var panelItems = new List<string> { string.Empty };
+            panelItems.AddRange(EzResourceDiscovery.ListPanelImages(storage));
+
+            string currentPanel = ezSkinConfig.Get<string>(Ez2Setting.StageBackground);
+
+            if (!string.IsNullOrEmpty(currentPanel) && !panelItems.Contains(currentPanel))
+                panelItems.Insert(1, currentPanel);
+
+            var columnItems = EzResourceDiscovery.ListColumnSets(storage).ToList();
+
+            if (!columnItems.Contains("EzColumnLight"))
+                columnItems.Insert(0, "EzColumnLight");
+
+            string currentColumn = ezSkinConfig.Get<string>(Ez2Setting.ColumnLightName);
+
+            if (!string.IsNullOrEmpty(currentColumn) && !columnItems.Contains(currentColumn))
+                columnItems.Insert(0, currentColumn);
+
             Children = new Drawable[]
             {
                 new FillFlowContainer
@@ -96,6 +114,21 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                     TooltipText = EzSkinStrings.NOTE_SET_TOOLTIP,
                     Current = nameOfNote,
                     Items = availableNoteSets,
+                },
+                new EzOptionalStringDropdown
+                {
+                    LabelText = EzColumnStrings.STAGE_BACKGROUND,
+                    TooltipText = EzColumnStrings.STAGE_BACKGROUND_TOOLTIP,
+                    EmptyLabel = "None",
+                    Current = ezSkinConfig.GetBindable<string>(Ez2Setting.StageBackground),
+                    Items = panelItems,
+                },
+                new SettingsDropdown<string>
+                {
+                    LabelText = EzColumnStrings.COLUMN_SET,
+                    TooltipText = EzColumnStrings.COLUMN_SET_TOOLTIP,
+                    Current = ezSkinConfig.GetBindable<string>(Ez2Setting.ColumnLightName),
+                    Items = columnItems,
                 },
             };
         }
