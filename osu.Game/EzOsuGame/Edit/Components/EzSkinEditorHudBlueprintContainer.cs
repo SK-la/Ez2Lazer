@@ -8,13 +8,12 @@ using System.Diagnostics;
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Input.Events;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame.SkinEditor;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets.Edit;
 using osu.Game.Screens.Edit.Compose.Components;
 using osu.Game.Skinning;
-using osuTK;
 
 namespace osu.Game.EzOsuGame.Edit.Components
 {
@@ -23,26 +22,43 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// </summary>
     public partial class EzSkinEditorHudBlueprintContainer : BlueprintContainer<ISerialisableDrawable>
     {
-        private readonly ISerialisableDrawableContainer targetContainer;
-        private readonly BindableList<ISerialisableDrawable> selection;
+        private readonly SkinnableContainer targetContainer;
+        private readonly SelectionSource selection;
         private readonly Action? onLayoutMutated;
         private readonly List<BindableList<ISerialisableDrawable>> targetComponents = new List<BindableList<ISerialisableDrawable>>();
 
         public EzSkinEditorHudBlueprintContainer(
-            ISerialisableDrawableContainer targetContainer,
+            SkinnableContainer targetContainer,
             BindableList<ISerialisableDrawable> selection,
             Action? onLayoutMutated = null)
         {
             this.targetContainer = targetContainer;
-            this.selection = selection;
+            this.selection = new SelectionSource(selection);
             this.onLayoutMutated = onLayoutMutated;
+        }
+
+        /// <summary>
+        /// 共享选中列表的持有者。该列表不能直接存成 <see cref="IUnbindable"/> 字段：框架的
+        /// <see cref="Drawable.Dispose"/> 会用反射对所有这类字段调用 <c>UnbindAll()</c>，
+        /// 那会把列表的 <c>CollectionChanged</c> 清空。蓝图容器在每次
+        /// <c>EzSkinEditorHudLayer.refreshBlueprints</c> 时都会重建，于是侧栏对同一列表的订阅
+        /// 会被反复清除，表现为「蓝图能选中、侧栏永远读不到选中项」。
+        /// </summary>
+        private sealed class SelectionSource
+        {
+            public readonly BindableList<ISerialisableDrawable> Value;
+
+            public SelectionSource(BindableList<ISerialisableDrawable> value)
+            {
+                Value = value;
+            }
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            SelectedItems.BindTo(selection);
+            SelectedItems.BindTo(selection.Value);
 
             var bindableList = new BindableList<ISerialisableDrawable> { BindTarget = targetContainer.Components };
             bindableList.BindCollectionChanged(componentsChanged, true);
@@ -99,22 +115,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
         protected override SelectionBlueprint<ISerialisableDrawable> CreateBlueprintFor(ISerialisableDrawable component)
             => new SkinBlueprint(component);
 
-        // 最小拖移：无 HUD 吸附，仅按指针位移移动选中项。
-        protected override bool TryMoveBlueprints(DragEvent e, IList<(SelectionBlueprint<ISerialisableDrawable> blueprint, Vector2[] originalSnapPositions)> blueprints)
-        {
-            Vector2 distanceTravelled = e.ScreenSpaceMousePosition - e.ScreenSpaceMouseDownPosition;
-            var referenceBlueprint = blueprints.First().blueprint;
-            Vector2 movePosition = blueprints.First().originalSnapPositions.First() + distanceTravelled;
-            Vector2 screenDelta = movePosition - referenceBlueprint.ScreenSpaceSelectionPoint;
-            return SelectionHandler.HandleMovement(new MoveSelectionEvent<ISerialisableDrawable>(referenceBlueprint, screenDelta));
-        }
-
-        protected override void DragOperationCompleted()
-        {
-            base.DragOperationCompleted();
-            onLayoutMutated?.Invoke();
-        }
-
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
@@ -136,7 +136,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 var item = c.Item;
                 var drawable = (Drawable)item;
 
-                if (!item.UsesFixedAnchor)
+                if (!item.UsesFixedAnchor && !SkinHudSnapRuntime.DeferClosestAnchorDuringDrag)
                     SkinSelectionHandler.ApplyClosestAnchorOrigin(drawable);
 
                 drawable.Position += drawable.ScreenSpaceDeltaToParentSpace(moveEvent.ScreenSpaceDelta);
