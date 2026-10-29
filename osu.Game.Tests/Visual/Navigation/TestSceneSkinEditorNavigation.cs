@@ -15,8 +15,9 @@ using osu.Framework.Input;
 using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Framework.Threading;
-using osu.Game.Online.API;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Edit;
+using osu.Game.Online.API;
 using osu.Game.Overlays.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Overlays.SkinEditor;
@@ -24,6 +25,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Screens.Edit.Components;
+using osu.Game.Screens.Menu;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Select;
@@ -40,6 +42,79 @@ namespace osu.Game.Tests.Visual.Navigation
         private ModSelectOverlay modSelect => Game.ChildrenOfType<ModSelectOverlay>().First();
 
         private SkinEditor skinEditor => Game.ChildrenOfType<SkinEditor>().FirstOrDefault();
+
+        private EzSkinEditorOverlay ezSkinEditor => Game.ChildrenOfType<EzSkinEditorOverlay>().Single();
+
+        [Test]
+        public void TestEzEditorKeepsLastEditedSongSelect()
+        {
+            advanceToSongSelect();
+            AddStep("select beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).WaitSafely());
+            AddUntilStep("beatmap selected", () => !Game.Beatmap.IsDefault);
+
+            AddUntilStep("Ez editor overlay available", () => Game.ChildrenOfType<EzSkinEditorOverlay>().Any());
+            AddStep("open Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("editor workspace ready", () => ezSkinEditor.Workspace?.IsLoaded == true);
+            AddAssert("song select scene selected", () => ezSkinEditor.Workspace!.CurrentScene.Value == EzSkinEditorSceneType.SongSelect);
+            AddStep("close Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("last scene screen remains current", () => Game.ScreenStack.CurrentScreen is SoloSongSelect);
+            AddAssert("selected beatmap retained", () => !Game.Beatmap.IsDefault);
+        }
+
+        [Test]
+        public void TestEzEditorKeepsLastEditedGameplay()
+        {
+            AddStep("import editor beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).WaitSafely());
+            AddUntilStep("editor beatmap ready", () => !Game.Beatmap.IsDefault);
+
+            AddUntilStep("main menu current", () => Game.ScreenStack.CurrentScreen is MainMenu);
+            AddUntilStep("Ez editor overlay available", () => Game.ChildrenOfType<EzSkinEditorOverlay>().Any());
+            AddStep("open Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("editor gameplay current", () => Game.ScreenStack.CurrentScreen is Player);
+            AddUntilStep("Ez editor visible", () => ezSkinEditor.State.Value == Visibility.Visible);
+            AddStep("close Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("editor gameplay stays current", () => Game.ScreenStack.CurrentScreen is Player);
+        }
+
+        [Test]
+        public void TestEzEditorSwitchesFromGameplayToSongSelectWithoutCrash()
+        {
+            AddStep("import editor beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).WaitSafely());
+            AddUntilStep("editor beatmap ready", () => !Game.Beatmap.IsDefault);
+
+            AddUntilStep("main menu current", () => Game.ScreenStack.CurrentScreen is MainMenu);
+            AddUntilStep("Ez editor overlay available", () => Game.ChildrenOfType<EzSkinEditorOverlay>().Any());
+            AddStep("open Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("editor gameplay current", () => Game.ScreenStack.CurrentScreen is Player);
+
+            AddStep("switch to song select scene", () => ezSkinEditor.Workspace!.CurrentScene.Value = EzSkinEditorSceneType.SongSelect);
+            AddUntilStep("real song select current", () => Game.ScreenStack.CurrentScreen is SoloSongSelect);
+            AddUntilStep("no residual gameplay", () => Game.ScreenStack.CurrentScreen is not Player);
+
+            AddStep("close Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("song select remains current", () => Game.ScreenStack.CurrentScreen is SoloSongSelect);
+        }
+
+        [Test]
+        public void TestEzEditorSwitchesBackFromSongSelectToGameplay()
+        {
+            AddStep("import editor beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).WaitSafely());
+            AddUntilStep("editor beatmap ready", () => !Game.Beatmap.IsDefault);
+
+            AddUntilStep("main menu current", () => Game.ScreenStack.CurrentScreen is MainMenu);
+            AddUntilStep("Ez editor overlay available", () => Game.ChildrenOfType<EzSkinEditorOverlay>().Any());
+            AddStep("open Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("editor gameplay current", () => Game.ScreenStack.CurrentScreen is Player);
+
+            AddStep("switch to song select scene", () => ezSkinEditor.Workspace!.CurrentScene.Value = EzSkinEditorSceneType.SongSelect);
+            AddUntilStep("real song select current", () => Game.ScreenStack.CurrentScreen is SoloSongSelect);
+
+            AddStep("switch back to gameplay scene", () => ezSkinEditor.Workspace!.CurrentScene.Value = EzSkinEditorSceneType.Gameplay);
+            AddUntilStep("editor gameplay current again", () => Game.ScreenStack.CurrentScreen is Player);
+
+            AddStep("close Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("gameplay remains current", () => Game.ScreenStack.CurrentScreen is Player);
+        }
 
         [Test]
         public void TestEditComponentFromGameplayScene()
@@ -73,7 +148,8 @@ namespace osu.Game.Tests.Visual.Navigation
             {
                 InputManager.MoveMouseTo(
                     skinEditor.ChildrenOfType<SkinSettingsToolbox>().First()
-                              .ChildrenOfType<SettingsSlider<float>>().Skip(2).First()
+                              .ChildrenOfType<SettingsSlider<float>>()
+                              .First(s => s.LabelText.ToString() == "Wireframe opacity")
                               .ChildrenOfType<SliderBar<float>>().First()
                 );
             });

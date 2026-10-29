@@ -19,12 +19,15 @@ using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
+using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens;
+using osu.Game.Screens.Menu;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Select;
+using osu.Game.Skinning;
 using osu.Game.Users;
 using osu.Game.Utils;
 
@@ -38,16 +41,8 @@ namespace osu.Game.EzOsuGame.Edit
     {
         private readonly ScalingContainer scalingContainer;
 
-        private OsuScreenStack? songSelectHost;
-        private SoloSongSelect? pluggedSongSelect;
-
-        private OsuScreen? lastTargetScreen;
-        private float previousTargetAlpha = 1;
-        private bool targetScreenHidden;
-        private Drawable? hiddenStoryboard;
-        private float previousStoryboardAlpha = 1;
-        private bool beatmapBackgroundHidden;
-        private bool waitingForGameplay;
+        private OsuScreen? sessionTarget;
+        private EzSkinEditorSceneCoordinator? sceneCoordinator;
 
         private readonly LayoutValue drawSizeLayout;
 
@@ -56,6 +51,9 @@ namespace osu.Game.EzOsuGame.Edit
 
         [Resolved(canBeNull: true)]
         private EzLayoutLayer? layoutLayer { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private SkinEditorOverlay? officialSkinEditor { get; set; }
 
         [Resolved(canBeNull: true)]
         private IPerformFromScreenRunner? performer { get; set; }
@@ -74,6 +72,9 @@ namespace osu.Game.EzOsuGame.Edit
 
         [Resolved]
         private RealmAccess realm { get; set; } = null!;
+
+        [Resolved]
+        private SkinManager skinManager { get; set; } = null!;
 
         private EzSkinEditorBeatmapPicker? beatmapPicker;
 
@@ -98,11 +99,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         protected override void PopIn()
         {
-            lastTargetScreen = game.ScreenStack.CurrentScreen as OsuScreen;
-            waitingForGameplay = lastTargetScreen is not Player;
-
-            if (waitingForGameplay)
-                Schedule(startGameplayForEditing);
+            sessionTarget = game.ScreenStack.CurrentScreen as OsuScreen;
 
             if (Workspace == null)
             {
@@ -110,7 +107,6 @@ namespace osu.Game.EzOsuGame.Edit
                 {
                     RequestClose = Hide,
                     OpenOfficialHudEditor = openOfficialHudEditor,
-                    SceneChanged = onWorkspaceSceneChanged,
                 };
                 LoadComponentAsync(Workspace, loaded =>
                 {
@@ -119,20 +115,14 @@ namespace osu.Game.EzOsuGame.Edit
 
                     AddInternal(loaded);
 
-                    if (lastTargetScreen is not Player)
-                        loaded.CurrentScene.Value = EzSkinEditorSceneType.Appearance;
-
                     loaded.Activate();
-                    onWorkspaceSceneChanged(loaded.CurrentScene.Value);
+                    initializeSceneCoordinator(loaded);
                 });
             }
             else
             {
-                if (lastTargetScreen is not Player)
-                    Workspace.CurrentScene.Value = EzSkinEditorSceneType.Appearance;
-
                 Workspace.Activate();
-                onWorkspaceSceneChanged(Workspace.CurrentScene.Value);
+                initializeSceneCoordinator(Workspace);
             }
 
             this.FadeIn(200, Easing.OutQuint);
@@ -140,11 +130,10 @@ namespace osu.Game.EzOsuGame.Edit
 
         protected override void PopOut()
         {
-            waitingForGameplay = false;
-            detachSongSelect();
-            restoreNonPlayerTarget();
-            restoreTargetPresentation();
-            scalingContainer.SetCustomRect(null);
+            // Closing the editor only hides editor chrome; the last edited scene keeps running.
+            sceneCoordinator?.Close();
+            sceneCoordinator = null;
+
             Workspace?.Deactivate();
             this.FadeOut(200, Easing.OutQuint);
         }
@@ -156,13 +145,7 @@ namespace osu.Game.EzOsuGame.Edit
             if (State.Value != Visibility.Visible)
                 return;
 
-            if (waitingForGameplay && game.ScreenStack.CurrentScreen is Player player && player.IsLoaded)
-            {
-                waitingForGameplay = false;
-                lastTargetScreen = player;
-                Workspace?.BindHudToTarget(player, layoutLayer);
-                applyTargetPresentation();
-            }
+            sceneCoordinator?.Tick(game.ScreenStack.CurrentScreen as OsuScreen);
 
             if (!drawSizeLayout.IsValid)
             {
@@ -184,156 +167,51 @@ namespace osu.Game.EzOsuGame.Edit
         {
         }
 
-        private void onWorkspaceSceneChanged(EzSkinEditorSceneType scene)
+        private bool canPresentScene(EzSkinEditorSceneType scene) => scene != EzSkinEditorSceneType.SkinIni || EzSkinIniSupport.IsSupported(skinManager.CurrentSkinInfo.Value);
+
+        private void initializeSceneCoordinator(EzSkinEditorScreen workspace)
         {
-            if (scene == EzSkinEditorSceneType.SongSelect)
-                attachSongSelect();
-            else
-            {
-                detachSongSelect();
-                restoreNonPlayerTarget();
-                applyTargetPresentation();
-            }
+            sceneCoordinator = new EzSkinEditorSceneCoordinator(scalingContainer, workspace, layoutLayer, updateScreenSizing, canPresentScene, () => game.ScreenStack.CurrentScreen, enterSongSelect, enterGameplay);
+            workspace.SceneRequested = scene => sceneCoordinator?.RequestScene(scene, game.ScreenStack.CurrentScreen as OsuScreen);
+            workspace.SceneApplied = scene => sceneCoordinator?.Present(scene, game.ScreenStack.CurrentScreen as OsuScreen);
+            workspace.CanPresentScene = canPresentScene;
+            sceneCoordinator.BeginSession(sessionTarget);
         }
 
-        private void attachSongSelect()
-        {
-            scalingContainer.SetCustomRect(null);
-            restorePlayerChrome();
-            hideNonPlayerTarget();
-            Workspace!.BindHudToTarget(null, layoutLayer);
-
-            songSelectHost ??= new OsuScreenStack
-            {
-                RelativeSizeAxes = Axes.Both,
-            };
-
-            if (songSelectHost.CurrentScreen == null)
-            {
-                pluggedSongSelect = new SoloSongSelect();
-                songSelectHost.Push(pluggedSongSelect);
-            }
-
-            if (songSelectHost.Parent == null)
-                Workspace!.SetPluggedSongSelectHost(songSelectHost);
-
-            songSelectHost.Alpha = 1;
-        }
-
-        private void detachSongSelect()
-        {
-            songSelectHost?.Alpha = 0;
-        }
-
-        private void hideNonPlayerTarget()
-        {
-            if (lastTargetScreen == null || lastTargetScreen is Player || targetScreenHidden)
-                return;
-
-            previousTargetAlpha = lastTargetScreen.Alpha;
-            lastTargetScreen.Alpha = 0;
-            targetScreenHidden = true;
-        }
-
-        private void restoreNonPlayerTarget()
-        {
-            if (!targetScreenHidden || lastTargetScreen == null)
-                return;
-
-            lastTargetScreen.Alpha = previousTargetAlpha;
-            targetScreenHidden = false;
-        }
-
-        private void applyTargetPresentation()
-        {
-            if (Workspace?.CurrentScene.Value == EzSkinEditorSceneType.SongSelect)
-                return;
-
-            updateScreenSizing();
-            hidePlayerChrome();
-            Workspace?.BindHudToTarget(lastTargetScreen, layoutLayer);
-        }
-
-        private void hidePlayerChrome()
-        {
-            if (lastTargetScreen is not Player player || !player.IsLoaded)
-                return;
-
-            if (player.DimmableStoryboard != null && hiddenStoryboard == null)
-            {
-                hiddenStoryboard = player.DimmableStoryboard;
-                previousStoryboardAlpha = hiddenStoryboard.Alpha;
-                hiddenStoryboard.Alpha = 0;
-            }
-
-            if (!beatmapBackgroundHidden)
-            {
-                player.ApplyToBackground(b => b.Hide());
-                beatmapBackgroundHidden = true;
-            }
-        }
-
-        private void restorePlayerChrome() => restoreTargetPresentation();
-
-        private void restoreTargetPresentation()
-        {
-            if (hiddenStoryboard != null)
-            {
-                hiddenStoryboard.Alpha = previousStoryboardAlpha;
-                hiddenStoryboard = null;
-            }
-
-            if (beatmapBackgroundHidden && lastTargetScreen is Player player)
-            {
-                player.ApplyToBackground(b => b.Show());
-                beatmapBackgroundHidden = false;
-            }
-        }
-
-        private void updateScreenSizing()
-        {
-            if (State.Value != Visibility.Visible || Workspace?.IsLoaded != true)
-                return;
-
-            if (Workspace.CurrentScene.Value == EzSkinEditorSceneType.SongSelect)
-            {
-                scalingContainer.SetCustomRect(null);
-                return;
-            }
-
-            const float padding = 10;
-            float relativeRailWidth = EzSkinEditorSidebarGroupRail.WIDTH / DrawWidth;
-            float relativeToolbarHeight = (EzSkinEditorSceneBar.HEIGHT + global::osu.Game.Overlays.SkinEditor.SkinEditor.MENU_HEIGHT + padding) / DrawHeight;
-
-            float relativeWidth = 1 - relativeRailWidth;
-            float spaceHeight = 1f - relativeToolbarHeight - padding / DrawHeight;
-            float targetHeight = relativeWidth;
-            float offsetY;
-
-            if (targetHeight > spaceHeight)
-            {
-                targetHeight = spaceHeight;
-                offsetY = 0f;
-            }
-            else
-            {
-                offsetY = (spaceHeight - targetHeight) / 2f;
-            }
-
-            scalingContainer.SetCustomRect(new RectangleF(0, relativeToolbarHeight + offsetY, relativeWidth, targetHeight), true);
-        }
-
-        private void startGameplayForEditing()
+        /// <summary>
+        /// Ends whatever is on screen and opens a real song select screen. Editor-owned gameplay is
+        /// exited first so song select binds against the game's own mods state.
+        /// </summary>
+        private void enterSongSelect()
         {
             performer?.PerformFromScreen(screen =>
             {
-                if (!waitingForGameplay || State.Value != Visibility.Visible || screen is not OsuScreen osuScreen || screen is Player)
+                if (screen is SongSelect)
                     return;
 
-                if (!tryUseBeatmapForActiveRuleset())
+                if (screen is Player player)
+                {
+                    player.ValidForResume = false;
+                    player.Exit();
+                    Schedule(enterSongSelect);
+                    return;
+                }
+
+                screen.Push(new SoloSongSelect());
+            }, new[] { typeof(SongSelect) });
+        }
+
+        /// <summary>
+        /// Opens the editor's endless gameplay on the real screen stack.
+        /// </summary>
+        private void enterGameplay()
+        {
+            performer?.PerformFromScreen(screen =>
+            {
+                if (screen is Player || State.Value != Visibility.Visible)
                     return;
 
-                if (ruleset.Value?.Available != true)
+                if (!tryUseBeatmapForActiveRuleset() || ruleset.Value?.Available != true)
                     return;
 
                 ModAutoplay? autoplay;
@@ -355,8 +233,35 @@ namespace osu.Game.EzOsuGame.Edit
                 if (!ModUtils.CheckCompatibleSet(usableMods, out var invalid))
                     mods.Value = mods.Value.Except(invalid).ToArray();
 
-                osuScreen.Push(new EzEditorEndlessPlayer(autoplay.CreateScoreFromReplayData));
-            }, new[] { typeof(Player), typeof(SoloSongSelect) });
+                screen.Push(new EzEditorEndlessPlayer(autoplay.CreateScoreFromReplayData));
+            }, new[] { typeof(Player), typeof(SoloSongSelect), typeof(MainMenu) });
+        }
+
+        private void updateScreenSizing()
+        {
+            if (State.Value != Visibility.Visible || Workspace?.IsLoaded != true)
+                return;
+
+            const float padding = 10;
+            float relativeRailWidth = EzSkinEditorSidebarGroupRail.WIDTH / DrawWidth;
+            float relativeToolbarHeight = (EzSkinEditorSceneBar.HEIGHT + global::osu.Game.Overlays.SkinEditor.SkinEditor.MENU_HEIGHT + padding) / DrawHeight;
+
+            float relativeWidth = 1 - relativeRailWidth;
+            float spaceHeight = 1f - relativeToolbarHeight - padding / DrawHeight;
+            float targetHeight = relativeWidth;
+            float offsetY;
+
+            if (targetHeight > spaceHeight)
+            {
+                targetHeight = spaceHeight;
+                offsetY = 0f;
+            }
+            else
+            {
+                offsetY = (spaceHeight - targetHeight) / 2f;
+            }
+
+            scalingContainer.SetCustomRect(new RectangleF(0, relativeToolbarHeight + offsetY, relativeWidth, targetHeight), true);
         }
 
         private bool tryUseBeatmapForActiveRuleset()
@@ -387,7 +292,16 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void openOfficialHudEditor()
         {
+            // 关掉 Ez 盖层（恢复插拔屏缩放），再拉起官方 HUD 皮肤编辑器接续编辑。
             Hide();
+
+            if (officialSkinEditor == null)
+                return;
+
+            if (officialSkinEditor.State.Value != Visibility.Visible)
+                officialSkinEditor.Show();
+
+            officialSkinEditor.PresentGameplay();
         }
 
         private partial class EzEditorEndlessPlayer : ReplayPlayer

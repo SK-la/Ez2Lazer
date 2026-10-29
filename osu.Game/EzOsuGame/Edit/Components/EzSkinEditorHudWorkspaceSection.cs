@@ -40,7 +40,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 return;
             }
 
-            hudLayer.InteractionEnabled.BindValueChanged(_ => rebuild(), true);
+            hudLayer.LayerVisible.BindValueChanged(_ => rebuild(), true);
             hudLayer.SelectedComponents.BindCollectionChanged((_, _) => Scheduler.AddOnce(rebuild), true);
         }
 
@@ -54,7 +54,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 return;
             }
 
-            if (!hudLayer.InteractionEnabled.Value)
+            if (!hudLayer.LayerVisible.Value)
             {
                 showMessage(EzEditorStrings.SIDEBAR_HUD_LAYER_OFF);
                 return;

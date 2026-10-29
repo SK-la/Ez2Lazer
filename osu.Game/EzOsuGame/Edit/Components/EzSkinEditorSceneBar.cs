@@ -26,6 +26,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Bindable<EzSkinEditorSceneType> CurrentScene { get; } = new Bindable<EzSkinEditorSceneType>(EzSkinEditorSceneType.Appearance);
 
+        public Action<EzSkinEditorSceneType>? SceneRequested { get; set; }
+
         public Action? OpenOfficialHudEditorRequested { get; set; }
 
         public BindableBool HudLayerVisible => hudLayerToggle.Active;
@@ -107,7 +109,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private IEnumerable<Drawable> buildSceneButtons() => EzSkinEditorSceneRegistry.All.Select(strategy =>
         {
-            var button = new SceneTabButton(strategy.SceneType, strategy.TabTitle.ToString(), () => CurrentScene.Value = strategy.SceneType);
+            var button = new SceneTabButton(strategy.SceneType, strategy.TabTitle.ToString(), () => SceneRequested?.Invoke(strategy.SceneType));
             tabButtons[strategy.SceneType] = button;
             return button;
         });

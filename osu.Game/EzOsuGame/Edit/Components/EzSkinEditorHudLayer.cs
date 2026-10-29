@@ -21,7 +21,15 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// </summary>
     public partial class EzSkinEditorHudLayer : CompositeDrawable
     {
+        /// <summary>
+        /// 蓝图是否接受输入。由场景是否为 HUD 场景与 HUD layer 开关共同决定；与蓝图是否显示无关。
+        /// </summary>
         public readonly BindableBool InteractionEnabled = new BindableBool();
+
+        /// <summary>
+        /// HUD layer 开关本身：控制蓝图显示隐藏。
+        /// </summary>
+        public readonly BindableBool LayerVisible = new BindableBool(true);
 
         public IBindableList<ISerialisableDrawable> SelectedComponents => selectedComponents;
 
@@ -53,17 +61,33 @@ namespace osu.Game.EzOsuGame.Edit.Components
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            InteractionEnabled.BindValueChanged(_ => refreshBlueprints(), true);
+            LayerVisible.BindValueChanged(_ => refreshBlueprints(), true);
         }
 
         public void AttachLiveTargets(OsuScreen? screen, EzLayoutLayer? ezLayout)
         {
+            if (!ReferenceEquals(layoutLayer, ezLayout))
+            {
+                if (layoutLayer != null)
+                    layoutLayer.LayoutTargetsChanged -= onLayoutTargetsChanged;
+
+                layoutLayer = ezLayout;
+
+                if (layoutLayer != null)
+                    layoutLayer.LayoutTargetsChanged += onLayoutTargetsChanged;
+            }
+
             liveScreen = screen;
-            layoutLayer = ezLayout;
             refreshBlueprints();
         }
 
         public void DetachLiveTargets() => AttachLiveTargets(null, null);
+
+        private void onLayoutTargetsChanged()
+        {
+            if (IsLoaded)
+                Schedule(refreshBlueprints);
+        }
 
         public void SetRuleset(RulesetInfo? newRuleset)
         {
@@ -74,15 +98,22 @@ namespace osu.Game.EzOsuGame.Edit.Components
             refreshBlueprints();
         }
 
-        public void SetVisible(bool visible) =>
+        public void SetVisible(bool visible)
+        {
+            LayerVisible.Value = visible;
             this.FadeTo(visible ? 1 : 0, 200, Easing.OutQuint);
+        }
 
         private void refreshBlueprints()
         {
+            if (!IsLoaded)
+                return;
+
             blueprintHost.Clear();
             selectedComponents.Clear();
 
-            if (!InteractionEnabled.Value)
+            // 显示由 HUD layer 开关决定，交互由场景 + 开关共同决定；两者互不代管。
+            if (!LayerVisible.Value)
                 return;
 
             foreach (var target in EnumerateTargets())
@@ -121,6 +152,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }
 
             skins.Save(skin);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            if (layoutLayer != null)
+                layoutLayer.LayoutTargetsChanged -= onLayoutTargetsChanged;
         }
     }
 }

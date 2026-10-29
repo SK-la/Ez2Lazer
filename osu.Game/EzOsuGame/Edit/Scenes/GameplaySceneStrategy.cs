@@ -18,6 +18,8 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
 
         public LocalisableString TabTitle => EzEditorStrings.SIDEBAR_TAB_HUD;
 
+        public bool SupportsHudLayer => true;
+
         public Drawable CreateSceneContent(EzSkinEditorSceneContext context) => new Container();
 
         public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context) => new[]

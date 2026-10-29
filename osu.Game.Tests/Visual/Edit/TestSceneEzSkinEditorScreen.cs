@@ -27,6 +27,9 @@ using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.EzMania.Editor;
 using osu.Game.Screens.Edit.Components.Menus;
+using osu.Game.Screens.Menu;
+using osu.Game.Screens.Play;
+using osu.Game.Screens.Select;
 using osu.Game.Skinning;
 using osu.Game.Tests.Resources;
 using osuTK.Input;
@@ -45,6 +48,14 @@ namespace osu.Game.Tests.Visual.Edit
         private Storage storage { get; set; } = null!;
 
         private EzSkinEditorScreen editorScreen = null!;
+
+        [Test]
+        public void TestSceneRegistryMapsCurrentScreenOrFallsBackToGameplay()
+        {
+            AddAssert("main menu falls back to gameplay", () => EzSkinEditorSceneRegistry.ResolveCurrentScene(typeof(MainMenu)) == EzSkinEditorSceneType.Gameplay);
+            AddAssert("player maps to gameplay", () => EzSkinEditorSceneRegistry.ResolveCurrentScene(typeof(Player)) == EzSkinEditorSceneType.Gameplay);
+            AddAssert("song select maps to song select", () => EzSkinEditorSceneRegistry.ResolveCurrentScene(typeof(SoloSongSelect)) == EzSkinEditorSceneType.SongSelect);
+        }
 
         [SetUpSteps]
         public override void SetUpSteps()
@@ -168,7 +179,7 @@ namespace osu.Game.Tests.Visual.Edit
             });
 
             AddStep("enable hud layer", () => sceneBar.HudLayerVisible.Value = true);
-            selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_HUD);
+            selectSidebarGroup(GameplaySceneStrategy.GROUP_ID_HUD);
             AddAssert("interaction on", () => hud.InteractionEnabled.Value);
             AddUntilStep("hud workspace section", () => editorScreen.ChildrenOfType<EzSkinEditorHudWorkspaceSection>().Any());
             AddUntilStep("no-selection hint", () =>
@@ -178,7 +189,7 @@ namespace osu.Game.Tests.Visual.Edit
             selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_TEXTURE);
             AddAssert("interaction off off-group", () => !hud.InteractionEnabled.Value);
 
-            selectSidebarGroup(AppearanceSceneStrategy.GROUP_ID_HUD);
+            selectSidebarGroup(GameplaySceneStrategy.GROUP_ID_HUD);
             AddStep("disable hud layer", () => sceneBar.HudLayerVisible.Value = false);
             AddAssert("interaction off layer hidden", () => !hud.InteractionEnabled.Value);
             AddUntilStep("layer-off hint", () =>

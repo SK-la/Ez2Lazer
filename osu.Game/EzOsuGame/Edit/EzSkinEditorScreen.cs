@@ -15,7 +15,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Localisation;
 using osu.Framework.Platform;
-using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
@@ -63,7 +62,11 @@ namespace osu.Game.EzOsuGame.Edit
 
         public Action? OpenOfficialHudEditor { get; set; }
 
-        public Action<EzSkinEditorSceneType>? SceneChanged { get; set; }
+        public Action<EzSkinEditorSceneType>? SceneRequested { get; set; }
+
+        public Action<EzSkinEditorSceneType>? SceneApplied { get; set; }
+
+        public Func<EzSkinEditorSceneType, bool>? CanPresentScene { get; set; }
 
         [Cached]
         private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Blue);
@@ -104,7 +107,7 @@ namespace osu.Game.EzOsuGame.Edit
         private DependencyContainer dependencies = null!;
         private Container? backgroundContainer;
         private Container gameplayHole = null!;
-        private ScreenStack? pluggedSongSelectHost;
+        private Drawable? activeSceneHost;
         private EzSkinEditorHudLayer hudLayer = null!;
         private EzSkinEditorMenuBar menuBar = null!;
         private EzSkinEditorSceneBar sceneBar = null!;
@@ -138,6 +141,8 @@ namespace osu.Game.EzOsuGame.Edit
         private EzLayoutLayer? layoutLayer;
 
         public Bindable<EzSkinEditorSceneType> CurrentScene => sceneBar.CurrentScene;
+
+        internal void ApplyCoordinatedScene(EzSkinEditorSceneType scene) => sceneBar.CurrentScene.Value = scene;
 
         internal Bindable<EzSkinEditorPreviewSource> PreviewSource => PreviewState.Source;
 
@@ -174,15 +179,18 @@ namespace osu.Game.EzOsuGame.Edit
 
         public void RequestCloseFromUser() => tryExit();
 
-        public void SetPluggedSongSelectHost(ScreenStack? host)
+        public void SetSceneHost(Drawable? host)
         {
-            if (host == null)
+            if (activeSceneHost == host)
                 return;
 
-            pluggedSongSelectHost = host;
+            if (activeSceneHost?.Parent == gameplayHole)
+                gameplayHole.Remove(activeSceneHost, false);
 
-            if (host.Parent != gameplayHole)
-                gameplayHole.Add(host);
+            activeSceneHost = host;
+
+            if (activeSceneHost != null && activeSceneHost.Parent != gameplayHole)
+                gameplayHole.Add(activeSceneHost);
         }
 
         public void BindHudToTarget(OsuScreen? screen, EzLayoutLayer? ezLayout)
@@ -194,6 +202,12 @@ namespace osu.Game.EzOsuGame.Edit
             // 游玩洞须透视到下层 SetCustomRect 屏；整屏背景只在无插拔游玩屏时铺。
             backgroundContainer?.Alpha = screen is Player ? 0 : 1;
         }
+
+        /// <summary>
+        /// Controls the full-screen workspace backdrop independently of the HUD target, so a real
+        /// scene screen (e.g. song select) can show through behind the editor chrome.
+        /// </summary>
+        internal void SetSceneBackdropVisible(bool visible) => backgroundContainer?.Alpha = visible ? 1 : 0;
 
         [BackgroundDependencyLoader]
         private void load()
@@ -300,6 +314,7 @@ namespace osu.Game.EzOsuGame.Edit
                                     sceneBar = new EzSkinEditorSceneBar
                                     {
                                         RelativeSizeAxes = Axes.X,
+                                        SceneRequested = scene => SceneRequested?.Invoke(scene),
                                         OpenOfficialHudEditorRequested = () => OpenOfficialHudEditor?.Invoke(),
                                     },
                                 },
@@ -362,12 +377,12 @@ namespace osu.Game.EzOsuGame.Edit
         }
 
         /// <summary>
-        /// 选中 HUD 分组且 HUD layer 开启时才允许蓝图拖选；否则只读预览。
+        /// 场景支持 HUD 蓝图且 HUD layer 开启时才允许蓝图拖选；否则只读预览。
         /// </summary>
         private void updateHudInteraction()
         {
-            bool hudGroup = sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Gameplay;
-            hudLayer.InteractionEnabled.Value = hudGroup && sceneBar.HudLayerVisible.Value;
+            bool sceneSupportsHud = EzSkinEditorSceneRegistry.Get(sceneBar.CurrentScene.Value).SupportsHudLayer;
+            hudLayer.InteractionEnabled.Value = sceneSupportsHud && sceneBar.HudLayerVisible.Value;
         }
 
         protected override void Update()
@@ -453,9 +468,9 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void onSceneChanged(ValueChangedEvent<EzSkinEditorSceneType> change)
         {
-            if (change.NewValue == EzSkinEditorSceneType.SkinIni && !isSkinIniSupported())
+            if (CanPresentScene?.Invoke(change.NewValue) == false)
             {
-                sceneBar.CurrentScene.Value = EzSkinEditorSceneType.Appearance;
+                SceneRequested?.Invoke(change.OldValue);
                 return;
             }
 
@@ -465,7 +480,7 @@ namespace osu.Game.EzOsuGame.Edit
             Schedule(() =>
             {
                 applyCurrentScene();
-                SceneChanged?.Invoke(sceneBar.CurrentScene.Value);
+                SceneApplied?.Invoke(sceneBar.CurrentScene.Value);
             });
         }
 
@@ -506,7 +521,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             sceneContext = buildSceneContext();
             applyCurrentScene();
-            SceneChanged?.Invoke(sceneBar.CurrentScene.Value);
+            SceneApplied?.Invoke(sceneBar.CurrentScene.Value);
 
             Schedule(() => refreshSceneBarPlayback());
             menuBar.RefreshMenuState();

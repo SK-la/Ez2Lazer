@@ -25,5 +25,10 @@ namespace osu.Game.EzOsuGame.Edit
         /// Optional footer overlay pinned to the bottom of the sidebar (e.g. skin.ini save bar).
         /// </summary>
         Drawable? CreateSidebarFooter(EzSkinEditorSceneContext context) => null;
+
+        /// <summary>
+        /// Whether this scene presents an inserted screen whose skinnable HUD containers can be edited.
+        /// </summary>
+        bool SupportsHudLayer => false;
     }
 }
