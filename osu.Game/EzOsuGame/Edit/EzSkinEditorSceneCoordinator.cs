@@ -35,7 +35,6 @@ namespace osu.Game.EzOsuGame.Edit
 
         private Drawable? hiddenStoryboard;
         private float previousStoryboardAlpha;
-        private bool beatmapBackgroundHidden;
 
         public EzSkinEditorSceneCoordinator(ScalingContainer scalingContainer, EzSkinEditorScreen workspace, EzLayoutLayer? layoutLayer, Action updateScreenSizing, Func<EzSkinEditorSceneType, bool> sceneIsAvailable, Func<IScreen?> getCurrentScreen, Action enterSongSelect, Action enterGameplay)
         {
@@ -101,7 +100,6 @@ namespace osu.Game.EzOsuGame.Edit
             restorePlayerChrome();
             boundPlayer = null;
             workspace.SetSceneHost(null);
-            workspace.SetSceneBackdropVisible(true);
             scalingContainer.SetCustomRect(null);
         }
 
@@ -126,17 +124,14 @@ namespace osu.Game.EzOsuGame.Edit
         {
             boundPlayer = player;
 
+            // Gameplay may have pushed its own beatmap background before the editor opened.
+            player.DetachOwnedBackground();
+
             if (player.DimmableStoryboard != null && hiddenStoryboard == null)
             {
                 hiddenStoryboard = player.DimmableStoryboard;
                 previousStoryboardAlpha = hiddenStoryboard.Alpha;
                 hiddenStoryboard.Alpha = 0;
-            }
-
-            if (!beatmapBackgroundHidden)
-            {
-                player.ApplyToBackground(background => background.Hide());
-                beatmapBackgroundHidden = true;
             }
 
             workspace.BindHudToTarget(player, layoutLayer);
@@ -152,7 +147,6 @@ namespace osu.Game.EzOsuGame.Edit
             boundPlayer = null;
             workspace.SetSceneHost(null);
             workspace.BindHudToTarget(null, layoutLayer);
-            workspace.SetSceneBackdropVisible(false);
             updateScreenSizing();
 
             if (getCurrentScreen() is not SongSelect)
@@ -165,12 +159,6 @@ namespace osu.Game.EzOsuGame.Edit
             {
                 hiddenStoryboard.Alpha = previousStoryboardAlpha;
                 hiddenStoryboard = null;
-            }
-
-            if (beatmapBackgroundHidden && boundPlayer != null)
-            {
-                boundPlayer.ApplyToBackground(background => background.Show());
-                beatmapBackgroundHidden = false;
             }
         }
     }

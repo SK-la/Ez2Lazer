@@ -34,6 +34,7 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Overlays;
@@ -1076,7 +1077,13 @@ namespace osu.Game.Screens.Select
         }
 
         protected override BackgroundScreen CreateBackground()
-            => useEzBackground.Value ? new BackgroundScreenDefault() : new BackgroundScreenBeatmap(Beatmap.Value);
+        {
+            // While the Ez skin editor is open, keep the global (main menu) background alive.
+            if (EzSkinEditorActiveState.Active)
+                return null;
+
+            return useEzBackground.Value ? new BackgroundScreenDefault() : new BackgroundScreenBeatmap(Beatmap.Value);
+        }
 
         private void updateBackgroundDim()
         {

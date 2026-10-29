@@ -105,7 +105,6 @@ namespace osu.Game.EzOsuGame.Edit
         private EzResourceStore resource { get; set; } = null!;
 
         private DependencyContainer dependencies = null!;
-        private Container? backgroundContainer;
         private Container gameplayHole = null!;
         private Drawable? activeSceneHost;
         private EzSkinEditorHudLayer hudLayer = null!;
@@ -198,16 +197,7 @@ namespace osu.Game.EzOsuGame.Edit
             hudTargetScreen = screen;
             layoutLayer = ezLayout;
             hudLayer.AttachLiveTargets(screen, ezLayout);
-
-            // 游玩洞须透视到下层 SetCustomRect 屏；整屏背景只在无插拔游玩屏时铺。
-            backgroundContainer?.Alpha = screen is Player ? 0 : 1;
         }
-
-        /// <summary>
-        /// Controls the full-screen workspace backdrop independently of the HUD target, so a real
-        /// scene screen (e.g. song select) can show through behind the editor chrome.
-        /// </summary>
-        internal void SetSceneBackdropVisible(bool visible) => backgroundContainer?.Alpha = visible ? 1 : 0;
 
         [BackgroundDependencyLoader]
         private void load()
@@ -218,7 +208,6 @@ namespace osu.Game.EzOsuGame.Edit
 
             InternalChildren = new Drawable[]
             {
-                backgroundContainer = new Container { RelativeSizeAxes = Axes.Both },
                 new OsuContextMenuContainer
                 {
                     RelativeSizeAxes = Axes.Both,
@@ -509,9 +498,6 @@ namespace osu.Game.EzOsuGame.Edit
         private void refreshScene()
         {
             ensureGlobalBeatmapPreview();
-
-            backgroundContainer!.Child = createManiaStageBackgroundOrNull() ?? new Container { RelativeSizeAxes = Axes.Both };
-            backgroundContainer.Child.RelativeSizeAxes = Axes.Both;
 
             ensureSkinIniSession();
             ensureSkinSpecificSceneVisibility();
@@ -1247,15 +1233,6 @@ namespace osu.Game.EzOsuGame.Edit
                 SkinIniSession?.Discard();
                 RequestClose?.Invoke();
             }));
-        }
-
-        private static Drawable? createManiaStageBackgroundOrNull()
-        {
-            var lookup = tryCreateManiaSkinComponentLookupOrNull("StageBackground");
-            if (lookup == null)
-                return null;
-
-            return new SkinnableDrawable(lookup) { RelativeSizeAxes = Axes.Both };
         }
 
         private static ISkinComponentLookup? tryCreateManiaSkinComponentLookupOrNull(string componentName)
