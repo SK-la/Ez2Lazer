@@ -29,5 +29,11 @@ namespace osu.Game.EzOsuGame.Edit
         /// Whether this scene presents an inserted screen whose skinnable HUD containers can be edited.
         /// </summary>
         bool SupportsHudLayer => false;
+
+        /// <summary>
+        /// Whether hovering the collapsed sidebar summons the settings panel. HUD scenes opt out so the
+        /// panel does not cover the play area the user is dragging components in.
+        /// </summary>
+        bool HoverExpandsSidebar => true;
     }
 }

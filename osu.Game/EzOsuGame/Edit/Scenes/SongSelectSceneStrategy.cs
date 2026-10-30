@@ -20,6 +20,8 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
 
         public bool SupportsHudLayer => true;
 
+        public bool HoverExpandsSidebar => false;
+
         public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context) => new[]
         {
             new EzSkinEditorSidebarGroupDefinition

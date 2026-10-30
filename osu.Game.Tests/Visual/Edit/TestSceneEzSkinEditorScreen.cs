@@ -483,6 +483,31 @@ namespace osu.Game.Tests.Visual.Edit
         }
 
         [Test]
+        public void TestSidebarHoverExpansionFollowsScene()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            var sidebar = (EzSkinEditorSidebar)null!;
+
+            AddStep("capture sidebar", () => sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single());
+            AddStep("unpin sidebar", () => sidebar.Pinned.Value = false);
+
+            // 非 HUD 场景保持原样：收起后悬停唤出设置面板。
+            switchScene(EzSkinEditorSceneType.Appearance);
+            AddStep("collapse sidebar", () => sidebar.ExpandedState.Value = false);
+            AddStep("hover sidebar", () => InputManager.MoveMouseTo(sidebar));
+            AddUntilStep("appearance hover expands", () => sidebar.ExpandedState.Value);
+
+            // HUD 场景悬停不唤出，避免面板盖住正在拖拽组件的游玩区。
+            switchScene(EzSkinEditorSceneType.Gameplay);
+            AddStep("collapse sidebar", () => sidebar.ExpandedState.Value = false);
+            AddStep("hover sidebar", () => InputManager.MoveMouseTo(sidebar));
+            AddWaitStep("wait for hover ticks", 5);
+            AddAssert("hud hover does not expand", () => !sidebar.ExpandedState.Value);
+        }
+
+        [Test]
         public void TestTopToolbarControls()
         {
             AddStep("load screen", loadScreen);

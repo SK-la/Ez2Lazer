@@ -61,6 +61,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private IReadOnlyList<EzSkinEditorSidebarGroupDefinition> pages = Array.Empty<EzSkinEditorSidebarGroupDefinition>();
         private readonly Dictionary<EzSkinEditorSceneType, int> rememberedIndex = new Dictionary<EzSkinEditorSceneType, int>();
         private EzSkinEditorSceneType? activeScene;
+
+        // HUD 场景悬停不唤出设置面板，避免面板盖住正在拖拽组件的游玩区。
+        private bool hoverExpands = true;
+
         public BindableBool Pinned { get; } = new BindableBool(true);
 
         public BindableBool ExpandedState { get; } = new BindableBool(true);
@@ -210,9 +214,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
             {
                 bool over = receiveHoverAt(inputManager.CurrentState.Mouse.Position);
 
-                if (over)
+                // HoverExpandsSidebar 为 false 的场景（HUD 编辑）只悬停不展开；展开态仍可由滚轮图标或
+                // 固定开关进入，指针移开后收起。
+                if (over && hoverExpands)
                     ExpandedState.Value = true;
-                else if (inputManager.DraggedDrawable == null)
+                else if (!over && inputManager.DraggedDrawable == null)
                     ExpandedState.Value = false;
             }
 
@@ -236,6 +242,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         public void ApplyStrategy(IEzSkinEditorSceneStrategy strategy, EzSkinEditorSceneContext context)
         {
             activeScene = strategy.SceneType;
+            hoverExpands = strategy.HoverExpandsSidebar;
 
             var groups = strategy.CreateSidebarGroups(context);
             applyPages(groups);
