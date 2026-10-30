@@ -8,7 +8,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
-using osu.Game.Graphics.Containers;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
@@ -137,22 +136,17 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             GameplayClock.Add(skinProvider);
 
-            skinProvider.Add(new ScalingContainer(ScalingMode.Gameplay)
+            // Gameplay letterbox 由 Screen 共享 ScalingContainer 托管，便于与 HUD 同坐标空间。
+            skinProvider.Add(DrawableRuleset.With(rulesetDrawable =>
             {
-                Children = new Drawable[]
+                rulesetDrawable.FrameStableComponents.Children = new Drawable[]
                 {
-                    DrawableRuleset.With(rulesetDrawable =>
-                    {
-                        rulesetDrawable.FrameStableComponents.Children = new Drawable[]
-                        {
-                            scoreProcessor,
-                            healthProcessor,
-                            new ComboEffects(scoreProcessor),
-                            breakTracker,
-                        };
-                    }),
-                },
-            });
+                    scoreProcessor,
+                    healthProcessor,
+                    new ComboEffects(scoreProcessor),
+                    breakTracker,
+                };
+            }));
 
             InternalChild = GameplayClock;
 

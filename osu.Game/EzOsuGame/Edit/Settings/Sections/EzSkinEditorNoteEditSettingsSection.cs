@@ -48,8 +48,11 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             variantDropdown = new SettingsDropdown<string>
             {
                 LabelText = EzEditorStrings.NOTE_VARIANT_LABEL,
-                Current = session.VariantId,
+                // ItemSource must bind before Current: binding a pre-populated source makes the dropdown
+                // pick its first item while Current is still unset, which would otherwise be written
+                // straight through to the shared session bindable.
                 ItemSource = variantItems,
+                Current = session.VariantId,
             };
 
             Children = new Drawable[]
@@ -111,6 +114,11 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         {
             var profile = EzSkinEditorNoteRulesetProfileRegistry.Get(session.Ruleset.Value);
 
+            // ItemSource is bound to the shared session bindable, so rebuilding it writes through:
+            // Clear() blanks the value and the first Add() selects the first item. Remember the
+            // selection and restore it, otherwise every sidebar rebuild discards the session state.
+            string? previous = session.VariantId.Value;
+
             variantItems.Clear();
 
             if (profile == null)
@@ -122,8 +130,9 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             if (variantItems.Count == 0)
                 return;
 
-            if (!variantItems.Contains(session.VariantId.Value))
-                session.VariantId.Value = profile.GetDefaultVariantId(usesEzNoteVariants(), session.Part.Value);
+            session.VariantId.Value = previous != null && variantItems.Contains(previous)
+                ? previous
+                : profile.GetDefaultVariantId(usesEzNoteVariants(), session.Part.Value);
         }
     }
 }

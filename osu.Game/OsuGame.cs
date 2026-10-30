@@ -49,6 +49,7 @@ using osu.Game.EzOsuGame.Material;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.EzOsuGame.Performance;
 using osu.Game.EzOsuGame.Pets;
+using osu.Game.EzOsuGame.Playback;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Screens.Play;
 using osu.Game.Graphics;
@@ -168,7 +169,9 @@ namespace osu.Game
 
         private EzLayoutLayer ezLayoutLayer;
 
-        private EzLayoutEditorOverlay ezLayoutEditor;
+        private EzSkinEditorOverlay ezSkinEditor;
+
+        private EzPlaybackController ezPlayback;
 
         private Container overlayContent;
 
@@ -1103,7 +1106,7 @@ namespace osu.Game
 
         private void onCurrentSkinChangedForEzJson(ValueChangedEvent<Live<SkinInfo>> skin)
         {
-            if (ScreenStack.CurrentScreen is EzSkinEditorScreen)
+            if (ezSkinEditor?.State.Value == Visibility.Visible)
                 return;
 
             if (!Ez2ConfigManager.Get<bool>(Ez2Setting.EzSkinJsonAutoApplyOnSkinChange))
@@ -1232,6 +1235,11 @@ namespace osu.Game
 
             Dependencies.Cache(ScreenFooter);
 
+            // Functional-layer transport for playback UIs (editor progress bar, visualizer ring). Resolves the
+            // current control target from the screen stack, so it must be registered after the stack exists.
+            Add(ezPlayback = new EzPlaybackController(() => ScreenStack.CurrentScreen));
+            Dependencies.CacheAs(ezPlayback);
+
             ScreenStack.ScreenPushed += screenPushed;
             ScreenStack.ScreenExited += screenExited;
 
@@ -1312,16 +1320,17 @@ namespace osu.Game
             loadComponentSingleFile(wikiOverlay = new WikiOverlay(), overlayContent.Add, true);
             // Above screens, below logo / footer / sheared overlays (higher Depth = further back).
             loadComponentSingleFile(ezLayoutLayer = new EzLayoutLayer { Depth = 0.5f }, screenCaptureContent.Add, true);
+            // Ez 编辑器须先于官方 SkinEditor 入树，供 SkinEditorOverlay [Resolved] 注入。
+            loadComponentSingleFile(ezSkinEditor = new EzSkinEditorOverlay(ScreenContainer), overlayContent.Add, true);
             loadComponentSingleFile(skinEditor = new SkinEditorOverlay(ScreenContainer), overlayContent.Add, true);
-            loadComponentSingleFile(ezLayoutEditor = new EzLayoutEditorOverlay(ScreenContainer, ezLayoutLayer), topMostOverlayContent.Add, true);
 
             skinEditor.State.ValueChanged += state =>
             {
                 if (state.NewValue == Visibility.Visible)
-                    ezLayoutEditor.Hide();
+                    ezSkinEditor.Hide();
             };
 
-            ezLayoutEditor.State.ValueChanged += state =>
+            ezSkinEditor.State.ValueChanged += state =>
             {
                 if (state.NewValue == Visibility.Visible)
                     skinEditor.Hide();
@@ -1975,7 +1984,6 @@ namespace osu.Game
                     Toolbar.Show();
 
                 skinEditor.SetTarget(newOsuScreen);
-                ezLayoutEditor.SetTarget(newOsuScreen);
             }
         }
 

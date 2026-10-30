@@ -10,34 +10,14 @@ namespace osu.Game.EzOsuGame.Localization
         #region Settings (Skin section)
 
         public static readonly LocalisableString SETTINGS_SKIN_EDITOR_BUTTON = new EzLocalizationManager.EzLocalisableString(
-            "Skin Editor(Madding)",
-            "Skin Editor (WIP)");
+            "Ez Skin 编辑器",
+            "Ez Skin Editor");
 
         public static readonly LocalisableString SETTINGS_SKIN_EDITOR_BUTTON_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "(画饼)长期施工中，目标："
-            + "\n1.游戏内完整Skin.ini编辑"
-            + "\n2.实现完整Ez特有皮肤设置，并可覆写进Skin.ini"
-            + "\n3.游戏内PS、图片导出(包括渐变动画)",
-            "(WIP) Long-term goals:"
-            + "\n1. Full in-game skin.ini editing"
-            + "\n2. Full Ez skin settings with skin.ini export"
-            + "\n3. In-game image export (including gradient animations)");
-
-        public static readonly LocalisableString SETTINGS_LAYOUT_EDITOR_BUTTON = new EzLocalizationManager.EzLocalisableString(
-            "Ez 布局编辑器",
-            "Ez layout editor");
-
-        public static readonly LocalisableString SETTINGS_LAYOUT_EDITOR_BUTTON_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "编辑与皮肤无关的客户端布局（存于 EzResources/Config/layout）",
-            "Edit the client layout stored in EzResources/Config/layout, independent of skins");
-
-        public static readonly LocalisableString LAYOUT_EDITOR_TITLE = new EzLocalizationManager.EzLocalisableString(
-            "Ez 布局编辑器",
-            "Ez layout editor");
-
-        public static readonly LocalisableString LAYOUT_EDITOR_SUBTITLE = new EzLocalizationManager.EzLocalisableString(
-            "客户端布局（不写入皮肤）",
-            "Client layout (not saved to skin)");
+            "此编辑器中的HUD均修改Ez布局图层，不会修改皮肤HUD图层"
+            + "\nEz布局存于 EzResources/Config/layout",
+            "Editor HUDs in this editor modify the Ez layout layer, not the skin HUD layer"
+            + "\nEz layout is stored in EzResources/Config/layout");
 
         public static readonly LocalisableString LAYOUT_SAVED = new EzLocalizationManager.EzLocalisableString(
             "布局已保存",
@@ -294,6 +274,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString TAB_SKIN_INI = new EzLocalizationManager.EzLocalisableString("skin.ini", "skin.ini");
 
+        public static readonly LocalisableString TAB_SKIN_SPECIFIC = new EzLocalizationManager.EzLocalisableString("皮肤专用", "Skin-specific");
+
         public static readonly LocalisableString TAB_NOTE = new EzLocalizationManager.EzLocalisableString("Note", "Note");
 
         #endregion
@@ -306,7 +288,7 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString GROUP_SIZE = new EzLocalizationManager.EzLocalisableString("尺寸", "Size");
 
-        public static readonly LocalisableString GROUP_SKIN_SPECIFIC = new EzLocalizationManager.EzLocalisableString("皮肤专用", "Skin-specific");
+        public static readonly LocalisableString GROUP_SKIN_SPECIFIC = new EzLocalizationManager.EzLocalisableString("专用", "Specific");
 
         public static readonly LocalisableString GROUP_SCRIPTED_SKIN = new EzLocalizationManager.EzLocalisableString("脚本皮肤", "Scripted skin");
 
@@ -409,6 +391,29 @@ namespace osu.Game.EzOsuGame.Localization
         #region Sidebar
 
         public static readonly LocalisableString SIDEBAR_PIN_LABEL = new EzLocalizationManager.EzLocalisableString("固定显示", "Pin sidebar");
+
+        public static readonly LocalisableString SIDEBAR_TAB_HUD = new EzLocalizationManager.EzLocalisableString("HUD", "HUD");
+
+        public static readonly LocalisableString SIDEBAR_TAB_SIZE = new EzLocalizationManager.EzLocalisableString("尺寸", "Size");
+        public static readonly LocalisableString SIDEBAR_HUD_PLACEHOLDER = new EzLocalizationManager.EzLocalisableString(
+            "开启 HUD layer，并在预览中选中组件以编辑设置。",
+            "Turn on HUD layer, then select a component in the preview to edit its settings.");
+
+        public static readonly LocalisableString SIDEBAR_HUD_LAYER_OFF = new EzLocalizationManager.EzLocalisableString(
+            "请先打开顶栏 HUD layer。",
+            "Turn on the HUD layer toggle in the scene bar first.");
+
+        public static readonly LocalisableString SIDEBAR_HUD_NO_SELECTION = new EzLocalizationManager.EzLocalisableString(
+            "在预览中点击 HUD 组件以选中并显示设置。",
+            "Click a HUD component in the preview to select it and show settings.");
+
+        public static readonly LocalisableString SIDEBAR_SKIN_SCOPED_EMPTY = new EzLocalizationManager.EzLocalisableString(
+            "当前皮肤没有专用设置。",
+            "This skin has no scoped settings.");
+
+        public static readonly LocalisableString SKIN_SPECIFIC_SCENE_PLACEHOLDER = new EzLocalizationManager.EzLocalisableString(
+            "皮肤专用场景布局预留。请在主工作区侧栏「专用」中编辑设置。",
+            "Skin-specific scene layout is reserved. Edit settings under the workspace 「Scoped」 sidebar tab.");
 
         #endregion
 

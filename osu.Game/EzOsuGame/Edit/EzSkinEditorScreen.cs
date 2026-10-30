@@ -15,15 +15,15 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Localisation;
 using osu.Framework.Platform;
-using osu.Framework.Screens;
-using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Note;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays.Preview;
+using osu.Game.EzOsuGame.Playback;
 using osu.Game.EzOsuGame.ScriptedSkin;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Cursor;
@@ -31,9 +31,9 @@ using osu.Game.IO;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Notifications;
-using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
+using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osuTK;
 using SixLabors.ImageSharp;
@@ -54,12 +54,25 @@ namespace osu.Game.EzOsuGame.Edit
     // M10: Note scene with independent note-edit snapshot comparison + export
 
     /// <summary>
-    /// Ez skin editor screen with menu bar, scene bar, scene content and toolbox-style settings sidebar.
-    /// Scene switching is driven by <see cref="IEzSkinEditorSceneStrategy"/> — not by sidebar groups.
+    /// Ez 皮肤编辑器工作区（菜单栏、场景栏、游玩洞、侧栏）。
+    /// 由 <see cref="EzSkinEditorOverlay"/> 托管；当前游玩/选歌屏经缩放插拔，不进本树。
     /// </summary>
-    public partial class EzSkinEditorScreen : OsuScreen
+    public partial class EzSkinEditorScreen : CompositeDrawable
     {
-        public override bool HideOverlaysOnEnter => true;
+        public Action? RequestClose { get; set; }
+
+        public Action? OpenOfficialHudEditor { get; set; }
+
+        public Action<EzSkinEditorSceneType>? SceneApplied { get; set; }
+
+        public Func<EzSkinEditorSceneType, bool>? CanPresentScene { get; set; }
+
+        /// <summary>
+        /// Raised when the user picks a preview mode. The workspace only resolves which beatmap to use;
+        /// the owning overlay switches the global ruleset/beatmap and re-presents the scene, because the
+        /// visible preview is a real gameplay screen bound to those globals, not this workspace's state.
+        /// </summary>
+        public Action<RulesetInfo, WorkingBeatmap>? BeatmapPreviewRequested { get; set; }
 
         [Cached]
         private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Blue);
@@ -97,18 +110,20 @@ namespace osu.Game.EzOsuGame.Edit
         [Resolved]
         private EzResourceStore resource { get; set; } = null!;
 
-        [Resolved(canBeNull: true)]
-        private SkinEditorOverlay? skinEditorOverlay { get; set; }
+        [Resolved]
+        private EzPlaybackController playback { get; set; } = null!;
 
-        private bool openHudEditorAfterExit;
-
-        private Container? backgroundContainer;
-        private Container sceneContentHost = null!;
+        private DependencyContainer dependencies = null!;
+        private Container gameplayHole = null!;
+        private Drawable? activeSceneHost;
+        private EzSkinEditorHudLayer hudLayer = null!;
         private EzSkinEditorMenuBar menuBar = null!;
         private EzSkinEditorSceneBar sceneBar = null!;
         private EzSkinEditorSidebar sidebar = null!;
-        private EzSkinEditorTopToolbar topToolbar = null!;
-        private EzSkinEditorPlaybackControls playbackControls = null!;
+        private EzPlaybackBar playbackBar = null!;
+
+        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
+            => dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
 
         private EzSkinEditorBeatmapPicker? beatmapPicker;
 
@@ -128,14 +143,14 @@ namespace osu.Game.EzOsuGame.Edit
         private ISkinEditorVirtualProvider? provider;
         private EzSkinEditorSceneContext? sceneContext;
 
-        private EzSkinEditorEmbeddedPlayer? embeddedPlayer;
-        private string embeddedPlayerBeatmapHash = string.Empty;
-        private int embeddedPlayerRulesetId;
-        private Guid embeddedPlayerSkinId;
-        private double lastSceneBarProgressDisplayTime = double.MinValue;
         private Bindable<EzBeatmapPreviewMode>? sceneBarPreviewModeBindable;
+        private bool playbackBarActive;
+        private OsuScreen? hudTargetScreen;
+        private EzLayoutLayer? layoutLayer;
 
         public Bindable<EzSkinEditorSceneType> CurrentScene => sceneBar.CurrentScene;
+
+        internal void ApplyCoordinatedScene(EzSkinEditorSceneType scene) => sceneBar.CurrentScene.Value = scene;
 
         internal Bindable<EzSkinEditorPreviewSource> PreviewSource => PreviewState.Source;
 
@@ -156,46 +171,52 @@ namespace osu.Game.EzOsuGame.Edit
         public EzSkinEditorScreen()
         {
             RelativeSizeAxes = Axes.Both;
-            Anchor = Anchor.Centre;
-            Origin = Anchor.Centre;
         }
 
-        public override void OnEntering(ScreenTransitionEvent e)
+        public void Activate()
         {
-            base.OnEntering(e);
             Schedule(refreshScene);
             this.FadeInFromZero(200, Easing.OutQuint);
         }
 
-        public override void OnResuming(ScreenTransitionEvent e)
-        {
-            base.OnResuming(e);
-            Schedule(refreshScene);
-        }
-
-        public override bool OnExiting(ScreenExitEvent e)
+        public void Deactivate()
         {
             persistEditorConfig();
-            this.FadeOut(200, Easing.OutQuint);
+            hudLayer.DetachLiveTargets();
+        }
 
-            bool blocking = base.OnExiting(e);
+        public void RequestCloseFromUser() => tryExit();
 
-            if (!blocking && openHudEditorAfterExit)
-            {
-                openHudEditorAfterExit = false;
-                skinEditorOverlay?.Show();
-                skinEditorOverlay?.PresentGameplay();
-            }
+        public void SetSceneHost(Drawable? host)
+        {
+            if (activeSceneHost == host)
+                return;
 
-            return blocking;
+            if (activeSceneHost?.Parent == gameplayHole)
+                gameplayHole.Remove(activeSceneHost, false);
+
+            activeSceneHost = host;
+
+            if (activeSceneHost != null && activeSceneHost.Parent != gameplayHole)
+                gameplayHole.Add(activeSceneHost);
+        }
+
+        public void BindHudToTarget(OsuScreen? screen, EzLayoutLayer? ezLayout)
+        {
+            hudTargetScreen = screen;
+            layoutLayer = ezLayout;
+            hudLayer.Apply(sceneBar.CurrentScene.Value, screen, ezLayout);
         }
 
         [BackgroundDependencyLoader]
         private void load()
         {
+            // 先构造并缓存，供侧栏 HUD 栏解析选中项。
+            hudLayer = new EzSkinEditorHudLayer();
+            dependencies.CacheAs(hudLayer);
+
             InternalChildren = new Drawable[]
             {
-                backgroundContainer = new Container { RelativeSizeAxes = Axes.Both },
                 new OsuContextMenuContainer
                 {
                     RelativeSizeAxes = Axes.Both,
@@ -267,8 +288,8 @@ namespace osu.Game.EzOsuGame.Edit
                                                 },
                                                 Children = new Drawable[]
                                                 {
-                                                    playbackControls = new EzSkinEditorPlaybackControls(),
-                                                    topToolbar = new EzSkinEditorTopToolbar
+                                                    playbackBar = new EzPlaybackBar(playback),
+                                                    new EzSkinEditorTopToolbar
                                                     {
                                                         PreviewSource = PreviewState.Source,
                                                         PreviewMode = PreviewState.Mode,
@@ -291,7 +312,8 @@ namespace osu.Game.EzOsuGame.Edit
                                     sceneBar = new EzSkinEditorSceneBar
                                     {
                                         RelativeSizeAxes = Axes.X,
-                                        OpenOfficialHudEditorRequested = openOfficialHudEditor,
+                                        SceneRequested = scene => sceneBar.CurrentScene.Value = scene,
+                                        OpenOfficialHudEditorRequested = () => OpenOfficialHudEditor?.Invoke(),
                                     },
                                 },
                                 new Drawable[]
@@ -308,7 +330,15 @@ namespace osu.Game.EzOsuGame.Edit
                                         {
                                             new Drawable[]
                                             {
-                                                sceneContentHost = new Container { RelativeSizeAxes = Axes.Both, Masking = true },
+                                                // 游玩洞：下层 ScreenContainer 经 SetCustomRect 缩进此处；本层只叠 HUD 蓝图。
+                                                gameplayHole = new Container
+                                                {
+                                                    RelativeSizeAxes = Axes.Both,
+                                                    Children = new Drawable[]
+                                                    {
+                                                        hudLayer,
+                                                    },
+                                                },
                                                 sidebar = new EzSkinEditorSidebar(),
                                             },
                                         },
@@ -329,116 +359,105 @@ namespace osu.Game.EzOsuGame.Edit
             sceneBar.CurrentScene.BindValueChanged(onSceneChanged, true);
             skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
             PreviewState.LoopBeatmap.BindValueChanged(_ => refreshScene());
+            PreviewState.Ruleset.BindValueChanged(r =>
+            {
+                hudLayer.SetRuleset(r.NewValue);
+                hudLayer.Apply(sceneBar.CurrentScene.Value, hudTargetScreen, layoutLayer);
+            }, true);
+            sceneBar.HudLayerVisible.BindValueChanged(v =>
+            {
+                hudLayer.SetVisible(v.NewValue);
+                updateHudInteraction();
+            }, true);
             bindConfigPreviewRefresh();
             bindSceneBarPlayback();
+        }
+
+        /// <summary>
+        /// 场景支持 HUD 蓝图且 HUD layer 开启时才允许蓝图拖选；否则只读预览。
+        /// </summary>
+        private void updateHudInteraction()
+        {
+            hudLayer.InteractionEnabled.Value = EzSkinEditorSceneRegistry.SupportsHudLayer(sceneBar.CurrentScene.Value) && sceneBar.HudLayerVisible.Value;
         }
 
         protected override void Update()
         {
             base.Update();
 
-            var source = getActiveScenePlaybackSource();
+            bool active = isGameplayPlaybackActive();
+            playbackBar.Alpha = active ? 1 : 0;
 
-            if (source == null)
-                return;
+            if (active != playbackBarActive)
+            {
+                playbackBarActive = active;
 
-            // Match EzBeatmapPreviewOverlay: Abs so seek/loop backwards still refreshes.
-            if (Math.Abs(source.CurrentTime - lastSceneBarProgressDisplayTime) < 16)
-                return;
-
-            playbackControls.SetCurrentTime(source.CurrentTime);
-            lastSceneBarProgressDisplayTime = source.CurrentTime;
+                if (active)
+                    applyPreviewAudioPolicy();
+            }
         }
 
         private void bindSceneBarPlayback()
         {
-            var controls = playbackControls;
-            controls.OnSeek = seekSceneBarPlayback;
-            controls.OnPlayPauseClicked = toggleBeatmapPlayback;
-
             sceneBarPreviewModeBindable = PreviewState.Mode.GetBoundCopy();
             sceneBarPreviewModeBindable.BindValueChanged(mode =>
             {
-                setBeatmapPlaybackPlaying(mode.NewValue == EzBeatmapPreviewMode.Dynamic, updateMode: false);
+                // Mode 是预览的 desired state：只有仍在游戏内预览时才把播放键同步过去。
+                if (!isGameplayPlaybackActive())
+                    return;
+
+                playback.SetPlaying(mode.NewValue == EzBeatmapPreviewMode.Dynamic);
             }, true);
-        }
 
-        private void seekSceneBarPlayback(double time)
-        {
-            getActiveScenePlaybackSource()?.Seek(time);
-            lastSceneBarProgressDisplayTime = double.MinValue;
-            playbackControls.SetCurrentTime(time, seeking: true);
-        }
-
-        private void setBeatmapPlaybackPlaying(bool playing, bool updateMode = true)
-        {
-            if (updateMode)
+            playback.IsPlaying.BindValueChanged(p =>
             {
-                if (playing)
+                if (!isGameplayPlaybackActive())
+                    return;
+
+                if (p.NewValue)
                     PreviewState.ResumeBeatmapPlayback();
                 else
                     PreviewState.PauseBeatmapPlayback();
-            }
-
-            getActiveScenePlaybackSource()?.SetPlaying(playing);
-            playbackControls.SetPlaying(playing);
-            applyPreviewAudioPolicy();
-            refreshSceneBarPlayback(playing);
+            });
         }
 
-        private void refreshSceneBarPlayback(bool? playingOverride = null)
-        {
-            var controls = playbackControls;
-            var source = getActiveScenePlaybackSource();
-
-            if (source == null)
-            {
-                controls.Alpha = 0;
-                return;
-            }
-
-            bool playing = playingOverride ?? source.IsPlaying;
-
-            controls.Alpha = 1;
-            controls.SetRange(source.BeatmapMinTime, source.BeatmapMaxTime);
-            controls.SetCurrentTime(source.CurrentTime);
-            lastSceneBarProgressDisplayTime = source.CurrentTime;
-            controls.SetPlaying(playing);
-        }
-
-        private IEzSkinEditorScenePlaybackSource? getActiveScenePlaybackSource()
-        {
-            var scene = sceneBar.CurrentScene.Value;
-
-            if (scene == EzSkinEditorSceneType.Appearance
-                && !PreviewState.LoopBeatmap.Value
-                && embeddedPlayer is { CanBeMounted: true } player)
-                return player;
-
-            if (scene is EzSkinEditorSceneType.Appearance
-                         or EzSkinEditorSceneType.Size
-                         or EzSkinEditorSceneType.Colour
-                         or EzSkinEditorSceneType.SkinIni)
-                return sceneContentHost.ChildrenOfType<IEzSkinEditorScenePlaybackSource>().FirstOrDefault(s => s.IsActive);
-
-            return null;
-        }
+        /// <summary>
+        /// 只有插拔进来的真实游玩屏在当前时，播放条才有意义；选歌/主菜单场景隐藏。
+        /// </summary>
+        private bool isGameplayPlaybackActive() => playback.ActiveTarget.Value == EzPlaybackTarget.Gameplay;
 
         private void onSceneChanged(ValueChangedEvent<EzSkinEditorSceneType> change)
         {
-            if (change.NewValue == EzSkinEditorSceneType.SkinIni && !isSkinIniSupported())
+            // CurrentScene is the single request source; a scene the editor cannot present reverts it
+            // so the bar and coordinator never diverge.
+            if (CanPresentScene?.Invoke(change.NewValue) == false)
             {
-                sceneBar.CurrentScene.Value = EzSkinEditorSceneType.Appearance;
+                sceneBar.CurrentScene.Value = change.OldValue;
                 return;
             }
 
             if (change.OldValue != change.NewValue)
                 persistEditorConfig();
 
-            Schedule(applyCurrentScene);
+            Schedule(() =>
+            {
+                applyCurrentScene();
+                SceneApplied?.Invoke(sceneBar.CurrentScene.Value);
+            });
         }
 
         public void PopulateSettings() => refreshScene();
+
+        /// <summary>
+        /// Re-presents the current scene after the preview beatmap/ruleset changed, without rebuilding the
+        /// sidebar or the HUD layer. Only the plugged gameplay screen depends on the preview selection;
+        /// sidebar sections bind to the shared <see cref="PreviewState"/> and follow it live, and the
+        /// playback bar renders straight from <see cref="EzPlaybackController"/>.
+        /// </summary>
+        internal void RefreshPreviewScene()
+        {
+            SceneApplied?.Invoke(sceneBar.CurrentScene.Value);
+        }
 
         public void ApplySettings() => applySettings();
 
@@ -464,27 +483,16 @@ namespace osu.Game.EzOsuGame.Edit
         {
             ensureGlobalBeatmapPreview();
 
-            bool appearanceBeatmapMode = sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Appearance
-                                         && !PreviewState.LoopBeatmap.Value;
-
-            if (!appearanceBeatmapMode)
-                disposeEmbeddedPlayer();
-
-            backgroundContainer!.Child = createManiaStageBackgroundOrNull() ?? new Container { RelativeSizeAxes = Axes.Both };
-            backgroundContainer.Child.RelativeSizeAxes = Axes.Both;
-
             ensureSkinIniSession();
+            ensureSkinSpecificSceneVisibility();
             ensureSkinJsonSession();
             ensureComparisonSnapshotForCurrentSkin();
             ensureNoteSnapshotForCurrentSkin();
 
             sceneContext = buildSceneContext();
             applyCurrentScene();
+            SceneApplied?.Invoke(sceneBar.CurrentScene.Value);
 
-            if (appearanceBeatmapMode)
-                mountAppearanceEmbeddedPlayer();
-
-            Schedule(() => refreshSceneBarPlayback());
             menuBar.RefreshMenuState();
         }
 
@@ -504,22 +512,12 @@ namespace osu.Game.EzOsuGame.Edit
             PreviewState.SetBeatmap(gameBeatmap.Value, ruleset, EzBeatmapPreviewModes.GetAppearanceLoadMode(ruleset));
         }
 
-        private void toggleBeatmapPlayback()
-        {
-            if (!PreviewState.HasBeatmapLoaded && !PreviewState.LoopBeatmap.Value)
-                return;
-
-            var source = getActiveScenePlaybackSource();
-            bool playing = source?.IsPlaying ?? PreviewState.Mode.Value == EzBeatmapPreviewMode.Dynamic;
-            setBeatmapPlaybackPlaying(!playing);
-        }
-
         private void selectBeatmapPreview(RulesetInfo ruleset)
         {
             if (beatmapPicker == null)
                 return;
 
-            if (!beatmapPicker.TryPickRandom(ruleset, out var workingBeatmap))
+            if (!beatmapPicker.TryPickRandom(ruleset, out var workingBeatmap) || workingBeatmap is not WorkingBeatmap picked)
             {
                 notifications?.Post(new SimpleNotification
                 {
@@ -528,11 +526,10 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
-            embeddedPlayer?.StopAudio();
-            stopPreviewBeatmapTrack(PreviewState.PreviewBeatmap);
-            musicController.Stop();
-            PreviewState.SetBeatmap(workingBeatmap!, ruleset, EzBeatmapPreviewModes.GetAppearanceLoadMode(ruleset));
-            refreshScene();
+            // The visible preview is the real gameplay screen, which renders the global beatmap; updating
+            // this workspace's PreviewState alone changes nothing on screen. The overlay owns the switch.
+            PreviewState.SetBeatmap(picked, ruleset, EzBeatmapPreviewModes.GetAppearanceLoadMode(ruleset));
+            BeatmapPreviewRequested?.Invoke(ruleset, picked);
         }
 
         private EzSkinEditorSceneContext buildSceneContext()
@@ -540,14 +537,14 @@ namespace osu.Game.EzOsuGame.Edit
             var currentScene = sceneBar.CurrentScene.Value;
 
             bool useLoopBeatmap = PreviewState.LoopBeatmap.Value;
-            bool useVirtualComparisonPreview = currentScene == EzSkinEditorSceneType.Size;
+            // Size/Colour 已并入 Appearance 五栏；本步关闭虚拟对比预览。
+            const bool use_virtual_comparison_preview = false;
             bool useNoteComparisonOnly = currentScene == EzSkinEditorSceneType.Note;
             bool supportsPlayfieldPreview = currentScene is EzSkinEditorSceneType.Appearance
-                                                            or EzSkinEditorSceneType.Size
-                                                            or EzSkinEditorSceneType.Colour
-                                                            or EzSkinEditorSceneType.SkinIni;
+                                                            or EzSkinEditorSceneType.SkinIni
+                                                            or EzSkinEditorSceneType.SkinSpecific;
 
-            // PreviewHost scenes use the selected ruleset beatmap unless loop chart is on.
+            // PreviewHost 场景在未开循环谱时用选中谱面预览。
             bool allowBeatmapPreview = supportsPlayfieldPreview
                                        && currentScene != EzSkinEditorSceneType.Appearance
                                        && !useLoopBeatmap
@@ -574,7 +571,7 @@ namespace osu.Game.EzOsuGame.Edit
                 EditorSkin = getEditorSkin(),
                 ActualSkin = skinManager.CurrentSkin.Value,
                 UsesEzNoteVariants = usesEzNoteVariants,
-                NoteComparisonSource = buildNoteComparisonSource(useNoteComparisonOnly, useVirtualComparisonPreview, usesEzNoteVariants),
+                NoteComparisonSource = buildNoteComparisonSource(useNoteComparisonOnly, use_virtual_comparison_preview, usesEzNoteVariants),
                 NoteCompareKind = NoteCompareKind,
                 SkinIniSession = SkinIniSession,
                 SkinJsonSession = SkinJsonSession,
@@ -584,7 +581,7 @@ namespace osu.Game.EzOsuGame.Edit
                 CommitSkinIni = commitSkinIni,
                 AllowBeatmapPreview = allowBeatmapPreview,
                 UseLoopBeatmap = useLoopBeatmap,
-                UseVirtualComparisonPreview = useVirtualComparisonPreview,
+                UseVirtualComparisonPreview = use_virtual_comparison_preview,
                 VirtualPreviewKeyCount = virtualPreviewKeyCount,
                 UseNoteComparisonOnly = useNoteComparisonOnly,
                 PreviewSource = PreviewState.Source.Value,
@@ -597,124 +594,21 @@ namespace osu.Game.EzOsuGame.Edit
                 CreateNoteSnapshot = createNoteSnapshot,
                 RestoreNoteSnapshot = restoreNoteSnapshot,
                 ExportNotePreview = exportNotePreview,
-                GetEmbeddedPlayer = () => embeddedPlayer,
+                GetEmbeddedPlayer = () => null,
             };
         }
 
         private int getLoopPreviewKeyCount(EzSkinEditorSceneType scene) => scene switch
         {
-            EzSkinEditorSceneType.Colour => getColourPreviewKeyMode(),
-            EzSkinEditorSceneType.Size => 4,
+            EzSkinEditorSceneType.SkinSpecific => 4,
             _ => Math.Max(4, getCurrentKeyMode()),
         };
 
-        private void mountAppearanceEmbeddedPlayer()
-        {
-            var workingBeatmap = resolveAppearanceWorkingBeatmap();
-            var ruleset = resolveAppearanceRuleset(workingBeatmap);
-
-            if (embeddedPlayer != null && !embeddedPlayer.CanBeMounted)
-            {
-                embeddedPlayer = null;
-                embeddedPlayerBeatmapHash = string.Empty;
-                embeddedPlayerRulesetId = -1;
-                embeddedPlayerSkinId = Guid.Empty;
-            }
-
-            if (workingBeatmap == null || ruleset == null)
-            {
-                disposeEmbeddedPlayer();
-                return;
-            }
-
-            string beatmapHash = workingBeatmap.BeatmapInfo.Hash;
-            int rulesetId = ruleset.OnlineID;
-            var skinId = skinManager.CurrentSkinInfo.Value.ID;
-
-            if (embeddedPlayer != null
-                && embeddedPlayerBeatmapHash == beatmapHash
-                && embeddedPlayerRulesetId == rulesetId
-                && embeddedPlayerSkinId == skinId)
-            {
-                applyEmbeddedPlayerToAppearanceContent();
-                Schedule(() => setBeatmapPlaybackPlaying(PreviewState.Mode.Value == EzBeatmapPreviewMode.Dynamic, updateMode: false));
-                return;
-            }
-
-            disposeEmbeddedPlayer();
-
-            ensureAppearanceBeatmapTrackLoaded(workingBeatmap);
-
-            embeddedPlayer = new EzSkinEditorEmbeddedPlayer(workingBeatmap, ruleset, getEditorSkin());
-            embeddedPlayerBeatmapHash = beatmapHash;
-            embeddedPlayerRulesetId = rulesetId;
-            embeddedPlayerSkinId = skinId;
-
-            applyEmbeddedPlayerToAppearanceContent();
-
-            Schedule(() => setBeatmapPlaybackPlaying(PreviewState.Mode.Value == EzBeatmapPreviewMode.Dynamic, updateMode: false));
-        }
-
-        private T? getSceneContent<T>() where T : Drawable => sceneContentHost.Children.Count == 1 ? sceneContentHost.Child as T : null;
-
-        private void applyEmbeddedPlayerToAppearanceContent()
-        {
-            if (getSceneContent<EzSkinEditorAppearanceSceneContent>() is EzSkinEditorAppearanceSceneContent appearance)
-                appearance.SetEmbeddedPlayer(embeddedPlayer);
-        }
-
-        private void ensureAppearanceBeatmapTrackLoaded(WorkingBeatmap workingBeatmap)
-        {
-            if (workingBeatmap.TrackLoaded)
-                return;
-
-            if (gameBeatmap.Value is WorkingBeatmap current && current.TryTransferTrack(workingBeatmap))
-                return;
-
-            workingBeatmap.LoadTrack();
-        }
-
-        private WorkingBeatmap? resolveAppearanceWorkingBeatmap()
-        {
-            if (PreviewState.PreviewBeatmap is WorkingBeatmap preview)
-                return preview;
-
-            if (EzSkinEditorBeatmapPicker.CanUseAsPreview(gameBeatmap.Value))
-                return gameBeatmap.Value;
-
-            return null;
-        }
-
-        private RulesetInfo? resolveAppearanceRuleset(WorkingBeatmap? workingBeatmap) => PreviewState.Ruleset.Value ?? workingBeatmap?.BeatmapInfo.Ruleset;
-
-        private void disposeEmbeddedPlayer()
-        {
-            embeddedPlayer?.StopAudio();
-            embeddedPlayer?.Expire();
-            embeddedPlayer = null;
-            embeddedPlayerBeatmapHash = string.Empty;
-            embeddedPlayerRulesetId = -1;
-            embeddedPlayerSkinId = Guid.Empty;
-
-            applyEmbeddedPlayerToAppearanceContent();
-        }
-
-        private static void stopPreviewBeatmapTrack(IWorkingBeatmap? beatmap)
-        {
-            if (beatmap is not { TrackLoaded: true })
-                return;
-
-            if (beatmap.Track.IsRunning)
-                beatmap.Track.Stop();
-        }
-
         private void applyPreviewAudioPolicy()
         {
-            if (sceneBar.CurrentScene.Value != EzSkinEditorSceneType.Appearance)
-                return;
-
-            // Preview audio is owned by the embedded player while dynamic; global music must stay off.
-            musicController.Stop();
+            // 游玩音频由插拔进来的 Player 持有；编辑器打开时停掉选歌全局轨，避免双音。
+            if (hudTargetScreen is Player)
+                musicController.Stop();
         }
 
         private IEzSkinEditorNoteComparisonSource? buildNoteComparisonSource(bool useNoteComparisonOnly, bool useVirtualComparisonPreview, bool usesEzNoteVariants)
@@ -744,28 +638,17 @@ namespace osu.Game.EzOsuGame.Edit
         {
             sceneContext = buildSceneContext();
 
+            // 游玩洞常驻插拔屏；场景只换侧栏，不重建中间前景。
             var strategy = EzSkinEditorSceneRegistry.Get(sceneBar.CurrentScene.Value);
-
-            if (sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Appearance
-                && !sceneContext.UseLoopBeatmap
-                && getSceneContent<EzSkinEditorAppearanceSceneContent>() is EzSkinEditorAppearanceSceneContent appearance)
-            {
-                appearance.RefreshFromContext(sceneContext);
-            }
-            else
-            {
-                detachEmbeddedPlayerFromHierarchy();
-                sceneContentHost.Child = strategy.CreateSceneContent(sceneContext);
-            }
-
             sidebar.ApplyStrategy(strategy, sceneContext);
+            updateHudInteraction();
+            hudLayer.Apply(sceneBar.CurrentScene.Value, hudTargetScreen, layoutLayer);
         }
-
-        private void detachEmbeddedPlayerFromHierarchy() => embeddedPlayer?.DetachForRemount();
 
         private void applySettings()
         {
             ezSkinConfig.Save();
+            hudLayer.PersistLayoutToCurrentSkin();
 
             if (SkinIniSession is { IsSupported: true, IsDirty: true })
                 SkinIniSession.Commit();
@@ -790,6 +673,12 @@ namespace osu.Game.EzOsuGame.Edit
         private void invalidateResourceCaches() => resource.InvalidateResourceCaches();
 
         private bool isSkinIniSupported() => EzSkinIniSupport.IsSupported(skinManager.CurrentSkinInfo.Value);
+
+        private void ensureSkinSpecificSceneVisibility()
+        {
+            // 顶栏 SkinSpecific 为占位壳，按钮已隐藏；专用设置在 Appearance 侧栏「皮肤专用」栏。
+            sceneBar.SetSceneVisible(EzSkinEditorSceneType.SkinSpecific, false);
+        }
 
         private void ensureSkinIniSession()
         {
@@ -1025,12 +914,6 @@ namespace osu.Game.EzOsuGame.Edit
             return ezSkinConfig.Get<int>(Ez2Setting.ColumnTypeListSelect);
         }
 
-        private int getColourPreviewKeyMode()
-        {
-            int selected = ezSkinConfig.Get<int>(Ez2Setting.ColumnTypeListSelect);
-            return selected > 0 ? selected : 0;
-        }
-
         private bool canExportOsk() => RuntimeInfo.IsDesktop
                                        && !skinManager.CurrentSkin.Disabled
                                        && skinManager.CurrentSkinInfo.Value.PerformRead(s => !s.Protected);
@@ -1125,40 +1008,9 @@ namespace osu.Game.EzOsuGame.Edit
             refreshNoteComparisonLivePane();
         }
 
-        private void refreshNoteComparisonSnapshotPane()
-        {
-            if (tryGetNoteComparisonHost(out var noteHost))
-                noteHost.RefreshSnapshotPane();
-            else
-                Schedule(refreshPreviewContent);
-        }
+        private void refreshNoteComparisonSnapshotPane() => Schedule(refreshPreviewContent);
 
-        private void refreshNoteComparisonLivePane()
-        {
-            if (tryGetNoteComparisonHost(out var noteHost))
-                noteHost.UpdateContext(buildSceneContext());
-            else
-                Schedule(refreshPreviewContent);
-        }
-
-        private bool tryGetNoteComparisonHost(out EzSkinEditorNoteComparisonHost noteHost)
-        {
-            if (getSceneContent<EzSkinEditorNoteComparisonHost>() is EzSkinEditorNoteComparisonHost directHost)
-            {
-                noteHost = directHost;
-                return true;
-            }
-
-            if (getSceneContent<EzSkinEditorPreviewHost>() is EzSkinEditorPreviewHost previewHost
-                && previewHost.ChildrenOfType<EzSkinEditorNoteComparisonHost>().FirstOrDefault() is EzSkinEditorNoteComparisonHost nestedHost)
-            {
-                noteHost = nestedHost;
-                return true;
-            }
-
-            noteHost = null!;
-            return false;
-        }
+        private void refreshNoteComparisonLivePane() => Schedule(refreshPreviewContent);
 
         private void exportNotePreview()
         {
@@ -1283,31 +1135,7 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
 
             sceneContext = buildSceneContext();
-
-            if (tryGetNoteComparisonHost(out var noteHost))
-            {
-                noteHost.UpdateContext(sceneContext);
-                return;
-            }
-
-            if (getSceneContent<EzSkinEditorAppearanceSceneContent>() is EzSkinEditorAppearanceSceneContent appearanceContent)
-            {
-                appearanceContent.RefreshFromContext(sceneContext);
-                applyEmbeddedPlayerToAppearanceContent();
-                refreshSceneBarPlayback();
-                return;
-            }
-
-            if (getSceneContent<EzSkinEditorPreviewHost>() is EzSkinEditorPreviewHost previewHost)
-            {
-                previewHost.RefreshFromContext(sceneContext);
-                Schedule(() => refreshSceneBarPlayback());
-                return;
-            }
-
-            var strategy = EzSkinEditorSceneRegistry.Get(sceneBar.CurrentScene.Value);
-            sceneContentHost.Child = strategy.CreateSceneContent(sceneContext);
-            Schedule(() => refreshSceneBarPlayback());
+            sidebar.ApplyStrategy(EzSkinEditorSceneRegistry.Get(sceneBar.CurrentScene.Value), sceneContext);
         }
 
         private void exportPreviewImage()
@@ -1353,92 +1181,25 @@ namespace osu.Game.EzOsuGame.Edit
                 : new EzStyleProSkin(skinManager);
         }
 
+        public void ShowExitDialog() => tryExit();
+
         private void tryExit()
         {
-            if (this.IsCurrentScreen())
-                ShowExitDialog();
-        }
-
-        private void openOfficialHudEditor()
-        {
-            if (!this.IsCurrentScreen())
-                return;
-
-            void proceed()
-            {
-                openHudEditorAfterExit = true;
-
-                if (this.IsCurrentScreen())
-                    this.Exit();
-            }
-
             if (dialogOverlay == null || SkinIniSession?.IsDirty != true)
             {
-                proceed();
+                RequestClose?.Invoke();
                 return;
             }
 
             dialogOverlay.Push(new ConfirmDialog(EzEditorStrings.EXIT_CONFIRM_APPLY_TO_SKIN, () =>
             {
                 applySettings();
-                proceed();
+                RequestClose?.Invoke();
             }, () =>
             {
                 SkinIniSession?.Discard();
-                proceed();
+                RequestClose?.Invoke();
             }));
-        }
-
-        public void ShowExitDialog()
-        {
-            if (!this.IsCurrentScreen())
-                return;
-
-            if (dialogOverlay == null)
-            {
-                this.Exit();
-                return;
-            }
-
-            if (SkinIniSession?.IsDirty != true)
-            {
-                this.Exit();
-                return;
-            }
-
-            dialogOverlay.Push(new ConfirmDialog(EzEditorStrings.EXIT_CONFIRM_APPLY_TO_SKIN, () =>
-            {
-                applySettings();
-
-                if (this.IsCurrentScreen())
-                    this.Exit();
-            }, () =>
-            {
-                SkinIniSession?.Discard();
-
-                if (this.IsCurrentScreen())
-                    this.Exit();
-            }));
-        }
-
-        public void PresentGameplay()
-        {
-            if (sceneBar.CurrentScene.Value != EzSkinEditorSceneType.Appearance)
-                return;
-
-            mountAppearanceEmbeddedPlayer();
-            PreviewState.ResumeBeatmapPlayback();
-            embeddedPlayer?.Restart();
-            refreshPreviewContent();
-        }
-
-        private static Drawable? createManiaStageBackgroundOrNull()
-        {
-            var lookup = tryCreateManiaSkinComponentLookupOrNull("StageBackground");
-            if (lookup == null)
-                return null;
-
-            return new SkinnableDrawable(lookup) { RelativeSizeAxes = Axes.Both };
         }
 
         private static ISkinComponentLookup? tryCreateManiaSkinComponentLookupOrNull(string componentName)

@@ -8,7 +8,8 @@ using osu.Framework.Localisation;
 namespace osu.Game.EzOsuGame.Edit
 {
     /// <summary>
-    /// Each scene owns its scene content and sidebar grouping strategy.
+    /// Each scene owns its sidebar grouping strategy. Scenes with a HUD layer declare it here;
+    /// scene content is hosted by <see cref="EzSkinEditorSceneCoordinator"/>.
     /// Add new scenes by implementing this interface and registering in <see cref="EzSkinEditorSceneRegistry"/>.
     /// </summary>
     public interface IEzSkinEditorSceneStrategy
@@ -17,13 +18,16 @@ namespace osu.Game.EzOsuGame.Edit
 
         LocalisableString TabTitle { get; }
 
-        Drawable CreateSceneContent(EzSkinEditorSceneContext context);
-
         IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context);
 
         /// <summary>
         /// Optional footer overlay pinned to the bottom of the sidebar (e.g. skin.ini save bar).
         /// </summary>
         Drawable? CreateSidebarFooter(EzSkinEditorSceneContext context) => null;
+
+        /// <summary>
+        /// Whether this scene presents an inserted screen whose skinnable HUD containers can be edited.
+        /// </summary>
+        bool SupportsHudLayer => false;
     }
 }

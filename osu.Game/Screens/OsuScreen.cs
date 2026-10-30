@@ -310,7 +310,29 @@ namespace osu.Game.Screens
         /// Override to create a BackgroundMode for the current screen.
         /// Note that the instance created may not be the used instance if it matches the BackgroundMode equality clause.
         /// </summary>
+        [CanBeNull]
         protected virtual BackgroundScreen CreateBackground() => null;
+
+        /// <summary>
+        /// Exits the background this screen pushed, so the one below (e.g. the global menu background)
+        /// becomes current again. Used while the Ez skin editor is open.
+        /// </summary>
+        internal void DetachOwnedBackground()
+        {
+            if (backgroundStack == null)
+                return;
+
+            // Exiting hands the screen over to the background stack, which expires it once the exit
+            // transition completes. Disposing it here would free its draw node while the transition
+            // is still drawing it.
+            if (ownedBackground != null && backgroundStack.CurrentScreen == ownedBackground)
+            {
+                backgroundStack.Exit();
+                ownedBackground = null;
+            }
+
+            background = backgroundStack.CurrentScreen as BackgroundScreen;
+        }
 
         /// <summary>
         /// Replace this screen's background using <see cref="CreateBackground"/>.
@@ -357,6 +379,7 @@ namespace osu.Game.Screens
             ownedBackground = null;
             background = backgroundStack.CurrentScreen as BackgroundScreen;
         }
+
         public virtual bool OnBackButton() => false;
     }
 }

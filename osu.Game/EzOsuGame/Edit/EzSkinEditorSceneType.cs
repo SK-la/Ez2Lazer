@@ -4,14 +4,15 @@
 namespace osu.Game.EzOsuGame.Edit
 {
     /// <summary>
-    /// Identifies an Ez skin editor scene. Each value maps to a dedicated <see cref="IEzSkinEditorSceneStrategy"/>.
+    /// Ez 皮肤编辑器顶栏场景。尺寸与颜色设置已迁入 Appearance 侧栏五栏。
     /// </summary>
     public enum EzSkinEditorSceneType
     {
+        SongSelect,
+        Gameplay,
         Appearance,
-        Size,
-        Colour,
         SkinIni,
+        SkinSpecific,
         Note,
     }
 }

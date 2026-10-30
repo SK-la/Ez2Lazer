@@ -11,7 +11,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame.Edit;
-using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.Overlays.Settings;
 
 namespace osu.Game.Tests.Visual.Edit
@@ -65,21 +64,11 @@ namespace osu.Game.Tests.Visual.Edit
 
         private List<Drawable> collectItems() =>
             screen.ChildrenOfType<Drawable>()
-                  .Where(d => d is ISettingsItem && d.IsLoaded && isInsideSettingsGroup(d))
+                  .Where(d => d is ISettingsItem && d.IsLoaded)
                   .OrderBy(d => d.ScreenSpaceDrawQuad.TopLeft.Y)
                   .ThenBy(d => d.ScreenSpaceDrawQuad.TopLeft.X)
                   .ToList();
 
-        private static bool isInsideSettingsGroup(Drawable drawable)
-        {
-            for (var parent = drawable.Parent; parent != null; parent = parent.Parent)
-            {
-                if (parent is EzSkinEditorSettingsGroup)
-                    return true;
-            }
-
-            return false;
-        }
 
         private static string getLabel(Drawable item)
         {

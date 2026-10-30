@@ -7,7 +7,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
-using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
@@ -20,8 +19,6 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
         public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.SkinIni;
 
         public LocalisableString TabTitle => EzEditorStrings.TAB_SKIN_INI;
-
-        public Drawable CreateSceneContent(EzSkinEditorSceneContext context) => new EzSkinEditorPreviewHost(context);
 
         public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context)
         {

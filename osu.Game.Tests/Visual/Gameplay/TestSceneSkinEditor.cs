@@ -339,7 +339,8 @@ namespace osu.Game.Tests.Visual.Gameplay
             {
                 InputManager.MoveMouseTo(
                     skinEditor.ChildrenOfType<SkinSettingsToolbox>().First()
-                              .ChildrenOfType<SettingsSlider<float>>().Skip(2).First()
+                              .ChildrenOfType<SettingsSlider<float>>()
+                              .First(s => s.LabelText.ToString() == "Wireframe opacity")
                               .ChildrenOfType<SliderBar<float>>().First()
                 );
             });

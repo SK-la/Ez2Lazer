@@ -2,12 +2,16 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Linq;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.UserInterface;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.SkinEditor;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
-using osu.Game.Overlays.SkinEditor;
 using osu.Game.Screens.Edit.Components.Menus;
 
 namespace osu.Game.EzOsuGame.Edit.Components
@@ -78,6 +82,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private readonly EditorMenuItem writeSizesItem;
         private readonly EditorMenuItem exportOskItem;
 
+        private Bindable<bool> hudSnapEnabled = null!;
+        private Bindable<float> hudSnapDistance = null!;
+        private Bindable<bool> hudSnapPixelFlush = null!;
+        private SkinHudSnapDistanceMenuItem? hudSnapDistanceMenuItem;
+        private ToggleMenuItem? hudSnapPixelFlushMenuItem;
+
         public EzSkinEditorMenuBar()
         {
             Anchor = Anchor.CentreLeft;
@@ -117,6 +127,47 @@ namespace osu.Game.EzOsuGame.Edit.Components
                         writeColoursItem = new EditorMenuItem(EzEditorStrings.MENU_WRITE_COLOURS_TO_SKIN_INI, MenuItemType.Standard, () => WriteColoursToSkinIniAction?.Invoke()),
                         writeSizesItem = new EditorMenuItem(EzEditorStrings.MENU_WRITE_SIZES_TO_SKIN_INI, MenuItemType.Standard, () => WriteSizesToSkinIniAction?.Invoke()),
                     },
+                },
+            };
+        }
+
+        [BackgroundDependencyLoader]
+        private void load(Ez2ConfigManager ezConfig)
+        {
+            hudSnapEnabled = ezConfig.GetBindable<bool>(Ez2Setting.SkinEditorHudSnapEnabled);
+            hudSnapDistance = ezConfig.GetBindable<float>(Ez2Setting.SkinEditorHudSnapDistance);
+            hudSnapPixelFlush = ezConfig.GetBindable<bool>(Ez2Setting.SkinEditorHudSnapPixelFlush);
+
+            Items = Items.Append(createEzSettingsMenu()).ToArray();
+        }
+
+        private MenuItem createEzSettingsMenu()
+        {
+            hudSnapDistanceMenuItem = new SkinHudSnapDistanceMenuItem(hudSnapDistance);
+            hudSnapPixelFlushMenuItem = new ToggleMenuItem(EzEditorStrings.MENU_HUD_SNAP_PIXEL_FLUSH)
+            {
+                State = { BindTarget = hudSnapPixelFlush },
+            };
+
+            hudSnapEnabled.BindValueChanged(enabled =>
+            {
+                bool on = enabled.NewValue;
+
+                hudSnapDistanceMenuItem?.Action.Disabled = !on;
+
+                hudSnapPixelFlushMenuItem?.Action.Disabled = !on;
+            }, true);
+
+            return new MenuItem(EzEditorStrings.MENU_EZ_SETTINGS)
+            {
+                Items = new MenuItem[]
+                {
+                    new ToggleMenuItem(EzEditorStrings.MENU_HUD_SNAP)
+                    {
+                        State = { BindTarget = hudSnapEnabled },
+                    },
+                    hudSnapDistanceMenuItem,
+                    hudSnapPixelFlushMenuItem,
                 },
             };
         }

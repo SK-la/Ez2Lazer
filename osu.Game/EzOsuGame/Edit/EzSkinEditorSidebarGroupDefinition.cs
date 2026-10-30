@@ -8,15 +8,21 @@ using osu.Framework.Localisation;
 namespace osu.Game.EzOsuGame.Edit
 {
     /// <summary>
-    /// Describes one collapsible sidebar group produced by a scene strategy.
-    /// Groups are not used to identify scenes — only strategies define grouping.
+    /// 当前场景下一个侧栏设置组；导航轨按顺序索引并滚动到对应分组。
     /// </summary>
     public sealed class EzSkinEditorSidebarGroupDefinition
     {
+        /// <summary>
+        /// 可选稳定标识，供交互接线与导航定位使用。
+        /// </summary>
+        public string? Id { get; init; }
+
         public LocalisableString Title { get; init; }
 
         public Func<Drawable> CreateContent { get; init; } = null!;
 
         public bool ExpandedByDefault { get; init; } = true;
+
+        public bool Visible { get; init; } = true;
     }
 }

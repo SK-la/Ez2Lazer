@@ -3,9 +3,7 @@
 
 using System;
 using System.Collections.Generic;
-using osu.Framework.Graphics;
 using osu.Framework.Localisation;
-using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
 using osu.Game.EzOsuGame.Localization;
 
@@ -16,9 +14,6 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
         public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.Note;
 
         public LocalisableString TabTitle => EzEditorStrings.TAB_NOTE;
-
-        public Drawable CreateSceneContent(EzSkinEditorSceneContext context) =>
-            new EzSkinEditorNoteComparisonHost(context);
 
         public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context)
         {

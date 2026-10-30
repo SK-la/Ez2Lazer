@@ -10,16 +10,16 @@ using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.EzOsuGame.Edit.Scenes;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.EzMania.Editor;
-using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Skinning;
 using osu.Game.Tests.Resources;
 
 namespace osu.Game.Tests.Visual.Edit
 {
     /// <summary>
-    /// Walks every setting of every skin editor scene in sidebar order and moves each one, asserting that the scene survives.
+    /// 按侧栏可见设置逐项改动，断言场景仍存活。
     /// </summary>
     public partial class TestSceneEzSkinEditorSceneInteractions : ScreenTestScene
     {
@@ -49,57 +49,90 @@ namespace osu.Game.Tests.Visual.Edit
         }
 
         [Test]
-        public void TestAppearanceSceneInteractions()
+        public void TestAppearanceGroupInteractions()
         {
-            runSceneInteraction(EzSkinEditorSceneType.Appearance);
-            AddAssert("appearance scene still present", () => editorScreen.ChildrenOfType<EzSkinEditorAppearanceSceneContent>().Any());
-            AddAssert("three sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
+            runSidebarGroupInteraction(AppearanceSceneStrategy.GROUP_ID_TEXTURE);
+            AddAssert("workspace still present", () => editorScreen.IsLoaded);
+            AddAssert("all appearance groups visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() >= 5);
         }
 
         [Test]
-        public void TestSizeSceneInteractions()
+        public void TestSizeGroupInteractions()
         {
-            runSceneInteraction(EzSkinEditorSceneType.Size);
-            AddUntilStep("comparison panes still present", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonPane>().Count() == 2);
-            AddAssert("sidebar group present", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Any());
+            runSidebarGroupInteraction(AppearanceSceneStrategy.GROUP_ID_SIZE);
+            AddAssert("size group present", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Any());
         }
 
         [Test]
-        public void TestColourSceneInteractions()
+        public void TestColourGroupInteractions()
         {
-            runSceneInteraction(EzSkinEditorSceneType.Colour);
-            AddStep("enable loop chart", () => editorScreen.PreviewState.LoopBeatmap.Value = true);
-            AddUntilStep("virtual playfield still present", () => editorScreen.ChildrenOfType<Column>().Any());
-            AddAssert("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
+            runSidebarGroupInteraction(AppearanceSceneStrategy.GROUP_ID_BASE_COLOURS);
+            AddAssert("all appearance groups visible", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() >= 5);
         }
 
         [Test]
         public void TestNoteSceneInteractions()
         {
-            runSceneInteraction(EzSkinEditorSceneType.Note);
-            AddUntilStep("note comparison host still present", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonHost>().Any());
-            AddAssert("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
+            // Note 首页可改项较少，两页合计断言。
+            runSceneInteraction(EzSkinEditorSceneType.Note, minVisited: 1);
+            AddStep("navigate to note edit group", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectSidebarPage(1));
+            cycleDriverSettings(minVisited: 1);
+            AddAssert("workspace still present", () => editorScreen.IsLoaded);
+            AddAssert("sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().PageCount == 2);
         }
 
         [Test]
         public void TestSkinIniSceneInteractions()
         {
             runSceneInteraction(EzSkinEditorSceneType.SkinIni, importSkin: true);
-            AddAssert("three sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
-            AddAssert("preview host still present", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Any());
+            AddAssert("sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().PageCount == 3);
+            AddAssert("workspace still present", () => editorScreen.IsLoaded);
             AddStep("discard draft", () => editorScreen.SkinIniSession?.Discard());
         }
 
-        private void runSceneInteraction(EzSkinEditorSceneType scene, bool importSkin = false)
+        private void loadWorkspace()
+        {
+            AddStep("load workspace", () =>
+            {
+                Child = editorScreen = new EzSkinEditorScreen
+                {
+                    RelativeSizeAxes = Framework.Graphics.Axes.Both,
+                    RequestClose = () => editorScreen.Expire(),
+                };
+                editorScreen.Activate();
+            });
+            AddUntilStep("wait for workspace load", () => editorScreen.IsLoaded);
+        }
+
+        private void runSidebarGroupInteraction(string groupId)
+        {
+            driver = null;
+
+            loadWorkspace();
+            AddStep("switch to appearance", () => editorScreen.CurrentScene.Value = EzSkinEditorSceneType.Appearance);
+            AddStep($"select group {groupId}", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectSidebarGroupById(groupId));
+
+            cycleDriverSettings();
+        }
+
+        private void runSceneInteraction(EzSkinEditorSceneType scene, bool importSkin = false, int minVisited = 2)
         {
             if (importSkin)
                 importLegacySkin();
 
             driver = null;
 
-            AddStep("load screen", () => LoadScreen(editorScreen = new EzSkinEditorScreen()));
-            AddUntilStep("wait for screen load", () => editorScreen.IsLoaded);
+            loadWorkspace();
             AddStep($"switch to {scene}", () => editorScreen.CurrentScene.Value = scene);
+
+            AddUntilStep("sidebar ready", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().PageCount > 0);
+            AddStep("select first page", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectSidebarPage(0));
+            cycleDriverSettings(minVisited);
+        }
+
+        private void cycleDriverSettings(int minVisited = 2)
+        {
+            driver = null;
 
             AddUntilStep("driver has settings", () =>
             {
@@ -119,7 +152,7 @@ namespace osu.Game.Tests.Visual.Edit
                 return driver.IsComplete;
             });
 
-            AddAssert("every setting was changed", () => driver!.Visited.Count, () => Is.GreaterThan(2));
+            AddAssert("every setting was changed", () => driver!.Visited.Count, () => Is.GreaterThan(minVisited - 1));
             AddWaitStep("let preview settle", 2);
         }
 

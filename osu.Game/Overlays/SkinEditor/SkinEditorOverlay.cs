@@ -65,6 +65,9 @@ namespace osu.Game.Overlays.SkinEditor
         private OsuGame game { get; set; } = null!;
 
         [Resolved]
+        private EzSkinEditorOverlay ezSkinEditor { get; set; } = null!;
+
+        [Resolved]
         private MusicController music { get; set; } = null!;
 
         [Resolved]
@@ -184,19 +187,12 @@ namespace osu.Game.Overlays.SkinEditor
         }
 
         /// <summary>
-        /// 关闭 HUD 皮肤编辑器并进入全屏 EzSkinEditorScreen。
+        /// 关闭官方 HUD 编辑器并打开 Ez 皮肤编辑器盖层（缩放插拔当前屏，不 Push）。
         /// </summary>
         public void ToggleEzSkinEditor()
         {
             Hide();
-
-            performer?.PerformFromScreen(screen =>
-            {
-                if (screen is EzSkinEditorScreen)
-                    return;
-
-                screen.Push(new EzSkinEditorScreen());
-            }, new[] { typeof(EzSkinEditorScreen) });
+            ezSkinEditor.Toggle();
         }
 
         public void PresentGameplay() => presentGameplay(false);
@@ -402,9 +398,6 @@ namespace osu.Game.Overlays.SkinEditor
         /// </summary>
         public virtual void SetTarget(OsuScreen screen)
         {
-            if (screen is EzSkinEditorScreen)
-                return;
-
             nestedInputManagerDisable?.Dispose();
             nestedInputManagerDisable = null;
 

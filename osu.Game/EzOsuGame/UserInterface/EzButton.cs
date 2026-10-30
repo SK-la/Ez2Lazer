@@ -57,6 +57,12 @@ namespace osu.Game.EzOsuGame.UserInterface
             set => text.Font = OsuFont.TorusAlternate.With(size: value);
         }
 
+        public MarginPadding TextMargin
+        {
+            get => text.Margin;
+            set => text.Margin = value;
+        }
+
         private Colour4 buttonAccentColour;
 
         public Colour4 AccentColour
