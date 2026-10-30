@@ -44,6 +44,9 @@ namespace osu.Game.EzOsuGame.Edit
         private OsuScreen? sessionTarget;
         private EzSkinEditorSceneCoordinator? sceneCoordinator;
 
+        // 当前已订阅 ReservedWidth 的工作区；关层时要解绑。
+        private EzSkinEditorScreen? reservedWidthBound;
+
         private readonly LayoutValue drawSizeLayout;
 
         [Resolved]
@@ -143,11 +146,19 @@ namespace osu.Game.EzOsuGame.Edit
             sceneCoordinator?.Close();
             sceneCoordinator = null;
 
+            if (reservedWidthBound != null)
+            {
+                reservedWidthBound.SidebarReservedWidth.ValueChanged -= onReservedWidthChanged;
+                reservedWidthBound = null;
+            }
+
             EzSkinEditorActiveState.SetActive(false);
 
             Workspace?.Deactivate();
             this.FadeOut(200, Easing.OutQuint);
         }
+
+        private void onReservedWidthChanged(ValueChangedEvent<float> _) => updateScreenSizing();
 
         protected override void Update()
         {
@@ -185,6 +196,11 @@ namespace osu.Game.EzOsuGame.Edit
             sceneCoordinator = new EzSkinEditorSceneCoordinator(scalingContainer, workspace, layoutLayer, updateScreenSizing, canPresentScene, () => game.ScreenStack.CurrentScreen, enterSongSelect, enterGameplay);
             workspace.SceneApplied = scene => sceneCoordinator?.Present(scene, game.ScreenStack.CurrentScreen as OsuScreen);
             workspace.CanPresentScene = canPresentScene;
+
+            // 侧栏固定时挤占场景可用宽度；宽度变化后跟随重算插拔场景矩形。
+            workspace.SidebarReservedWidth.ValueChanged += onReservedWidthChanged;
+            reservedWidthBound = workspace;
+
             sceneCoordinator.BeginSession(sessionTarget);
         }
 
@@ -281,8 +297,9 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
 
             const float toolbar_height = EzSkinEditorSceneBar.HEIGHT + global::osu.Game.Overlays.SkinEditor.SkinEditor.MENU_HEIGHT;
+            float reservedWidth = Workspace.SidebarReservedWidth.Value;
 
-            scalingContainer.SetCustomRect(EzSkinEditorSceneSizing.ComputeSceneRect(DrawSize, toolbar_height, EzSkinEditorSidebarGroupRail.WIDTH), true);
+            scalingContainer.SetCustomRect(EzSkinEditorSceneSizing.ComputeSceneRect(DrawSize, toolbar_height, reservedWidth), true);
         }
 
         private bool tryUseBeatmapForActiveRuleset()

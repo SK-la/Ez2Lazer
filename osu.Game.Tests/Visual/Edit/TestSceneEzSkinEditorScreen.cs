@@ -6,6 +6,7 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Extensions;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Platform;
@@ -19,6 +20,7 @@ using osu.Game.EzOsuGame.Edit.Scenes;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.UserInterface;
+using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
@@ -192,8 +194,9 @@ namespace osu.Game.Tests.Visual.Edit
             });
             AddUntilStep("scene and sidebar are horizontal", () =>
             {
-                var sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().SingleOrDefault();
-                return sidebar != null && sidebar.ScreenSpaceDrawQuad.Width > 0;
+                // 侧栏占位宽随固定态变化，稳妥地按其内部的导航轨宽度判定。
+                var rail = editorScreen.ChildrenOfType<EzSkinEditorSidebarGroupRail>().SingleOrDefault();
+                return rail != null && rail.ScreenSpaceDrawQuad.Width > 0;
             });
             AddAssert("no size/colour scene tabs", () =>
                 !EzSkinEditorSceneRegistry.All.Any(s => s.SceneType.ToString() is "Size" or "Colour"));
@@ -902,14 +905,16 @@ namespace osu.Game.Tests.Visual.Edit
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
 
+            // 取消固定后侧栏悬浮不占位，先落到这个状态再取基线。
+            AddStep("unpin sidebar", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().Pinned.Value = false);
+
             float gameplayWidthBefore = 0;
             AddStep("capture gameplay width", () =>
                 gameplayWidthBefore = editorScreen.ChildrenOfType<EzSkinEditorHudLayer>().Single().DrawWidth);
 
-            AddStep("unpin sidebar", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().Pinned.Value = false);
             AddStep("collapse sidebar", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().ExpandedState.Value = false);
 
-            // 布局只占轨宽；收起只藏设置面板，游戏区宽度与导航轨均不变。
+            // 未固定时侧栏不占位：收起后设置面板隐藏，导航轨仍在，游戏区宽度不变。
             AddUntilStep("content panel hidden", () =>
             {
                 var sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single();
@@ -926,26 +931,64 @@ namespace osu.Game.Tests.Visual.Edit
         }
 
         [Test]
+        public void TestPinnedSidebarReservesSceneWidth()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var sidebar = (EzSkinEditorSidebar)null!;
+
+            AddStep("capture sidebar", () => sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single());
+
+            // 固定开启：侧栏挤占场景可用空间，ReservedWidth 为面板+轨宽。
+            AddUntilStep("pinned reserves panel width", () =>
+                sidebar.Pinned.Value
+                && Math.Abs(sidebar.ReservedWidth.Value - EzSkinEditorSidebar.ExpandedWidthWithRail) < 1);
+
+            // 固定时设置面板必须让出导航轨位置，不能和轨叠在一起（也不越过屏幕右缘）。
+            AddUntilStep("settings panel clears the rail", () =>
+            {
+                var rail = editorScreen.ChildrenOfType<EzSkinEditorSidebarGroupRail>().Single();
+                var panel = editorScreen.ChildrenOfType<OsuScrollContainer>()
+                                       .FirstOrDefault(s => s.Parent is Container c && c.Width == EzSkinEditorSidebar.CONTENT_WIDTH);
+
+                return panel != null
+                       && rail.ScreenSpaceDrawQuad.Width > 0
+                       && panel.ScreenSpaceDrawQuad.TopRight.X <= rail.ScreenSpaceDrawQuad.TopLeft.X + 1;
+            });
+
+            // 取消固定：侧栏浮在场景之上，不再挤占空间。
+            AddStep("unpin sidebar", () => sidebar.Pinned.Value = false);
+            AddUntilStep("unpinned reserves nothing", () => sidebar.ReservedWidth.Value == 0);
+        }
+
+        [Test]
         public void TestSidebarHoverExpansionFollowsScene()
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
 
             var sidebar = (EzSkinEditorSidebar)null!;
+            var rail = (EzSkinEditorSidebarGroupRail)null!;
 
-            AddStep("capture sidebar", () => sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single());
+            AddStep("capture sidebar", () =>
+            {
+                sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single();
+                rail = editorScreen.ChildrenOfType<EzSkinEditorSidebarGroupRail>().Single();
+            });
             AddStep("unpin sidebar", () => sidebar.Pinned.Value = false);
 
-            // 非 HUD 场景保持原样：收起后悬停唤出设置面板。
+            // 非 HUD 场景保持原样：收起后悬停导航轨唤出设置面板。
             switchScene(EzSkinEditorSceneType.Appearance);
             AddStep("collapse sidebar", () => sidebar.ExpandedState.Value = false);
-            AddStep("hover sidebar", () => InputManager.MoveMouseTo(sidebar));
+            AddStep("hover rail", () => InputManager.MoveMouseTo(rail));
             AddUntilStep("appearance hover expands", () => sidebar.ExpandedState.Value);
 
             // HUD 场景悬停不唤出，避免面板盖住正在拖拽组件的游玩区。
             switchScene(EzSkinEditorSceneType.Gameplay);
             AddStep("collapse sidebar", () => sidebar.ExpandedState.Value = false);
-            AddStep("hover sidebar", () => InputManager.MoveMouseTo(sidebar));
+            AddStep("hover rail", () => InputManager.MoveMouseTo(rail));
             AddWaitStep("wait for hover ticks", 5);
             AddAssert("hud hover does not expand", () => !sidebar.ExpandedState.Value);
         }

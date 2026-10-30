@@ -157,6 +157,12 @@ namespace osu.Game.EzOsuGame.Edit
         internal Bindable<EzSkinEditorPreviewSource> PreviewSource => PreviewState.Source;
 
         /// <summary>
+        /// Space the sidebar currently reserves in the workspace layout. Zero while the sidebar
+        /// overlays (unpinned); panel + rail width while pinned-expanded. Drives the plugged scene rect.
+        /// </summary>
+        internal Bindable<float> SidebarReservedWidth => sidebar.ReservedWidth;
+
+        /// <summary>
         /// Per-skin skin.ini session. Skin-layer only.
         /// </summary>
         public EzSkinIniSession? SkinIniSession { get; private set; }
@@ -365,7 +371,12 @@ namespace osu.Game.EzOsuGame.Edit
                                                         componentPicker = new EzSkinEditorComponentPickerWindow(ezSkinConfig.GetBindable<float>(Ez2Setting.SkinEditorComponentPickerX)),
                                                     },
                                                 },
-                                                sidebar = new EzSkinEditorSidebar(),
+                                                sidebar = new EzSkinEditorSidebar
+                                                {
+                                                    Anchor = Anchor.TopRight,
+                                                    Origin = Anchor.TopRight,
+                                                    Width = 0,
+                                                },
                                             },
                                         },
                                     },
