@@ -18,6 +18,7 @@ using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Edit.Scenes;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
@@ -93,7 +94,7 @@ namespace osu.Game.Tests.Visual.Edit
             {
                 var ruleset = new ManiaRuleset().RulesetInfo;
                 var lookup = EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.Gameplay, EzSkinEditorLayer.EzHudRuleset, ruleset);
-                return lookup != null && lookup.Ruleset == ruleset && lookup.Lookup == GlobalSkinnableContainers.MainHUDComponents;
+                return lookup != null && ReferenceEquals(lookup.Ruleset, ruleset) && lookup.Lookup == GlobalSkinnableContainers.MainHUDComponents;
             });
             AddAssert("ruleset playfield targets playfield", () =>
             {
@@ -199,6 +200,34 @@ namespace osu.Game.Tests.Visual.Edit
             AddAssert("hud layer present", () => editorScreen.ChildrenOfType<EzSkinEditorHudLayer>().Any());
             AddAssert("song select is first scene", () =>
                 EzSkinEditorSceneRegistry.All[0].SceneType == EzSkinEditorSceneType.SongSelect);
+        }
+
+        [Test]
+        public void TestSceneBarControlsTrailRightEdge()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var bar = (EzSkinEditorSceneBar)null!;
+            var layer = (EzEditorLayerButton)null!;
+            var picker = (EzToggleButton)null!;
+
+            AddStep("capture scene bar controls", () =>
+            {
+                bar = editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Single();
+                layer = editorScreen.ChildrenOfType<EzEditorLayerButton>().Single();
+                picker = editorScreen.ChildrenOfType<EzToggleButton>().Single(b => b.Text.ToString() == EzEditorStrings.TOOLBAR_VISUAL_PICKER.ToString());
+            });
+
+            AddUntilStep("controls laid out", () => layer.ScreenSpaceDrawQuad.Width > 0 && picker.ScreenSpaceDrawQuad.Width > 0
+                                                        && bar.ScreenSpaceDrawQuad.Width > 0);
+
+            // The layer dropdown is the rightmost control; every later button is inserted to its left.
+            AddAssert("layer dropdown hugs the right edge", () =>
+                Math.Abs(bar.ScreenSpaceDrawQuad.TopRight.X - layer.ScreenSpaceDrawQuad.TopRight.X) <= 12);
+            AddAssert("visual picker sits left of the layer dropdown", () =>
+                picker.ScreenSpaceDrawQuad.TopRight.X <= layer.ScreenSpaceDrawQuad.TopLeft.X + 1);
         }
 
         [Test]
@@ -407,6 +436,198 @@ namespace osu.Game.Tests.Visual.Edit
 
         private int visibleLibraryCount() =>
             editorScreen.ChildrenOfType<EzSkinEditorComponentLibrarySection>().Count(s => s.Parent != null);
+
+        [Test]
+        public void TestComponentPickerOpenAndClamped()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var picker = (EzSkinEditorComponentPickerWindow)null!;
+
+            AddStep("capture picker", () => picker = editorScreen.ChildrenOfType<EzSkinEditorComponentPickerWindow>().Single());
+
+            AddStep("open picker", () => picker.Open.Value = true);
+            AddUntilStep("picker visible", () => picker.Alpha == 1);
+            AddUntilStep("picker inside gameplay hole", () =>
+            {
+                var parent = picker.Parent;
+                return parent != null && picker.X >= 0 && picker.X + picker.DrawWidth <= parent.DrawWidth + 0.5f;
+            });
+            AddUntilStep("picker remembers position", () => ezConfig.Get<float>(Ez2Setting.SkinEditorComponentPickerX) >= 0);
+
+            AddStep("close picker", () => picker.Open.Value = false);
+            AddUntilStep("picker hidden", () => picker.Alpha == 0);
+        }
+
+        [Test]
+        public void TestComponentPickerChromeMatchesSidebarHeightAndFolds()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var picker = (EzSkinEditorComponentPickerWindow)null!;
+
+            AddStep("capture picker", () => picker = editorScreen.ChildrenOfType<EzSkinEditorComponentPickerWindow>().Single());
+            AddStep("open picker", () => picker.Open.Value = true);
+            AddUntilStep("picker visible", () => picker.Alpha == 1);
+
+            AddUntilStep("top edge sits on the gameplay hole's top edge", () =>
+            {
+                var parent = picker.Parent;
+
+                if (parent == null)
+                    return false;
+
+                return Math.Abs(picker.ScreenSpaceDrawQuad.TopLeft.Y - parent.ScreenSpaceDrawQuad.TopLeft.Y) <= 1;
+            });
+
+            // Expanded height matches the sidebar: both span the gameplay hole's full height.
+            AddUntilStep("expanded fills the gameplay hole height", () =>
+            {
+                var parent = picker.Parent;
+                return parent != null && Math.Abs(picker.DrawHeight - parent.DrawHeight) <= 2;
+            });
+
+            float expandedHeight = 0;
+            float topEdge = 0;
+            AddStep("record expanded height and top edge", () =>
+            {
+                expandedHeight = picker.DrawHeight;
+                topEdge = picker.ScreenSpaceDrawQuad.TopLeft.Y;
+            });
+
+            AddStep("collapse", () => picker.Expanded.Value = false);
+
+            AddUntilStep("collapsed to the title bar", () => picker.DrawHeight < expandedHeight);
+
+            // Collapsing folds the body up: the header (and thus the top edge) must not move.
+            AddAssert("top edge unchanged while collapsing", () => Math.Abs(picker.ScreenSpaceDrawQuad.TopLeft.Y - topEdge) <= 1);
+
+            AddStep("expand again", () => picker.Expanded.Value = true);
+            AddUntilStep("expands back to full height", () => Math.Abs(picker.DrawHeight - expandedHeight) <= 1);
+            AddAssert("top edge unchanged while expanding", () => Math.Abs(picker.ScreenSpaceDrawQuad.TopLeft.Y - topEdge) <= 1);
+        }
+
+        [Test]
+        public void TestComponentPickerRestoresRememberedPosition()
+        {
+            AddStep("seed remembered position at right edge", () =>
+                ezConfig.GetBindable<float>(Ez2Setting.SkinEditorComponentPickerX).Value = 1f);
+
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var picker = (EzSkinEditorComponentPickerWindow)null!;
+
+            AddStep("capture picker", () => picker = editorScreen.ChildrenOfType<EzSkinEditorComponentPickerWindow>().Single());
+            AddStep("open picker", () => picker.Open.Value = true);
+
+            // Regression: the position was applied before the parent was sized, so free travel resolved
+            // to 0 and the window stuck to the left instead of the remembered right edge.
+            AddUntilStep("picker restored to remembered right edge", () =>
+            {
+                var parent = picker.Parent;
+
+                if (parent == null || parent.DrawWidth <= 0)
+                    return false;
+
+                var sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single();
+                float expectedRight = parent.DrawWidth - sidebar.VisiblePanelReserve;
+                return Math.Abs(picker.X + picker.DrawWidth - expectedRight) <= 1;
+            });
+        }
+
+        [Test]
+        public void TestComponentPickerTravelSpansScreenToSidebar()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var picker = (EzSkinEditorComponentPickerWindow)null!;
+
+            AddStep("capture picker", () => picker = editorScreen.ChildrenOfType<EzSkinEditorComponentPickerWindow>().Single());
+            AddStep("open picker", () => picker.Open.Value = true);
+            AddUntilStep("picker visible", () => picker.Alpha == 1);
+
+            // Left limit is the parent's left edge (no gap), right limit stops at the sidebar panel.
+            AddStep("push hard left", () => picker.X = -50);
+            AddStep("drag to flush left", () =>
+            {
+                InputManager.MoveMouseTo(picker.ScreenSpaceDrawQuad.TopLeft + new osuTK.Vector2(picker.DrawWidth / 2, 10));
+                InputManager.PressButton(MouseButton.Left);
+                InputManager.MoveMouseTo(picker.ScreenSpaceDrawQuad.TopLeft + new osuTK.Vector2(-10, 10));
+                InputManager.ReleaseButton(MouseButton.Left);
+            });
+
+            AddUntilStep("left edge flushes the screen edge", () => Math.Abs(picker.X) <= 1);
+
+            AddStep("push hard right", () => picker.X = 5000);
+            AddUntilStep("right edge stops at the sidebar panel", () =>
+            {
+                var sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single();
+                var parent = picker.Parent!;
+                return Math.Abs(picker.X - (parent.DrawWidth - sidebar.VisiblePanelReserve - picker.DrawWidth)) <= 1;
+            });
+        }
+
+        [Test]
+        public void TestComponentPickerDragsHorizontally()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var picker = (EzSkinEditorComponentPickerWindow)null!;
+
+            AddStep("capture picker", () => picker = editorScreen.ChildrenOfType<EzSkinEditorComponentPickerWindow>().Single());
+            AddStep("open picker", () => picker.Open.Value = true);
+            AddUntilStep("picker visible", () => picker.Alpha == 1);
+
+            float before = 0;
+
+            AddStep("park picker at left edge", () => picker.X = before = 0);
+
+            AddStep("grab header", () =>
+            {
+                // A drag starts on the header, so grab a point in the top strip.
+                InputManager.MoveMouseTo(picker.ScreenSpaceDrawQuad.TopLeft + new osuTK.Vector2(picker.DrawWidth / 2, 10));
+                InputManager.PressButton(MouseButton.Left);
+            });
+
+            AddStep("drag beyond the click threshold", () =>
+            {
+                InputManager.MoveMouseTo(picker.ScreenSpaceDrawQuad.TopLeft + new osuTK.Vector2(picker.DrawWidth / 2 + 120, 10));
+            });
+
+            AddStep("release", () => InputManager.ReleaseButton(MouseButton.Left));
+
+            // Regression: the picker handled OnMouseDown/OnDrag but never OnDragStart, so the framework
+            // never entered a drag and the window could not be moved horizontally at all.
+            AddUntilStep("picker followed the pointer horizontally", () => picker.X > before + 20);
+        }
+
+        [Test]
+        public void TestLibraryPlacementRequiresBoundTarget()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var hud = (EzSkinEditorHudLayer)null!;
+
+            AddStep("capture hud", () => hud = editorScreen.ChildrenOfType<EzSkinEditorHudLayer>().Single());
+            AddStep("select global layer", () => editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Single().ActiveLayer.Value = EzSkinEditorLayer.EzHud);
+
+            // No real screen is presented in this bare test, so no Ez layout container is bound.
+            AddAssert("no active target without bound layout", () => hud.ActiveTarget == null);
+            AddAssert("placement gracefully refused", () =>
+                !hud.TryPlaceComponent(SerialisedDrawableInfo.GetAllAvailableDrawables(null).First()));
+        }
 
         [Test]
         public void TestSizeWorkspaceColumnWidthKeepsSnapshotBaseline()

@@ -76,6 +76,13 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public int PageCount => pages.Count;
 
+        /// <summary>
+        /// Width the settings panel currently overlays to the left of the rail while expanded and fading,
+        /// 0 while collapsed. Excludes the panel's own inner padding so a consumer (the visual picker)
+        /// stops flush against the panel's content edge rather than against the panel's outer edge.
+        /// </summary>
+        public float VisiblePanelReserve => (CONTENT_WIDTH - padding) * contentPanel.Alpha;
+
         internal float FooterReservedHeight => footerContainer.Height;
 
         internal float ContentBottomPadding => contentFlow.Padding.Bottom;

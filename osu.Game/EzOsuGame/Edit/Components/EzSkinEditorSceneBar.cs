@@ -11,6 +11,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.UI;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Overlays.SkinEditor;
@@ -42,7 +43,13 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// </summary>
         public Bindable<RulesetInfo?> Ruleset { get; } = new Bindable<RulesetInfo?>();
 
+        /// <summary>
+        /// Whether the visual component picker window is shown.
+        /// </summary>
+        public BindableBool VisualPickerOpen { get; } = new BindableBool();
+
         private EzEditorLayerButton layerButton = null!;
+        private EzToggleButton visualPickerButton = null!;
 
         private readonly Dictionary<EzSkinEditorSceneType, SceneTabButton> tabButtons = new Dictionary<EzSkinEditorSceneType, SceneTabButton>();
 
@@ -101,12 +108,32 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                            })
                                            .ToArray(),
                             },
-                            layerButton = new EzEditorLayerButton
+                            // 右端控件组：HUD 层下拉固定贴最右，之后新增的按钮一律插到它左边。
+                            new FillFlowContainer
                             {
-                                Margin = new MarginPadding { Left = padding, Top = gap, Right = padding },
-                                GetAvailableLayers = () => EzSkinEditorLayerOptions.For(CurrentScene.Value).Select(d => d.Layer).ToList(),
-                                GetDisplayName = layer => EzSkinEditorLayerOptions.GetDisplayName(layer, Ruleset.Value),
-                                ActiveLayer = ActiveLayer,
+                                Name = @"Ez Scene bar controls",
+                                AutoSizeAxes = Axes.X,
+                                RelativeSizeAxes = Axes.Y,
+                                Spacing = new Vector2(EzUIStyleV1.SCENE_BAR_BUTTON_SPACING, 0),
+                                Padding = new MarginPadding { Horizontal = padding, Vertical = gap },
+                                Direction = FillDirection.Horizontal,
+                                Children = new Drawable[]
+                                {
+                                    visualPickerButton = new EzToggleButton
+                                    {
+                                        AutoSizeAxes = Axes.X,
+                                        Height = EzUIStyleV1.SceneBarControlHeight(),
+                                        Text = EzEditorStrings.TOOLBAR_VISUAL_PICKER,
+                                        TextSize = 14,
+                                        Active = { BindTarget = VisualPickerOpen },
+                                    },
+                                    layerButton = new EzEditorLayerButton
+                                    {
+                                        GetAvailableLayers = () => EzSkinEditorLayerOptions.For(CurrentScene.Value).Select(d => d.Layer).ToList(),
+                                        GetDisplayName = layer => EzSkinEditorLayerOptions.GetDisplayName(layer, Ruleset.Value),
+                                        ActiveLayer = ActiveLayer,
+                                    },
+                                },
                             },
                         },
                     },

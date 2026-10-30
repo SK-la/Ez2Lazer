@@ -122,6 +122,7 @@ namespace osu.Game.EzOsuGame.Edit
         private EzSkinEditorSceneBar sceneBar = null!;
         private EzSkinEditorSidebar sidebar = null!;
         private EzPlaybackBar playbackBar = null!;
+        private EzSkinEditorComponentPickerWindow componentPicker = null!;
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
             => dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
@@ -361,6 +362,7 @@ namespace osu.Game.EzOsuGame.Edit
                                                     Children = new Drawable[]
                                                     {
                                                         hudLayer,
+                                                        componentPicker = new EzSkinEditorComponentPickerWindow(ezSkinConfig.GetBindable<float>(Ez2Setting.SkinEditorComponentPickerX)),
                                                     },
                                                 },
                                                 sidebar = new EzSkinEditorSidebar(),
@@ -396,6 +398,9 @@ namespace osu.Game.EzOsuGame.Edit
                 refreshPreviewContent();
             }, true);
             hudLayer.OnStateChange += () => menuBar.RefreshMenuState();
+            // 侧栏设置面板叠在游玩区右缘上；选择器右界跟随面板当前可见宽度，面板收起时贴到轨道左缘。
+            componentPicker.RightReserve = () => sidebar.VisiblePanelReserve;
+            sceneBar.VisualPickerOpen.BindTo(componentPicker.Open);
             bindConfigPreviewRefresh();
             bindSceneBarPlayback();
         }

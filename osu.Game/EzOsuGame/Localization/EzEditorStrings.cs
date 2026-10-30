@@ -434,6 +434,15 @@ namespace osu.Game.EzOsuGame.Localization
             "当前层没有可放置的组件。",
             "No components can be placed in the current layer.");
 
+        public static readonly LocalisableString PICKER_WINDOW_TITLE = new EzLocalizationManager.EzLocalisableString(
+            "可视化选择器", "Visual picker");
+
+        public static readonly LocalisableString PICKER_WINDOW_DRAG_HINT = new EzLocalizationManager.EzLocalisableString(
+            "拖动标题栏移动", "Drag the title bar");
+
+        public static readonly LocalisableString TOOLBAR_VISUAL_PICKER = new EzLocalizationManager.EzLocalisableString(
+            "可视化选择器", "Visual picker");
+
         public static readonly LocalisableString SIDEBAR_SKIN_SCOPED_EMPTY = new EzLocalizationManager.EzLocalisableString(
             "当前皮肤没有专用设置。",
             "This skin has no scoped settings.");

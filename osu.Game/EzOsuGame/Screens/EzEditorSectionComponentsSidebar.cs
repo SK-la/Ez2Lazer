@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -19,8 +20,10 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Edit.Components;
 using osuTK;
@@ -42,11 +45,24 @@ namespace osu.Game.EzOsuGame.Screens
         [Resolved]
         private EzResourceStore resources { get; set; } = null!;
 
-        private FillFlowContainer cardFlow = null!;
-        private readonly Bindable<EzEditorComponentType> componentType = new Bindable<EzEditorComponentType>(EzEditorComponentType.Note);
+        /// <summary>
+        /// Selects which resource category the card list shows. Exposed so a host that pins the
+        /// selector outside the scroll container can still drive the list.
+        /// </summary>
+        public Bindable<EzEditorComponentType> ComponentType { get; } = new Bindable<EzEditorComponentType>(EzEditorComponentType.Note);
 
-        public EzEditorSectionComponentsSidebar()
-            : base("Ez Pro Skin") { }
+        private readonly bool showComponentTypeSelector;
+        private FillFlowContainer cardFlow = null!;
+
+        /// <param name="showComponentTypeSelector">
+        /// When true the selector is part of this section's own content; when false the host draws it
+        /// outside the scroll container so only the card list scrolls.
+        /// </param>
+        public EzEditorSectionComponentsSidebar(bool showComponentTypeSelector = true)
+            : base("Ez Pro Skin")
+        {
+            this.showComponentTypeSelector = showComponentTypeSelector;
+        }
 
         private Bindable<string>? noteSetName;
         private Bindable<string>? stageName;
@@ -68,34 +84,39 @@ namespace osu.Game.EzOsuGame.Screens
             ensureEzSkinBindings();
             refreshEzSkinOptions();
 
+            var children = new List<Drawable>();
+
+            if (showComponentTypeSelector)
+            {
+                children.Add(new SettingsEnumDropdown<EzEditorComponentType>
+                {
+                    LabelText = EzSkinStrings.COMPONENT_TYPE_LABEL,
+                    Current = ComponentType,
+                });
+                children.Add(new Box
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Height = 1,
+                    Colour = new Color4(1f, 1f, 1f, 0.1f),
+                    Margin = new MarginPadding { Vertical = 4 },
+                });
+            }
+
+            children.Add(cardFlow = new FillFlowContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Full,
+                Spacing = new Vector2(6),
+            });
+
             InternalChild = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
                 Direction = FillDirection.Vertical,
                 Spacing = new Vector2(10),
-                Children = new Drawable[]
-                {
-                    new SettingsEnumDropdown<EzEditorComponentType>
-                    {
-                        LabelText = EzSkinStrings.COMPONENT_TYPE_LABEL,
-                        Current = componentType,
-                    },
-                    new Box
-                    {
-                        RelativeSizeAxes = Axes.X,
-                        Height = 1,
-                        Colour = new Color4(1f, 1f, 1f, 0.1f),
-                        Margin = new MarginPadding { Vertical = 4 },
-                    },
-                    cardFlow = new FillFlowContainer
-                    {
-                        RelativeSizeAxes = Axes.X,
-                        AutoSizeAxes = Axes.Y,
-                        Direction = FillDirection.Full,
-                        Spacing = new Vector2(6),
-                    },
-                }
+                Children = children,
             };
 
             noteSetName!.BindValueChanged(_ => rebuildVisualLists());
@@ -104,7 +125,7 @@ namespace osu.Game.EzOsuGame.Screens
             gameThemeName!.BindValueChanged(_ => rebuildVisualLists());
             judgementLineName!.BindValueChanged(_ => rebuildVisualLists());
             columnLightName!.BindValueChanged(_ => rebuildVisualLists());
-            componentType.BindValueChanged(_ => rebuildVisualLists());
+            ComponentType.BindValueChanged(_ => rebuildVisualLists());
             EzGameThemeCandidates.Refresh(storage);
             rebuildVisualLists();
         }
@@ -181,7 +202,7 @@ namespace osu.Game.EzOsuGame.Screens
             refreshEzSkinOptions();
             cardFlow.Clear();
 
-            switch (componentType.Value)
+            switch (ComponentType.Value)
             {
                 case EzEditorComponentType.Stage:
                     populateStageCards();
@@ -372,7 +393,12 @@ namespace osu.Game.EzOsuGame.Screens
             private readonly Action onClick;
             private readonly Func<bool> isSelected;
 
-            private Box selectedBox = null!;
+            private Box stateBox = null!;
+            private OsuSpriteText nameText = null!;
+            private OverlayColourProvider colourProvider = null!;
+
+            private float? appliedStateAlpha;
+            private Color4? appliedNameColour;
 
             public VisualTextureItem(LocalisableString name, Texture? preview, Action onClick, Func<bool> isSelected)
             {
@@ -383,23 +409,30 @@ namespace osu.Game.EzOsuGame.Screens
 
                 Size = new Vector2(item_width, item_height);
                 Masking = true;
-                CornerRadius = 6;
+                CornerRadius = EzUIStyleV1.CORNER_RADIUS_SHEARED;
+                // Top-centre anchor/origin makes the fill-flow centre each wrapped row instead of
+                // stacking rows flush left.
+                Anchor = Anchor.TopCentre;
+                Origin = Anchor.TopCentre;
             }
 
             [BackgroundDependencyLoader]
-            private void load(OsuColour colours)
+            private void load(OverlayColourProvider colourProvider)
             {
+                this.colourProvider = colourProvider;
+
                 InternalChildren = new Drawable[]
                 {
                     new Box
                     {
                         RelativeSizeAxes = Axes.Both,
-                        Colour = colours.GreySeaFoamDark,
+                        Colour = colourProvider.Background5,
                     },
-                    selectedBox = new Box
+                    // Hover / selected tint, same accent hue as the editor chrome.
+                    stateBox = new Box
                     {
                         RelativeSizeAxes = Axes.Both,
-                        Colour = Color4.White,
+                        Colour = colourProvider.Highlight1,
                         Alpha = 0,
                     },
                     new FillFlowContainer
@@ -415,18 +448,20 @@ namespace osu.Game.EzOsuGame.Screens
                                 RelativeSizeAxes = Axes.X,
                                 Height = 80,
                                 Masking = true,
-                                CornerRadius = 4,
+                                CornerRadius = EzUIStyleV1.CORNER_RADIUS_CHIP,
                                 Children = new Drawable[]
                                 {
                                     new Box
                                     {
                                         RelativeSizeAxes = Axes.Both,
-                                        Colour = new Color4(0f, 0f, 0f, 0.35f),
+                                        Colour = colourProvider.Background6,
                                     },
                                     preview != null
                                         ? new Sprite
                                         {
                                             RelativeSizeAxes = Axes.Both,
+                                            Anchor = Anchor.Centre,
+                                            Origin = Anchor.Centre,
                                             FillMode = FillMode.Fit,
                                             Texture = preview,
                                         }
@@ -438,31 +473,75 @@ namespace osu.Game.EzOsuGame.Screens
                                         }
                                 }
                             },
-                            new OsuSpriteText
+                            new Container
                             {
                                 RelativeSizeAxes = Axes.X,
-                                Text = name,
-                                Font = OsuFont.GetFont(size: 12, weight: FontWeight.SemiBold),
+                                AutoSizeAxes = Axes.Y,
+                                Child = nameText = new TruncatingSpriteText
+                                {
+                                    Anchor = Anchor.TopCentre,
+                                    Origin = Anchor.TopCentre,
+                                    MaxWidth = item_width - 12,
+                                    Text = name,
+                                    Font = OsuFont.GetFont(size: 12, weight: FontWeight.SemiBold),
+                                }
                             }
                         }
                     }
                 };
+
+                updateState();
             }
 
             protected override void LoadComplete()
             {
                 base.LoadComplete();
-                updateSelectedState();
+                updateState();
             }
 
             protected override void Update()
             {
                 base.Update();
-                updateSelectedState();
+                updateState();
             }
 
-            private void updateSelectedState()
-                => selectedBox.Colour = isSelected() ? new Color4(1f, 1f, 1f, 0.2f) : new Color4(1f, 1f, 1f, 0f);
+            protected override bool OnHover(HoverEvent e)
+            {
+                updateState();
+                return true;
+            }
+
+            protected override void OnHoverLost(HoverLostEvent e)
+            {
+                updateState();
+                base.OnHoverLost(e);
+            }
+
+            private void updateState()
+            {
+                bool selected = isSelected();
+                bool hovered = IsHovered;
+
+                // Selected outranks hover; both read as the editor accent so the state is obvious.
+                float targetAlpha = selected ? (hovered ? 0.45f : 0.3f) : (hovered ? 0.15f : 0f);
+
+                if (appliedStateAlpha != targetAlpha)
+                {
+                    appliedStateAlpha = targetAlpha;
+                    stateBox.FadeTo(targetAlpha, 120, Easing.OutQuint);
+                }
+
+                Color4 targetColour = selected ? colourProvider.Highlight1 : colourProvider.Content1;
+
+                if (!selected && hovered)
+                    targetColour = colourProvider.Content1.Lighten(0.2f);
+
+                if (appliedNameColour != targetColour)
+                {
+                    appliedNameColour = targetColour;
+                    nameText.FadeColour(targetColour, 120, Easing.OutQuint);
+                }
+            }
 
             protected override bool OnClick(ClickEvent e)
             {
