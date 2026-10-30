@@ -266,6 +266,19 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString TOOLBAR_HUD_LAYER = new EzLocalizationManager.EzLocalisableString("HUD layer", "HUD layer");
 
+        public static readonly LocalisableString LAYER_HUD_OFF = new EzLocalizationManager.EzLocalisableString("隐藏 HUD", "Hide HUD");
+
+        public static readonly LocalisableString LAYER_EZ_HUD = new EzLocalizationManager.EzLocalisableString("Ez HUD", "Ez HUD");
+
+        public static readonly LocalisableString LAYER_EZ_HUD_RULESET = new EzLocalizationManager.EzLocalisableString("Ez HUD（{0}）", "Ez HUD ({0})");
+
+        public static readonly LocalisableString LAYER_EZ_PLAYFIELD_RULESET = new EzLocalizationManager.EzLocalisableString("Ez Playfield（{0}）", "Ez Playfield ({0})");
+
+        /// <summary>
+        /// Fallback used in place of the ruleset name when no ruleset is active yet.
+        /// </summary>
+        public static readonly LocalisableString LAYER_MODE_UNKNOWN = new EzLocalizationManager.EzLocalisableString("模式", "mode");
+
         public static readonly LocalisableString TAB_APPEARANCE = new EzLocalizationManager.EzLocalisableString("外观", "Appearance");
 
         public static readonly LocalisableString TAB_SIZE = new EzLocalizationManager.EzLocalisableString("尺寸", "Size");

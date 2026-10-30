@@ -5,6 +5,7 @@ using System;
 using System.IO;
 using NUnit.Framework;
 using osu.Framework.Platform;
+using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.Rulesets;
 using osu.Game.Skinning;
@@ -85,6 +86,39 @@ namespace osu.Game.Tests.NonVisual
                 Assert.That(afterReset.TryGetDrawableInfo(mania, out _), Is.False);
                 Assert.That(afterReset.TryGetDrawableInfo(null, out var stillGlobal), Is.True);
                 Assert.That(stillGlobal![0].Type, Is.EqualTo(typeof(BoxElement)));
+            }
+            finally
+            {
+                try
+                {
+                    if (Directory.Exists(path))
+                        Directory.Delete(path, true);
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        [Test]
+        public void TestLayoutFileNameMatchesContainerName()
+        {
+            string path = Path.Combine(Path.GetTempPath(), "ez-layout-test-" + Guid.NewGuid().ToString("N"));
+            var storage = new NativeStorage(path);
+
+            try
+            {
+                var store = new EzLayoutStore(storage);
+
+                var layout = new SkinLayoutInfo();
+                layout.Update(null, new[] { new SerialisedDrawableInfo(new BoxElement()) });
+                store.Save(GlobalSkinnableContainers.MainHUDComponents, layout);
+
+                var layoutStorage = storage.GetStorageForDirectory(EzModifyPath.LayoutSetPath(EzModifyPath.LAYOUT_SET_DEFAULT));
+
+                // Follows the official convention: the file is named after the container enum member.
+                Assert.That(layoutStorage.Exists("MainHUDComponents.json"), Is.True);
+                Assert.That(layoutStorage.Exists("Gameplay.json"), Is.False);
             }
             finally
             {

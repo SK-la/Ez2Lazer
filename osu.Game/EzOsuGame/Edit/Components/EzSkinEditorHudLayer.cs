@@ -46,6 +46,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private EzLayoutLayer? layoutLayer;
         private OsuScreen? liveScreen;
         private EzSkinEditorSceneType scene = EzSkinEditorSceneType.Gameplay;
+        private EzSkinEditorLayer layer = EzSkinEditorLayer.EzHud;
         private RulesetInfo? ruleset;
 
         private HUDOverlay? boundHudOverlay;
@@ -82,7 +83,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// Binds the editor HUD to a scene. Only <paramref name="ezLayout"/> contributes editable targets;
         /// <paramref name="screen"/> is used to reach the skin layer HUD for temporary visibility only.
         /// </summary>
-        public void Apply(EzSkinEditorSceneType scene, OsuScreen? screen, EzLayoutLayer? ezLayout)
+        public void Apply(EzSkinEditorSceneType scene, OsuScreen? screen, EzLayoutLayer? ezLayout, EzSkinEditorLayer? activeLayer = null)
         {
             if (!ReferenceEquals(layoutLayer, ezLayout))
             {
@@ -100,6 +101,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             this.scene = scene;
             liveScreen = screen;
+            layer = EzSkinEditorLayerOptions.Normalize(scene, activeLayer ?? layer);
 
             updateLayoutLayerVisibility();
             updateSkinLayerVisibility();
@@ -146,20 +148,21 @@ namespace osu.Game.EzOsuGame.Edit.Components
         }
 
         /// <summary>
-        /// Ez 布局层中属于当前场景的容器。可编辑目标由 <see cref="EzSkinEditorSceneRegistry"/> 解析，
-        /// 本层不再自行维护场景到目标的映射。
+        /// Ez 布局层中属于当前场景/当前编辑层的容器。可编辑目标由
+        /// <see cref="EzSkinEditorLayerOptions"/> 解析，本层不再自行维护场景到目标的映射。
+        /// 只匹配精确 lookup（Lookup + Ruleset 均相等），保证只编辑所选层。
         /// </summary>
         public IEnumerable<EzLayoutContainer> EnumerateTargets()
         {
             if (layoutLayer == null)
                 yield break;
 
-            GlobalSkinnableContainers? wanted = EzSkinEditorSceneRegistry.ResolveLayoutTarget(scene);
+            GlobalSkinnableContainerLookup? wanted = EzSkinEditorLayerOptions.ResolveLookup(layer, ruleset);
 
             if (wanted == null)
                 yield break;
 
-            foreach (var container in layoutLayer.LayoutContainers.Where(c => c.Lookup.Lookup == wanted))
+            foreach (var container in layoutLayer.LayoutContainers.Where(c => c.Lookup.Equals(wanted)))
                 yield return container;
         }
 

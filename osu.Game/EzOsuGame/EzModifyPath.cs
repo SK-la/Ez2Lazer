@@ -25,6 +25,22 @@ namespace osu.Game.EzOsuGame
         public const string BG_PATH = @"EzResources/BG";
         public const string BG_PIXIV_PATH = @"EzResources/BG_PIXIV";
         public const string CONFIG_LAYOUT_PATH = @"EzResources/Config/layout";
+
+        /// <summary>
+        /// Root directory holding one layout set. Multiple sets (for example <c>layout</c>,
+        /// <c>layout-O2jam</c>) live side by side under <see cref="CONFIG_ROOT_PATH"/> and can be
+        /// switched as a whole later.
+        /// </summary>
+        public const string CONFIG_ROOT_PATH = @"EzResources/Config";
+
+        /// <summary>Default layout set name; resolves to <see cref="CONFIG_LAYOUT_PATH"/>.</summary>
+        public const string LAYOUT_SET_DEFAULT = @"layout";
+
+        /// <summary>
+        /// Directory of a named layout set, e.g. <c>EzResources/Config/layout-O2jam</c>.
+        /// </summary>
+        public static string LayoutSetPath(string layoutSetName) => $"{CONFIG_ROOT_PATH}/{layoutSetName}";
+
         public const string PETS_PATH = @"EzResources/Pets";
 
         /// <summary>

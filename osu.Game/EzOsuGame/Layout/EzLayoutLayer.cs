@@ -32,6 +32,7 @@ namespace osu.Game.EzOsuGame.Layout
 
         private EzLayoutContainer? gameplayContainer;
         private EzLayoutContainer? rulesetGameplayContainer;
+        private EzLayoutContainer? rulesetPlayfieldContainer;
         private Player? pendingPlayer;
 
         private bool onSongSelect;
@@ -85,12 +86,18 @@ namespace osu.Game.EzOsuGame.Layout
         [BackgroundDependencyLoader]
         private void load(Storage storage)
         {
-            Store = new EzLayoutStore(storage);
+            Store = createStore(storage);
 
             InternalChild = SongSelectContainer = new EzLayoutContainer(
                 Store,
                 new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.SongSelect));
         }
+
+        /// <summary>
+        /// Single entry point resolving the layout set for this layer. Future whole-set switching
+        /// swaps the set name here and reloads every container instead of scattering paths.
+        /// </summary>
+        private static EzLayoutStore createStore(Storage storage) => new EzLayoutStore(storage);
 
         protected override void LoadComplete()
         {
@@ -184,7 +191,10 @@ namespace osu.Game.EzOsuGame.Layout
 
             var ruleset = player.Ruleset.Value;
             if (ruleset != null)
+            {
                 rulesetGameplayContainer = addGameplayContainer(player, new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, ruleset));
+                rulesetPlayfieldContainer = addGameplayContainer(player, new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.Playfield, ruleset));
+            }
 
             updateGameplayContainerVisibility();
             notifyTargetsChanged();
@@ -213,6 +223,8 @@ namespace osu.Game.EzOsuGame.Layout
             gameplayContainer = null;
             rulesetGameplayContainer?.Expire();
             rulesetGameplayContainer = null;
+            rulesetPlayfieldContainer?.Expire();
+            rulesetPlayfieldContainer = null;
         }
 
         private void updateSongSelectContainerVisibility()
@@ -226,6 +238,7 @@ namespace osu.Game.EzOsuGame.Layout
 
             gameplayContainer?.Alpha = alpha;
             rulesetGameplayContainer?.Alpha = alpha;
+            rulesetPlayfieldContainer?.Alpha = alpha;
         }
 
         private void notifyTargetsChanged() => LayoutTargetsChanged?.Invoke();
