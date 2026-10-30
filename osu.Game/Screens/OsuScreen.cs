@@ -310,6 +310,7 @@ namespace osu.Game.Screens
         /// Override to create a BackgroundMode for the current screen.
         /// Note that the instance created may not be the used instance if it matches the BackgroundMode equality clause.
         /// </summary>
+        [CanBeNull]
         protected virtual BackgroundScreen CreateBackground() => null;
 
         /// <summary>
@@ -378,6 +379,7 @@ namespace osu.Game.Screens
             ownedBackground = null;
             background = backgroundStack.CurrentScreen as BackgroundScreen;
         }
+
         public virtual bool OnBackButton() => false;
     }
 }

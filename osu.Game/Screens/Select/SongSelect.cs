@@ -1076,7 +1076,7 @@ namespace osu.Game.Screens.Select
             }
         }
 
-        protected override BackgroundScreen CreateBackground()
+        protected override BackgroundScreen? CreateBackground()
         {
             // While the Ez skin editor is open, keep the global (main menu) background alive.
             if (EzSkinEditorActiveState.Active)

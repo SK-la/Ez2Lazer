@@ -39,7 +39,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         /// <summary>
         /// 共享选中列表的持有者。该列表不能直接存成 <see cref="IUnbindable"/> 字段：框架的
-        /// <see cref="Drawable.Dispose"/> 会用反射对所有这类字段调用 <c>UnbindAll()</c>，
+        /// Drawable.Dispose 会用反射对所有这类字段调用 <c>UnbindAll()</c>，
         /// 那会把列表的 <c>CollectionChanged</c> 清空。蓝图容器在每次
         /// <c>EzSkinEditorHudLayer.refreshBlueprints</c> 时都会重建，于是侧栏对同一列表的订阅
         /// 会被反复清除，表现为「蓝图能选中、侧栏永远读不到选中项」。

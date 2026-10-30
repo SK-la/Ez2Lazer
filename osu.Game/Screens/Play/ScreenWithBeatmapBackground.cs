@@ -11,7 +11,7 @@ namespace osu.Game.Screens.Play
 {
     public abstract partial class ScreenWithBeatmapBackground : OsuScreen
     {
-        protected override BackgroundScreen CreateBackground()
+        protected override BackgroundScreen? CreateBackground()
         {
             // While the Ez skin editor is open, keep the global (main menu) background alive behind the
             // plugged screen instead of replacing it with a beatmap background.

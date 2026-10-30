@@ -398,9 +398,6 @@ namespace osu.Game.Overlays.SkinEditor
         /// </summary>
         public virtual void SetTarget(OsuScreen screen)
         {
-            if (screen is EzSkinEditorScreen)
-                return;
-
             nestedInputManagerDisable?.Dispose();
             nestedInputManagerDisable = null;
 
