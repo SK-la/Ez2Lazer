@@ -23,6 +23,7 @@ using osu.Framework.Testing;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.HUD;
+using osu.Game.EzOsuGame.Playback;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.EzOsuGame.ScriptedSkin;
 using osu.Game.EzOsuGame.UI;
@@ -36,7 +37,6 @@ using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Edit;
 using osu.Game.Screens.Edit.Components;
 using osu.Game.Screens.Edit.Components.Menus;
-using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osu.Game.Utils;
 using osuTK;
@@ -60,12 +60,14 @@ namespace osu.Game.Overlays.SkinEditor
         protected Drawable? TargetScreen;
 
         private SkinEditorSceneLibrary sceneLibrary = null!;
-        private EzSkinEditorPlaybackControls playbackControls = null!;
+        private EzPlaybackBar playbackBar = null!;
         private EzSkinEditorBeatmapMenuButton modeButton = null!;
 
         private Bindable<Skin> currentSkin = null!;
         private Bindable<string> clipboardContent = null!;
-        private double lastPlaybackProgressDisplayTime = double.MinValue;
+
+        [Resolved]
+        private EzPlaybackController playback { get; set; } = null!;
 
         [Resolved]
         private OsuGame? game { get; set; }
@@ -214,11 +216,7 @@ namespace osu.Game.Overlays.SkinEditor
                                             },
                                             Children = new Drawable[]
                                             {
-                                                playbackControls = new EzSkinEditorPlaybackControls
-                                                {
-                                                    OnSeek = seekGameplayPlayback,
-                                                    OnPlayPauseClicked = toggleGameplayPlayback,
-                                                },
+                                                playbackBar = new EzPlaybackBar(playback),
                                                 modeButton = new EzSkinEditorBeatmapMenuButton
                                                 {
                                                     Anchor = Anchor.CentreLeft,
@@ -420,7 +418,6 @@ namespace osu.Game.Overlays.SkinEditor
         public void UpdateTargetScreen(Drawable targetScreen)
         {
             TargetScreen = targetScreen;
-            lastPlaybackProgressDisplayTime = double.MinValue;
 
             changeHandler?.Dispose();
 
@@ -430,7 +427,6 @@ namespace osu.Game.Overlays.SkinEditor
 
             Scheduler.AddOnce(loadBlueprintContainer);
             Scheduler.AddOnce(populateSettings);
-            Scheduler.AddOnce(refreshGameplayPlaybackControls);
 
             void loadBlueprintContainer()
             {
@@ -445,67 +441,10 @@ namespace osu.Game.Overlays.SkinEditor
         {
             base.Update();
 
-            var clock = getTargetGameplayClock();
+            bool active = playback.ActiveTarget.Value == EzPlaybackTarget.Gameplay;
 
-            if (clock == null)
-                return;
-
-            if (Math.Abs(clock.CurrentTime - lastPlaybackProgressDisplayTime) < 16)
-                return;
-
-            playbackControls.SetCurrentTime(clock.CurrentTime);
-            lastPlaybackProgressDisplayTime = clock.CurrentTime;
-            playbackControls.SetPlaying(!clock.IsPaused.Value);
-        }
-
-        private void refreshGameplayPlaybackControls()
-        {
-            var clock = getTargetGameplayClock();
-
-            if (clock == null || TargetScreen is not Player player)
-            {
-                playbackControls.Alpha = 0;
-                modeButton.Active = false;
-                return;
-            }
-
-            double maxTime = Math.Max(player.Beatmap.Value.BeatmapInfo.Length, 1);
-            playbackControls.Alpha = 1;
-            playbackControls.SetRange(0, maxTime);
-            playbackControls.SetCurrentTime(clock.CurrentTime);
-            playbackControls.SetPlaying(!clock.IsPaused.Value);
-            modeButton.Active = true;
-            lastPlaybackProgressDisplayTime = clock.CurrentTime;
-        }
-
-        private GameplayClockContainer? getTargetGameplayClock()
-        {
-            if (TargetScreen is not Player)
-                return null;
-
-            return TargetScreen.ChildrenOfType<GameplayClockContainer>().FirstOrDefault();
-        }
-
-        private void seekGameplayPlayback(double time)
-        {
-            var clock = getTargetGameplayClock();
-            clock?.Seek(time);
-            lastPlaybackProgressDisplayTime = double.MinValue;
-            playbackControls.SetCurrentTime(time, seeking: true);
-        }
-
-        private void toggleGameplayPlayback()
-        {
-            var clock = getTargetGameplayClock();
-            if (clock == null)
-                return;
-
-            if (clock.IsPaused.Value)
-                clock.Start();
-            else
-                clock.Stop();
-
-            playbackControls.SetPlaying(!clock.IsPaused.Value);
+            playbackBar.Alpha = active ? 1 : 0;
+            modeButton.Active = active;
         }
 
         private void targetChanged(ValueChangedEvent<GlobalSkinnableContainerLookup?> target)

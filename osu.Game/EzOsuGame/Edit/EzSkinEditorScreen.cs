@@ -23,6 +23,7 @@ using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays.Preview;
+using osu.Game.EzOsuGame.Playback;
 using osu.Game.EzOsuGame.ScriptedSkin;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Cursor;
@@ -109,6 +110,9 @@ namespace osu.Game.EzOsuGame.Edit
         [Resolved]
         private EzResourceStore resource { get; set; } = null!;
 
+        [Resolved]
+        private EzPlaybackController playback { get; set; } = null!;
+
         private DependencyContainer dependencies = null!;
         private Container gameplayHole = null!;
         private Drawable? activeSceneHost;
@@ -116,7 +120,7 @@ namespace osu.Game.EzOsuGame.Edit
         private EzSkinEditorMenuBar menuBar = null!;
         private EzSkinEditorSceneBar sceneBar = null!;
         private EzSkinEditorSidebar sidebar = null!;
-        private EzSkinEditorPlaybackControls playbackControls = null!;
+        private EzPlaybackBar playbackBar = null!;
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
             => dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
@@ -139,8 +143,8 @@ namespace osu.Game.EzOsuGame.Edit
         private ISkinEditorVirtualProvider? provider;
         private EzSkinEditorSceneContext? sceneContext;
 
-        private double lastSceneBarProgressDisplayTime = double.MinValue;
         private Bindable<EzBeatmapPreviewMode>? sceneBarPreviewModeBindable;
+        private bool playbackBarActive;
         private OsuScreen? hudTargetScreen;
         private EzLayoutLayer? layoutLayer;
 
@@ -284,7 +288,7 @@ namespace osu.Game.EzOsuGame.Edit
                                                 },
                                                 Children = new Drawable[]
                                                 {
-                                                    playbackControls = new EzSkinEditorPlaybackControls(),
+                                                    playbackBar = new EzPlaybackBar(playback),
                                                     new EzSkinEditorTopToolbar
                                                     {
                                                         PreviewSource = PreviewState.Source,
@@ -381,82 +385,46 @@ namespace osu.Game.EzOsuGame.Edit
         {
             base.Update();
 
-            var source = getActiveScenePlaybackSource();
+            bool active = isGameplayPlaybackActive();
+            playbackBar.Alpha = active ? 1 : 0;
 
-            if (source == null)
-                return;
+            if (active != playbackBarActive)
+            {
+                playbackBarActive = active;
 
-            // Match EzBeatmapPreviewOverlay: Abs so seek/loop backwards still refreshes.
-            if (Math.Abs(source.CurrentTime - lastSceneBarProgressDisplayTime) < 16)
-                return;
-
-            playbackControls.SetCurrentTime(source.CurrentTime);
-            lastSceneBarProgressDisplayTime = source.CurrentTime;
+                if (active)
+                    applyPreviewAudioPolicy();
+            }
         }
 
         private void bindSceneBarPlayback()
         {
-            var controls = playbackControls;
-            controls.OnSeek = seekSceneBarPlayback;
-            controls.OnPlayPauseClicked = toggleBeatmapPlayback;
-
             sceneBarPreviewModeBindable = PreviewState.Mode.GetBoundCopy();
             sceneBarPreviewModeBindable.BindValueChanged(mode =>
             {
-                setBeatmapPlaybackPlaying(mode.NewValue == EzBeatmapPreviewMode.Dynamic, updateMode: false);
+                // Mode 是预览的 desired state：只有仍在游戏内预览时才把播放键同步过去。
+                if (!isGameplayPlaybackActive())
+                    return;
+
+                playback.SetPlaying(mode.NewValue == EzBeatmapPreviewMode.Dynamic);
             }, true);
-        }
 
-        private void seekSceneBarPlayback(double time)
-        {
-            getActiveScenePlaybackSource()?.Seek(time);
-            lastSceneBarProgressDisplayTime = double.MinValue;
-            playbackControls.SetCurrentTime(time, seeking: true);
-        }
-
-        private void setBeatmapPlaybackPlaying(bool playing, bool updateMode = true)
-        {
-            if (updateMode)
+            playback.IsPlaying.BindValueChanged(p =>
             {
-                if (playing)
+                if (!isGameplayPlaybackActive())
+                    return;
+
+                if (p.NewValue)
                     PreviewState.ResumeBeatmapPlayback();
                 else
                     PreviewState.PauseBeatmapPlayback();
-            }
-
-            getActiveScenePlaybackSource()?.SetPlaying(playing);
-            playbackControls.SetPlaying(playing);
-            applyPreviewAudioPolicy();
-            refreshSceneBarPlayback(playing);
+            });
         }
 
-        private void refreshSceneBarPlayback(bool? playingOverride = null)
-        {
-            var controls = playbackControls;
-            var source = getActiveScenePlaybackSource();
-
-            if (source == null)
-            {
-                controls.Alpha = 0;
-                return;
-            }
-
-            bool playing = playingOverride ?? source.IsPlaying;
-
-            controls.Alpha = 1;
-            controls.SetRange(source.BeatmapMinTime, source.BeatmapMaxTime);
-            controls.SetCurrentTime(source.CurrentTime);
-            lastSceneBarProgressDisplayTime = source.CurrentTime;
-            controls.SetPlaying(playing);
-        }
-
-        private IEzSkinEditorScenePlaybackSource? getActiveScenePlaybackSource()
-        {
-            if (hudTargetScreen is Player player && player.IsLoaded)
-                return new EzSkinEditorPlayerPlaybackSource(player);
-
-            return null;
-        }
+        /// <summary>
+        /// 只有插拔进来的真实游玩屏在当前时，播放条才有意义；选歌/主菜单场景隐藏。
+        /// </summary>
+        private bool isGameplayPlaybackActive() => playback.ActiveTarget.Value == EzPlaybackTarget.Gameplay;
 
         private void onSceneChanged(ValueChangedEvent<EzSkinEditorSceneType> change)
         {
@@ -483,12 +451,12 @@ namespace osu.Game.EzOsuGame.Edit
         /// <summary>
         /// Re-presents the current scene after the preview beatmap/ruleset changed, without rebuilding the
         /// sidebar or the HUD layer. Only the plugged gameplay screen depends on the preview selection;
-        /// sidebar sections bind to the shared <see cref="PreviewState"/> and follow it live.
+        /// sidebar sections bind to the shared <see cref="PreviewState"/> and follow it live, and the
+        /// playback bar renders straight from <see cref="EzPlaybackController"/>.
         /// </summary>
         internal void RefreshPreviewScene()
         {
             SceneApplied?.Invoke(sceneBar.CurrentScene.Value);
-            Schedule(() => refreshSceneBarPlayback());
         }
 
         public void ApplySettings() => applySettings();
@@ -525,7 +493,6 @@ namespace osu.Game.EzOsuGame.Edit
             applyCurrentScene();
             SceneApplied?.Invoke(sceneBar.CurrentScene.Value);
 
-            Schedule(() => refreshSceneBarPlayback());
             menuBar.RefreshMenuState();
         }
 
@@ -543,16 +510,6 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
 
             PreviewState.SetBeatmap(gameBeatmap.Value, ruleset, EzBeatmapPreviewModes.GetAppearanceLoadMode(ruleset));
-        }
-
-        private void toggleBeatmapPlayback()
-        {
-            if (!PreviewState.HasBeatmapLoaded && !PreviewState.LoopBeatmap.Value)
-                return;
-
-            var source = getActiveScenePlaybackSource();
-            bool playing = source?.IsPlaying ?? PreviewState.Mode.Value == EzBeatmapPreviewMode.Dynamic;
-            setBeatmapPlaybackPlaying(!playing);
         }
 
         private void selectBeatmapPreview(RulesetInfo ruleset)
@@ -1179,7 +1136,6 @@ namespace osu.Game.EzOsuGame.Edit
 
             sceneContext = buildSceneContext();
             sidebar.ApplyStrategy(EzSkinEditorSceneRegistry.Get(sceneBar.CurrentScene.Value), sceneContext);
-            Schedule(() => refreshSceneBarPlayback());
         }
 
         private void exportPreviewImage()
