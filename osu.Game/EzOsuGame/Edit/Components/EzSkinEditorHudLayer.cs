@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
@@ -10,8 +11,10 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame.Layout;
+using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
+using osu.Game.Screens.Edit;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Select;
 using osu.Game.Skinning;
@@ -22,7 +25,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// Ez 皮肤编辑器 HUD 蓝图层。只把 Ez 布局层（<see cref="EzLayoutLayer"/>）的容器作为可编辑目标，
     /// 皮肤层 HUD 只在 layer 开关下临时显隐，既不建蓝图也不写回皮肤。
     /// </summary>
-    public partial class EzSkinEditorHudLayer : CompositeDrawable
+    public partial class EzSkinEditorHudLayer : CompositeDrawable, IEditorChangeHandler
     {
         /// <summary>
         /// 蓝图是否接受输入。由场景是否为 HUD 场景与 HUD layer 开关共同决定；与蓝图是否显示无关。
@@ -36,6 +39,60 @@ namespace osu.Game.EzOsuGame.Edit.Components
         public readonly BindableBool LayerVisible = new BindableBool(true);
 
         public IBindableList<ISerialisableDrawable> SelectedComponents => selectedComponents;
+
+        /// <summary>
+        /// Raised when the active editing target changes (layer switch, scene switch, or ruleset change),
+        /// so library sections can rebuild their previews against the new container.
+        /// </summary>
+        public event Action? ActiveTargetChanged;
+
+        /// <summary>
+        /// Undo/redo over the active layer's container, reusing the official
+        /// <see cref="SkinEditorChangeHandler"/>. Recreated whenever the active target changes because a
+        /// handler binds exactly one container. Null while there is no editable target.
+        /// </summary>
+        public SkinEditorChangeHandler? ChangeHandler => changeHandler;
+
+        private SkinEditorChangeHandler? changeHandler;
+
+        // Nested BeginChange/EndChange from the selection handler must not unbalance the delegate swap.
+        private IEditorChangeHandler? activeChangeHandler;
+        private int changeDepth;
+
+        public event Action? OnStateChange;
+
+        public void BeginChange()
+        {
+            activeChangeHandler = changeHandler;
+
+            if (activeChangeHandler == null)
+                return;
+
+            changeDepth++;
+            activeChangeHandler.BeginChange();
+            activeChangeHandler.OnStateChange += raiseStateChange;
+        }
+
+        public void EndChange()
+        {
+            if (activeChangeHandler == null)
+                return;
+
+            activeChangeHandler.EndChange();
+            activeChangeHandler.OnStateChange -= raiseStateChange;
+
+            if (--changeDepth <= 0)
+            {
+                changeDepth = 0;
+                activeChangeHandler = null;
+            }
+        }
+
+        public void SaveState() => changeHandler?.SaveState();
+
+        public void RestoreState(int direction) => changeHandler?.RestoreState(direction);
+
+        private void raiseStateChange() => OnStateChange?.Invoke();
 
         private readonly BindableList<ISerialisableDrawable> selectedComponents = new BindableList<ISerialisableDrawable>();
 
@@ -148,10 +205,48 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             // 显示由 HUD layer 开关决定，交互由场景 + 开关共同决定；两者互不代管。
             if (!LayerVisible.Value)
+            {
+                ActiveTargetChanged?.Invoke();
                 return;
+            }
 
             foreach (var target in EnumerateTargets())
                 blueprintHost.Add(new EzSkinEditorHudBlueprintContainer(target, selectedComponents, PersistLayoutToCurrentSkin));
+
+            rebuildChangeHandler();
+            ActiveTargetChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Recreates the undo/redo handler against the current active container. The official handler
+        /// binds exactly one container, so it must be rebuilt on every target change.
+        /// </summary>
+        private void rebuildChangeHandler()
+        {
+            changeHandler?.Dispose();
+            changeHandler = null;
+
+            EzLayoutContainer? target = ActiveTarget;
+
+            if (target == null)
+                return;
+
+            var handler = new SkinEditorChangeHandler(target);
+            handler.CanUndo.BindValueChanged(_ => raiseStateChange());
+            handler.CanRedo.BindValueChanged(_ => raiseStateChange());
+            changeHandler = handler;
+        }
+
+        /// <summary>
+        /// Persists every layout container edited by the editor. Used on apply/save.
+        /// </summary>
+        public void PersistAllLayouts()
+        {
+            if (layoutLayer == null)
+                return;
+
+            foreach (var target in layoutLayer.LayoutContainers)
+                layoutLayer.Store.Save(target);
         }
 
         /// <summary>
@@ -178,6 +273,42 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             foreach (var target in EnumerateTargets())
                 layoutLayer?.Store.Save(target);
+        }
+
+        /// <summary>
+        /// The container currently being edited (the active layer's only target), or null when the
+        /// layer has no editable container. Used as the dependency source for library previews.
+        /// </summary>
+        public EzLayoutContainer? ActiveTarget => EnumerateTargets().FirstOrDefault();
+
+        /// <summary>
+        /// The ruleset active in the editor; drives which library (global / mode) can be edited.
+        /// </summary>
+        public RulesetInfo? CurrentRuleset => ruleset;
+
+        /// <summary>
+        /// Instantiates and places a component into the active layer's container, persisting the
+        /// layout and selecting the new component. Returns false when there is no editable target
+        /// or the container rejects the component.
+        /// </summary>
+        public bool TryPlaceComponent(Type type)
+        {
+            EzLayoutContainer? target = ActiveTarget;
+
+            if (target == null)
+                return false;
+
+            if (Activator.CreateInstance(type) is not ISerialisableDrawable component)
+                return false;
+
+            if (!target.TryPlace(component))
+                return false;
+
+            selectedComponents.Clear();
+            selectedComponents.Add(component);
+
+            layoutLayer?.Store.Save(target);
+            return true;
         }
 
         private void updateLayoutLayerVisibility()
@@ -285,6 +416,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
+
+            changeHandler?.Dispose();
+            changeHandler = null;
 
             if (layoutLayer != null)
             {

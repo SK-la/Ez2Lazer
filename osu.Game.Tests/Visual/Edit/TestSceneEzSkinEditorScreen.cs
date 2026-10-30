@@ -384,6 +384,31 @@ namespace osu.Game.Tests.Visual.Edit
         }
 
         [Test]
+        public void TestLibraryGroupsSplitOnModeLayer()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var sceneBar = (EzSkinEditorSceneBar)null!;
+
+            AddStep("capture scene bar", () => sceneBar = editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Single());
+
+            // Invisible sidebar groups create no content, so counting the library sections counts visible ones.
+            AddStep("select global layer", () => sceneBar.ActiveLayer.Value = EzSkinEditorLayer.EzHud);
+            AddUntilStep("only global library visible", () => visibleLibraryCount() == 1);
+
+            AddStep("select mode layer", () => sceneBar.ActiveLayer.Value = EzSkinEditorLayer.EzHudRuleset);
+            AddUntilStep("both libraries visible as separate groups", () => visibleLibraryCount() == 2);
+
+            AddStep("hide hud layer", () => sceneBar.ActiveLayer.Value = EzSkinEditorLayer.HudOff);
+            AddUntilStep("no library visible", () => visibleLibraryCount() == 0);
+        }
+
+        private int visibleLibraryCount() =>
+            editorScreen.ChildrenOfType<EzSkinEditorComponentLibrarySection>().Count(s => s.Parent != null);
+
+        [Test]
         public void TestSizeWorkspaceColumnWidthKeepsSnapshotBaseline()
         {
             AddStep("load screen", loadScreen);

@@ -110,7 +110,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
             SelectedItems.AddRange(targetComponents.SelectMany(list => list).Except(SelectedItems).ToArray());
         }
 
-        protected override SelectionHandler<ISerialisableDrawable> CreateSelectionHandler() => new EzSkinEditorHudSelectionHandler();
+        protected override SelectionHandler<ISerialisableDrawable> CreateSelectionHandler() => new EzSkinEditorHudSelectionHandler
+        {
+            DeleteTarget = component =>
+            {
+                targetContainer.Remove(component, true);
+                onLayoutMutated?.Invoke();
+            },
+        };
 
         protected override SelectionBlueprint<ISerialisableDrawable> CreateBlueprintFor(ISerialisableDrawable component)
             => new SkinBlueprint(component);
@@ -125,10 +132,16 @@ namespace osu.Game.EzOsuGame.Edit.Components
     }
 
     /// <summary>
-    /// 仅移动与选中；删除 / 层级 / 完整菜单留待后续接入。
+    /// 仅移动与选中；删除写回当前编辑层容器。层级 / 完整菜单留待后续接入。
     /// </summary>
     public partial class EzSkinEditorHudSelectionHandler : SelectionHandler<ISerialisableDrawable>
     {
+        /// <summary>
+        /// Removes a single item from the edited container. Owner wires this to the container so the
+        /// handler does not need to know which layer is active; the owner also persists the layout.
+        /// </summary>
+        public Action<ISerialisableDrawable>? DeleteTarget { get; set; }
+
         public override bool HandleMovement(MoveSelectionEvent<ISerialisableDrawable> moveEvent)
         {
             foreach (var c in SelectedBlueprints)
@@ -156,7 +169,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         protected override void DeleteItems(IEnumerable<ISerialisableDrawable> items)
         {
-            // 删除接入前先空实现。
+            var targets = items.ToArray();
+
+            foreach (var item in targets)
+                DeleteTarget?.Invoke(item);
         }
     }
 }

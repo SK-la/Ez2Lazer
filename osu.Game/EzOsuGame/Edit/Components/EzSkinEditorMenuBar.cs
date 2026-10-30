@@ -7,6 +7,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Input;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.SkinEditor;
@@ -51,6 +52,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Action? ExportPreviewImageAction { get; set; }
 
+        public Action? UndoAction { get; set; }
+
+        public Action? RedoAction { get; set; }
+
+        public Func<bool>? CanUndo { get; set; }
+
+        public Func<bool>? CanRedo { get; set; }
+
         public Func<bool>? CanCreateEzSkinJson { get; set; }
 
         public Func<bool>? CanUpdateEzSkinJsonSnapshot { get; set; }
@@ -81,6 +90,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private readonly EditorMenuItem writeColoursItem;
         private readonly EditorMenuItem writeSizesItem;
         private readonly EditorMenuItem exportOskItem;
+        private readonly EditorMenuItem undoItem;
+        private readonly EditorMenuItem redoItem;
 
         private Bindable<bool> hudSnapEnabled = null!;
         private Bindable<float> hudSnapDistance = null!;
@@ -111,6 +122,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 {
                     Items = new OsuMenuItem[]
                     {
+                        undoItem = new EditorMenuItem(CommonStrings.Undo, MenuItemType.Standard, () => UndoAction?.Invoke()) { Hotkey = new Hotkey(PlatformAction.Undo) },
+                        redoItem = new EditorMenuItem(CommonStrings.Redo, MenuItemType.Standard, () => RedoAction?.Invoke()) { Hotkey = new Hotkey(PlatformAction.Redo) },
+                        new OsuMenuItemSpacer(),
                         createConfigSnapshotItem = new EditorMenuItem(EzEditorStrings.MENU_CREATE_CONFIG_SNAPSHOT, MenuItemType.Standard, () => CreateConfigSnapshotAction?.Invoke()),
                         restoreConfigSnapshotItem = new EditorMenuItem(EzEditorStrings.MENU_RESTORE_CONFIG_SNAPSHOT, MenuItemType.Standard, () => RestoreConfigSnapshotAction?.Invoke()),
                         new OsuMenuItemSpacer(),
@@ -174,6 +188,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public void RefreshMenuState()
         {
+            undoItem.Action.Disabled = !(CanUndo?.Invoke() ?? false);
+            redoItem.Action.Disabled = !(CanRedo?.Invoke() ?? false);
             bool canUseConfigSnapshot = CanUseConfigSnapshot?.Invoke() ?? true;
             createConfigSnapshotItem.Action.Disabled = !canUseConfigSnapshot;
             restoreConfigSnapshotItem.Action.Disabled = !canUseConfigSnapshot;

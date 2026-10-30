@@ -413,12 +413,26 @@ namespace osu.Game.EzOsuGame.Localization
             "Turn on HUD layer, then select a component in the preview to edit its settings.");
 
         public static readonly LocalisableString SIDEBAR_HUD_LAYER_OFF = new EzLocalizationManager.EzLocalisableString(
-            "请先打开顶栏 HUD layer。",
-            "Turn on the HUD layer toggle in the scene bar first.");
+            "请先在场景栏选择编辑层（非「隐藏 HUD」）。",
+            "Pick an editing layer in the scene bar first (anything but \"Hide HUD\").");
 
         public static readonly LocalisableString SIDEBAR_HUD_NO_SELECTION = new EzLocalizationManager.EzLocalisableString(
             "在预览中点击 HUD 组件以选中并显示设置。",
             "Click a HUD component in the preview to select it and show settings.");
+
+        public static readonly LocalisableString LIBRARY_GLOBAL_TITLE = new EzLocalizationManager.EzLocalisableString(
+            "组件库(通用)", "Component library (global)");
+
+        public static readonly LocalisableString LIBRARY_RULESET_TITLE = new EzLocalizationManager.EzLocalisableString(
+            "组件库(模式)", "Component library (mode)");
+
+        public static readonly LocalisableString LIBRARY_PLACEHOLDER = new EzLocalizationManager.EzLocalisableString(
+            "请先进入 HUD 场景并选择编辑层。",
+            "Open a HUD scene and pick an editing layer first.");
+
+        public static readonly LocalisableString LIBRARY_EMPTY = new EzLocalizationManager.EzLocalisableString(
+            "当前层没有可放置的组件。",
+            "No components can be placed in the current layer.");
 
         public static readonly LocalisableString SIDEBAR_SKIN_SCOPED_EMPTY = new EzLocalizationManager.EzLocalisableString(
             "当前皮肤没有专用设置。",

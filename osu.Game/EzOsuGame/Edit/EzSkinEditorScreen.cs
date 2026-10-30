@@ -33,6 +33,7 @@ using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
+using osu.Game.Screens.Edit;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osuTK;
@@ -229,9 +230,10 @@ namespace osu.Game.EzOsuGame.Edit
         [BackgroundDependencyLoader]
         private void load()
         {
-            // 先构造并缓存，供侧栏 HUD 栏解析选中项。
+            // 先构造并缓存，供侧栏 HUD 栏解析选中项；同时作为 IEditorChangeHandler 供选择处理器做撤销/重做。
             hudLayer = new EzSkinEditorHudLayer();
             dependencies.CacheAs(hudLayer);
+            dependencies.CacheAs<IEditorChangeHandler>(hudLayer);
 
             InternalChildren = new Drawable[]
             {
@@ -288,6 +290,10 @@ namespace osu.Game.EzOsuGame.Edit
                                                 CanWriteSizesToSkinIni = () => SkinIniSession is { IsSupported: true } && getCurrentKeyMode() > 0,
                                                 CanExportOsk = canExportOsk,
                                                 CanUseConfigSnapshot = () => sceneBar.CurrentScene.Value != EzSkinEditorSceneType.Note,
+                                                UndoAction = undo,
+                                                RedoAction = redo,
+                                                CanUndo = () => hudLayer.ChangeHandler?.CanUndo.Value ?? false,
+                                                CanRedo = () => hudLayer.ChangeHandler?.CanRedo.Value ?? false,
                                             },
                                             // Ez-only (official menu has skin dropdown alone). Right→left: skin, mode, progress+play.
                                             new FillFlowContainer
@@ -387,7 +393,9 @@ namespace osu.Game.EzOsuGame.Edit
                 hudLayer.SetVisible(v.NewValue != EzSkinEditorLayer.HudOff);
                 hudLayer.Apply(sceneBar.CurrentScene.Value, hudTargetScreen, layoutLayer, v.NewValue);
                 updateHudInteraction();
+                refreshPreviewContent();
             }, true);
+            hudLayer.OnStateChange += () => menuBar.RefreshMenuState();
             bindConfigPreviewRefresh();
             bindSceneBarPlayback();
         }
@@ -608,6 +616,7 @@ namespace osu.Game.EzOsuGame.Edit
                 PreviewBeatmap = PreviewState.PreviewBeatmap,
                 PreviewRuleset = PreviewState.Ruleset.Value,
                 PreviewMode = PreviewState.Mode.Value,
+                ActiveLayer = sceneBar.ActiveLayer.Value,
                 ComparisonSnapshot = useNoteComparisonOnly ? null : ComparisonSnapshotForTesting,
                 NoteSession = NoteSessionForTesting,
                 NoteSnapshot = NoteSnapshotForTesting,
@@ -668,7 +677,7 @@ namespace osu.Game.EzOsuGame.Edit
         private void applySettings()
         {
             ezSkinConfig.Save();
-            hudLayer.PersistLayoutToCurrentSkin();
+            hudLayer.PersistAllLayouts();
 
             if (SkinIniSession is { IsSupported: true, IsDirty: true })
                 SkinIniSession.Commit();
@@ -676,6 +685,18 @@ namespace osu.Game.EzOsuGame.Edit
             invalidateResourceCaches();
             skinManager.CurrentSkinInfo.TriggerChange();
             refreshScene();
+        }
+
+        private void undo()
+        {
+            hudLayer.RestoreState(-1);
+            menuBar.RefreshMenuState();
+        }
+
+        private void redo()
+        {
+            hudLayer.RestoreState(1);
+            menuBar.RefreshMenuState();
         }
 
         private void commitSkinIni()

@@ -30,6 +30,13 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
                 Title = EzEditorStrings.SIDEBAR_TAB_HUD,
                 CreateContent = () => new EzSkinEditorHudWorkspaceSection(),
             },
+            new EzSkinEditorSidebarGroupDefinition
+            {
+                Id = GameplaySceneStrategy.GROUP_ID_LIBRARY_GLOBAL,
+                Title = EzEditorStrings.LIBRARY_GLOBAL_TITLE,
+                Visible = context.ActiveLayer != EzSkinEditorLayer.HudOff,
+                CreateContent = () => new EzSkinEditorComponentLibrarySection(rulesetScoped: false) { Title = EzEditorStrings.LIBRARY_GLOBAL_TITLE },
+            },
         };
     }
 }
