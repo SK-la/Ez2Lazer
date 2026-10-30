@@ -49,7 +49,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private EzSkinEditorSidebarGroupRail rail = null!;
         private OsuScrollContainer contentScroll = null!;
         private FillFlowContainer contentFlow = null!;
-        private SettingsCheckbox pinCheckbox = null!;
         private readonly List<EzSkinEditorSettingsGroup?> groupDrawables = new List<EzSkinEditorSettingsGroup?>();
 
         // 滚动驱动的选中变化期间置位，阻止 onRailSelectionChanged 再把视口拉回分组顶部。
@@ -153,13 +152,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
                     Origin = Anchor.TopRight,
                 },
             };
-
-            pinCheckbox = new SettingsCheckbox
-            {
-                LabelText = EzEditorStrings.SIDEBAR_PIN_LABEL,
-                Current = Pinned,
-            };
-            contentFlow.Add(pinCheckbox);
         }
 
         protected override void LoadComplete()
@@ -317,6 +309,15 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private void rebuildGroups()
         {
             contentFlow.Clear();
+
+            // 固定开关置顶。分组重建会清空并销毁 contentFlow 的子项，开关必须每次重建，
+            // 否则切换场景后顶部就看不到它了。
+            contentFlow.Add(new SettingsCheckbox
+            {
+                LabelText = EzEditorStrings.SIDEBAR_PIN_LABEL,
+                Current = Pinned,
+            });
+
             groupDrawables.Clear();
 
             foreach (var definition in pages)

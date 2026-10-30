@@ -875,6 +875,28 @@ namespace osu.Game.Tests.Visual.Edit
         }
 
         [Test]
+        public void TestSidebarPinSwitchVisibleAcrossScenes()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            AddUntilStep("pin switch shown on initial scene", () =>
+                editorScreen.ChildrenOfType<SettingsCheckbox>()
+                            .Any(c => c.LabelText.ToString() == EzEditorStrings.SIDEBAR_PIN_LABEL.ToString()));
+
+            // 切场景会重建侧栏分组，固定开关不能随旧分组一起消失。
+            switchScene(EzSkinEditorSceneType.Gameplay);
+            AddUntilStep("pin switch still shown on gameplay", () =>
+                editorScreen.ChildrenOfType<SettingsCheckbox>()
+                            .Any(c => c.LabelText.ToString() == EzEditorStrings.SIDEBAR_PIN_LABEL.ToString()));
+
+            switchScene(EzSkinEditorSceneType.Note);
+            AddUntilStep("pin switch still shown on note", () =>
+                editorScreen.ChildrenOfType<SettingsCheckbox>()
+                            .Any(c => c.LabelText.ToString() == EzEditorStrings.SIDEBAR_PIN_LABEL.ToString()));
+        }
+
+        [Test]
         public void TestSidebarCollapse()
         {
             AddStep("load screen", loadScreen);
