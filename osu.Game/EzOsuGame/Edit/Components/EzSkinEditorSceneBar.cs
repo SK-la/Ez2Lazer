@@ -14,6 +14,7 @@ using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Overlays.SkinEditor;
+using osu.Game.Rulesets;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.Edit.Components
@@ -30,9 +31,18 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Action? OpenOfficialHudEditorRequested { get; set; }
 
-        public BindableBool HudLayerVisible => hudLayerToggle.Active;
+        /// <summary>
+        /// The active editing layer. Only selects which layout container is edited; visibility is
+        /// driven separately by whether the value is <see cref="EzSkinEditorLayer.HudOff"/>.
+        /// </summary>
+        public Bindable<EzSkinEditorLayer> ActiveLayer { get; } = new Bindable<EzSkinEditorLayer>(EzSkinEditorLayer.EzHud);
 
-        private EzEditorHudLayerToggle hudLayerToggle = null!;
+        /// <summary>
+        /// Ruleset shown by the editor; used to label the ruleset-scoped layer options.
+        /// </summary>
+        public Bindable<RulesetInfo?> Ruleset { get; } = new Bindable<RulesetInfo?>();
+
+        private EzEditorLayerButton layerButton = null!;
 
         private readonly Dictionary<EzSkinEditorSceneType, SceneTabButton> tabButtons = new Dictionary<EzSkinEditorSceneType, SceneTabButton>();
 
@@ -91,9 +101,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                            })
                                            .ToArray(),
                             },
-                            hudLayerToggle = new EzEditorHudLayerToggle
+                            layerButton = new EzEditorLayerButton
                             {
                                 Margin = new MarginPadding { Left = padding, Top = gap, Right = padding },
+                                GetAvailableLayers = () => EzSkinEditorLayerOptions.For(CurrentScene.Value).Select(d => d.Layer).ToList(),
+                                GetDisplayName = layer => EzSkinEditorLayerOptions.GetDisplayName(layer, Ruleset.Value),
+                                ActiveLayer = ActiveLayer,
                             },
                         },
                     },
@@ -104,7 +117,13 @@ namespace osu.Game.EzOsuGame.Edit.Components
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            CurrentScene.BindValueChanged(e => updateActiveTab(e.NewValue), true);
+            CurrentScene.BindValueChanged(e =>
+            {
+                updateActiveTab(e.NewValue);
+                ActiveLayer.Value = EzSkinEditorLayerOptions.Normalize(e.NewValue, ActiveLayer.Value);
+            }, true);
+
+            Ruleset.BindValueChanged(_ => layerButton.RefreshDisplayText(), true);
         }
 
         private IEnumerable<Drawable> buildSceneButtons() => EzSkinEditorSceneRegistry.All.Select(strategy =>

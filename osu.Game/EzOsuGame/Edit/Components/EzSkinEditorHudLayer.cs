@@ -30,7 +30,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
         public readonly BindableBool InteractionEnabled = new BindableBool();
 
         /// <summary>
-        /// HUD layer 开关本身：临时控制 Ez 布局层与皮肤层 HUD 的显示隐藏。
+        /// HUD layer 显隐总闸：对标官方编辑器的全开/全关，只有「隐藏 HUD」层才整体隐藏。
+        /// 只控制显隐，不决定编辑哪一层容器。
         /// </summary>
         public readonly BindableBool LayerVisible = new BindableBool(true);
 
@@ -83,7 +84,13 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// Binds the editor HUD to a scene. Only <paramref name="ezLayout"/> contributes editable targets;
         /// <paramref name="screen"/> is used to reach the skin layer HUD for temporary visibility only.
         /// </summary>
-        public void Apply(EzSkinEditorSceneType scene, OsuScreen? screen, EzLayoutLayer? ezLayout, EzSkinEditorLayer? activeLayer = null)
+        public void Apply(EzSkinEditorSceneType scene, OsuScreen? screen, EzLayoutLayer? ezLayout) => Apply(scene, screen, ezLayout, layer);
+
+        /// <summary>
+        /// Binds the editor HUD to a scene and selects which layout layer is actively edited.
+        /// Visibility stays decoupled: it is driven solely by <see cref="LayerVisible"/>.
+        /// </summary>
+        public void Apply(EzSkinEditorSceneType scene, OsuScreen? screen, EzLayoutLayer? ezLayout, EzSkinEditorLayer activeLayer)
         {
             if (!ReferenceEquals(layoutLayer, ezLayout))
             {
@@ -101,14 +108,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             this.scene = scene;
             liveScreen = screen;
-            layer = EzSkinEditorLayerOptions.Normalize(scene, activeLayer ?? layer);
+            layer = EzSkinEditorLayerOptions.Normalize(scene, activeLayer);
 
             updateLayoutLayerVisibility();
             updateSkinLayerVisibility();
             refreshBlueprints();
         }
 
-        public void DetachLiveTargets() => Apply(scene, null, null);
+        public void DetachLiveTargets() => Apply(scene, null, null, layer);
 
         private void onLayoutTargetsChanged()
         {
@@ -149,15 +156,16 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         /// <summary>
         /// Ez 布局层中属于当前场景/当前编辑层的容器。可编辑目标由
-        /// <see cref="EzSkinEditorLayerOptions"/> 解析，本层不再自行维护场景到目标的映射。
-        /// 只匹配精确 lookup（Lookup + Ruleset 均相等），保证只编辑所选层。
+        /// <see cref="EzSkinEditorSceneRegistry"/> 与 <see cref="EzSkinEditorLayerOptions"/> 解析，
+        /// 本层不再自行维护场景到目标的映射。只匹配精确 lookup（Lookup + Ruleset 均相等），
+        /// 保证只编辑所选层，其余层保持可见但不进蓝图。
         /// </summary>
         public IEnumerable<EzLayoutContainer> EnumerateTargets()
         {
             if (layoutLayer == null)
                 yield break;
 
-            GlobalSkinnableContainerLookup? wanted = EzSkinEditorLayerOptions.ResolveLookup(layer, ruleset);
+            GlobalSkinnableContainerLookup? wanted = EzSkinEditorLayerOptions.ResolveLookup(scene, layer, ruleset);
 
             if (wanted == null)
                 yield break;
@@ -174,6 +182,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private void updateLayoutLayerVisibility()
         {
+            // 全开/全关对标官方编辑器：只有「隐藏 HUD」层才整体隐藏，切层不影响其它层显隐。
             layoutLayer?.EditorHidden = !LayerVisible.Value;
         }
 

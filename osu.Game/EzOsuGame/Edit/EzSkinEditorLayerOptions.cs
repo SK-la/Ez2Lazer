@@ -93,15 +93,22 @@ namespace osu.Game.EzOsuGame.Edit
         };
 
         /// <summary>
-        /// The layout lookup a layer edits, given the ruleset active in the editor. Ruleset-scoped
-        /// layers only produce a lookup when a ruleset is present.
+        /// The layout lookup a layer edits in a scene, given the ruleset active in the editor.
+        /// Song select only has a single non-ruleset container; gameplay layers map to their
+        /// definition's target. Scenes without an editable HUD and the hidden state yield null.
         /// </summary>
-        public static GlobalSkinnableContainerLookup? ResolveLookup(EzSkinEditorLayer layer, RulesetInfo? ruleset)
+        public static GlobalSkinnableContainerLookup? ResolveLookup(EzSkinEditorSceneType sceneType, EzSkinEditorLayer layer, RulesetInfo? ruleset)
         {
-            var definition = Get(layer);
-
-            if (definition.HidesEverything)
+            if (layer == EzSkinEditorLayer.HudOff)
                 return null;
+
+            if (!EzSkinEditorSceneRegistry.SupportsHudLayer(sceneType))
+                return null;
+
+            if (sceneType == EzSkinEditorSceneType.SongSelect)
+                return new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.SongSelect);
+
+            var definition = Get(layer);
 
             if (definition.RulesetScoped && ruleset == null)
                 return null;
@@ -112,7 +119,7 @@ namespace osu.Game.EzOsuGame.Edit
         /// <summary>
         /// Whether a layer can actually build an editing target right now (used for interaction gating).
         /// </summary>
-        public static bool HasEditingTarget(EzSkinEditorLayer layer, RulesetInfo? ruleset) => ResolveLookup(layer, ruleset) != null;
+        public static bool HasEditingTarget(EzSkinEditorSceneType sceneType, EzSkinEditorLayer layer, RulesetInfo? ruleset) => ResolveLookup(sceneType, layer, ruleset) != null;
 
         /// <summary>
         /// Localised dropdown label. Ruleset-scoped layers substitute the active ruleset name for the

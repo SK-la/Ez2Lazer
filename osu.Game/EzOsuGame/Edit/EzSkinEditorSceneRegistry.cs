@@ -8,7 +8,6 @@ using osu.Framework.Screens;
 using osu.Game.EzOsuGame.Edit.Scenes;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Select;
-using osu.Game.Skinning;
 
 namespace osu.Game.EzOsuGame.Edit
 {
@@ -32,17 +31,6 @@ namespace osu.Game.EzOsuGame.Edit
         /// Single source for the editor HUD layer's capability check.
         /// </summary>
         public static bool SupportsHudLayer(EzSkinEditorSceneType sceneType) => Get(sceneType).SupportsHudLayer;
-
-        /// <summary>
-        /// The Ez layout container target a scene edits, or null when the scene has no editable HUD.
-        /// Keeps the scene-to-target mapping out of the HUD layer.
-        /// </summary>
-        public static GlobalSkinnableContainers? ResolveLayoutTarget(EzSkinEditorSceneType sceneType) => sceneType switch
-        {
-            EzSkinEditorSceneType.Gameplay => GlobalSkinnableContainers.MainHUDComponents,
-            EzSkinEditorSceneType.SongSelect => GlobalSkinnableContainers.SongSelect,
-            _ => null,
-        };
 
         public static EzSkinEditorSceneType ResolveCurrentScene(IScreen? currentScreen) => ResolveCurrentScene(currentScreen?.GetType());
 

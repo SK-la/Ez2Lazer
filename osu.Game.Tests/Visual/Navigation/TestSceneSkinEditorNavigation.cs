@@ -17,6 +17,8 @@ using osu.Framework.Testing;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Edit;
+using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.Online.API;
 using osu.Game.Overlays.Mods;
 using osu.Game.Overlays.Settings;
@@ -510,6 +512,110 @@ namespace osu.Game.Tests.Visual.Navigation
             AddStep("change back to modified skin", () => Game.Dependencies.Get<SkinManager>().SetSkinFromConfiguration(editedSkinId.ToString()));
             AddUntilStep("components loaded", () => Game.ChildrenOfType<SkinnableContainer>().All(c => c.ComponentsLoaded));
             AddUntilStep("changes saved", () => skinEditor.ChildrenOfType<SkinBlueprint>().Any());
+        }
+
+        [Test]
+        public void TestEzEditorLayerDropdownSwitchesLayer()
+        {
+            AddStep("import editor beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).WaitSafely());
+            AddUntilStep("editor beatmap ready", () => !Game.Beatmap.IsDefault);
+
+            AddUntilStep("main menu current", () => Game.ScreenStack.CurrentScreen is MainMenu);
+            AddUntilStep("Ez editor overlay available", () => Game.ChildrenOfType<EzSkinEditorOverlay>().Any());
+            AddStep("open Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("editor gameplay current", () => Game.ScreenStack.CurrentScreen is Player);
+            AddUntilStep("editor workspace ready", () => ezSkinEditor.Workspace?.IsLoaded == true);
+            AddUntilStep("gameplay scene selected", () => ezSkinEditor.Workspace!.CurrentScene.Value == EzSkinEditorSceneType.Gameplay);
+
+            AddUntilStep("layer button present", () => ezSkinEditor.Workspace!.ChildrenOfType<EzEditorLayerButton>().Any());
+
+            AddStep("open layer dropdown", () =>
+            {
+                var button = ezSkinEditor.Workspace!.ChildrenOfType<EzEditorLayerButton>().Single();
+                InputManager.MoveMouseTo(button);
+                InputManager.Click(MouseButton.Left);
+            });
+
+            AddUntilStep("popover shown", () =>
+                ezSkinEditor.Workspace!.ChildrenOfType<osu.Framework.Graphics.Cursor.PopoverContainer>().Any(p => p.CurrentPopover != null));
+
+            AddStep("click ruleset layer option", () =>
+            {
+                var options = ezSkinEditor.Workspace!.ChildrenOfType<EzEditorLayerButton.LayerListPopover.LayerSelectButton>().ToArray();
+                TestContext.Progress.WriteLine("OPTIONS=" + string.Join(" | ", options.Select(o => o.Text.ToString())));
+
+                string rulesetLayerLabel = EzSkinEditorLayerOptions.GetDisplayName(EzSkinEditorLayer.EzHudRuleset,
+                    ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorSceneBar>().Single().Ruleset.Value).ToString();
+                var option = options.SingleOrDefault(b => b.Text.ToString() == rulesetLayerLabel);
+                Assert.That(option, Is.Not.Null, $"ruleset layer option ({rulesetLayerLabel}) not found: " + string.Join(" | ", options.Select(o => o.Text.ToString())));
+
+                InputManager.MoveMouseTo(option!);
+                InputManager.Click(MouseButton.Left);
+            });
+
+            AddUntilStep("layer changed to ruleset", () => ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorSceneBar>().Single().ActiveLayer.Value == EzSkinEditorLayer.EzHudRuleset);
+        }
+
+        [Test]
+        public void TestSongSelectSceneEditsTheSongSelectContainer()
+        {
+            advanceToSongSelect();
+            openEzEditor();
+            AddUntilStep("song select scene selected", () => ezSkinEditor.Workspace!.CurrentScene.Value == EzSkinEditorSceneType.SongSelect);
+
+            AddUntilStep("song select container is an editing target", () =>
+                ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorHudLayer>().Single()
+                            .EnumerateTargets().Any(c => c.Lookup.Lookup == GlobalSkinnableContainers.SongSelect));
+        }
+
+        [Test]
+        public void TestGameplayGlobalLayerEditsTheGlobalContainer()
+        {
+            AddStep("import editor beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).WaitSafely());
+            AddUntilStep("editor beatmap ready", () => !Game.Beatmap.IsDefault);
+
+            AddUntilStep("main menu current", () => Game.ScreenStack.CurrentScreen is MainMenu);
+            openEzEditor();
+            AddUntilStep("editor gameplay current", () => Game.ScreenStack.CurrentScreen is Player);
+            AddUntilStep("gameplay scene selected", () => ezSkinEditor.Workspace!.CurrentScene.Value == EzSkinEditorSceneType.Gameplay);
+
+            AddUntilStep("global layer edits the global hud container", () =>
+            {
+                var hudLayer = ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorHudLayer>().Single();
+                return hudLayer.EnumerateTargets().Any(c => c.Lookup.Lookup == GlobalSkinnableContainers.MainHUDComponents && c.Lookup.Ruleset == null);
+            });
+        }
+
+        [Test]
+        public void TestGameplayRulesetLayerResolvesFromLiveScreen()
+        {
+            AddStep("import editor beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).WaitSafely());
+            AddUntilStep("editor beatmap ready", () => !Game.Beatmap.IsDefault);
+
+            AddUntilStep("main menu current", () => Game.ScreenStack.CurrentScreen is MainMenu);
+            openEzEditor();
+            AddUntilStep("editor gameplay current", () => Game.ScreenStack.CurrentScreen is Player);
+            AddUntilStep("gameplay scene selected", () => ezSkinEditor.Workspace!.CurrentScene.Value == EzSkinEditorSceneType.Gameplay);
+
+            AddUntilStep("wait for gameplay containers", () =>
+                Game.ChildrenOfType<EzLayoutLayer>().Single().LayoutContainers.Count() > 1);
+
+            AddUntilStep("editor picks up the live ruleset", () =>
+                ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorSceneBar>().Single().Ruleset.Value != null);
+
+            AddStep("select ruleset hud layer", () =>
+                ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorSceneBar>().Single().ActiveLayer.Value = EzSkinEditorLayer.EzHudRuleset);
+
+            AddUntilStep("ruleset layer edits the live ruleset container", () =>
+                ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorHudLayer>().Single()
+                            .EnumerateTargets().Any(c => c.Lookup.Lookup == GlobalSkinnableContainers.MainHUDComponents && c.Lookup.Ruleset != null));
+        }
+
+        private void openEzEditor()
+        {
+            AddUntilStep("Ez editor overlay available", () => Game.ChildrenOfType<EzSkinEditorOverlay>().Any());
+            AddStep("open Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("editor workspace ready", () => ezSkinEditor.Workspace?.IsLoaded == true);
         }
 
         private void advanceToSongSelect()

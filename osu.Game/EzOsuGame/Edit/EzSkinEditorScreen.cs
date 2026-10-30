@@ -205,7 +205,25 @@ namespace osu.Game.EzOsuGame.Edit
         {
             hudTargetScreen = screen;
             layoutLayer = ezLayout;
-            hudLayer.Apply(sceneBar.CurrentScene.Value, screen, ezLayout);
+            syncHudRuleset();
+            hudLayer.Apply(sceneBar.CurrentScene.Value, screen, ezLayout, sceneBar.ActiveLayer.Value);
+        }
+
+        /// <summary>
+        /// Resolves the ruleset the HUD layer edits from the same source the gameplay containers are
+        /// built from (the live screen), falling back to the editor's preview ruleset. Without this the
+        /// ruleset-scoped layers resolve to no target, and the global layer only sees an empty global
+        /// container whenever the layout keeps its components under a ruleset section.
+        /// </summary>
+        private void syncHudRuleset()
+        {
+            RulesetInfo? resolved = (hudTargetScreen as Player)?.Ruleset.Value ?? PreviewState.Ruleset.Value;
+
+            if (sceneBar.Ruleset.Value?.Equals(resolved) == true)
+                return;
+
+            sceneBar.Ruleset.Value = resolved;
+            hudLayer.SetRuleset(resolved);
         }
 
         [BackgroundDependencyLoader]
@@ -359,14 +377,15 @@ namespace osu.Game.EzOsuGame.Edit
             sceneBar.CurrentScene.BindValueChanged(onSceneChanged, true);
             skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
             PreviewState.LoopBeatmap.BindValueChanged(_ => refreshScene());
-            PreviewState.Ruleset.BindValueChanged(r =>
+            PreviewState.Ruleset.BindValueChanged(_ =>
             {
-                hudLayer.SetRuleset(r.NewValue);
-                hudLayer.Apply(sceneBar.CurrentScene.Value, hudTargetScreen, layoutLayer);
+                syncHudRuleset();
+                hudLayer.Apply(sceneBar.CurrentScene.Value, hudTargetScreen, layoutLayer, sceneBar.ActiveLayer.Value);
             }, true);
-            sceneBar.HudLayerVisible.BindValueChanged(v =>
+            sceneBar.ActiveLayer.BindValueChanged(v =>
             {
-                hudLayer.SetVisible(v.NewValue);
+                hudLayer.SetVisible(v.NewValue != EzSkinEditorLayer.HudOff);
+                hudLayer.Apply(sceneBar.CurrentScene.Value, hudTargetScreen, layoutLayer, v.NewValue);
                 updateHudInteraction();
             }, true);
             bindConfigPreviewRefresh();
@@ -374,11 +393,12 @@ namespace osu.Game.EzOsuGame.Edit
         }
 
         /// <summary>
-        /// 场景支持 HUD 蓝图且 HUD layer 开启时才允许蓝图拖选；否则只读预览。
+        /// 场景支持 HUD 蓝图、且有可编辑层（非「隐藏 HUD」）时才允许蓝图拖选；否则只读预览。
         /// </summary>
         private void updateHudInteraction()
         {
-            hudLayer.InteractionEnabled.Value = EzSkinEditorSceneRegistry.SupportsHudLayer(sceneBar.CurrentScene.Value) && sceneBar.HudLayerVisible.Value;
+            hudLayer.InteractionEnabled.Value = EzSkinEditorSceneRegistry.SupportsHudLayer(sceneBar.CurrentScene.Value)
+                                                && sceneBar.ActiveLayer.Value != EzSkinEditorLayer.HudOff;
         }
 
         protected override void Update()
@@ -642,7 +662,7 @@ namespace osu.Game.EzOsuGame.Edit
             var strategy = EzSkinEditorSceneRegistry.Get(sceneBar.CurrentScene.Value);
             sidebar.ApplyStrategy(strategy, sceneContext);
             updateHudInteraction();
-            hudLayer.Apply(sceneBar.CurrentScene.Value, hudTargetScreen, layoutLayer);
+            hudLayer.Apply(sceneBar.CurrentScene.Value, hudTargetScreen, layoutLayer, sceneBar.ActiveLayer.Value);
         }
 
         private void applySettings()
