@@ -33,6 +33,7 @@ using osu.Framework.IO.Stores;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
+using osu.Framework.Screens;
 using osu.Framework.Timing;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
@@ -53,6 +54,7 @@ using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Online;
+using osu.Game.EzOsuGame.Playback;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Screens.Menu;
 using osu.Game.EzOsuGame.Skills;
@@ -213,6 +215,18 @@ namespace osu.Game
         protected GlobalCursorDisplay GlobalCursorDisplay { get; private set; }
 
         protected MusicController MusicController { get; private set; }
+
+        /// <summary>
+        /// Functional-layer transport shared by playback UIs. Lives here with <see cref="MusicController"/> so all
+        /// hosts provide it; the base resolves no gameplay target because only <see cref="OsuGame"/> has a screen stack.
+        /// </summary>
+        protected EzPlaybackController EzPlayback { get; private set; }
+
+        /// <summary>
+        /// The screen the playback transport should follow for a gameplay target, or <c>null</c> when the host has
+        /// no screen stack (e.g. the test browser). Overridden by <see cref="OsuGame"/>.
+        /// </summary>
+        protected virtual IScreen CurrentScreen => null;
 
         protected IAPIProvider API { get; set; }
 
@@ -539,6 +553,11 @@ namespace osu.Game
 
             base.Content.Add(MusicController = new MusicController());
             dependencies.CacheAs(MusicController);
+
+            // Functional-layer transport for playback UIs (editor progress bar, visualizer ring). Registered here
+            // alongside MusicController so every host — the game and test runners alike — can resolve it.
+            base.Content.Add(EzPlayback = new EzPlaybackController(() => CurrentScreen));
+            dependencies.CacheAs(EzPlayback);
 
             MusicController.TrackChanged += onTrackChanged;
             base.Content.Add(beatmapClock);
