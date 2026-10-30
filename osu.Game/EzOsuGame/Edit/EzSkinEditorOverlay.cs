@@ -8,7 +8,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Primitives;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Layout;
@@ -116,7 +115,7 @@ namespace osu.Game.EzOsuGame.Edit
                 {
                     RequestClose = Hide,
                     OpenOfficialHudEditor = openOfficialHudEditor,
-                    BeatmapPreviewRequested = PresentBeatmapForRuleset,
+                    BeatmapPreviewRequested = presentBeatmapForRuleset,
                 };
                 LoadComponentAsync(Workspace, loaded =>
                 {
@@ -255,7 +254,7 @@ namespace osu.Game.EzOsuGame.Edit
         /// <see cref="IPerformFromScreenRunner"/> first steps back to song select / main menu (exiting any
         /// running gameplay) before the switch is applied.
         /// </summary>
-        private void PresentBeatmapForRuleset(RulesetInfo rulesetInfo, WorkingBeatmap workingBeatmap)
+        private void presentBeatmapForRuleset(RulesetInfo rulesetInfo, WorkingBeatmap workingBeatmap)
         {
             performer?.PerformFromScreen(_ =>
             {
@@ -281,26 +280,9 @@ namespace osu.Game.EzOsuGame.Edit
             if (State.Value != Visibility.Visible || Workspace?.IsLoaded != true)
                 return;
 
-            const float padding = 10;
-            float relativeRailWidth = EzSkinEditorSidebarGroupRail.WIDTH / DrawWidth;
-            float relativeToolbarHeight = (EzSkinEditorSceneBar.HEIGHT + global::osu.Game.Overlays.SkinEditor.SkinEditor.MENU_HEIGHT + padding) / DrawHeight;
+            const float toolbar_height = EzSkinEditorSceneBar.HEIGHT + global::osu.Game.Overlays.SkinEditor.SkinEditor.MENU_HEIGHT;
 
-            float relativeWidth = 1 - relativeRailWidth;
-            float spaceHeight = 1f - relativeToolbarHeight - padding / DrawHeight;
-            float targetHeight = relativeWidth;
-            float offsetY;
-
-            if (targetHeight > spaceHeight)
-            {
-                targetHeight = spaceHeight;
-                offsetY = 0f;
-            }
-            else
-            {
-                offsetY = (spaceHeight - targetHeight) / 2f;
-            }
-
-            scalingContainer.SetCustomRect(new RectangleF(0, relativeToolbarHeight + offsetY, relativeWidth, targetHeight), true);
+            scalingContainer.SetCustomRect(EzSkinEditorSceneSizing.ComputeSceneRect(DrawSize, toolbar_height, EzSkinEditorSidebarGroupRail.WIDTH), true);
         }
 
         private bool tryUseBeatmapForActiveRuleset()
