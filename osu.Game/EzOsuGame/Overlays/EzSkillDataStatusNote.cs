@@ -87,7 +87,7 @@ namespace osu.Game.EzOsuGame.Overlays
             Task.Run(() =>
             {
                 var stopwatch = Stopwatch.StartNew();
-                EzStartupTrace.Log($"SkillDataStatus.Measure begin thread={Environment.CurrentManagedThreadId}");
+                EzStartupTrace.LogDiagnostic($"SkillDataStatus.Measure begin thread={Environment.CurrentManagedThreadId}");
 
                 bool failed = false;
                 EzDataStateReport? status = null;
@@ -115,7 +115,7 @@ namespace osu.Game.EzOsuGame.Overlays
                     failed = true;
                 }
 
-                EzStartupTrace.Log($"SkillDataStatus.Measure worker done {stopwatch.ElapsedMilliseconds}ms failed={failed}");
+                EzStartupTrace.LogDiagnostic($"SkillDataStatus.Measure worker done {stopwatch.ElapsedMilliseconds}ms failed={failed}");
 
                 // Only the Realm reads stay off-thread; the note text is composed back on the update thread
                 // so its localisable labels resolve against the UI culture.

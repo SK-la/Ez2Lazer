@@ -39,12 +39,6 @@ namespace osu.Game.EzOsuGame.Startup
         {
             base.LoadComplete();
 
-            if (!EzStartupTuning.SampleStartupFrames)
-            {
-                Expire();
-                return;
-            }
-
             double now = Clock.CurrentTime;
             windowStart = now;
             lastFrameTime = now;
@@ -57,9 +51,6 @@ namespace osu.Game.EzOsuGame.Startup
         protected override void Update()
         {
             base.Update();
-
-            if (!EzStartupTuning.SampleStartupFrames)
-                return;
 
             double now = Clock.CurrentTime;
             double elapsedMs = now - lastFrameTime;
@@ -83,7 +74,7 @@ namespace osu.Game.EzOsuGame.Startup
             double avgMs = frames > 0 ? (now - windowStart) / frames : 0;
             double allocMb = (allocated - lastAllocatedBytes) / 1024.0 / 1024.0;
 
-            EzStartupTrace.Log($"FrameSample {secondsReported}s frames={frames} avg={fmt(avgMs)}ms worst={fmt(worstFrameMs)}ms "
+            EzStartupTrace.LogDiagnostic($"FrameSample {secondsReported}s frames={frames} avg={fmt(avgMs)}ms worst={fmt(worstFrameMs)}ms "
                                + $"alloc={fmt(allocMb)}MB gc0={gc0 - lastGc0} gc1={gc1 - lastGc1} gc2={gc2 - lastGc2}");
 
             windowStart = now;

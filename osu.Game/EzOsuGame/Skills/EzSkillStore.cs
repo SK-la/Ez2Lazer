@@ -330,7 +330,7 @@ namespace osu.Game.EzOsuGame.Skills
             stopwatch.Stop();
 
             if (traceCaller != null)
-                EzStartupTrace.Log($"ChartChainState caller={traceCaller} elapsedMs={stopwatch.ElapsedMilliseconds} rateable={chain.RateableChartCount}");
+                EzStartupTrace.LogDiagnostic($"ChartChainState caller={traceCaller} elapsedMs={stopwatch.ElapsedMilliseconds} rateable={chain.RateableChartCount}");
 
             return chain;
         }
