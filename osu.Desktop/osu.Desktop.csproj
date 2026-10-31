@@ -11,6 +11,10 @@
     <ApplicationIcon>lazer.ico</ApplicationIcon>
     <Version>0.0.0</Version>
     <FileVersion>0.0.0</FileVersion>
+    <!-- 启动期有大量 drawable/纹理分配（选歌预加载 + 设置预加载），workstation GC 会让 gen0/gen1
+         回收直接暂停主线程，表现为启动后数秒卡顿。Server GC 用后台回收降低暂停。 -->
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
   </PropertyGroup>
 
   <!-- Required for deployment. -->
