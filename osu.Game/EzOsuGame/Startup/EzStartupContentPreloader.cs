@@ -53,6 +53,7 @@ namespace osu.Game.EzOsuGame.Startup
 
         public void LogStatus(string context)
         {
+            settings?.LogPreloadStatus(context);
         }
 
         public bool AreSettingsLoaded => settings?.AreSectionsLoaded ?? false;

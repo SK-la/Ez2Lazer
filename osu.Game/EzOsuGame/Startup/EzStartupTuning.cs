@@ -45,5 +45,11 @@ namespace osu.Game.EzOsuGame.Startup
         /// Spreads Gen2 pressure on the main menu.
         /// </summary>
         public static double SettingsPreloadDelayAfterBdspMs { get; set; } = 1_500;
+
+        /// <summary>
+        /// Emit per-section load timings and a Top-N snapshot to <see cref="EzStartupTrace"/>.
+        /// Set false to silence the per-section lines while A/B testing.
+        /// </summary>
+        public static bool LogSectionLoadTimings { get; set; } = true;
     }
 }

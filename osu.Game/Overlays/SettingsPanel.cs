@@ -335,6 +335,12 @@ namespace osu.Game.Overlays
         /// </summary>
         public void LogPreloadStatus(string context)
         {
+            if (!EzStartupTuning.LogSectionLoadTimings)
+                return;
+
+            EzStartupTrace.Log($"Settings.status context={context} loaded={AreSectionsLoaded} ready={AreSectionsReadyForDisplay} "
+                               + $"sections={loadableSections.Count} mounted={SectionsContainer?.Count ?? 0} "
+                               + $"preloadMs={sectionsPreloadDurationMs?.ToString() ?? "-"}");
         }
 
         private void loadSections()
@@ -364,6 +370,7 @@ namespace osu.Game.Overlays
             {
                 loadedSections = sections.ToList();
                 AreSectionsLoaded = true;
+                logSectionLoadSnapshot();
 
                 if (State.Value != Visibility.Visible)
                 {
@@ -376,6 +383,19 @@ namespace osu.Game.Overlays
 
                 scheduleAfterPopInLoadDelay(scheduleMountLoadedSections);
             }, scheduler: preloadScheduler);
+        }
+
+        /// <summary>
+        /// Reports the per-section load cost after async construction, so the slowest sections are visible
+        /// without re-reading individual <see cref="SettingsSection.LoadDurationMs"/> values by hand.
+        /// </summary>
+        private void logSectionLoadSnapshot()
+        {
+            if (!EzStartupTuning.LogSectionLoadTimings || loadedSections == null)
+                return;
+
+            foreach (var section in loadedSections.OrderByDescending(s => s.LoadDurationMs).Take(5))
+                EzStartupTrace.Log($"Settings.snapshot top5 {section.LoadDurationMs}ms header=\"{section.Header}\"");
         }
 
         private void scheduleMountLoadedSections()
