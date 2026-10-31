@@ -47,6 +47,8 @@ namespace osu.Game.Tests.Visual.Navigation
 
         private EzSkinEditorOverlay ezSkinEditor => Game.ChildrenOfType<EzSkinEditorOverlay>().Single();
 
+        private SkinEditorOverlay skinEditorOverlay => Game.Dependencies.Get<SkinEditorOverlay>();
+
         [Test]
         public void TestEzEditorKeepsLastEditedSongSelect()
         {
@@ -116,6 +118,33 @@ namespace osu.Game.Tests.Visual.Navigation
 
             AddStep("close Ez editor", () => ezSkinEditor.Toggle());
             AddUntilStep("gameplay remains current", () => Game.ScreenStack.CurrentScreen is Player);
+        }
+
+        [Test]
+        public void TestOfficialSkinEditorHotkeyClosesEzEditor()
+        {
+            advanceToSongSelect();
+            openEzEditor();
+            AddUntilStep("Ez editor visible", () => ezSkinEditor.State.Value == Visibility.Visible);
+
+            // 官方编辑器的热键入口不经过 Ez 盖层，须由 OsuGame 的互斥兜住。
+            toggleSkinEditor();
+
+            AddUntilStep("official skin editor visible", () => skinEditorOverlay.State.Value == Visibility.Visible);
+            AddUntilStep("Ez editor hidden", () => ezSkinEditor.State.Value == Visibility.Hidden);
+        }
+
+        [Test]
+        public void TestOpeningEzEditorClosesOfficialSkinEditor()
+        {
+            advanceToSongSelect();
+            openSkinEditor();
+
+            // 官方场景栏的 "Ez Skin" 按钮走的就是这个入口。
+            AddStep("open Ez editor from official editor", () => skinEditorOverlay.ToggleEzSkinEditor());
+
+            AddUntilStep("Ez editor visible", () => ezSkinEditor.State.Value == Visibility.Visible);
+            AddUntilStep("official skin editor hidden", () => skinEditorOverlay.State.Value == Visibility.Hidden);
         }
 
         [Test]
