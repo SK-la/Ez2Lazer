@@ -205,6 +205,20 @@ namespace osu.Game.Rulesets.BMS.UI
             };
         }
 
+        /// <summary>
+        /// 返回 BMS 管理器；后台开库尚未完成时同步补上，避免该窗口内点按钮静默无响应。
+        /// </summary>
+        private BMSBeatmapManager ensureManager()
+        {
+            if (beatmapManager == null)
+            {
+                beatmapManager = BMSBeatmapManager.GetShared(storage);
+                bmsConfig.ApplyResolvedLibraryPaths(beatmapManager);
+            }
+
+            return beatmapManager;
+        }
+
         private void bindManiaScrollSettings()
         {
             var maniaConfig = rulesetConfigCache.GetConfigFor(new ManiaRuleset()) as ManiaRulesetConfigManager;
@@ -221,21 +235,28 @@ namespace osu.Game.Rulesets.BMS.UI
         {
             base.LoadComplete();
 
-            // The BMS index is a SQLite file. Touch it here rather than in the background load so the
-            // settings preload window does not open the database; the status row is filled in below.
-            beatmapManager = BMSBeatmapManager.GetShared(storage);
-            bmsConfig.ApplyResolvedLibraryPaths(beatmapManager);
+            // The BMS index is a SQLite file. Open it off the update thread (RunAsync does not guarantee
+            // a background thread) so the first reveal doesn't pay for the database open and counts.
+            _ = realm.RunAsync(_ =>
+            {
+                beatmapManager = BMSBeatmapManager.GetShared(storage);
+                bmsConfig.ApplyResolvedLibraryPaths(beatmapManager);
+                return beatmapManager.SongCount;
+            }).ContinueWith(t => Schedule(() =>
+            {
+                if (t.IsFaulted || t.IsCanceled || beatmapManager == null)
+                    return;
+
+                cacheStatusNote.Current.Value = new SettingsNote.Data(
+                    BmsStrings.Settings_CachedStatus(beatmapManager.SongCount, beatmapManager.ChartCount),
+                    SettingsNote.Type.Informational);
+            }));
 
             libraryPathsBindable.BindValueChanged(_ => updatePathDisplay(), true);
             legacyRootPathBindable.BindValueChanged(_ => updatePathDisplay());
 
             speedNote.Current.Value = new SettingsNote.Data(BmsStrings.SETTINGS_MANIA_SCROLL_NOTE, SettingsNote.Type.Informational);
             tablesHintNote.Current.Value = new SettingsNote.Data(BmsStrings.SETTINGS_TABLES_HINT, SettingsNote.Type.Informational);
-
-            // Show initial cache status
-            cacheStatusNote.Current.Value = new SettingsNote.Data(
-                BmsStrings.Settings_CachedStatus(beatmapManager.SongCount, beatmapManager.ChartCount),
-                SettingsNote.Type.Informational);
         }
 
         private IReadOnlyList<string> getConfiguredPaths() => bmsConfig.GetLibraryPaths();
@@ -310,14 +331,13 @@ namespace osu.Game.Rulesets.BMS.UI
 
         private void buildAnalyticsDatabase()
         {
-            if (beatmapManager == null)
-                return;
+            var manager = ensureManager();
 
             var analyticsRepository = new BmsAnalyticsSqliteRepository(BmsStoragePaths.GetAnalyticsDatabasePath(storage));
 
             BmsUiSongSelect.BmsSongSelectAnalyticsOperations.RunAnalyticsBuild(
                 Scheduler,
-                beatmapManager,
+                manager,
                 analyticsRepository,
                 audioManager,
                 realm,
@@ -349,10 +369,10 @@ namespace osu.Game.Rulesets.BMS.UI
 
         private void startScan(IReadOnlyList<string>? configuredPaths = null)
         {
-            if (beatmapManager == null) return;
+            var manager = ensureManager();
 
             IReadOnlyList<string> paths = configuredPaths ?? getConfiguredPaths();
-            beatmapManager.SetRootPaths(paths);
+            manager.SetRootPaths(paths);
 
             // Empty list clears the library. Non-empty lists still require at least one existing folder.
             if (paths.Count > 0 && !paths.Any(Directory.Exists))
@@ -522,7 +542,7 @@ namespace osu.Game.Rulesets.BMS.UI
                 realm.Write(r =>
                 {
                     BeatmapCollection? existing = r.All<BeatmapCollection>()
-                        .FirstOrDefault(c => c.Name == collectionName);
+                                                   .FirstOrDefault(c => c.Name == collectionName);
 
                     if (existing != null)
                     {

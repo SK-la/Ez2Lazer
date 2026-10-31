@@ -162,6 +162,8 @@ namespace osu.Game.Overlays.Settings.Sections
             Scheduler.AddOnce(initialiseSkinList);
         }
 
+        private bool skinListInitialised;
+
         private void initialiseSkinList()
         {
             if (realmSubscription != null)
@@ -171,7 +173,13 @@ namespace osu.Game.Overlays.Settings.Sections
                                                                          .Where(s => !s.DeletePending)
                                                                          .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase), skinsChanged);
 
-            refreshSkinsList();
+            // The subscription fires once with the current collection as part of registration, so a manual
+            // initial refresh here would duplicate the scan. Only run an extra one if that didn't happen.
+            if (!skinListInitialised)
+            {
+                skinListInitialised = true;
+                refreshSkinsList();
+            }
         }
 
         /// <summary>
@@ -213,6 +221,9 @@ namespace osu.Game.Overlays.Settings.Sections
             // Because we are using `Live<>` in this class, we don't need to worry about this scenario too much.
             if (!sender.Any())
                 return;
+
+            skinListInitialised = true;
+
             // For simplicity repopulate the full list.
             refreshSkinsList();
         }
