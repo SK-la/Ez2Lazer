@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -11,6 +11,7 @@ using osu.Framework.Development;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.IPC;
 using osu.Game.Tournament;
 using SDL;
@@ -33,10 +34,14 @@ namespace osu.Desktop
         [STAThread]
         public static void Main(string[] args)
         {
+            // 第一件事：把 +Nms 的零点钉在进程启动，之后所有启动分段才可与别的启动横向比较。
+            EzStartupTrace.MarkProcessStart();
+
             // IMPORTANT DON'T IGNORE: For general sanity, velopack's setup needs to run before anything else.
             // This has bitten us in the rear before (bricked updater), and although the underlying issue from
             // last time has been fixed, let's not tempt fate.
             setupVelopack(args);
+            EzStartupTrace.LogDiagnostic("Velopack setup complete");
 
             if (OperatingSystem.IsWindows())
             {
@@ -105,6 +110,8 @@ namespace osu.Desktop
             if (EzGcModeBootstrap.EnsureRequestedGcMode(gameName, args))
                 return;
 
+            EzStartupTrace.LogDiagnostic("Host options resolved");
+
             var hostOptions = new HostOptions
             {
                 IPCPipeName = !tournamentClient ? OsuGame.IPC_PIPE_NAME : null,
@@ -141,9 +148,13 @@ namespace osu.Desktop
                 }
 
                 if (tournamentClient)
+                {
+                    EzStartupTrace.LogDiagnostic("Host.Run begin (tournament)");
                     host.Run(new TournamentGame());
+                }
                 else
                 {
+                    EzStartupTrace.LogDiagnostic("Host.Run begin");
                     host.Run(new OsuGameDesktop(args)
                     {
                         IsFirstRun = isFirstRun,
