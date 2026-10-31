@@ -36,6 +36,13 @@ namespace osu.Game.EzOsuGame.Startup
                 return;
 
             lightStarted = true;
+
+            if (EzStartupTuning.SkipSettingsPreload)
+            {
+                EzStartupTrace.Log("Settings.preload skipped (SkipSettingsPreload)");
+                return;
+            }
+
             tryScheduleSettingsPreload();
         }
 

@@ -51,5 +51,19 @@ namespace osu.Game.EzOsuGame.Startup
         /// Set false to silence the per-section lines while A/B testing.
         /// </summary>
         public static bool LogSectionLoadTimings { get; set; } = true;
+
+        /// <summary>
+        /// Diagnostic: skip the settings-section async preload entirely.
+        /// Used to A/B whether the startup frame-rate dip is caused by settings preload or by other
+        /// startup work (BDSP backfill, song-select preload). Sections then load on first PopIn instead.
+        /// </summary>
+        public static bool SkipSettingsPreload { get; set; }
+
+        /// <summary>
+        /// Diagnostic: sample frame time and GC activity once per second after main menu entry, so the
+        /// shape of a startup frame-rate dip can be attributed instead of only its total length.
+        /// Output goes to <see cref="EzStartupTrace"/>. Off by default; flip on to re-measure.
+        /// </summary>
+        public static bool SampleStartupFrames { get; set; }
     }
 }
