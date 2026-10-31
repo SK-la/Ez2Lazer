@@ -14,6 +14,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osuTK;
@@ -73,6 +74,19 @@ namespace osu.Game.Overlays.Settings
 
         [Resolved(canBeNull: true)]
         private SettingsPanel settingsPanel { get; set; }
+
+        /// <summary>
+        /// Wall-clock cost of this section's background dependency load (self + all descendants).
+        /// Measured from the start of dependency injection until the async load finishes, i.e. the span
+        /// the async preload actually spends building elements. Reported through <see cref="EzStartupTrace"/>;
+        /// only meaningful on the settings startup path.
+        /// </summary>
+        private readonly Stopwatch loadStopwatch = Stopwatch.StartNew();
+
+        /// <summary>
+        /// Load duration in milliseconds, or -1 until the async load has finished.
+        /// </summary>
+        public long LoadDurationMs { get; private set; } = -1;
 
         protected SettingsSection()
         {
@@ -149,6 +163,26 @@ namespace osu.Game.Overlays.Settings
         /// The subsections directly contained by this section, used to drive second-level sidebar navigation.
         /// </summary>
         public IReadOnlyList<SettingsSubsection> IndexedSubsections => indexedSubsections ?? Array.Empty<SettingsSubsection>();
+
+        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
+        {
+            // Runs at the very start of this section's load, before the [BackgroundDependencyLoader]
+            // methods of this section and its descendants. Restarting here measures exactly the
+            // background dependency load, not the time spent waiting to be mounted.
+            loadStopwatch.Restart();
+            return base.CreateChildDependencies(parent);
+        }
+
+        protected override void LoadAsyncComplete()
+        {
+            base.LoadAsyncComplete();
+
+            // The whole subtree's background dependency load has finished by now.
+            LoadDurationMs = loadStopwatch.ElapsedMilliseconds;
+            loadStopwatch.Stop();
+
+            EzStartupTrace.LogDiagnostic($"Settings.section load {LoadDurationMs}ms header=\"{Header}\"");
+        }
 
         protected override void LoadComplete()
         {

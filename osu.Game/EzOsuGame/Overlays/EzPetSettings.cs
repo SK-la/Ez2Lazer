@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
@@ -24,20 +25,18 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private EzPetPackLoader loader = null!;
         private OsuSpriteText packStatusText = null!;
+        private FormDropdown<string> packDropdown = null!;
+        private Bindable<string> packBindable = null!;
 
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig, Storage storage)
         {
             loader = new EzPetPackLoader(storage);
-            var packNames = new List<string>(loader.ListPackNames());
-            var packBindable = ezConfig.GetBindable<string>(Ez2Setting.DesktopPetPack);
+            packBindable = ezConfig.GetBindable<string>(Ez2Setting.DesktopPetPack);
 
-            if (!string.IsNullOrEmpty(packBindable.Value) && !packNames.Contains(packBindable.Value))
-                packNames.Insert(0, packBindable.Value);
-
-            if (packNames.Count == 0)
-                packNames.Add(EzDefaultPetPack.NAME);
-
+            // The pack list needs a directory scan and the status row reads pet.json from disk. Both are
+            // deferred to LoadComplete so the settings preload window does not touch the filesystem.
+            // Seed the dropdown with just the bound value so the current selection still renders.
             AddRange(new[]
             {
                 new SettingsItemV2(new FormCheckBox
@@ -85,12 +84,12 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "pet", "results", "桌宠", "结算" }
                 },
-                new SettingsItemV2(new FormDropdown<string>
+                new SettingsItemV2(packDropdown = new FormDropdown<string>
                 {
                     Caption = EzSettingsDesktopPet.DESKTOP_PET_PACK,
                     HintText = EzSettingsDesktopPet.DESKTOP_PET_PACK_TOOLTIP,
                     Current = packBindable,
-                    Items = packNames,
+                    Items = initialPackItems(),
                 })
                 {
                     Keywords = new[] { "pet", "pack", "mascot", "桌宠", "live2d" }
@@ -117,7 +116,41 @@ namespace osu.Game.EzOsuGame.Overlays
                 },
             });
 
-            packBindable.BindValueChanged(_ => refreshPackStatus(packBindable.Value), true);
+            packBindable.BindValueChanged(_ => refreshPackStatus(packBindable.Value));
+        }
+
+        private List<string> initialPackItems()
+        {
+            // Only what is needed to render the current selection; the full list is filled in on first display.
+            var items = new List<string>();
+
+            if (!string.IsNullOrEmpty(packBindable.Value))
+                items.Add(packBindable.Value);
+            else
+                items.Add(EzDefaultPetPack.NAME);
+
+            return items;
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            Scheduler.AddOnce(populatePackList);
+        }
+
+        private void populatePackList()
+        {
+            var packNames = new List<string>(loader.ListPackNames());
+
+            if (!string.IsNullOrEmpty(packBindable.Value) && !packNames.Contains(packBindable.Value))
+                packNames.Insert(0, packBindable.Value);
+
+            if (packNames.Count == 0)
+                packNames.Add(EzDefaultPetPack.NAME);
+
+            packDropdown.Items = packNames;
+            refreshPackStatus(packBindable.Value);
         }
 
         private Drawable createPackStatusRow()

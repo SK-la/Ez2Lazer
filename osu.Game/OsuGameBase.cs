@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
@@ -44,6 +45,7 @@ using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Background.Pixiv;
 using osu.Game.EzOsuGame.Camera;
 using osu.Game.EzOsuGame.Configuration;
@@ -56,8 +58,8 @@ using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Playback;
 using osu.Game.EzOsuGame.Scoring;
-using osu.Game.EzOsuGame.Screens.Menu;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Cursor;
@@ -369,8 +371,11 @@ namespace osu.Game
             GlobalConfigStore.Config = LocalConfig;
             GlobalConfigStore.EzConfig = Ez2ConfigManager;
             dependencies.Cache(Ez2ConfigManager);
+
+            // 记录实际生效的 GC 形态。选择项的启动引导在 osu.Desktop 侧，之后仅靠本行即可确认是否已应用。
+            EzStartupTrace.Log($"GC server={GCSettings.IsServerGC} latency={GCSettings.LatencyMode}");
             dependencies.Cache(new PixivBackgroundCoordinator(Storage, Ez2ConfigManager));
-            dependencies.Cache(new EzLogoBackdropSampler());
+            // dependencies.Cache(new EzLogoBackdropSampler());
 
             Func<IEzCameraBackend> cameraFactory = null;
 
@@ -416,6 +421,11 @@ namespace osu.Game
             addFilesWarning();
 
             Audio.Samples.PlaybackConcurrency = SAMPLE_CONCURRENCY;
+
+            // Process-level ASIO configuration, applied once as the audio manager becomes available.
+            // Previously this ran from the settings panel's background load, which pulled audio init into
+            // the settings preload window and depended on that panel ever being constructed.
+            Audio.ApplyEzAsioDefaults();
 
             dependencies.Cache(SkinManager = new SkinManager(Storage, realm, Host, Resources, Audio, Scheduler, Ez2ConfigManager));
             dependencies.CacheAs<ISkinSource>(SkinManager);

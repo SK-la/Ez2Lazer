@@ -40,13 +40,13 @@ namespace osu.Game.EzOsuGame.Screens.Menu
                 fill = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = EzLogoBackdropSampler.DefaultColour,
+                    Colour = Colour4.FromHex("ff66ab"),
                 },
             };
         }
 
         [BackgroundDependencyLoader(true)]
-        private void load(Ez2ConfigManager? ezConfig, EzLogoBackdropSampler? backdropSampler)
+        private void load(Ez2ConfigManager? ezConfig)
         {
             if (ezConfig == null)
                 return;

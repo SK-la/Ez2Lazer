@@ -137,10 +137,6 @@ namespace osu.Game.Overlays.Settings.Sections
         {
             base.LoadComplete();
 
-            realmSubscription = realm.RegisterForNotifications(_ => realm.Realm.All<SkinInfo>()
-                                                                         .Where(s => !s.DeletePending)
-                                                                         .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase), skinsChanged);
-
             skinDropdown.Current.BindValueChanged(skin =>
             {
                 if (skin.NewValue.ID == SkinInfo.RANDOM_SKIN)
@@ -160,6 +156,30 @@ namespace osu.Game.Overlays.Settings.Sections
             enableScriptedSkinsBindable.BindValueChanged(onEnableScriptedSkinsChanged);
 
             skins.ScriptedSkinsCatalogUpdated += refreshSkinsList;
+
+            // A full SkinInfo scan plus a Realm notification registration. Both are deferred out of the
+            // settings preload window; the dropdown renders the current skin from `Current` in the meantime.
+            Scheduler.AddOnce(initialiseSkinList);
+        }
+
+        private bool skinListInitialised;
+
+        private void initialiseSkinList()
+        {
+            if (realmSubscription != null)
+                return;
+
+            realmSubscription = realm.RegisterForNotifications(_ => realm.Realm.All<SkinInfo>()
+                                                                         .Where(s => !s.DeletePending)
+                                                                         .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase), skinsChanged);
+
+            // The subscription fires once with the current collection as part of registration, so a manual
+            // initial refresh here would duplicate the scan. Only run an extra one if that didn't happen.
+            if (!skinListInitialised)
+            {
+                skinListInitialised = true;
+                refreshSkinsList();
+            }
         }
 
         /// <summary>
@@ -201,6 +221,9 @@ namespace osu.Game.Overlays.Settings.Sections
             // Because we are using `Live<>` in this class, we don't need to worry about this scenario too much.
             if (!sender.Any())
                 return;
+
+            skinListInitialised = true;
+
             // For simplicity repopulate the full list.
             refreshSkinsList();
         }

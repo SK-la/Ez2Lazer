@@ -335,6 +335,9 @@ namespace osu.Game.Overlays
         /// </summary>
         public void LogPreloadStatus(string context)
         {
+            EzStartupTrace.LogDiagnostic($"Settings.status context={context} loaded={AreSectionsLoaded} ready={AreSectionsReadyForDisplay} "
+                                         + $"sections={loadableSections.Count} mounted={SectionsContainer?.Count ?? 0} "
+                                         + $"preloadMs={sectionsPreloadDurationMs?.ToString() ?? "-"}");
         }
 
         private void loadSections()
@@ -356,7 +359,7 @@ namespace osu.Game.Overlays
 
         private void beginAsyncSectionLoad()
         {
-            EzStartupTrace.Log($"Settings.asyncPreload begin sections={loadableSections.Count}");
+            EzStartupTrace.LogDiagnostic($"Settings.asyncPreload begin sections={loadableSections.Count}");
             sectionsLoadStopwatch = Stopwatch.StartNew();
             startLoadHeartbeat();
 
@@ -364,18 +367,32 @@ namespace osu.Game.Overlays
             {
                 loadedSections = sections.ToList();
                 AreSectionsLoaded = true;
+                logSectionLoadSnapshot();
 
                 if (State.Value != Visibility.Visible)
                 {
                     sectionsPreloadDurationMs = sectionsLoadStopwatch.ElapsedMilliseconds;
                     sectionsLoadStopwatch.Stop();
                     loadHeartbeatActive = false;
-                    EzStartupTrace.Log($"Settings.asyncPreload complete {sectionsPreloadDurationMs}ms (mount deferred)");
+                    EzStartupTrace.LogDiagnostic($"Settings.asyncPreload complete {sectionsPreloadDurationMs}ms (mount deferred)");
                     return;
                 }
 
                 scheduleAfterPopInLoadDelay(scheduleMountLoadedSections);
             }, scheduler: preloadScheduler);
+        }
+
+        /// <summary>
+        /// Reports the per-section load cost after async construction, so the slowest sections are visible
+        /// without re-reading individual <see cref="SettingsSection.LoadDurationMs"/> values by hand.
+        /// </summary>
+        private void logSectionLoadSnapshot()
+        {
+            if (loadedSections == null)
+                return;
+
+            foreach (var section in loadedSections.OrderByDescending(s => s.LoadDurationMs).Take(5))
+                EzStartupTrace.LogDiagnostic($"Settings.snapshot top5 {section.LoadDurationMs}ms header=\"{section.Header}\"");
         }
 
         private void scheduleMountLoadedSections()
@@ -430,7 +447,7 @@ namespace osu.Game.Overlays
             }
 
             if (startIndex == 0)
-                EzStartupTrace.Log($"Settings.mount batches begin count={sections.Count}");
+                EzStartupTrace.LogDiagnostic($"Settings.mount batches begin count={sections.Count}");
 
             int endIndex = Math.Min(startIndex + sections_add_batch_size, sections.Count);
 
@@ -444,7 +461,7 @@ namespace osu.Game.Overlays
             }
 
             sectionsMountInProgress = false;
-            EzStartupTrace.Log("Settings.mount batches complete");
+            EzStartupTrace.LogDiagnostic("Settings.mount batches complete");
             finishSectionsDisplay();
         }
 
@@ -471,7 +488,7 @@ namespace osu.Game.Overlays
             if (Sidebar == null)
                 return;
 
-            EzStartupTrace.Log("Settings.sidebar mount begin (sync)");
+            EzStartupTrace.LogDiagnostic("Settings.sidebar mount begin (sync)");
 
             float delay = 0;
 

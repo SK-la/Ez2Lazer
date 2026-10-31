@@ -38,7 +38,7 @@ namespace osu.Game.EzOsuGame.Fonts
             tryRegisterFallback(game, EzUiFontIds.UI_DEFAULT_LOCALIZED, ezConfig.Get<string>(Ez2Setting.UiFontDefaultLocalized));
             tryRegisterFallback(game, EzUiFontIds.TITLE_ALTERNATE_LOCALIZED, ezConfig.Get<string>(Ez2Setting.UiFontTitleAlternateLocalized));
 
-            EzStartupTrace.Log($"Fonts.localizedFallbacks {stopwatch.ElapsedMilliseconds}ms");
+            EzStartupTrace.LogDiagnostic($"Fonts.localizedFallbacks {stopwatch.ElapsedMilliseconds}ms");
         }
 
         /// <summary>
@@ -103,7 +103,7 @@ namespace osu.Game.EzOsuGame.Fonts
             if (tryApplySlot(game, Typeface.TorusAlternate, EzUiFontIds.TITLE_ALTERNATE, ezConfig.Get<string>(Ez2Setting.UiFontTitleAlternate))) resolved++;
             if (tryApplySlot(game, Typeface.Venera, EzUiFontIds.NUMERIC, ezConfig.Get<string>(Ez2Setting.UiFontNumeric))) resolved++;
 
-            EzStartupTrace.Log($"Fonts.apply slots={resolved}/3 {stopwatch.ElapsedMilliseconds}ms");
+            EzStartupTrace.LogDiagnostic($"Fonts.apply slots={resolved}/3 {stopwatch.ElapsedMilliseconds}ms");
         }
 
         private static bool tryRegisterFallback(OsuGameBase game, string lookupId, string systemFamily)
