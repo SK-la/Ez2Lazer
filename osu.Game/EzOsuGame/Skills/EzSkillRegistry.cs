@@ -8,7 +8,7 @@ using System.Linq;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Catalog of skill systems (mania Mina/SSR/pattern/dan, …).
+    /// Catalog of skill systems (mania Mina/SSR/pattern/dan + osu PP+ chart/player, …).
     /// Ruleset consumers should prefer <see cref="GetProfile"/> over hard-coded OnlineID checks.
     /// </summary>
     public sealed class EzSkillRegistry
@@ -43,10 +43,15 @@ namespace osu.Game.EzOsuGame.Skills
 
         public static IEnumerable<IEzSkillSystem> CreateDefaultSystems()
         {
+            // Mania plugins
             yield return new BeatmapMsdSkillSystem();
             yield return new PlayerSsrSkillSystem();
             yield return new PlayerPatternSkillSystem();
             yield return new DanSkillSystem();
+
+            // osu!standard plugins (PP+-shaped; stub engine until authorised)
+            yield return new BeatmapPpPlusSkillSystem();
+            yield return new PlayerPpPlusSkillSystem();
         }
     }
 }
