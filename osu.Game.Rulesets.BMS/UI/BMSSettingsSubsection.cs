@@ -84,8 +84,6 @@ namespace osu.Game.Rulesets.BMS.UI
             libraryPathsBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsLibraryPaths);
             legacyRootPathBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsRootPath);
 
-            beatmapManager = BMSBeatmapManager.GetShared(storage);
-            bmsConfig.ApplyResolvedLibraryPaths(beatmapManager);
             bindManiaScrollSettings();
 
             Children = new Drawable[]
@@ -223,6 +221,11 @@ namespace osu.Game.Rulesets.BMS.UI
         {
             base.LoadComplete();
 
+            // The BMS index is a SQLite file. Touch it here rather than in the background load so the
+            // settings preload window does not open the database; the status row is filled in below.
+            beatmapManager = BMSBeatmapManager.GetShared(storage);
+            bmsConfig.ApplyResolvedLibraryPaths(beatmapManager);
+
             libraryPathsBindable.BindValueChanged(_ => updatePathDisplay(), true);
             legacyRootPathBindable.BindValueChanged(_ => updatePathDisplay());
 
@@ -230,12 +233,9 @@ namespace osu.Game.Rulesets.BMS.UI
             tablesHintNote.Current.Value = new SettingsNote.Data(BmsStrings.SETTINGS_TABLES_HINT, SettingsNote.Type.Informational);
 
             // Show initial cache status
-            if (beatmapManager != null)
-            {
-                cacheStatusNote.Current.Value = new SettingsNote.Data(
-                    BmsStrings.Settings_CachedStatus(beatmapManager.SongCount, beatmapManager.ChartCount),
-                    SettingsNote.Type.Informational);
-            }
+            cacheStatusNote.Current.Value = new SettingsNote.Data(
+                BmsStrings.Settings_CachedStatus(beatmapManager.SongCount, beatmapManager.ChartCount),
+                SettingsNote.Type.Informational);
         }
 
         private IReadOnlyList<string> getConfiguredPaths() => bmsConfig.GetLibraryPaths();

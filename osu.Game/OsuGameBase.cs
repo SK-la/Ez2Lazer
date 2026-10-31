@@ -45,6 +45,7 @@ using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Background.Pixiv;
 using osu.Game.EzOsuGame.Camera;
 using osu.Game.EzOsuGame.Configuration;
@@ -420,6 +421,11 @@ namespace osu.Game
             addFilesWarning();
 
             Audio.Samples.PlaybackConcurrency = SAMPLE_CONCURRENCY;
+
+            // Process-level ASIO configuration, applied once as the audio manager becomes available.
+            // Previously this ran from the settings panel's background load, which pulled audio init into
+            // the settings preload window and depended on that panel ever being constructed.
+            Audio.ApplyEzAsioDefaults();
 
             dependencies.Cache(SkinManager = new SkinManager(Storage, realm, Host, Resources, Audio, Scheduler, Ez2ConfigManager));
             dependencies.CacheAs<ISkinSource>(SkinManager);
