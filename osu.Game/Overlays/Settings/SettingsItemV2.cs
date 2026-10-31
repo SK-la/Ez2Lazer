@@ -24,6 +24,8 @@ namespace osu.Game.Overlays.Settings
         private readonly BindableBool controlDefault = new BindableBool(true);
         private readonly BindableBool controlEnabled = new BindableBool(true);
 
+        private bool revertVisible;
+
         /// <summary>
         /// Whether a revert button should be displayed when the control is modified away from default state.
         /// </summary>
@@ -91,6 +93,7 @@ namespace osu.Game.Overlays.Settings
                 updateNote();
             }, true);
             Note.BindValueChanged(_ => updateNote(), true);
+            updateDefaultState();
             FinishTransforms(true);
         }
 
@@ -99,9 +102,18 @@ namespace osu.Game.Overlays.Settings
             bool showRevertButton = !controlDefault.Value && controlEnabled.Value && ShowRevertToDefaultButton;
 
             if (showRevertButton)
+            {
+                // The control's height is only needed while the button is shown, so track and size it here
+                // rather than reading layout (MainDrawHeight) for every item on every frame.
+                revertVisible = true;
+                revertButton.Height = Control.MainDrawHeight;
                 revertButton.Show();
+            }
             else
+            {
+                revertVisible = false;
                 revertButton.Hide();
+            }
         }
 
         private void updateNote()
@@ -117,10 +129,13 @@ namespace osu.Game.Overlays.Settings
         protected override void Update()
         {
             base.Update();
+
             controlDefault.Value = Control.IsDefault;
             controlEnabled.Value = !Control.IsDisabled;
 
-            revertButton.Height = Control.MainDrawHeight;
+            // Cheap guard so only the few items with a visible revert button touch layout each frame.
+            if (revertVisible)
+                revertButton.Height = Control.MainDrawHeight;
         }
 
         #region ISettingsItem
