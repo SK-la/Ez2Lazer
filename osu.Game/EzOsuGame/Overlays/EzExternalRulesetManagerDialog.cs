@@ -44,6 +44,9 @@ namespace osu.Game.EzOsuGame.Overlays
         [Resolved]
         private Storage storage { get; set; } = null!;
 
+        [Resolved]
+        private IEzExternalRulesetCatalog rulesetCatalog { get; set; } = null!;
+
         [Resolved(CanBeNull = true)]
         private INotificationOverlay? notifications { get; set; }
 
@@ -61,9 +64,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         public void ShowManager()
         {
-            if (IsLoaded)
-                refreshEntries();
-
+            // PopIn refreshes entries; no refresh is needed here or the two would double up per open.
             Show();
         }
 
@@ -260,12 +261,6 @@ namespace osu.Game.EzOsuGame.Overlays
             };
         }
 
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-            refreshEntries();
-        }
-
         protected override void PopIn()
         {
             refreshEntries();
@@ -283,7 +278,7 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             rows.Clear();
 
-            var discovered = EzExternalRulesetScanner.Scan(storage);
+            var discovered = rulesetCatalog.AllDiscovered;
             var config = EzRulesetMappingConfig.Load(storage);
             config.EnsureDefaults(discovered);
 
