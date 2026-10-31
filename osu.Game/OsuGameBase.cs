@@ -57,7 +57,6 @@ using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Playback;
 using osu.Game.EzOsuGame.Scoring;
-using osu.Game.EzOsuGame.Screens.Menu;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.EzOsuGame.WarmUp;
@@ -375,7 +374,7 @@ namespace osu.Game
             // 记录实际生效的 GC 形态。选择项的启动引导在 osu.Desktop 侧，之后仅靠本行即可确认是否已应用。
             EzStartupTrace.Log($"GC server={GCSettings.IsServerGC} latency={GCSettings.LatencyMode}");
             dependencies.Cache(new PixivBackgroundCoordinator(Storage, Ez2ConfigManager));
-            dependencies.Cache(new EzLogoBackdropSampler());
+            // dependencies.Cache(new EzLogoBackdropSampler());
 
             Func<IEzCameraBackend> cameraFactory = null;
 
