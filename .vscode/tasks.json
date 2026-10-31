@@ -104,6 +104,21 @@
             ],
             "group": "build",
             "problemMatcher": "$msCompile"
+        },
+        {
+            // ReadyToRun 关/开 两次发布 + N 次冷启，比对进主菜单的分段耗时（见 scripts/Measure-EzStartup.ps1）。
+            "label": "Measure startup (R2R A/B)",
+            "type": "shell",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-File",
+                "${workspaceRoot}/scripts/Measure-EzStartup.ps1"
+            ],
+            "options": {
+                "cwd": "${workspaceRoot}"
+            },
+            "problemMatcher": []
         }
     ]
 }

@@ -537,6 +537,8 @@ def main():
     parser.add_argument('--release-version', default=None, help='MSBuild ReleaseVersion (numeric dotted version only, for example: YYYY.MDD.0); defaults to --tag')
     parser.add_argument('--pack-version', default=None, help='Velopack pack version; defaults to {tag}-ez2lazer')
     parser.add_argument('--no-velopack', action='store_true', help='Skip Velopack packaging even for official builds')
+    parser.add_argument('--ready-to-run', dest='ready_to_run', action='store_true', default=None, help='Force ReadyToRun on (only valid for windows/x64)')
+    parser.add_argument('--no-ready-to-run', dest='ready_to_run', action='store_false', default=None, help='Force ReadyToRun off')
     parser.add_argument('--deps-path', default=None, help='Path to folder containing dependency DLLs to include')
     parser.add_argument('--deps-pattern', default='*.dll', help='Glob pattern for dependency files to copy')
     parser.add_argument('--deps-source', choices=['local','github','none'], default='local', help='Where to get dependency DLLs')
@@ -681,6 +683,21 @@ def main():
         print(f'Official build: ReleaseVersion={release_version}')
         print(f'  AssemblyVersion will be: {release_version}')
         print(f'  InformationalVersion will be: {release_version}-ez2lazer')
+
+    # ReadyToRun 只在 Windows x64 生效（osu.Desktop.csproj 里按 win RID 前缀默认打开）。
+    # macOS / Linux / arm64 一律显式关闭：crossgen2 的 runtime pack 与 Velopack 差分体积都还没验证过。
+    if args.ready_to_run is None:
+        ready_to_run = target_platform == 'windows' and arch_name == 'x64'
+    else:
+        ready_to_run = args.ready_to_run
+
+    if ready_to_run and not (target_platform == 'windows' and arch_name == 'x64'):
+        print(f'WARNING: ReadyToRun requested for {target_platform}/{arch_name}; only windows/x64 is validated. Disabling.')
+        ready_to_run = False
+
+    msbuild_properties = msbuild_properties or {}
+    msbuild_properties['PublishReadyToRun'] = 'true' if ready_to_run else 'false'
+    print(f'PublishReadyToRun={ready_to_run} (platform={target_platform} arch={arch_name})')
 
     pack_version = args.pack_version or f'{args.tag}-ez2lazer'
 
