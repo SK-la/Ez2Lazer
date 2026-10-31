@@ -152,8 +152,6 @@ namespace osu.Game
 
         private UserProfileOverlay userProfile;
 
-        private EzLocalProfileOverlay ezLocalProfile;
-
         private LoginOverlay loginOverlay;
 
         private NowPlayingOverlay nowPlayingOverlay;
@@ -166,9 +164,11 @@ namespace osu.Game
 
         private SkinEditorOverlay skinEditor;
 
-        private EzLayoutLayer ezLayoutLayer;
-
         private EzSkinEditorOverlay ezSkinEditor;
+
+        private EzLocalProfileOverlay ezLocalProfile;
+
+        private EzTurboMode turboMode;
 
         private Container overlayContent;
 
@@ -203,8 +203,6 @@ namespace osu.Game
 
         private SentryLogger sentryLogger;
 
-        private EzTurboMode turboMode;
-
         public virtual StableStorage GetStorageForStableInstall() => null;
 
         private float toolbarOffset => (Toolbar?.Position.Y ?? 0) + (Toolbar?.DrawHeight ?? 0);
@@ -228,6 +226,9 @@ namespace osu.Game
         public OsuScreenStack ScreenStack { get; private set; }
 
         protected override IScreen CurrentScreen => ScreenStack?.CurrentScreen;
+
+        private MaterialCaptureScope materialCaptureScope;
+        private Container screenCaptureContent;
 
         protected BackButton BackButton => screenStackFooter.BackButton;
         protected ScreenFooter ScreenFooter => screenStackFooter.Footer;
@@ -263,9 +264,6 @@ namespace osu.Game
         private RealmDetachedBeatmapStore detachedBeatmapStore;
 
         private ScreenStackFooter screenStackFooter;
-
-        private MaterialCaptureScope materialCaptureScope;
-        private Container screenCaptureContent;
 
         private readonly string[] args;
 
@@ -1094,12 +1092,11 @@ namespace osu.Game
             {
                 // General expectation that osu! starts in fullscreen by default (also gives the most predictable performance).
                 // However, macOS is bound to have issues when using exclusive fullscreen as it takes full control away from OS, therefore borderless is default there.
-                { FrameworkSetting.WindowMode, RuntimeInfo.OS == RuntimeInfo.Platform.macOS ? WindowMode.Borderless : WindowMode.Fullscreen },
+                { FrameworkSetting.WindowMode, WindowMode.Borderless }, // Ez2Lazer 默认无边框
                 { FrameworkSetting.VolumeUniversal, 0.6 },
                 { FrameworkSetting.VolumeMusic, 0.6 },
                 { FrameworkSetting.VolumeEffect, 0.6 },
-                // Ez2Lazer defaults to the legacy audio engine (ASIO / BASS device handling is tuned against it).
-                { FrameworkSetting.AudioUseExperimentalWasapi, false },
+                { FrameworkSetting.AudioUseExperimentalWasapi, false }, // Ez2Lazer 默认使用传统音频，针对 ASIO / BASS 设备调优
             };
         }
 
@@ -1172,8 +1169,7 @@ namespace osu.Game
                             Children = new Drawable[]
                             {
                                 backReceptor = new ScreenFooter.BackReceptor(),
-                                // Footer / Mod overlays sit outside ScreenStack but must share the same
-                                // offscreen buffer so AcrylicBackdropDrawable can sample song-select chrome.
+                                // Footer / Mod 覆盖层位于 ScreenStack 之外，但必须共享相同的离屏缓冲区，以便 AcrylicBackdropDrawable 可以对歌曲选择界面进行采样。
                                 materialCaptureScope = new MaterialCaptureScope(screenCaptureContent = new Container
                                 {
                                     RelativeSizeAxes = Axes.Both,
@@ -1244,8 +1240,6 @@ namespace osu.Game
                 Margin = new MarginPadding(5),
             }, topMostOverlayContent.Add);
 
-            loadComponentSingleFile(new EzDesktopPetLayer(), topMostOverlayContent.Add, true);
-
             if (!IsDeployedBuild)
                 loadComponentSingleFile(devBuildBanner = new DevBuildBanner(), ScreenContainer.Add);
 
@@ -1273,6 +1267,9 @@ namespace osu.Game
                 },
             }, topMostOverlayContent.Add);
 
+            // TODO：如果支持启动动画模型，再另外考虑加载顺序。
+            loadComponentSingleFile(new EzDesktopPetLayer(), topMostOverlayContent.Add, true);
+
             onScreenDisplay = new OnScreenDisplay();
 
             onScreenDisplay.BeginTracking(this, frameworkConfig);
@@ -1297,8 +1294,6 @@ namespace osu.Game
             loadComponentSingleFile(FirstRunOverlay = new FirstRunSetupOverlay(), footerBasedOverlayContent.Add, true);
             loadComponentSingleFile(new ManageCollectionsDialog(), overlayContent.Add, true);
             loadComponentSingleFile(new EzManageSongsBranchesDialog(), overlayContent.Add, true);
-            loadComponentSingleFile(new EzExternalRulesetManagerDialog(), overlayContent.Add, true);
-            loadComponentSingleFile(new EzFontSettingsOverlay(), topMostOverlayContent.Add, true);
             loadComponentSingleFile(beatmapListing = new BeatmapListingOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(dashboard = new DashboardOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(news = new NewsOverlay(), overlayContent.Add, true);
@@ -1306,6 +1301,8 @@ namespace osu.Game
             loadComponentSingleFile(channelManager = new ChannelManager(API), Add, true);
             loadComponentSingleFile(chatOverlay = new ChatOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(new MessageNotifier(), Add, true);
+            loadComponentSingleFile(new EzExternalRulesetManagerDialog(), overlayContent.Add, true);
+            loadComponentSingleFile(new EzFontSettingsOverlay(), topMostOverlayContent.Add, true);
             loadComponentSingleFile(Settings = new SettingsOverlay(), leftFloatingOverlayContent.Add, true);
             loadComponentSingleFile(changelogOverlay = new ChangelogOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(userProfile = new UserProfileOverlay(), overlayContent.Add, true);
@@ -1313,11 +1310,13 @@ namespace osu.Game
             loadComponentSingleFile(beatmapSetOverlay = new BeatmapSetOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(wikiOverlay = new WikiOverlay(), overlayContent.Add, true);
             // Above screens, below logo / footer / sheared overlays (higher Depth = further back).
-            loadComponentSingleFile(ezLayoutLayer = new EzLayoutLayer { Depth = 0.5f }, screenCaptureContent.Add, true);
+            loadComponentSingleFile(new EzLayoutLayer { Depth = 0.5f }, screenCaptureContent.Add, true);
             // Ez 编辑器须先于官方 SkinEditor 入树，供 SkinEditorOverlay [Resolved] 注入。
             loadComponentSingleFile(ezSkinEditor = new EzSkinEditorOverlay(ScreenContainer), overlayContent.Add, true);
             loadComponentSingleFile(skinEditor = new SkinEditorOverlay(ScreenContainer), overlayContent.Add, true);
 
+            // 官方皮肤编辑器可由热键直接打开，不一定经过 Ez 盖层的入口，故在此兜一互斥。
+            // 反向（打开 Ez 盖层时关官方）由各入口显式 Hide() 保证，不在这里回灌。
             skinEditor.State.ValueChanged += state =>
             {
                 if (state.NewValue == Visibility.Visible)
@@ -1340,6 +1339,7 @@ namespace osu.Game
             loadComponentSingleFile<IDialogOverlay>(dialogOverlay = new DialogOverlay(), topMostOverlayContent.Add, true);
             loadComponentSingleFile(new MedalOverlay(), topMostOverlayContent.Add);
 
+            // 缓存供 realm重算 使用，必须在 BackgroundDataStoreProcessor 之前注册。
             loadComponentSingleFile(new BackgroundDataStoreProcessor(), Add, true);
             loadComponentSingleFile<BeatmapStore>(detachedBeatmapStore = new RealmDetachedBeatmapStore(), Add, true);
             loadComponentSingleFile(new QueueController(), Add, true);
@@ -1360,7 +1360,8 @@ namespace osu.Game
             loadComponentSingleFile(loaderStartGate, Add, true);
             Dependencies.CacheAs<IEzScoreRacePlayerStartGate>(loaderStartGate);
 
-            loadComponentSingleFile(new PixivAutoDownloadProcessor(), Add, true);
+            if (Ez2ConfigManager.Get<bool>(Ez2Setting.PixivAutoDownloadEnabled))
+                loadComponentSingleFile(new PixivAutoDownloadProcessor(), Add, true);
 
             loadStartupContentPreloader();
 
@@ -1496,6 +1497,9 @@ namespace osu.Game
                 // 屏蔽这些，不需要删除
                 // Audio.UseExperimentalWasapi.Value = true;
                 //
+                // // TODO: can be removed 20270101.
+                // // leave the migration but just stop telling users about it. if they haven't been playing for this long they are more likely
+                // // to setup offset again, or even have different hardware.
                 // dialogOverlay.Push(new MigrateNewAudioDialog(wasAlreadyUsing));
             }
 
@@ -1564,9 +1568,8 @@ namespace osu.Game
             if (entry.Exception is SentryOnlyDiagnosticsException)
                 return;
 
-            // Custom builds may hit server-side gating for online features.
-            // These messages are not actionable for end-users of this fork, so avoid spamming notifications.
-            if (entry.Message?.Contains("Realtime online functionality is not supported on this version of the game", StringComparison.OrdinalIgnoreCase) == true)
+            // Ez2Lazer屏蔽一些服务器向非官方客户端发送的通知噪音
+            if (entry.Message?.Contains("is not supported on this version of the game", StringComparison.OrdinalIgnoreCase) == true)
                 return;
 
             if (entry.Message?.Contains("Please ensure that you are using the latest version of the official game releases", StringComparison.OrdinalIgnoreCase) == true)
@@ -1782,12 +1785,14 @@ namespace osu.Game
                             ezLocalProfile.Hide();
                         else
                             ezLocalProfile.Show();
+
+                        return true;
                     }
-                    else if (userProfile.State.Value == Visibility.Visible)
+
+                    if (userProfile.State.Value == Visibility.Visible)
                         userProfile.Hide();
                     else
                         ShowUser(API.LocalUser.Value);
-
                     return true;
 
                 case GlobalAction.RandomSkin:
@@ -1980,7 +1985,7 @@ namespace osu.Game
         private void screenExited(IScreen lastScreen, IScreen newScreen)
         {
             ScreenChanged((OsuScreen)lastScreen, (OsuScreen)newScreen);
-            onScreenExitedForStartupPreload((OsuScreen)lastScreen, (OsuScreen)newScreen);
+            startupSongSelectPreload((OsuScreen)lastScreen, (OsuScreen)newScreen);
 
             if (newScreen == null)
                 Exit();
