@@ -161,11 +161,31 @@ namespace osu.Game.Rulesets.UI
 
             // Else we want the earliest valid nested.
             // In cases of nested objects, they will always have earlier sample data than their parent object.
-            return getEarliestNestedAfter(mostValidObject.HitObject) ?? mostValidObject.HitObject;
+            return SelectSampleSource(mostValidObject, getReferenceTime());
         }
 
+        /// <summary>
+        /// 取样的「离当前时间足够近」窗口（毫秒）。物件开始时间之前这么远的按键仍算在打这颗物件。
+        /// </summary>
+        /// <remarks>
+        /// [Ez] 抽成虚方法：取样对象决定发哪个键音，窗口必须与「这颗物件现在按下去会不会被判到」一致。
+        /// 默认取物件自身的 miss 窗口（上游语义，判定时恰好放行两倍 miss 窗口）。
+        /// </remarks>
+        protected virtual double SampleWindowFor(HitObject hitObject) => hitObject.HitWindows.WindowFor(HitResult.Miss);
+
+        /// <summary>
+        /// 取 <paramref name="entry"/> 中真正提供键音的对象。
+        /// </summary>
+        /// <param name="entry">已选定的取样条目。</param>
+        /// <param name="referenceTime">当前参考时间（与物件开始时间同一时间轴）。</param>
+        /// <remarks>
+        /// [Ez] 抽成虚方法，默认保持上游语义：取「结束时间晚于参考时间的最早嵌套对象」，没有则取条目自身。
+        /// </remarks>
+        protected virtual HitObject? SelectSampleSource(HitObjectLifetimeEntry entry, double referenceTime)
+            => getEarliestNestedAfter(entry.HitObject, referenceTime) ?? entry.HitObject;
+
         private bool isAlreadyHit(HitObjectLifetimeEntry h) => h.AllJudged;
-        private bool isCloseEnoughToCurrentTime(HitObject h) => getReferenceTime() >= h.StartTime - h.HitWindows.WindowFor(HitResult.Miss) * 2;
+        private bool isCloseEnoughToCurrentTime(HitObject h) => getReferenceTime() >= h.StartTime - SampleWindowFor(h) * 2;
 
         private double getReferenceTime() => gameplayClock?.CurrentTime ?? Clock.CurrentTime;
 
@@ -251,11 +271,10 @@ namespace osu.Game.Rulesets.UI
         private readonly Stack<HitObject> nestedSearchStack = new Stack<HitObject>();
 
         /// <summary>
-        /// 取 <paramref name="hitObject"/> 的后代中，结束时间晚于参考时间且最早的一个。
+        /// 取 <paramref name="hitObject"/> 的后代中，结束时间晚于 <paramref name="referenceTime"/> 且最早的一个。
         /// </summary>
-        private HitObject? getEarliestNestedAfter(HitObject hitObject)
+        private HitObject? getEarliestNestedAfter(HitObject hitObject, double referenceTime)
         {
-            double referenceTime = getReferenceTime();
             HitObject? earliest = null;
             double earliestEndTime = double.MaxValue;
 
