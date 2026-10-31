@@ -17,11 +17,11 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
-using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Screens.Select;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -496,24 +496,11 @@ namespace osu.Game.Overlays
                 return;
 
             var working = beatmap.Value;
-            var set = working.BeatmapSetInfo;
-            var difficulties = set.Beatmaps.ToList();
 
-            if (difficulties.Count == 0)
+            if (EzBeatmapJumpSelector.Select(working, ruleset.Value) is not BeatmapInfo selection)
                 return;
 
-            var matchingRuleset = difficulties.Where(b => b.Ruleset.Equals(ruleset.Value)).ToList();
-
-            BeatmapInfo selection;
-
-            if (matchingRuleset.Count > 0)
-                selection = matchingRuleset[RNG.Next(matchingRuleset.Count)];
-            else if (working.BeatmapInfo.BeatmapSet?.Equals(set) == true || difficulties.Any(b => b.Equals(working.BeatmapInfo)))
-                selection = working.BeatmapInfo;
-            else
-                selection = difficulties[RNG.Next(difficulties.Count)];
-
-            game.PresentBeatmap(set, b => b.ID == selection.ID);
+            game.PresentBeatmap(working.BeatmapSetInfo, b => b.ID == selection.ID);
             Hide();
         }
 
