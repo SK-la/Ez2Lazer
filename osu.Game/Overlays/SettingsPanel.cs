@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using osuTK;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
@@ -21,10 +20,11 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
 using osu.Framework.Threading;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.EzOsuGame.Startup;
 using osu.Game.Overlays.Settings;
+using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Overlays
@@ -554,7 +554,7 @@ namespace osu.Game.Overlays
                               && subsectionNavSection != null
                               && ReferenceEquals(section, subsectionNavSection)
                               && subsections != null
-                              && subsections.Count > 3
+                              // && subsections.Count > 3 // 统一固定显示，交互体验更一致
                               && !subsectionNavSuppressed
                               && !searchActive;
 
