@@ -106,6 +106,29 @@ namespace osu.Game.EzOsuGame.Overlays
         [BackgroundDependencyLoader]
         private void load(OsuColour colours)
         {
+            // The slot/picker tree is only needed once the dialog is opened, so it is built on first PopIn.
+            // This keeps the startup path free of ~40 drawables that are not visible on the first screen.
+            this.colours = colours;
+        }
+
+        private OsuColour colours = null!;
+        private bool slotsBuilt;
+
+        private bool ensureSlotsBuilt()
+        {
+            if (slotsBuilt)
+                return true;
+
+            if (!IsLoaded)
+                return false;
+
+            slotsBuilt = true;
+            buildSlots();
+            return true;
+        }
+
+        private void buildSlots()
+        {
             Children = new Drawable[]
             {
                 new Box
@@ -302,6 +325,13 @@ namespace osu.Game.EzOsuGame.Overlays
 
         protected override void PopIn()
         {
+            // Build the slot tree on first open; PopIn may be invoked before it exists.
+            if (!ensureSlotsBuilt())
+            {
+                Schedule(PopIn);
+                return;
+            }
+
             dialogFontsActive = true;
             ensureDialogFontStore();
 

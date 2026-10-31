@@ -15,9 +15,6 @@ namespace osu.Game.EzOsuGame.Overlays
     {
         protected override LocalisableString Header => EzSettingsStrings.EZ_GAMEPLAY_SETTINGS_HEADER;
 
-        [Resolved(CanBeNull = true)]
-        private EzFontSettingsOverlay? fontOverlay { get; set; }
-
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
         {
