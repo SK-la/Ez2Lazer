@@ -14,6 +14,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osuTK;
@@ -73,6 +74,18 @@ namespace osu.Game.Overlays.Settings
 
         [Resolved(canBeNull: true)]
         private SettingsPanel settingsPanel { get; set; }
+
+        /// <summary>
+        /// Wall-clock cost of this section's load (self + all descendants), measured from construction
+        /// until <see cref="LoadComplete"/>. Reported through <see cref="EzStartupTrace"/> so the async
+        /// preload can be attributed per section. Only meaningful on the settings startup path.
+        /// </summary>
+        private readonly Stopwatch loadStopwatch = Stopwatch.StartNew();
+
+        /// <summary>
+        /// Load duration in milliseconds, or -1 until <see cref="LoadComplete"/> has run.
+        /// </summary>
+        public long LoadDurationMs { get; private set; } = -1;
 
         protected SettingsSection()
         {
@@ -153,6 +166,13 @@ namespace osu.Game.Overlays.Settings
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
+            // The section's own BDL (and that of every descendant) has finished by now.
+            LoadDurationMs = loadStopwatch.ElapsedMilliseconds;
+            loadStopwatch.Stop();
+
+            if (EzStartupTuning.LogSectionLoadTimings)
+                EzStartupTrace.Log($"Settings.section load {LoadDurationMs}ms header=\"{Header}\"");
 
             if (ShowSubsectionIndex)
                 indexedSubsections = FlowContent.Children.OfType<SettingsSubsection>().ToArray();
