@@ -347,7 +347,7 @@ namespace osu.Game.Rulesets.Osu.Objects
                 : CreateDegenerateEvents();
 
             // 添加时跟踪，而非从 NestedHitObjects 回读：此处建好的嵌套物件进构造列表，本方法返回后才替换 NestedHitObjects。
-            HitObject? lastScoredNested = null;
+            HitObject lastScoredNested = null;
 
             // stable 跳过与任一端重叠的评分点绘制；整条滑条都那么小时整条跳过。仅在按 stable 规则游玩时应用。
             double radiusSquared = Radius * Radius;
@@ -355,8 +355,8 @@ namespace osu.Game.Rulesets.Osu.Objects
             Vector2 tailPosition = spanDuration > 0 ? EndPosition : Position;
 
             bool overlapsEnds(Vector2 point) => HideOverlappingScoringPoints
-                                               && (Vector2.DistanceSquared(point, headPosition) < radiusSquared
-                                                   || Vector2.DistanceSquared(point, tailPosition) < radiusSquared);
+                                                && (Vector2.DistanceSquared(point, headPosition) < radiusSquared
+                                                    || Vector2.DistanceSquared(point, tailPosition) < radiusSquared);
 
             foreach (var e in sliderEvents)
             {

@@ -14,6 +14,7 @@ using osu.Game.Online.Spectator;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
 using osu.Game.Rulesets.Osu.Replays;
 using osu.Game.Rulesets.Osu.Scoring;
 using osu.Game.Rulesets.Replays;

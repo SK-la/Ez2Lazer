@@ -1258,7 +1258,7 @@ SliderTickRate:1
             Assert.That(decoded.ControlPointInfo.Groups, Is.Not.Empty);
 
             // 拍长保留；辅助字段回退而非抛错。
-            Assert.That(decoded.ControlPointInfo.TimingPoints, Has.Some.Matches<osu.Game.Beatmaps.ControlPoints.TimingControlPoint>(p => Math.Abs(p.BeatLength - 307.692307692308) < 1e-9));
+            Assert.That(decoded.ControlPointInfo.TimingPoints, Has.Some.Matches<osu.Game.Beatmaps.ControlPoints.TimingControlPoint>(p => p != null && Math.Abs(p.BeatLength - 307.692307692308) < 1e-9));
             Assert.That(decoded.ControlPointInfo.TimingPoints.All(p => p.TimeSignature.Numerator > 0), Is.True);
             Assert.That(decoded.HitObjects, Has.Count.EqualTo(1));
         }

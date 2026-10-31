@@ -92,7 +92,7 @@ namespace osu.Game.Tests.Beatmaps
             (double start, double end) = beatmap.CalculatePlayableBounds();
 
             // 若物件报告的结束时间超出边界，按边界排布会冲出远端。进度图正是用该偏移给数组下标。
-            Assert.That(beatmap.HitObjects, Has.All.Matches<HitObject>(o => o.GetPlayableEndTime() >= start && o.GetPlayableEndTime() <= end));
+            Assert.That(beatmap.HitObjects, Has.All.Matches<HitObject>(o => o?.GetPlayableEndTime() >= start && o.GetPlayableEndTime() <= end));
         }
 
         private static Slider createSlider()
