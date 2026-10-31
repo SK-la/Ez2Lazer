@@ -2,8 +2,10 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Diagnostics;
 using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.Graphics;
 
 namespace osu.Game.EzOsuGame.Fonts
@@ -31,8 +33,12 @@ namespace osu.Game.EzOsuGame.Fonts
 
             localizedFallbacksRegistered = true;
 
+            var stopwatch = Stopwatch.StartNew();
+
             tryRegisterFallback(game, EzUiFontIds.UI_DEFAULT_LOCALIZED, ezConfig.Get<string>(Ez2Setting.UiFontDefaultLocalized));
             tryRegisterFallback(game, EzUiFontIds.TITLE_ALTERNATE_LOCALIZED, ezConfig.Get<string>(Ez2Setting.UiFontTitleAlternateLocalized));
+
+            EzStartupTrace.Log($"Fonts.localizedFallbacks {stopwatch.ElapsedMilliseconds}ms");
         }
 
         /// <summary>
@@ -90,46 +96,53 @@ namespace osu.Game.EzOsuGame.Fonts
 
             OsuFont.ClearFamilyOverrides();
 
-            tryApplySlot(game, Typeface.Torus, EzUiFontIds.UI_DEFAULT, ezConfig.Get<string>(Ez2Setting.UiFontDefault));
-            tryApplySlot(game, Typeface.TorusAlternate, EzUiFontIds.TITLE_ALTERNATE, ezConfig.Get<string>(Ez2Setting.UiFontTitleAlternate));
-            tryApplySlot(game, Typeface.Venera, EzUiFontIds.NUMERIC, ezConfig.Get<string>(Ez2Setting.UiFontNumeric));
+            var stopwatch = Stopwatch.StartNew();
+            int resolved = 0;
+
+            if (tryApplySlot(game, Typeface.Torus, EzUiFontIds.UI_DEFAULT, ezConfig.Get<string>(Ez2Setting.UiFontDefault))) resolved++;
+            if (tryApplySlot(game, Typeface.TorusAlternate, EzUiFontIds.TITLE_ALTERNATE, ezConfig.Get<string>(Ez2Setting.UiFontTitleAlternate))) resolved++;
+            if (tryApplySlot(game, Typeface.Venera, EzUiFontIds.NUMERIC, ezConfig.Get<string>(Ez2Setting.UiFontNumeric))) resolved++;
+
+            EzStartupTrace.Log($"Fonts.apply slots={resolved}/3 {stopwatch.ElapsedMilliseconds}ms");
         }
 
-        private static void tryRegisterFallback(OsuGameBase game, string lookupId, string systemFamily)
+        private static bool tryRegisterFallback(OsuGameBase game, string lookupId, string systemFamily)
         {
             if (string.IsNullOrWhiteSpace(systemFamily))
-                return;
+                return false;
 
-            var entry = EzSystemFontCatalog.FindByFamily(systemFamily);
+            var entry = EzSystemFontCatalog.TryResolveFamily(systemFamily);
 
             if (entry == null)
             {
                 Logger.Log($"Ez localized font: system family '{systemFamily}' not found for {lookupId}.", Ez2ConfigManager.LOGGER_NAME);
-                return;
+                return false;
             }
 
             try
             {
                 game.AddOutlineFontFromFile(entry.Value.Path, lookupId, entry.Value.FaceIndex);
                 Logger.Log($"Ez localized font: {entry.Value.Family} -> {lookupId}", Ez2ConfigManager.LOGGER_NAME);
+                return true;
             }
             catch (Exception ex)
             {
                 Logger.Log($"Ez localized font: failed to load '{entry.Value.Path}': {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                return false;
             }
         }
 
-        private static void tryApplySlot(OsuGameBase game, Typeface typeface, string lookupId, string systemFamily)
+        private static bool tryApplySlot(OsuGameBase game, Typeface typeface, string lookupId, string systemFamily)
         {
             if (string.IsNullOrWhiteSpace(systemFamily))
-                return;
+                return false;
 
-            var entry = EzSystemFontCatalog.FindByFamily(systemFamily);
+            var entry = EzSystemFontCatalog.TryResolveFamily(systemFamily);
 
             if (entry == null)
             {
                 Logger.Log($"Ez UI font: system family '{systemFamily}' not found; keeping built-in for {typeface}.", Ez2ConfigManager.LOGGER_NAME);
-                return;
+                return false;
             }
 
             try
@@ -137,10 +150,12 @@ namespace osu.Game.EzOsuGame.Fonts
                 game.AddOutlineFontFromFile(entry.Value.Path, lookupId, entry.Value.FaceIndex);
                 OsuFont.SetFamilyOverride(typeface, lookupId);
                 Logger.Log($"Ez UI font: {typeface} -> {entry.Value.Family} ({lookupId})", Ez2ConfigManager.LOGGER_NAME);
+                return true;
             }
             catch (Exception ex)
             {
                 Logger.Log($"Ez UI font: failed to load '{entry.Value.Path}': {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                return false;
             }
         }
     }

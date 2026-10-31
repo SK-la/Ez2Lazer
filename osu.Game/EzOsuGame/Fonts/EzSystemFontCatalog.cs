@@ -26,6 +26,8 @@ namespace osu.Game.EzOsuGame.Fonts
         private static IReadOnlyList<EzSystemFontEntry>? cached;
         public static IReadOnlyList<EzSystemFontEntry>? CachedEmoji;
 
+        private static readonly Dictionary<string, EzSystemFontEntry?> resolved_families = new Dictionary<string, EzSystemFontEntry?>(StringComparer.OrdinalIgnoreCase);
+
         private static Storage? nameCacheStorage;
         private static EzSystemFontNameCache? name_cache;
         private static bool nameCacheLoaded;
@@ -44,6 +46,7 @@ namespace osu.Game.EzOsuGame.Fonts
                 nameCacheStorage = storage;
                 name_cache = null;
                 nameCacheLoaded = false;
+                resolved_families.Clear();
             }
         }
 
@@ -71,6 +74,118 @@ namespace osu.Game.EzOsuGame.Fonts
             0x1F525, // 🔥
         };
 
+        /// <summary>
+        /// Resolves a single configured family name without requiring the full installed-font catalog.
+        /// A previously loaded catalog answers from memory; otherwise the persisted name map is consulted
+        /// per font file, which costs one directory enumeration and no FreeType parse for unchanged files.
+        /// </summary>
+        /// <remarks>
+        /// Startup only needs the handful of families named in config, so callers on the startup path should
+        /// prefer this over <see cref="GetEntries"/>. Returns null when no installed face declares the family.
+        /// Results are memoised, so repeated lookups of the same configured family do not re-enumerate;
+        /// the memo is dropped together with <see cref="cached"/> by <see cref="AttachCache"/> and force refresh.
+        /// </remarks>
+        public static EzSystemFontEntry? TryResolveFamily(string? family)
+        {
+            if (string.IsNullOrWhiteSpace(family))
+                return null;
+
+            lock (cache_lock)
+            {
+                if (cached != null)
+                    return findInOrdered(cached, family);
+
+                if (resolved_families.TryGetValue(family, out var memoised))
+                    return memoised;
+
+                var result = resolveFamilyFromDisk(family);
+                resolved_families[family] = result;
+                return result;
+            }
+        }
+
+        private static EzSystemFontEntry? resolveFamilyFromDisk(string family)
+        {
+            var cache = getNameCache();
+            string? bestPath = null;
+            bool bestPreferred = false;
+
+            foreach (string directory in enumerateFontDirectories())
+            {
+                if (!Directory.Exists(directory))
+                    continue;
+
+                IEnumerable<string> files;
+
+                try
+                {
+                    var depth = RuntimeInfo.OS == RuntimeInfo.Platform.Windows
+                        ? SearchOption.TopDirectoryOnly
+                        : SearchOption.AllDirectories;
+
+                    files = Directory.EnumerateFiles(directory, "*.*", depth).Where(isFontFile);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                foreach (string file in files)
+                {
+                    try
+                    {
+                        var info = new FileInfo(file);
+                        string resolved;
+
+                        if (cache == null || !cache.TryGet(file, info.Length, info.LastWriteTimeUtc.Ticks, out resolved))
+                        {
+                            resolved = resolveFamilyName(file);
+                            cache?.Store(file, info.Length, info.LastWriteTimeUtc.Ticks, resolved);
+                        }
+
+                        if (!string.Equals(resolved, family, StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        bool prefer = isPreferredStyleFile(file);
+
+                        if (bestPath == null || (prefer && !bestPreferred))
+                        {
+                            bestPath = file;
+                            bestPreferred = prefer;
+                        }
+                    }
+                    catch
+                    {
+                        // Skip unreadable / broken fonts.
+                    }
+                }
+            }
+
+            cache?.Save();
+
+            return bestPath == null ? null : new EzSystemFontEntry(family, family, bestPath, 0);
+        }
+
+        private static EzSystemFontEntry? findInOrdered(IReadOnlyList<EzSystemFontEntry> entries, string family)
+        {
+            foreach (var entry in entries)
+            {
+                if (string.Equals(entry.Family, family, StringComparison.OrdinalIgnoreCase))
+                    return entry;
+            }
+
+            return null;
+        }
+
+        private static bool isFontFile(string path)
+        {
+            string ext = Path.GetExtension(path);
+
+            return ext.Equals(".ttf", StringComparison.OrdinalIgnoreCase)
+                   || ext.Equals(".otf", StringComparison.OrdinalIgnoreCase)
+                   || ext.Equals(".ttc", StringComparison.OrdinalIgnoreCase);
+        }
+
         public static IReadOnlyList<EzSystemFontEntry> GetEntries(bool forceRefresh = false)
         {
             lock (cache_lock)
@@ -79,7 +194,10 @@ namespace osu.Game.EzOsuGame.Fonts
                     return cached;
 
                 if (forceRefresh)
+                {
+                    resolved_families.Clear();
                     CachedEmoji = null;
+                }
 
                 var byFamily = new Dictionary<string, EzSystemFontEntry>(StringComparer.OrdinalIgnoreCase);
                 var cache = getNameCache();
@@ -215,7 +333,7 @@ namespace osu.Game.EzOsuGame.Fonts
 
             foreach (string family in knownSystemEmojiFamilyNames())
             {
-                var entry = FindByFamily(family);
+                var entry = TryResolveFamily(family);
 
                 if (entry != null)
                     return entry;
@@ -255,7 +373,7 @@ namespace osu.Game.EzOsuGame.Fonts
                     if (byFamily.ContainsKey(family))
                         continue;
 
-                    var entry = FindByFamily(family);
+                    var entry = TryResolveFamily(family);
                     if (entry == null || !isEmojiCapable(entry.Value.Path, entry.Value.FaceIndex))
                         continue;
 
