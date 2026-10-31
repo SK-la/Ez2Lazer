@@ -97,7 +97,10 @@ namespace osu.Game.EzOsuGame.Audio
 
             var playableBeatmap = EzPlayableBeatmapCache.GetShared(beatmap, beatmap.BeatmapInfo.Ruleset);
             previewHitSoundsEnabled = fastCheckShouldPreviewHitSounds(beatmap, hitsound_threshold);
-            previewStoryboardEnabled = hasStoryboardSamples(beatmap.Storyboard);
+
+            // note 音谱里 storyboard 音频就是键音，两者同一条时间线：它不再单独开门，随 note 音预览一起起停。
+            previewStoryboardEnabled = hasStoryboardSamples(beatmap.Storyboard)
+                                       && (!storyboardIsNoteAudio || previewHitSoundsEnabled);
 
             if (!previewHitSoundsEnabled && !previewStoryboardEnabled)
                 return false;
@@ -156,15 +159,24 @@ namespace osu.Game.EzOsuGame.Audio
             return count;
         }
 
-        private static bool hasStoryboardSamples(Storyboard? storyboard)
+        /// <summary>
+        /// storyboard 样本是否按 note 音发声：mania / BMS 的谱面里 note 本身就是音频，storyboard 音频与 note 同处
+        /// 一条时间线，因此并入 note 音流，受同一门槛与同一过滤；其它规则集的 storyboard 音频仍是背景音。
+        /// </summary>
+        private bool storyboardIsNoteAudio => StoryboardSampleInfoExtensions.IsNoteAudioIn(currentBeatmap?.BeatmapInfo.Ruleset);
+
+        private bool hasStoryboardSamples(Storyboard? storyboard)
         {
             if (storyboard?.Layers == null)
                 return false;
 
             foreach (var layer in storyboard.Layers)
             {
-                if (layer.Elements.OfType<StoryboardSampleInfo>().Any())
-                    return true;
+                foreach (var element in layer.Elements)
+                {
+                    if (element is StoryboardSampleInfo)
+                        return true;
+                }
             }
 
             return false;
