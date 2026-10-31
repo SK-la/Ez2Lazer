@@ -8,6 +8,7 @@ using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 
 namespace osu.Game.Storyboards.Drawables
@@ -36,8 +37,21 @@ namespace osu.Game.Storyboards.Drawables
         [Resolved(canBeNull: true)]
         private OsuConfigManager? config { get; set; }
 
+        [Resolved(canBeNull: true)]
+        private DrawableRuleset? drawableRuleset { get; set; }
+
         private Bindable<double>? hitsoundVolume;
         private IAdjustableAudioComponent? hitsoundChain;
+
+        /// <summary>
+        /// Whether this sample plays under the hitsound volume the notes in this beatmap play under.
+        /// </summary>
+        /// <remarks>
+        /// In rulesets whose notes are themselves audio (mania, BMS) a storyboard sample sits on the same timeline the
+        /// notes do, so it is note audio and follows the hitsound volume. Elsewhere the sample is plain background
+        /// sound, which takes the game-wide sample volume.
+        /// </remarks>
+        protected virtual bool CountsAsNoteAudio => StoryboardSampleInfoExtensions.IsNoteAudioIn(drawableRuleset?.Ruleset.RulesetInfo);
 
         /// <summary>
         /// The audio component whose volume chain a hitsound-classified sample plays under, or <see langword="null"/>
@@ -55,7 +69,7 @@ namespace osu.Game.Storyboards.Drawables
         {
             base.LoadAsyncComplete();
 
-            if (sampleInfo.IsHitsound)
+            if (sampleInfo.IsHitsound || CountsAsNoteAudio)
             {
                 if (HitsoundVolumeChain is { } chain)
                     BindAdjustments(hitsoundChain = chain);
