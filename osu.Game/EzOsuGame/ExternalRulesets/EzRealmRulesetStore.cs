@@ -13,11 +13,13 @@ using Realms;
 
 namespace osu.Game.EzOsuGame.ExternalRulesets
 {
-    public class EzRealmRulesetStore : RealmRulesetStore
+    public class EzRealmRulesetStore : RealmRulesetStore, IEzExternalRulesetCatalog
     {
         private EzRulesetMappingConfig? mappingConfig;
         private readonly HashSet<string> disabledByConfig = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> mappedExplicitShortNames = new HashSet<string>(StringComparer.Ordinal);
+
+        public IReadOnlyList<DiscoveredExternalRuleset> AllDiscovered { get; private set; } = Array.Empty<DiscoveredExternalRuleset>();
 
         public EzRealmRulesetStore(RealmAccess realmAccess, Storage? storage = null)
             : base(realmAccess, storage)
@@ -36,8 +38,13 @@ namespace osu.Game.EzOsuGame.ExternalRulesets
                                 .Where(i => IsUserRulesetAssembly(i.GetType().Assembly))
                                 .ToList();
 
-            mappingConfig.EnsureDefaults(userInstances.Select(i =>
-                new DiscoveredExternalRuleset(i.ShortName, i.RulesetInfo.Name, i.RulesetInfo.OnlineID)));
+            // Published for the external ruleset manager; the same projection feeds EnsureDefaults below.
+            // OnlineID is read before the resolver overwrites it, so it is the ruleset's declared value.
+            AllDiscovered = userInstances
+                            .Select(i => new DiscoveredExternalRuleset(i.ShortName, i.RulesetInfo.Name, i.RulesetInfo.OnlineID))
+                            .ToList();
+
+            mappingConfig.EnsureDefaults(AllDiscovered);
 
             var usedIds = new HashSet<int> { 0, 1, 2, 3 };
 

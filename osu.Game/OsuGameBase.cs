@@ -393,6 +393,7 @@ namespace osu.Game
 
             dependencies.CacheAs<RulesetStore>(RulesetStore = new EzRealmRulesetStore(realm, Storage));
             dependencies.CacheAs<IRulesetStore>(RulesetStore);
+            dependencies.CacheAs<IEzExternalRulesetCatalog>((EzRealmRulesetStore)RulesetStore);
 
             Decoder.RegisterDependencies(RulesetStore);
 
