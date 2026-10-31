@@ -59,6 +59,12 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
             var scores = new List<BmsScoreRow>();
             var informations = new List<BmsInformationRow>();
 
+            // song/score/information are keyed by content sha256, so duplicate content (the same chart
+            // copied into several folders or tables) collapses to one row; later entries win.
+            var songIndices = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var scoreIndices = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var informationIndices = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var chart in charts)
             {
                 string pathKey = string.IsNullOrEmpty(chart.Md5Hash)
@@ -72,7 +78,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
                     ? chart.ContentMd5
                     : (pathKey.Length >= 32 ? pathKey[..32] : pathKey);
 
-                songs.Add(new BmsSongRow(
+                replaceOrAdd(songs, songIndices, sha256, new BmsSongRow(
                     md5,
                     sha256,
                     chart.Title,
@@ -91,11 +97,25 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
                     (int)Math.Round(chart.MinBpm),
                     (int)Math.Round(chart.Duration)));
 
-                scores.Add(buildScoreRow(chart, sha256, pathKey, lampsByBeatmapId, realm));
-                informations.Add(BmsInformationBuilder.Build(chart, sha256, realm, analytics));
+                replaceOrAdd(scores, scoreIndices, sha256, buildScoreRow(chart, sha256, pathKey, lampsByBeatmapId, realm));
+
+                BmsInformationRow information = BmsInformationBuilder.Build(chart, sha256, realm, analytics);
+                replaceOrAdd(informations, informationIndices, information.Sha256, information);
             }
 
             return (songs, scores, informations);
+        }
+
+        private static void replaceOrAdd<T>(List<T> rows, Dictionary<string, int> indices, string key, T row)
+        {
+            if (indices.TryGetValue(key, out int existing))
+            {
+                rows[existing] = row;
+                return;
+            }
+
+            indices[key] = rows.Count;
+            rows.Add(row);
         }
 
         private static BmsScoreRow buildScoreRow(

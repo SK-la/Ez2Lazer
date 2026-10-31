@@ -122,6 +122,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
             CancellationToken cancellationToken)
         {
             var upsertCharts = new List<BMSChartCache>();
+            var upsertBeatmapIds = new HashSet<Guid>();
             var deleteKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var lampIds = new HashSet<Guid>();
 
@@ -144,6 +145,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
                 }
 
                 if (!beatmapManager.TryGetChart(change.BeatmapId, out BMSChartCache chart))
+                    continue;
+
+                if (!upsertBeatmapIds.Add(change.BeatmapId))
                     continue;
 
                 upsertCharts.Add(chart);
@@ -253,7 +257,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
             var cmd = connection.CreateCommand();
             cmd.Transaction = transaction;
             cmd.CommandText = @"
-INSERT INTO song (md5, sha256, title, subtitle, genre, artist, subartist, path, folder, parent, level, difficulty, mode, notes, favorite, maxbpm, minbpm, length, date, adddate)
+INSERT OR REPLACE INTO song (md5, sha256, title, subtitle, genre, artist, subartist, path, folder, parent, level, difficulty, mode, notes, favorite, maxbpm, minbpm, length, date, adddate)
 VALUES ($md5, $sha256, $title, $subtitle, $genre, $artist, $subartist, $path, $folder, $parent, $level, $difficulty, $mode, $notes, $favorite, $maxbpm, $minbpm, $length, 0, 0);";
             cmd.Parameters.Add("$md5", SqliteType.Text);
             cmd.Parameters.Add("$sha256", SqliteType.Text);
@@ -282,7 +286,7 @@ VALUES ($md5, $sha256, $title, $subtitle, $genre, $artist, $subartist, $path, $f
             var cmd = connection.CreateCommand();
             cmd.Transaction = transaction;
             cmd.CommandText = @"
-INSERT INTO score (sha256, mode, clear, playcount, clearcount, epg, lpg, egr, lgr, egd, lgd, ebd, lbd, epr, lpr, ems, lms, notes, combo, minbp, avgjudge, date)
+INSERT OR REPLACE INTO score (sha256, mode, clear, playcount, clearcount, epg, lpg, egr, lgr, egd, lgd, ebd, lbd, epr, lpr, ems, lms, notes, combo, minbp, avgjudge, date)
 VALUES ($sha256, $mode, $clear, $playcount, $clearcount, $epg, $lpg, $egr, $lgr, 0, 0, 0, 0, 0, 0, 0, 0, $notes, $combo, $minbp, 2147483647, 0);";
             addScoreParameters(cmd);
             cmd.Prepare();
@@ -306,7 +310,7 @@ VALUES ($sha256, $mode, $clear, $playcount, $clearcount, $epg, $lpg, $egr, $lgr,
             var cmd = connection.CreateCommand();
             cmd.Transaction = transaction;
             cmd.CommandText = @"
-INSERT INTO information (sha256, n, ln, s, ls, total, density, peakdensity, enddensity, mainbpm)
+INSERT OR REPLACE INTO information (sha256, n, ln, s, ls, total, density, peakdensity, enddensity, mainbpm)
 VALUES ($sha256, $n, $ln, $s, $ls, $total, $density, $peakdensity, $enddensity, $mainbpm);";
             cmd.Parameters.Add("$sha256", SqliteType.Text);
             cmd.Parameters.Add("$n", SqliteType.Integer);
