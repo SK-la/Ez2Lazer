@@ -46,11 +46,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayInputNotes
         private readonly Dictionary<int, EzReplayInputNote[]> notesByColumn = new Dictionary<int, EzReplayInputNote[]>();
 
         private double fallbackEndTime;
-        private bool loaded;
-        private bool resultsApplied;
 
         /// <summary>Whether the overlay is drawn at all; the master switch of the replay sidebar section.</summary>
-        public BindableBool ShowOverlay { get; } = new BindableBool(true);
+        public BindableBool ShowOverlay { get; } = new BindableBool();
 
         /// <summary>Whether the overlay colours notes by the judgement of the press / hold sections.</summary>
         public BindableBool ColourByHitResult { get; } = new BindableBool();
@@ -62,15 +60,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayInputNotes
         public int Version { get; private set; }
 
         /// <summary>Whether a replay was loaded and the overlay has anything to show.</summary>
-        public bool Enabled => loaded;
+        public bool Enabled { get; private set; }
 
         /// <summary>Whether judgement results have been applied; <see cref="OnlyJudgedNotes"/> has no notes before this.</summary>
-        public bool ResultsApplied => resultsApplied;
+        public bool ResultsApplied { get; private set; }
 
         /// <summary>
         /// Whether the overlay should draw with the current mode. The judged-notes mode needs results, the span mode does not.
         /// </summary>
-        public bool CanDraw => loaded && ShowOverlay.Value && (!OnlyJudgedNotes.Value || resultsApplied);
+        public bool CanDraw => Enabled && ShowOverlay.Value && (!OnlyJudgedNotes.Value || ResultsApplied);
 
         public EzReplayInputNoteModel()
         {
@@ -113,7 +111,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayInputNotes
                 }
             }
 
-            loaded = true;
+            Enabled = true;
             Rebuild();
         }
 
@@ -199,7 +197,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayInputNotes
             foreach (var entries in judgedHeads.Values)
                 entries.Sort(static (a, b) => a.Time.CompareTo(b.Time));
 
-            resultsApplied = true;
+            ResultsApplied = true;
             Rebuild();
         }
 
@@ -211,7 +209,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayInputNotes
             notesByColumn.Clear();
             buildBuffer.Clear();
 
-            if (loaded && ShowOverlay.Value)
+            if (Enabled && ShowOverlay.Value)
             {
                 if (OnlyJudgedNotes.Value)
                     buildJudgedNotes();
@@ -269,7 +267,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayInputNotes
 
         private void buildJudgedNotes()
         {
-            if (!resultsApplied)
+            if (!ResultsApplied)
                 return;
 
             // Plain notes: one note per judgement, drawn as an editor tap note and ignoring the release time.
