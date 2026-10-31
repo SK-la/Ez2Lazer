@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
@@ -58,6 +59,7 @@ using osu.Game.EzOsuGame.Playback;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Screens.Menu;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Cursor;
@@ -369,6 +371,9 @@ namespace osu.Game
             GlobalConfigStore.Config = LocalConfig;
             GlobalConfigStore.EzConfig = Ez2ConfigManager;
             dependencies.Cache(Ez2ConfigManager);
+
+            // 记录实际生效的 GC 形态。选择项的启动引导在 osu.Desktop 侧，之后仅靠本行即可确认是否已应用。
+            EzStartupTrace.Log($"GC server={GCSettings.IsServerGC} latency={GCSettings.LatencyMode}");
             dependencies.Cache(new PixivBackgroundCoordinator(Storage, Ez2ConfigManager));
             dependencies.Cache(new EzLogoBackdropSampler());
 

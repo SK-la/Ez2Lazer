@@ -88,20 +88,10 @@ namespace osu.Game.EzOsuGame.Overlays
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.EzSubFrameCorrectionEnabled),
                     Caption = EZ_SUB_FRAME_CORRECTION_ENABLED,
                     HintText = EZ_SUB_FRAME_CORRECTION_ENABLED_TOOLTIP,
-                }),
-                new SettingsItemV2(new FormCheckBox
+                })
                 {
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzJudgmentDiagEnabled),
-                    Caption = EZ_JUDGMENT_DIAG_ENABLED,
-                    HintText = EZ_JUDGMENT_DIAG_ENABLED_TOOLTIP,
-                }),
-
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzTimingTraceEnabled),
-                    Caption = EZ_TIMING_TRACE_ENABLED,
-                    HintText = EZ_TIMING_TRACE_ENABLED_TOOLTIP,
-                }),
+                    Keywords = new[] { "sub", "frame", "correction", "latency", "input" }
+                },
                 new SettingsItemV2(new FormCheckBox
                 {
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.InputAudioLatencyTracker),
@@ -111,6 +101,21 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "latency", "audio", "input" }
                 },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzJudgmentDiagEnabled),
+                    Caption = EZ_JUDGMENT_DIAG_ENABLED,
+                    HintText = EZ_JUDGMENT_DIAG_ENABLED_TOOLTIP,
+                })
+                {
+                    Keywords = new[] { "judgment", "diag", "debug", "分析", "诊断" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzTimingTraceEnabled),
+                    Caption = EZ_TIMING_TRACE_ENABLED,
+                    HintText = EZ_TIMING_TRACE_ENABLED_TOOLTIP,
+                }),
                 new SettingsItemV2(new FormCheckBox
                 {
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.EzHudCameraEnabled),
@@ -137,6 +142,15 @@ namespace osu.Game.EzOsuGame.Overlays
                 })
                 {
                     Keywords = new[] { "race", "feed", "batch", "stream", "角逐", "预建" }
+                },
+                new SettingsItemV2(new FormEnumDropdown<EzGcMode>
+                {
+                    Caption = EZ_GC_MODE,
+                    HintText = EZ_GC_MODE_TOOLTIP,
+                    Current = ezConfig.GetBindable<EzGcMode>(Ez2Setting.GcMode),
+                })
+                {
+                    Keywords = new[] { "gc", "garbage", "collection", "server", "workstation", "stutter", "frame", "内存", "卡顿", "帧" }
                 },
             });
         }
@@ -299,17 +313,17 @@ namespace osu.Game.EzOsuGame.Overlays
                     var progress = new EzLocalProfileOnlinePullNotification.Forwarder(notification);
 
                     onlinePullService.PullAsync(request, progress, notification.CancellationToken)
-                                    .ContinueWith(t =>
-                                    {
-                                        var result = EzLocalProfileOnlinePullNotification.Finish(t, notification, notifications);
+                                     .ContinueWith(t =>
+                                     {
+                                         var result = EzLocalProfileOnlinePullNotification.Finish(t, notification, notifications);
 
-                                        if (result is { StatsRecorded: > 0 }
-                                            && localProfileService is not null
-                                            && !localProfileService.IsComputing.Value)
-                                        {
-                                            runCompute(localProfileService, localProfileService.GetPreviouslyIncludedUsernames(), clearRebuild: false, notifications);
-                                        }
-                                    });
+                                         if (result is { StatsRecorded: > 0 }
+                                             && localProfileService is not null
+                                             && !localProfileService.IsComputing.Value)
+                                         {
+                                             runCompute(localProfileService, localProfileService.GetPreviouslyIncludedUsernames(), clearRebuild: false, notifications);
+                                         }
+                                     });
                 }));
         }
 
@@ -365,6 +379,27 @@ namespace osu.Game.EzOsuGame.Overlays
 
         internal static readonly LocalisableString EZ_HUD_CAMERA_ENABLED = new EzLocalizationManager.EzLocalisableString(
             "启用摄像头 HUD", "Enable Camera HUD");
+
+        internal static readonly LocalisableString EZ_GC_MODE = new EzLocalizationManager.EzLocalisableString(
+            "GC 类型（需重启）", "GC type (requires restart)");
+
+        internal static readonly LocalisableString EZ_GC_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "决定 .NET 的垃圾回收形态，只在进程启动时生效，改动后需重启客户端。"
+            + "\nServer：每核一个堆、后台并行回收。任何大量分配的阶段（启动预加载、进选歌、进局、编辑器载大谱）"
+            + "回收次数更少、单次暂停更短，但内存占用更高（默认）。"
+            + "\nWorkstation：单堆、内存占用更低，但大量分配时 gen0/gen1 回收更频繁，"
+            + "每次都会暂停主线程（含渲染）造成卡顿。"
+            + "\n稳态低分配时两者差异很小；两者都会暂停主线程，Server 只是暂停更少、更短。"
+            + "\n与官方设置里的「GC 延迟模式」不是同一项：那项改运行期的延迟策略，本项改启动期的 GC 形态。",
+            "Selects the .NET garbage collector flavour. Applies only at process start; restart required."
+            + "\nServer: a heap per core with background parallel collections. During any heavy-allocation phase"
+            + " (startup preload, entering song select, entering play, loading a large map in the editor) it collects"
+            + " less often and pauses shorter each time, at the cost of higher memory use (default)."
+            + "\nWorkstation: single heap, lower memory, but heavy allocation triggers more frequent gen0/gen1"
+            + " collections, each of which pauses the main thread (including rendering) and stutters."
+            + "\nAt low steady-state allocation the two are nearly identical; both pause the main thread,"
+            + " Server just pauses less often and for less time."
+            + "\nThis is not the same as the official \"GC mode\" setting, which adjusts the runtime latency policy rather than the GC flavour.");
 
         internal static readonly LocalisableString EZ_HUD_CAMERA_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "默认关闭。关闭时不加载摄像头后端，不枚举设备，不打开摄像头，也不上传画面，对帧率没有影响。"

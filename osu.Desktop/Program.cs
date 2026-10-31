@@ -100,6 +100,11 @@ namespace osu.Desktop
                 }
             }
 
+            // GC 形态只能在进程启动时确定。若用户的实验设置与当前进程不符，则带环境变量重入并退出本进程。
+            // 必须在创建 host（占用 IPC 单实例锁）之前完成，否则新进程会因单实例冲突而自行退出。
+            if (EzGcModeBootstrap.EnsureRequestedGcMode(gameName, args))
+                return;
+
             var hostOptions = new HostOptions
             {
                 IPCPipeName = !tournamentClient ? OsuGame.IPC_PIPE_NAME : null,
