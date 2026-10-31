@@ -137,10 +137,6 @@ namespace osu.Game.Overlays.Settings.Sections
         {
             base.LoadComplete();
 
-            realmSubscription = realm.RegisterForNotifications(_ => realm.Realm.All<SkinInfo>()
-                                                                         .Where(s => !s.DeletePending)
-                                                                         .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase), skinsChanged);
-
             skinDropdown.Current.BindValueChanged(skin =>
             {
                 if (skin.NewValue.ID == SkinInfo.RANDOM_SKIN)
@@ -160,6 +156,22 @@ namespace osu.Game.Overlays.Settings.Sections
             enableScriptedSkinsBindable.BindValueChanged(onEnableScriptedSkinsChanged);
 
             skins.ScriptedSkinsCatalogUpdated += refreshSkinsList;
+
+            // A full SkinInfo scan plus a Realm notification registration. Both are deferred out of the
+            // settings preload window; the dropdown renders the current skin from `Current` in the meantime.
+            Scheduler.AddOnce(initialiseSkinList);
+        }
+
+        private void initialiseSkinList()
+        {
+            if (realmSubscription != null)
+                return;
+
+            realmSubscription = realm.RegisterForNotifications(_ => realm.Realm.All<SkinInfo>()
+                                                                         .Where(s => !s.DeletePending)
+                                                                         .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase), skinsChanged);
+
+            refreshSkinsList();
         }
 
         /// <summary>

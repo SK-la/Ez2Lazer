@@ -34,6 +34,12 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly SettingsButton checkButton;
         private int loginRequestInFlight;
 
+        /// <summary>
+        /// Set when the initial background-source bind selects Pixiv before load finished, so the
+        /// disk-backed status read can run once on <see cref="LoadComplete"/> instead of during preload.
+        /// </summary>
+        private bool pendingInitialStatusRefresh;
+
         public EzPixivBackgroundSettings(
             Ez2ConfigManager ezConfig,
             PixivBackgroundCoordinator coordinator,
@@ -218,13 +224,31 @@ namespace osu.Game.EzOsuGame.Overlays
                 if (change.NewValue == BackgroundSource.PixivFollow)
                 {
                     Show();
-                    refreshLocalStatus();
+
+                    // The status read touches disk (token/account name); skip it during the settings
+                    // preload window and let LoadComplete do the first read once the tree is up.
+                    if (IsLoaded)
+                        refreshLocalStatus();
+                    else
+                        pendingInitialStatusRefresh = true;
                 }
                 else
                 {
+                    pendingInitialStatusRefresh = false;
                     Hide();
                 }
             }, true);
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            if (pendingInitialStatusRefresh)
+            {
+                pendingInitialStatusRefresh = false;
+                refreshLocalStatus();
+            }
         }
 
         private void checkLogin()
