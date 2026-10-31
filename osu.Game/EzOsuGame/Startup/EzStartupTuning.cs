@@ -47,10 +47,11 @@ namespace osu.Game.EzOsuGame.Startup
         public static double SettingsPreloadDelayAfterBdspMs { get; set; } = 1_500;
 
         /// <summary>
-        /// Emit per-section load timings and a Top-N snapshot to <see cref="EzStartupTrace"/>.
-        /// Set false to silence the per-section lines while A/B testing.
+        /// Master switch for the high-level <see cref="EzStartupTrace.Log"/> milestones in a release build.
+        /// Default off; enable to trace startup on a shipped build. Fine-grained investigation lines use
+        /// <see cref="EzStartupTrace.LogDiagnostic"/> and are debug-build only regardless of this flag.
         /// </summary>
-        public static bool LogSectionLoadTimings { get; set; } = true;
+        public static bool EnableStartupTrace { get; set; }
 
         /// <summary>
         /// Diagnostic: skip the settings-section async preload entirely.
@@ -58,12 +59,5 @@ namespace osu.Game.EzOsuGame.Startup
         /// startup work (BDSP backfill, song-select preload). Sections then load on first PopIn instead.
         /// </summary>
         public static bool SkipSettingsPreload { get; set; }
-
-        /// <summary>
-        /// Diagnostic: sample frame time and GC activity once per second after main menu entry, so the
-        /// shape of a startup frame-rate dip can be attributed instead of only its total length.
-        /// Output goes to <see cref="EzStartupTrace"/>. Off by default; flip on to re-measure.
-        /// </summary>
-        public static bool SampleStartupFrames { get; set; }
     }
 }

@@ -181,8 +181,7 @@ namespace osu.Game.Overlays.Settings
             LoadDurationMs = loadStopwatch.ElapsedMilliseconds;
             loadStopwatch.Stop();
 
-            if (EzStartupTuning.LogSectionLoadTimings)
-                EzStartupTrace.Log($"Settings.section load {LoadDurationMs}ms header=\"{Header}\"");
+            EzStartupTrace.LogDiagnostic($"Settings.section load {LoadDurationMs}ms header=\"{Header}\"");
         }
 
         protected override void LoadComplete()
