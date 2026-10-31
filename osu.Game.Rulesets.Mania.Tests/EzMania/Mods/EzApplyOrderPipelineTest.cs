@@ -156,6 +156,26 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
             Assert.That(ruleset.GetKeyCount(beatmapInfo, new Mod[] { new ManiaModNtoMAnother { Key = { Value = 9 } } }), Is.EqualTo(9));
         }
 
+        /// <summary>
+        /// EXT 排在改键 mod 之后：PS 先重建整谱，EXT 再在成品两侧加外列，选歌键数也要一致。
+        /// </summary>
+        [Test]
+        public void TestExtendKeysRunsAfterKeyCountMods()
+        {
+            var ruleset = new ManiaRuleset();
+
+            var ps = new ManiaModPatternShift { KeyCount = { Value = 6 }, Seed = { Value = 1 } };
+            var extend = new ManiaModExtendKeys { TargetKeys = { Value = 10 }, Seed = { Value = 1 } };
+
+            var beatmap = (ManiaBeatmap)createManiaWorkingBeatmap(7).GetPlayableBeatmap(ruleset.RulesetInfo, new Mod[] { ps, extend });
+
+            Assert.That(beatmap.TotalColumns, Is.EqualTo(10));
+            Assert.That(beatmap.HitObjects.All(h => h.Column < 10), Is.True);
+
+            var beatmapInfo = new BeatmapInfo(ruleset.RulesetInfo, new BeatmapDifficulty { CircleSize = 7 });
+            Assert.That(ruleset.GetKeyCount(beatmapInfo, new Mod[] { ps, extend }), Is.EqualTo(10));
+        }
+
         private static TestWorkingBeatmap createManiaWorkingBeatmap(int columns)
         {
             var beatmap = new ManiaBeatmap(new StageDefinition(columns))
