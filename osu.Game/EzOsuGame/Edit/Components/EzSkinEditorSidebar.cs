@@ -49,7 +49,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private EzSkinEditorSidebarGroupRail rail = null!;
         private OsuScrollContainer contentScroll = null!;
         private FillFlowContainer contentFlow = null!;
-        private SettingsCheckbox pinCheckbox = null!;
         private readonly List<EzSkinEditorSettingsGroup?> groupDrawables = new List<EzSkinEditorSettingsGroup?>();
 
         // 滚动驱动的选中变化期间置位，阻止 onRailSelectionChanged 再把视口拉回分组顶部。
@@ -70,11 +69,38 @@ namespace osu.Game.EzOsuGame.Edit.Components
         public BindableBool ExpandedState { get; } = new BindableBool(true);
 
         /// <summary>
+        /// Width the sidebar reserves in the workspace layout. Zero while unpinned (the panel overlays
+        /// the scene and is only summoned by hover); track width while pinned-expanded, since the pin
+        /// keeps the panel open. The scene re-fits to whatever space is left.
+        /// </summary>
+        public Bindable<float> ReservedWidth { get; } = new Bindable<float>();
+
+        /// <summary>
+        /// True while the sidebar should take layout space: pinned and showing the settings panel.
+        /// Unpinned collapses and overlays so the scene keeps the full width.
+        /// </summary>
+        public bool ReservesSpace => Pinned.Value && ExpandedState.Value;
+
+        /// <summary>
+        /// Width taken by the reserved sidebar, or zero while it overlays.
+        /// </summary>
+        public float ReservedLayoutWidth => ReservesSpace ? ExpandedWidthWithRail : 0;
+
+        /// <summary>
         /// 当前选中分组的 <see cref="EzSkinEditorSidebarGroupDefinition.Id"/>；无 Id 时为 null。
         /// </summary>
         public Bindable<string?> SelectedGroupId { get; } = new Bindable<string?>();
 
         public int PageCount => pages.Count;
+
+        /// <summary>
+        /// 为避免与侧边栏重叠，Picker 需要距离游戏区域右边缘保留的安全距离。
+        /// 该距离 = 固定 Rail 宽度 + 淡入淡出的 Settings Panel 宽度 - 已在布局中预留的侧边栏宽度。
+        /// 由于预留空间已经压缩了游戏区域，再次扣除 Panel 宽度会导致双重留白。
+        /// 侧边栏折叠或未预留空间时返回 0。
+        /// </summary>
+        public float VisiblePanelReserve =>
+            Math.Max(0, EzSkinEditorSidebarGroupRail.WIDTH + (CONTENT_WIDTH - padding) * contentPanel.Alpha - ReservedLayoutWidth);
 
         internal float FooterReservedHeight => footerContainer.Height;
 
@@ -83,8 +109,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
         public EzSkinEditorSidebar()
         {
             RelativeSizeAxes = Axes.Y;
-            // AutoSize 只认轨宽，设置面板 BypassAutoSize 并向左悬停，游戏区右缘始终贴轨。
-            Width = EzSkinEditorSidebarGroupRail.WIDTH;
+            // 占位宽度由 ReservedWidth 驱动（固定+展开时为面板+轨，其余为 0）；面板 BypassAutoSize
+            // 并向左悬停，不撑大自身宽度。
+            Width = 0;
         }
 
         [BackgroundDependencyLoader]
@@ -96,16 +123,17 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 {
                     Icon = FontAwesome.Solid.Cog,
                     Origin = Anchor.TopRight,
-                    Anchor = Anchor.TopLeft,
-                    Margin = new MarginPadding(5),
+                    Anchor = Anchor.TopRight,
+                    Margin = new MarginPadding { Right = EzSkinEditorSidebarGroupRail.WIDTH + 5, Top = 5 },
                     AlwaysPresent = true,
                     Action = () => ExpandedState.Value = true,
                 },
-                // 设置面板：右缘贴轨左缘，不参与 AutoSize。
+                // 设置面板：贴容器右缘并左移一个轨宽，让出导航轨位置，避免和轨叠在一起。
                 contentPanel = new Container
                 {
-                    Anchor = Anchor.TopLeft,
+                    Anchor = Anchor.TopRight,
                     Origin = Anchor.TopRight,
+                    Margin = new MarginPadding { Right = EzSkinEditorSidebarGroupRail.WIDTH },
                     RelativeSizeAxes = Axes.Y,
                     Width = CONTENT_WIDTH,
                     BypassAutoSizeAxes = Axes.Both,
@@ -146,13 +174,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
                     Origin = Anchor.TopRight,
                 },
             };
-
-            pinCheckbox = new SettingsCheckbox
-            {
-                LabelText = EzEditorStrings.SIDEBAR_PIN_LABEL,
-                Current = Pinned,
-            };
-            contentFlow.Add(pinCheckbox);
         }
 
         protected override void LoadComplete()
@@ -165,15 +186,29 @@ namespace osu.Game.EzOsuGame.Edit.Components
             {
                 if (e.NewValue)
                     ExpandedState.Value = true;
+
+                updateReservedWidth();
             }, true);
 
             ExpandedState.BindValueChanged(v =>
             {
-                // 只显隐设置面板；轨 Alpha 与布局占位（轨宽）不变，游戏区右缘不跟着跳。
+                // 只显隐设置面板；占位宽度另由 Pinned/ExpandedState 决定。
                 contentPanel.FadeTo(v.NewValue ? 1 : 0, transition_duration, Easing.OutQuint);
+                updateReservedWidth();
             }, true);
 
             rail.SelectedIndex.BindValueChanged(onRailSelectionChanged);
+        }
+
+        /// <summary>
+        /// Pushes the space the sidebar has to occupy. Zero while overlaying, so the scene keeps the
+        /// full width; panel + rail while pinned-expanded. The sidebar's own width tracks the same
+        /// value so the settings panel and rail lay out from the right edge without overlapping it.
+        /// </summary>
+        private void updateReservedWidth()
+        {
+            ReservedWidth.Value = ReservedLayoutWidth;
+            Width = ReservedWidth.Value;
         }
 
         /// <summary>
@@ -310,6 +345,15 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private void rebuildGroups()
         {
             contentFlow.Clear();
+
+            // 固定开关置顶。分组重建会清空并销毁 contentFlow 的子项，开关必须每次重建，
+            // 否则切换场景后顶部就看不到它了。
+            contentFlow.Add(new SettingsCheckbox
+            {
+                LabelText = EzEditorStrings.SIDEBAR_PIN_LABEL,
+                Current = Pinned,
+            });
+
             groupDrawables.Clear();
 
             foreach (var definition in pages)
@@ -361,6 +405,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 return;
 
             suppressRailScrollResponse = true;
+
             try
             {
                 rail.SelectedIndex.Value = index;

@@ -11,9 +11,11 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.UI;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Overlays.SkinEditor;
+using osu.Game.Rulesets;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.Edit.Components
@@ -30,9 +32,24 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Action? OpenOfficialHudEditorRequested { get; set; }
 
-        public BindableBool HudLayerVisible => hudLayerToggle.Active;
+        /// <summary>
+        /// The active editing layer. Only selects which layout container is edited; visibility is
+        /// driven separately by whether the value is <see cref="EzSkinEditorLayer.HudOff"/>.
+        /// </summary>
+        public Bindable<EzSkinEditorLayer> ActiveLayer { get; } = new Bindable<EzSkinEditorLayer>(EzSkinEditorLayer.EzHud);
 
-        private EzEditorHudLayerToggle hudLayerToggle = null!;
+        /// <summary>
+        /// Ruleset shown by the editor; used to label the ruleset-scoped layer options.
+        /// </summary>
+        public Bindable<RulesetInfo?> Ruleset { get; } = new Bindable<RulesetInfo?>();
+
+        /// <summary>
+        /// Whether the visual component picker window is shown.
+        /// </summary>
+        public BindableBool VisualPickerOpen { get; } = new BindableBool();
+
+        private EzEditorLayerButton layerButton = null!;
+        private EzToggleButton visualPickerButton = null!;
 
         private readonly Dictionary<EzSkinEditorSceneType, SceneTabButton> tabButtons = new Dictionary<EzSkinEditorSceneType, SceneTabButton>();
 
@@ -91,9 +108,32 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                            })
                                            .ToArray(),
                             },
-                            hudLayerToggle = new EzEditorHudLayerToggle
+                            // 右端控件组：HUD 层下拉固定贴最右，之后新增的按钮一律插到它左边。
+                            new FillFlowContainer
                             {
-                                Margin = new MarginPadding { Left = padding, Top = gap, Right = padding },
+                                Name = @"Ez Scene bar controls",
+                                AutoSizeAxes = Axes.X,
+                                RelativeSizeAxes = Axes.Y,
+                                Spacing = new Vector2(EzUIStyleV1.SCENE_BAR_BUTTON_SPACING, 0),
+                                Padding = new MarginPadding { Horizontal = padding, Vertical = gap },
+                                Direction = FillDirection.Horizontal,
+                                Children = new Drawable[]
+                                {
+                                    visualPickerButton = new EzToggleButton
+                                    {
+                                        AutoSizeAxes = Axes.X,
+                                        Height = EzUIStyleV1.SceneBarControlHeight(),
+                                        Text = EzEditorStrings.TOOLBAR_VISUAL_PICKER,
+                                        TextSize = 14,
+                                        Active = { BindTarget = VisualPickerOpen },
+                                    },
+                                    layerButton = new EzEditorLayerButton
+                                    {
+                                        GetAvailableLayers = () => EzSkinEditorLayerOptions.For(CurrentScene.Value).Select(d => d.Layer).ToList(),
+                                        GetDisplayName = layer => EzSkinEditorLayerOptions.GetDisplayName(layer, Ruleset.Value),
+                                        ActiveLayer = ActiveLayer,
+                                    },
+                                },
                             },
                         },
                     },
@@ -104,7 +144,13 @@ namespace osu.Game.EzOsuGame.Edit.Components
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            CurrentScene.BindValueChanged(e => updateActiveTab(e.NewValue), true);
+            CurrentScene.BindValueChanged(e =>
+            {
+                updateActiveTab(e.NewValue);
+                ActiveLayer.Value = EzSkinEditorLayerOptions.Normalize(e.NewValue, ActiveLayer.Value);
+            }, true);
+
+            Ruleset.BindValueChanged(_ => layerButton.RefreshDisplayText(), true);
         }
 
         private IEnumerable<Drawable> buildSceneButtons() => EzSkinEditorSceneRegistry.All.Select(strategy =>

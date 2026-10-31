@@ -6,6 +6,8 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Extensions;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
@@ -17,6 +19,8 @@ using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Edit.Scenes;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.UserInterface;
+using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
@@ -63,12 +67,58 @@ namespace osu.Game.Tests.Visual.Edit
             AddAssert("appearance has no hud", () => !EzSkinEditorSceneRegistry.SupportsHudLayer(EzSkinEditorSceneType.Appearance));
             AddAssert("note has no hud", () => !EzSkinEditorSceneRegistry.SupportsHudLayer(EzSkinEditorSceneType.Note));
 
-            AddAssert("gameplay targets main hud", () =>
-                EzSkinEditorSceneRegistry.ResolveLayoutTarget(EzSkinEditorSceneType.Gameplay) == GlobalSkinnableContainers.MainHUDComponents);
-            AddAssert("song select targets song select layout", () =>
-                EzSkinEditorSceneRegistry.ResolveLayoutTarget(EzSkinEditorSceneType.SongSelect) == GlobalSkinnableContainers.SongSelect);
-            AddAssert("appearance has no layout target", () =>
-                EzSkinEditorSceneRegistry.ResolveLayoutTarget(EzSkinEditorSceneType.Appearance) == null);
+            AddAssert("gameplay offers ez hud + ruleset layers", () =>
+            {
+                var layers = EzSkinEditorLayerOptions.For(EzSkinEditorSceneType.Gameplay);
+                return layers.Any(d => d.Layer == EzSkinEditorLayer.EzHud)
+                       && layers.Any(d => d.Layer == EzSkinEditorLayer.EzHudRuleset)
+                       && layers.Any(d => d.Layer == EzSkinEditorLayer.EzPlayfieldRuleset);
+            });
+            AddAssert("song select offers only global ez hud", () =>
+            {
+                var layers = EzSkinEditorLayerOptions.For(EzSkinEditorSceneType.SongSelect);
+                return layers.Any(d => d.Layer == EzSkinEditorLayer.EzHud) && !layers.Any(d => d.RulesetScoped);
+            });
+            AddAssert("appearance offers full layers (shown but not editable)", () =>
+            {
+                var layers = EzSkinEditorLayerOptions.For(EzSkinEditorSceneType.Appearance);
+                return layers.Any(d => d.Layer == EzSkinEditorLayer.EzHud)
+                       && layers.Any(d => d.Layer == EzSkinEditorLayer.EzHudRuleset)
+                       && layers.Any(d => d.Layer == EzSkinEditorLayer.EzPlayfieldRuleset);
+            });
+
+            AddAssert("global ez hud targets main hud without ruleset", () =>
+            {
+                var lookup = EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.Gameplay, EzSkinEditorLayer.EzHud, new ManiaRuleset().RulesetInfo);
+                return lookup is { Ruleset: null, Lookup: GlobalSkinnableContainers.MainHUDComponents };
+            });
+            AddAssert("ruleset hud targets main hud with ruleset", () =>
+            {
+                var ruleset = new ManiaRuleset().RulesetInfo;
+                var lookup = EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.Gameplay, EzSkinEditorLayer.EzHudRuleset, ruleset);
+                return lookup != null && ReferenceEquals(lookup.Ruleset, ruleset) && lookup.Lookup == GlobalSkinnableContainers.MainHUDComponents;
+            });
+            AddAssert("ruleset playfield targets playfield", () =>
+            {
+                var lookup = EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.Gameplay, EzSkinEditorLayer.EzPlayfieldRuleset, new ManiaRuleset().RulesetInfo);
+                return lookup != null && lookup.Lookup == GlobalSkinnableContainers.Playfield;
+            });
+            AddAssert("song select resolves its own container", () =>
+            {
+                var lookup = EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.SongSelect, EzSkinEditorLayer.EzHud, new ManiaRuleset().RulesetInfo);
+                return lookup != null && lookup.Lookup == GlobalSkinnableContainers.SongSelect;
+            });
+            AddAssert("hud off has no editing target", () =>
+                EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.Gameplay, EzSkinEditorLayer.HudOff, new ManiaRuleset().RulesetInfo) == null);
+
+            AddAssert("ruleset layer label shows the ruleset name once", () =>
+            {
+                var ruleset = new ManiaRuleset().RulesetInfo;
+                string label = EzSkinEditorLayerOptions.GetDisplayName(EzSkinEditorLayer.EzHudRuleset, ruleset).ToString();
+                return label == EzEditorStrings.LAYER_EZ_HUD_RULESET.ToString().Replace("{0}", ruleset.Name)
+                       && !label.Contains("模式")
+                       && !label.Contains("mode");
+            });
         }
 
         [SetUpSteps]
@@ -144,14 +194,43 @@ namespace osu.Game.Tests.Visual.Edit
             });
             AddUntilStep("scene and sidebar are horizontal", () =>
             {
-                var sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().SingleOrDefault();
-                return sidebar != null && sidebar.ScreenSpaceDrawQuad.Width > 0;
+                // 侧栏占位宽随固定态变化，稳妥地按其内部的导航轨宽度判定。
+                var rail = editorScreen.ChildrenOfType<EzSkinEditorSidebarGroupRail>().SingleOrDefault();
+                return rail != null && rail.ScreenSpaceDrawQuad.Width > 0;
             });
             AddAssert("no size/colour scene tabs", () =>
                 !EzSkinEditorSceneRegistry.All.Any(s => s.SceneType.ToString() is "Size" or "Colour"));
             AddAssert("hud layer present", () => editorScreen.ChildrenOfType<EzSkinEditorHudLayer>().Any());
             AddAssert("song select is first scene", () =>
                 EzSkinEditorSceneRegistry.All[0].SceneType == EzSkinEditorSceneType.SongSelect);
+        }
+
+        [Test]
+        public void TestSceneBarControlsTrailRightEdge()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var bar = (EzSkinEditorSceneBar)null!;
+            var layer = (EzEditorLayerButton)null!;
+            var picker = (EzToggleButton)null!;
+
+            AddStep("capture scene bar controls", () =>
+            {
+                bar = editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Single();
+                layer = editorScreen.ChildrenOfType<EzEditorLayerButton>().Single();
+                picker = editorScreen.ChildrenOfType<EzToggleButton>().Single(b => b.Text.ToString() == EzEditorStrings.TOOLBAR_VISUAL_PICKER.ToString());
+            });
+
+            AddUntilStep("controls laid out", () => layer.ScreenSpaceDrawQuad.Width > 0 && picker.ScreenSpaceDrawQuad.Width > 0
+                                                        && bar.ScreenSpaceDrawQuad.Width > 0);
+
+            // The layer dropdown is the rightmost control; every later button is inserted to its left.
+            AddAssert("layer dropdown hugs the right edge", () =>
+                Math.Abs(bar.ScreenSpaceDrawQuad.TopRight.X - layer.ScreenSpaceDrawQuad.TopRight.X) <= 12);
+            AddAssert("visual picker sits left of the layer dropdown", () =>
+                picker.ScreenSpaceDrawQuad.TopRight.X <= layer.ScreenSpaceDrawQuad.TopLeft.X + 1);
         }
 
         [Test]
@@ -190,7 +269,7 @@ namespace osu.Game.Tests.Visual.Edit
                 hud = editorScreen.ChildrenOfType<EzSkinEditorHudLayer>().Single();
             });
 
-            AddStep("enable hud layer", () => sceneBar.HudLayerVisible.Value = true);
+            AddStep("enable hud layer", () => sceneBar.ActiveLayer.Value = EzSkinEditorLayer.EzHud);
             AddUntilStep("gameplay interaction on", () => hud.InteractionEnabled.Value);
             AddUntilStep("hud workspace section", () => editorScreen.ChildrenOfType<EzSkinEditorHudWorkspaceSection>().Any());
             AddUntilStep("no-selection hint", () =>
@@ -201,11 +280,356 @@ namespace osu.Game.Tests.Visual.Edit
             AddUntilStep("appearance interaction off", () => !hud.InteractionEnabled.Value);
 
             switchScene(EzSkinEditorSceneType.Gameplay);
-            AddStep("disable hud layer", () => sceneBar.HudLayerVisible.Value = false);
+            AddStep("hide hud layer", () => sceneBar.ActiveLayer.Value = EzSkinEditorLayer.HudOff);
             AddUntilStep("interaction off layer hidden", () => !hud.InteractionEnabled.Value);
             AddUntilStep("layer-off hint", () =>
                 editorScreen.ChildrenOfType<OsuSpriteText>()
                             .Any(t => t.Text.ToString() == EzEditorStrings.SIDEBAR_HUD_LAYER_OFF.ToString()));
+        }
+
+        [Test]
+        public void TestActiveLayerSelectsTargetWithoutChangingVisibility()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var sceneBar = (EzSkinEditorSceneBar)null!;
+            var hud = (EzSkinEditorHudLayer)null!;
+
+            AddStep("capture", () =>
+            {
+                sceneBar = editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Single();
+                hud = editorScreen.ChildrenOfType<EzSkinEditorHudLayer>().Single();
+            });
+
+            AddStep("select global ez hud", () => sceneBar.ActiveLayer.Value = EzSkinEditorLayer.EzHud);
+            AddUntilStep("ez hud resolves the global gameplay lookup", () =>
+                EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.Gameplay, EzSkinEditorLayer.EzHud, null) is { } globalLookup
+                && globalLookup.Lookup == GlobalSkinnableContainers.MainHUDComponents
+                && globalLookup.Ruleset == null);
+
+            AddStep("select ruleset hud layer", () => sceneBar.ActiveLayer.Value = EzSkinEditorLayer.EzHudRuleset);
+            AddUntilStep("ruleset layer stays visible but only edits its container", () =>
+            {
+                var ruleset = new ManiaRuleset().RulesetInfo;
+                return hud.LayerVisible.Value
+                       && EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.Gameplay, EzSkinEditorLayer.EzHudRuleset, ruleset) is { } rulesetLookup
+                       && rulesetLookup.Ruleset != null
+                       && rulesetLookup.Lookup == GlobalSkinnableContainers.MainHUDComponents;
+            });
+
+            AddStep("select hud off", () => sceneBar.ActiveLayer.Value = EzSkinEditorLayer.HudOff);
+            AddUntilStep("layer hidden", () => !hud.LayerVisible.Value);
+            AddUntilStep("no editing lookup when hidden", () =>
+                EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.Gameplay, EzSkinEditorLayer.HudOff, null) == null);
+        }
+
+        [Test]
+        public void TestSongSelectSceneResolvesItsOwnContainer()
+        {
+            AddAssert("song select layer resolves to the song select container", () =>
+                EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.SongSelect, EzSkinEditorLayer.EzHud, null) is { } lookup
+                && lookup.Lookup == GlobalSkinnableContainers.SongSelect);
+
+            AddAssert("song select hides everything on hud off", () =>
+                EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.SongSelect, EzSkinEditorLayer.HudOff, null) == null);
+
+            AddAssert("appearance has no editable hud", () =>
+                EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.Appearance, EzSkinEditorLayer.EzHud, null) == null);
+        }
+
+        [Test]
+        public void TestLayerDropdownClickAppliesLayer()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var sceneBar = (EzSkinEditorSceneBar)null!;
+            var hud = (EzSkinEditorHudLayer)null!;
+
+            AddStep("capture", () =>
+            {
+                sceneBar = editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Single();
+                hud = editorScreen.ChildrenOfType<EzSkinEditorHudLayer>().Single();
+            });
+
+            AddStep("open layer dropdown", () =>
+            {
+                var button = editorScreen.ChildrenOfType<EzEditorLayerButton>().Single();
+                InputManager.MoveMouseTo(button);
+                InputManager.Click(MouseButton.Left);
+            });
+
+            AddUntilStep("popover shown", () => editorScreen.ChildrenOfType<PopoverContainer>().Any(p => p.CurrentPopover != null));
+
+            AddStep("click ruleset layer option", () =>
+            {
+                var options = editorScreen.ChildrenOfType<EzEditorLayerButton.LayerListPopover.LayerSelectButton>().ToArray();
+                TestContext.Progress.WriteLine("OPTIONS=" + string.Join(" | ", options.Select(o => o.Text.ToString())));
+
+                string rulesetLayerLabel = EzSkinEditorLayerOptions.GetDisplayName(EzSkinEditorLayer.EzHudRuleset, sceneBar.Ruleset.Value).ToString();
+                var option = options.SingleOrDefault(b => b.Text.ToString() == rulesetLayerLabel);
+                Assert.That(option, Is.Not.Null, $"ruleset layer option ({rulesetLayerLabel}) not found in popover: " + string.Join(" | ", options.Select(o => o.Text.ToString())));
+
+                InputManager.MoveMouseTo(option!);
+                InputManager.PressButton(MouseButton.Left);
+            });
+
+            AddStep("release after hold", () => InputManager.ReleaseButton(MouseButton.Left));
+
+            AddUntilStep("layer changed to ruleset", () => sceneBar.ActiveLayer.Value == EzSkinEditorLayer.EzHudRuleset);
+            AddUntilStep("layer stays visible", () => hud.LayerVisible.Value);
+            AddUntilStep("button text updated", () => editorScreen.ChildrenOfType<EzEditorLayerButton>().Single().Text.ToString()
+                                                        == EzSkinEditorLayerOptions.GetDisplayName(EzSkinEditorLayer.EzHudRuleset, sceneBar.Ruleset.Value).ToString());
+        }
+
+        [Test]
+        public void TestLayerNotForcedOffOnNonHudScene()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            var sceneBar = (EzSkinEditorSceneBar)null!;
+            var hud = (EzSkinEditorHudLayer)null!;
+
+            AddStep("capture", () =>
+            {
+                sceneBar = editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Single();
+                hud = editorScreen.ChildrenOfType<EzSkinEditorHudLayer>().Single();
+            });
+
+            // The editor opens on Appearance by default, whose layer list is hidden-only. That must not
+            // coerce the active layer to HudOff, or every later HUD scene would start hidden.
+            AddAssert("layer not forced off on appearance", () => sceneBar.ActiveLayer.Value != EzSkinEditorLayer.HudOff);
+            AddAssert("layer visible on appearance", () => hud.LayerVisible.Value);
+
+            switchScene(EzSkinEditorSceneType.Gameplay);
+            AddAssert("layer still visible on gameplay", () => hud.LayerVisible.Value);
+            AddAssert("layer not hidden on gameplay", () => sceneBar.ActiveLayer.Value != EzSkinEditorLayer.HudOff);
+
+            AddStep("select global ez hud", () => sceneBar.ActiveLayer.Value = EzSkinEditorLayer.EzHud);
+            switchScene(EzSkinEditorSceneType.Appearance);
+            switchScene(EzSkinEditorSceneType.Gameplay);
+            AddAssert("layer choice preserved across scenes", () => sceneBar.ActiveLayer.Value == EzSkinEditorLayer.EzHud);
+        }
+
+        [Test]
+        public void TestLibraryGroupsSplitOnModeLayer()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var sceneBar = (EzSkinEditorSceneBar)null!;
+
+            AddStep("capture scene bar", () => sceneBar = editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Single());
+
+            // Invisible sidebar groups create no content, so counting the library sections counts visible ones.
+            AddStep("select global layer", () => sceneBar.ActiveLayer.Value = EzSkinEditorLayer.EzHud);
+            AddUntilStep("only global library visible", () => visibleLibraryCount() == 1);
+
+            AddStep("select mode layer", () => sceneBar.ActiveLayer.Value = EzSkinEditorLayer.EzHudRuleset);
+            AddUntilStep("both libraries visible as separate groups", () => visibleLibraryCount() == 2);
+
+            AddStep("hide hud layer", () => sceneBar.ActiveLayer.Value = EzSkinEditorLayer.HudOff);
+            AddUntilStep("no library visible", () => visibleLibraryCount() == 0);
+        }
+
+        private int visibleLibraryCount() =>
+            editorScreen.ChildrenOfType<EzSkinEditorComponentLibrarySection>().Count(s => s.Parent != null);
+
+        [Test]
+        public void TestComponentPickerOpenAndClamped()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var picker = (EzSkinEditorComponentPickerWindow)null!;
+
+            AddStep("capture picker", () => picker = editorScreen.ChildrenOfType<EzSkinEditorComponentPickerWindow>().Single());
+
+            AddStep("open picker", () => picker.Open.Value = true);
+            AddUntilStep("picker visible", () => picker.Alpha == 1);
+            AddUntilStep("picker inside gameplay hole", () =>
+            {
+                var parent = picker.Parent;
+                return parent != null && picker.X >= 0 && picker.X + picker.DrawWidth <= parent.DrawWidth + 0.5f;
+            });
+            AddUntilStep("picker remembers position", () => ezConfig.Get<float>(Ez2Setting.SkinEditorComponentPickerX) >= 0);
+
+            AddStep("close picker", () => picker.Open.Value = false);
+            AddUntilStep("picker hidden", () => picker.Alpha == 0);
+        }
+
+        [Test]
+        public void TestComponentPickerChromeMatchesSidebarHeightAndFolds()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var picker = (EzSkinEditorComponentPickerWindow)null!;
+
+            AddStep("capture picker", () => picker = editorScreen.ChildrenOfType<EzSkinEditorComponentPickerWindow>().Single());
+            AddStep("open picker", () => picker.Open.Value = true);
+            AddUntilStep("picker visible", () => picker.Alpha == 1);
+
+            AddUntilStep("top edge sits on the gameplay hole's top edge", () =>
+            {
+                var parent = picker.Parent;
+
+                if (parent == null)
+                    return false;
+
+                return Math.Abs(picker.ScreenSpaceDrawQuad.TopLeft.Y - parent.ScreenSpaceDrawQuad.TopLeft.Y) <= 1;
+            });
+
+            // Expanded height matches the sidebar: both span the gameplay hole's full height.
+            AddUntilStep("expanded fills the gameplay hole height", () =>
+            {
+                var parent = picker.Parent;
+                return parent != null && Math.Abs(picker.DrawHeight - parent.DrawHeight) <= 2;
+            });
+
+            float expandedHeight = 0;
+            float topEdge = 0;
+            AddStep("record expanded height and top edge", () =>
+            {
+                expandedHeight = picker.DrawHeight;
+                topEdge = picker.ScreenSpaceDrawQuad.TopLeft.Y;
+            });
+
+            AddStep("collapse", () => picker.Expanded.Value = false);
+
+            AddUntilStep("collapsed to the title bar", () => picker.DrawHeight < expandedHeight);
+
+            // Collapsing folds the body up: the header (and thus the top edge) must not move.
+            AddAssert("top edge unchanged while collapsing", () => Math.Abs(picker.ScreenSpaceDrawQuad.TopLeft.Y - topEdge) <= 1);
+
+            AddStep("expand again", () => picker.Expanded.Value = true);
+            AddUntilStep("expands back to full height", () => Math.Abs(picker.DrawHeight - expandedHeight) <= 1);
+            AddAssert("top edge unchanged while expanding", () => Math.Abs(picker.ScreenSpaceDrawQuad.TopLeft.Y - topEdge) <= 1);
+        }
+
+        [Test]
+        public void TestComponentPickerRestoresRememberedPosition()
+        {
+            AddStep("seed remembered position at right edge", () =>
+                ezConfig.GetBindable<float>(Ez2Setting.SkinEditorComponentPickerX).Value = 1f);
+
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var picker = (EzSkinEditorComponentPickerWindow)null!;
+
+            AddStep("capture picker", () => picker = editorScreen.ChildrenOfType<EzSkinEditorComponentPickerWindow>().Single());
+            AddStep("open picker", () => picker.Open.Value = true);
+
+            // Regression: the position was applied before the parent was sized, so free travel resolved
+            // to 0 and the window stuck to the left instead of the remembered right edge.
+            AddUntilStep("picker restored to remembered right edge", () =>
+            {
+                var parent = picker.Parent;
+
+                if (parent == null || parent.DrawWidth <= 0)
+                    return false;
+
+                var sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single();
+                float expectedRight = parent.DrawWidth - sidebar.VisiblePanelReserve;
+                return Math.Abs(picker.X + picker.DrawWidth - expectedRight) <= 1;
+            });
+        }
+
+        [Test]
+        public void TestComponentPickerTravelSpansScreenToSidebar()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var picker = (EzSkinEditorComponentPickerWindow)null!;
+
+            AddStep("capture picker", () => picker = editorScreen.ChildrenOfType<EzSkinEditorComponentPickerWindow>().Single());
+            AddStep("open picker", () => picker.Open.Value = true);
+            AddUntilStep("picker visible", () => picker.Alpha == 1);
+
+            // Left limit is the parent's left edge (no gap), right limit stops at the sidebar panel.
+            AddStep("push hard left", () => picker.X = -50);
+            AddStep("drag to flush left", () =>
+            {
+                InputManager.MoveMouseTo(picker.ScreenSpaceDrawQuad.TopLeft + new osuTK.Vector2(picker.DrawWidth / 2, 10));
+                InputManager.PressButton(MouseButton.Left);
+                InputManager.MoveMouseTo(picker.ScreenSpaceDrawQuad.TopLeft + new osuTK.Vector2(-10, 10));
+                InputManager.ReleaseButton(MouseButton.Left);
+            });
+
+            AddUntilStep("left edge flushes the screen edge", () => Math.Abs(picker.X) <= 1);
+
+            AddStep("push hard right", () => picker.X = 5000);
+            AddUntilStep("right edge stops at the sidebar panel", () =>
+            {
+                var sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single();
+                var parent = picker.Parent!;
+                return Math.Abs(picker.X - (parent.DrawWidth - sidebar.VisiblePanelReserve - picker.DrawWidth)) <= 1;
+            });
+        }
+
+        [Test]
+        public void TestComponentPickerDragsHorizontally()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var picker = (EzSkinEditorComponentPickerWindow)null!;
+
+            AddStep("capture picker", () => picker = editorScreen.ChildrenOfType<EzSkinEditorComponentPickerWindow>().Single());
+            AddStep("open picker", () => picker.Open.Value = true);
+            AddUntilStep("picker visible", () => picker.Alpha == 1);
+
+            float before = 0;
+
+            AddStep("park picker at left edge", () => picker.X = before = 0);
+
+            AddStep("grab header", () =>
+            {
+                // A drag starts on the header, so grab a point in the top strip.
+                InputManager.MoveMouseTo(picker.ScreenSpaceDrawQuad.TopLeft + new osuTK.Vector2(picker.DrawWidth / 2, 10));
+                InputManager.PressButton(MouseButton.Left);
+            });
+
+            AddStep("drag beyond the click threshold", () =>
+            {
+                InputManager.MoveMouseTo(picker.ScreenSpaceDrawQuad.TopLeft + new osuTK.Vector2(picker.DrawWidth / 2 + 120, 10));
+            });
+
+            AddStep("release", () => InputManager.ReleaseButton(MouseButton.Left));
+
+            // Regression: the picker handled OnMouseDown/OnDrag but never OnDragStart, so the framework
+            // never entered a drag and the window could not be moved horizontally at all.
+            AddUntilStep("picker followed the pointer horizontally", () => picker.X > before + 20);
+        }
+
+        [Test]
+        public void TestLibraryPlacementRequiresBoundTarget()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var hud = (EzSkinEditorHudLayer)null!;
+
+            AddStep("capture hud", () => hud = editorScreen.ChildrenOfType<EzSkinEditorHudLayer>().Single());
+            AddStep("select global layer", () => editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Single().ActiveLayer.Value = EzSkinEditorLayer.EzHud);
+
+            // No real screen is presented in this bare test, so no Ez layout container is bound.
+            AddAssert("no active target without bound layout", () => hud.ActiveTarget == null);
+            AddAssert("placement gracefully refused", () =>
+                !hud.TryPlaceComponent(SerialisedDrawableInfo.GetAllAvailableDrawables(null).First()));
         }
 
         [Test]
@@ -454,19 +878,43 @@ namespace osu.Game.Tests.Visual.Edit
         }
 
         [Test]
+        public void TestSidebarPinSwitchVisibleAcrossScenes()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            AddUntilStep("pin switch shown on initial scene", () =>
+                editorScreen.ChildrenOfType<SettingsCheckbox>()
+                            .Any(c => c.LabelText.ToString() == EzEditorStrings.SIDEBAR_PIN_LABEL.ToString()));
+
+            // 切场景会重建侧栏分组，固定开关不能随旧分组一起消失。
+            switchScene(EzSkinEditorSceneType.Gameplay);
+            AddUntilStep("pin switch still shown on gameplay", () =>
+                editorScreen.ChildrenOfType<SettingsCheckbox>()
+                            .Any(c => c.LabelText.ToString() == EzEditorStrings.SIDEBAR_PIN_LABEL.ToString()));
+
+            switchScene(EzSkinEditorSceneType.Note);
+            AddUntilStep("pin switch still shown on note", () =>
+                editorScreen.ChildrenOfType<SettingsCheckbox>()
+                            .Any(c => c.LabelText.ToString() == EzEditorStrings.SIDEBAR_PIN_LABEL.ToString()));
+        }
+
+        [Test]
         public void TestSidebarCollapse()
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
 
+            // 取消固定后侧栏悬浮不占位，先落到这个状态再取基线。
+            AddStep("unpin sidebar", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().Pinned.Value = false);
+
             float gameplayWidthBefore = 0;
             AddStep("capture gameplay width", () =>
                 gameplayWidthBefore = editorScreen.ChildrenOfType<EzSkinEditorHudLayer>().Single().DrawWidth);
 
-            AddStep("unpin sidebar", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().Pinned.Value = false);
             AddStep("collapse sidebar", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().ExpandedState.Value = false);
 
-            // 布局只占轨宽；收起只藏设置面板，游戏区宽度与导航轨均不变。
+            // 未固定时侧栏不占位：收起后设置面板隐藏，导航轨仍在，游戏区宽度不变。
             AddUntilStep("content panel hidden", () =>
             {
                 var sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single();
@@ -483,26 +931,64 @@ namespace osu.Game.Tests.Visual.Edit
         }
 
         [Test]
+        public void TestPinnedSidebarReservesSceneWidth()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Gameplay);
+
+            var sidebar = (EzSkinEditorSidebar)null!;
+
+            AddStep("capture sidebar", () => sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single());
+
+            // 固定开启：侧栏挤占场景可用空间，ReservedWidth 为面板+轨宽。
+            AddUntilStep("pinned reserves panel width", () =>
+                sidebar.Pinned.Value
+                && Math.Abs(sidebar.ReservedWidth.Value - EzSkinEditorSidebar.ExpandedWidthWithRail) < 1);
+
+            // 固定时设置面板必须让出导航轨位置，不能和轨叠在一起（也不越过屏幕右缘）。
+            AddUntilStep("settings panel clears the rail", () =>
+            {
+                var rail = editorScreen.ChildrenOfType<EzSkinEditorSidebarGroupRail>().Single();
+                var panel = editorScreen.ChildrenOfType<OsuScrollContainer>()
+                                       .FirstOrDefault(s => s.Parent is Container c && c.Width == EzSkinEditorSidebar.CONTENT_WIDTH);
+
+                return panel != null
+                       && rail.ScreenSpaceDrawQuad.Width > 0
+                       && panel.ScreenSpaceDrawQuad.TopRight.X <= rail.ScreenSpaceDrawQuad.TopLeft.X + 1;
+            });
+
+            // 取消固定：侧栏浮在场景之上，不再挤占空间。
+            AddStep("unpin sidebar", () => sidebar.Pinned.Value = false);
+            AddUntilStep("unpinned reserves nothing", () => sidebar.ReservedWidth.Value == 0);
+        }
+
+        [Test]
         public void TestSidebarHoverExpansionFollowsScene()
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
 
             var sidebar = (EzSkinEditorSidebar)null!;
+            var rail = (EzSkinEditorSidebarGroupRail)null!;
 
-            AddStep("capture sidebar", () => sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single());
+            AddStep("capture sidebar", () =>
+            {
+                sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single();
+                rail = editorScreen.ChildrenOfType<EzSkinEditorSidebarGroupRail>().Single();
+            });
             AddStep("unpin sidebar", () => sidebar.Pinned.Value = false);
 
-            // 非 HUD 场景保持原样：收起后悬停唤出设置面板。
+            // 非 HUD 场景保持原样：收起后悬停导航轨唤出设置面板。
             switchScene(EzSkinEditorSceneType.Appearance);
             AddStep("collapse sidebar", () => sidebar.ExpandedState.Value = false);
-            AddStep("hover sidebar", () => InputManager.MoveMouseTo(sidebar));
+            AddStep("hover rail", () => InputManager.MoveMouseTo(rail));
             AddUntilStep("appearance hover expands", () => sidebar.ExpandedState.Value);
 
             // HUD 场景悬停不唤出，避免面板盖住正在拖拽组件的游玩区。
             switchScene(EzSkinEditorSceneType.Gameplay);
             AddStep("collapse sidebar", () => sidebar.ExpandedState.Value = false);
-            AddStep("hover sidebar", () => InputManager.MoveMouseTo(sidebar));
+            AddStep("hover rail", () => InputManager.MoveMouseTo(rail));
             AddWaitStep("wait for hover ticks", 5);
             AddAssert("hud hover does not expand", () => !sidebar.ExpandedState.Value);
         }

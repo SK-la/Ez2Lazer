@@ -266,6 +266,19 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString TOOLBAR_HUD_LAYER = new EzLocalizationManager.EzLocalisableString("HUD layer", "HUD layer");
 
+        public static readonly LocalisableString LAYER_HUD_OFF = new EzLocalizationManager.EzLocalisableString("隐藏 HUD", "Hide HUD");
+
+        public static readonly LocalisableString LAYER_EZ_HUD = new EzLocalizationManager.EzLocalisableString("Ez HUD", "Ez HUD");
+
+        public static readonly LocalisableString LAYER_EZ_HUD_RULESET = new EzLocalizationManager.EzLocalisableString("Ez HUD（{0}）", "Ez HUD ({0})");
+
+        public static readonly LocalisableString LAYER_EZ_PLAYFIELD_RULESET = new EzLocalizationManager.EzLocalisableString("Ez Playfield（{0}）", "Ez Playfield ({0})");
+
+        /// <summary>
+        /// Fallback used in place of the ruleset name when no ruleset is active yet.
+        /// </summary>
+        public static readonly LocalisableString LAYER_MODE_UNKNOWN = new EzLocalizationManager.EzLocalisableString("模式", "mode");
+
         public static readonly LocalisableString TAB_APPEARANCE = new EzLocalizationManager.EzLocalisableString("外观", "Appearance");
 
         public static readonly LocalisableString TAB_SIZE = new EzLocalizationManager.EzLocalisableString("尺寸", "Size");
@@ -400,12 +413,35 @@ namespace osu.Game.EzOsuGame.Localization
             "Turn on HUD layer, then select a component in the preview to edit its settings.");
 
         public static readonly LocalisableString SIDEBAR_HUD_LAYER_OFF = new EzLocalizationManager.EzLocalisableString(
-            "请先打开顶栏 HUD layer。",
-            "Turn on the HUD layer toggle in the scene bar first.");
+            "请先在场景栏选择编辑层（非「隐藏 HUD」）。",
+            "Pick an editing layer in the scene bar first (anything but \"Hide HUD\").");
 
         public static readonly LocalisableString SIDEBAR_HUD_NO_SELECTION = new EzLocalizationManager.EzLocalisableString(
             "在预览中点击 HUD 组件以选中并显示设置。",
             "Click a HUD component in the preview to select it and show settings.");
+
+        public static readonly LocalisableString LIBRARY_GLOBAL_TITLE = new EzLocalizationManager.EzLocalisableString(
+            "组件库(通用)", "Component library (global)");
+
+        public static readonly LocalisableString LIBRARY_RULESET_TITLE = new EzLocalizationManager.EzLocalisableString(
+            "组件库(模式)", "Component library (mode)");
+
+        public static readonly LocalisableString LIBRARY_PLACEHOLDER = new EzLocalizationManager.EzLocalisableString(
+            "请先进入 HUD 场景并选择编辑层。",
+            "Open a HUD scene and pick an editing layer first.");
+
+        public static readonly LocalisableString LIBRARY_EMPTY = new EzLocalizationManager.EzLocalisableString(
+            "当前层没有可放置的组件。",
+            "No components can be placed in the current layer.");
+
+        public static readonly LocalisableString PICKER_WINDOW_TITLE = new EzLocalizationManager.EzLocalisableString(
+            "可视化选择器", "Visual picker");
+
+        public static readonly LocalisableString PICKER_WINDOW_DRAG_HINT = new EzLocalizationManager.EzLocalisableString(
+            "拖动标题栏移动", "Drag the title bar");
+
+        public static readonly LocalisableString TOOLBAR_VISUAL_PICKER = new EzLocalizationManager.EzLocalisableString(
+            "可视化选择器", "Visual picker");
 
         public static readonly LocalisableString SIDEBAR_SKIN_SCOPED_EMPTY = new EzLocalizationManager.EzLocalisableString(
             "当前皮肤没有专用设置。",

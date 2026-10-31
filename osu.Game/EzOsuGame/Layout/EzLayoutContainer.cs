@@ -5,6 +5,7 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.Overlays.SkinEditor;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -52,6 +53,36 @@ namespace osu.Game.EzOsuGame.Layout
         }
 
         public void LoadFromStore() => Reload(store.CreateComponentsContainer(Lookup));
+
+        /// <summary>
+        /// Places a freshly created component into this container with sane defaults, mirroring the
+        /// official skin editor's placement (top-centre anchor, vertically centred), then anchors it
+        /// to the closest anchor/origin pair. Returns false if the container or the component cannot
+        /// accept the addition (e.g. missing dependencies).
+        /// </summary>
+        public bool TryPlace(ISerialisableDrawable component)
+        {
+            if (component is not Drawable drawable)
+                return false;
+
+            drawable.Origin = Anchor.TopCentre;
+            drawable.Anchor = Anchor.TopCentre;
+            drawable.Y = DrawSize.Y / 2;
+
+            try
+            {
+                Add(component);
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (!component.UsesFixedAnchor)
+                SkinSelectionHandler.ApplyClosestAnchorOrigin(drawable);
+
+            return true;
+        }
 
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos) =>
             Alpha > 0 && InternalChildren.Any(c => c.IsPresent && c.ReceivePositionalInputAt(screenSpacePos));

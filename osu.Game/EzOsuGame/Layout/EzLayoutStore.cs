@@ -31,9 +31,17 @@ namespace osu.Game.EzOsuGame.Layout
 
         private readonly Storage storage;
 
-        public EzLayoutStore(Storage gameStorage)
+        /// <summary>
+        /// Name of the layout set this store reads and writes (a folder under
+        /// <see cref="EzModifyPath.CONFIG_ROOT_PATH"/>). Defaults to
+        /// <see cref="EzModifyPath.LAYOUT_SET_DEFAULT"/> so existing installs keep their path.
+        /// </summary>
+        public string LayoutSetName { get; }
+
+        public EzLayoutStore(Storage gameStorage, string layoutSetName = EzModifyPath.LAYOUT_SET_DEFAULT)
         {
-            storage = gameStorage.GetStorageForDirectory(EzModifyPath.CONFIG_LAYOUT_PATH);
+            LayoutSetName = layoutSetName;
+            storage = gameStorage.GetStorageForDirectory(EzModifyPath.LayoutSetPath(layoutSetName));
         }
 
         public SkinLayoutInfo Load(GlobalSkinnableContainers target)
@@ -149,11 +157,6 @@ namespace osu.Game.EzOsuGame.Layout
             };
         }
 
-        private static string getFilename(GlobalSkinnableContainers target) => target switch
-        {
-            GlobalSkinnableContainers.SongSelect => @"SongSelect.json",
-            GlobalSkinnableContainers.MainHUDComponents => @"Gameplay.json",
-            _ => $"{target}.json",
-        };
+        private static string getFilename(GlobalSkinnableContainers target) => $"{target}.json";
     }
 }

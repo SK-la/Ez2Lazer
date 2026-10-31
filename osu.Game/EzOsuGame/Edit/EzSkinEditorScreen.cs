@@ -33,6 +33,7 @@ using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
+using osu.Game.Screens.Edit;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osuTK;
@@ -121,6 +122,7 @@ namespace osu.Game.EzOsuGame.Edit
         private EzSkinEditorSceneBar sceneBar = null!;
         private EzSkinEditorSidebar sidebar = null!;
         private EzPlaybackBar playbackBar = null!;
+        private EzSkinEditorComponentPickerWindow componentPicker = null!;
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
             => dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
@@ -153,6 +155,12 @@ namespace osu.Game.EzOsuGame.Edit
         internal void ApplyCoordinatedScene(EzSkinEditorSceneType scene) => sceneBar.CurrentScene.Value = scene;
 
         internal Bindable<EzSkinEditorPreviewSource> PreviewSource => PreviewState.Source;
+
+        /// <summary>
+        /// Space the sidebar currently reserves in the workspace layout. Zero while the sidebar
+        /// overlays (unpinned); panel + rail width while pinned-expanded. Drives the plugged scene rect.
+        /// </summary>
+        internal Bindable<float> SidebarReservedWidth => sidebar.ReservedWidth;
 
         /// <summary>
         /// Per-skin skin.ini session. Skin-layer only.
@@ -205,15 +213,34 @@ namespace osu.Game.EzOsuGame.Edit
         {
             hudTargetScreen = screen;
             layoutLayer = ezLayout;
-            hudLayer.Apply(sceneBar.CurrentScene.Value, screen, ezLayout);
+            syncHudRuleset();
+            hudLayer.Apply(sceneBar.CurrentScene.Value, screen, ezLayout, sceneBar.ActiveLayer.Value);
+        }
+
+        /// <summary>
+        /// Resolves the ruleset the HUD layer edits from the same source the gameplay containers are
+        /// built from (the live screen), falling back to the editor's preview ruleset. Without this the
+        /// ruleset-scoped layers resolve to no target, and the global layer only sees an empty global
+        /// container whenever the layout keeps its components under a ruleset section.
+        /// </summary>
+        private void syncHudRuleset()
+        {
+            RulesetInfo? resolved = (hudTargetScreen as Player)?.Ruleset.Value ?? PreviewState.Ruleset.Value;
+
+            if (sceneBar.Ruleset.Value?.Equals(resolved) == true)
+                return;
+
+            sceneBar.Ruleset.Value = resolved;
+            hudLayer.SetRuleset(resolved);
         }
 
         [BackgroundDependencyLoader]
         private void load()
         {
-            // 先构造并缓存，供侧栏 HUD 栏解析选中项。
+            // 先构造并缓存，供侧栏 HUD 栏解析选中项；同时作为 IEditorChangeHandler 供选择处理器做撤销/重做。
             hudLayer = new EzSkinEditorHudLayer();
             dependencies.CacheAs(hudLayer);
+            dependencies.CacheAs<IEditorChangeHandler>(hudLayer);
 
             InternalChildren = new Drawable[]
             {
@@ -270,6 +297,10 @@ namespace osu.Game.EzOsuGame.Edit
                                                 CanWriteSizesToSkinIni = () => SkinIniSession is { IsSupported: true } && getCurrentKeyMode() > 0,
                                                 CanExportOsk = canExportOsk,
                                                 CanUseConfigSnapshot = () => sceneBar.CurrentScene.Value != EzSkinEditorSceneType.Note,
+                                                UndoAction = undo,
+                                                RedoAction = redo,
+                                                CanUndo = () => hudLayer.ChangeHandler?.CanUndo.Value ?? false,
+                                                CanRedo = () => hudLayer.ChangeHandler?.CanRedo.Value ?? false,
                                             },
                                             // Ez-only (official menu has skin dropdown alone). Right→left: skin, mode, progress+play.
                                             new FillFlowContainer
@@ -337,9 +368,15 @@ namespace osu.Game.EzOsuGame.Edit
                                                     Children = new Drawable[]
                                                     {
                                                         hudLayer,
+                                                        componentPicker = new EzSkinEditorComponentPickerWindow(ezSkinConfig.GetBindable<float>(Ez2Setting.SkinEditorComponentPickerX)),
                                                     },
                                                 },
-                                                sidebar = new EzSkinEditorSidebar(),
+                                                sidebar = new EzSkinEditorSidebar
+                                                {
+                                                    Anchor = Anchor.TopRight,
+                                                    Origin = Anchor.TopRight,
+                                                    Width = 0,
+                                                },
                                             },
                                         },
                                     },
@@ -359,26 +396,33 @@ namespace osu.Game.EzOsuGame.Edit
             sceneBar.CurrentScene.BindValueChanged(onSceneChanged, true);
             skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
             PreviewState.LoopBeatmap.BindValueChanged(_ => refreshScene());
-            PreviewState.Ruleset.BindValueChanged(r =>
+            PreviewState.Ruleset.BindValueChanged(_ =>
             {
-                hudLayer.SetRuleset(r.NewValue);
-                hudLayer.Apply(sceneBar.CurrentScene.Value, hudTargetScreen, layoutLayer);
+                syncHudRuleset();
+                hudLayer.Apply(sceneBar.CurrentScene.Value, hudTargetScreen, layoutLayer, sceneBar.ActiveLayer.Value);
             }, true);
-            sceneBar.HudLayerVisible.BindValueChanged(v =>
+            sceneBar.ActiveLayer.BindValueChanged(v =>
             {
-                hudLayer.SetVisible(v.NewValue);
+                hudLayer.SetVisible(v.NewValue != EzSkinEditorLayer.HudOff);
+                hudLayer.Apply(sceneBar.CurrentScene.Value, hudTargetScreen, layoutLayer, v.NewValue);
                 updateHudInteraction();
+                refreshPreviewContent();
             }, true);
+            hudLayer.OnStateChange += () => menuBar.RefreshMenuState();
+            // 侧栏设置面板叠在游玩区右缘上；选择器右界跟随面板当前可见宽度，面板收起时贴到轨道左缘。
+            componentPicker.RightReserve = () => sidebar.VisiblePanelReserve;
+            sceneBar.VisualPickerOpen.BindTo(componentPicker.Open);
             bindConfigPreviewRefresh();
             bindSceneBarPlayback();
         }
 
         /// <summary>
-        /// 场景支持 HUD 蓝图且 HUD layer 开启时才允许蓝图拖选；否则只读预览。
+        /// 场景支持 HUD 蓝图、且有可编辑层（非「隐藏 HUD」）时才允许蓝图拖选；否则只读预览。
         /// </summary>
         private void updateHudInteraction()
         {
-            hudLayer.InteractionEnabled.Value = EzSkinEditorSceneRegistry.SupportsHudLayer(sceneBar.CurrentScene.Value) && sceneBar.HudLayerVisible.Value;
+            hudLayer.InteractionEnabled.Value = EzSkinEditorSceneRegistry.SupportsHudLayer(sceneBar.CurrentScene.Value)
+                                                && sceneBar.ActiveLayer.Value != EzSkinEditorLayer.HudOff;
         }
 
         protected override void Update()
@@ -588,6 +632,7 @@ namespace osu.Game.EzOsuGame.Edit
                 PreviewBeatmap = PreviewState.PreviewBeatmap,
                 PreviewRuleset = PreviewState.Ruleset.Value,
                 PreviewMode = PreviewState.Mode.Value,
+                ActiveLayer = sceneBar.ActiveLayer.Value,
                 ComparisonSnapshot = useNoteComparisonOnly ? null : ComparisonSnapshotForTesting,
                 NoteSession = NoteSessionForTesting,
                 NoteSnapshot = NoteSnapshotForTesting,
@@ -642,13 +687,13 @@ namespace osu.Game.EzOsuGame.Edit
             var strategy = EzSkinEditorSceneRegistry.Get(sceneBar.CurrentScene.Value);
             sidebar.ApplyStrategy(strategy, sceneContext);
             updateHudInteraction();
-            hudLayer.Apply(sceneBar.CurrentScene.Value, hudTargetScreen, layoutLayer);
+            hudLayer.Apply(sceneBar.CurrentScene.Value, hudTargetScreen, layoutLayer, sceneBar.ActiveLayer.Value);
         }
 
         private void applySettings()
         {
             ezSkinConfig.Save();
-            hudLayer.PersistLayoutToCurrentSkin();
+            hudLayer.PersistAllLayouts();
 
             if (SkinIniSession is { IsSupported: true, IsDirty: true })
                 SkinIniSession.Commit();
@@ -656,6 +701,18 @@ namespace osu.Game.EzOsuGame.Edit
             invalidateResourceCaches();
             skinManager.CurrentSkinInfo.TriggerChange();
             refreshScene();
+        }
+
+        private void undo()
+        {
+            hudLayer.RestoreState(-1);
+            menuBar.RefreshMenuState();
+        }
+
+        private void redo()
+        {
+            hudLayer.RestoreState(1);
+            menuBar.RefreshMenuState();
         }
 
         private void commitSkinIni()
