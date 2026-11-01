@@ -18,6 +18,8 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
     {
         public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.SkinIni;
 
+        public EzSkinEditorSceneGroup Group => EzSkinEditorSceneGroup.Gameplay;
+
         public LocalisableString TabTitle => EzEditorStrings.TAB_SKIN_INI;
 
         public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context)

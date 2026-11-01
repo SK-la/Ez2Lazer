@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.Localisation;
 
 namespace osu.Game.EzOsuGame.Edit.Scenes
 {
@@ -14,9 +13,11 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
     /// </summary>
     public class SongSelectSceneStrategy : IEzSkinEditorSceneStrategy
     {
-        public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.SongSelect;
+        public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.SongSelectHud;
 
-        public LocalisableString TabTitle => SkinEditorStrings.SongSelect;
+        public EzSkinEditorSceneGroup Group => EzSkinEditorSceneGroup.SongSelect;
+
+        public LocalisableString TabTitle => EzEditorStrings.SIDEBAR_TAB_HUD;
 
         public bool SupportsHudLayer => true;
 

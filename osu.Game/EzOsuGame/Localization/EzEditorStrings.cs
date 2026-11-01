@@ -260,6 +260,10 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SCENE_LIBRARY_LABEL = new EzLocalizationManager.EzLocalisableString("场景库", "Scene library");
 
+        public static readonly LocalisableString SCENE_GROUP_SONG_SELECT = new EzLocalizationManager.EzLocalisableString("选歌", "Song select");
+
+        public static readonly LocalisableString SCENE_GROUP_GAMEPLAY = new EzLocalizationManager.EzLocalisableString("游玩", "Gameplay");
+
         public static readonly LocalisableString SCENE_OFFICIAL_HUD = new EzLocalizationManager.EzLocalisableString("官方 HUD", "Official HUD");
 
         public static readonly LocalisableString SCENE_EZ_SKIN = new EzLocalizationManager.EzLocalisableString("Ez Skin", "Ez Skin");
@@ -290,6 +294,8 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString TAB_SKIN_SPECIFIC = new EzLocalizationManager.EzLocalisableString("皮肤专用", "Skin-specific");
 
         public static readonly LocalisableString TAB_NOTE = new EzLocalizationManager.EzLocalisableString("Note", "Note");
+
+        public static readonly LocalisableString TAB_BEATMAP_PREVIEW = new EzLocalizationManager.EzLocalisableString("谱面预览", "Beatmap preview");
 
         #endregion
 
@@ -450,6 +456,11 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString SKIN_SPECIFIC_SCENE_PLACEHOLDER = new EzLocalizationManager.EzLocalisableString(
             "皮肤专用场景布局预留。请在主工作区侧栏「专用」中编辑设置。",
             "Skin-specific scene layout is reserved. Edit settings under the workspace 「Scoped」 sidebar tab.");
+
+        // TODO: 谱面预览场景未实现：仅做全谱预览，用来修改每种 note 的颜色与厚度。
+        public static readonly LocalisableString BEATMAP_PREVIEW_SCENE_PLACEHOLDER = new EzLocalizationManager.EzLocalisableString(
+            "谱面预览场景布局预留。仅全谱预览，之后用来修改每种 note 的颜色、厚度。",
+            "Beatmap preview scene layout is reserved. Full-beatmap preview only; will edit each note colour and thickness later.");
 
         #endregion
 

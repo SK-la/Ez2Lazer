@@ -16,7 +16,9 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
 
         public const string GROUP_ID_LIBRARY_RULESET = "library-ruleset";
 
-        public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.Gameplay;
+        public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.GameplayHud;
+
+        public EzSkinEditorSceneGroup Group => EzSkinEditorSceneGroup.Gameplay;
 
         public LocalisableString TabTitle => EzEditorStrings.SIDEBAR_TAB_HUD;
 

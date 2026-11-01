@@ -297,9 +297,10 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
 
             const float toolbar_height = EzSkinEditorSceneBar.HEIGHT + global::osu.Game.Overlays.SkinEditor.SkinEditor.MENU_HEIGHT;
+            float leftRailWidth = Workspace.SceneRailReservedWidth;
             float reservedWidth = Workspace.SidebarReservedWidth.Value;
 
-            scalingContainer.SetCustomRect(EzSkinEditorSceneSizing.ComputeSceneRect(DrawSize, toolbar_height, reservedWidth), true);
+            scalingContainer.SetCustomRect(EzSkinEditorSceneSizing.ComputeSceneRect(DrawSize, toolbar_height, leftRailWidth, reservedWidth), true);
         }
 
         private bool tryUseBeatmapForActiveRuleset()

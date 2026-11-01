@@ -124,6 +124,7 @@ namespace osu.Game.EzOsuGame.Edit
         private EzSkinEditorHudLayer hudLayer = null!;
         private EzSkinEditorMenuBar menuBar = null!;
         private EzSkinEditorSceneBar sceneBar = null!;
+        private EzSkinEditorSceneRail sceneRail = null!;
         private EzSkinEditorSidebar sidebar = null!;
         private EzPlaybackBar playbackBar = null!;
         private EzSkinEditorComponentPickerWindow componentPicker = null!;
@@ -158,6 +159,32 @@ namespace osu.Game.EzOsuGame.Edit
 
         internal void ApplyCoordinatedScene(EzSkinEditorSceneType scene) => sceneBar.CurrentScene.Value = scene;
 
+        /// <summary>
+        /// Top-level group switch: re-selects the scene last used in that group, falling back to its
+        /// first available scene. The scene bar only picks groups; the rail lists the scenes inside.
+        /// </summary>
+        private void requestSceneGroup(EzSkinEditorSceneGroup group)
+        {
+            if (rememberedScene.TryGetValue(group, out var remembered) && canPresent(remembered))
+            {
+                sceneBar.CurrentScene.Value = remembered;
+                return;
+            }
+
+            foreach (var strategy in EzSkinEditorSceneRegistry.ForGroup(group))
+            {
+                if (!canPresent(strategy.SceneType))
+                    continue;
+
+                sceneBar.CurrentScene.Value = strategy.SceneType;
+                return;
+            }
+        }
+
+        private bool canPresent(EzSkinEditorSceneType scene) => CanPresentScene?.Invoke(scene) != false;
+
+        private readonly Dictionary<EzSkinEditorSceneGroup, EzSkinEditorSceneType> rememberedScene = new Dictionary<EzSkinEditorSceneGroup, EzSkinEditorSceneType>();
+
         internal Bindable<EzSkinEditorPreviewSource> PreviewSource => PreviewState.Source;
 
         /// <summary>
@@ -165,6 +192,12 @@ namespace osu.Game.EzOsuGame.Edit
         /// overlays (unpinned); panel + rail width while pinned-expanded. Drives the plugged scene rect.
         /// </summary>
         internal Bindable<float> SidebarReservedWidth => sidebar.ReservedWidth;
+
+        /// <summary>
+        /// Space the left secondary-scene rail always reserves. Drives the plugged scene rect the same
+        /// way the sidebar's reserved width does, but is fixed since the rail never collapses.
+        /// </summary>
+        internal float SceneRailReservedWidth => EzVerticalRail.WIDTH;
 
         /// <summary>
         /// Per-skin skin.ini session. Skin-layer only.
@@ -354,7 +387,7 @@ namespace osu.Game.EzOsuGame.Edit
                                     sceneBar = new EzSkinEditorSceneBar
                                     {
                                         RelativeSizeAxes = Axes.X,
-                                        SceneRequested = scene => sceneBar.CurrentScene.Value = scene,
+                                        GroupRequested = requestSceneGroup,
                                         OpenOfficialHudEditorRequested = () => OpenOfficialHudEditor?.Invoke(),
                                     },
                                 },
@@ -365,6 +398,7 @@ namespace osu.Game.EzOsuGame.Edit
                                         RelativeSizeAxes = Axes.Both,
                                         ColumnDimensions = new[]
                                         {
+                                            new Dimension(GridSizeMode.AutoSize),
                                             new Dimension(),
                                             new Dimension(GridSizeMode.AutoSize),
                                         },
@@ -372,6 +406,7 @@ namespace osu.Game.EzOsuGame.Edit
                                         {
                                             new Drawable[]
                                             {
+                                                sceneRail = new EzSkinEditorSceneRail(),
                                                 // 游玩洞：下层 ScreenContainer 经 SetCustomRect 缩进此处；本层只叠 HUD 蓝图。
                                                 gameplayHole = new Container
                                                 {
@@ -404,6 +439,7 @@ namespace osu.Game.EzOsuGame.Edit
             base.LoadComplete();
             SkinEditorProviderResolver.EnsureDefaultProviderRegistered();
             beatmapPicker = new EzSkinEditorBeatmapPicker(realm, beatmapManager);
+            sceneRail.CurrentScene.BindTo(sceneBar.CurrentScene);
             sceneBar.CurrentScene.BindValueChanged(onSceneChanged, true);
             skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
             PreviewState.LoopBeatmap.BindValueChanged(_ => refreshScene());
@@ -494,6 +530,8 @@ namespace osu.Game.EzOsuGame.Edit
             if (change.OldValue != change.NewValue)
                 persistEditorConfig();
 
+            rememberedScene[EzSkinEditorSceneRegistry.GroupOf(change.NewValue)] = change.NewValue;
+
             Schedule(() =>
             {
                 applyCurrentScene();
@@ -540,6 +578,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             ensureSkinIniSession();
             ensureSkinSpecificSceneVisibility();
+            ensureSceneAvailability();
             ensureSkinJsonSession();
             ensureComparisonSnapshotForCurrentSkin();
             ensureNoteSnapshotForCurrentSkin();
@@ -821,8 +860,15 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void ensureSkinSpecificSceneVisibility()
         {
-            // 顶栏 SkinSpecific 为占位壳，按钮已隐藏；专用设置在 Appearance 侧栏「皮肤专用」栏。
-            sceneBar.SetSceneVisible(EzSkinEditorSceneType.SkinSpecific, false);
+            // 左栏 SkinSpecific 为占位壳，按钮已隐藏；专用设置在 Appearance 侧栏「皮肤专用」栏。
+            sceneRail.SetSceneVisible(EzSkinEditorSceneType.SkinSpecific, false);
+        }
+
+        private void ensureSceneAvailability()
+        {
+            // 场景自身的静态可用性（如 debug-only 的谱面预览）在这里落到左栏显隐。
+            foreach (var strategy in EzSkinEditorSceneRegistry.All)
+                sceneRail.SetSceneVisible(strategy.SceneType, strategy.IsAvailable);
         }
 
         private void ensureSkinIniSession()
@@ -835,7 +881,7 @@ namespace osu.Game.EzOsuGame.Edit
                     SkinIniSession.Discard();
 
                 SkinIniSession = null;
-                sceneBar.SetSceneVisible(EzSkinEditorSceneType.SkinIni, false);
+                sceneRail.SetSceneVisible(EzSkinEditorSceneType.SkinIni, false);
 
                 if (sceneBar.CurrentScene.Value == EzSkinEditorSceneType.SkinIni)
                     sceneBar.CurrentScene.Value = EzSkinEditorSceneType.Appearance;
@@ -843,7 +889,7 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
-            sceneBar.SetSceneVisible(EzSkinEditorSceneType.SkinIni, true);
+            sceneRail.SetSceneVisible(EzSkinEditorSceneType.SkinIni, true);
 
             Guid currentSkinId = currentSkin.ID;
             SkinIniSession ??= new EzSkinIniSession(skinManager);

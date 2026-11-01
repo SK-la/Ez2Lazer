@@ -110,7 +110,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private Container blueprintHost = null!;
         private EzLayoutLayer? layoutLayer;
         private OsuScreen? liveScreen;
-        private EzSkinEditorSceneType scene = EzSkinEditorSceneType.Gameplay;
+        private EzSkinEditorSceneType scene = EzSkinEditorSceneType.GameplayHud;
         private EzSkinEditorLayer layer = EzSkinEditorLayer.EzHud;
         private RulesetInfo? ruleset;
 

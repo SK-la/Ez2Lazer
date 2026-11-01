@@ -9,6 +9,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
@@ -20,6 +21,10 @@ using osuTK;
 
 namespace osu.Game.EzOsuGame.Edit.Components
 {
+    /// <summary>
+    /// 顶部一级场景栏。只列出一级场景组（选歌 / 游玩）；组内二级场景由左侧
+    /// <see cref="EzSkinEditorSceneRail"/> 提供。
+    /// </summary>
     public partial class EzSkinEditorSceneBar : CompositeDrawable
     {
         public const float HEIGHT = SkinEditorSceneLibrary.HEIGHT;
@@ -28,7 +33,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Bindable<EzSkinEditorSceneType> CurrentScene { get; } = new Bindable<EzSkinEditorSceneType>(EzSkinEditorSceneType.Appearance);
 
-        public Action<EzSkinEditorSceneType>? SceneRequested { get; set; }
+        /// <summary>
+        /// Raised when the user picks a top-level group. The owner resolves which secondary scene in
+        /// that group to show (remembered per group) and writes it back to <see cref="CurrentScene"/>.
+        /// </summary>
+        public Action<EzSkinEditorSceneGroup>? GroupRequested { get; set; }
 
         public Action? OpenOfficialHudEditorRequested { get; set; }
 
@@ -51,7 +60,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private EzEditorLayerButton layerButton = null!;
         private EzToggleButton visualPickerButton = null!;
 
-        private readonly Dictionary<EzSkinEditorSceneType, SceneTabButton> tabButtons = new Dictionary<EzSkinEditorSceneType, SceneTabButton>();
+        private readonly Dictionary<EzSkinEditorSceneGroup, GroupTabButton> groupButtons = new Dictionary<EzSkinEditorSceneGroup, GroupTabButton>();
 
         public EzSkinEditorSceneBar()
         {
@@ -92,7 +101,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                 Spacing = new Vector2(EzUIStyleV1.SCENE_BAR_BUTTON_SPACING, 0),
                                 Padding = new MarginPadding { Horizontal = padding, Vertical = gap },
                                 Direction = FillDirection.Horizontal,
-                                Children = buildSceneButtons()
+                                Children = buildGroupButtons()
                                            .Prepend(new OsuSpriteText
                                            {
                                                Text = EzEditorStrings.SCENE_LIBRARY_LABEL,
@@ -153,37 +162,34 @@ namespace osu.Game.EzOsuGame.Edit.Components
             Ruleset.BindValueChanged(_ => layerButton.RefreshDisplayText(), true);
         }
 
-        private IEnumerable<Drawable> buildSceneButtons() => EzSkinEditorSceneRegistry.All.Select(strategy =>
+        private IEnumerable<Drawable> buildGroupButtons() => EzSkinEditorSceneRegistry.Groups.Select(group =>
         {
-            var button = new SceneTabButton(strategy.SceneType, strategy.TabTitle.ToString(), () => SceneRequested?.Invoke(strategy.SceneType));
-            tabButtons[strategy.SceneType] = button;
+            var button = new GroupTabButton(group, getGroupTitle(group), () => GroupRequested?.Invoke(group));
+            groupButtons[group] = button;
             return button;
         });
 
-        public void SetSceneVisible(EzSkinEditorSceneType scene, bool visible)
+        private static LocalisableString getGroupTitle(EzSkinEditorSceneGroup group) => group switch
         {
-            if (!tabButtons.TryGetValue(scene, out var button))
-                return;
-
-            if (visible)
-                button.Show();
-            else
-                button.Hide();
-        }
+            EzSkinEditorSceneGroup.SongSelect => EzEditorStrings.SCENE_GROUP_SONG_SELECT,
+            _ => EzEditorStrings.SCENE_GROUP_GAMEPLAY,
+        };
 
         private void updateActiveTab(EzSkinEditorSceneType scene)
         {
-            foreach (var (sceneType, button) in tabButtons)
-                button.Active = sceneType == scene;
+            var activeGroup = EzSkinEditorSceneRegistry.GroupOf(scene);
+
+            foreach (var (group, button) in groupButtons)
+                button.Active = group == activeGroup;
         }
 
-        private partial class SceneTabButton : SkinEditorSceneLibrary.SceneButton
+        private partial class GroupTabButton : SkinEditorSceneLibrary.SceneButton
         {
-            public EzSkinEditorSceneType SceneType { get; }
+            public EzSkinEditorSceneGroup Group { get; }
 
-            public SceneTabButton(EzSkinEditorSceneType sceneType, string text, Action action)
+            public GroupTabButton(EzSkinEditorSceneGroup group, LocalisableString text, Action action)
             {
-                SceneType = sceneType;
+                Group = group;
                 Text = text;
                 Action = action;
             }

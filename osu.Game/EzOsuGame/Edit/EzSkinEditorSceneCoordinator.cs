@@ -64,7 +64,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             desiredScene = scene;
 
-            if (scene == EzSkinEditorSceneType.SongSelect)
+            if (EzSkinEditorSceneRegistry.GroupOf(scene) == EzSkinEditorSceneGroup.SongSelect)
                 presentSongSelect();
             else
                 presentGameplay(target as Player);
@@ -76,7 +76,7 @@ namespace osu.Game.EzOsuGame.Edit
         /// </summary>
         public void Tick(OsuScreen? current)
         {
-            if (desiredScene == EzSkinEditorSceneType.SongSelect)
+            if (EzSkinEditorSceneRegistry.GroupOf(desiredScene) == EzSkinEditorSceneGroup.SongSelect)
             {
                 if (current is SongSelect songSelect && songSelect.IsLoaded && !ReferenceEquals(boundSongSelect, songSelect))
                     bindSongSelect(songSelect);
