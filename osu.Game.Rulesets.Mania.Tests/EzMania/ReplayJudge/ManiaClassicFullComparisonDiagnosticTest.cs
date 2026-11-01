@@ -346,6 +346,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                                 o.Pressed = true;
                                 o.TimePress = time;
                                 o.StartHit = true;
+                                o.IsMissing = false;
                                 o.HoldTickBaseline = time;
                                 routed = true;
                             }
@@ -373,7 +374,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                             o.TimeRelease = time;
                             evaluate(o, time);
                         }
-                        else if (o.IsLong && !o.IsMissing)
+                        else if (o.IsLong)
                             evaluate(o, time);
                     }
                 }
@@ -473,6 +474,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                     if (o.Pressed)
                         return;
 
+                    // stable UpdateMissing()：同一次缺按态只结算一次，落帧重入不再重复计 break。
+                    if (o.IsMissing)
+                        return;
+
+                    o.IsMissing = true;
                     o.HasHoldBreak = true;
                     applyValue(-1048576);
                     return;
