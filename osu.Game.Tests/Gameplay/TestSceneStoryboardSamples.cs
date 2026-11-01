@@ -48,6 +48,22 @@ namespace osu.Game.Tests.Gameplay
         [Resolved]
         private GameHost host { get; set; }
 
+        private TestSamplePlaybackDisabler disabler = null!;
+
+        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
+        {
+            var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
+            dependencies.CacheAs<ISamplePlaybackDisabler>(disabler = new TestSamplePlaybackDisabler());
+            return dependencies;
+        }
+
+        private class TestSamplePlaybackDisabler : ISamplePlaybackDisabler
+        {
+            public readonly Bindable<bool> Disabled = new Bindable<bool>();
+
+            public IBindable<bool> SamplePlaybackDisabled => Disabled;
+        }
+
         [Test]
         public void TestRetrieveTopLevelSample()
         {
@@ -176,7 +192,7 @@ namespace osu.Game.Tests.Gameplay
             AddStep("adjust hitsound volume", () => hitsoundVolume.Value = 0.13);
             AddUntilStep("volume follows again", () => sample.Volume.Value == 0.13);
 
-            AddStep("restore default", () => hitsoundVolume.SetDefault());
+            AddStep("restore default", hitsoundVolume.SetDefault);
         }
 
         [Test]
@@ -195,7 +211,7 @@ namespace osu.Game.Tests.Gameplay
             AddStep("adjust hitsound volume", () => hitsoundVolume.Value = 0.13);
             AddAssert("volume unchanged", () => sample.Volume.Value == initialVolume);
 
-            AddStep("restore default", () => hitsoundVolume.SetDefault());
+            AddStep("restore default", hitsoundVolume.SetDefault);
         }
 
         /// <summary>
@@ -327,7 +343,7 @@ namespace osu.Game.Tests.Gameplay
             AddAssert("volume unaffected by effect", () => sample.Volume.Value == musicVolume.Value);
 
             AddStep("restore effect volume", () => Audio.VolumeSample.Value = 1);
-            AddStep("restore default", () => hitsoundVolume.SetDefault());
+            AddStep("restore default", hitsoundVolume.SetDefault);
         }
 
         /// <summary>
@@ -364,7 +380,47 @@ namespace osu.Game.Tests.Gameplay
             AddAssert("volume unaffected by music", () => sample.Volume.Value == hitsoundVolume.Value);
 
             AddStep("restore music volume", () => musicVolume.Value = 1);
-            AddStep("restore default", () => hitsoundVolume.SetDefault());
+            AddStep("restore default", hitsoundVolume.SetDefault);
+        }
+
+        /// <summary>
+        /// Background music is as long as a track, so a pause must not discard it. It is suspended and then resumed
+        /// on the same channel, which is what keeps the playback position rather than restarting the music.
+        /// </summary>
+        [Test]
+        public void TestStoryboardMusicResumesAfterPause()
+        {
+            DrawableStoryboardSample sample = null;
+            SampleChannel channelBeforePause = null;
+
+            AddStep("select mania beatmap without an audio track", () =>
+            {
+                Beatmap.Value = new VirtualTrackWorkingBeatmap(new ManiaRuleset().RulesetInfo, Audio);
+
+                var ruleset = new ManiaRuleset();
+                var drawableRuleset = ruleset.CreateDrawableRulesetWith(Beatmap.Value.GetPlayableBeatmap(ruleset.RulesetInfo));
+
+                var container = new SkinProvidingContainer(new LookupRecordingSkin());
+                container.Add(sample = new DrawableStoryboardSample(
+                    new StoryboardSampleInfo(StoryboardElementSource.Beatmap, "music.mp3", 0, 100)));
+                drawableRuleset.Overlays.Add(container);
+
+                Add(drawableRuleset);
+            });
+
+            AddUntilStep("loaded", () => sample.IsLoaded);
+            AddUntilStep("track is virtual", () => Beatmap.Value.TrackLoaded && Beatmap.Value.Track is TrackVirtual);
+
+            AddStep("sample playing", () => sample.Play());
+            AddUntilStep("channel acquired", () => sample.BackgroundMusicChannel != null);
+            AddStep("record channel", () => channelBeforePause = sample.BackgroundMusicChannel);
+
+            AddStep("disable sample playback", () => disabler.Disabled.Value = true);
+            AddUntilStep("sample suspended", () => sample.IsBackgroundMusicSuspended);
+
+            AddStep("enable sample playback", () => disabler.Disabled.Value = false);
+            AddUntilStep("sample resumed", () => !sample.IsBackgroundMusicSuspended);
+            AddAssert("same channel kept", () => sample.BackgroundMusicChannel == channelBeforePause);
         }
 
         /// <summary>

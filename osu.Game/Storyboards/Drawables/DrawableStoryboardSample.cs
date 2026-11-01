@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
+using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
@@ -95,6 +96,8 @@ namespace osu.Game.Storyboards.Drawables
             if ((noteAudio || backgroundMusic) && !sampleInfo.IsHitsound)
                 Samples = new ISampleInfo[] { new HitsoundClassifiedSampleInfo(sampleInfo) };
 
+            backgroundMusicPlaying = backgroundMusic;
+
             base.LoadAsyncComplete();
 
             if (noteAudio || sampleInfo.IsHitsound)
@@ -110,6 +113,38 @@ namespace osu.Game.Storyboards.Drawables
             }
         }
 
+        public override void Play()
+        {
+            if (!backgroundMusicPlaying)
+            {
+                base.Play();
+                return;
+            }
+
+            RequestedPlaying = true;
+
+            if (SamplePlaybackDisabled)
+                return;
+
+            if (BackgroundMusicChannel == null)
+                playBackgroundMusic();
+            else
+                pauseFrequency!.Value = 1;
+        }
+
+        public override void Stop()
+        {
+            if (!backgroundMusicPlaying)
+            {
+                base.Stop();
+                return;
+            }
+
+            // A full stop (as opposed to a pause) releases the channel, so a later start begins the sample afresh.
+            RequestedPlaying = false;
+            releaseBackgroundMusic();
+        }
+
         protected override void SkinChanged(ISkinSource skin)
         {
             base.SkinChanged(skin);
@@ -122,10 +157,32 @@ namespace osu.Game.Storyboards.Drawables
                         mod.ApplyToSample(sample);
                 }
             }
+
+            if (backgroundMusicPlaying)
+            {
+                // The samples were rebuilt, so the channel taken from the previous ones is stale. Re-acquire one, and
+                // keep playing: a skin change should not silence the beatmap's music.
+                bool wasPlaying = RequestedPlaying;
+                releaseBackgroundMusic();
+
+                if (wasPlaying)
+                    playBackgroundMusic();
+            }
         }
 
         protected override void SamplePlaybackDisabledChanged(ValueChangedEvent<bool> disabled)
         {
+            if (backgroundMusicPlaying)
+            {
+                // A sample the length of a track is suspended rather than released, so that resuming playback continues
+                // from where it was paused. Driving the channel frequency to zero is what the framework translates into
+                // a pause that keeps the playback position; releasing the channel would discard it instead.
+                if (BackgroundMusicChannel is { IsDisposed: false })
+                    pauseFrequency!.Value = disabled.NewValue ? 0 : 1;
+
+                return;
+            }
+
             if (!RequestedPlaying) return;
 
             if (!Looping && disabled.NewValue)
@@ -137,6 +194,76 @@ namespace osu.Game.Storyboards.Drawables
             }
 
             base.SamplePlaybackDisabledChanged(disabled);
+        }
+
+        /// <summary>
+        /// Whether playback is driven by this class rather than by <see cref="SkinnableSound"/>.
+        /// </summary>
+        private bool backgroundMusicPlaying;
+
+        /// <summary>
+        /// Held at zero to suspend the music, and at one otherwise.
+        /// </summary>
+        /// <remarks>
+        /// The channel frequency is the only knob that suspends playback while keeping the position: zero is translated
+        /// by the framework into a channel pause, and back into a resume when returned to a non-zero value.
+        /// </remarks>
+        private BindableNumber<double>? pauseFrequency;
+
+        /// <summary>
+        /// The channel the background music is held on, or <see langword="null"/> when not started.
+        /// </summary>
+        /// <remarks>
+        /// Exposed for tests: the same channel across a pause is what proves playback resumed where it stopped
+        /// instead of being restarted from the beginning.
+        /// </remarks>
+        internal SampleChannel? BackgroundMusicChannel { get; private set; }
+
+        /// <summary>
+        /// Whether the background music is suspended by pause handling while keeping its playback position.
+        /// </summary>
+        internal bool IsBackgroundMusicSuspended => backgroundMusicPlaying && BackgroundMusicChannel is { IsDisposed: false } && BackgroundMusicChannel.AggregateFrequency.Value == 0;
+
+        /// <remarks>
+        /// Playback is driven here instead of through <see cref="SkinnableSound"/> because a sample the length of a
+        /// track must keep the channel it started on: the base implementation hands out a fresh channel on every call
+        /// and discards the one it had, so neither a resume nor a suspension can be performed on the playback.
+        /// </remarks>
+        private void playBackgroundMusic()
+        {
+            FlushPendingSkinChanges();
+
+            var dSample = DrawableSamples.FirstOrDefault();
+
+            if (dSample == null)
+                return;
+
+            BackgroundMusicChannel = dSample.GetChannel();
+
+            // The channel inherits the volume and the mod-applied playback rate through the sample it was taken from,
+            // so only the pause switch is added here.
+            pauseFrequency = new BindableNumber<double>(1);
+            BackgroundMusicChannel.AddAdjustment(AdjustableProperty.Frequency, pauseFrequency);
+
+            BackgroundMusicChannel.Play();
+        }
+
+        private void releaseBackgroundMusic()
+        {
+            if (BackgroundMusicChannel == null)
+                return;
+
+            // The channel may already have been disposed by the sample it was taken from if it played to its end.
+            if (!BackgroundMusicChannel.IsDisposed)
+            {
+                if (pauseFrequency != null)
+                    BackgroundMusicChannel.RemoveAdjustment(AdjustableProperty.Frequency, pauseFrequency);
+
+                BackgroundMusicChannel.Stop();
+            }
+
+            pauseFrequency = null;
+            BackgroundMusicChannel = null;
         }
 
         protected override void Update()
@@ -175,6 +302,8 @@ namespace osu.Game.Storyboards.Drawables
         {
             if (isDisposing)
             {
+                releaseBackgroundMusic();
+
                 if (boundVolume != null)
                     Volume.UnbindFrom(boundVolume);
 
