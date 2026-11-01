@@ -25,6 +25,14 @@ namespace osu.Game.EzOsuGame.Startup
         /// <summary>缓冲上限：日志存储就绪前只留这么多行，避免存储始终不就绪（例如测试宿主）时无限增长。</summary>
         private const int pending_capacity = 64;
 
+        /// <summary>
+        /// 强制打开启动追踪的环境变量。release 构建里 <see cref="EzStartupTuning.EnableStartupTrace"/> 默认关闭，
+        /// 靠它才能在不改源码的前提下、对发布产物取到分段日志（测量脚本与现场排障都用它）。
+        /// </summary>
+        private const string force_trace_env = "EZ2LAZER_STARTUP_TRACE";
+
+        private static readonly bool force_trace = Environment.GetEnvironmentVariable(force_trace_env) == "1";
+
         private static readonly Lock pendingLock = new Lock();
         private static readonly List<string> pendingLines = new List<string>();
 
@@ -50,11 +58,12 @@ namespace osu.Game.EzOsuGame.Startup
 
         /// <summary>
         /// High-level startup milestones (BDSP, song-select preload, settings ready, effective GC mode, enter timings).
-        /// Runs in a release build when <see cref="EzStartupTuning.EnableStartupTrace"/> is enabled.
+        /// Runs in a release build when <see cref="EzStartupTuning.EnableStartupTrace"/> is enabled or
+        /// <c>EZ2LAZER_STARTUP_TRACE=1</c> is set.
         /// </summary>
         public static void Log(string message)
         {
-            if (!EzStartupTuning.EnableStartupTrace)
+            if (!force_trace && !EzStartupTuning.EnableStartupTrace)
                 return;
 
             write(message);

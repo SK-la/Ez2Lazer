@@ -679,6 +679,8 @@ namespace osu.Game.Screens.Select
             if (Beatmap.IsDefault)
                 return;
 
+            onEzGameplayStart();
+
             startAction();
         }
 
@@ -1164,6 +1166,8 @@ namespace osu.Game.Screens.Select
         private partial double? onEzGetFilterScheduleDelay(bool isFirstFilter);
 
         partial void onEzCarouselItemsPresented();
+
+        partial void onEzGameplayStart();
 
         private void newItemsPresented(IEnumerable<CarouselItem> carouselItems)
         {

@@ -34,6 +34,7 @@ using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Scoring.Bonus;
 using osu.Game.EzOsuGame.Screens.Play;
 using osu.Game.EzOsuGame.Screens.Rotation;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.Graphics.Containers;
 using osu.Game.IO.Archives;
 using osu.Game.Online.API;
@@ -1422,6 +1423,8 @@ namespace osu.Game.Screens.Play
 
             if (!LoadedBeatmapSuccessfully)
                 return;
+
+            EzSongSelectEnterTrace.RecordPlayerEntered();
 
             Alpha = 0;
             this

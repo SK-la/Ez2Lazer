@@ -32,5 +32,7 @@ namespace osu.Game.Screens.Select
         }
 
         partial void onEzCarouselItemsPresented() => EzSongSelectEnterTrace.RecordCarouselReady();
+
+        partial void onEzGameplayStart() => EzSongSelectEnterTrace.RecordGameplayStart();
     }
 }
