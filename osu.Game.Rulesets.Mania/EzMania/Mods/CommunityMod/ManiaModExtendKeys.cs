@@ -349,34 +349,54 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                 if (hitObjects.Count == 0)
                     return new LnGaps(0, 0, false);
 
-                int columns = hitObjects.Max(h => h.Column) + 1;
-                var pressTimes = new List<double>[columns];
+                int columns = 0;
 
                 foreach (var hitObject in hitObjects)
-                    (pressTimes[hitObject.Column] ??= new List<double>()).Add(hitObject.StartTime);
+                    columns = Math.Max(columns, hitObject.Column + 1);
 
-                foreach (var times in pressTimes)
-                    times?.Sort();
+                var startTimes = new List<double>[columns];
+                var tailTimes = new List<double>[columns];
 
-                var gaps = new List<double>();
+                for (int i = 0; i < columns; i++)
+                {
+                    startTimes[i] = new List<double>();
+                    tailTimes[i] = new List<double>();
+                }
 
                 foreach (var hitObject in hitObjects)
                 {
-                    if (hitObject is not HoldNote hold || hold.EndTime <= hold.StartTime)
+                    startTimes[hitObject.Column].Add(hitObject.StartTime);
+
+                    if (hitObject is HoldNote hold && hold.EndTime > hold.StartTime)
+                        tailTimes[hold.Column].Add(hold.EndTime);
+                }
+
+                var gaps = new List<double>();
+
+                for (int column = 0; column < columns; column++)
+                {
+                    var columnStarts = startTimes[column];
+                    var columnTails = tailTimes[column];
+
+                    if (columnTails.Count == 0)
                         continue;
 
-                    var times = pressTimes[hold.Column];
+                    columnStarts.Sort();
+                    columnTails.Sort();
 
-                    if (times == null)
-                        continue;
+                    int index = 0;
 
-                    int index = times.BinarySearch(hold.EndTime);
+                    // 两个列表都升序，尾时刻递增，指针只前进。
+                    foreach (double tail in columnTails)
+                    {
+                        while (index < columnStarts.Count && columnStarts[index] < tail)
+                            index++;
 
-                    if (index < 0)
-                        index = ~index;
+                        if (index == columnStarts.Count)
+                            break;
 
-                    if (index < times.Count)
-                        gaps.Add(times[index] - hold.EndTime);
+                        gaps.Add(columnStarts[index] - tail);
+                    }
                 }
 
                 if (gaps.Count == 0)
