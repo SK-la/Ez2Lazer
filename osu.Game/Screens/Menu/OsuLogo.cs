@@ -23,10 +23,10 @@ using osu.Framework.Threading;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Configuration;
-using osu.Game.Graphics.Backgrounds;
-using osu.Game.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Screens.Menu;
+using osu.Game.Graphics.Backgrounds;
+using osu.Game.Graphics.Containers;
 using osu.Game.Overlays;
 using osuTK;
 using osuTK.Graphics;
@@ -120,8 +120,6 @@ namespace osu.Game.Screens.Menu
         private const float visualizer_default_alpha = 0.5f;
 
         private static readonly Color4 armed_visualiser_colour = Color4Extensions.FromHex(@"00A8E8");
-
-        private readonly Box flashLayer;
 
         private readonly Container impactContainer;
 
@@ -222,13 +220,6 @@ namespace osu.Game.Screens.Menu
                                                                             RelativeSizeAxes = Axes.Both,
                                                                         },
                                                                     }
-                                                                },
-                                                                flashLayer = new Box
-                                                                {
-                                                                    RelativeSizeAxes = Axes.Both,
-                                                                    Blending = BlendingParameters.Additive,
-                                                                    Colour = Color4.White,
-                                                                    Alpha = 0,
                                                                 },
                                                             },
                                                         },
@@ -382,13 +373,8 @@ namespace osu.Game.Screens.Menu
                 .ScaleTo(logoAmplitudeContainer.Scale * (1 + 0.04f * amplitudeAdjust), beatLength, Easing.OutQuint)
                 .FadeTo(0.15f * amplitudeAdjust).FadeOut(beatLength, Easing.OutQuint);
 
-            if (effectPoint.KiaiMode && flashLayer.Alpha < 0.4f)
+            if (effectPoint.KiaiMode)
             {
-                flashLayer.ClearTransforms();
-                flashLayer
-                    .FadeTo(0.2f * amplitudeAdjust, early_activation, Easing.Out).Then()
-                    .FadeOut(beatLength);
-
                 visualizer.ClearTransforms();
                 visualizer
                     .FadeTo(visualizer_default_alpha * 1.8f * amplitudeAdjust, early_activation, Easing.Out).Then()
@@ -477,10 +463,6 @@ namespace osu.Game.Screens.Menu
                 suppressNextClick = false;
                 return true;
             }
-
-            flashLayer.ClearTransforms();
-            flashLayer.Alpha = 0.4f;
-            flashLayer.FadeOut(1500, Easing.OutExpo);
 
             if (Action?.Invoke() == true)
             {

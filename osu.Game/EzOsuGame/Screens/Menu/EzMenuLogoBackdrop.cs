@@ -4,6 +4,7 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Configuration;
@@ -46,7 +47,7 @@ namespace osu.Game.EzOsuGame.Screens.Menu
         }
 
         [BackgroundDependencyLoader(true)]
-        private void load(Ez2ConfigManager? ezConfig, EzLogoBackdropSampler? backdropSampler)
+        private void load(Ez2ConfigManager? ezConfig)
         {
             if (ezConfig == null)
                 return;
@@ -102,7 +103,8 @@ namespace osu.Game.EzOsuGame.Screens.Menu
 
             if (solidLook)
             {
-                fill.Colour = solidColour.Value;
+                var colour = solidColour.Value;
+                fill.Colour = ColourInfo.GradientVertical(colour, colour.Darken(0.2f));
                 fill.Alpha = 1;
             }
             else
