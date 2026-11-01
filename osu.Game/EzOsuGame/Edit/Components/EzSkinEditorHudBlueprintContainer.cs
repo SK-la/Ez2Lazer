@@ -7,9 +7,6 @@ using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Linq;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
-using osu.Game.Extensions;
-using osu.Game.EzOsuGame.SkinEditor;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets.Edit;
 using osu.Game.Screens.Edit.Compose.Components;
@@ -112,6 +109,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         protected override SelectionHandler<ISerialisableDrawable> CreateSelectionHandler() => new EzSkinEditorHudSelectionHandler
         {
+            LayerTarget = targetContainer,
             DeleteTarget = component =>
             {
                 targetContainer.Remove(component, true);
@@ -132,47 +130,81 @@ namespace osu.Game.EzOsuGame.Edit.Components
     }
 
     /// <summary>
-    /// 仅移动与选中；删除写回当前编辑层容器。层级 / 完整菜单留待后续接入。
+    /// Ez 编辑层的选中处理器。复用官方 <see cref="SkinSelectionHandler"/> 的手柄（旋转/缩放/翻转）、
+    /// 锚点与原点菜单和变换逻辑，只把选中源、层级调整与删除接到 Ez 自己的容器上。
     /// </summary>
-    public partial class EzSkinEditorHudSelectionHandler : SelectionHandler<ISerialisableDrawable>
+    public partial class EzSkinEditorHudSelectionHandler : SkinSelectionHandler
     {
+        /// <summary>
+        /// The container being edited, used for layering operations. The official editor reaches this
+        /// through its own target screen, which is not available here.
+        /// </summary>
+        public ISerialisableDrawableContainer? LayerTarget { get; set; }
+
         /// <summary>
         /// Removes a single item from the edited container. Owner wires this to the container so the
         /// handler does not need to know which layer is active; the owner also persists the layout.
         /// </summary>
         public Action<ISerialisableDrawable>? DeleteTarget { get; set; }
 
-        public override bool HandleMovement(MoveSelectionEvent<ISerialisableDrawable> moveEvent)
-        {
-            foreach (var c in SelectedBlueprints)
-            {
-                var item = c.Item;
-                var drawable = (Drawable)item;
-
-                if (!item.UsesFixedAnchor && !SkinHudSnapRuntime.DeferClosestAnchorDuringDrag)
-                    SkinSelectionHandler.ApplyClosestAnchorOrigin(drawable);
-
-                drawable.Position += drawable.ScreenSpaceDeltaToParentSpace(moveEvent.ScreenSpaceDelta);
-            }
-
-            return true;
-        }
-
-        protected override void OnSelectionChanged()
-        {
-            base.OnSelectionChanged();
-
-            SelectionBox.CanFlipX = true;
-            SelectionBox.CanFlipY = true;
-            SelectionBox.CanReverse = false;
-        }
+        /// <summary>
+        /// The blueprint binds its shared selection onto <see cref="SelectionHandler{T}.SelectedItems"/>
+        /// before this handler loads, so the transform handlers can follow it directly.
+        /// </summary>
+        protected override BindableList<ISerialisableDrawable>? TransformSelectionSource => SelectedItems;
 
         protected override void DeleteItems(IEnumerable<ISerialisableDrawable> items)
         {
             var targets = items.ToArray();
 
+            ChangeHandler?.BeginChange();
+
             foreach (var item in targets)
                 DeleteTarget?.Invoke(item);
+
+            ChangeHandler?.EndChange();
+        }
+
+        protected override void BringSelectionToFront()
+        {
+            if (LayerTarget == null)
+                return;
+
+            ChangeHandler?.BeginChange();
+
+            // Iterating by target order keeps the relative order of the selection intact.
+            foreach (var d in LayerTarget.Components.ToArray())
+            {
+                if (!SelectedItems.Contains(d))
+                    continue;
+
+                LayerTarget.Remove(d, false);
+
+                // Removing resets the selection, so add it back.
+                SelectedItems.Add(d);
+                LayerTarget.Add(d);
+            }
+
+            ChangeHandler?.EndChange();
+        }
+
+        protected override void SendSelectionToBack()
+        {
+            if (LayerTarget == null)
+                return;
+
+            ChangeHandler?.BeginChange();
+
+            foreach (var d in LayerTarget.Components.ToArray())
+            {
+                if (SelectedItems.Contains(d))
+                    continue;
+
+                LayerTarget.Remove(d, false);
+                LayerTarget.Add(d);
+            }
+
+            ChangeHandler?.EndChange();
         }
     }
 }

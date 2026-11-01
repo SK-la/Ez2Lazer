@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Primitives;
@@ -12,9 +13,9 @@ using osu.Framework.Graphics.UserInterface;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.SkinEditor;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Localisation;
 using osu.Game.Rulesets.Edit;
 using osu.Game.Screens.Edit.Compose.Components;
-using osu.Game.Localisation;
 using osu.Game.Skinning;
 using osu.Game.Utils;
 using osuTK;
@@ -28,19 +29,31 @@ namespace osu.Game.Overlays.SkinEditor
         private TernaryStateRadioMenuItem? closestAnchor;
         private AnchorMenuItem[]? fixedAnchors;
 
-        [Resolved]
-        private SkinEditor skinEditor { get; set; } = null!;
+        [Resolved(canBeNull: true)]
+        private SkinEditor? skinEditor { get; set; }
+
+        /// <summary>
+        /// Selection the rotation and scale handlers transform.
+        /// </summary>
+        /// <remarks>
+        /// Null keeps the created handlers resolving the official editor's selection themselves, which is
+        /// the only option when this handler is created by it: <see cref="CreateRotationHandler"/> runs
+        /// before this handler's own resolved dependencies are injected.
+        /// </remarks>
+        protected virtual BindableList<ISerialisableDrawable>? TransformSelectionSource => null;
 
         public override SelectionRotationHandler CreateRotationHandler() => new SkinSelectionRotationHandler
         {
-            UpdatePosition = updateDrawablePosition
+            UpdatePosition = updateDrawablePosition,
+            SelectedComponents = TransformSelectionSource,
         };
 
         public override SelectionScaleHandler CreateScaleHandler()
         {
             var scaleHandler = new SkinSelectionScaleHandler
             {
-                UpdatePosition = updateDrawablePosition
+                UpdatePosition = updateDrawablePosition,
+                SelectedComponents = TransformSelectionSource,
             };
 
             scaleHandler.PerformFlipFromScaleHandles += a => SelectionBox.PerformFlipFromScaleHandles(a);
@@ -133,7 +146,7 @@ namespace osu.Game.Overlays.SkinEditor
         }
 
         protected override void DeleteItems(IEnumerable<ISerialisableDrawable> items) =>
-            skinEditor.DeleteItems(items.ToArray());
+            skinEditor?.DeleteItems(items.ToArray());
 
         protected override IEnumerable<MenuItem> GetContextMenuItemsForSelection(IEnumerable<SelectionBlueprint<ISerialisableDrawable>> selection)
         {
@@ -179,9 +192,9 @@ namespace osu.Game.Overlays.SkinEditor
 
             yield return new OsuMenuItemSpacer();
 
-            yield return new OsuMenuItem(SkinEditorStrings.BringToFront, MenuItemType.Standard, () => skinEditor.BringSelectionToFront());
+            yield return new OsuMenuItem(SkinEditorStrings.BringToFront, MenuItemType.Standard, BringSelectionToFront);
 
-            yield return new OsuMenuItem(SkinEditorStrings.SendToBack, MenuItemType.Standard, () => skinEditor.SendSelectionToBack());
+            yield return new OsuMenuItem(SkinEditorStrings.SendToBack, MenuItemType.Standard, SendSelectionToBack);
 
             yield return new OsuMenuItemSpacer();
 
@@ -190,6 +203,18 @@ namespace osu.Game.Overlays.SkinEditor
 
             updateTernaryStates();
         }
+
+        /// <summary>
+        /// Moves the current selection to the front of its container. Overridden by editors which do not
+        /// own the official <see cref="SkinEditor"/>.
+        /// </summary>
+        protected virtual void BringSelectionToFront() => skinEditor?.BringSelectionToFront();
+
+        /// <summary>
+        /// Moves the current selection to the back of its container. Overridden by editors which do not
+        /// own the official <see cref="SkinEditor"/>.
+        /// </summary>
+        protected virtual void SendSelectionToBack() => skinEditor?.SendSelectionToBack();
 
         private IEnumerable<AnchorMenuItem> createAnchorItems(Action<Anchor> applyFunction)
         {

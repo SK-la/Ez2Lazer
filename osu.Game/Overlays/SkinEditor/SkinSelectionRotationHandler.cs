@@ -20,15 +20,26 @@ namespace osu.Game.Overlays.SkinEditor
     {
         public Action<Drawable, Vector2> UpdatePosition { get; init; } = null!;
 
+        /// <summary>
+        /// The selection this handler transforms. Null falls back to the official editor's selection.
+        /// </summary>
+        public BindableList<ISerialisableDrawable>? SelectedComponents { get; init; }
+
         [Resolved]
         private IEditorChangeHandler? changeHandler { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private SkinEditor? skinEditor { get; set; }
 
         private BindableList<ISerialisableDrawable> selectedItems { get; } = new BindableList<ISerialisableDrawable>();
 
         [BackgroundDependencyLoader]
-        private void load(SkinEditor skinEditor)
+        private void load()
         {
-            selectedItems.BindTo(skinEditor.SelectedComponents);
+            if (SelectedComponents != null)
+                selectedItems.BindTo(SelectedComponents);
+            else if (skinEditor != null)
+                selectedItems.BindTo(skinEditor.SelectedComponents);
         }
 
         protected override void LoadComplete()
