@@ -119,12 +119,47 @@ namespace osu.Game.EzOsuGame
         public Dictionary<string, bool>? KeysColumnWidth { get; set; }
 
         /// <summary>
-        /// 该键数的按键图是否按列宽缩放；layout 未声明时为 <c>false</c>。
+        /// 该键数的按键图是否按列宽缩放；layout 未声明该键数时为 <c>false</c>。
         /// </summary>
+        /// <remarks>
+        /// 除声明外还要求该键数是平铺型。整幅画布型（<see cref="IsCanvasLayout"/>）的按键图一张就覆盖
+        /// 整个面板，宽度已等于面板宽，再按单列宽压下去会缩成一条窄条，故即便声明了也不生效。
+        /// </remarks>
         public bool UsesColumnWidth(int keyMode)
-            => KeysColumnWidth != null
-               && KeysColumnWidth.TryGetValue(keyMode.ToString(CultureInfo.InvariantCulture), out bool enabled)
-               && enabled;
+        {
+            if (KeysColumnWidth == null
+                || !KeysColumnWidth.TryGetValue(keyMode.ToString(CultureInfo.InvariantCulture), out bool enabled)
+                || !enabled)
+                return false;
+
+            IReadOnlyList<EzStagePlateKey>? keys = GetKeys(keyMode);
+
+            return keys != null && !IsCanvasLayout(keys);
+        }
+
+        /// <summary>
+        /// 按键槽位是否为整幅画布型：各列共用同一原点，位置由源图内部决定（一张图里已按列画好）。
+        /// </summary>
+        /// <remarks>
+        /// 平铺型则记录每列中心，需按列宽缩放才能贴合列。两种形态都由 <c>keys</c> 的 x 区分，
+        /// 导出脚本对画布型写出的 x 全等。
+        /// </remarks>
+        public static bool IsCanvasLayout(IReadOnlyList<EzStagePlateKey> keys)
+        {
+            if (keys.Count == 0)
+                return false;
+
+            float x = keys[0].X;
+
+            for (int i = 1; i < keys.Count; i++)
+            {
+                // 同一起点由导出按同一节点给出，容差只用于吸收 JSON 往返的末位误差。
+                if (Math.Abs(keys[i].X - x) > 0.001f)
+                    return false;
+            }
+
+            return true;
+        }
 
         #region 图层默认顺序
 
