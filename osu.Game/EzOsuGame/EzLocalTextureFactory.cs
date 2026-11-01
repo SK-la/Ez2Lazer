@@ -981,7 +981,8 @@ namespace osu.Game.EzOsuGame
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 Position = piece.ToOsuPosition(),
-                Loop = piece.Loop,
+                // 多帧默认循环：layout 只在要停住时才写 "loop": false。
+                Loop = piece.Loop ?? true,
                 DefaultFrameLength = piece.FrameLength,
                 Blending = blending,
             };

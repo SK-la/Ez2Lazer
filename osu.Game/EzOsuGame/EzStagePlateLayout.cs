@@ -330,8 +330,9 @@ namespace osu.Game.EzOsuGame
         [JsonPropertyName("blend")]
         public string? Blend { get; set; }
 
+        // 多帧时是否循环。未声明为 null，绘制方按「多帧即循环」补默认值。
         [JsonPropertyName("loop")]
-        public bool Loop { get; set; }
+        public bool? Loop { get; set; }
 
         [JsonPropertyName("frameMs")]
         public double FrameMs { get; set; }
