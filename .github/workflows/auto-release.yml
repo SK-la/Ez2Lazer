@@ -299,6 +299,14 @@ jobs:
             }
           }
 
+          # ReadyToRun 只在 Windows x64 验证过（把首启的 JIT 编译量换到发布期）。
+          # 其余平台显式关闭，避免未验证的 crossgen2 产物进入发布通道。
+          if ($platform -eq 'windows' -and $arch -eq 'x64') {
+            $publishArgs += @('--ready-to-run')
+          } else {
+            $publishArgs += @('--no-ready-to-run')
+          }
+
           # Keep release channels stable for in-game differential updates.
           # win and linux channels are intentionally x64-only to avoid mixed-arch channel collisions.
           if (($platform -eq 'windows' -and $arch -eq 'arm64') -or ($platform -eq 'linux' -and $arch -eq 'arm64')) {

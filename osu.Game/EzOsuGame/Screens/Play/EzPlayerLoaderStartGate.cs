@@ -15,6 +15,7 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Screens.Rotation;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Play;
@@ -174,6 +175,8 @@ namespace osu.Game.EzOsuGame.Screens.Play
             loaderActive = true;
             activeLoader = loader;
 
+            EzSongSelectEnterTrace.RecordLoaderEntered();
+
             var session = EzQuickRotationCoordinator.Session;
 
             if (session.IsActive)
@@ -303,6 +306,8 @@ namespace osu.Game.EzOsuGame.Screens.Play
 
             if (reason != null)
                 Logger.Log($"[EzPlayerLoaderStartGate] Texture warm-up released early ({reason}).", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+
+            EzSongSelectEnterTrace.RecordWarmUpFinished();
 
             // 取消未完成的等待并释放预热宿主；纹理本身已进入 store 缓存，不受影响。
             cancelWarmUp();

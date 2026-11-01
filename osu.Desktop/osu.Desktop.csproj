@@ -23,6 +23,36 @@
     <CETCompat>false</CETCompat>
   </PropertyGroup>
 
+  <!-- Windows x64 Release 走 ReadyToRun：把首启的方法 JIT 编译量换到发布期。
+       不开 composite（它要求 self-contained，会让 zip 与 Velopack 差分体积翻倍）。 -->
+  <PropertyGroup Condition="'$(Configuration)'=='Release' and $([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('win'))">
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishReadyToRunUseCrossgen2>true</PublishReadyToRunUseCrossgen2>
+    <PublishReadyToRunShowWarnings>true</PublishReadyToRunShowWarnings>
+  </PropertyGroup>
+
+  <!-- R2R 白名单。填一个程序集名（不含扩展名）= 只 ReadyToRun 这一个；留空 = 全部。
+       默认只 R2R osu.Framework：冷启中位 8719 → 8031ms，发布体积 360.8 → 364.7MB。
+       改成全部能再省约 265ms（→7766ms），但 osu.Game 一改差分包就多传 ~19MB，
+       且会连带 crossgen 全部第三方依赖，净得 +79.7MB。权衡见 artifacts/startup-results/。 -->
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <EzReadyToRunOnly>osu.Framework</EzReadyToRunOnly>
+  </PropertyGroup>
+
+  <!-- 只收窄送进 crossgen 的程序集列表。必须用 SDK 的 PublishReadyToRunExclude：
+       crossgen 是在 _PrepareForReadyToRunCompilation 内部调用的，AfterTargets 挂上去已经太晚。
+       挂在 _ComputeAssembliesToPostprocessOnPublish 之后，此时待后处理程序集名单刚算出来。 -->
+  <Target Name="EzNarrowReadyToRunSet"
+          AfterTargets="_ComputeAssembliesToPostprocessOnPublish"
+          BeforeTargets="_PrepareForReadyToRunCompilation"
+          Condition="'$(PublishReadyToRun)' == 'true' and '$(EzReadyToRunOnly)' != ''">
+    <ItemGroup>
+      <_EzReadyToRunExclude Include="@(_AssemblyToPostprocessOnPublish)"
+                            Condition="'%(Filename)' != '$(EzReadyToRunOnly)'" />
+      <PublishReadyToRunExclude Include="@(_EzReadyToRunExclude->'%(Filename).dll')" />
+    </ItemGroup>
+  </Target>
+
   <PropertyGroup>
     <StartupObject>osu.Desktop.Program</StartupObject>
   </PropertyGroup>
