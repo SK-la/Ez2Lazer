@@ -104,7 +104,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.MenuLogoVisualisationStyle, EzLogoVisualisationStyle.RadialBars);
             SetDefault(Ez2Setting.MenuLogoBackdropStyle, EzLogoBackdropStyle.Acrylic);
             SetDefault(Ez2Setting.MenuLogoBackdropColour, Colour4.FromHex("ff66ab"));
-            SetDefault(Ez2Setting.MenuLogoBackdropBlur, 16.0, 0.0, 40.0, 1.0);
+            SetDefault(Ez2Setting.MenuLogoBackdropBlur, 10.0, 0.0, 40.0, 1.0);
             SetDefault(Ez2Setting.MenuLogoBackdropOpacity, 1.0, 0.0, 1.0, 0.01);
             SetDefault(Ez2Setting.SongSelectUseEzBackground, false);
             SetDefault(Ez2Setting.NotificationBehaviour, EzNotificationBehaviour.Normal);
