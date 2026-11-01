@@ -12,6 +12,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.SkinEditor;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Input.Bindings;
 using osu.Game.Localisation;
 using osu.Game.Screens.Edit.Components.Menus;
 
@@ -56,9 +57,23 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Action? RedoAction { get; set; }
 
+        public Action? CutAction { get; set; }
+
+        public Action? CopyAction { get; set; }
+
+        public Action? PasteAction { get; set; }
+
+        public Action? CloneAction { get; set; }
+
         public Func<bool>? CanUndo { get; set; }
 
         public Func<bool>? CanRedo { get; set; }
+
+        public Func<bool>? CanCut { get; set; }
+
+        public Func<bool>? CanCopy { get; set; }
+
+        public Func<bool>? CanPaste { get; set; }
 
         public Func<bool>? CanCreateEzSkinJson { get; set; }
 
@@ -92,6 +107,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private readonly EditorMenuItem exportOskItem;
         private readonly EditorMenuItem undoItem;
         private readonly EditorMenuItem redoItem;
+        private readonly EditorMenuItem cutItem;
+        private readonly EditorMenuItem copyItem;
+        private readonly EditorMenuItem pasteItem;
+        private readonly EditorMenuItem cloneItem;
 
         private Bindable<bool> hudSnapEnabled = null!;
         private Bindable<float> hudSnapDistance = null!;
@@ -118,13 +137,23 @@ namespace osu.Game.EzOsuGame.Edit.Components
                         new EditorMenuItem(CommonStrings.Exit, MenuItemType.Standard, () => ExitAction?.Invoke()),
                     },
                 },
-                new MenuItem(EzEditorStrings.MENU_CONFIG)
+                new MenuItem(CommonStrings.MenuBarEdit)
                 {
                     Items = new OsuMenuItem[]
                     {
                         undoItem = new EditorMenuItem(CommonStrings.Undo, MenuItemType.Standard, () => UndoAction?.Invoke()) { Hotkey = new Hotkey(PlatformAction.Undo) },
                         redoItem = new EditorMenuItem(CommonStrings.Redo, MenuItemType.Standard, () => RedoAction?.Invoke()) { Hotkey = new Hotkey(PlatformAction.Redo) },
                         new OsuMenuItemSpacer(),
+                        cutItem = new EditorMenuItem(CommonStrings.Cut, MenuItemType.Standard, () => CutAction?.Invoke()) { Hotkey = new Hotkey(PlatformAction.Cut) },
+                        copyItem = new EditorMenuItem(CommonStrings.Copy, MenuItemType.Standard, () => CopyAction?.Invoke()) { Hotkey = new Hotkey(PlatformAction.Copy) },
+                        pasteItem = new EditorMenuItem(CommonStrings.Paste, MenuItemType.Standard, () => PasteAction?.Invoke()) { Hotkey = new Hotkey(PlatformAction.Paste) },
+                        cloneItem = new EditorMenuItem(CommonStrings.Clone, MenuItemType.Standard, () => CloneAction?.Invoke()) { Hotkey = new Hotkey(GlobalAction.EditorCloneSelection) },
+                    },
+                },
+                new MenuItem(EzEditorStrings.MENU_CONFIG)
+                {
+                    Items = new OsuMenuItem[]
+                    {
                         createConfigSnapshotItem = new EditorMenuItem(EzEditorStrings.MENU_CREATE_CONFIG_SNAPSHOT, MenuItemType.Standard, () => CreateConfigSnapshotAction?.Invoke()),
                         restoreConfigSnapshotItem = new EditorMenuItem(EzEditorStrings.MENU_RESTORE_CONFIG_SNAPSHOT, MenuItemType.Standard, () => RestoreConfigSnapshotAction?.Invoke()),
                         new OsuMenuItemSpacer(),
@@ -190,6 +219,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             undoItem.Action.Disabled = !(CanUndo?.Invoke() ?? false);
             redoItem.Action.Disabled = !(CanRedo?.Invoke() ?? false);
+            cutItem.Action.Disabled = !(CanCut?.Invoke() ?? false);
+            copyItem.Action.Disabled = !(CanCopy?.Invoke() ?? false);
+            cloneItem.Action.Disabled = !(CanCopy?.Invoke() ?? false);
+            pasteItem.Action.Disabled = !(CanPaste?.Invoke() ?? false);
             bool canUseConfigSnapshot = CanUseConfigSnapshot?.Invoke() ?? true;
             createConfigSnapshotItem.Action.Disabled = !canUseConfigSnapshot;
             restoreConfigSnapshotItem.Action.Disabled = !canUseConfigSnapshot;
