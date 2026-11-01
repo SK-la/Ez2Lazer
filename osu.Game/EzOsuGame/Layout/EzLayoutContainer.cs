@@ -55,19 +55,27 @@ namespace osu.Game.EzOsuGame.Layout
         public void LoadFromStore() => Reload(store.CreateComponentsContainer(Lookup));
 
         /// <summary>
-        /// Places a freshly created component into this container with sane defaults, mirroring the
-        /// official skin editor's placement (top-centre anchor, vertically centred), then anchors it
-        /// to the closest anchor/origin pair. Returns false if the container or the component cannot
-        /// accept the addition (e.g. missing dependencies).
+        /// Places a component into this container with sane defaults, mirroring the official skin editor's
+        /// placement (top-centre anchor, vertically centred), then anchors it to the closest anchor/origin
+        /// pair. Returns false if the container or the component cannot accept the addition (e.g. missing
+        /// dependencies).
         /// </summary>
-        public bool TryPlace(ISerialisableDrawable component)
+        /// <param name="component">The component to add.</param>
+        /// <param name="applyDefaults">
+        /// Whether to apply the default anchor / origin / position. Pasted and cloned components carry the
+        /// serialised transform, so their placement must not overwrite it.
+        /// </param>
+        public bool TryPlace(ISerialisableDrawable component, bool applyDefaults = true)
         {
             if (component is not Drawable drawable)
                 return false;
 
-            drawable.Origin = Anchor.TopCentre;
-            drawable.Anchor = Anchor.TopCentre;
-            drawable.Y = DrawSize.Y / 2;
+            if (applyDefaults)
+            {
+                drawable.Origin = Anchor.TopCentre;
+                drawable.Anchor = Anchor.TopCentre;
+                drawable.Y = DrawSize.Y / 2;
+            }
 
             try
             {
@@ -78,7 +86,7 @@ namespace osu.Game.EzOsuGame.Layout
                 return false;
             }
 
-            if (!component.UsesFixedAnchor)
+            if (applyDefaults && !component.UsesFixedAnchor)
                 SkinSelectionHandler.ApplyClosestAnchorOrigin(drawable);
 
             return true;

@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -95,6 +96,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private void raiseStateChange() => OnStateChange?.Invoke();
 
         private readonly BindableList<ISerialisableDrawable> selectedComponents = new BindableList<ISerialisableDrawable>();
+
+        /// <summary>
+        /// Ez's own clipboard. The official one is cached inside the official editor overlay's tree,
+        /// which this layer cannot resolve.
+        /// </summary>
+        public readonly EditorClipboard Clipboard = new EditorClipboard();
 
         public override bool PropagatePositionalInputSubTree => InteractionEnabled.Value;
 
@@ -276,6 +283,85 @@ namespace osu.Game.EzOsuGame.Edit.Components
         }
 
         /// <summary>
+        /// Whether there is anything in the Ez clipboard to paste.
+        /// </summary>
+        public bool CanPaste => !string.IsNullOrEmpty(Clipboard.Content.Value);
+
+        /// <summary>
+        /// Copies the current selection into the clipboard.
+        /// </summary>
+        public void CopySelection()
+        {
+            var serialised = selectedComponents.OfType<Drawable>().Select(s => s.CreateSerialisedInfo()).ToArray();
+            Clipboard.Content.Value = JsonConvert.SerializeObject(serialised);
+        }
+
+        public void CutSelection()
+        {
+            if (selectedComponents.Count == 0)
+                return;
+
+            CopySelection();
+
+            changeHandler?.BeginChange();
+
+            foreach (var item in selectedComponents.ToArray())
+                ActiveTarget?.Remove(item, true);
+
+            changeHandler?.EndChange();
+
+            selectedComponents.Clear();
+            persistActiveTarget();
+        }
+
+        /// <summary>
+        /// Places the clipboard contents into the active target, replacing the current selection.
+        /// </summary>
+        public void PasteClipboard()
+        {
+            if (!CanPaste)
+                return;
+
+            var drawableInfo = JsonConvert.DeserializeObject<SerialisedDrawableInfo[]>(Clipboard.Content.Value);
+
+            if (drawableInfo == null)
+                return;
+
+            changeHandler?.BeginChange();
+
+            var instances = drawableInfo.Select(d => d.CreateInstance()).OfType<ISerialisableDrawable>().ToArray();
+            selectedComponents.Clear();
+
+            foreach (var instance in instances)
+            {
+                // Pasted components carry their serialised transform, so placement must not reset it.
+                if (ActiveTarget?.TryPlace(instance, false) == true)
+                    selectedComponents.Add(instance);
+            }
+
+            changeHandler?.EndChange();
+            persistActiveTarget();
+        }
+
+        /// <summary>
+        /// Copies the current selection then pastes it back, leaving the copies selected.
+        /// </summary>
+        public void CloneSelection()
+        {
+            if (selectedComponents.Count == 0)
+                return;
+
+            CopySelection();
+            PasteClipboard();
+        }
+
+        private void persistActiveTarget()
+        {
+            if (ActiveTarget != null)
+                layoutLayer?.Store.Save(ActiveTarget);
+        }
+
+        /// <summary>
         /// The container currently being edited (the active layer's only target), or null when the
         /// layer has no editable container. Used as the dependency source for library previews.
         /// </summary>
@@ -293,15 +379,29 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// </summary>
         public bool TryPlaceComponent(Type type)
         {
+            if (Activator.CreateInstance(type) is not ISerialisableDrawable component)
+                return false;
+
+            return TryPlaceComponent(component);
+        }
+
+        /// <summary>
+        /// Places an existing component into the active layer's container, persisting the layout and
+        /// selecting it. Returns false when there is no editable target or the container rejects it.
+        /// </summary>
+        /// <param name="component">The component to place.</param>
+        /// <param name="applyDefaults">
+        /// Whether to apply the default anchor / origin / position. Imported, pasted and cloned
+        /// components carry their own transform, so placement must not overwrite it.
+        /// </param>
+        public bool TryPlaceComponent(ISerialisableDrawable component, bool applyDefaults = true)
+        {
             EzLayoutContainer? target = ActiveTarget;
 
             if (target == null)
                 return false;
 
-            if (Activator.CreateInstance(type) is not ISerialisableDrawable component)
-                return false;
-
-            if (!target.TryPlace(component))
+            if (!target.TryPlace(component, applyDefaults))
                 return false;
 
             selectedComponents.Clear();
