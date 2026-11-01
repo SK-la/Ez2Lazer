@@ -6,6 +6,8 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
+using osu.Game.Audio;
+using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
@@ -38,9 +40,15 @@ namespace osu.Game.Storyboards.Drawables
         private OsuConfigManager? config { get; set; }
 
         [Resolved(canBeNull: true)]
+        private AudioManager? audioManager { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private IBindable<WorkingBeatmap>? beatmap { get; set; }
+
+        [Resolved(canBeNull: true)]
         private DrawableRuleset? drawableRuleset { get; set; }
 
-        private Bindable<double>? hitsoundVolume;
+        private Bindable<double>? boundVolume;
         private IAdjustableAudioComponent? hitsoundChain;
 
         /// <summary>
@@ -48,10 +56,20 @@ namespace osu.Game.Storyboards.Drawables
         /// </summary>
         /// <remarks>
         /// In rulesets whose notes are themselves audio (mania, BMS) a storyboard sample sits on the same timeline the
-        /// notes do, so it is note audio and follows the hitsound volume. Elsewhere the sample is plain background
-        /// sound, which takes the game-wide sample volume.
+        /// notes do, which is the only signal available to tell it apart from a storyboard that merely carries
+        /// background sound on these rulesets: both arrive as plain <see cref="StoryboardSampleInfo"/>.
         /// </remarks>
         protected virtual bool CountsAsNoteAudio => StoryboardSampleInfoExtensions.IsNoteAudioIn(drawableRuleset?.Ruleset.RulesetInfo);
+
+        /// <summary>
+        /// Whether this sample is the beatmap's background music, played from the storyboard because the beatmap has
+        /// no audio track of its own.
+        /// </summary>
+        /// <remarks>
+        /// Background music is not note audio, so it must not follow the hitsound volume even on the rulesets whose
+        /// storyboard samples otherwise do.
+        /// </remarks>
+        protected virtual bool CarriesBackgroundMusic => beatmap != null && StoryboardSampleInfoExtensions.CarriesBackgroundMusicIn(beatmap.Value);
 
         /// <summary>
         /// The audio component whose volume chain a hitsound-classified sample plays under, or <see langword="null"/>
@@ -67,14 +85,28 @@ namespace osu.Game.Storyboards.Drawables
 
         protected override void LoadAsyncComplete()
         {
+            bool noteAudio = CountsAsNoteAudio && !CarriesBackgroundMusic;
+            bool backgroundMusic = CarriesBackgroundMusic && !sampleInfo.IsHitsound;
+
+            // Note audio and storyboard-carried background music both resolve through the hitsound store: that store
+            // carries neither the game-wide effect volume nor the music volume, so each of them only needs its own
+            // slider applied here. The regular store already carries the music volume, and binding it on top of that
+            // would apply it twice.
+            if ((noteAudio || backgroundMusic) && !sampleInfo.IsHitsound)
+                Samples = new ISampleInfo[] { new HitsoundClassifiedSampleInfo(sampleInfo) };
+
             base.LoadAsyncComplete();
 
-            if (sampleInfo.IsHitsound || CountsAsNoteAudio)
+            if (noteAudio || sampleInfo.IsHitsound)
             {
                 if (HitsoundVolumeChain is { } chain)
                     BindAdjustments(hitsoundChain = chain);
                 else if (config != null)
-                    Volume.BindTo(hitsoundVolume = config.GetBindable<double>(OsuSetting.HitsoundVolume));
+                    Volume.BindTo(boundVolume = config.GetBindable<double>(OsuSetting.HitsoundVolume));
+            }
+            else if (backgroundMusic && audioManager != null)
+            {
+                Volume.BindTo(boundVolume = audioManager.VolumeTrack);
             }
         }
 
@@ -143,17 +175,41 @@ namespace osu.Game.Storyboards.Drawables
         {
             if (isDisposing)
             {
-                if (hitsoundVolume != null)
-                    Volume.UnbindFrom(hitsoundVolume);
+                if (boundVolume != null)
+                    Volume.UnbindFrom(boundVolume);
 
                 if (hitsoundChain != null)
                     UnbindAdjustments(hitsoundChain);
             }
 
-            hitsoundVolume = null;
+            boundVolume = null;
             hitsoundChain = null;
 
             base.Dispose(isDisposing);
+        }
+
+        /// <summary>
+        /// A copy of a storyboard sample marked as a hitsound, so playback resolves through the hitsound sample store.
+        /// </summary>
+        /// <remarks>
+        /// Deriving from <see cref="StoryboardSampleInfo"/> keeps the lookup itself untouched: beatmap-skin sample
+        /// gating and fallback rules key on that type, so a wrapper of any other type would silently disable them.
+        /// </remarks>
+        private sealed class HitsoundClassifiedSampleInfo : StoryboardSampleInfo
+        {
+            private readonly StoryboardSampleInfo inner;
+
+            public HitsoundClassifiedSampleInfo(StoryboardSampleInfo inner)
+                : base(inner.Source, inner.Path, inner.StartTime, inner.Volume)
+            {
+                this.inner = inner;
+            }
+
+            public override bool IsHitsound => true;
+
+            public override int Volume => inner.Volume;
+
+            public override IEnumerable<string> LookupNames => inner.LookupNames;
         }
     }
 }

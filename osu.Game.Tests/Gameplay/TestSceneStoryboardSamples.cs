@@ -12,6 +12,7 @@ using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
+using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Rendering;
@@ -25,12 +26,14 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.IO;
 using osu.Game.Rulesets;
+using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
 using osu.Game.Storyboards.Drawables;
+using osu.Game.Tests.Beatmaps;
 using osu.Game.Tests.Resources;
 using osu.Game.Tests.Visual;
 
@@ -254,6 +257,140 @@ namespace osu.Game.Tests.Gameplay
         }
 
         /// <summary>
+        /// A storyboard sample in mania sits on the note timeline, so it has to resolve through the hitsound sample
+        /// store. That store omits the game-wide effect volume, which is what keeps the effect slider off storyboard
+        /// audio on these rulesets; resolving through the regular store would leave the effect slider in control.
+        /// </summary>
+        [Test]
+        public void TestStoryboardSampleResolvesAsHitsoundInMania()
+        {
+            DrawableRuleset drawableRuleset = null;
+            LookupRecordingSkin skin = null;
+            DrawableStoryboardSample sample = null;
+
+            AddStep("create mania gameplay holding a storyboard sample", () =>
+            {
+                var ruleset = new ManiaRuleset();
+                var beatmap = CreateWorkingBeatmap(ruleset.RulesetInfo).GetPlayableBeatmap(ruleset.RulesetInfo);
+
+                drawableRuleset = ruleset.CreateDrawableRulesetWith(beatmap);
+
+                var container = new SkinProvidingContainer(skin = new LookupRecordingSkin());
+                container.Add(sample = new DrawableStoryboardSample(new StoryboardSampleInfo(StoryboardElementSource.Beatmap, "test-sample", 0, 1)));
+                drawableRuleset.Overlays.Add(container);
+
+                Add(drawableRuleset);
+            });
+
+            AddUntilStep("sample loaded", () => sample.IsLoaded);
+            AddUntilStep("storyboard sample resolved", () => skin.Lookups.OfType<StoryboardSampleInfo>().Any());
+
+            AddAssert("storyboard lookup was classified as a hitsound", () => skin.Lookups.OfType<StoryboardSampleInfo>().All(l => l.IsHitsound));
+        }
+
+        /// <summary>
+        /// A beatmap whose music is carried by the storyboard has no audio track of its own, so its storyboard samples
+        /// are background music rather than note audio. They must follow the music volume, not the hitsound volume.
+        /// </summary>
+        [Test]
+        public void TestStoryboardMusicFollowsMusicVolumeNotHitsound()
+        {
+            DrawableStoryboardSample sample = null;
+            var hitsoundVolume = config.GetBindable<double>(OsuSetting.HitsoundVolume);
+            var musicVolume = Audio.VolumeTrack;
+
+            AddStep("select mania beatmap without an audio track", () =>
+            {
+                Beatmap.Value = new VirtualTrackWorkingBeatmap(new ManiaRuleset().RulesetInfo, Audio);
+
+                var ruleset = new ManiaRuleset();
+                var drawableRuleset = ruleset.CreateDrawableRulesetWith(Beatmap.Value.GetPlayableBeatmap(ruleset.RulesetInfo));
+
+                drawableRuleset.Overlays.Add(sample = new DrawableStoryboardSample(
+                    new StoryboardSampleInfo(StoryboardElementSource.Beatmap, "music.mp3", 0, 100)));
+
+                Add(drawableRuleset);
+            });
+
+            AddUntilStep("loaded", () => sample.IsLoaded);
+            AddUntilStep("track is virtual", () => Beatmap.Value.TrackLoaded && Beatmap.Value.Track is TrackVirtual);
+
+            AddStep("lower music volume", () => musicVolume.Value = 0.25);
+            AddUntilStep("volume follows music", () => sample.Volume.Value, () => Is.EqualTo(musicVolume.Value).Within(1e-6));
+
+            AddStep("restore music volume", () => musicVolume.Value = 1);
+
+            AddStep("change hitsound volume", () => hitsoundVolume.Value = 0.13);
+            AddAssert("volume unaffected by hitsound", () => sample.Volume.Value == musicVolume.Value);
+
+            AddStep("change effect volume", () => Audio.VolumeSample.Value = 0.5);
+            AddAssert("volume unaffected by effect", () => sample.Volume.Value == musicVolume.Value);
+
+            AddStep("restore effect volume", () => Audio.VolumeSample.Value = 1);
+            AddStep("restore default", () => hitsoundVolume.SetDefault());
+        }
+
+        /// <summary>
+        /// The ruleset alone does not decide the volume chain: on these rulesets a storyboard sample is only note audio
+        /// when the beatmap actually has an audio track. With one, the same sample must follow the hitsound volume.
+        /// </summary>
+        [Test]
+        public void TestStoryboardSampleFollowsHitsoundWithRealTrack()
+        {
+            DrawableStoryboardSample sample = null;
+            var hitsoundVolume = config.GetBindable<double>(OsuSetting.HitsoundVolume);
+            var musicVolume = Audio.VolumeTrack;
+
+            AddStep("select mania beatmap with a real track", () =>
+            {
+                Beatmap.Value = new RealTrackWorkingBeatmap(new ManiaRuleset().RulesetInfo, Audio);
+
+                var ruleset = new ManiaRuleset();
+                var drawableRuleset = ruleset.CreateDrawableRulesetWith(Beatmap.Value.GetPlayableBeatmap(ruleset.RulesetInfo));
+
+                drawableRuleset.Overlays.Add(sample = new DrawableStoryboardSample(
+                    new StoryboardSampleInfo(StoryboardElementSource.Beatmap, "test-sample", 0, 100)));
+
+                Add(drawableRuleset);
+            });
+
+            AddUntilStep("loaded", () => sample.IsLoaded);
+            AddUntilStep("track is real", () => Beatmap.Value.TrackLoaded && Beatmap.Value.Track is not TrackVirtual);
+
+            AddStep("lower hitsound volume", () => hitsoundVolume.Value = 0.13);
+            AddUntilStep("volume follows hitsound", () => sample.Volume.Value, () => Is.EqualTo(hitsoundVolume.Value).Within(1e-6));
+
+            AddStep("lower music volume", () => musicVolume.Value = 0.25);
+            AddAssert("volume unaffected by music", () => sample.Volume.Value == hitsoundVolume.Value);
+
+            AddStep("restore music volume", () => musicVolume.Value = 1);
+            AddStep("restore default", () => hitsoundVolume.SetDefault());
+        }
+
+        /// <summary>
+        /// Records the classification of every sample the skin is asked for.
+        /// </summary>
+        private class LookupRecordingSkin : ISkin
+        {
+            public readonly List<ISampleInfo> Lookups = new List<ISampleInfo>();
+
+            public Drawable GetDrawableComponent(ISkinComponentLookup lookup) => null;
+
+            public Texture GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT) => null;
+
+            public IBindable<TValue> GetConfig<TLookup, TValue>(TLookup lookup)
+                where TLookup : notnull
+                where TValue : notnull => null;
+
+            public ISample GetSample(ISampleInfo sampleInfo)
+            {
+                Lookups.Add(sampleInfo);
+
+                return new SampleVirtual(sampleInfo.LookupNames.FirstOrDefault() ?? "test-sample");
+            }
+        }
+
+        /// <summary>
         /// Stands in for the type-sensitive dispatch a ruleset or beatmap skin performs: only a note's own sample
         /// definition is recognised, so a wrapper around one resolves nothing.
         /// </summary>
@@ -285,6 +422,90 @@ namespace osu.Game.Tests.Gameplay
             }
 
             public override bool IsHitsound => true;
+        }
+
+        /// <summary>
+        /// A working beatmap whose created track is an actual <see cref="TrackVirtual"/>, standing in for a beatmap
+        /// that has no audio file and takes its music from the storyboard.
+        /// </summary>
+        private class VirtualTrackWorkingBeatmap : TestWorkingBeatmap
+        {
+            private readonly Track track;
+
+            public VirtualTrackWorkingBeatmap(RulesetInfo ruleset, AudioManager audio)
+                : base(new TestBeatmap(ruleset), null, audio)
+            {
+                track = audio.Tracks.GetVirtual(60000);
+                LoadTrack();
+            }
+
+            protected override Track GetBeatmapTrack() => track;
+        }
+
+        /// <summary>
+        /// A working beatmap whose created track is a real (non-<see cref="TrackVirtual"/>) track, standing in for a
+        /// beatmap that carries its own audio file.
+        /// </summary>
+        private class RealTrackWorkingBeatmap : TestWorkingBeatmap
+        {
+            private readonly Track track;
+
+            public RealTrackWorkingBeatmap(RulesetInfo ruleset, AudioManager audio)
+                : base(new TestBeatmap(ruleset), null, audio)
+            {
+                track = new RealTrack(audio);
+                LoadTrack();
+            }
+
+            protected override Track GetBeatmapTrack() => track;
+
+            /// <summary>
+            /// Stands in for a real audio track: a plain <see cref="Track"/> that is not a <see cref="TrackVirtual"/>,
+            /// which is the only property the classification reads.
+            /// </summary>
+            private class RealTrack : Track
+            {
+                private readonly TrackVirtual backing = new TrackVirtual(60000);
+
+                public RealTrack(AudioManager audio)
+                    : base("real")
+                {
+                    Length = 60000;
+                    audio.AddItem(this);
+                }
+
+                public override bool IsRunning => backing.IsRunning;
+
+                public override double CurrentTime => backing.CurrentTime;
+
+                public override bool Seek(double seek)
+                {
+                    backing.Seek(seek);
+                    return true;
+                }
+
+                public override Task<bool> SeekAsync(double seek) => backing.SeekAsync(seek);
+
+                public override void Start() => backing.Start();
+
+                public override Task StartAsync() => backing.StartAsync();
+
+                public override void Stop() => backing.Stop();
+
+                public override Task StopAsync() => backing.StopAsync();
+
+                public override void Reset()
+                {
+                    backing.Reset();
+                    base.Reset();
+                }
+
+                protected override void UpdateState()
+                {
+                    backing.Update();
+                    base.UpdateState();
+                }
+            }
         }
 
         private class TestSkin : LegacySkin

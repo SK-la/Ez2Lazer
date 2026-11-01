@@ -40,6 +40,19 @@ namespace osu.Game.Storyboards.Drawables
         /// </remarks>
         protected override IAdjustableAudioComponent? HitsoundVolumeChain => drawableRuleset?.Audio;
 
+        /// <remarks>
+        /// This sample already carries its own <see cref="DetachedStoryboardSampleInfo.IsHitsound"/> decision, which
+        /// selects both the lookup and the volume chain, and its playback resolves the definition of the note it came
+        /// from rather than the storyboard wrapper. Classifying it by ruleset would rewrite that lookup.
+        /// </remarks>
+        protected override bool CountsAsNoteAudio => false;
+
+        /// <remarks>
+        /// A detached sample stands in for a note, never for the beatmap's music, so it is never background music
+        /// even when the beatmap hosting it carries its music through the storyboard.
+        /// </remarks>
+        protected override bool CarriesBackgroundMusic => false;
+
         [BackgroundDependencyLoader]
         private void load()
         {
