@@ -77,7 +77,6 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 },
             };
 
-            audio.ApplyEzAsioDefaults();
             audio.OnAsioOutputUnavailable = () => Schedule(() =>
             {
                 notifications?.Post(new SimpleNotification

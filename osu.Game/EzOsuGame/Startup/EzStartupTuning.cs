@@ -45,5 +45,19 @@ namespace osu.Game.EzOsuGame.Startup
         /// Spreads Gen2 pressure on the main menu.
         /// </summary>
         public static double SettingsPreloadDelayAfterBdspMs { get; set; } = 1_500;
+
+        /// <summary>
+        /// Master switch for the high-level <see cref="EzStartupTrace.Log"/> milestones in a release build.
+        /// Default off; enable to trace startup on a shipped build. Fine-grained investigation lines use
+        /// <see cref="EzStartupTrace.LogDiagnostic"/> and are debug-build only regardless of this flag.
+        /// </summary>
+        public static bool EnableStartupTrace { get; set; }
+
+        /// <summary>
+        /// Diagnostic: skip the settings-section async preload entirely.
+        /// Used to A/B whether the startup frame-rate dip is caused by settings preload or by other
+        /// startup work (BDSP backfill, song-select preload). Sections then load on first PopIn instead.
+        /// </summary>
+        public static bool SkipSettingsPreload { get; set; }
     }
 }

@@ -41,7 +41,7 @@ namespace osu.Game.EzOsuGame.Screens.Menu
                 fill = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = EzLogoBackdropSampler.DefaultColour,
+                    Colour = Colour4.FromHex("ff66ab"),
                 },
             };
         }
