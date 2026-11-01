@@ -294,8 +294,12 @@ namespace osu.Game.EzOsuGame
         /// </summary>
         /// <remarks>
         /// 只用框架原生的 <see cref="TextureStore.ClearCache"/>（<see cref="TextureStore"/> 会把未命中也缓存下来，
-        /// 故新增文件不清缓存就永远看不到）。纹理池只清动画帧与静态大图两池：字形页与通用图集页里的纹理
+        /// 故新增文件不清缓存就永远看不到）。纹理池只清动画帧池：字形页与通用图集页里的纹理
         /// 可能正被绘制（TextStyle 反复复用），整体清会在用户操作时把已绘制的图集区域释放掉。
+        /// <see cref="EzTextureUsage.Large"/> 池不能走 <c>ClearCache</c>：它每次 Get 返回带引用计数的包装，
+        /// 而 <c>ClearCache</c> 会直接释放底层 native 纹理，不管外面还有多少个包装活着，
+        /// 会让仍显示的预览图变空、并在随后销毁时崩溃（实测：保存 skin.ini 后预览全空，退出编辑器崩溃）。
+        /// 需改为「只清无存活引用/null 的条目」，见下方注释。
         /// 只在冷的、用户主动的入口调用（资源选择器打开、皮肤编辑器保存/应用）。
         /// </remarks>
         internal void InvalidateResourceCaches()
@@ -304,23 +308,7 @@ namespace osu.Game.EzOsuGame
             frameSets.Clear();
 
             animationSafeStore.ClearCache();
-            largeTextureStore.ClearCache();
-        }
-
-        /// <summary>
-        /// 构建 Note 组件路径
-        /// </summary>
-        public string BuildNotePath(string component)
-        {
-            return $"note/{noteSetName.Value}/{component}";
-        }
-
-        /// <summary>
-        /// 构建 Stage 组件路径
-        /// </summary>
-        public string BuildStagePath(string component)
-        {
-            return $"Stage/{stageName.Value}/Stage/{component}";
+            largeTextureStore.ClearFailedCache();
         }
 
         #endregion
