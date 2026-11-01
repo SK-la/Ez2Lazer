@@ -73,9 +73,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             return downgraded;
         }
 
-        public static bool ShouldHideTailDisplayResult(ManiaJudgementRound? round)
-            => round?.Environment.JudgeMode == EzEnumJudgeMode.O2Jam;
-
         internal static BmsJudgeModeJudgement.BmsRouteState GetBmsState(DrawableNote note)
         {
             if (note.FindClosestParent<Column>() is Column column && column.TryGetBmsRoute(note, out var route))

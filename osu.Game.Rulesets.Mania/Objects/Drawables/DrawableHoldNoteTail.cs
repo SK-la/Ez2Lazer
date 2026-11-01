@@ -98,8 +98,6 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         public new bool CanRouteToKPoor => ManiaEzDrawableJudgement.CanRouteToKPoor(this);
 
-        public override bool DisplayResult => !ManiaEzDrawableJudgement.ShouldHideTailDisplayResult(ManiaEzDrawableJudgement.GetJudgementRound(this)) && base.DisplayResult;
-
         internal override void EzApplyFinalResult(HitResult result, EzEnumJudgeMode judgeMode)
         {
             result = ManiaEzDrawableJudgement.SanitizeResult(this, result);
