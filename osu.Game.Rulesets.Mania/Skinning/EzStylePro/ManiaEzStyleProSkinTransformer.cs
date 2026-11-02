@@ -204,6 +204,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
                         case ManiaSkinComponents.StageForeground:
                             return new EzStageBottom();
+
+                        case ManiaSkinComponents.StageBackground:
+                            return Drawable.Empty();
                     }
 
                     break;
