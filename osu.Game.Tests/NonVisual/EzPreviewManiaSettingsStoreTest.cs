@@ -31,13 +31,17 @@ namespace osu.Game.Tests.NonVisual
                 {
                     Value = Colour4.FromHex("#778899"),
                 },
-                HoldTailColour =
-                {
-                    Value = Colour4.FromHex("#AABBCC"),
-                },
+                // HoldTailColour =
+                // {
+                //     Value = Colour4.FromHex("#AABBCC"),
+                // },
                 ThicknessScale =
                 {
                     Value = 2.5f,
+                },
+                LaneBackgroundColour =
+                {
+                    Value = Colour4.FromHex("#0A0A14CC"),
                 },
             };
 
@@ -48,8 +52,9 @@ namespace osu.Game.Tests.NonVisual
             Assert.That(loaded.NoteColour.Value.ToHex(), Is.EqualTo("#112233"));
             Assert.That(loaded.HoldHeadColour.Value.ToHex(), Is.EqualTo("#445566"));
             Assert.That(loaded.HoldBodyColour.Value.ToHex(), Is.EqualTo("#778899"));
-            Assert.That(loaded.HoldTailColour.Value.ToHex(), Is.EqualTo("#AABBCC"));
+            // Assert.That(loaded.HoldTailColour.Value.ToHex(), Is.EqualTo("#AABBCC"));
             Assert.That(loaded.ThicknessScale.Value, Is.EqualTo(2.5f).Within(0.001f));
+            Assert.That(loaded.LaneBackgroundColour.Value.ToHex(), Is.EqualTo("#0A0A14CC"));
         }
 
         [Test]

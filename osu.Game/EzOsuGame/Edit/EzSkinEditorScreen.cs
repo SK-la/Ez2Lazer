@@ -1213,8 +1213,9 @@ namespace osu.Game.EzOsuGame.Edit
             PreviewManiaSettings.NoteColour.BindValueChanged(_ => saveFullMapPreviewSettings());
             PreviewManiaSettings.HoldHeadColour.BindValueChanged(_ => saveFullMapPreviewSettings());
             PreviewManiaSettings.HoldBodyColour.BindValueChanged(_ => saveFullMapPreviewSettings());
-            PreviewManiaSettings.HoldTailColour.BindValueChanged(_ => saveFullMapPreviewSettings());
+            // PreviewManiaSettings.HoldTailColour.BindValueChanged(_ => saveFullMapPreviewSettings());
             PreviewManiaSettings.ThicknessScale.BindValueChanged(_ => saveFullMapPreviewSettings());
+            PreviewManiaSettings.LaneBackgroundColour.BindValueChanged(_ => saveFullMapPreviewSettings());
         }
 
         private void saveFullMapPreviewSettings() => previewManiaSettingsStore?.Save(PreviewManiaSettings);

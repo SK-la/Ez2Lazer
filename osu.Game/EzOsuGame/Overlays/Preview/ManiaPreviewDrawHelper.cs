@@ -18,6 +18,18 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
     {
         private static Colour4 colourFor(EzPreviewManiaSettings settings, EzManiaNotePart kind) => settings.For(kind);
 
+        public static void AddUniformLaneBackgrounds(List<PreviewQuad> quads, ManiaPreviewData data, float originX, float width, float height, Colour4 colour)
+        {
+            if (colour.A <= 0)
+                return;
+
+            int totalColumns = Math.Max(1, data.TotalColumns);
+            float laneWidth = width / totalColumns;
+
+            for (int lane = 0; lane < totalColumns; lane++)
+                quads.Add(new PreviewQuad(originX + lane * laneWidth, 0, laneWidth, height, colour));
+        }
+
         public static void AddLaneLines(List<PreviewQuad> quads, ManiaPreviewData data, float originX, float width, float height, float thickness)
         {
             int totalColumns = data.TotalColumns;

@@ -47,6 +47,11 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                 },
                 new EzSettingsColour
                 {
+                    LabelText = ManiaBeatmapPreviewStrings.COLOUR_LANE_BACKGROUND,
+                    Current = settings.LaneBackgroundColour,
+                },
+                new EzSettingsColour
+                {
                     LabelText = ManiaBeatmapPreviewStrings.COLOUR_NOTE,
                     Current = settings.NoteColour,
                 },
@@ -60,11 +65,11 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                     LabelText = ManiaBeatmapPreviewStrings.COLOUR_HOLD_BODY,
                     Current = settings.HoldBodyColour,
                 },
-                new EzSettingsColour
-                {
-                    LabelText = ManiaBeatmapPreviewStrings.COLOUR_HOLD_TAIL,
-                    Current = settings.HoldTailColour,
-                },
+                // new EzSettingsColour
+                // {
+                //     LabelText = ManiaBeatmapPreviewStrings.COLOUR_HOLD_TAIL,
+                //     Current = settings.HoldTailColour,
+                // },
             };
         }
     }
@@ -78,6 +83,8 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             "The current beatmap is not mania. Switch to a mania beatmap to preview.");
 
         public static readonly LocalisableString NOTE_THICKNESS = new EzLocalizationManager.EzLocalisableString("note 厚度", "Note thickness");
+
+        public static readonly LocalisableString COLOUR_LANE_BACKGROUND = new EzLocalizationManager.EzLocalisableString("轨道背景颜色", "Lane background colour");
 
         public static readonly LocalisableString COLOUR_NOTE = new EzLocalizationManager.EzLocalisableString("普通 note 颜色", "Note colour");
 

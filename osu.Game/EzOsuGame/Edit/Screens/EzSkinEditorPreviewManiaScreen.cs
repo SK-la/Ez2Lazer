@@ -75,11 +75,12 @@ namespace osu.Game.EzOsuGame.Edit.Screens
             // 设置即改即存且立即回灌预览：任一 bindable 变化触发一次重绘。
             settings.Style.BindValueChanged(_ => applySettings());
             settings.ThicknessScale.BindValueChanged(_ => applySettings());
+            settings.LaneBackgroundColour.BindValueChanged(_ => applySettings());
 
             settings.NoteColour.BindValueChanged(_ => applySettings());
             settings.HoldHeadColour.BindValueChanged(_ => applySettings());
             settings.HoldBodyColour.BindValueChanged(_ => applySettings());
-            settings.HoldTailColour.BindValueChanged(_ => applySettings());
+            // settings.HoldTailColour.BindValueChanged(_ => applySettings());
         }
 
         /// <summary>

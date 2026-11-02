@@ -14,7 +14,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
     /// </summary>
     public sealed class EzPreviewManiaSettings
     {
-        public const string FILENAME = "ManiaBeatmapPreviewStrings.json";
+        public const string FILENAME = "ManiaBeatmapPreviewSettings.json";
 
         /// <summary>厚度缩放，1 为基准。</summary>
         public const float MIN_THICKNESS_SCALE = 0.25f;
@@ -23,13 +23,15 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
         public const float DEFAULT_THICKNESS_SCALE = 1f;
 
-        public static readonly Colour4 DEFAULT_NOTE_COLOUR = new Colour4(0, 170, 255, 230);
+        public static readonly Colour4 DEFAULT_LANE_BACKGROUND_COLOUR = Colour4.FromHex("#181818");
 
-        public static readonly Colour4 DEFAULT_HOLD_HEAD_COLOUR = new Colour4(255, 80, 80, 235);
+        public static readonly Colour4 DEFAULT_NOTE_COLOUR = Colour4.FromHex("#00AAFF");
 
-        public static readonly Colour4 DEFAULT_HOLD_BODY_COLOUR = new Colour4(255, 220, 70, 230);
+        public static readonly Colour4 DEFAULT_HOLD_HEAD_COLOUR = Colour4.FromHex("#FF5050EB");
 
-        public static readonly Colour4 DEFAULT_HOLD_TAIL_COLOUR = new Colour4(255, 220, 70, 230);
+        public static readonly Colour4 DEFAULT_HOLD_BODY_COLOUR = Colour4.FromHex("#FFE782B2");
+
+        // public static readonly Colour4 DEFAULT_HOLD_TAIL_COLOUR = Colour4.FromHex("#FFFF00");
 
         /// <summary>
         /// 共享默认实例。没有用户设置的调用点（如预览叠层）从这里取默认值，不再各自重复字面量。
@@ -43,7 +45,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         {
             EzManiaNotePart.HoldHead => DEFAULT_HOLD_HEAD_COLOUR,
             EzManiaNotePart.HoldBody => DEFAULT_HOLD_BODY_COLOUR,
-            EzManiaNotePart.HoldTail => DEFAULT_HOLD_TAIL_COLOUR,
+            // EzManiaNotePart.HoldTail => DEFAULT_HOLD_TAIL_COLOUR,
             _ => DEFAULT_NOTE_COLOUR,
         };
 
@@ -53,7 +55,10 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
         public BindableColour4 HoldBodyColour { get; } = new BindableColour4(DEFAULT_HOLD_BODY_COLOUR);
 
-        public BindableColour4 HoldTailColour { get; } = new BindableColour4(DEFAULT_HOLD_TAIL_COLOUR);
+        // public BindableColour4 HoldTailColour { get; } = new BindableColour4(DEFAULT_HOLD_TAIL_COLOUR); //不绘制Tail
+
+        /// <summary>全键道统一底色。交替配色预留为后续扩展，当前仅使用本项。</summary>
+        public BindableColour4 LaneBackgroundColour { get; } = new BindableColour4(DEFAULT_LANE_BACKGROUND_COLOUR);
 
         public BindableFloat ThicknessScale { get; } = new BindableFloat(DEFAULT_THICKNESS_SCALE)
         {
@@ -67,7 +72,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         {
             EzManiaNotePart.HoldHead => HoldHeadColour.Value,
             EzManiaNotePart.HoldBody => HoldBodyColour.Value,
-            EzManiaNotePart.HoldTail => HoldTailColour.Value,
+            // EzManiaNotePart.HoldTail => HoldTailColour.Value,
             _ => NoteColour.Value,
         };
 
@@ -75,7 +80,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         {
             EzManiaNotePart.HoldHead => HoldHeadColour,
             EzManiaNotePart.HoldBody => HoldBodyColour,
-            EzManiaNotePart.HoldTail => HoldTailColour,
+            // EzManiaNotePart.HoldTail => HoldTailColour,
             _ => NoteColour,
         };
 
@@ -85,7 +90,8 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             target.NoteColour.Value = NoteColour.Value;
             target.HoldHeadColour.Value = HoldHeadColour.Value;
             target.HoldBodyColour.Value = HoldBodyColour.Value;
-            target.HoldTailColour.Value = HoldTailColour.Value;
+            // target.HoldTailColour.Value = HoldTailColour.Value;
+            target.LaneBackgroundColour.Value = LaneBackgroundColour.Value;
             target.ThicknessScale.Value = ThicknessScale.Value;
             target.Style.Value = Style.Value;
         }
@@ -102,7 +108,9 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
         public string? HoldBodyColour { get; set; }
 
-        public string? HoldTailColour { get; set; }
+        // public string? HoldTailColour { get; set; }
+
+        public string? LaneBackgroundColour { get; set; }
 
         public float? ThicknessScale { get; set; }
 
@@ -113,7 +121,8 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             NoteColour = maniaSettings.NoteColour.Value.ToHex(),
             HoldHeadColour = maniaSettings.HoldHeadColour.Value.ToHex(),
             HoldBodyColour = maniaSettings.HoldBodyColour.Value.ToHex(),
-            HoldTailColour = maniaSettings.HoldTailColour.Value.ToHex(),
+            // HoldTailColour = maniaSettings.HoldTailColour.Value.ToHex(),
+            LaneBackgroundColour = maniaSettings.LaneBackgroundColour.Value.ToHex(),
             ThicknessScale = maniaSettings.ThicknessScale.Value,
             Style = maniaSettings.Style.Value.ToString(),
         };
@@ -123,7 +132,8 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             maniaSettings.NoteColour.Value = parse(NoteColour, EzPreviewManiaSettings.DEFAULT_NOTE_COLOUR);
             maniaSettings.HoldHeadColour.Value = parse(HoldHeadColour, EzPreviewManiaSettings.DEFAULT_HOLD_HEAD_COLOUR);
             maniaSettings.HoldBodyColour.Value = parse(HoldBodyColour, EzPreviewManiaSettings.DEFAULT_HOLD_BODY_COLOUR);
-            maniaSettings.HoldTailColour.Value = parse(HoldTailColour, EzPreviewManiaSettings.DEFAULT_HOLD_TAIL_COLOUR);
+            // maniaSettings.HoldTailColour.Value = parse(HoldTailColour, EzPreviewManiaSettings.DEFAULT_HOLD_TAIL_COLOUR);
+            maniaSettings.LaneBackgroundColour.Value = parse(LaneBackgroundColour, EzPreviewManiaSettings.DEFAULT_LANE_BACKGROUND_COLOUR);
             maniaSettings.ThicknessScale.Value = parseThickness(ThicknessScale);
             maniaSettings.Style.Value = parseStyle(Style);
         }
