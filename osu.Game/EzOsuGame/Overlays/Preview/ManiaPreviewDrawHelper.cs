@@ -16,15 +16,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
     /// </summary>
     public static class ManiaPreviewDrawHelper
     {
-        private static Colour4 colourFor(EzPreviewManiaSettings settings, ManiaPreviewNoteKind kind) => settings.For(toPart(kind));
-
-        private static EzManiaNotePart toPart(ManiaPreviewNoteKind kind) => kind switch
-        {
-            ManiaPreviewNoteKind.HoldHead => EzManiaNotePart.HoldHead,
-            ManiaPreviewNoteKind.HoldBody => EzManiaNotePart.HoldBody,
-            ManiaPreviewNoteKind.HoldTail => EzManiaNotePart.HoldTail,
-            _ => EzManiaNotePart.Note,
-        };
+        private static Colour4 colourFor(EzPreviewManiaSettings settings, EzManiaNotePart kind) => settings.For(kind);
 
         public static void AddLaneLines(List<PreviewQuad> quads, ManiaPreviewData data, float originX, float width, float height, float thickness)
         {
@@ -83,14 +75,14 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
                 switch (entry.Kind)
                 {
-                    case ManiaPreviewNoteKind.Tap:
-                    case ManiaPreviewNoteKind.HoldHead:
+                    case EzManiaNotePart.Note:
+                    case EzManiaNotePart.HoldHead:
                     {
                         quads.Add(new PreviewQuad(x, anchorY - headHeight, laneW, headHeight, colourFor(settings, entry.Kind)));
                         break;
                     }
 
-                    case ManiaPreviewNoteKind.HoldBody:
+                    case EzManiaNotePart.HoldBody:
                     {
                         // 身体停在结束时刻。不要铺到格子远端，否则尾巴会和下一个头贴死，滚动映射比例也拉不开。
                         float bodyTop = mapTime ? yAtTime(entry.EndTime) : GetSlotBottomY(entry.EndRow, rowStep, height);
