@@ -424,15 +424,15 @@ namespace osu.Game.Rulesets.BMS.UI
                     notification.Text = e.NewValue;
             }
 
-            beatmapManager.ScanProgress.BindValueChanged(onScanProgress, true);
-            beatmapManager.StatusMessage.BindValueChanged(onScanStatus, true);
+            manager.ScanProgress.BindValueChanged(onScanProgress, true);
+            manager.StatusMessage.BindValueChanged(onScanStatus, true);
 
             Task.Run(async () =>
             {
                 try
                 {
                     var result = await BmsLibraryImportPipeline.RunAsync(
-                        beatmapManager,
+                        manager,
                         storage,
                         realm,
                         new BMSRuleset().RulesetInfo,
@@ -477,8 +477,8 @@ namespace osu.Game.Rulesets.BMS.UI
                 }
                 finally
                 {
-                    beatmapManager.ScanProgress.ValueChanged -= onScanProgress;
-                    beatmapManager.StatusMessage.ValueChanged -= onScanStatus;
+                    manager.ScanProgress.ValueChanged -= onScanProgress;
+                    manager.StatusMessage.ValueChanged -= onScanStatus;
                 }
             });
         }
