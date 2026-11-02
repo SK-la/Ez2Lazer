@@ -245,7 +245,13 @@ namespace osu.Game.EzOsuGame.Edit
                 if (screen is EzSkinEditorPreviewManiaScreen || State.Value != Visibility.Visible)
                     return;
 
-                screen.Push(new EzSkinEditorPreviewManiaScreen(Workspace?.PreviewState.PreviewBeatmap, Workspace?.PreviewState.Ruleset.Value, Workspace?.PreviewManiaSettings));
+                if (Workspace == null)
+                    return;
+
+                screen.Push(new EzSkinEditorPreviewManiaScreen(
+                    Workspace.PreviewState.PreviewBeatmap,
+                    Workspace.PreviewState.Ruleset.Value,
+                    Workspace.PreviewManiaSettings));
             }, new[] { typeof(MainMenu) });
         }
 

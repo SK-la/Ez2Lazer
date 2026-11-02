@@ -95,6 +95,12 @@ namespace osu.Game.EzOsuGame.Edit
         private IBindable<WorkingBeatmap> gameBeatmap { get; set; } = null!;
 
         [Resolved]
+        private Bindable<RulesetInfo> gameRuleset { get; set; } = null!;
+
+        [Resolved]
+        private IRulesetStore rulesets { get; set; } = null!;
+
+        [Resolved]
         private RealmAccess realm { get; set; } = null!;
 
         [Resolved]
@@ -134,7 +140,6 @@ namespace osu.Game.EzOsuGame.Edit
 
         private EzSkinEditorBeatmapPicker? beatmapPicker;
 
-        private bool attemptedGlobalBeatmapPreview;
         private bool comparisonSnapshotInitialized;
         private Guid comparisonSnapshotSkinId;
         private bool noteSnapshotInitialized;
@@ -543,6 +548,9 @@ namespace osu.Game.EzOsuGame.Edit
 
             rememberedScene[EzSkinEditorSceneRegistry.GroupOf(change.NewValue)] = change.NewValue;
 
+            if (change.NewValue == EzSkinEditorSceneType.BeatmapPreview)
+                syncPreviewStateFromGlobalBeatmap();
+
             Schedule(() =>
             {
                 applyCurrentScene();
@@ -560,8 +568,14 @@ namespace osu.Game.EzOsuGame.Edit
         /// </summary>
         internal void RefreshPreviewScene()
         {
+            syncPreviewStateFromGlobalBeatmap();
             SceneApplied?.Invoke(sceneBar.CurrentScene.Value);
         }
+
+        /// <summary>
+        /// 用当前全局谱面刷新本地预览状态（不随机切谱）。进入全谱预览或全局谱面变化时调用。
+        /// </summary>
+        internal void SyncPreviewStateFromGlobalBeatmap() => syncPreviewStateFromGlobalBeatmap();
 
         public void ApplySettings() => applySettings();
 
@@ -585,7 +599,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void refreshScene()
         {
-            ensureGlobalBeatmapPreview();
+            syncPreviewStateFromGlobalBeatmap();
 
             ensureSkinIniSession();
             ensureSkinSpecificSceneVisibility();
@@ -599,20 +613,28 @@ namespace osu.Game.EzOsuGame.Edit
             menuBar.RefreshMenuState();
         }
 
-        private void ensureGlobalBeatmapPreview()
+        private void syncPreviewStateFromGlobalBeatmap()
         {
-            if (attemptedGlobalBeatmapPreview || PreviewState.HasBeatmapLoaded)
-                return;
-
-            attemptedGlobalBeatmapPreview = true;
-
             if (!EzSkinEditorBeatmapPicker.CanUseAsPreview(gameBeatmap.Value))
                 return;
 
-            if (gameBeatmap.Value.BeatmapInfo.Ruleset is not RulesetInfo ruleset)
+            if (gameBeatmap.Value.BeatmapInfo.Ruleset is not RulesetInfo beatmapRuleset)
                 return;
 
-            PreviewState.SetBeatmap(gameBeatmap.Value, ruleset, EzBeatmapPreviewModes.GetAppearanceLoadMode(ruleset));
+            RulesetInfo? ruleset = EzSkinEditorBeatmapPicker.ResolveRulesetForPreview(rulesets, beatmapRuleset, gameRuleset.Value);
+
+            if (ruleset == null)
+                return;
+
+            var working = gameBeatmap.Value;
+
+            if (PreviewState.HasBeatmapLoaded
+                && PreviewState.PreviewBeatmap!.BeatmapInfo.Hash == working.BeatmapInfo.Hash
+                && PreviewState.Ruleset.Value?.ShortName == ruleset.ShortName
+                && EzBeatmapPreviewModes.IsManiaRuleset(PreviewState.Ruleset.Value))
+                return;
+
+            PreviewState.SetBeatmap(working, ruleset, EzBeatmapPreviewModes.GetAppearanceLoadMode(ruleset));
         }
 
         private void selectBeatmapPreview(RulesetInfo ruleset)

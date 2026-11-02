@@ -37,6 +37,9 @@ namespace osu.Game.EzOsuGame.Edit.Screens
 
         private Container viewport = null!;
 
+        [Resolved]
+        private IRulesetStore rulesets { get; set; } = null!;
+
         public EzSkinEditorPreviewManiaScreen(IWorkingBeatmap? workingBeatmap, RulesetInfo? rulesetInfo, EzPreviewManiaSettings settings)
         {
             this.workingBeatmap = workingBeatmap;
@@ -84,7 +87,10 @@ namespace osu.Game.EzOsuGame.Edit.Screens
         /// </summary>
         public void SetSource(IWorkingBeatmap? beatmap, RulesetInfo? ruleset)
         {
-            if (ReferenceEquals(workingBeatmap, beatmap) && ReferenceEquals(rulesetInfo, ruleset))
+            bool unchanged = workingBeatmap?.BeatmapInfo.Hash == beatmap?.BeatmapInfo.Hash
+                             && rulesetInfo?.ShortName == ruleset?.ShortName;
+
+            if (unchanged)
                 return;
 
             workingBeatmap = beatmap;
@@ -100,7 +106,9 @@ namespace osu.Game.EzOsuGame.Edit.Screens
 
             viewport.Child = renderer;
 
-            if (workingBeatmap == null || rulesetInfo == null || !EzBeatmapPreviewModes.IsManiaRuleset(rulesetInfo))
+            RulesetInfo? ruleset = resolveRulesetForRender(rulesetInfo, workingBeatmap);
+
+            if (workingBeatmap == null || ruleset == null || !EzBeatmapPreviewModes.IsManiaRuleset(ruleset))
             {
                 viewport.Child = createPlaceholder(ManiaBeatmapPreviewStrings.BEATMAP_NOT_MANIA);
                 return;
@@ -110,7 +118,7 @@ namespace osu.Game.EzOsuGame.Edit.Screens
 
             try
             {
-                playableBeatmap = workingBeatmap.GetPlayableBeatmap(rulesetInfo);
+                playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset);
             }
             catch
             {
@@ -134,6 +142,14 @@ namespace osu.Game.EzOsuGame.Edit.Screens
         {
             if (viewport.Child is StaticFullMapPreviewRenderer renderer)
                 renderer.SetSettings(settings);
+        }
+
+        private RulesetInfo? resolveRulesetForRender(RulesetInfo? ruleset, IWorkingBeatmap? beatmap)
+        {
+            if (beatmap?.BeatmapInfo.Ruleset is not RulesetInfo beatmapRuleset)
+                return ruleset;
+
+            return EzSkinEditorBeatmapPicker.ResolveRulesetForPreview(rulesets, beatmapRuleset, ruleset) ?? ruleset;
         }
 
         private static OsuSpriteText createPlaceholder(LocalisableString text) => new OsuSpriteText

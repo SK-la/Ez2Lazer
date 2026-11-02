@@ -42,6 +42,25 @@ namespace osu.Game.EzOsuGame.Edit
             return working.BeatmapInfo.TotalObjectCount != 0;
         }
 
+        /// <summary>
+        /// Maps beatmap metadata or session ruleset to a store-backed <see cref="RulesetInfo"/> (valid <see cref="RulesetInfo.OnlineID"/>).
+        /// </summary>
+        public static RulesetInfo? ResolveRulesetForPreview(IRulesetStore rulesets, RulesetInfo beatmapRuleset, RulesetInfo? preferredRuleset = null)
+        {
+            if (rulesets.GetRuleset(beatmapRuleset.ShortName) is RulesetInfo fromBeatmapShortName)
+                return fromBeatmapShortName;
+
+            if (preferredRuleset != null
+                && preferredRuleset.ShortName == beatmapRuleset.ShortName
+                && preferredRuleset.Available)
+                return preferredRuleset;
+
+            if (beatmapRuleset.Available && beatmapRuleset.OnlineID >= 0)
+                return beatmapRuleset;
+
+            return null;
+        }
+
         public bool TryPickRandom(RulesetInfo ruleset, out IWorkingBeatmap? workingBeatmap)
         {
             workingBeatmap = null;
