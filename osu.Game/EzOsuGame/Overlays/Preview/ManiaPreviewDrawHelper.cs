@@ -4,18 +4,27 @@
 using System;
 using System.Collections.Generic;
 using osu.Framework.Extensions.Color4Extensions;
+using osu.Framework.Graphics;
+using osu.Game.EzOsuGame.Configuration;
 using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Overlays.Preview
 {
     /// <summary>
     /// Bottom of the drawable is map start; time progresses upward (mania scroll direction).
+    /// 颜色与厚度默认值以 <see cref="EzPreviewManiaSettings"/> 为唯一来源。
     /// </summary>
     public static class ManiaPreviewDrawHelper
     {
-        private static readonly Color4 tap_colour = new Color4(80, 150, 255, 230);
-        private static readonly Color4 hold_head_colour = new Color4(255, 80, 80, 235);
-        private static readonly Color4 hold_body_tail_colour = new Color4(255, 220, 70, 230);
+        private static Colour4 colourFor(EzPreviewManiaSettings settings, ManiaPreviewNoteKind kind) => settings.For(toPart(kind));
+
+        private static EzManiaNotePart toPart(ManiaPreviewNoteKind kind) => kind switch
+        {
+            ManiaPreviewNoteKind.HoldHead => EzManiaNotePart.HoldHead,
+            ManiaPreviewNoteKind.HoldBody => EzManiaNotePart.HoldBody,
+            ManiaPreviewNoteKind.HoldTail => EzManiaNotePart.HoldTail,
+            _ => EzManiaNotePart.Note,
+        };
 
         public static void AddLaneLines(List<PreviewQuad> quads, ManiaPreviewData data, float originX, float width, float height, float thickness)
         {
@@ -55,12 +64,13 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             float rowStep,
             float noteHeight,
             bool flatNotes,
+            EzPreviewManiaSettings settings,
             double timeOriginMs = double.NaN,
             double msPerRow = 0)
         {
             float laneWidth = width / Math.Max(1, totalColumns);
             float laneInset = laneWidth * 0.1f;
-            float headHeight = flatNotes ? Math.Max(1f, noteHeight * 0.55f) : noteHeight;
+            float headHeight = (flatNotes ? Math.Max(1f, noteHeight * 0.55f) : noteHeight) * settings.ThicknessScale.Value;
             bool mapTime = msPerRow > 0 && !double.IsNaN(timeOriginMs);
 
             float yAtTime(double time) => height - (float)((time - timeOriginMs) / msPerRow) * rowStep;
@@ -76,7 +86,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                     case ManiaPreviewNoteKind.Tap:
                     case ManiaPreviewNoteKind.HoldHead:
                     {
-                        quads.Add(new PreviewQuad(x, anchorY - headHeight, laneW, headHeight, getColour(entry.Kind)));
+                        quads.Add(new PreviewQuad(x, anchorY - headHeight, laneW, headHeight, colourFor(settings, entry.Kind)));
                         break;
                     }
 
@@ -86,7 +96,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                         float bodyTop = mapTime ? yAtTime(entry.EndTime) : GetSlotBottomY(entry.EndRow, rowStep, height);
                         float bodyBottom = anchorY - headHeight;
                         float h = Math.Max(1f, bodyBottom - bodyTop);
-                        quads.Add(new PreviewQuad(x, bodyTop, laneW, h, getColour(entry.Kind)));
+                        quads.Add(new PreviewQuad(x, bodyTop, laneW, h, colourFor(settings, entry.Kind)));
                         break;
                     }
                 }
@@ -105,14 +115,5 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             float noteHeight = rowStep * 0.5f;
             return (rowStep, noteHeight);
         }
-
-        private static Color4 getColour(ManiaPreviewNoteKind kind) => kind switch
-        {
-            ManiaPreviewNoteKind.Tap => tap_colour,
-            ManiaPreviewNoteKind.HoldHead => hold_head_colour,
-            ManiaPreviewNoteKind.HoldBody => hold_body_tail_colour,
-            ManiaPreviewNoteKind.HoldTail => hold_body_tail_colour,
-            _ => tap_colour,
-        };
     }
 }

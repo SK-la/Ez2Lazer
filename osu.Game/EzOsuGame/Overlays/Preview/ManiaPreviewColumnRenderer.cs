@@ -16,7 +16,8 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             ManiaPreviewColumnLayout layout,
             ManiaPreviewData data,
             int totalRows,
-            float panelHeight)
+            float panelHeight,
+            EzPreviewManiaSettings settings)
         {
             float laneLineThickness = Math.Max(0.5f, layout.ColumnWidth * 0.004f);
             float beatLineThickness = Math.Max(0.5f, layout.RowStep * 0.08f);
@@ -82,6 +83,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                     layout.RowStep,
                     layout.NoteHeight,
                     flatNotes: false,
+                    settings,
                     columnStart,
                     msPerRow);
             }

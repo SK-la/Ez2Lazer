@@ -19,6 +19,7 @@ using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Edit.Scenes;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Screens;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -232,9 +233,30 @@ namespace osu.Game.Tests.Visual.Edit
             switchScene(EzSkinEditorSceneType.GameplayHud);
             AddUntilStep("gameplay group rail syncs", () => rail.CurrentScene.Value == EzSkinEditorSceneType.GameplayHud);
 
-            // 切到选歌组：二级场景为 HUD 与（debug 下）谱面预览。
+            // 切到选歌组：二级场景为 HUD 与谱面预览。
             switchScene(EzSkinEditorSceneType.SongSelectHud);
             AddUntilStep("song select group rail syncs", () => rail.CurrentScene.Value == EzSkinEditorSceneType.SongSelectHud);
+            AddAssert("song select group lists beatmap preview", () =>
+                EzSkinEditorSceneRegistry.ForGroup(EzSkinEditorSceneGroup.SongSelect)
+                                          .Any(s => s.SceneType == EzSkinEditorSceneType.BeatmapPreview && s.IsAvailable));
+        }
+
+        [Test]
+        public void TestBeatmapPreviewSceneExposesFullMapAppearance()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.BeatmapPreview);
+
+            AddUntilStep("full-map appearance group present", () =>
+                editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Any());
+            AddUntilStep("four part colours", () =>
+                editorScreen.ChildrenOfType<EzSettingsColour>().Count() >= 4);
+            AddUntilStep("style dropdown present", () =>
+                editorScreen.ChildrenOfType<SettingsEnumDropdown<ManiaLongNoteStyle>>().Any());
+            AddUntilStep("thickness slider present", () =>
+                editorScreen.ChildrenOfType<SettingsSlider<float>>()
+                            .Any(s => s.LabelText.ToString() == ManiaBeatmapPreviewStrings.NOTE_THICKNESS.ToString()));
         }
 
         [Test]
@@ -976,7 +998,7 @@ namespace osu.Game.Tests.Visual.Edit
             {
                 var sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single();
                 return sidebar.ExpandedState.Value == false
-                       && sidebar.DrawWidth <= EzSkinEditorSidebarGroupRail.WIDTH + 1;
+                       && sidebar.DrawWidth <= EzVerticalRail.WIDTH + 1;
             });
             AddAssert("rail still present", () =>
                 editorScreen.ChildrenOfType<EzSkinEditorSidebarGroupRail>().Single().IsPresent);

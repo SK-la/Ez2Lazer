@@ -315,6 +315,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString GROUP_COLUMN_COLOURS = new EzLocalizationManager.EzLocalisableString("列配色", "Column colours");
 
+        public static readonly LocalisableString GROUP_BEATMAP_PREVIEW_MANIA = new EzLocalizationManager.EzLocalisableString("全谱外观", "Full-map appearance");
+
         public static readonly LocalisableString GROUP_GENERAL = new EzLocalizationManager.EzLocalisableString("General", "General");
 
         public static readonly LocalisableString GROUP_COLOURS = new EzLocalizationManager.EzLocalisableString("Colours", "Colours");
@@ -457,10 +459,10 @@ namespace osu.Game.EzOsuGame.Localization
             "皮肤专用场景布局预留。请在主工作区侧栏「专用」中编辑设置。",
             "Skin-specific scene layout is reserved. Edit settings under the workspace 「Scoped」 sidebar tab.");
 
-        // TODO: 谱面预览场景未实现：仅做全谱预览，用来修改每种 note 的颜色与厚度。
+        // TODO: 谱面预览场景未实现编辑：仅做全谱预览，之后用来修改每种 note 的颜色与厚度。
         public static readonly LocalisableString BEATMAP_PREVIEW_SCENE_PLACEHOLDER = new EzLocalizationManager.EzLocalisableString(
-            "谱面预览场景布局预留。仅全谱预览，之后用来修改每种 note 的颜色、厚度。",
-            "Beatmap preview scene layout is reserved. Full-beatmap preview only; will edit each note colour and thickness later.");
+            "谱面预览场景：插屏渲染 mania 全谱。之后用来修改每种 note 的颜色、厚度。",
+            "Beatmap preview scene: renders the full mania chart in a plugged screen. Will edit each note colour and thickness later.");
 
         #endregion
 

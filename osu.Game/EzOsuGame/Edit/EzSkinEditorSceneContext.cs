@@ -7,6 +7,7 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Note;
+using osu.Game.EzOsuGame.Overlays.Preview;
 using osu.Game.Rulesets;
 using osu.Game.Skinning;
 
@@ -85,6 +86,11 @@ namespace osu.Game.EzOsuGame.Edit
         public EzSkinEditorNoteEditSession? NoteSession { get; init; }
 
         public EzSkinEditorNoteEditSnapshot? NoteSnapshot { get; init; }
+
+        /// <summary>
+        /// 全谱预览绘制外观（谱面预览场景侧栏）。独立于 Ez2Setting / skin.ini。
+        /// </summary>
+        public EzPreviewManiaSettings? BeatmapPreviewManiaSettings { get; init; }
 
         public Action? CreateNoteSnapshot { get; init; }
 
