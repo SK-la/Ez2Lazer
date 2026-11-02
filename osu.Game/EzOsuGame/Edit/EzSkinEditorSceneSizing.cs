@@ -19,28 +19,31 @@ namespace osu.Game.EzOsuGame.Edit
         /// <summary>
         /// Returns the scene rectangle in relative window coordinates (0..1 on both axes). The scene
         /// is the largest square sharing the window's aspect ratio that fits inside the area left
-        /// below <paramref name="toolbarHeight"/> and left of <paramref name="railWidth"/>. Relative
-        /// coordinates scale equally on each axis, so giving both axes the same size fraction yields
-        /// an on-screen rect with the window's ratio.
-        /// The scene is anchored to the left edge but centred vertically in the available area. Left
-        /// anchoring keeps it still when toggling the sidebar's pin (which changes the reserved width);
-        /// vertical centring balances it against the toolbar.
+        /// below <paramref name="toolbarHeight"/> and between the fixed left scene rail and the
+        /// reserved sidebar width. Relative coordinates scale equally on each axis, so giving both
+        /// axes the same size fraction yields an on-screen rect with the window's ratio.
+        /// The scene is centred horizontally in the space between the two rails (so it stays put when
+        /// the sidebar's reserved width changes only while the space still fits the scene), and centred
+        /// vertically in the available area to balance it against the toolbar.
         /// </summary>
-        public static RectangleF ComputeSceneRect(Vector2 windowSize, float toolbarHeight, float railWidth)
+        public static RectangleF ComputeSceneRect(Vector2 windowSize, float toolbarHeight, float leftRailWidth, float rightRailWidth)
         {
             if (windowSize.X <= 0 || windowSize.Y <= 0)
                 return new RectangleF(0, 0, 1, 1);
 
             float relativeTop = (toolbarHeight + PADDING) / windowSize.Y;
-            float relativeRail = railWidth / windowSize.X;
+            float relativeLeft = leftRailWidth / windowSize.X;
+            float relativeRight = rightRailWidth / windowSize.X;
 
-            float availableWidth = 1f - relativeRail;
+            float availableWidth = 1f - relativeLeft - relativeRight;
             float availableHeight = 1f - relativeTop - PADDING / windowSize.Y;
 
             float size = Math.Max(0, Math.Min(availableWidth, availableHeight));
+
+            float offsetX = relativeLeft + (availableWidth - size) / 2f;
             float offsetY = relativeTop + (availableHeight - size) / 2f;
 
-            return new RectangleF(0, offsetY, size, size);
+            return new RectangleF(offsetX, offsetY, size, size);
         }
     }
 }

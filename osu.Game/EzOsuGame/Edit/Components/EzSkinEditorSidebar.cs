@@ -40,7 +40,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// <summary>
         /// 设置面板展开时的视觉总宽（内容 + 轨）。布局占位始终仅为轨宽。
         /// </summary>
-        public static float ExpandedWidthWithRail => CONTENT_WIDTH + EzSkinEditorSidebarGroupRail.WIDTH;
+        public static float ExpandedWidthWithRail => CONTENT_WIDTH + EzVerticalRail.WIDTH;
 
         private Container contentPanel = null!;
         private Container footerContainer = null!;
@@ -100,7 +100,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// 侧边栏折叠或未预留空间时返回 0。
         /// </summary>
         public float VisiblePanelReserve =>
-            Math.Max(0, EzSkinEditorSidebarGroupRail.WIDTH + (CONTENT_WIDTH - padding) * contentPanel.Alpha - ReservedLayoutWidth);
+            Math.Max(0, EzVerticalRail.WIDTH + (CONTENT_WIDTH - padding) * contentPanel.Alpha - ReservedLayoutWidth);
 
         internal float FooterReservedHeight => footerContainer.Height;
 
@@ -124,7 +124,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                     Icon = FontAwesome.Solid.Cog,
                     Origin = Anchor.TopRight,
                     Anchor = Anchor.TopRight,
-                    Margin = new MarginPadding { Right = EzSkinEditorSidebarGroupRail.WIDTH + 5, Top = 5 },
+                    Margin = new MarginPadding { Right = EzVerticalRail.WIDTH + 5, Top = 5 },
                     AlwaysPresent = true,
                     Action = () => ExpandedState.Value = true,
                 },
@@ -133,7 +133,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 {
                     Anchor = Anchor.TopRight,
                     Origin = Anchor.TopRight,
-                    Margin = new MarginPadding { Right = EzSkinEditorSidebarGroupRail.WIDTH },
+                    Margin = new MarginPadding { Right = EzVerticalRail.WIDTH },
                     RelativeSizeAxes = Axes.Y,
                     Width = CONTENT_WIDTH,
                     BypassAutoSizeAxes = Axes.Both,

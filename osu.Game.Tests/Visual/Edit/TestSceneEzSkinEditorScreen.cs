@@ -26,6 +26,7 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Settings;
+using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.EzMania.Editor;
 using osu.Game.Screens.Edit.Components.Menus;
@@ -54,29 +55,29 @@ namespace osu.Game.Tests.Visual.Edit
         [Test]
         public void TestSceneRegistryMapsCurrentScreenOrFallsBackToGameplay()
         {
-            AddAssert("main menu falls back to gameplay", () => EzSkinEditorSceneRegistry.ResolveCurrentScene(typeof(MainMenu)) == EzSkinEditorSceneType.Gameplay);
-            AddAssert("player maps to gameplay", () => EzSkinEditorSceneRegistry.ResolveCurrentScene(typeof(Player)) == EzSkinEditorSceneType.Gameplay);
-            AddAssert("song select maps to song select", () => EzSkinEditorSceneRegistry.ResolveCurrentScene(typeof(SoloSongSelect)) == EzSkinEditorSceneType.SongSelect);
+            AddAssert("main menu falls back to gameplay", () => EzSkinEditorSceneRegistry.ResolveCurrentScene(typeof(MainMenu)) == EzSkinEditorSceneType.GameplayHud);
+            AddAssert("player maps to gameplay", () => EzSkinEditorSceneRegistry.ResolveCurrentScene(typeof(Player)) == EzSkinEditorSceneType.GameplayHud);
+            AddAssert("song select maps to song select", () => EzSkinEditorSceneRegistry.ResolveCurrentScene(typeof(SoloSongSelect)) == EzSkinEditorSceneType.SongSelectHud);
         }
 
         [Test]
         public void TestSceneRegistryIsSingleHudCapabilitySource()
         {
-            AddAssert("gameplay supports hud", () => EzSkinEditorSceneRegistry.SupportsHudLayer(EzSkinEditorSceneType.Gameplay));
-            AddAssert("song select supports hud", () => EzSkinEditorSceneRegistry.SupportsHudLayer(EzSkinEditorSceneType.SongSelect));
+            AddAssert("gameplay supports hud", () => EzSkinEditorSceneRegistry.SupportsHudLayer(EzSkinEditorSceneType.GameplayHud));
+            AddAssert("song select supports hud", () => EzSkinEditorSceneRegistry.SupportsHudLayer(EzSkinEditorSceneType.SongSelectHud));
             AddAssert("appearance has no hud", () => !EzSkinEditorSceneRegistry.SupportsHudLayer(EzSkinEditorSceneType.Appearance));
             AddAssert("note has no hud", () => !EzSkinEditorSceneRegistry.SupportsHudLayer(EzSkinEditorSceneType.Note));
 
             AddAssert("gameplay offers ez hud + ruleset layers", () =>
             {
-                var layers = EzSkinEditorLayerOptions.For(EzSkinEditorSceneType.Gameplay);
+                var layers = EzSkinEditorLayerOptions.For(EzSkinEditorSceneType.GameplayHud);
                 return layers.Any(d => d.Layer == EzSkinEditorLayer.EzHud)
                        && layers.Any(d => d.Layer == EzSkinEditorLayer.EzHudRuleset)
                        && layers.Any(d => d.Layer == EzSkinEditorLayer.EzPlayfieldRuleset);
             });
             AddAssert("song select offers only global ez hud", () =>
             {
-                var layers = EzSkinEditorLayerOptions.For(EzSkinEditorSceneType.SongSelect);
+                var layers = EzSkinEditorLayerOptions.For(EzSkinEditorSceneType.SongSelectHud);
                 return layers.Any(d => d.Layer == EzSkinEditorLayer.EzHud) && !layers.Any(d => d.RulesetScoped);
             });
             AddAssert("appearance offers full layers (shown but not editable)", () =>
@@ -89,27 +90,27 @@ namespace osu.Game.Tests.Visual.Edit
 
             AddAssert("global ez hud targets main hud without ruleset", () =>
             {
-                var lookup = EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.Gameplay, EzSkinEditorLayer.EzHud, new ManiaRuleset().RulesetInfo);
+                var lookup = EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.GameplayHud, EzSkinEditorLayer.EzHud, new ManiaRuleset().RulesetInfo);
                 return lookup is { Ruleset: null, Lookup: GlobalSkinnableContainers.MainHUDComponents };
             });
             AddAssert("ruleset hud targets main hud with ruleset", () =>
             {
                 var ruleset = new ManiaRuleset().RulesetInfo;
-                var lookup = EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.Gameplay, EzSkinEditorLayer.EzHudRuleset, ruleset);
+                var lookup = EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.GameplayHud, EzSkinEditorLayer.EzHudRuleset, ruleset);
                 return lookup != null && ReferenceEquals(lookup.Ruleset, ruleset) && lookup.Lookup == GlobalSkinnableContainers.MainHUDComponents;
             });
             AddAssert("ruleset playfield targets playfield", () =>
             {
-                var lookup = EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.Gameplay, EzSkinEditorLayer.EzPlayfieldRuleset, new ManiaRuleset().RulesetInfo);
+                var lookup = EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.GameplayHud, EzSkinEditorLayer.EzPlayfieldRuleset, new ManiaRuleset().RulesetInfo);
                 return lookup != null && lookup.Lookup == GlobalSkinnableContainers.Playfield;
             });
             AddAssert("song select resolves its own container", () =>
             {
-                var lookup = EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.SongSelect, EzSkinEditorLayer.EzHud, new ManiaRuleset().RulesetInfo);
+                var lookup = EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.SongSelectHud, EzSkinEditorLayer.EzHud, new ManiaRuleset().RulesetInfo);
                 return lookup != null && lookup.Lookup == GlobalSkinnableContainers.SongSelect;
             });
             AddAssert("hud off has no editing target", () =>
-                EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.Gameplay, EzSkinEditorLayer.HudOff, new ManiaRuleset().RulesetInfo) == null);
+                EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.GameplayHud, EzSkinEditorLayer.HudOff, new ManiaRuleset().RulesetInfo) == null);
 
             AddAssert("ruleset layer label shows the ruleset name once", () =>
             {
@@ -202,7 +203,63 @@ namespace osu.Game.Tests.Visual.Edit
                 !EzSkinEditorSceneRegistry.All.Any(s => s.SceneType.ToString() is "Size" or "Colour"));
             AddAssert("hud layer present", () => editorScreen.ChildrenOfType<EzSkinEditorHudLayer>().Any());
             AddAssert("song select is first scene", () =>
-                EzSkinEditorSceneRegistry.All[0].SceneType == EzSkinEditorSceneType.SongSelect);
+                EzSkinEditorSceneRegistry.All[0].SceneType == EzSkinEditorSceneType.SongSelectHud);
+            AddUntilStep("secondary scene rail visible", () =>
+                editorScreen.ChildrenOfType<EzSkinEditorSceneRail>().SingleOrDefault() is { Alpha: > 0, DrawHeight: > 1, DrawWidth: > 1 });
+            AddAssert("scene bar lists both groups", () =>
+            {
+                var texts = editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Single()
+                                        .ChildrenOfType<SkinEditorSceneLibrary.SceneButton>()
+                                        .Select(b => b.Text.ToString())
+                                        .ToArray();
+
+                return texts.Contains(EzEditorStrings.SCENE_GROUP_SONG_SELECT.ToString())
+                       && texts.Contains(EzEditorStrings.SCENE_GROUP_GAMEPLAY.ToString());
+            });
+        }
+
+        [Test]
+        public void TestSceneRailListsGroupScenes()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            var rail = (EzSkinEditorSceneRail)null!;
+
+            AddStep("capture rail", () => rail = editorScreen.ChildrenOfType<EzSkinEditorSceneRail>().Single());
+
+            // 游玩组二级场景：HUD、外观、Note、skin.ini。
+            switchScene(EzSkinEditorSceneType.GameplayHud);
+            AddUntilStep("gameplay group rail syncs", () => rail.CurrentScene.Value == EzSkinEditorSceneType.GameplayHud);
+
+            // 切到选歌组：二级场景为 HUD 与（debug 下）谱面预览。
+            switchScene(EzSkinEditorSceneType.SongSelectHud);
+            AddUntilStep("song select group rail syncs", () => rail.CurrentScene.Value == EzSkinEditorSceneType.SongSelectHud);
+        }
+
+        [Test]
+        public void TestSceneRailSwitchesScene()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            var rail = (EzSkinEditorSceneRail)null!;
+
+            AddStep("capture rail", () => rail = editorScreen.ChildrenOfType<EzSkinEditorSceneRail>().Single());
+            switchScene(EzSkinEditorSceneType.GameplayHud);
+
+            // 点击左栏按钮切换到另一二级场景，场景值应跟随（程序化改索引不触发切换）。
+            AddStep("click note rail button", () =>
+            {
+                int noteIndex = EzSkinEditorSceneRegistry.ForGroup(EzSkinEditorSceneGroup.Gameplay)
+                                                         .ToList()
+                                                         .FindIndex(s => s.SceneType == EzSkinEditorSceneType.Note);
+
+                var button = rail.ChildrenOfType<EzButton>().ElementAt(noteIndex);
+                InputManager.MoveMouseTo(button);
+                InputManager.Click(MouseButton.Left);
+            });
+            AddUntilStep("scene switched to note", () => editorScreen.CurrentScene.Value == EzSkinEditorSceneType.Note);
         }
 
         [Test]
@@ -210,7 +267,7 @@ namespace osu.Game.Tests.Visual.Edit
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
-            switchScene(EzSkinEditorSceneType.Gameplay);
+            switchScene(EzSkinEditorSceneType.GameplayHud);
 
             var bar = (EzSkinEditorSceneBar)null!;
             var layer = (EzEditorLayerButton)null!;
@@ -258,7 +315,7 @@ namespace osu.Game.Tests.Visual.Edit
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
-            switchScene(EzSkinEditorSceneType.Gameplay);
+            switchScene(EzSkinEditorSceneType.GameplayHud);
 
             var sceneBar = (EzSkinEditorSceneBar)null!;
             var hud = (EzSkinEditorHudLayer)null!;
@@ -279,7 +336,7 @@ namespace osu.Game.Tests.Visual.Edit
             switchScene(EzSkinEditorSceneType.Appearance);
             AddUntilStep("appearance interaction off", () => !hud.InteractionEnabled.Value);
 
-            switchScene(EzSkinEditorSceneType.Gameplay);
+            switchScene(EzSkinEditorSceneType.GameplayHud);
             AddStep("hide hud layer", () => sceneBar.ActiveLayer.Value = EzSkinEditorLayer.HudOff);
             AddUntilStep("interaction off layer hidden", () => !hud.InteractionEnabled.Value);
             AddUntilStep("layer-off hint", () =>
@@ -292,7 +349,7 @@ namespace osu.Game.Tests.Visual.Edit
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
-            switchScene(EzSkinEditorSceneType.Gameplay);
+            switchScene(EzSkinEditorSceneType.GameplayHud);
 
             var sceneBar = (EzSkinEditorSceneBar)null!;
             var hud = (EzSkinEditorHudLayer)null!;
@@ -305,7 +362,7 @@ namespace osu.Game.Tests.Visual.Edit
 
             AddStep("select global ez hud", () => sceneBar.ActiveLayer.Value = EzSkinEditorLayer.EzHud);
             AddUntilStep("ez hud resolves the global gameplay lookup", () =>
-                EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.Gameplay, EzSkinEditorLayer.EzHud, null) is { } globalLookup
+                EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.GameplayHud, EzSkinEditorLayer.EzHud, null) is { } globalLookup
                 && globalLookup.Lookup == GlobalSkinnableContainers.MainHUDComponents
                 && globalLookup.Ruleset == null);
 
@@ -314,7 +371,7 @@ namespace osu.Game.Tests.Visual.Edit
             {
                 var ruleset = new ManiaRuleset().RulesetInfo;
                 return hud.LayerVisible.Value
-                       && EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.Gameplay, EzSkinEditorLayer.EzHudRuleset, ruleset) is { } rulesetLookup
+                       && EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.GameplayHud, EzSkinEditorLayer.EzHudRuleset, ruleset) is { } rulesetLookup
                        && rulesetLookup.Ruleset != null
                        && rulesetLookup.Lookup == GlobalSkinnableContainers.MainHUDComponents;
             });
@@ -322,18 +379,18 @@ namespace osu.Game.Tests.Visual.Edit
             AddStep("select hud off", () => sceneBar.ActiveLayer.Value = EzSkinEditorLayer.HudOff);
             AddUntilStep("layer hidden", () => !hud.LayerVisible.Value);
             AddUntilStep("no editing lookup when hidden", () =>
-                EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.Gameplay, EzSkinEditorLayer.HudOff, null) == null);
+                EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.GameplayHud, EzSkinEditorLayer.HudOff, null) == null);
         }
 
         [Test]
         public void TestSongSelectSceneResolvesItsOwnContainer()
         {
             AddAssert("song select layer resolves to the song select container", () =>
-                EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.SongSelect, EzSkinEditorLayer.EzHud, null) is { } lookup
+                EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.SongSelectHud, EzSkinEditorLayer.EzHud, null) is { } lookup
                 && lookup.Lookup == GlobalSkinnableContainers.SongSelect);
 
             AddAssert("song select hides everything on hud off", () =>
-                EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.SongSelect, EzSkinEditorLayer.HudOff, null) == null);
+                EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.SongSelectHud, EzSkinEditorLayer.HudOff, null) == null);
 
             AddAssert("appearance has no editable hud", () =>
                 EzSkinEditorLayerOptions.ResolveLookup(EzSkinEditorSceneType.Appearance, EzSkinEditorLayer.EzHud, null) == null);
@@ -344,7 +401,7 @@ namespace osu.Game.Tests.Visual.Edit
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
-            switchScene(EzSkinEditorSceneType.Gameplay);
+            switchScene(EzSkinEditorSceneType.GameplayHud);
 
             var sceneBar = (EzSkinEditorSceneBar)null!;
             var hud = (EzSkinEditorHudLayer)null!;
@@ -405,13 +462,13 @@ namespace osu.Game.Tests.Visual.Edit
             AddAssert("layer not forced off on appearance", () => sceneBar.ActiveLayer.Value != EzSkinEditorLayer.HudOff);
             AddAssert("layer visible on appearance", () => hud.LayerVisible.Value);
 
-            switchScene(EzSkinEditorSceneType.Gameplay);
+            switchScene(EzSkinEditorSceneType.GameplayHud);
             AddAssert("layer still visible on gameplay", () => hud.LayerVisible.Value);
             AddAssert("layer not hidden on gameplay", () => sceneBar.ActiveLayer.Value != EzSkinEditorLayer.HudOff);
 
             AddStep("select global ez hud", () => sceneBar.ActiveLayer.Value = EzSkinEditorLayer.EzHud);
             switchScene(EzSkinEditorSceneType.Appearance);
-            switchScene(EzSkinEditorSceneType.Gameplay);
+            switchScene(EzSkinEditorSceneType.GameplayHud);
             AddAssert("layer choice preserved across scenes", () => sceneBar.ActiveLayer.Value == EzSkinEditorLayer.EzHud);
         }
 
@@ -420,7 +477,7 @@ namespace osu.Game.Tests.Visual.Edit
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
-            switchScene(EzSkinEditorSceneType.Gameplay);
+            switchScene(EzSkinEditorSceneType.GameplayHud);
 
             var sceneBar = (EzSkinEditorSceneBar)null!;
 
@@ -445,7 +502,7 @@ namespace osu.Game.Tests.Visual.Edit
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
-            switchScene(EzSkinEditorSceneType.Gameplay);
+            switchScene(EzSkinEditorSceneType.GameplayHud);
 
             var picker = (EzSkinEditorComponentPickerWindow)null!;
 
@@ -469,7 +526,7 @@ namespace osu.Game.Tests.Visual.Edit
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
-            switchScene(EzSkinEditorSceneType.Gameplay);
+            switchScene(EzSkinEditorSceneType.GameplayHud);
 
             var picker = (EzSkinEditorComponentPickerWindow)null!;
 
@@ -522,7 +579,7 @@ namespace osu.Game.Tests.Visual.Edit
 
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
-            switchScene(EzSkinEditorSceneType.Gameplay);
+            switchScene(EzSkinEditorSceneType.GameplayHud);
 
             var picker = (EzSkinEditorComponentPickerWindow)null!;
 
@@ -549,7 +606,7 @@ namespace osu.Game.Tests.Visual.Edit
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
-            switchScene(EzSkinEditorSceneType.Gameplay);
+            switchScene(EzSkinEditorSceneType.GameplayHud);
 
             var picker = (EzSkinEditorComponentPickerWindow)null!;
 
@@ -583,7 +640,7 @@ namespace osu.Game.Tests.Visual.Edit
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
-            switchScene(EzSkinEditorSceneType.Gameplay);
+            switchScene(EzSkinEditorSceneType.GameplayHud);
 
             var picker = (EzSkinEditorComponentPickerWindow)null!;
 
@@ -619,7 +676,7 @@ namespace osu.Game.Tests.Visual.Edit
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
-            switchScene(EzSkinEditorSceneType.Gameplay);
+            switchScene(EzSkinEditorSceneType.GameplayHud);
 
             var hud = (EzSkinEditorHudLayer)null!;
 
@@ -888,7 +945,7 @@ namespace osu.Game.Tests.Visual.Edit
                             .Any(c => c.LabelText.ToString() == EzEditorStrings.SIDEBAR_PIN_LABEL.ToString()));
 
             // 切场景会重建侧栏分组，固定开关不能随旧分组一起消失。
-            switchScene(EzSkinEditorSceneType.Gameplay);
+            switchScene(EzSkinEditorSceneType.GameplayHud);
             AddUntilStep("pin switch still shown on gameplay", () =>
                 editorScreen.ChildrenOfType<SettingsCheckbox>()
                             .Any(c => c.LabelText.ToString() == EzEditorStrings.SIDEBAR_PIN_LABEL.ToString()));
@@ -935,7 +992,7 @@ namespace osu.Game.Tests.Visual.Edit
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
-            switchScene(EzSkinEditorSceneType.Gameplay);
+            switchScene(EzSkinEditorSceneType.GameplayHud);
 
             var sidebar = (EzSkinEditorSidebar)null!;
 
@@ -986,7 +1043,7 @@ namespace osu.Game.Tests.Visual.Edit
             AddUntilStep("appearance hover expands", () => sidebar.ExpandedState.Value);
 
             // HUD 场景悬停不唤出，避免面板盖住正在拖拽组件的游玩区。
-            switchScene(EzSkinEditorSceneType.Gameplay);
+            switchScene(EzSkinEditorSceneType.GameplayHud);
             AddStep("collapse sidebar", () => sidebar.ExpandedState.Value = false);
             AddStep("hover rail", () => InputManager.MoveMouseTo(rail));
             AddWaitStep("wait for hover ticks", 5);

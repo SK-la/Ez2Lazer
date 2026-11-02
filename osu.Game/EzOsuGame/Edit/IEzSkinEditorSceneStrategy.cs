@@ -16,7 +16,19 @@ namespace osu.Game.EzOsuGame.Edit
     {
         EzSkinEditorSceneType SceneType { get; }
 
+        /// <summary>
+        /// Top-level group this scene belongs to. Drives which scene-bar group is highlighted and
+        /// which secondary scenes the left rail lists.
+        /// </summary>
+        EzSkinEditorSceneGroup Group { get; }
+
         LocalisableString TabTitle { get; }
+
+        /// <summary>
+        /// Static availability (e.g. debug-only scenes). Runtime visibility is driven separately by
+        /// the screen calling <c>SetSceneVisible</c>.
+        /// </summary>
+        bool IsAvailable => true;
 
         IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context);
 
