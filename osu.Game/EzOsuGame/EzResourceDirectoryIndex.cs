@@ -163,6 +163,9 @@ namespace osu.Game.EzOsuGame
         private EzFrameGroup? frozenHyphen3;
         private bool frozen;
 
+        // 三位且没有前导 0（100–999）。同前缀有没有补零帧，要等这个目录的文件都登记完才知道。
+        private readonly List<(string Prefix, int Index, string Key)> pendingWideFrames = new List<(string Prefix, int Index, string Key)>();
+
         public EzResourceDirectory(string directory)
         {
             Directory = directory;
@@ -247,6 +250,7 @@ namespace osu.Game.EzOsuGame
                 registerFrame(fileName, key);
             }
 
+            resolvePendingWideFrames();
             pendingFiles.Clear();
             freezeFrames();
         }
@@ -344,9 +348,20 @@ namespace osu.Game.EzOsuGame
 
             int width = frameWidth(digits);
 
+            if (width < 0)
+            {
+                pendingWideFrames.Add((prefix, index, key));
+                return;
+            }
+
             if (width == 0)
                 return;
 
+            addFrame(prefix, index, key, width);
+        }
+
+        private void addFrame(string prefix, int index, string key, int width)
+        {
             Dictionary<string, EzFrameGroup> table = width == 3 ? frames3 : frames1;
 
             if (table.TryGetValue(prefix, out EzFrameGroup? existing))
@@ -360,14 +375,25 @@ namespace osu.Game.EzOsuGame
             table[prefix] = group;
         }
 
+        // 100–999 本身看不出补零。同前缀已有 000–099 时并入 {000}，否则并入不补零的 {0}。
+        // 按位数直接放进 {000} 时，0..119 会在第 99 帧被截断，循环就从半路跳回第 0 帧。
+        private void resolvePendingWideFrames()
+        {
+            foreach ((string prefix, int index, string key) in pendingWideFrames)
+                addFrame(prefix, index, key, frames3.ContainsKey(prefix) ? 3 : 1);
+
+            pendingWideFrames.Clear();
+        }
+
         private static bool isHyphenPrefix(string prefix)
             => prefix.Length > 0 && (prefix[^1] == '-' || prefix[^1] == '_');
 
-        // {000} 是恰好三位。{0} 是不补零：一位，或更长且没有前导 0（10、11）。{00} 不建组。
+        // {000} 是恰好三位且有前导 0。{0} 是不补零：一位，或更长且没有前导 0（10、11、1000）。
+        // 恰好三位但没有前导 0（100–999）先返回 -1，等见过同前缀的其他帧再归组。{00} 不建组。
         private static int frameWidth(string digits)
         {
             if (digits.Length == 3)
-                return 3;
+                return digits[0] == '0' ? 3 : -1;
 
             if (digits.Length == 1 || digits[0] != '0')
                 return 1;

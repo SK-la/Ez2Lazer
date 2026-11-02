@@ -155,6 +155,50 @@ namespace osu.Game.Tests.EzOsuGame.Textures
         }
 
         [Test]
+        public void UnpaddedSequenceKeepsFramesPast99()
+        {
+            AddStep("准备资源", createResourceStore);
+
+            AddStep("不补零 0..119", () =>
+            {
+                for (int i = 0; i < 120; i++)
+                    writePng($"EzResources/Stage/Over/Over_{i}.png", 10 + i);
+            });
+
+            AddAssert("100 及以上仍留在同一段，不在 99 截断", () =>
+            {
+                int[] expected = new int[120];
+
+                for (int i = 0; i < expected.Length; i++)
+                    expected[i] = 10 + i;
+
+                return expect(expected, "Stage/Over/Over");
+            });
+        }
+
+        [Test]
+        public void PaddedSequenceKeepsFramesPast99()
+        {
+            AddStep("准备资源", createResourceStore);
+
+            AddStep("补零 000..104", () =>
+            {
+                for (int i = 0; i < 105; i++)
+                    writePng($"EzResources/Stage/Pad/Pad_{i:D3}.png", 20 + i);
+            });
+
+            AddAssert("100 及以上并入补零段", () =>
+            {
+                int[] expected = new int[105];
+
+                for (int i = 0; i < expected.Length; i++)
+                    expected[i] = 20 + i;
+
+                return expect(expected, "Stage/Pad/Pad");
+            });
+        }
+
+        [Test]
         public void FrameWindowTruncatesAtGap()
         {
             AddStep("准备资源", createResourceStore);
