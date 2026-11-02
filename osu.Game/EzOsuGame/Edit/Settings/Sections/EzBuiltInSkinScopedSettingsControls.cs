@@ -56,6 +56,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 
                 case EzSkinEditorSkinKind.SbI:
                     children.AddRange(createLnSettings());
+                    children.Add(createNoteCornerRadiusSlider());
                     break;
             }
 
@@ -134,6 +135,14 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             LabelText = EzSkinStrings.NOTE_TRACK_LINE,
             TooltipText = EzSkinStrings.NOTE_TRACK_LINE_TOOLTIP,
             Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteTrackLineHeight),
+        };
+
+        private Drawable createNoteCornerRadiusSlider() => new SettingsSlider<double>
+        {
+            LabelText = EzSkinStrings.NOTE_CORNER_RADIUS,
+            TooltipText = EzSkinStrings.NOTE_CORNER_RADIUS_TOOLTIP,
+            Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteCornerRadius),
+            KeyboardStep = 1.0f,
         };
     }
 }

@@ -38,9 +38,9 @@ namespace osu.Game.EzOsuGame.Edit
             Ez2Setting.HitTargetFloatFixed,
             Ez2Setting.HitTargetAlpha,
             Ez2Setting.NoteHeightScaleToWidth,
-            Ez2Setting.NoteCornerRadius,
 
             // Skin-specific
+            Ez2Setting.NoteCornerRadius,
             Ez2Setting.ManiaLNGradientEnable,
             Ez2Setting.ManiaHoldTailMaskDynamicEnable,
             Ez2Setting.ManiaHoldTailMaskGradientHeight,

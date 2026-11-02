@@ -67,13 +67,6 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                     Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth),
                     KeyboardStep = 0.1f,
                 },
-                new SettingsSlider<double>
-                {
-                    LabelText = EzSkinStrings.NOTE_CORNER_RADIUS,
-                    TooltipText = EzSkinStrings.NOTE_CORNER_RADIUS_TOOLTIP,
-                    Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteCornerRadius),
-                    KeyboardStep = 1.0f,
-                },
             };
         }
     }
