@@ -680,6 +680,7 @@ namespace osu.Game.EzOsuGame.Edit
             if (SkinIniSession is { IsSupported: true, IsDirty: true })
                 SkinIniSession.Commit();
 
+            refreshScene();
             invalidateResourceCaches();
             skinManager.CurrentSkinInfo.TriggerChange();
             refreshScene();
@@ -780,12 +781,12 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
 
             SkinIniSession.Commit();
+            refreshScene();
             invalidateResourceCaches();
             refreshScene();
         }
 
-        // 用户可能在我们开着编辑器时往 EzResources 里丢/换图。保存与应用皮肤是用户主动的冷入口，
-        // 在这里丢弃目录索引、帧解析缓存与动画/大图两页，新文件才会立刻出现在预览里（与资源选择器同一套做法）。
+        // 用户可能在我们开着编辑器时往 EzResources 里丢/换图。须先 refresh 让旧预览 Drawable 下树，再 ClearCache 动画池，最后再 refresh 取新图。
         private void invalidateResourceCaches() => resource.InvalidateResourceCaches();
 
         private bool isSkinIniSupported() => EzSkinIniSupport.IsSupported(skinManager.CurrentSkinInfo.Value);
@@ -1007,6 +1008,7 @@ namespace osu.Game.EzOsuGame.Edit
                 if (SkinIniSession is { IsDirty: true })
                 {
                     SkinIniSession.Commit();
+                    refreshScene();
                     invalidateResourceCaches();
                     committedSkinIni = true;
                 }

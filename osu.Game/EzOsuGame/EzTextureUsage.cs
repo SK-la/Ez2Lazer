@@ -14,9 +14,8 @@ namespace osu.Game.EzOsuGame
         Atlas,
 
         /// <summary>
-        /// 多帧 / 循环动画帧：独立 GPU 纹理、Dispose 为空操作。
-        /// 可安全交给 <see cref="Framework.Graphics.Animations.TextureAnimation"/>。
-        /// 禁止与 <see cref="Large"/> 混淆——Large 的引用计数会在切帧 Dispose 后 Purge。
+        /// 多帧 / 循环动画帧：独立非图集池，缓存内纹理稳定、不按引用 Purge。
+        /// 单帧大图用 <see cref="Large"/>。
         /// </summary>
         AnimationSafe,
 

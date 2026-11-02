@@ -2,10 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
@@ -26,9 +24,6 @@ namespace osu.Game.EzOsuGame
         private const int max_note_frames = 60;
 
         private const double default_frame_length = 1000.0 / 60.0 * 4;
-        private const float square_ratio_threshold = 0.75f;
-
-        private static readonly ConcurrentDictionary<string, float> note_ratio_cache = new ConcurrentDictionary<string, float>();
 
         private readonly Ez2ConfigManager ezConfig;
         private readonly EzResourceStore resource;
@@ -197,38 +192,7 @@ namespace osu.Game.EzOsuGame
         }
 
         public float GetRatio(bool forceRecalculate = false)
-        {
-            string noteSet = noteSetName.Value;
-
-            // 如果强制重新计算或缓存中没有，则重新计算
-            if (forceRecalculate || !note_ratio_cache.TryGetValue(noteSet, out float ratio))
-            {
-                string notePath = GetNotePath("whitenote");
-                Texture? note = GetNoteTexture(notePath);
-                float calculatedRatio = 1;
-
-                if (note != null)
-                {
-                    float noteHeight = note.Height;
-                    float noteWidth = note.Width;
-                    calculatedRatio = noteHeight / noteWidth;
-
-                    // Logger.Log($"{noteSet} ratio: {calculatedRatio}");
-                }
-
-                ratio = calculatedRatio;
-
-                // if (noteHeightScaleToWidth.IsDefault)
-                //     ratio = calculatedRatio;
-                // else
-                //     ratio = calculatedRatio >= square_ratio_threshold ? 1.0f : calculatedRatio;
-
-                // 更新缓存
-                note_ratio_cache.AddOrUpdate(noteSet, ratio, (_, _) => ratio);
-            }
-
-            return ratio;
-        }
+            => resource.GetNoteRatio(forceRecalculate, clampSquare: false);
 
         public Bindable<Vector2> GetNoteSizeBindable(int keyMode, int columnIndex, bool noSpecial = false)
         {
@@ -358,14 +322,6 @@ namespace osu.Game.EzOsuGame
                 MaxFrames = max_note_frames,
                 Usage = EzTextureUsage.AnimationSafe,
             };
-
-            IReadOnlyList<string> keys = resource.ResolveFrameKeys(request);
-
-            if (keys.Count > 1)
-            {
-                // 帧互相独立、TextureStore 自身带锁，批量帧并行解码，避免逐帧串行拖慢进图。
-                Parallel.For(0, keys.Count, i => resource.Get(keys[i], EzTextureUsage.AnimationSafe));
-            }
 
             return new List<Texture>(resource.GetTextureFrames(request));
         }

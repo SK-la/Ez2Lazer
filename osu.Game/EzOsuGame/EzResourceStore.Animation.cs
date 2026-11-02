@@ -64,7 +64,7 @@ namespace osu.Game.EzOsuGame
             Texture[] materialised = materialiseFrames(set.Keys, request.Usage);
 
             // Large 池是 LargeTextureStore：取像带引用计数，全部引用释放后才 Purge 掉纹理（见框架该实现）。
-            // 帧级缓存长期持有一份引用即等于「永不回收」，所以该池的帧每次现取、不落缓存。
+            // AnimationSafe 使用非计数 animationSafeStore；帧级缓存可长期持有帧纹理引用。
             return request.Usage == EzTextureUsage.Large ? materialised : set.CacheTextures(materialised);
         }
 
@@ -120,27 +120,17 @@ namespace osu.Game.EzOsuGame
                 AllowSingleFallback = false,
             };
 
-            IReadOnlyList<string> keys = resolveFrameSet(framesRequest).Keys;
+            // 与 GetAnimation 共用 EzFrameSet 缓存，避免舞台 Clear 后仅剩 Drawable 持有的引用被回收，
+            // 同一帧 DrawNode 仍访问已 Purge 的 AnimationSafe 纹理。
+            Texture[] frames = GetTextureFrames(framesRequest);
+
+            if (frames.Length > 0)
+                return new List<Texture>(frames);
 
             // 无多帧时按静态大图取单张（单图不能进 AnimationSafe 池被当帧 Dispose）。
-            if (keys.Count == 0)
-            {
-                Texture? single = getFirstFrame(new EzAnimationRequest { Path = basePath, Usage = EzTextureUsage.Large });
+            Texture? single = getFirstFrame(new EzAnimationRequest { Path = basePath, Usage = EzTextureUsage.Large });
 
-                return single != null ? new List<Texture>(1) { single } : new List<Texture>();
-            }
-
-            var frames = new List<Texture>(keys.Count);
-
-            foreach (string key in keys)
-            {
-                Texture? texture = Get(key, EzTextureUsage.AnimationSafe);
-
-                if (texture != null)
-                    frames.Add(texture);
-            }
-
-            return frames;
+            return single != null ? new List<Texture>(1) { single } : new List<Texture>();
         }
 
         /// <summary>
@@ -205,10 +195,34 @@ namespace osu.Game.EzOsuGame
         // 帧键与帧纹理分两层缓存：只要首帧的场景（GetNote / GetStage）只走键缓存，不触发整段解码。
         private EzFrameSet resolveFrameSet(EzAnimationRequest request)
         {
+            request = normaliseRequest(request);
+
             if (frameSets.TryGetValue(request, out EzFrameSet? cached))
                 return cached;
 
             return frameSets.GetOrAdd(request, buildFrameSet(request));
+        }
+
+        private static EzAnimationRequest normaliseRequest(EzAnimationRequest request)
+        {
+            if (string.IsNullOrEmpty(request.Path))
+                return request;
+
+            string path = EzResourcePath.Normalise(request.Path);
+
+            if (path == request.Path)
+                return request;
+
+            return new EzAnimationRequest
+            {
+                Path = path,
+                FrameTemplate = request.FrameTemplate,
+                Separators = request.Separators,
+                StartIndex = request.StartIndex,
+                MaxFrames = request.MaxFrames,
+                Usage = request.Usage,
+                AllowSingleFallback = request.AllowSingleFallback,
+            };
         }
 
         private static readonly int[] frame_widths = { 3, 1 };

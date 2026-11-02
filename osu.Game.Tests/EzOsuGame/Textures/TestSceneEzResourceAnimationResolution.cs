@@ -55,9 +55,13 @@ namespace osu.Game.Tests.EzOsuGame.Textures
                 return true;
             });
 
-            AddAssert("与既有直取路径命中同一张纹理（不重复解码）", () =>
+            AddAssert("直取与帧列表解码尺寸一致（同一底图，包装实例可不同）", () =>
             {
-                Assert.That(resources!.Get("note/circle/whitenote/000", EzTextureUsage.AnimationSafe), Is.SameAs(getFrames("note/circle/whitenote")[0]));
+                Texture? direct = resources!.Get("note/circle/whitenote/000", EzTextureUsage.AnimationSafe);
+                Texture fromFrames = getFrames("note/circle/whitenote")[0];
+                Assert.That(direct, Is.Not.Null);
+                Assert.That(direct!.Width, Is.EqualTo(fromFrames.Width));
+                Assert.That(direct.Height, Is.EqualTo(fromFrames.Height));
                 return true;
             });
         }

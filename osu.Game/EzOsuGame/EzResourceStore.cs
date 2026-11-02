@@ -70,8 +70,10 @@ namespace osu.Game.EzOsuGame
 
         // 纹理加载器链（对应EzTextureUsage）
         private readonly TextureStore textureStore;
+        // 多帧 / 循环动画：非图集 animationSafeStore（稳定缓存纹理，不按引用 Purge）。
         private readonly TextureStore animationSafeStore;
-        private readonly LargeTextureStore largeTextureStore;
+        // 单帧大图：refCountedTextureStore（LargeTextureStore）。
+        private readonly LargeTextureStore refCountedTextureStore;
         private readonly TextureStore glyphStore;
         private readonly TextureStore shellStore;
         private readonly TextureStore danStore;
@@ -128,13 +130,13 @@ namespace osu.Game.EzOsuGame
             textureStore = new TextureStore(renderer, textureLoaderStore1, true, TextureFilteringMode.Linear, false, 2, null, "EzUi");
             textureStore.AddTextureSource(baseTextureLoader);
 
-            // 动画安全：非 atlas、Dispose 为空操作。scaleAdjust 与默认 TextureStore 一致（2），避免资源显示放大一倍。
+            // 动画帧：独立非 atlas 页，scaleAdjust 与默认 TextureStore 一致（2）。
             animationSafeStore = new TextureStore(renderer, textureLoaderStore1, useAtlas: false, scaleAdjust: 2);
             animationSafeStore.AddTextureSource(baseTextureLoader);
 
-            // 单帧大图：refcount，禁止循环动画
-            largeTextureStore = new LargeTextureStore(renderer, textureLoaderStore1);
-            largeTextureStore.AddTextureSource(baseTextureLoader);
+            // 单帧大图：引用计数，禁止用于循环动画帧。
+            refCountedTextureStore = new LargeTextureStore(renderer, textureLoaderStore1);
+            refCountedTextureStore.AddTextureSource(baseTextureLoader);
 
             // HUD combo / score 与舞台数字共用。超过 100 的图先缩小再进一页。
             var glyphLoader = new MaxDimensionLimitedTextureLoaderStore(new TextureLoaderStore(combinedStore), glyph_upload_edge, ResizeMode.Max);
@@ -179,7 +181,7 @@ namespace osu.Game.EzOsuGame
             return usage switch
             {
                 EzTextureUsage.AnimationSafe => animationSafeStore.Get(path),
-                EzTextureUsage.Large => largeTextureStore.Get(path),
+                EzTextureUsage.Large => refCountedTextureStore.Get(path),
                 EzTextureUsage.Glyph => glyphStore.Get(path),
                 EzTextureUsage.Badge => danStore.Get(path),
                 EzTextureUsage.Shell => shellStore.Get(path),
@@ -224,7 +226,7 @@ namespace osu.Game.EzOsuGame
             return usage switch
             {
                 EzTextureUsage.AnimationSafe => animationSafeStore,
-                EzTextureUsage.Large => largeTextureStore,
+                EzTextureUsage.Large => refCountedTextureStore,
                 EzTextureUsage.Glyph => glyphStore,
                 EzTextureUsage.Badge => danStore,
                 EzTextureUsage.Shell => shellStore,
@@ -233,22 +235,27 @@ namespace osu.Game.EzOsuGame
         }
 
         /// <summary>
-        /// 获取 Note 宽高比（带缓存）
+        /// 获取 Note 宽高比（带缓存）。<paramref name="clampSquare"/> 为 <c>false</c> 时不把近方形的 note 压成 1:1。
         /// </summary>
-        public float GetNoteRatio(bool forceRecalculate = false)
+        public float GetNoteRatio(bool forceRecalculate = false, bool clampSquare = true)
         {
             string noteSet = noteSetName.Value;
+            float raw = getRawNoteRatio(noteSet, forceRecalculate);
 
-            if (forceRecalculate || !note_ratio_cache.TryGetValue(noteSet, out float ratio))
-            {
-                ratio = calculateNoteRatio(noteSet);
-                note_ratio_cache.AddOrUpdate(noteSet, ratio, (_, _) => ratio);
-            }
+            return clampSquare && raw >= square_ratio_threshold ? 1.0f : raw;
+        }
 
+        private float getRawNoteRatio(string noteSet, bool forceRecalculate)
+        {
+            if (!forceRecalculate && note_ratio_cache.TryGetValue(noteSet, out float ratio))
+                return ratio;
+
+            ratio = measureRawNoteRatio(noteSet);
+            note_ratio_cache.AddOrUpdate(noteSet, ratio, (_, _) => ratio);
             return ratio;
         }
 
-        private float calculateNoteRatio(string noteSet)
+        private float measureRawNoteRatio(string noteSet)
         {
             try
             {
@@ -258,10 +265,7 @@ namespace osu.Game.EzOsuGame
                                    Get($"{basePath}/001", EzTextureUsage.AnimationSafe);
 
                 if (texture != null)
-                {
-                    float calculatedRatio = texture.Height / (float)texture.Width;
-                    return calculatedRatio >= square_ratio_threshold ? 1.0f : calculatedRatio;
-                }
+                    return texture.Height / (float)texture.Width;
             }
             catch (Exception ex)
             {
@@ -290,25 +294,29 @@ namespace osu.Game.EzOsuGame
         #region 工具方法
 
         /// <summary>
-        /// 丢弃层1 目录索引与层2 帧解析缓存，使新放进 <c>EzResources</c> 的图（含新增帧）重新可见。
+        /// 丢弃层1 目录索引、层2 帧解析与 note 比例缓存；各纹理池清未命中（null），动画池另整池 ClearCache 以支持同键覆盖。
         /// </summary>
         /// <remarks>
-        /// 只用框架原生的 <see cref="TextureStore.ClearCache"/>（<see cref="TextureStore"/> 会把未命中也缓存下来，
-        /// 故新增文件不清缓存就永远看不到）。纹理池只清动画帧池：字形页与通用图集页里的纹理
-        /// 可能正被绘制（TextStyle 反复复用），整体清会在用户操作时把已绘制的图集区域释放掉。
-        /// <see cref="EzTextureUsage.Large"/> 池不能走 <c>ClearCache</c>：它每次 Get 返回带引用计数的包装，
-        /// 而 <c>ClearCache</c> 会直接释放底层 native 纹理，不管外面还有多少个包装活着，
-        /// 会让仍显示的预览图变空、并在随后销毁时崩溃（实测：保存 skin.ini 后预览全空，退出编辑器崩溃）。
-        /// 需改为「只清无存活引用/null 的条目」，见下方注释。
-        /// 只在冷的、用户主动的入口调用（资源选择器打开、皮肤编辑器保存/应用）。
+        /// <see cref="refCountedTextureStore"/> 禁止 <see cref="TextureStore.ClearCache"/>（仍被 Drawable 引用的包装会崩）。
+        /// <see cref="animationSafeStore"/> 须在调用方已 refresh、旧 Drawable 下树后再 <c>ClearCache</c>（皮肤编辑器见 <c>refreshScene</c> → 本方法 → 再 refresh）。
+        /// 图集四池只 <c>ClearFailedCache</c>；同键覆盖字形/UI 时在无引用冷入口对对应 store 调 <c>ClearCache(disposeAtlas: true)</c>（同 <see cref="Overlays.EzFontSettingsOverlay"/>）。
+        /// 只在用户主动入口调用（资源选择器、皮肤编辑器保存/应用等）。
         /// </remarks>
         internal void InvalidateResourceCaches()
         {
             directoryIndex.Invalidate();
             frameSets.Clear();
+            note_ratio_cache.Clear();
 
+            textureStore.ClearFailedCache();
+            glyphStore.ClearFailedCache();
+            danStore.ClearFailedCache();
+            shellStore.ClearFailedCache();
+
+            animationSafeStore.ClearFailedCache();
             animationSafeStore.ClearCache();
-            largeTextureStore.ClearFailedCache();
+
+            refCountedTextureStore.ClearFailedCache();
         }
 
         #endregion
@@ -378,7 +386,7 @@ namespace osu.Game.EzOsuGame
             {
                 textureStore.Dispose();
                 animationSafeStore.Dispose();
-                largeTextureStore.Dispose();
+                refCountedTextureStore.Dispose();
                 glyphStore.Dispose();
                 shellStore.Dispose();
                 danStore.Dispose();
