@@ -14,6 +14,7 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
 {
     /// <summary>
     /// 皮肤专用场景占位壳；实际专用设置在 Appearance 场景侧栏的「专用」分组。
+    /// 按钮永久隐藏，故 <see cref="IsAvailable"/> 为 false。
     /// </summary>
     public class SkinSpecificSceneStrategy : IEzSkinEditorSceneStrategy
     {
@@ -22,6 +23,8 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
         public EzSkinEditorSceneGroup Group => EzSkinEditorSceneGroup.Gameplay;
 
         public LocalisableString TabTitle => EzEditorStrings.TAB_SKIN_SPECIFIC;
+
+        public bool IsAvailable => false;
 
         public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context) =>
             new[]
