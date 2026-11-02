@@ -110,8 +110,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             factory.OnNoteSizeChanged += updatePosition;
         }
 
-        private void OnSkinChanged()
+        private void OnSkinChanged() => Schedule(rebuildStage);
+
+        private void rebuildStage()
         {
+            if (!IsLoaded)
+                return;
+
             sprite.Clear();
             sprite.Add(factory.CreateStage(columnCount, keyState, out keyLayer));
             resetKeyWidths();

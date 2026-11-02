@@ -438,8 +438,12 @@ namespace osu.Game.EzOsuGame
 
                 if (gauge != null || bright != null)
                 {
-                    place(applyRotation(new EzStageGrooveMeter(layout.Meter, gauge, bright), layout.Meter),
-                        layout.Meter.Order ?? EzStagePlateLayout.ORDER_METER);
+                    Drawable meter = new EzStageGrooveMeter(layout.Meter, gauge, bright);
+
+                    if (layout.Meter.HasRotation)
+                        meter = applyRotation(meter, layout.Meter);
+
+                    place(meter, layout.Meter.Order ?? EzStagePlateLayout.ORDER_METER);
                 }
             }
 
@@ -981,6 +985,7 @@ namespace osu.Game.EzOsuGame
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 Position = piece.ToOsuPosition(),
+                Size = contentSize,
                 // 多帧默认循环：layout 只在要停住时才写 "loop": false。
                 Loop = piece.Loop ?? true,
                 DefaultFrameLength = piece.FrameLength,
