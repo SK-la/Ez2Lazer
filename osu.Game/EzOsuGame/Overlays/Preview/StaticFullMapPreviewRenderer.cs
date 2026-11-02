@@ -25,6 +25,8 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         private float lastHeight;
         private float density = 1f;
 
+        private EzPreviewManiaSettings settings = EzPreviewManiaSettings.DEFAULT;
+
         public StaticFullMapPreviewRenderer()
         {
             RelativeSizeAxes = Axes.Both;
@@ -65,6 +67,18 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             rebuild();
         }
 
+        /// <summary>
+        /// 设置绘制外观（部件颜色 + 厚度）。与预览屏共享同一实例时，其 bindable 变化由屏驱动重绘。
+        /// 数据未就绪时只记录，等 <see cref="SetData"/> 再按新外观重建。
+        /// </summary>
+        public void SetSettings(EzPreviewManiaSettings settings)
+        {
+            this.settings = settings;
+
+            if (hasData)
+                rebuild();
+        }
+
         public void SetCurrentTime(double time)
         {
         }
@@ -86,8 +100,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
         private void rebuild()
         {
-            if (DrawWidth <= 1 || DrawHeight <= 1)
-
+            if (!hasData || DrawWidth <= 1 || DrawHeight <= 1)
                 return;
 
             lastWidth = DrawWidth;
@@ -112,7 +125,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
             var quads = new List<PreviewQuad>(layoutEntries.Count + layout.ColumnCount * (data.TotalColumns + layout.RowsPerColumn));
 
-            ManiaPreviewColumnRenderer.BuildColumnPanels(quads, layoutEntries, layout, data, totalRows, layout.PanelHeight);
+            ManiaPreviewColumnRenderer.BuildColumnPanels(quads, layoutEntries, layout, data, totalRows, layout.PanelHeight, settings);
 
             batchDrawable.SetQuads(quads);
         }

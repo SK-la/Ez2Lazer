@@ -15,6 +15,7 @@ using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.EzOsuGame.Edit.Screens;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
@@ -189,11 +190,17 @@ namespace osu.Game.EzOsuGame.Edit
         {
         }
 
-        private bool canPresentScene(EzSkinEditorSceneType scene) => scene != EzSkinEditorSceneType.SkinIni || EzSkinIniSupport.IsSupported(skinManager.CurrentSkinInfo.Value);
+        private bool canPresentScene(EzSkinEditorSceneType scene)
+        {
+            if (scene == EzSkinEditorSceneType.SkinIni)
+                return EzSkinIniSupport.IsSupported(skinManager.CurrentSkinInfo.Value);
+
+            return true;
+        }
 
         private void initializeSceneCoordinator(EzSkinEditorScreen workspace)
         {
-            sceneCoordinator = new EzSkinEditorSceneCoordinator(scalingContainer, workspace, layoutLayer, updateScreenSizing, canPresentScene, () => game.ScreenStack.CurrentScreen, enterSongSelect, enterGameplay);
+            sceneCoordinator = new EzSkinEditorSceneCoordinator(scalingContainer, workspace, layoutLayer, updateScreenSizing, canPresentScene, () => game.ScreenStack.CurrentScreen, enterSongSelect, enterGameplay, enterFullMapPreview);
             workspace.SceneApplied = scene => sceneCoordinator?.Present(scene, game.ScreenStack.CurrentScreen as OsuScreen);
             workspace.CanPresentScene = canPresentScene;
 
@@ -225,6 +232,21 @@ namespace osu.Game.EzOsuGame.Edit
 
                 screen.Push(new SoloSongSelect());
             }, new[] { typeof(SongSelect) });
+        }
+
+        /// <summary>
+        /// Steps back to the main menu (exiting song select / gameplay) and pushes the editor's
+        /// full-map preview screen. The screen renders whatever the editor's preview state holds.
+        /// </summary>
+        private void enterFullMapPreview()
+        {
+            performer?.PerformFromScreen(screen =>
+            {
+                if (screen is EzSkinEditorPreviewManiaScreen || State.Value != Visibility.Visible)
+                    return;
+
+                screen.Push(new EzSkinEditorPreviewManiaScreen(Workspace?.PreviewState.PreviewBeatmap, Workspace?.PreviewState.Ruleset.Value, Workspace?.PreviewManiaSettings));
+            }, new[] { typeof(MainMenu) });
         }
 
         /// <summary>

@@ -3,22 +3,12 @@
 
 using System;
 using System.Collections.Generic;
+using osu.Game.EzOsuGame.Configuration;
 using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Overlays.Preview
 {
-    public enum ManiaPreviewNoteKind
-    {
-        Tap,
-
-        HoldHead,
-
-        HoldBody,
-
-        HoldTail,
-    }
-
-    public readonly record struct ManiaPreviewNote(double StartTime, double EndTime, int Column, ManiaPreviewNoteKind Kind);
+    public readonly record struct ManiaPreviewNote(double StartTime, double EndTime, int Column, EzManiaNotePart Kind);
 
     public readonly record struct ManiaPreviewData(
         int TotalColumns,
@@ -32,7 +22,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         int Column,
         int Row,
         int EndRow,
-        ManiaPreviewNoteKind Kind,
+        EzManiaNotePart Kind,
         double StartTime = 0,
         double EndTime = 0);
 

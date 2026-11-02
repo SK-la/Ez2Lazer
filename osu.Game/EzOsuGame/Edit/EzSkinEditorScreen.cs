@@ -211,6 +211,13 @@ namespace osu.Game.EzOsuGame.Edit
 
         internal EzSkinEditorPreviewState PreviewState { get; } = new EzSkinEditorPreviewState();
 
+        /// <summary>
+        /// 全谱预览的绘制外观。独立于 Ez2Setting / skin.ini，存到 EzResources/Config。改动即改即存。
+        /// </summary>
+        internal EzPreviewManiaSettings PreviewManiaSettings { get; } = new EzPreviewManiaSettings();
+
+        private EzPreviewManiaSettingsStore? previewManiaSettingsStore;
+
         internal Bindable<EzSkinEditorNoteCompareKind> NoteCompareKind { get; } = new Bindable<EzSkinEditorNoteCompareKind>();
 
         public EzSkinEditorScreen()
@@ -439,6 +446,7 @@ namespace osu.Game.EzOsuGame.Edit
             base.LoadComplete();
             SkinEditorProviderResolver.EnsureDefaultProviderRegistered();
             beatmapPicker = new EzSkinEditorBeatmapPicker(realm, beatmapManager);
+            loadFullMapPreviewSettings();
             sceneRail.CurrentScene.BindTo(sceneBar.CurrentScene);
             sceneBar.CurrentScene.BindValueChanged(onSceneChanged, true);
             skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
@@ -578,7 +586,6 @@ namespace osu.Game.EzOsuGame.Edit
 
             ensureSkinIniSession();
             ensureSkinSpecificSceneVisibility();
-            ensureSceneAvailability();
             ensureSkinJsonSession();
             ensureComparisonSnapshotForCurrentSkin();
             ensureNoteSnapshotForCurrentSkin();
@@ -684,6 +691,7 @@ namespace osu.Game.EzOsuGame.Edit
                 PreviewMode = PreviewState.Mode.Value,
                 ActiveLayer = sceneBar.ActiveLayer.Value,
                 ComparisonSnapshot = useNoteComparisonOnly ? null : ComparisonSnapshotForTesting,
+                BeatmapPreviewManiaSettings = PreviewManiaSettings,
                 NoteSession = NoteSessionForTesting,
                 NoteSnapshot = NoteSnapshotForTesting,
                 CreateNoteSnapshot = createNoteSnapshot,
@@ -862,13 +870,6 @@ namespace osu.Game.EzOsuGame.Edit
         {
             // 左栏 SkinSpecific 为占位壳，按钮已隐藏；专用设置在 Appearance 侧栏「皮肤专用」栏。
             sceneRail.SetSceneVisible(EzSkinEditorSceneType.SkinSpecific, false);
-        }
-
-        private void ensureSceneAvailability()
-        {
-            // 场景自身的静态可用性（如 debug-only 的谱面预览）在这里落到左栏显隐。
-            foreach (var strategy in EzSkinEditorSceneRegistry.All)
-                sceneRail.SetSceneVisible(strategy.SceneType, strategy.IsAvailable);
         }
 
         private void ensureSkinIniSession()
@@ -1286,6 +1287,20 @@ namespace osu.Game.EzOsuGame.Edit
             ezSkinConfig.Save();
             skinManager.CurrentSkinInfo.TriggerChange();
         }
+
+        private void loadFullMapPreviewSettings()
+        {
+            previewManiaSettingsStore = new EzPreviewManiaSettingsStore(storage);
+            previewManiaSettingsStore.Load().CopyTo(PreviewManiaSettings);
+
+            PreviewManiaSettings.NoteColour.BindValueChanged(_ => saveFullMapPreviewSettings());
+            PreviewManiaSettings.HoldHeadColour.BindValueChanged(_ => saveFullMapPreviewSettings());
+            PreviewManiaSettings.HoldBodyColour.BindValueChanged(_ => saveFullMapPreviewSettings());
+            PreviewManiaSettings.HoldTailColour.BindValueChanged(_ => saveFullMapPreviewSettings());
+            PreviewManiaSettings.ThicknessScale.BindValueChanged(_ => saveFullMapPreviewSettings());
+        }
+
+        private void saveFullMapPreviewSettings() => previewManiaSettingsStore?.Save(PreviewManiaSettings);
 
         private void bindConfigPreviewRefresh()
         {

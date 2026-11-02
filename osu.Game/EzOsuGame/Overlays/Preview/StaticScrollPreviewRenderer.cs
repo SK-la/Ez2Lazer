@@ -123,7 +123,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             batchDrawable.Size = new Vector2(layout.ContentWidth, DrawHeight);
 
             var quads = new List<PreviewQuad>(layoutEntries.Count + layout.ColumnCount * (data.TotalColumns + layout.RowsPerColumn));
-            ManiaPreviewColumnRenderer.BuildColumnPanels(quads, layoutEntries, layout, data, totalRows, DrawHeight);
+            ManiaPreviewColumnRenderer.BuildColumnPanels(quads, layoutEntries, layout, data, totalRows, DrawHeight, EzPreviewManiaSettings.DEFAULT);
 
             batchDrawable.SetQuads(quads);
             scrollOffset = Math.Clamp(scrollOffset, 0, getMaxScrollOffset());

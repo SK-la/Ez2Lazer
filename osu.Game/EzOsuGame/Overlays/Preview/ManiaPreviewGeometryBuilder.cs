@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 
@@ -38,11 +39,11 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
                 if (!isHold)
                 {
-                    notes.Add(new ManiaPreviewNote(obj.StartTime, endTime, column, ManiaPreviewNoteKind.Tap));
+                    notes.Add(new ManiaPreviewNote(obj.StartTime, endTime, column, EzManiaNotePart.Note));
                     continue;
                 }
 
-                notes.Add(new ManiaPreviewNote(obj.StartTime, endTime, column, ManiaPreviewNoteKind.HoldHead));
+                notes.Add(new ManiaPreviewNote(obj.StartTime, endTime, column, EzManiaNotePart.HoldHead));
             }
 
             notes.Sort((a, b) =>

@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.EzOsuGame.Configuration;
 
 namespace osu.Game.EzOsuGame.Overlays.Preview
 {
@@ -40,22 +41,22 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
                 switch (note.Kind)
                 {
-                    case ManiaPreviewNoteKind.Tap:
+                    case EzManiaNotePart.Note:
                         entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, startRow, note.Kind));
                         break;
 
-                    case ManiaPreviewNoteKind.HoldHead:
+                    case EzManiaNotePart.HoldHead:
                     {
                         int endRow = holdEndRows.TryGetValue(note, out int row) ? row : startRow + 1;
                         endRow = Math.Max(startRow + 1, endRow);
                         // startRow = press (bottom), endRow = release (top).
-                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, startRow, ManiaPreviewNoteKind.HoldHead));
-                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, endRow, ManiaPreviewNoteKind.HoldBody));
-                        // entries.Add(new ManiaPreviewLayoutEntry(note.Column, endRow, endRow, ManiaPreviewNoteKind.HoldTail));
+                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, startRow, EzManiaNotePart.HoldHead));
+                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, endRow, EzManiaNotePart.HoldBody));
+                        // entries.Add(new ManiaPreviewLayoutEntry(note.Column, endRow, endRow, EzManiaNotePart.HoldTail));
                         break;
                     }
 
-                    case ManiaPreviewNoteKind.HoldTail:
+                    case EzManiaNotePart.HoldTail:
                         break;
                 }
             }
@@ -79,20 +80,20 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
                 switch (note.Kind)
                 {
-                    case ManiaPreviewNoteKind.Tap:
+                    case EzManiaNotePart.Note:
                         entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, startRow, note.Kind, note.StartTime, note.StartTime));
                         break;
 
-                    case ManiaPreviewNoteKind.HoldHead:
+                    case EzManiaNotePart.HoldHead:
                     {
                         int endRow = Math.Max(startRow + 1, timeToRow(note.EndTime));
-                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, startRow, ManiaPreviewNoteKind.HoldHead, note.StartTime, note.StartTime));
-                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, endRow, ManiaPreviewNoteKind.HoldBody, note.StartTime, note.EndTime));
-                        // entries.Add(new ManiaPreviewLayoutEntry(note.Column, endRow, endRow, ManiaPreviewNoteKind.HoldTail));
+                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, startRow, EzManiaNotePart.HoldHead, note.StartTime, note.StartTime));
+                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, endRow, EzManiaNotePart.HoldBody, note.StartTime, note.EndTime));
+                        // entries.Add(new ManiaPreviewLayoutEntry(note.Column, endRow, endRow, EzManiaNotePart.HoldTail));
                         break;
                     }
 
-                    case ManiaPreviewNoteKind.HoldTail:
+                    case EzManiaNotePart.HoldTail:
                         break;
                 }
             }
@@ -116,7 +117,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             var result = new Dictionary<ManiaPreviewNote, int>();
             var orderedTimes = rowByTime.Keys.OrderBy(t => t).ToList();
 
-            foreach (ManiaPreviewNote note in notes.Where(n => n.Kind == ManiaPreviewNoteKind.HoldHead))
+            foreach (ManiaPreviewNote note in notes.Where(n => n.Kind == EzManiaNotePart.HoldHead))
             {
                 int startRow = rowByTime[note.StartTime];
                 int endRow = startRow + 1;

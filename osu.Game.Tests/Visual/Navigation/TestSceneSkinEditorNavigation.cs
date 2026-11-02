@@ -18,6 +18,7 @@ using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.EzOsuGame.Edit.Screens;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.Online.API;
 using osu.Game.Overlays.Mods;
@@ -557,6 +558,8 @@ namespace osu.Game.Tests.Visual.Navigation
             AddUntilStep("gameplay scene selected", () => ezSkinEditor.Workspace!.CurrentScene.Value == EzSkinEditorSceneType.GameplayHud);
 
             AddUntilStep("layer button present", () => ezSkinEditor.Workspace!.ChildrenOfType<EzEditorLayerButton>().Any());
+            AddUntilStep("editor resolved a ruleset", () =>
+                ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorSceneBar>().Single().Ruleset.Value != null);
 
             AddStep("open layer dropdown", () =>
             {
@@ -595,6 +598,47 @@ namespace osu.Game.Tests.Visual.Navigation
             AddUntilStep("song select container is an editing target", () =>
                 ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorHudLayer>().Single()
                             .EnumerateTargets().Any(c => c.Lookup.Lookup == GlobalSkinnableContainers.SongSelect));
+        }
+
+        [Test]
+        public void TestBeatmapPreviewScenePushesFullMapPreviewScreen()
+        {
+            BeatmapSetInfo beatmapSet = null!;
+
+            AddStep("import editor beatmap", () => beatmapSet = BeatmapImportHelper.LoadQuickOszIntoOsu(Game).GetResultSafely());
+            AddStep("select mania difficulty", () =>
+            {
+                var mania = beatmapSet.Beatmaps.First(b => b.Ruleset.OnlineID == 3);
+                Game.Beatmap.Value = Game.BeatmapManager.GetWorkingBeatmap(mania);
+            });
+            AddUntilStep("mania beatmap selected", () => Game.Beatmap.Value.BeatmapInfo.Ruleset.OnlineID == 3);
+
+            openEzEditor();
+            AddUntilStep("editor workspace ready", () => ezSkinEditor.Workspace?.IsLoaded == true);
+
+            AddStep("switch to song select scene", () => ezSkinEditor.Workspace!.CurrentScene.Value = EzSkinEditorSceneType.SongSelectHud);
+            AddUntilStep("real song select current", () => Game.ScreenStack.CurrentScreen is SoloSongSelect);
+
+            AddStep("switch to beatmap preview scene", () => ezSkinEditor.Workspace!.CurrentScene.Value = EzSkinEditorSceneType.BeatmapPreview);
+            AddUntilStep("full map preview screen current", () => Game.ScreenStack.CurrentScreen is EzSkinEditorPreviewManiaScreen);
+            AddUntilStep("song select was exited", () => Game.ScreenStack.CurrentScreen is not SoloSongSelect);
+        }
+
+        [Test]
+        public void TestBeatmapPreviewScenePresentsWithoutManualSelection()
+        {
+            // 默认导入的谱面是 osu!std。不做「选择模式」手动切歌，直接点谱面预览二级场景也应能呈现
+            // （非 mania 由屏内占位提示），而不是静默驳回、看起来像没反应。
+            AddStep("import editor beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).WaitSafely());
+            AddUntilStep("editor beatmap ready", () => !Game.Beatmap.IsDefault);
+            AddAssert("selected difficulty is not mania", () => Game.Beatmap.Value.BeatmapInfo.Ruleset.OnlineID != 3);
+
+            openEzEditor();
+            AddUntilStep("editor workspace ready", () => ezSkinEditor.Workspace?.IsLoaded == true);
+
+            AddStep("switch to beatmap preview scene", () => ezSkinEditor.Workspace!.CurrentScene.Value = EzSkinEditorSceneType.BeatmapPreview);
+            AddUntilStep("scene stayed on beatmap preview", () => ezSkinEditor.Workspace!.CurrentScene.Value == EzSkinEditorSceneType.BeatmapPreview);
+            AddUntilStep("full map preview screen current", () => Game.ScreenStack.CurrentScreen is EzSkinEditorPreviewManiaScreen);
         }
 
         [Test]
