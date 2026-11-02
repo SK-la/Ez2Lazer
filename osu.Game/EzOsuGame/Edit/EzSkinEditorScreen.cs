@@ -458,7 +458,7 @@ namespace osu.Game.EzOsuGame.Edit
             }, true);
             sceneBar.ActiveLayer.BindValueChanged(v =>
             {
-                hudLayer.SetVisible(v.NewValue != EzSkinEditorLayer.HudOff);
+                hudLayer.SetVisible(v.NewValue != EzHUDLayer.HudOff);
                 hudLayer.Apply(sceneBar.CurrentScene.Value, hudTargetScreen, layoutLayer, v.NewValue);
                 updateHudInteraction();
                 refreshPreviewContent();
@@ -477,7 +477,7 @@ namespace osu.Game.EzOsuGame.Edit
         private void updateHudInteraction()
         {
             hudLayer.InteractionEnabled.Value = EzSkinEditorSceneRegistry.SupportsHudLayer(sceneBar.CurrentScene.Value)
-                                                && sceneBar.ActiveLayer.Value != EzSkinEditorLayer.HudOff;
+                                                && sceneBar.ActiveLayer.Value != EzHUDLayer.HudOff;
         }
 
         protected override void Update()

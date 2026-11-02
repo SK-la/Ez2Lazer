@@ -39,7 +39,7 @@ namespace osu.Game.EzOsuGame.Edit
         /// The editing layer currently selected in the scene bar. Sidebar groups may conditionally
         /// appear based on it (e.g. the ruleset-specific component library).
         /// </summary>
-        public EzSkinEditorLayer ActiveLayer { get; init; } = EzSkinEditorLayer.EzHud;
+        public EzHUDLayer ActiveLayer { get; init; } = EzHUDLayer.EzHud;
 
         public Action? RequestSceneRefresh { get; init; }
 

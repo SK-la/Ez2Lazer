@@ -43,9 +43,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         /// <summary>
         /// The active editing layer. Only selects which layout container is edited; visibility is
-        /// driven separately by whether the value is <see cref="EzSkinEditorLayer.HudOff"/>.
+        /// driven separately by whether the value is <see cref="EzHUDLayer.HudOff"/>.
         /// </summary>
-        public Bindable<EzSkinEditorLayer> ActiveLayer { get; } = new Bindable<EzSkinEditorLayer>(EzSkinEditorLayer.EzHud);
+        public Bindable<EzHUDLayer> ActiveLayer { get; } = new Bindable<EzHUDLayer>(EzHUDLayer.EzHud);
 
         /// <summary>
         /// Ruleset shown by the editor; used to label the ruleset-scoped layer options.

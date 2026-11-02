@@ -35,7 +35,7 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
             {
                 Id = GameplaySceneStrategy.GROUP_ID_LIBRARY_GLOBAL,
                 Title = EzEditorStrings.LIBRARY_GLOBAL_TITLE,
-                Visible = context.ActiveLayer != EzSkinEditorLayer.HudOff,
+                Visible = context.ActiveLayer != EzHUDLayer.HudOff,
                 CreateContent = () => new EzSkinEditorComponentLibrarySection(rulesetScoped: false) { Title = EzEditorStrings.LIBRARY_GLOBAL_TITLE },
             },
         };

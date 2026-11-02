@@ -111,7 +111,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private EzLayoutLayer? layoutLayer;
         private OsuScreen? liveScreen;
         private EzSkinEditorSceneType scene = EzSkinEditorSceneType.GameplayHud;
-        private EzSkinEditorLayer layer = EzSkinEditorLayer.EzHud;
+        private EzHUDLayer layer = EzHUDLayer.EzHud;
         private RulesetInfo? ruleset;
 
         private HUDOverlay? boundHudOverlay;
@@ -154,7 +154,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// Binds the editor HUD to a scene and selects which layout layer is actively edited.
         /// Visibility stays decoupled: it is driven solely by <see cref="LayerVisible"/>.
         /// </summary>
-        public void Apply(EzSkinEditorSceneType scene, OsuScreen? screen, EzLayoutLayer? ezLayout, EzSkinEditorLayer activeLayer)
+        public void Apply(EzSkinEditorSceneType scene, OsuScreen? screen, EzLayoutLayer? ezLayout, EzHUDLayer activeLayer)
         {
             if (!ReferenceEquals(layoutLayer, ezLayout))
             {

@@ -9,7 +9,8 @@ namespace osu.Game.EzOsuGame.Edit
     /// HUD layer is hidden. Visibility itself is all-or-nothing (see
     /// <see cref="EzSkinEditorLayerOptions"/>): only <see cref="HudOff"/> hides everything.
     /// </summary>
-    public enum EzSkinEditorLayer
+    /// 此类型有误导性，实际是 HUD Layer。应改名为 EzSkinHudLayer，文件层级上移。
+    public enum EzHUDLayer
     {
         /// <summary>Hide the whole HUD layer.</summary>
         HudOff = 0,
@@ -34,6 +35,7 @@ namespace osu.Game.EzOsuGame.Edit
     /// Which storage the layer's container belongs to. Only <see cref="Ez"/> layers are editable
     /// in the current phase; <see cref="Skin"/> is reserved for the follow-up skin-layer phase.
     /// </summary>
+    /// TODO：此类型后续删除，通过判断 EzHUDLayer 是否为 Ez 开头即可。
     public enum EzSkinEditorLayerSource
     {
         Ez,

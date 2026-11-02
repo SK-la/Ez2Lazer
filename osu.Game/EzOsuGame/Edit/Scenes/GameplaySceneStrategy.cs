@@ -51,9 +51,9 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
         };
 
         // 通用库在任何编辑层都在；模式库在模式专用层时追加为第二个库分组（各自一个导航按钮）。
-        private static bool hasEditingLayer(EzSkinEditorLayer layer) => layer != EzSkinEditorLayer.HudOff;
+        private static bool hasEditingLayer(EzHUDLayer layer) => layer != EzHUDLayer.HudOff;
 
-        private static bool isRulesetLibraryActive(EzSkinEditorLayer layer)
-            => layer is EzSkinEditorLayer.EzHudRuleset or EzSkinEditorLayer.EzPlayfieldRuleset;
+        private static bool isRulesetLibraryActive(EzHUDLayer layer)
+            => layer is EzHUDLayer.EzHudRuleset or EzHUDLayer.EzPlayfieldRuleset;
     }
 }

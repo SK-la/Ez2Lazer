@@ -576,7 +576,7 @@ namespace osu.Game.Tests.Visual.Navigation
                 var options = ezSkinEditor.Workspace!.ChildrenOfType<EzEditorLayerButton.LayerListPopover.LayerSelectButton>().ToArray();
                 TestContext.Progress.WriteLine("OPTIONS=" + string.Join(" | ", options.Select(o => o.Text.ToString())));
 
-                string rulesetLayerLabel = EzSkinEditorLayerOptions.GetDisplayName(EzSkinEditorLayer.EzHudRuleset,
+                string rulesetLayerLabel = EzSkinEditorLayerOptions.GetDisplayName(EzHUDLayer.EzHudRuleset,
                     ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorSceneBar>().Single().Ruleset.Value).ToString();
                 var option = options.SingleOrDefault(b => b.Text.ToString() == rulesetLayerLabel);
                 Assert.That(option, Is.Not.Null, $"ruleset layer option ({rulesetLayerLabel}) not found: " + string.Join(" | ", options.Select(o => o.Text.ToString())));
@@ -585,7 +585,7 @@ namespace osu.Game.Tests.Visual.Navigation
                 InputManager.Click(MouseButton.Left);
             });
 
-            AddUntilStep("layer changed to ruleset", () => ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorSceneBar>().Single().ActiveLayer.Value == EzSkinEditorLayer.EzHudRuleset);
+            AddUntilStep("layer changed to ruleset", () => ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorSceneBar>().Single().ActiveLayer.Value == EzHUDLayer.EzHudRuleset);
         }
 
         [Test]
@@ -677,7 +677,7 @@ namespace osu.Game.Tests.Visual.Navigation
                 ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorSceneBar>().Single().Ruleset.Value != null);
 
             AddStep("select ruleset hud layer", () =>
-                ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorSceneBar>().Single().ActiveLayer.Value = EzSkinEditorLayer.EzHudRuleset);
+                ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorSceneBar>().Single().ActiveLayer.Value = EzHUDLayer.EzHudRuleset);
 
             AddUntilStep("ruleset layer edits the live ruleset container", () =>
                 ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorHudLayer>().Single()

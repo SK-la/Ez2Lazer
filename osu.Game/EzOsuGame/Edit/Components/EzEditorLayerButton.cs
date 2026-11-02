@@ -27,16 +27,16 @@ namespace osu.Game.EzOsuGame.Edit.Components
         public new const float DEFAULT_WIDTH = 160;
 
         /// <summary>Layers offered for the current scene, in display order.</summary>
-        public Func<IReadOnlyList<EzSkinEditorLayer>>? GetAvailableLayers { get; set; }
+        public Func<IReadOnlyList<EzHUDLayer>>? GetAvailableLayers { get; set; }
 
         /// <summary>Localised label for a layer, including the current ruleset name where relevant.</summary>
-        public Func<EzSkinEditorLayer, LocalisableString>? GetDisplayName { get; set; }
+        public Func<EzHUDLayer, LocalisableString>? GetDisplayName { get; set; }
 
         /// <summary>
         /// The layer this button reflects. Owned by the scene bar; this button only reads it and
         /// pushes changes back through <see cref="SetLayer"/>.
         /// </summary>
-        public Bindable<EzSkinEditorLayer>? ActiveLayer { get; set; }
+        public Bindable<EzHUDLayer>? ActiveLayer { get; set; }
 
         public EzEditorLayerButton()
         {
@@ -63,23 +63,23 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// Recomputes the header text. Call when the display name source changes without the layer
         /// changing (e.g. the active ruleset was switched).
         /// </summary>
-        public void RefreshDisplayText() => Text = GetDisplayName?.Invoke(ActiveLayer?.Value ?? EzSkinEditorLayer.HudOff) ?? string.Empty;
+        public void RefreshDisplayText() => Text = GetDisplayName?.Invoke(ActiveLayer?.Value ?? EzHUDLayer.HudOff) ?? string.Empty;
 
         /// <summary>
         /// Applies a layer chosen in the popover. The popover never holds the shared bindable: a
         /// short-lived popover is disposed (and its fields <c>UnbindAll</c>ed) on close, which would
         /// otherwise clear this button's own subscription to <see cref="ActiveLayer"/>.
         /// </summary>
-        private void SetLayer(EzSkinEditorLayer layer)
+        private void SetLayer(EzHUDLayer layer)
         {
             if (ActiveLayer != null)
                 ActiveLayer.Value = layer;
         }
 
         public Popover GetPopover() => new LayerListPopover(
-            GetAvailableLayers?.Invoke() ?? Array.Empty<EzSkinEditorLayer>(),
+            GetAvailableLayers?.Invoke() ?? Array.Empty<EzHUDLayer>(),
             GetDisplayName ?? (_ => string.Empty),
-            ActiveLayer?.Value ?? EzSkinEditorLayer.HudOff,
+            ActiveLayer?.Value ?? EzHUDLayer.HudOff,
             SetLayer);
 
         public partial class LayerListPopover : OsuPopover
@@ -89,12 +89,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
             private const float item_height = 32;
             private const float item_spacing = 4;
 
-            private readonly IReadOnlyList<EzSkinEditorLayer> layers;
-            private readonly Func<EzSkinEditorLayer, LocalisableString> getDisplayName;
-            private readonly EzSkinEditorLayer current;
-            private readonly Action<EzSkinEditorLayer> onSelected;
+            private readonly IReadOnlyList<EzHUDLayer> layers;
+            private readonly Func<EzHUDLayer, LocalisableString> getDisplayName;
+            private readonly EzHUDLayer current;
+            private readonly Action<EzHUDLayer> onSelected;
 
-            public LayerListPopover(IReadOnlyList<EzSkinEditorLayer> layers, Func<EzSkinEditorLayer, LocalisableString> getDisplayName, EzSkinEditorLayer current, Action<EzSkinEditorLayer> onSelected)
+            public LayerListPopover(IReadOnlyList<EzHUDLayer> layers, Func<EzHUDLayer, LocalisableString> getDisplayName, EzHUDLayer current, Action<EzHUDLayer> onSelected)
                 : base(withPadding: false)
             {
                 this.layers = layers;
@@ -142,7 +142,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 Child = flow;
             }
 
-            private void select(EzSkinEditorLayer layer)
+            private void select(EzHUDLayer layer)
             {
                 onSelected(layer);
                 this.HidePopover();
