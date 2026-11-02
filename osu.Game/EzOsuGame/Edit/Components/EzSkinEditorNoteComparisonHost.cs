@@ -11,6 +11,7 @@ using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Skinning;
 using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Edit.Components
@@ -21,7 +22,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// </summary>
     public partial class EzSkinEditorNoteComparisonHost : Container
     {
-        private EzSkinEditorSceneContext context;
+        private ISkin editorSkin = null!;
+        private EzSkinEditorNoteEditSession? session;
+        private IEzSkinEditorNoteComparisonSource? source;
 
         private Container liveContainer = null!;
         private Container snapshotContainer = null!;
@@ -31,9 +34,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
         // The note edit session outlives scene switches, so bindings must be owned (and released) here.
         private readonly List<IUnbindable> sessionBindings = new List<IUnbindable>();
 
-        public EzSkinEditorNoteComparisonHost(EzSkinEditorSceneContext context)
+        public EzSkinEditorNoteComparisonHost(ISkin editorSkin, EzSkinEditorNoteEditSession? session, IEzSkinEditorNoteComparisonSource? source)
         {
-            this.context = context;
+            this.editorSkin = editorSkin;
+            this.session = session;
+            this.source = source;
             RelativeSizeAxes = Axes.Both;
         }
 
@@ -65,10 +70,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             base.LoadComplete();
 
-            if (context.NoteSession == null)
+            if (session == null)
                 return;
-
-            var session = context.NoteSession;
 
             bindSession(session.VariantId, refreshLivePane);
             bindSession(session.Ruleset, refreshLivePane);
@@ -97,9 +100,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
             base.Dispose(isDisposing);
         }
 
-        public void UpdateContext(EzSkinEditorSceneContext newContext)
+        public void Update(ISkin skin, EzSkinEditorNoteEditSession? noteSession, IEzSkinEditorNoteComparisonSource? comparisonSource)
         {
-            context = newContext;
+            editorSkin = skin;
+            session = noteSession;
+            source = comparisonSource;
             populate();
         }
 
@@ -113,8 +118,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private void refreshLivePane()
         {
-            var source = context.NoteComparisonSource;
-
             if (source == null)
             {
                 showPlaceholder(liveContainer, EzEditorStrings.TOOLBAR_NOT_SUPPORTED);
@@ -132,13 +135,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }
 
             livePane = getOrCreatePane(liveContainer, livePane);
-            livePane.Apply(context.EditorSkin, profile, source.GetLiveRequest);
+            livePane.Apply(editorSkin, profile, source.GetLiveRequest);
         }
 
         private void refreshSnapshotPane()
         {
-            var source = context.NoteComparisonSource;
-
             if (source == null)
             {
                 showPlaceholder(snapshotContainer, EzEditorStrings.TOOLBAR_NOT_SUPPORTED);
@@ -156,20 +157,20 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }
 
             snapshotPane = getOrCreatePane(snapshotContainer, snapshotPane);
-            snapshotPane.Apply(context.EditorSkin, profile, source.GetSnapshotRequest);
+            snapshotPane.Apply(editorSkin, profile, source.GetSnapshotRequest);
         }
 
         private void applyLiveLayout()
         {
-            if (livePane == null || context.NoteComparisonSource == null)
+            if (livePane == null || source == null)
                 return;
 
-            var profile = EzSkinEditorNoteRulesetProfileRegistry.Get(context.NoteComparisonSource.Ruleset);
+            var profile = EzSkinEditorNoteRulesetProfileRegistry.Get(source.Ruleset);
 
             if (profile == null)
                 return;
 
-            livePane.Apply(context.EditorSkin, profile, context.NoteComparisonSource.GetLiveRequest);
+            livePane.Apply(editorSkin, profile, source.GetLiveRequest);
         }
 
         private static EzSkinEditorNoteComparisonPane getOrCreatePane(Container container, EzSkinEditorNoteComparisonPane? current)
