@@ -684,21 +684,6 @@ def main():
         print(f'  AssemblyVersion will be: {release_version}')
         print(f'  InformationalVersion will be: {release_version}-ez2lazer')
 
-    # ReadyToRun 只在 Windows x64 生效（osu.Desktop.csproj 里按 win RID 前缀默认打开）。
-    # macOS / Linux / arm64 一律显式关闭：crossgen2 的 runtime pack 与 Velopack 差分体积都还没验证过。
-    if args.ready_to_run is None:
-        ready_to_run = target_platform == 'windows' and arch_name == 'x64'
-    else:
-        ready_to_run = args.ready_to_run
-
-    if ready_to_run and not (target_platform == 'windows' and arch_name == 'x64'):
-        print(f'WARNING: ReadyToRun requested for {target_platform}/{arch_name}; only windows/x64 is validated. Disabling.')
-        ready_to_run = False
-
-    msbuild_properties = msbuild_properties or {}
-    msbuild_properties['PublishReadyToRun'] = 'true' if ready_to_run else 'false'
-    print(f'PublishReadyToRun={ready_to_run} (platform={target_platform} arch={arch_name})')
-
     pack_version = args.pack_version or f'{args.tag}-ez2lazer'
 
     # Velopack expects a 3-part SemVer core (major.minor.patch) with optional prerelease.
@@ -752,6 +737,21 @@ def main():
     if not explicit and target_platform != host_platform:
         print(f"Inferred platform '{target_platform}' from filename but current host is '{host_platform}'; skipping publish to avoid accidental cross-platform build.")
         sys.exit(0)
+
+    # ReadyToRun 只在 Windows x64 生效（osu.Desktop.csproj 里按 win RID 前缀默认打开）。
+    # macOS / Linux / arm64 一律显式关闭：crossgen2 的 runtime pack 与 Velopack 差分体积都还没验证过。
+    if args.ready_to_run is None:
+        ready_to_run = target_platform == 'windows' and arch_name == 'x64'
+    else:
+        ready_to_run = args.ready_to_run
+
+    if ready_to_run and not (target_platform == 'windows' and arch_name == 'x64'):
+        print(f'WARNING: ReadyToRun requested for {target_platform}/{arch_name}; only windows/x64 is validated. Disabling.')
+        ready_to_run = False
+
+    msbuild_properties = msbuild_properties or {}
+    msbuild_properties['PublishReadyToRun'] = 'true' if ready_to_run else 'false'
+    print(f'PublishReadyToRun={ready_to_run} (platform={target_platform} arch={arch_name})')
 
     # fixed folder names
     # Place all outputs under <outroot>/artifacts for a unified layout across platforms
