@@ -3,8 +3,10 @@
 
 using osu.Framework.Allocation;
 using osu.Game.Audio;
+using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
 
@@ -39,6 +41,42 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
         /// </remarks>
         protected override HitObjectLifetimeEntry? FindFallbackEntry(HitObjectLifetimeEntry? nextUnjudged, double referenceTime)
             => FindLatestPassedEntry(referenceTime);
+
+        /// <summary>
+        /// LN 的键音来自头部，因此取样窗口取头节点的 miss 窗口。
+        /// </summary>
+        /// <remarks>
+        /// <see cref="HoldNote"/> 自身的 <see cref="HitObject.HitWindows"/> 是 <see cref="HitWindows.Empty"/>，
+        /// miss 窗口恒为 0，上游的「差两倍 miss 窗口以内」于是退化成「不早于这件物件的开始时间」：
+        /// 只要按早哪怕 1ms，这颗 LN 就被当成「离得还太远」，直接落进退回分支取到上一颗 note 的键音。
+        /// 头的判定窗口才是「按下会不会判到这颗 LN」的依据（<see cref="osu.Game.Rulesets.Mania.Objects.Drawables.DrawableHoldNote"/>
+        /// 判头与限制按早起点的都是 <c>Head.HitObject.HitWindows</c>）。
+        /// </remarks>
+        protected override double SampleWindowFor(HitObject hitObject)
+        {
+            if (hitObject is HoldNote hold && hold.Head?.HitWindows != null)
+                return hold.Head.HitWindows.WindowFor(HitResult.Miss);
+
+            return base.SampleWindowFor(hitObject);
+        }
+
+        /// <summary>
+        /// 头部判定窗口内一律取头节点作为键音来源。
+        /// </summary>
+        /// <remarks>
+        /// 头的 <c>GetEndTime()</c> 就是它自己的开始时间，而 LN 只有一个键音样本（在头上）。
+        /// 上游按「结束时间晚于参考时间」筛嵌套对象，按下晚于头时刻时会跳过头部，改取尾/体：
+        /// 键音谱的尾节点通常没有样本，于是这次按键静音，而头部判定随后才把键音补上，听起来就是键音跟着判定走、
+        /// 和按键对不上。超出窗口（长按过程中再次按下）仍走上游分支。
+        /// </remarks>
+        protected override HitObject? SelectSampleSource(HitObjectLifetimeEntry entry, double referenceTime)
+        {
+            if (entry.HitObject is HoldNote hold && hold.Head != null
+                && referenceTime <= hold.StartTime + SampleWindowFor(hold))
+                return hold.Head;
+
+            return base.SelectSampleSource(entry, referenceTime);
+        }
 
         public EzGameplaySampleTriggerSource(HitObjectContainer hitObjectContainer)
             : base(hitObjectContainer)
