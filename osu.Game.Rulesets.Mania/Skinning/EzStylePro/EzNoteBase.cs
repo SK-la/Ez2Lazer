@@ -15,6 +15,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected virtual bool UseColorization => false;
         protected virtual bool ShowSeparators => false;
 
+        protected virtual bool SupportsImprovedNoteDisplayColour => true;
+
         [Resolved(CanBeNull = true)]
         protected Column Column { get; private set; } = null!;
 
@@ -23,11 +25,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         // Read through the column instead of caching the shared bindables: a drawable that stores a shared bindable in a field
         // would unbind it from everyone else when disposed (see Drawable.UnbindAllBindables).
-        private bool ColorizationEnabled => Column.ColorSettingsEnabledBindable.Value;
+        private bool colorizationEnabled => Column.ColorSettingsEnabledBindable.Value;
 
-        private Colour4 ColumnNoteColour => Column.EzNoteColourBindable.Value;
+        private Colour4 columnNoteColour => Column.EzNoteColourBindable.Value;
 
-        private EzColumnType ColumnNoteType => Column.EzNoteTypeBindable.Value;
+        private EzColumnType columnNoteType => Column.EzNoteTypeBindable.Value;
 
         protected Container MainContainer { get; private set; } = null!;
         private Container? lineContainer;
@@ -60,8 +62,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             get
             {
-                if (ColorizationEnabled && UseColorization && !Column.ConfigTimingBasedNoteColouring)
-                    return ColumnNoteColour;
+                if (!SupportsImprovedNoteDisplayColour)
+                {
+                    if (colorizationEnabled && UseColorization && !Column.ConfigTimingBasedNoteColouring)
+                        return columnNoteColour;
+
+                    return Colour4.White;
+                }
+
+                if (colorizationEnabled && UseColorization && !Column.ConfigTimingBasedNoteColouring)
+                    return ManiaNoteDisplayColour.ResolveColumnColour(columnNoteColour);
 
                 return Colour4.White;
             }
@@ -75,16 +85,33 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             get
             {
-                if ((ColorizationEnabled && UseColorization) || !UseColorization || Column.ConfigTimingBasedNoteColouring) return "white";
+                if ((colorizationEnabled && UseColorization) || !UseColorization || Column.ConfigTimingBasedNoteColouring)
+                    return "white";
 
-                return ColumnNoteType switch
+                if (!SupportsImprovedNoteDisplayColour)
+                {
+                    return columnNoteType switch
+                    {
+                        EzColumnType.A => "white",
+                        EzColumnType.B => "blue",
+                        EzColumnType.S => "green",
+                        EzColumnType.E => "white",
+                        EzColumnType.P => "green",
+                        _ => "white",
+                    };
+                }
+
+                if (ManiaNoteTextureColouring.ShouldUseNormalisedNoteTextures(colorizationEnabled, Column.ConfigTimingBasedNoteColouring))
+                    return "white";
+
+                return columnNoteType switch
                 {
                     EzColumnType.A => "white",
                     EzColumnType.B => "blue",
                     EzColumnType.S => "green",
                     EzColumnType.E => "white",
                     EzColumnType.P => "green",
-                    _ => "white"
+                    _ => "white",
                 };
             }
         }

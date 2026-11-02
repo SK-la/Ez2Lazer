@@ -26,6 +26,10 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         protected override ManiaSkinComponents Component => ManiaSkinComponents.HoldNoteHead;
 
+        protected override bool SupportsImprovedNoteDisplayColour => false;
+
+        protected override bool SupportsTimingBasedNoteColouring => false;
+
         public DrawableHoldNoteHead()
             : this(null)
         {

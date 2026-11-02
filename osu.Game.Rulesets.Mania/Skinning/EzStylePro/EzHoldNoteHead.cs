@@ -10,6 +10,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzHoldNoteHead : EzNoteBase
     {
+        protected override bool SupportsImprovedNoteDisplayColour => false;
+
         protected override bool UseColorization => true;
         protected override bool ShowSeparators => true;
 
