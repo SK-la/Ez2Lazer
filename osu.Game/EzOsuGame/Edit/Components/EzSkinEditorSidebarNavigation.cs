@@ -22,7 +22,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private readonly EzSkinEditorSidebarGroupRail rail;
         private readonly OsuScrollContainer scroll;
-        private readonly IReadOnlyList<EzSkinEditorSettingsGroup?> groups;
+        private readonly IReadOnlyList<EzSkinEditorSettingsGroup> groups;
 
         private readonly Dictionary<EzSkinEditorSceneType, int> rememberedIndex = new Dictionary<EzSkinEditorSceneType, int>();
 
@@ -34,16 +34,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
         // 分组重建后先等一帧让新分组完成布局，期间不反推选中项。
         private bool syncArmed;
 
-        /// <summary>
-        /// 选中项变化时触发，参数为新的分组下标。
-        /// </summary>
-        public event Action<int>? SelectionChanged;
-
-        public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> Pages { get; private set; } = Array.Empty<EzSkinEditorSidebarGroupDefinition>();
+        public IReadOnlyList<EzSkinEditorSettingsGroup> Pages { get; private set; } = Array.Empty<EzSkinEditorSettingsGroup>();
 
         public int SelectedIndex => rail.SelectedIndex.Value;
 
-        public EzSkinEditorSidebarNavigation(EzSkinEditorSidebarGroupRail rail, OsuScrollContainer scroll, IReadOnlyList<EzSkinEditorSettingsGroup?> groups)
+        public EzSkinEditorSidebarNavigation(EzSkinEditorSidebarGroupRail rail, OsuScrollContainer scroll, IReadOnlyList<EzSkinEditorSettingsGroup> groups)
         {
             this.rail = rail;
             this.scroll = scroll;
@@ -53,28 +48,30 @@ namespace osu.Game.EzOsuGame.Edit.Components
         }
 
         /// <summary>
-        /// 换用新的分组列表：重建轨上项目，并按该场景记忆的选中项或首个可见分组选中。
+        /// 换上这一场景的栏目。栏目对象由场景持有，这里只更新导航轨。
         /// </summary>
-        public void ApplyPages(EzSkinEditorSceneType nextScene, IReadOnlyList<EzSkinEditorSidebarGroupDefinition> definitions)
+        public void ShowSections(EzSkinEditorSceneType nextScene, IReadOnlyList<EzSkinEditorSettingsGroup> sections)
         {
             scene = nextScene;
-            Pages = definitions;
+            Pages = sections;
 
-            rail.SetItems(definitions.Select(d => (d.Title, d.Visible)).ToList());
+            rail.SetItems(sections.Select(s => (s.SectionTitle, s.SectionVisible.Value)).ToList());
 
             if (scene is EzSkinEditorSceneType currentScene
                 && rememberedIndex.TryGetValue(currentScene, out int remembered)
-                && remembered >= 0 && remembered < definitions.Count
-                && definitions[remembered].Visible)
+                && remembered >= 0 && remembered < sections.Count
+                && sections[remembered].SectionVisible.Value)
             {
                 rail.SelectedIndex.Value = remembered;
             }
             else
             {
-                int first = definitions.ToList().FindIndex(d => d.Visible);
+                int first = sections.ToList().FindIndex(s => s.SectionVisible.Value);
                 rail.SelectedIndex.Value = first >= 0 ? first : 0;
             }
         }
+
+        public void SetSectionVisible(int index, bool visible) => rail.SetItemVisible(index, visible);
 
         /// <summary>
         /// 换用新的分组定义，但不重建己有的分组 Drawable。
@@ -85,21 +82,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 return;
 
             rail.SelectedIndex.Value = index;
-        }
-
-        /// <summary>
-        /// 按分组 Id 切换；找不到则忽略。
-        /// </summary>
-        public void SelectPageById(string id)
-        {
-            for (int i = 0; i < Pages.Count; i++)
-            {
-                if (Pages[i].Id == id)
-                {
-                    SelectPage(i);
-                    return;
-                }
-            }
         }
 
         /// <summary>
@@ -147,7 +129,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
             if (scene is EzSkinEditorSceneType currentScene)
                 rememberedIndex[currentScene] = change.NewValue;
 
-            SelectionChanged?.Invoke(change.NewValue);
             scrollToGroup(change.NewValue);
         }
 
@@ -156,10 +137,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
             if (suppressScrollResponse)
                 return;
 
-            if (index < 0 || index >= groups.Count || groups[index] is not EzSkinEditorSettingsGroup group)
+            if (index < 0 || index >= groups.Count || !groups[index].SectionVisible.Value)
                 return;
 
-            scroll.ScrollTo(group);
+            scroll.ScrollTo(groups[index]);
         }
 
         private int groupAtScrollTarget()
@@ -178,8 +159,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             for (int i = 0; i < groups.Count; i++)
             {
-                if (groups[i] is not EzSkinEditorSettingsGroup group)
+                if (!groups[i].SectionVisible.Value)
                     continue;
+
+                var group = groups[i];
 
                 // Pin 复选框等非分组内容位于列表顶部，视口顶尚未进入首个分组时挂到它上面。
                 if (scroll.GetChildPosInContent(group) > target + scroll_position_epsilon)
@@ -196,13 +179,13 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             for (int i = Math.Min(from, groups.Count - 1); i >= 0; i--)
             {
-                if (groups[i] != null)
+                if (groups[i].SectionVisible.Value)
                     return i;
             }
 
             for (int i = 0; i < groups.Count; i++)
             {
-                if (groups[i] != null)
+                if (groups[i].SectionVisible.Value)
                     return i;
             }
 

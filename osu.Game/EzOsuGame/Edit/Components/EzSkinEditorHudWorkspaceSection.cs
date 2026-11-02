@@ -4,7 +4,6 @@
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Sprites;
@@ -16,18 +15,15 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// <summary>
     /// HUD 栏内容：跟随选中组件显示官方同类设置控件。
     /// </summary>
-    public partial class EzSkinEditorHudWorkspaceSection : FillFlowContainer
+    public partial class EzSkinEditorHudWorkspaceSection : EzSkinEditorSettingsGroup
     {
         [Resolved(canBeNull: true)]
         private EzSkinEditorHudLayer? hudLayer { get; set; }
 
         public EzSkinEditorHudWorkspaceSection()
+            : base(EzEditorStrings.SIDEBAR_TAB_HUD)
         {
-            RelativeSizeAxes = Axes.X;
-            AutoSizeAxes = Axes.Y;
-            Direction = FillDirection.Vertical;
             Spacing = new Vector2(0, 12);
-            Padding = new MarginPadding(8);
         }
 
         protected override void LoadComplete()

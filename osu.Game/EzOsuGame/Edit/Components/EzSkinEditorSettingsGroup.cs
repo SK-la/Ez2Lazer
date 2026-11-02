@@ -1,30 +1,27 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Input.Events;
+using osu.Framework.Localisation;
 using osu.Game.Overlays;
 
 namespace osu.Game.EzOsuGame.Edit.Components
 {
     /// <summary>
-    /// Sidebar settings group using the same toolbox styling as pause-menu settings groups.
+    /// 侧栏里的一个栏目。对象在场景第一次显示时创建，之后一直复用。
+    /// 子控件在 <c>load</c> 里绑定配置。显隐走 <see cref="SectionVisible"/>，不拆掉重建。
     /// </summary>
-    public partial class EzSkinEditorSettingsGroup : SettingsToolboxGroup
+    public abstract partial class EzSkinEditorSettingsGroup : SettingsToolboxGroup
     {
-        private readonly EzSkinEditorSidebarGroupDefinition definition;
+        public LocalisableString SectionTitle { get; }
 
-        public EzSkinEditorSettingsGroup(EzSkinEditorSidebarGroupDefinition definition)
-            : base(definition.Title)
-        {
-            this.definition = definition;
-            Expanded.Value = definition.ExpandedByDefault;
-        }
+        public BindableBool SectionVisible { get; } = new BindableBool(true);
 
-        [BackgroundDependencyLoader]
-        private void load()
+        protected EzSkinEditorSettingsGroup(LocalisableString title)
+            : base(title)
         {
-            Add(definition.CreateContent());
+            SectionTitle = title;
         }
 
         protected override bool OnHover(HoverEvent e)

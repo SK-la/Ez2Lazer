@@ -1,43 +1,35 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
+using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
+using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays.Settings;
+using osu.Game.Skinning;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 {
-    public partial class EzSkinEditorNoteEditSettingsSection : FillFlowContainer
+    public partial class EzSkinEditorNoteEditSettingsSection : EzSkinEditorSettingsGroup
     {
-        private readonly EzSkinEditorNoteEditSession session;
-        private readonly Func<bool> usesEzNoteVariants;
-        private readonly Action createNoteSnapshot;
-        private readonly Action restoreNoteSnapshot;
-        private readonly Action exportNotePreview;
+        [Resolved]
+        private EzSkinEditorNoteEditSession session { get; set; } = null!;
+
+        [Resolved]
+        private EzSkinEditorSidebarActions actions { get; set; } = null!;
+
+        [Resolved]
+        private SkinManager skinManager { get; set; } = null!;
 
         private readonly BindableList<string> variantItems = new BindableList<string>();
         private SettingsDropdown<string> variantDropdown = null!;
 
-        public EzSkinEditorNoteEditSettingsSection(
-            EzSkinEditorNoteEditSession session,
-            Func<bool> usesEzNoteVariants,
-            Action createNoteSnapshot,
-            Action restoreNoteSnapshot,
-            Action exportNotePreview)
+        public EzSkinEditorNoteEditSettingsSection()
+            : base(EzEditorStrings.GROUP_NOTE_EDIT)
         {
-            this.session = session;
-            this.usesEzNoteVariants = usesEzNoteVariants;
-            this.createNoteSnapshot = createNoteSnapshot;
-            this.restoreNoteSnapshot = restoreNoteSnapshot;
-            this.exportNotePreview = exportNotePreview;
-            RelativeSizeAxes = Axes.X;
-            AutoSizeAxes = Axes.Y;
-            Direction = FillDirection.Vertical;
             Spacing = new Vector2(8);
         }
 
@@ -89,17 +81,17 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                 new SettingsButton
                 {
                     Text = EzEditorStrings.NOTE_CREATE_SNAPSHOT,
-                    Action = createNoteSnapshot,
+                    Action = () => actions.CreateNoteSnapshot?.Invoke(),
                 },
                 new SettingsButton
                 {
                     Text = EzEditorStrings.NOTE_RESTORE_SNAPSHOT,
-                    Action = restoreNoteSnapshot,
+                    Action = () => actions.RestoreNoteSnapshot?.Invoke(),
                 },
                 new SettingsButton
                 {
                     Text = EzEditorStrings.NOTE_EXPORT_BUTTON,
-                    Action = exportNotePreview,
+                    Action = () => actions.ExportNotePreview?.Invoke(),
                 },
             };
 
@@ -124,7 +116,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             if (profile == null)
                 return;
 
-            foreach (var variant in profile.GetVariants(usesEzNoteVariants(), session.Part.Value))
+            foreach (var variant in profile.GetVariants(usesEzVariants(), session.Part.Value))
                 variantItems.Add(variant.Id);
 
             if (variantItems.Count == 0)
@@ -132,7 +124,9 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 
             session.VariantId.Value = previous != null && variantItems.Contains(previous)
                 ? previous
-                : profile.GetDefaultVariantId(usesEzNoteVariants(), session.Part.Value);
+                : profile.GetDefaultVariantId(usesEzVariants(), session.Part.Value);
         }
+
+        private bool usesEzVariants() => EzSkinEditorNoteVariantResolver.UsesEzVariants(skinManager.CurrentSkin.Value);
     }
 }

@@ -7,6 +7,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
@@ -16,7 +17,7 @@ using osuTK;
 
 namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 {
-    public partial class EzSkinEditorBaseColourSettingsSection : FillFlowContainer
+    public partial class EzSkinEditorBaseColourSettingsSection : EzSkinEditorSettingsGroup
     {
         private readonly Dictionary<Ez2Setting, BindableColour4> colorBindables = new Dictionary<Ez2Setting, BindableColour4>();
 
@@ -27,10 +28,8 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         public EzSkinEditorBaseColourSettingsSection()
+            : base(EzEditorStrings.GROUP_BASE_COLOURS)
         {
-            RelativeSizeAxes = Axes.X;
-            AutoSizeAxes = Axes.Y;
-            Direction = FillDirection.Vertical;
             Spacing = new Vector2(8);
         }
 

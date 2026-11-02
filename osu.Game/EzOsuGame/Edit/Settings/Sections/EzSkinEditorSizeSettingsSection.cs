@@ -3,24 +3,22 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays.Settings;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 {
-    public partial class EzSkinEditorSizeSettingsSection : FillFlowContainer
+    public partial class EzSkinEditorSizeSettingsSection : EzSkinEditorSettingsGroup
     {
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         public EzSkinEditorSizeSettingsSection()
+            : base(EzEditorStrings.SIDEBAR_TAB_SIZE)
         {
-            RelativeSizeAxes = Axes.X;
-            AutoSizeAxes = Axes.Y;
-            Direction = FillDirection.Vertical;
             Spacing = new Vector2(8);
         }
 

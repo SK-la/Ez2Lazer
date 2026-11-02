@@ -1,10 +1,12 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
@@ -13,22 +15,42 @@ using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 {
-    public abstract partial class EzSkinEditorSkinIniSectionBase : FillFlowContainer
+    public abstract partial class EzSkinEditorSkinIniSectionBase : EzSkinEditorSettingsGroup
     {
-        protected readonly EzSkinIniSession? Session;
+        private Action? sessionReload;
 
-        protected readonly EzSkinEditorComparisonSnapshot? ComparisonSnapshot;
+        [Resolved]
+        private EzSkinIniSession session { get; set; } = null!;
+
+        [Resolved]
+        private EzSkinEditorComparisonSnapshot comparisonSnapshot { get; set; } = null!;
+
+        protected EzSkinIniSession Session => session;
 
         protected bool Applying { get; private set; }
 
-        protected EzSkinEditorSkinIniSectionBase(EzSkinIniSession? session, EzSkinEditorComparisonSnapshot? comparisonSnapshot = null)
+        protected EzSkinEditorSkinIniSectionBase(LocalisableString title)
+            : base(title)
         {
-            Session = session;
-            ComparisonSnapshot = comparisonSnapshot;
-            RelativeSizeAxes = Axes.X;
-            AutoSizeAxes = Axes.Y;
-            Direction = FillDirection.Vertical;
             Spacing = new Vector2(8);
+        }
+
+        /// <summary>
+        /// 订阅会话重新载入，并立刻用当前草稿填一次控件。
+        /// </summary>
+        protected void WatchSession(Action reload)
+        {
+            sessionReload = reload;
+            session.Loaded += sessionReload;
+            sessionReload();
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (sessionReload != null)
+                session.Loaded -= sessionReload;
+
+            base.Dispose(isDisposing);
         }
 
         protected Drawable CreateSubheader(LocalisableString text) =>
@@ -61,7 +83,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                 Current = bindable,
             };
 
-        protected void WithApplying(System.Action action)
+        protected void WithApplying(Action action)
         {
             Applying = true;
 
@@ -123,9 +145,9 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             Session.ApplyDocument(document);
         }
 
-        protected EzSkinIniDocument? ParseDocument() => Session?.ParseDraftDocument();
+        protected EzSkinIniDocument? ParseDocument() => Session.ParseDraftDocument();
 
         protected EzSkinIniDocument? ParseSnapshotDocument() =>
-            EzSkinIniBridge.TryParseSnapshotDocument(ComparisonSnapshot?.SkinIniDraftText);
+            EzSkinIniBridge.TryParseSnapshotDocument(comparisonSnapshot.SkinIniDraftText);
     }
 }

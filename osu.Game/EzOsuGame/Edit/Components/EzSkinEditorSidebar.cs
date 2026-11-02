@@ -48,7 +48,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private EzSkinEditorSidebarGroupRail rail = null!;
         private OsuScrollContainer contentScroll = null!;
         private FillFlowContainer contentFlow = null!;
-        private readonly List<EzSkinEditorSettingsGroup?> groupDrawables = new List<EzSkinEditorSettingsGroup?>();
+        private readonly List<EzSkinEditorSettingsGroup> groupDrawables = new List<EzSkinEditorSettingsGroup>();
+
+        private IEzSkinEditorSceneStrategy? shownStrategy;
+        private Drawable? shownFooter;
+        private readonly Dictionary<EzSkinEditorSettingsGroup, Action<ValueChangedEvent<bool>>> visibilityHandlers = new Dictionary<EzSkinEditorSettingsGroup, Action<ValueChangedEvent<bool>>>();
 
         private EzSkinEditorSidebarNavigation navigation = null!;
 
@@ -77,13 +81,16 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// </summary>
         public float ReservedLayoutWidth => ReservesSpace ? ExpandedWidthWithRail : 0;
 
-        /// <summary>
-        /// 当前选中分组的 <see cref="EzSkinEditorSidebarGroupDefinition.Id"/>；无 Id 时为 null。
-        /// 由测试与外部接线读取。
-        /// </summary>
-        internal Bindable<string?> SelectedGroupId { get; } = new Bindable<string?>();
-
         internal int PageCount => navigation.Pages.Count;
+
+        internal EzSkinEditorSettingsGroup? SelectedSection
+        {
+            get
+            {
+                int index = navigation.SelectedIndex;
+                return index >= 0 && index < groupDrawables.Count ? groupDrawables[index] : null;
+            }
+        }
 
         /// <summary>
         /// 为避免与侧边栏重叠，Picker 需要距离游戏区域右边缘保留的安全距离。
@@ -168,7 +175,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
             };
 
             navigation = new EzSkinEditorSidebarNavigation(rail, contentScroll, groupDrawables);
-            navigation.SelectionChanged += syncSelectedGroupId;
         }
 
         protected override void LoadComplete()
@@ -191,6 +197,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 contentPanel.FadeTo(v.NewValue ? 1 : 0, transition_duration, Easing.OutQuint);
                 updateReservedWidth();
             }, true);
+
+            contentFlow.Add(new SettingsCheckbox
+            {
+                LabelText = EzEditorStrings.SIDEBAR_PIN_LABEL,
+                Current = Pinned,
+            });
         }
 
         /// <summary>
@@ -209,10 +221,13 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// </summary>
         internal void SelectSidebarPage(int index) => navigation.SelectPage(index);
 
-        /// <summary>
-        /// 按分组 Id 切换；找不到则忽略。
-        /// </summary>
-        internal void SelectSidebarGroupById(string id) => navigation.SelectPageById(id);
+        internal void SelectSidebarGroup(EzSkinEditorSettingsGroup group)
+        {
+            int index = groupDrawables.IndexOf(group);
+
+            if (index >= 0)
+                navigation.SelectPage(index);
+        }
 
         protected override void Update()
         {
@@ -251,32 +266,76 @@ namespace osu.Game.EzOsuGame.Edit.Components
             return false;
         }
 
-        public void ApplyStrategy(IEzSkinEditorSceneStrategy strategy, EzSkinEditorSceneContext context)
+        /// <summary>
+        /// 显示这一场景的栏目。同一场景再次进入时复用已经创建的栏目，不重建。
+        /// </summary>
+        public void ShowScene(IEzSkinEditorSceneStrategy strategy)
         {
             hoverExpands = strategy.HoverExpandsSidebar;
 
-            var groups = strategy.CreateSidebarGroups(context);
-            applyPages(strategy.SceneType, groups);
+            if (ReferenceEquals(shownStrategy, strategy))
+                return;
 
-            footerContainer.Clear();
-            var footer = strategy.CreateSidebarFooter(context);
+            detachSections();
+            shownStrategy = strategy;
 
-            if (footer != null)
+            foreach (var section in strategy.Sections)
+            {
+                groupDrawables.Add(section);
+                var captured = section;
+                Action<ValueChangedEvent<bool>> handler = e => applySectionVisible(captured, e.NewValue);
+                visibilityHandlers[section] = handler;
+                section.SectionVisible.BindValueChanged(handler, true);
+                contentFlow.Add(section);
+            }
+
+            navigation.ShowSections(strategy.SceneType, groupDrawables);
+            navigation.SuspendSync();
+            Scheduler.AddOnce(navigation.ResumeSync);
+
+            if (shownFooter != null && shownFooter.Parent == footerContainer)
+                footerContainer.Remove(shownFooter, false);
+
+            shownFooter = strategy.Footer;
+
+            if (shownFooter != null)
             {
                 footerContainer.Height = FOOTER_HEIGHT;
-                footerContainer.Child = footer;
+                footerContainer.Child = shownFooter;
                 updateContentPadding();
             }
             else
                 clearFooter();
         }
 
-        private void applyPages(EzSkinEditorSceneType scene, IReadOnlyList<EzSkinEditorSidebarGroupDefinition> definitions)
+        private void detachSections()
         {
-            navigation.ApplyPages(scene, definitions);
-            updateContentPadding();
-            rebuildGroups();
-            syncSelectedGroupId(navigation.SelectedIndex);
+            foreach (var section in groupDrawables)
+            {
+                if (visibilityHandlers.TryGetValue(section, out var handler))
+                {
+                    section.SectionVisible.ValueChanged -= handler;
+                    visibilityHandlers.Remove(section);
+                }
+
+                if (section.Parent == contentFlow)
+                    contentFlow.Remove(section, false);
+            }
+
+            groupDrawables.Clear();
+        }
+
+        private void applySectionVisible(EzSkinEditorSettingsGroup section, bool visible)
+        {
+            if (visible)
+                section.Show();
+            else
+                section.Hide();
+
+            int index = groupDrawables.IndexOf(section);
+
+            if (index >= 0)
+                navigation.SetSectionVisible(index, visible);
         }
 
         private void updateContentPadding()
@@ -290,44 +349,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 Top = padding,
                 Bottom = bottom,
             };
-        }
-
-        private void rebuildGroups()
-        {
-            contentFlow.Clear();
-
-            // 固定开关置顶。分组重建会清空并销毁 contentFlow 的子项，开关必须每次重建，
-            // 否则切换场景后顶部就看不到它了。
-            contentFlow.Add(new SettingsCheckbox
-            {
-                LabelText = EzEditorStrings.SIDEBAR_PIN_LABEL,
-                Current = Pinned,
-            });
-
-            groupDrawables.Clear();
-
-            foreach (var definition in navigation.Pages)
-            {
-                if (!definition.Visible)
-                {
-                    groupDrawables.Add(null);
-                    continue;
-                }
-
-                var group = new EzSkinEditorSettingsGroup(definition);
-                groupDrawables.Add(group);
-                contentFlow.Add(group);
-            }
-
-            // 新分组在本帧才完成布局，先不要依据旧位置反推选中项。
-            navigation.SuspendSync();
-            Scheduler.AddOnce(navigation.ResumeSync);
-        }
-
-        private void syncSelectedGroupId(int index)
-        {
-            var pages = navigation.Pages;
-            SelectedGroupId.Value = index >= 0 && index < pages.Count ? pages[index].Id : null;
         }
 
         private void clearFooter()

@@ -18,8 +18,8 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
     {
         private readonly Dictionary<string, Bindable<Colour4>> colourFields = new Dictionary<string, Bindable<Colour4>>();
 
-        public EzSkinEditorSkinIniColoursSection(EzSkinIniSession? session, EzSkinEditorComparisonSnapshot? comparisonSnapshot = null)
-            : base(session, comparisonSnapshot)
+        public EzSkinEditorSkinIniColoursSection()
+            : base(EzEditorStrings.GROUP_COLOURS)
         {
         }
 
@@ -42,7 +42,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                 Add(CreateColourField(key, bindable));
             }
 
-            reloadFromSession();
+            WatchSession(reloadFromSession);
         }
 
         private void reloadFromSession()

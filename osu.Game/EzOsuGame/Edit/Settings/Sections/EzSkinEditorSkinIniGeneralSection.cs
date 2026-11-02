@@ -20,8 +20,8 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         private readonly Dictionary<string, Bindable<string>> textFields = new Dictionary<string, Bindable<string>>();
         private readonly Dictionary<string, Bindable<bool>> boolFields = new Dictionary<string, Bindable<bool>>();
 
-        public EzSkinEditorSkinIniGeneralSection(EzSkinIniSession? session, EzSkinEditorComparisonSnapshot? comparisonSnapshot = null)
-            : base(session, comparisonSnapshot)
+        public EzSkinEditorSkinIniGeneralSection()
+            : base(EzEditorStrings.GROUP_GENERAL)
         {
         }
 
@@ -64,7 +64,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                 }
             }
 
-            reloadFromSession();
+            WatchSession(reloadFromSession);
         }
 
         private void reloadFromSession()

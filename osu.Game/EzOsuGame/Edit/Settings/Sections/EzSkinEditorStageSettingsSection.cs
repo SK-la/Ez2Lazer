@@ -3,8 +3,8 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Screens;
@@ -13,7 +13,7 @@ using osuTK;
 
 namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 {
-    public partial class EzSkinEditorStageSettingsSection : FillFlowContainer
+    public partial class EzSkinEditorStageSettingsSection : EzSkinEditorSettingsGroup
     {
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
@@ -22,10 +22,8 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         private ManiaPlayfieldLayoutConfig playfieldLayout { get; set; } = null!;
 
         public EzSkinEditorStageSettingsSection()
+            : base(EzEditorStrings.GROUP_STAGE)
         {
-            RelativeSizeAxes = Axes.X;
-            AutoSizeAxes = Axes.Y;
-            Direction = FillDirection.Vertical;
             Spacing = new Vector2(8);
         }
 

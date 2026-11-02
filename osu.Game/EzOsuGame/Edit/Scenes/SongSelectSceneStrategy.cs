@@ -13,6 +13,8 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
     /// </summary>
     public class SongSelectSceneStrategy : IEzSkinEditorSceneStrategy
     {
+        private EzSkinEditorSettingsGroup[]? sections;
+
         public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.SongSelectHud;
 
         public EzSkinEditorSceneGroup Group => EzSkinEditorSceneGroup.SongSelect;
@@ -23,21 +25,10 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
 
         public bool HoverExpandsSidebar => false;
 
-        public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context) => new[]
+        public IReadOnlyList<EzSkinEditorSettingsGroup> Sections => sections ??= new EzSkinEditorSettingsGroup[]
         {
-            new EzSkinEditorSidebarGroupDefinition
-            {
-                Id = GameplaySceneStrategy.GROUP_ID_HUD,
-                Title = EzEditorStrings.SIDEBAR_TAB_HUD,
-                CreateContent = () => new EzSkinEditorHudWorkspaceSection(),
-            },
-            new EzSkinEditorSidebarGroupDefinition
-            {
-                Id = GameplaySceneStrategy.GROUP_ID_LIBRARY_GLOBAL,
-                Title = EzEditorStrings.LIBRARY_GLOBAL_TITLE,
-                Visible = context.ActiveLayer != EzHUDLayer.HudOff,
-                CreateContent = () => new EzSkinEditorComponentLibrarySection(rulesetScoped: false) { Title = EzEditorStrings.LIBRARY_GLOBAL_TITLE },
-            },
+            new EzSkinEditorHudWorkspaceSection(),
+            new EzSkinEditorComponentLibrarySection(rulesetScoped: false),
         };
     }
 }

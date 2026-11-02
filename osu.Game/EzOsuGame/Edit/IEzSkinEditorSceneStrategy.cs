@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Edit.Components;
 
 namespace osu.Game.EzOsuGame.Edit
 {
@@ -14,13 +15,15 @@ namespace osu.Game.EzOsuGame.Edit
     /// </summary>
     public interface IEzSkinEditorSceneStrategy
     {
-        EzSkinEditorSceneType SceneType { get; }
-
         /// <summary>
-        /// Top-level group this scene belongs to. Drives which scene-bar group is highlighted and
-        /// which secondary scenes the left rail lists.
+        /// 场景，一级分类。
         /// </summary>
         EzSkinEditorSceneGroup Group { get; }
+
+        /// <summary>
+        /// 场景，二级分类
+        /// </summary>
+        EzSkinEditorSceneType SceneType { get; }
 
         LocalisableString TabTitle { get; }
 
@@ -30,12 +33,13 @@ namespace osu.Game.EzOsuGame.Edit
         /// </summary>
         bool IsAvailable => true;
 
-        IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context);
+        IReadOnlyList<EzSkinEditorSettingsGroup> Sections { get; }
 
         /// <summary>
-        /// Optional footer overlay pinned to the bottom of the sidebar (e.g. skin.ini save bar).
+        /// Optional footer pinned to the bottom of the sidebar (e.g. skin.ini save bar).
+        /// Created once and reused.
         /// </summary>
-        Drawable? CreateSidebarFooter(EzSkinEditorSceneContext context) => null;
+        Drawable? Footer => null;
 
         /// <summary>
         /// Whether this scene presents an inserted screen whose skinnable HUD containers can be edited.

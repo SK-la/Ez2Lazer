@@ -3,9 +3,8 @@
 
 using System.Collections.Generic;
 using System.Linq;
-using osu.Game.EzOsuGame.Edit.Scenes;
+using osu.Framework.Graphics;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
-using osu.Game.EzOsuGame.Localization;
 
 namespace osu.Game.EzOsuGame.Edit
 {
@@ -23,7 +22,7 @@ namespace osu.Game.EzOsuGame.Edit
             All.Where(p => p.Kind == kind);
 
         /// <summary>
-        /// 皮肤专用分组。所有皮肤种类共用同一导航标题与稳定 Id，差异只在分组内容。
+        /// 皮肤专用栏目的内容。所有皮肤种类共用同一导航标题，差异只在控件。
         /// </summary>
         private sealed class SkinScopedGroupProvider : IEzSkinEditorSkinScopedGroupProvider
         {
@@ -34,21 +33,9 @@ namespace osu.Game.EzOsuGame.Edit
 
             public EzSkinEditorSkinKind Kind { get; }
 
-            public bool IsApplicable(EzSkinEditorSceneContext context) =>
-                EzSkinEditorSkinKindResolver.Resolve(context.ActualSkin) == Kind;
-
-            public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateGroups(EzSkinEditorSceneContext context) =>
-                new[]
-                {
-                    new EzSkinEditorSidebarGroupDefinition
-                    {
-                        Id = AppearanceSceneStrategy.GROUP_ID_SKIN_SCOPED,
-                        Title = EzEditorStrings.GROUP_SKIN_SPECIFIC,
-                        CreateContent = () => Kind == EzSkinEditorSkinKind.Scripted
-                            ? new EzSkinEditorScriptedSkinSettingsSection()
-                            : new EzBuiltInSkinScopedSettingsControls(Kind),
-                    },
-                };
+            public Drawable CreateControls() => Kind == EzSkinEditorSkinKind.Scripted
+                ? new EzSkinEditorScriptedSkinSettingsSection()
+                : new EzBuiltInSkinScopedSettingsControls(Kind);
         }
     }
 }

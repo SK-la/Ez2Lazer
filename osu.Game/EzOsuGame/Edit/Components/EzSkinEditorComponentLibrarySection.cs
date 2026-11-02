@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// persists the layout, and selects it. Global and ruleset-specific libraries are separate
     /// instances of this section.
     /// </summary>
-    public partial class EzSkinEditorComponentLibrarySection : FillFlowContainer
+    public partial class EzSkinEditorComponentLibrarySection : EzSkinEditorSettingsGroup
     {
         private readonly bool rulesetScoped;
 
@@ -35,10 +35,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
         [Resolved(canBeNull: true)]
         private ISkinComponentToolboxFilter? typeFilter { get; set; }
 
-        /// <summary>
-        /// Library title shown at the top of the section.
-        /// </summary>
-        public LocalisableString Title { get; init; }
+        [Resolved]
+        private EzSkinEditorSceneBar sceneBar { get; set; } = null!;
 
         /// <param name="rulesetScoped">
         /// When true the library lists ruleset-specific components for the ruleset the editor is editing;
@@ -46,14 +44,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// it always matches the container the components are placed into.
         /// </param>
         public EzSkinEditorComponentLibrarySection(bool rulesetScoped)
+            : base(rulesetScoped ? EzEditorStrings.LIBRARY_RULESET_TITLE : EzEditorStrings.LIBRARY_GLOBAL_TITLE)
         {
             this.rulesetScoped = rulesetScoped;
-
-            RelativeSizeAxes = Axes.X;
-            AutoSizeAxes = Axes.Y;
-            Direction = FillDirection.Vertical;
             Spacing = new Vector2(0, 8);
-            Padding = new MarginPadding(8);
         }
 
         /// <summary>The ruleset whose components this library lists, or null for the global library.</summary>
@@ -72,6 +66,19 @@ namespace osu.Game.EzOsuGame.Edit.Components
             hudLayer.ActiveTargetChanged += rebuild;
         }
 
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            sceneBar.ActiveLayer.BindValueChanged(_ =>
+            {
+                var layer = sceneBar.ActiveLayer.Value;
+                SectionVisible.Value = rulesetScoped
+                    ? layer is EzHUDLayer.EzHudRuleset or EzHUDLayer.EzPlayfieldRuleset
+                    : layer != EzHUDLayer.HudOff;
+            }, true);
+        }
+
         private void rebuild()
         {
             Clear();
@@ -79,7 +86,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             Add(new OsuSpriteText
             {
                 RelativeSizeAxes = Axes.X,
-                Text = Title,
+                Text = SectionTitle,
                 Font = OsuFont.Default.With(size: 15, weight: FontWeight.SemiBold),
             });
 

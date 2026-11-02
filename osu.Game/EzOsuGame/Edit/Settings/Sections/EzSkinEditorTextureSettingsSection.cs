@@ -9,6 +9,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Overlays.Settings;
@@ -16,7 +17,7 @@ using osuTK;
 
 namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 {
-    public partial class EzSkinEditorTextureSettingsSection : FillFlowContainer
+    public partial class EzSkinEditorTextureSettingsSection : EzSkinEditorSettingsGroup
     {
         private readonly List<string> availableGameThemes = new List<string>();
 
@@ -30,10 +31,8 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         private Storage storage { get; set; } = null!;
 
         public EzSkinEditorTextureSettingsSection()
+            : base(EzEditorStrings.GROUP_TEXTURE)
         {
-            RelativeSizeAxes = Axes.X;
-            AutoSizeAxes = Axes.Y;
-            Direction = FillDirection.Vertical;
             Spacing = new Vector2(8);
         }
 

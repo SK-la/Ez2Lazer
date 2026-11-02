@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Collections.Generic;
 using osu.Framework.Graphics;
 
 namespace osu.Game.EzOsuGame.Edit
@@ -14,10 +13,6 @@ namespace osu.Game.EzOsuGame.Edit
     {
         EzSkinEditorSkinKind Kind { get; }
 
-        bool IsApplicable(EzSkinEditorSceneContext context);
-
-        IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateGroups(EzSkinEditorSceneContext context);
-
-        Drawable? CreateSidebarFooter(EzSkinEditorSceneContext context) => null;
+        Drawable CreateControls();
     }
 }

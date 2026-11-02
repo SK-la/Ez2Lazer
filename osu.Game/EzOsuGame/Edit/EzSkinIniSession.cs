@@ -34,6 +34,8 @@ namespace osu.Game.EzOsuGame.Edit
 
         public bool IsSupported { get; private set; }
 
+        public event Action? Loaded;
+
         public EzSkinIniSession(SkinManager skinManager)
         {
             this.skinManager = skinManager;
@@ -50,12 +52,14 @@ namespace osu.Game.EzOsuGame.Edit
             {
                 SavedText = string.Empty;
                 DraftText = string.Empty;
+                Loaded?.Invoke();
                 return;
             }
 
             string text = skinInfo.PerformRead(readSkinIniText);
             SavedText = text;
             DraftText = text;
+            Loaded?.Invoke();
         }
 
         public void SetDraftText(string text) => DraftText = text;

@@ -29,8 +29,8 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         private FillFlowContainer staticFields = null!;
         private FillFlowContainer perKeyFields = null!;
 
-        public EzSkinEditorSkinIniManiaSection(EzSkinIniSession? session, EzSkinEditorComparisonSnapshot? comparisonSnapshot = null)
-            : base(session, comparisonSnapshot)
+        public EzSkinEditorSkinIniManiaSection()
+            : base(EzEditorStrings.GROUP_MODE)
         {
         }
 
@@ -79,7 +79,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                     reloadFromSession();
             };
 
-            reloadFromSession();
+            WatchSession(reloadFromSession);
         }
 
         private void addFieldGroup(FillFlowContainer container, LocalisableString title, IReadOnlyList<EzSkinIniFieldDefinition> fields)

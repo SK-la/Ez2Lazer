@@ -1,12 +1,13 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Linq;
+using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays.Settings;
@@ -15,22 +16,18 @@ using osuTK;
 
 namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 {
-    public partial class EzSkinEditorNoteRulesetSettingsSection : FillFlowContainer
+    public partial class EzSkinEditorNoteRulesetSettingsSection : EzSkinEditorSettingsGroup
     {
-        private readonly EzSkinEditorNoteEditSession session;
-        private readonly Action requestRefresh;
+        [Resolved]
+        private EzSkinEditorNoteEditSession session { get; set; } = null!;
 
         private readonly BindableList<RulesetInfo> rulesets = new BindableList<RulesetInfo>();
 
         private FillFlowContainer rulesetSettingsContainer = null!;
 
-        public EzSkinEditorNoteRulesetSettingsSection(EzSkinEditorNoteEditSession session, Action requestRefresh)
+        public EzSkinEditorNoteRulesetSettingsSection()
+            : base(EzEditorStrings.GROUP_NOTE_RULESET)
         {
-            this.session = session;
-            this.requestRefresh = requestRefresh;
-            RelativeSizeAxes = Axes.X;
-            AutoSizeAxes = Axes.Y;
-            Direction = FillDirection.Vertical;
             Spacing = new Vector2(8);
         }
 
@@ -65,8 +62,6 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             });
 
             session.Ruleset.BindValueChanged(_ => refreshRulesetSettings(), true);
-            session.Ruleset.BindValueChanged(_ => requestRefresh(), false);
-            session.Part.BindValueChanged(_ => requestRefresh(), false);
         }
 
         private void refreshRulesetSettings()

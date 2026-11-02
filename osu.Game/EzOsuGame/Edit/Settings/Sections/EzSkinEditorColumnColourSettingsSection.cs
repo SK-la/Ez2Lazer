@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Screens;
@@ -23,11 +24,11 @@ using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 {
-    public partial class EzSkinEditorColumnColourSettingsSection : FillFlowContainer
+    public partial class EzSkinEditorColumnColourSettingsSection : EzSkinEditorSettingsGroup
     {
         private static readonly List<int> available_key_modes = new List<int> { 0, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
 
-        private readonly EzSkinEditorPreviewState? previewState;
+        private IBindable<int?>? suggestedKeyMode;
 
         private readonly Dictionary<int, List<EzSelectorColour>> columnSelectorCache = new Dictionary<int, List<EzSelectorColour>>();
         private readonly Dictionary<Ez2Setting, BindableColour4> colorBindables = new Dictionary<Ez2Setting, BindableColour4>();
@@ -39,12 +40,12 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
-        public EzSkinEditorColumnColourSettingsSection(EzSkinEditorPreviewState? previewState = null)
+        [Resolved]
+        private EzSkinEditorPreviewState previewState { get; set; } = null!;
+
+        public EzSkinEditorColumnColourSettingsSection()
+            : base(EzEditorStrings.GROUP_COLUMN_COLOURS)
         {
-            this.previewState = previewState;
-            RelativeSizeAxes = Axes.X;
-            AutoSizeAxes = Axes.Y;
-            Direction = FillDirection.Vertical;
             Spacing = new Vector2(8);
         }
 
@@ -104,7 +105,8 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             colorBindables[Ez2Setting.ColumnTypeE].BindValueChanged(e => updateBaseColour(e.NewValue, EzConstants.COLUMN_TYPE_E));
             colorBindables[Ez2Setting.ColumnTypeP].BindValueChanged(e => updateBaseColour(e.NewValue, EzConstants.COLUMN_TYPE_P));
 
-            previewState?.SuggestedKeyMode.BindValueChanged(e => updateKeyModeFromPreview(), true);
+            suggestedKeyMode = previewState.SuggestedKeyMode.GetBoundCopy();
+            suggestedKeyMode.BindValueChanged(_ => updateKeyModeFromPreview(), true);
         }
 
         protected override void Dispose(bool isDisposing)
@@ -115,7 +117,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             foreach (var bindable in colorBindables.Values)
                 bindable.UnbindAll();
 
-            previewState?.SuggestedKeyMode.UnbindAll();
+            suggestedKeyMode?.UnbindAll();
             base.Dispose(isDisposing);
         }
 
@@ -150,7 +152,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 
         private void updateKeyModeFromPreview()
         {
-            int? suggested = previewState?.SuggestedKeyMode.Value;
+            int? suggested = previewState.SuggestedKeyMode.Value;
 
             if (suggested == null || !available_key_modes.Contains(suggested.Value))
                 return;

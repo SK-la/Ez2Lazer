@@ -10,11 +10,7 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
 {
     public class GameplaySceneStrategy : IEzSkinEditorSceneStrategy
     {
-        public const string GROUP_ID_HUD = "hud";
-
-        public const string GROUP_ID_LIBRARY_GLOBAL = "library-global";
-
-        public const string GROUP_ID_LIBRARY_RULESET = "library-ruleset";
+        private EzSkinEditorSettingsGroup[]? sections;
 
         public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.GameplayHud;
 
@@ -26,34 +22,11 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
 
         public bool HoverExpandsSidebar => false;
 
-        public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context) => new[]
+        public IReadOnlyList<EzSkinEditorSettingsGroup> Sections => sections ??= new EzSkinEditorSettingsGroup[]
         {
-            new EzSkinEditorSidebarGroupDefinition
-            {
-                Id = GROUP_ID_HUD,
-                Title = EzEditorStrings.SIDEBAR_TAB_HUD,
-                CreateContent = () => new EzSkinEditorHudWorkspaceSection(),
-            },
-            new EzSkinEditorSidebarGroupDefinition
-            {
-                Id = GROUP_ID_LIBRARY_GLOBAL,
-                Title = EzEditorStrings.LIBRARY_GLOBAL_TITLE,
-                Visible = hasEditingLayer(context.ActiveLayer),
-                CreateContent = () => new EzSkinEditorComponentLibrarySection(rulesetScoped: false) { Title = EzEditorStrings.LIBRARY_GLOBAL_TITLE },
-            },
-            new EzSkinEditorSidebarGroupDefinition
-            {
-                Id = GROUP_ID_LIBRARY_RULESET,
-                Title = EzEditorStrings.LIBRARY_RULESET_TITLE,
-                Visible = isRulesetLibraryActive(context.ActiveLayer),
-                CreateContent = () => new EzSkinEditorComponentLibrarySection(rulesetScoped: true) { Title = EzEditorStrings.LIBRARY_RULESET_TITLE },
-            },
+            new EzSkinEditorHudWorkspaceSection(),
+            new EzSkinEditorComponentLibrarySection(rulesetScoped: false),
+            new EzSkinEditorComponentLibrarySection(rulesetScoped: true),
         };
-
-        // 通用库在任何编辑层都在；模式库在模式专用层时追加为第二个库分组（各自一个导航按钮）。
-        private static bool hasEditingLayer(EzHUDLayer layer) => layer != EzHUDLayer.HudOff;
-
-        private static bool isRulesetLibraryActive(EzHUDLayer layer)
-            => layer is EzHUDLayer.EzHudRuleset or EzHUDLayer.EzPlayfieldRuleset;
     }
 }
