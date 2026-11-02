@@ -5,7 +5,6 @@ using System;
 using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Overlays.Preview;
 using osu.Game.Rulesets;
@@ -48,14 +47,12 @@ namespace osu.Game.EzOsuGame.Edit
         /// </summary>
         public Action? RequestPreviewRefresh { get; init; }
 
-        public Func<EzSkinEditorEmbeddedPlayer?>? GetEmbeddedPlayer { get; set; }
-
         public Action? CommitSkinIni { get; init; }
 
         public EzSkinEditorPreviewSource PreviewSource { get; init; } = EzSkinEditorPreviewSource.Static;
 
         /// <summary>
-        /// When true, <see cref="Components.EzSkinEditorPreviewHost"/> shows the selected ruleset beatmap.
+        /// When true, the selected ruleset beatmap is used for preview playback.
         /// </summary>
         public bool AllowBeatmapPreview { get; init; }
 
