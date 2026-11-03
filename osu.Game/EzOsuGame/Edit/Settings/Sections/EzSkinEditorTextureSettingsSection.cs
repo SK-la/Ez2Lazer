@@ -12,6 +12,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays;
+using osu.Game.EzOsuGame.Screens;
 using osu.Game.Overlays.Settings;
 using osuTK;
 

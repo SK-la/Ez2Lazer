@@ -14,7 +14,6 @@ using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Edit.Settings;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Localization;

@@ -12,7 +12,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Edit.Settings;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Overlays.Settings;
