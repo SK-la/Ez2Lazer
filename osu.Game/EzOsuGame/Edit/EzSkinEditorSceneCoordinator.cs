@@ -197,7 +197,7 @@ namespace osu.Game.EzOsuGame.Edit
             if (getCurrentScreen() is EzSkinEditorPreviewManiaScreen { IsLoaded: true } existing)
             {
                 // 已经在预览屏上：只换谱面源，不重插屏幕。
-                existing.SetSource(workspace.PreviewState.PreviewBeatmap, workspace.PreviewState.Ruleset.Value);
+                existing.SetSource(workspace.PreviewState.PreviewBeatmap.Value, workspace.PreviewState.Ruleset.Value);
                 bindFullMapPreview(existing);
                 return;
             }

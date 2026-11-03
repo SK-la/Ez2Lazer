@@ -180,7 +180,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         private readonly Dictionary<EzSkinEditorSceneGroup, EzSkinEditorSceneType> rememberedScene = new Dictionary<EzSkinEditorSceneGroup, EzSkinEditorSceneType>();
 
-        internal Bindable<EzSkinEditorPreviewSource> PreviewSource => PreviewState.Source;
+        internal Bindable<IWorkingBeatmap?> PreviewBeatmap => PreviewState.PreviewBeatmap;
 
         /// <summary>
         /// Space the sidebar currently reserves in the workspace layout. Zero while the sidebar
@@ -381,7 +381,7 @@ namespace osu.Game.EzOsuGame.Edit
                                                     playbackBar = new EzPlaybackBar(playback),
                                                     new EzSkinEditorTopToolbar
                                                     {
-                                                        PreviewSource = PreviewState.Source,
+                                                        PreviewBeatmap = PreviewState.PreviewBeatmap,
                                                         PreviewMode = PreviewState.Mode,
                                                         LoopBeatmap = PreviewState.LoopBeatmap,
                                                         Ruleset = PreviewState.Ruleset,
@@ -629,7 +629,7 @@ namespace osu.Game.EzOsuGame.Edit
             var working = gameBeatmap.Value;
 
             if (PreviewState.HasBeatmapLoaded
-                && PreviewState.PreviewBeatmap!.BeatmapInfo.Hash == working.BeatmapInfo.Hash
+                && PreviewState.PreviewBeatmap.Value!.BeatmapInfo.Hash == working.BeatmapInfo.Hash
                 && PreviewState.Ruleset.Value?.ShortName == ruleset.ShortName
                 && EzBeatmapPreviewModes.IsManiaRuleset(PreviewState.Ruleset.Value))
                 return;

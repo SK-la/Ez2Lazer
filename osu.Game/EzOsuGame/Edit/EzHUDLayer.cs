@@ -30,15 +30,4 @@ namespace osu.Game.EzOsuGame.Edit
         // SkinHudRuleset,
         // SkinPlayfieldRuleset,
     }
-
-    /// <summary>
-    /// Which storage the layer's container belongs to. Only <see cref="Ez"/> layers are editable
-    /// in the current phase; <see cref="Skin"/> is reserved for the follow-up skin-layer phase.
-    /// </summary>
-    /// TODO：此类型后续删除，通过判断 EzHUDLayer 是否为 Ez 开头即可。
-    public enum EzSkinEditorLayerSource
-    {
-        Ez,
-        Skin,
-    }
 }

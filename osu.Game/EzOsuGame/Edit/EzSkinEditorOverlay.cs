@@ -249,7 +249,7 @@ namespace osu.Game.EzOsuGame.Edit
                     return;
 
                 screen.Push(new EzSkinEditorPreviewManiaScreen(
-                    Workspace.PreviewState.PreviewBeatmap,
+                    Workspace.PreviewState.PreviewBeatmap.Value,
                     Workspace.PreviewState.Ruleset.Value,
                     Workspace.PreviewManiaSettings));
             }, new[] { typeof(MainMenu) });

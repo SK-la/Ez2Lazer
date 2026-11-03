@@ -1084,7 +1084,7 @@ namespace osu.Game.Tests.Visual.Edit
             AddUntilStep("top toolbar visible", () => editorScreen.ChildrenOfType<EzSkinEditorTopToolbar>().Any());
             AddUntilStep("skin dropdown visible", () => editorScreen.ChildrenOfType<EzSkinEditorSkinDropdown>().Any());
             AddUntilStep("beatmap menu button visible", () => editorScreen.ChildrenOfType<EzSkinEditorBeatmapMenuButton>().Any());
-            AddAssert("preview source resolved", () => editorScreen.PreviewSource.Value is EzSkinEditorPreviewSource.Static or EzSkinEditorPreviewSource.Beatmap);
+            AddAssert("no preview beatmap on load", () => editorScreen.PreviewBeatmap.Value == null);
         }
 
         [Test]
@@ -1195,7 +1195,7 @@ namespace osu.Game.Tests.Visual.Edit
             importLegacySkin();
 
             AddUntilStep("workspace still present", () => editorScreen.IsLoaded);
-            AddAssert("still static preview", () => editorScreen.PreviewSource.Value == EzSkinEditorPreviewSource.Static);
+            AddAssert("still no preview beatmap", () => editorScreen.PreviewBeatmap.Value == null);
         }
 
         [Test]

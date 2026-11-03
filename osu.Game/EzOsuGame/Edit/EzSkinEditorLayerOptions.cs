@@ -17,8 +17,6 @@ namespace osu.Game.EzOsuGame.Edit
     {
         public required EzHUDLayer Layer { get; init; }
 
-        public required EzSkinEditorLayerSource Source { get; init; }
-
         /// <summary>
         /// Whether the layer only matches components scoped to the current ruleset.
         /// </summary>
@@ -28,11 +26,6 @@ namespace osu.Game.EzOsuGame.Edit
         /// The layout target this layer edits. Only meaningful for <see cref="EzSkinEditorLayerSource.Ez"/>.
         /// </summary>
         public required GlobalSkinnableContainers Target { get; init; }
-
-        /// <summary>
-        /// Whether this layer hides the whole HUD layer instead of selecting an editing target.
-        /// </summary>
-        public bool HidesEverything => Layer == EzHUDLayer.HudOff;
     }
 
     /// <summary>
@@ -44,7 +37,6 @@ namespace osu.Game.EzOsuGame.Edit
         public static readonly EzSkinEditorLayerDefinition HUD_OFF = new EzSkinEditorLayerDefinition
         {
             Layer = EzHUDLayer.HudOff,
-            Source = EzSkinEditorLayerSource.Ez,
             RulesetScoped = false,
             Target = GlobalSkinnableContainers.MainHUDComponents,
         };
@@ -52,7 +44,6 @@ namespace osu.Game.EzOsuGame.Edit
         public static readonly EzSkinEditorLayerDefinition EZ_HUD = new EzSkinEditorLayerDefinition
         {
             Layer = EzHUDLayer.EzHud,
-            Source = EzSkinEditorLayerSource.Ez,
             RulesetScoped = false,
             Target = GlobalSkinnableContainers.MainHUDComponents,
         };
@@ -60,7 +51,6 @@ namespace osu.Game.EzOsuGame.Edit
         public static readonly EzSkinEditorLayerDefinition EZ_HUD_RULESET = new EzSkinEditorLayerDefinition
         {
             Layer = EzHUDLayer.EzHudRuleset,
-            Source = EzSkinEditorLayerSource.Ez,
             RulesetScoped = true,
             Target = GlobalSkinnableContainers.MainHUDComponents,
         };
@@ -68,7 +58,6 @@ namespace osu.Game.EzOsuGame.Edit
         public static readonly EzSkinEditorLayerDefinition EZ_PLAYFIELD_RULESET = new EzSkinEditorLayerDefinition
         {
             Layer = EzHUDLayer.EzPlayfieldRuleset,
-            Source = EzSkinEditorLayerSource.Ez,
             RulesetScoped = true,
             Target = GlobalSkinnableContainers.Playfield,
         };
@@ -161,7 +150,7 @@ namespace osu.Game.EzOsuGame.Edit
             if (!EzSkinEditorSceneRegistry.SupportsHudLayer(sceneType))
                 return layer;
 
-            var fallback = offered.FirstOrDefault(d => !d.HidesEverything);
+            var fallback = offered.FirstOrDefault(d => d.Layer != EzHUDLayer.HudOff);
             return fallback?.Layer ?? EzHUDLayer.HudOff;
         }
     }

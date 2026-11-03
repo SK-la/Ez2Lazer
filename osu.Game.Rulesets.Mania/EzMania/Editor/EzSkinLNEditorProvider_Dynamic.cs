@@ -2,13 +2,13 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
-using osu.Game.EzOsuGame.Edit;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
@@ -96,7 +96,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             return beatmap;
         }
 
-        private sealed partial class VirtualPlayfieldPreview : Container, IEzSkinEditorScenePlaybackSource
+        private sealed partial class VirtualPlayfieldPreview : Container
         {
             private readonly int keyCount;
             private readonly StopwatchClock playbackClock = new StopwatchClock(true);
@@ -104,8 +104,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
 
             private DrawableRuleset drawableRuleset = null!;
             private ManiaBeatmap previewBeatmap = null!;
-            private double beatmapMinTime;
-            private double beatmapMaxTime;
             private double? pendingSeekTime;
 
             public VirtualPlayfieldPreview(int keyCount)
@@ -139,7 +137,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             protected override void LoadComplete()
             {
                 base.LoadComplete();
-                EzSkinEditorRulesetPreviewBootstrap.ApplyAutoplayReplay(drawableRuleset, previewBeatmap);
+                ApplyAutoplayReplay(drawableRuleset, previewBeatmap);
+            }
+
+            public static void ApplyAutoplayReplay(DrawableRuleset ruleset, IBeatmap beatmap)
+            {
+                var autoplay = ruleset.Mods.OfType<ICreateReplayData>().FirstOrDefault();
+
+                if (autoplay != null)
+                    ruleset.SetReplayScore(autoplay.CreateScoreFromReplayData(beatmap, ruleset.Mods));
             }
 
             protected override void Update()
@@ -157,17 +163,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
                     playbackClock.Seek(playbackClock.CurrentTime - loopBack);
             }
 
-            bool IEzSkinEditorScenePlaybackSource.IsActive => IsLoaded && !IsDisposed;
+            private bool isActive => IsLoaded && !IsDisposed;
 
-            double IEzSkinEditorScenePlaybackSource.BeatmapMinTime => beatmapMinTime;
+            private double beatmapMinTime { get; set; }
 
-            double IEzSkinEditorScenePlaybackSource.BeatmapMaxTime => beatmapMaxTime;
+            private double beatmapMaxTime { get; set; }
 
-            double IEzSkinEditorScenePlaybackSource.CurrentTime => playbackClock.CurrentTime;
+            private double currentTime => playbackClock.CurrentTime;
 
-            bool IEzSkinEditorScenePlaybackSource.IsPlaying => playbackClock.IsRunning;
+            private bool isPlaying => playbackClock.IsRunning;
 
-            void IEzSkinEditorScenePlaybackSource.Seek(double time)
+            private void seek(double time)
             {
                 double span = loop_pattern_period * loop_pattern_cycles;
                 double wrapped = time % span;
@@ -188,7 +194,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
                 playbackClock.Seek(time);
             }
 
-            void IEzSkinEditorScenePlaybackSource.SetPlaying(bool playing)
+            private void setPlaying(bool playing)
             {
                 if (playing)
                     playbackClock.Start();

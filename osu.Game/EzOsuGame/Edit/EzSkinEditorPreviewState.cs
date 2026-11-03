@@ -15,9 +15,7 @@ namespace osu.Game.EzOsuGame.Edit
     {
         private static readonly int[] available_key_modes = { 0, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
 
-        public Bindable<EzSkinEditorPreviewSource> Source { get; } = new Bindable<EzSkinEditorPreviewSource>(EzSkinEditorPreviewSource.Static);
-
-        public Bindable<EzBeatmapPreviewMode> Mode { get; } = new Bindable<EzBeatmapPreviewMode>(EzBeatmapPreviewMode.Static);
+        public Bindable<EzBeatmapPreviewMode> Mode { get; } = new Bindable<EzBeatmapPreviewMode>();
 
         public Bindable<RulesetInfo?> Ruleset { get; } = new Bindable<RulesetInfo?>();
 
@@ -29,26 +27,17 @@ namespace osu.Game.EzOsuGame.Edit
         /// </summary>
         public BindableBool LoopBeatmap { get; } = new BindableBool();
 
-        public IWorkingBeatmap? PreviewBeatmap { get; private set; }
-
-        public void SetStatic()
-        {
-            Source.Value = EzSkinEditorPreviewSource.Static;
-            PreviewBeatmap = null;
-            Ruleset.Value = null;
-            SuggestedKeyMode.Value = null;
-        }
+        public Bindable<IWorkingBeatmap?> PreviewBeatmap { get; } = new Bindable<IWorkingBeatmap?>();
 
         public void SetBeatmap(IWorkingBeatmap workingBeatmap, RulesetInfo ruleset, EzBeatmapPreviewMode mode)
         {
-            PreviewBeatmap = workingBeatmap;
+            PreviewBeatmap.Value = workingBeatmap;
             Ruleset.Value = ruleset;
             Mode.Value = mode;
-            Source.Value = EzSkinEditorPreviewSource.Beatmap;
             SuggestedKeyMode.Value = resolveKeyModeFromBeatmap(workingBeatmap);
         }
 
-        public bool HasBeatmapLoaded => Source.Value == EzSkinEditorPreviewSource.Beatmap && PreviewBeatmap != null;
+        public bool HasBeatmapLoaded => PreviewBeatmap.Value != null;
 
         public void PauseBeatmapPlayback() => Mode.Value = EzBeatmapPreviewMode.Static;
 
