@@ -58,6 +58,8 @@ namespace osu.Game.Screens.Edit.Compose.Components
 
         private readonly Cached lineCache = new Cached();
 
+        public void InvalidateLines() => lineCache.Invalidate();
+
         private (double start, double end)? selectionTimeRange;
 
         [BackgroundDependencyLoader]
@@ -77,6 +79,9 @@ namespace osu.Game.Screens.Edit.Compose.Components
         }
 
         protected abstract IEnumerable<Container> GetTargetContainers(HitObjectComposer composer);
+
+        protected virtual Color4 GetLineColour(int divisor)
+            => BindableBeatDivisor.GetColourFor(divisor, colours);
 
         protected override void Update()
         {
@@ -138,8 +143,7 @@ namespace osu.Game.Screens.Edit.Compose.Components
                     }
                 }
 
-                Color4 colour = BindableBeatDivisor.GetColourFor(
-                    BindableBeatDivisor.GetDivisorForBeatIndex(beat, beatDivisor.Value), colours);
+                Color4 colour = GetLineColour(BindableBeatDivisor.GetDivisorForBeatIndex(beat, beatDivisor.Value));
 
                 foreach (var grid in grids)
                 {

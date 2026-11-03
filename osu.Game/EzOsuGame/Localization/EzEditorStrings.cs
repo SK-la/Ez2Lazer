@@ -264,6 +264,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SCENE_GROUP_GAMEPLAY = new EzLocalizationManager.EzLocalisableString("游玩", "Gameplay");
 
+        public static readonly LocalisableString SCENE_GROUP_BEATMAP_EDITOR = new EzLocalizationManager.EzLocalisableString("谱面编辑器", "Beatmap editor");
+
         public static readonly LocalisableString SCENE_OFFICIAL_HUD = new EzLocalizationManager.EzLocalisableString("官方 HUD", "Official HUD");
 
         public static readonly LocalisableString SCENE_EZ_SKIN = new EzLocalizationManager.EzLocalisableString("Ez Skin", "Ez Skin");
@@ -297,6 +299,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString TAB_BEATMAP_PREVIEW = new EzLocalizationManager.EzLocalisableString("谱面预览", "Beatmap preview");
 
+        public static readonly LocalisableString TAB_EDITOR_COLOURING = new EzLocalizationManager.EzLocalisableString("配色", "Colouring");
+
         #endregion
 
         #region Sidebar groups
@@ -326,6 +330,11 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString GROUP_NOTE_RULESET = new EzLocalizationManager.EzLocalisableString("规则集", "Ruleset");
 
         public static readonly LocalisableString GROUP_NOTE_EDIT = new EzLocalizationManager.EzLocalisableString("Note 编辑", "Note edit");
+
+        public static readonly LocalisableString GROUP_BEAT_SNAP_LINES = new EzLocalizationManager.EzLocalisableString("节拍线", "Beat snap lines");
+
+        public static LocalisableString GetBeatSnapLineDivisorLabel(int divisor) =>
+            new EzLocalizationManager.EzLocalisableString($"分母 {divisor}", $"Divisor {divisor}");
 
         #endregion
 
