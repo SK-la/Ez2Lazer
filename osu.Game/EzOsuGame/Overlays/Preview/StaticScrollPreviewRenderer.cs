@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         private float lastViewportHeight;
         private int lastMeasuresPerColumn = -1;
 
-        private EzPreviewManiaSettings settings = EzPreviewManiaSettings.DEFAULT;
+        private EzPreviewManiaSettings? settings;
 
         public StaticScrollPreviewRenderer()
         {
@@ -119,7 +119,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
         private void rebuild()
         {
-            if (DrawWidth <= 1 || DrawHeight <= 1)
+            if (DrawWidth <= 1 || DrawHeight <= 1 || settings == null)
                 return;
 
             lastViewportWidth = DrawWidth;

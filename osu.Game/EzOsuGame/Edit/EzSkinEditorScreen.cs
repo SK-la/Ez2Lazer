@@ -194,13 +194,6 @@ namespace osu.Game.EzOsuGame.Edit
 
         internal EzSkinEditorPreviewState PreviewState { get; } = new EzSkinEditorPreviewState();
 
-        /// <summary>
-        /// 全谱预览的绘制外观。独立于 Ez2Setting / skin.ini，存到 EzResources/Config。改动即改即存。
-        /// </summary>
-        internal EzPreviewManiaSettings PreviewManiaSettings { get; } = new EzPreviewManiaSettings();
-
-        private EzPreviewManiaSettingsStore? previewManiaSettingsStore;
-
         internal Bindable<EzSkinEditorNoteCompareKind> NoteCompareKind { get; } = new Bindable<EzSkinEditorNoteCompareKind>();
 
         public EzSkinEditorScreen()
@@ -271,7 +264,6 @@ namespace osu.Game.EzOsuGame.Edit
             dependencies.CacheAs(PreviewState);
             dependencies.CacheAs(NoteSessionForTesting);
             dependencies.CacheAs(ComparisonSnapshotForTesting);
-            dependencies.CacheAs(PreviewManiaSettings);
             SkinIniSession = new EzSkinIniSession(skinManager);
             dependencies.CacheAs(SkinIniSession);
             dependencies.CacheAs(new EzSkinEditorSidebarActions
@@ -443,7 +435,6 @@ namespace osu.Game.EzOsuGame.Edit
             base.LoadComplete();
             SkinEditorProviderResolver.EnsureDefaultProviderRegistered();
             beatmapPicker = new EzSkinEditorBeatmapPicker(realm, beatmapManager);
-            loadFullMapPreviewSettings();
             sceneRail.CurrentScene.BindTo(sceneBar.CurrentScene);
             sceneBar.CurrentScene.BindValueChanged(onSceneChanged, true);
             skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
@@ -1189,22 +1180,6 @@ namespace osu.Game.EzOsuGame.Edit
             ezSkinConfig.Save();
             skinManager.CurrentSkinInfo.TriggerChange();
         }
-
-        private void loadFullMapPreviewSettings()
-        {
-            previewManiaSettingsStore = new EzPreviewManiaSettingsStore(storage);
-            previewManiaSettingsStore.Load().CopyTo(PreviewManiaSettings);
-
-            PreviewManiaSettings.Style.BindValueChanged(_ => saveFullMapPreviewSettings());
-            PreviewManiaSettings.NoteColour.BindValueChanged(_ => saveFullMapPreviewSettings());
-            PreviewManiaSettings.HoldHeadColour.BindValueChanged(_ => saveFullMapPreviewSettings());
-            PreviewManiaSettings.HoldBodyColour.BindValueChanged(_ => saveFullMapPreviewSettings());
-            // PreviewManiaSettings.HoldTailColour.BindValueChanged(_ => saveFullMapPreviewSettings());
-            PreviewManiaSettings.ThicknessScale.BindValueChanged(_ => saveFullMapPreviewSettings());
-            PreviewManiaSettings.LaneBackgroundColour.BindValueChanged(_ => saveFullMapPreviewSettings());
-        }
-
-        private void saveFullMapPreviewSettings() => previewManiaSettingsStore?.Save(PreviewManiaSettings);
 
         private void exportPreviewImage()
         {

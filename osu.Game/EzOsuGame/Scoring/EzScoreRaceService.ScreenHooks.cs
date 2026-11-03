@@ -60,7 +60,7 @@ namespace osu.Game.EzOsuGame.Scoring
             bindModsFromScreen(newScreen as OsuScreen);
 
             // 选歌界面是预加载决策点：皮肤 / Ez 布局编辑器可能刚改过布局，
-            // 而官方编辑器与 EzLayoutStore 的保存都不产生任何绑定事件，只有这里强制重扫才可达。
+            // 而官方编辑器与 EzConfigLayoutStore 的保存都不产生任何绑定事件，只有这里强制重扫才可达。
             // 其他屏幕（含 Player / 结算）不重扫，保证局内零额外负担。
             if (newScreen is SongSelect)
                 recomputeDemand(force: true);

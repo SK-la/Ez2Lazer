@@ -250,8 +250,7 @@ namespace osu.Game.EzOsuGame.Edit
 
                 screen.Push(new EzSkinEditorPreviewManiaScreen(
                     Workspace.PreviewState.PreviewBeatmap.Value,
-                    Workspace.PreviewState.Ruleset.Value,
-                    Workspace.PreviewManiaSettings));
+                    Workspace.PreviewState.Ruleset.Value));
             }, new[] { typeof(MainMenu) });
         }
 

@@ -6,6 +6,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays.Preview;
 using osu.Game.EzOsuGame.Screens;
@@ -20,7 +21,9 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
     public partial class BeatmapPreviewManiaSettingsSection : EzSkinEditorSettingsGroup
     {
         [Resolved]
-        private EzPreviewManiaSettings settings { get; set; } = null!;
+        private EzConfigStore configStore { get; set; } = null!;
+
+        private EzPreviewManiaSettings settings => configStore.PreviewManiaSettings;
 
         public BeatmapPreviewManiaSettingsSection()
             : base(EzEditorStrings.GROUP_BEATMAP_PREVIEW_MANIA)

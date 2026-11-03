@@ -213,19 +213,19 @@ namespace osu.Game.Tests.NonVisual
 
             try
             {
-                var store = new EzLayoutStore(storage);
+                var store = new EzConfigLayoutStore(storage);
 
-                Assert.That(EzScoreRaceService.ContainsScoreRaceHud(store.CreateComponentsContainer(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents))), Is.False);
+                Assert.That(EzScoreRaceService.ContainsScoreRaceHud(store.CreateComponentsContainer(EzLayoutFiles.MAIN_HUD, null)), Is.False);
 
                 var layout = new SkinLayoutInfo();
                 layout.Update(null, new[] { new SerialisedDrawableInfo { Type = typeof(EzHUDScoreRaceLeaderboard) } });
-                store.Save(GlobalSkinnableContainers.MainHUDComponents, layout);
+                store.Save(EzLayoutFiles.MAIN_HUD, layout);
 
-                Assert.That(EzScoreRaceService.ContainsScoreRaceHud(store.CreateComponentsContainer(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents))), Is.True);
+                Assert.That(EzScoreRaceService.ContainsScoreRaceHud(store.CreateComponentsContainer(EzLayoutFiles.MAIN_HUD, null)), Is.True);
 
                 // 规则集专属查询不应命中 global 条目。
                 var mania = new RulesetInfo("mania", "osu!mania", string.Empty, 3);
-                Assert.That(EzScoreRaceService.ContainsScoreRaceHud(store.CreateComponentsContainer(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, mania))), Is.False);
+                Assert.That(EzScoreRaceService.ContainsScoreRaceHud(store.CreateComponentsContainer(EzLayoutFiles.MAIN_HUD, mania)), Is.False);
             }
             finally
             {
@@ -251,16 +251,16 @@ namespace osu.Game.Tests.NonVisual
 
             try
             {
-                var store = new EzLayoutStore(storage);
+                var store = new EzConfigLayoutStore(storage);
 
                 var outer = new SerialisedDrawableInfo { Type = typeof(Container) };
                 outer.Children.Add(new SerialisedDrawableInfo { Type = typeof(EzHUDScoreCompareBars) });
 
                 var layout = new SkinLayoutInfo();
                 layout.Update(null, new[] { outer });
-                store.Save(GlobalSkinnableContainers.MainHUDComponents, layout);
+                store.Save(EzLayoutFiles.MAIN_HUD, layout);
 
-                Assert.That(EzScoreRaceService.ContainsScoreRaceHud(store.CreateComponentsContainer(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents))), Is.True);
+                Assert.That(EzScoreRaceService.ContainsScoreRaceHud(store.CreateComponentsContainer(EzLayoutFiles.MAIN_HUD, null)), Is.True);
             }
             finally
             {

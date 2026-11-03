@@ -29,7 +29,9 @@ namespace osu.Game.Rulesets.Mania.UI
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         [Resolved]
-        private ManiaPlayfieldLayoutConfig playfieldLayout { get; set; } = null!;
+        private EzConfigLayoutStore layoutStore { get; set; } = null!;
+
+        private ManiaPlayfieldLayoutConfig playfieldLayout => layoutStore.PlayfieldLayout;
 
         private Anchor appliedAnchor;
         private Vector2 appliedPosition;
