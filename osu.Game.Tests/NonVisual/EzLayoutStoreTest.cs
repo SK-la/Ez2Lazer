@@ -24,7 +24,7 @@ namespace osu.Game.Tests.NonVisual
 
             try
             {
-                var store = new EzLayoutStore(storage);
+                var store = new EzConfigLayoutStore(storage);
 
                 var layout = new SkinLayoutInfo();
                 layout.Update(null, new[]
@@ -32,15 +32,15 @@ namespace osu.Game.Tests.NonVisual
                     new SerialisedDrawableInfo(new BoxElement())
                 });
 
-                store.Save(GlobalSkinnableContainers.SongSelect, layout);
+                store.Save(EzLayoutFiles.SONG_SELECT, layout);
 
-                var loaded = store.Load(GlobalSkinnableContainers.SongSelect);
+                var loaded = store.Load(EzLayoutFiles.SONG_SELECT);
                 Assert.That(loaded.TryGetDrawableInfo(null, out var infos), Is.True);
                 Assert.That(infos!.Length, Is.EqualTo(1));
                 Assert.That(infos[0].Type, Is.EqualTo(typeof(BoxElement)));
 
-                store.Reset(GlobalSkinnableContainers.SongSelect);
-                var empty = store.Load(GlobalSkinnableContainers.SongSelect);
+                store.Reset(EzLayoutFiles.SONG_SELECT);
+                var empty = store.Load(EzLayoutFiles.SONG_SELECT);
                 Assert.That(empty.TryGetDrawableInfo(null, out _), Is.False);
             }
             finally
@@ -65,24 +65,24 @@ namespace osu.Game.Tests.NonVisual
 
             try
             {
-                var store = new EzLayoutStore(storage);
+                var store = new EzConfigLayoutStore(storage);
 
                 var globalLayout = new SkinLayoutInfo();
                 globalLayout.Update(null, new[] { new SerialisedDrawableInfo(new BoxElement()) });
-                store.Save(GlobalSkinnableContainers.MainHUDComponents, globalLayout);
+                store.Save(EzLayoutFiles.MAIN_HUD, globalLayout);
 
-                var merged = store.Load(GlobalSkinnableContainers.MainHUDComponents);
+                var merged = store.Load(EzLayoutFiles.MAIN_HUD);
                 merged.Update(mania, new[] { new SerialisedDrawableInfo(new BigBlackBox()) });
-                store.Save(GlobalSkinnableContainers.MainHUDComponents, merged);
+                store.Save(EzLayoutFiles.MAIN_HUD, merged);
 
-                var loaded = store.Load(GlobalSkinnableContainers.MainHUDComponents);
+                var loaded = store.Load(EzLayoutFiles.MAIN_HUD);
                 Assert.That(loaded.TryGetDrawableInfo(null, out var global), Is.True);
                 Assert.That(global![0].Type, Is.EqualTo(typeof(BoxElement)));
                 Assert.That(loaded.TryGetDrawableInfo(mania, out var ruleset), Is.True);
                 Assert.That(ruleset![0].Type, Is.EqualTo(typeof(BigBlackBox)));
 
-                store.Reset(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, mania));
-                var afterReset = store.Load(GlobalSkinnableContainers.MainHUDComponents);
+                store.Reset(EzLayoutFiles.MAIN_HUD, mania);
+                var afterReset = store.Load(EzLayoutFiles.MAIN_HUD);
                 Assert.That(afterReset.TryGetDrawableInfo(mania, out _), Is.False);
                 Assert.That(afterReset.TryGetDrawableInfo(null, out var stillGlobal), Is.True);
                 Assert.That(stillGlobal![0].Type, Is.EqualTo(typeof(BoxElement)));
@@ -108,11 +108,11 @@ namespace osu.Game.Tests.NonVisual
 
             try
             {
-                var store = new EzLayoutStore(storage);
+                var store = new EzConfigLayoutStore(storage);
 
                 var layout = new SkinLayoutInfo();
                 layout.Update(null, new[] { new SerialisedDrawableInfo(new BoxElement()) });
-                store.Save(GlobalSkinnableContainers.MainHUDComponents, layout);
+                store.Save(EzLayoutFiles.MAIN_HUD, layout);
 
                 var layoutStorage = storage.GetStorageForDirectory(EzModifyPath.LayoutSetPath(EzModifyPath.LAYOUT_SET_DEFAULT));
 

@@ -19,7 +19,9 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         [Resolved]
-        private ManiaPlayfieldLayoutConfig playfieldLayout { get; set; } = null!;
+        private EzConfigLayoutStore layoutStore { get; set; } = null!;
+
+        private ManiaPlayfieldLayoutConfig playfieldLayout => layoutStore.PlayfieldLayout;
 
         public EzSkinEditorStageSettingsSection()
             : base(EzEditorStrings.GROUP_STAGE)

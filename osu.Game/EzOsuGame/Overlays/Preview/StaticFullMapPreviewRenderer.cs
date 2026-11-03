@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         private float lastHeight;
         private float density = 1f;
 
-        private EzPreviewManiaSettings settings = EzPreviewManiaSettings.DEFAULT;
+        private EzPreviewManiaSettings? settings;
 
         public StaticFullMapPreviewRenderer()
         {
@@ -100,7 +100,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
         private void rebuild()
         {
-            if (!hasData || DrawWidth <= 1 || DrawHeight <= 1)
+            if (!hasData || settings == null || DrawWidth <= 1 || DrawHeight <= 1)
                 return;
 
             lastWidth = DrawWidth;

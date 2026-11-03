@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Screens;
 using osu.Game.EzOsuGame.Edit.Scenes;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Select;
 
@@ -48,6 +49,8 @@ namespace osu.Game.EzOsuGame.Edit
         /// Single source for the editor HUD layer's capability check.
         /// </summary>
         public static bool SupportsHudLayer(EzEditorSceneType sceneType) => Get(sceneType).SupportsHudLayer;
+
+        public static EzLayoutRoot LayoutRootOf(EzEditorSceneType sceneType) => Get(sceneType).LayoutRoot;
 
         public static EzEditorSceneType ResolveCurrentScene(IScreen? currentScreen) => ResolveCurrentScene(currentScreen?.GetType());
 

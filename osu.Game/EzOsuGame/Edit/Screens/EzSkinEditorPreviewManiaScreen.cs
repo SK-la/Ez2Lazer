@@ -2,11 +2,14 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays.Preview;
 using osu.Game.Graphics.Sprites;
@@ -30,21 +33,30 @@ namespace osu.Game.EzOsuGame.Edit.Screens
 
         public override bool? AllowGlobalTrackControl => false;
 
-        private readonly EzPreviewManiaSettings settings;
+        [Resolved]
+        private EzConfigStore configStore { get; set; } = null!;
+
+        private EzPreviewManiaSettings settings => configStore.PreviewManiaSettings;
 
         private IWorkingBeatmap? workingBeatmap;
         private RulesetInfo? rulesetInfo;
 
         private Container viewport = null!;
 
+        private readonly Bindable<ManiaLongNoteStyle> styleTrigger = new Bindable<ManiaLongNoteStyle>();
+        private readonly BindableFloat thicknessTrigger = new BindableFloat();
+        private readonly BindableColour4 laneBackgroundTrigger = new BindableColour4();
+        private readonly BindableColour4 noteColourTrigger = new BindableColour4();
+        private readonly BindableColour4 holdHeadTrigger = new BindableColour4();
+        private readonly BindableColour4 holdBodyTrigger = new BindableColour4();
+
         [Resolved]
         private IRulesetStore rulesets { get; set; } = null!;
 
-        public EzSkinEditorPreviewManiaScreen(IWorkingBeatmap? workingBeatmap, RulesetInfo? rulesetInfo, EzPreviewManiaSettings settings)
+        public EzSkinEditorPreviewManiaScreen(IWorkingBeatmap? workingBeatmap, RulesetInfo? rulesetInfo)
         {
             this.workingBeatmap = workingBeatmap;
             this.rulesetInfo = rulesetInfo;
-            this.settings = settings;
 
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
@@ -72,15 +84,29 @@ namespace osu.Game.EzOsuGame.Edit.Screens
 
             rebuild();
 
-            // 设置即改即存且立即回灌预览：任一 bindable 变化触发一次重绘。
-            settings.Style.BindValueChanged(_ => applySettings());
-            settings.ThicknessScale.BindValueChanged(_ => applySettings());
-            settings.LaneBackgroundColour.BindValueChanged(_ => applySettings());
+            bindSettingTrigger(styleTrigger, settings.Style);
+            bindSettingTrigger(thicknessTrigger, settings.ThicknessScale);
+            bindSettingTrigger(laneBackgroundTrigger, settings.LaneBackgroundColour);
+            bindSettingTrigger(noteColourTrigger, settings.NoteColour);
+            bindSettingTrigger(holdHeadTrigger, settings.HoldHeadColour);
+            bindSettingTrigger(holdBodyTrigger, settings.HoldBodyColour);
+        }
 
-            settings.NoteColour.BindValueChanged(_ => applySettings());
-            settings.HoldHeadColour.BindValueChanged(_ => applySettings());
-            settings.HoldBodyColour.BindValueChanged(_ => applySettings());
-            // settings.HoldTailColour.BindValueChanged(_ => applySettings());
+        protected override void Dispose(bool isDisposing)
+        {
+            styleTrigger.UnbindAll();
+            thicknessTrigger.UnbindAll();
+            laneBackgroundTrigger.UnbindAll();
+            noteColourTrigger.UnbindAll();
+            holdHeadTrigger.UnbindAll();
+            holdBodyTrigger.UnbindAll();
+            base.Dispose(isDisposing);
+        }
+
+        private void bindSettingTrigger<T>(Bindable<T> trigger, Bindable<T> source)
+        {
+            trigger.BindTo(source);
+            trigger.BindValueChanged(_ => applySettings(), false);
         }
 
         /// <summary>

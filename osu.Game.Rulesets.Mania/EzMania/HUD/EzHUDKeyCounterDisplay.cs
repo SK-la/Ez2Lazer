@@ -45,7 +45,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         [Resolved(canBeNull: true)]
-        private ManiaPlayfieldLayoutConfig? playfieldLayout { get; set; }
+        private EzConfigLayoutStore? layoutStore { get; set; }
+
+        private ManiaPlayfieldLayoutConfig? playfieldLayout => layoutStore?.PlayfieldLayout;
 
         [Resolved]
         private InputCountController controller { get; set; } = null!;

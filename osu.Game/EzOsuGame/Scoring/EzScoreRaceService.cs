@@ -13,8 +13,8 @@ using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.HUD;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.Rulesets;
 using osu.Game.Scoring;
 using osu.Game.Screens;
@@ -243,7 +243,7 @@ namespace osu.Game.EzOsuGame.Scoring
                 if (skin != null && (hasSavedScoreRaceHud(skin, globalLookup) || hasSavedScoreRaceHud(skin, rulesetLookup)))
                     return true;
 
-                var ezLayout = ezLayoutLayer.Store.Load(target);
+                var ezLayout = ezLayoutLayer.Store.Load($"{target}.json");
 
                 if (hasSavedScoreRaceHud(ezLayout, globalLookup) || hasSavedScoreRaceHud(ezLayout, rulesetLookup))
                     return true;

@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.EzOsuGame.Layout;
 
 namespace osu.Game.EzOsuGame.Edit
 {
@@ -51,5 +52,10 @@ namespace osu.Game.EzOsuGame.Edit
         /// panel does not cover the play area the user is dragging components in.
         /// </summary>
         bool HoverExpandsSidebar => true;
+
+        /// <summary>
+        /// Which Game layout directory persists this scene's HUD JSON when edited.
+        /// </summary>
+        EzLayoutRoot LayoutRoot => EzLayoutRoot.Theme;
     }
 }

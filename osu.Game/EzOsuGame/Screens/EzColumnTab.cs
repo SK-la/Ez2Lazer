@@ -48,7 +48,9 @@ namespace osu.Game.EzOsuGame.Screens
         private Storage storage { get; set; } = null!;
 
         [Resolved]
-        private ManiaPlayfieldLayoutConfig playfieldLayout { get; set; } = null!;
+        private EzConfigLayoutStore layoutStore { get; set; } = null!;
+
+        private ManiaPlayfieldLayoutConfig playfieldLayout => layoutStore.PlayfieldLayout;
 
         [Resolved]
         private Bindable<WorkingBeatmap> beatmap { get; set; } = null!;
