@@ -45,7 +45,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         protected virtual bool SupportsImprovedNoteDisplayColour => Component == ManiaSkinComponents.Note;
 
-        protected virtual bool SupportsTimingBasedNoteColouring => true;
+        protected virtual bool SupportsDivisorNoteDisplayTint => true;
 
         private Drawable headPiece;
 
@@ -162,13 +162,12 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 return;
             }
 
-            if (SupportsTimingBasedNoteColouring
+            if (SupportsDivisorNoteDisplayTint
                 && configTimingBasedNoteColouring.Value
                 && beatmap != null
                 && HitObject != null)
             {
-                headPiece.Colour = ManiaNoteDisplayColour.ResolveTimingColour(
-                    true,
+                headPiece.Colour = ManiaNoteDisplayColour.ForDivisorNoteDisplayTint(
                     beatmap,
                     HitObject.StartTime,
                     colours);
@@ -177,7 +176,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
             if (column != null && column.ColorSettingsEnabledBindable.Value)
             {
-                headPiece.Colour = ManiaNoteDisplayColour.ResolveColumnColour(column.EzNoteColourBindable.Value);
+                headPiece.Colour = ManiaNoteDisplayColour.ForColumnNoteDisplayTint(column.EzNoteColourBindable.Value);
                 return;
             }
 

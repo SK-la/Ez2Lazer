@@ -71,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 }
 
                 if (colorizationEnabled && UseColorization && !Column.ConfigTimingBasedNoteColouring)
-                    return ManiaNoteDisplayColour.ResolveColumnColour(columnNoteColour);
+                    return ManiaNoteDisplayColour.ForColumnNoteDisplayTint(columnNoteColour);
 
                 return Colour4.White;
             }
@@ -101,7 +101,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     };
                 }
 
-                if (ManiaNoteTextureColouring.ShouldUseNormalisedNoteTextures(colorizationEnabled, Column.ConfigTimingBasedNoteColouring))
+                if (ManiaNoteTextureColouring.ShouldUseTintBaseNoteTextures(colorizationEnabled, Column.ConfigTimingBasedNoteColouring))
                     return "white";
 
                 return columnNoteType switch

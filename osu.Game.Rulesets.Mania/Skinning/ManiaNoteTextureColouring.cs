@@ -5,7 +5,7 @@ namespace osu.Game.Rulesets.Mania.Skinning
 {
     public static class ManiaNoteTextureColouring
     {
-        public static bool ShouldUseNormalisedNoteTextures(bool colorSettingsEnabled, bool timingBasedNoteColouring)
-            => colorSettingsEnabled || timingBasedNoteColouring;
+        public static bool ShouldUseTintBaseNoteTextures(bool colorSettingsEnabled, bool divisorNoteColouringEnabled)
+            => colorSettingsEnabled || divisorNoteColouringEnabled;
     }
 }

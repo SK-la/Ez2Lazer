@@ -10,32 +10,32 @@ using osuTK.Graphics;
 namespace osu.Game.Rulesets.Mania.Skinning
 {
     /// <summary>
-    /// Blends a source colour onto normalised note textures.
+    /// Blends a source colour onto note textures prepared for display tinting.
     /// </summary>
-    public static class ManiaTimingBasedNoteColour
+    public static class ManiaNoteDisplayTint
     {
-        public const double DefaultTargetGrayscale = 1.5;
+        public const double DEFAULT_TARGET_GRAYSCALE = 1.5;
 
-        public const double DefaultColourAlpha = 0.8;
+        public const double DEFAULT_COLOUR_ALPHA = 0.8;
 
-        public static Color4 GetColourFor(IBeatmap beatmap, double startTime, OsuColour colours)
-            => GetColourFor(beatmap, startTime, colours, DefaultTargetGrayscale, DefaultColourAlpha);
+        public static Color4 GetDivisorNoteColour(IBeatmap beatmap, double startTime, OsuColour colours)
+            => GetDivisorNoteColour(beatmap, startTime, colours, DEFAULT_TARGET_GRAYSCALE, DEFAULT_COLOUR_ALPHA);
 
-        public static Color4 GetColourFor(IBeatmap beatmap, double startTime, OsuColour colours, double targetGrayscale, double colourAlpha)
+        public static Color4 GetDivisorNoteColour(IBeatmap beatmap, double startTime, OsuColour colours, double targetGrayscale, double colourAlpha)
         {
             int snapDivisor = beatmap.ControlPointInfo.GetClosestBeatDivisor(startTime);
             return ApplyTo(BindableBeatDivisor.GetColourFor(snapDivisor, colours), targetGrayscale, colourAlpha);
         }
 
-        public static Color4 ApplyTo(Color4 timingBasedColour, double targetGrayscale, double colourAlpha)
+        public static Color4 ApplyTo(Color4 sourceColour, double targetGrayscale, double colourAlpha)
         {
             float target = (float)targetGrayscale;
             float alpha = (float)colourAlpha;
 
             return new Color4(
-                target + (timingBasedColour.R - target) * alpha,
-                target + (timingBasedColour.G - target) * alpha,
-                target + (timingBasedColour.B - target) * alpha,
+                target + (sourceColour.R - target) * alpha,
+                target + (sourceColour.G - target) * alpha,
+                target + (sourceColour.B - target) * alpha,
                 1f);
         }
 

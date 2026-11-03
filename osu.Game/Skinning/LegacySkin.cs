@@ -45,8 +45,6 @@ namespace osu.Game.Skinning
 
         internal readonly Dictionary<int, LegacyManiaSkinConfiguration> ManiaConfigurations = new Dictionary<int, LegacyManiaSkinConfiguration>();
 
-        private LegacyTextureLoaderStore? legacyTextureLoaderStore;
-
         [UsedImplicitly(ImplicitUseKindFlags.InstantiatedWithFixedConstructorSignature)]
         public LegacySkin(SkinInfo skin, IStorageResourceProvider resources)
             : this(skin, resources, null)
@@ -66,10 +64,7 @@ namespace osu.Game.Skinning
         }
 
         protected override IResourceStore<TextureUpload> CreateTextureLoaderStore(IStorageResourceProvider resources, IResourceStore<byte[]> storage)
-            => legacyTextureLoaderStore = new LegacyTextureLoaderStore(base.CreateTextureLoaderStore(resources, storage));
-
-        public void RegisterManiaTimingColourTextureGroup(string groupName, IEnumerable<IEnumerable<string>> sourceTextureNameFallbacks)
-            => legacyTextureLoaderStore?.RegisterManiaTimingColourTextureGroup(groupName, sourceTextureNameFallbacks);
+            => new LegacyTextureLoaderStore(base.CreateTextureLoaderStore(resources, storage));
 
         protected override void ParseConfigurationStream(Stream stream)
         {

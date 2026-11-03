@@ -95,7 +95,7 @@ namespace osu.Game.Rulesets.Mania.Skinning
                 if (!EnabledColorBindable.Value || !UseColorization || Column.ConfigTimingBasedNoteColouring)
                     return Colour4.White;
 
-                return ManiaNoteDisplayColour.ResolveColumnColour(NoteColourBindable.Value);
+                return ManiaNoteDisplayColour.ForColumnNoteDisplayTint(NoteColourBindable.Value);
             }
         }
 

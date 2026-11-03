@@ -28,7 +28,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         protected override bool SupportsImprovedNoteDisplayColour => false;
 
-        protected override bool SupportsTimingBasedNoteColouring => false;
+        protected override bool SupportsDivisorNoteDisplayTint => false;
 
         public DrawableHoldNoteHead()
             : this(null)
