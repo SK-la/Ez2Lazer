@@ -14,6 +14,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
+using osu.Framework.Platform;
 using osu.Framework.Threading;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
@@ -122,6 +123,10 @@ namespace osu.Game.EzOsuGame.Overlays
         private Drawable? pendingPreviewRoot;
         private DrawableRuleset? drawableRuleset;
         private IManiaStaticPreviewRenderer? maniaStaticRenderer;
+
+        private readonly EzPreviewManiaSettings overlayPreviewManiaSettings = new EzPreviewManiaSettings();
+        private EzPreviewManiaSettingsStore? previewManiaSettingsStore;
+
         private PreviewDensityController? densityController;
         private Bindable<double> previewDensity = null!;
         private Bindable<EzBeatmapPreviewMode> sharedPreviewModeConfig = null!;
@@ -362,8 +367,11 @@ namespace osu.Game.EzOsuGame.Overlays
         }
 
         [BackgroundDependencyLoader]
-        private void load(Ez2ConfigManager ezConfig)
+        private void load(Ez2ConfigManager ezConfig, Storage storage)
         {
+            previewManiaSettingsStore = new EzPreviewManiaSettingsStore(storage);
+            reloadOverlayPreviewManiaSettingsFromStore();
+
             sharedPreviewModeConfig = ezConfig.GetBindable<EzBeatmapPreviewMode>(Ez2Setting.BeatmapPreviewMode);
             maniaPreviewModeConfig = ezConfig.GetBindable<EzBeatmapPreviewMode>(Ez2Setting.BeatmapPreviewModeMania);
             previewDensity = ezConfig.GetBindable<double>(Ez2Setting.BeatmapPreviewDensity);
@@ -1501,6 +1509,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private void setupManiaStaticPreview(IBeatmap beatmap)
         {
+            reloadOverlayPreviewManiaSettingsFromStore();
+
             ManiaPreviewData data = ManiaPreviewGeometryBuilder.Build(beatmap);
 
             var renderer = previewMode.Value switch
@@ -1513,6 +1523,7 @@ namespace osu.Game.EzOsuGame.Overlays
             if (renderer == null)
                 return;
 
+            renderer.SetSettings(overlayPreviewManiaSettings);
             renderer.SetData(data);
             renderer.SetDensity((float)previewDensity.Value);
             renderer.SetCurrentTime(previewClock.CurrentTime);
@@ -1529,6 +1540,11 @@ namespace osu.Game.EzOsuGame.Overlays
                 syncScrollRendererFromTime(previewClock.CurrentTime);
 
             updatePreviewControlsLayout();
+        }
+
+        private void reloadOverlayPreviewManiaSettingsFromStore()
+        {
+            previewManiaSettingsStore?.Load().CopyTo(overlayPreviewManiaSettings);
         }
 
         private void setFullMapFocusState(bool focused)

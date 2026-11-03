@@ -1212,6 +1212,7 @@ namespace osu.Game.EzOsuGame.Edit
             previewManiaSettingsStore = new EzPreviewManiaSettingsStore(storage);
             previewManiaSettingsStore.Load().CopyTo(PreviewManiaSettings);
 
+            PreviewManiaSettings.Style.BindValueChanged(_ => saveFullMapPreviewSettings());
             PreviewManiaSettings.NoteColour.BindValueChanged(_ => saveFullMapPreviewSettings());
             PreviewManiaSettings.HoldHeadColour.BindValueChanged(_ => saveFullMapPreviewSettings());
             PreviewManiaSettings.HoldBodyColour.BindValueChanged(_ => saveFullMapPreviewSettings());
