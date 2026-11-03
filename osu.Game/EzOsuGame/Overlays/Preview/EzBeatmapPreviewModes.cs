@@ -47,10 +47,5 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         }
 
         public static bool IsManiaRuleset(RulesetInfo? ruleset) => ruleset?.OnlineID == mania_ruleset_online_id;
-
-        /// <summary>
-        /// Skin editor appearance scene loads a full playable beatmap preview.
-        /// </summary>
-        public static EzBeatmapPreviewMode GetAppearanceLoadMode(RulesetInfo ruleset) => EzBeatmapPreviewMode.Dynamic;
     }
 }

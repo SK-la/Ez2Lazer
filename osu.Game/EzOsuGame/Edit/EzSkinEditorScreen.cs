@@ -145,7 +145,7 @@ namespace osu.Game.EzOsuGame.Edit
         private bool noteSnapshotInitialized;
         private Guid noteSnapshotSkinId;
 
-        private Bindable<EzBeatmapPreviewMode>? sceneBarPreviewModeBindable;
+        private Bindable<bool>? previewIsPlayingBindable;
         private bool playbackBarActive;
         private OsuScreen? hudTargetScreen;
         private EzLayoutLayer? layoutLayer;
@@ -382,7 +382,6 @@ namespace osu.Game.EzOsuGame.Edit
                                                     new EzSkinEditorTopToolbar
                                                     {
                                                         PreviewBeatmap = PreviewState.PreviewBeatmap,
-                                                        PreviewMode = PreviewState.Mode,
                                                         LoopBeatmap = PreviewState.LoopBeatmap,
                                                         Ruleset = PreviewState.Ruleset,
                                                         BeatmapPreviewRequested = selectBeatmapPreview,
@@ -506,14 +505,13 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void bindSceneBarPlayback()
         {
-            sceneBarPreviewModeBindable = PreviewState.Mode.GetBoundCopy();
-            sceneBarPreviewModeBindable.BindValueChanged(mode =>
+            previewIsPlayingBindable = PreviewState.IsPlaying.GetBoundCopy();
+            previewIsPlayingBindable.BindValueChanged(isPlaying =>
             {
-                // Mode 是预览的 desired state：只有仍在游戏内预览时才把播放键同步过去。
                 if (!isGameplayPlaybackActive())
                     return;
 
-                playback.SetPlaying(mode.NewValue == EzBeatmapPreviewMode.Dynamic);
+                playback.SetPlaying(isPlaying.NewValue);
             }, true);
 
             playback.IsPlaying.BindValueChanged(p =>
@@ -521,10 +519,7 @@ namespace osu.Game.EzOsuGame.Edit
                 if (!isGameplayPlaybackActive())
                     return;
 
-                if (p.NewValue)
-                    PreviewState.ResumeBeatmapPlayback();
-                else
-                    PreviewState.PauseBeatmapPlayback();
+                PreviewState.IsPlaying.Value = p.NewValue;
             });
         }
 
@@ -634,7 +629,7 @@ namespace osu.Game.EzOsuGame.Edit
                 && EzBeatmapPreviewModes.IsManiaRuleset(PreviewState.Ruleset.Value))
                 return;
 
-            PreviewState.SetBeatmap(working, ruleset, EzBeatmapPreviewModes.GetAppearanceLoadMode(ruleset));
+            PreviewState.SetBeatmap(working, ruleset);
         }
 
         private void selectBeatmapPreview(RulesetInfo ruleset)
@@ -653,7 +648,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             // The visible preview is the real gameplay screen, which renders the global beatmap; updating
             // this workspace's PreviewState alone changes nothing on screen. The overlay owns the switch.
-            PreviewState.SetBeatmap(picked, ruleset, EzBeatmapPreviewModes.GetAppearanceLoadMode(ruleset));
+            PreviewState.SetBeatmap(picked, ruleset);
             BeatmapPreviewRequested?.Invoke(ruleset, picked);
         }
 

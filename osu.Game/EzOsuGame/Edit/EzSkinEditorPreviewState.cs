@@ -3,7 +3,6 @@
 
 using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets;
 
 namespace osu.Game.EzOsuGame.Edit
@@ -15,7 +14,10 @@ namespace osu.Game.EzOsuGame.Edit
     {
         private static readonly int[] available_key_modes = { 0, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
 
-        public Bindable<EzBeatmapPreviewMode> Mode { get; } = new Bindable<EzBeatmapPreviewMode>();
+        /// <summary>
+        /// Desired playback for the embedded gameplay preview; synced with the editor playback bar while gameplay preview is active.
+        /// </summary>
+        public BindableBool IsPlaying { get; } = new BindableBool();
 
         public Bindable<RulesetInfo?> Ruleset { get; } = new Bindable<RulesetInfo?>();
 
@@ -29,19 +31,15 @@ namespace osu.Game.EzOsuGame.Edit
 
         public Bindable<IWorkingBeatmap?> PreviewBeatmap { get; } = new Bindable<IWorkingBeatmap?>();
 
-        public void SetBeatmap(IWorkingBeatmap workingBeatmap, RulesetInfo ruleset, EzBeatmapPreviewMode mode)
+        public void SetBeatmap(IWorkingBeatmap workingBeatmap, RulesetInfo ruleset)
         {
             PreviewBeatmap.Value = workingBeatmap;
             Ruleset.Value = ruleset;
-            Mode.Value = mode;
+            IsPlaying.Value = true;
             SuggestedKeyMode.Value = resolveKeyModeFromBeatmap(workingBeatmap);
         }
 
         public bool HasBeatmapLoaded => PreviewBeatmap.Value != null;
-
-        public void PauseBeatmapPlayback() => Mode.Value = EzBeatmapPreviewMode.Static;
-
-        public void ResumeBeatmapPlayback() => Mode.Value = EzBeatmapPreviewMode.Dynamic;
 
         private static int? resolveKeyModeFromBeatmap(IWorkingBeatmap workingBeatmap)
         {

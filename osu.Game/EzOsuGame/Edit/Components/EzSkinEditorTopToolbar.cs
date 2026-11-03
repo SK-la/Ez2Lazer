@@ -7,7 +7,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets;
 using osuTK;
 
@@ -18,8 +17,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
         public Action<RulesetInfo>? BeatmapPreviewRequested { get; set; }
 
         public Bindable<IWorkingBeatmap?>? PreviewBeatmap { get; set; }
-
-        public Bindable<EzBeatmapPreviewMode>? PreviewMode { get; set; }
 
         public BindableBool? LoopBeatmap { get; set; }
 
@@ -58,7 +55,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
             base.LoadComplete();
 
             PreviewBeatmap?.BindValueChanged(_ => updateActiveState(), true);
-            PreviewMode?.BindValueChanged(_ => updateActiveState(), true);
             LoopBeatmap?.BindValueChanged(_ => updateActiveState(), true);
             Ruleset?.BindValueChanged(_ => updateActiveState(), true);
         }
