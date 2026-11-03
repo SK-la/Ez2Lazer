@@ -109,7 +109,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                                Origin = Anchor.CentreLeft,
                                                Margin = new MarginPadding { Horizontal = 10 },
                                            })
-                                           .Append(new SkinEditorSceneLibrary.SceneButton
+                                           .Append(new EzSceneBarButton
                                            {
                                                Text = EzEditorStrings.SCENE_OFFICIAL_HUD,
                                                Width = 120,
@@ -183,7 +183,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 button.Active = group == activeGroup;
         }
 
-        private partial class GroupTabButton : SkinEditorSceneLibrary.SceneButton
+        private partial class GroupTabButton : EzSceneBarButton
         {
             public EzEditorSceneGroup Group { get; }
 

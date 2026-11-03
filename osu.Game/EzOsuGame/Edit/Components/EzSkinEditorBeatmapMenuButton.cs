@@ -13,17 +13,17 @@ using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays.Preview;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
-using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.Edit.Components
 {
-    public partial class EzSkinEditorBeatmapMenuButton : SkinEditorSceneLibrary.SceneButton, IHasPopover
+    public partial class EzSkinEditorBeatmapMenuButton : EzSceneBarButton, IHasPopover
     {
         public Action<RulesetInfo>? BeatmapPreviewRequested;
 

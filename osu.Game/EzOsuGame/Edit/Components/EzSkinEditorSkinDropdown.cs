@@ -12,12 +12,12 @@ using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
-using osu.Game.Overlays.SkinEditor;
 using osu.Game.Skinning;
 using osuTK;
 using Realms;
@@ -27,7 +27,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// <summary>
     /// Skin selector for the editor menu bar (right side). Uses a popover so the list does not expand inline over the editor.
     /// </summary>
-    public partial class EzSkinEditorSkinDropdown : SkinEditorSceneLibrary.SceneButton, IHasPopover
+    public partial class EzSkinEditorSkinDropdown : EzSceneBarButton, IHasPopover
     {
         public new const float DEFAULT_WIDTH = 200;
 

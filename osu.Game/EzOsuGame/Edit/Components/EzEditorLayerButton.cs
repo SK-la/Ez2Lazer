@@ -13,7 +13,6 @@ using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
-using osu.Game.Overlays.SkinEditor;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.Edit.Components
@@ -22,7 +21,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// Scene-bar selector for the active editing layer. Uses a popover so the option list is not
     /// clipped by the masked scene bar (same approach as <see cref="EzSkinEditorSkinDropdown"/>).
     /// </summary>
-    public partial class EzEditorLayerButton : SkinEditorSceneLibrary.SceneButton, IHasPopover
+    public partial class EzEditorLayerButton : EzSceneBarButton, IHasPopover
     {
         public new const float DEFAULT_WIDTH = 160;
 
@@ -34,7 +33,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         /// <summary>
         /// The layer this button reflects. Owned by the scene bar; this button only reads it and
-        /// pushes changes back through <see cref="SetLayer"/>.
+        /// pushes changes back through <see cref="setLayer"/>.
         /// </summary>
         public Bindable<EzHUDLayer>? ActiveLayer { get; set; }
 
@@ -55,8 +54,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             base.LoadComplete();
 
-            if (ActiveLayer != null)
-                ActiveLayer.BindValueChanged(_ => RefreshDisplayText(), true);
+            ActiveLayer?.BindValueChanged(_ => RefreshDisplayText(), true);
         }
 
         /// <summary>
@@ -70,17 +68,16 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// short-lived popover is disposed (and its fields <c>UnbindAll</c>ed) on close, which would
         /// otherwise clear this button's own subscription to <see cref="ActiveLayer"/>.
         /// </summary>
-        private void SetLayer(EzHUDLayer layer)
+        private void setLayer(EzHUDLayer layer)
         {
-            if (ActiveLayer != null)
-                ActiveLayer.Value = layer;
+            ActiveLayer?.Value = layer;
         }
 
         public Popover GetPopover() => new LayerListPopover(
             GetAvailableLayers?.Invoke() ?? Array.Empty<EzHUDLayer>(),
             GetDisplayName ?? (_ => string.Empty),
             ActiveLayer?.Value ?? EzHUDLayer.HudOff,
-            SetLayer);
+            setLayer);
 
         public partial class LayerListPopover : OsuPopover
         {

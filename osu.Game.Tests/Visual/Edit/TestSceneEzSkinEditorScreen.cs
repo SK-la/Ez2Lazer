@@ -26,7 +26,6 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Settings;
-using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.EzMania.Editor;
 using osu.Game.Screens.Edit.Components.Menus;
@@ -213,7 +212,7 @@ namespace osu.Game.Tests.Visual.Edit
             AddAssert("scene bar lists both groups", () =>
             {
                 var texts = editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Single()
-                                        .ChildrenOfType<SkinEditorSceneLibrary.SceneButton>()
+                                        .ChildrenOfType<EzSceneBarButton>()
                                         .Select(b => b.Text.ToString())
                                         .ToArray();
 

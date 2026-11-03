@@ -86,7 +86,7 @@ namespace osu.Game.Overlays.SkinEditor
                                                 Origin = Anchor.CentreLeft,
                                                 Margin = new MarginPadding { Horizontal = 10 },
                                             },
-                                            new SceneButton
+                                            new EzSceneBarButton
                                             {
                                                 Text = SkinEditorStrings.SongSelect,
                                                 Action = () => performer?.PerformFromScreen(screen =>
@@ -97,12 +97,12 @@ namespace osu.Game.Overlays.SkinEditor
                                                     screen.Push(new SoloSongSelect());
                                                 }, new[] { typeof(SongSelect) })
                                             },
-                                            new SceneButton
+                                            new EzSceneBarButton
                                             {
                                                 Text = SkinEditorStrings.Gameplay,
                                                 Action = () => skinEditorOverlay?.PresentGameplay(),
                                             },
-                                            new SceneButton
+                                            new EzSceneBarButton
                                             {
                                                 Text = EzEditorStrings.SCENE_EZ_SKIN,
                                                 Width = 110,
@@ -120,11 +120,6 @@ namespace osu.Game.Overlays.SkinEditor
                     },
                 },
             };
-        }
-
-        /// <summary>Scene-bar action button; footer chrome via <see cref="EzSceneBarButton"/>.</summary>
-        public partial class SceneButton : EzSceneBarButton
-        {
         }
     }
 }

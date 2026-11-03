@@ -20,6 +20,7 @@ using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Screens;
 using osu.Game.EzOsuGame.Layout;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Online.API;
 using osu.Game.Overlays.Mods;
 using osu.Game.Overlays.Settings;
@@ -719,7 +720,7 @@ namespace osu.Game.Tests.Visual.Navigation
         {
             AddStep("Click gameplay scene button", () =>
             {
-                InputManager.MoveMouseTo(skinEditor.ChildrenOfType<SkinEditorSceneLibrary.SceneButton>().First(b => b.Text.ToString() == "Gameplay"));
+                InputManager.MoveMouseTo(skinEditor.ChildrenOfType<EzSceneBarButton>().First(b => b.Text.ToString() == "Gameplay"));
                 InputManager.Click(MouseButton.Left);
             });
 

@@ -115,7 +115,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             ruleset is null || ruleset.OnlineID == 3;
 
         /*
-        private partial class LoopBeatmapButton : SkinEditorSceneLibrary.SceneButton
+        private partial class LoopBeatmapButton : EzSceneBarButton
         {
             public LoopBeatmapButton()
             {
