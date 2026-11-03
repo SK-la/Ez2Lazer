@@ -333,6 +333,14 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString GROUP_BEAT_SNAP_LINES = new EzLocalizationManager.EzLocalisableString("节拍线", "Beat snap lines");
 
+        public static readonly LocalisableString GROUP_COMPOSE_GRID_PREVIEW = new EzLocalizationManager.EzLocalisableString("网格预览", "Grid preview");
+
+        public static readonly LocalisableString GROUP_EDITOR_DIVISOR_NOTE_COLOURING = new EzLocalizationManager.EzLocalisableString("Note 分母色", "Note divisor colours");
+
+        public static readonly LocalisableString BEATMAP_EDITOR_COMPOSE_READONLY_WATERMARK = new EzLocalizationManager.EzLocalisableString(
+            "此界面不会修改谱面",
+            "This view will not modify the beatmap");
+
         public static LocalisableString GetBeatSnapLineDivisorLabel(int divisor) =>
             new EzLocalizationManager.EzLocalisableString($"分母 {divisor}", $"Divisor {divisor}");
 

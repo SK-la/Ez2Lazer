@@ -200,7 +200,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void initializeSceneCoordinator(EzSkinEditorScreen workspace)
         {
-            sceneCoordinator = new EzSkinEditorSceneCoordinator(scalingContainer, workspace, layoutLayer, updateScreenSizing, canPresentScene, () => game.ScreenStack.CurrentScreen, enterSongSelect, enterGameplay, enterFullMapPreview);
+            sceneCoordinator = new EzSkinEditorSceneCoordinator(scalingContainer, workspace, layoutLayer, updateScreenSizing, canPresentScene, () => game.ScreenStack.CurrentScreen, enterSongSelect, enterGameplay, enterFullMapPreview, enterBeatmapCompose);
             workspace.SceneApplied = scene => sceneCoordinator?.Present(scene, game.ScreenStack.CurrentScreen as OsuScreen);
             workspace.CanPresentScene = canPresentScene;
 
@@ -251,6 +251,23 @@ namespace osu.Game.EzOsuGame.Edit
                 screen.Push(new EzSkinEditorPreviewManiaScreen(
                     Workspace.PreviewState.PreviewBeatmap.Value,
                     Workspace.PreviewState.Ruleset.Value));
+            }, new[] { typeof(MainMenu) });
+        }
+
+        private void enterBeatmapCompose()
+        {
+            performer?.PerformFromScreen(screen =>
+            {
+                if (screen is EzSkinEditorBeatmapComposePreviewScreen || State.Value != Visibility.Visible)
+                    return;
+
+                if (Workspace == null)
+                    return;
+
+                screen.Push(new EzSkinEditorBeatmapComposePreviewScreen(
+                    Workspace.PreviewState.PreviewBeatmap.Value,
+                    Workspace.PreviewState.Ruleset.Value,
+                    Workspace.PreviewState.PreviewGridBeatDivisor));
             }, new[] { typeof(MainMenu) });
         }
 

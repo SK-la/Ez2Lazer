@@ -8,7 +8,9 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Screens;
 using osu.Framework.Testing;
+using osu.Game.EzOsuGame.Edit.Screens;
 using osu.Game.Overlays;
+using osu.Game.Screens.Edit;
 using osu.Game.Screens.Play;
 
 namespace osu.Game.EzOsuGame.Playback
@@ -26,6 +28,9 @@ namespace osu.Game.EzOsuGame.Playback
 
         /// <summary>The global music track (<see cref="MusicController"/>).</summary>
         Music,
+
+        /// <summary>The skin editor beatmap compose preview clock.</summary>
+        Editor,
     }
 
     /// <summary>
@@ -61,6 +66,7 @@ namespace osu.Game.EzOsuGame.Playback
 
         private Player? boundPlayer;
         private GameplayClockContainer? boundClock;
+        private EditorClock? boundEditorClock;
         private bool controlsClockDirectly;
 
         /// <param name="getCurrentScreen">Retrieves the game's current screen; used to resolve the gameplay target.</param>
@@ -81,23 +87,32 @@ namespace osu.Game.EzOsuGame.Playback
         {
             Player? player = getCurrentScreen() as Player;
 
-            if (player?.IsLoaded != true)
+            if (player?.IsLoaded == true)
             {
-                boundPlayer = null;
-                boundClock = null;
-                controlsClockDirectly = false;
+                if (!ReferenceEquals(boundPlayer, player))
+                {
+                    boundPlayer = player;
+                    boundClock = player.ChildrenOfType<GameplayClockContainer>().FirstOrDefault();
+                    controlsClockDirectly = player is ReplayPlayer;
+                }
+
+                boundEditorClock = null;
                 return;
             }
 
-            if (ReferenceEquals(boundPlayer, player))
+            boundPlayer = null;
+            boundClock = null;
+            controlsClockDirectly = false;
+
+            if (getCurrentScreen() is EzSkinEditorBeatmapComposePreviewScreen { IsLoaded: true, ComposeClock: { } composeClock })
+            {
+                if (!ReferenceEquals(boundEditorClock, composeClock))
+                    boundEditorClock = composeClock;
+
                 return;
+            }
 
-            boundPlayer = player;
-            boundClock = player.ChildrenOfType<GameplayClockContainer>().FirstOrDefault();
-
-            // Replay-style players (including the editor's endless autoplay) cannot pause through the player
-            // state machine, so their clock is driven directly.
-            controlsClockDirectly = player is ReplayPlayer;
+            boundEditorClock = null;
         }
 
         private void updateTransport()
@@ -110,6 +125,17 @@ namespace osu.Game.EzOsuGame.Playback
                 minTime.Value = 0;
                 maxTime.Value = Math.Max(boundPlayer.Beatmap.Value.BeatmapInfo.Length, 1);
                 currentTime.Value = boundClock.CurrentTime;
+                return;
+            }
+
+            if (boundEditorClock != null)
+            {
+                activeTarget.Value = EzPlaybackTarget.Editor;
+                isActive.Value = true;
+                isPlaying.Value = boundEditorClock.IsRunning;
+                minTime.Value = 0;
+                maxTime.Value = Math.Max(boundEditorClock.TrackLength, 1);
+                currentTime.Value = boundEditorClock.CurrentTime;
                 return;
             }
 
@@ -140,6 +166,12 @@ namespace osu.Game.EzOsuGame.Playback
                 return;
             }
 
+            if (boundEditorClock != null)
+            {
+                boundEditorClock.Seek(time);
+                return;
+            }
+
             musicController.SeekTo(time);
         }
 
@@ -161,6 +193,16 @@ namespace osu.Game.EzOsuGame.Playback
                     boundPlayer.Resume();
                 else
                     boundPlayer.Pause();
+
+                return;
+            }
+
+            if (boundEditorClock != null)
+            {
+                if (playing)
+                    boundEditorClock.Start();
+                else
+                    boundEditorClock.Stop();
 
                 return;
             }

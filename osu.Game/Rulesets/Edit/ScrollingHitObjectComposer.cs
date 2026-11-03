@@ -42,6 +42,11 @@ namespace osu.Game.Rulesets.Edit
         /// </summary>
         protected virtual BeatSnapGrid? CreateBeatSnapGrid() => null;
 
+        /// <summary>
+        /// When true, the beat snap grid follows <see cref="EditorClock"/> instead of selection/placement.
+        /// </summary>
+        protected virtual bool CentreBeatSnapGridOnEditorClock => false;
+
         protected ScrollingHitObjectComposer(Ruleset ruleset)
             : base(ruleset)
         {
@@ -126,6 +131,12 @@ namespace osu.Game.Rulesets.Edit
         {
             if (beatSnapGrid == null)
                 return;
+
+            if (CentreBeatSnapGridOnEditorClock)
+            {
+                beatSnapGrid.SelectionTimeRange = (EditorClock.CurrentTime, EditorClock.CurrentTime);
+                return;
+            }
 
             if (BlueprintContainer.CurrentTool is SelectTool)
             {

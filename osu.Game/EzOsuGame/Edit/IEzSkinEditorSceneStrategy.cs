@@ -6,6 +6,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Layout;
+using osu.Game.Rulesets;
 
 namespace osu.Game.EzOsuGame.Edit
 {
@@ -35,6 +36,14 @@ namespace osu.Game.EzOsuGame.Edit
         bool IsAvailable => true;
 
         IReadOnlyList<EzSkinEditorSettingsGroup> Sections { get; }
+
+        /// <summary>
+        /// Supplies loaded rulesets before <see cref="Sections"/> is first read.
+        /// Colouring scenes ask each ruleset for its own sidebar groups.
+        /// </summary>
+        void AttachRulesets(IReadOnlyList<Ruleset> rulesets)
+        {
+        }
 
         /// <summary>
         /// Optional footer pinned to the bottom of the sidebar (e.g. skin.ini save bar).

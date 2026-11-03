@@ -2,19 +2,22 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.Rulesets;
 
 namespace osu.Game.EzOsuGame.Edit.Scenes
 {
     /// <summary>
-    /// 谱面编辑器组 · 配色：节拍线 palette（与 note 分母色同源键，仅影响 grid 绘制）。
+    /// 谱面编辑器组 · 配色：网格预览、各规则集配色栏目、节拍线 palette。
     /// </summary>
     public class EditorColouringSceneStrategy : IEzSkinEditorSceneStrategy
     {
         private EzSkinEditorSettingsGroup[]? sections;
+        private Ruleset[] rulesets = [];
 
         public EzEditorSceneGroup Group => EzEditorSceneGroup.BeatmapEditor;
 
@@ -22,9 +25,28 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
 
         public LocalisableString TabTitle => EzEditorStrings.TAB_EDITOR_COLOURING;
 
-        public IReadOnlyList<EzSkinEditorSettingsGroup> Sections => sections ??= new EzSkinEditorSettingsGroup[]
+        public void AttachRulesets(IReadOnlyList<Ruleset> rulesets)
         {
-            new EzSkinEditorBeatSnapLineSettingsSection(),
-        };
+            if (sections != null)
+                return;
+
+            this.rulesets = rulesets.ToArray();
+        }
+
+        public IReadOnlyList<EzSkinEditorSettingsGroup> Sections => sections ??= createSections();
+
+        private EzSkinEditorSettingsGroup[] createSections()
+        {
+            var result = new List<EzSkinEditorSettingsGroup>
+            {
+                new EzSkinEditorComposeGridPreviewSettingsSection(),
+            };
+
+            foreach (var ruleset in rulesets)
+                result.AddRange(ruleset.CreateSkinEditorColouringSections());
+
+            result.Add(new EzSkinEditorBeatSnapLineSettingsSection());
+            return result.ToArray();
+        }
     }
 }

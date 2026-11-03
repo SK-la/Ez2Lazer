@@ -30,17 +30,19 @@ namespace osu.Game.EzOsuGame.Edit
         private readonly Action enterSongSelect;
         private readonly Action enterGameplay;
         private readonly Action enterFullMapPreview;
+        private readonly Action enterBeatmapCompose;
 
         private readonly Container gameplayHost = new Container { RelativeSizeAxes = Axes.Both };
         private EzEditorSceneType desiredScene;
         private Player? boundPlayer;
         private SongSelect? boundSongSelect;
         private EzSkinEditorPreviewManiaScreen? boundFullMapPreview;
+        private EzSkinEditorBeatmapComposePreviewScreen? boundBeatmapCompose;
 
         private Drawable? hiddenStoryboard;
         private float previousStoryboardAlpha;
 
-        public EzSkinEditorSceneCoordinator(ScalingContainer scalingContainer, EzSkinEditorScreen workspace, EzLayoutLayer? layoutLayer, Action updateScreenSizing, Func<EzEditorSceneType, bool> sceneIsAvailable, Func<IScreen?> getCurrentScreen, Action enterSongSelect, Action enterGameplay, Action enterFullMapPreview)
+        public EzSkinEditorSceneCoordinator(ScalingContainer scalingContainer, EzSkinEditorScreen workspace, EzLayoutLayer? layoutLayer, Action updateScreenSizing, Func<EzEditorSceneType, bool> sceneIsAvailable, Func<IScreen?> getCurrentScreen, Action enterSongSelect, Action enterGameplay, Action enterFullMapPreview, Action enterBeatmapCompose)
         {
             this.scalingContainer = scalingContainer;
             this.workspace = workspace;
@@ -51,6 +53,7 @@ namespace osu.Game.EzOsuGame.Edit
             this.enterSongSelect = enterSongSelect;
             this.enterGameplay = enterGameplay;
             this.enterFullMapPreview = enterFullMapPreview;
+            this.enterBeatmapCompose = enterBeatmapCompose;
             desiredScene = workspace.CurrentScene.Value;
         }
 
@@ -75,6 +78,8 @@ namespace osu.Game.EzOsuGame.Edit
                 else
                     presentSongSelect();
             }
+            else if (EzSkinEditorSceneRegistry.GroupOf(scene) == EzEditorSceneGroup.BeatmapEditor)
+                presentBeatmapCompose();
             else
                 presentGameplay(target as Player);
         }
@@ -101,6 +106,14 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
+            if (EzSkinEditorSceneRegistry.GroupOf(desiredScene) == EzEditorSceneGroup.BeatmapEditor)
+            {
+                if (current is EzSkinEditorBeatmapComposePreviewScreen { IsLoaded: true } compose && !ReferenceEquals(boundBeatmapCompose, compose))
+                    bindBeatmapCompose(compose);
+
+                return;
+            }
+
             if (current is Player player && player.IsLoaded && !ReferenceEquals(boundPlayer, player))
                 bindGameplay(player);
         }
@@ -115,6 +128,7 @@ namespace osu.Game.EzOsuGame.Edit
             boundPlayer = null;
             boundSongSelect = null;
             boundFullMapPreview = null;
+            boundBeatmapCompose = null;
             workspace.SetSceneHost(null);
             scalingContainer.SetCustomRect(null);
         }
@@ -133,6 +147,7 @@ namespace osu.Game.EzOsuGame.Edit
                 boundPlayer = null;
                 boundSongSelect = null;
                 boundFullMapPreview = null;
+                boundBeatmapCompose = null;
                 workspace.BindHudToTarget(null, layoutLayer);
                 enterGameplay();
             }
@@ -143,6 +158,7 @@ namespace osu.Game.EzOsuGame.Edit
             boundPlayer = player;
             boundSongSelect = null;
             boundFullMapPreview = null;
+            boundBeatmapCompose = null;
 
             // Gameplay may have pushed its own beatmap background before the editor opened.
             player.DetachOwnedBackground();
@@ -166,6 +182,7 @@ namespace osu.Game.EzOsuGame.Edit
             restorePlayerChrome();
             boundPlayer = null;
             boundFullMapPreview = null;
+            boundBeatmapCompose = null;
             workspace.SetSceneHost(null);
             updateScreenSizing();
 
@@ -206,6 +223,35 @@ namespace osu.Game.EzOsuGame.Edit
             enterFullMapPreview();
         }
 
+        private void presentBeatmapCompose()
+        {
+            restorePlayerChrome();
+            boundPlayer = null;
+            boundSongSelect = null;
+            boundFullMapPreview = null;
+            workspace.SetSceneHost(null);
+            workspace.BindHudToTarget(null, layoutLayer);
+            updateScreenSizing();
+
+            workspace.SyncPreviewStateFromGlobalBeatmap();
+
+            if (getCurrentScreen() is EzSkinEditorBeatmapComposePreviewScreen { IsLoaded: true } existing)
+            {
+                existing.SetSource(workspace.PreviewState.PreviewBeatmap.Value, workspace.PreviewState.Ruleset.Value);
+                bindBeatmapCompose(existing);
+                return;
+            }
+
+            boundBeatmapCompose = null;
+            enterBeatmapCompose();
+        }
+
+        private void bindBeatmapCompose(EzSkinEditorBeatmapComposePreviewScreen composeScreen)
+        {
+            boundBeatmapCompose = composeScreen;
+            updateScreenSizing();
+        }
+
         private void bindFullMapPreview(EzSkinEditorPreviewManiaScreen maniaScreen)
         {
             boundFullMapPreview = maniaScreen;
@@ -216,6 +262,7 @@ namespace osu.Game.EzOsuGame.Edit
         {
             boundSongSelect = songSelect;
             boundFullMapPreview = null;
+            boundBeatmapCompose = null;
 
             // The skin layer HUD is only reached for temporary visibility; only the Ez layout
             // container contributes editable targets.
