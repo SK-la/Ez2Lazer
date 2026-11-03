@@ -62,11 +62,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             get
             {
-                if (SupportsImprovedNoteDisplayColour)
+                if (!SupportsImprovedNoteDisplayColour)
+                {
+                    if (colorizationEnabled && UseColorization && !Column.ConfigTimingBasedNoteColouring)
+                        return columnNoteColour;
+
                     return Colour4.White;
+                }
 
                 if (colorizationEnabled && UseColorization && !Column.ConfigTimingBasedNoteColouring)
-                    return columnNoteColour;
+                    return ManiaNoteDisplayColour.ForColumnNoteDisplayTint(columnNoteColour);
 
                 return Colour4.White;
             }
