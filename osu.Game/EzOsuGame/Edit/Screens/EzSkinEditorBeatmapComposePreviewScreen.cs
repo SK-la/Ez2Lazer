@@ -18,6 +18,7 @@ using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Edit;
 using osu.Game.Screens;
+using osu.Game.Screens.Backgrounds;
 using osu.Game.Screens.Edit;
 using osu.Game.Screens.Menu;
 using osuTK.Graphics;
@@ -34,6 +35,14 @@ namespace osu.Game.EzOsuGame.Edit.Screens
         public override bool HideOverlaysOnEnter => false;
 
         public override bool? AllowGlobalTrackControl => false;
+
+        protected override BackgroundScreen? CreateBackground()
+        {
+            if (EzSkinEditorActiveState.Active || workingBeatmap is not WorkingBeatmap concrete)
+                return null;
+
+            return new BackgroundScreenBeatmap(concrete);
+        }
 
         /// <summary>
         /// Clock driving audio and the playback bar while this screen is current.
@@ -176,7 +185,7 @@ namespace osu.Game.EzOsuGame.Edit.Screens
         {
             public Action<EditorClock>? OnClockReady { get; set; }
 
-            public EditorClock Clock { get; private set; } = null!;
+            public EditorClock EditorClock { get; private set; } = null!;
 
             private readonly IWorkingBeatmap workingBeatmap;
             private readonly IBeatmap playableBeatmap;
@@ -216,9 +225,9 @@ namespace osu.Game.EzOsuGame.Edit.Screens
 
                 previewGridBeatDivisor.SetArbitraryDivisor(concrete.BeatmapInfo.BeatDivisor);
 
-                Clock = new EditorClock(playableBeatmap, previewGridBeatDivisor);
-                Clock.ChangeSource(concrete.Track);
-                Clock.Stop();
+                EditorClock = new EditorClock(playableBeatmap, previewGridBeatDivisor);
+                EditorClock.ChangeSource(concrete.Track);
+                EditorClock.Stop();
 
                 editorBeatmap = new EditorBeatmap(
                     playableBeatmap,
@@ -227,7 +236,7 @@ namespace osu.Game.EzOsuGame.Edit.Screens
                     concrete.BeatmapInfo);
 
                 dependencies.Cache(previewGridBeatDivisor);
-                dependencies.CacheAs(Clock);
+                dependencies.CacheAs(EditorClock);
                 dependencies.CacheAs(editorBeatmap);
                 dependencies.CacheAs<IBeatmap>(editorBeatmap);
                 dependencies.CacheAs<IBeatSnapProvider>(editorBeatmap);
@@ -245,7 +254,7 @@ namespace osu.Game.EzOsuGame.Edit.Screens
                 if (composer != null)
                     AddInternal(new EditorSkinProvidingContainer(editorBeatmap).WithChild(composer));
 
-                AddInternal(Clock);
+                AddInternal(EditorClock);
                 AddInternal(new OsuSpriteText
                 {
                     Anchor = Anchor.TopLeft,
@@ -256,7 +265,7 @@ namespace osu.Game.EzOsuGame.Edit.Screens
                     Font = OsuFont.GetFont(size: 14),
                 });
 
-                OnClockReady?.Invoke(Clock);
+                OnClockReady?.Invoke(EditorClock);
             }
         }
     }

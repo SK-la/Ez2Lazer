@@ -35,8 +35,8 @@ using osu.Game.Utils;
 namespace osu.Game.EzOsuGame.Edit
 {
     /// <summary>
-    /// Ez 皮肤编辑器盖层。用 <see cref="ScalingContainer.SetCustomRect"/> 把当前屏缩进游玩区，
-    /// 不 Push，故回放中途可继续。背景与 chrome 由本层绘制，当前屏不换背景栈。
+    /// Ez 皮肤编辑器盖层。用 <see cref="ScalingContainer.SetCustomRect"/> 把当前屏缩进游玩区。
+    /// 关闭时留在正在编辑的那一屏，只卸掉编辑器盖上去的背景和挂起状态。
     /// </summary>
     public partial class EzSkinEditorOverlay : OverlayContainer, IKeyBindingHandler<GlobalAction>
     {
@@ -111,7 +111,16 @@ namespace osu.Game.EzOsuGame.Edit
             // Keep the global (main menu) background alive behind plugged screens: stop screens from
             // pushing their own beatmap background, and drop the one already on the stack.
             EzSkinEditorActiveState.SetActive(true);
-            Schedule(() => sessionTarget?.DetachOwnedBackground());
+            Schedule(() =>
+            {
+                if (!EzSkinEditorActiveState.Active)
+                    return;
+
+                if (sessionTarget is SongSelect songSelect)
+                    songSelect.SuspendForSkinEditor();
+                else
+                    sessionTarget?.DetachOwnedBackground();
+            });
 
             if (Workspace == null)
             {
@@ -143,7 +152,6 @@ namespace osu.Game.EzOsuGame.Edit
 
         protected override void PopOut()
         {
-            // Closing the editor only hides editor chrome; the last edited scene keeps running.
             sceneCoordinator?.Close();
             sceneCoordinator = null;
 
@@ -153,10 +161,26 @@ namespace osu.Game.EzOsuGame.Edit
                 reservedWidthBound = null;
             }
 
+            // 先停用，当前屏的 CreateBackground 才不会继续交回 null。
             EzSkinEditorActiveState.SetActive(false);
 
             Workspace?.Deactivate();
             this.FadeOut(200, Easing.OutQuint);
+
+            // 不退回打开前的屏。只把正在编辑的这一屏上，编辑器挂起的播放和被换掉的背景接回去。
+            if (game.ScreenStack.CurrentScreen is OsuScreen current)
+            {
+                if (current is SongSelect songSelect)
+                    songSelect.ResumeFromSkinEditor();
+                else
+                    EzSkinEditorActiveState.RestoreBackgroundDraw();
+
+                current.RestoreOwnedBackground();
+            }
+            else
+                EzSkinEditorActiveState.RestoreBackgroundDraw();
+
+            sessionTarget = null;
         }
 
         private void onReservedWidthChanged(ValueChangedEvent<float> _) => updateScreenSizing();

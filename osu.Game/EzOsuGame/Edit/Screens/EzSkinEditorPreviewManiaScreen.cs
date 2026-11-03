@@ -15,6 +15,7 @@ using osu.Game.EzOsuGame.Overlays.Preview;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
+using osu.Game.Screens.Backgrounds;
 using osu.Game.Screens.Menu;
 using osuTK.Graphics;
 
@@ -32,6 +33,14 @@ namespace osu.Game.EzOsuGame.Edit.Screens
         public override bool HideOverlaysOnEnter => false;
 
         public override bool? AllowGlobalTrackControl => false;
+
+        protected override BackgroundScreen? CreateBackground()
+        {
+            if (EzSkinEditorActiveState.Active || workingBeatmap is not WorkingBeatmap concrete)
+                return null;
+
+            return new BackgroundScreenBeatmap(concrete);
+        }
 
         [Resolved]
         private EzConfigStore configStore { get; set; } = null!;

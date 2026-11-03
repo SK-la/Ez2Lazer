@@ -15,9 +15,8 @@ using osu.Game.Screens.Select;
 namespace osu.Game.EzOsuGame.Edit
 {
     /// <summary>
-    /// Presents Ez editor scenes. Non-song-select scenes keep the embedded gameplay viewport; the
-    /// song select scene is a real screen on the game stack so its selection outlives the editor.
-    /// Closing the editor hides chrome only and leaves the last edited scene running.
+    /// Presents Ez editor scenes. Song select, gameplay, preview and compose are real screens.
+    /// Closing the editor drops its own bindings and leaves the screen that was being edited.
     /// </summary>
     internal sealed class EzSkinEditorSceneCoordinator
     {
@@ -119,8 +118,7 @@ namespace osu.Game.EzOsuGame.Edit
         }
 
         /// <summary>
-        /// Hides editor chrome only. The last edited scene keeps running: no screen is exited and
-        /// the editor does not return to the screen it was opened from.
+        /// Drops editor bindings and the scene rect. The screen being edited stays current.
         /// </summary>
         public void Close()
         {
@@ -266,6 +264,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             // The skin layer HUD is only reached for temporary visibility; only the Ez layout
             // container contributes editable targets.
+            songSelect.SuspendForSkinEditor();
             workspace.BindHudToTarget(songSelect, layoutLayer);
             updateScreenSizing();
         }
