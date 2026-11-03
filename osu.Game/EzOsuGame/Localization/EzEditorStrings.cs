@@ -383,13 +383,7 @@ namespace osu.Game.EzOsuGame.Localization
 
         #region Toolbar and preview
 
-        public static readonly LocalisableString TOOLBAR_PAUSE_BEATMAP = new EzLocalizationManager.EzLocalisableString("暂停谱面", "Pause beatmap");
-
-        public static readonly LocalisableString TOOLBAR_PLAY_BEATMAP = new EzLocalizationManager.EzLocalisableString("播放谱面", "Play beatmap");
-
-        public static readonly LocalisableString TOOLBAR_SELECT_MODE = new EzLocalizationManager.EzLocalisableString("选择模式", "Select mode");
-
-        public static readonly LocalisableString TOOLBAR_LOOP_BEATMAP = new EzLocalizationManager.EzLocalisableString("循环谱面", "Loop chart");
+        public static readonly LocalisableString TOOLBAR_SWITCH_MODE = new EzLocalizationManager.EzLocalisableString("选择模式", "Select mode");
 
         public static readonly LocalisableString TOOLBAR_NOT_SUPPORTED = new EzLocalizationManager.EzLocalisableString(
             "尚未支持",

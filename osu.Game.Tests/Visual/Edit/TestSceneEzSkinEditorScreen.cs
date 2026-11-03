@@ -1082,7 +1082,7 @@ namespace osu.Game.Tests.Visual.Edit
 
             AddUntilStep("top toolbar visible", () => editorScreen.ChildrenOfType<EzSkinEditorTopToolbar>().Any());
             AddUntilStep("skin dropdown visible", () => editorScreen.ChildrenOfType<EzSkinEditorSkinDropdown>().Any());
-            AddUntilStep("beatmap menu button visible", () => editorScreen.ChildrenOfType<EzSkinEditorBeatmapMenuButton>().Any());
+            AddUntilStep("beatmap menu button visible", () => editorScreen.ChildrenOfType<EzEditorSwitchModeButton>().Any());
             AddAssert("no preview beatmap on load", () => editorScreen.PreviewBeatmap.Value == null);
         }
 

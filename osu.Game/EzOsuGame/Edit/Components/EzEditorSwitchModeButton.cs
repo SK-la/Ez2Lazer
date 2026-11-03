@@ -23,16 +23,16 @@ using osuTK;
 
 namespace osu.Game.EzOsuGame.Edit.Components
 {
-    public partial class EzSkinEditorBeatmapMenuButton : EzSceneBarButton, IHasPopover
+    public partial class EzEditorSwitchModeButton : EzSceneBarButton, IHasPopover
     {
         public Action<RulesetInfo>? BeatmapPreviewRequested;
 
         [Resolved]
         private IRulesetStore rulesets { get; set; } = null!;
 
-        public EzSkinEditorBeatmapMenuButton()
+        public EzEditorSwitchModeButton()
         {
-            Text = EzEditorStrings.TOOLBAR_SELECT_MODE;
+            Text = EzEditorStrings.TOOLBAR_SWITCH_MODE;
             Width = 100;
         }
 

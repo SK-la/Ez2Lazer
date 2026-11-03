@@ -61,7 +61,7 @@ namespace osu.Game.Overlays.SkinEditor
 
         private SkinEditorSceneLibrary sceneLibrary = null!;
         private EzPlaybackBar playbackBar = null!;
-        private EzSkinEditorBeatmapMenuButton modeButton = null!;
+        private EzEditorSwitchModeButton modeButton = null!;
 
         private Bindable<Skin> currentSkin = null!;
         private Bindable<string> clipboardContent = null!;
@@ -217,7 +217,7 @@ namespace osu.Game.Overlays.SkinEditor
                                             Children = new Drawable[]
                                             {
                                                 playbackBar = new EzPlaybackBar(playback),
-                                                modeButton = new EzSkinEditorBeatmapMenuButton
+                                                modeButton = new EzEditorSwitchModeButton
                                                 {
                                                     Anchor = Anchor.CentreLeft,
                                                     Origin = Anchor.CentreLeft,

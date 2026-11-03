@@ -23,7 +23,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// <summary>Preview ruleset; drives which ruleset-specific buttons are present.</summary>
         public Bindable<RulesetInfo?>? Ruleset { get; set; }
 
-        private EzSkinEditorBeatmapMenuButton beatmapButton = null!;
+        private EzEditorSwitchModeButton beatmapButton = null!;
         // private LoopBeatmapButton? loopButton;
 
         public EzSkinEditorTopToolbar()
@@ -41,7 +41,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             Children = new Drawable[]
             {
-                beatmapButton = new EzSkinEditorBeatmapMenuButton
+                beatmapButton = new EzEditorSwitchModeButton
                 {
                     Anchor = Anchor.CentreLeft,
                     Origin = Anchor.CentreLeft,
