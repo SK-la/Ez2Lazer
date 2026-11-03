@@ -14,6 +14,7 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Edit;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.Edit;
 using osu.Game.Rulesets.Edit.Tools;
@@ -88,9 +89,15 @@ namespace osu.Game.Rulesets.Mania.Edit
         protected override ComposeBlueprintContainer CreateBlueprintContainer()
             => new ManiaBlueprintContainer(this);
 
-        protected override BeatSnapGrid CreateBeatSnapGrid() => beatSnapGrid = new ManiaBeatSnapGrid();
+        protected override BeatSnapGrid CreateBeatSnapGrid() => new ManiaBeatSnapGrid();
 
-        private ManiaBeatSnapGrid? beatSnapGrid;
+        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
+        {
+            var container = new DependencyContainer(base.CreateChildDependencies(parent));
+            parent.TryGet(out EzConfigStore? configStore);
+            container.CacheAs(new ManiaEditorDivisorPaletteBinding(configStore));
+            return container;
+        }
 
         protected override Drawable CreatePlayfieldContentRoot(Drawable defaultContent)
             => PlayfieldContent = new ManiaEditorPlayfieldContent(defaultContent, Playfield, ScrollingInfo, TOOLBOX_EXPANDED_SIZE_RIGHT - TOOLBOX_CONTRACTED_SIZE_RIGHT,

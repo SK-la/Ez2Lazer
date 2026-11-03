@@ -56,8 +56,13 @@ namespace osu.Game.EzOsuGame.Edit.Settings
             {
                 var bindable = GetBindable(divisor);
                 var expected = (Colour4)BindableBeatDivisor.GetColourFor(divisor, colours);
+                bindable.Default = expected;
 
-                if (bindable.Value != expected && !storedDivisors.Contains(divisor))
+                // 尚未写入，或仍是构造时的白色占位（1/1 的官方色本身就是白）。
+                bool unset = !storedDivisors.Contains(divisor)
+                             || (bindable.Value == Colour4.White && expected != Colour4.White);
+
+                if (unset && bindable.Value != expected)
                     bindable.Value = expected;
             }
         }

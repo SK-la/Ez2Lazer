@@ -69,7 +69,7 @@ namespace osu.Game.Screens.Edit.Compose.Components
 
             foreach (var target in GetTargetContainers(composer))
             {
-                var lineContainer = new ScrollingHitObjectContainer();
+                var lineContainer = new ScrollingHitObjectContainer { Depth = -1 };
 
                 grids.Add(lineContainer);
                 target.Add(lineContainer);

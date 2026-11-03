@@ -49,6 +49,9 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
         [Resolved]
         private OsuColour colours { get; set; } = null!;
 
+        [Resolved(CanBeNull = true)]
+        private ManiaEditorDivisorPaletteBinding? divisorPalette { get; set; }
+
         /// <summary>
         /// What the columns should create for a placement gesture, following the composer's active tool.
         /// </summary>
@@ -145,6 +148,9 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
             columnSet.Columns.BindCollectionChanged(onColumnsChanged, true);
             editorBeatmap.ControlPointInfo.ControlPointsChanged += onControlPointsChanged;
+
+            if (divisorPalette != null)
+                divisorPalette.Changed += InvalidateSnapGrid;
         }
 
         private void onControlPointsChanged() => snapGrid.Clear();
@@ -277,6 +283,12 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
             return nearest;
         }
 
+        internal void InvalidateSnapGrid()
+        {
+            snapGrid.InvalidateCache();
+            updateGrid();
+        }
+
         private void updateHover()
         {
             HoverColumn = null;
@@ -305,7 +317,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
             if (selectionTimeRange is var (start, end))
             {
                 if (!snapGrid.IsValidForRange(start, end, beatDivisor.Value))
-                    snapGrid.RebuildForRange(start, end, editorBeatmap.ControlPointInfo, beatDivisor.Value, editorBeatmap.FixedGridEnabled.Value, colours);
+                    snapGrid.RebuildForRange(start, end, editorBeatmap.ControlPointInfo, beatDivisor.Value, editorBeatmap.FixedGridEnabled.Value, colours, divisorPalette?.Palette);
 
                 return;
             }
@@ -317,7 +329,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
             }
 
             if (!snapGrid.IsValidFor(snapped, beatDivisor.Value))
-                snapGrid.Rebuild(snapped, editorBeatmap.ControlPointInfo, beatDivisor.Value, editorBeatmap.FixedGridEnabled.Value, colours);
+                snapGrid.Rebuild(snapped, editorBeatmap.ControlPointInfo, beatDivisor.Value, editorBeatmap.FixedGridEnabled.Value, colours, divisorPalette?.Palette);
         }
 
         private Vector2? currentMousePosition()
@@ -358,6 +370,9 @@ namespace osu.Game.Rulesets.Mania.Edit.Extension
 
         protected override void Dispose(bool isDisposing)
         {
+            if (divisorPalette != null)
+                divisorPalette.Changed -= InvalidateSnapGrid;
+
             columnSet.Columns.CollectionChanged -= onColumnsChanged;
             editorBeatmap.ControlPointInfo.ControlPointsChanged -= onControlPointsChanged;
 

@@ -148,6 +148,8 @@ namespace osu.Game.Rulesets.Mania.Edit
         /// </summary>
         internal ExtensionPlacementMode PlacementMode => extensionArea.Mode;
 
+        internal void InvalidateExtensionSnapGrid() => extensionArea.InvalidateSnapGrid();
+
         /// <summary>
         /// The time range whose beat lines the columns should show, when their selection owns them.
         /// </summary>
