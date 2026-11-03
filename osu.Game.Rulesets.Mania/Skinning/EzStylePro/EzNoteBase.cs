@@ -62,16 +62,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             get
             {
-                if (!SupportsImprovedNoteDisplayColour)
-                {
-                    if (colorizationEnabled && UseColorization && !Column.ConfigTimingBasedNoteColouring)
-                        return columnNoteColour;
-
+                if (SupportsImprovedNoteDisplayColour)
                     return Colour4.White;
-                }
 
                 if (colorizationEnabled && UseColorization && !Column.ConfigTimingBasedNoteColouring)
-                    return ManiaNoteDisplayColour.ResolveColumnColour(columnNoteColour);
+                    return columnNoteColour;
 
                 return Colour4.White;
             }
@@ -101,7 +96,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     };
                 }
 
-                if (ManiaNoteTextureColouring.ShouldUseNormalisedNoteTextures(colorizationEnabled, Column.ConfigTimingBasedNoteColouring))
+                if (ManiaNoteTextureColouring.ShouldUseTintBaseNoteTextures(colorizationEnabled, Column.ConfigTimingBasedNoteColouring))
                     return "white";
 
                 return columnNoteType switch

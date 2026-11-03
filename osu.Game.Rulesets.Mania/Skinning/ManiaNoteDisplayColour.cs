@@ -9,20 +9,21 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning
 {
-    /// <summary>
-    /// Resolves column or timing-based tint for textured tap notes.
-    /// </summary>
     public static class ManiaNoteDisplayColour
     {
-        public static Color4 ResolveTimingColour(bool timingBasedNoteColouringEnabled, IBeatmap beatmap, double startTime, OsuColour colours)
-        {
-            if (!timingBasedNoteColouringEnabled)
-                return Color4.White;
+        /// <summary>
+        /// Column-assigned note tint (Column bindables). PR #14 adds texture-preserving ApplyTo here.
+        /// </summary>
+        public static Color4 ForColumnNoteDisplayTint(Colour4 columnColour) => columnColour;
 
+        /// <summary>
+        /// Snap-divisor note tint from the beat line palette. PR #14 adds texture-preserving ApplyTo here.
+        /// </summary>
+        public static Color4 ForDivisorNoteDisplayTint(IBeatmap beatmap, double startTime, OsuColour colours)
+        {
             int snapDivisor = beatmap.ControlPointInfo.GetClosestBeatDivisor(startTime);
             return BindableBeatDivisor.GetColourFor(snapDivisor, colours);
         }
-
-        public static Colour4 ResolveColumnColour(Colour4 columnColour) => columnColour;
     }
 }
+
