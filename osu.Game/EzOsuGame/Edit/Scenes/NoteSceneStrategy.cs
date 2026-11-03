@@ -13,9 +13,9 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
     {
         private EzSkinEditorSettingsGroup[]? sections;
 
-        public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.Note;
+        public EzEditorSceneType SceneType => EzEditorSceneType.Note;
 
-        public EzSkinEditorSceneGroup Group => EzSkinEditorSceneGroup.Gameplay;
+        public EzEditorSceneGroup Group => EzEditorSceneGroup.Gameplay;
 
         public LocalisableString TabTitle => EzEditorStrings.TAB_NOTE;
 

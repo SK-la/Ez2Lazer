@@ -8,43 +8,43 @@ namespace osu.Game.EzOsuGame.Edit
 {
     public static class EzSkinEditorSkinKindResolver
     {
-        public static EzSkinEditorSkinKind Resolve(ISkin? skin)
+        public static EzSkinFamily Resolve(ISkin? skin)
         {
             if (skin is ScriptedSkinWrapper)
-                return EzSkinEditorSkinKind.Scripted;
+                return EzSkinFamily.Scripted;
 
             if (skin is EzStyleProSkin)
-                return EzSkinEditorSkinKind.EzStylePro;
+                return EzSkinFamily.EzStylePro;
 
             if (skin is Ez2Skin)
-                return EzSkinEditorSkinKind.Ez2;
+                return EzSkinFamily.Ez2;
 
             if (skin is SbISkin)
-                return EzSkinEditorSkinKind.SbI;
+                return EzSkinFamily.SbI;
 
-            return EzSkinEditorSkinKind.None;
+            return EzSkinFamily.None;
         }
 
-        public static EzSkinEditorSkinKind Resolve(SkinInfo? skinInfo)
+        public static EzSkinFamily Resolve(SkinInfo? skinInfo)
         {
             if (skinInfo == null)
-                return EzSkinEditorSkinKind.None;
+                return EzSkinFamily.None;
 
             if (ScriptedSkinSupport.IsScriptedSkin(skinInfo))
-                return EzSkinEditorSkinKind.Scripted;
+                return EzSkinFamily.Scripted;
 
             string info = skinInfo.InstantiationInfo;
 
             if (info.Contains(nameof(EzStyleProSkin), System.StringComparison.Ordinal))
-                return EzSkinEditorSkinKind.EzStylePro;
+                return EzSkinFamily.EzStylePro;
 
             if (info.Contains(nameof(Ez2Skin), System.StringComparison.Ordinal))
-                return EzSkinEditorSkinKind.Ez2;
+                return EzSkinFamily.Ez2;
 
             if (info.Contains(nameof(SbISkin), System.StringComparison.Ordinal))
-                return EzSkinEditorSkinKind.SbI;
+                return EzSkinFamily.SbI;
 
-            return EzSkinEditorSkinKind.None;
+            return EzSkinFamily.None;
         }
     }
 }

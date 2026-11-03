@@ -110,7 +110,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private Container blueprintHost = null!;
         private EzLayoutLayer? layoutLayer;
         private OsuScreen? liveScreen;
-        private EzSkinEditorSceneType scene = EzSkinEditorSceneType.GameplayHud;
+        private EzEditorSceneType scene = EzEditorSceneType.GameplayHud;
         private EzHUDLayer layer = EzHUDLayer.EzHud;
         private RulesetInfo? ruleset;
 
@@ -148,13 +148,13 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// Binds the editor HUD to a scene. Only <paramref name="ezLayout"/> contributes editable targets;
         /// <paramref name="screen"/> is used to reach the skin layer HUD for temporary visibility only.
         /// </summary>
-        public void Apply(EzSkinEditorSceneType scene, OsuScreen? screen, EzLayoutLayer? ezLayout) => Apply(scene, screen, ezLayout, layer);
+        public void Apply(EzEditorSceneType scene, OsuScreen? screen, EzLayoutLayer? ezLayout) => Apply(scene, screen, ezLayout, layer);
 
         /// <summary>
         /// Binds the editor HUD to a scene and selects which layout layer is actively edited.
         /// Visibility stays decoupled: it is driven solely by <see cref="LayerVisible"/>.
         /// </summary>
-        public void Apply(EzSkinEditorSceneType scene, OsuScreen? screen, EzLayoutLayer? ezLayout, EzHUDLayer activeLayer)
+        public void Apply(EzEditorSceneType scene, OsuScreen? screen, EzLayoutLayer? ezLayout, EzHUDLayer activeLayer)
         {
             if (!ReferenceEquals(layoutLayer, ezLayout))
             {

@@ -13,21 +13,21 @@ namespace osu.Game.Tests.NonVisual
         [Test]
         public void TestResolveFromSkinInfoInstantiation()
         {
-            Assert.That(EzSkinEditorSkinKindResolver.Resolve(EzStyleProSkin.CreateInfo()), Is.EqualTo(EzSkinEditorSkinKind.EzStylePro));
-            Assert.That(EzSkinEditorSkinKindResolver.Resolve(Ez2Skin.CreateInfo()), Is.EqualTo(EzSkinEditorSkinKind.Ez2));
-            Assert.That(EzSkinEditorSkinKindResolver.Resolve(SbISkin.CreateInfo()), Is.EqualTo(EzSkinEditorSkinKind.SbI));
-            Assert.That(EzSkinEditorSkinKindResolver.Resolve(ArgonSkin.CreateInfo()), Is.EqualTo(EzSkinEditorSkinKind.None));
-            Assert.That(EzSkinEditorSkinKindResolver.Resolve((SkinInfo?)null), Is.EqualTo(EzSkinEditorSkinKind.None));
+            Assert.That(EzSkinEditorSkinKindResolver.Resolve(EzStyleProSkin.CreateInfo()), Is.EqualTo(EzSkinFamily.EzStylePro));
+            Assert.That(EzSkinEditorSkinKindResolver.Resolve(Ez2Skin.CreateInfo()), Is.EqualTo(EzSkinFamily.Ez2));
+            Assert.That(EzSkinEditorSkinKindResolver.Resolve(SbISkin.CreateInfo()), Is.EqualTo(EzSkinFamily.SbI));
+            Assert.That(EzSkinEditorSkinKindResolver.Resolve(ArgonSkin.CreateInfo()), Is.EqualTo(EzSkinFamily.None));
+            Assert.That(EzSkinEditorSkinKindResolver.Resolve((SkinInfo?)null), Is.EqualTo(EzSkinFamily.None));
         }
 
         [Test]
         public void TestRegistryHasOneProviderPerKind()
         {
-            Assert.That(EzSkinEditorSkinScopedGroupRegistry.For(EzSkinEditorSkinKind.EzStylePro), Has.Exactly(1).Items);
-            Assert.That(EzSkinEditorSkinScopedGroupRegistry.For(EzSkinEditorSkinKind.Ez2), Has.Exactly(1).Items);
-            Assert.That(EzSkinEditorSkinScopedGroupRegistry.For(EzSkinEditorSkinKind.SbI), Has.Exactly(1).Items);
-            Assert.That(EzSkinEditorSkinScopedGroupRegistry.For(EzSkinEditorSkinKind.Scripted), Has.Exactly(1).Items);
-            Assert.That(EzSkinEditorSkinScopedGroupRegistry.For(EzSkinEditorSkinKind.None), Is.Empty);
+            Assert.That(EzSkinEditorSkinScopedGroupRegistry.For(EzSkinFamily.EzStylePro), Has.Exactly(1).Items);
+            Assert.That(EzSkinEditorSkinScopedGroupRegistry.For(EzSkinFamily.Ez2), Has.Exactly(1).Items);
+            Assert.That(EzSkinEditorSkinScopedGroupRegistry.For(EzSkinFamily.SbI), Has.Exactly(1).Items);
+            Assert.That(EzSkinEditorSkinScopedGroupRegistry.For(EzSkinFamily.Scripted), Has.Exactly(1).Items);
+            Assert.That(EzSkinEditorSkinScopedGroupRegistry.For(EzSkinFamily.None), Is.Empty);
         }
     }
 }

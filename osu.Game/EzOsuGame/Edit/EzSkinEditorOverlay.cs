@@ -190,9 +190,9 @@ namespace osu.Game.EzOsuGame.Edit
         {
         }
 
-        private bool canPresentScene(EzSkinEditorSceneType scene)
+        private bool canPresentScene(EzEditorSceneType scene)
         {
-            if (scene == EzSkinEditorSceneType.SkinIni)
+            if (scene == EzEditorSceneType.SkinIni)
                 return EzSkinIniSupport.IsSupported(skinManager.CurrentSkinInfo.Value);
 
             return true;

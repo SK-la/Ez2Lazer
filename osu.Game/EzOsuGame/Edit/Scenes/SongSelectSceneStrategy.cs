@@ -15,9 +15,9 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
     {
         private EzSkinEditorSettingsGroup[]? sections;
 
-        public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.SongSelectHud;
+        public EzEditorSceneType SceneType => EzEditorSceneType.SongSelectHud;
 
-        public EzSkinEditorSceneGroup Group => EzSkinEditorSceneGroup.SongSelect;
+        public EzEditorSceneGroup Group => EzEditorSceneGroup.SongSelect;
 
         public LocalisableString TabTitle => EzEditorStrings.SIDEBAR_TAB_HUD;
 

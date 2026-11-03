@@ -67,9 +67,9 @@ namespace osu.Game.EzOsuGame.Edit
         /// the hidden state and the global Ez HUD layer. Every other scene runs inside gameplay, where
         /// the HUD is shown (even when not interactively editable), so it offers the full layer set.
         /// </summary>
-        public static IReadOnlyList<EzSkinEditorLayerDefinition> For(EzSkinEditorSceneType sceneType) => sceneType switch
+        public static IReadOnlyList<EzSkinEditorLayerDefinition> For(EzEditorSceneType sceneType) => sceneType switch
         {
-            EzSkinEditorSceneType.SongSelectHud => new[] { HUD_OFF, EZ_HUD },
+            EzEditorSceneType.SongSelectHud => new[] { HUD_OFF, EZ_HUD },
             _ => new[] { HUD_OFF, EZ_HUD, EZ_HUD_RULESET, EZ_PLAYFIELD_RULESET },
         };
 
@@ -86,7 +86,7 @@ namespace osu.Game.EzOsuGame.Edit
         /// Song select only has a single non-ruleset container; gameplay layers map to their
         /// definition's target. Scenes without an editable HUD and the hidden state yield null.
         /// </summary>
-        public static GlobalSkinnableContainerLookup? ResolveLookup(EzSkinEditorSceneType sceneType, EzHUDLayer layer, RulesetInfo? ruleset)
+        public static GlobalSkinnableContainerLookup? ResolveLookup(EzEditorSceneType sceneType, EzHUDLayer layer, RulesetInfo? ruleset)
         {
             if (layer == EzHUDLayer.HudOff)
                 return null;
@@ -94,7 +94,7 @@ namespace osu.Game.EzOsuGame.Edit
             if (!EzSkinEditorSceneRegistry.SupportsHudLayer(sceneType))
                 return null;
 
-            if (sceneType == EzSkinEditorSceneType.SongSelectHud)
+            if (sceneType == EzEditorSceneType.SongSelectHud)
                 return new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.SongSelect);
 
             var definition = Get(layer);
@@ -108,7 +108,7 @@ namespace osu.Game.EzOsuGame.Edit
         /// <summary>
         /// Whether a layer can actually build an editing target right now (used for interaction gating).
         /// </summary>
-        public static bool HasEditingTarget(EzSkinEditorSceneType sceneType, EzHUDLayer layer, RulesetInfo? ruleset) => ResolveLookup(sceneType, layer, ruleset) != null;
+        public static bool HasEditingTarget(EzEditorSceneType sceneType, EzHUDLayer layer, RulesetInfo? ruleset) => ResolveLookup(sceneType, layer, ruleset) != null;
 
         /// <summary>
         /// Localised dropdown label. Ruleset-scoped layers substitute the active ruleset name for the
@@ -140,7 +140,7 @@ namespace osu.Game.EzOsuGame.Edit
         /// <see cref="EzHUDLayer.HudOff"/>. HUD scenes without the requested layer fall back to
         /// their default non-hidden layer (e.g. a ruleset layer on song select becomes the global Ez HUD).
         /// </summary>
-        public static EzHUDLayer Normalize(EzSkinEditorSceneType sceneType, EzHUDLayer layer)
+        public static EzHUDLayer Normalize(EzEditorSceneType sceneType, EzHUDLayer layer)
         {
             var offered = For(sceneType);
 

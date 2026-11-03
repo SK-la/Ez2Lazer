@@ -12,13 +12,13 @@ namespace osu.Game.EzOsuGame.Edit
     {
         public static IReadOnlyList<IEzSkinEditorSkinScopedGroupProvider> All { get; } = new IEzSkinEditorSkinScopedGroupProvider[]
         {
-            new SkinScopedGroupProvider(EzSkinEditorSkinKind.EzStylePro),
-            new SkinScopedGroupProvider(EzSkinEditorSkinKind.Ez2),
-            new SkinScopedGroupProvider(EzSkinEditorSkinKind.SbI),
-            new SkinScopedGroupProvider(EzSkinEditorSkinKind.Scripted),
+            new SkinScopedGroupProvider(EzSkinFamily.EzStylePro),
+            new SkinScopedGroupProvider(EzSkinFamily.Ez2),
+            new SkinScopedGroupProvider(EzSkinFamily.SbI),
+            new SkinScopedGroupProvider(EzSkinFamily.Scripted),
         };
 
-        public static IEnumerable<IEzSkinEditorSkinScopedGroupProvider> For(EzSkinEditorSkinKind kind) =>
+        public static IEnumerable<IEzSkinEditorSkinScopedGroupProvider> For(EzSkinFamily kind) =>
             All.Where(p => p.Kind == kind);
 
         /// <summary>
@@ -26,14 +26,14 @@ namespace osu.Game.EzOsuGame.Edit
         /// </summary>
         private sealed class SkinScopedGroupProvider : IEzSkinEditorSkinScopedGroupProvider
         {
-            public SkinScopedGroupProvider(EzSkinEditorSkinKind kind)
+            public SkinScopedGroupProvider(EzSkinFamily kind)
             {
                 Kind = kind;
             }
 
-            public EzSkinEditorSkinKind Kind { get; }
+            public EzSkinFamily Kind { get; }
 
-            public Drawable CreateControls() => Kind == EzSkinEditorSkinKind.Scripted
+            public Drawable CreateControls() => Kind == EzSkinFamily.Scripted
                 ? new EzSkinEditorScriptedSkinSettingsSection()
                 : new EzBuiltInSkinScopedSettingsControls(Kind);
         }

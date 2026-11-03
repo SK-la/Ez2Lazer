@@ -24,9 +24,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private readonly OsuScrollContainer scroll;
         private readonly IReadOnlyList<EzSkinEditorSettingsGroup> groups;
 
-        private readonly Dictionary<EzSkinEditorSceneType, int> rememberedIndex = new Dictionary<EzSkinEditorSceneType, int>();
+        private readonly Dictionary<EzEditorSceneType, int> rememberedIndex = new Dictionary<EzEditorSceneType, int>();
 
-        private EzSkinEditorSceneType? scene;
+        private EzEditorSceneType? scene;
 
         // 滚动驱动的选中变化期间置位，阻止选择回调再把视口拉回分组顶部。
         private bool suppressScrollResponse;
@@ -50,14 +50,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// <summary>
         /// 换上这一场景的栏目。栏目对象由场景持有，这里只更新导航轨。
         /// </summary>
-        public void ShowSections(EzSkinEditorSceneType nextScene, IReadOnlyList<EzSkinEditorSettingsGroup> sections)
+        public void ShowSections(EzEditorSceneType nextScene, IReadOnlyList<EzSkinEditorSettingsGroup> sections)
         {
             scene = nextScene;
             Pages = sections;
 
             rail.SetItems(sections.Select(s => (s.SectionTitle, s.SectionVisible.Value)).ToList());
 
-            if (scene is EzSkinEditorSceneType currentScene
+            if (scene is EzEditorSceneType currentScene
                 && rememberedIndex.TryGetValue(currentScene, out int remembered)
                 && remembered >= 0 && remembered < sections.Count
                 && sections[remembered].SectionVisible.Value)
@@ -126,7 +126,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private void onSelectionChanged(ValueChangedEvent<int> change)
         {
-            if (scene is EzSkinEditorSceneType currentScene)
+            if (scene is EzEditorSceneType currentScene)
                 rememberedIndex[currentScene] = change.NewValue;
 
             scrollToGroup(change.NewValue);

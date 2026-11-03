@@ -17,14 +17,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// <summary>
         /// Shared with the scene bar. Setting it re-groups this rail; the rail's buttons write back here.
         /// </summary>
-        public Bindable<EzSkinEditorSceneType> CurrentScene { get; } = new Bindable<EzSkinEditorSceneType>();
+        public Bindable<EzEditorSceneType> CurrentScene { get; } = new Bindable<EzEditorSceneType>();
 
         private IReadOnlyList<IEzSkinEditorSceneStrategy> scenes = new List<IEzSkinEditorSceneStrategy>();
 
         // Runtime visibility per scene (screen-driven), separate from each strategy's static availability.
-        private readonly Dictionary<EzSkinEditorSceneType, bool> runtimeVisible = new Dictionary<EzSkinEditorSceneType, bool>();
+        private readonly Dictionary<EzEditorSceneType, bool> runtimeVisible = new Dictionary<EzEditorSceneType, bool>();
 
-        private EzSkinEditorSceneGroup? group;
+        private EzEditorSceneGroup? group;
 
         // Guards the SelectedIndex <-> CurrentScene two-way sync against feedback loops.
         private bool syncing;
@@ -38,7 +38,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// <summary>
         /// Shows or hides a scene without rebuilding the rail or resetting the current scene.
         /// </summary>
-        public void SetSceneVisible(EzSkinEditorSceneType scene, bool visible)
+        public void SetSceneVisible(EzEditorSceneType scene, bool visible)
         {
             runtimeVisible[scene] = visible;
 
@@ -53,7 +53,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             SetItemVisible(index, isVisible(scenes[index]));
         }
 
-        private void onCurrentSceneChanged(ValueChangedEvent<EzSkinEditorSceneType> change)
+        private void onCurrentSceneChanged(ValueChangedEvent<EzEditorSceneType> change)
         {
             if (syncing)
                 return;
@@ -92,7 +92,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }
         }
 
-        private void rebuildForGroup(EzSkinEditorSceneGroup newGroup)
+        private void rebuildForGroup(EzEditorSceneGroup newGroup)
         {
             group = newGroup;
             scenes = EzSkinEditorSceneRegistry.ForGroup(newGroup).ToList();
@@ -102,7 +102,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                      .ToList());
         }
 
-        private void selectScene(EzSkinEditorSceneType scene)
+        private void selectScene(EzEditorSceneType scene)
         {
             int index = indexOf(scene);
 
@@ -110,7 +110,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 SelectedIndex.Value = index;
         }
 
-        private int indexOf(EzSkinEditorSceneType scene)
+        private int indexOf(EzEditorSceneType scene)
         {
             for (int i = 0; i < scenes.Count; i++)
             {

@@ -74,7 +74,7 @@ namespace osu.Game.Tests.Visual.Edit
         public void TestNoteSceneInteractions()
         {
             // Note 首页可改项较少，两页合计断言。
-            runSceneInteraction(EzSkinEditorSceneType.Note, minVisited: 1);
+            runSceneInteraction(EzEditorSceneType.Note, minVisited: 1);
             AddStep("navigate to note edit group", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().SelectSidebarPage(1));
             cycleDriverSettings(minVisited: 1);
             AddAssert("workspace still present", () => editorScreen.IsLoaded);
@@ -84,7 +84,7 @@ namespace osu.Game.Tests.Visual.Edit
         [Test]
         public void TestSkinIniSceneInteractions()
         {
-            runSceneInteraction(EzSkinEditorSceneType.SkinIni, importSkin: true);
+            runSceneInteraction(EzEditorSceneType.SkinIni, importSkin: true);
             AddAssert("sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().PageCount == 3);
             AddAssert("workspace still present", () => editorScreen.IsLoaded);
             AddStep("discard draft", () => editorScreen.SkinIniSession.Discard());
@@ -109,7 +109,7 @@ namespace osu.Game.Tests.Visual.Edit
             driver = null;
 
             loadWorkspace();
-            AddStep("switch to appearance", () => editorScreen.CurrentScene.Value = EzSkinEditorSceneType.Appearance);
+            AddStep("switch to appearance", () => editorScreen.CurrentScene.Value = EzEditorSceneType.Appearance);
             AddStep($"select {typeof(T).Name}", () =>
             {
                 var group = editorScreen.ChildrenOfType<T>().Single();
@@ -119,7 +119,7 @@ namespace osu.Game.Tests.Visual.Edit
             cycleDriverSettings();
         }
 
-        private void runSceneInteraction(EzSkinEditorSceneType scene, bool importSkin = false, int minVisited = 2)
+        private void runSceneInteraction(EzEditorSceneType scene, bool importSkin = false, int minVisited = 2)
         {
             if (importSkin)
                 importLegacySkin();

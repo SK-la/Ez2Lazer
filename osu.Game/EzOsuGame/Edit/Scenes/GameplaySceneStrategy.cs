@@ -12,9 +12,9 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
     {
         private EzSkinEditorSettingsGroup[]? sections;
 
-        public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.GameplayHud;
+        public EzEditorSceneType SceneType => EzEditorSceneType.GameplayHud;
 
-        public EzSkinEditorSceneGroup Group => EzSkinEditorSceneGroup.Gameplay;
+        public EzEditorSceneGroup Group => EzEditorSceneGroup.Gameplay;
 
         public LocalisableString TabTitle => EzEditorStrings.SIDEBAR_TAB_HUD;
 

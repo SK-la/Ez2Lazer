@@ -19,7 +19,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
     /// </summary>
     public partial class EzBuiltInSkinScopedSettingsControls : FillFlowContainer
     {
-        public EzSkinEditorSkinKind Kind { get; }
+        public EzSkinFamily Kind { get; }
 
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
@@ -27,7 +27,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         [Resolved]
         private Storage storage { get; set; } = null!;
 
-        public EzBuiltInSkinScopedSettingsControls(EzSkinEditorSkinKind kind)
+        public EzBuiltInSkinScopedSettingsControls(EzSkinFamily kind)
         {
             Kind = kind;
             RelativeSizeAxes = Axes.X;
@@ -43,18 +43,18 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 
             switch (Kind)
             {
-                case EzSkinEditorSkinKind.EzStylePro:
+                case EzSkinFamily.EzStylePro:
                     // children.Add(createJudgementLineDropdown()); //暂时不显示
                     children.AddRange(createHitTargetSettings());
                     children.AddRange(createLnSettings());
                     children.Add(createNoteTrackLineSlider());
                     break;
 
-                case EzSkinEditorSkinKind.Ez2:
+                case EzSkinFamily.Ez2:
                     children.AddRange(createHitTargetSettings());
                     break;
 
-                case EzSkinEditorSkinKind.SbI:
+                case EzSkinFamily.SbI:
                     children.AddRange(createLnSettings());
                     children.Add(createNoteCornerRadiusSlider());
                     break;

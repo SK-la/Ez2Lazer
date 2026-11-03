@@ -25,14 +25,14 @@ namespace osu.Game.EzOsuGame.Edit
         private readonly EzSkinEditorScreen workspace;
         private readonly EzLayoutLayer? layoutLayer;
         private readonly Action updateScreenSizing;
-        private readonly Func<EzSkinEditorSceneType, bool> sceneIsAvailable;
+        private readonly Func<EzEditorSceneType, bool> sceneIsAvailable;
         private readonly Func<IScreen?> getCurrentScreen;
         private readonly Action enterSongSelect;
         private readonly Action enterGameplay;
         private readonly Action enterFullMapPreview;
 
         private readonly Container gameplayHost = new Container { RelativeSizeAxes = Axes.Both };
-        private EzSkinEditorSceneType desiredScene;
+        private EzEditorSceneType desiredScene;
         private Player? boundPlayer;
         private SongSelect? boundSongSelect;
         private EzSkinEditorPreviewManiaScreen? boundFullMapPreview;
@@ -40,7 +40,7 @@ namespace osu.Game.EzOsuGame.Edit
         private Drawable? hiddenStoryboard;
         private float previousStoryboardAlpha;
 
-        public EzSkinEditorSceneCoordinator(ScalingContainer scalingContainer, EzSkinEditorScreen workspace, EzLayoutLayer? layoutLayer, Action updateScreenSizing, Func<EzSkinEditorSceneType, bool> sceneIsAvailable, Func<IScreen?> getCurrentScreen, Action enterSongSelect, Action enterGameplay, Action enterFullMapPreview)
+        public EzSkinEditorSceneCoordinator(ScalingContainer scalingContainer, EzSkinEditorScreen workspace, EzLayoutLayer? layoutLayer, Action updateScreenSizing, Func<EzEditorSceneType, bool> sceneIsAvailable, Func<IScreen?> getCurrentScreen, Action enterSongSelect, Action enterGameplay, Action enterFullMapPreview)
         {
             this.scalingContainer = scalingContainer;
             this.workspace = workspace;
@@ -61,16 +61,16 @@ namespace osu.Game.EzOsuGame.Edit
             Present(desiredScene, target);
         }
 
-        public void Present(EzSkinEditorSceneType scene, OsuScreen? target)
+        public void Present(EzEditorSceneType scene, OsuScreen? target)
         {
             if (!sceneIsAvailable(scene))
                 return;
 
             desiredScene = scene;
 
-            if (EzSkinEditorSceneRegistry.GroupOf(scene) == EzSkinEditorSceneGroup.SongSelect)
+            if (EzSkinEditorSceneRegistry.GroupOf(scene) == EzEditorSceneGroup.SongSelect)
             {
-                if (scene == EzSkinEditorSceneType.BeatmapPreview)
+                if (scene == EzEditorSceneType.BeatmapPreview)
                     presentFullMapPreview();
                 else
                     presentSongSelect();
@@ -85,9 +85,9 @@ namespace osu.Game.EzOsuGame.Edit
         /// </summary>
         public void Tick(OsuScreen? current)
         {
-            if (EzSkinEditorSceneRegistry.GroupOf(desiredScene) == EzSkinEditorSceneGroup.SongSelect)
+            if (EzSkinEditorSceneRegistry.GroupOf(desiredScene) == EzEditorSceneGroup.SongSelect)
             {
-                if (desiredScene == EzSkinEditorSceneType.BeatmapPreview)
+                if (desiredScene == EzEditorSceneType.BeatmapPreview)
                 {
                     if (current is EzSkinEditorPreviewManiaScreen { IsLoaded: true } fullMapPreview && !ReferenceEquals(boundFullMapPreview, fullMapPreview))
                         bindFullMapPreview(fullMapPreview);

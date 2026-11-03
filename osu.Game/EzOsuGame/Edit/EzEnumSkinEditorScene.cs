@@ -4,10 +4,21 @@
 namespace osu.Game.EzOsuGame.Edit
 {
     /// <summary>
-    /// Ez 皮肤编辑器二级场景。尺寸与颜色设置已迁入 Appearance 侧栏五栏。
-    /// 一级分组见 <see cref="EzSkinEditorSceneGroup"/>。
+    /// 可编辑场景的一级分组
     /// </summary>
-    public enum EzSkinEditorSceneType
+    public enum EzEditorSceneGroup
+    {
+        SongSelect,
+        Gameplay,
+        // TODO: 需要实现的场景。
+        // BeatmapEditor
+    }
+
+    /// <summary>
+    /// 可编辑场景的二级分组
+    /// 一级分组见 <see cref="EzEditorSceneGroup"/>。
+    /// </summary>
+    public enum EzEditorSceneType
     {
         SongSelectHud,
         BeatmapPreview,

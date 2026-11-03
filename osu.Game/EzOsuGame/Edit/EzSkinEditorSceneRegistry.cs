@@ -30,36 +30,36 @@ namespace osu.Game.EzOsuGame.Edit
         /// <summary>
         /// Top-level groups in scene-bar order.
         /// </summary>
-        public static IReadOnlyList<EzSkinEditorSceneGroup> Groups { get; } = new[]
+        public static IReadOnlyList<EzEditorSceneGroup> Groups { get; } = new[]
         {
-            EzSkinEditorSceneGroup.SongSelect,
-            EzSkinEditorSceneGroup.Gameplay,
+            EzEditorSceneGroup.SongSelect,
+            EzEditorSceneGroup.Gameplay,
         };
 
-        public static IEnumerable<IEzSkinEditorSceneStrategy> ForGroup(EzSkinEditorSceneGroup group) => All.Where(s => s.Group == group);
+        public static IEnumerable<IEzSkinEditorSceneStrategy> ForGroup(EzEditorSceneGroup group) => All.Where(s => s.Group == group);
 
-        public static IEzSkinEditorSceneStrategy Get(EzSkinEditorSceneType sceneType) =>
+        public static IEzSkinEditorSceneStrategy Get(EzEditorSceneType sceneType) =>
             All.First(s => s.SceneType == sceneType);
 
-        public static EzSkinEditorSceneGroup GroupOf(EzSkinEditorSceneType sceneType) => Get(sceneType).Group;
+        public static EzEditorSceneGroup GroupOf(EzEditorSceneType sceneType) => Get(sceneType).Group;
 
         /// <summary>
         /// Whether a scene presents an inserted screen whose skinnable HUD containers can be edited.
         /// Single source for the editor HUD layer's capability check.
         /// </summary>
-        public static bool SupportsHudLayer(EzSkinEditorSceneType sceneType) => Get(sceneType).SupportsHudLayer;
+        public static bool SupportsHudLayer(EzEditorSceneType sceneType) => Get(sceneType).SupportsHudLayer;
 
-        public static EzSkinEditorSceneType ResolveCurrentScene(IScreen? currentScreen) => ResolveCurrentScene(currentScreen?.GetType());
+        public static EzEditorSceneType ResolveCurrentScene(IScreen? currentScreen) => ResolveCurrentScene(currentScreen?.GetType());
 
-        public static EzSkinEditorSceneType ResolveCurrentScene(Type? screenType)
+        public static EzEditorSceneType ResolveCurrentScene(Type? screenType)
         {
             if (screenType != null && typeof(SoloSongSelect).IsAssignableFrom(screenType))
-                return EzSkinEditorSceneType.SongSelectHud;
+                return EzEditorSceneType.SongSelectHud;
 
             if (screenType != null && typeof(Player).IsAssignableFrom(screenType))
-                return EzSkinEditorSceneType.GameplayHud;
+                return EzEditorSceneType.GameplayHud;
 
-            return EzSkinEditorSceneType.GameplayHud;
+            return EzEditorSceneType.GameplayHud;
         }
     }
 }

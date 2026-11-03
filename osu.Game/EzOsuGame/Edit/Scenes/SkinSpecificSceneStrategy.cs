@@ -20,9 +20,9 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
     {
         private EzSkinEditorSettingsGroup[]? sections;
 
-        public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.SkinSpecific;
+        public EzEditorSceneType SceneType => EzEditorSceneType.SkinSpecific;
 
-        public EzSkinEditorSceneGroup Group => EzSkinEditorSceneGroup.Gameplay;
+        public EzEditorSceneGroup Group => EzEditorSceneGroup.Gameplay;
 
         public LocalisableString TabTitle => EzEditorStrings.TAB_SKIN_SPECIFIC;
 

@@ -19,9 +19,9 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
         private EzSkinEditorSettingsGroup[]? sections;
         private SkinIniSaveFooter? footer;
 
-        public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.SkinIni;
+        public EzEditorSceneType SceneType => EzEditorSceneType.SkinIni;
 
-        public EzSkinEditorSceneGroup Group => EzSkinEditorSceneGroup.Gameplay;
+        public EzEditorSceneGroup Group => EzEditorSceneGroup.Gameplay;
 
         public LocalisableString TabTitle => EzEditorStrings.TAB_SKIN_INI;
 

@@ -11,7 +11,7 @@ namespace osu.Game.EzOsuGame.Edit
     /// </summary>
     public interface IEzSkinEditorSkinScopedGroupProvider
     {
-        EzSkinEditorSkinKind Kind { get; }
+        EzSkinFamily Kind { get; }
 
         Drawable CreateControls();
     }

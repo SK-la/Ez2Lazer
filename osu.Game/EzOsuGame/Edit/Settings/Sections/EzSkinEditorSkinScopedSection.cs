@@ -16,7 +16,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
     public partial class EzSkinEditorSkinScopedSection : EzSkinEditorSettingsGroup
     {
         private IBindable<Skin> skin = null!;
-        private EzSkinEditorSkinKind shownKind = EzSkinEditorSkinKind.None;
+        private EzSkinFamily shownKind = EzSkinFamily.None;
 
         [Resolved]
         private SkinManager skinManager { get; set; } = null!;
@@ -37,7 +37,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         private void syncKind()
         {
             var kind = EzSkinEditorSkinKindResolver.Resolve(skin.Value);
-            SectionVisible.Value = kind != EzSkinEditorSkinKind.None;
+            SectionVisible.Value = kind != EzSkinFamily.None;
 
             if (kind == shownKind)
                 return;
@@ -45,7 +45,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             shownKind = kind;
             Clear();
 
-            if (kind == EzSkinEditorSkinKind.None)
+            if (kind == EzSkinFamily.None)
                 return;
 
             var provider = EzSkinEditorSkinScopedGroupRegistry.For(kind).FirstOrDefault();

@@ -18,12 +18,12 @@ namespace osu.Game.EzOsuGame.Edit
         /// <summary>
         /// 场景，一级分类。
         /// </summary>
-        EzSkinEditorSceneGroup Group { get; }
+        EzEditorSceneGroup Group { get; }
 
         /// <summary>
         /// 场景，二级分类
         /// </summary>
-        EzSkinEditorSceneType SceneType { get; }
+        EzEditorSceneType SceneType { get; }
 
         LocalisableString TabTitle { get; }
 

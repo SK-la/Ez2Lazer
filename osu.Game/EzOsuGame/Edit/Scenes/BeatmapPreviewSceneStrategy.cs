@@ -16,9 +16,9 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
     {
         private EzSkinEditorSettingsGroup[]? sections;
 
-        public EzSkinEditorSceneGroup Group => EzSkinEditorSceneGroup.SongSelect;
+        public EzEditorSceneGroup Group => EzEditorSceneGroup.SongSelect;
 
-        public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.BeatmapPreview;
+        public EzEditorSceneType SceneType => EzEditorSceneType.BeatmapPreview;
 
         public LocalisableString TabTitle => EzEditorStrings.TAB_BEATMAP_PREVIEW;
 
