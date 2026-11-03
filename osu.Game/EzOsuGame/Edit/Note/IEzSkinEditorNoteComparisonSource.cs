@@ -7,7 +7,7 @@ namespace osu.Game.EzOsuGame.Edit.Note
 {
     public interface IEzSkinEditorNoteComparisonSource
     {
-        RulesetInfo? Ruleset { get; }
+        RulesetInfo Ruleset { get; }
 
         EzSkinEditorNotePreviewRequest GetLiveRequest(EzSkinEditorNoteCompareKind compareKind);
 

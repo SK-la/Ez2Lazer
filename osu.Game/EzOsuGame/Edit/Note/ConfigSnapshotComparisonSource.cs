@@ -12,28 +12,23 @@ namespace osu.Game.EzOsuGame.Edit.Note
         private readonly EzSkinEditorComparisonSnapshot snapshot;
         private readonly bool useEzNoteVariants;
         private readonly string variantId;
-        private readonly RulesetInfo ruleset;
 
-        public ConfigSnapshotComparisonSource(
-            Ez2ConfigManager config,
-            EzSkinEditorComparisonSnapshot snapshot,
-            bool useEzNoteVariants,
-            string variantId,
-            RulesetInfo ruleset)
+        public RulesetInfo Ruleset { get; }
+
+        public ConfigSnapshotComparisonSource(Ez2ConfigManager config, EzSkinEditorComparisonSnapshot snapshot,
+                                              bool useEzNoteVariants, string variantId, RulesetInfo ruleset)
         {
             this.config = config;
             this.snapshot = snapshot;
             this.useEzNoteVariants = useEzNoteVariants;
             this.variantId = variantId;
-            this.ruleset = ruleset;
+            Ruleset = ruleset;
         }
 
-        public RulesetInfo? Ruleset => ruleset;
-
         public EzSkinEditorNotePreviewRequest GetLiveRequest(EzSkinEditorNoteCompareKind compareKind) =>
-            EzSkinEditorNotePreviewRequestFactory.FromConfig(config, useEzNoteVariants, compareKind, variantId, ruleset);
+            EzSkinEditorNotePreviewRequestFactory.FromConfig(config, useEzNoteVariants, compareKind, variantId, Ruleset);
 
         public EzSkinEditorNotePreviewRequest GetSnapshotRequest(EzSkinEditorNoteCompareKind compareKind) =>
-            EzSkinEditorNotePreviewRequestFactory.FromSnapshot(snapshot, useEzNoteVariants, compareKind, variantId, ruleset);
+            EzSkinEditorNotePreviewRequestFactory.FromSnapshot(snapshot, useEzNoteVariants, compareKind, variantId, Ruleset);
     }
 }

@@ -32,7 +32,7 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
             new EzSkinEditorSkinIniManiaSection(),
         };
 
-        public Drawable? Footer => footer ??= new SkinIniSaveFooter();
+        public Drawable Footer => footer ??= new SkinIniSaveFooter();
     }
 
     internal partial class SkinIniSaveFooter : Container

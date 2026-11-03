@@ -20,12 +20,10 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         private Action? sessionReload;
 
         [Resolved]
-        private EzSkinIniSession session { get; set; } = null!;
+        protected EzSkinIniSession? Session { get; private set; }
 
         [Resolved]
         private EzSkinEditorComparisonSnapshot comparisonSnapshot { get; set; } = null!;
-
-        protected EzSkinIniSession Session => session;
 
         protected bool Applying { get; private set; }
 
@@ -41,14 +39,14 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         protected void WatchSession(Action reload)
         {
             sessionReload = reload;
-            session.Loaded += sessionReload;
+            Session?.Loaded += sessionReload;
             sessionReload();
         }
 
         protected override void Dispose(bool isDisposing)
         {
             if (sessionReload != null)
-                session.Loaded -= sessionReload;
+                Session?.Loaded -= sessionReload;
 
             base.Dispose(isDisposing);
         }
@@ -145,7 +143,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             Session.ApplyDocument(document);
         }
 
-        protected EzSkinIniDocument? ParseDocument() => Session.ParseDraftDocument();
+        protected EzSkinIniDocument? ParseDocument() => Session?.ParseDraftDocument();
 
         protected EzSkinIniDocument? ParseSnapshotDocument() =>
             EzSkinIniBridge.TryParseSnapshotDocument(comparisonSnapshot.SkinIniDraftText);

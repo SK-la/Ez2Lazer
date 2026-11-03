@@ -4,7 +4,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Bindables;
-using osu.Framework.Localisation;
 
 namespace osu.Game.EzOsuGame.Edit.Components
 {
@@ -98,7 +97,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             scenes = EzSkinEditorSceneRegistry.ForGroup(newGroup).ToList();
 
             SetItems(scenes
-                     .Select(s => ((LocalisableString)s.TabTitle, isVisible(s)))
+                     .Select(s => (s.TabTitle, isVisible(s)))
                      .ToList());
         }
 

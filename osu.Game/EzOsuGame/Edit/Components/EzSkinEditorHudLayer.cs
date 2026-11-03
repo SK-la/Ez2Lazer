@@ -52,9 +52,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// <see cref="SkinEditorChangeHandler"/>. Recreated whenever the active target changes because a
         /// handler binds exactly one container. Null while there is no editable target.
         /// </summary>
-        public SkinEditorChangeHandler? ChangeHandler => changeHandler;
-
-        private SkinEditorChangeHandler? changeHandler;
+        public SkinEditorChangeHandler? ChangeHandler { get; private set; }
 
         // Nested BeginChange/EndChange from the selection handler must not unbalance the delegate swap.
         private IEditorChangeHandler? activeChangeHandler;
@@ -64,7 +62,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public void BeginChange()
         {
-            activeChangeHandler = changeHandler;
+            activeChangeHandler = ChangeHandler;
 
             if (activeChangeHandler == null)
                 return;
@@ -89,9 +87,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }
         }
 
-        public void SaveState() => changeHandler?.SaveState();
+        public void SaveState() => ChangeHandler?.SaveState();
 
-        public void RestoreState(int direction) => changeHandler?.RestoreState(direction);
+        public void RestoreState(int direction) => ChangeHandler?.RestoreState(direction);
 
         private void raiseStateChange() => OnStateChange?.Invoke();
 
@@ -112,7 +110,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private OsuScreen? liveScreen;
         private EzEditorSceneType scene = EzEditorSceneType.GameplayHud;
         private EzHUDLayer layer = EzHUDLayer.EzHud;
-        private RulesetInfo? ruleset;
 
         private HUDOverlay? boundHudOverlay;
         private LeasedBindable<bool>? leasedShowHud;
@@ -189,10 +186,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public void SetRuleset(RulesetInfo? newRuleset)
         {
-            if (ruleset?.Equals(newRuleset) == true)
+            if (CurrentRuleset?.Equals(newRuleset) == true)
                 return;
 
-            ruleset = newRuleset;
+            CurrentRuleset = newRuleset;
             refreshBlueprints();
         }
 
@@ -230,8 +227,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// </summary>
         private void rebuildChangeHandler()
         {
-            changeHandler?.Dispose();
-            changeHandler = null;
+            ChangeHandler?.Dispose();
+            ChangeHandler = null;
 
             EzLayoutContainer? target = ActiveTarget;
 
@@ -241,7 +238,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             var handler = new SkinEditorChangeHandler(target);
             handler.CanUndo.BindValueChanged(_ => raiseStateChange());
             handler.CanRedo.BindValueChanged(_ => raiseStateChange());
-            changeHandler = handler;
+            ChangeHandler = handler;
         }
 
         /// <summary>
@@ -267,7 +264,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             if (layoutLayer == null)
                 yield break;
 
-            GlobalSkinnableContainerLookup? wanted = EzSkinEditorLayerOptions.ResolveLookup(scene, layer, ruleset);
+            GlobalSkinnableContainerLookup? wanted = EzSkinEditorLayerOptions.ResolveLookup(scene, layer, CurrentRuleset);
 
             if (wanted == null)
                 yield break;
@@ -303,12 +300,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             CopySelection();
 
-            changeHandler?.BeginChange();
+            ChangeHandler?.BeginChange();
 
             foreach (var item in selectedComponents.ToArray())
                 ActiveTarget?.Remove(item, true);
 
-            changeHandler?.EndChange();
+            ChangeHandler?.EndChange();
 
             selectedComponents.Clear();
             persistActiveTarget();
@@ -327,7 +324,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             if (drawableInfo == null)
                 return;
 
-            changeHandler?.BeginChange();
+            ChangeHandler?.BeginChange();
 
             var instances = drawableInfo.Select(d => d.CreateInstance()).OfType<ISerialisableDrawable>().ToArray();
             selectedComponents.Clear();
@@ -339,7 +336,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                     selectedComponents.Add(instance);
             }
 
-            changeHandler?.EndChange();
+            ChangeHandler?.EndChange();
             persistActiveTarget();
         }
 
@@ -370,7 +367,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// <summary>
         /// The ruleset active in the editor; drives which library (global / mode) can be edited.
         /// </summary>
-        public RulesetInfo? CurrentRuleset => ruleset;
+        public RulesetInfo? CurrentRuleset { get; private set; }
 
         /// <summary>
         /// Instantiates and places a component into the active layer's container, persisting the
@@ -517,8 +514,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             base.Dispose(isDisposing);
 
-            changeHandler?.Dispose();
-            changeHandler = null;
+            ChangeHandler?.Dispose();
+            ChangeHandler = null;
 
             if (layoutLayer != null)
             {

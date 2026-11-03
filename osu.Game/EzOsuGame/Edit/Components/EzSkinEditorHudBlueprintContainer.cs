@@ -151,7 +151,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// The blueprint binds its shared selection onto <see cref="SelectionHandler{T}.SelectedItems"/>
         /// before this handler loads, so the transform handlers can follow it directly.
         /// </summary>
-        protected override BindableList<ISerialisableDrawable>? TransformSelectionSource => SelectedItems;
+        protected override BindableList<ISerialisableDrawable> TransformSelectionSource => SelectedItems;
 
         protected override void DeleteItems(IEnumerable<ISerialisableDrawable> items)
         {

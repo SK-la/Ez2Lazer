@@ -200,7 +200,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             private readonly Drawable component;
 
-            private Container previewContainer = null!;
+            private readonly Container previewContainer;
 
             public ComponentPlaceButton(Type type, Drawable component, CompositeDrawable? dependencySource)
             {

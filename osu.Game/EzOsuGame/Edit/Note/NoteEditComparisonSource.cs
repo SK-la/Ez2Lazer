@@ -21,7 +21,7 @@ namespace osu.Game.EzOsuGame.Edit.Note
             this.useEzNoteVariants = useEzNoteVariants;
         }
 
-        public RulesetInfo? Ruleset => session.Ruleset.Value;
+        public RulesetInfo Ruleset => session.Ruleset.Value;
 
         public EzSkinEditorNotePreviewRequest GetLiveRequest(EzSkinEditorNoteCompareKind compareKind) =>
             session.ToPreviewRequest(useEzNoteVariants, compareKind);

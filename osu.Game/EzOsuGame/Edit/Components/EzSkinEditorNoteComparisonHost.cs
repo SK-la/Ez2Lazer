@@ -22,7 +22,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// </summary>
     public partial class EzSkinEditorNoteComparisonHost : Container
     {
-        private ISkin editorSkin = null!;
+        private ISkin editorSkin;
         private EzSkinEditorNoteEditSession? session;
         private IEzSkinEditorNoteComparisonSource? source;
 

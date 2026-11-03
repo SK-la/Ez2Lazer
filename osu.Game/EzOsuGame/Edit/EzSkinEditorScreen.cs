@@ -46,18 +46,6 @@ using SixLabors.ImageSharp.PixelFormats;
 
 namespace osu.Game.EzOsuGame.Edit
 {
-    // Milestone index — see EzSkinEditor refactor plan:
-    // M1: layout shell + scene strategies + sidebar groups
-    // M2: live vs snapshot comparison + Note/LN preview (skin.ini keeps Saved/Draft)
-    // M3: Skin.ini editor + backup + save footer
-    // M4: top-bar preview controls + static/beatmap scene backends
-    // M5: EzSkin.json + advanced colouring + config menu (json/colour→ini)
-    // M6: size→ini, .osk export
-    // M7: preview toolbar + skin popover + virtual comparison on size/colour scenes
-    // M8: size/colour virtual provider registration fix
-    // M9: config snapshot comparison + create/restore snapshot + auto-save on navigate
-    // M10: Note scene with independent note-edit snapshot comparison + export
-
     /// <summary>
     /// Ez 皮肤编辑器工作区（菜单栏、场景栏、游玩洞、侧栏）。
     /// 由 <see cref="EzSkinEditorOverlay"/> 托管；当前游玩/选歌屏经缩放插拔，不进本树。
