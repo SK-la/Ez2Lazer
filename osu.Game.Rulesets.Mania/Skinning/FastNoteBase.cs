@@ -7,6 +7,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.UI;
+using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning
 {
@@ -28,6 +29,9 @@ namespace osu.Game.Rulesets.Mania.Skinning
 
         [Resolved]
         protected Column Column { get; private set; } = null!;
+
+        // [Resolved]
+        // private OsuColour colours { get; set; }
 
         // [Resolved]
         // protected EzLocalTextureFactory Factory { get; private set; } = null!;
@@ -88,14 +92,13 @@ namespace osu.Game.Rulesets.Mania.Skinning
         {
             get
             {
-                // 模板模式下不受编辑器配色总开关影响：10k2s1p 开启时 Ez 皮肤本来就无视列色配置。
                 if (BuiltInColourTemplateSwitch?.Value == true)
                     return BuiltInColourTemplate;
 
-                if (!EnabledColorBindable.Value || !UseColorization || Column.ConfigTimingBasedNoteColouring)
-                    return Colour4.White;
+                if (EnabledColorBindable.Value && UseColorization && !Column.ConfigTimingBasedNoteColouring)
+                    return ManiaNoteDisplayColour.ForColumnNoteDisplayTint(NoteColourBindable.Value);
 
-                return ManiaNoteDisplayColour.ForColumnNoteDisplayTint(NoteColourBindable.Value);
+                return Color4.White;
             }
         }
 

@@ -39,7 +39,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         [Resolved(canBeNull: true)]
         private Column column { get; set; }
 
-        private readonly Bindable<bool> configTimingBasedNoteColouring = new Bindable<bool>();
+        private readonly Bindable<bool> gameDivisorNoteColouring = new Bindable<bool>();
 
         protected virtual ManiaSkinComponents Component => ManiaSkinComponents.Note;
 
@@ -63,7 +63,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         [BackgroundDependencyLoader(true)]
         private void load(ManiaRulesetConfigManager rulesetConfig)
         {
-            rulesetConfig?.BindWith(ManiaRulesetSetting.TimingBasedNoteColouring, configTimingBasedNoteColouring);
+            rulesetConfig?.BindWith(ManiaRulesetSetting.TimingBasedNoteColouring, gameDivisorNoteColouring);
 
             AddInternal(headPiece = new SkinnableDrawable(new ManiaSkinComponentLookup(Component), _ => new DefaultNotePiece())
             {
@@ -76,7 +76,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
             base.LoadComplete();
 
-            configTimingBasedNoteColouring.BindValueChanged(_ => updateSnapColour());
+            gameDivisorNoteColouring.BindValueChanged(_ => updateSnapColour());
             StartTimeBindable.BindValueChanged(_ => updateSnapColour(), true);
 
             if (column != null)
@@ -162,25 +162,22 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 return;
             }
 
-            if (SupportsDivisorNoteDisplayTint
-                && configTimingBasedNoteColouring.Value
-                && beatmap != null
-                && HitObject != null)
+            bool columnColourEnabled = column != null && column.ColorSettingsEnabledBindable.Value;
+            bool divisorNoteColouringEnabled = gameDivisorNoteColouring.Value;
+
+            if (SupportsDivisorNoteDisplayTint && divisorNoteColouringEnabled && beatmap != null)
             {
                 headPiece.Colour = ManiaNoteDisplayColour.ForDivisorNoteDisplayTint(
                     beatmap,
-                    HitObject.StartTime,
+                    HitObject?.StartTime ?? 0,
                     colours);
-                return;
             }
-
-            if (column != null && column.ColorSettingsEnabledBindable.Value)
+            else if (columnColourEnabled)
             {
-                headPiece.Colour = ManiaNoteDisplayColour.ForColumnNoteDisplayTint(column.EzNoteColourBindable.Value);
-                return;
+                headPiece.Colour = ManiaNoteDisplayColour.ForColumnNoteDisplayTint(column!.EzNoteColourBindable.Value);
             }
-
-            headPiece.Colour = Color4.White;
+            else
+                headPiece.Colour = Color4.White;
         }
 
         public bool CanRouteToKPoor => ManiaEzDrawableJudgement.CanRouteToKPoor(this);
