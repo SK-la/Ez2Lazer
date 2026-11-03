@@ -667,6 +667,28 @@ namespace osu.Game.EzOsuGame.Localization
             "When enabled, pressing gameplay keys for the current mode also triggers skip during skippable periods."
             + "\nUses your current ruleset/variant key bindings (for example, mania key count bindings).");
 
+        public static readonly LocalisableString EDITOR_SECTION_HEADER = new EzLocalizationManager.EzLocalisableString("编辑器", "Editor");
+
+        public static readonly LocalisableString GAMEPLAY_DIVISOR_NOTE_COLOURING = new EzLocalizationManager.EzLocalisableString(
+            "游戏内按节拍分母着色 Note",
+            "Colour notes by beat divisor in gameplay");
+
+        public static readonly LocalisableString GAMEPLAY_DIVISOR_NOTE_COLOURING_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "保存在 Ez 设置里，不写入 Mania 规则集配置。"
+            + "\n只在游玩中按节拍分母给 Note 着色，和编辑器里的开关互不影响。",
+            "Stored in Ez settings, not in the mania ruleset config."
+            + "\nColours notes by beat divisor during gameplay only, separate from the editor switch.");
+
+        public static readonly LocalisableString EDITOR_DIVISOR_NOTE_COLOURING = new EzLocalizationManager.EzLocalisableString(
+            "编辑器按节拍分母着色 Note",
+            "Colour notes by beat divisor in the editor");
+
+        public static readonly LocalisableString EDITOR_DIVISOR_NOTE_COLOURING_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "保存在 Ez 设置里，不写入 Mania 规则集配置。"
+            + "\n只在谱面编辑器 Compose 中按节拍分母给 Note 着色，和游戏内的开关互不影响。",
+            "Stored in Ez settings, not in the mania ruleset config."
+            + "\nColours notes by beat divisor in the beatmap editor compose screen only, separate from the gameplay switch.");
+
         // public static readonly LocalisableString SKIP_EMPTY_EDGE_COLUMNS = new EzLocalizationManager.EzLocalisableString("跳过空边缘列", "Skip Empty Edge Columns");
         //
         // public static readonly LocalisableString SKIP_EMPTY_EDGE_COLUMNS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(

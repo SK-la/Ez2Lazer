@@ -37,7 +37,8 @@ namespace osu.Game.EzOsuGame.Localization
             "Scaled by half the screen height: 100% moves half a screen up, -100% moves half a screen down. Positive means up."
             + "\nHUD elements with \"match judgement line layout\" enabled move along with it.");
 
-        public static readonly LocalisableString COLUMN_BACKGROUND_DIM = new EzLocalizationManager.EzLocalisableString(            "Column背景暗化",
+        public static readonly LocalisableString COLUMN_BACKGROUND_DIM = new EzLocalizationManager.EzLocalisableString(
+            "Column背景暗化",
             "Column BackGround Dim");
 
         public static readonly LocalisableString COLUMN_BACKGROUND_DIM_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
@@ -94,17 +95,17 @@ namespace osu.Game.EzOsuGame.Localization
             "此开关影响stable导入皮肤中的mania-stage显示。"
             + "\nEzPro皮肤的面板不受此开关控制", "Toggle visibility of the stage foreground");
 
-        public static readonly LocalisableString COLOUR_ENABLE_BUTTON = new EzLocalizationManager.EzLocalisableString(
-            "启用颜色配置",
-            "Enable Colour Config");
+        public static readonly LocalisableString COLUMN_COLOURING_ENABLE_BUTTON = new EzLocalizationManager.EzLocalisableString(
+            "启用列级Note着色",
+            "Enable Column Note Colouring");
 
-        public static readonly LocalisableString COLOUR_ENABLE_BUTTON_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "仅支持EzPro, Ez2, SBI, 3个皮肤.\n"
-            + "先修改Base基础颜色，然后定义每一列的类型（一个5种类型，S为Special特殊列，同时还关联特殊列宽度倍率设置）\n"
-            + "切换tab栏或保存后, 将重置默认颜色为当前设置值。",
-            "Only supports EzPro, Ez2 and SBI skins.\n"
-            + "First modify the base colour, then define the type of each column (5 types; S is the Special column and is related to the Special Column Width Factor setting).\n"
-            + "Switching tabs or saving will reset the default colours to the current saved values.");
+        public static readonly LocalisableString COLUMN_COLOURING_ENABLE_BUTTON_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "通过 【类型基础色 + 每列类型】 批量改色\n"
+            + "5种类型中，S为Special 特殊列，此类型还定义为特殊列，影响宽度倍率\n"
+            + "着色优先级：节拍线着色>列着色>基础色",
+            "Batch recolour by [Base Colour + Column Type].\n"
+            + "Among the 5 types, S is Special; this type also defines special columns, affecting width multipliers.\n"
+            + "Colouring priority: Beat line colouring > Column colouring > Base colour.");
 
         public static readonly LocalisableString SAVE_COLOUR_BUTTON = new EzLocalizationManager.EzLocalisableString(
             "保存颜色配置",

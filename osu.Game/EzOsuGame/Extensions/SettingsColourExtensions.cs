@@ -79,7 +79,7 @@ namespace osu.Game.EzOsuGame.Extensions
         {
             public Box BackgroundBox { get; set; } = null!;
 
-            public LocalisableString TooltipText { get; set; } = "全局列颜色方案设置";
+            public LocalisableString TooltipText { get; set; } = "";
 
             protected override bool OnHover(HoverEvent e)
             {

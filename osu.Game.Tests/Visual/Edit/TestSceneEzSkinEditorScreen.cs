@@ -710,7 +710,7 @@ namespace osu.Game.Tests.Visual.Edit
             // No real screen is presented in this bare test, so no Ez layout container is bound.
             AddAssert("no active target without bound layout", () => hud.ActiveTarget == null);
             AddAssert("placement gracefully refused", () =>
-                !hud.TryPlaceComponent(SerialisedDrawableInfo.GetAllAvailableDrawables(null).First()));
+                !hud.TryPlaceComponent(SerialisedDrawableInfo.GetAllAvailableDrawables().First()));
         }
 
         [Test]

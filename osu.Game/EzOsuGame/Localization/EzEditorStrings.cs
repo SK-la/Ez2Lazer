@@ -315,9 +315,9 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString GROUP_SCRIPTED_SKIN = new EzLocalizationManager.EzLocalisableString("脚本皮肤", "Scripted skin");
 
-        public static readonly LocalisableString GROUP_BASE_COLOURS = new EzLocalizationManager.EzLocalisableString("基础颜色", "Base colours");
+        public static readonly LocalisableString COLUMN_COLOURING = new EzLocalizationManager.EzLocalisableString("列配色", "Column colours");
 
-        public static readonly LocalisableString GROUP_COLUMN_COLOURS = new EzLocalizationManager.EzLocalisableString("列配色", "Column colours");
+        public static readonly LocalisableString COLUMN_TYPE = new EzLocalizationManager.EzLocalisableString("列类型", "Column type");
 
         public static readonly LocalisableString GROUP_BEATMAP_PREVIEW_MANIA = new EzLocalizationManager.EzLocalisableString("全谱外观", "Full-map appearance");
 

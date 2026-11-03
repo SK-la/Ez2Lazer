@@ -35,6 +35,7 @@ using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Screens.Edit;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -121,6 +122,9 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved(canBeNull: true)]
         private DrawableManiaRuleset? drawableRuleset { get; set; }
 
+        [Resolved(canBeNull: true)]
+        private EditorBeatmap? editorBeatmap { get; set; }
+
         internal ManiaLaneController LaneController { get; private set; } = null!;
 
         private double pressHistoryRetentionMs = 120_000;
@@ -195,7 +199,20 @@ namespace osu.Game.Rulesets.Mania.UI
             NoteSetNameBindable = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
             ColorSettingsEnabledBindable = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
 
-            if (rulesetConfig != null) ConfigTimingBasedNoteColouring = rulesetConfig.Get<bool>(ManiaRulesetSetting.TimingBasedNoteColouring);
+            var editorDivisorNoteColouring = ezConfig.GetBindable<bool>(Ez2Setting.EditorDivisorNoteColouring);
+            var gameDivisorNoteColouring = ezConfig.GetBindable<bool>(Ez2Setting.GameplayDivisorNoteColouring);
+
+            void syncDivisorNoteColouringConfig()
+            {
+                ConfigTimingBasedNoteColouring = ManiaDivisorNoteColouring.IsEnabled(
+                    editorBeatmap != null,
+                    gameDivisorNoteColouring.Value,
+                    editorDivisorNoteColouring.Value);
+                NoteColourChanged?.Invoke();
+            }
+
+            gameDivisorNoteColouring.BindValueChanged(_ => syncDivisorNoteColouringConfig());
+            editorDivisorNoteColouring.BindValueChanged(_ => syncDivisorNoteColouringConfig(), true);
 
             SkinnableDrawable keyArea;
 

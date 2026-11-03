@@ -168,8 +168,8 @@ namespace osu.Game.EzOsuGame.Screens
                     },
                     new SettingsCheckbox
                     {
-                        LabelText = EzColumnStrings.COLOUR_ENABLE_BUTTON,
-                        TooltipText = EzColumnStrings.COLOUR_ENABLE_BUTTON_TOOLTIP,
+                        LabelText = EzColumnStrings.COLUMN_COLOURING_ENABLE_BUTTON,
+                        TooltipText = EzColumnStrings.COLUMN_COLOURING_ENABLE_BUTTON_TOOLTIP,
                         Current = colorSettingsEnabled,
                     },
                     baseColorsContainer = new FillFlowContainer

@@ -5,21 +5,21 @@
 
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Testing;
+using osu.Framework.Timing;
+using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
-using osu.Game.Tests.Visual;
-using osu.Framework.Timing;
-using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.Configuration;
-using osu.Framework.Bindables;
-using osu.Framework.Extensions.ObjectExtensions;
-using osu.Framework.Testing;
-using osu.Framework.Utils;
+using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.UI;
+using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.Mania.Tests
 {
@@ -29,6 +29,9 @@ namespace osu.Game.Rulesets.Mania.Tests
         protected override Ruleset CreateRuleset() => new ManiaRuleset();
 
         private Bindable<bool> configTimingBasedNoteColouring;
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; }
 
         private ManualClock clock;
         private DrawableManiaRuleset drawableRuleset;
@@ -52,8 +55,7 @@ namespace osu.Game.Rulesets.Mania.Tests
             });
             AddStep("retrieve config bindable", () =>
             {
-                var config = (ManiaRulesetConfigManager)RulesetConfigs.GetConfigFor(Ruleset.Value.CreateInstance()).AsNonNull();
-                configTimingBasedNoteColouring = config.GetBindable<bool>(ManiaRulesetSetting.TimingBasedNoteColouring);
+                configTimingBasedNoteColouring = ezConfig.GetBindable<bool>(Ez2Setting.GameplayDivisorNoteColouring);
             });
         }
 

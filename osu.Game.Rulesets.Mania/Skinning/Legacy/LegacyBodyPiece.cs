@@ -11,7 +11,6 @@ using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Testing;
-using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI.Scrolling;
@@ -33,23 +32,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         private Drawable? light;
         private LegacyManiaSkinConfiguration.LegacyNoteBodyStyle? bodyStyle;
 
-        private string index = "1";
-
         public LegacyBodyPiece()
         {
             RelativeSizeAxes = Axes.Both;
         }
 
         [BackgroundDependencyLoader]
-        private void load(ISkinSource skin, IScrollingInfo scrollingInfo, DrawableHitObject drawableObject, ManiaRulesetConfigManager? config)
+        private void load(ISkinSource skin, IScrollingInfo scrollingInfo, DrawableHitObject drawableObject)
         {
             holdNote = (DrawableHoldNote)drawableObject;
 
-            bool baseColor = config != null && config.Get<bool>(ManiaRulesetSetting.TimingBasedNoteColouring);
-            index = baseColor ? "1" : FallbackColumnIndex;
-
             string imageName = GetColumnSkinConfig<string>(skin, LegacyManiaSkinConfigurationLookups.HoldNoteBodyImage)?.Value
-                               ?? $"mania-note{index}L";
+                               ?? $"mania-note{FallbackColumnIndex}L";
 
             string lightImage = GetColumnSkinConfig<string>(skin, LegacyManiaSkinConfigurationLookups.HoldNoteLightImage)?.Value
                                 ?? "lightingL";

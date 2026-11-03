@@ -7,6 +7,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
 using osu.Game.EzOsuGame.Localization;
@@ -96,6 +97,12 @@ namespace osu.Game.EzOsuGame.Edit.Screens
             return true;
         }
 
+        public override bool OnExiting(ScreenExitEvent e)
+        {
+            ComposeClock?.Stop();
+            return base.OnExiting(e);
+        }
+
         public void SetSource(IWorkingBeatmap? beatmap, RulesetInfo? ruleset)
         {
             bool unchanged = workingBeatmap?.BeatmapInfo.Hash == beatmap?.BeatmapInfo.Hash
@@ -113,6 +120,7 @@ namespace osu.Game.EzOsuGame.Edit.Screens
 
         private void rebuild()
         {
+            ComposeClock?.Stop();
             ComposeClock = null;
             viewport.Clear();
 
@@ -198,11 +206,19 @@ namespace osu.Game.EzOsuGame.Edit.Screens
                 var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
 
                 var concrete = (WorkingBeatmap)workingBeatmap;
-                concrete.LoadTrack();
+
+                // LoadTrack() 会换成新实例。音乐控制器仍持有旧实例并继续播放，播放条够不着。
+                if (!concrete.TrackLoaded)
+                    concrete.LoadTrack();
+
+                if (dependencies.TryGet(out MusicController music))
+                    music.Stop();
+
                 previewGridBeatDivisor.SetArbitraryDivisor(concrete.BeatmapInfo.BeatDivisor);
 
                 Clock = new EditorClock(playableBeatmap, previewGridBeatDivisor);
                 Clock.ChangeSource(concrete.Track);
+                Clock.Stop();
 
                 editorBeatmap = new EditorBeatmap(
                     playableBeatmap,
@@ -213,6 +229,7 @@ namespace osu.Game.EzOsuGame.Edit.Screens
                 dependencies.Cache(previewGridBeatDivisor);
                 dependencies.CacheAs(Clock);
                 dependencies.CacheAs(editorBeatmap);
+                dependencies.CacheAs<IBeatmap>(editorBeatmap);
                 dependencies.CacheAs<IBeatSnapProvider>(editorBeatmap);
                 dependencies.CacheAs(colourProvider);
 
