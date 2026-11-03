@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
@@ -19,19 +20,24 @@ using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Database;
 using osu.Game.Input.Bindings;
 using osu.Game.Input.Handlers;
-using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Mods;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.EzMania;
+using osu.Game.Rulesets.Mania.EzMania.ReplayInputNotes;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Replays;
+using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Scoring;
@@ -39,9 +45,13 @@ using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osuTK.Input;
 
+#if DEBUG
+using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
+#endif
+
 namespace osu.Game.Rulesets.Mania.UI
 {
-    public partial class DrawableManiaRuleset : DrawableScrollingRuleset<ManiaHitObject>
+    public partial class DrawableManiaRuleset : DrawableScrollingRuleset<ManiaHitObject>, IPreviewScrollDensityAdjustable, IManiaGameplayModeSnapshot
     {
         /// <summary>
         /// The minimum time range. This occurs at a <see cref="ManiaRulesetSetting.ScrollSpeed"/> of 40.
@@ -72,6 +82,12 @@ namespace osu.Game.Rulesets.Mania.UI
 
         public double TargetTimeRange { get; protected set; }
 
+        /// <summary>
+        /// Multiplier applied to <see cref="TargetTimeRange"/> when computing <see cref="DrawableScrollingRuleset{TObject}.TimeRange"/>.
+        /// Values greater than 1 increase density (notes closer together). Used by beatmap preview overlay.
+        /// </summary>
+        public double PreviewDensityMultiplier { get; set; } = 1;
+
         // Stores the current speed adjustment active in gameplay.
         private readonly Track speedAdjustmentTrack = new TrackVirtual(0);
 
@@ -83,7 +99,76 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved]
         private RealmAccess realm { get; set; } = null!;
 
-        private readonly Bindable<EzEnumHitMode> hitModeBindable = new Bindable<EzEnumHitMode>();
+        [Resolved(canBeNull: true)]
+        private ScoreProcessor? scoreProcessor { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private GameplayState? gameplayState { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private IEzReplaySession? replaySession { get; set; }
+
+        /// <summary>
+        /// Replay input note overlay state, shared with the columns and the replay sidebar section.
+        /// </summary>
+        public EzReplayInputNoteModel ReplayInputNotes { get; } = new EzReplayInputNoteModel();
+
+        private bool replayInputNoteResultsRequested;
+        private bool replayInputNoteLayersCreated;
+        private int replayInputNoteVersion = -1;
+        private readonly List<EzReplayInputNotePlayfield> replayInputNoteOverlays = new List<EzReplayInputNotePlayfield>();
+
+        private readonly Bindable<EzEnumJudgeMode> judgeModeBindable = new Bindable<EzEnumJudgeMode>();
+        private EzEnumJudgeMode gameplayJudgeMode;
+        private bool suppressJudgeModeRevert;
+
+        int IManiaGameplayModeSnapshot.JudgeMode => (int)gameplayJudgeMode;
+
+        // 以本局冻结环境为准，而不是某个 ManiaHealthProcessor 实例：BMS 复用本 Drawable 但用的是
+        // BMSNoFailHealthProcessor，没有 Ez 血量模式，读处理器实例会把 BMS 记成 Lazer（旧实现更糟：
+        // 读 ManiaHealthProcessor 的 static，记的是上一局 Mania 的遗留值）。
+        int IManiaGameplayModeSnapshot.HealthMode => (int)(JudgementRound?.Environment.HealthMode ?? EzEnumHealthMode.Lazer);
+
+        /// <summary>
+        /// 列级按键输入由 <see cref="UI.Column"/> 路由到单一 press 目标（C2 COLUMN-INPUT）。
+        /// 本地游玩与回放均使用同一路由，以保持 Drawable 与 Session 输入模型一致。
+        /// </summary>
+        public bool ColumnRoutesInput => JudgementRound != null;
+
+        /// <summary>
+        /// 本局冻结的判定上下文；热路径读取此实例，禁止再解析全局配置。
+        /// </summary>
+        public ManiaJudgementRound? JudgementRound { get; private set; }
+
+        /// <summary>
+        /// stable classic 长条持有期连击增量的落点；仅局内且档位为 stable classic 时非空。
+        /// </summary>
+        /// <remarks>
+        /// 皮肤预览、编辑器等无 <see cref="ScoreProcessor"/> 的场景为 <c>null</c>。
+        /// </remarks>
+        internal ManiaScoreProcessor? StableClassicComboProcessor
+            => JudgementRound?.Environment.JudgeMode == EzEnumJudgeMode.StableClassic ? scoreProcessor as ManiaScoreProcessor : null;
+
+        /// <summary>
+        /// 进局时确认的主 BPM 拍长（ms）。由 <see cref="EzBeatmapSpeedTracker.ResolveBeatLength"/> 在 loading 时计算一次，之后不再更新。
+        /// </summary>
+        public double MainBeatLength { get; private set; }
+
+        /// <summary>
+        /// 进局时确认的投皮档位。UI 0-8，除 32 得到节拍；0 关闭投皮额外负担。局内不跟随设置变更。
+        /// </summary>
+        public double HoldTailMaskLevel { get; private set; }
+
+        /// <summary>
+        /// 进局时确认的动态投皮开关。局内不跟随设置变更；开启后 LN 投皮按 tracker 当前拍长调整。
+        /// </summary>
+        public bool DynamicHoldTailMask { get; private set; }
+
+        /// <summary>
+        /// 仅在 <see cref="DynamicHoldTailMask"/> 开启时提供当前拍长。LN 侧只读 <see cref="EzBeatmapSpeedTracker.BeatLength"/>.Value，不 BindValueChanged。
+        /// </summary>
+        public EzBeatmapSpeedTracker? HoldTailSpeedTracker { get; private set; }
+
         private readonly Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
         private readonly BindableDouble configBaseMs = new BindableDouble();
         private readonly BindableDouble configTimePerSpeed = new BindableDouble();
@@ -102,7 +187,7 @@ namespace osu.Game.Rulesets.Mania.UI
         }
 
         [BackgroundDependencyLoader]
-        private void load(ISkinSource source)
+        private void load(ISkinSource source, ReplayPlayer? replayPlayer)
         {
             currentSkin = source;
             currentSkin.SourceChanged += onSkinChange;
@@ -140,6 +225,14 @@ namespace osu.Game.Rulesets.Mania.UI
 
             TimeRange.Value = TargetTimeRange = ComputeScrollTime(configScrollSpeed.Value, configBaseMs.Value, configTimePerSpeed.Value);
 
+            // 判定线位置先绑定并立即算一次：下面 scrollingStyle 的立即回调会调用 updateTimeRange()，
+            // 而它依赖已缓存的 hitPosition。
+            ezConfig.BindWith(Ez2Setting.HitPosition, hitPositonBindable);
+            hitPositonBindable.BindValueChanged(_ => skinChanged(), true);
+
+            ezConfig.BindWith(Ez2Setting.HitPositionGlobalEnable, globalHitPosition);
+            globalHitPosition.BindValueChanged(_ => skinChanged(), true);
+
             Config.BindWith(ManiaRulesetSetting.ScrollStyle, scrollingStyle);
             scrollingStyle.BindValueChanged(style =>
             {
@@ -153,30 +246,171 @@ namespace osu.Game.Rulesets.Mania.UI
             Config.BindWith(ManiaRulesetSetting.TouchOverlay, touchOverlay);
             touchOverlay.BindValueChanged(_ => updateMobileLayout(), true);
 
-            ezConfig.BindWith(Ez2Setting.HitPosition, hitPositonBindable);
-            hitPositonBindable.BindValueChanged(_ => skinChanged(), true);
-
-            ezConfig.BindWith(Ez2Setting.HitPositionGlobalEnable, globalHitPosition);
-            globalHitPosition.BindValueChanged(_ => skinChanged(), true);
-
             ezConfig.BindWith(Ez2Setting.ManiaBarLinesBool, barLinesBindable);
-            ezConfig.BindWith(Ez2Setting.ManiaHitMode, hitModeBindable);
+            ezConfig.BindWith(Ez2Setting.ManiaJudgeMode, judgeModeBindable);
+
+            // 进局快照：不 Bindable。档位（含 0）和动态开关局内都不跟随设置变更。
+            HoldTailMaskLevel = ezConfig.Get<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight);
+            DynamicHoldTailMask = ezConfig.Get<bool>(Ez2Setting.ManiaHoldTailMaskDynamicEnable);
+            MainBeatLength = EzBeatmapSpeedTracker.ResolveBeatLength(Beatmap, null, Beatmap.BeatmapInfo.BPM);
+
+            if (!(MainBeatLength > 0))
+                MainBeatLength = 500;
+
+            if (ManiaHoldTailMask.IsEnabled(HoldTailMaskLevel) && DynamicHoldTailMask)
+                FrameStableComponents.Add(HoldTailSpeedTracker = new EzBeatmapSpeedTracker());
+
+            setupReplayInputNotes(replayPlayer);
+        }
+
+        /// <summary>
+        /// Enables the input note overlay for score replays only; local play and autoplay playback keep a clean playfield.
+        /// </summary>
+        private void setupReplayInputNotes(ReplayPlayer? replayPlayer)
+        {
+            if (replayPlayer?.Score == null || Mods.OfType<ModAutoplay>().Any())
+                return;
+
+            var score = replayPlayer.Score;
+
+            ReplayInputNotes.Load(score.Replay, Beatmap);
+
+            if (!ReplayInputNotes.Enabled)
+                return;
+
+            replayPlayer.AddSettings(new EzReplayInputNoteSettingsGroup(ReplayInputNotes));
+            ReplayInputNotes.ShowOverlay.BindValueChanged(_ => ensureReplayInputNoteResults(score), true);
+            ReplayInputNotes.ColourByHitResult.BindValueChanged(_ => ensureReplayInputNoteResults(score), true);
+            ReplayInputNotes.OnlyJudgedNotes.BindValueChanged(_ => ensureReplayInputNoteResults(score), true);
+        }
+
+        /// <summary>
+        /// Mounts one overlay playfield per column. Runs after the playfield's columns are loaded, so each overlay attaches
+        /// to a live hit object area and receives the same scrolling info the column's own notes use.
+        /// </summary>
+        private void createReplayInputNoteLayers()
+        {
+            if (!ReplayInputNotes.Enabled || replayInputNoteLayersCreated)
+                return;
+
+            replayInputNoteLayersCreated = true;
+
+            foreach (var stage in Playfield.Stages)
+            {
+                foreach (var column in stage.Columns)
+                {
+                    var overlay = new EzReplayInputNotePlayfield(ReplayInputNotes, column.Index);
+                    column.MountReplayInputNoteOverlay(overlay);
+                    replayInputNoteOverlays.Add(overlay);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Pushes the model's current notes into the overlays whenever the model rebuilt them (mode switch, results applied).
+        /// </summary>
+        private void refreshReplayInputNoteOverlays()
+        {
+            if (replayInputNoteOverlays.Count == 0 || ReplayInputNotes.Version == replayInputNoteVersion)
+                return;
+
+            replayInputNoteVersion = ReplayInputNotes.Version;
+
+            foreach (var overlay in replayInputNoteOverlays)
+                overlay.SetNotes(ReplayInputNotes.NotesFor(overlay.Column));
+        }
+
+        private void ensureReplayInputNoteResults(Score score)
+        {
+            if (replayInputNoteResultsRequested)
+                return;
+
+            // Hidden overlay needs no judgements: keep the request pending so it can still run when re-enabled.
+            if (!ReplayInputNotes.ShowOverlay.Value)
+                return;
+
+            if (!ReplayInputNotes.ColourByHitResult.Value && !ReplayInputNotes.OnlyJudgedNotes.Value)
+                return;
+
+            replayInputNoteResultsRequested = true;
+
+            if (replaySession == null)
+            {
+                ReplayInputNotes.ApplyResults(Array.Empty<HitEvent>());
+                return;
+            }
+
+            var session = replaySession;
+            var beatmap = Beatmap;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var events = await session.RunHitEventsAsync(score, beatmap, ReplayRunPurpose.ForLive).ConfigureAwait(false);
+
+                    Schedule(() => ReplayInputNotes.ApplyResults(events));
+                }
+                catch (OperationCanceledException)
+                {
+                    // Replay exited or the beatmap went away; the overlay simply stays uncoloured.
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Replay exited while the session was running.
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Replay input note results unavailable: {e}", LoggingTarget.Runtime, LogLevel.Important);
+                }
+            });
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            hitModeBindable.BindValueChanged(h =>
-            {
-                O2HitModeExtension.PILL_COUNT.Value = 0;
+            createReplayInputNoteLayers();
 
-                if (h.NewValue == EzEnumHitMode.O2Jam)
+            gameplayJudgeMode = judgeModeBindable.Value;
+
+            JudgementRound = ManiaJudgementRound.Create(
+                ezConfig.ResolveEnvironment(ReplayRunPurpose.ForLive, ReplayScore?.ScoreInfo, ignoreOffset: ReplayScore != null, ruleset: Ruleset.RulesetInfo),
+                Beatmap);
+            // 本局实例的 JudgeMode 绑定。仿真一律在 ManiaSimulationBeatmapProvider 产出的独立副本上绑定
+            // （见 ManiaReplaySessionService），所以这里不再需要「本局实例」登记。
+            ManiaBeatmapBinding.BindForLive(Beatmap, JudgementRound.Environment);
+
+            judgeModeBindable.BindValueChanged(h =>
+            {
+                // 仅在“本局本地游玩尚未完成”期间锁定 JudgeMode，避免中途更改破坏一致性。
+                // 结算/回放/分析等非活跃本地游玩场景应允许改动，不要回退全局设置值。
+                bool lockJudgeModeForThisSession = ReplayScore == null && gameplayState?.HasCompleted == false;
+
+                // 游戏中途修改判定模式将回退到开局时的设置
+                if (lockJudgeModeForThisSession && h.NewValue != gameplayJudgeMode)
                 {
-                    O2HitModeExtension.SetOriginalBPM(Beatmap.BeatmapInfo.BPM);
-                    O2HitModeExtension.SetControlPoints(Beatmap.ControlPointInfo);
-                    O2HitModeExtension.PillActivated = true;
+                    if (suppressJudgeModeRevert)
+                        return;
+
+                    suppressJudgeModeRevert = true;
+
+                    try
+                    {
+                        judgeModeBindable.Value = gameplayJudgeMode;
+                    }
+                    finally
+                    {
+                        suppressJudgeModeRevert = false;
+                    }
+
+                    return;
                 }
+
+                O2JudgeModeExtension.PILL_COUNT.Value = 0;
+
+                if (h.NewValue == EzEnumJudgeMode.O2Jam)
+                    O2JudgeModeExtension.InitializeRuntime(Beatmap, resetPillCount: false);
             }, true);
             barLinesBindable.BindValueChanged(b =>
             {
@@ -186,15 +420,10 @@ namespace osu.Game.Rulesets.Mania.UI
                 }
             }, true);
 
-            try
-            {
-                var factory = Dependencies.Get<EzLocalTextureFactory>();
-                _ = factory.PreloadGameTextures();
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"[DrawableManiaRuleset] Preload textures failed: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
-            }
+#if DEBUG
+            // TRACE-JUDGE 每局归零，使 Dispose 时的读数是本局累计。
+            ManiaJudgeHotPathTrace.Clear();
+#endif
         }
 
         private ManiaTouchInputArea? touchInputArea;
@@ -275,6 +504,7 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             base.Update();
             updateTimeRange();
+            refreshReplayInputNoteOverlays();
         }
 
         private ScheduledDelegate? pendingSkinChange;
@@ -290,23 +520,26 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void skinChanged()
         {
-            if (globalHitPosition.Value)
-                hitPosition = (float)hitPositonBindable.Value;
-            else
-            {
-                hitPosition = currentSkin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                                  new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
-                              ?? (float)hitPositonBindable.Value;
-            }
-
+            updateHitPosition();
             pendingSkinChange = null;
+        }
+
+        /// <summary>
+        /// 重算并缓存判定线位置。只在皮肤或相关设置变化时调用。
+        /// </summary>
+        /// <remarks>
+        /// <see cref="updateTimeRange"/> 每帧都会被 <see cref="Update"/> 调到。判定线查询放在这里缓存，避免每帧走皮肤配置。
+        /// </remarks>
+        private void updateHitPosition()
+        {
+            hitPosition = ManiaPlayfieldLayoutHelper.GetHitPosition(currentSkin, globalHitPosition.Value, hitPositonBindable.Value);
         }
 
         private void updateTimeRange()
         {
             const float length_to_default_hit_position = 768 - LegacyManiaSkinConfiguration.DEFAULT_HIT_POSITION;
 
-            skinChanged();
+            // hitPosition 由 skinChanged() 缓存在字段里，这里只做算术。
             float lengthToHitPosition = 768 - hitPosition;
 
             // This scaling factor preserves the scroll speed as the scroll length varies from changes to the hit position.
@@ -331,7 +564,7 @@ namespace osu.Game.Rulesets.Mania.UI
                     break;
             }
 
-            TimeRange.Value = TargetTimeRange * speedAdjustmentTrack.AggregateTempo.Value * speedAdjustmentTrack.AggregateFrequency.Value * scale;
+            TimeRange.Value = TargetTimeRange / PreviewDensityMultiplier * speedAdjustmentTrack.AggregateTempo.Value * speedAdjustmentTrack.AggregateFrequency.Value * scale;
         }
 
         /// <summary>
@@ -383,6 +616,12 @@ namespace osu.Game.Rulesets.Mania.UI
 
             if (currentSkin.IsNotNull())
                 currentSkin.SourceChanged -= onSkinChange;
+
+#if DEBUG
+            // TRACE-JUDGE 读数出口：诊断开关打开时，一局结束把热路径计数打到运行日志。
+            if (ManiaJudgeHotPathTrace.Enabled)
+                Logger.Log($"[ManiaJudgeHotPathTrace] {ManiaJudgeHotPathTrace.FormatSummary()}", LoggingTarget.Runtime, LogLevel.Important);
+#endif
         }
     }
 }

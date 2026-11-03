@@ -17,9 +17,9 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Osu.Judgements;
 using osu.Game.Rulesets.Osu.Skinning.Default;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -62,6 +62,15 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
 
         public IBindable<int> PathVersion => pathVersion;
         private readonly Bindable<int> pathVersion = new Bindable<int>();
+
+        /// <summary>
+        /// 本滑条身是否像 osu!stable 一样栅格化到一张窗口大小的画布上。
+        /// </summary>
+        /// <remarks>
+        /// 由 playfield 在本滑条加载前赋值，以便身在加载时读取。对 aspire 谱面与 stable classic 判定档启用；
+        /// 普通 lazer 游玩不改动。
+        /// </remarks>
+        public bool UseStableViewportBody { get; set; }
 
         public readonly SliderInputManager SliderInputManager;
 
@@ -189,10 +198,18 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
                     break;
 
                 case DrawableSliderTick tick:
+                    if (isUndrawnByStable(tick))
+                        break;
+
                     tickContainer.Add(tick);
                     break;
 
                 case DrawableSliderRepeat repeat:
+                    // stable 不绘制与端点重叠的评分点，因此完全不进显示容器，而非仅透明。
+                    // drawable 仍存在且仍判定；只是每帧布局/瞄准零开销。否则有数千重叠折返的滑条每帧都会遍历它们。
+                    if (isUndrawnByStable(repeat))
+                        break;
+
                     repeatContainer.Add(repeat);
                     break;
             }
@@ -200,6 +217,18 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
             relativeAnchorPositionLayout.Invalidate();
         }
 
+        /// <summary>
+        /// osu!stable 是否不绘制该评分点。
+        /// </summary>
+        /// <remarks>
+        /// 滑条构建嵌套物件时已决定，此处无需重复几何计算。
+        /// </remarks>
+        private static bool isUndrawnByStable(DrawableHitObject nested)
+            => nested.HitObject is IStableUndrawnScoringPoint { UndrawnUnderStableRules: true };
+
+        /// <summary>
+        /// osu!stable 是否因与端点重叠而不绘制该评分点。
+        /// </summary>
         protected override void ClearNestedHitObjects()
         {
             base.ClearNestedHitObjects();
@@ -265,22 +294,49 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
             double completionProgress = Math.Clamp((Time.Current - HitObject.StartTime) / HitObject.Duration, 0, 1);
 
             Ball.UpdateProgress(completionProgress);
+
+            // stable 把滑条结束时间存成 int，长到越过 int.MaxValue 会绕成负数。
+            // 身只在开始与该结束之间揭示，整扇窗口已关闭：什么都不画，球与跟踪仍按真实评分点继续。
+            // 此处只有身跟随绕回值；EndTime 本身不动，因为跟踪门读它而 stable 不读。
+            if (HitObject.RevealEndTimeWrapsUnderStableRules && Time.Current > HitObject.StableRevealEndTime)
+                Body.Alpha = 0;
+
             SliderBody?.UpdateProgress(HeadCircle.IsHit ? completionProgress : 0);
 
-            foreach (DrawableSliderRepeat repeat in repeatContainer)
-                repeat.UpdateSnakingPosition(HitObject.Path.PositionAt(SliderBody?.SnakedStart ?? 0), HitObject.Path.PositionAt(SliderBody?.SnakedEnd ?? 0));
+            if (repeatContainer.Any())
+            {
+                // 提出循环：aspire 滑条可有数千折返，每个折返解析蛇行端点等于每帧数千次路径查找。
+                Vector2 snakedStartPosition = HitObject.Path.PositionAt(SliderBody?.SnakedStart ?? 0);
+                Vector2 snakedEndPosition = HitObject.Path.PositionAt(SliderBody?.SnakedEnd ?? 0);
 
-            Size = SliderBody?.Size ?? Vector2.Zero;
-            OriginPosition = SliderBody?.PathOffset ?? Vector2.Zero;
+                // 本容器内都是绘制的：stable 不画的点从未加入。
+                foreach (DrawableSliderRepeat repeat in repeatContainer)
+                    repeat.UpdateSnakingPosition(snakedStartPosition, snakedEndPosition);
+            }
+
+            if (SliderBody != null)
+            {
+                Size = SliderBody.Size;
+                OriginPosition = SliderBody.PathOffset;
+            }
 
             if (!relativeAnchorPositionLayout.IsValid)
             {
-                Vector2 pos = Vector2.Divide(OriginPosition, DrawSize);
-                foreach (var obj in NestedHitObjects)
-                    obj.RelativeAnchorPosition = pos;
-                Ball.RelativeAnchorPosition = pos;
+                // 尚未定尺寸的身报告零绘制尺寸，用它除锚点是 NaN，框架拒绝非有限相对锚点。等到下次尺寸失效。
+                Vector2 drawSize = DrawSize;
 
-                relativeAnchorPositionLayout.Validate();
+                if (drawSize.X > 0 && drawSize.Y > 0
+                    && float.IsFinite(drawSize.X) && float.IsFinite(drawSize.Y)
+                    && float.IsFinite(OriginPosition.X) && float.IsFinite(OriginPosition.Y))
+                {
+                    Vector2 pos = Vector2.Divide(OriginPosition, drawSize);
+
+                    foreach (var obj in NestedHitObjects)
+                        obj.RelativeAnchorPosition = pos;
+
+                    Ball.RelativeAnchorPosition = pos;
+                    relativeAnchorPositionLayout.Validate();
+                }
             }
         }
 
@@ -292,37 +348,21 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            if (JudgementKernelDriven)
+                return;
+
             if (userTriggered || !TailCircle.Judged || Time.Current < HitObject.EndTime)
                 return;
 
-            if (HitObject.ClassicSliderBehaviour)
+            ApplyResult(static (r, slider) =>
             {
-                // Classic behaviour means a slider is judged proportionally to the number of nested hitobjects hit. This is the classic osu!stable scoring.
-                ApplyResult(static (r, hitObject) =>
-                {
-                    int totalTicks = hitObject.NestedHitObjects.Count;
-                    int hitTicks = hitObject.NestedHitObjects.Count(h => h.IsHit);
-
-                    if (hitTicks == totalTicks)
-                        r.Type = HitResult.Great;
-                    else if (hitTicks == 0)
-                        r.Type = HitResult.Miss;
-                    else
-                    {
-                        double hitFraction = (double)hitTicks / totalTicks;
-                        r.Type = hitFraction >= 0.5 ? HitResult.Ok : HitResult.Meh;
-                    }
-                });
-            }
-            else
-            {
-                // If only the nested hitobjects are judged, then the slider's own judgement is ignored for scoring purposes.
-                // But the slider needs to still be judged with a reasonable hit/miss result for visual purposes (hit/miss transforms, etc).
-                ApplyResult(static (r, hitObject) =>
-                {
-                    r.Type = hitObject.NestedHitObjects.Any(h => h.Result.IsHit) ? r.Judgement.MaxResult : r.Judgement.MinResult;
-                });
-            }
+                r.Type = OsuSliderJudgement.BodyResultFromNestedHits(
+                    slider.HitObject.ClassicSliderBehaviour,
+                    slider.NestedHitObjects.Count,
+                    slider.NestedHitObjects.Count(h => h.IsHit),
+                    r.Judgement.MaxResult,
+                    r.Judgement.MinResult);
+            }, this);
         }
 
         public override void PlaySamples()

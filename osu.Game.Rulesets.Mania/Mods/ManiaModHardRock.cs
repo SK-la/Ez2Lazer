@@ -1,6 +1,9 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using System.Linq;
+using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
@@ -10,7 +13,8 @@ namespace osu.Game.Rulesets.Mania.Mods
 {
     public class ManiaModHardRock : ModHardRock, IApplicableToHitObject
     {
-        public override double ScoreMultiplier => 1;
+        public override Type[] IncompatibleMods => base.IncompatibleMods.Concat(new[] { typeof(ManiaModAdjust) }).ToArray();
+
         public override bool Ranked => false;
 
         public const double HIT_WINDOW_DIFFICULTY_MULTIPLIER = 1.4;

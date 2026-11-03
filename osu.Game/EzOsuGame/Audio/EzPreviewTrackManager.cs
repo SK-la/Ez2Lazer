@@ -3,46 +3,41 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Overlays;
+using osu.Game.Rulesets.Edit.Checks.Components;
 using osu.Game.Rulesets.Objects;
-using osu.Game.Skinning;
 using osu.Game.Storyboards;
 
 namespace osu.Game.EzOsuGame.Audio
 {
     /// <summary>
-    /// <para>一个增强的预览音轨管理器，支持在预览时播放note音效和故事板背景音。</para>
-    /// <para>主要有两个用途：</para>
-    /// 1. 在选歌界面实现最完整的游戏音轨预览。
-    /// <para>2. 提供拓展支持，自定义预览时间、循环次数和间隔、关联游戏时钟、开关note音效等。</para>
+    /// Song Select 增强预览：在 <see cref="osu.Game.Screens.Select.SongSelect"/> 中于 BGM（<c>MusicController</c>）之上
+    /// 调度谱面 note 音效与 storyboard 样本。BGM 循环与预览起点由 SongSelect 调用
+    /// <see cref="IWorkingBeatmap.PrepareTrackForPreview"/> 配置；本类不负责主音乐轨。
     /// </summary>
+    /// <remarks>
+    /// note 音效只播谱面自身的键音：皮肤兜底的默认命中音与 whistle / clap / finish 附加层都不属于 note 音，预览里不发声。
+    /// </remarks>
     public partial class EzPreviewTrackManager : CompositeDrawable
     {
-        // 单例/实例都可用，但我们使用实例级 Bindable 以便在 `SongSelect` 中直接 BindTo。
         public BindableBool EnabledBindable { get; } = new BindableBool();
 
-        // 预览时，非重复音效必须大于此值才会激活hitsound预览，否则退回外部预览。
+        // 预览时，谱面包内 hitsound 音效文件达到阈值才启用 note 预览，避免把少量固定音效误判成 keysound。
         private const int hitsound_threshold = 10;
-        private const double scheduler_interval = 16; // ~60fps
-        private const double trigger_tolerance = 5; // ms 容差
-        private const int max_cached_beatmaps = 3; // LRU 缓存：最多保留最近 3 首歌曲的样本
+        private const double tick_ms = 8; // 调度间隔与事件触发容差（~120fps）
+        private const double preload_lookahead_ms = 2000;
+        private const int max_cached_beatmaps = 3; // LRU 缓存：最多保留最近 3 首谱面的调度表
 
         private readonly SampleSchedulerState sampleScheduler = new SampleSchedulerState();
         private readonly PlaybackState playback = new PlaybackState();
@@ -50,36 +45,22 @@ namespace osu.Game.EzOsuGame.Audio
         private Track? currentTrack;
         private IWorkingBeatmap? currentBeatmap;
         private ScheduledDelegate? updateDelegate;
-        private Container audioContainer = null!;
-        private ISampleStore? fallbackSampleStore;
-        private ISampleStore? previewSampleStore;
-        private IBeatmapSetInfo? lastPreviewSet;
+        private readonly Queue<Action> pendingPreloadActions = new Queue<Action>();
+        private int prepareGeneration;
 
-        // LRU 缓存：按 BeatmapSetID 缓存样本数据
+        // LRU 缓存：按 BeatmapID 缓存调度数据，避免跨难度复用。
         private readonly LinkedList<string> beatmapAccessOrder = new LinkedList<string>();
         private readonly Dictionary<string, BeatmapSampleCache> sampleCache = new Dictionary<string, BeatmapSampleCache>();
 
-        [Resolved]
-        protected AudioManager AudioManager { get; private set; } = null!;
-
-        [Resolved(CanBeNull = true)]
-        private SkinManager? skinManager { get; set; }
-
-        [Resolved(CanBeNull = true)]
-        private MusicController? musicController { get; set; }
-
         /// <summary>
-        /// 覆盖预览起点时间（毫秒）。
-        /// 若为 null，则使用谱面元数据的预览时间（PreviewTime）。
+        /// 覆盖预览起点时间（毫秒）。若为 null，则使用谱面元数据的 PreviewTime。
+        /// 供未来 Mod / 编辑器场景使用；SongSelect 默认不设置。
         /// </summary>
         public double? OverridePreviewStartTime { get; set; }
 
-        private bool ownsCurrentTrack;
         private bool previewMainAudioAvailable;
         private bool previewHitSoundsEnabled;
         private bool previewStoryboardEnabled;
-
-        #region Disposal
 
         protected override void Dispose(bool isDisposing)
         {
@@ -93,71 +74,60 @@ namespace osu.Game.EzOsuGame.Audio
                 beatmapAccessOrder.Clear();
             }
 
-            previewSampleStore?.Dispose();
-            previewSampleStore = null;
-
             base.Dispose(isDisposing);
         }
 
-        #endregion
-
         /// <summary>
-        /// 为指定谱面启动预览。
-        /// 若命中音效数量低于阈值，会自动回退到“仅 BGM”的标准预览。
+        /// 为指定谱面启动预览。若命中音效数量低于阈值且无 storyboard 样本，返回 false（仅 BGM）。
         /// </summary>
-        /// <param name="beatmap">要预览的谱面</param>
-        /// <param name="forceEnhanced">是否强制使用增强预览（忽略命中音效数量阈值）</param>
-        public bool StartPreview(IWorkingBeatmap beatmap, bool forceEnhanced = false)
+        /// <param name="ignoreEnabled">
+        /// 预览开关关闭时也启动。用于主 BGM 只存在于 storyboard 的谱面：这类谱面没有别的音频来源，
+        /// 预览开关本该只关 note 音，关掉 storyboard 会让整首音乐消失。
+        /// </param>
+        public bool StartPreview(IWorkingBeatmap beatmap, bool ignoreEnabled = false)
         {
-            if (!EnabledBindable.Value)
+            if (!EnabledBindable.Value && !ignoreEnabled)
                 return false;
 
             StopPreview();
-            resetPreviewSampleStoreForSet(beatmap);
-
             currentBeatmap = beatmap;
-            currentTrack = CreateTrack(beatmap, out ownsCurrentTrack);
-            previewMainAudioAvailable = currentTrack is not null && currentTrack is not TrackVirtual;
+            currentTrack = prepareTrack(beatmap);
+            previewMainAudioAvailable = currentTrack is not null and not TrackVirtual;
 
             if (currentTrack == null)
                 Logger.Log("EzPreviewTrackManager: currentTrack is null (falling back?)", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
             playback.ResetPlaybackProgress();
 
-            previewHitSoundsEnabled = forceEnhanced || fastCheckShouldPreviewHitSounds(beatmap, hitsound_threshold);
+            var playableBeatmap = EzPlayableBeatmapCache.GetShared(beatmap, beatmap.BeatmapInfo.Ruleset);
+            previewHitSoundsEnabled = fastCheckShouldPreviewHitSounds(beatmap, hitsound_threshold);
             previewStoryboardEnabled = hasStoryboardSamples(beatmap.Storyboard);
 
-            if (!forceEnhanced && !previewHitSoundsEnabled && !previewStoryboardEnabled)
+            // 预览开关关上、且主 BGM 走 storyboard 时，只留 storyboard 这一路音乐，note 音不随开关打开而发声。
+            if (!EnabledBindable.Value && StoryboardSampleInfoExtensions.CarriesBackgroundMusicIn(beatmap))
+                previewHitSoundsEnabled = false;
+
+            if (!previewHitSoundsEnabled && !previewStoryboardEnabled)
                 return false;
 
-            startEnhancedPreview(beatmap);
+            startEnhancedPreview(beatmap, playableBeatmap);
             return true;
         }
 
-        public void StopPreview()
-        {
-            StopPreviewInternal();
-        }
+        public void StopPreview() => stopPreviewInternal();
 
-        protected void StopPreviewInternal()
+        private void stopPreviewInternal()
         {
             playback.IsPlaying = false;
             updateDelegate?.Cancel();
             updateDelegate = null;
 
-            if (currentTrack != null)
-            {
-                currentTrack.Volume.Value = 1f;
-                currentTrack.Stop();
-                if (ownsCurrentTrack)
-                    currentTrack.Dispose();
-            }
+            prepareGeneration++;
 
-            // 切歌时必须同步切断旧歌已经发出的样本通道，尤其是 virtual 谱面下的 storyboard / keysound。
             stopActiveChannels();
-
-            // 保存到缓存而不是完全清空
+            clearSampleCaches();
             saveCurrentBeatmapToCache();
+
             currentBeatmap = null;
             currentTrack = null;
             previewMainAudioAvailable = false;
@@ -166,121 +136,32 @@ namespace osu.Game.EzOsuGame.Audio
             playback.ResetPlaybackProgress();
         }
 
-        [BackgroundDependencyLoader]
-        private void load()
+        /// <summary>
+        /// 按谱面包内实际音效文件数量判断（排除主音频轨），而非 note 上的 sample 引用数。
+        /// </summary>
+        private static bool fastCheckShouldPreviewHitSounds(IWorkingBeatmap beatmap, int threshold)
+            => countBeatmapHitsoundFiles(beatmap) >= threshold;
+
+        private static int countBeatmapHitsoundFiles(IWorkingBeatmap beatmap)
         {
-            fallbackSampleStore = AudioManager.Samples;
+            var files = beatmap.BeatmapInfo.BeatmapSet?.Files;
+            if (files == null)
+                return 0;
 
-            InternalChild = audioContainer = new Container
+            string? mainAudio = beatmap.BeatmapInfo.Metadata.AudioFile;
+            int count = 0;
+
+            foreach (var file in files)
             {
-                RelativeSizeAxes = Axes.Both
-            };
+                if (!string.IsNullOrEmpty(mainAudio)
+                    && string.Equals(file.Filename, mainAudio, StringComparison.OrdinalIgnoreCase))
+                    continue;
 
-            // EnabledBindable.BindValueChanged(_ =>
-            // {
-            //     // 在主调度线程执行 Stop/Start 操作以保证线程安全。
-            //     Schedule(() =>
-            //     {
-            //         if (currentBeatmap != null)
-            //         {
-            //             StopPreviewInternal();
-            //             StartPreview(currentBeatmap);
-            //         }
-            //     });
-            // }, false);
-        }
-
-        private void resetPreviewSampleStoreForSet(IWorkingBeatmap beatmap)
-        {
-            var newSet = getBeatmapSet(beatmap);
-
-            if (previewSampleStore != null && !EqualityComparer<IBeatmapSetInfo?>.Default.Equals(newSet, lastPreviewSet))
-            {
-                previewSampleStore.Dispose();
-                previewSampleStore = null;
+                if (AudioCheckUtils.HasAudioExtension(file.Filename))
+                    count++;
             }
 
-            lastPreviewSet = newSet;
-
-            previewSampleStore ??= createPreviewSampleStore();
-        }
-
-        private static IBeatmapSetInfo? getBeatmapSet(IWorkingBeatmap beatmap) => beatmap.BeatmapInfo?.BeatmapSet;
-
-        private ISampleStore createPreviewSampleStore()
-        {
-            var source = fallbackSampleStore ?? AudioManager.Samples;
-            var store = new ResourceStore<byte[]>(new SampleStreamResourceStore(source));
-            var preview = AudioManager.GetSampleStore(store, AudioManager.SampleMixer);
-
-            // Allow .ogg lookups in addition to the default wav/mp3.
-            preview.AddExtension(@"ogg");
-            return preview;
-        }
-
-        private sealed class SampleStreamResourceStore : IResourceStore<byte[]>
-        {
-            private readonly ISampleStore source;
-
-            public SampleStreamResourceStore(ISampleStore source)
-            {
-                this.source = source;
-            }
-
-            public byte[] Get(string name)
-            {
-                using (var stream = source.GetStream(name))
-                {
-                    using (var memory = new MemoryStream())
-                    {
-                        stream?.CopyTo(memory);
-                        return memory.ToArray();
-                    }
-                }
-            }
-
-            public Task<byte[]> GetAsync(string name, CancellationToken cancellationToken = default) => Task.Run(() => Get(name), cancellationToken);
-
-            public Stream GetStream(string name) => source.GetStream(name);
-
-            public IEnumerable<string> GetAvailableResources() => source.GetAvailableResources();
-
-            public void Dispose()
-            {
-            }
-        }
-
-        // 快速判定该谱面是否属于 KeySound 谱：遍历命中对象直到达到阈值即返回 true。
-        // 统计谱面中命中对象所使用的采样音频的唯一文件名数量（使用 HitSampleInfo.LookupNames 的首选值）。
-        private bool fastCheckShouldPreviewHitSounds(IWorkingBeatmap beatmap, int threshold)
-        {
-            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var obj in beatmap.Beatmap.HitObjects)
-            {
-                var stack = new Stack<HitObject>();
-                stack.Push(obj);
-
-                while (stack.Count > 0)
-                {
-                    var ho = stack.Pop();
-
-                    foreach (var sm in ho.Samples)
-                    {
-                        string? first = sm.LookupNames.FirstOrDefault();
-                        if (first == null || !set.Add(first))
-                            continue;
-
-                        if (set.Count >= threshold)
-                            return true;
-                    }
-
-                    foreach (var n in ho.NestedHitObjects)
-                        stack.Push(n);
-                }
-            }
-
-            return set.Count >= threshold;
+            return count;
         }
 
         private static bool hasStoryboardSamples(Storyboard? storyboard)
@@ -297,59 +178,73 @@ namespace osu.Game.EzOsuGame.Audio
             return false;
         }
 
-        /// <summary>
-        /// 启动增强预览（BGM + 命中音效 + 故事板音效）。
-        /// </summary>
-        private void startEnhancedPreview(IWorkingBeatmap beatmap)
+        private void startEnhancedPreview(IWorkingBeatmap beatmap, IBeatmap playableBeatmap)
         {
             try
             {
-                beatmap.PrepareTrackForPreview(true);
                 playback.PreviewStartTime = OverridePreviewStartTime ?? beatmap.BeatmapInfo.Metadata.PreviewTime;
 
                 if (playback.PreviewStartTime < 0 || playback.PreviewStartTime > (currentTrack?.Length ?? 0))
                 {
-                    // virtual 谱面没有可供“截取副歌”的真实主音频，预览起点无效时应从时间线开头开始，
-                    // 否则会直接跳过前半段 storyboard sample。
                     playback.PreviewStartTime = previewMainAudioAvailable
                         ? (currentTrack?.Length ?? 0) * 0.4
                         : 0;
                 }
 
-                // 尝试从缓存恢复
+                double trackTimelineEndTime = currentTrack?.Length ?? 0;
+                double trackLoopLength = Math.Max(1, trackTimelineEndTime - playback.PreviewStartTime);
+                double scheduleWindowStart = playback.PreviewStartTime - tick_ms;
+                double longestHitTimeEstimate = playableBeatmap.GetLastObjectTime();
+                double longestStoryboardTimeEstimate = beatmap.Storyboard?.LatestEventTime ?? 0;
+                double scheduleWindowEnd = Math.Max(
+                    Math.Max(playback.PreviewStartTime + trackLoopLength, longestHitTimeEstimate),
+                    longestStoryboardTimeEstimate) + tick_ms;
+
+                clearSampleCaches();
                 bool cacheHit = restoreFromCache(beatmap);
 
                 if (!cacheHit)
                 {
-                    // 缓存未命中，需要重新准备并保存
-                    var playableBeatmap = beatmap.GetPlayableBeatmap(beatmap.BeatmapInfo.Ruleset);
-                    prepareScheduledData(playableBeatmap, beatmap.Storyboard);
-                }
+                    if (previewHitSoundsEnabled)
+                    {
+                        prepareHitSounds(playableBeatmap, scheduleWindowStart, scheduleWindowEnd);
+                        sampleScheduler.LongestHitTime = longestHitTimeEstimate;
+                    }
+                    else
+                    {
+                        sampleScheduler.ScheduledHitSounds.Clear();
+                        sampleScheduler.LongestHitTime = 0;
+                    }
 
-                applyPreviewModeToScheduledData();
+                    if (previewStoryboardEnabled)
+                    {
+                        prepareStoryboardSamples(beatmap.Storyboard, scheduleWindowStart, scheduleWindowEnd);
+                        sampleScheduler.LongestStoryboardTime = longestStoryboardTimeEstimate;
+                    }
+                    else
+                    {
+                        sampleScheduler.ScheduledStoryboardSamples.Clear();
+                        sampleScheduler.LongestStoryboardTime = 0;
+                    }
+                }
 
                 resetScheduledTriggers();
 
-                double longestEventTime = Math.Max(previewHitSoundsEnabled ? sampleScheduler.LongestHitTime : 0, previewStoryboardEnabled ? sampleScheduler.LongestStoryboardTime : 0);
+                double longestEventTime = Math.Max(
+                    previewHitSoundsEnabled ? sampleScheduler.LongestHitTime : 0,
+                    previewStoryboardEnabled ? sampleScheduler.LongestStoryboardTime : 0);
 
-                // 对预览来说，track.Length 是整段时钟可推进的长度；
-                // 但当 AudioFilename 为 virtual 时，它并不代表真实主音频存在。
-                double trackTimelineEndTime = currentTrack?.Length ?? 0;
                 double mainAudioEndTime = previewMainAudioAvailable ? trackTimelineEndTime : 0;
 
-                // 预览循环必须以“时钟推进长度 / 谱面事件长度”的较长者为基准。
-                // 主音频是否存在单独控制，不再把 virtual track 的长度误当成真实音频长度。
                 playback.PreviewEndTime = Math.Max(trackTimelineEndTime, longestEventTime);
 
                 if (playback.PreviewEndTime <= playback.PreviewStartTime)
                     playback.PreviewEndTime = Math.Max(trackTimelineEndTime, playback.PreviewStartTime + 1);
 
                 playback.TrackLoopLength = Math.Max(1, trackTimelineEndTime - playback.PreviewStartTime);
-                playback.ShortBgmOneShotMode = previewMainAudioAvailable && mainAudioEndTime + trigger_tolerance < playback.PreviewEndTime;
+                playback.ShortBgmOneShotMode = previewMainAudioAvailable && mainAudioEndTime + tick_ms < playback.PreviewEndTime;
                 playback.ResetPlaybackProgress();
-
-                if (!previewMainAudioAvailable)
-                    playback.ResetLogicalClock(playback.PreviewStartTime, Time.Current);
+                playback.ResetLogicalClock(playback.PreviewStartTime, Time.Current);
 
                 if (sampleScheduler.ScheduledHitSounds.Count == 0 && sampleScheduler.ScheduledStoryboardSamples.Count == 0)
                 {
@@ -368,13 +263,8 @@ namespace osu.Game.EzOsuGame.Audio
                     currentTrack.RestartPoint = playback.PreviewStartTime;
                 }
 
-                if (shouldStartControlledTrack())
-                    currentTrack?.Start();
-
                 playback.IsPlaying = true;
-
-                // 保持样本调度逻辑以触发命中音效与故事板样本。
-                updateDelegate = Scheduler.AddDelayed(updateSamples, scheduler_interval, true);
+                updateDelegate = Scheduler.AddDelayed(updateSamples, tick_ms, true);
                 updateSamples();
             }
             catch (Exception ex)
@@ -384,10 +274,9 @@ namespace osu.Game.EzOsuGame.Audio
             }
         }
 
-        private void prepareHitSounds(IBeatmap beatmap)
+        private void prepareHitSounds(IBeatmap beatmap, double windowStart, double windowEnd)
         {
             sampleScheduler.ScheduledHitSounds.Clear();
-            sampleScheduler.LongestHitTime = 0;
 
             foreach (var ho in beatmap.HitObjects)
                 schedule(ho);
@@ -396,16 +285,19 @@ namespace osu.Game.EzOsuGame.Audio
 
             void schedule(HitObject ho)
             {
-                if (ho.Samples.Any())
+                if (ho.StartTime >= windowStart && ho.StartTime <= windowEnd)
                 {
-                    sampleScheduler.ScheduledHitSounds.Add(new ScheduledHitSound
-                    {
-                        Time = ho.StartTime,
-                        Samples = ho.Samples.ToArray(),
-                        HasTriggered = false
-                    });
+                    var samples = collectNoteSamples(ho.Samples);
 
-                    sampleScheduler.LongestHitTime = Math.Max(sampleScheduler.LongestHitTime, ho.StartTime);
+                    if (samples.Length > 0)
+                    {
+                        sampleScheduler.ScheduledHitSounds.Add(new ScheduledHitSound
+                        {
+                            Time = ho.StartTime,
+                            Samples = samples,
+                            HasTriggered = false
+                        });
+                    }
                 }
 
                 foreach (var n in ho.NestedHitObjects)
@@ -413,18 +305,18 @@ namespace osu.Game.EzOsuGame.Audio
             }
         }
 
-        private void prepareStoryboardSamples(Storyboard? storyboard)
+        private void prepareStoryboardSamples(Storyboard? storyboard, double windowStart, double windowEnd)
         {
             sampleScheduler.ScheduledStoryboardSamples.Clear();
-            sampleScheduler.LongestStoryboardTime = 0;
 
-            if (storyboard?.Layers == null) return;
+            if (storyboard?.Layers == null)
+                return;
 
             foreach (var layer in storyboard.Layers)
             {
                 foreach (var element in layer.Elements)
                 {
-                    if (element is StoryboardSampleInfo s)
+                    if (element is StoryboardSampleInfo s && s.StartTime >= windowStart && s.StartTime <= windowEnd)
                     {
                         sampleScheduler.ScheduledStoryboardSamples.Add(new ScheduledStoryboardSample
                         {
@@ -432,7 +324,6 @@ namespace osu.Game.EzOsuGame.Audio
                             Sample = s,
                             HasTriggered = false
                         });
-                        sampleScheduler.LongestStoryboardTime = Math.Max(sampleScheduler.LongestStoryboardTime, s.StartTime);
                     }
                 }
             }
@@ -440,98 +331,127 @@ namespace osu.Game.EzOsuGame.Audio
             sampleScheduler.ScheduledStoryboardSamples.Sort((a, b) => a.Time.CompareTo(b.Time));
         }
 
-        private void applyPreviewModeToScheduledData()
+        private void clearPendingPreloadActions()
         {
-            if (!previewHitSoundsEnabled)
+            pendingPreloadActions.Clear();
+            sampleScheduler.PreloadQueuedKeys.Clear();
+        }
+
+        private void clearSampleCaches()
+        {
+            sampleScheduler.HitSampleCache.Clear();
+            sampleScheduler.StoryboardSampleCache.Clear();
+            clearPendingPreloadActions();
+        }
+
+        private void enqueueLookaheadPreload(double logicalTime)
+        {
+            double windowEnd = logicalTime + preload_lookahead_ms;
+            int generation = prepareGeneration;
+
+            if (previewHitSoundsEnabled)
             {
-                sampleScheduler.ScheduledHitSounds.Clear();
-                sampleScheduler.LongestHitTime = 0;
+                int index = findNextValidIndex(
+                    sampleScheduler.ScheduledHitSounds,
+                    sampleScheduler.NextHitSoundIndex,
+                    logicalTime - tick_ms);
+
+                while (index < sampleScheduler.ScheduledHitSounds.Count)
+                {
+                    var hs = sampleScheduler.ScheduledHitSounds[index];
+
+                    if (hs.Time > windowEnd)
+                        break;
+
+                    foreach (var info in hs.Samples)
+                    {
+                        if (!isNoteSample(info))
+                            continue;
+
+                        string? key = getHitSampleCacheKey(info);
+
+                        if (string.IsNullOrEmpty(key))
+                            continue;
+
+                        if (sampleScheduler.HitSampleCache.ContainsKey(key) || !sampleScheduler.PreloadQueuedKeys.Add(key))
+                            continue;
+
+                        var captured = info;
+                        pendingPreloadActions.Enqueue(() =>
+                        {
+                            if (generation == prepareGeneration)
+                                resolveHitSample(captured);
+                        });
+                    }
+
+                    index++;
+                }
             }
 
-            if (!previewStoryboardEnabled)
+            if (previewStoryboardEnabled)
             {
-                sampleScheduler.ScheduledStoryboardSamples.Clear();
-                sampleScheduler.StoryboardSampleCache.Clear();
-                sampleScheduler.LongestStoryboardTime = 0;
+                int index = findNextValidIndex(
+                    sampleScheduler.ScheduledStoryboardSamples,
+                    sampleScheduler.NextStoryboardSampleIndex,
+                    logicalTime - tick_ms);
+
+                while (index < sampleScheduler.ScheduledStoryboardSamples.Count)
+                {
+                    var sb = sampleScheduler.ScheduledStoryboardSamples[index];
+
+                    if (sb.Time > windowEnd)
+                        break;
+
+                    string key = sb.Sample.Path.Replace('\\', '/');
+
+                    if (sampleScheduler.StoryboardSampleCache.ContainsKey(key) || !sampleScheduler.PreloadQueuedKeys.Add(key))
+                    {
+                        index++;
+                        continue;
+                    }
+
+                    var captured = sb.Sample;
+                    pendingPreloadActions.Enqueue(() =>
+                    {
+                        if (generation == prepareGeneration)
+                            resolveStoryboardSample(captured);
+                    });
+
+                    index++;
+                }
             }
         }
 
-        // 样本预加载：去重后调用一次 GetChannel() 以确保缓存 / 文件读取
-        private void preloadSamples()
+        private void processPreloadQueue()
         {
+            if (pendingPreloadActions.Count == 0)
+                return;
+
             try
             {
-                if (previewHitSoundsEnabled)
+                int count = 0;
+
+                while (count < 3 && pendingPreloadActions.Count > 0)
                 {
-                    var uniqueHitInfos = new HashSet<string?>();
-
-                    foreach (var s in sampleScheduler.ScheduledHitSounds.SelectMany(h => h.Samples))
-                    {
-                        foreach (var sample in fetchSamplesForInfo(s, true))
-                        {
-                            string? key = sample?.ToString();
-
-                            if (key != null && uniqueHitInfos.Add(key))
-                            {
-                                var ch = sample?.GetChannel();
-
-                                if (ch != null)
-                                {
-                                    try
-                                    {
-                                        ch.Stop();
-                                    }
-                                    finally
-                                    {
-                                        if (!ch.IsDisposed && !ch.ManualFree)
-                                            ch.Dispose();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (previewStoryboardEnabled)
-                {
-                    var uniqueStoryboard = new HashSet<string>();
-
-                    foreach (var sb in sampleScheduler.ScheduledStoryboardSamples)
-                    {
-                        // 通过统一的 fetchStoryboardSample 进行预热
-                        var fetched = fetchStoryboardSample(sb.Sample, true);
-
-                        if (fetched.sample != null && uniqueStoryboard.Add(fetched.chosenKey))
-                        {
-                            var ch = fetched.sample.GetChannel();
-
-                            try
-                            {
-                                ch.Stop();
-                            }
-                            finally
-                            {
-                                if (!ch.IsDisposed && !ch.ManualFree)
-                                    ch.Dispose();
-                            }
-                        }
-                    }
+                    pendingPreloadActions.Dequeue().Invoke();
+                    count++;
                 }
             }
             catch (Exception ex)
             {
                 Logger.Log($"EzPreviewTrackManager: Preload error {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                clearPendingPreloadActions();
             }
         }
 
-        // 调度函数基于索引推进
         private void updateSamples()
         {
-            if (!playback.IsPlaying || currentTrack == null) return;
+            if (!playback.IsPlaying || currentTrack == null)
+                return;
 
             double physicalTime = currentTrack.CurrentTime;
 
-            if (isControlledPlaybackPaused() || !currentTrack.IsRunning)
+            if (!currentTrack.IsRunning)
             {
                 if (currentTrack.IsDisposed)
                 {
@@ -553,18 +473,16 @@ namespace osu.Game.EzOsuGame.Audio
             }
 
             playback.TrackPausedExternally = false;
+
+            double schedulerTime = Time.Current;
+            double elapsed = Math.Max(0, schedulerTime - playback.LastLogicalClockTime);
+
+            playback.LastLogicalClockTime = schedulerTime;
+            playback.LogicalClockTime += elapsed;
+
             double logicalTime;
 
-            if (!previewMainAudioAvailable)
-            {
-                double schedulerTime = Time.Current;
-                double elapsed = Math.Max(0, schedulerTime - playback.LastLogicalClockTime);
-
-                playback.LastLogicalClockTime = schedulerTime;
-                playback.LogicalClockTime += elapsed;
-                logicalTime = playback.LogicalClockTime;
-            }
-            else
+            if (previewMainAudioAvailable)
             {
                 if (playback.LastTrackTime != 0 && physicalTime + 200 < playback.LastTrackTime)
                 {
@@ -577,88 +495,71 @@ namespace osu.Game.EzOsuGame.Audio
                     }
                 }
 
-                logicalTime = playback.PreviewStartTime + playback.TrackLoopCount * playback.TrackLoopLength + Math.Max(0, physicalTime - playback.PreviewStartTime);
+                double trackTime = playback.PreviewStartTime + playback.TrackLoopCount * playback.TrackLoopLength
+                                                             + Math.Max(0, physicalTime - playback.PreviewStartTime);
+
+                logicalTime = Math.Max(trackTime, playback.LogicalClockTime);
+            }
+            else
+            {
+                logicalTime = playback.LogicalClockTime;
             }
 
-            if (logicalTime > playback.PreviewEndTime + trigger_tolerance)
+            if (logicalTime > playback.PreviewEndTime + tick_ms)
             {
                 restartPreviewCycle();
                 return;
             }
 
-            double logicalTimeForEvents = logicalTime;
+            enqueueLookaheadPreload(logicalTime);
+            processPreloadQueue();
 
             if (previewHitSoundsEnabled)
-            {
-                sampleScheduler.NextHitSoundIndex = findNextValidIndex(sampleScheduler.ScheduledHitSounds, sampleScheduler.NextHitSoundIndex, logicalTimeForEvents - trigger_tolerance);
-
-                while (sampleScheduler.NextHitSoundIndex < sampleScheduler.ScheduledHitSounds.Count)
-                {
-                    var hs = sampleScheduler.ScheduledHitSounds[sampleScheduler.NextHitSoundIndex];
-
-                    if (hs.HasTriggered)
-                    {
-                        sampleScheduler.NextHitSoundIndex++;
-                        continue;
-                    }
-
-                    if (hs.Time > logicalTimeForEvents + trigger_tolerance) break;
-
-                    if (Math.Abs(hs.Time - logicalTimeForEvents) <= trigger_tolerance)
-                    {
-                        triggerHitSound(hs.Samples);
-                        hs.HasTriggered = true;
-                        sampleScheduler.ScheduledHitSounds[sampleScheduler.NextHitSoundIndex] = hs;
-                        sampleScheduler.NextHitSoundIndex++;
-                    }
-                    else if (hs.Time < logicalTimeForEvents - trigger_tolerance)
-                    {
-                        // 已错过（比如用户 Seek）
-                        hs.HasTriggered = true;
-                        sampleScheduler.ScheduledHitSounds[sampleScheduler.NextHitSoundIndex] = hs;
-                        sampleScheduler.NextHitSoundIndex++;
-                    }
-                    else break;
-                }
-            }
+                processScheduledEvents(sampleScheduler.ScheduledHitSounds, ref sampleScheduler.NextHitSoundIndex, logicalTime, triggerHitSound);
 
             if (previewStoryboardEnabled)
-            {
-                // 同样优化 storyboard samples
-                sampleScheduler.NextStoryboardSampleIndex = findNextValidIndex(sampleScheduler.ScheduledStoryboardSamples, sampleScheduler.NextStoryboardSampleIndex,
-                    logicalTimeForEvents - trigger_tolerance);
-
-                while (sampleScheduler.NextStoryboardSampleIndex < sampleScheduler.ScheduledStoryboardSamples.Count)
-                {
-                    var sb = sampleScheduler.ScheduledStoryboardSamples[sampleScheduler.NextStoryboardSampleIndex];
-
-                    if (sb.HasTriggered)
-                    {
-                        sampleScheduler.NextStoryboardSampleIndex++;
-                        continue;
-                    }
-
-                    if (sb.Time > logicalTimeForEvents + trigger_tolerance) break;
-
-                    if (Math.Abs(sb.Time - logicalTimeForEvents) <= trigger_tolerance)
-                    {
-                        triggerStoryboardSample(sb.Sample);
-                        sb.HasTriggered = true;
-                        sampleScheduler.ScheduledStoryboardSamples[sampleScheduler.NextStoryboardSampleIndex] = sb;
-                        sampleScheduler.NextStoryboardSampleIndex++;
-                    }
-                    else if (sb.Time < logicalTimeForEvents - trigger_tolerance)
-                    {
-                        sb.HasTriggered = true;
-                        sampleScheduler.ScheduledStoryboardSamples[sampleScheduler.NextStoryboardSampleIndex] = sb;
-                        sampleScheduler.NextStoryboardSampleIndex++;
-                    }
-                    else break;
-                }
-            }
+                processScheduledEvents(sampleScheduler.ScheduledStoryboardSamples, ref sampleScheduler.NextStoryboardSampleIndex, logicalTime, triggerStoryboardSample);
 
             cleanupInactiveChannels();
             playback.LastTrackTime = physicalTime;
+        }
+
+        private void processScheduledEvents<T>(List<T> list, ref int nextIndex, double logicalTime, Action<T> trigger)
+            where T : struct, ITimedScheduleEntry
+        {
+            nextIndex = findNextValidIndex(list, nextIndex, logicalTime - tick_ms);
+
+            while (nextIndex < list.Count)
+            {
+                var entry = list[nextIndex];
+
+                if (entry.HasTriggered)
+                {
+                    nextIndex++;
+                    continue;
+                }
+
+                if (entry.Time > logicalTime + tick_ms)
+                    break;
+
+                if (Math.Abs(entry.Time - logicalTime) <= tick_ms)
+                {
+                    trigger(entry);
+                    entry.HasTriggered = true;
+                    list[nextIndex] = entry;
+                    nextIndex++;
+                }
+                else if (entry.Time < logicalTime - tick_ms)
+                {
+                    entry.HasTriggered = true;
+                    list[nextIndex] = entry;
+                    nextIndex++;
+                }
+                else
+                {
+                    break;
+                }
+            }
         }
 
         private void cleanupInactiveChannels()
@@ -669,6 +570,12 @@ namespace osu.Game.EzOsuGame.Audio
 
                 if (channel.Playing)
                     continue;
+
+                if (sampleScheduler.ActiveChannelStartTimes.TryGetValue(channel, out double startedAt)
+                    && Time.Current - startedAt < tick_ms + 2)
+                {
+                    continue;
+                }
 
                 try
                 {
@@ -681,6 +588,7 @@ namespace osu.Game.EzOsuGame.Audio
                 }
 
                 sampleScheduler.ActiveChannels.RemoveAt(i);
+                sampleScheduler.ActiveChannelStartTimes.Remove(channel);
             }
         }
 
@@ -695,12 +603,13 @@ namespace osu.Game.EzOsuGame.Audio
             }
 
             sampleScheduler.ActiveChannels.Clear();
+            sampleScheduler.ActiveChannelStartTimes.Clear();
         }
 
-        private void resetScheduledTriggers(bool stopActiveChannels = false)
+        private void resetScheduledTriggers(bool stopChannels = false)
         {
-            if (stopActiveChannels)
-                this.stopActiveChannels();
+            if (stopChannels)
+                stopActiveChannels();
 
             for (int i = 0; i < sampleScheduler.ScheduledHitSounds.Count; i++)
             {
@@ -722,51 +631,41 @@ namespace osu.Game.EzOsuGame.Audio
             if (currentTrack == null)
                 return;
 
-            resetScheduledTriggers(stopActiveChannels: true);
+            resetScheduledTriggers(stopChannels: true);
             sampleScheduler.ResetIndices(playback.PreviewStartTime);
             playback.ResetPlaybackProgress();
-
-            if (!previewMainAudioAvailable)
-                playback.ResetLogicalClock(playback.PreviewStartTime, Time.Current);
+            playback.ResetLogicalClock(playback.PreviewStartTime, Time.Current);
 
             currentTrack.Volume.Value = 1f;
             currentTrack.Seek(playback.PreviewStartTime);
-
-            if (!currentTrack.IsRunning && shouldStartControlledTrack())
-                currentTrack.Start();
         }
 
-        private bool shouldStartControlledTrack() => !isControlledPlaybackPaused();
-
-        private bool isControlledPlaybackPaused() => musicController?.UserPauseRequested == true;
-
-        private void triggerHitSound(HitSampleInfo[] samples)
+        private void triggerHitSound(ScheduledHitSound scheduled)
         {
-            if (samples.Length == 0) return;
+            if (scheduled.Samples.Length == 0)
+                return;
 
             try
             {
-                foreach (var info in samples)
+                foreach (var info in scheduled.Samples)
                 {
-                    // bool playedAny = false;
+                    var sample = resolveHitSample(info);
 
-                    foreach (var sample in fetchSamplesForInfo(info))
+                    if (sample == null)
+                        continue;
+
+                    var channel = sample.GetChannel();
+
+                    if (info.Volume > 0)
                     {
-                        if (sample == null) continue;
-
-                        var channelInner = sample.GetChannel();
-
-                        // 同上：仅当命中对象样本显式给出音量 (>0) 时才应用；否则保持默认以跟随系统设置。
-                        if (info.Volume > 0)
-                        {
-                            double volInner = Math.Clamp(info.Volume / 100.0, 0, 1);
-                            channelInner.Volume.Value = (float)volInner;
-                        }
-
-                        channelInner.Play();
-                        sampleScheduler.ActiveChannels.Add(channelInner);
-                        break; // 只需播放命中链中的首个可用样本
+                        double vol = Math.Clamp(info.Volume / 100.0, 0, 1);
+                        channel.Volume.Value = (float)vol;
                     }
+
+                    channel.Play();
+                    sampleScheduler.ActiveChannels.Add(channel);
+                    sampleScheduler.ActiveChannelStartTimes[channel] = Time.Current;
+                    break;
                 }
             }
             catch (Exception ex)
@@ -775,29 +674,91 @@ namespace osu.Game.EzOsuGame.Audio
             }
         }
 
-        // note hitsound 只使用谱面采样，避免把用户皮肤/默认皮肤里的全局打击音误当作 KeySound 预览播放出来。
-        private IEnumerable<ISample?> fetchSamplesForInfo(HitSampleInfo info, bool preloadOnly = false)
+        private static string? getHitSampleCacheKey(HitSampleInfo info)
         {
-            var sample = currentBeatmap?.Skin.GetSample(info);
-            if (sample != null)
-                yield return sample;
+            if (!isNoteSample(info))
+                return null;
+
+            return info.LookupNames.FirstOrDefault() ?? info.Name;
         }
+
+        /// <summary>
+        /// 只有 note 自身携带的谱面音效算预览键音：皮肤兜底的默认命中音与命中音附加层都不发声。
+        /// </summary>
+        /// <remarks>
+        /// <see cref="HitSampleInfo.UseBeatmapSamples"/> 为 false 的样本只能从皮肤解析（例如没有自定义音效的
+        /// note 落到 <c>normal-hitnormal</c>），预览不播这类皮肤音效；whistle / clap / finish 是叠加在
+        /// note 上的附加层，也不是 note 自身的键音。
+        /// </remarks>
+        private static bool isNoteSample(HitSampleInfo info)
+        {
+            if (!info.UseBeatmapSamples)
+                return false;
+
+            return info.Name is not (HitSampleInfo.HIT_WHISTLE or HitSampleInfo.HIT_CLAP or HitSampleInfo.HIT_FINISH);
+        }
+
+        /// <summary>
+        /// 取出物件样本中的 note 键音；没有则返回空数组，避免为空物件建立调度条目。
+        /// </summary>
+        private static HitSampleInfo[] collectNoteSamples(IList<HitSampleInfo> samples)
+        {
+            int count = 0;
+
+            for (int i = 0; i < samples.Count; i++)
+            {
+                if (isNoteSample(samples[i]))
+                    count++;
+            }
+
+            if (count == 0)
+                return Array.Empty<HitSampleInfo>();
+
+            var result = new HitSampleInfo[count];
+            int index = 0;
+
+            for (int i = 0; i < samples.Count; i++)
+            {
+                if (isNoteSample(samples[i]))
+                    result[index++] = samples[i];
+            }
+
+            return result;
+        }
+
+        private ISample? resolveHitSample(HitSampleInfo info)
+        {
+            string? key = getHitSampleCacheKey(info);
+
+            if (string.IsNullOrEmpty(key))
+                return null;
+
+            if (sampleScheduler.HitSampleCache.TryGetValue(key, out var cached))
+            {
+                if (cached is AudioComponent { IsDisposed: true })
+                    sampleScheduler.HitSampleCache.Remove(key);
+                else
+                    return cached;
+            }
+
+            ISample? sample = currentBeatmap?.Skin.GetSample(info);
+            sampleScheduler.HitSampleCache[key] = sample;
+            return sample;
+        }
+
+        private void triggerStoryboardSample(ScheduledStoryboardSample scheduled) => triggerStoryboardSample(scheduled.Sample);
 
         private void triggerStoryboardSample(StoryboardSampleInfo sampleInfo)
         {
             try
             {
-                var (sample, _, _) = fetchStoryboardSample(sampleInfo);
+                var sample = resolveStoryboardSample(sampleInfo);
 
                 if (sample == null)
-                {
-                    // Logger.Log($"EzPreviewTrackManager: Miss storyboard sample {sampleInfo.Path} (tried: {string.Join("|", tried)})", LoggingTarget.Runtime);
                     return;
-                }
 
                 var channel = sample.GetChannel();
 
-                // 仅在谱面 Storyboard 显式指定音量 (>0) 时应用相对缩放；否则保持默认，完全跟随系统全局音量/效果音量设置。
                 if (sampleInfo.Volume > 0)
                 {
                     double vol = Math.Clamp(sampleInfo.Volume / 100.0, 0, 1);
@@ -806,7 +767,7 @@ namespace osu.Game.EzOsuGame.Audio
 
                 channel.Play();
                 sampleScheduler.ActiveChannels.Add(channel);
-                // Logger.Log($"EzPreviewTrackManager: Played storyboard sample {sampleInfo.Path} <- {chosenKey}");
+                sampleScheduler.ActiveChannelStartTimes[channel] = Time.Current;
             }
             catch (Exception ex)
             {
@@ -814,98 +775,55 @@ namespace osu.Game.EzOsuGame.Audio
             }
         }
 
-        /// <summary>
-        /// 统一 storyboard 样本获取逻辑。返回 (sample, 命中的key, 尝试列表)
-        /// 顺序：缓存 -> beatmap skin
-        /// </summary>
-        private (ISample? sample, string chosenKey, List<string> tried) fetchStoryboardSample(StoryboardSampleInfo info, bool preload = false)
+        private ISample? resolveStoryboardSample(StoryboardSampleInfo info)
         {
-            var tried = new List<string>();
             string normalizedPath = info.Path.Replace('\\', '/');
 
-            // 1. 缓存
-            if (sampleScheduler.StoryboardSampleCache.TryGetValue(normalizedPath, out var cached) && cached != null)
-                return (cached, normalizedPath + "(cache)", tried);
-
-            ISample? selected = null;
-            string chosenKey = string.Empty;
-
-            void consider(ISample? s, string key)
+            if (sampleScheduler.StoryboardSampleCache.TryGetValue(normalizedPath, out var cached))
             {
-                if (s != null && selected == null)
-                {
-                    selected = s;
-                    chosenKey = key;
-                }
-
-                tried.Add(key);
+                if (cached is AudioComponent { IsDisposed: true })
+                    sampleScheduler.StoryboardSampleCache.Remove(normalizedPath);
+                else
+                    return cached;
             }
 
-            // 2. beatmap skin
-            // StoryboardSampleInfo 实现 ISampleInfo，直接走 Skin.GetSample 会使用其 LookupNames
-            var beatmapSkinSample = currentBeatmap?.Skin.GetSample(info);
-            consider(beatmapSkinSample, "beatmapSkin:" + normalizedPath);
-
-            // 3. 若谱面本地资源未命中，则退到当前用户皮肤/默认皮肤。
-            if (selected == null)
-                consider(skinManager?.GetSample(info), "skinManager:" + normalizedPath);
-
-            // 4. 写缓存（即使 null 也缓存，避免重复磁盘尝试；预加载阶段写入，触发阶段复用）
-            sampleScheduler.StoryboardSampleCache[normalizedPath] = selected;
-
-            return (selected, chosenKey, tried);
+            ISample? sample = currentBeatmap?.Skin.GetSample(info);
+            sampleScheduler.StoryboardSampleCache[normalizedPath] = sample;
+            return sample;
         }
 
         private void clearEnhancedElements()
         {
-            // 停止并释放所有仍在播放的样本通道，避免依赖最终化器来回收短期通道
             stopActiveChannels();
-
             sampleScheduler.Reset();
             playback.ShortBgmOneShotMode = false;
             playback.ShortBgmMutedAfterFirstLoop = false;
-            // 避免在非更新线程直接操作 InternalChildren 导致 InvalidThreadForMutationException
-            Schedule(() => audioContainer.Clear());
         }
 
-        /// <summary>
-        /// 准备调度数据（命中音效和故事板样本）。
-        /// </summary>
-        private void prepareScheduledData(IBeatmap beatmap, Storyboard? storyboard)
-        {
-            prepareHitSounds(beatmap);
-            prepareStoryboardSamples(storyboard);
-        }
-
-        /// <summary>
-        /// 保存当前谱面的样本数据到 LRU 缓存。
-        /// </summary>
         private void saveCurrentBeatmapToCache()
         {
-            if (currentBeatmap == null || currentBeatmap.BeatmapInfo?.BeatmapSet?.OnlineID <= 0)
+            if (currentBeatmap == null)
                 return;
 
-            string beatmapSetId = currentBeatmap.BeatmapInfo!.BeatmapSet!.OnlineID.ToString();
+            string? beatmapCacheKey = getBeatmapCacheKey(currentBeatmap.BeatmapInfo);
 
-            // 保存到缓存
-            if (!sampleCache.TryGetValue(beatmapSetId, out var value))
+            if (string.IsNullOrEmpty(beatmapCacheKey))
+                return;
+
+            if (!sampleCache.TryGetValue(beatmapCacheKey, out var cache))
             {
-                value = new BeatmapSampleCache();
-                sampleCache[beatmapSetId] = value;
+                cache = new BeatmapSampleCache();
+                sampleCache[beatmapCacheKey] = cache;
             }
 
-            var cache = value;
             cache.ScheduledHitSounds = sampleScheduler.ScheduledHitSounds.ToArray();
             cache.ScheduledStoryboardSamples = sampleScheduler.ScheduledStoryboardSamples.ToArray();
-            cache.StoryboardSampleCache = new Dictionary<string, ISample?>(sampleScheduler.StoryboardSampleCache);
             cache.LongestHitTime = sampleScheduler.LongestHitTime;
             cache.LongestStoryboardTime = sampleScheduler.LongestStoryboardTime;
 
-            // 更新访问顺序（LRU）
-            beatmapAccessOrder.Remove(beatmapSetId);
-            beatmapAccessOrder.AddFirst(beatmapSetId);
+            beatmapAccessOrder.Remove(beatmapCacheKey);
+            beatmapAccessOrder.AddFirst(beatmapCacheKey);
 
-            // 如果超过缓存上限，移除最旧的
             while (beatmapAccessOrder.Count > max_cached_beatmaps)
             {
                 string? oldest = beatmapAccessOrder.Last?.Value;
@@ -918,77 +836,83 @@ namespace osu.Game.EzOsuGame.Audio
             }
         }
 
-        /// <summary>
-        /// 尝试从缓存恢复谱面的样本数据。
-        /// </summary>
         private bool restoreFromCache(IWorkingBeatmap beatmap)
         {
-            if (beatmap.BeatmapInfo?.BeatmapSet?.OnlineID <= 0)
+            string? beatmapCacheKey = getBeatmapCacheKey(beatmap.BeatmapInfo);
+
+            if (string.IsNullOrEmpty(beatmapCacheKey))
                 return false;
 
-            string beatmapSetId = beatmap.BeatmapInfo!.BeatmapSet!.OnlineID.ToString();
-
-            if (!sampleCache.TryGetValue(beatmapSetId, out var cache))
+            if (!sampleCache.TryGetValue(beatmapCacheKey, out var cache))
                 return false;
 
-            // 从缓存恢复数据（使用 Clear + AddRange 方式避免 readonly 字段赋值错误）
             sampleScheduler.ScheduledHitSounds.Clear();
             sampleScheduler.ScheduledHitSounds.AddRange(cache.ScheduledHitSounds);
 
             sampleScheduler.ScheduledStoryboardSamples.Clear();
             sampleScheduler.ScheduledStoryboardSamples.AddRange(cache.ScheduledStoryboardSamples);
 
-            sampleScheduler.StoryboardSampleCache.Clear();
-
-            foreach (var kvp in cache.StoryboardSampleCache)
-            {
-                sampleScheduler.StoryboardSampleCache[kvp.Key] = kvp.Value;
-            }
-
             sampleScheduler.LongestHitTime = cache.LongestHitTime;
             sampleScheduler.LongestStoryboardTime = cache.LongestStoryboardTime;
 
-            // 更新访问顺序（LRU）
-            beatmapAccessOrder.Remove(beatmapSetId);
-            beatmapAccessOrder.AddFirst(beatmapSetId);
+            beatmapAccessOrder.Remove(beatmapCacheKey);
+            beatmapAccessOrder.AddFirst(beatmapCacheKey);
 
             return true;
         }
 
-        private struct ScheduledHitSound
+        private static string? getBeatmapCacheKey(IBeatmapInfo? beatmapInfo)
+        {
+            if (beatmapInfo == null)
+                return null;
+
+            if (beatmapInfo is BeatmapInfo localBeatmap && localBeatmap.ID != Guid.Empty)
+                return localBeatmap.ID.ToString();
+
+            if (!string.IsNullOrWhiteSpace(beatmapInfo.MD5Hash))
+                return beatmapInfo.MD5Hash;
+
+            return beatmapInfo.GetDisplayTitle();
+        }
+
+        private interface ITimedScheduleEntry
+        {
+            double Time { get; }
+            bool HasTriggered { get; set; }
+        }
+
+        private struct ScheduledHitSound : ITimedScheduleEntry
         {
             public double Time;
             public HitSampleInfo[] Samples;
             public bool HasTriggered;
+
+            double ITimedScheduleEntry.Time => Time;
+
+            bool ITimedScheduleEntry.HasTriggered
+            {
+                get => HasTriggered;
+                set => HasTriggered = value;
+            }
         }
 
-        private struct ScheduledStoryboardSample
+        private struct ScheduledStoryboardSample : ITimedScheduleEntry
         {
             public double Time;
             public StoryboardSampleInfo Sample;
             public bool HasTriggered;
-        }
 
-        // 二分查找辅助方法：找到第一个 Time >= minTime 的索引
-        private static int findNextValidIndex(List<ScheduledHitSound> list, int startIndex, double minTime)
-        {
-            int low = startIndex, high = list.Count - 1;
+            double ITimedScheduleEntry.Time => Time;
 
-            while (low <= high)
+            bool ITimedScheduleEntry.HasTriggered
             {
-                int mid = (low + high) / 2;
-                double time = list[mid].Time;
-
-                if (time < minTime)
-                    low = mid + 1;
-                else
-                    high = mid - 1;
+                get => HasTriggered;
+                set => HasTriggered = value;
             }
-
-            return low;
         }
 
-        private static int findNextValidIndex(List<ScheduledStoryboardSample> list, int startIndex, double minTime)
+        private static int findNextValidIndex<T>(List<T> list, int startIndex, double minTime)
+            where T : ITimedScheduleEntry
         {
             int low = startIndex, high = list.Count - 1;
 
@@ -1046,13 +970,15 @@ namespace osu.Game.EzOsuGame.Audio
         {
             public readonly List<ScheduledHitSound> ScheduledHitSounds = new List<ScheduledHitSound>();
             public readonly List<ScheduledStoryboardSample> ScheduledStoryboardSamples = new List<ScheduledStoryboardSample>();
+            public readonly Dictionary<string, ISample?> HitSampleCache = new Dictionary<string, ISample?>();
             public readonly Dictionary<string, ISample?> StoryboardSampleCache = new Dictionary<string, ISample?>();
+            public readonly HashSet<string> PreloadQueuedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             public readonly List<SampleChannel> ActiveChannels = new List<SampleChannel>();
+            public readonly Dictionary<SampleChannel, double> ActiveChannelStartTimes = new Dictionary<SampleChannel, double>();
 
             public int NextHitSoundIndex;
             public int NextStoryboardSampleIndex;
 
-            // 用于缓存的最长事件时间
             public double LongestHitTime;
             public double LongestStoryboardTime;
 
@@ -1065,35 +991,33 @@ namespace osu.Game.EzOsuGame.Audio
             public void Reset()
             {
                 ActiveChannels.Clear();
+                ActiveChannelStartTimes.Clear();
                 ScheduledHitSounds.Clear();
                 ScheduledStoryboardSamples.Clear();
+                HitSampleCache.Clear();
                 StoryboardSampleCache.Clear();
+                PreloadQueuedKeys.Clear();
                 LongestHitTime = 0;
                 LongestStoryboardTime = 0;
                 ResetIndices(0);
             }
         }
 
-        /// <summary>
-        /// 用于 LRU 缓存的谱面样本数据结构。
-        /// </summary>
         private sealed class BeatmapSampleCache
         {
             public ScheduledHitSound[] ScheduledHitSounds { get; set; } = Array.Empty<ScheduledHitSound>();
             public ScheduledStoryboardSample[] ScheduledStoryboardSamples { get; set; } = Array.Empty<ScheduledStoryboardSample>();
-            public Dictionary<string, ISample?> StoryboardSampleCache { get; set; } = new Dictionary<string, ISample?>();
             public double LongestHitTime { get; set; }
             public double LongestStoryboardTime { get; set; }
         }
 
-        protected virtual Track? CreateTrack(IWorkingBeatmap beatmap, out bool ownsTrack)
+        private Track? prepareTrack(IWorkingBeatmap beatmap)
         {
             var beatmapTrack = beatmap.Track;
 
             if (beatmapTrack is TrackVirtual)
                 beatmapTrack.Length = getVirtualTimelineLength(beatmap);
 
-            ownsTrack = false;
             return beatmapTrack;
         }
 
@@ -1110,7 +1034,6 @@ namespace osu.Game.EzOsuGame.Audio
             double storyboardEndTime = beatmap.Storyboard?.LatestEventTime ?? 0;
             double lastRelevantTime = Math.Max(previewTime, Math.Max(mappedEndTime, storyboardEndTime));
 
-            // virtual 谱面没有真实主音频时，额外补若干拍尾巴，保证末尾事件后仍有可用时钟空间。
             double beatLength = beatmap.Beatmap.ControlPointInfo.TimingPointAt(lastRelevantTime).BeatLength;
 
             if (double.IsNaN(beatLength) || double.IsInfinity(beatLength) || beatLength <= 0)

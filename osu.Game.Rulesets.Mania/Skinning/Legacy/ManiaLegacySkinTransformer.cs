@@ -16,6 +16,7 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Objects.Legacy;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
+using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -108,6 +109,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
                                 var combo = container.ChildrenOfType<LegacyManiaComboCounter>().FirstOrDefault();
                                 var spectatorList = container.OfType<SpectatorList>().FirstOrDefault();
                                 var leaderboard = container.OfType<DrawableGameplayLeaderboard>().FirstOrDefault();
+                                var hitError = container.OfType<HitErrorMeter>().FirstOrDefault();
 
                                 if (combo != null)
                                 {
@@ -130,6 +132,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
                                     leaderboard.X = 10;
                                 }
 
+                                if (hitError != null)
+                                {
+                                    hitError.Anchor = Anchor.BottomCentre;
+                                    hitError.Origin = Anchor.BottomCentre;
+                                }
+
                                 foreach (var d in container.OfType<ISerialisableDrawable>())
                                     d.UsesFixedAnchor = true;
                             })
@@ -137,6 +145,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
                                 new LegacyManiaComboCounter(),
                                 new SpectatorList(),
                                 new DrawableGameplayLeaderboard(),
+                                new LegacyBarHitErrorMeter(),
                             };
                     }
 
@@ -232,8 +241,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
             if (Skin is not LegacySkin legacySkin)
                 return;
 
-            registerNoteTimingColourTextureGroup(LegacyNotePiece.CreateTimingColourTextureGroupName(beatmap.TotalColumns, LegacyManiaSkinConfigurationLookups.NoteImage), LegacyManiaSkinConfigurationLookups.NoteImage);
-            registerNoteTimingColourTextureGroup(LegacyNotePiece.CreateTimingColourTextureGroupName(beatmap.TotalColumns, LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage), LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage, LegacyManiaSkinConfigurationLookups.NoteImage);
+            registerNoteTimingColourTextureGroup(
+                LegacyNotePiece.CreateTimingColourTextureGroupName(beatmap.TotalColumns, LegacyManiaSkinConfigurationLookups.NoteImage),
+                LegacyManiaSkinConfigurationLookups.NoteImage);
 
             void registerNoteTimingColourTextureGroup(string groupName, params LegacyManiaSkinConfigurationLookups[] lookupFallbacks)
                 => legacySkin.RegisterManiaTimingColourTextureGroup(groupName, getTextureNameFallbacksForLookups(lookupFallbacks));

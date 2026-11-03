@@ -11,18 +11,23 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
+using osu.Game.EzOsuGame.Mods.CommunityMod;
+using osu.Game.EzOsuGame.Mods.LAsMods;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
-using osu.Game.EzOsuGame.Mods;
 using osu.Game.Localisation;
+using osu.Game.Localisation.Catch;
 using osu.Game.Rulesets.Catch.Beatmaps;
 using osu.Game.Rulesets.Catch.Difficulty;
 using osu.Game.Rulesets.Catch.Edit;
 using osu.Game.Rulesets.Catch.Edit.Setup;
+using osu.Game.Rulesets.Catch.EzCatch.ReplayJudge;
 using osu.Game.Rulesets.Catch.Mods;
 using osu.Game.Rulesets.Catch.Objects;
 using osu.Game.Rulesets.Catch.Replays;
 using osu.Game.Rulesets.Catch.Scoring;
 using osu.Game.Rulesets.Catch.Skinning.Argon;
+using osu.Game.Rulesets.Catch.Skinning.Default;
 using osu.Game.Rulesets.Catch.Skinning.Legacy;
 using osu.Game.Rulesets.Catch.UI;
 using osu.Game.Rulesets.Difficulty;
@@ -48,6 +53,8 @@ namespace osu.Game.Rulesets.Catch
 
         public override ScoreProcessor CreateScoreProcessor() => new CatchScoreProcessor();
 
+        public override IEzReplaySession CreateEzReplaySession() => new CatchReplaySessionService();
+
         public override HealthProcessor CreateHealthProcessor(double drainStartTime) => new CatchHealthProcessor(drainStartTime);
 
         public override IBeatmapConverter CreateBeatmapConverter(IBeatmap beatmap) => new CatchBeatmapConverter(beatmap, this);
@@ -58,15 +65,31 @@ namespace osu.Game.Rulesets.Catch
 
         public override string RulesetAPIVersionSupported => CURRENT_RULESET_API_VERSION;
 
-        public override IEnumerable<KeyBinding> GetDefaultKeyBindings(int variant = 0) => new[]
+        public override IEnumerable<KeyBinding> GetDefaultKeyBindings(int variant = 0)
         {
-            new KeyBinding(InputKey.Z, CatchAction.MoveLeft),
-            new KeyBinding(InputKey.Left, CatchAction.MoveLeft),
-            new KeyBinding(InputKey.X, CatchAction.MoveRight),
-            new KeyBinding(InputKey.Right, CatchAction.MoveRight),
-            new KeyBinding(InputKey.Shift, CatchAction.Dash),
-            new KeyBinding(InputKey.MouseLeft, CatchAction.Dash),
-        };
+            switch (variant)
+            {
+                default:
+                    return new[]
+                    {
+                        new KeyBinding(InputKey.Z, CatchAction.MoveLeft),
+                        new KeyBinding(InputKey.Left, CatchAction.MoveLeft),
+                        new KeyBinding(InputKey.X, CatchAction.MoveRight),
+                        new KeyBinding(InputKey.Right, CatchAction.MoveRight),
+                        new KeyBinding(InputKey.Shift, CatchAction.Dash),
+                        new KeyBinding(InputKey.MouseLeft, CatchAction.Dash),
+                    };
+
+                case EDITOR_VARIANT:
+                    return
+                    [
+                        new KeyBinding(InputKey.Number2, CatchAction.EditorFruitTool),
+                        new KeyBinding(InputKey.Number3, CatchAction.EditorJuiceStreamTool),
+                        new KeyBinding(InputKey.Number4, CatchAction.EditorBananaShowerTool),
+                        new KeyBinding(InputKey.T, CatchAction.EditorToggleDistanceSnap),
+                    ];
+            }
+        }
 
         public override IEnumerable<Mod> ConvertFromLegacyMods(LegacyMods mods)
         {
@@ -120,6 +143,14 @@ namespace osu.Game.Rulesets.Catch
                         new ModNiceBPM(),
                         new ModReconcile(),
                         new UniversalLoopPlayClip(),
+                        new CatchModTouchMove(),
+                    };
+
+                case ModType.CommunityMod:
+                    return new Mod[]
+                    {
+                        new ModHealthAdaptive(),
+                        new ModAccuracyAdaptive(),
                     };
 
                 case ModType.DifficultyReduction:
@@ -178,6 +209,8 @@ namespace osu.Game.Rulesets.Catch
             }
         }
 
+        public override ScoreMultiplierCalculator CreateScoreMultiplierCalculator(ScoreMultiplierContext context) => new CatchScoreMultiplierCalculator(context);
+
         public override string Description => "osu!catch";
 
         public override string ShortName => SHORT_NAME;
@@ -231,6 +264,9 @@ namespace osu.Game.Rulesets.Catch
 
                 case ArgonSkin:
                     return new CatchArgonSkinTransformer(skin);
+
+                case TrianglesSkin:
+                    return new CatchTrianglesSkinTransformer(skin);
             }
 
             return null;
@@ -276,7 +312,7 @@ namespace osu.Game.Rulesets.Catch
         {
             return new[]
             {
-                new StatisticItem("Performance Breakdown", () => new PerformanceBreakdownChart(score, playableBeatmap)
+                new StatisticItem("Performance Breakdown", () => new PerformanceBreakdownChart(score)
                 {
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y
@@ -304,23 +340,23 @@ namespace osu.Game.Rulesets.Catch
 
             yield return new RulesetBeatmapAttribute(SongSelectStrings.CircleSize, @"CS", originalDifficulty.CircleSize, effectiveDifficulty.CircleSize, 10)
             {
-                Description = "Affects the size of fruits.",
+                Description = CatchRulesetStrings.CircleSizeDescription,
                 AdditionalMetrics =
                 [
-                    new RulesetBeatmapAttribute.AdditionalMetric("Hit circle radius", (CatchHitObject.OBJECT_RADIUS * LegacyRulesetExtensions.CalculateScaleFromCircleSize(effectiveDifficulty.CircleSize)).ToLocalisableString("0.#"))
+                    new RulesetBeatmapAttribute.AdditionalMetric(CatchRulesetStrings.FruitRadius, (CatchHitObject.OBJECT_RADIUS * LegacyRulesetExtensions.CalculateScaleFromCircleSize(effectiveDifficulty.CircleSize)).ToLocalisableString("0.#"))
                 ]
             };
             yield return new RulesetBeatmapAttribute(SongSelectStrings.ApproachRate, @"AR", originalDifficulty.ApproachRate, effectiveDifficulty.ApproachRate, 10)
             {
-                Description = "Affects how early fruits fade in on the screen.",
+                Description = CatchRulesetStrings.ApproachRateDescription,
                 AdditionalMetrics =
                 [
-                    new RulesetBeatmapAttribute.AdditionalMetric("Fade-in time", LocalisableString.Interpolate($@"{IBeatmapDifficultyInfo.DifficultyRangeInt(effectiveDifficulty.ApproachRate, CatchHitObject.PREEMPT_RANGE):#,0.##} ms"))
+                    new RulesetBeatmapAttribute.AdditionalMetric(CatchRulesetStrings.FadeInTime, LocalisableString.Interpolate($@"{IBeatmapDifficultyInfo.DifficultyRangeInt(effectiveDifficulty.ApproachRate, CatchHitObject.PREEMPT_RANGE):#,0.##} ms"))
                 ]
             };
             yield return new RulesetBeatmapAttribute(SongSelectStrings.HPDrain, @"HP", originalDifficulty.DrainRate, effectiveDifficulty.DrainRate, 10)
             {
-                Description = "Affects the harshness of health drain and the health penalties for missing."
+                Description = SongSelectStrings.HPDrainDescription
             };
         }
 

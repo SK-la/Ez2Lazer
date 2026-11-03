@@ -1,0 +1,241 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.Linq;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Input;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.SkinEditor;
+using osu.Game.Graphics.UserInterface;
+using osu.Game.Input.Bindings;
+using osu.Game.Localisation;
+using osu.Game.Screens.Edit.Components.Menus;
+
+namespace osu.Game.EzOsuGame.Edit.Components
+{
+    /// <summary>
+    /// Top menu bar for Ez skin editor, matching <see cref="SkinEditor"/> <see cref="EditorMenuBar"/> layout.
+    /// </summary>
+    public partial class EzSkinEditorMenuBar : EditorMenuBar
+    {
+        public const float HEIGHT = Game.Overlays.SkinEditor.SkinEditor.MENU_HEIGHT;
+
+        public Action? ApplyAction { get; set; }
+
+        public Action? ExitAction { get; set; }
+
+        public Action? CreateEzSkinJsonAction { get; set; }
+
+        public Action? UpdateEzSkinJsonSnapshotAction { get; set; }
+
+        public Action? RemoveEzSkinJsonAction { get; set; }
+
+        public Action? ImportJsonAction { get; set; }
+
+        public Action? ImportFromSkinJsonAction { get; set; }
+
+        public Action? ExportJsonAction { get; set; }
+
+        public Action? WriteColoursToSkinIniAction { get; set; }
+
+        public Action? WriteSizesToSkinIniAction { get; set; }
+
+        public Action? ExportOskAction { get; set; }
+
+        public Action? CreateConfigSnapshotAction { get; set; }
+
+        public Action? RestoreConfigSnapshotAction { get; set; }
+
+        public Action? ExportPreviewImageAction { get; set; }
+
+        public Action? UndoAction { get; set; }
+
+        public Action? RedoAction { get; set; }
+
+        public Action? CutAction { get; set; }
+
+        public Action? CopyAction { get; set; }
+
+        public Action? PasteAction { get; set; }
+
+        public Action? CloneAction { get; set; }
+
+        public Func<bool>? CanUndo { get; set; }
+
+        public Func<bool>? CanRedo { get; set; }
+
+        public Func<bool>? CanCut { get; set; }
+
+        public Func<bool>? CanCopy { get; set; }
+
+        public Func<bool>? CanPaste { get; set; }
+
+        public Func<bool>? CanCreateEzSkinJson { get; set; }
+
+        public Func<bool>? CanUpdateEzSkinJsonSnapshot { get; set; }
+
+        public Func<bool>? CanRemoveEzSkinJson { get; set; }
+
+        public Func<bool>? CanImportFromSkinJson { get; set; }
+
+        public Func<bool>? CanWriteColoursToSkinIni { get; set; }
+
+        public Func<bool>? CanWriteSizesToSkinIni { get; set; }
+
+        public Func<bool>? CanExportOsk { get; set; }
+
+        public Func<bool>? CanExportPreviewImage { get; set; }
+
+        public Func<bool>? CanUseConfigSnapshot { get; set; }
+
+        private readonly EditorMenuItem createConfigSnapshotItem;
+        private readonly EditorMenuItem restoreConfigSnapshotItem;
+        private readonly EditorMenuItem exportPreviewImageItem;
+        private readonly EditorMenuItem createJsonItem;
+        private readonly EditorMenuItem updateSnapshotItem;
+        private readonly EditorMenuItem removeJsonItem;
+        private readonly EditorMenuItem importJsonItem;
+        private readonly EditorMenuItem importFromSkinItem;
+        private readonly EditorMenuItem exportJsonItem;
+        private readonly EditorMenuItem writeColoursItem;
+        private readonly EditorMenuItem writeSizesItem;
+        private readonly EditorMenuItem exportOskItem;
+        private readonly EditorMenuItem undoItem;
+        private readonly EditorMenuItem redoItem;
+        private readonly EditorMenuItem cutItem;
+        private readonly EditorMenuItem copyItem;
+        private readonly EditorMenuItem pasteItem;
+        private readonly EditorMenuItem cloneItem;
+
+        private Bindable<bool> hudSnapEnabled = null!;
+        private Bindable<float> hudSnapDistance = null!;
+        private Bindable<bool> hudSnapPixelFlush = null!;
+        private SkinHudSnapDistanceMenuItem? hudSnapDistanceMenuItem;
+        private ToggleMenuItem? hudSnapPixelFlushMenuItem;
+
+        public EzSkinEditorMenuBar()
+        {
+            Anchor = Anchor.CentreLeft;
+            Origin = Anchor.CentreLeft;
+            RelativeSizeAxes = Axes.Both;
+
+            Items = new[]
+            {
+                new MenuItem(CommonStrings.MenuBarFile)
+                {
+                    Items = new OsuMenuItem[]
+                    {
+                        new EditorMenuItem(EzEditorStrings.MENU_APPLY, MenuItemType.Standard, () => ApplyAction?.Invoke()),
+                        new OsuMenuItemSpacer(),
+                        exportOskItem = new EditorMenuItem(EzEditorStrings.MENU_EXPORT_OSK, MenuItemType.Standard, () => ExportOskAction?.Invoke()),
+                        new OsuMenuItemSpacer(),
+                        new EditorMenuItem(CommonStrings.Exit, MenuItemType.Standard, () => ExitAction?.Invoke()),
+                    },
+                },
+                new MenuItem(CommonStrings.MenuBarEdit)
+                {
+                    Items = new OsuMenuItem[]
+                    {
+                        undoItem = new EditorMenuItem(CommonStrings.Undo, MenuItemType.Standard, () => UndoAction?.Invoke()) { Hotkey = new Hotkey(PlatformAction.Undo) },
+                        redoItem = new EditorMenuItem(CommonStrings.Redo, MenuItemType.Standard, () => RedoAction?.Invoke()) { Hotkey = new Hotkey(PlatformAction.Redo) },
+                        new OsuMenuItemSpacer(),
+                        cutItem = new EditorMenuItem(CommonStrings.Cut, MenuItemType.Standard, () => CutAction?.Invoke()) { Hotkey = new Hotkey(PlatformAction.Cut) },
+                        copyItem = new EditorMenuItem(CommonStrings.Copy, MenuItemType.Standard, () => CopyAction?.Invoke()) { Hotkey = new Hotkey(PlatformAction.Copy) },
+                        pasteItem = new EditorMenuItem(CommonStrings.Paste, MenuItemType.Standard, () => PasteAction?.Invoke()) { Hotkey = new Hotkey(PlatformAction.Paste) },
+                        cloneItem = new EditorMenuItem(CommonStrings.Clone, MenuItemType.Standard, () => CloneAction?.Invoke()) { Hotkey = new Hotkey(GlobalAction.EditorCloneSelection) },
+                    },
+                },
+                new MenuItem(EzEditorStrings.MENU_CONFIG)
+                {
+                    Items = new OsuMenuItem[]
+                    {
+                        createConfigSnapshotItem = new EditorMenuItem(EzEditorStrings.MENU_CREATE_CONFIG_SNAPSHOT, MenuItemType.Standard, () => CreateConfigSnapshotAction?.Invoke()),
+                        restoreConfigSnapshotItem = new EditorMenuItem(EzEditorStrings.MENU_RESTORE_CONFIG_SNAPSHOT, MenuItemType.Standard, () => RestoreConfigSnapshotAction?.Invoke()),
+                        new OsuMenuItemSpacer(),
+                        exportPreviewImageItem = new EditorMenuItem(EzEditorStrings.MENU_EXPORT_PREVIEW_IMAGE, MenuItemType.Standard, () => ExportPreviewImageAction?.Invoke()),
+                        new OsuMenuItemSpacer(),
+                        createJsonItem = new EditorMenuItem(EzEditorStrings.MENU_CREATE_EZSKIN_JSON, MenuItemType.Standard, () => CreateEzSkinJsonAction?.Invoke()),
+                        updateSnapshotItem = new EditorMenuItem(EzEditorStrings.MENU_UPDATE_EZSKIN_JSON_SNAPSHOT, MenuItemType.Standard, () => UpdateEzSkinJsonSnapshotAction?.Invoke()),
+                        removeJsonItem = new EditorMenuItem(EzEditorStrings.MENU_REMOVE_EZSKIN_JSON, MenuItemType.Standard, () => RemoveEzSkinJsonAction?.Invoke()),
+                        new OsuMenuItemSpacer(),
+                        importJsonItem = new EditorMenuItem(EzEditorStrings.MENU_IMPORT_JSON, MenuItemType.Standard, () => ImportJsonAction?.Invoke()),
+                        importFromSkinItem = new EditorMenuItem(EzEditorStrings.MENU_IMPORT_FROM_SKIN_JSON, MenuItemType.Standard, () => ImportFromSkinJsonAction?.Invoke()),
+                        exportJsonItem = new EditorMenuItem(EzEditorStrings.MENU_EXPORT_JSON, MenuItemType.Standard, () => ExportJsonAction?.Invoke()),
+                        new OsuMenuItemSpacer(),
+                        writeColoursItem = new EditorMenuItem(EzEditorStrings.MENU_WRITE_COLOURS_TO_SKIN_INI, MenuItemType.Standard, () => WriteColoursToSkinIniAction?.Invoke()),
+                        writeSizesItem = new EditorMenuItem(EzEditorStrings.MENU_WRITE_SIZES_TO_SKIN_INI, MenuItemType.Standard, () => WriteSizesToSkinIniAction?.Invoke()),
+                    },
+                },
+            };
+        }
+
+        [BackgroundDependencyLoader]
+        private void load(Ez2ConfigManager ezConfig)
+        {
+            hudSnapEnabled = ezConfig.GetBindable<bool>(Ez2Setting.SkinEditorHudSnapEnabled);
+            hudSnapDistance = ezConfig.GetBindable<float>(Ez2Setting.SkinEditorHudSnapDistance);
+            hudSnapPixelFlush = ezConfig.GetBindable<bool>(Ez2Setting.SkinEditorHudSnapPixelFlush);
+
+            Items = Items.Append(createEzSettingsMenu()).ToArray();
+        }
+
+        private MenuItem createEzSettingsMenu()
+        {
+            hudSnapDistanceMenuItem = new SkinHudSnapDistanceMenuItem(hudSnapDistance);
+            hudSnapPixelFlushMenuItem = new ToggleMenuItem(EzEditorStrings.MENU_HUD_SNAP_PIXEL_FLUSH)
+            {
+                State = { BindTarget = hudSnapPixelFlush },
+            };
+
+            hudSnapEnabled.BindValueChanged(enabled =>
+            {
+                bool on = enabled.NewValue;
+
+                hudSnapDistanceMenuItem?.Action.Disabled = !on;
+
+                hudSnapPixelFlushMenuItem?.Action.Disabled = !on;
+            }, true);
+
+            return new MenuItem(EzEditorStrings.MENU_EZ_SETTINGS)
+            {
+                Items = new MenuItem[]
+                {
+                    new ToggleMenuItem(EzEditorStrings.MENU_HUD_SNAP)
+                    {
+                        State = { BindTarget = hudSnapEnabled },
+                    },
+                    hudSnapDistanceMenuItem,
+                    hudSnapPixelFlushMenuItem,
+                },
+            };
+        }
+
+        public void RefreshMenuState()
+        {
+            undoItem.Action.Disabled = !(CanUndo?.Invoke() ?? false);
+            redoItem.Action.Disabled = !(CanRedo?.Invoke() ?? false);
+            cutItem.Action.Disabled = !(CanCut?.Invoke() ?? false);
+            copyItem.Action.Disabled = !(CanCopy?.Invoke() ?? false);
+            cloneItem.Action.Disabled = !(CanCopy?.Invoke() ?? false);
+            pasteItem.Action.Disabled = !(CanPaste?.Invoke() ?? false);
+            bool canUseConfigSnapshot = CanUseConfigSnapshot?.Invoke() ?? true;
+            createConfigSnapshotItem.Action.Disabled = !canUseConfigSnapshot;
+            restoreConfigSnapshotItem.Action.Disabled = !canUseConfigSnapshot;
+            exportPreviewImageItem.Action.Disabled = !(CanExportPreviewImage?.Invoke() ?? false);
+            createJsonItem.Action.Disabled = !(CanCreateEzSkinJson?.Invoke() ?? false);
+            updateSnapshotItem.Action.Disabled = !(CanUpdateEzSkinJsonSnapshot?.Invoke() ?? false);
+            removeJsonItem.Action.Disabled = !(CanRemoveEzSkinJson?.Invoke() ?? false);
+            importFromSkinItem.Action.Disabled = !(CanImportFromSkinJson?.Invoke() ?? false);
+            writeColoursItem.Action.Disabled = !(CanWriteColoursToSkinIni?.Invoke() ?? false);
+            writeSizesItem.Action.Disabled = !(CanWriteSizesToSkinIni?.Invoke() ?? false);
+            exportOskItem.Action.Disabled = !(CanExportOsk?.Invoke() ?? false);
+            importJsonItem.Action.Disabled = false;
+            exportJsonItem.Action.Disabled = false;
+        }
+    }
+}

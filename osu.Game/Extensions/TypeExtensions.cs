@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace osu.Game.Extensions
 {
-    internal static class TypeExtensions
+    public static class TypeExtensions
     {
         /// <summary>
         /// Returns <paramref name="type"/>'s <see cref="Type.AssemblyQualifiedName"/>
@@ -19,7 +19,7 @@ namespace osu.Game.Extensions
         /// Leaving only the type and assembly names in such a scenario allows to preserve compatibility
         /// across assembly versions.
         /// </remarks>
-        internal static string GetInvariantInstantiationInfo(this Type type)
+        public static string GetInvariantInstantiationInfo(this Type type)
         {
             string? assemblyQualifiedName = type.AssemblyQualifiedName;
             if (assemblyQualifiedName == null)

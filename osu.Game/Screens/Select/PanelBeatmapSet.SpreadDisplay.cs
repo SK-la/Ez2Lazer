@@ -58,7 +58,7 @@ namespace osu.Game.Screens.Select
             {
                 AutoSizeAxes = Axes.X;
                 Height = 14;
-                Content.CornerRadius = 5;
+                Content.CornerRadius = CORNER_RADIUS / 2;
             }
 
             [BackgroundDependencyLoader]

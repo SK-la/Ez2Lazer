@@ -6,9 +6,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using osu.Game.Beatmaps;
+using osu.Game.Extensions;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Storyboards.Drawables;
 using osu.Game.Utils;
+using osuTK;
 
 namespace osu.Game.Storyboards
 {
@@ -17,7 +19,7 @@ namespace osu.Game.Storyboards
         private readonly Dictionary<string, StoryboardLayer> layers = new Dictionary<string, StoryboardLayer>();
         public IEnumerable<StoryboardLayer> Layers => layers.Values;
 
-        public BeatmapInfo BeatmapInfo = new BeatmapInfo();
+        public BeatmapInfo BeatmapInfo { get; set; } = new BeatmapInfo();
         public IBeatmap Beatmap { get; set; } = new Beatmap();
 
         /// <summary>
@@ -52,6 +54,8 @@ namespace osu.Game.Storyboards
         public double? LatestEventTime => Layers.SelectMany(l => l.Elements)
                                                 .Where(e => e is not StoryboardVideo)
                                                 .MaxBy(e => e.GetEndTime())?.GetEndTime();
+
+        public StoryboardVideo? PrimaryVideo => GetLayer(@"Video").Elements.OfType<StoryboardVideo>().FirstOrDefault();
 
         /// <summary>
         /// Depth of the currently front-most storyboard layer, excluding the overlay layer.
@@ -96,6 +100,12 @@ namespace osu.Game.Storyboards
             }
         }
 
+        /// <summary>
+        /// Offset to be applied to the beatmap background.
+        /// TODO: Unused yet. See https://github.com/ppy/osu/issues/14238.
+        /// </summary>
+        public Vector2 BackgroundOffset { get; set; } = Vector2.Zero;
+
         public virtual DrawableStoryboard CreateDrawable(IReadOnlyList<Mod>? mods = null) =>
             new DrawableStoryboard(this, mods);
 
@@ -106,6 +116,19 @@ namespace osu.Game.Storyboards
             if (Path.HasExtension(path))
             {
                 resolvedPath = BeatmapInfo.BeatmapSet?.GetPathForFile(path);
+
+                // Nested set files may be registered as "folder/file.ext" while events use "file.ext".
+                if (resolvedPath == null && BeatmapInfo.BeatmapSet != null)
+                {
+                    string fileName = Path.GetFileName(path);
+
+                    if (!string.IsNullOrEmpty(fileName))
+                    {
+                        var match = BeatmapInfo.BeatmapSet.Files.FirstOrDefault(f =>
+                            string.Equals(Path.GetFileName(f.Filename), fileName, StringComparison.OrdinalIgnoreCase));
+                        resolvedPath = match?.File.GetStoragePath();
+                    }
+                }
             }
             else
             {

@@ -3,13 +3,14 @@
 
 using System;
 using osu.Framework.Bindables;
+using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
     // 代码改编自YuLiangSSS提供的ManiaModO2Judgement
-    public static partial class O2HitModeExtension
+    public static partial class O2JudgeModeExtension
     {
         // 💊数量（可绑定）
         // 上限为 5，在达到一定 Cool 连击后会增加，发生较大偏移时会减少。
@@ -34,6 +35,19 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         // 保存原始 BPM 值
         private static double originalBPM = 120.0;
         public static bool IsPlaying = true;
+
+        /// <summary>
+        /// 开局绑定谱面控制点与 BPM 基线；ManiaWindowBaker 在 O2Jam 开局对齐时会调用。
+        /// </summary>
+        public static void InitializeRuntime(IBeatmap beatmap, bool resetPillCount = true)
+        {
+            if (resetPillCount)
+                PILL_COUNT.Value = 0;
+
+            SetOriginalBPM(beatmap.BeatmapInfo.BPM);
+            SetControlPoints(beatmap.ControlPointInfo);
+            PillActivated = true;
+        }
 
         /// <summary>
         /// 设置当前谱面的控制点信息，用于动态 BPM 计算
@@ -92,6 +106,86 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         /// <returns>Bad 判定范围</returns>
         public static double GetBadRangeAtTime(double time) => BASE_BAD / GetBPMAtTime(time);
 
+        public static double SafeBpm(double bpm) => double.IsFinite(bpm) && bpm > 0 ? Math.Max(bpm, 75.0) : 75.0;
+
+        /// <summary>
+        /// Pill 逻辑：使用已算 BPM，避免 press 路径重复 <see cref="GetBPMAtTime"/>。
+        /// </summary>
+        public static bool PillCheckWithBpm(double timeOffset, double bpm, out bool applyComboBreak, out bool upgradeToPerfect)
+        {
+            applyComboBreak = false;
+            upgradeToPerfect = false;
+
+            if (!PillActivated)
+                return true;
+
+            double absOffset = Math.Abs(timeOffset);
+            GetRanges(SafeBpm(bpm), 1, out double coolRange, out double goodRange, out double badRange);
+
+            if (absOffset <= coolRange)
+            {
+                IncrementCoolCombo();
+            }
+            else if (absOffset <= goodRange)
+            {
+                CoolCombo = 0;
+            }
+            else if (absOffset <= badRange)
+            {
+                CoolCombo = 0;
+
+                if (PILL_COUNT.Value > 0)
+                {
+                    PILL_COUNT.Value = Math.Clamp(PILL_COUNT.Value - 1, 0, 5);
+                    upgradeToPerfect = true;
+                }
+                else
+                {
+                    applyComboBreak = true;
+                }
+            }
+
+            return true;
+        }
+
+        public static void GetRanges(double bpm, double totalMultiplier, out double cool, out double good, out double bad)
+        {
+            double safe = SafeBpm(bpm);
+            cool = BASE_COOL / safe * totalMultiplier;
+            good = BASE_GOOD / safe * totalMultiplier;
+            bad = BASE_BAD / safe * totalMultiplier;
+        }
+
+        /// O2Jam 判定：按 press-time BPM 计算，不 mutate 物件 HitWindows 可变状态。
+        public static HitResult ResultFor(double timeOffset, double bpm, double totalMultiplier = 1)
+        {
+            GetRanges(bpm, totalMultiplier, out double cool, out double good, out double bad);
+            double absOffset = Math.Abs(timeOffset);
+
+            if (absOffset <= cool)
+                return HitResult.Perfect;
+
+            if (absOffset <= good)
+                return HitResult.Good;
+
+            if (absOffset <= bad)
+                return HitResult.Meh;
+
+            return HitResult.None;
+        }
+
+        public static bool CanBeHit(double timeOffset, double bpm, double totalMultiplier = 1)
+        {
+            GetRanges(bpm, totalMultiplier, out _, out _, out double bad);
+            return Math.Abs(timeOffset) <= bad;
+        }
+
+        public static double MissWindow(double bpm, double totalMultiplier = 1)
+        {
+            GetRanges(bpm, totalMultiplier, out _, out _, out double bad);
+            return bad;
+        }
+
         /// <summary>
         /// 更新 CoolCombo 值，自动处理溢出逻辑
         /// </summary>
@@ -131,7 +225,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             double goodRange = GetGoodRangeAtTime(currentTime);
             double badRange = GetBadRangeAtTime(currentTime);
 
-            // Logger.Log("[O2HitModeExtension] Ranges at time " + currentTime + ": Cool=" + coolRange + ", Good=" + goodRange + ", Bad=" + badRange);
+            // Logger.Log("[O2JudgeModeExtension] Ranges at time " + currentTime + ": Cool=" + coolRange + ", Good=" + goodRange + ", Bad=" + badRange);
 
             if (absOffset <= coolRange)
             {

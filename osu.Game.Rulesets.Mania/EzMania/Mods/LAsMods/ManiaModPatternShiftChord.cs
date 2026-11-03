@@ -8,6 +8,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania.Mods.ModHelp;
 using osu.Game.Rulesets.Mania.Objects;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
@@ -227,7 +228,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
             // Filter out columns that already have a note at the snapped time (within TIME_TOLERANCE)
             var existingCols = ManiaKeyPatternHelp.GetColumnsAtTime(beatmap.HitObjects.ToList(), candidateTime, TIME_TOLERANCE);
-            columns.RemoveAll(c => existingCols.Contains(c));
+            columns.RemoveAll(existingCols.Contains);
 
             // 禁止产生 1/4 间隙的叠键：若同列在前后 1/4 内已有 note，则不在该列添加
             double quarter = beatLength / 4.0;

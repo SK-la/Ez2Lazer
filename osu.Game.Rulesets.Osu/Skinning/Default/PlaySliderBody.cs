@@ -40,9 +40,15 @@ namespace osu.Game.Rulesets.Osu.Skinning.Default
             AccentColourBindable.BindValueChanged(accent => AccentColour = GetBodyAccentColour(skin, accent.NewValue), true);
 
             config?.BindWith(OsuRulesetSetting.SnakingInSliders, SnakingIn);
-            config?.BindWith(OsuRulesetSetting.SnakingOutSliders, configSnakingOut);
 
-            SnakingOut.BindTo(configSnakingOut);
+            // 抑制该效果的 hitobject 保留自己的值而不跟随设置，因此不绑定会覆盖它的源。
+            bool suppressSnakingOut = (drawableObject.HitObject as Slider)?.SuppressSnakingOut == true;
+
+            if (!suppressSnakingOut)
+            {
+                config?.BindWith(OsuRulesetSetting.SnakingOutSliders, configSnakingOut);
+                SnakingOut.BindTo(configSnakingOut);
+            }
 
             BorderColour = GetBorderColour(skin);
         }

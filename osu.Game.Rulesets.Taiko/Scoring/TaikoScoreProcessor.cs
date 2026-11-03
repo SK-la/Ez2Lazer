@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using osu.Game.Rulesets.Difficulty.Utils;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.Taiko.Objects;
@@ -22,7 +23,7 @@ namespace osu.Game.Rulesets.Taiko.Scoring
         protected override double ComputeTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
             return 250000 * comboProgress
-                   + 750000 * Math.Pow(Accuracy.Value, 3.6) * accuracyProgress
+                   + 750000 * DiffUtils.Pow(Accuracy.Value, 3.6) * accuracyProgress
                    + bonusPortion;
         }
 
@@ -35,9 +36,9 @@ namespace osu.Game.Rulesets.Taiko.Scoring
                    * strongScaleValue(result);
         }
 
-        public override ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results)
+        public override ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results, bool useDefaultCutoffs = false)
         {
-            ScoreRank rank = base.RankFromScore(accuracy, results);
+            ScoreRank rank = base.RankFromScore(accuracy, results, useDefaultCutoffs);
 
             switch (rank)
             {

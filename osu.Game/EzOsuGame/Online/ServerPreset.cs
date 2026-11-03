@@ -27,15 +27,15 @@ namespace osu.Game.EzOsuGame.Online
         /// <summary>
         /// Gu 预设服务器
         /// </summary>
-        [LocalisableDescription(typeof(ServerPresetStrings), nameof(ServerPresetStrings.GU))]
-        Gu = 2,
+        [LocalisableDescription(typeof(ServerPresetStrings), nameof(ServerPresetStrings.g0v0))]
+        g0v0 = 2,
     }
 
     public static class ServerPresetStrings
     {
         public static readonly LocalisableString OFFICIAL = new EzLocalizationManager.EzLocalisableString("官方服务器", "Official Server");
         public static readonly LocalisableString MANUAL = new EzLocalizationManager.EzLocalisableString("手动输入", "Manual");
-        public static readonly LocalisableString GU = new EzLocalizationManager.EzLocalisableString("Gu 服务器", "Gu Server");
+        public static readonly LocalisableString g0v0 = new EzLocalizationManager.EzLocalisableString("g0v0 服务器", "g0v0 Server");
     }
 
     /// <summary>
@@ -88,7 +88,7 @@ namespace osu.Game.EzOsuGame.Online
                     apiUrl: "https://osu.ppy.sh",
                     websiteUrl: "https://osu.ppy.sh"
                 ),
-                ServerPreset.Gu => new ServerConfig(
+                ServerPreset.g0v0 => new ServerConfig(
                     apiUrl: "https://lazer-api.g0v0.top",
                     websiteUrl: "https://lazer.g0v0.top"
                 ),

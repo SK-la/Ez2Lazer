@@ -22,6 +22,11 @@ namespace osu.Game.Overlays.Settings
 
         protected abstract LocalisableString Header { get; }
 
+        /// <summary>
+        /// The user-facing title of this subsection, exposed so section navigation can reference it.
+        /// </summary>
+        public LocalisableString Title => Header;
+
         public virtual IEnumerable<LocalisableString> FilterTerms => new[] { Header };
 
         public bool MatchingFilter
@@ -39,7 +44,6 @@ namespace osu.Game.Overlays.Settings
 
             FlowContent = new FillFlowContainer
             {
-                Margin = new MarginPadding { Top = SettingsSection.ITEM_SPACING_V2 },
                 Direction = FillDirection.Vertical,
                 Spacing = new Vector2(0, SettingsSection.ITEM_SPACING_V2),
                 RelativeSizeAxes = Axes.X,
@@ -56,7 +60,14 @@ namespace osu.Game.Overlays.Settings
             AddRangeInternal(new[]
             {
                 CreateHeader(),
-                FlowContent
+                // Separate container to ensure margin remains even if FlowContent is hidden.
+                new Container
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Margin = new MarginPadding { Top = SettingsSection.ITEM_SPACING_V2 },
+                    Child = FlowContent
+                },
             });
         }
 
@@ -66,7 +77,7 @@ namespace osu.Game.Overlays.Settings
             {
                 Text = Header,
                 Font = OsuFont.GetFont(size: header_font_size),
-                Margin = new MarginPadding { Vertical = VERTICAL_PADDING },
+                Margin = new MarginPadding { Vertical = VERTICAL_PADDING, Horizontal = 5 },
                 Padding = SettingsPanel.CONTENT_PADDING,
             };
         }

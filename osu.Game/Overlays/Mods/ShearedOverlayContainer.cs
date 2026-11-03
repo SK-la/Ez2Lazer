@@ -8,6 +8,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Screens.Footer;
@@ -70,17 +72,33 @@ namespace osu.Game.Overlays.Mods
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(Ez2ConfigManager ezConfig)
         {
+            var materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
+
+            Box pageDim;
+            EzMaterialPanelBackground pageMaterial;
+
             Child = TopLevelContent = new Container
             {
                 RelativeSizeAxes = Axes.Both,
                 Children = new Drawable[]
                 {
-                    new Box
+                    new Container
                     {
                         RelativeSizeAxes = Axes.Both,
-                        Colour = ColourProvider.Background6.Opacity(0.75f),
+                        Children = new Drawable[]
+                        {
+                            pageMaterial = new EzMaterialPanelBackground(EzUIStyleV1.ModPageVeil)
+                            {
+                                MaterialCaptureVisible = true,
+                            },
+                            pageDim = new Box
+                            {
+                                RelativeSizeAxes = Axes.Both,
+                                Colour = ColourProvider.Background6.Opacity(0.75f),
+                            },
+                        }
                     },
                     Header = new ShearedOverlayHeader
                     {
@@ -100,6 +118,8 @@ namespace osu.Game.Overlays.Mods
                     },
                 }
             };
+
+            EzMaterialOverlayAlpha.BindExclusive(pageDim, pageMaterial, materialUiMode);
         }
 
         public VisibilityContainer? DisplayedFooterContent { get; private set; }

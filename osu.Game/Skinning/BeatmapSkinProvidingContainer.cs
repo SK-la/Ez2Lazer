@@ -1,11 +1,10 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Game.Audio;
-using osu.Game.Configuration;
+using osu.Game.Rulesets.Objects.Legacy;
 using osu.Game.Storyboards;
 
 namespace osu.Game.Skinning
@@ -15,60 +14,48 @@ namespace osu.Game.Skinning
     /// </summary>
     public partial class BeatmapSkinProvidingContainer : SkinProvidingContainer
     {
-        private Bindable<bool>? beatmapSkins;
-        private Bindable<bool>? beatmapColours;
-        private Bindable<bool>? beatmapHitsounds;
+        public BindableWithCurrent<bool> BeatmapSkins = new BindableWithCurrent<bool>(true);
+        public BindableWithCurrent<bool> BeatmapColours = new BindableWithCurrent<bool>(true);
+        public BindableWithCurrent<bool> BeatmapHitsounds = new BindableWithCurrent<bool>(true);
 
-        protected override bool AllowConfigurationLookup
+        protected override bool AllowConfigurationLookup => BeatmapSkins.Value;
+
+        protected override bool AllowColourLookup => BeatmapColours.Value;
+
+        protected override bool AllowDrawableLookup(ISkinComponentLookup lookup) => BeatmapSkins.Value;
+
+        protected override bool AllowTextureLookup(string componentName) => BeatmapSkins.Value;
+
+        protected override bool AllowSampleLookup(ISampleInfo sampleInfo) => sampleInfo is StoryboardSampleInfo || BeatmapHitsounds.Value;
+
+        /// <summary>
+        /// When set, beatmap-tied samples that miss on the beatmap skin will not fall back to parent skins.
+        /// Used for externally hosted sets where samples must resolve only from the content root.
+        /// </summary>
+        public bool DisallowBeatmapSampleParentFallback { get; set; }
+
+        protected override bool AllowParentSampleFallback(ISampleInfo sampleInfo)
+            => !DisallowBeatmapSampleParentFallback || !isBeatmapTiedSample(sampleInfo);
+
+        private static bool isBeatmapTiedSample(ISampleInfo sampleInfo)
         {
-            get
+            switch (sampleInfo)
             {
-                if (beatmapSkins == null)
-                    throw new InvalidOperationException($"{nameof(BeatmapSkinProvidingContainer)} needs to be loaded before being consumed.");
+                case HitSampleInfo hit when hit.UseBeatmapSamples:
+                    return true;
 
-                return beatmapSkins.Value;
+                case ConvertHitObjectParser.FileHitSampleInfo:
+                    return true;
+
+                default:
+                    return false;
             }
-        }
-
-        protected override bool AllowColourLookup
-        {
-            get
-            {
-                if (beatmapColours == null)
-                    throw new InvalidOperationException($"{nameof(BeatmapSkinProvidingContainer)} needs to be loaded before being consumed.");
-
-                return beatmapColours.Value;
-            }
-        }
-
-        protected override bool AllowDrawableLookup(ISkinComponentLookup lookup)
-        {
-            if (beatmapSkins == null)
-                throw new InvalidOperationException($"{nameof(BeatmapSkinProvidingContainer)} needs to be loaded before being consumed.");
-
-            return beatmapSkins.Value;
-        }
-
-        protected override bool AllowTextureLookup(string componentName)
-        {
-            if (beatmapSkins == null)
-                throw new InvalidOperationException($"{nameof(BeatmapSkinProvidingContainer)} needs to be loaded before being consumed.");
-
-            return beatmapSkins.Value;
-        }
-
-        protected override bool AllowSampleLookup(ISampleInfo sampleInfo)
-        {
-            if (beatmapSkins == null || beatmapHitsounds == null)
-                throw new InvalidOperationException($"{nameof(BeatmapSkinProvidingContainer)} needs to be loaded before being consumed.");
-
-            return sampleInfo is StoryboardSampleInfo || beatmapHitsounds.Value;
         }
 
         private readonly ISkin skin;
         private readonly ISkin? classicFallback;
 
-        private Bindable<Skin>? currentSkin;
+        private Bindable<Skin> currentSkin = null!;
 
         public BeatmapSkinProvidingContainer(ISkin skin, ISkin? classicFallback = null)
             : base(skin)
@@ -77,23 +64,12 @@ namespace osu.Game.Skinning
             this.classicFallback = classicFallback;
         }
 
-        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
-        {
-            var config = parent.Get<OsuConfigManager>();
-
-            beatmapSkins = config.GetBindable<bool>(OsuSetting.BeatmapSkins).GetBoundCopy();
-            beatmapColours = config.GetBindable<bool>(OsuSetting.BeatmapColours).GetBoundCopy();
-            beatmapHitsounds = config.GetBindable<bool>(OsuSetting.BeatmapHitsounds).GetBoundCopy();
-
-            return base.CreateChildDependencies(parent);
-        }
-
         [BackgroundDependencyLoader]
         private void load(SkinManager skins)
         {
-            beatmapSkins!.BindValueChanged(_ => TriggerSourceChanged());
-            beatmapColours!.BindValueChanged(_ => TriggerSourceChanged());
-            beatmapHitsounds!.BindValueChanged(_ => TriggerSourceChanged());
+            BeatmapSkins.BindValueChanged(_ => TriggerSourceChanged());
+            BeatmapColours.BindValueChanged(_ => TriggerSourceChanged());
+            BeatmapHitsounds.BindValueChanged(_ => TriggerSourceChanged());
 
             currentSkin = skins.CurrentSkin.GetBoundCopy();
             currentSkin.BindValueChanged(_ =>
@@ -116,16 +92,6 @@ namespace osu.Game.Skinning
                 else
                     SetSources(new[] { skin });
             }, true);
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            beatmapSkins?.UnbindAll();
-            beatmapColours?.UnbindAll();
-            beatmapHitsounds?.UnbindAll();
-            currentSkin?.UnbindAll();
-
-            base.Dispose(isDisposing);
         }
     }
 }

@@ -5,6 +5,8 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Primitives;
+using osu.Framework.Input.Events;
+using osu.Game.Rulesets.Edit.Tools;
 using osu.Game.Rulesets.Mania.Edit.Blueprints.Components;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
@@ -52,41 +54,12 @@ namespace osu.Game.Rulesets.Mania.Edit.Blueprints
                     RelativeSizeAxes = Axes.X,
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
-                    DragStarted = () => changeHandler?.BeginChange(),
-                    Dragging = pos =>
-                    {
-                        double endTimeBeforeDrag = HitObject.EndTime;
-                        double proposedStartTime = positionSnapProvider?.FindSnappedPositionAndTime(pos).Time ?? HitObjectContainer.TimeAtScreenSpacePosition(pos);
-                        double proposedEndTime = endTimeBeforeDrag;
-
-                        if (proposedStartTime >= proposedEndTime)
-                            return;
-
-                        HitObject.StartTime = proposedStartTime;
-                        HitObject.EndTime = proposedEndTime;
-                        editorBeatmap?.Update(HitObject);
-                    },
-                    DragEnded = () => changeHandler?.EndChange(),
                 },
                 tail = new EditHoldNoteEndPiece
                 {
                     RelativeSizeAxes = Axes.X,
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
-                    DragStarted = () => changeHandler?.BeginChange(),
-                    Dragging = pos =>
-                    {
-                        double proposedStartTime = HitObject.StartTime;
-                        double proposedEndTime = positionSnapProvider?.FindSnappedPositionAndTime(pos).Time ?? HitObjectContainer.TimeAtScreenSpacePosition(pos);
-
-                        if (proposedStartTime >= proposedEndTime)
-                            return;
-
-                        HitObject.StartTime = proposedStartTime;
-                        HitObject.EndTime = proposedEndTime;
-                        editorBeatmap?.Update(HitObject);
-                    },
-                    DragEnded = () => changeHandler?.EndChange(),
                 },
             };
         }
@@ -95,11 +68,13 @@ namespace osu.Game.Rulesets.Mania.Edit.Blueprints
         {
             base.Update();
 
-            head.Height = DrawableObject.Head.DrawHeight;
+            head.Height = EditHoldNoteEndPiece.GetInteractionHeight(DrawableObject.Head.DrawHeight);
             head.Y = HitObjectContainer.PositionAtTime(HitObject.Head.StartTime, HitObject.StartTime);
-            tail.Height = DrawableObject.Tail.DrawHeight;
+
+            float tailInteractionHeight = EditHoldNoteEndPiece.GetInteractionHeight(DrawableObject.Tail.DrawHeight);
+            tail.Height = tailInteractionHeight;
             tail.Y = HitObjectContainer.PositionAtTime(HitObject.Tail.StartTime, HitObject.StartTime);
-            Height = HitObjectContainer.LengthAtTime(HitObject.StartTime, HitObject.EndTime) + tail.DrawHeight;
+            Height = HitObjectContainer.LengthAtTime(HitObject.StartTime, HitObject.EndTime) + tailInteractionHeight;
         }
 
         protected override void OnDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
@@ -115,5 +90,88 @@ namespace osu.Game.Rulesets.Mania.Edit.Blueprints
         public override Quad SelectionQuad => ScreenSpaceDrawQuad;
 
         public override Vector2 ScreenSpaceSelectionPoint => head.ScreenSpaceDrawQuad.Centre;
+
+        public override bool ReceivePositionalInputAt(Vector2 screenSpacePos) =>
+            IsHandleAt(screenSpacePos) || base.ReceivePositionalInputAt(screenSpacePos);
+
+        internal bool IsHandleAt(Vector2 screenSpacePos) =>
+            head.ReceivePositionalInputAt(screenSpacePos) || tail.ReceivePositionalInputAt(screenSpacePos);
+
+        /// <summary>
+        /// Whether a press at <paramref name="screenSpacePos"/> should adjust an end of the hold rather than act on the note.
+        /// </summary>
+        /// <remarks>
+        /// Only an already selected hold takes its ends. Otherwise a press falls through to the blueprint container, which
+        /// selects the note — a short hold's end pieces cover its whole body, so claiming them unconditionally would make
+        /// such a hold unselectable. Ends are also left alone outside the select tool, where a drag means placement.
+        /// </remarks>
+        private bool isHandleGrabbableAt(Vector2 screenSpacePos) =>
+            IsSelected && positionSnapProvider?.BlueprintContainer.CurrentTool is SelectTool && IsHandleAt(screenSpacePos);
+
+        protected override bool OnMouseDown(MouseDownEvent e) =>
+            isHandleGrabbableAt(e.ScreenSpaceMouseDownPosition);
+
+        protected override bool OnDragStart(DragStartEvent e)
+        {
+            if (!isHandleGrabbableAt(e.ScreenSpaceMouseDownPosition))
+                return false;
+
+            changeHandler?.BeginChange();
+            return true;
+        }
+
+        protected override void OnDrag(DragEvent e) =>
+            applyHandleDrag(e.ScreenSpaceMousePosition, isHeadAt(e.ScreenSpaceMouseDownPosition));
+
+        protected override void OnDragEnd(DragEndEvent e)
+        {
+            if (IsHandleAt(e.ScreenSpaceMouseDownPosition))
+                changeHandler?.EndChange();
+
+            base.OnDragEnd(e);
+        }
+
+        private bool isHeadAt(Vector2 screenSpacePos)
+        {
+            bool onHead = head.ReceivePositionalInputAt(screenSpacePos);
+            bool onTail = tail.ReceivePositionalInputAt(screenSpacePos);
+
+            if (onHead && onTail)
+            {
+                float headDist = Vector2.DistanceSquared(screenSpacePos, head.ScreenSpaceDrawQuad.Centre);
+                float tailDist = Vector2.DistanceSquared(screenSpacePos, tail.ScreenSpaceDrawQuad.Centre);
+                return headDist <= tailDist;
+            }
+
+            return onHead;
+        }
+
+        private void applyHandleDrag(Vector2 screenSpacePosition, bool dragHead)
+        {
+            if (dragHead)
+            {
+                double endTimeBeforeDrag = HitObject.EndTime;
+                double proposedStartTime = positionSnapProvider?.FindSnappedPositionAndTime(screenSpacePosition).Time
+                                           ?? HitObjectContainer.TimeAtScreenSpacePosition(screenSpacePosition);
+
+                if (proposedStartTime >= endTimeBeforeDrag)
+                    return;
+
+                HitObject.StartTime = proposedStartTime;
+                HitObject.EndTime = endTimeBeforeDrag;
+            }
+            else
+            {
+                double proposedEndTime = positionSnapProvider?.FindSnappedPositionAndTime(screenSpacePosition).Time
+                                         ?? HitObjectContainer.TimeAtScreenSpacePosition(screenSpacePosition);
+
+                if (HitObject.StartTime >= proposedEndTime)
+                    return;
+
+                HitObject.EndTime = proposedEndTime;
+            }
+
+            editorBeatmap?.Update(HitObject);
+        }
     }
 }

@@ -1,6 +1,7 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Configuration;
@@ -9,6 +10,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Dialog;
@@ -22,10 +25,19 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
         private bool automaticRendererInUse;
 
         [BackgroundDependencyLoader]
-        private void load(FrameworkConfigManager config, OsuConfigManager osuConfig, IDialogOverlay? dialogOverlay, OsuGame? game, GameHost host)
+        private void load(FrameworkConfigManager config, OsuConfigManager osuConfig, IDialogOverlay? dialogOverlay, OsuGame? game, GameHost host, Ez2ConfigManager ezConfig)
         {
             var renderer = config.GetBindable<RendererType>(FrameworkSetting.Renderer);
             automaticRendererInUse = renderer.Value == RendererType.Automatic;
+
+            IEnumerable<RendererType> availableRenderers = host.GetPreferredRenderersForCurrentPlatform().Order();
+
+            // Vulkan renderers are pretty broken to the point it may result in a startup crash at worst.
+            // If a user isn't already using it let's hide it until we can fix.
+            if (renderer.Value != RendererType.Deferred_Vulkan)
+                availableRenderers = availableRenderers.Where(t => t != RendererType.Deferred_Vulkan);
+            if (renderer.Value != RendererType.Vulkan)
+                availableRenderers = availableRenderers.Where(t => t != RendererType.Vulkan);
 
             Children = new Drawable[]
             {
@@ -33,13 +45,26 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                 {
                     Caption = GraphicsSettingsStrings.Renderer,
                     Current = renderer,
-                    Items = host.GetPreferredRenderersForCurrentPlatform().Order()
-#pragma warning disable CS0612 // Type or member is obsolete
-                                .Where(t => t != RendererType.Vulkan && t != RendererType.OpenGLLegacy),
-#pragma warning restore CS0612 // Type or member is obsolete
+                    Items = availableRenderers,
                 })
                 {
                     Keywords = new[] { @"compatibility", @"directx" },
+                },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzSettingsStrings.FRAME_LIMITER_BASE,
+                    HintText = EzSettingsStrings.FRAME_LIMITER_BASE_TOOLTIP,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.FrameLimiterBase),
+                    KeyboardStep = 1,
+                }),
+                new SettingsItemV2(new FormEnumDropdown<FrameSync>
+                {
+                    Caption = EzSettingsStrings.UPDATE_FRAME_LIMITER,
+                    HintText = EzSettingsStrings.UPDATE_FRAME_LIMITER_TOOLTIP,
+                    Current = ezConfig.GetBindable<FrameSync>(Ez2Setting.UpdateFrameLimiter),
+                })
+                {
+                    Keywords = new[] { "fps", "framerate", "update", "frame", "limiter", "ez" }
                 },
                 // TODO: this needs to be a custom dropdown at some point
                 new SettingsItemV2(new FormEnumDropdown<FrameSync>

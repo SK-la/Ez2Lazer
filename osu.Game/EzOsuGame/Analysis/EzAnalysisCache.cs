@@ -10,8 +10,8 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Lists;
-using osu.Framework.Logging;
 using osu.Framework.Localisation;
+using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -25,29 +25,34 @@ using osu.Game.Screens.Select;
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
-    /// 选歌分析前台缓存。
+    /// 选歌 Ez 分析前台缓存；<see cref="Ez2Setting.EzAnalysisRecEnabled"/> 控制本 cache 是否对 SQLite 体系指标做即时计算。
     ///
-    /// 职责尽量对齐官方 BeatmapDifficultyCache：
-    /// - 自身负责当前 ruleset/mods 下的前台查询、bindable 跟踪与失效更新。
-    /// - SQLite 持久化结果仅作为默认 ruleset + 无 mod 时的基线读取来源。
-    /// - 不承担预热、补算、写库职责。
+    /// - L1 Realm 基线 xxy/PP：UI 直读 <see cref="BeatmapInfo"/>，不经本 cache；Panel PP 应对齐官方 <see cref="BeatmapDifficultyCache"/>。
+    /// - L2 主 SQLite（<see cref="Ez2Setting.EzAnalysisSqliteEnabled"/>）：NoMod kps/KPC 切片；只读，不含 xxy/PP。
+    /// - L3 本 cache（受 Rec 开关）：当前 ruleset/mods 下即时计算 <see cref="EzAnalysisResult"/>（kps、mod xxy 等）；Rec 关则仅 L2 预填/回退。
+    /// 分支库 xxy/PP 为预生成快照，由 <see cref="EzAnalysisDatabase"/> 读取；Rec 关时不为分支场景做选歌补算。
+    /// NoMod 语义对齐 <see cref="BeatmapDifficultyCache"/>：先 L2 预填，debounce 后 <see cref="EzAnalysisDatabase.BackfillStoredDataAsync"/>（Rec 开且缺失时补算主库）。
+    /// 不承担启动预热、Realm 回填或分支库构建。
     /// </summary>
     public partial class EzAnalysisCache : MemoryCachingComponent<EzAnalysisLookupCache, EzAnalysisResult?>
     {
         private static int computeFailCount;
 
-        private readonly EzAnalysisDatabase analysisDatabase;
-        private readonly IBindable<bool> runtimeAnalysisEnabled;
         private readonly ThreadedTaskScheduler updateScheduler = new ThreadedTaskScheduler(1, nameof(EzAnalysisCache));
         private readonly WeakList<BindableBeatmapEzAnalysis> trackedBindables = new WeakList<BindableBeatmapEzAnalysis>();
         private readonly List<CancellationTokenSource> linkedCancellationSources = new List<CancellationTokenSource>();
-        private readonly object bindableUpdateLock = new object();
+        private readonly Lock bindableUpdateLock = new Lock();
 
         private CancellationTokenSource trackedUpdateCancellationSource = new CancellationTokenSource();
         private ModSettingChangeTracker? modSettingChangeTracker;
         private ScheduledDelegate? debouncedModSettingsChange;
 
+        private readonly IBindable<bool> runtimeAnalysisEnabled = new Bindable<bool>();
+
         private const int mod_settings_debounce = SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE + 10;
+
+        [Resolved]
+        private EzAnalysisDatabase analysisDatabase { get; set; } = null!;
 
         [Resolved]
         private BeatmapManager beatmapManager { get; set; } = null!;
@@ -58,10 +63,10 @@ namespace osu.Game.EzOsuGame.Analysis
         [Resolved]
         private Bindable<IReadOnlyList<Mod>> currentMods { get; set; } = null!;
 
-        public EzAnalysisCache(EzAnalysisDatabase analysisDatabase, Ez2ConfigManager ezConfig)
+        [BackgroundDependencyLoader]
+        private void load(Ez2ConfigManager ezConfig)
         {
-            this.analysisDatabase = analysisDatabase;
-            runtimeAnalysisEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled);
+            runtimeAnalysisEnabled.BindTo(ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled));
         }
 
         protected override void LoadComplete()
@@ -127,8 +132,11 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             var bindable = new BindableBeatmapEzAnalysis(beatmapInfo, cancellationToken);
 
-            if (analysisDatabase.TryGetStoredAnalysis(beatmapInfo, beatmapInfo.Ruleset, out var storedAnalysis))
-                bindable.Value = storedAnalysis;
+            // NoMod：仅预填主 SQLite 的 kps/KPC 切片；xxy/PP 占位由面板直读 Realm（对齐 StarRating）。
+            if (currentMods.Value.Count == 0
+                && beatmapInfo is BeatmapInfo seedBeatmapInfo
+                && analysisDatabase.TryGetStoredSqliteSlice(seedBeatmapInfo, currentRuleset.Value, out var storedSlice))
+                bindable.Value = storedSlice;
 
             if (beatmapInfo is BeatmapInfo localBeatmapInfo)
                 updateBindable(bindable, localBeatmapInfo, currentRuleset.Value, currentMods.Value, cancellationToken, computationDelay);
@@ -139,20 +147,39 @@ namespace osu.Game.EzOsuGame.Analysis
             return bindable;
         }
 
+        internal int GetTrackedBindableCount()
+        {
+            lock (bindableUpdateLock)
+            {
+                int count = 0;
+
+                foreach (var _ in trackedBindables)
+                    count++;
+
+                return count;
+            }
+        }
+
         public virtual Task<EzAnalysisResult?> GetAnalysisAsync(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo = null, IEnumerable<Mod>? mods = null,
                                                                 CancellationToken cancellationToken = default, int computationDelay = 0)
         {
             rulesetInfo ??= beatmapInfo.Ruleset;
 
             var localBeatmapInfo = beatmapInfo as BeatmapInfo;
+            var localRulesetInfo = (rulesetInfo as RulesetInfo) ?? localBeatmapInfo?.Ruleset;
 
-            if (runtimeAnalysisEnabled.Value && localBeatmapInfo != null && rulesetInfo is RulesetInfo localRulesetInfo)
+            if (runtimeAnalysisEnabled.Value && localBeatmapInfo != null && localRulesetInfo != null)
+            {
+                if (!analysisDatabase.IsSqliteAnalysisEnabled)
+                    return GetDynamicAnalysisAsync(localBeatmapInfo, localRulesetInfo, mods, cancellationToken, computationDelay);
+
                 return getDynamicWithStoredFallbackAsync(localBeatmapInfo, localRulesetInfo);
+            }
 
             if (localBeatmapInfo != null
                 && EzAnalysisDatabase.CanUseStoredAnalysis(localBeatmapInfo, rulesetInfo, mods)
-                && analysisDatabase.TryGetStoredAnalysis(beatmapInfo, rulesetInfo, out var storedAnalysis))
-                return Task.FromResult<EzAnalysisResult?>(storedAnalysis);
+                && analysisDatabase.TryGetStoredSqliteSlice(beatmapInfo, rulesetInfo, out var storedSlice))
+                return Task.FromResult<EzAnalysisResult?>(storedSlice);
 
             return Task.FromResult<EzAnalysisResult?>(null);
 
@@ -163,9 +190,10 @@ namespace osu.Game.EzOsuGame.Analysis
                 if (dynamicAnalysis != null)
                     return dynamicAnalysis;
 
-                if (EzAnalysisDatabase.CanUseStoredAnalysis(dynamicBeatmapInfo, dynamicRulesetInfo, mods)
-                    && analysisDatabase.TryGetStoredAnalysis(dynamicBeatmapInfo, dynamicRulesetInfo, out var fallbackStoredAnalysis))
-                    return fallbackStoredAnalysis;
+                if (analysisDatabase.IsSqliteAnalysisEnabled
+                    && EzAnalysisDatabase.CanUseStoredAnalysis(dynamicBeatmapInfo, dynamicRulesetInfo, mods)
+                    && analysisDatabase.TryGetStoredSqliteSlice(dynamicBeatmapInfo, dynamicRulesetInfo, out var fallbackStoredSlice))
+                    return fallbackStoredSlice;
 
                 return null;
             }
@@ -189,8 +217,8 @@ namespace osu.Game.EzOsuGame.Analysis
         public IReadOnlyDictionary<Guid, double> GetActiveSongsBranchPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
             => analysisDatabase.GetActiveSongsBranchPpValues(beatmaps, rulesetInfo, mods);
 
-        public IReadOnlyDictionary<Guid, double> GetStoredXxySrValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
-            => analysisDatabase.GetStoredXxySrValues(beatmaps, rulesetInfo, mods);
+        public IReadOnlyDictionary<Guid, double> GetBaselineXxySrFromRealm(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
+            => analysisDatabase.GetBaselineXxySrFromRealm(beatmaps, rulesetInfo, mods);
 
         public IReadOnlyDictionary<Guid, double> GetStoredPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
             => analysisDatabase.GetStoredPpValues(beatmaps, rulesetInfo, mods);
@@ -217,8 +245,8 @@ namespace osu.Game.EzOsuGame.Analysis
         //     => analysisDatabase.TryToggleSongsBranchHidden(databasePath, out message, out nonHideableBeatmapSets);
 
         public bool TryToggleCollectionHidden(Guid collectionId, string collectionName, IEnumerable<string> beatmapMd5Hashes, out LocalisableString message,
-                                              out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
-            => analysisDatabase.TryToggleCollectionHidden(collectionId, collectionName, beatmapMd5Hashes, out message, out nonHideableBeatmapSets);
+                                              out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets, long lastModifiedUnixMilliseconds = 0)
+            => analysisDatabase.TryToggleCollectionHidden(collectionId, collectionName, beatmapMd5Hashes, out message, out nonHideableBeatmapSets, lastModifiedUnixMilliseconds);
 
         public IReadOnlySet<Guid> GetHiddenCollectionIds()
             => analysisDatabase.GetHiddenCollectionIds();
@@ -248,9 +276,6 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private void updateTrackedBindables()
         {
-            if (!runtimeAnalysisEnabled.Value)
-                return;
-
             lock (bindableUpdateLock)
             {
                 cancelTrackedBindableUpdate();
@@ -307,6 +332,17 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             try
             {
+                if (analysisDatabase.IsSqliteAnalysisEnabled
+                    && EzAnalysisDatabase.CanUseStoredAnalysis(lookup.BeatmapInfo, lookup.Ruleset, lookup.OrderedMods))
+                {
+                    var backfillResult = analysisDatabase.BackfillStoredDataAsync(lookup.BeatmapInfo, skipExistingComparison: false, cancellationToken)
+                                                         .GetAwaiter()
+                                                         .GetResult();
+
+                    if (backfillResult != null)
+                        return backfillResult;
+                }
+
                 return EzAnalysisComputation.Compute(beatmapManager, lookup, cancellationToken);
             }
             catch (OperationCanceledException)

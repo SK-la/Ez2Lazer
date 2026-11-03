@@ -4,3 +4,27 @@ profile:
   name: qodana.recommended
 include:
   - name: CheckDependencyLicenses
+exclude:
+  - name: CppClangTidyClangDiagnosticShadow
+  - name: CppClangTidyClangDiagnosticUnusedMacros
+  - name: EditorConfigDeprecatedDescriptor
+  - name: EditorConfigNoMatchingFiles
+  - name: EditorConfigKeyCorrectness
+  - name: DuplicateSectionInFile
+  - name: All
+    paths:
+      - ..\ez2lazer-resources\
+      - osu.sln.DotSettings
+      - *.xml
+      - *.ini
+  - name: UnusedMember.Global
+  - name: LocalizableElement
+  - name: EditorConfigPartialOverride
+  - name: JsonStandardCompliance
+  - name: HeapView.BoxingAllocation
+  - name: HeapView.ClosureAllocation
+  - name: HeapView.CanAvoidClosure
+  - name: HeapView.DelegateAllocation
+  - name: HeapView.ObjectAllocation.Evident
+  - name: HeapView.ObjectAllocation
+  - name: HeapView.PossibleBoxingAllocation

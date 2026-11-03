@@ -12,6 +12,7 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.Extensions;
 using osu.Game.IO;
+using osu.Game.EzOsuGame.HUD;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Play.HUD.JudgementCounter;
 using osu.Game.Skinning.Components;
@@ -83,7 +84,7 @@ namespace osu.Game.Skinning
                                 var score = container.OfType<ArgonScoreCounter>().FirstOrDefault();
                                 var accuracy = container.OfType<ArgonAccuracyCounter>().FirstOrDefault();
                                 var performancePoints = container.OfType<ArgonPerformancePointsCounter>().FirstOrDefault();
-                                var songProgress = container.OfType<ArgonSongProgress>().FirstOrDefault();
+                                var songProgress = container.OfType<SongProgress>().FirstOrDefault();
 
                                 const float x_offset = 20;
 
@@ -185,7 +186,7 @@ namespace osu.Game.Skinning
                                     {
                                         WireframeOpacity = { Value = 0 },
                                     },
-                                    new ArgonSongProgress(),
+                                    new EzArgonSongProgress(),
                                     new JudgementCounterDisplay
                                     {
                                         FillMode = FillMode.Fill,

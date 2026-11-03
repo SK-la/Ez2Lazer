@@ -1,20 +1,70 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Project">
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <OutputType>WinExe</OutputType>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Description>A free-to-win rhythm game. Rhythm is just a *click* away!</Description>
+    <Description>Ez2Lazer, a fork of osu!lazer.</Description>
     <AssemblyName>Ez2osu!</AssemblyName>
-    <AssemblyTitle>osu!(Ez2lazer)</AssemblyTitle>
-    <Title>Ez2lazer!</Title>
-    <Product>osu!(Ez2lazer)</Product>
+    <AssemblyTitle>Ez2Lazer</AssemblyTitle>
+    <Title>Ez2Lazer</Title>
+    <Product>Ez2Lazer</Product>
     <ApplicationIcon>lazer.ico</ApplicationIcon>
     <Version>0.0.0</Version>
     <FileVersion>0.0.0</FileVersion>
+    <!-- 启动期有大量 drawable/纹理分配（选歌预加载 + 设置预加载），workstation GC 会让 gen0/gen1
+         回收直接暂停主线程，表现为启动后数秒卡顿。Server GC 用后台回收降低暂停。 -->
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
   </PropertyGroup>
+
+  <!-- Required for deployment. -->
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <StartupHookSupport>false</StartupHookSupport>
+    <CETCompat>false</CETCompat>
+  </PropertyGroup>
+
+  <!-- Windows x64 Release 走 ReadyToRun：把首启的方法 JIT 编译量换到发布期。
+       不开 composite（它要求 self-contained，会让 zip 与 Velopack 差分体积翻倍）。 -->
+  <PropertyGroup Condition="'$(Configuration)'=='Release' and $([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('win'))">
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishReadyToRunUseCrossgen2>true</PublishReadyToRunUseCrossgen2>
+    <PublishReadyToRunShowWarnings>true</PublishReadyToRunShowWarnings>
+  </PropertyGroup>
+
+  <!-- R2R 白名单。填一个程序集名（不含扩展名）= 只 ReadyToRun 这一个；留空 = 全部。
+       默认只 R2R osu.Framework：冷启中位 8719 → 8031ms，发布体积 360.8 → 364.7MB。
+       改成全部能再省约 265ms（→7766ms），但 osu.Game 一改差分包就多传 ~19MB，
+       且会连带 crossgen 全部第三方依赖，净得 +79.7MB。权衡见 artifacts/startup-results/。 -->
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <EzReadyToRunOnly>osu.Framework</EzReadyToRunOnly>
+  </PropertyGroup>
+
+  <!-- 只收窄送进 crossgen 的程序集列表。必须用 SDK 的 PublishReadyToRunExclude：
+       crossgen 是在 _PrepareForReadyToRunCompilation 内部调用的，AfterTargets 挂上去已经太晚。
+       挂在 _ComputeAssembliesToPostprocessOnPublish 之后，此时待后处理程序集名单刚算出来。 -->
+  <Target Name="EzNarrowReadyToRunSet"
+          AfterTargets="_ComputeAssembliesToPostprocessOnPublish"
+          BeforeTargets="_PrepareForReadyToRunCompilation"
+          Condition="'$(PublishReadyToRun)' == 'true' and '$(EzReadyToRunOnly)' != ''">
+    <ItemGroup>
+      <_EzReadyToRunExclude Include="@(_AssemblyToPostprocessOnPublish)"
+                            Condition="'%(Filename)' != '$(EzReadyToRunOnly)'" />
+      <PublishReadyToRunExclude Include="@(_EzReadyToRunExclude->'%(Filename).dll')" />
+    </ItemGroup>
+  </Target>
+
   <PropertyGroup>
     <StartupObject>osu.Desktop.Program</StartupObject>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(OfficialEz2Build)' == 'true'">
+    <Version>$(ReleaseVersion)</Version>
+    <FileVersion>$(ReleaseVersion)</FileVersion>
+    <AssemblyVersion>$(ReleaseVersion)</AssemblyVersion>
+    <InformationalVersion>$(ReleaseVersion)-ez2lazer</InformationalVersion>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(OfficialEz2Build)' == 'true'">
+    <AssemblyAttribute Include="osu.Game.Utils.OfficialBuildAttribute" />
+  </ItemGroup>
   <ItemGroup Label="Project References">
     <ProjectReference Include="..\osu.Game.Tournament\osu.Game.Tournament.csproj" />
     <ProjectReference Include="..\osu.Game\osu.Game.csproj" />
@@ -23,10 +73,16 @@
     <ProjectReference Include="..\osu.Game.Rulesets.Mania\osu.Game.Rulesets.Mania.csproj" />
     <ProjectReference Include="..\osu.Game.Rulesets.Taiko\osu.Game.Rulesets.Taiko.csproj" />
   </ItemGroup>
+  <!-- BMS Ruleset only loads in Debug configuration -->
+<!--  <ItemGroup Label="Debug-Only References" Condition="'$(Configuration)' == 'Debug'">-->
+  <ItemGroup>
+    <ProjectReference Include="..\osu.Game.Rulesets.BMS\osu.Game.Rulesets.BMS.csproj" />
+  </ItemGroup>
   <ItemGroup Label="Package References">
-    <PackageReference Include="System.IO.Packaging" Version="10.0.5" />
-    <PackageReference Include="DiscordRichPresence" Version="1.6.1.70" />
-    <PackageReference Include="Velopack" Version="0.0.1298" />
+    <PackageReference Include="System.IO.Packaging" Version="10.0.12" />
+    <!-- Held back due to invite bug in newer versions. See https://github.com/Lachee/discord-rpc-csharp/issues/286 -->
+    <PackageReference Include="DiscordRichPresence" Version="1.5.0.51" />
+    <PackageReference Include="Velopack" Version="1.2.158" />
   </ItemGroup>
   <ItemGroup Label="Resources">
     <EmbeddedResource Include="lazer.ico" />
@@ -38,4 +94,32 @@
   <ItemGroup Label="Windows Icons">
     <Content Include="*.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <!-- 摄像头后端不是 Desktop 的 ProjectReference，dotnet publish 不会还原它。 -->
+  <Target Name="RestoreEzCameraBackend" BeforeTargets="Build" Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <MSBuild Projects="$(MSBuildThisFileDirectory)..\osu.Game.EzCamera.Windows\osu.Game.EzCamera.Windows.csproj" Targets="Restore" Properties="Configuration=$(Configuration)" />
+  </Target>
+  <Target Name="StageEzCameraBackend" AfterTargets="Build" DependsOnTargets="RestoreEzCameraBackend" Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <MSBuild Projects="$(MSBuildThisFileDirectory)..\osu.Game.EzCamera.Windows\osu.Game.EzCamera.Windows.csproj" Targets="Build" Properties="Configuration=$(Configuration)" />
+    <MSBuild Projects="$(MSBuildThisFileDirectory)..\osu.Game.EzCamera.Windows\osu.Game.EzCamera.Windows.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_EzCameraDll" />
+    </MSBuild>
+    <ItemGroup>
+      <_EzCameraCopy Include="@(_EzCameraDll)" />
+      <_EzCameraCopy Include="@(_EzCameraDll->'%(RootDir)%(Directory)Microsoft.Windows.SDK.NET.dll')" />
+      <_EzCameraCopy Include="@(_EzCameraDll->'%(RootDir)%(Directory)WinRT.Runtime.dll')" />
+      <_EzCameraCopy Remove="@(_EzCameraCopy)" Condition="!Exists('%(Identity)')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_EzCameraCopy)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="PublishEzCameraBackend" AfterTargets="ComputeFilesToPublish" Condition="$([MSBuild]::IsOSPlatform('Windows'))" DependsOnTargets="StageEzCameraBackend">
+    <ItemGroup>
+      <_EzCameraPublish Include="$(OutputPath)osu.Game.EzCamera.Windows.dll" />
+      <_EzCameraPublish Include="$(OutputPath)Microsoft.Windows.SDK.NET.dll" Condition="Exists('$(OutputPath)Microsoft.Windows.SDK.NET.dll')" />
+      <_EzCameraPublish Include="$(OutputPath)WinRT.Runtime.dll" Condition="Exists('$(OutputPath)WinRT.Runtime.dll')" />
+      <ResolvedFileToPublish Include="@(_EzCameraPublish)">
+        <RelativePath>%(Filename)%(Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 </Project>

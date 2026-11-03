@@ -7,13 +7,11 @@ using System;
 using System.Linq;
 using JetBrains.Annotations;
 using osu.Framework.Audio;
-using osu.Framework.Audio.EzLatency;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Audio;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Logging;
 using osu.Game.Audio;
 
 namespace osu.Game.Skinning
@@ -127,17 +125,6 @@ namespace osu.Game.Skinning
             activeChannel.Looping = Looping;
             activeChannel.Play();
 
-            // Framework-level latency instrumentation: best-effort playback event routing.
-            try
-            {
-                if (EzLatencyManager.GLOBAL.Enabled.Value)
-                    EzLatencyManager.GLOBAL.RecordPlaybackEvent();
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"PoolableSkinnableSample: failed to record playback event: {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
-            }
-
             Played = true;
         }
 
@@ -169,8 +156,7 @@ namespace osu.Game.Skinning
             {
                 looping = value;
 
-                if (activeChannel != null)
-                    activeChannel.Looping = value;
+                activeChannel?.Looping = value;
             }
         }
 

@@ -10,27 +10,31 @@ namespace osu.Game.Storyboards
 {
     public class StoryboardSampleInfo : IStoryboardElement, ISampleInfo
     {
+        public StoryboardElementSource Source { get; }
         public string Path { get; }
         public bool IsDrawable => true;
 
         public double StartTime { get; }
 
-        public int Volume { get; }
+        public virtual int Volume { get; }
 
-        public IEnumerable<string> LookupNames => new[]
+        public virtual bool IsHitsound => false;
+
+        public virtual IEnumerable<string> LookupNames => new[]
         {
             // Try first with the full name, then attempt with no path
             Path,
             System.IO.Path.ChangeExtension(Path, null),
         };
 
-        public StoryboardSampleInfo(string path, double time, int volume)
+        public StoryboardSampleInfo(StoryboardElementSource source, string path, double time, int volume)
         {
+            Source = source;
             Path = path;
             StartTime = time;
             Volume = volume;
         }
 
-        public Drawable CreateDrawable() => new DrawableStoryboardSample(this);
+        public virtual Drawable CreateDrawable() => new DrawableStoryboardSample(this);
     }
 }

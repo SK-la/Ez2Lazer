@@ -30,11 +30,11 @@ namespace osu.Game.Skinning
             {
                 serialisableDrawable.UsesFixedAnchor = drawableInfo.UsesFixedAnchor;
 
-                foreach (var (_, property) in component.GetSettingsSourceProperties())
+                foreach (var entry in component.GetSkinSettingEntries())
                 {
-                    var bindable = ((IBindable)property.GetValue(component)!);
+                    var bindable = ((IBindable)entry.Property.GetValue(entry.Target)!);
 
-                    if (!drawableInfo.Settings.TryGetValue(property.Name.ToSnakeCase(), out object? settingValue))
+                    if (!drawableInfo.Settings.TryGetValue(entry.StorageName.ToSnakeCase(), out object? settingValue))
                     {
                         // TODO: We probably want to restore default if not included in serialisation information.
                         // This is not simple to do as SetDefault() is only found in the typed Bindable<T> interface right now.

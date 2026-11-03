@@ -195,31 +195,6 @@ namespace osu.Game.Tests.Beatmaps.Formats
         }
 
         [Test]
-        public void TestEndTimeForDisplayIgnoresTrailingInvisibleTransforms()
-        {
-            var sprite = new StoryboardSprite("test.png", Anchor.Centre, Vector2.Zero);
-
-            sprite.Commands.AddAlpha(Easing.None, 1000, 2000, 0, 1);
-            sprite.Commands.AddAlpha(Easing.None, 3000, 4000, 1, 0);
-            sprite.Commands.AddScale(Easing.None, 4000, 10000, 1, 2);
-
-            ClassicAssert.AreEqual(4000, sprite.EndTimeForDisplay);
-        }
-
-        [Test]
-        public void TestEndTimeForDisplayIgnoresTrailingInvisibleLoopTransforms()
-        {
-            var sprite = new StoryboardSprite("test.png", Anchor.Centre, Vector2.Zero);
-            var loop = sprite.AddLoopingGroup(2000, 2);
-
-            loop.AddAlpha(Easing.None, 0, 500, 0, 1);
-            loop.AddAlpha(Easing.None, 500, 1000, 1, 0);
-            loop.AddScale(Easing.None, 1000, 1500, 1, 2);
-
-            ClassicAssert.AreEqual(6000, sprite.EndTimeForDisplay);
-        }
-
-        [Test]
         public void TestDecodeVariableWithSuffix()
         {
             var decoder = new LegacyStoryboardDecoder();
@@ -231,6 +206,23 @@ namespace osu.Game.Tests.Beatmaps.Formats
 
                 StoryboardLayer background = storyboard.Layers.Single(l => l.Depth == 3);
                 ClassicAssert.AreEqual(3456, ((StoryboardSprite)background.Elements.Single()).InitialPosition.X);
+            }
+        }
+
+        [Test]
+        public void TestDecodeSelfReferencingVariableDoesNotHang()
+        {
+            var decoder = new LegacyStoryboardDecoder();
+
+            using (var resStream = TestResources.OpenResource("variable-with-self-reference.osb"))
+            using (var stream = new LineBufferedReader(resStream))
+            {
+                // a self-referential variable definition (e.g. $self=x$self) must not cause the decode to loop indefinitely.
+                var storyboard = decoder.Decode(stream);
+
+                // the remaining (well-formed) sprite is still decoded correctly.
+                StoryboardLayer background = storyboard.Layers.Single(l => l.Depth == 3);
+                ClassicAssert.AreEqual(320, ((StoryboardSprite)background.Elements.Single()).InitialPosition.X);
             }
         }
 

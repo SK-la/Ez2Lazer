@@ -28,7 +28,12 @@ using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Scoring.Bonus;
 using osu.Game.Scoring;
 using osu.Game.Utils;
 using osuTK;
@@ -78,7 +83,7 @@ namespace osu.Game.Screens.Select
 
             public void SetContent(ScoreInfo content)
             {
-                if (lastContent != null && lastContent.Equals(content))
+                if (lastContent != null && lastContent.Equals(content) && lastContent.TotalScore == content.TotalScore)
                     return;
 
                 dateAndStatistics.Score = content;
@@ -120,19 +125,37 @@ namespace osu.Game.Screens.Select
                         var judgementsStatistics = value.GetStatisticsForDisplay().Select(s =>
                             new StatisticRow(s.DisplayName.ToUpper(), s.Count.ToLocalisableString("N0"), colours.ForHitResult(s.Result)));
 
-                        double multiplier = 1.0;
+                        var ruleset = value.Ruleset.CreateInstance();
+                        var scoreMultiplierCalculator = ruleset.CreateScoreMultiplierCalculator(new ScoreMultiplierContext(score.BeatmapInfo!.Difficulty));
+                        double multiplier = scoreMultiplierCalculator.CalculateFor(value.Mods);
 
-                        foreach (var mod in value.Mods)
-                            multiplier *= mod.ScoreMultiplier;
-
-                        var generalStatistics = new[]
+                        var generalStatistics = new List<Drawable>
                         {
                             new StatisticRow(BeatmapsetsStrings.ShowScoreboardHeadersCombo, value.MaxCombo.ToLocalisableString(@"0\x")),
                             new StatisticRow(BeatmapsetsStrings.ShowScoreboardHeadersAccuracy, value.Accuracy.FormatAccuracy()),
                             new PerformanceStatisticRow(BeatmapsetsStrings.ShowScoreboardHeaderspp.ToUpper(), score),
-                            Empty().With(d => d.Height = 20),
-                            new StatisticRow(ModSelectOverlayStrings.ScoreMultiplier, ModUtils.FormatScoreMultiplier(multiplier)),
                         };
+
+                        if (value.TryGetManiaGameplayModes(out int judgeMode, out int healthMode))
+                        {
+                            // Lazer 是默认档，不展示；仅画非默认的档位。
+                            if (judgeMode != (int)EzEnumJudgeMode.Lazer || healthMode != (int)EzEnumHealthMode.Lazer)
+                                generalStatistics.Add(Empty().With(d => d.Height = 10));
+
+                            if (judgeMode != (int)EzEnumJudgeMode.Lazer)
+                                generalStatistics.Add(new StatisticRow("HIT", EzScoreInfoExtensions.GetJudgeModeDisplayName(judgeMode)));
+
+                            if (healthMode != (int)EzEnumHealthMode.Lazer)
+                                generalStatistics.Add(new StatisticRow("HP", EzScoreInfoExtensions.GetHealthModeDisplayName(healthMode)));
+                        }
+                        else if (value.TryGetStdGameplayMode(out int stdMode) && stdMode != (int)EzEnumJudgeMode.Lazer)
+                        {
+                            generalStatistics.Add(Empty().With(d => d.Height = 10));
+                            generalStatistics.Add(new StatisticRow("JUDGE", EzScoreInfoExtensions.GetJudgeModeDisplayName(stdMode)));
+                        }
+
+                        generalStatistics.Add(Empty().With(d => d.Height = 20));
+                        generalStatistics.Add(new StatisticRow(ModSelectOverlayStrings.ScoreMultiplier, ModUtils.FormatScoreMultiplier(multiplier)));
 
                         statistics.ChildrenEnumerable = judgementsStatistics
                                                         .Append(Empty().With(d => d.Height = 20))
@@ -396,6 +419,7 @@ namespace osu.Game.Screens.Select
                 private Box rankBackground = null!;
                 private Container<DrawableRank> rankContainer = null!;
                 private OsuSpriteText totalScore = null!;
+                private BonusLines bonusLines = null!;
 
                 [Resolved]
                 private ScoreManager scoreManager { get; set; } = null!;
@@ -409,6 +433,7 @@ namespace osu.Game.Screens.Select
                             OsuColour.ForRank(value.Rank).Opacity(0.5f));
                         rankContainer.Child = new DrawableRank(value.Rank);
                         totalScore.Current = scoreManager.GetBindableTotalScoreString(value);
+                        bonusLines.SetScore(value);
                     }
                 }
 
@@ -445,16 +470,133 @@ namespace osu.Game.Screens.Select
                             Size = new Vector2(25f, 14f),
                             Margin = new MarginPadding { Bottom = 5f },
                         },
+                        bonusLines = new BonusLines
+                        {
+                            Anchor = Anchor.BottomCentre,
+                            Origin = Anchor.BottomCentre,
+                            Margin = new MarginPadding { Bottom = 22f },
+                        },
                         totalScore = new OsuSpriteText
                         {
                             Anchor = Anchor.BottomCentre,
                             Origin = Anchor.BottomCentre,
-                            Margin = new MarginPadding { Bottom = 25f, Top = 10f + spacing },
+                            Margin = new MarginPadding { Bottom = 52f, Top = 10f + spacing },
                             Font = OsuFont.Style.Subtitle.With(weight: FontWeight.Light, fixedWidth: true),
                             Spacing = new Vector2(-1.5f),
                             UseFullGlyphHeight = false,
                         },
                     };
+
+                    bonusLines.VisibilityChanged = shown =>
+                    {
+                        totalScore.Margin = new MarginPadding { Bottom = shown ? 52f : 25f, Top = 10f + spacing };
+                    };
+                }
+            }
+
+            /// <summary>
+            /// 悬停卡片里、分数和评价之间的两项：判定加成、失误罚分。
+            /// </summary>
+            private partial class BonusLines : CompositeDrawable
+            {
+                private OsuSpriteText judgeText = null!;
+                private OsuSpriteText missText = null!;
+                private EzScoreBonusTracker? tracker;
+
+                [Resolved]
+                private OsuColour colours { get; set; } = null!;
+
+                public BonusLines()
+                {
+                    RelativeSizeAxes = Axes.X;
+                    AutoSizeAxes = Axes.Y;
+                }
+
+                [BackgroundDependencyLoader]
+                private void load()
+                {
+                    InternalChild = new FillFlowContainer
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                        Direction = FillDirection.Vertical,
+                        Spacing = new Vector2(0f, 2f),
+                        Padding = new MarginPadding { Horizontal = 10f },
+                        Children = new[]
+                        {
+                            createLine(EzSongSelectStrings.SCORE_BONUS_JUDGE, colours.Pink1, out judgeText),
+                            createLine(EzSongSelectStrings.SCORE_BONUS_ERROR, colours.Red1, out missText),
+                        },
+                    };
+                }
+
+                protected override void LoadComplete()
+                {
+                    base.LoadComplete();
+                    updateText();
+                }
+
+                public Action<bool>? VisibilityChanged { get; set; }
+
+                public void SetScore(ScoreInfo score)
+                {
+                    tracker?.Expire();
+                    AddInternal(tracker = new EzScoreBonusTracker(score));
+                    tracker.Tendency.BindValueChanged(_ => updateText());
+                    tracker.Current.BindValueChanged(_ => updateText(), true);
+                    tracker.State.BindValueChanged(_ => updateText(), true);
+                }
+
+                private void updateText()
+                {
+                    if (judgeText == null)
+                        return;
+
+                    bool shown = tracker?.Shown != false;
+                    Alpha = shown ? 1 : 0;
+                    Margin = new MarginPadding { Bottom = shown ? 22f : 0f };
+                    VisibilityChanged?.Invoke(shown);
+
+                    if (!shown)
+                        return;
+
+                    if (tracker?.Current.Value is not EzScoreBonusResult bonus)
+                    {
+                        string placeholder = tracker?.State.Value == EzScoreBonusState.Pending ? "\u2026" : "\u2014";
+                        judgeText.Text = missText.Text = placeholder;
+                        return;
+                    }
+
+                    judgeText.Text = EzScoreBonusTracker.FormatSigned(bonus.JudgeBonus);
+                    missText.Text = EzScoreBonusTracker.FormatSigned(bonus.ErrorMalus);
+                }
+
+                private static Container createLine(LocalisableString label, Color4 valueColour, out OsuSpriteText valueText)
+                {
+                    var line = new Container
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                        Anchor = Anchor.TopCentre,
+                        Origin = Anchor.TopCentre,
+                    };
+
+                    line.Add(new OsuSpriteText
+                    {
+                        Text = label,
+                        Font = OsuFont.Style.Caption2.With(weight: FontWeight.SemiBold),
+                        UseFullGlyphHeight = false,
+                    });
+                    line.Add(valueText = new OsuSpriteText
+                    {
+                        Anchor = Anchor.TopRight,
+                        Origin = Anchor.TopRight,
+                        Colour = valueColour,
+                        Font = OsuFont.Style.Caption2.With(fixedWidth: true),
+                        UseFullGlyphHeight = false,
+                    });
+
+                    return line;
                 }
             }
         }

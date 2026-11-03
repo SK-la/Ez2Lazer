@@ -4,10 +4,10 @@
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
 using osu.Game.Skinning;
 using osuTK;
@@ -44,6 +44,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
                         Font = OsuFont.Default.With(size: 18),
                         Anchor = Anchor.TopLeft,
                         Origin = Anchor.TopLeft,
+                    },
+                    new SettingsCheckbox
+                    {
+                        LabelText = EzSkinStrings.LN_DYNAMIC_TAIL,
+                        TooltipText = EzSkinStrings.LN_DYNAMIC_TAIL_TOOLTIP,
+                        Current = ezSkinConfig.GetBindable<bool>(Ez2Setting.ManiaHoldTailMaskDynamicEnable),
                     },
                     new SettingsSlider<double>
                     {

@@ -12,6 +12,8 @@ using osu.Framework.Input.Events;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Objects.Types;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
+using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
 using osu.Game.Screens.Play;
 using osuTK;
 
@@ -45,6 +47,14 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
         private double? timeToAcceptAnyKeyAfter;
 
         /// <summary>
+        /// 当前这段跟踪的起始时刻；未在跟踪时为 <see langword="null"/>。
+        /// </summary>
+        /// <remarks>
+        /// 用于评分点资格门：跟踪掉落再重新接上不能补判掉落期间已经到期的 tick / repeat / tail。
+        /// </remarks>
+        public double? TrackingStartTime { get; private set; }
+
+        /// <summary>
         /// The actions that were pressed in the previous frame.
         /// </summary>
         private readonly List<OsuAction> lastPressedActions = new List<OsuAction>();
@@ -52,10 +62,19 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
         private Vector2? screenSpaceMousePosition;
         private readonly DrawableSlider slider;
 
+        /// <summary>
+        /// <see cref="Slider.LastScoredNested"/> 对应的 drawable，每个 hitobject 应用时解析一次。
+        /// </summary>
+        /// <remarks>
+        /// 在判定路径内查找会让每个嵌套物件每帧扫描整份嵌套列表：aspire 滑条可有数千折返，那是二次方并会卡死。
+        /// </remarks>
+        private DrawableHitObject? lastScoredNestedDrawable;
+
         public SliderInputManager(DrawableSlider slider)
         {
             this.slider = slider;
             this.slider.HitObjectApplied += resetState;
+            this.slider.HitObjectApplied += resolveLastScoredNestedDrawable;
         }
 
         /// <summary>
@@ -84,6 +103,14 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
                 return;
 
             Debug.Assert(screenSpaceMousePosition != null);
+
+            // classic 档按「评分点到期那一刻的跟踪状态」逐点消费：晚判的滑条头不能回头补判
+            // 已经到期的 tick / repeat / tail（stable 在那种情况下会直接断掉滑条）。
+            if (slider.HitObject.ClassicSliderBehaviour)
+            {
+                updateTracking(IsMouseInFollowArea(Tracking));
+                return;
+            }
 
             Vector2 mousePositionInSlider = slider.ToLocalSpace(screenSpaceMousePosition.Value) - slider.OriginPosition;
 
@@ -139,41 +166,40 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
             updateTracking(allTicksInRange || IsMouseInFollowArea(false));
         }
 
-        public void TryJudgeNestedObject(DrawableOsuHitObject nestedObject, double timeOffset)
+        public void TryJudgeNestedObject(DrawableOsuHitObject nestedObject)
         {
-            switch (nestedObject)
-            {
-                case DrawableSliderRepeat:
-                case DrawableSliderTick:
-                    if (timeOffset < 0)
-                        return;
+            var sliderHitObject = slider.HitObject;
 
-                    break;
-
-                case DrawableSliderTail:
-                    if (timeOffset < SliderEventGenerator.TAIL_LENIENCY)
-                        return;
-
-                    // Ensure the tail can only activate after all previous ticks/repeats already have.
-                    //
-                    // This covers the edge case where the lenience may allow the tail to activate before
-                    // the last tick, changing ordering of score/combo awarding.
-                    var lastTick = slider.NestedHitObjects.LastOrDefault(o => o.HitObject is SliderTick || o.HitObject is SliderRepeat);
-                    if (lastTick?.Judged == false)
-                        return;
-
-                    break;
-
-                default:
-                    return;
-            }
-
-            if (!slider.HeadCircle.Judged)
+            if (!OsuSliderJudgement.IsNestedDue(nestedObject.HitObject, Time.Current, sliderHitObject.StartTime, sliderHitObject.Duration))
                 return;
 
-            if (Tracking)
+            if (!OsuSliderJudgement.ArePrerequisitesJudged(
+                    nestedObject.HitObject,
+                    isJudged: _ => lastScoredNestedDrawable?.Judged == true,
+                    lastScoredNested: sliderHitObject.LastScoredNested))
+                return;
+
+            // stable 逐帧按序消耗评分点，滑条头判没判不影响 tick / tail 的归属；
+            // 默认轨保留 lazer 的「头部已判才给嵌套」语义，避免影响非 stable 判定档。
+            bool classic = sliderHitObject.ClassicSliderBehaviour;
+
+            if (!classic && !slider.HeadCircle.Judged)
+                return;
+
+            bool hit = Tracking;
+
+            if (classic && !StableClassicSliderRules.WasTrackingAtDueTime(
+                    TrackingStartTime,
+                    OsuSliderJudgement.NestedDueTime(nestedObject.HitObject, sliderHitObject.StartTime, sliderHitObject.Duration)))
+                hit = false;
+
+            // 默认轨保留 lazer 的尾点宽限：到期时没跟踪也先不落判，等跟踪或等到截止时刻。
+            if (!hit && !OsuSliderJudgement.IsNestedSettled(nestedObject.HitObject, Time.Current, classic, sliderHitObject.StartTime, sliderHitObject.Duration))
+                return;
+
+            if (hit)
                 nestedObject.HitForcefully();
-            else if (timeOffset >= 0)
+            else
                 nestedObject.MissForcefully();
         }
 
@@ -186,13 +212,17 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
             if (screenSpaceMousePosition is not Vector2 pos)
                 return false;
 
-            float radius = getFollowRadius(expanded);
-
-            double followProgress = Math.Clamp((Time.Current - slider.HitObject.StartTime) / slider.HitObject.Duration, 0, 1);
-            Vector2 followCirclePosition = slider.HitObject.CurvePositionAt(followProgress);
             Vector2 mousePositionInSlider = slider.ToLocalSpace(pos) - slider.OriginPosition;
 
-            return (mousePositionInSlider - followCirclePosition).LengthSquared <= radius * radius;
+            return OsuSliderJudgement.IsInFollowArea(
+                mousePositionInSlider,
+                Vector2.Zero,
+                slider.HitObject.CurvePositionAt,
+                slider.HitObject.StartTime,
+                slider.HitObject.Duration,
+                Time.Current,
+                slider.HitObject.Radius,
+                expanded);
         }
 
         /// <summary>
@@ -200,14 +230,7 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
         /// </summary>
         /// <param name="expanded">Whether to return the maximum area of the follow circle.</param>
         private float getFollowRadius(bool expanded)
-        {
-            float radius = (float)slider.HitObject.Radius;
-
-            if (expanded)
-                radius *= DrawableSliderBall.FOLLOW_AREA;
-
-            return radius;
-        }
+            => OsuSliderJudgement.FollowRadius(slider.HitObject.Radius, expanded);
 
         /// <summary>
         /// Updates the tracking state.
@@ -224,6 +247,7 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
                 Debug.Assert(trackingHistory.Count > 0);
 
                 Tracking = trackingHistory.Peek().tracking;
+                TrackingStartTime = trackingHistory.TryPeek(out var restored) && restored.tracking ? restored.time : null;
                 return;
             }
 
@@ -270,7 +294,10 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
                 && validTrackingAction;
 
             if (wasTracking != Tracking)
+            {
                 slider.Result.TrackingHistory.Push((Time.Current, Tracking));
+                TrackingStartTime = Tracking ? Time.Current : null;
+            }
         }
 
         private OsuAction? getInitialHitAction() => slider.HeadCircle?.HitAction;
@@ -280,18 +307,43 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
         /// </summary>
         private bool isValidTrackingAction(OsuAction action)
         {
+            if (action != OsuAction.LeftButton && action != OsuAction.RightButton)
+                return false;
+
+            // stable classic 只要求「有任意按键按住」：换了手指、或另一键先按着，都继续算跟踪。
+            if (slider.HitObject.ClassicSliderBehaviour)
+                return StableClassicSliderRules.AcceptsAnyTrackingKey(action);
+
             OsuAction? hitAction = getInitialHitAction();
 
             // if the head circle was hit, we may not yet be allowed to accept any key, so we must use the initial hit action.
             if (hitAction.HasValue && (!timeToAcceptAnyKeyAfter.HasValue || Time.Current <= timeToAcceptAnyKeyAfter.Value))
                 return action == hitAction;
 
-            return action == OsuAction.LeftButton || action == OsuAction.RightButton;
+            return true;
+        }
+
+        private void resolveLastScoredNestedDrawable(DrawableHitObject obj)
+        {
+            lastScoredNestedDrawable = null;
+
+            if (slider.HitObject?.LastScoredNested is not { } last)
+                return;
+
+            foreach (var nested in slider.NestedHitObjects)
+            {
+                if (nested.HitObject == last)
+                {
+                    lastScoredNestedDrawable = nested;
+                    return;
+                }
+            }
         }
 
         private void resetState(DrawableHitObject obj)
         {
             Tracking = false;
+            TrackingStartTime = null;
             timeToAcceptAnyKeyAfter = null;
             lastPressedActions.Clear();
             screenSpaceMousePosition = null;
@@ -302,6 +354,7 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
             base.Dispose(isDisposing);
 
             slider.HitObjectApplied -= resetState;
+            slider.HitObjectApplied -= resolveLastScoredNestedDrawable;
         }
     }
 }

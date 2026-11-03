@@ -105,8 +105,11 @@ namespace osu.Game.Screens.Play.HUD.JudgementCounter
 
                 switch (Mode.Value)
                 {
+                    case DisplayMode.MissesOnly:
+                        return hitResult.IsMiss();
+
                     case DisplayMode.Simple:
-                        return false;
+                        return hitResult.IsBasic();
 
                     case DisplayMode.Normal:
                         return !hitResult.IsBonus();
@@ -115,7 +118,7 @@ namespace osu.Game.Screens.Play.HUD.JudgementCounter
                         return true;
 
                     default:
-                        throw new ArgumentOutOfRangeException();
+                        throw new ArgumentOutOfRangeException(nameof(Mode), Mode.Value, null);
                 }
             }
         }
@@ -151,7 +154,10 @@ namespace osu.Game.Screens.Play.HUD.JudgementCounter
             Normal,
 
             [LocalisableDescription(typeof(JudgementCounterDisplayStrings), nameof(JudgementCounterDisplayStrings.JudgementDisplayModeAll))]
-            All
+            All,
+
+            [LocalisableDescription(typeof(JudgementCounterDisplayStrings), nameof(JudgementCounterDisplayStrings.JudgementDisplayModeMissesOnly))]
+            MissesOnly,
         }
     }
 }

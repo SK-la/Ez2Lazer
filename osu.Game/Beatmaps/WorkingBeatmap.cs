@@ -41,7 +41,7 @@ namespace osu.Game.Beatmaps
 
         private CancellationTokenSource loadCancellationSource = new CancellationTokenSource();
 
-        private readonly object beatmapFetchLock = new object();
+        private readonly Lock beatmapFetchLock = new Lock();
 
         private readonly Lazy<Storyboard> storyboard;
         private readonly Lazy<ISkin> skin;
@@ -288,7 +288,7 @@ namespace osu.Game.Beatmaps
                 throw new BeatmapInvalidForRulesetException($"{nameof(Beatmaps.Beatmap)} can not be converted for the ruleset (ruleset: {ruleset.InstantiationInfo}, converter: {converter}).");
 
             // Apply conversion mods
-            foreach (var mod in mods.OfType<IApplicableToBeatmapConverter>())
+            foreach (var mod in EzApplyOrder.Sort(mods.OfType<IApplicableToBeatmapConverter>()))
             {
                 token.ThrowIfCancellationRequested();
                 mod.ApplyToBeatmapConverter(converter);
@@ -297,12 +297,18 @@ namespace osu.Game.Beatmaps
             // Convert
             IBeatmap converted = converter.Convert(token);
 
-            // 应用转换后的Mod。如果Mod实现了IHasApplyOrder接口，则尊重它们的顺序（值较小的优先）。
+            // Mods below may remove or rewrite hit objects; remember what they carried so their audio survives as
+            // background sound instead of being lost with the object. This has to sit before the post-conversion mods,
+            // which is where the rewriting mods live, and reads sample times off the objects, so it does not depend on
+            // ApplyDefaults having created nested objects yet.
+            DetachedSampleLedger sampleLedger = mods.Any(m => m is IApplicableAfterBeatmapConversion or IApplicableToBeatmap)
+                ? DetachedSampleLedger.Capture(converted)
+                : null;
+
+            // 应用转换后的Mod。如果Mod实现了IEzApplyOrder接口，则尊重它们的顺序（值较小的优先）。
             // 没有该接口的Mod默认为顺序0，以保持现有行为。
             // Apply conversion mods to the result
-            foreach (var mod in mods.OfType<IApplicableAfterBeatmapConversion>()
-                                    .OrderBy(m => (m as IEzApplyOrder)?.ApplyOrder)
-                    )
+            foreach (var mod in EzApplyOrder.Sort(mods.OfType<IApplicableAfterBeatmapConversion>()))
             {
                 token.ThrowIfCancellationRequested();
                 mod.ApplyToBeatmap(converted);
@@ -351,6 +357,8 @@ namespace osu.Game.Beatmaps
                 token.ThrowIfCancellationRequested();
                 mod.ApplyToBeatmap(converted);
             }
+
+            sampleLedger?.Settle(converted);
 
             return converted;
         }

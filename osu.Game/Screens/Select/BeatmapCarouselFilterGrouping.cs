@@ -10,6 +10,7 @@ using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Graphics.Carousel;
+using osu.Game.Localisation;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -47,7 +48,6 @@ namespace osu.Game.Screens.Select
         public required Func<List<BeatmapCollection>> GetCollections { get; init; }
         public required Func<FilterCriteria, IReadOnlyDictionary<Guid, ScoreRank>> GetLocalUserTopRanks { get; init; }
         public required Func<HashSet<int>> GetFavouriteBeatmapSets { get; init; }
-        public required Func<bool> ShouldUseXxySrForDifficultyOperations { get; init; }
         public required Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> GetDifficultiesForOperationsAsync { get; init; }
         public required Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> GetPpForOperationsAsync { get; init; }
 
@@ -69,12 +69,11 @@ namespace osu.Game.Screens.Select
 
                 // xxy_SR is only required when difficulty is the active grouping key.
                 // For 0/1 item, grouping key does not affect output.
-                bool useXxyDifficulty = criteria.Group == GroupMode.Difficulty
-                                        && ShouldUseXxySrForDifficultyOperations()
-                                        && itemList.Count > 1;
+                bool useXxyStarRatingGrouping = itemList.Count > 1
+                                                && criteria.Group == GroupMode.XxyStarRating;
                 bool usePpGrouping = criteria.Group == GroupMode.PP && itemList.Count > 0;
 
-                if (useXxyDifficulty)
+                if (useXxyStarRatingGrouping)
                 {
                     var uniqueBeatmaps = itemList.Select(i => (BeatmapInfo)i.Model).Distinct().ToList();
                     operationDifficulties = GetDifficultiesForOperationsAsync(uniqueBeatmaps, cancellationToken)
@@ -96,6 +95,9 @@ namespace osu.Game.Screens.Select
                 {
                     if (operationDifficulties != null && operationDifficulties.TryGetValue(beatmap, out double difficulty))
                         return difficulty;
+
+                    if (criteria.Group == GroupMode.XxyStarRating)
+                        return beatmap.XxyStarRating;
 
                     return beatmap.StarRating;
                 }
@@ -200,7 +202,8 @@ namespace osu.Game.Screens.Select
         {
             // In certain cases, we intentionally split out difficulties
             // where it's more relevant or convenient to view them as individual items.
-            if (criteria.Sort == SortMode.Difficulty || criteria.Group == GroupMode.Difficulty || criteria.Group == GroupMode.PP)
+            if (criteria.Sort is SortMode.Difficulty or SortMode.XxyStarRating
+                || criteria.Group is GroupMode.Difficulty or GroupMode.XxyStarRating or GroupMode.PP)
                 return false;
             if (criteria.Sort == SortMode.LastPlayed && criteria.Group == GroupMode.LastPlayed)
                 return false;
@@ -239,7 +242,7 @@ namespace osu.Game.Screens.Select
                         var date = b.LastPlayed;
 
                         if (date == null)
-                            return new GroupDefinition(int.MaxValue, "Never").Yield();
+                            return new GroupDefinition(int.MaxValue, BeatmapCarouselFilterGroupingStrings.NeverPlayed).Yield();
 
                         return defineGroupByDate(date.Value);
                     }, items);
@@ -251,6 +254,7 @@ namespace osu.Game.Screens.Select
                     return getGroupsBy(b => defineGroupByBPM(FormatUtils.RoundBPM(b.BPM)), items);
 
                 case GroupMode.Difficulty:
+                case GroupMode.XxyStarRating:
                     return getGroupsBy(b => defineGroupByStars(getDifficulty(b)), items);
 
                 case GroupMode.PP:
@@ -287,7 +291,7 @@ namespace osu.Game.Screens.Select
                 {
                     var rulesetInstance = criteria.Ruleset?.CreateInstance();
 
-                    if (rulesetInstance == null || rulesetInstance.AvailableVariants.Count() <= 1)
+                    if (rulesetInstance == null || rulesetInstance.GameplayVariants.Count() <= 1)
                         goto case GroupMode.None;
 
                     return getGroupsBy(b => defineGroupByVariant(rulesetInstance, b, criteria.Mods), items);
@@ -329,7 +333,7 @@ namespace osu.Game.Screens.Select
             if (char.IsAsciiLetter(firstChar))
                 return new GroupDefinition(char.ToUpperInvariant(firstChar) - 'A', char.ToUpperInvariant(firstChar).ToString()).Yield();
 
-            return new GroupDefinition(int.MaxValue, "Other").Yield();
+            return new GroupDefinition(int.MaxValue, BeatmapCarouselFilterGroupingStrings.OtherSymbols).Yield();
         }
 
         private IEnumerable<GroupDefinition> defineGroupByDate(DateTimeOffset date)
@@ -338,33 +342,30 @@ namespace osu.Game.Screens.Select
             var elapsed = now - date;
 
             if (elapsed.TotalDays < 1)
-                return new GroupDefinition(0, "Today").Yield();
+                return new GroupDefinition(0, BeatmapCarouselFilterGroupingStrings.Today).Yield();
 
             if (elapsed.TotalDays < 2)
-                return new GroupDefinition(1, "Yesterday").Yield();
+                return new GroupDefinition(1, BeatmapCarouselFilterGroupingStrings.Yesterday).Yield();
 
             if (elapsed.TotalDays < 7)
-                return new GroupDefinition(2, "Last week").Yield();
+                return new GroupDefinition(2, BeatmapCarouselFilterGroupingStrings.LastWeek).Yield();
 
             if (elapsed.TotalDays < 30)
-                return new GroupDefinition(3, "Last month").Yield();
+                return new GroupDefinition(3, BeatmapCarouselFilterGroupingStrings.LastMonth).Yield();
 
-            if (elapsed.TotalDays < 60)
-                return new GroupDefinition(4, "1 month ago").Yield();
-
-            for (int i = 90; i <= 150; i += 30)
+            for (int i = 60; i <= 150; i += 30)
             {
                 if (elapsed.TotalDays < i)
-                    return new GroupDefinition(i, $"{i / 30 - 1} months ago").Yield();
+                    return new GroupDefinition(i, BeatmapCarouselFilterGroupingStrings.MonthsAgo(i / 30 - 1)).Yield();
             }
 
-            return new GroupDefinition(151, "Over 5 months ago").Yield();
+            return new GroupDefinition(151, BeatmapCarouselFilterGroupingStrings.OverMonthsAgo(5)).Yield();
         }
 
         private IEnumerable<GroupDefinition> defineGroupByRankedDate(DateTimeOffset? date)
         {
             if (date == null)
-                return new GroupDefinition(0, "Unranked").Yield();
+                return new GroupDefinition(0, BeatmapCarouselFilterGroupingStrings.Unranked).Yield();
 
             return new GroupDefinition(-date.Value.Year, $"{date.Value.Year}").Yield();
         }
@@ -406,15 +407,15 @@ namespace osu.Game.Screens.Select
         private IEnumerable<GroupDefinition> defineGroupByBPM(double bpm)
         {
             if (bpm < 60)
-                return new GroupDefinition(60, "Under 60 BPM").Yield();
+                return new GroupDefinition(60, BeatmapCarouselFilterGroupingStrings.UnderBPM(60)).Yield();
 
             for (int i = 70; i <= 300; i += 10)
             {
                 if (bpm < i)
-                    return new GroupDefinition(i, $"{i - 10} - {i} BPM").Yield();
+                    return new GroupDefinition(i, BeatmapCarouselFilterGroupingStrings.RangeBPM(i - 10, i)).Yield();
             }
 
-            return new GroupDefinition(301, "Over 300 BPM").Yield();
+            return new GroupDefinition(301, BeatmapCarouselFilterGroupingStrings.OverBPM(300)).Yield();
         }
 
         private IEnumerable<GroupDefinition> defineGroupByStars(double stars)
@@ -424,15 +425,12 @@ namespace osu.Game.Screens.Select
             var starDifficulty = new StarDifficulty(starInt, 0);
 
             if (starInt == 0)
-                return new StarDifficultyGroupDefinition(0, "Below 1 Star", starDifficulty).Yield();
-
-            if (starInt == 1)
-                return new StarDifficultyGroupDefinition(1, "1 Star", starDifficulty).Yield();
+                return new StarDifficultyGroupDefinition(0, BeatmapCarouselFilterGroupingStrings.BelowStars(1), starDifficulty).Yield();
 
             if (starInt < 15)
-                return new StarDifficultyGroupDefinition(starInt, $"{starInt} Stars", starDifficulty).Yield();
+                return new StarDifficultyGroupDefinition(starInt, BeatmapCarouselFilterGroupingStrings.Stars(starInt), starDifficulty).Yield();
 
-            return new StarDifficultyGroupDefinition(15, "Over 15 Stars", new StarDifficulty(15, 0)).Yield();
+            return new StarDifficultyGroupDefinition(15, BeatmapCarouselFilterGroupingStrings.OverStars(15), new StarDifficulty(15, 0)).Yield();
         }
 
         private IEnumerable<GroupDefinition> defineGroupByLength(double length)
@@ -440,18 +438,13 @@ namespace osu.Game.Screens.Select
             for (int i = 1; i < 6; i++)
             {
                 if (length <= i * 60_000)
-                {
-                    if (i == 1)
-                        return new GroupDefinition(1, "1 minute or less").Yield();
-
-                    return new GroupDefinition(i, $"{i} minutes or less").Yield();
-                }
+                    return new GroupDefinition(i, BeatmapCarouselFilterGroupingStrings.MinutesOrLess(i)).Yield();
             }
 
             if (length <= 10 * 60_000)
-                return new GroupDefinition(10, "10 minutes or less").Yield();
+                return new GroupDefinition(10, BeatmapCarouselFilterGroupingStrings.MinutesOrLess(10)).Yield();
 
-            return new GroupDefinition(11, "Over 10 minutes").Yield();
+            return new GroupDefinition(11, BeatmapCarouselFilterGroupingStrings.OverMinutes(10)).Yield();
         }
 
         private IEnumerable<GroupDefinition> defineGroupByPp(double? pp)
@@ -529,6 +522,11 @@ namespace osu.Game.Screens.Select
                     "game"))
                 return new GroupDefinition(3, "ACG").Yield();
 
+            // Ez: group beatmaps with storyboard or video that didn't match any game-specific group above.
+            // Placed after game groups so that e.g. "vocaloid" beatmaps still go to VOCALOID group even if they also have media.
+            if (beatmap.HasStoryboard == true || beatmap.HasVideo == true)
+                return new GroupDefinition(5, "Has StoryBoard/Vedio").Yield();
+
             // If none of the special rules matched but the source field was provided, put into Others
             if (hasSource)
                 return new GroupDefinition(50, "Others").Yield();
@@ -563,12 +561,15 @@ namespace osu.Game.Screens.Select
                 }
             }
 
-            var notInCollection = new GroupDefinition(int.MaxValue, "Not in collection");
+            var notInCollection = new GroupDefinition(int.MaxValue, BeatmapCarouselFilterGroupingStrings.NotInCollection);
             groupMappings[notInCollection] = new GroupMapping(notInCollection, []);
 
             foreach (var item in carouselItems)
             {
                 var beatmap = (BeatmapInfo)item.Model;
+
+                if (string.IsNullOrEmpty(beatmap.MD5Hash))
+                    continue;
 
                 // as a side note, even reading the `MD5Hash` off a realm model is slow if done enough times,
                 // so it definitely helps that thanks to the mapping it needs to only be retrieved once
@@ -594,7 +595,7 @@ namespace osu.Game.Screens.Select
             var author = beatmap.BeatmapSet!.Metadata.Author;
 
             if (author.OnlineID == localUserId || (author.OnlineID <= 1 && author.Username == localUserUsername))
-                return new GroupDefinition(0, "My maps").Yield();
+                return new GroupDefinition(0, BeatmapCarouselFilterGroupingStrings.MyMaps).Yield();
 
             // discard beatmaps not owned by the user.
             return [];
@@ -605,13 +606,13 @@ namespace osu.Game.Screens.Select
             if (topRankMapping.TryGetValue(beatmap.ID, out var rank))
                 return new RankDisplayGroupDefinition(rank).Yield();
 
-            return new GroupDefinition(int.MaxValue, "Unplayed").Yield();
+            return new GroupDefinition(int.MaxValue, BeatmapCarouselFilterGroupingStrings.Unplayed).Yield();
         }
 
         private IEnumerable<GroupDefinition> defineGroupByFavourites(BeatmapInfo beatmap, HashSet<int> favouriteBeatmapSets)
         {
             if (beatmap.BeatmapSet?.OnlineID > 0 && favouriteBeatmapSets.Contains(beatmap.BeatmapSet.OnlineID))
-                return new GroupDefinition(0, "Favourites").Yield();
+                return new GroupDefinition(0, BeatmapCarouselFilterGroupingStrings.Favourites).Yield();
 
             return [];
         }

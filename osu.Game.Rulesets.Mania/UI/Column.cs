@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
@@ -18,12 +19,20 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
+using osu.Game.Rulesets.Mania.EzMania;
+using osu.Game.Rulesets.Mania.EzMania.Audio;
+using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
+using osu.Game.Rulesets.Mania.EzMania.Helper;
+using osu.Game.Rulesets.Mania.EzMania.Input;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
-using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.UI.Components;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Skinning;
@@ -52,7 +61,14 @@ namespace osu.Game.Rulesets.Mania.UI
         internal readonly Container TopLevelContainer = new Container { RelativeSizeAxes = Axes.Both };
 
         private DrawablePool<PoolableHitExplosion> hitExplosionPool = null!;
-        private readonly OrderedHitPolicy hitPolicy;
+        private OrderedHitPolicyHelper hitPolicyHelper = null!;
+        private DrawableHitObject? columnRoutedPressTarget;
+        private EzEnumJudgePrecedence judgePrecedence;
+        private EzEnumJudgeMode? configuredMissCollectionJudgeMode;
+
+        /// <summary>命中时「提前判定为 miss」的条目缓冲，避免每次命中分配一个迭代器。</summary>
+        private readonly List<ManiaLaneEntry> forceMissScratch = new List<ManiaLaneEntry>();
+
         public Container UnderlayElements => HitObjectArea.UnderlayElements;
 
         private GameplaySampleTriggerSource sampleTriggerSource = null!;
@@ -77,7 +93,6 @@ namespace osu.Game.Rulesets.Mania.UI
             RelativeSizeAxes = Axes.Y;
             Width = COLUMN_WIDTH;
 
-            hitPolicy = new OrderedHitPolicy(HitObjectContainer);
             HitObjectArea = new ColumnHitObjectArea
             {
                 RelativeSizeAxes = Axes.Both,
@@ -92,6 +107,9 @@ namespace osu.Game.Rulesets.Mania.UI
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
+        private SkinManager skinManager { get; set; } = null!;
+
+        [Resolved]
         private EzLocalTextureFactory ezFactory { get; set; } = null!;
 
         // 保留备用，以后有精力对比一下全局注入和列级缓存的差异
@@ -100,12 +118,35 @@ namespace osu.Game.Rulesets.Mania.UI
         //
         // public IEzSkinInfo EzSkinInfo => ezSkinInfo;
 
+        [Resolved(canBeNull: true)]
+        private DrawableManiaRuleset? drawableRuleset { get; set; }
+
+        internal ManiaLaneController LaneController { get; private set; } = null!;
+
+        private double pressHistoryRetentionMs = 120_000;
+
+        // 环形缓冲，避免在高 KPS 下占用过多内存。4096 个按键记录在 120s 内的 KPS 为 34.1，足够覆盖绝大多数情况。
+        private readonly RingBufferPressTimes pressTimes = new RingBufferPressTimes(4096);
+
+        internal IReadOnlyList<double> PressTimes => pressTimes;
+
+        internal bool TryGetBmsRoute(DrawableNote note, out BmsJudgeModeJudgement.BmsRouteState route)
+        {
+            if (LaneController.TryGetEntry(note, out var entry))
+            {
+                route = entry.BmsRoute;
+                return true;
+            }
+
+            route = null!;
+            return false;
+        }
+
         public Bindable<string> NoteSetNameBindable = null!;
         public Bindable<bool> ColorSettingsEnabledBindable = null!;
         public Bindable<Colour4> EzNoteColourBindable = null!;
         public Bindable<Vector2> EzNoteSizeBindable = null!;
         public Bindable<EzColumnType> EzNoteTypeBindable = null!;
-        private Bindable<EzEnumHitMode> hitModeBindable = null!;
 
         private KeySoundPreviewMode keySoundPreviewMode;
 
@@ -116,16 +157,45 @@ namespace osu.Game.Rulesets.Mania.UI
 
         // 缓存计算参数，避免闭包捕获
         public int KeyMode;
+        public bool ConfigTimingBasedNoteColouring;
+
+        protected override ScrollingHitObjectContainer CreateScrollingHitObjectContainer()
+            => new LaneTrackingScrollingHitObjectContainer(this);
+
+        /// <summary>
+        /// Mounts an overlay playfield above this column's own notes, inside the same hit object area so both share the
+        /// hit position padding and the scroll length.
+        /// </summary>
+        internal void MountReplayInputNoteOverlay(Playfield overlay)
+        {
+            HitObjectArea.Add(overlay);
+            AddNested(overlay);
+        }
+
+        internal void RegisterLaneDrawable(DrawableHitObject drawable)
+            => LaneController.Register(drawable, drawableRuleset?.ColumnRoutesInput == true);
+
+        internal void UnregisterLaneDrawable(DrawableHitObject drawable) => LaneController.Unregister(drawable);
 
         [BackgroundDependencyLoader]
         private void load(GameHost host, ManiaRulesetConfigManager? rulesetConfig, StageDefinition stageDefinition)
         {
             KeyMode = stageDefinition.Columns;
+
+            // JudgePrecedence 来自全局配置（与 ManiaJudgementRound.Create 一致）；勿 [Resolved] DrawableManiaRuleset——
+            // 皮肤预览等场景会单独构造 Column，且 JudgementRound 在 ruleset LoadComplete 才冻结。
+            judgePrecedence = ezConfig.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence);
+
+            LaneController = new ManiaLaneController();
+            hitPolicyHelper = new OrderedHitPolicyHelper(HitObjectContainer, LaneController);
+
             EzNoteTypeBindable = ezConfig.GetColumnTypeBindable(KeyMode, Index);
             EzNoteSizeBindable = ezFactory.GetNoteSizeBindable(KeyMode, Index);
             EzNoteColourBindable = ezConfig.GetColumnColorBindable(KeyMode, Index);
             NoteSetNameBindable = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
             ColorSettingsEnabledBindable = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+
+            if (rulesetConfig != null) ConfigTimingBasedNoteColouring = rulesetConfig.Get<bool>(ManiaRulesetSetting.TimingBasedNoteColouring);
 
             SkinnableDrawable keyArea;
 
@@ -134,8 +204,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
             InternalChildren = new Drawable[]
             {
-                hitExplosionPool = new DrawablePool<PoolableHitExplosion>(5),
-                sampleTriggerSource = new GameplaySampleTriggerSource(HitObjectContainer),
+                hitExplosionPool = new DrawablePool<PoolableHitExplosion>(10),
+                sampleTriggerSource = new EzGameplaySampleTriggerSource(HitObjectContainer),
                 HitObjectArea,
                 keyArea = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.KeyArea), _ => new DefaultKeyArea())
                 {
@@ -158,25 +228,34 @@ namespace osu.Game.Rulesets.Mania.UI
             BackgroundContainer.Add(background);
             TopLevelContainer.Add(HitObjectArea.Explosions.CreateProxy());
 
+            RegisterPool<Note, DrawableNote>(10, 50);
+            RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
+            RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
+            RegisterPool<TailNote, DrawableHoldNoteTail>(10, 50);
+            RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
+            RegisterPool<HoldNoteTick, DrawableHoldNoteTick>(50, 200);
+
             if (rulesetConfig != null)
                 touchOverlay = rulesetConfig.GetBindable<bool>(ManiaRulesetSetting.TouchOverlay);
 
             keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
-            hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-            hitModeBindable.BindValueChanged(configurePools, true);
         }
 
         private void onSourceChanged()
         {
             AccentColour.Value = skin.GetManiaSkinConfig<Color4>(LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour, Index)?.Value ?? Color4.Black;
 
-            leftColumnSpacing = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                                        new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.LeftColumnSpacing, Index))
-                                    ?.Value ?? Stage.COLUMN_SPACING;
+            var columnSize = ManiaPlayfieldLayoutHelper.CalculateColumnSize(
+                Index,
+                KeyMode,
+                skin,
+                skinManager,
+                ezConfig,
+                mobileAdjust: 1f,
+                applyGlobalWidthSettings: true);
 
-            rightColumnSpacing = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                                         new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.RightColumnSpacing, Index))
-                                     ?.Value ?? Stage.COLUMN_SPACING;
+            leftColumnSpacing = columnSize.Margin.Left;
+            rightColumnSpacing = columnSize.Margin.Right;
         }
 
         public event Action? NoteSetChanged;
@@ -186,6 +265,8 @@ namespace osu.Game.Rulesets.Mania.UI
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
+            drawableRuleset ??= this.FindClosestParent<DrawableManiaRuleset>();
             NewResult += OnNewResult;
 
             onNoteDrawableChangedHandler = () => NoteSetChanged?.Invoke();
@@ -203,6 +284,22 @@ namespace osu.Game.Rulesets.Mania.UI
 
             onNoteColourChangedHandler = () => NoteColourChanged?.Invoke();
             ezFactory.OnNoteColourChanged += onNoteColourChangedHandler;
+        }
+
+        protected override void Update()
+        {
+            if (drawableRuleset?.ColumnRoutesInput == true)
+                LaneController.EnableAutoMissScheduling();
+
+            base.Update();
+        }
+
+        protected override void UpdateAfterChildren()
+        {
+            base.UpdateAfterChildren();
+
+            if (drawableRuleset?.ColumnRoutesInput == true)
+                LaneController.ProcessAutoMiss(Time.Current);
         }
 
         protected override void Dispose(bool isDisposing)
@@ -232,9 +329,23 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
             dependencies.CacheAs<IBindable<ManiaAction>>(Action);
-            // dependencies.CacheAs(EzSkinInfo);
-
             return dependencies;
+        }
+
+        protected override void OnHitObjectAdded(HitObject hitObject)
+        {
+            // 不调用 base：base 只做 Playfield.preloadSamples，即按音频名为每个 sample 预建一个
+            // DrawablePool<PoolableSkinnableSample>。note 音已全部由 ManiaPlayfield.SampleChannels 按音频名播放，
+            // 这批池没有人取用，且每个池会在全局统计里留下一条永不释放的 PoolableSkinnableSample`N 条目，
+            // 于是每开一局编号就往上累加一段。
+            //
+            // 唯一的例外是转换谱 LN 按住期间的滑动音：它仍走 note 自带的 SkinnableSound（名字由 Samples 派生、
+            // 不在谱面 Samples 列表里），需要在这里预热，否则会在这条 LN 首次出现时才建池。
+            if (hitObject is HoldNote holdNote && holdNote.PlaySlidingSamples)
+            {
+                foreach (var sample in holdNote.CreateSlidingSamples())
+                    GetPooledSample(sample);
+            }
         }
 
         protected override void OnNewDrawableHitObject(DrawableHitObject drawableHitObject)
@@ -244,18 +355,124 @@ namespace osu.Game.Rulesets.Mania.UI
             DrawableManiaHitObject maniaObject = (DrawableManiaHitObject)drawableHitObject;
 
             maniaObject.AccentColour.BindTo(AccentColour);
-            maniaObject.CheckHittable = hitPolicy.IsHittable;
+            maniaObject.CheckHittable = (d, time) =>
+            {
+                LaneController.RegisterIfNeeded(d, drawableRuleset?.ColumnRoutesInput == true);
+                resolvePressRouting(out var precedence);
+                return isHittable(d, time, precedence);
+            };
+            maniaObject.ShouldSkipColumnRoutedPress = _ => columnRoutedPressTarget != null;
+        }
+
+        private sealed partial class LaneTrackingScrollingHitObjectContainer : ScrollingHitObjectContainer
+        {
+            private readonly Column column;
+
+            public LaneTrackingScrollingHitObjectContainer(Column column)
+            {
+                this.column = column;
+            }
+
+            protected override void AddDrawable(HitObjectLifetimeEntry entry, DrawableHitObject drawable)
+            {
+                base.AddDrawable(entry, drawable);
+                column.RegisterLaneDrawable(drawable);
+            }
+
+            protected override void RemoveDrawable(HitObjectLifetimeEntry entry, DrawableHitObject drawable)
+            {
+                column.UnregisterLaneDrawable(drawable);
+                base.RemoveDrawable(entry, drawable);
+            }
         }
 
         internal void OnNewResult(DrawableHitObject judgedObject, JudgementResult result)
         {
             if (result.IsHit)
-                hitPolicy.HandleHit(judgedObject);
+                handleHit(judgedObject);
+            else
+                LaneController.NotifyJudged(judgedObject);
 
             if (!result.IsHit || !judgedObject.DisplayResult || !DisplayJudgements.Value)
                 return;
 
-            HitObjectArea.Explosions.Add(hitExplosionPool.Get(e => e.Apply(result)));
+            // 不用 setup 委托：`Apply` 只是记录 Result，而 `PrepareForUse`（真正读它的地方）在下一帧 Update 才跑，
+            // 所以拿到实例后再赋值等价，且省掉每次判定一个捕获 result 的闭包。
+            var explosion = hitExplosionPool.Get();
+            explosion.Apply(result);
+            HitObjectArea.Explosions.Add(explosion);
+        }
+
+        private bool isHittable(DrawableHitObject drawable, double time, EzEnumJudgePrecedence precedence)
+        {
+            ManiaJudgeHotPathTrace.RecordIsHittable();
+
+            if (drawable is DrawableHoldNoteTail)
+                return hitPolicyHelper.IsHittableWithPrecedence(drawable, time, precedence);
+
+            if (LaneController.IsHittable(drawable, time, precedence))
+                return true;
+
+            // HoldNote fallback: when the Head has been auto-missed, TryCreateEntry rejects the HoldNote
+            // from LaneController entries. Without an entry, LaneController.IsHittable returns false.
+            // Fall through to hitPolicyHelper which checks hit windows via the HitObjectContainer directly.
+            if (drawable is DrawableHoldNote)
+                return hitPolicyHelper.IsHittableWithPrecedence(drawable, time, precedence);
+
+            return false;
+        }
+
+        private bool applyRoutedPress(DrawableHitObject target, double time, KeyBindingPressEvent<ManiaAction> e)
+        {
+            switch (target)
+            {
+                case DrawableNote note when ManiaEzDrawableJudgement.TryBmsOnPressed(note, e):
+                    columnRoutedPressTarget = target;
+                    return true;
+
+                case DrawableNote note:
+                    if (!note.ApplyColumnRoutedPress())
+                        return false;
+
+                    columnRoutedPressTarget = target;
+                    return true;
+
+                case DrawableHoldNote hold:
+                    if (!hold.TryBeginHoldPressFromColumn(time))
+                        return false;
+
+                    LaneController.SetActiveHold(hold);
+                    columnRoutedPressTarget = target;
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
+        private void handleHit(DrawableHitObject hitObject)
+        {
+            double judgementTime = hitObject.Result.TimeAbsolute;
+
+            forceMissScratch.Clear();
+            LaneController.CollectForceMissBefore(hitObject.HitObject.StartTime, forceMissScratch);
+
+            for (int i = 0; i < forceMissScratch.Count; i++)
+            {
+                var entry = forceMissScratch[i];
+
+                // 走快照而不是实时枚举：其间 MissForcefully 会判掉条目（含其它条目），
+                // 这里按实时状态再确认一次，语义与原来的惰性枚举一致。
+                if (entry.IsPressJudged)
+                    continue;
+
+                if (OrderedHitPolicyHelper.IsUserTriggerJudgeableNow(entry.RoutedObject, judgementTime))
+                    continue;
+
+                ((DrawableManiaHitObject)entry.RoutedObject).MissForcefully();
+            }
+
+            LaneController.NotifyJudged(hitObject);
         }
 
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
@@ -263,16 +480,106 @@ namespace osu.Game.Rulesets.Mania.UI
             if (e.Action != Action.Value)
                 return false;
 
-            // 记录延迟追踪按键输入
+            double time = Time.Current;
+
             InputAudioLatencyTracker.Instance?.RecordColumnPress(Index);
 
-            if (keySoundPreviewMode != KeySoundPreviewMode.AutoPlayPlus)
+            // 按键历史是 Ez 被动 miss stored TimeOffset 的输入（ManiaDrawableMissTiming → Session parity），
+            // 保留时长也由判定窗口算出，属生产数据；只有计数埋点受 ManiaJudgeHotPathTrace.Enabled 控制。
+            pressTimes.Add(time);
+            pressTimes.Trim(time - pressHistoryRetentionMs);
+
+            if (ManiaJudgeHotPathTrace.Enabled)
+            {
+                ManiaJudgeHotPathTrace.RecordPressTimesCount(pressTimes.Count);
+                ManiaJudgeHotPathTrace.RecordColumnOnPressed();
+            }
+
+            // 取样必须先于路由判定：判定一落地，本次 note 即为「已判定」，触发源会改取「下一颗」或回退到
+            // 「上一个已判定对象」，后者会把上一颗的键音再触发一次（同名键音被发声池打断后从头重播）。
+            // 只有「按键音预览」这一档在按键时取样：Off 不发声；AutoPlayPlus 的 note 音由物件自身时间轴发声，按键不得再来一次。
+            if (keySoundPreviewMode == KeySoundPreviewMode.AutoPreview)
                 sampleTriggerSource.Play();
-            return true;
+
+            if (drawableRuleset?.ColumnRoutesInput == true)
+            {
+                columnRoutedPressTarget = null;
+
+                if (drawableRuleset.JudgementRound is { IsO2Jam: true } round)
+                    round.NotifyO2InputAt(time);
+
+                resolvePressRouting(out var precedence);
+
+                var entry = LaneController.SelectPressEntry(time, precedence);
+
+                if (entry != null)
+                    applyRoutedPress(entry.RoutedObject, time, e);
+            }
+
+            return false;
         }
 
         public void OnReleased(KeyBindingReleaseEvent<ManiaAction> e)
         {
+            if (e.Action != Action.Value)
+                return;
+
+            if (drawableRuleset?.ColumnRoutesInput != true)
+                return;
+
+            var activeHold = LaneController.ActiveHold;
+
+            if (activeHold == null || !activeHold.IsHolding.Value)
+                return;
+
+            var round = drawableRuleset.JudgementRound;
+
+            if (round != null)
+                ManiaEzDrawableJudgement.TryColumnHoldTailRelease(activeHold, Time.Current, round);
+
+            LaneController.SetActiveHold(null);
+        }
+
+        private void resolvePressRouting(out EzEnumJudgePrecedence precedence)
+        {
+            var round = drawableRuleset?.JudgementRound;
+
+            if (round != null)
+            {
+                precedence = round.JudgePrecedence;
+                LaneController.SetPoorEnabled(round.PoorEnabled);
+                ensureLaneConfigured(round);
+                return;
+            }
+
+            precedence = judgePrecedence;
+        }
+
+        private void ensureLaneConfigured(ManiaJudgementRound round)
+        {
+            var judgeMode = round.Environment.JudgeMode;
+
+            if (configuredMissCollectionJudgeMode == judgeMode)
+                return;
+
+            configuredMissCollectionJudgeMode = judgeMode;
+            double overallDifficulty = drawableRuleset?.Beatmap.Difficulty.OverallDifficulty ?? 5;
+            LaneController.ConfigureMissCollection(judgeMode, overallDifficulty);
+            pressHistoryRetentionMs = computePressHistoryRetentionMs(judgeMode, overallDifficulty);
+        }
+
+        private static double computePressHistoryRetentionMs(EzEnumJudgeMode judgeMode, double overallDifficulty)
+        {
+            var helper = new JudgeModeHelper(judgeMode) { OverallDifficulty = overallDifficulty };
+            double early = helper.WindowFor(HitResult.Miss, true);
+            double late = helper.WindowFor(HitResult.Miss, false);
+
+            if (JudgeModeHelper.IsBMSJudgeMode(judgeMode))
+                BmsJudgeModeJudgement.ExpandMissCollectionWindows(helper, 1, ref early, ref late);
+
+            // Keep enough history for nearest-press miss offset (several miss windows + margin).
+            // Avoid the old 120s floor which retained ~2 minutes of presses per column at high KPS.
+            return Math.Max(15_000, (early + late) * 8 + 5_000);
         }
 
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)
@@ -280,55 +587,6 @@ namespace osu.Game.Rulesets.Mania.UI
             // Extend input coverage to the gaps close to this column.
             var spacingInflation = new MarginPadding { Left = leftColumnSpacing, Right = rightColumnSpacing };
             return DrawRectangle.Inflate(spacingInflation).Contains(ToLocalSpace(screenSpacePos));
-        }
-
-        private void configurePools(ValueChangedEvent<EzEnumHitMode> v)
-        {
-            switch (v.NewValue)
-            {
-                case EzEnumHitMode.EZ2AC:
-                    RegisterPool<Note, Ez2AcDrawableNote>(10, 50);
-                    RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
-                    RegisterPool<HeadNote, Ez2AcDrawableLNeHead>(10, 50);
-                    RegisterPool<TailNote, Ez2AcDrawableLNTail>(10, 50);
-                    RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
-                    break;
-
-                case EzEnumHitMode.Malody_E:
-                case EzEnumHitMode.Malody_B:
-                    RegisterPool<Note, DrawableNote>(10, 50);
-                    RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
-                    RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
-                    RegisterPool<TailNote, MalodyDrawableLNTail>(10, 50);
-                    RegisterPool<HoldNoteBody, MalodyDrawableLNBody>(10, 50);
-                    break;
-
-                case EzEnumHitMode.IIDX_HD:
-                case EzEnumHitMode.LR2_HD:
-                case EzEnumHitMode.Raja_NM:
-                    RegisterPool<Note, BMSDrawableNote>(10, 50);
-                    RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
-                    RegisterPool<HeadNote, BMSDrawableHoldNoteHead>(10, 50);
-                    RegisterPool<TailNote, BMSDrawableHoldNoteTail>(10, 50);
-                    RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
-                    break;
-
-                case EzEnumHitMode.O2Jam:
-                    RegisterPool<Note, O2DrawableNote>(10, 50);
-                    RegisterPool<HoldNote, O2DrawableHoldNote>(10, 50);
-                    RegisterPool<HeadNote, O2DrawableHoldNoteHead>(10, 50);
-                    RegisterPool<TailNote, O2DrawableHoldNoteTail>(10, 50);
-                    RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
-                    break;
-
-                default:
-                    RegisterPool<Note, DrawableNote>(10, 50);
-                    RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
-                    RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
-                    RegisterPool<TailNote, DrawableHoldNoteTail>(10, 50);
-                    RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
-                    break;
-            }
         }
 
         #region Touch Input

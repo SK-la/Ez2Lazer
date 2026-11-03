@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 #nullable disable
@@ -6,8 +6,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
@@ -18,11 +21,16 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
+using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Threading;
 using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.Database;
+using osu.Game.Extensions;
+using osu.Game.EzOsuGame;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.ScriptedSkin;
 using osu.Game.IO;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Utils;
@@ -61,6 +69,29 @@ namespace osu.Game.Skinning
 
         private readonly IResourceStore<byte[]> userFiles;
 
+        private readonly SandboxedScriptRunner scriptRunner;
+
+        [CanBeNull]
+        private readonly HotReloadManager hotReloadManager;
+
+        private readonly Lock scriptedCatalogLock = new Lock();
+        private List<Live<SkinInfo>> scriptedSkinCatalog = new List<Live<SkinInfo>>();
+
+        private readonly Lock scriptedSkinInstanceLock = new Lock();
+        private readonly Dictionary<Guid, Skin> scriptedSkinInstances = new Dictionary<Guid, Skin>();
+        private readonly Dictionary<Guid, Task<Skin>> scriptedSkinLoadTasks = new Dictionary<Guid, Task<Skin>>();
+
+        /// <summary>
+        /// 脚本皮肤目录扫描/编译完成后触发（于更新线程调度）。
+        /// </summary>
+        public event Action ScriptedSkinsCatalogUpdated;
+
+        /// <summary>
+        /// 脚本皮肤总开关的启动期快照，来自 <see cref="Ez2Setting.EnableScriptedSkins"/>。
+        /// 刻意不做响应式绑定：关闭时整个 <c>ScriptedSkin</c> 目录（扫描、文件监视、脚本编译）都不参与启动。
+        /// </summary>
+        public bool ScriptedSkinsEnabled { get; }
+
         private Skin ezProSkin { get; }
         private Skin sbiSkin { get; }
         private Skin argonSkin { get; }
@@ -85,7 +116,7 @@ namespace osu.Game.Skinning
             }
         }
 
-        public SkinManager(Storage storage, RealmAccess realm, GameHost host, IResourceStore<byte[]> resources, AudioManager audio, Scheduler scheduler)
+        public SkinManager(Storage storage, RealmAccess realm, GameHost host, IResourceStore<byte[]> resources, AudioManager audio, Scheduler scheduler, Ez2ConfigManager ezConfig)
             : base(storage, realm)
         {
             this.audio = audio;
@@ -93,7 +124,15 @@ namespace osu.Game.Skinning
             this.host = host;
             this.resources = resources;
 
+            ScriptedSkinsEnabled = ezConfig.Get<bool>(Ez2Setting.EnableScriptedSkins);
+
             userFiles = new StorageBackedResourceStore(storage.GetStorageForDirectory("files"));
+
+            scriptRunner = new SandboxedScriptRunner();
+
+            // 初始化热重载管理器
+            hotReloadManager = new HotReloadManager(scriptRunner);
+            hotReloadManager.SkinReloaded += onScriptReloaded;
 
             skinImporter = new SkinImporter(storage, realm, this)
             {
@@ -183,6 +222,10 @@ namespace osu.Game.Skinning
                 skins.Add(realm.Find<SkinInfo>(SkinInfo.SBI_SKIN).ToLive(Realm));
                 skins.Add(random_skin_info);
 
+                // 脚本皮肤：使用缓存目录列表，避免在 UI 线程同步编译
+                lock (scriptedCatalogLock)
+                    skins.AddRange(scriptedSkinCatalog);
+
                 var userSkins = realm.All<SkinInfo>()
                                      .Where(s => !s.DeletePending && !s.Protected)
                                      .AsEnumerable()
@@ -263,7 +306,229 @@ namespace osu.Game.Skinning
         /// </summary>
         /// <param name="skinInfo">The skin to lookup.</param>
         /// <returns>A <see cref="Skin"/> instance correlating to the provided <see cref="SkinInfo"/>.</returns>
-        public Skin GetSkin(SkinInfo skinInfo) => skinInfo.CreateInstance(this);
+        public Skin GetSkin(SkinInfo skinInfo)
+        {
+            // 检查是否为脚本皮肤（通过查找 .csx 文件）
+            if (isScriptedSkin(skinInfo))
+                return getOrLoadScriptedSkin(skinInfo);
+
+            // 传统皮肤加载逻辑
+            return skinInfo.CreateInstance(this);
+        }
+
+        /// <summary>
+        /// 检查皮肤是否为脚本皮肤（包含 .csx 文件）。
+        /// </summary>
+        private bool isScriptedSkin(SkinInfo skinInfo)
+        {
+            try
+            {
+                string scriptPath = getScriptPath(skinInfo);
+                return !string.IsNullOrEmpty(scriptPath) && File.Exists(scriptPath);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 刷新脚本皮肤目录列表。只做目录名扫描，不编译脚本：脚本声明的元数据（<c>CreateInfo()</c>）与脚本实例
+        /// 都要等到首次选中该皮肤时才编译，避免启动期为列表显示付出整轮 Roslyn 编译（并因此编译两次）。
+        /// 代价是列表显示目录名而非脚本声明的显示名。
+        /// </summary>
+        public void BeginScriptedSkinCatalogRefresh()
+        {
+            if (!ScriptedSkinsEnabled)
+                return;
+
+            lock (scriptedCatalogLock)
+                scriptedSkinCatalog = scanScriptedSkinDirectories();
+
+            scheduler.Add(() => ScriptedSkinsCatalogUpdated?.Invoke());
+        }
+
+        /// <summary>
+        /// 仅根据目录结构生成脚本皮肤条目（不编译）。
+        /// </summary>
+        private List<Live<SkinInfo>> scanScriptedSkinDirectories()
+        {
+            var scriptedSkins = new List<Live<SkinInfo>>();
+
+            string scriptBasePath = Path.Combine(getEzResourcesBasePath(), "ScriptedSkin");
+
+            if (!Directory.Exists(scriptBasePath))
+                return scriptedSkins;
+
+            foreach (string skinDir in Directory.GetDirectories(scriptBasePath))
+            {
+                string skinName = Path.GetFileName(skinDir);
+
+                if (string.IsNullOrEmpty(findPrimaryScriptPath(skinDir)))
+                    continue;
+
+                scriptedSkins.Add(createScriptedSkinInfo(skinName).ToLiveUnmanaged());
+            }
+
+            return scriptedSkins;
+        }
+
+        private static SkinInfo createScriptedSkinInfo(string skinName) => new SkinInfo
+        {
+            Name = skinName,
+            Creator = string.Empty,
+            Protected = false,
+            ID = generateScriptedSkinId(skinName),
+            Hash = skinName,
+            InstantiationInfo = typeof(ScriptedSkinWrapper).GetInvariantInstantiationInfo(),
+        };
+
+        private Skin getOrLoadScriptedSkin(SkinInfo skinInfo)
+        {
+            lock (scriptedSkinInstanceLock)
+            {
+                if (scriptedSkinInstances.TryGetValue(skinInfo.ID, out Skin cached))
+                    return cached;
+
+                if (scriptedSkinLoadTasks.TryGetValue(skinInfo.ID, out Task<Skin> existingTask))
+                {
+                    if (scriptedSkinInstances.TryGetValue(skinInfo.ID, out cached))
+                        return cached;
+
+                    if (existingTask.IsFaulted)
+                        scriptedSkinLoadTasks.Remove(skinInfo.ID);
+                    else
+                        return getScriptedSkinLoadingFallback();
+                }
+            }
+
+            string scriptPath = getScriptPath(skinInfo);
+
+            if (string.IsNullOrEmpty(scriptPath))
+                return trianglesSkin;
+
+            beginScriptedSkinLoad(skinInfo, scriptPath);
+            return getScriptedSkinLoadingFallback();
+        }
+
+        private void beginScriptedSkinLoad(SkinInfo skinInfo, string scriptPath)
+        {
+            Task<Skin> loadTask;
+
+            lock (scriptedSkinInstanceLock)
+            {
+                if (scriptedSkinLoadTasks.TryGetValue(skinInfo.ID, out loadTask))
+                    return;
+
+                loadTask = loadScriptedSkinAsync(skinInfo, scriptPath);
+                scriptedSkinLoadTasks[skinInfo.ID] = loadTask;
+            }
+
+            loadTask.ContinueWith(task =>
+            {
+                lock (scriptedSkinInstanceLock)
+                    scriptedSkinLoadTasks.Remove(skinInfo.ID);
+
+                if (task.IsCompletedSuccessfully)
+                {
+                    Skin loadedSkin;
+
+                    lock (scriptedSkinInstanceLock)
+                    {
+                        if (!scriptedSkinInstances.TryGetValue(skinInfo.ID, out loadedSkin))
+                            return;
+                    }
+
+                    scheduler.Add(() =>
+                    {
+                        if (CurrentSkinInfo.Value.PerformRead(s => s.ID) == skinInfo.ID)
+                            CurrentSkin.Value = loadedSkin;
+                    });
+
+                    return;
+                }
+
+                if (task.Exception != null)
+                    Logger.Log($"Failed to load scripted skin '{skinInfo.Name}': {task.Exception.GetBaseException().Message}", LoggingTarget.Runtime, LogLevel.Error);
+            }, TaskScheduler.Default);
+        }
+
+        private async Task<Skin> loadScriptedSkinAsync(SkinInfo skinInfo, string scriptPath)
+        {
+            IScriptedSkin scriptedSkin = await scriptRunner.LoadScriptAsync<IScriptedSkin>(scriptPath, skinInfo, this).ConfigureAwait(false);
+            var wrapper = new ScriptedSkinWrapper(this, this, scriptedSkin, scriptRunner, skinInfo, scriptPath);
+
+            lock (scriptedSkinInstanceLock)
+                scriptedSkinInstances[skinInfo.ID] = wrapper;
+
+            return wrapper;
+        }
+
+        private Skin getScriptedSkinLoadingFallback()
+        {
+            Skin current = CurrentSkin.Value;
+
+            if (current != null && !isScriptedSkin(current.SkinInfo.Value))
+                return current;
+
+            return trianglesSkin;
+        }
+
+        private void invalidateScriptedSkinCaches(string scriptPath = null)
+        {
+            Guid? targetId = null;
+
+            if (scriptPath != null)
+            {
+                lock (scriptedCatalogLock)
+                {
+                    foreach (var liveSkinInfo in scriptedSkinCatalog)
+                    {
+                        if (getScriptPath(liveSkinInfo.Value) == scriptPath)
+                        {
+                            targetId = liveSkinInfo.Value.ID;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            lock (scriptedSkinInstanceLock)
+            {
+                if (scriptPath == null)
+                {
+                    scriptedSkinInstances.Clear();
+                    scriptedSkinLoadTasks.Clear();
+                }
+                else if (targetId.HasValue)
+                {
+                    scriptedSkinInstances.Remove(targetId.Value);
+                    scriptedSkinLoadTasks.Remove(targetId.Value);
+                }
+            }
+
+            if (scriptPath != null)
+                scriptRunner.ClearCache(scriptPath);
+            else
+                scriptRunner.ClearAllCache();
+        }
+
+        /// <summary>
+        /// 基于皮肤名称生成稳定的 GUID。
+        /// </summary>
+        private static Guid generateScriptedSkinId(string skinName)
+        {
+            // 使用 MD5 哈希生成稳定的 GUID
+            byte[] hash = MD5.HashData(
+                Encoding.UTF8.GetBytes($"scripted_{skinName}")
+            );
+            return new Guid(hash.Take(16).ToArray());
+        }
+
+        /// <summary>
+        /// 获取脚本文件的路径。
+        /// </summary>
+        private string getScriptPath(SkinInfo skinInfo) => ScriptedSkinSupport.GetScriptPath(skinInfo, getEzResourcesBasePath());
 
         /// <summary>
         /// Ensure that the current skin is in a state it can accept user modifications.
@@ -316,11 +581,46 @@ namespace osu.Game.Skinning
         /// <returns>Whether any change actually occurred.</returns>
         public bool Save(Skin skin)
         {
+            if (ScriptedSkinSupport.IsScriptedSkin(skin.SkinInfo))
+                return SaveScriptedSkinLayout(skin);
+
             if (!skin.SkinInfo.IsManaged)
                 throw new InvalidOperationException($"Attempting to save a skin which is not yet tracked. Call {nameof(EnsureMutableSkin)} first.");
 
             return skinImporter.Save(skin);
         }
+
+        /// <summary>
+        /// Save HUD layout JSON files for a scripted skin into its on-disk script directory.
+        /// </summary>
+        public bool SaveScriptedSkinLayout(Skin skin) => ScriptedSkinSupport.SaveLayoutToScriptDirectory(skin, getEzResourcesBasePath());
+
+        /// <summary>
+        /// Reload the current scripted skin from disk after external file edits.
+        /// </summary>
+        public void ReloadCurrentScriptedSkinIfActive()
+        {
+            CurrentSkinInfo.Value.PerformRead(skinInfo =>
+            {
+                if (!ScriptedSkinSupport.IsScriptedSkin(skinInfo))
+                    return;
+
+                string scriptPath = getScriptPath(skinInfo);
+
+                if (string.IsNullOrEmpty(scriptPath))
+                    return;
+
+                invalidateScriptedSkinCaches(scriptPath);
+                CurrentSkin.Value = getOrLoadScriptedSkin(skinInfo);
+            });
+
+            SourceChanged.Invoke();
+        }
+
+        /// <summary>
+        /// Resolves the on-disk directory for a scripted skin.
+        /// </summary>
+        public string GetScriptDirectory(SkinInfo skinInfo) => ScriptedSkinSupport.GetScriptDirectory(skinInfo, getEzResourcesBasePath());
 
         /// <summary>
         /// Perform a lookup query on available <see cref="SkinInfo"/>s.
@@ -419,8 +719,7 @@ namespace osu.Game.Skinning
         public Task<IEnumerable<Live<SkinInfo>>> Import(ProgressNotification notification, ImportTask[] tasks, ImportParameters parameters = default) =>
             skinImporter.Import(notification, tasks, parameters);
 
-        public Task<Live<SkinInfo>> ImportAsUpdate(ProgressNotification notification, ImportTask task, SkinInfo original) =>
-            skinImporter.ImportAsUpdate(notification, task, original);
+        public Task<Live<SkinInfo>> ImportAsUpdate(ProgressNotification notification, ImportTask task, SkinInfo original) => skinImporter.ImportAsUpdate(notification, task, original);
 
         public Task<ExternalEditOperation<SkinInfo>> BeginExternalEditing(SkinInfo model) => skinImporter.BeginExternalEditing(model);
 
@@ -485,6 +784,126 @@ namespace osu.Game.Skinning
             }
 
             CurrentSkinInfo.Value = skinInfo ?? trianglesSkin.SkinInfo;
+        }
+
+        /// <summary>
+        /// 启动脚本文件监控（在游戏启动时调用）。<see cref="ScriptedSkinsEnabled"/> 关闭时不装监视、不扫描目录。
+        /// </summary>
+        public void StartScriptWatching()
+        {
+            if (!ScriptedSkinsEnabled)
+            {
+                Logger.Log("脚本皮肤未启用（EzSkinSettings.ini: EnableScriptedSkins），跳过目录监视与扫描。", LoggingTarget.Information);
+                return;
+            }
+
+            if (hotReloadManager == null)
+                return;
+
+            string scriptPath = Path.Combine(getEzResourcesBasePath(), "ScriptedSkin");
+
+            if (Directory.Exists(scriptPath))
+            {
+                hotReloadManager.StartWatching(scriptPath);
+                Logger.Log($"开始监控脚本目录: {scriptPath}", LoggingTarget.Information);
+            }
+
+            BeginScriptedSkinCatalogRefresh();
+        }
+
+        /// <summary>
+        /// 获取指定皮肤的脚本文件路径。
+        /// </summary>
+        /// <param name="skinInfo">皮肤信息</param>
+        /// <returns>脚本文件路径，如果不是脚本皮肤则返回 null</returns>
+        public string GetScriptPath(SkinInfo skinInfo)
+        {
+            return getScriptPath(skinInfo);
+        }
+
+        /// <summary>
+        /// 获取指定皮肤的脚本文件路径（静态方法）。
+        /// </summary>
+        /// <param name="skinInfo">皮肤信息</param>
+        /// <returns>脚本文件路径，如果不是脚本皮肤则返回 null</returns>
+        public static string GetScriptPathStatic(SkinInfo skinInfo) =>
+            ScriptedSkinSupport.GetScriptPath(skinInfo, Path.GetFullPath(EzModifyPath.RESOURCES_PATH));
+
+        private string getEzResourcesBasePath()
+        {
+            string basePath = host.Storage?.GetFullPath(EzModifyPath.RESOURCES_PATH);
+            return string.IsNullOrWhiteSpace(basePath) ? EzModifyPath.RESOURCES_PATH : basePath;
+        }
+
+        public async Task<int> ReloadAllScriptedSkins()
+        {
+            if (!ScriptedSkinsEnabled || hotReloadManager == null)
+                return 0;
+
+            string scriptBasePath = Path.Combine(getEzResourcesBasePath(), "ScriptedSkin");
+
+            if (!Directory.Exists(scriptBasePath))
+                return 0;
+
+            int reloaded = 0;
+
+            foreach (string skinDir in Directory.GetDirectories(scriptBasePath))
+            {
+                string scriptPath = findPrimaryScriptPath(skinDir);
+                if (string.IsNullOrEmpty(scriptPath))
+                    continue;
+
+                if (await hotReloadManager.TriggerReload(scriptPath).ConfigureAwait(false))
+                    reloaded++;
+            }
+
+            if (reloaded > 0)
+                scheduler.Add(BeginScriptedSkinCatalogRefresh);
+
+            return reloaded;
+        }
+
+        private static string findPrimaryScriptPath(string scriptDirectory) => ScriptedSkinSupport.FindPrimaryScriptPath(scriptDirectory);
+
+        /// <summary>
+        /// 手动触发指定脚本的重载。
+        /// </summary>
+        /// <param name="scriptPath">脚本文件路径</param>
+        /// <returns>是否成功重载</returns>
+        public async Task<bool> TriggerScriptReload(string scriptPath)
+        {
+            if (!ScriptedSkinsEnabled || hotReloadManager == null)
+                return false;
+
+            return await hotReloadManager.TriggerReload(scriptPath).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 脚本重载完成时的回调。
+        /// </summary>
+        private void onScriptReloaded(string scriptPath, bool success)
+        {
+            if (success)
+            {
+                Logger.Log($"脚本重载成功: {Path.GetFileName(scriptPath)}", LoggingTarget.Information);
+
+                invalidateScriptedSkinCaches(scriptPath);
+
+                scheduler.Add(() =>
+                {
+                    CurrentSkinInfo.Value.PerformRead(skinInfo =>
+                    {
+                        if (isScriptedSkin(skinInfo) && getScriptPath(skinInfo) == scriptPath)
+                            CurrentSkin.Value = getOrLoadScriptedSkin(skinInfo);
+                    });
+
+                    SourceChanged?.Invoke();
+                });
+            }
+            else
+            {
+                Logger.Log($"脚本重载失败: {Path.GetFileName(scriptPath)}", LoggingTarget.Runtime, LogLevel.Error);
+            }
         }
     }
 }

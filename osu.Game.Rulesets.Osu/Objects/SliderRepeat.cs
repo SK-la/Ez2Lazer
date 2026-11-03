@@ -3,9 +3,12 @@
 
 namespace osu.Game.Rulesets.Osu.Objects
 {
-    public class SliderRepeat : SliderEndCircle
+    public class SliderRepeat : SliderEndCircle, IStableUndrawnScoringPoint
     {
         public double PathProgress { get; set; }
+
+        /// <inheritdoc />
+        public bool UndrawnUnderStableRules { get; set; }
 
         public SliderRepeat(Slider slider)
             : base(slider)

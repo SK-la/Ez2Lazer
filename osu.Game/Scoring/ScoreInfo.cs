@@ -7,6 +7,7 @@ using System.Linq;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
 using osu.Framework.Localisation;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Models;
@@ -26,7 +27,7 @@ namespace osu.Game.Scoring
     /// A realm model containing metadata for a single score.
     /// </summary>
     [MapTo("Score")]
-    public class ScoreInfo : RealmObject, IHasGuidPrimaryKey, IHasRealmFiles, ISoftDelete, IEquatable<ScoreInfo>, IScoreInfo
+    public class ScoreInfo : RealmObject, IHasGuidPrimaryKey, IHasRealmFiles, ISoftDelete, IEquatable<ScoreInfo>, IScoreWithReplayData
     {
         [PrimaryKey]
         public Guid ID { get; set; }
@@ -55,6 +56,7 @@ namespace osu.Game.Scoring
         /// <summary>
         /// The <see cref="osu.Game.Beatmaps.BeatmapInfo.Hash"/> at the point in time when the score was set.
         /// </summary>
+        [Indexed]
         public string BeatmapHash { get; set; } = string.Empty;
 
         public RulesetInfo Ruleset { get; set; } = null!;
@@ -95,6 +97,7 @@ namespace osu.Game.Scoring
         /// </summary>
         /// <remarks>
         /// Not populated if <see cref="IsLegacyScore"/> is <c>false</c>.
+        /// Always 0 on scores set in lazer.
         /// </remarks>
         public long? LegacyTotalScore { get; set; }
 
@@ -207,9 +210,18 @@ namespace osu.Game.Scoring
         [MapTo(nameof(Rank))]
         public int RankInt { get; set; }
 
+        #region IScoreWithReplayData
+
         IRulesetInfo IScoreInfo.Ruleset => Ruleset;
         IBeatmapInfo? IScoreInfo.Beatmap => BeatmapInfo;
         IUser IScoreInfo.User => User;
+        IEnumerable<IConfiguredMod> IScoreInfo.Mods => APIMods;
+        IReadOnlyDictionary<HitResult, int> IScoreInfo.Statistics => Statistics;
+        IReadOnlyDictionary<HitResult, int> IScoreInfo.MaximumStatistics => MaximumStatistics;
+        IReadOnlyList<HitEvent> IScoreWithReplayData.HitEvents => HitEvents;
+        IReadOnlyList<HealthValue> IScoreWithReplayData.HealthGraph => HealthGraph;
+
+        #endregion
 
         #region Properties required to make things work with existing usages
 
@@ -219,6 +231,9 @@ namespace osu.Game.Scoring
 
         [Ignored]
         public List<HitEvent> HitEvents { get; set; } = new List<HitEvent>();
+
+        [Ignored]
+        public List<HealthValue> HealthGraph { get; set; } = new List<HealthValue>();
 
         public ScoreInfo DeepClone()
         {
@@ -238,6 +253,15 @@ namespace osu.Game.Scoring
                 Username = RealmUser.Username,
                 CountryCode = RealmUser.CountryCode,
             };
+
+            clone.JudgeMode = JudgeMode;
+            clone.HealthMode = HealthMode;
+            clone.SessionOffsetPlusMania = SessionOffsetPlusMania;
+            clone.SessionOffsetPlusNonMania = SessionOffsetPlusNonMania;
+            clone.SessionAccuracyCutoffA = SessionAccuracyCutoffA;
+            clone.SessionAccuracyCutoffS = SessionAccuracyCutoffS;
+            clone.SessionSettingsCaptured = SessionSettingsCaptured;
+            clone.EzBonus = EzBonus;
 
             return clone;
         }
@@ -260,6 +284,60 @@ namespace osu.Game.Scoring
         /// Whether this <see cref="ScoreInfo"/> represents a legacy (osu!stable) score.
         /// </summary>
         public bool IsLegacyScore { get; set; }
+
+        /// <summary>
+        /// Ez2Lazer: 本成绩的判定档（全规则集共用）。Lazer (0) 为默认；其余为各规则集私有档或共享 stable 经典档。
+        /// 负值仅出现在字段引入前的旧行，读取时按 Lazer 处理。
+        /// </summary>
+        /// <remarks>
+        /// ez v11 起为规范列名；旧列 <c>ManiaHitMode</c> 的数据已由该版迁移搬入。
+        /// </remarks>
+        public int JudgeMode { get; set; }
+
+        /// <summary>
+        /// Ez2Lazer: 本成绩的血量档（全规则集共用）。语义同 <see cref="JudgeMode"/>。
+        /// </summary>
+        /// <remarks>
+        /// ez v11 起为规范列名；旧列 <c>ManiaHealthMode</c> 的数据已由该版迁移搬入。
+        /// </remarks>
+        public int HealthMode { get; set; }
+
+        /// <summary>
+        /// Ez2Lazer: 附加分（两种倾向各一份），与 <see cref="HitEvents"/> 同为临时数据：游玩结束或 Session 重跑后才有，
+        /// 不入 Realm。<see langword="null"/> 表示未计算。
+        /// </summary>
+        [Ignored]
+        public EzOsuGame.Scoring.Bonus.EzScoreBonusSet? EzBonus { get; set; }
+
+        /// <summary>
+        /// Ez2Lazer: Mania offset-plus setting at gameplay start (submission eligibility snapshot).
+        /// </summary>
+        [Ignored]
+        public double SessionOffsetPlusMania { get; set; }
+
+        /// <summary>
+        /// Ez2Lazer: Non-mania offset-plus setting at gameplay start (submission eligibility snapshot).
+        /// </summary>
+        [Ignored]
+        public double SessionOffsetPlusNonMania { get; set; }
+
+        /// <summary>
+        /// Ez2Lazer: Accuracy cutoff A at gameplay start (submission eligibility snapshot).
+        /// </summary>
+        [Ignored]
+        public double SessionAccuracyCutoffA { get; set; } = EzOsuGame.Scoring.EzOnlineScoreSubmissionPolicy.DEFAULT_ACCURACY_CUTOFF_A;
+
+        /// <summary>
+        /// Ez2Lazer: Accuracy cutoff S at gameplay start (submission eligibility snapshot).
+        /// </summary>
+        [Ignored]
+        public double SessionAccuracyCutoffS { get; set; } = EzOsuGame.Scoring.EzOnlineScoreSubmissionPolicy.DEFAULT_ACCURACY_CUTOFF_S;
+
+        /// <summary>
+        /// Whether session offset/cutoff snapshots were captured at gameplay start.
+        /// </summary>
+        [Ignored]
+        public bool SessionSettingsCaptured { get; set; }
 
         private Dictionary<HitResult, int>? statistics;
 
@@ -349,7 +427,54 @@ namespace osu.Game.Scoring
                 if (mods != null)
                     return mods;
 
-                return APIMods.Select(m => m.ToMod(Ruleset.CreateInstance())).ToArray();
+                var apiModList = APIMods;
+                if (apiModList.Length == 0)
+                    return mods = Array.Empty<Mod>();
+
+                List<Mod> parsedMods = new List<Mod>();
+                List<string>? strippedUnknown = null;
+
+                try
+                {
+                    var ruleset = Ruleset.CreateInstance();
+
+                    foreach (var apiMod in apiModList)
+                    {
+                        try
+                        {
+                            var parsed = apiMod.ToMod(ruleset);
+
+                            // [Ez] Deleted/obsolete mods resolve as UnknownMod. Strip them so leaderboards,
+                            // difficulty cache, Player, and race paths do not abort or re-log on every access.
+                            // ModsJson is left unchanged (no realm write-back).
+                            if (parsed is UnknownMod unknown)
+                            {
+                                strippedUnknown ??= new List<string>();
+                                strippedUnknown.Add(unknown.OriginalAcronym);
+                                continue;
+                            }
+
+                            parsedMods.Add(parsed);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"Failed to deserialize score mod '{apiMod}': {ex.Message}");
+                        }
+                    }
+                }
+                catch (RulesetLoadException ex)
+                {
+                    Logger.Log($"Failed to load ruleset for score mods (ruleset: {Ruleset.ShortName}): {ex.Message}");
+                }
+
+                if (strippedUnknown != null)
+                {
+                    Logger.Log(
+                        $"Score mods contained unresolved acronyms and were stripped: {string.Join(", ", strippedUnknown.Distinct())}",
+                        level: LogLevel.Important);
+                }
+
+                return mods = parsedMods.ToArray();
             }
             set
             {
@@ -371,7 +496,17 @@ namespace osu.Game.Scoring
 
                 // prioritise reading from realm backing
                 if (!string.IsNullOrEmpty(ModsJson))
-                    apiMods = JsonConvert.DeserializeObject<APIMod[]>(ModsJson);
+                {
+                    try
+                    {
+                        apiMods = JsonConvert.DeserializeObject<APIMod[]>(ModsJson);
+                    }
+                    catch (JsonException ex)
+                    {
+                        Logger.Log($"Failed to deserialize score mods JSON: {ex.Message}");
+                        apiMods = Array.Empty<APIMod>();
+                    }
+                }
 
                 // then check mods set via Mods property.
                 if (mods != null)
@@ -399,36 +534,6 @@ namespace osu.Game.Scoring
             ModsJson = APIMods.Length > 0
                 ? JsonConvert.SerializeObject(APIMods)
                 : string.Empty;
-        }
-
-        public IEnumerable<HitResultDisplayStatistic> GetStatisticsForDisplay()
-        {
-            foreach (var r in Ruleset.CreateInstance().GetHitResultsForDisplay())
-            {
-                int value = Statistics.GetValueOrDefault(r.result);
-
-                switch (r.result)
-                {
-                    case HitResult.SmallTickHit:
-                    case HitResult.LargeTickHit:
-                    case HitResult.SliderTailHit:
-                    case HitResult.LargeBonus:
-                    case HitResult.SmallBonus:
-                        if (MaximumStatistics.TryGetValue(r.result, out int count) && count > 0)
-                            yield return new HitResultDisplayStatistic(r.result, value, count, r.displayName);
-
-                        break;
-
-                    case HitResult.SmallTickMiss:
-                    case HitResult.LargeTickMiss:
-                        break;
-
-                    default:
-                        yield return new HitResultDisplayStatistic(r.result, value, null, r.displayName);
-
-                        break;
-                }
-            }
         }
 
         #endregion

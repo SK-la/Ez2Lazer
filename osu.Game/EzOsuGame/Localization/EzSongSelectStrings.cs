@@ -7,6 +7,12 @@ namespace osu.Game.EzOsuGame.Localization
 {
     public static class EzSongSelectStrings
     {
+        public static readonly EzLocalizationManager.EzLocalisableString SCORE_BONUS_JUDGE = new EzLocalizationManager.EzLocalisableString("判定加成", "Timing bonus");
+        public static readonly EzLocalizationManager.EzLocalisableString SCORE_BONUS_ERROR = new EzLocalizationManager.EzLocalisableString("失误罚分", "Error malus");
+        public static readonly EzLocalizationManager.EzLocalisableString SCORE_BONUS_TOTAL = new EzLocalizationManager.EzLocalisableString("含附加分", "With bonus");
+        public static readonly EzLocalizationManager.EzLocalisableString SCORE_BONUS_PENDING = new EzLocalizationManager.EzLocalisableString("附加分补算中", "Calculating bonus");
+        public static readonly EzLocalizationManager.EzLocalisableString SCORE_BONUS_UNAVAILABLE = new EzLocalizationManager.EzLocalisableString("无回放，无法计算附加分", "No replay, bonus unavailable");
+
         public static readonly EzLocalizationManager.EzLocalisableString SAVE_TO_COLLECTION = new EzLocalizationManager.EzLocalisableString(
             "将当前过滤结果保存到收藏夹",
             "Add all visible beatmaps to collection");
@@ -35,11 +41,19 @@ namespace osu.Game.EzOsuGame.Localization
             "移除交集",
             "Remove intersection");
 
-        public static readonly LocalisableString SQLITE_FILTER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "使用 sqlite 库进行过滤、排序、分组；"
-            + "\n启用xxySR、PP的支持，搭配分支库时可以获得mod处理结果的支持；",
-            "Use sqlite library for filtering, sorting and grouping;"
-            + "\nEnable xxySR and PP support, with branch library can get mod processing results support;");
+        public static readonly LocalisableString EZ_ANALYSIS_FILTER = new EzLocalizationManager.EzLocalisableString(
+            "Ez分析过滤",
+            "Ez analysis filter");
+
+        public static readonly LocalisableString XXY_STAR_RATING = new EzLocalizationManager.EzLocalisableString(
+            "xxy SR",
+            "xxy SR");
+
+        public static readonly LocalisableString EZ_ANALYSIS_FILTER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "分支曲库激活时：开启后，**xxy SR** 排序/分组/筛选改用分支库 sqlite 中的 xxy（含 mod 变体），替代 Realm 基线。"
+            + "\n**官方难度**排序/分组始终使用 StarRating，不受此开关影响。",
+            "When a songs branch is active: **xxy SR** sort/group/star filter use branch sqlite xxy (incl. mod variants) instead of Realm baseline."
+            + "\nSort/group by official **Difficulty** always uses StarRating.");
 
         public static readonly LocalisableString KEY_SOUND_PREVIEW_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "按键音预览：\n0 关闭; \n1 蓝灯开启 (全量音效预览); \n2 黄灯开启 (全量音效预览, 游戏中自动播放 note 音效, 按键不再触发样本播放) ",
@@ -53,5 +67,61 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString MULTI_SELECT_BUTTON_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "多选模式",
             "Multi-select mode");
+
+        public static readonly LocalisableString SELECTION_EZ_ANALYSIS = new EzLocalizationManager.EzLocalisableString(
+            "Ez分析",
+            "EzAnalysis");
+
+        public static readonly LocalisableString EZ_ANALYSIS_PLAYER = new EzLocalizationManager.EzLocalisableString(
+            "玩家",
+            "Player");
+
+        public static readonly LocalisableString EZ_ANALYSIS_RADAR_LEFT = new EzLocalizationManager.EzLocalisableString(
+            "雷达 L",
+            "Radar L");
+
+        public static readonly LocalisableString EZ_ANALYSIS_RADAR_RIGHT = new EzLocalizationManager.EzLocalisableString(
+            "雷达 R",
+            "Radar R");
+
+        public static readonly LocalisableString RADAR_MODE_SKILL = new EzLocalizationManager.EzLocalisableString(
+            "Skill",
+            "Skill");
+
+        public static readonly LocalisableString RESTORE_MOD_SELECTION = new EzLocalizationManager.EzLocalisableString(
+            "恢复上一次选择",
+            "Restore previous selection");
+
+        public static readonly LocalisableString MOD_CLEAR_RESTORE_HINT = new EzLocalizationManager.EzLocalisableString(
+            "清空 / 恢复 Mod",
+            "Clear / restore mods");
+
+        public static readonly LocalisableString MOD_CLEAR_RESTORE_HINT_SUB = new EzLocalizationManager.EzLocalisableString(
+            "切换",
+            "Toggle");
+
+        public static readonly LocalisableString RECALCULATE_SCORE = new EzLocalizationManager.EzLocalisableString(
+            "重算成绩",
+            "Recalculate score");
+
+        public static readonly LocalisableString RECALCULATE_SCORE_ORIGINAL_ENV = new EzLocalizationManager.EzLocalisableString(
+            "重算成绩（原始环境）",
+            "Recalculate score (original environment)");
+
+        public static readonly LocalisableString RECALCULATE_SCORE_CURRENT_ENV = new EzLocalizationManager.EzLocalisableString(
+            "重算成绩（当前环境）",
+            "Recalculate score (current environment)");
+
+        public static readonly LocalisableString RENAME_PLAYER = new EzLocalizationManager.EzLocalisableString(
+            "玩家重命名",
+            "Rename player");
+
+        public static readonly LocalisableString RENAME_PLAYER_HEADER = new EzLocalizationManager.EzLocalisableString(
+            "修改玩家名称",
+            "Rename player");
+
+        public static readonly LocalisableString RENAME_PLAYER_PLACEHOLDER = new EzLocalizationManager.EzLocalisableString(
+            "输入新的玩家名称",
+            "Enter new player name");
     }
 }

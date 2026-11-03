@@ -12,6 +12,7 @@ using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Extensions.TypeExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Effects;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays.Settings;
 using osu.Game.Utils;
@@ -111,9 +112,14 @@ namespace osu.Game.Configuration
     {
         public static IEnumerable<Drawable> CreateSettingsControls(this object obj)
         {
-            foreach (var (attr, property) in obj.GetOrderedSettingsSourceProperties())
+            foreach (var entry in obj.GetSkinSettingEntries())
             {
-                object value = property.GetValue(obj)!;
+                if (entry.Target is IScopedSkinSettings scoped && !scoped.IsSettingActive(entry.Property))
+                    continue;
+
+                var attr = entry.Attribute;
+                var property = entry.Property;
+                object value = property.GetValue(entry.Target)!;
 
                 if (attr.SettingControlType != null)
                 {
@@ -122,10 +128,10 @@ namespace osu.Game.Configuration
                         throw new InvalidOperationException($"{nameof(SettingSourceAttribute)} had an unsupported custom control type ({controlType.ReadableName()})");
 
                     var control = (Drawable)Activator.CreateInstance(controlType)!;
-                    controlType.GetProperty(nameof(SettingsItem<object>.SettingSourceObject))?.SetValue(control, obj);
-                    controlType.GetProperty(nameof(SettingsItem<object>.LabelText))?.SetValue(control, attr.Label);
-                    controlType.GetProperty(nameof(SettingsItem<object>.TooltipText))?.SetValue(control, attr.Description);
-                    controlType.GetProperty(nameof(SettingsItem<object>.Current))?.SetValue(control, value);
+                    controlType.GetProperty(nameof(SettingsItem<>.SettingSourceObject))?.SetValue(control, entry.Target);
+                    controlType.GetProperty(nameof(SettingsItem<>.LabelText))?.SetValue(control, attr.Label);
+                    controlType.GetProperty(nameof(SettingsItem<>.TooltipText))?.SetValue(control, attr.Description);
+                    controlType.GetProperty(nameof(SettingsItem<>.Current))?.SetValue(control, value);
 
                     yield return control;
 
@@ -201,9 +207,9 @@ namespace osu.Game.Configuration
                         var dropdownType = typeof(ModSettingsEnumDropdown<>).MakeGenericType(bindable.GetType().GetGenericArguments()[0]);
                         var dropdown = (Drawable)Activator.CreateInstance(dropdownType)!;
 
-                        dropdownType.GetProperty(nameof(SettingsDropdown<object>.LabelText))?.SetValue(dropdown, attr.Label);
-                        dropdownType.GetProperty(nameof(SettingsDropdown<object>.TooltipText))?.SetValue(dropdown, attr.Description);
-                        dropdownType.GetProperty(nameof(SettingsDropdown<object>.Current))?.SetValue(dropdown, bindable);
+                        dropdownType.GetProperty(nameof(SettingsDropdown<>.LabelText))?.SetValue(dropdown, attr.Label);
+                        dropdownType.GetProperty(nameof(SettingsDropdown<>.TooltipText))?.SetValue(dropdown, attr.Description);
+                        dropdownType.GetProperty(nameof(SettingsDropdown<>.Current))?.SetValue(dropdown, bindable);
 
                         yield return dropdown;
 
@@ -247,6 +253,66 @@ namespace osu.Game.Configuration
                 default:
                     // fall back for non-bindable cases.
                     return setting;
+            }
+        }
+
+        public readonly struct SkinSettingEntry
+        {
+            public SettingSourceAttribute Attribute { get; }
+
+            public PropertyInfo Property { get; }
+
+            public object Target { get; }
+
+            public string StorageName { get; }
+
+            public SkinSettingEntry(SettingSourceAttribute attribute, PropertyInfo property, object target, string storageName)
+            {
+                Attribute = attribute;
+                Property = property;
+                Target = target;
+                StorageName = storageName;
+            }
+        }
+
+        public static IEnumerable<SkinSettingEntry> GetSkinSettingEntries(this object obj)
+        {
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
+            bool hasHost = obj.GetType().GetProperties(flags).Any(p => p.GetCustomAttribute<EzBuiltinEffectSourceAttribute>(true) != null);
+
+            if (!hasHost)
+            {
+                foreach (var (attr, property) in obj.GetOrderedSettingsSourceProperties())
+                    yield return new SkinSettingEntry(attr, property, obj, property.Name);
+
+                yield break;
+            }
+
+            foreach (var property in obj.GetType().GetProperties(flags))
+            {
+                var hostAttribute = property.GetCustomAttribute<EzBuiltinEffectSourceAttribute>(true);
+
+                if (hostAttribute != null && property.GetValue(obj) is EzBuiltinEffectHost host)
+                {
+                    foreach (var (attr, hostProperty) in host.GetOrderedSettingsSourceProperties())
+                    {
+                        if (!host.ExposeSetting(hostProperty))
+                            continue;
+
+                        string storageName = hostProperty.Name == nameof(EzBuiltinEffectHost.EffectType) && hostAttribute.TypeStorageName != null
+                            ? hostAttribute.TypeStorageName
+                            : hostProperty.Name;
+
+                        yield return new SkinSettingEntry(attr, hostProperty, host, storageName);
+                    }
+
+                    continue;
+                }
+
+                var setting = property.GetCustomAttribute<SettingSourceAttribute>(true);
+
+                if (setting != null)
+                    yield return new SkinSettingEntry(setting, property, obj, property.Name);
             }
         }
 

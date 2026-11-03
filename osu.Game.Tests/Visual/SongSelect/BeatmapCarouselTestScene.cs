@@ -60,6 +60,8 @@ namespace osu.Game.Tests.Visual.SongSelect
 
         protected int NewItemsPresentedInvocationCount;
 
+        protected Action<IEnumerable<CarouselItem>>? OnNewItemsPresented;
+
         protected BeatmapCarouselTestScene()
         {
             store = new TestBeatmapStore
@@ -86,6 +88,7 @@ namespace osu.Game.Tests.Visual.SongSelect
                 BeatmapSetRequestedSelections.Clear();
                 BeatmapRecommendationFunction = null;
                 NewItemsPresentedInvocationCount = 0;
+                OnNewItemsPresented = null;
 
                 GroupedBeatmap? previousSelection = retainSelection ? Carousel.CurrentGroupedBeatmap : null;
 
@@ -123,7 +126,11 @@ namespace osu.Game.Tests.Visual.SongSelect
                                 Carousel = new TestBeatmapCarousel
                                 {
                                     CurrentGroupedBeatmap = previousSelection,
-                                    NewItemsPresented = _ => NewItemsPresentedInvocationCount++,
+                                    NewItemsPresented = items =>
+                                    {
+                                        NewItemsPresentedInvocationCount++;
+                                        OnNewItemsPresented?.Invoke(items);
+                                    },
                                     RequestSelection = b =>
                                     {
                                         BeatmapRequestedSelections.Push(b.Beatmap);
@@ -198,6 +205,7 @@ namespace osu.Game.Tests.Visual.SongSelect
 
         protected void WaitForDrawablePanels() => AddUntilStep("drawable panels loaded", () => Carousel.ChildrenOfType<ICarouselPanel>().Count(), () => Is.GreaterThan(0));
         protected void WaitForFiltering() => AddUntilStep("filtering finished", () => Carousel.IsFiltering, () => Is.False);
+        protected void WaitForFilterPresentation(int previousCount) => AddUntilStep("filter presentation finished", () => NewItemsPresentedInvocationCount, () => Is.GreaterThan(previousCount));
         protected void WaitForScrolling() => AddUntilStep("scroll finished", () => Scroll.Current, () => Is.EqualTo(Scroll.Target));
 
         protected void ToggleGroupCollapse() => AddStep("toggle group collapse", () =>

@@ -1,7 +1,9 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
@@ -9,8 +11,11 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Lines;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shaders;
+using osu.Framework.Graphics.Shaders.Types;
+using osu.Framework.Graphics.Textures;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.UserInterface;
+using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.UserInterface
@@ -120,21 +125,21 @@ namespace osu.Game.EzOsuGame.UserInterface
         }
     }
 
-    public partial class TriangleBorderPath : Path
+    public partial class TriangleBorderPath : SmoothPath
     {
-        private readonly float thickness;
-        private readonly float texelSize;
+        public float BorderThickness { get; set; }
+
+        public float BorderTexelSize { get; set; }
 
         public TriangleBorderPath(float thickness, float texelSize)
         {
-            this.thickness = thickness;
-            this.texelSize = texelSize;
+            BorderThickness = thickness;
+            BorderTexelSize = texelSize;
         }
 
         [BackgroundDependencyLoader]
         private void load(ShaderManager shaders)
         {
-            // Use reflection to set the TriangleBorder shader
             var shaderField = typeof(Path).GetField("TextureShader", BindingFlags.NonPublic | BindingFlags.Instance);
 
             if (shaderField != null)
@@ -144,48 +149,74 @@ namespace osu.Game.EzOsuGame.UserInterface
             }
         }
 
-        protected override DrawNode CreateDrawNode() => new TriangleBorderPathDrawNode(this);
+        protected override DrawNode CreateDrawNode()
+        {
+            var pathDrawNodeType = typeof(Path).GetNestedType("PathDrawNode", BindingFlags.NonPublic)!;
+            var child = (DrawNode)Activator.CreateInstance(pathDrawNodeType, this)!;
+            var sharedData = (BufferedDrawNodeSharedData)typeof(Path).GetField("sharedData", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(this)!;
 
-        private class TriangleBorderPathDrawNode : DrawNode
+            return new TriangleBorderBufferedDrawNode(this, child, sharedData);
+        }
+
+        private class TriangleBorderBufferedDrawNode : BufferedDrawNode
         {
             protected new TriangleBorderPath Source => (TriangleBorderPath)base.Source;
 
+            private long pathInvalidationID = -1;
+            private Texture texture = null!;
+            private Vector4 textureRect;
+            private IUniformBuffer<PathTextureParameters>? parametersBuffer;
             private IUniformBuffer<TriangleBorderData>? borderDataBuffer;
-            private IShader? shader;
 
-            public TriangleBorderPathDrawNode(TriangleBorderPath source)
-                : base(source)
+            public TriangleBorderBufferedDrawNode(TriangleBorderPath source, DrawNode child, BufferedDrawNodeSharedData sharedData)
+                : base(source, child, sharedData)
             {
             }
 
             public override void ApplyState()
             {
                 base.ApplyState();
-                shader = Source.TextureShader;
+                pathInvalidationID = Source.PathInvalidationID;
+                texture = Source.Texture;
+
+                var rect = texture.GetTextureRect();
+                textureRect = new Vector4(rect.Left, rect.Top, rect.Width, rect.Height);
             }
 
-            protected override void Draw(IRenderer renderer)
+            protected override void BindUniformResources(IShader shader, IRenderer renderer)
             {
-                base.Draw(renderer);
+                base.BindUniformResources(shader, renderer);
 
-                // Set up TriangleBorder uniform data and bind it
-                if (shader != null)
+                parametersBuffer ??= renderer.CreateUniformBuffer<PathTextureParameters>();
+                parametersBuffer.Data = new PathTextureParameters
                 {
-                    borderDataBuffer ??= renderer.CreateUniformBuffer<TriangleBorderData>();
-                    borderDataBuffer.Data = borderDataBuffer.Data with
-                    {
-                        Thickness = Source.thickness,
-                        TexelSize = Source.texelSize
-                    };
+                    TexRect1 = textureRect,
+                };
+                shader.BindUniformBlock("m_PathTextureParameters", parametersBuffer);
 
-                    shader.BindUniformBlock("m_BorderData", borderDataBuffer);
-                }
+                texture.Bind(1);
+
+                borderDataBuffer ??= renderer.CreateUniformBuffer<TriangleBorderData>();
+                borderDataBuffer.Data = borderDataBuffer.Data with
+                {
+                    Thickness = Source.BorderThickness,
+                    TexelSize = Source.BorderTexelSize,
+                };
+                shader.BindUniformBlock("m_BorderData", borderDataBuffer);
             }
+
+            protected override long GetDrawVersion() => pathInvalidationID;
 
             protected override void Dispose(bool isDisposing)
             {
                 base.Dispose(isDisposing);
                 borderDataBuffer?.Dispose();
+            }
+
+            [StructLayout(LayoutKind.Sequential, Pack = 1)]
+            private record struct PathTextureParameters
+            {
+                public UniformVector4 TexRect1;
             }
         }
     }

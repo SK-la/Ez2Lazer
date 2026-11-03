@@ -2,25 +2,30 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Drawing;
 using System.Text;
+using System.Threading;
 using JetBrains.Annotations;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration;
+using osu.Framework.Development;
 using osu.Framework.Graphics;
 using osu.Framework.Platform;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Online;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Scoring.Bonus;
+using osu.Game.Rulesets;
+using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.Configuration
 {
     public class Ez2ConfigManager : IniConfigManager<Ez2Setting>, IGameplaySettings
     {
         public static readonly string LOGGER_NAME = "ez_runtime";
-        public const double DEFAULT_TIMING_BASED_NOTE_TARGET_GRAYSCALE = 1.5;
-        public const double DEFAULT_TIMING_BASED_NOTE_COLOUR_ALPHA = 0.8;
         protected override string Filename => "EzSkinSettings.ini";
         private readonly int[] commonKeyModes = { 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
         public float DefaultHitPosition = 180f;
@@ -62,13 +67,20 @@ namespace osu.Game.EzOsuGame.Configuration
 
         private readonly Dictionary<EzColumnType, Bindable<Colour4>> columnColorBindables = new Dictionary<EzColumnType, Bindable<Colour4>>();
         private readonly Dictionary<(int keyMode, int columnIndex), ColumnBindings> columnBindings = new Dictionary<(int keyMode, int columnIndex), ColumnBindings>();
-        private readonly object columnBindingsLock = new object();
+        private readonly Lock columnBindingsLock = new Lock();
 
         public event Action<int, int, EzColumnType>? ColumnTypeChanged;
 
         public Ez2ConfigManager(Storage storage)
             : base(storage)
+        { }
+
+        protected override void PerformLoad()
         {
+            if (DebugUtils.IsNUnitRunning)
+                return;
+
+            base.PerformLoad();
         }
 
         protected override void InitialiseDefaults()
@@ -81,44 +93,132 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
             SetDefault(Ez2Setting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
 
+            // 0 = 尚未设置，首次启动时用显示器刷新率写入
+            SetDefault(Ez2Setting.FrameLimiterBase, EzFrameLimiter.UNINITIALISED_BASE, 60.0, 720.0, 1.0);
+            SetDefault(Ez2Setting.UpdateFrameLimiter, FrameSync.Unlimited);
             SetDefault(Ez2Setting.EzAnalysisRecEnabled, true);
             SetDefault(Ez2Setting.EzAnalysisSqliteEnabled, true);
             SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
-            SetDefault(Ez2Setting.HitObjectLifetimeUsesOwnTime, true);
+            SetDefault(Ez2Setting.MenuLogoPath, @"Menu/logo");
+            SetDefault(Ez2Setting.MenuLogoText, "(´・ω・｀),120");
+            SetDefault(Ez2Setting.MenuLogoVisualisationStyle, EzLogoVisualisationStyle.RadialBars);
+            SetDefault(Ez2Setting.MenuLogoBackdropStyle, EzLogoBackdropStyle.Acrylic);
+            SetDefault(Ez2Setting.MenuLogoBackdropColour, Colour4.FromHex("ff66ab"));
+            SetDefault(Ez2Setting.MenuLogoBackdropBlur, 10.0, 0.0, 40.0, 1.0);
+            SetDefault(Ez2Setting.MenuLogoBackdropOpacity, 1.0, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.SongSelectUseEzBackground, false);
+            SetDefault(Ez2Setting.NotificationBehaviour, EzNotificationBehaviour.Normal);
+            SetDefault(Ez2Setting.ScreenshotAction, EzScreenshotAction.SaveAndCopy);
+            SetDefault(Ez2Setting.HitObjectLifetimeUsesOwnTime, !DebugUtils.IsNUnitRunning);
+            SetDefault(Ez2Setting.ManiaSkipEmptyEdgeColumns, false);
+            SetDefault(Ez2Setting.ScratchAxisEnabled, false);
+            SetDefault(Ez2Setting.CatchScratchEz2Enabled, false);
+            // 格式：guid|axisIndex（多设备）；兼容旧版纯数字轴下标
+            SetDefault(Ez2Setting.ScratchAxisL, string.Empty);
+            SetDefault(Ez2Setting.ScratchAxisR, string.Empty);
+            SetDefault(Ez2Setting.ScratchAxisDeadzone, 0.005, 0.001, 0.01, 0.001);
+            SetDefault(Ez2Setting.ScratchAxisStopThreshold, 30, 10, 150);
+            SetDefault(Ez2Setting.CatchScratchDashEnterAcceleration, 0.0005, 0.0001, 0.0010, 0.00005);
+            SetDefault(Ez2Setting.CatchScratchDashExitVelocity, 0.00010, 0.00010, 0.00020, 0.00001);
+            SetDefault(Ez2Setting.ScratchAxisInvert, false);
+            SetDefault(Ez2Setting.SkipWithGameplayKeys, true);
 
-            SetDefault(Ez2Setting.StoryboardAutoVideoSize, true);
+            SetDefault(Ez2Setting.TurboMode, false);
+            SetDefault(Ez2Setting.TurboModeSnapshot, string.Empty);
+            SetDefault(Ez2Setting.FlowMode, false);
+
+            SetDefault(Ez2Setting.QuickRotationEnabled, false);
+            SetDefault(Ez2Setting.QuickRotationDifficultyTolerance, 0.5, 0.1, 2.0, 0.1);
+            SetDefault(Ez2Setting.QuickRotationCrossKeyMode, false);
+            SetDefault(Ez2Setting.QuickRotationCandidateCount, 5, 3, 6);
+
+            SetDefault(Ez2Setting.StoryboardAutoVideoSize, false);
+            SetDefault(Ez2Setting.MaterialUiMode, EzMaterialUiMode.LiquidGlass);
+
+            // 以下默认值的液态玻璃：轻磨砂、窄而强的边缘透镜、极轻色散、明亮窄镜面、
+            // 低染色高通透。模糊核半径约为 2.15σ，σ=6 时核半径 ~13px，折射强度 14 的位移
+            // 比值约 1.1，边缘弯折才看得见；σ 再大就会把可折射的细节抹平。
+            SetDefault(Ez2Setting.MaterialUiBlur, 8.0, 0.0, 40.0, 1.0);
+            SetDefault(Ez2Setting.MaterialGlassRefractionDepth, 20.0, 0.0, 60.0, 1.0);
+            SetDefault(Ez2Setting.MaterialGlassRefractionStrength, 10.0, 0.0, 24.0, 0.5);
+            SetDefault(Ez2Setting.MaterialGlassChromatic, 0.25, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.MaterialGlassEdgeHighlight, 0.2, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.MaterialGlassInnerShadow, 0.2, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.MaterialGlassTintStrength, 0.25, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.MaterialGlassEdgeSaturation, 0.5, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.UiFontDefault, string.Empty);
+            SetDefault(Ez2Setting.UiFontDefaultLocalized, string.Empty);
+            SetDefault(Ez2Setting.UiFontTitleAlternate, string.Empty);
+            SetDefault(Ez2Setting.UiFontTitleAlternateLocalized, string.Empty);
+            SetDefault(Ez2Setting.UiFontNumeric, string.Empty);
+            SetDefault(Ez2Setting.UiFontEmoji, string.Empty);
+            SetDefault(Ez2Setting.DesktopPetEnabled, false);
+            SetDefault(Ez2Setting.DesktopPetPack, "Default");
+            SetDefault(Ez2Setting.DesktopPetScale, 0.4, 0.25, 3.0, 0.05);
+            SetDefault(Ez2Setting.DesktopPetPositionX, 0.90f);
+            SetDefault(Ez2Setting.DesktopPetPositionY, 0.82f);
+            SetDefault(Ez2Setting.DesktopPetShowOnMenu, true);
+            SetDefault(Ez2Setting.DesktopPetShowOnSongSelect, true);
+            SetDefault(Ez2Setting.DesktopPetShowOnGameplay, true);
+            SetDefault(Ez2Setting.DesktopPetShowOnResults, true);
+            SetDefault(Ez2Setting.DesktopPetLive2DLipSync, false);
             SetDefault(Ez2Setting.KeySoundPreviewMode, KeySoundPreviewMode.Off);
             SetDefault(Ez2Setting.BeatmapPreviewMode, EzBeatmapPreviewMode.Static);
-            SetDefault(Ez2Setting.SqliteFilter, false);
-            SetDefault(Ez2Setting.KpcDisplayMode, EzEnumChartDisplay.BarChart);
+            SetDefault(Ez2Setting.BeatmapPreviewModeMania, EzBeatmapPreviewMode.StaticFullMap);
+            SetDefault(Ez2Setting.BeatmapPreviewDensity, 1.0, 0.1, 5.0, 0.05);
+            // 宽或高 <= 0 表示对应轴未手动调整，打开时使用默认宽度 / 最大高度。
+            SetDefault(Ez2Setting.BeatmapPreviewPanelSize, new Size(-1, -1), null);
+            SetDefault(Ez2Setting.EditorSyncTimelineSpacing, true);
+            SetDefault(Ez2Setting.SkinEditorHudSnapEnabled, false);
+            SetDefault(Ez2Setting.SkinEditorHudSnapDistance, 20, 10, 50, 5);
+            SetDefault(Ez2Setting.SkinEditorHudSnapPixelFlush, false);
+            SetDefault(Ez2Setting.SkinEditorComponentPickerX, 0.5f);
+
+            SetDefault(Ez2Setting.EzAnalysisFilter, false);
             SetDefault(Ez2Setting.EzSelectCsMode, string.Empty);
             SetDefault(Ez2Setting.ColumnTypeListSelect, 4);
+
+            // Ez 技能：默认与 EzDanAlgorithm.LN_CHART_MIN_HOLD_OBJECTS 一致。
+            SetDefault(Ez2Setting.SkillLnChartMinHoldObjects, 150, 0, 1000);
 
             #endregion
 
             #region 音频与输入
 
             SetDefault(Ez2Setting.AsioSampleRate, 48000);
+            SetDefault(Ez2Setting.AsioBitDepth, 24);
             SetDefault(Ez2Setting.AsioBufferSize, 128);
+            SetDefault(Ez2Setting.AsioUseExternalPCM, true);
 
             SetDefault(Ez2Setting.OffsetPlusMania, 0.0, -200.0, 200.0, 1.0);
             SetDefault(Ez2Setting.OffsetPlusNonMania, 0.0, -200.0, 200.0, 1.0);
+            SetDefault(Ez2Setting.StdJudgeMode, EzEnumJudgeMode.Lazer);
 
             #endregion
 
             #region 皮肤与舞台资源
 
             SetDefault(Ez2Setting.GlobalTextureName, 4);
-            SetDefault(Ez2Setting.GameThemeName, EzEnumGameThemeName.Celeste_Lumiere);
+            SetDefault(Ez2Setting.GameThemeName, EzGameThemeNames.DEFAULT);
             SetDefault(Ez2Setting.NoteSetName, "lucenteclat");
             SetDefault(Ez2Setting.StageName, "Celeste_Lumiere");
             SetDefault(Ez2Setting.StagePanelEnabled, true);
+            SetDefault(Ez2Setting.StageBackground, string.Empty);
+            SetDefault(Ez2Setting.StageBackgroundColour, Colour4.White);
+            SetDefault(Ez2Setting.ColumnLightName, "EzColumnLight");
+
+            // 默认不覆盖：各 stage layout 里的 judgementLine 决定画哪张，这里留空。
+            SetDefault(Ez2Setting.JudgementLineName, string.Empty);
 
             SetDefault(Ez2Setting.ColumnWidthStyle, ColumnWidthStyle.EzSkinOnly);
             SetDefault(Ez2Setting.ColumnWidth, 76, 5, 400.0, 1.0);
             SetDefault(Ez2Setting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
 
             SetDefault(Ez2Setting.HitPositionGlobalEnable, false);
+            SetDefault(Ez2Setting.EzSkinJsonAutoApplyOnSkinChange, false);
+
+            // 启动时读取一次（见 SkinManager.ScriptedSkinsEnabled），改动需重启生效。
+            SetDefault(Ez2Setting.EnableScriptedSkins, false);
             SetDefault(Ez2Setting.HitPosition, DefaultHitPosition, 0, 500, 1.0);
             SetDefault(Ez2Setting.HitTargetFloatFixed, 6, 0, 10, 0.1);
             SetDefault(Ez2Setting.HitTargetAlpha, 0.6, 0, 1, 0.01);
@@ -159,7 +259,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
             #region 服务器与账号
 
-            SetDefault(Ez2Setting.ServerPreset, ServerPreset.Official);
+            SetDefault(Ez2Setting.ServerPreset, ServerPreset.g0v0);
             SetDefault(Ez2Setting.CustomApiUrl, string.Empty);
             SetDefault(Ez2Setting.CustomWebsiteUrl, string.Empty);
             SetDefault(Ez2Setting.CustomClientId, string.Empty);
@@ -175,34 +275,49 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ServerGuToken, string.Empty);
             SetDefault(Ez2Setting.ServerManualUsername, string.Empty);
             SetDefault(Ez2Setting.ServerManualToken, string.Empty);
+            SetDefault(Ez2Setting.PixivAllowR18, false);
+            SetDefault(Ez2Setting.PixivLandscapeOnly, true);
+            SetDefault(Ez2Setting.PixivAccountWhitelist, string.Empty);
+            SetDefault(Ez2Setting.PixivAccountBlacklist, string.Empty);
+            SetDefault(Ez2Setting.PixivTagInclude, string.Empty);
+            SetDefault(Ez2Setting.PixivTagExclude, string.Empty);
+            SetDefault(Ez2Setting.PixivAutoDownloadEnabled, false);
+            SetDefault(Ez2Setting.PixivApiProxyBaseUrl, string.Empty);
 
             #endregion
 
             #region 实验性功能
 
+            SetDefault(Ez2Setting.GcMode, EzGcMode.Server);
             SetDefault(Ez2Setting.InputAudioLatencyTracker, false);
             SetDefault(Ez2Setting.ExperimentalLocalAccount, false);
 
             SetDefault(Ez2Setting.EzJudgmentDiagEnabled, false);
-            SetDefault(Ez2Setting.EzSubFrameCorrectionEnabled, true);
+            SetDefault(Ez2Setting.EzSubFrameCorrectionEnabled, false);
             SetDefault(Ez2Setting.EzTimingTraceEnabled, false);
+            SetDefault(Ez2Setting.EzScoreRaceServiceEnabled, true);
+            SetDefault(Ez2Setting.EzScoreRaceFeedMode, EzReplayFeedMode.BatchAllEvents);
+            SetDefault(Ez2Setting.EzHudCameraEnabled, false);
 
             #endregion
         }
 
         private void initializeManiaDefaults()
         {
-            SetDefault(Ez2Setting.ManiaHitMode, EzEnumHitMode.Lazer);
+            SetDefault(Ez2Setting.ManiaJudgeMode, EzEnumJudgeMode.Lazer);
             SetDefault(Ez2Setting.ManiaHealthMode, EzEnumHealthMode.Lazer);
-            SetDefault(Ez2Setting.BmsPoorHitResultEnable, true);
+            SetDefault(Ez2Setting.BmsPoorHitResultEnable, !DebugUtils.IsNUnitRunning);
+            SetDefault(Ez2Setting.JudgePrecedence, EzEnumJudgePrecedence.Earliest);
+            SetDefault(Ez2Setting.ScoreBonusTendency, EzScoreBonusTendency.LowErrorRate);
+            SetDefault(Ez2Setting.ScoreBonusCrossMs, EzScoreBonusFormula.OFFSET_CROSS_MS, 11, 64, 1.0);
             SetDefault(Ez2Setting.ManiaBarLinesBool, true);
 
             SetDefault(Ez2Setting.ManiaPseudo3DRotation, 0.0, 0.0, 75.0, 1.0);
-            SetDefault(Ez2Setting.TimingBasedNoteColouringTargetGrayscale, DEFAULT_TIMING_BASED_NOTE_TARGET_GRAYSCALE, 0.1, 2.0, 0.01);
-            SetDefault(Ez2Setting.TimingBasedNoteColouringColourAlpha, DEFAULT_TIMING_BASED_NOTE_COLOUR_ALPHA, 0.0, 1.0, 0.01);
             SetDefault(Ez2Setting.ManiaHoldTailAlpha, 1.0, 0.0, 1.0, 0.01);
-            SetDefault(Ez2Setting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 100.0, 1.0);
+            // UI 0-8，除 32 得到节拍；0 关闭投皮额外负担，默认 4 = 4/32 = 2/16。旧存档 >8 的像素值钳回默认 4。
+            SetDefault(Ez2Setting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 8.0, 1.0);
             SetDefault(Ez2Setting.ManiaLNGradientEnable, true);
+            SetDefault(Ez2Setting.ManiaHoldTailMaskDynamicEnable, false);
         }
 
         #region 列类型管理
@@ -245,6 +360,130 @@ namespace osu.Game.EzOsuGame.Configuration
         #endregion
 
         #region 公共方法
+
+        /// <summary>
+        /// 从当前配置读取实时游玩环境快照（等同 <see cref="ResolveEnvironment"/> + <see cref="ReplayRunPurpose.ForLive"/>）。
+        /// </summary>
+        public GameplayEnvironment GetGameplayEnvironment(RulesetInfo? ruleset = null)
+            => ResolveEnvironment(ReplayRunPurpose.ForLive, ruleset: ruleset);
+
+        /// <summary>
+        /// 统一环境解析：Purpose 决定 JudgeMode/HealthMode 来源；score 可选。
+        /// </summary>
+        /// <param name="purpose">
+        /// <see cref="ReplayRunPurpose.ForStored"/>：读 score 嵌入 JudgeMode/HealthMode（无嵌入时 Mania 回退 Lazer）。
+        /// <see cref="ReplayRunPurpose.ForLive"/>：读当前全局配置，判定轨按规则集取。
+        /// </param>
+        /// <param name="score">可选；ForStored 时用于嵌入模式查询，并作为规则集来源。</param>
+        /// <param name="ignoreOffset">
+        /// 为 true 时强制 offset = 0（Session / 分析的 <see cref="ReplayRunPurpose.ForLive"/>）。
+        /// 省略时：<see cref="ReplayRunPurpose.ForStored"/> 恒为 0；<see cref="ReplayRunPurpose.ForLive"/> 读全局设置。
+        /// </param>
+        /// <param name="ruleset">可选；score 为 null 时用于解析 live 判定轨的规则集（如无成绩的本地 Mania 局）。</param>
+        public GameplayEnvironment ResolveEnvironment(ReplayRunPurpose purpose, ScoreInfo? score = null, bool ignoreOffset = false, RulesetInfo? ruleset = null)
+        {
+            int rulesetId = score?.Ruleset.OnlineID ?? ruleset?.OnlineID ?? -1;
+            var live = readLiveGameplayEnvironment(rulesetId);
+
+            GameplayEnvironment resolved = purpose switch
+            {
+                ReplayRunPurpose.ForStored => resolveStoredModes(live, score, rulesetId),
+                _ => live,
+            };
+
+            double offsetMania = purpose == ReplayRunPurpose.ForStored || ignoreOffset ? 0 : live.OffsetPlusMania;
+            double offsetNonMania = purpose == ReplayRunPurpose.ForStored || ignoreOffset ? 0 : live.OffsetPlusNonMania;
+
+            return resolved with
+            {
+                OffsetPlusMania = offsetMania,
+                OffsetPlusNonMania = offsetNonMania,
+            };
+        }
+
+        private GameplayEnvironment readLiveGameplayEnvironment(int rulesetId) => new GameplayEnvironment
+        {
+            JudgeMode = resolveLiveJudgeMode(rulesetId),
+            HealthMode = Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode),
+            JudgePrecedence = Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence),
+            OffsetPlusMania = Get<double>(Ez2Setting.OffsetPlusMania),
+            OffsetPlusNonMania = Get<double>(Ez2Setting.OffsetPlusNonMania),
+            BmsPoorHitResultEnable = Get<bool>(Ez2Setting.BmsPoorHitResultEnable),
+        };
+
+        /// <summary>
+        /// live 判定轨按规则集取：Mania/BMS 读 Mania 档，Osu 读 std 判定轨，其余默认 Lazer。
+        /// </summary>
+        private EzEnumJudgeMode resolveLiveJudgeMode(int rulesetId) => normalizeJudgeMode(rulesetId switch
+        {
+            3 => Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode),
+            0 => Get<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode),
+            _ => EzEnumJudgeMode.Lazer,
+        });
+
+        /// <summary>
+        /// 已保存配置里可能残留已淘汰的枚举值（例如 Mania Classic 的 38）。未定义值回退 StableClassic：
+        /// 留到下游会让窗口表落空、全判 Miss。只做内存回退，不改写已保存配置。
+        /// </summary>
+        private static EzEnumJudgeMode normalizeJudgeMode(EzEnumJudgeMode mode)
+            => Enum.IsDefined(mode) ? mode : EzEnumJudgeMode.StableClassic;
+
+        private static GameplayEnvironment resolveStoredModes(GameplayEnvironment live, ScoreInfo? score, int rulesetId)
+        {
+            if (score != null && score.TryGetManiaGameplayModes(out int judgeMode, out int healthMode))
+            {
+                return live with
+                {
+                    JudgeMode = (EzEnumJudgeMode)judgeMode,
+                    HealthMode = (EzEnumHealthMode)healthMode,
+                };
+            }
+
+            if (score != null && score.TryGetStdGameplayMode(out int stdMode))
+            {
+                return live with
+                {
+                    JudgeMode = (EzEnumJudgeMode)stdMode,
+                };
+            }
+
+            if (rulesetId == 3)
+            {
+                return live with
+                {
+                    JudgeMode = EzEnumJudgeMode.Lazer,
+                    HealthMode = EzEnumHealthMode.Lazer,
+                };
+            }
+
+            if (rulesetId == 0)
+            {
+                // 无成绩但已知按 osu 解析：ForStored 不得回读实时判定轨。
+                return live with
+                {
+                    JudgeMode = EzEnumJudgeMode.Lazer,
+                };
+            }
+
+            return live;
+        }
+
+        /// <summary>
+        /// 列宽风格换算到单列宽度时的系数：全局总宽度按 <c>10 / keyMode</c> 摊到每列，其余风格为 1。
+        /// </summary>
+        /// <remarks>
+        /// 实际列宽由 <c>ManiaPlayfieldLayoutHelper.CalculateColumnSize</c> 应用该系数；note 尺寸等按同一条规则换算，
+        /// 否则宽度随风格变化而高度不变，note 会被压扁。
+        /// </remarks>
+        public float GetColumnWidthStyleScale(int keyMode)
+        {
+            if (keyMode <= 0)
+                return 1;
+
+            return Get<ColumnWidthStyle>(Ez2Setting.ColumnWidthStyle) == ColumnWidthStyle.GlobalTotalWidth
+                ? 10f / keyMode
+                : 1f;
+        }
 
         /// <summary>
         /// 获取列宽
@@ -740,29 +979,297 @@ namespace osu.Game.EzOsuGame.Configuration
         AccuracyCutoffS,
         AccuracyCutoffA,
 
+        FrameLimiterBase,
+        UpdateFrameLimiter,
+
+        /// <summary>
+        /// 选歌时是否对 Ez SQLite 体系内指标（主库 kps/KPC、有 Mod 时的 kps/xxy 等）做即时计算；关闭则只读已落盘数据。
+        /// 分支库快照仍只读；PP 显示应对齐官方 Star 缓存，不由本开关控制。
+        /// </summary>
         EzAnalysisRecEnabled,
+
+        /// <summary>
+        /// Ez 分析 SQLite 主库与分支曲库读写总开关；与 <see cref="EzAnalysisRecEnabled"/> 分工（存储 vs 即时计算）。
+        /// </summary>
         EzAnalysisSqliteEnabled,
+
         HideMainMenuOnlineBanner,
+
+        /// <summary>
+        /// 主菜单 logo 贴图路径，默认 Menu/logo，可切换到 Menu/logo2 等同级资源。
+        /// </summary>
+        MenuLogoPath,
+
+        /// <summary>
+        /// 主菜单 logo 中心文字。格式：文本,字号（如 123,12）；支持颜文字；留空则不显示。
+        /// </summary>
+        MenuLogoText,
+
+        /// <summary>
+        /// 主菜单/选歌 logo 外圈音频可视化样式。
+        /// </summary>
+        MenuLogoVisualisationStyle,
+
+        /// <summary>
+        /// 主界面大 logo 圆圈底色：单色、亚克力、联动背景或透明。
+        /// </summary>
+        MenuLogoBackdropStyle,
+
+        /// <summary>
+        /// <see cref="MenuLogoBackdropStyle"/> 为单色时的颜色，含透明度。
+        /// </summary>
+        MenuLogoBackdropColour,
+
+        /// <summary>
+        /// <see cref="MenuLogoBackdropStyle"/> 为亚克力时的虚化强度。
+        /// </summary>
+        MenuLogoBackdropBlur,
+
+        /// <summary>
+        /// <see cref="MenuLogoBackdropStyle"/> 为联动背景时的不透明度。
+        /// </summary>
+        MenuLogoBackdropOpacity,
+
+        /// <summary>
+        /// 开启后选歌界面沿用主页背景，不单独加载当前谱面背景。
+        /// </summary>
+        SongSelectUseEzBackground,
+        NotificationBehaviour,
+        ScreenshotAction,
+        ManiaSkipEmptyEdgeColumns,
+
+        /// <summary>
+        /// 开启后 L/R 转盘轴可用于 Mania 首尾列与 Catch 左右移动（不改写 Realm 键位）。
+        /// </summary>
+        ScratchAxisEnabled,
+
+        /// <summary>
+        /// Catch 转盘 Ez2 增强：半死区、1 帧激活、转速变速（最高 1.5× Dash）。
+        /// </summary>
+        CatchScratchEz2Enabled,
+
+        /// <summary>
+        /// L 转盘绑定（<c>guid|axisIndex</c>）。规则集无关。
+        /// </summary>
+        ScratchAxisL,
+
+        /// <summary>
+        /// R 转盘绑定（<c>guid|axisIndex</c>）。
+        /// </summary>
+        ScratchAxisR,
+
+        /// <summary>
+        /// 转盘轴位移死区：|Δ| 低于此值视为抖动，不触发按下。
+        /// </summary>
+        ScratchAxisDeadzone,
+
+        /// <summary>
+        /// 停转判定：距上次有效转动超过多少毫秒后松开。
+        /// </summary>
+        ScratchAxisStopThreshold,
+
+        /// <summary>
+        /// Ez2Catch 转盘进入 Dash 的角加速度阈值（轴单位/ms²）。
+        /// </summary>
+        CatchScratchDashEnterAcceleration,
+
+        /// <summary>
+        /// Ez2Catch 转盘退出 Dash 的平滑角速度阈值（轴单位/ms）。
+        /// </summary>
+        CatchScratchDashExitVelocity,
+
+        /// <summary>
+        /// 反转转盘方向：交换顺/逆时针的含义（Catch 左右移动，以及选歌界面的上一首/下一首）。
+        /// 与「使用 Ez2Ac 10k2s1p」无关；Mania 顺逆均视为按下，不受影响。
+        /// </summary>
+        ScratchAxisInvert,
+
+        SkipWithGameplayKeys,
+
+        /// <summary>
+        /// 极速模式总开关：压制非皮肤相关的每帧开销（背景、故事板、模糊、HUD 特效等）以提高帧数。
+        /// 开启时把一组官方与 Ez 设置改写为低开销值，关闭时按 <see cref="TurboModeSnapshot"/> 还原。
+        /// </summary>
+        TurboMode,
+
+        /// <summary>
+        /// 极速模式生效前的原始设置快照（JSON）。非空表示压制正在生效，
+        /// 启动时若发现它非空即为上次异常退出，需立即还原。不面向用户。
+        /// </summary>
+        TurboModeSnapshot,
+
+        /// <summary>
+        /// 心流（Zen Flow）：从选歌进入的单人游玩结束后跳过结算直接回选歌；选歌界面禁用 Ranking 标签。
+        /// </summary>
+        FlowMode,
+
+        /// <summary>
+        /// 快速轮换总开关：从选歌进入的单人局结束后在专用界面连续抽卡开下一首。
+        /// </summary>
+        QuickRotationEnabled,
+
+        /// <summary>
+        /// 快速轮换难度平衡容差（相对首次进入时的基准难度）。
+        /// </summary>
+        QuickRotationDifficultyTolerance,
+
+        /// <summary>
+        /// Mania 快速轮换是否允许跨键数（4–10K）；关闭则锁定首轮键数。
+        /// </summary>
+        QuickRotationCrossKeyMode,
+
+        /// <summary>
+        /// 每轮抽卡展示的候选谱面数量（3–6）。
+        /// </summary>
+        QuickRotationCandidateCount,
+
         StoryboardAutoVideoSize,
+
+        /// <summary>
+        /// 穿透容器的材质：关闭 / 毛玻璃 / 液态玻璃。
+        /// </summary>
+        MaterialUiMode,
+        MaterialUiBlur,
+
+        /// <summary>
+        /// 液态玻璃边缘折射带宽度（屏幕像素）。越小越像薄玻璃，过渡越硬。
+        /// </summary>
+        MaterialGlassRefractionDepth,
+
+        /// <summary>
+        /// 液态玻璃边缘折射的最大位移（屏幕像素）。
+        /// </summary>
+        MaterialGlassRefractionStrength,
+
+        /// <summary>
+        /// 液态玻璃 R/G/B 三通道折射位移差，产生色散。
+        /// </summary>
+        MaterialGlassChromatic,
+
+        /// <summary>
+        /// 液态玻璃朝光侧边缘高光强度。
+        /// </summary>
+        MaterialGlassEdgeHighlight,
+
+        /// <summary>
+        /// 液态玻璃背光侧内阴影强度。
+        /// </summary>
+        MaterialGlassInnerShadow,
+
+        /// <summary>
+        /// 液态玻璃染色混合权重。
+        /// </summary>
+        MaterialGlassTintStrength,
+
+        /// <summary>
+        /// 液态玻璃边缘带饱和度提升量，制造厚玻璃的体积感。
+        /// </summary>
+        MaterialGlassEdgeSaturation,
+
+        /// <summary>English / Latin system font for default UI (empty = built-in Torus BMFont).</summary>
+        UiFontDefault,
+
+        /// <summary>Localized (CJK etc.) system font for default UI empty-name fallback (empty = Noto BMFont).</summary>
+        UiFontDefaultLocalized,
+
+        /// <summary>English system font for title/alternate (empty = built-in TorusAlternate).</summary>
+        UiFontTitleAlternate,
+
+        /// <summary>Localized system font for title/alternate empty-name fallback.</summary>
+        UiFontTitleAlternateLocalized,
+
+        /// <summary>System font family for numeric display (empty = built-in Venera).</summary>
+        UiFontNumeric,
+
+        /// <summary>System colour emoji font (empty = auto-detect platform emoji face).</summary>
+        UiFontEmoji,
+
+        /// <summary>Independent desktop pet overlay (not a skin component).</summary>
+        DesktopPetEnabled,
+
+        /// <summary>Folder name under EzResources/Pets.</summary>
+        DesktopPetPack,
+
+        DesktopPetScale,
+
+        /// <summary>Normalised pet centre X in [0, 1].</summary>
+        DesktopPetPositionX,
+
+        /// <summary>Normalised pet centre Y in [0, 1].</summary>
+        DesktopPetPositionY,
+
+        DesktopPetShowOnMenu,
+
+        DesktopPetShowOnSongSelect,
+
+        DesktopPetShowOnGameplay,
+
+        DesktopPetShowOnResults,
+
+        /// <summary>Drive Live2D mouth open from track amplitude (min open &gt; 0).</summary>
+        DesktopPetLive2DLipSync,
 
         // 界面功能
         KeySoundPreviewMode,
         BeatmapPreviewMode,
-        SqliteFilter,
-        KpcDisplayMode,
+        BeatmapPreviewModeMania,
+        BeatmapPreviewDensity,
+
+        /// <summary>已手动调整的谱面预览面板尺寸（像素，分量 &lt;= 0 = 该轴未调整）。</summary>
+        BeatmapPreviewPanelSize,
+
+        EditorSyncTimelineSpacing,
+
+        /// <summary>
+        /// Skin editor HUD magnetic snap (overlay layout editor).
+        /// </summary>
+        SkinEditorHudSnapEnabled,
+
+        /// <summary>
+        /// First-stage HUD snap gap in SkinnableContainer parent pixels (10/15/20/25/50).
+        /// </summary>
+        SkinEditorHudSnapDistance,
+
+        /// <summary>
+        /// When enabled, snap uses rendered pixel bounds. When disabled (default), snap uses each HUD component's layout/container box.
+        /// </summary>
+        SkinEditorHudSnapPixelFlush,
+
+        /// <summary>
+        /// Remembered horizontal position of the component picker as a fraction of its free travel
+        /// (0 = left edge, 1 = right edge). Resolution-independent so it survives window resizes.
+        /// </summary>
+        SkinEditorComponentPickerX,
+
+        EzAnalysisFilter,
+
         EzSelectCsMode,
         ColumnTypeListSelect,
 
         // 音频与输入
         AsioSampleRate,
+        AsioBitDepth,
         AsioBufferSize,
+        AsioUseExternalPCM,
         OffsetPlusMania,
         OffsetPlusNonMania,
+        StdJudgeMode,
         HitObjectLifetimeUsesOwnTime,
 
         // 皮肤与舞台资源
         ColumnWidthStyle,
         HitPositionGlobalEnable, // 未来要考虑，是否统一成，整套系统套用在传统皮肤上，变成切换设置
+
+        /// <summary>
+        /// When enabled, switching skins applies per-skin EzSkin.json to in-memory Ez config only.
+        /// </summary>
+        EzSkinJsonAutoApplyOnSkinChange,
+
+        /// <summary>
+        /// 脚本皮肤总开关。关闭时不扫描 <c>EzResources/ScriptedSkin</c>、不监视脚本文件、不做任何脚本编译。
+        /// 属启动期一次性读取的开关（不参与响应式绑定），改动后需重启生效。
+        /// </summary>
+        EnableScriptedSkins,
         GlobalTextureName,
         GameThemeName,
 
@@ -770,14 +1277,41 @@ namespace osu.Game.EzOsuGame.Configuration
         StageName,
         StagePanelEnabled,
 
+        /// <summary>
+        /// 文件名（不含扩展名），对应 <c>EzResources/Panel</c>。空字符串表示不显示。
+        /// </summary>
+        StageBackground,
+
+        /// <summary>
+        /// Panel 图的乘色，含透明度。默认不透明白。
+        /// </summary>
+        StageBackgroundColour,
+
+        /// <summary>
+        /// 子文件夹名，对应 <c>EzResources/ColumnLight</c>。在选中目录内先按列类型取图，没有再按 S、E、P、B、A 向下降级，最后用 ColumnLight 兜底。
+        /// 整段都没有则不加载。内置资源只在 <c>EzColumnLight</c> 仍找不到时使用。
+        /// </summary>
+        ColumnLightName,
+
+        /// <summary>
+        /// 判定线贴图名（不含 <c>JudgementLine_</c> 前缀与后缀），对应 <c>EzResources/JudgementLine</c>。
+        /// 空字符串表示不额外覆盖，只用 stage layout 里各自定义的那张。
+        /// </summary>
+        JudgementLineName,
+
         ColumnWidth,
         SpecialFactor,
         HitPosition,
 
         // Mania 专属行为
-        ManiaHitMode,
+        ManiaJudgeMode,
         ManiaHealthMode,
         BmsPoorHitResultEnable,
+        JudgePrecedence,
+
+        // 判定附加分
+        ScoreBonusTendency,
+        ScoreBonusCrossMs,
 
         HitTargetFloatFixed,
         HitTargetAlpha,
@@ -786,12 +1320,17 @@ namespace osu.Game.EzOsuGame.Configuration
 
         ManiaBarLinesBool,
         ManiaPseudo3DRotation,
-        TimingBasedNoteColouringTargetGrayscale,
-        TimingBasedNoteColouringColourAlpha,
 
         ManiaHoldTailAlpha,
-        ManiaHoldTailMaskGradientHeight, // 投皮面尾
+        /// <summary>
+        /// LN 投皮距离档位。UI 0-8，除 32 得到节拍；0 关闭投皮额外负担，默认 4 = 4/32 = 2/16。进局 Get 一次快照。
+        /// </summary>
+        ManiaHoldTailMaskGradientHeight,
         ManiaLNGradientEnable,
+        /// <summary>
+        /// 动态投皮。进局时 Get 一次快照，局内不跟随设置变更；开启后按 tracker 当前拍长调整投皮距离。
+        /// </summary>
+        ManiaHoldTailMaskDynamicEnable,
         NoteCornerRadius,
 
         // 列着色与配色系统
@@ -837,14 +1376,45 @@ namespace osu.Game.EzOsuGame.Configuration
         ServerManualUsername,
         ServerManualToken,
 
+        PixivAllowR18,
+        PixivLandscapeOnly,
+        PixivAccountWhitelist,
+        PixivAccountBlacklist,
+        PixivTagInclude,
+        PixivTagExclude,
+        PixivAutoDownloadEnabled,
+        PixivApiProxyBaseUrl,
+
         // 实验性功能
         InputAudioLatencyTracker,
         ExperimentalLocalAccount,
+
+        /// <summary>
+        /// GC 模式（<see cref="EzGcMode"/>）。仅在进程启动时生效，改动需重启客户端。
+        /// 启动引导见 <c>osu.Desktop/EzGcModeBootstrap</c>：读取本项并通过环境变量重入进程。
+        /// </summary>
+        GcMode,
 
         // 判定时序诊断与校正
         EzJudgmentDiagEnabled,
         EzSubFrameCorrectionEnabled,
         EzTimingTraceEnabled,
+
+        /// <summary>全局角逐/时间线服务；关闭后不做选歌查询与 PlayerLoader timeline 构建。</summary>
+        EzScoreRaceServiceEnabled,
+
+        /// <summary>角逐 timeline 喂入：BatchAllEvents=进局前预建；StreamByClock=进局不阻塞，后台按时钟就绪。</summary>
+        EzScoreRaceFeedMode,
+
+        /// <summary>摄像头 HUD 总开关。关闭时不加载采集后端、不枚举设备、不打开摄像头、不上传纹理。</summary>
+        EzHudCameraEnabled,
+
+        // Ez 技能
+        /// <summary>
+        /// ChartDan「LN 半」判定的绝对门槛（hold 物件数）：大于此值即认定 LN，无需达到比例线。
+        /// 与 <c>EzDanAlgorithm.LnPrimaryMinRatioFor</c> 为「或」关系。
+        /// </summary>
+        SkillLnChartMinHoldObjects,
     }
 
     public enum EzColumnType : byte
@@ -854,6 +1424,18 @@ namespace osu.Game.EzOsuGame.Configuration
         S,
         E,
         P
+    }
+
+    /// <summary>
+    /// GC 形态（进程启动期确定，改动需重启）。见 <c>osu.Desktop/EzGcModeBootstrap</c>。
+    /// </summary>
+    public enum EzGcMode
+    {
+        /// <summary>Server GC：每核一堆、后台回收。启动期高分配下的回收暂停更短，内存占用更高。</summary>
+        Server,
+
+        /// <summary>Workstation GC：单堆。内存占用更低，但高分配时 gen0/gen1 回收会暂停主线程。</summary>
+        Workstation,
     }
 
     public static class EzConstants

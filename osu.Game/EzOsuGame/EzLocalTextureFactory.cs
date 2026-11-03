@@ -2,21 +2,16 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Text;
-using System.Threading.Tasks;
+using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
-using osu.Framework.IO.Stores;
-using osu.Framework.Logging;
-using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Skinning;
+using osu.Game.EzOsuGame.Overlays;
 using osuTK;
 
 namespace osu.Game.EzOsuGame
@@ -25,22 +20,23 @@ namespace osu.Game.EzOsuGame
     public partial class EzLocalTextureFactory : CompositeDrawable
     {
         // private const int max_stage_frames = 120;
-        private const int max_frames_to_load = 240;
-        private const double default_frame_length = 1000.0 / 60.0 * 4;
-        private const float square_ratio_threshold = 0.75f;
+        /// <summary>note 帧上限，与旧实现的 <c>Parallel.For(0, 60)</c> 一致。</summary>
+        private const int max_note_frames = 60;
 
-        private static readonly ConcurrentDictionary<string, float> note_ratio_cache = new ConcurrentDictionary<string, float>();
+        private const double default_frame_length = 1000.0 / 60.0 * 4;
 
         private readonly Ez2ConfigManager ezConfig;
-        private readonly LargeTextureStore largeTextureStore;
-        private readonly TextureStore textureStore;
+        private readonly EzResourceStore resource;
 
         private readonly BindableDouble columnWidth = new BindableDouble();
         private readonly BindableDouble specialFactor = new BindableDouble();
         private readonly BindableDouble noteHeightScaleToWidth = new BindableDouble();
+        private readonly Bindable<ColumnWidthStyle> columnWidthStyle = new Bindable<ColumnWidthStyle>();
 
         private readonly Bindable<string> stageName = new Bindable<string>();
         private readonly Bindable<string> noteSetName = new Bindable<string>();
+        private readonly Bindable<string> gameThemeName = new Bindable<string>();
+        private readonly Bindable<string> judgementLineName = new Bindable<string>();
 
         private readonly BindableBool colorSettingsEnabled = new BindableBool(true);
         private readonly Bindable<Colour4> columnTypeA = new Bindable<Colour4>();
@@ -53,6 +49,9 @@ namespace osu.Game.EzOsuGame
         private readonly Dictionary<NoteSizeCacheKey, Bindable<Vector2>> noteSizeBindables = new Dictionary<NoteSizeCacheKey, Bindable<Vector2>>();
 
         private readonly Action<int, int, EzColumnType>? onColumnTypeChangedHandler;
+
+        private string? plateLayoutStage;
+        private EzStagePlateLayout? plateLayout;
 
         private readonly struct NoteSizeCacheKey : IEquatable<NoteSizeCacheKey>
         {
@@ -74,25 +73,18 @@ namespace osu.Game.EzOsuGame
             public override int GetHashCode() => HashCode.Combine(KeyMode, ColumnIndex, NoSpecial);
         }
 
-        public EzLocalTextureFactory(Ez2ConfigManager ezConfig, IRenderer renderer, Storage storage)
+        public EzLocalTextureFactory(Ez2ConfigManager ezConfig, EzResourceStore resource)
         {
             this.ezConfig = ezConfig;
-
-            IResourceStore<byte[]> userFiles = new StorageBackedResourceStore(storage.GetStorageForDirectory(EzModifyPath.RESOURCES_PATH));
-            var baseTextureLoaderStore = new TextureLoaderStore(userFiles);
-
-            // 创建尺寸限制的纹理加载器（使用官方的 MaxDimensionLimitedTextureLoaderStore）
-            var limitedLoader = new MaxDimensionLimitedTextureLoaderStore(baseTextureLoaderStore);
-            textureStore = new TextureStore(renderer, limitedLoader);
-            textureStore.AddTextureSource(baseTextureLoaderStore);
-
-            largeTextureStore = new LargeTextureStore(renderer, limitedLoader);
-            largeTextureStore.AddTextureSource(baseTextureLoaderStore);
+            this.resource = resource;
 
             ezConfig.BindWith(Ez2Setting.NoteSetName, noteSetName);
             ezConfig.BindWith(Ez2Setting.StageName, stageName);
+            ezConfig.BindWith(Ez2Setting.JudgementLineName, judgementLineName);
+            gameThemeName.BindTo(ezConfig.GetBindable<string>(Ez2Setting.GameThemeName));
 
             ezConfig.BindWith(Ez2Setting.ColumnWidth, columnWidth);
+            ezConfig.BindWith(Ez2Setting.ColumnWidthStyle, columnWidthStyle);
             ezConfig.BindWith(Ez2Setting.SpecialFactor, specialFactor);
             ezConfig.BindWith(Ez2Setting.NoteHeightScaleToWidth, noteHeightScaleToWidth);
 
@@ -162,7 +154,8 @@ namespace osu.Game.EzOsuGame
         {
             columnWidth.BindValueChanged(_ => scheduleTextureRefresh());
             specialFactor.BindValueChanged(_ => scheduleTextureRefresh());
-            noteHeightScaleToWidth.BindValueChanged(_ => scheduleTextureRefresh(), true);
+            noteHeightScaleToWidth.BindValueChanged(_ => scheduleTextureRefresh());
+            columnWidthStyle.BindValueChanged(_ => scheduleTextureRefresh());
         }
 
         private void initializeColourEvents()
@@ -192,36 +185,14 @@ namespace osu.Game.EzOsuGame
         /// </summary>
         public Texture? GetNoteTexture(string path)
         {
-            // 直接加载纹理计算比例，不使用缓存
-            var sb = new StringBuilder(path.Length + 8);
-            Texture? texture = textureStore.Get(sb.Append(path).Append("/000.png").ToString()) ??
-                               textureStore.Get(sb.Clear().Append(path).Append("/001.png").ToString());
+            Texture? texture = resource.Get($@"{path}/000", EzTextureUsage.AnimationSafe)
+                               ?? resource.Get($@"{path}/0", EzTextureUsage.AnimationSafe);
+
             return texture;
         }
 
-        private float getTextureRatio(Texture? texture)
-        {
-            return texture?.Height / (texture?.Width ?? 1f) ?? 1.0f;
-        }
-
         public float GetRatio(bool forceRecalculate = false)
-        {
-            string noteSet = noteSetName.Value;
-
-            // 如果强制重新计算或缓存中没有，则重新计算
-            if (forceRecalculate || !note_ratio_cache.TryGetValue(noteSet, out float ratio))
-            {
-                string notePath = GetNotePath("whitenote");
-                Texture? note = GetNoteTexture(notePath);
-                float calculatedRatio = getTextureRatio(note);
-                ratio = calculatedRatio >= square_ratio_threshold ? 1.0f : calculatedRatio;
-
-                // 更新缓存
-                note_ratio_cache.AddOrUpdate(noteSet, ratio, (_, _) => ratio);
-            }
-
-            return ratio;
-        }
+            => resource.GetNoteRatio(forceRecalculate, clampSquare: false);
 
         public Bindable<Vector2> GetNoteSizeBindable(int keyMode, int columnIndex, bool noSpecial = false)
         {
@@ -241,6 +212,11 @@ namespace osu.Game.EzOsuGame
             bool isSpecialColumn = !cacheKey.NoSpecial && ezConfig.IsSpecialColumnFast(cacheKey.KeyMode, cacheKey.ColumnIndex);
             float ratio = GetRatio();
             float x = (float)(columnWidth.Value * (isSpecialColumn ? specialFactor.Value : 1.0));
+
+            // 列宽风格可能改写实际列宽（全局总宽度按 10 / keyMode 摊到每列）。note 高度由宽度推导，
+            // 不跟着换算就会在风格切换后压扁。
+            x *= ezConfig.GetColumnWidthStyleScale(cacheKey.KeyMode);
+
             float y = (float)noteHeightScaleToWidth.Value * ratio * x;
             return new Vector2(x, y);
         }
@@ -280,21 +256,47 @@ namespace osu.Game.EzOsuGame
         #region 组件构造
 
         /// <summary>
-        /// 构造Note、光效等动画组件。
+        /// 构造Note、光效等动画组件。遵循 ISkin 的 <c>GetAnimation</c> 约定：0 帧返回 <c>null</c>，1 帧返回 <see cref="Sprite"/>，多帧才返回动画。
         /// </summary>
         /// <param name="component"></param>
         /// <param name="isFlare">是否为光效</param>
-        /// <returns></returns>
-        public TextureAnimation CreateAnimation(string component, bool? isFlare = null)
+        /// <returns>纹理 drawable；无资源时为 <c>null</c>。</returns>
+        public Drawable? CreateAnimation(string component, bool? isFlare = null)
         {
             bool isHit = isFlare is true;
 
+            if (component == "JudgementLine")
+                FillMode = FillMode.Fill;
+
+            // 直接加载纹理帧，不缓存
+            var frames = loadNotesFrames(component);
+
+            if (frames.Count == 0)
+                return null;
+
+            Anchor anchor = isHit ? Anchor.BottomCentre : Anchor.Centre;
+            Axes relativeSizeAxes = isHit ? Axes.None : Axes.Both;
+            FillMode fillMode = isHit ? FillMode.Fit : FillMode.Stretch;
+
+            // 1 帧即普通纹理，不按动画加载。
+            if (frames.Count == 1)
+            {
+                return new Sprite
+                {
+                    Anchor = anchor,
+                    Origin = Anchor.Centre,
+                    RelativeSizeAxes = relativeSizeAxes,
+                    FillMode = fillMode,
+                    Texture = frames[0],
+                };
+            }
+
             var animation = new TextureAnimation
             {
-                Anchor = isHit ? Anchor.BottomCentre : Anchor.Centre,
+                Anchor = anchor,
                 Origin = Anchor.Centre,
-                RelativeSizeAxes = isHit ? Axes.None : Axes.Both,
-                FillMode = isHit ? FillMode.Fit : FillMode.Stretch,
+                RelativeSizeAxes = relativeSizeAxes,
+                FillMode = fillMode,
                 Loop = !isHit
             };
 
@@ -304,151 +306,737 @@ namespace osu.Game.EzOsuGame
                 // animation.Blending = BlendingParameters.Inherit;
             }
 
-            if (component == "JudgementLine")
-                FillMode = FillMode.Fill;
-
-            // 直接加载纹理帧，不缓存
-            var frames = loadNotesFrames(component);
             animation.AddFrames(frames);
 
             return animation;
         }
 
+        // note 帧的**命名**交由层2 三模板统一解析（子目录 {i:D3}、同层 {name}-0、{name}/frame_0 都在覆盖范围内），
+        // JudgementLine 这类单图由单图回退自然覆盖。比例由 store 构造期的 scaleAdjust 决定，故这里不再改写共享纹理。
+        // 帧的**并行预解码**保留在本工厂：这是既有并已验证的做法，且并行只作用于这一处。
         private List<Texture> loadNotesFrames(string component)
         {
-            string notePath = GetNotePath(component);
-            var frames = new List<Texture>();
-
-            if (component != "JudgementLine")
+            var request = new EzAnimationRequest
             {
-                var textures = new Texture[60];
+                Path = GetNotePath(component),
+                MaxFrames = max_note_frames,
+                Usage = EzTextureUsage.AnimationSafe,
+            };
 
-                Parallel.For(0, 60, i =>
-                {
-                    string frameFile = $"{notePath}/{i:D3}";
-                    textures[i] = textureStore.Get(frameFile);
-                });
-
-                // 按顺序收集非空纹理
-                foreach (var texture in textures)
-                {
-                    if (texture == null) break;
-
-                    texture.ScaleAdjust = 2f;
-                    frames.Add(texture);
-                }
-            }
-            else
-            {
-                string frameFile = notePath;
-                var texture = textureStore.Get(frameFile);
-
-                if (texture != null)
-                {
-                    Logger.Log($"[EzLocalTextureFactory] Loading JudgementLine Frame: {frameFile}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-
-                    frames.Add(texture);
-                }
-            }
-
-            return frames;
+            return new List<Texture>(resource.GetTextureFrames(request));
         }
 
         #endregion
 
         #region Stage Creation
 
-        public Container CreateStage(string component)
+        public Container CreateStage(int columnCount)
         {
-            var container = new Container
+            return CreateStage(columnCount, null);
+        }
+
+        /// <summary>
+        /// 构造舞台板。<paramref name="keyState"/> 为每列的按下状态，用于驱动按键贴图。
+        /// </summary>
+        public Container CreateStage(int columnCount, EzStageKeyState? keyState)
+            => CreateStage(columnCount, keyState, out _);
+
+        /// <summary>
+        /// 构造舞台板，并给出按键层供调用方按列宽调整尺寸（layout 声明了 <c>keysColumnWidth</c> 时）。
+        /// </summary>
+        public Container CreateStage(int columnCount, EzStageKeyState? keyState, out EzStageKeyLayer? keyLayer)
+        {
+            keyLayer = null;
+
+            // 舞台板的 (0, 0) 是判定线：EzStageAnchorContainer 保持零尺寸，子项沿用 layout 的绝对坐标，
+            // 外层把这个原点放到游戏判定线位置再缩放，因此列宽与画布缩放都不会移动判定线。
+            var container = new EzStageAnchorContainer
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
-
-                // AutoSizeAxes = Axes.X,
-                // Height = default_stage_body_height,
-                // Masking = true,
             };
 
-            string basePath = $"Stage/{stageName.Value}/Stage";
+            EzStagePlateLayout? layout = getPlateLayout();
 
-            container.Add(getStageTextureAnimation($"{basePath}/eightkey/{component}"));
-            container.Add(getStageTextureAnimation($"{basePath}/GrooveLight")); //此纹理需要修改正片叠底
-            container.Add(getStageTextureAnimation($"{basePath}/{stageName.Value}_OverObject/{stageName.Value}_OverObject"));
+            if (layout == null)
+                return container;
+
+            string basePath = $"Stage/{stageName.Value}/Stage";
+            string? keyFolder = ResolveStageKeyFolder(resource.ListSubdirectories(basePath), columnCount);
+
+            // 先收集再按 order 排序：Unity 的层级来自 m_SortingOrder，各舞台并不统一，
+            // 固定绘制先后会让角色、光效之类的附加图盖住数字。
+            var layers = new List<(int Order, Drawable Drawable)>();
+
+            void place(Drawable? drawable, int order)
+            {
+                if (drawable != null)
+                    layers.Add((order, drawable));
+            }
+
+            place(addPlateSprite(layout.Back, $"{basePath}/BlackPanel"), layout.Back?.Order ?? EzStagePlateLayout.ORDER_BACK);
+
+            Vector2 bodySize = Vector2.Zero;
+            int bodyOrder = layout.Body?.Order ?? EzStagePlateLayout.ORDER_BODY;
+
+            if (keyFolder != null)
+                place(addPlateSprite(layout.Body, $"{basePath}/{keyFolder}/Body", out bodySize), bodyOrder);
+
+            // 按键与数字都要能在 Body 之后，序号来自 layout；这里先算出来供后面复用。
+            int keyOrder = layout.GetKeys(columnCount)?.FirstOrDefault()?.Order ?? EzStagePlateLayout.ORDER_KEYS;
+
+            place(addPlateSprite(layout.GrooveLight, $"{basePath}/GrooveLight"), layout.GrooveLight?.Order ?? EzStagePlateLayout.ORDER_GROOVE_LIGHT);
+
+            if (layout.Meter != null)
+            {
+                Drawable? gauge = createPlateDrawable($"{basePath}/GrooveGauge", layout.Meter.Gauge);
+                Drawable? bright = createPlateDrawable($"{basePath}/GrooveGaugeLight", layout.Meter.Bright);
+
+                if (gauge != null || bright != null)
+                {
+                    Drawable meter = new EzStageGrooveMeter(layout.Meter, gauge, bright);
+
+                    if (layout.Meter.HasRotation)
+                        meter = applyRotation(meter, layout.Meter);
+
+                    place(meter, layout.Meter.Order ?? EzStagePlateLayout.ORDER_METER);
+                }
+            }
+
+            place(addPlateSprite(layout.OverObject, plateTexturePath(basePath, layout.OverObject, $"{stageName.Value}_OverObject/{stageName.Value}_OverObject")),
+                  layout.OverObject?.Order ?? EzStagePlateLayout.ORDER_OVER_OBJECT);
+
+            if (layout.Parts != null)
+            {
+                foreach (EzStagePlateSprite part in layout.Parts)
+                {
+                    if (string.IsNullOrEmpty(part.Path))
+                        continue;
+
+                    place(addPlateSprite(part, $"{basePath}/{part.Path}"), part.Order ?? EzStagePlateLayout.ORDER_OVER_OBJECT);
+                }
+            }
+
+            place(createPlateCounter(layout.Score, EzStagePlateCounter.Source.Score), layout.Score?.Order ?? EzStagePlateLayout.ORDER_DIGITS);
+            place(createPlateCounter(layout.Combo, EzStagePlateCounter.Source.MaxCombo), layout.Combo?.Order ?? EzStagePlateLayout.ORDER_DIGITS);
+
+            keyLayer = mountKeys(layout, keyFolder, basePath, columnCount, keyState);
+            place(keyLayer, keyOrder);
+
+            if (layout.Character != null)
+            {
+                Drawable? character = null;
+
+                if (!string.IsNullOrEmpty(layout.Character.Path))
+                    character = addPlateSprite(layout.Character, $"{basePath}/{layout.Character.Path}");
+
+                if (character == null && keyFolder != null)
+                    character = addPlateSprite(layout.Character, $"{basePath}/{keyFolder}/Character");
+
+                character ??= addPlateSprite(layout.Character, $"{basePath}/Character_overlayer");
+
+                place(character, layout.Character.Order ?? EzStagePlateLayout.ORDER_CHARACTER);
+            }
+
+            // 判定线的偏移决定整块舞台板的上移量，必须在加子项前算出来。
+            Drawable? judgementLine = createJudgementLine(layout.JudgementLine, basePath, bodySize, out float judgementLineOffset);
+
+            if (judgementLineOffset != 0)
+                container.Y = -judgementLineOffset;
+
+            place(judgementLine, layout.JudgementLine?.Order ?? EzStagePlateLayout.ORDER_JUDGEMENT_LINE);
+
+            // OrderBy 是稳定排序：同层的部件保持上面写死的先后。
+            container.AddRange(layers.OrderBy(l => l.Order).Select(l => l.Drawable));
 
             return container;
         }
 
-        private TextureAnimation getStageTextureAnimation(string basePath)
+        /// <summary>
+        /// 把静态旋转套在部件外面：容器摆在支点，部件改写成相对支点的偏移。
+        /// 旋转为 0 时不加任何层级，渲染路径与旧行为一致。
+        /// </summary>
+        private static Drawable applyRotation(Drawable drawable, EzStagePlateElement element)
         {
-            var frames = loadStageComponentFrames(basePath);
-            var animation = new TextureAnimation
+            if (!element.HasRotation)
+                return drawable;
+
+            Vector2 pivot = element.ToOsuPivot();
+            drawable.Position = element.ToOsuPosition() - pivot;
+
+            // 用零尺寸的锚点容器：它自身不能被裁剪判定丢掉，否则支点移出屏幕时子项会整块消失。
+            return new EzStageAnchorContainer
             {
-                Anchor = Anchor.BottomCentre,
-                Origin = Anchor.BottomCentre,
-                Y = 384f + 247f,
-                // RelativeSizeAxes = Axes.None,
-                // FillMode = FillMode.Fill,
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Position = pivot,
+                Rotation = element.Rotation,
+                Child = drawable,
             };
-            if (basePath.Contains("GrooveLight"))
-                animation.Blending = BlendingParameters.Additive;
-
-            animation.Loop = frames.Count > 1;
-            animation.Scale = frames.Count > 1
-                ? new Vector2(2f)
-                : Vector2.One;
-
-            animation.AddFrames(frames);
-
-            return animation;
         }
 
-        private List<Texture> loadStageComponentFrames(string basePath)
+        /// <summary>
+        /// 构造按键层。位置与文件名全部来自 stage layout；该键数没有声明时整层不画，
+        /// 因此缺美术的回退组合不会画到错误的位置上。
+        /// </summary>
+        private EzStageKeyLayer? mountKeys(EzStagePlateLayout layout, string? keyFolder, string basePath, int columnCount, EzStageKeyState? keyState)
         {
-            var frames = new List<Texture>();
+            IReadOnlyList<EzStagePlateKey>? keys = layout.GetKeys(columnCount);
 
-            for (int i = 0;; i++)
+            if (keys == null || keyFolder == null)
+                return null;
+
+            var bases = new List<Drawable?>(keys.Count);
+            var presses = new List<Drawable?>(keys.Count);
+            var pressed = new List<IBindable<bool>?>(keys.Count);
+
+            // 键图目录名与 Body 相同（_8key），文件直接放在 keybase / keypress 下。
+            for (int i = 0; i < keys.Count; i++)
             {
-                Texture? texture = textureStore.Get($"{basePath}_{i}");
+                EzStagePlateKey key = keys[i];
+                var position = key.ToOsuPosition();
 
-                if (texture == null) break;
-
-                Logger.Log($"[EzLocalTextureFactory] Added Stage Frames: {basePath}_{i}.png", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-
-                frames.Add(texture);
+                bases.Add(createKeyDrawable(basePath, keyFolder, "keybase", key.Path, position, key));
+                presses.Add(createKeyDrawable(basePath, keyFolder, "keypress", key.PressPath, position, key));
+                pressed.Add(keyState?.GetPressed(i));
             }
 
-            if (frames.Count == 0)
-            {
-                Texture? texture = largeTextureStore.Get($"{basePath}");
+            return new EzStageKeyLayer(bases, presses, pressed, layout.UsesColumnWidth(columnCount));
+        }
 
-                if (texture != null)
+        // 文件名由 layout 给出，且只是前缀：帧序号不在数据里，按前缀把该列所有帧一起取出来。
+        // 先查该键数自己的目录；派生排列（7/9/10 复用 5 张图）的时候源图在别的目录，再逐个回退。
+        private Drawable? createKeyDrawable(string basePath, string? keyFolder, string folder, string? stem, Vector2 position, EzStagePlateKey key)
+        {
+            if (string.IsNullOrWhiteSpace(stem))
+                return null;
+
+            List<Texture> frames = loadKeyFrames(basePath, keyFolder, folder, keyPrefixOf(stem.Trim()));
+
+            if (frames.Count == 0)
+                return null;
+
+            // 键图按源图像素绘制：纹理池按 @2x 处理（scaleAdjust=2），只对舞台板贴图合适；
+            // 键图是 1x 资源，必须还原这一半，否则会变成半大小。旧 EzKeyArea 的 ×2 就是干这个的。
+            Vector2 size = frames[0].DisplaySize * frames[0].ScaleAdjust;
+
+            Drawable drawable;
+
+            if (frames.Count == 1)
+            {
+                drawable = new Sprite
                 {
-                    Logger.Log($"[EzLocalTextureFactory] Added Stage Frame: {basePath}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                    frames.Add(texture);
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Position = position,
+                    Size = size,
+                    Texture = frames[0],
+                };
+            }
+            else
+            {
+                var animation = new TextureAnimation
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    RelativeSizeAxes = Axes.None,
+                    Position = position,
+                    Size = size,
+                    Loop = true,
+                    DefaultFrameLength = keyFrameLength,
+                };
+
+                animation.AddFrames(frames);
+                drawable = animation;
+            }
+
+            return applyRotation(drawable, key);
+        }
+
+        private double keyFrameLength => 1000.0 / StageKeyPressFps;
+
+        // 去掉结尾的帧序号，得到这一列帧序列的公共前缀。layout 只存前缀，这里兼容早期带序号的数据。
+        private static string keyPrefixOf(string stem)
+        {
+            int end = stem.Length;
+
+            while (end > 0 && char.IsAsciiDigit(stem[end - 1]))
+                end--;
+
+            if (end == stem.Length || end == 0)
+                return stem;
+
+            char separator = stem[end - 1];
+
+            return separator is '_' or '-' ? stem[..(end - 1)] : stem;
+        }
+
+        // 先查该键数的目录，再逐个看其它键数目录；帧序列按序号排序后交给 store 加载。
+        private List<Texture> loadKeyFrames(string basePath, string? keyFolder, string folder, string prefix)
+        {
+            if (keyFolder != null)
+            {
+                List<Texture> preferred = resource.LoadStageFramesFromKeys(resolveKeyFrameKeys($"{basePath}/{keyFolder}/{folder}", prefix));
+
+                if (preferred.Count > 0)
+                    return preferred;
+            }
+
+            foreach (string candidate in resource.ListSubdirectories(basePath))
+            {
+                if (candidate == keyFolder || !candidate.EndsWith("key", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                List<Texture> frames = resource.LoadStageFramesFromKeys(resolveKeyFrameKeys($"{basePath}/{candidate}/{folder}", prefix));
+
+                if (frames.Count > 0)
+                    return frames;
+            }
+
+            return new List<Texture>();
+        }
+
+        // 目录里的实际帧：前缀相同、后接 _ 或 - 与数字的文件，按数字升序。
+        private IReadOnlyList<string> resolveKeyFrameKeys(string directory, string prefix)
+        {
+            var matches = new List<(int Index, string Key)>();
+
+            foreach (string key in resource.ListImageKeys(directory))
+            {
+                string stem = EzResourcePath.Stem(EzResourcePath.FileName(key));
+
+                if (!tryGetFrameIndex(stem, prefix, out int index))
+                    continue;
+
+                matches.Add((index, key));
+            }
+
+            if (matches.Count == 0)
+                return Array.Empty<string>();
+
+            matches.Sort((a, b) => a.Index.CompareTo(b.Index));
+
+            string[] keys = new string[matches.Count];
+
+            for (int i = 0; i < matches.Count; i++)
+                keys[i] = matches[i].Key;
+
+            return keys;
+        }
+
+        private static bool tryGetFrameIndex(string stem, string prefix, out int index)
+        {
+            index = 0;
+
+            if (stem.Equals(prefix, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (stem.Length <= prefix.Length + 1 || !stem.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            char separator = stem[prefix.Length];
+
+            if (separator is not ('_' or '-'))
+                return false;
+
+            ReadOnlySpan<char> digits = stem.AsSpan(prefix.Length + 1);
+
+            foreach (char c in digits)
+            {
+                if (!char.IsAsciiDigit(c))
+                    return false;
+            }
+
+            return int.TryParse(digits, out index);
+        }
+
+        /// <summary>
+        /// 构造判定线贴图。<paramref name="lineOffset"/> 是判定线相对 Body 中心的偏移，
+        /// 舞台板要整体上移该值，使其 (0, 0) 正好落在判定线上。
+        /// </summary>
+        private Drawable? createJudgementLine(EzStagePlateJudgementLine? piece, string basePath, Vector2 bodySize, out float lineOffset)
+        {
+            // ratio 相对 Body 底边，用 Body 的实际绘制高度换算，因此不受 store 缩放与源图分辨率影响。
+            // 舞台没有声明 judgementLine 时无从得知判定线位置，退化为以板中心为锚点。
+            lineOffset = piece != null && bodySize.Y > 0
+                ? EzStagePlacement.GetJudgementLineOffset(bodySize.Y, piece.Ratio)
+                : 0;
+
+            // 下拉选中的图优先；留空时才退回舞台 layout 声明的判定线；两者都没有就不画。
+            List<Texture> frames = loadStageJudgementFrames(piece, basePath);
+
+            if (frames.Count == 0)
+                return null;
+
+            var position = new Vector2(-(piece?.X ?? 0), lineOffset);
+
+            // 贴图按自身显示尺寸绘制，随舞台板一起缩放；这与旧 EzJudgementLine 的视觉一致。
+            Vector2 size = frames[0].DisplaySize;
+
+            Drawable drawable;
+
+            if (frames.Count == 1)
+            {
+                drawable = new Sprite
+                {
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
+                    Position = position,
+                    Size = size,
+                    Texture = frames[0],
+                };
+            }
+            else
+            {
+                var animation = new TextureAnimation
+                {
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
+                    RelativeSizeAxes = Axes.None,
+                    Position = position,
+                    Size = size,
+                    Loop = true,
+                    DefaultFrameLength = piece?.FrameLength ?? 66,
+                };
+
+                animation.AddFrames(frames);
+                drawable = animation;
+            }
+
+            return drawable;
+        }
+
+        /// <summary>
+        /// 判定线帧：<c>EzResources/JudgementLine</c> 当前选中的那张优先，留空时才用舞台目录里声明的图。
+        /// </summary>
+        private List<Texture> loadStageJudgementFrames(EzStagePlateJudgementLine? piece, string basePath)
+        {
+            string name = judgementLineName.Value?.Trim() ?? string.Empty;
+
+            if (name.Length > 0)
+            {
+                if (name.StartsWith(EzResourceDiscovery.judgement_line_prefix, StringComparison.OrdinalIgnoreCase))
+                    name = name[EzResourceDiscovery.judgement_line_prefix.Length..];
+
+                if (name.Length > 0)
+                {
+                    List<Texture> overrideFrames = loadStageComponentFrames($"JudgementLine/{EzResourceDiscovery.judgement_line_prefix}{name}");
+
+                    // 不带前缀的 {name}.png 也接受，与资源选择列表的口径一致。
+                    if (overrideFrames.Count == 0)
+                        overrideFrames = loadStageComponentFrames($"JudgementLine/{name}");
+
+                    if (overrideFrames.Count > 0)
+                        return overrideFrames;
                 }
             }
 
-            return frames;
+            string? stagePath = piece?.Path?.Trim().Trim('/');
+
+            if (!string.IsNullOrEmpty(stagePath))
+                stagePath = $"{basePath}/{stagePath}";
+            else if (piece != null)
+                stagePath = $"{basePath}/JudgementLine";
+
+            return stagePath != null ? loadStageComponentFrames(stagePath) : new List<Texture>();
         }
 
-        public TextureAnimation CreateStageKeys(string component, string? keySuffix = null)
+        private EzStagePlateLayout? getPlateLayout()
+        {
+            if (plateLayoutStage == stageName.Value)
+                return plateLayout;
+
+            plateLayoutStage = stageName.Value;
+            plateLayout = EzStagePlateLayout.TryLoad(resource, stageName.Value);
+            return plateLayout;
+        }
+
+        /// <summary>
+        /// 当前舞台的按键动画帧率（keybase 与 keypress 共用），由 stage layout 的 <c>keyPressFps</c> 声明；
+        /// 未声明或非正数时为 <see cref="EzStagePlateLayout.DEFAULT_KEY_PRESS_FPS"/>（与旧固定帧长等价）。
+        /// </summary>
+        public float StageKeyPressFps
+        {
+            get
+            {
+                float fps = getPlateLayout()?.KeyPressFps ?? 0;
+                return fps > 0 ? fps : EzStagePlateLayout.DEFAULT_KEY_PRESS_FPS;
+            }
+        }
+
+        /// <summary>
+        /// 当前舞台的设计宽度，由 stage layout 声明；未声明或非法时为 <see cref="EzStagePlacement.DEFAULT_DESIGN_WIDTH"/>。
+        /// </summary>
+        public float StageDesignWidth
+        {
+            get
+            {
+                float width = getPlateLayout()?.DesignWidth ?? EzStagePlacement.DEFAULT_DESIGN_WIDTH;
+                return width > 0 ? width : EzStagePlacement.DEFAULT_DESIGN_WIDTH;
+            }
+        }
+
+        internal const int MAX_STAGE_KEYS = 18;
+
+        private const int stage_key_downward_floor = 4;
+
+        internal static string? ResolveStageKeyFolder(IEnumerable<string> folderNames, int columnCount)
+        {
+            if (columnCount <= 0)
+                return null;
+
+            string?[] best = new string?[MAX_STAGE_KEYS + 1];
+
+            foreach (string name in folderNames)
+            {
+                if (!tryParseKeyFolder(name, out int keys))
+                    continue;
+
+                string? current = best[keys];
+
+                if (current == null || keyFolderPreference(name, keys) > keyFolderPreference(current, keys))
+                    best[keys] = name;
+            }
+
+            if (columnCount > MAX_STAGE_KEYS)
+                columnCount = MAX_STAGE_KEYS;
+
+            if (best[columnCount] != null)
+                return best[columnCount];
+
+            // 先耗尽同奇偶（先下后上，向下不低于 4），再按同样顺序耗尽异奇偶。
+            int parity = columnCount & 1;
+
+            return scanParity(parity) ?? scanParity(parity ^ 1);
+
+            string? scanParity(int wantedParity)
+            {
+                if (columnCount >= stage_key_downward_floor)
+                {
+                    for (int keys = columnCount - 1; keys >= stage_key_downward_floor; keys--)
+                    {
+                        if ((keys & 1) != wantedParity)
+                            continue;
+
+                        if (best[keys] != null)
+                            return best[keys];
+                    }
+                }
+
+                for (int keys = columnCount + 1; keys <= MAX_STAGE_KEYS; keys++)
+                {
+                    if ((keys & 1) != wantedParity)
+                        continue;
+
+                    if (best[keys] != null)
+                        return best[keys];
+                }
+
+                return null;
+            }
+        }
+
+        private static int keyFolderPreference(string name, int keys)
+        {
+            if (name.Equals($"_{keys}key", StringComparison.OrdinalIgnoreCase))
+                return 2;
+
+            if (name.Equals($"{keys}key", StringComparison.OrdinalIgnoreCase))
+                return 1;
+
+            return 0;
+        }
+
+        private static bool tryParseKeyFolder(string folder, out int keys)
+        {
+            keys = 0;
+
+            if (folder.Length <= 3 || !folder.EndsWith("key", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            string head = folder[..^3].TrimStart('_');
+
+            if (head.Length == 0)
+                return false;
+
+            if (int.TryParse(head, out keys))
+                return keys is >= 1 and <= MAX_STAGE_KEYS;
+
+            return false;
+        }
+
+        private static string plateTexturePath(string basePath, EzStagePlateSprite? piece, string fallback)
+        {
+            string relative = piece != null && !string.IsNullOrEmpty(piece.Path) ? piece.Path : fallback;
+            return $"{basePath}/{relative}";
+        }
+
+        private static Drawable? createPlateCounter(EzStagePlateDigits? digits, EzStagePlateCounter.Source source)
+        {
+            if (digits == null || !digits.Enabled || digits.Digits <= 0)
+                return null;
+
+            return new EzStagePlateCounter(digits, source);
+        }
+
+        private Drawable? addPlateSprite(EzStagePlateSprite? piece, string texturePath)
+            => addPlateSprite(piece, texturePath, out _);
+
+        // 返回已套上旋转的 drawable（加入容器用）；contentSize 供 Body 之类需要度量尺寸的地方使用。
+        private Drawable? addPlateSprite(EzStagePlateSprite? piece, string texturePath, out Vector2 contentSize)
+        {
+            contentSize = Vector2.Zero;
+
+            if (piece == null)
+                return null;
+
+            Drawable? drawable = createPlateDrawable(texturePath, piece, out contentSize);
+
+            return drawable == null ? null : applyRotation(drawable, piece);
+        }
+
+        private Drawable? createPlateDrawable(string texturePath, EzStagePlateSprite? piece)
+            => createPlateDrawable(texturePath, piece, out _);
+
+        private Drawable? createPlateDrawable(string texturePath, EzStagePlateSprite? piece, out Vector2 contentSize)
+        {
+            contentSize = Vector2.Zero;
+
+            if (piece == null)
+                return null;
+
+            var frames = loadStageComponentFrames(texturePath);
+
+            if (frames.Count == 0)
+                return null;
+
+            // 首帧的显示尺寸就是 drawable 铺开后的尺寸；动画在布局前 Height 还是 0，所以这里按帧取。
+            contentSize = new Vector2(frames[0].DisplayWidth, frames[0].DisplayHeight);
+
+            BlendingParameters blending = piece.IsAdditive ? BlendingParameters.Additive : BlendingParameters.Inherit;
+
+            if (frames.Count == 1)
+            {
+                var sprite = new Sprite
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Position = piece.ToOsuPosition(),
+                    Texture = frames[0],
+                    Blending = blending,
+                };
+
+                if (isSingleFrameGlow(texturePath))
+                {
+                    applySpin(sprite, piece);
+                    return new EzStageSingleLightBreath(sprite);
+                }
+
+                applySpin(sprite, piece);
+                return sprite;
+            }
+
+            var animation = new TextureAnimation
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Position = piece.ToOsuPosition(),
+                Size = contentSize,
+                // 多帧默认循环：layout 只在要停住时才写 "loop": false。
+                Loop = piece.Loop ?? true,
+                DefaultFrameLength = piece.FrameLength,
+                Blending = blending,
+            };
+
+            animation.AddFrames(frames);
+            applySpin(animation, piece);
+            return animation;
+        }
+
+        private static void applySpin(Drawable drawable, EzStagePlateSprite piece)
+        {
+            EzStagePlateSpin? spin = piece.Spin;
+
+            if (spin == null || spin.Seconds <= 0 || spin.Degrees == 0)
+                return;
+
+            double revolution = spin.Seconds * 360.0 / Math.Abs(spin.Degrees);
+            RotationDirection direction = spin.Degrees > 0 ? RotationDirection.Counterclockwise : RotationDirection.Clockwise;
+            bool loop = spin.Loop;
+            float angle = direction == RotationDirection.Counterclockwise ? -Math.Abs(spin.Degrees) : Math.Abs(spin.Degrees);
+            double seconds = spin.Seconds;
+
+            // Loop 会读 Clock.Time。零件这时还没挂进画面，时钟为空。
+            void start(Drawable target)
+            {
+                target.OnLoadComplete -= start;
+
+                if (loop)
+                    target.Spin(revolution, direction);
+                else
+                    target.RotateTo(angle, seconds, Easing.None);
+            }
+
+            if (drawable.IsLoaded)
+                start(drawable);
+            else
+                drawable.OnLoadComplete += start;
+        }
+
+        private static bool isSingleFrameGlow(string texturePath)
+            => texturePath.EndsWith("/GrooveLight", StringComparison.OrdinalIgnoreCase)
+               || texturePath.EndsWith("/GrooveGaugeLight", StringComparison.OrdinalIgnoreCase);
+
+        // Stage 组件帧：交给层2/层3 同一规则（多帧 AnimationSafe，空则回退 Large 单图）。
+        private List<Texture> loadStageComponentFrames(string basePath) => resource.LoadStageFrames(basePath);
+
+        /// <summary>
+        /// 构造 Key 底/压图。同样遵循 0 帧 <c>null</c>、1 帧 <see cref="Sprite"/>、多帧动画。
+        /// </summary>
+        public Drawable? CreateStageKeys(string component, string? keySuffix = null)
         {
             // 直接加载纹理帧，不缓存
             var frames = loadStageKeysFrames(component, keySuffix);
+
+            if (frames.Count == 0)
+                return null;
+
+            // 1 帧即普通纹理，不按动画加载。
+            if (frames.Count == 1)
+            {
+                return new Sprite
+                {
+                    Anchor = Anchor.TopCentre,
+                    Origin = Anchor.TopCentre,
+                    RelativeSizeAxes = Axes.None,
+                    FillMode = FillMode.Stretch,
+                    Texture = frames[0],
+                };
+            }
+
             var animation = new TextureAnimation
             {
                 Anchor = Anchor.TopCentre,
                 Origin = Anchor.TopCentre,
                 RelativeSizeAxes = Axes.None,
                 FillMode = FillMode.Stretch,
-                DefaultFrameLength = default_frame_length * 4,
+                DefaultFrameLength = getStageKeyFrameLength(component),
             };
             animation.AddFrames(frames);
 
             return animation;
         }
 
+        // keybase / keypress 的帧长由 stage layout 的 keyPressFps 决定，两者共用同一速率。
+        private double getStageKeyFrameLength(string component)
+        {
+            if (component != "KeyPress" && component != "KeyBase")
+                return default_frame_length * 4;
+
+            return 1000.0 / StageKeyPressFps;
+        }
+
+        // keybase/keypress 四条路径的尝试与「累计为空才吃单图」属皮肤编排，留在工厂；单条路径的帧解析交给层2。
         private List<Texture> loadStageKeysFrames(string component, string? keySuffix = null)
         {
             var frames = new List<Texture>();
@@ -456,35 +1044,28 @@ namespace osu.Game.EzOsuGame
 
             string[] pathsToTry =
             {
-                $"Stage/{currentStageName}/Stage/eightkey/keybase/{component}",
-                $"Stage/{currentStageName}/Stage/eightkey/keypress/{component}",
-                $"Stage/{currentStageName}/Stage/eightkey/keybase/{component}_{keySuffix}",
-                $"Stage/{currentStageName}/Stage/eightkey/keypress/{component}_{keySuffix}",
+                $"Stage/{currentStageName}/Stage/_5key/keybase/{component}",
+                $"Stage/{currentStageName}/Stage/_5key/keypress/{component}",
+                $"Stage/{currentStageName}/Stage/_5key/keybase/{component}_{keySuffix}",
+                $"Stage/{currentStageName}/Stage/_5key/keypress/{component}_{keySuffix}",
             };
 
             foreach (string basePath in pathsToTry)
             {
-                for (int i = 0;; i++)
+                // 这里刻意不让层2 回退单图：单图只在「累计仍为空」时补一张，与原行为一致。
+                frames.AddRange(resource.GetTextureFrames(new EzAnimationRequest
                 {
-                    Texture? texture = textureStore.Get($"{basePath}_frame{i}");
+                    Path = basePath,
+                    Usage = EzTextureUsage.AnimationSafe,
+                    AllowSingleFallback = false,
+                }));
 
-                    if (texture == null) break;
-
-                    Logger.Log($"[EzLocalTextureFactory] Added Keys Frames: {basePath}_{i}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-
-                    frames.Add(texture);
-                }
-
-                // 如果没有帧，加载单个纹理作为单帧
                 if (frames.Count == 0)
                 {
-                    Texture? texture = textureStore.Get($"{basePath}");
+                    Texture? texture = resource.Get(basePath, EzTextureUsage.AnimationSafe);
 
                     if (texture != null)
-                    {
-                        Logger.Log($"[EzLocalTextureFactory] Added Keys Frame: {basePath}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                         frames.Add(texture);
-                    }
                 }
             }
 

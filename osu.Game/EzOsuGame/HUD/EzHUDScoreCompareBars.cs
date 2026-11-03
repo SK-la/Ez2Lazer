@@ -1,0 +1,707 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
+using osu.Framework.Extensions;
+using osu.Framework.Extensions.Color4Extensions;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Shapes;
+using osu.Framework.Localisation;
+using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Material;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
+using osu.Game.Localisation.SkinComponents;
+using osu.Game.Overlays.Settings;
+using osu.Game.Rulesets.Scoring;
+using osu.Game.Scoring;
+using osu.Game.Screens.Play;
+using osu.Game.Skinning;
+using osuTK;
+using osuTK.Graphics;
+using Container = osu.Framework.Graphics.Containers.Container;
+
+namespace osu.Game.EzOsuGame.HUD
+{
+    public enum EzScoreCompareBarDirection
+    {
+        [Description("Upward")]
+        Upward,
+
+        [Description("Downward")]
+        Downward,
+    }
+
+    /// <summary>
+    /// BMS 风格三柱分数对比：当前局 + 两条按对比条件选出的参考柱。
+    /// 服务注册时 ghost 柱绑定 timeline processor；未注册时展示 ScoreInfo 静态终值。
+    /// </summary>
+    public partial class EzHUDScoreCompareBars : EzHUDScoreRaceComponent, ISerialisableDrawable, IMaterialBackdropConsumer
+    {
+        private const float backdrop_blur_strength = 16;
+        private const int static_ghost_query_limit = 10;
+
+        public bool UsesFixedAnchor { get; set; }
+
+        public bool WantsMaterialCapture => materialBackdrop.WantsMaterialCapture;
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION1_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION1_DESCRIPTION))]
+        public Bindable<EzScoreRaceMetric> CompareCondition1Setting { get; } = new Bindable<EzScoreRaceMetric>(EzScoreRaceMetric.Accuracy);
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION2_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION2_DESCRIPTION))]
+        public Bindable<EzScoreRaceMetric> CompareCondition2Setting { get; } = new Bindable<EzScoreRaceMetric>(EzScoreRaceMetric.TotalScore);
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_RACE_BAR_DIRECTION_LABEL), nameof(EzHUDStrings.SCORE_RACE_BAR_DIRECTION_DESCRIPTION))]
+        public Bindable<EzScoreCompareBarDirection> BarDirection { get; } = new Bindable<EzScoreCompareBarDirection>(EzScoreCompareBarDirection.Upward);
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_BAR_HEIGHT_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_BAR_HEIGHT_DESCRIPTION))]
+        public BindableNumber<float> BarHeight { get; } = new BindableNumber<float>(120)
+        {
+            MinValue = 40,
+            MaxValue = 400,
+            Precision = 1,
+        };
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_BAR_WIDTH_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_BAR_WIDTH_DESCRIPTION))]
+        public BindableNumber<float> BarWidth { get; } = new BindableNumber<float>(38)
+        {
+            MinValue = 10,
+            MaxValue = 80,
+            Precision = 1,
+        };
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_BACKGROUND_VISIBLE_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_BACKGROUND_VISIBLE_DESCRIPTION))]
+        public BindableBool BackgroundVisible { get; } = new BindableBool(true);
+
+        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.CornerRadius), nameof(SkinnableComponentStrings.CornerRadiusDescription),
+            SettingControlType = typeof(SettingsPercentageSlider<float>))]
+        public new BindableFloat CornerRadius { get; } = new BindableFloat(0.12f)
+        {
+            MinValue = 0,
+            MaxValue = 0.5f,
+            Precision = 0.01f,
+        };
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BACKDROP_BLUR_LABEL), nameof(EzHUDStrings.BACKDROP_BLUR_DESCRIPTION))]
+        public BindableBool BackdropBlurEnabled { get; } = new BindableBool(false);
+
+        private const float bar_spacing = 4;
+        private const float label_area_height = 36;
+        private const float container_padding = 6;
+
+        private readonly EzMaterialContainer materialBackdrop;
+        private readonly Container backgroundLayer;
+        private Container barsContainer = null!;
+        private readonly CompareBar[] bars = new CompareBar[3];
+
+        private EzScoreRaceTimelineScoreProcessor? ghostProcessor1;
+        private EzScoreRaceTimelineScoreProcessor? ghostProcessor2;
+        private EzScoreRaceState? boundState1;
+        private EzScoreRaceState? boundState2;
+        private ScoreInfo? boundStaticScore1;
+        private ScoreInfo? boundStaticScore2;
+
+        private bool refreshScheduled;
+        private long lastNowBarScore = long.MinValue;
+        private double lastProcessorUpdateTime;
+        private bool passiveMode;
+        private EzScoreRaceService? interestService;
+
+        private IBindableDictionary<string, EzScoreRaceState>? stateLookup;
+
+        [Resolved]
+        private OsuColour colours { get; set; } = null!;
+
+        public EzHUDScoreCompareBars()
+        {
+            Width = 3 * BarWidth.Value + 2 * bar_spacing + container_padding * 2;
+            Height = BarHeight.Value + label_area_height + container_padding * 2;
+            Masking = true;
+
+            InternalChild = backgroundLayer = new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+                Alpha = 0,
+                Children = new Drawable[]
+                {
+                    materialBackdrop = new EzMaterialContainer(),
+                    new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = Color4.White.Opacity(0.12f),
+                    },
+                },
+            };
+        }
+
+        protected override void LoadComplete()
+        {
+            barsContainer = new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+                Padding = new MarginPadding(container_padding),
+                Alpha = 0,
+            };
+
+            for (int i = 0; i < bars.Length; i++)
+            {
+                bars[i] = new CompareBar();
+                barsContainer.Add(bars[i]);
+            }
+
+            AddInternal(barsContainer);
+
+            base.LoadComplete();
+
+            BackgroundVisible.BindValueChanged(_ => updateBackgroundVisibility(), true);
+            BackdropBlurEnabled.BindValueChanged(_ => SyncMaterialCaptureState(), true);
+
+            CompareCondition1Setting.BindValueChanged(_ => refreshGhostBars(), true);
+            CompareCondition2Setting.BindValueChanged(_ => refreshGhostBars(), true);
+            BarDirection.BindValueChanged(_ => layoutBars(), true);
+            BarHeight.BindValueChanged(_ => layoutBars(), true);
+            BarWidth.BindValueChanged(_ => layoutBars(), true);
+
+            layoutBars();
+        }
+
+        public void SyncMaterialCaptureState()
+        {
+            materialBackdrop.MaterialVisible = BackgroundVisible.Value && BackdropBlurEnabled.Value;
+            materialBackdrop.BlurSigma = new Vector2(backdrop_blur_strength);
+            materialBackdrop.SyncMaterialCaptureState();
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            updateCurrentAndTheoreticalBars();
+            float effectiveCornerRadius = CornerRadius.Value * Math.Min(DrawWidth, DrawHeight);
+            base.CornerRadius = effectiveCornerRadius;
+            materialBackdrop.GlassCornerRadius = effectiveCornerRadius;
+
+            if (passiveMode)
+                return;
+
+            if (Time.Current - lastProcessorUpdateTime >= 50)
+            {
+                ghostProcessor1?.UpdateScore();
+                ghostProcessor2?.UpdateScore();
+                lastProcessorUpdateTime = Time.Current;
+            }
+        }
+
+        protected override void OnGameplayClockResolved(GameplayClockContainer clock)
+        {
+            base.OnGameplayClockResolved(clock);
+
+            ghostProcessor1?.ReferenceClock = clock;
+            ghostProcessor2?.ReferenceClock = clock;
+        }
+
+        private void bindStateLookupWhenAvailable()
+        {
+            if (IsScoreRaceServiceAvailable)
+                activateLive();
+            else
+                activatePassive();
+        }
+
+        private void ensureGhostProcessors()
+        {
+            if (ghostProcessor1 != null)
+                return;
+
+            ghostProcessor1 = new EzScoreRaceTimelineScoreProcessor();
+            ghostProcessor2 = new EzScoreRaceTimelineScoreProcessor();
+
+            if (GameplayClockContainer != null)
+            {
+                ghostProcessor1.ReferenceClock = GameplayClockContainer;
+                ghostProcessor2.ReferenceClock = GameplayClockContainer;
+            }
+
+            AddInternal(ghostProcessor1);
+            AddInternal(ghostProcessor2);
+
+            ghostProcessor1.TotalScore.BindValueChanged(_ => updateGhostCompareBar(1));
+            ghostProcessor2.TotalScore.BindValueChanged(_ => updateGhostCompareBar(2));
+        }
+
+        private void activateLive()
+        {
+            passiveMode = false;
+            boundStaticScore1 = null;
+            boundStaticScore2 = null;
+
+            var service = ScoreRaceService!;
+
+            registerInterest(service);
+
+            ensureGhostProcessors();
+
+            if (stateLookup == null)
+            {
+                stateLookup = service.States;
+                stateLookup.BindCollectionChanged(onStatesChanged, true);
+            }
+
+            barsContainer.Alpha = 1;
+            updateBackgroundVisibility();
+            refreshPickedGhosts();
+        }
+
+        private void activatePassive()
+        {
+            passiveMode = true;
+
+            unregisterInterest();
+
+            stateLookup = null;
+            bindProcessorToState(ghostProcessor1, ref boundState1, null);
+            bindProcessorToState(ghostProcessor2, ref boundState2, null);
+
+            barsContainer.Alpha = 1;
+            updateBackgroundVisibility();
+            refreshStaticGhosts();
+        }
+
+        private void onStatesChanged(object? sender, NotifyDictionaryChangedEventArgs<string, EzScoreRaceState> e)
+        {
+            if (!refreshScheduled)
+            {
+                refreshScheduled = true;
+                Scheduler.AddOnce(scheduleRefresh);
+            }
+        }
+
+        private void scheduleRefresh()
+        {
+            refreshScheduled = false;
+            refreshPickedGhosts();
+        }
+
+        protected override void OnSessionReady()
+        {
+            bindStateLookupWhenAvailable();
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                unregisterInterest();
+
+                ghostProcessor1?.Dispose();
+                ghostProcessor2?.Dispose();
+            }
+
+            base.Dispose(isDisposing);
+        }
+
+        private void registerInterest(EzScoreRaceService service)
+        {
+            if (interestService != null)
+                return;
+
+            service.RegisterInterest();
+            interestService = service;
+        }
+
+        private void unregisterInterest()
+        {
+            if (interestService == null)
+                return;
+
+            interestService.UnregisterInterest();
+            interestService = null;
+        }
+
+        private void refreshGhostBars()
+        {
+            if (passiveMode)
+                refreshStaticGhosts();
+            else
+                refreshPickedGhosts();
+        }
+
+        private void updateCurrentAndTheoreticalBars()
+        {
+            long barScoreScale = getBarScoreScale();
+            long nowBarScore = GetLiveDisplayScore();
+
+            if (nowBarScore != lastNowBarScore)
+            {
+                bars[0].UpdateValues(EzHUDStrings.SCORE_COMPARE_NOW_LABEL, formatScore(nowBarScore), nowBarScore, barScoreScale, getBarColour(isCurrent: true));
+                lastNowBarScore = nowBarScore;
+            }
+
+            if (CompareCondition1Setting.Value == EzScoreRaceMetric.TheoreticalMaxScore)
+                updateTheoreticalCompareBar(bars[1], CompareCondition1Setting.Value, barScoreScale);
+
+            if (CompareCondition2Setting.Value == EzScoreRaceMetric.TheoreticalMaxScore)
+                updateTheoreticalCompareBar(bars[2], CompareCondition2Setting.Value, barScoreScale);
+        }
+
+        private void updateGhostCompareBar(int conditionIndex)
+        {
+            var metric = conditionIndex == 1 ? CompareCondition1Setting.Value : CompareCondition2Setting.Value;
+
+            if (metric == EzScoreRaceMetric.TheoreticalMaxScore)
+                return;
+
+            var processor = conditionIndex == 1 ? ghostProcessor1 : ghostProcessor2;
+            long barScoreScale = getBarScoreScale();
+
+            if (processor == null || !SupportsGhostRace)
+            {
+                bars[conditionIndex].UpdateValues(metric.GetLocalisableDescription(), string.Empty, 0, barScoreScale, getBarColour(metric));
+                return;
+            }
+
+            long barScore = processor.TotalScore.Value;
+            string label = barScore > 0 ? formatScore(barScore) : string.Empty;
+            bars[conditionIndex].UpdateValues(
+                metric.GetLocalisableDescription(),
+                label,
+                barScore,
+                barScoreScale,
+                getBarColour(metric));
+        }
+
+        private void updateStaticCompareBar(int conditionIndex)
+        {
+            var metric = conditionIndex == 1 ? CompareCondition1Setting.Value : CompareCondition2Setting.Value;
+
+            if (metric == EzScoreRaceMetric.TheoreticalMaxScore)
+                return;
+
+            var scoreInfo = conditionIndex == 1 ? boundStaticScore1 : boundStaticScore2;
+            long barScoreScale = getBarScoreScale();
+
+            if (scoreInfo == null || !SupportsGhostRace)
+            {
+                bars[conditionIndex].UpdateValues(metric.GetLocalisableDescription(), string.Empty, 0, barScoreScale, getBarColour(metric));
+                return;
+            }
+
+            long barScore = scoreInfo.TotalScore;
+            string label = barScore > 0 ? formatScore(barScore) : string.Empty;
+            bars[conditionIndex].UpdateValues(
+                metric.GetLocalisableDescription(),
+                label,
+                barScore,
+                barScoreScale,
+                getBarColour(metric));
+        }
+
+        private void updateTheoreticalCompareBar(CompareBar bar, EzScoreRaceMetric metric, long barScoreScale)
+        {
+            long theoreticalScore = getTheoreticalScoreAtTime();
+            bar.UpdateValues(
+                metric.GetLocalisableDescription(),
+                formatScore(theoreticalScore),
+                theoreticalScore,
+                barScoreScale,
+                getBarColour(metric));
+        }
+
+        private void refreshStaticGhosts()
+        {
+            var scores = QueryStaticGhostScores(EzScoreModFilter.Any, static_ghost_query_limit);
+
+            boundStaticScore1 = pickBestScoreInfo(scores, CompareCondition1Setting.Value);
+            boundStaticScore2 = pickBestScoreInfo(scores, CompareCondition2Setting.Value);
+
+            updateStaticCompareBar(1);
+            updateStaticCompareBar(2);
+        }
+
+        /// <summary>
+        /// 根据当前 compare condition，从字典中选择最佳 ghost 并绑定到对应 processor。
+        /// </summary>
+        private void refreshPickedGhosts()
+        {
+            if (stateLookup == null || stateLookup.Count == 0)
+            {
+                bindProcessorToState(ghostProcessor1, ref boundState1, null);
+                bindProcessorToState(ghostProcessor2, ref boundState2, null);
+                updateGhostCompareBar(1);
+                updateGhostCompareBar(2);
+                return;
+            }
+
+            var states = stateLookup.Values.OrderByDescending(s => s.ScoreInfo.TotalScore).ToList();
+
+            EzScoreRaceState? newState1 = pickBestState(states, CompareCondition1Setting.Value);
+            EzScoreRaceState? newState2 = pickBestState(states, CompareCondition2Setting.Value);
+
+            bindProcessorToState(ghostProcessor1, ref boundState1, newState1);
+            bindProcessorToState(ghostProcessor2, ref boundState2, newState2);
+
+            updateGhostCompareBar(1);
+            updateGhostCompareBar(2);
+        }
+
+        private static EzScoreRaceState? pickBestState(List<EzScoreRaceState> states, EzScoreRaceMetric metric)
+        {
+            if (metric == EzScoreRaceMetric.TheoreticalMaxScore)
+                return null;
+
+            if (states.Count == 0)
+                return null;
+
+            if (metric == EzScoreRaceMetric.TotalScore)
+                return states.OrderByDescending(s => s.ScoreInfo.TotalScore).ThenByDescending(s => s.ScoreInfo.Date).FirstOrDefault();
+
+            return EzScoreRaceMetricOrdering.ApplyMetricOrdering(
+                states,
+                metric,
+                s => s.ScoreInfo.TotalScore,
+                s => s.ScoreInfo.Accuracy,
+                s => s.ScoreInfo.MaxCombo,
+                s => s.ScoreInfo.Statistics.Where(kv => kv.Key.IsMiss()).Sum(kv => kv.Value)
+            ).FirstOrDefault();
+        }
+
+        private static ScoreInfo? pickBestScoreInfo(List<ScoreInfo> scores, EzScoreRaceMetric metric)
+        {
+            if (metric == EzScoreRaceMetric.TheoreticalMaxScore)
+                return null;
+
+            if (scores.Count == 0)
+                return null;
+
+            if (metric == EzScoreRaceMetric.TotalScore)
+                return scores.OrderByDescending(s => s.TotalScore).ThenByDescending(s => s.Date).FirstOrDefault();
+
+            return EzScoreRaceMetricOrdering.ApplyMetricOrdering(
+                scores,
+                metric,
+                s => s.TotalScore,
+                s => s.Accuracy,
+                s => s.MaxCombo,
+                EzLocalScoreQueries.GetMissCount
+            ).FirstOrDefault();
+        }
+
+        private void bindProcessorToState(EzScoreRaceTimelineScoreProcessor? processor, ref EzScoreRaceState? currentBound, EzScoreRaceState? newState)
+        {
+            if (currentBound == newState)
+                return;
+
+            if (currentBound != null)
+            {
+                processor?.Reset();
+                currentBound = null;
+            }
+
+            if (newState != null && processor != null)
+            {
+                processor.BindTo(newState);
+                currentBound = newState;
+            }
+        }
+
+        private void updateBackgroundVisibility()
+        {
+            backgroundLayer.Alpha = BackgroundVisible.Value ? 1 : 0;
+            SyncMaterialCaptureState();
+        }
+
+        private Color4 getBarColour(EzScoreRaceMetric metric = default, bool isCurrent = false)
+        {
+            const float alpha = 0.85f;
+
+            if (isCurrent)
+                return colours.Lime2.Opacity(alpha);
+
+            return metric switch
+            {
+                EzScoreRaceMetric.TotalScore => colours.YellowLight.Opacity(alpha),
+                EzScoreRaceMetric.MissCount => colours.Red2.Opacity(alpha),
+                _ => colours.Blue4.Opacity(alpha),
+            };
+        }
+
+        private static string formatScore(long score) => score.ToString("N0");
+
+        private long getTheoreticalScoreAtTime()
+        {
+            if (ScoreProcessor == null)
+                return 0;
+
+            return ScoreProcessor.GetTheoreticalPerfectJudgedDisplayScore();
+        }
+
+        private long getBarScoreScale()
+        {
+            if (ScoreProcessor != null && ScoreProcessor.MaximumTotalScore > 0)
+                return ScoreProcessor.MaximumTotalScore;
+
+            return (long)ScoreProcessor.MAX_SCORE;
+        }
+
+        private void layoutBars()
+        {
+            float barThickness = BarWidth.Value;
+            float barAxisHeight = BarHeight.Value;
+            var direction = BarDirection.Value;
+
+            Width = bars.Length * barThickness + (bars.Length - 1) * bar_spacing + container_padding * 2;
+            Height = barAxisHeight + label_area_height + container_padding * 2;
+
+            for (int i = 0; i < bars.Length; i++)
+            {
+                var bar = bars[i];
+                bar.Configure(direction, barAxisHeight, barThickness);
+
+                bar.Anchor = Anchor.BottomLeft;
+                bar.Origin = Anchor.BottomLeft;
+                bar.Width = barThickness;
+                bar.Height = barAxisHeight + label_area_height;
+                bar.X = i * (barThickness + bar_spacing);
+            }
+        }
+
+        private partial class CompareBar : CompositeDrawable
+        {
+            private const float min_bar_height = 3;
+
+            private Box bar = null!;
+            private OsuSpriteText titleText = null!;
+            private OsuSpriteText valueText = null!;
+            private Container barTrack = null!;
+            private EzScoreCompareBarDirection direction = EzScoreCompareBarDirection.Upward;
+            private float maxBarSize;
+            private float barThickness;
+
+            private LocalisableString lastTitle;
+            private string lastValue = string.Empty;
+            private float lastBarHeight = -1;
+            private Color4 lastBarColour;
+
+            public CompareBar()
+            {
+                RelativeSizeAxes = Axes.None;
+            }
+
+            public void Configure(EzScoreCompareBarDirection barDirection, float maxSize, float thickness)
+            {
+                direction = barDirection;
+                maxBarSize = maxSize;
+                barThickness = thickness;
+
+                barTrack.Size = new Vector2(barThickness, maxSize);
+                Width = barThickness;
+                applyBarAnchor();
+            }
+
+            [BackgroundDependencyLoader]
+            private void load()
+            {
+                InternalChild = new FillFlowContainer
+                {
+                    Direction = FillDirection.Vertical,
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Spacing = new Vector2(0, 2),
+                    Children = new Drawable[]
+                    {
+                        titleText = new OsuSpriteText
+                        {
+                            Anchor = Anchor.TopCentre,
+                            Origin = Anchor.TopCentre,
+                            Font = OsuFont.GetFont(size: 11, weight: FontWeight.Bold),
+                        },
+                        barTrack = new Container
+                        {
+                            RelativeSizeAxes = Axes.None,
+                            Size = new Vector2(barThickness, maxBarSize),
+                            Child = bar = new Box
+                            {
+                                RelativeSizeAxes = Axes.None,
+                                Width = barThickness,
+                            },
+                        },
+                        valueText = new OsuSpriteText
+                        {
+                            Anchor = Anchor.TopCentre,
+                            Origin = Anchor.TopCentre,
+                            Font = OsuFont.GetFont(size: 11),
+                        },
+                    },
+                };
+
+                applyBarAnchor();
+            }
+
+            private void applyBarAnchor()
+            {
+                if (direction == EzScoreCompareBarDirection.Upward)
+                {
+                    bar.Anchor = Anchor.BottomCentre;
+                    bar.Origin = Anchor.BottomCentre;
+                }
+                else
+                {
+                    bar.Anchor = Anchor.TopCentre;
+                    bar.Origin = Anchor.TopCentre;
+                }
+            }
+
+            public void ResetVisualCache()
+            {
+                lastBarHeight = -1;
+            }
+
+            public void UpdateValues(LocalisableString title, string value, long barScore, long maxBarScore, Color4 barColour)
+            {
+                Alpha = 1;
+
+                if (!lastTitle.Equals(title))
+                {
+                    titleText.Text = title;
+                    lastTitle = title;
+                }
+
+                if (lastValue != value)
+                {
+                    valueText.Text = value;
+                    lastValue = value;
+                }
+
+                if (lastBarColour != barColour)
+                {
+                    bar.Colour = barColour;
+                    lastBarColour = barColour;
+                }
+
+                float ratio = maxBarScore <= 0 ? 0 : (float)barScore / maxBarScore;
+                ratio = Math.Clamp(ratio, 0, 1);
+
+                float barHeight = maxBarSize * ratio;
+
+                if (barScore > 0 && barHeight < min_bar_height)
+                    barHeight = min_bar_height;
+
+                if (Math.Abs(lastBarHeight - barHeight) < 0.01f)
+                    return;
+
+                lastBarHeight = barHeight;
+                bar.RelativeSizeAxes = Axes.None;
+                bar.Width = barThickness;
+                bar.Height = barHeight;
+            }
+        }
+    }
+}

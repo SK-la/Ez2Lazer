@@ -5,6 +5,7 @@ using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.EzOsuGame.Edit;
+using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Rulesets.UI.Scrolling.Algorithms;
@@ -15,7 +16,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
 {
     public partial class EzSkinLNEditorProvider : ISkinEditorVirtualProvider
     {
-        public Drawable CreateDynamicPart(ISkin skin) => createDynamicPartImpl(skin);
+        public Drawable CreateDynamicPart(ISkin skin, int keyCount) => createDynamicPartImpl(skin, keyCount);
 
         public Drawable CreateStaticPart(ISkin skin) => createStaticPartImpl(skin);
 
@@ -23,26 +24,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
 
         private const int preview_key_count = 4;
         private const int preview_column_width = 100;
+        private const int preview_hold_duration = 1000;
 
-        private static ISkin createTransformedSkin(ISkin skin)
+        private static ISkin createTransformedSkin(ISkin skin, int keyCount)
         {
             var ruleset = new ManiaRuleset();
-            var beatmap = new ManiaBeatmap(new StageDefinition(preview_key_count));
+            var beatmap = new ManiaBeatmap(new StageDefinition(keyCount));
             return ruleset.CreateSkinTransformer(skin, beatmap) ?? skin;
         }
 
         static EzSkinLNEditorProvider()
         {
-            // Register this provider for the Mania ruleset in the global registry.
-            try
-            {
-                int rulesetId = new ManiaRuleset().RulesetInfo.OnlineID;
-                SkinEditorProviderRegistry.Register(rulesetId, () => new EzSkinLNEditorProvider());
-            }
-            catch
-            {
-                // swallow - registration is best-effort (assembly load ordering may vary)
-            }
+            // Mania ruleset online ID is stable across osu! releases.
+            SkinEditorProviderRegistry.Register(3, () => new EzSkinLNEditorProvider());
+            EzSkinEditorNoteRulesetProfileRegistry.Register(new ManiaEzSkinEditorNoteRulesetProfile());
         }
 
         protected sealed class PreviewScrollingInfo : IScrollingInfo

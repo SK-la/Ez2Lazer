@@ -3,6 +3,7 @@
 
 #nullable disable
 
+using System;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -11,7 +12,12 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Audio;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
+#if DEBUG
+using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
+#endif
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Judgements;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Objects;
@@ -30,6 +36,11 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
     public partial class DrawableHoldNote : DrawableManiaHitObject<HoldNote>, IKeyBindingHandler<ManiaAction>
     {
         public override bool DisplayResult => false;
+
+        /// <summary>
+        /// LN 松手后应立刻按实际判定时刻淡出；若沿用物件 EndTime，头冻结解除后仍会继续滚动一段。
+        /// </summary>
+        protected override bool HitObjectLifetimeUsesOwnTime => false;
 
         /// <summary>
         /// Whether the user is currently pressing the hold note.
@@ -53,6 +64,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         private Container<DrawableHoldNoteHead> headContainer;
         private Container<DrawableHoldNoteTail> tailContainer;
         private Container<DrawableHoldNoteBody> bodyContainer;
+        private Container<DrawableHoldNoteTick> tickContainer;
 
         private PausableSkinnableSound slidingSample;
 
@@ -103,6 +115,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                     }
                 },
                 bodyContainer = new Container<DrawableHoldNoteBody> { RelativeSizeAxes = Axes.Both },
+                tickContainer = new Container<DrawableHoldNoteTick> { RelativeSizeAxes = Axes.Both },
                 bodyPiece = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.HoldNoteBody), _ => new DefaultBodyPiece
                 {
                     RelativeSizeAxes = Axes.Both,
@@ -156,6 +169,11 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 case DrawableHoldNoteBody body:
                     bodyContainer.Child = body;
                     break;
+
+                case DrawableHoldNoteTick tick:
+                    // 不可见，但仍须挂入树以获得 Clock / ApplyResult 生命周期。
+                    tickContainer.Add(tick);
+                    break;
             }
         }
 
@@ -165,6 +183,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             headContainer.Clear(false);
             tailContainer.Clear(false);
             bodyContainer.Clear(false);
+            tickContainer.Clear(false);
         }
 
         protected override DrawableHitObject CreateNestedHitObject(HitObject hitObject)
@@ -179,6 +198,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
                 case HoldNoteBody body:
                     return new DrawableHoldNoteBody(body);
+
+                case HoldNoteTick tick:
+                    return new DrawableHoldNoteTick(tick);
             }
 
             return base.CreateNestedHitObject(hitObject);
@@ -221,6 +243,18 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         protected override void Update()
         {
             base.Update();
+
+            ManiaEzDrawableJudgement.TryO2HoldUpdate(this);
+            // 先推帧钟增量、再同刻结算：结算会摘掉持有态，抢跑会吞掉长按的连击格。
+            ManiaEzDrawableJudgement.TryStableClassicHoldComboTick(this);
+            ManiaEzDrawableJudgement.TryStableClassicHoldBreak(this);
+            ManiaEzDrawableJudgement.TryStableClassicSettleHeldTail(this);
+#if DEBUG
+            ManiaJudgeHotPathTrace.RecordHoldUpdate();
+
+            if (!ManiaHoldAblation.DisableHoldTickScan)
+#endif
+                judgePendingHoldTicks();
 
             if (Head.Judged && !Head.IsHit)
                 missingStartTime.Value ??= Head.Result.TimeAbsolute;
@@ -271,12 +305,48 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 sizingContainer.Height = 1;
         }
 
+        private void judgePendingHoldTicks()
+        {
+            // Empty HitWindows 的 tick 不会进列级 auto-miss 队列，必须由父 Hold 到点结算（含非 EZ2AC 的 Ignore）。
+            var nested = NestedHitObjects;
+
+#if DEBUG
+            ManiaJudgeHotPathTrace.RecordHoldTickScan(nested.Count);
+#endif
+
+            for (int i = 0; i < nested.Count; i++)
+            {
+                if (nested[i] is not DrawableHoldNoteTick tick || tick.AllJudged || tick.HitObject == null)
+                    continue;
+
+                if (Time.Current >= tick.HitObject.StartTime)
+                {
+#if DEBUG
+                    ManiaJudgeHotPathTrace.RecordHoldTickUpdate();
+#endif
+                    tick.UpdateTickResult();
+                }
+            }
+        }
+
         protected override JudgementResult CreateResult(Judgement judgement) => new HoldNoteJudgementResult(HitObject, judgement);
 
         public new HoldNoteJudgementResult Result => (HoldNoteJudgementResult)base.Result;
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            if (UsesEzJudgement)
+            {
+                if (ManiaEzDrawableJudgement.TryMalodyHoldCheckForResult(this, userTriggered, timeOffset))
+                    return;
+
+                if (ManiaEzDrawableJudgement.TryEz2AcHoldCheckForResult(this, userTriggered, timeOffset))
+                    return;
+
+                if (ManiaEzDrawableJudgement.TryO2HoldCheckForResult(this, userTriggered, timeOffset))
+                    return;
+            }
+
             if (Tail.AllJudged)
             {
                 if (Tail.IsHit)
@@ -303,6 +373,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
         {
+            if (ShouldSkipColumnRoutedPress?.Invoke(this) == true)
+                return false;
+
             if (AllJudged)
                 return false;
 
@@ -313,18 +386,60 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             if ((Clock as IGameplayClock)?.IsRewinding == true)
                 return false;
 
-            if (CheckHittable?.Invoke(this, Time.Current) == false)
+            return TryBeginHoldPress(Time.Current);
+        }
+
+        internal bool TryBeginHoldPress(double currentTime)
+        {
+            if (CheckHittable?.Invoke(this, currentTime) == false)
                 return false;
 
             // The tail has a lenience applied to it which is factored into the miss window (i.e. the miss judgement will be delayed).
             // But the hold cannot ever be started within the late-lenience window, so we should skip trying to begin the hold during that time.
             // Note: Unlike below, we use the tail's start time to determine the time offset.
-            if (Time.Current > Tail.HitObject.StartTime && !Tail.HitObject.HitWindows.CanBeHit(Time.Current - Tail.HitObject.StartTime))
+            if (currentTime > Tail.HitObject.StartTime && !Tail.HitObject.HitWindows.CanBeHit(currentTime - Tail.HitObject.StartTime))
                 return false;
 
-            beginHoldAt(Time.Current - Head.HitObject.StartTime);
+            return beginHoldAndJudgeHead(currentTime);
+        }
 
-            return Head.UpdateResult();
+        /// <summary>
+        /// 列级路由已选中本 hold，跳过重复的 <see cref="DrawableManiaHitObject.CheckHittable"/>。
+        /// </summary>
+        internal bool TryBeginHoldPressFromColumn(double currentTime)
+        {
+            if (AllJudged)
+                return false;
+
+            if ((Clock as IGameplayClock)?.IsRewinding == true)
+                return false;
+
+            if (currentTime > Tail.HitObject.StartTime && !Tail.HitObject.HitWindows.CanBeHit(currentTime - Tail.HitObject.StartTime))
+                return false;
+
+            return beginHoldAndJudgeHead(currentTime);
+        }
+
+        private bool beginHoldAndJudgeHead(double currentTime)
+        {
+            bool preHeld = Result.IsHolding(currentTime);
+            bool headAlreadyJudged = Head.AllJudged;
+
+            beginHoldAt(currentTime - Head.HitObject.StartTime);
+
+            if (headAlreadyJudged)
+            {
+                ManiaEzDrawableJudgement.NotifyEz2AcRepress(this);
+                ManiaEzDrawableJudgement.NotifyStableClassicRepress(this);
+                return true;
+            }
+
+            bool judged = Head.UpdateResult();
+
+            if (Head.AllJudged)
+                ManiaEzDrawableJudgement.NotifyEz2AcHeadJudged(this, Head.Result.Type, preHeld);
+
+            return judged;
         }
 
         private void beginHoldAt(double timeOffset)
@@ -351,20 +466,74 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             // the user has released too early (before the tail).
             //
             // In such a case, we want to record this against the DrawableHoldNoteBody.
+            if (ManiaEzDrawableJudgement.TryMalodyHoldOnReleased(this))
+                return;
+
+            if (ManiaEzDrawableJudgement.TryEz2AcHoldOnReleased(this))
+                return;
+
             if (isHolding.Value)
             {
+                // 松手只作用于「此刻正按住的那条 LN」。同列的其它存活 LN（尚未按下的下一颗）也会收到这次
+                // 松开事件，若照记，会被当成提前松手记成断连（Session 侧只认列级 active hold）。
+                ManiaEzDrawableJudgement.NotifyStableClassicReleased(this);
+
                 Tail.UpdateResult();
-                Body.TriggerResult(Tail.IsHit);
+                EzTriggerBodyAfterTailRelease();
 
                 Result.ReportHoldState(Time.Current, false);
+                EzTryFinalizeAfterTailJudged();
             }
         }
+
+        /// <summary>
+        /// 列级 AutoMiss 仅在 EndTime 才轮询父 Hold；尾已判时立刻走 CheckForResult，避免冻结解除后头/尾继续下落。
+        /// </summary>
+        internal void EzTryFinalizeAfterTailJudged()
+        {
+            if (AllJudged || !Tail.AllJudged)
+                return;
+
+            UpdateResult(false);
+        }
+
+        internal void EzTriggerBodyAfterTailRelease()
+        {
+            if (Tail.AllJudged)
+                Body.TriggerResult(Tail.IsHit);
+            else if (isEarlyHoldRelease() || UsesEzJudgement)
+            {
+                // EZ2AC LN：中途松手由 tick IgnoreMiss 处理，Miss 不断 combo。
+                if (ManiaEzDrawableJudgement.GetJudgementRound(this).Environment.JudgeMode == EzEnumJudgeMode.EZ2AC)
+                    return;
+
+                // Body 已判定：首次断连已落 ComboBreak，后续松手仅在允许多次断连的 JudgeMode 下补发瞬态断连。
+                // 用实时持有态而非缓存 bindable：同一次松手可能同时经 Column.OnReleased 与
+                // DrawableHoldNote.OnReleased 各结算一遍（后者读到的是本帧 Update 前的旧 IsHolding），
+                // 首个调用已 ReportHoldState(false)，据此识别重复，避免同帧多发一次断连。
+                if (Body.AllJudged)
+                {
+                    if (ManiaEzDrawableJudgement.AllowsRepeatedHoldBreak(this) && Result.IsHolding(Time.Current))
+                        Body.EzDispatchExtraResult(HitResult.ComboBreak);
+
+                    return;
+                }
+
+                Body.TriggerResult(false);
+            }
+        }
+
+        private bool isEarlyHoldRelease()
+            => Time.Current < Tail.HitObject.StartTime;
 
         protected override void LoadSamples()
         {
             // Note: base.LoadSamples() isn't called since the slider plays the tail's hitsounds for the time being.
 
-            slidingSample.Samples = HitObject.CreateSlidingSamples().Cast<ISampleInfo>().ToArray();
+            // 按住期间的滑动音只在 PlaySlidingSamples 的谱面（osu! 转换谱）会播；Mania / BMS 的 LN 不播，
+            // 装载了就只是让每条 LN 首次出现时多要一次 sliderslide / sliderwhistle。
+            if (HitObject.PlaySlidingSamples)
+                slidingSample.Samples = HitObject.CreateSlidingSamples().Cast<ISampleInfo>().ToArray();
         }
 
         public override void StopAllSamples()
@@ -386,5 +555,78 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             slidingSample.ClearSamples();
             base.OnFree();
         }
+
+        internal void EzFinalizeMalodyHoldFromTail()
+        {
+            if (Head.IsHit)
+                ApplyMaxResult();
+            else
+                MissForcefully();
+
+            EzTriggerBodyIfNeeded(Head.IsHit);
+            EzReportHoldReleased();
+        }
+
+        internal void EzFinalizeEz2AcHoldFromTail()
+        {
+            // 尾为 Ignore；父物件与 Body 以头是否命中收束，中途松不 ComboBreak。
+            if (Head.IsHit)
+                ApplyMaxResult();
+            else
+                MissForcefully();
+
+            EzTriggerBodyIfNeeded(true);
+            EzReportHoldReleased();
+        }
+
+        internal void EzTriggerMalodyBodyOnRelease() => Body.TriggerResult(true);
+
+        internal void EzFinalizeO2HoldFromTail()
+        {
+            if (EzTailIsHit)
+                EzApplyO2HoldHeadResult(EzTailBreaksCombo);
+            else
+                EzMissForcefully();
+
+            EzTriggerBodyIfNeeded(EzTailIsHit);
+            EzReportHoldReleased();
+        }
+
+        internal bool EzTailAllJudged => Tail.AllJudged;
+
+        internal bool EzTailIsHit => Tail.IsHit;
+
+        internal bool EzTailBreaksCombo => Tail.Result.Type == HitResult.Meh;
+
+        internal bool EzHasEarlyHoldBreak => Body != null && Tail != null && Body.HasHoldBreak && Time.Current < Tail.HitObject.StartTime;
+
+        internal IBindable<bool> EzIsHoldingBindable => IsHolding;
+
+        internal Func<DrawableHitObject, double, bool> EzCheckHittable => CheckHittable;
+
+        internal void EzApplyO2HoldHeadResult(bool breakComboFromTailMeh)
+        {
+            ApplyResult(static (r, breakCombo) =>
+            {
+                r.Type = r.Judgement.MaxResult;
+
+                if (breakCombo)
+                    r.IsComboHit = false;
+            }, breakComboFromTailMeh);
+        }
+
+        internal void EzMissForcefully() => MissForcefully();
+
+        internal void EzTriggerBodyIfNeeded(bool tailHit)
+        {
+            if (!Body.AllJudged)
+                Body.TriggerResult(tailHit);
+        }
+
+        internal void EzReportHoldReleased() => Result.ReportHoldState(Time.Current, false);
+
+        internal void EzRestoreCheckHittable(Func<DrawableHitObject, double, bool> backup) => CheckHittable = backup;
+
+        internal void EzDisableCheckHittable() => CheckHittable = (_, _) => false;
     }
 }

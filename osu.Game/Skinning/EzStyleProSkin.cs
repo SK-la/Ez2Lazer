@@ -35,7 +35,7 @@ namespace osu.Game.Skinning
             InstantiationInfo = typeof(EzStyleProSkin).GetInvariantInstantiationInfo()
         };
 
-        protected EzResourceProvider? EzResources;
+        protected EzResourceStore? EzResources;
 
         public EzStyleProSkin(IStorageResourceProvider resources)
             : this(CreateInfo(), resources)
@@ -46,7 +46,7 @@ namespace osu.Game.Skinning
         public EzStyleProSkin(SkinInfo skin, IStorageResourceProvider resources)
             : base(skin, resources)
         {
-            if (resources is EzResourceProvider ezProvider)
+            if (resources is EzResourceStore ezProvider)
             {
                 EzResources = ezProvider;
             }
@@ -77,36 +77,12 @@ namespace osu.Game.Skinning
                 case GlobalSkinnableContainerLookup containerLookup:
                     switch (containerLookup.Lookup)
                     {
-                        case GlobalSkinnableContainers.SongSelect:
-                            var songSelectComponents = new DefaultSkinComponentsContainer(c =>
-                            {
-                                var radars = c.OfType<EzHUDRadarPanel>().ToArray();
-
-                                if (radars.Length >= 2)
-                                {
-                                    var r1 = radars[0];
-                                    var r2 = radars[1];
-
-                                    r1.Anchor = Anchor.BottomLeft;
-                                    r1.Origin = Anchor.BottomLeft;
-                                    r1.Position = new Vector2(-1, -65);
-                                    r1.RadarDisplayMode.Value = EzRadarDisplayMode.XxySrPattern;
-
-                                    r2.Anchor = Anchor.BottomLeft;
-                                    r2.Origin = Anchor.BottomLeft;
-                                    r2.Position = new Vector2(r1.DrawWidth - 2, -65);
-                                    r2.RadarDisplayMode.Value = EzRadarDisplayMode.KeyPattern;
-                                }
-                            })
-                            {
-                                Children = new Drawable[]
-                                {
-                                    new EzHUDRadarPanel(),
-                                    new EzHUDRadarPanel()
-                                }
-                            };
-
-                            return songSelectComponents;
+                        // case GlobalSkinnableContainers.SongSelect:
+                        //     var songSelectComponents = new DefaultSkinComponentsContainer(c =>
+                        //     {
+                        //     });
+                        //
+                        //     return songSelectComponents;
 
                         case GlobalSkinnableContainers.MainHUDComponents:
 
@@ -116,7 +92,9 @@ namespace osu.Game.Skinning
                                 var score = container.OfType<EzHUDScoreCounter>().FirstOrDefault();
                                 var pps = container.OfType<ArgonPerformancePointsCounter>().FirstOrDefault();
                                 var acc = container.OfType<EzHUDAccuracyCounter>().FirstOrDefault();
-                                var songProgress = container.OfType<ArgonSongProgress>().FirstOrDefault();
+                                var songProgress = container.OfType<SongProgress>().FirstOrDefault();
+                                var scoreRaceLeaderboard = container.OfType<EzHUDScoreRaceLeaderboard>().FirstOrDefault();
+                                var unused = container.OfType<EzHUDScoreCompareBars>().FirstOrDefault();
 
                                 const float x_offset = 20;
                                 const float padding = 10;
@@ -147,7 +125,7 @@ namespace osu.Game.Skinning
                                         score.Origin = Anchor.TopLeft;
                                         score.Position = new Vector2(x_offset, x_offset);
                                         score.ShowLabel.Value = false;
-                                        score.ThemeName.Value = EzEnumGameThemeName.Celeste_Lumiere;
+                                        score.ThemeName.Value = EzGameThemeNames.DEFAULT;
                                     }
 
                                     var attributeTexts = container.OfType<BeatmapAttributeText>().ToArray();
@@ -193,6 +171,13 @@ namespace osu.Game.Skinning
                                         }
                                     }
 
+                                    if (scoreRaceLeaderboard != null)
+                                    {
+                                        scoreRaceLeaderboard.Anchor = Anchor.BottomLeft;
+                                        scoreRaceLeaderboard.Origin = Anchor.BottomLeft;
+                                        scoreRaceLeaderboard.Position = new Vector2(x_offset, 0);
+                                    }
+
                                     if (songProgress != null)
                                     {
                                         songProgress.Position = new Vector2(0, -padding);
@@ -215,7 +200,7 @@ namespace osu.Game.Skinning
                                     {
                                         WireframeOpacity = { Value = 0 },
                                     },
-                                    new ArgonSongProgress(),
+                                    new EzArgonSongProgress(),
                                     new JudgementCounterDisplay
                                     {
                                         FillMode = FillMode.Fill,
@@ -224,6 +209,7 @@ namespace osu.Game.Skinning
                                         Origin = Anchor.CentreLeft,
                                         Position = new Vector2(20, 0),
                                     },
+                                    new EzHUDScoreRaceLeaderboard(),
                                 }
                             };
 

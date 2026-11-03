@@ -16,7 +16,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
-    internal partial class Ez2HitExplosion : Ez2HitTarget, IHitExplosion
+    public partial class Ez2HitExplosion : Ez2HitTarget, IHitExplosion
     {
         public override bool RemoveWhenNotAlive => true;
 
@@ -95,16 +95,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         public void Animate(JudgementResult result)
         {
             this.FadeOutFromOne(PoolableHitExplosion.DURATION, Easing.Out);
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-            {
-                accentColourLocal.UnbindBindings();
-            }
-
-            base.Dispose(isDisposing);
         }
     }
 }

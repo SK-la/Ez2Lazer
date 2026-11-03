@@ -51,6 +51,8 @@ namespace osu.Game.Screens.Edit.Compose.Components.Timeline
 
             beatmap.ControlPointInfo.ControlPointsChanged += invalidateTicks;
 
+            beatmap.FixedGridEnabled.BindValueChanged(_ => invalidateTicks());
+
             configManager.BindWith(OsuSetting.EditorTimelineShowTimingChanges, showTimingChanges);
             showTimingChanges.BindValueChanged(_ => invalidateTicks());
         }
@@ -108,14 +110,14 @@ namespace osu.Game.Screens.Edit.Compose.Components.Timeline
             nextMinTick = null;
             nextMaxTick = null;
 
-            for (int i = 0; i < beatmap.ControlPointInfo.TimingPoints.Count; i++)
+            if (beatmap.FixedGridEnabled.Value && beatmap.ControlPointInfo.TimingPoints.Count > 0)
             {
-                var point = beatmap.ControlPointInfo.TimingPoints[i];
-                double until = i + 1 < beatmap.ControlPointInfo.TimingPoints.Count ? beatmap.ControlPointInfo.TimingPoints[i + 1].Time : working.Value.Track.Length;
-
+                // 固定模式：只用第一条 TimingPoint 覆盖整个时间线
+                var firstTp = beatmap.ControlPointInfo.TimingPoints[0];
+                double until = working.Value.Track.Length;
                 int beat = 0;
 
-                for (double t = point.Time; t < until; t += point.BeatLength / beatDivisor.Value)
+                for (double t = firstTp.Time; t < until; t += firstTp.BeatLength / beatDivisor.Value)
                 {
                     float xPos = (float)t;
 
@@ -126,15 +128,13 @@ namespace osu.Game.Screens.Edit.Compose.Components.Timeline
                     else
                     {
                         // if this is the first beat in the beatmap, there is no next min tick
-                        if (beat == 0 && i == 0)
+                        if (beat == 0)
                             nextMinTick = float.MinValue;
 
-                        int indexInBar = beat % (point.TimeSignature.Numerator * beatDivisor.Value);
+                        int indexInBar = beat % (firstTp.TimeSignature.Numerator * beatDivisor.Value);
 
                         int divisor = BindableBeatDivisor.GetDivisorForBeatIndex(beat, beatDivisor.Value);
                         var colour = BindableBeatDivisor.GetColourFor(divisor, colours);
-
-                        // even though "bar lines" take up the full vertical space, we render them in two pieces because it allows for less anchor/origin churn.
 
                         var size = indexInBar == 0
                             ? new Vector2(1.3f, 1)
@@ -149,6 +149,52 @@ namespace osu.Game.Screens.Edit.Compose.Components.Timeline
                     }
 
                     beat++;
+                }
+            }
+            else
+            {
+                for (int i = 0; i < beatmap.ControlPointInfo.TimingPoints.Count; i++)
+                {
+                    var point = beatmap.ControlPointInfo.TimingPoints[i];
+                    double until = i + 1 < beatmap.ControlPointInfo.TimingPoints.Count ? beatmap.ControlPointInfo.TimingPoints[i + 1].Time : working.Value.Track.Length;
+
+                    int beat = 0;
+
+                    for (double t = point.Time; t < until; t += point.BeatLength / beatDivisor.Value)
+                    {
+                        float xPos = (float)t;
+
+                        if (t < visibleRange.min)
+                            nextMinTick = xPos;
+                        else if (t > visibleRange.max)
+                            nextMaxTick ??= xPos;
+                        else
+                        {
+                            // if this is the first beat in the beatmap, there is no next min tick
+                            if (beat == 0 && i == 0)
+                                nextMinTick = float.MinValue;
+
+                            int indexInBar = beat % (point.TimeSignature.Numerator * beatDivisor.Value);
+
+                            int divisor = BindableBeatDivisor.GetDivisorForBeatIndex(beat, beatDivisor.Value);
+                            var colour = BindableBeatDivisor.GetColourFor(divisor, colours);
+
+                            // even though "bar lines" take up the full vertical space, we render them in two pieces because it allows for less anchor/origin churn.
+
+                            var size = indexInBar == 0
+                                ? new Vector2(1.3f, 1)
+                                : BindableBeatDivisor.GetSize(divisor);
+
+                            var line = getNextUsableLine();
+                            line.X = xPos;
+
+                            line.Width = TICK_WIDTH * size.X;
+                            line.Height = size.Y;
+                            line.Colour = colour;
+                        }
+
+                        beat++;
+                    }
                 }
             }
 

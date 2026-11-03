@@ -11,6 +11,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Testing;
 using osu.Framework.Utils;
+using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Edit;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Edit;
@@ -19,8 +20,10 @@ using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Database;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Edit;
+using osu.Game.Skinning;
 using osu.Game.Tests.Visual;
 using osuTK;
 using osuTK.Input;
@@ -31,13 +34,18 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor
     {
         private TestComposer composer;
 
+        [Resolved]
+        private SkinManager skins { get; set; } = null!;
+
         [SetUp]
         public void Setup() => Schedule(() =>
         {
             BeatDivisor.Value = 8;
             EditorClock.Seek(0);
+            skins.CurrentSkinInfo.Value = ArgonSkin.CreateInfo().ToLiveUnmanaged();
 
             Child = composer = new TestComposer { RelativeSizeAxes = Axes.Both };
+            composer.EditorBeatmap.ControlPointInfo.Add(0, new TimingControlPoint());
         });
 
         [Test]
@@ -49,11 +57,16 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor
 
             setScrollStep(ScrollingDirection.Up);
 
-            AddStep("seek to last object", () =>
+            const double last_start_time = 125 * 9;
+
+            AddStep("seek to last object", () => EditorClock.Seek(last_start_time));
+
+            AddUntilStep("wait for last drawable", () => this.ChildrenOfType<DrawableHitObject>().Any(d => d.HitObject.StartTime == last_start_time));
+
+            AddStep("cache last object", () =>
             {
-                lastObject = this.ChildrenOfType<DrawableHitObject>().Single(d => d.HitObject == composer.EditorBeatmap.HitObjects.Last());
+                lastObject = this.ChildrenOfType<DrawableHitObject>().Single(d => d.HitObject.StartTime == last_start_time);
                 originalTime = lastObject.HitObject.StartTime;
-                EditorClock.Seek(composer.EditorBeatmap.HitObjects.Last().StartTime);
             });
 
             AddStep("select all objects", () => composer.EditorBeatmap.SelectedHitObjects.AddRange(composer.EditorBeatmap.HitObjects));
@@ -66,11 +79,13 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor
                 InputManager.PressButton(MouseButton.Left);
             });
 
-            AddStep("move mouse downwards", () =>
+            AddRepeatStep("move mouse to target time", () =>
             {
-                InputManager.MoveMouseTo(lastObject, new Vector2(0, lastObject.ScreenSpaceDrawQuad.Height * 4));
-                InputManager.ReleaseButton(MouseButton.Left);
-            });
+                var column = composer.Composer.Playfield.GetColumn(0);
+                InputManager.MoveMouseTo(column.ScreenSpacePositionAtTime(originalTime + 125));
+            }, 10);
+
+            AddStep("release drag", () => InputManager.ReleaseButton(MouseButton.Left));
 
             AddAssert("hitobjects not moved columns", () => composer.EditorBeatmap.HitObjects.All(h => ((ManiaHitObject)h).Column == 0));
             AddAssert("hitobjects moved downwards", () => lastObject.DrawPosition.Y - originalPosition.Y > 0);
@@ -86,11 +101,16 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor
 
             setScrollStep(ScrollingDirection.Down);
 
-            AddStep("seek to last object", () =>
+            const double last_start_time = 125 * 9;
+
+            AddStep("seek to last object", () => EditorClock.Seek(last_start_time));
+
+            AddUntilStep("wait for last drawable", () => this.ChildrenOfType<DrawableHitObject>().Any(d => d.HitObject.StartTime == last_start_time));
+
+            AddStep("cache last object", () =>
             {
-                lastObject = this.ChildrenOfType<DrawableHitObject>().Single(d => d.HitObject == composer.EditorBeatmap.HitObjects.Last());
+                lastObject = this.ChildrenOfType<DrawableHitObject>().Single(d => d.HitObject.StartTime == last_start_time);
                 originalTime = lastObject.HitObject.StartTime;
-                EditorClock.Seek(composer.EditorBeatmap.HitObjects.Last().StartTime);
             });
 
             AddStep("select all objects", () => composer.EditorBeatmap.SelectedHitObjects.AddRange(composer.EditorBeatmap.HitObjects));
@@ -103,11 +123,13 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor
                 InputManager.PressButton(MouseButton.Left);
             });
 
-            AddStep("move mouse upwards", () =>
+            AddRepeatStep("move mouse to target time", () =>
             {
-                InputManager.MoveMouseTo(lastObject, new Vector2(0, -lastObject.ScreenSpaceDrawQuad.Height * 4));
-                InputManager.ReleaseButton(MouseButton.Left);
-            });
+                var column = composer.Composer.Playfield.GetColumn(0);
+                InputManager.MoveMouseTo(column.ScreenSpacePositionAtTime(originalTime + 125));
+            }, 10);
+
+            AddStep("release drag", () => InputManager.ReleaseButton(MouseButton.Left));
 
             AddAssert("hitobjects not moved columns", () => composer.EditorBeatmap.HitObjects.All(h => ((ManiaHitObject)h).Column == 0));
             AddAssert("hitobjects moved upwards", () => originalPosition.Y - lastObject.DrawPosition.Y > 0);
@@ -122,10 +144,15 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor
 
             setScrollStep(ScrollingDirection.Down);
 
-            AddStep("seek to last object", () =>
+            const double last_start_time = 125 * 9;
+
+            AddStep("seek to last object", () => EditorClock.Seek(last_start_time));
+
+            AddUntilStep("wait for last drawable", () => this.ChildrenOfType<DrawableHitObject>().Any(d => d.HitObject.StartTime == last_start_time));
+
+            AddStep("cache last object", () =>
             {
-                lastObject = this.ChildrenOfType<DrawableHitObject>().Single(d => d.HitObject == composer.EditorBeatmap.HitObjects.Last());
-                EditorClock.Seek(composer.EditorBeatmap.HitObjects.Last().StartTime);
+                lastObject = this.ChildrenOfType<DrawableHitObject>().Single(d => d.HitObject.StartTime == last_start_time);
             });
 
             AddStep("select all objects", () => composer.EditorBeatmap.SelectedHitObjects.AddRange(composer.EditorBeatmap.HitObjects));
@@ -138,14 +165,15 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor
                 InputManager.PressButton(MouseButton.Left);
             });
 
-            AddStep("move mouse right", () =>
+            AddRepeatStep("move mouse right", () =>
             {
                 var firstColumn = composer.Composer.Playfield.GetColumn(0);
                 var secondColumn = composer.Composer.Playfield.GetColumn(1);
 
                 InputManager.MoveMouseTo(lastObject, new Vector2(secondColumn.ScreenSpaceDrawQuad.Centre.X - firstColumn.ScreenSpaceDrawQuad.Centre.X + 1, 0));
-                InputManager.ReleaseButton(MouseButton.Left);
-            });
+            }, 5);
+
+            AddStep("release drag", () => InputManager.ReleaseButton(MouseButton.Left));
 
             AddAssert("hitobjects moved columns", () => composer.EditorBeatmap.HitObjects.All(h => ((ManiaHitObject)h).Column == 1));
 
@@ -210,33 +238,41 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor
             DrawableHoldNote drawableHoldNote = null;
             EditHoldNoteEndPiece headPiece = null;
 
-            AddStep("select blueprint", () =>
+            AddUntilStep("wait for hold drawable", () => this.ChildrenOfType<DrawableHoldNote>().Any());
+
+            AddStep("seek to hold", () => EditorClock.Seek(500));
+
+            AddStep("select hold", () =>
             {
                 drawableHoldNote = this.ChildrenOfType<DrawableHoldNote>().Single();
                 InputManager.MoveMouseTo(drawableHoldNote);
                 InputManager.Click(MouseButton.Left);
             });
+
             AddStep("grab hold note head", () =>
             {
-                headPiece = this.ChildrenOfType<EditHoldNoteEndPiece>().First();
-                InputManager.MoveMouseTo(headPiece);
+                headPiece = this.ChildrenOfType<EditHoldNoteEndPiece>()
+                                .OrderByDescending(p => p.ScreenSpaceDrawQuad.Centre.Y)
+                                .First();
+                InputManager.MoveMouseTo(headPiece.ScreenSpaceDrawQuad.Centre);
                 InputManager.PressButton(MouseButton.Left);
             });
 
-            AddStep("drag head downwards", () =>
-            {
-                InputManager.MoveMouseTo(headPiece, new Vector2(0, 100));
-                InputManager.ReleaseButton(MouseButton.Left);
-            });
+            AddRepeatStep("drag head to earlier time", () =>
+                InputManager.MoveMouseTo(headPiece.ScreenSpaceDrawQuad.Centre + new Vector2(0, headPiece.ScreenSpaceDrawQuad.Height * 4)), 5);
 
-            AddAssert("start time moved back", () => holdNote!.StartTime, () => Is.LessThan(250));
-            AddAssert("end time unchanged", () => holdNote.EndTime, () => Is.EqualTo(750));
+            AddStep("release head drag", () => InputManager.ReleaseButton(MouseButton.Left));
+
+            AddAssert("start time moved back", () => composer.EditorBeatmap.HitObjects.OfType<HoldNote>().Single().StartTime < 250);
+            AddAssert("end time unchanged", () => composer.EditorBeatmap.HitObjects.OfType<HoldNote>().Single().EndTime == 750);
 
             AddAssert("head note positioned correctly", () => Precision.AlmostEquals(drawableHoldNote.ScreenSpaceDrawQuad.BottomLeft, drawableHoldNote.Head.ScreenSpaceDrawQuad.BottomLeft));
             AddAssert("tail note positioned correctly", () => Precision.AlmostEquals(drawableHoldNote.ScreenSpaceDrawQuad.TopLeft, drawableHoldNote.Tail.ScreenSpaceDrawQuad.BottomLeft));
 
-            AddAssert("head blueprint positioned correctly", () => this.ChildrenOfType<EditHoldNoteEndPiece>().ElementAt(0).DrawPosition == drawableHoldNote.Head.DrawPosition);
-            AddAssert("tail blueprint positioned correctly", () => this.ChildrenOfType<EditHoldNoteEndPiece>().ElementAt(1).DrawPosition == drawableHoldNote.Tail.DrawPosition);
+            AddAssert("head blueprint positioned correctly", () => this.ChildrenOfType<EditHoldNoteEndPiece>()
+                                                                       .OrderByDescending(p => p.ScreenSpaceDrawQuad.Centre.Y).First().DrawPosition == drawableHoldNote.Head.DrawPosition);
+            AddAssert("tail blueprint positioned correctly", () => this.ChildrenOfType<EditHoldNoteEndPiece>()
+                                                                       .OrderByDescending(p => p.ScreenSpaceDrawQuad.Centre.Y).Last().DrawPosition == drawableHoldNote.Tail.DrawPosition);
         }
 
         [Test]
@@ -256,8 +292,12 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor
                 });
             });
 
+            AddStep("seek to hold", () => EditorClock.Seek(500));
+
             DrawableHoldNote drawableHoldNote = null;
             EditHoldNoteEndPiece tailPiece = null;
+
+            AddUntilStep("wait for hold drawable", () => this.ChildrenOfType<DrawableHoldNote>().Any());
 
             AddStep("select blueprint", () =>
             {
@@ -267,16 +307,17 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor
             });
             AddStep("grab hold note tail", () =>
             {
-                tailPiece = this.ChildrenOfType<EditHoldNoteEndPiece>().Last();
-                InputManager.MoveMouseTo(tailPiece);
+                tailPiece = this.ChildrenOfType<EditHoldNoteEndPiece>()
+                                .OrderByDescending(p => p.ScreenSpaceDrawQuad.Centre.Y)
+                                .Last();
+                InputManager.MoveMouseTo(tailPiece.ScreenSpaceDrawQuad.Centre);
                 InputManager.PressButton(MouseButton.Left);
             });
 
-            AddStep("drag tail upwards", () =>
-            {
-                InputManager.MoveMouseTo(tailPiece, new Vector2(0, -100));
-                InputManager.ReleaseButton(MouseButton.Left);
-            });
+            AddRepeatStep("drag tail upwards", () =>
+                InputManager.MoveMouseTo(tailPiece.ScreenSpaceDrawQuad.Centre + new Vector2(0, -tailPiece.ScreenSpaceDrawQuad.Height * 4)), 5);
+
+            AddStep("release tail drag", () => InputManager.ReleaseButton(MouseButton.Left));
 
             AddAssert("start time unchanged", () => holdNote!.StartTime, () => Is.EqualTo(250));
             AddAssert("end time moved forward", () => holdNote.EndTime, () => Is.GreaterThan(750));
@@ -284,8 +325,10 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor
             AddAssert("head note positioned correctly", () => Precision.AlmostEquals(drawableHoldNote.ScreenSpaceDrawQuad.BottomLeft, drawableHoldNote.Head.ScreenSpaceDrawQuad.BottomLeft));
             AddAssert("tail note positioned correctly", () => Precision.AlmostEquals(drawableHoldNote.ScreenSpaceDrawQuad.TopLeft, drawableHoldNote.Tail.ScreenSpaceDrawQuad.BottomLeft));
 
-            AddAssert("head blueprint positioned correctly", () => this.ChildrenOfType<EditHoldNoteEndPiece>().ElementAt(0).DrawPosition == drawableHoldNote.Head.DrawPosition);
-            AddAssert("tail blueprint positioned correctly", () => this.ChildrenOfType<EditHoldNoteEndPiece>().ElementAt(1).DrawPosition == drawableHoldNote.Tail.DrawPosition);
+            AddAssert("head blueprint positioned correctly", () => this.ChildrenOfType<EditHoldNoteEndPiece>()
+                                                                       .OrderByDescending(p => p.ScreenSpaceDrawQuad.Centre.Y).First().DrawPosition == drawableHoldNote.Head.DrawPosition);
+            AddAssert("tail blueprint positioned correctly", () => this.ChildrenOfType<EditHoldNoteEndPiece>()
+                                                                       .OrderByDescending(p => p.ScreenSpaceDrawQuad.Centre.Y).Last().DrawPosition == drawableHoldNote.Tail.DrawPosition);
         }
 
         private void setScrollStep(ScrollingDirection direction)

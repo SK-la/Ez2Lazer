@@ -206,6 +206,11 @@ namespace osu.Game.Screens.Edit.Compose.Components
             switch (e.Action)
             {
                 case PlatformAction.Delete:
+                    // An empty selection must not consume the key, otherwise sibling selection handlers (e.g. the
+                    // extension columns in the mania editor) never receive it.
+                    if (SelectedItems.Count == 0)
+                        return false;
+
                     DeleteSelected();
                     return true;
             }
@@ -307,17 +312,6 @@ namespace osu.Game.Screens.Edit.Compose.Components
                 DeleteItems(new[] { blueprint.Item });
             else
                 DeleteSelected();
-        }
-
-        /// <summary>
-        /// Given a selection target and a function of truth, retrieve the correct ternary state for display.
-        /// </summary>
-        public static TernaryState GetStateFromSelection<TObject>(IEnumerable<TObject> selection, Func<TObject, bool> func)
-        {
-            if (selection.Any(func))
-                return selection.All(func) ? TernaryState.True : TernaryState.Indeterminate;
-
-            return TernaryState.False;
         }
 
         /// <summary>

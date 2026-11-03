@@ -19,12 +19,20 @@ namespace osu.Game.Rulesets.Mania.Edit.Setup
     {
         public override LocalisableString Title => EditorSetupStrings.DifficultyHeader;
 
-        private FormSliderBar<float> keyCountSlider { get; set; } = null!;
+        private FormSliderBar<int> keyCountSlider { get; set; } = null!;
         private FormCheckBox specialStyle { get; set; } = null!;
         private FormSliderBar<float> healthDrainSlider { get; set; } = null!;
         private FormSliderBar<float> overallDifficultySlider { get; set; } = null!;
         private FormSliderBar<double> baseVelocitySlider { get; set; } = null!;
         private FormSliderBar<double> tickRateSlider { get; set; } = null!;
+
+        private readonly BindableInt keyCount = new BindableInt
+        {
+            Default = (int)BeatmapDifficulty.DEFAULT_DIFFICULTY,
+            MinValue = 1,
+            MaxValue = ManiaRuleset.MAX_STAGE_KEYS,
+            Precision = 1,
+        };
 
         [Resolved]
         private Editor? editor { get; set; }
@@ -37,17 +45,11 @@ namespace osu.Game.Rulesets.Mania.Edit.Setup
         {
             Children = new Drawable[]
             {
-                keyCountSlider = new FormSliderBar<float>
+                keyCountSlider = new FormSliderBar<int>
                 {
                     Caption = BeatmapsetsStrings.ShowStatsCsMania,
                     HintText = "The number of columns in the beatmap",
-                    Current = new BindableFloat(Beatmap.Difficulty.CircleSize)
-                    {
-                        Default = BeatmapDifficulty.DEFAULT_DIFFICULTY,
-                        MinValue = 0,
-                        MaxValue = ManiaRuleset.MAX_STAGE_KEYS,
-                        Precision = 1,
-                    },
+                    Current = keyCount,
                     TransferValueOnCommit = true,
                     TabbableContentContainer = this,
                 },
@@ -117,7 +119,9 @@ namespace osu.Game.Rulesets.Mania.Edit.Setup
                 },
             };
 
-            keyCountSlider.Current.BindValueChanged(updateKeyCount);
+            keyCount.Value = (int)Beatmap.Difficulty.CircleSize;
+            keyCount.BindValueChanged(updateKeyCount);
+
             healthDrainSlider.Current.BindValueChanged(_ => updateValues());
             overallDifficultySlider.Current.BindValueChanged(_ => updateValues());
             baseVelocitySlider.Current.BindValueChanged(_ => updateValues());
@@ -126,7 +130,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Setup
 
         private bool updatingKeyCount;
 
-        private void updateKeyCount(ValueChangedEvent<float> keyCount)
+        private void updateKeyCount(ValueChangedEvent<int> keyCountChange)
         {
             if (updatingKeyCount) return;
 
@@ -143,7 +147,8 @@ namespace osu.Game.Rulesets.Mania.Edit.Setup
                     Schedule(() =>
                     {
                         changeHandler!.RestoreState(-1);
-                        Beatmap.Difficulty.CircleSize = keyCountSlider.Current.Value = keyCount.OldValue;
+                        Beatmap.Difficulty.CircleSize = keyCountChange.OldValue;
+                        keyCount.Value = keyCountChange.OldValue;
                         updatingKeyCount = false;
                     });
                 }
@@ -158,7 +163,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Setup
         {
             // for now, update these on commit rather than making BeatmapMetadata bindables.
             // after switching database engines we can reconsider if switching to bindables is a good direction.
-            Beatmap.Difficulty.CircleSize = keyCountSlider.Current.Value;
+            Beatmap.Difficulty.CircleSize = keyCount.Value;
             Beatmap.SpecialStyle = specialStyle.Current.Value;
             Beatmap.Difficulty.DrainRate = healthDrainSlider.Current.Value;
             Beatmap.Difficulty.OverallDifficulty = overallDifficultySlider.Current.Value;

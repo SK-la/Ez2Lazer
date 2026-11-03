@@ -2,72 +2,81 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using osu.Framework.Allocation;
+using System.Threading.Tasks;
 using osu.Framework.Audio.EzLatency;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Logging;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osuTK.Input;
 
 namespace osu.Game.EzOsuGame.Audio
 {
     /// <summary>
-    /// Unified latency measurement manager that coordinates between game input events and the EzLatency system.
-    /// Acts as the central bridge between osu! game events and framework-level latency tracking.
+    /// 音频闭环延迟桥：输入戳 → <c>Sample.Play</c> → 输出路径 PCM 过阈值
+    /// （Default / Shared / Exclusive / ASIO；非麦克风 loopback）。
+    /// 判定耗时（In→Judge）归 <see cref="Diagnostics.EzJudgmentDiagnostics"/>，不在此追踪。
     /// </summary>
     public partial class InputAudioLatencyTracker : IDisposable
     {
-        [Resolved(canBeNull: true)]
-        private INotificationOverlay? notificationOverlay { get; set; }
+        /// <summary>
+        /// 输出路径 RMS 阈值（线性 0–1）。表达式属性便于 IDE 热重载调试，无设置项。
+        /// 电平换算：<c>20 * log10(0.08) ≈ -22 dBFS</c>。
+        /// </summary>
+        public static float AcousticRmsThreshold => 0.08f;
 
-        private Ez2ConfigManager ezConfig { get; set; }
-
-        private ScoreProcessor? scoreProcessor;
-
+        private readonly Ez2ConfigManager ezConfig;
+        private readonly INotificationOverlay? notificationOverlay;
         private readonly EzLatencyManager latencyManager;
+
         private Bindable<bool>? inputAudioLatencyConfigBindable;
         private Action<ValueChangedEvent<bool>>? inputAudioLatencyConfigHandler;
         private Action<ValueChangedEvent<bool>>? enabledChangedHandler;
+        private Action<EzLatencyRecord>? measurementHandler;
+        private bool initialized;
+        private bool started;
+        private bool disposed;
+        private bool reportGenerated;
 
-        /// <summary>
-        /// Global instance for unified access
-        /// </summary>
         public static InputAudioLatencyTracker? Instance { get; private set; }
 
-        public InputAudioLatencyTracker(Ez2ConfigManager ez2ConfigManager)
+        public InputAudioLatencyTracker(Ez2ConfigManager ez2ConfigManager, INotificationOverlay? notificationOverlay = null)
         {
             ezConfig = ez2ConfigManager;
+            this.notificationOverlay = notificationOverlay;
             Instance = this;
-
-            // 使用全局的 EzLatencyManager 实例以与框架层的全局插桩一致
             latencyManager = EzLatencyManager.GLOBAL;
         }
 
         public void Initialize(ScoreProcessor processor)
         {
-            Logger.Log("InputAudioLatencyTracker.Initialize called", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-            scoreProcessor = processor;
+            if (disposed)
+                return;
 
-            // Start each gameplay session from a clean latency dataset.
+            // processor kept for call-site compatibility (Player still passes ScoreProcessor).
+            _ = processor;
+
+            if (initialized)
+            {
+                latencyManager.ClearStatistics();
+                reportGenerated = false;
+                pushAcousticThreshold();
+                if (latencyManager.Enabled.Value)
+                    Start();
+                return;
+            }
+
+            initialized = true;
+            reportGenerated = false;
             latencyManager.ClearStatistics();
 
-            // 将 Ez2Setting 的启用状态绑定到 EzLatencyManager
             inputAudioLatencyConfigBindable = ezConfig.GetBindable<bool>(Ez2Setting.InputAudioLatencyTracker);
-            // Avoid BindTo here to prevent repeated double-binding errors when Initialize is called multiple times.
-            // Use a one-way update from config -> latencyManager instead.
             inputAudioLatencyConfigHandler = v => latencyManager.Enabled.Value = v.NewValue;
             inputAudioLatencyConfigBindable.BindValueChanged(inputAudioLatencyConfigHandler, true);
 
-            // 订阅延迟记录事件，用于日志输出
-            latencyManager.OnNewRecord += OnLatencyRecordGenerated;
-
-            // 绑定启用状态变化，控制生命周期
             enabledChangedHandler = enabled =>
             {
                 if (enabled.NewValue)
@@ -75,125 +84,183 @@ namespace osu.Game.EzOsuGame.Audio
                 else
                     Stop();
             };
-
             latencyManager.Enabled.BindValueChanged(enabledChangedHandler, true);
-        }
 
-        private bool started;
+            measurementHandler = onMeasurement;
+            latencyManager.OnNewRecord += measurementHandler;
+
+            Logger.Log(
+                $"[EzOsuLatency] audio tracker armed (In→Play→Acou; threshold={AcousticRmsThreshold:F4}, acousticProbe={(latencyManager.AcousticProbeRunning ? "on" : "off")})",
+                Ez2ConfigManager.LOGGER_NAME,
+                LogLevel.Debug);
+        }
 
         public void Start()
         {
-            if (started) return;
+            if (disposed || started)
+                return;
 
             started = true;
-
-            Logger.Log("InputAudioLatencyTracker.Start called", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-
-            if (scoreProcessor != null)
-                scoreProcessor.NewJudgement += OnNewJudgement;
+            pushAcousticThreshold();
         }
 
         public void Stop()
         {
-            if (!started) return;
-
             started = false;
-
-            if (scoreProcessor != null)
-                scoreProcessor.NewJudgement -= OnNewJudgement;
         }
 
-        /// <summary>
-        /// Records a key press event for latency measurement.
-        /// Call this when the player presses a key.
-        /// </summary>
-        /// <param name="key">The key that was pressed</param>
         public void RecordKeyPress(Key key)
-        {
-            if (latencyManager.Enabled.Value)
-            {
-                // 记录输入事件
-                latencyManager.RecordInputEvent(key);
-            }
-        }
-
-        /// <summary>
-        /// Records a column press event for mania ruleset.
-        /// </summary>
-        /// <param name="column">The column that was pressed</param>
-        public void RecordColumnPress(int column)
-        {
-            if (latencyManager.Enabled.Value)
-            {
-                // 记录输入事件 (使用 column 作为标识)
-                latencyManager.RecordInputEvent(column);
-            }
-        }
-
-        /// <summary>
-        /// Call this when the game exits to generate latency statistics.
-        /// </summary>
-        public void GenerateLatencyReport()
         {
             if (!latencyManager.Enabled.Value)
                 return;
 
-            // 停止收集新数据
+            pushAcousticThreshold();
+            latencyManager.RecordInputEvent(key);
+        }
+
+        /// <summary>
+        /// Mania column press (may follow framework KeyDown for the same key; analyzer upgrades Key→column only).
+        /// </summary>
+        public void RecordColumnPress(int column)
+        {
+            if (!latencyManager.Enabled.Value)
+                return;
+
+            pushAcousticThreshold();
+            latencyManager.RecordInputEvent(column);
+        }
+
+        /// <summary>
+        /// Emit session summary. Always writes ez_runtime log on exit.
+        /// Toast is only for a completed play (<paramref name="postNotification"/>), deferred so
+        /// <c>InGameFocus</c> can show a toast after leaving <c>Player</c>.
+        /// </summary>
+        public void GenerateLatencyReport(bool postNotification = false)
+        {
+            if (disposed || reportGenerated)
+                return;
+
+            reportGenerated = true;
             Stop();
 
-            // 从 EzLatencyManager 获取统计数据
             var stats = latencyManager.GetStatistics();
 
             if (!stats.HasData)
             {
-                Logger.Log("[EzOsuLatency] No latency data available for analysis", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                Logger.Log("[EzOsuLatency] session ended with no complete records", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+
+                if (postNotification)
+                    postSummaryNotification("Audio latency: no complete samples this play.");
+
+                latencyManager.ClearStatistics();
                 return;
             }
 
-            // 输出统计日志
-            string message =
-                $"Input→Judgement: {stats.AvgInputToJudge:F2}ms, \nInput→Audio: {stats.AvgInputToPlayback:F2}ms, \nAudio→Judgement: {stats.AvgPlaybackToJudge:F2}ms \n(based on {stats.RecordCount} complete records)";
+            string playToAcouPart = string.Empty;
+            string acousticPart = string.Empty;
 
-            Logger.Log($"[EzOsuLatency] Latency Analysis: {message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-
-            // 显示通知
-            notificationOverlay?.Post(new SimpleNotification
+            if (stats.AcousticRecordCount > 0)
             {
-                Text =
-                    $"Latency analysis complete!\nInput→Judge: {stats.AvgInputToJudge:F1}ms\nInput→Audio: {stats.AvgInputToPlayback:F1}ms\nAudio→Judge: {stats.AvgPlaybackToJudge:F1}ms\nRecords: {stats.RecordCount}",
-                Icon = FontAwesome.Solid.ChartLine,
-            });
+                double playToAcouAvg = stats.AvgAcousticRoundtrip - stats.AvgInputToPlayback;
+                acousticPart =
+                    $" | In→Acou avg/min/max={stats.AvgAcousticRoundtrip:F2}/{stats.MinAcousticRoundtrip:F2}/{stats.MaxAcousticRoundtrip:F2}ms (n={stats.AcousticRecordCount})";
+                playToAcouPart = $" | Play→Acou≈{playToAcouAvg:F2}ms (avg)";
+            }
+
+            string summary =
+                $"[EzOsuLatency] n={stats.RecordCount}"
+                + $" | In→Play avg/min/max={stats.AvgInputToPlayback:F2}/{stats.MinInputToPlayback:F2}/{stats.MaxInputToPlayback:F2}ms"
+                + playToAcouPart
+                + acousticPart;
+
+            Logger.Log(summary, Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+
+            if (postNotification)
+            {
+                string notificationText =
+                    $"Audio latency (n={stats.RecordCount})\n"
+                    + $"In→Play  avg {stats.AvgInputToPlayback:F1}  min {stats.MinInputToPlayback:F1}  max {stats.MaxInputToPlayback:F1} ms";
+
+                if (stats.AcousticRecordCount > 0)
+                {
+                    double playToAcouAvg = stats.AvgAcousticRoundtrip - stats.AvgInputToPlayback;
+                    notificationText +=
+                        $"\nPlay→Acou  ≈ {playToAcouAvg:F1} ms (avg)"
+                        + $"\nIn→Acou  avg {stats.AvgAcousticRoundtrip:F1}  min {stats.MinAcousticRoundtrip:F1}  max {stats.MaxAcousticRoundtrip:F1} ms"
+                        + $" (n={stats.AcousticRecordCount})";
+                }
+
+                postSummaryNotification(notificationText);
+            }
 
             latencyManager.ClearStatistics();
         }
 
-        private void OnNewJudgement(JudgementResult result)
+        private void postSummaryNotification(string text)
         {
-            if (!latencyManager.Enabled.Value)
-                return;
-
-            if (result.Type.IsScorable())
+            if (notificationOverlay == null)
             {
-                // 检查是否为普通note且判定为Perfect
-                bool isNote = result.HitObject.GetType().Name.EndsWith("Note", StringComparison.Ordinal) ||
-                              result.HitObject.GetType().Name == "Fruit" ||
-                              result.HitObject.GetType().Name == "HitCircle" ||
-                              result.HitObject.GetType().Name == "Hit";
-
-                // 记录所有可计分的 note 判定，以便收集判定时间戳（不局限于 Perfect）
-                if (isNote)
-                {
-                    latencyManager.RecordJudgeEvent();
-                }
+                Logger.Log("[EzOsuLatency] summary ready but INotificationOverlay is null", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                return;
             }
+
+            var overlay = notificationOverlay;
+            var notification = new SimpleNotification
+            {
+                Text = text,
+                Icon = FontAwesome.Solid.ChartLine,
+            };
+
+            // Defer past Player/PlayerLoader so InGameFocus allows toast + sound.
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(300).ConfigureAwait(false);
+                    overlay.Post(notification);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"[EzOsuLatency] deferred notification failed: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                }
+            });
+        }
+
+        private void pushAcousticThreshold() => latencyManager.SetAcousticThreshold(AcousticRmsThreshold);
+
+        private static string formatMs(double? ms) => ms.HasValue ? $"{ms.Value:F2}" : "n/a";
+
+        private void onMeasurement(EzLatencyRecord record)
+        {
+            double? inToPlay = record.PlaybackTime > 0 && record.InputTime > 0
+                ? record.PlaybackTime - record.InputTime
+                : null;
+
+            bool hasAcou = record.Note == EzLatencyAnalyzer.NOTE_ACOUSTIC_LOOPBACK
+                           || (record.LatencyDifference > 0 && record.HardwareData.IsValid);
+
+            double? inToAcou = hasAcou ? record.LatencyDifference : null;
+            double? playToAcou = inToPlay.HasValue && inToAcou.HasValue
+                ? inToAcou.Value - inToPlay.Value
+                : null;
+
+            Logger.Log(
+                $"[EzOsuLatency] key={record.InputData.KeyValue} | In→Play={formatMs(inToPlay)} | Play→Acou={formatMs(playToAcou)} | In→Acou={formatMs(inToAcou)}",
+                Ez2ConfigManager.LOGGER_NAME,
+                LogLevel.Debug);
         }
 
         public void Dispose()
         {
-            Stop();
+            if (disposed)
+                return;
 
-            // 解绑事件
-            latencyManager.OnNewRecord -= OnLatencyRecordGenerated;
+            // Exit/teardown: log only, never toast.
+            if (!reportGenerated)
+                GenerateLatencyReport(postNotification: false);
+
+            disposed = true;
+            Stop();
 
             if (enabledChangedHandler != null)
                 latencyManager.Enabled.ValueChanged -= enabledChangedHandler;
@@ -201,36 +268,17 @@ namespace osu.Game.EzOsuGame.Audio
             if (inputAudioLatencyConfigBindable != null && inputAudioLatencyConfigHandler != null)
                 inputAudioLatencyConfigBindable.ValueChanged -= inputAudioLatencyConfigHandler;
 
+            if (measurementHandler != null)
+                latencyManager.OnNewRecord -= measurementHandler;
+
+            // Critical: do not leave GLOBAL.Enabled true after leaving gameplay.
+            latencyManager.Enabled.Value = false;
             latencyManager.ClearStatistics();
 
-            Instance = null;
-        }
+            if (Instance == this)
+                Instance = null;
 
-        /// <summary>
-        /// 处理从 framework 层传来的延迟记录，输出详细日志
-        /// </summary>
-        private void OnLatencyRecordGenerated(EzLatencyRecord r)
-        {
-            try
-            {
-                var inputData = r.InputData;
-                var hw = r.HardwareData;
-
-                string keyVal = inputData.KeyValue?.ToString() ?? "-";
-
-                string line =
-                    $"[EzOsuLatency] {r.Timestamp:O} | {r.MeasuredMs:F2} ms | note={r.Note} | in={r.InputTime:F2} | key={keyVal} | play={r.PlaybackTime:F2} | judge={r.JudgeTime:F2} | driver={r.DriverTime:F2} | out_hw={r.OutputHardwareTime:F2} | in_hw={r.InputHardwareTime:F2} | diff={r.LatencyDifference:F2}";
-
-                // extra low-level structs
-                string extra = $" | input_struct=(in={inputData.InputTime:F2}, key={inputData.KeyValue ?? "-"}, judge={inputData.JudgeTime:F2}, play={inputData.PlaybackTime:F2})" +
-                               $" | hw_struct=(driver={hw.DriverTime:F2}, out_hw={hw.OutputHardwareTime:F2}, in_hw={hw.InputHardwareTime:F2}, diff={hw.LatencyDifference:F2})";
-
-                Logger.Log(line + extra, Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"InputAudioLatencyTracker: failed to handle new record: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
-            }
+            Logger.Log("[EzOsuLatency] tracker disposed; GLOBAL.Enabled=false", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
         }
     }
 }

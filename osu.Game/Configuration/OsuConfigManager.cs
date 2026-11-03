@@ -2,15 +2,12 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Linq;
 using osu.Framework;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration;
 using osu.Framework.Configuration.Tracking;
 using osu.Framework.Extensions;
 using osu.Framework.Extensions.LocalisationExtensions;
-using osu.Framework.Input.Handlers.Mouse;
-using osu.Framework.Input.Handlers.Pen;
 using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps.Drawables.Cards;
@@ -33,14 +30,9 @@ namespace osu.Game.Configuration
 {
     public class OsuConfigManager : IniConfigManager<OsuSetting>, IGameplaySettings
     {
-        private readonly GameHost? host;
-
-        public OsuConfigManager(Storage storage, GameHost? host = null)
+        public OsuConfigManager(Storage storage)
             : base(storage)
         {
-            this.host = host;
-
-            Migrate();
         }
 
         protected override void InitialiseDefaults()
@@ -59,6 +51,7 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.SongSelectGroupMode, GroupMode.None);
             SetDefault(OsuSetting.SongSelectSortingMode, SortMode.Title);
+            SetDefault(OsuSetting.SongSelectCollectionFilter, string.Empty);
 
             SetDefault(OsuSetting.RandomSelectAlgorithm, RandomSelectAlgorithm.RandomPermutation);
             SetDefault(OsuSetting.ModSelectHotkeyStyle, ModSelectHotkeyStyle.Sequential);
@@ -110,6 +103,8 @@ namespace osu.Game.Configuration
             // Audio
             SetDefault(OsuSetting.VolumeInactive, 0.25, 0, 1, 0.01);
 
+            SetDefault(OsuSetting.HitsoundVolume, 0.6, 0, 1, 0.01);
+
             SetDefault(OsuSetting.MenuVoice, true);
             SetDefault(OsuSetting.MenuMusic, true);
             SetDefault(OsuSetting.MenuTips, true);
@@ -140,7 +135,10 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.CursorRotation, true);
 
+#pragma warning disable CS0612 // Type or member is obsolete (setting default value to avoid risk of any future crashes)
             SetDefault(OsuSetting.MenuParallax, true);
+#pragma warning restore CS0612 // Type or member is obsolete
+            SetDefault(OsuSetting.MenuParallaxScale, 1.0f, 0.0f, 2.0f, 0.1f);
 
             // See https://stackoverflow.com/a/63307411 for default sourcing.
             SetDefault(OsuSetting.Prefer24HourTime, !CultureInfoHelper.SystemCulture.DateTimeFormat.ShortTimePattern.Contains(@"tt"));
@@ -219,6 +217,7 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.MultiplayerRoomFilter, RoomPermissionsFilter.All);
             SetDefault(OsuSetting.MultiplayerShowInProgressFilter, true);
+            SetDefault(OsuSetting.MultiplayerShowFullFilter, false);
 
             SetDefault(OsuSetting.LastProcessedMetadataId, -1);
 
@@ -245,6 +244,8 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.DashboardSortMode, UserSortCriteria.LastVisit);
             SetDefault(OsuSetting.DashboardDisplayStyle, OverlayPanelDisplayStyle.Card);
+
+            SetDefault(OsuSetting.PMFriendsOnly, false);
         }
 
         protected override bool CheckLookupContainsPrivateInformation(OsuSetting lookup)
@@ -256,42 +257,6 @@ namespace osu.Game.Configuration
             }
 
             return false;
-        }
-
-        public void Migrate()
-        {
-            // arrives as 2020.123.0-lazer
-            string rawVersion = Get<string>(OsuSetting.Version);
-
-            if (rawVersion.Length < 6)
-                return;
-
-            string[] pieces = rawVersion.Split('.');
-
-            // on a fresh install or when coming from a non-release build, execution will end here.
-            // we don't want to run migrations in such cases.
-            if (!int.TryParse(pieces[0], out int year)) return;
-            if (!int.TryParse(pieces[1], out int monthDay)) return;
-
-            int combined = year * 10000 + monthDay;
-
-            if (combined < 20250214)
-            {
-                // UI scaling on mobile platforms has been internally adjusted such that 1x UI scale looks correctly zoomed in than before.
-                if (RuntimeInfo.IsMobile)
-                    GetBindable<float>(OsuSetting.UIScale).SetDefault();
-            }
-
-            if (combined < 20250428)
-            {
-                // Pen tablet sensitivity is now separated from cursor sensitivity.
-                // Most users will want the default to be what they already had set on cursor sensitivity so let's transfer it.
-                var mouseHandler = host?.AvailableInputHandlers.OfType<MouseHandler>().SingleOrDefault();
-                var penHandler = host?.AvailableInputHandlers.OfType<PenHandler>().SingleOrDefault();
-
-                if (penHandler != null && mouseHandler != null && penHandler.Sensitivity.IsDefault)
-                    penHandler.Sensitivity.Value = mouseHandler.Sensitivity.Value;
-            }
         }
 
         public override TrackedSettings CreateTrackedSettings()
@@ -408,7 +373,11 @@ namespace osu.Game.Configuration
         MenuVoice,
         MenuTips,
         CursorRotation,
-        MenuParallax,
+
+        [Obsolete]
+        MenuParallax, // todo: can be removed 20270101
+
+        MenuParallaxScale,
         Prefer24HourTime,
         BeatmapDetailTab,
         BeatmapLeaderboardSortMode,
@@ -421,6 +390,7 @@ namespace osu.Game.Configuration
         DisplayStarsMaximum,
         SongSelectGroupMode,
         SongSelectSortingMode,
+        SongSelectCollectionFilter,
         RandomSelectAlgorithm,
         ModSelectHotkeyStyle,
         ShowFpsDisplay,
@@ -493,6 +463,7 @@ namespace osu.Game.Configuration
         EditorAdjustExistingObjectsOnTimingChanges,
         AlwaysRequireHoldingForPause,
         MultiplayerShowInProgressFilter,
+        MultiplayerShowFullFilter,
         BeatmapListingFeaturedArtistFilter,
         ShowMobileDisclaimer,
         EditorShowStoryboard,
@@ -511,5 +482,11 @@ namespace osu.Game.Configuration
 
         DashboardSortMode,
         DashboardDisplayStyle,
+
+        /// <summary>
+        /// Blocks private messages, multiplayer room invites, and duel requests from people not on the user's friends list.
+        /// </summary>
+        PMFriendsOnly,
+        HitsoundVolume,
     }
 }

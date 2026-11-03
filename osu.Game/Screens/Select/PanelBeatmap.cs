@@ -15,22 +15,25 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
-using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
+using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Screens.Select.Filter;
 using osuTK;
 
 namespace osu.Game.Screens.Select
@@ -47,6 +50,7 @@ namespace osu.Game.Screens.Select
         private OsuSpriteText difficultyText = null!;
         private OsuSpriteText authorText = null!;
         private FillFlowContainer mainFill = null!;
+        private FillFlowContainer starMetricsFlow = null!;
 
         private IBindable<StarDifficulty>? starDifficultyBindable;
         private CancellationTokenSource? starDifficultyCancellationSource;
@@ -61,20 +65,26 @@ namespace osu.Game.Screens.Select
         private EzDisplayKpc ezDisplayKpc = null!;
         private EzDisplaySR displaySR = null!;
         private EzDisplayTag ezDisplayTag = null!;
+        private EzDisplaySkillsDan ezDisplaySkillsDan = null!;
 
         private IBindable<EzAnalysisResult>? ezAnalysisBindable;
         private CancellationTokenSource? ezAnalysisCancellationSource;
-        private ScheduledDelegate? scheduledEzAnalysisUpdate;
 
-        private bool ezAnalysisEnabled;
         private string? scratchText;
-        private const int mania_ui_update_throttle_ms = 15;
+
+        private Bindable<EzMaterialUiMode> materialUiMode = null!;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
+        private OsuConfigManager config { get; set; } = null!;
+
+        [Resolved]
         private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
+
+        [Resolved]
+        private EzAnalysisDatabase ezAnalysisDatabase { get; set; } = null!;
 
         [Resolved]
         private IRulesetStore rulesets { get; set; } = null!;
@@ -91,7 +101,12 @@ namespace osu.Game.Screens.Select
         [Resolved]
         private ISongSelect? songSelect { get; set; }
 
+        [Resolved(canBeNull: true)]
+        private IPanelAccentColourProvider? accentColourProvider { get; set; }
+
         private BeatmapInfo beatmap => ((GroupedBeatmap)Item!.Model).Beatmap;
+
+        private bool supportsEzAnalysis => EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value);
 
         public PanelBeatmap()
         {
@@ -115,23 +130,33 @@ namespace osu.Game.Screens.Select
                 RelativeSizeAxes = Axes.Both,
             };
 
+            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
+            Container colourOverlays;
+
             Content.Children = new Drawable[]
             {
-                new Box
+                colourOverlays = new Container
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = ColourInfo.GradientHorizontal(colourProvider.Background3, colourProvider.Background4),
-                },
-                backgroundDifficultyTint = new Box
-                {
-                    RelativeSizeAxes = Axes.Both,
-                },
-                triangles = new TrianglesV2
-                {
-                    ScaleAdjust = 1.2f,
-                    Thickness = 0.01f,
-                    Velocity = 0.3f,
-                    RelativeSizeAxes = Axes.Both,
+                    Children = new Drawable[]
+                    {
+                        new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Colour = ColourInfo.GradientHorizontal(colourProvider.Background3, colourProvider.Background4),
+                        },
+                        backgroundDifficultyTint = new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                        },
+                        triangles = new TrianglesV2
+                        {
+                            ScaleAdjust = 1.2f,
+                            Thickness = 0.01f,
+                            Velocity = 0.3f,
+                            RelativeSizeAxes = Axes.Both,
+                        },
+                    }
                 },
                 new FillFlowContainer
                 {
@@ -143,11 +168,32 @@ namespace osu.Game.Screens.Select
                     Direction = FillDirection.Horizontal,
                     Children = new Drawable[]
                     {
-                        localRank = new PanelLocalRankDisplay
+                        new FillFlowContainer
                         {
-                            Scale = new Vector2(0.8f),
-                            Origin = Anchor.CentreLeft,
+                            AutoSizeAxes = Axes.Both,
                             Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Direction = FillDirection.Vertical,
+                            Spacing = new Vector2(0, 2),
+                            Children = new Drawable[]
+                            {
+                                localRank = new PanelLocalRankDisplay
+                                {
+                                    Scale = new Vector2(0.8f),
+                                    Origin = Anchor.TopCentre,
+                                    Anchor = Anchor.TopCentre,
+                                },
+                                ezDisplaySkillsDan = new EzDisplaySkillsDan
+                                {
+                                    LayoutDirection = FillDirection.Vertical,
+                                    PreferDanImage = true,
+                                    Scale = new Vector2(0.85f),
+                                    Origin = Anchor.TopCentre,
+                                    Anchor = Anchor.TopCentre,
+                                    Alpha = 0,
+                                    BypassAutoSizeAxes = Axes.Both,
+                                },
+                            },
                         },
                         mainFill = new FillFlowContainer
                         {
@@ -188,39 +234,53 @@ namespace osu.Game.Screens.Select
                                         }
                                     }
                                 },
-                                new FillFlowContainer
+                                new Container
                                 {
-                                    Direction = FillDirection.Horizontal,
-                                    Spacing = new Vector2(3),
                                     AutoSizeAxes = Axes.Both,
                                     Children = new Drawable[]
                                     {
-                                        starRatingDisplay = new StarRatingDisplay(default, StarRatingDisplaySize.Small, animated: true)
+                                        starMetricsFlow = new FillFlowContainer
                                         {
-                                            Origin = Anchor.CentreLeft,
-                                            Anchor = Anchor.CentreLeft,
-                                            Scale = new Vector2(0.875f),
+                                            Direction = FillDirection.Horizontal,
+                                            Spacing = new Vector2(2),
+                                            AutoSizeAxes = Axes.Both,
+                                            Children = new Drawable[]
+                                            {
+                                                starRatingDisplay = new StarRatingDisplay(default, StarRatingDisplaySize.Small, animated: true)
+                                                {
+                                                    Origin = Anchor.CentreLeft,
+                                                    Anchor = Anchor.CentreLeft,
+                                                    Scale = new Vector2(0.875f),
+                                                },
+                                                displaySR = new EzDisplaySR(EzManiaSummary.EMPTY, StarRatingDisplaySize.Small, animated: true)
+                                                {
+                                                    Origin = Anchor.CentreLeft,
+                                                    Anchor = Anchor.CentreLeft,
+                                                    Scale = new Vector2(0.875f),
+                                                },
+                                                starCounter = new StarCounter
+                                                {
+                                                    Anchor = Anchor.CentreLeft,
+                                                    Origin = Anchor.CentreLeft,
+                                                    Scale = new Vector2(0.4f)
+                                                },
+                                            },
                                         },
-                                        displaySR = new EzDisplaySR(EzManiaSummary.EMPTY, StarRatingDisplaySize.Small, animated: true)
+                                        ezDisplayKpsGraph = new EzDisplayKpsGraph
                                         {
-                                            Origin = Anchor.CentreLeft,
-                                            Anchor = Anchor.CentreLeft,
-                                            Scale = new Vector2(0.875f),
+                                            ExcludeFromParentAutoSize = true,
+                                            OverlayAnchorRow = starMetricsFlow,
+                                            Size = new Vector2(300, 15),
+                                            Blending = BlendingParameters.Mixture,
                                         },
-                                        starCounter = new StarCounter
-                                        {
-                                            Anchor = Anchor.CentreLeft,
-                                            Origin = Anchor.CentreLeft,
-                                            Scale = new Vector2(0.4f)
-                                        },
-                                        ezDisplayKpc = new EzDisplayKpc(),
                                     },
                                 },
                                 new FillFlowContainer
                                 {
                                     Direction = FillDirection.Horizontal,
+                                    Padding = new MarginPadding { Top = 2, Bottom = 2 },
+                                    Spacing = new Vector2(3),
                                     AutoSizeAxes = Axes.Both,
-                                    // Padding = new MarginPadding { Bottom = 2 },
                                     Children = new Drawable[]
                                     {
                                         ezDisplayKps = new EzDisplayKps
@@ -229,12 +289,11 @@ namespace osu.Game.Screens.Select
                                             Origin = Anchor.CentreLeft,
                                             Scale = new Vector2(0.875f),
                                         },
-                                        ezDisplayKpsGraph = new EzDisplayKpsGraph
+                                        ezDisplayKpc = new EzDisplayKpc
                                         {
-                                            Size = new Vector2(300, 15),
-                                            Blending = BlendingParameters.Mixture,
-                                            Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
+                                            Anchor = Anchor.CentreLeft,
+                                            Margin = new MarginPadding(2f),
                                         },
                                     }
                                 },
@@ -248,37 +307,42 @@ namespace osu.Game.Screens.Select
                     }
                 }
             };
+
+            // Glass N lives on Panel; hide classic M overlays when acrylic is on.
+            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(colourOverlays, materialUiMode);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            ezConfig.BindWith(Ez2Setting.KpcDisplayMode, ezDisplayKpc.KpcDisplayModeBindable);
-
-            bool ezAnalysisCacheEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisRecEnabled);
-            bool ezAnalysisSqliteEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
-
             ruleset.BindValueChanged(_ =>
             {
-                ezAnalysisEnabled = ezAnalysisCacheEnabled || ezAnalysisSqliteEnabled;
-
+                scratchText = null;
                 resetEzDisplay();
                 updateKeyCount();
             }, true);
 
-            mods.BindValueChanged(_ =>
-            {
-                updateKeyCount();
-            }, true);
+            mods.BindValueChanged(_ => updateKeyCount(), true);
 
-            var sqliteFilter = ezConfig.GetBindable<bool>(Ez2Setting.SqliteFilter);
-            sqliteFilter.BindValueChanged(value =>
+            var ezAnalysisFilter = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisFilter);
+            var sortMode = config.GetBindable<SortMode>(OsuSetting.SongSelectSortingMode);
+            var groupMode = config.GetBindable<GroupMode>(OsuSetting.SongSelectGroupMode);
+
+            void updateStarFilterIcon()
             {
-                starCounter.Icon = value.NewValue
+                bool useXxyMetric = EzXxyStarRatingSupport.SupportsRuleset(ruleset.Value)
+                                    && (sortMode.Value == SortMode.XxyStarRating || groupMode.Value == GroupMode.XxyStarRating);
+
+                starCounter.Icon = useXxyMetric
                     ? FontAwesome.Solid.Moon
                     : FontAwesome.Solid.Star;
-            }, true);
+            }
+
+            ruleset.BindValueChanged(_ => updateStarFilterIcon(), true);
+            sortMode.BindValueChanged(_ => updateStarFilterIcon());
+            groupMode.BindValueChanged(_ => updateStarFilterIcon());
+            ezAnalysisFilter.BindValueChanged(_ => updateStarFilterIcon(), true);
         }
 
         protected override void PrepareForUse()
@@ -291,27 +355,43 @@ namespace osu.Game.Screens.Select
             difficultyText.Text = beatmap.DifficultyName;
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
+            applyPanelKps(EzSongSelectAnalysisDisplay.Empty);
+            ezDisplayKps.SetPp(EzPanelPerformancePoints.ResolveRealmBaselinePp(beatmap));
+
+            if (ruleset.Value is RulesetInfo rulesetInfo
+                && EzPanelKpsMetrics.TryResolveBaselineFromSqlite(ezAnalysisDatabase, beatmap, rulesetInfo, mods.Value, out var baselineKps))
+                applyPanelKps(baselineKps);
+
             computeStarRating();
             updateKeyCount();
 
             resetEzDisplay();
-            ezDisplayTag.TagSummary = null;
+            ezDisplaySkillsDan.Beatmap = beatmap;
             ezDisplayTag.Beatmap = beatmap;
+
+            if (supportsEzAnalysis && beatmap.SupportsXxyStarRating())
+                displaySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay();
+
             computeEzAnalysis();
         }
 
         private void resetEzDisplay()
         {
-            if (ezAnalysisEnabled && ruleset.Value.OnlineID == 3)
-            {
+            if (Item?.IsVisible != true)
+                return;
+
+            bool showXxy = supportsEzAnalysis && beatmap.SupportsXxyStarRating();
+
+            if (showXxy)
                 displaySR.Show();
-            }
             else
             {
-                ezDisplayKpc.ManiaSummary = null;
                 displaySR.Current.Value = EzManiaSummary.EMPTY;
                 displaySR.Hide();
             }
+
+            ezDisplayKpc.ManiaSummary = null;
+            ezDisplayKpc.Hide();
         }
 
         private Drawable getRulesetIcon(RulesetInfo rulesetInfo)
@@ -340,9 +420,6 @@ namespace osu.Game.Screens.Select
 
         private void clearEzAnalysisBinding(bool resetDisplay = true)
         {
-            scheduledEzAnalysisUpdate?.Cancel();
-            scheduledEzAnalysisUpdate = null;
-
             ezAnalysisBindable?.UnbindAll();
             ezAnalysisBindable = null;
 
@@ -353,63 +430,86 @@ namespace osu.Game.Screens.Select
             if (!resetDisplay)
                 return;
 
+            ezDisplaySkillsDan.Beatmap = null;
             ezDisplayTag.Beatmap = null;
-            ezDisplayTag.TagSummary = null;
             scratchText = null;
 
             displaySR.Current.Value = EzManiaSummary.EMPTY;
             ezDisplayKpc.ManiaSummary = null;
+            ezDisplayKpc.Hide();
+            applyPanelKps(EzSongSelectAnalysisDisplay.Empty);
+            ezDisplayKps.SetPp(null);
+        }
+
+        private void applyPanelKps(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
+        {
+            ezDisplayKpsGraph.SetPoints(metrics.KpsList);
+            ezDisplayKps.SetKpsMetrics(metrics);
+        }
+
+        private void applyPanelKpc(EzManiaSummary? maniaSummary)
+        {
+            if (maniaSummary?.ColumnCounts.Count > 0)
+            {
+                ezDisplayKpc.ManiaSummary = maniaSummary;
+                ezDisplayKpc.Show();
+            }
+            else
+            {
+                ezDisplayKpc.ManiaSummary = null;
+                ezDisplayKpc.Hide();
+            }
         }
 
         private void updateKPS(EzAnalysisResult ezAnalysisResult)
         {
-            double avgKPS = ezAnalysisResult.AverageKps;
-            double maxKps = ezAnalysisResult.MaxKps;
-            var kpsList = ezAnalysisResult.KpsList;
-            ezDisplayKps.SetKps(ezAnalysisResult.Pp, avgKPS, maxKps);
-            ezDisplayKpsGraph.SetPoints(kpsList);
+            if (Item == null)
+                return;
 
-            if (ezAnalysisEnabled && ezAnalysisResult.TagSummary != null)
-                ezDisplayTag.TagSummary = ezAnalysisResult.TagSummary;
+            if (!EzSongSelectAnalysisDisplay.ShouldApplyPanelKpsUpdate(ezAnalysisResult, mods.Value))
+                return;
 
-            if (ezAnalysisEnabled && ruleset.Value.OnlineID == 3)
-            {
-                var maniaSummary = ezAnalysisResult.ManiaSummary;
-                var columnCounts = maniaSummary?.ColumnCounts ?? new Dictionary<int, int>();
+            var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, ezAnalysisResult, mods.Value);
+            applyPanelKps(metrics);
 
-                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
-                updateKeyCount();
-                ezDisplayKpc.ManiaSummary = maniaSummary;
-                displaySR.Current.Value = maniaSummary ?? EzManiaSummary.EMPTY;
-            }
+            if (!supportsEzAnalysis || !beatmap.SupportsXxyStarRating())
+                return;
+
+            var maniaSummary = metrics.ManiaSummary;
+            var columnCounts = maniaSummary?.ColumnCounts;
+
+            applyPanelKpc(maniaSummary);
+
+            string? scratch = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, metrics.MaxKps);
+
+            if (scratch != null)
+                scratchText = scratch;
+
+            updateKeyCount();
+
+            var summaryForDisplay = maniaSummary ?? EzManiaSummary.EMPTY;
+            if (displaySR.Current.Value.XxySr != summaryForDisplay.XxySr)
+                displaySR.Current.Value = summaryForDisplay;
         }
 
         private void computeEzAnalysis()
         {
-            if (!ezAnalysisEnabled)
-                return;
-
-            ezAnalysisCancellationSource?.Cancel();
-            ezAnalysisCancellationSource?.Dispose();
-            ezAnalysisCancellationSource = new CancellationTokenSource();
-
             if (Item == null)
                 return;
 
+            clearEzAnalysisBinding(resetDisplay: false);
+
+            ezAnalysisCancellationSource = new CancellationTokenSource();
+
             ezAnalysisBindable = ezAnalysisCache.GetBindableAnalysis(beatmap, ezAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
-            ezAnalysisBindable.BindValueChanged(result =>
-            {
-                scheduledEzAnalysisUpdate?.Cancel();
-                scheduledEzAnalysisUpdate = Scheduler.AddDelayed(() =>
-                {
-                    updateKPS(result.NewValue);
-                    scheduledEzAnalysisUpdate = null;
-                }, mania_ui_update_throttle_ms);
-            }, true);
+            ezAnalysisBindable.BindValueChanged(result => updateKPS(result.NewValue), true);
         }
 
         private void computeStarRating()
         {
+            starDifficultyBindable?.UnbindAll();
+            starDifficultyBindable = null;
+
             starDifficultyCancellationSource?.Cancel();
             starDifficultyCancellationSource?.Dispose();
             starDifficultyCancellationSource = new CancellationTokenSource();
@@ -420,9 +520,14 @@ namespace osu.Game.Screens.Select
             starDifficultyBindable = difficultyCache.GetBindableDifficulty(beatmap, starDifficultyCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
             starDifficultyBindable.BindValueChanged(starDifficulty =>
             {
+                if (Item?.IsVisible != true)
+                    return;
+
                 starRatingDisplay.Current.Value = starDifficulty.NewValue;
                 starCounter.Current = (float)starDifficulty.NewValue.Stars;
-            }, true);
+
+                ezDisplayKps.SetPp(EzPanelPerformancePoints.ResolvePanelPp(starDifficulty.NewValue, beatmap));
+            });
         }
 
         protected override void Update()
@@ -444,16 +549,27 @@ namespace osu.Game.Screens.Select
             // I can't find a better way to do this.
             mainFill.Margin = new MarginPadding { Left = 1 / starRatingDisplay.Scale.X * (localRank.HasRank ? 0 : -3) };
 
-            var diffColour = starRatingDisplay.DisplayedDifficultyColour;
+            // Ruleset-supplied accent (e.g. BMS lamp colour) wins; otherwise fall back to the
+            // standard star-rating colour. The numeric star-counter always tracks the star spectrum
+            // so the "stars" graphic itself reads as difficulty regardless of what tinted the panel.
+            // `beatmap` resolves through Item!.Model, so guard against the pool-recycled state where
+            // Item is null (FreeAfterUse) — accessing `beatmap` there throws NRE.
+            var starColour = starRatingDisplay.DisplayedDifficultyColour;
+            var diffColour = Item != null
+                ? accentColourProvider?.GetAccentColourFor(beatmap) ?? starColour
+                : starColour;
+
+            if (starCounter.Colour != starColour)
+                starCounter.Colour = starColour;
 
             if (AccentColour != diffColour)
-            {
                 AccentColour = diffColour;
-                starCounter.Colour = diffColour;
 
-                backgroundBorder.Colour = diffColour;
+            ApplyAcrylicIconStripBackground(backgroundBorder, EzMaterialOverlayAlpha.IsEnabled(materialUiMode.Value), diffColour);
+
+            if (!EzMaterialOverlayAlpha.IsEnabled(materialUiMode.Value))
+            {
                 backgroundDifficultyTint.Colour = ColourInfo.GradientHorizontal(diffColour.Opacity(0.25f), diffColour.Opacity(0f));
-
                 triangles.Colour = ColourInfo.GradientVertical(diffColour.Opacity(0.25f), diffColour.Opacity(0f));
             }
 
@@ -470,13 +586,21 @@ namespace osu.Game.Screens.Select
 
             var rulesetInstance = ruleset.Value.CreateInstance();
 
-            if (rulesetInstance.AvailableVariants.Count() > 1)
+            if (rulesetInstance.GameplayVariants.Count() > 1)
             {
+                if (scratchText != null)
+                {
+                    variantText.Alpha = 1;
+                    variantText.Text = LocalisableString.Interpolate($"[{scratchText}] ");
+                    variantText.Colour = Colour4.LightPink.ToLinear();
+                    return;
+                }
+
                 int variant = rulesetInstance.GetVariantForBeatmap(beatmap, mods.Value);
                 var variantName = rulesetInstance.GetVariantName(variant);
 
                 variantText.Alpha = 1;
-                variantText.Text = scratchText ?? LocalisableString.Interpolate($"[{variantName}] ");
+                variantText.Text = LocalisableString.Interpolate($"[{variantName}] ");
                 variantText.Colour = Colour4.LightPink.ToLinear();
             }
             else

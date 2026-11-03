@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using Realms;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
@@ -25,11 +26,11 @@ namespace osu.Game.Rulesets
             : base(storage)
         {
             this.realmAccess = realmAccess;
-            prepareDetachedRulesets();
+            PrepareDetachedRulesets();
             informUserAboutBrokenRulesets();
         }
 
-        private void prepareDetachedRulesets()
+        protected virtual void PrepareDetachedRulesets()
         {
             realmAccess.Write(realm =>
             {
@@ -67,6 +68,8 @@ namespace osu.Game.Rulesets
                     }
                 }
 
+                OnBeforeRulesetValidation(realm, rulesets, instances);
+
                 List<RulesetInfo> detachedRulesets = new List<RulesetInfo>();
 
                 // perform a consistency check and detach final rulesets from realm for cross-thread runtime usage.
@@ -74,6 +77,12 @@ namespace osu.Game.Rulesets
                 {
                     try
                     {
+                        if (ShouldDisableRuleset(r))
+                        {
+                            r.Available = false;
+                            continue;
+                        }
+
                         var resolvedType = Type.GetType(r.InstantiationInfo);
 
                         if (resolvedType == null)
@@ -93,10 +102,12 @@ namespace osu.Game.Rulesets
                                 $"Ruleset API version is too old (was {instance.RulesetAPIVersionSupported}, expected {Ruleset.CURRENT_RULESET_API_VERSION})");
                         }
 
-                        if (r.OnlineID != instanceInfo.OnlineID)
+                        if (!ShouldAllowOnlineIdMismatch(r, instance, instanceInfo.OnlineID) && r.OnlineID != instanceInfo.OnlineID)
                             throw new InvalidOperationException($@"Online ID mismatch for ruleset {r.ShortName}: database has {r.OnlineID}, constructed instance has {instanceInfo.OnlineID}");
 
-                        if (r.OnlineID > 0 && rulesets.Any(otherRuleset => otherRuleset.ShortName != r.ShortName && otherRuleset.OnlineID == r.OnlineID))
+                        if (!ShouldSkipDuplicateOnlineIdCheck(r, r.OnlineID, rulesets)
+                            && r.OnlineID > 0
+                            && rulesets.Any(otherRuleset => otherRuleset.ShortName != r.ShortName && otherRuleset.OnlineID == r.OnlineID))
                             throw new InvalidOperationException($@"Ruleset {r.ShortName} shares online ID {r.OnlineID} with another ruleset");
 
                         // If a ruleset isn't up-to-date with the API, it could cause a crash at an arbitrary point of execution.
@@ -122,6 +133,16 @@ namespace osu.Game.Rulesets
                 availableRulesets.AddRange(detachedRulesets.Order());
             });
         }
+
+        protected virtual void OnBeforeRulesetValidation(Realm realm, IQueryable<RulesetInfo> rulesets, List<Ruleset> instances)
+        {
+        }
+
+        protected virtual bool ShouldDisableRuleset(RulesetInfo ruleset) => false;
+
+        protected virtual bool ShouldAllowOnlineIdMismatch(RulesetInfo ruleset, Ruleset instance, int instanceOnlineId) => false;
+
+        protected virtual bool ShouldSkipDuplicateOnlineIdCheck(RulesetInfo ruleset, int onlineId, IQueryable<RulesetInfo> allRulesets) => false;
 
         private bool checkRulesetUpToDate(Ruleset instance)
         {

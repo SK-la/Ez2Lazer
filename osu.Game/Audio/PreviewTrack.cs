@@ -72,8 +72,7 @@ namespace osu.Game.Audio
             {
                 looping = value;
 
-                if (Track != null)
-                    Track.Looping = looping;
+                Track?.Looping = looping;
             }
         }
 
@@ -134,12 +133,19 @@ namespace osu.Game.Audio
         /// </summary>
         protected abstract Track? GetTrack();
 
+        /// <summary>
+        /// Whether <see cref="Track"/> is owned by this component and should be disposed with it.
+        /// </summary>
+        protected virtual bool DisposeTrack => true;
+
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
 
             Stop();
-            Track?.Dispose();
+
+            if (DisposeTrack)
+                Track?.Dispose();
         }
     }
 }

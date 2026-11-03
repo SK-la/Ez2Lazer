@@ -1,0 +1,39 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.Collections.Generic;
+using osu.Game.EzOsuGame.Configuration;
+using osuTK.Graphics;
+
+namespace osu.Game.EzOsuGame.Overlays.Preview
+{
+    public readonly record struct ManiaPreviewNote(double StartTime, double EndTime, int Column, EzManiaNotePart Kind);
+
+    public readonly record struct ManiaPreviewData(
+        int TotalColumns,
+        IReadOnlyList<bool> SeparatorAfterColumns,
+        IReadOnlyList<ManiaPreviewNote> Notes,
+        double StartTimeMs = 0,
+        double EndTimeMs = 0,
+        double MsPerMeasure = 2000);
+
+    public readonly record struct ManiaPreviewLayoutEntry(
+        int Column,
+        int Row,
+        int EndRow,
+        EzManiaNotePart Kind,
+        double StartTime = 0,
+        double EndTime = 0);
+
+    public readonly record struct PreviewQuad(float X, float Y, float Width, float Height, Color4 Colour);
+
+    public interface IManiaStaticPreviewRenderer : IDisposable
+    {
+        void SetData(ManiaPreviewData data);
+
+        void SetCurrentTime(double time);
+
+        void SetDensity(float density);
+    }
+}

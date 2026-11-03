@@ -349,3 +349,9 @@ FodyWeavers.xsd
 *.DS_Store
 
 #.github/workflows
+# Live2D Cubism Core (proprietary — never commit)
+**/Live2DCubismCore.dll
+**/EzResources/Pets/_cubism/
+
+# Local clone used for API reference only
+/externals/Live2DCSharpSDK/

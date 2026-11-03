@@ -16,6 +16,7 @@ using osu.Framework.Localisation;
 using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -43,7 +44,7 @@ namespace osu.Game.Overlays.Mods
             set => descriptionText.Text = value;
         }
 
-        public const float CORNER_RADIUS = 7;
+        public const float CORNER_RADIUS = EzUIStyleV1.CORNER_RADIUS_SHEARED;
         public const float HEIGHT = 42;
 
         public const double SAMPLE_PLAYBACK_DELAY = 30;

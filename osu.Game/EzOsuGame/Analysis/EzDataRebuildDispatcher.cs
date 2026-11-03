@@ -1,0 +1,160 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using osu.Framework.Logging;
+using osu.Game.Database;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Database;
+
+namespace osu.Game.EzOsuGame.Analysis
+{
+    public class EzDataRebuildDispatcher
+    {
+        private readonly Func<EzRealmMetadataScope, bool, EzDataRebuildDispatchResult>? queueRealm;
+        private readonly Func<bool, EzDataRebuildDispatchResult>? queueSqliteMain;
+        private readonly Func<bool, EzDataRebuildDispatchResult>? queueSqliteSongsBranches;
+        private readonly Func<bool, EzDataRebuildDispatchResult>? queueRealmScores;
+
+        public EzDataRebuildDispatcher(
+            BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
+            EzAnalysisWarmupProcessor? warmupProcessor)
+            : this(
+                backgroundDataStoreProcessor == null ? null : backgroundDataStoreProcessor.QueueEzRealmMetadataRebuild,
+                warmupProcessor == null ? null : warmupProcessor.QueueSqliteMainRebuild,
+                warmupProcessor == null ? null : warmupProcessor.QueueSqliteSongsBranchesRebuild,
+                backgroundDataStoreProcessor == null ? null : backgroundDataStoreProcessor.QueueEzScoreFullRecalculation)
+        { }
+
+        internal EzDataRebuildDispatcher(
+            Func<EzRealmMetadataScope, bool, EzDataRebuildDispatchResult>? queueRealm,
+            Func<bool, EzDataRebuildDispatchResult>? queueSqliteMain,
+            Func<bool, EzDataRebuildDispatchResult>? queueSqliteSongsBranches,
+            Func<bool, EzDataRebuildDispatchResult>? queueRealmScores = null)
+        {
+            this.queueRealm = queueRealm;
+            this.queueSqliteMain = queueSqliteMain;
+            this.queueSqliteSongsBranches = queueSqliteSongsBranches;
+            this.queueRealmScores = queueRealmScores;
+        }
+
+        public bool CanDispatch(EzDataRebuildTarget target)
+        {
+            switch (target)
+            {
+                case EzDataRebuildTarget.RealmTags:
+                case EzDataRebuildTarget.RealmXxy:
+                case EzDataRebuildTarget.RealmPp:
+                case EzDataRebuildTarget.RealmChartMSD:
+                case EzDataRebuildTarget.RealmChartCSIAndDan:
+                case EzDataRebuildTarget.RealmChartSkillChain:
+                case EzDataRebuildTarget.RealmAll:
+                    return queueRealm != null;
+
+                case EzDataRebuildTarget.RealmScores:
+                    return queueRealmScores != null;
+
+                case EzDataRebuildTarget.SqliteMain:
+                    return queueSqliteMain != null;
+
+                case EzDataRebuildTarget.SqliteSongsBranches:
+                    return queueSqliteSongsBranches != null;
+
+                default:
+                    return false;
+            }
+        }
+
+        public EzDataRebuildDispatchResult Execute(EzDataRebuildTarget target, bool forceAll)
+        {
+            switch (target)
+            {
+                case EzDataRebuildTarget.RealmTags:
+                    return dispatchRealm(EzRealmMetadataScope.Tags, forceAll);
+
+                case EzDataRebuildTarget.RealmXxy:
+                    return dispatchRealm(EzRealmMetadataScope.Xxy, forceAll);
+
+                case EzDataRebuildTarget.RealmPp:
+                    return dispatchRealm(EzRealmMetadataScope.Pp, forceAll);
+
+                case EzDataRebuildTarget.RealmChartMSD:
+                    return dispatchRealm(EzRealmMetadataScope.Msd, forceAll);
+
+                case EzDataRebuildTarget.RealmChartCSIAndDan:
+                    // DualPanel chart scene: CSI + ChartDan (Rating stays on MSD).
+                    return dispatchRealm(EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan, forceAll);
+
+                case EzDataRebuildTarget.RealmChartSkillChain:
+                    // Full chart skill chain: MSD → CSI → ChartDan.
+                    return dispatchRealm(
+                        EzRealmMetadataScope.Msd | EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan,
+                        forceAll);
+
+                case EzDataRebuildTarget.RealmAll:
+                    return dispatchRealm(EzRealmMetadataScope.All, forceAll);
+
+                case EzDataRebuildTarget.RealmScores:
+                    return dispatchRealmScores(forceAll);
+
+                case EzDataRebuildTarget.SqliteMain:
+                    return dispatchSqliteMain(forceAll);
+
+                case EzDataRebuildTarget.SqliteSongsBranches:
+                    return dispatchSqliteSongsBranches(forceAll);
+
+                default:
+                    Logger.Log($"Unknown data rebuild target: {target}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                    return EzDataRebuildDispatchResult.UnknownTarget;
+            }
+        }
+
+        private EzDataRebuildDispatchResult dispatchRealm(EzRealmMetadataScope scope, bool forceAll)
+        {
+            if (queueRealm == null)
+            {
+                Logger.Log($"Cannot queue Realm metadata rebuild ({scope}): background data store processor is unavailable.",
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                return EzDataRebuildDispatchResult.UnavailableProcessor;
+            }
+
+            return queueRealm(scope, forceAll);
+        }
+
+        private EzDataRebuildDispatchResult dispatchRealmScores(bool forceAll)
+        {
+            if (queueRealmScores == null)
+            {
+                Logger.Log("Cannot queue full score recalculation: background data store processor is unavailable.",
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                return EzDataRebuildDispatchResult.UnavailableProcessor;
+            }
+
+            return queueRealmScores(forceAll);
+        }
+
+        private EzDataRebuildDispatchResult dispatchSqliteMain(bool forceAll)
+        {
+            if (queueSqliteMain == null)
+            {
+                Logger.Log("Cannot queue SQLite main rebuild: analysis warmup processor is unavailable.",
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                return EzDataRebuildDispatchResult.UnavailableProcessor;
+            }
+
+            return queueSqliteMain(forceAll);
+        }
+
+        private EzDataRebuildDispatchResult dispatchSqliteSongsBranches(bool forceAll)
+        {
+            if (queueSqliteSongsBranches == null)
+            {
+                Logger.Log("Cannot queue SQLite songs branch rebuild: analysis warmup processor is unavailable.",
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                return EzDataRebuildDispatchResult.UnavailableProcessor;
+            }
+
+            return queueSqliteSongsBranches(forceAll);
+        }
+    }
+}

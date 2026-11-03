@@ -4,16 +4,16 @@
 using System;
 using System.Diagnostics;
 using System.Linq;
-using osu.Framework.Graphics;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics;
 using osu.Framework.Localisation;
-using osu.Game.Configuration;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
-using osu.Game.Rulesets.Osu.Objects.Drawables;
 using osu.Game.Rulesets.Osu.Objects;
+using osu.Game.Rulesets.Osu.Objects.Drawables;
 using osu.Game.Rulesets.Osu.Skinning;
 
 namespace osu.Game.Rulesets.Osu.Mods
@@ -24,7 +24,6 @@ namespace osu.Game.Rulesets.Osu.Mods
         public Bindable<bool> OnlyFadeApproachCircles { get; } = new BindableBool();
 
         public override LocalisableString Description => @"Play with no approach circles and fading circles/sliders.";
-        public override double ScoreMultiplier => UsesDefaultConfiguration ? 1.06 : 1;
 
         public override Type[] IncompatibleMods => new[] { typeof(IRequiresApproachCircles), typeof(OsuModSpinIn), typeof(OsuModDepth), typeof(OsuModFreezeFrame) };
 
@@ -42,7 +41,10 @@ namespace osu.Game.Rulesets.Osu.Mods
 
             static void applyFadeInAdjustment(OsuHitObject osuObject)
             {
-                osuObject.TimeFadeIn = osuObject.TimePreempt * FADE_IN_DURATION_MULTIPLIER;
+                // Sliders retain their default TimeFadeIn to match Stable
+                if (osuObject is not Slider)
+                    osuObject.TimeFadeIn = osuObject.TimePreempt * FADE_IN_DURATION_MULTIPLIER;
+
                 foreach (var nested in osuObject.NestedHitObjects.OfType<OsuHitObject>())
                     applyFadeInAdjustment(nested);
             }
@@ -96,7 +98,8 @@ namespace osu.Game.Rulesets.Osu.Mods
                 case DrawableSliderRepeat sliderRepeat:
                     using (drawableObject.BeginAbsoluteSequence(fadeStartTime))
                         // only apply to circle piece – reverse arrow is not affected by hidden.
-                        sliderRepeat.CirclePiece.FadeOut(fadeDuration);
+                        // Undrawn points have no pieces at all, so the whole case is a no-op for them.
+                        sliderRepeat.CirclePiece?.FadeOut(fadeDuration);
 
                     using (drawableObject.BeginAbsoluteSequence(drawableObject.HitStateUpdateTime))
                         sliderRepeat.FadeOut();

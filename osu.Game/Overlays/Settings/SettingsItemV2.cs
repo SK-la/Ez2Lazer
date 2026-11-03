@@ -8,6 +8,8 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Performance;
 using osu.Game.Graphics.UserInterfaceV2;
 
 namespace osu.Game.Overlays.Settings
@@ -17,9 +19,12 @@ namespace osu.Game.Overlays.Settings
         public readonly IFormControl Control;
 
         private readonly SettingsRevertToDefaultButton revertButton;
+        private readonly SettingsNote note;
 
         private readonly BindableBool controlDefault = new BindableBool(true);
         private readonly BindableBool controlEnabled = new BindableBool(true);
+
+        private bool revertVisible;
 
         /// <summary>
         /// Whether a revert button should be displayed when the control is modified away from default state.
@@ -66,10 +71,9 @@ namespace osu.Game.Overlays.Settings
                             }
                         }
                     },
-                    new SettingsNote
+                    note = new SettingsNote
                     {
                         RelativeSizeAxes = Axes.X,
-                        Current = { BindTarget = Note },
                     },
                 },
             };
@@ -83,7 +87,13 @@ namespace osu.Game.Overlays.Settings
             controlEnabled.Value = !Control.IsDisabled;
 
             controlDefault.BindValueChanged(_ => updateDefaultState());
-            controlEnabled.BindValueChanged(_ => updateDefaultState(), true);
+            controlEnabled.BindValueChanged(_ =>
+            {
+                updateDefaultState();
+                updateNote();
+            }, true);
+            Note.BindValueChanged(_ => updateNote(), true);
+            updateDefaultState();
             FinishTransforms(true);
         }
 
@@ -92,18 +102,40 @@ namespace osu.Game.Overlays.Settings
             bool showRevertButton = !controlDefault.Value && controlEnabled.Value && ShowRevertToDefaultButton;
 
             if (showRevertButton)
+            {
+                // The control's height is only needed while the button is shown, so track and size it here
+                // rather than reading layout (MainDrawHeight) for every item on every frame.
+                revertVisible = true;
+                revertButton.Height = Control.MainDrawHeight;
                 revertButton.Show();
+            }
             else
+            {
+                revertVisible = false;
                 revertButton.Hide();
+            }
+        }
+
+        private void updateNote()
+        {
+            // [Ez] 极速模式会把它接管的设置项置灰。这里拿不到设置的 key，无法反查具体是哪一项被接管，
+            // 所以用「压制生效中且控件被禁用」近似；只在调用方没提供自己的 note 时才回落。
+            note.Current.Value = Note.Value
+                                 ?? (controlEnabled.Value || !EzTurboMode.Active
+                                     ? null
+                                     : new SettingsNote.Data(EzSettingsStrings.TURBO_MODE_MANAGED_NOTE, SettingsNote.Type.Informational));
         }
 
         protected override void Update()
         {
             base.Update();
+
             controlDefault.Value = Control.IsDefault;
             controlEnabled.Value = !Control.IsDisabled;
 
-            revertButton.Height = Control.MainDrawHeight;
+            // Cheap guard so only the few items with a visible revert button touch layout each frame.
+            if (revertVisible)
+                revertButton.Height = Control.MainDrawHeight;
         }
 
         #region ISettingsItem

@@ -4,8 +4,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using osu.Framework.Extensions;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Localisation;
@@ -14,8 +14,14 @@ using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Mods;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Extensions;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.WarmUp;
+using osu.Game.Rulesets.Mania.EzMania.Editor;
+using osu.Game.Rulesets.Mania.EzMania.WarmUp;
 using osu.Game.Localisation;
+using osu.Game.Localisation.Mania;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Configuration;
 using osu.Game.Rulesets.Difficulty;
@@ -27,8 +33,10 @@ using osu.Game.Rulesets.Mania.Difficulty;
 using osu.Game.Rulesets.Mania.Edit;
 using osu.Game.Rulesets.Mania.Edit.Setup;
 using osu.Game.Rulesets.Mania.EzMania.Analysis;
+using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
-using osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods;
+using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.Statistics;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Replays;
@@ -39,6 +47,7 @@ using osu.Game.Rulesets.Mania.Skinning.Ez2;
 using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Mania.Skinning.Legacy;
 using osu.Game.Rulesets.Mania.Skinning.SbI;
+using osu.Game.Rulesets.Mania.Skinning.Scripted;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Replays.Types;
@@ -49,11 +58,18 @@ using osu.Game.Scoring;
 using osu.Game.Screens.Edit.Setup;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
+using osuTK;
 
 namespace osu.Game.Rulesets.Mania
 {
-    public class ManiaRuleset : Ruleset, ILegacyRuleset
+    public partial class ManiaRuleset : Ruleset, ILegacyRuleset, IEzGameplayWarmUpSource
     {
+        static ManiaRuleset()
+        {
+            // Ensure Mania skin editor provider is registered when the ruleset assembly is used.
+            _ = typeof(EzSkinLNEditorProvider);
+        }
+
         /// <summary>
         /// The maximum number of supported keys in a single stage.
         /// </summary>
@@ -78,6 +94,8 @@ namespace osu.Game.Rulesets.Mania
         public override IBeatmapVerifier CreateBeatmapVerifier() => new ManiaBeatmapVerifier();
 
         public override IEzAnalysisProvider CreateEzAnalysisProvider() => new EzManiaAnalysisProvider();
+
+        public override IEzReplaySession CreateEzReplaySession() => new ManiaReplaySessionService();
 
         public override ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap)
         {
@@ -104,9 +122,35 @@ namespace osu.Game.Rulesets.Mania
 
                 case LegacySkin:
                     return new ManiaLegacySkinTransformer(skin, beatmap);
+
+                // ✨ 脚本皮肤支持：使用通用的 ScriptedSkinTransformer
+                case ScriptedSkinWrapper:
+                    return new ManiaScriptedSkinTransformer(skin, beatmap);
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// 规则集侧自述预热：按当前皮肤产出 gameplay 组件离屏加载，供 <see cref="osu.Game.Screens.Play.PlayerLoader"/> 门控等待。
+        /// </summary>
+        /// <param name="skin">当前皮肤。</param>
+        /// <param name="beatmapInfo">当前谱面元数据。</param>
+        /// <param name="mods">本局 mods（key mod 会改键数，进而改列宽 / 布局尺度）。</param>
+        /// <remarks>
+        /// 键数只从元数据算（<see cref="GetKeyCount"/> 读 Realm 里的 CircleSize / 对象计数），
+        /// 然后现搭一个只含 Stage 的 <see cref="ManiaBeatmap"/>：预热要的只是「组件树 + 布局尺度」，
+        /// 不碰谱面内容——解码 / 转换一张图的代价远大于它省下的那几帧纹理解码。
+        /// 各皮肤 transformer 只用这个 beatmap 取 Stage / TotalColumns（列色、列宽），不读 HitObject。
+        /// </remarks>
+        public Drawable? CreateWarmUpDrawable(ISkin? skin, IBeatmapInfo? beatmapInfo, IReadOnlyList<Mod> mods)
+        {
+            if (skin == null || beatmapInfo == null)
+                return null;
+
+            int keyCount = Math.Max(1, GetKeyCount(beatmapInfo, mods));
+
+            return new ManiaGameplayWarmUpDrawable(this, skin, new ManiaBeatmap(new StageDefinition(keyCount)));
         }
 
         public override IEnumerable<Mod> ConvertFromLegacyMods(LegacyMods mods)
@@ -172,7 +216,7 @@ namespace osu.Game.Rulesets.Mania
                 yield return new ManiaModKey9();
 
             if (mods.HasFlag(LegacyMods.KeyCoop))
-                yield return new ManiaModDualStages();
+                yield return new ManiaModSplitStages();
 
             if (mods.HasFlag(LegacyMods.NoFail))
                 yield return new ManiaModNoFail();
@@ -231,7 +275,7 @@ namespace osu.Game.Rulesets.Mania
                         value |= LegacyMods.Key9;
                         break;
 
-                    case ManiaModDualStages:
+                    case ManiaModSplitStages:
                         value |= LegacyMods.KeyCoop;
                         break;
 
@@ -262,6 +306,7 @@ namespace osu.Game.Rulesets.Mania
                     {
                         new ManiaModEz2Settings(),
                         new ManiaModCleanColumn(),
+                        new ManiaModNoteCleanup(),
                         new ManiaModNiceBPM(),
                         new ManiaModSpaceBody(),
                         new ManiaModPatternShift(),
@@ -270,26 +315,29 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModPatternShiftDump(),
                         new ManiaModPatternShiftJack(),
                         new ManiaModPatternShiftChord(),
+                        new ManiaModKrrRandomPlus(),
                         new ManiaModKrrN2Nc(),
                         new ManiaModKrrLN(),
                         new ManiaModKrrDP(),
+                        new ManiaModKrrDPRefiner(),
                         new ManiaModReconcile(),
-                        new UniversalLoopPlayClip(),
+                        new ManiaUniversalLoopPlayClip(),
                         new ManiaModSRAdjust(),
                     };
 
-                case ModType.YuLiangSSS_Mod:
+                case ModType.CommunityMod:
                     return new Mod[]
                     {
                         new ManiaModAdjust(),
                         new ManiaModNtoM(),
                         new ManiaModNtoMAnother(),
-                        new ManiaModCleaner(),
                         new ManiaModNewJudgement(),
                         new ManiaModNoteAdjust(),
                         new ManiaModHealthAdaptive(),
                         new ManiaModAccuracyAdaptive(),
                         new ManiaModDoublePlay(),
+                        new ManiaModDoubleSpace(),
+                        new ManiaModExtendKeys(),
                         new ManiaModGracer(),
                         new ManiaModJudgmentsAdjust(),
                         new ManiaModLNJudgementAdjust(),
@@ -297,13 +345,12 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModLNDoubleDistribution(),
                         new ManiaModLNLongShortAddition(),
                         new ManiaModLNSimplify(),
-                        // new ManiaModMalodyStyleLN(),
                         // new ManiaModO2Health(),
-                        // new ManiaModO2Judgement(),
                         new ManiaModPlayfieldTransformation(),
                         new ManiaModReleaseAdjust(),
                         new ManiaModRemedy(),
-                        new ModStarRatingRebirth(),
+                        new ManiaModTrueInverse(),
+                        // new ModStarRatingRebirth(),
                     };
 
                 case ModType.DifficultyReduction:
@@ -330,7 +377,7 @@ namespace osu.Game.Rulesets.Mania
                     return new Mod[]
                     {
                         new ManiaModRandom(),
-                        new ManiaModDualStages(),
+                        new ManiaModSplitStages(),
                         new ManiaModMirror(),
                         new ManiaModDifficultyAdjust(),
                         new ManiaModClassic(),
@@ -376,6 +423,8 @@ namespace osu.Game.Rulesets.Mania
             }
         }
 
+        public override ScoreMultiplierCalculator CreateScoreMultiplierCalculator(ScoreMultiplierContext context) => new ManiaScoreMultiplierCalculator(context);
+
         public override string Description => "osu!mania";
 
         public override string ShortName => SHORT_NAME;
@@ -396,9 +445,9 @@ namespace osu.Game.Rulesets.Mania
 
         public override RulesetSettingsSubsection CreateSettings() => new ManiaSettingsSubsection(this);
 
-        public override LocalisableString VariantDescription => "Keys";
+        public override LocalisableString VariantDescription => ManiaRulesetStrings.VariantDescription;
 
-        public override IEnumerable<int> AvailableVariants
+        public override IEnumerable<int> GameplayVariants
         {
             get
             {
@@ -409,6 +458,15 @@ namespace osu.Game.Rulesets.Mania
 
         public override IEnumerable<KeyBinding> GetDefaultKeyBindings(int variant = 0)
         {
+            if (variant == EDITOR_VARIANT)
+            {
+                return
+                [
+                    new KeyBinding(InputKey.Number2, ManiaAction.EditorNoteTool),
+                    new KeyBinding(InputKey.Number3, ManiaAction.EditorHoldNoteTool),
+                ];
+            }
+
             switch (getPlayfieldType(variant))
             {
                 case PlayfieldType.Single:
@@ -420,6 +478,9 @@ namespace osu.Game.Rulesets.Mania
 
         public override LocalisableString GetVariantName(int variant)
         {
+            if (variant == EDITOR_VARIANT)
+                return base.GetVariantName(variant);
+
             switch (getPlayfieldType(variant))
             {
                 default:
@@ -438,25 +499,23 @@ namespace osu.Game.Rulesets.Mania
         }
 
         public override IEnumerable<HitResult> GetValidHitResults()
+            => JudgeModeHelper.GetJudgeModeValidHitResults();
+
+        public override IEnumerable<HitResult> GetValidHitResults(ScoreInfo? score)
+            => JudgeModeHelper.GetJudgeModeValidHitResultsForDisplay(score);
+
+        public override LocalisableString GetDisplayNameForHitResult(HitResult result)
         {
-            return new[]
-            {
-                HitResult.Perfect,
-                HitResult.Great,
-                HitResult.Good,
-                HitResult.Ok,
-                HitResult.Meh,
-                HitResult.Miss,
-                HitResult.Poor,
-                HitResult.IgnoreHit,
-                HitResult.ComboBreak,
-                HitResult.IgnoreMiss,
-            };
+            // 获取对应 JudgeMode 的显示名称
+            return result.GetJudgeModeDisplayName();
         }
+
+        public override LocalisableString GetDisplayNameForHitResult(HitResult result, ScoreInfo? score)
+            => result.GetJudgeModeDisplayName(EzScoreInfoExtensions.ResolveDisplayJudgeMode(score));
 
         public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap) => new[]
         {
-            new StatisticItem("Performance Breakdown", () => new PerformanceBreakdownChart(score, playableBeatmap)
+            new StatisticItem("Performance Breakdown", () => new PerformanceBreakdownChart(score)
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y
@@ -466,10 +525,24 @@ namespace osu.Game.Rulesets.Mania
                 RelativeSizeAxes = Axes.X,
                 Height = 200
             }, true),
-            new StatisticItem("Timing Distribution", () => new HitEventTimingDistributionGraph(score.HitEvents)
+            new StatisticItem("Timing Distribution", () => new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
-                Height = 120
+                AutoSizeAxes = Axes.Y,
+                Spacing = new Vector2(15),
+                Children = new Drawable[]
+                {
+                    new HitEventTimingDistributionGraph(score.HitEvents)
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        Height = 150
+                    },
+                    new SimpleStatisticTable(1, new SimpleStatisticItem[]
+                    {
+                        new AverageHitError(score.HitEvents),
+                        new UnstableRate(score.HitEvents)
+                    })
+                }
             }, true),
             new StatisticItem("Every Column Timing Graphs", () => new EzScoreEveryColumnTimingGraphs(score)
             {
@@ -479,12 +552,7 @@ namespace osu.Game.Rulesets.Mania
             new StatisticItem("HitResult Count", () => new EzManiaScoreHitResultCountGraph(score)
             {
                 RelativeSizeAxes = Axes.X
-            }, true),
-            new StatisticItem("Statistics", () => new SimpleStatisticTable(2, new SimpleStatisticItem[]
-            {
-                new AverageHitError(score.HitEvents),
-                new UnstableRate(score.HitEvents)
-            }), true)
+            }, true)
         };
 
         /// <seealso cref="ManiaHitWindows"/>
@@ -536,29 +604,74 @@ namespace osu.Game.Rulesets.Mania
 
             yield return new RulesetBeatmapAttribute(SongSelectStrings.KeyCount, @"KC", originalDifficulty.CircleSize, adjustedDifficulty.CircleSize, 18)
             {
-                Description = "Affects the number of key columns on the playfield."
+                Description = ManiaRulesetStrings.KeyCountDescription
             };
 
-            var hitWindows = new ManiaHitWindows { BPM = beatmapInfo.BPM };
+            var hitWindows = new ManiaHitWindows();
             hitWindows.SetDifficulty(adjustedDifficulty.OverallDifficulty);
             hitWindows.IsConvert = !beatmapInfo.Ruleset.Equals(RulesetInfo);
             hitWindows.ClassicModActive = mods.Any(m => m is ManiaModClassic);
+            hitWindows.BPM = beatmapInfo.BPM;
+
+            // 获取当前JudgeMode
+            var currentJudgeMode = GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
+            bool isBMSMode = JudgeModeHelper.IsBMSJudgeMode(currentJudgeMode);
+
             yield return new RulesetBeatmapAttribute(SongSelectStrings.Accuracy, @"OD", originalDifficulty.OverallDifficulty, adjustedDifficulty.OverallDifficulty, 10)
             {
-                Description = "Affects timing requirements for notes.",
+                Description = ManiaRulesetStrings.AccuracyDescription,
                 AdditionalMetrics = hitWindows.GetAllAvailableWindows()
                                               .Reverse()
-                                              .Select(window => new RulesetBeatmapAttribute.AdditionalMetric(
-                                                  $"{window.result.GetDescription().ToUpperInvariant()} hit window",
-                                                  LocalisableString.Interpolate($@"±{hitWindows.WindowFor(window.result):0.##} ms"),
-                                                  colours.ForHitResult(window.result)
-                                              )).ToArray()
+                                              .Select(window =>
+                                              {
+                                                  LocalisableString windowText;
+
+                                                  if (isBMSMode)
+                                                  {
+                                                      // BMS模式：根据数值是否相等选择显示格式
+                                                      double earlyWindow = hitWindows.WindowFor(window.result, true);
+                                                      double lateWindow = hitWindows.WindowFor(window.result, false);
+
+                                                      if (Math.Abs(earlyWindow - lateWindow) > 0.01)
+                                                          windowText = $@"-{earlyWindow:0.##}/+{lateWindow:0.##} ms";
+                                                      else
+                                                          windowText = $@"±{earlyWindow:0.##} ms";
+                                                  }
+                                                  else
+                                                  {
+                                                      // 非BMS模式：显示对称格式
+                                                      double d = hitWindows.WindowFor(window.result);
+                                                      windowText = $@"±{d:0.##} ms";
+                                                  }
+
+                                                  return new RulesetBeatmapAttribute.AdditionalMetric(
+                                                      SongSelectStrings.HitResultWindow(window.result.GetJudgeModeDisplayName().ToString().ToUpperInvariant()),
+                                                      windowText,
+                                                      colours.ForHitResult(window.result)
+                                                  );
+                                              }).ToArray()
             };
 
             yield return new RulesetBeatmapAttribute(SongSelectStrings.HPDrain, @"HP", originalDifficulty.DrainRate, adjustedDifficulty.DrainRate, 10)
             {
-                Description = "Affects the harshness of health drain and the health penalties for missing."
+                Description = SongSelectStrings.HPDrainDescription
             };
+        }
+
+        public override IEnumerable<RulesetBeatmapAttribute> GetBeatmapAttributesForRankedPlayCard(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
+        {
+            var attributes = GetBeatmapAttributesForDisplay(beatmapInfo, mods).ToList();
+
+            // Key count attribute isn't relevant to ranked play (it's decided by the pool).
+            attributes.RemoveAll(a => a.Acronym == "KC");
+
+            float holdNoteRatio = beatmapInfo.TotalObjectCount == 0 ? 0 : (float)beatmapInfo.EndTimeObjectCount / beatmapInfo.TotalObjectCount;
+            attributes.Insert(0, new RulesetBeatmapAttribute(BeatmapStatisticStrings.HoldNotes, @"HN", holdNoteRatio, holdNoteRatio, 1)
+            {
+                ValueFormat = "P0"
+            });
+
+            return attributes;
         }
 
         public override IRulesetFilterCriteria CreateRulesetFilterCriteria()

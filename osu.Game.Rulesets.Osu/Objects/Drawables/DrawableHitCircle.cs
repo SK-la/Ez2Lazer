@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
@@ -13,6 +14,8 @@ using osu.Framework.Utils;
 using osu.Game.Graphics.Containers;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Osu.Configuration;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Osu.Judgements;
 using osu.Game.Rulesets.Osu.Skinning;
 using osu.Game.Rulesets.Osu.Skinning.Default;
@@ -50,9 +53,13 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
         {
         }
 
+        private readonly Bindable<bool> hitAnimations = new Bindable<bool>(true);
+
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(OsuRulesetConfigManager? osuConfig)
         {
+            osuConfig?.BindWith(OsuRulesetSetting.HitAnimations, hitAnimations);
+
             Origin = Anchor.Centre;
 
             AddRangeInternal(new Drawable[]
@@ -67,7 +74,7 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
                         HitArea = new HitReceptor
                         {
                             CanBeHit = () => !AllJudged,
-                            Hit = () => UpdateResult(true)
+                            Hit = ReportKernelPress
                         },
                         shakeContainer = new ShakeContainer
                         {
@@ -128,8 +135,22 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
 
         public override void Shake() => shakeContainer.Shake();
 
+        /// <summary>
+        /// 内核驱动时把按下交给内核（时间语义由适配器解析）；非内核时保持原有的自查判定。
+        /// </summary>
+        private void ReportKernelPress()
+        {
+            OsuPlayfield? playfield = this.FindClosestParent<OsuPlayfield>();
+
+            if (playfield == null || !playfield.TryKernelPress(this, HitAction ?? OsuAction.LeftButton))
+                UpdateResult(true);
+        }
+
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            if (JudgementKernelDriven)
+                return;
+
             Debug.Assert(HitObject.HitWindows != null);
 
             if (!userTriggered)
@@ -179,7 +200,7 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
         /// </summary>
         /// <param name="timeOffset">The time offset.</param>
         /// <returns>The hit result, or <see cref="HitResult.None"/> if <paramref name="timeOffset"/> doesn't result in a judgement.</returns>
-        protected virtual HitResult ResultFor(double timeOffset) => HitObject.HitWindows.ResultFor(timeOffset);
+        protected virtual HitResult ResultFor(double timeOffset) => OsuCircleJudgement.ResultFor(HitObject.HitWindows, timeOffset);
 
         protected override void UpdateInitialTransforms()
         {
@@ -211,6 +232,9 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
             {
                 default:
                     ApproachCircle.FadeOut();
+
+                    if (!hitAnimations.Value)
+                        this.FadeOut(60, Easing.Out);
                     break;
 
                 case ArmedState.Idle:
@@ -287,8 +311,8 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
 
                         if (IsHovered)
                         {
-                            Hit();
                             HitAction ??= e.Action;
+                            Hit();
                             return true;
                         }
 

@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -97,6 +97,11 @@ namespace osu.Game.Rulesets.Scoring
         /// The current selected mods
         /// </summary>
         public readonly Bindable<IReadOnlyList<Mod>> Mods = new Bindable<IReadOnlyList<Mod>>(Array.Empty<Mod>());
+
+        /// <summary>
+        /// The current beatmap.
+        /// </summary>
+        public readonly Bindable<IBeatmap?> Beatmap = new Bindable<IBeatmap?>();
 
         /// <summary>
         /// The current rank.
@@ -210,9 +215,22 @@ namespace osu.Game.Rulesets.Scoring
 
         // 标记后，用于分数算法切换。
         public bool IsLegacyScore = false;
-        private static double accS;
 
-        private static double accA;
+        /// <summary>
+        /// [Ez] gameplay 入口调用：将当前全局 Ez 游玩环境（如 mania JudgeMode）冻结注入本处理器。
+        /// 必须在 <see cref="ApplyBeatmap"/> 之前调用。
+        /// 无头/转换路径（legacy 转换、后台升级、重算等）不得调用，以保持 ppy 上游官方行为。
+        /// </summary>
+        /// <param name="forceStableClassic">
+        /// 本局强制使用 stable classic 判定档，覆盖已保存的设置。仅作用于本局内存，不写回配置。
+        /// </param>
+        public virtual void ApplyEzGameplayEnvironment(bool forceStableClassic = false)
+        {
+        }
+
+        private static double accS = accuracy_cutoff_s;
+
+        private static double accA = accuracy_cutoff_a;
 
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
@@ -227,20 +245,29 @@ namespace osu.Game.Rulesets.Scoring
 
             Accuracy.ValueChanged += _ => updateRank();
 
-            Mods.ValueChanged += mods =>
+            Mods.ValueChanged += _ =>
             {
-                scoreMultiplier = 1;
-
-                foreach (var m in mods.NewValue)
-                    scoreMultiplier *= m.ScoreMultiplier;
-
+                updateScoreMultiplier();
                 updateScore();
                 updateRank();
+            };
+
+            Beatmap.ValueChanged += _ =>
+            {
+                updateScoreMultiplier();
             };
         }
 
         public override void ApplyBeatmap(IBeatmap beatmap)
         {
+            // NOTE: The ordering of operations here is significant.
+            // `Beatmap.Value` must be set before `base.ApplyBeatmap()` because changes to `Beatmap.Value`
+            // trigger recalculation of `scoreMultiplier`,
+            // and `base.ApplyBeatmap()` calls `SimulateAutoplay()` then `Reset(storeResults: true)`.
+            // failing to calculate the correct score multiplier *before* autoplay simulation would result in
+            // storing the incorrect value of `MaximumTotalScore`.
+            Beatmap.Value = beatmap;
+
             base.ApplyBeatmap(beatmap);
             beatmapApplied = true;
         }
@@ -257,12 +284,13 @@ namespace osu.Game.Rulesets.Scoring
 
             if (result.Type.AffectsCombo())
             {
+                // 显式 IsComboHit == false 时必须优先于 IncreasesCombo()（例如 O2/BMS 的 Bad/Meh 需断连但 Type 仍属 IsHit）
                 bool isComboHit = result.IsComboHit ?? result.Type.IsHit();
 
-                if (result.Type.IncreasesCombo() || isComboHit)
-                    Combo.Value++;
-                else if (result.Type.BreaksCombo() || !isComboHit)
+                if (!isComboHit || result.Type.BreaksCombo())
                     Combo.Value = 0;
+                else if (result.Type.IncreasesCombo() || isComboHit)
+                    Combo.Value++;
             }
 
             HighestCombo.Value = Math.Max(HighestCombo.Value, Combo.Value);
@@ -407,6 +435,11 @@ namespace osu.Game.Rulesets.Scoring
             updateScore();
         }
 
+        /// <summary>
+        /// [Ez] 规则集完全自管总分（例如 stable 原生 classic），总分不再乘以下游 <c>scoreMultiplier</c>。
+        /// </summary>
+        protected virtual bool TotalScoreIsSelfContained => false;
+
         private void updateScore()
         {
             AccuracyClassic.Value = ClassicMaxBaseScore > 0 ? ClassicBaseScore / ClassicMaxBaseScore : 1;
@@ -418,7 +451,9 @@ namespace osu.Game.Rulesets.Scoring
             double accuracyProgress = maximumAccuracyJudgementCount > 0 ? (double)currentAccuracyJudgementCount / maximumAccuracyJudgementCount : 1;
 
             TotalScoreWithoutMods.Value = (long)Math.Round(ComputeTotalScore(comboProgress, accuracyProgress, currentBonusPortion));
-            TotalScore.Value = (long)Math.Round(TotalScoreWithoutMods.Value * scoreMultiplier);
+            TotalScore.Value = TotalScoreIsSelfContained
+                ? TotalScoreWithoutMods.Value
+                : (long)Math.Round(TotalScoreWithoutMods.Value * scoreMultiplier);
         }
 
         private void updateRank()
@@ -435,10 +470,44 @@ namespace osu.Game.Rulesets.Scoring
             rank.Value = newRank;
         }
 
+        private void updateScoreMultiplier()
+        {
+            if (Beatmap.Value == null)
+                return;
+
+            var calculator = Ruleset.CreateScoreMultiplierCalculator(new ScoreMultiplierContext(Beatmap.Value.BeatmapInfo.Difficulty));
+            scoreMultiplier = calculator.CalculateFor(Mods.Value);
+        }
+
         protected virtual double ComputeTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
             return 500000 * Accuracy.Value * comboProgress +
                    500000 * Math.Pow(Accuracy.Value, 5) * accuracyProgress +
+                   bonusPortion;
+        }
+
+        /// <summary>
+        /// 已判定区间全 Perfect 时应达到的标准化总分（含 Mod 倍率）。
+        /// 与 live <see cref="TotalScore"/> 同源公式，按规则集 / JudgeMode 切换计分方式。
+        /// </summary>
+        public long GetTheoreticalPerfectJudgedDisplayScore()
+        {
+            double comboProgress = maximumComboPortion > 0 ? currentComboPortion / maximumComboPortion : 1;
+            double accuracyProgress = maximumAccuracyJudgementCount > 0 ? (double)currentAccuracyJudgementCount / maximumAccuracyJudgementCount : 1;
+            double theoreticalWithoutMods = ComputeTheoreticalPerfectJudgedTotalScore(comboProgress, accuracyProgress, currentBonusPortion);
+
+            return TotalScoreIsSelfContained
+                ? (long)Math.Round(theoreticalWithoutMods)
+                : (long)Math.Round(theoreticalWithoutMods * scoreMultiplier);
+        }
+
+        /// <summary>
+        /// 已判定区间全 Perfect 时的标准化总分（不含 Mod 倍率）。
+        /// </summary>
+        protected virtual double ComputeTheoreticalPerfectJudgedTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
+        {
+            return 500000 * comboProgress +
+                   500000 * accuracyProgress +
                    bonusPortion;
         }
 
@@ -514,6 +583,52 @@ namespace osu.Game.Rulesets.Scoring
         }
 
         /// <summary>
+        /// [Ez] Applies forced miss judgements for any remaining objects that could not be resolved via drawables.
+        /// </summary>
+        /// <param name="healthProcessor">Health processor to notify alongside the score processor, if any.</param>
+        /// <param name="gameplayRate">
+        /// Rate to stamp onto the synthetic results. Must be supplied by the caller (the processor has no clock):
+        /// leaving <see cref="JudgementResult.GameplayRate"/> null would emit hit events that
+        /// <see cref="HitEventExtensions.CalculateUnstableRate"/> rejects.
+        /// </param>
+        public void ApplyRemainingForcedMisses(HealthProcessor? healthProcessor, double gameplayRate)
+        {
+            var beatmap = Beatmap.Value;
+            if (beatmap == null)
+                return;
+
+            var judgedHitObjects = new HashSet<HitObject>(HitEvents.Select(e => e.HitObject));
+
+            int safety = Math.Max(MaximumJudgements, 1) * 2;
+
+            while (JudgedHits < MaximumJudgements && safety-- > 0)
+            {
+                bool appliedAny = false;
+
+                foreach (var hitObject in EnumerateHitObjects(beatmap))
+                {
+                    if (judgedHitObjects.Contains(hitObject))
+                        continue;
+
+                    var result = CreateResult(hitObject, hitObject.Judgement);
+
+                    result.Type = result.Judgement.MinResult;
+                    result.RawTime = hitObject.GetEndTime();
+                    result.GameplayRate = gameplayRate;
+
+                    healthProcessor?.ApplyResult(result);
+                    ApplyResult(result);
+                    judgedHitObjects.Add(hitObject);
+                    appliedAny = true;
+                    break;
+                }
+
+                if (!appliedAny)
+                    break;
+            }
+        }
+
+        /// <summary>
         /// Populates a failed score, marking it with the <see cref="ScoreRank.F"/> rank.
         /// </summary>
         public void FailScore(ScoreInfo score)
@@ -571,13 +686,22 @@ namespace osu.Game.Rulesets.Scoring
         /// <summary>
         /// Given an accuracy (0..1), return the correct <see cref="ScoreRank"/>.
         /// </summary>
-        public virtual ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results)
+        /// <param name="accuracy">The accuracy to evaluate.</param>
+        /// <param name="results">Hit result statistics used for ruleset-specific rank adjustments.</param>
+        /// <param name="useDefaultCutoffs">
+        /// When <c>true</c>, uses the original S/A accuracy thresholds instead of user-configured values.
+        /// This must be used when recomputing ranks for imported or migrated scores.
+        /// </param>
+        public virtual ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results, bool useDefaultCutoffs = false)
         {
+            double sCutoff = useDefaultCutoffs ? accuracy_cutoff_s : accS;
+            double aCutoff = useDefaultCutoffs ? accuracy_cutoff_a : accA;
+
             if (accuracy == accuracy_cutoff_x)
                 return ScoreRank.X;
-            if (accuracy >= accS)
+            if (accuracy >= sCutoff)
                 return ScoreRank.S;
-            if (accuracy >= accA)
+            if (accuracy >= aCutoff)
                 return ScoreRank.A;
             if (accuracy >= accuracy_cutoff_b)
                 return ScoreRank.B;

@@ -5,7 +5,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Graphics.Textures;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
@@ -19,7 +18,8 @@ namespace osu.Game.Screens.Edit.Components.Menus
 {
     public partial class EditorMenuBar : OsuMenu
     {
-        private const float heading_area = 114;
+        // Icon + "Ez2Lazereditor" needs more than upstream's 114 (sized for "osu!editor").
+        private const float heading_area = 140;
 
         public EditorMenuBar()
             : base(Direction.Horizontal, true)
@@ -34,19 +34,19 @@ namespace osu.Game.Screens.Edit.Components.Menus
         }
 
         [BackgroundDependencyLoader]
-        private void load(OverlayColourProvider colourProvider, TextureStore textures)
+        private void load(OverlayColourProvider colourProvider)
         {
             BackgroundColour = colourProvider.Background3;
 
-            TextFlowContainer text;
-
             AddRangeInternal(new[]
             {
-                new Container
+                new FillFlowContainer
                 {
                     RelativeSizeAxes = Axes.Y,
                     Width = heading_area,
                     Padding = new MarginPadding(8),
+                    Direction = FillDirection.Horizontal,
+                    Spacing = new Vector2(6),
                     Children = new Drawable[]
                     {
                         new SpriteIcon
@@ -56,21 +56,33 @@ namespace osu.Game.Screens.Edit.Components.Menus
                             Origin = Anchor.CentreLeft,
                             Icon = OsuIcon.EditCircle,
                         },
-                        text = new TextFlowContainer
+                        new FillFlowContainer
                         {
-                            Anchor = Anchor.CentreRight,
-                            Origin = Anchor.CentreRight,
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
                             AutoSizeAxes = Axes.Both,
+                            Direction = FillDirection.Horizontal,
+                            Children = new Drawable[]
+                            {
+                                new OsuSpriteText
+                                {
+                                    Text = @"Ez2Lazer",
+                                    Font = OsuFont.TorusAlternate,
+                                    Anchor = Anchor.CentreLeft,
+                                    Origin = Anchor.CentreLeft,
+                                },
+                                new OsuSpriteText
+                                {
+                                    Text = @"editor",
+                                    Font = OsuFont.TorusAlternate,
+                                    Colour = colourProvider.Highlight1,
+                                    Anchor = Anchor.CentreLeft,
+                                    Origin = Anchor.CentreLeft,
+                                },
+                            },
                         }
                     }
                 },
-            });
-
-            text.AddText(@"osu!", t => t.Font = OsuFont.TorusAlternate);
-            text.AddText(@"editor", t =>
-            {
-                t.Font = OsuFont.TorusAlternate;
-                t.Colour = colourProvider.Highlight1;
             });
         }
 

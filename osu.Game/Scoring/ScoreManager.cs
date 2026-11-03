@@ -14,7 +14,9 @@ using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Database;
 using osu.Game.IO.Archives;
+using osu.Game.Models;
 using osu.Game.Online.API;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;
@@ -23,12 +25,13 @@ using osu.Game.Scoring.Legacy;
 
 namespace osu.Game.Scoring
 {
-    public class ScoreManager : ModelManager<ScoreInfo>, IModelImporter<ScoreInfo>
+    public partial class ScoreManager : ModelManager<ScoreInfo>, IModelImporter<ScoreInfo>
     {
         private readonly Func<BeatmapManager> beatmaps;
         private readonly OsuConfigManager? configManager;
         private readonly ScoreImporter scoreImporter;
         private readonly LegacyScoreExporter scoreExporter;
+        private readonly Storage storage;
 
         public override bool PauseImports
         {
@@ -46,13 +49,23 @@ namespace osu.Game.Scoring
         {
             this.beatmaps = beatmaps;
             this.configManager = configManager;
+            this.storage = storage;
 
             scoreImporter = new ScoreImporter(rulesets, beatmaps, storage, realm, api)
             {
                 PostNotification = obj => PostNotification?.Invoke(obj)
             };
 
-            scoreExporter = new LegacyScoreExporter(storage)
+            scoreExporter = new LegacyScoreExporter(storage, info =>
+            {
+                var score = scoreImporter.GetScore(info);
+                if (score.ScoreInfo.BeatmapInfo == null || score.Replay == null)
+                    return null;
+
+                var playable = beatmaps().GetWorkingBeatmap(score.ScoreInfo.BeatmapInfo)
+                                         .GetPlayableBeatmap(score.ScoreInfo.Ruleset, score.ScoreInfo.Mods);
+                return (score, playable);
+            })
             {
                 PostNotification = obj => PostNotification?.Invoke(obj)
             };
@@ -178,6 +191,8 @@ namespace osu.Game.Scoring
 
                 Delete(items.ToList(), silent);
             });
+
+            EzScoreScanStamp.Invalidate(storage);
         }
 
         public void Delete(BeatmapInfo beatmap, bool silent = false)
@@ -187,6 +202,8 @@ namespace osu.Game.Scoring
                 var beatmapScores = r.Find<BeatmapInfo>(beatmap.ID)!.Scores.ToList();
                 Delete(beatmapScores, silent);
             });
+
+            EzScoreScanStamp.Invalidate(storage);
         }
 
         public Task Import(params string[] paths) => scoreImporter.Import(paths);
@@ -201,7 +218,8 @@ namespace osu.Game.Scoring
 
         public IEnumerable<string> HandledExtensions => scoreImporter.HandledExtensions;
 
-        public Task<IEnumerable<Live<ScoreInfo>>> Import(ProgressNotification notification, ImportTask[] tasks, ImportParameters parameters = default) => scoreImporter.Import(notification, tasks);
+        public Task<IEnumerable<Live<ScoreInfo>>> Import(ProgressNotification notification, ImportTask[] tasks, ImportParameters parameters = default) =>
+            scoreImporter.Import(notification, tasks, parameters);
 
         /// <summary>
         /// Export a replay from a given <see cref="IScoreInfo"/>.
@@ -243,5 +261,97 @@ namespace osu.Game.Scoring
         }
 
         #endregion
+
+        /// <summary>
+        /// Recalculates the accuracy, rank, and total score (from mod multipliers) of a stored score based on its saved statistics.
+        /// If the score is an online score (OnlineID > 0 or LegacyOnlineID > 0), it will be converted to a local score.
+        /// Other fields (Date, MaxCombo, Statistics, etc.) are not modified.
+        /// </summary>
+        public void Recalculate(ScoreInfo scoreInfo)
+        {
+            double? accuracy = null;
+            ScoreRank? rank = null;
+            long? updatedTotalScore = null;
+
+            Realm.Write(realm =>
+            {
+                var managed = realm.Find<ScoreInfo>(scoreInfo.ID);
+                if (managed == null) return;
+
+                var stats = managed.Statistics;
+                var maxStats = managed.MaximumStatistics;
+
+                if (stats.Count == 0 || maxStats.Count == 0) return;
+
+                var ruleset = managed.Ruleset.CreateInstance();
+                var processor = ruleset.CreateScoreProcessor();
+
+                accuracy = StandardisedScoreMigrationTools.ComputeAccuracy(stats, maxStats, processor);
+                managed.Accuracy = accuracy.Value;
+                rank = StandardisedScoreMigrationTools.ComputeRank(accuracy.Value, stats, managed.Mods, processor);
+                managed.Rank = rank.Value;
+
+                if (managed.TotalScoreWithoutMods > 0)
+                {
+                    var difficultyInfo = managed.BeatmapInfo?.Difficulty;
+                    if (difficultyInfo != null)
+                        StandardisedScoreMigrationTools.UpdateToLatestScoreMultipliers(managed, difficultyInfo);
+                }
+
+                managed.TotalScoreVersion = LegacyScoreEncoder.LATEST_VERSION;
+
+                if (managed.OnlineID > 0 || managed.LegacyOnlineID > 0)
+                {
+                    managed.OnlineID = -1;
+                    managed.LegacyOnlineID = -1;
+                }
+
+                updatedTotalScore = managed.TotalScore;
+            });
+
+            // Also update the caller's snapshot so that in-memory UI references see the new values.
+            if (accuracy != null && rank != null)
+            {
+                scoreInfo.Accuracy = accuracy.Value;
+                scoreInfo.Rank = rank.Value;
+                scoreInfo.TotalScore = updatedTotalScore ?? scoreInfo.TotalScore;
+                scoreInfo.TotalScoreVersion = LegacyScoreEncoder.LATEST_VERSION;
+
+                if (scoreInfo.OnlineID > 0 || scoreInfo.LegacyOnlineID > 0)
+                {
+                    scoreInfo.OnlineID = -1;
+                    scoreInfo.LegacyOnlineID = -1;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Renames the player associated with a stored score.
+        /// If the score is an online score (OnlineID > 0 or LegacyOnlineID > 0), it will be converted to a local score.
+        /// Other fields (Date, MaxCombo, Statistics, etc.) are not modified.
+        /// </summary>
+        public void RenamePlayer(ScoreInfo scoreInfo, string newUsername)
+        {
+            if (string.IsNullOrWhiteSpace(newUsername)) return;
+
+            Realm.Write(realm =>
+            {
+                var managed = realm.Find<ScoreInfo>(scoreInfo.ID);
+                if (managed == null) return;
+
+                managed.RealmUser = new RealmUser
+                {
+                    OnlineID = managed.RealmUser.OnlineID,
+                    Username = newUsername,
+                    CountryCode = managed.RealmUser.CountryCode,
+                };
+
+                if (managed.OnlineID > 0 || managed.LegacyOnlineID > 0)
+                {
+                    managed.OnlineID = -1;
+                    managed.LegacyOnlineID = -1;
+                }
+            });
+        }
     }
 }

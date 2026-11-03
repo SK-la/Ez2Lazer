@@ -193,7 +193,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             var stream = new MemoryStream();
             using (var sw = new StreamWriter(stream, Encoding.UTF8, 1024, true))
-                new LegacyBeatmapEncoder(playableBeatmap, workingBeatmap.Skin).Encode(sw);
+                new LegacyBeatmapEncoder(playableBeatmap, workingBeatmap.Skin, workingBeatmap.Storyboard).Encode(sw);
 
             stream.Seek(0, SeekOrigin.Begin);
             return stream;

@@ -16,6 +16,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Input.Bindings;
 using osu.Framework.Logging;
 using osu.Framework.Screens;
 using osu.Framework.Threading;
@@ -24,10 +25,18 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Extensions;
-using osu.Game.Graphics.Containers;
-using osu.Game.IO.Archives;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Performance;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Scoring.Bonus;
+using osu.Game.EzOsuGame.Screens.Play;
+using osu.Game.EzOsuGame.Screens.Rotation;
+using osu.Game.EzOsuGame.Startup;
+using osu.Game.Graphics.Containers;
+using osu.Game.IO.Archives;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
@@ -36,7 +45,6 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Scoring;
-using osu.Game.Scoring.Legacy;
 using osu.Game.Screens.Ranking;
 using osu.Game.Skinning;
 using osu.Game.Users;
@@ -119,8 +127,6 @@ namespace osu.Game.Screens.Play
 
             public Drawable StoryboardSource { get; private set; }
 
-            public bool StoryboardPreferred { get; private set; }
-
             public event Action SourcesChanged;
 
             public IReadOnlyList<Drawable> CaptureSources => captureSources;
@@ -143,14 +149,6 @@ namespace osu.Game.Screens.Play
                 BeatmapBackgroundSource = source;
                 updateCaptureSources();
                 SourcesChanged?.Invoke();
-            }
-
-            public void SetStoryboardPreferred(bool preferred)
-            {
-                if (StoryboardPreferred == preferred)
-                    return;
-
-                StoryboardPreferred = preferred;
             }
 
             private void updateCaptureSources()
@@ -188,6 +186,9 @@ namespace osu.Game.Screens.Play
         [Cached]
         private OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Purple);
 
+        [Resolved(canBeNull: true)]
+        private EzAnalysisCache ezAnalysisCache { get; set; }
+
         [Resolved]
         private ScoreManager scoreManager { get; set; }
 
@@ -199,6 +200,13 @@ namespace osu.Game.Screens.Play
 
         [Resolved]
         private OsuGameBase game { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private INotificationOverlay notificationOverlay { get; set; }
+
+        // [Ez] Local score analysis: a settled play is folded in at the same point its score reaches Realm.
+        [Resolved(canBeNull: true)]
+        private EzLocalProfileService ezLocalProfileService { get; set; }
 
         public GameplayState GameplayState { get; private set; }
 
@@ -275,17 +283,9 @@ namespace osu.Game.Screens.Play
             ScoreProcessor.NewJudgement += _ => ScoreProcessor.PopulateScore(Score.ScoreInfo);
             ScoreProcessor.OnResetFromReplayFrame += () => ScoreProcessor.PopulateScore(Score.ScoreInfo);
 
+            HealthProcessor.NewJudgement += _ => HealthProcessor.PopulateScore(Score.ScoreInfo);
+
             gameActive.BindValueChanged(_ => updatePauseOnFocusLostState(), true);
-        }
-
-        protected override void Update()
-        {
-            base.Update();
-
-            if (DimmableStoryboard == null)
-                return;
-
-            BackdropSource.SetStoryboardPreferred(DimmableStoryboard.ContentDisplayed && !DimmableStoryboard.HasStoryboardEnded.Value);
         }
 
         /// <summary>
@@ -324,6 +324,12 @@ namespace osu.Game.Screens.Play
             if (game != null)
                 gameActive.BindTo(game.IsActive);
 
+            // [Ez] 进局前一口断定：诊断与结算流程
+            // 时序追踪都在这里读一次。之后局内任何代码只读冻结值、不再读配置，所以没有「运行到某处才发现
+            // 现在能不能用」的分支。放在这里而不是启动时，是为了让设置改完下一局即生效；热路径代价不变。
+            EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled = ez2Config.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled);
+            EzOsuGame.Diagnostics.EzTimingTrace.Enabled = ez2Config.Get<bool>(Ez2Setting.EzTimingTraceEnabled);
+
             DrawableRuleset = ruleset.CreateDrawableRulesetWith(playableBeatmap, gameplayMods);
             dependencies.CacheAs(DrawableRuleset);
 
@@ -331,6 +337,13 @@ namespace osu.Game.Screens.Play
                 dependencies.CacheAs(scrollingRuleset.ScrollingInfo);
 
             ScoreProcessor = ruleset.CreateScoreProcessor();
+
+            // [Ez] aspire 谱面按 stable 的规则游玩，判定档随之固定。只作用于本局的内存值，不写回配置：
+            // ApplyEzGameplayEnvironment 内部的 `??=` 会让这个强制值优先，退出对局后配置原样。
+            bool aspireBeatmap = gameplayMods.Any(m => m.Acronym == "ASP");
+
+            // [Ez] 冻结当前全局游玩环境（JudgeMode 等）；必须先于 ApplyBeatmap 的全谱模拟。
+            ScoreProcessor.ApplyEzGameplayEnvironment(aspireBeatmap);
             ScoreProcessor.Mods.Value = gameplayMods;
             ScoreProcessor.ApplyBeatmap(playableBeatmap);
 
@@ -339,19 +352,18 @@ namespace osu.Game.Screens.Play
             // 初始化InputAudioLatencyTracker
             if (GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.InputAudioLatencyTracker))
             {
-                LatencyTracker = new InputAudioLatencyTracker(ez2Config);
+                LatencyTracker = new InputAudioLatencyTracker(ez2Config, notificationOverlay);
                 dependencies.CacheAs(LatencyTracker);
                 LatencyTracker.Initialize(ScoreProcessor);
                 LatencyTracker.Start();
             }
 
-            // [Ez] Wire judgment diagnostics, sub-frame correction, and timing trace to config toggles.
-            EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled = ez2Config.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled);
             EzOsuGame.Timing.EzSubFrameCorrection.Enabled = ez2Config.Get<bool>(Ez2Setting.EzSubFrameCorrectionEnabled);
-            EzOsuGame.Diagnostics.EzTimingTrace.Enabled = ez2Config.Get<bool>(Ez2Setting.EzTimingTraceEnabled);
 
             HealthProcessor = gameplayMods.OfType<IApplicableHealthProcessor>().FirstOrDefault()?.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);
             HealthProcessor ??= ruleset.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);
+            // [Ez] 与 ScoreProcessor 同源：冻结当前全局游玩环境（血量模式等）；必须先于 ApplyBeatmap。
+            HealthProcessor.ApplyEzGameplayEnvironment();
             HealthProcessor.ApplyBeatmap(playableBeatmap);
 
             dependencies.CacheAs(HealthProcessor);
@@ -374,6 +386,10 @@ namespace osu.Game.Screens.Play
             dependencies.CacheAs(GameplayState = new GameplayState(playableBeatmap, ruleset, gameplayMods, Score, ScoreProcessor, HealthProcessor, Beatmap.Value.Storyboard, PlayingState));
 
             var rulesetSkinProvider = new RulesetSkinProvidingContainer(ruleset, playableBeatmap, Beatmap.Value.Skin);
+            config.BindWith(OsuSetting.BeatmapSkins, rulesetSkinProvider.BeatmapSkins);
+            config.BindWith(OsuSetting.BeatmapColours, rulesetSkinProvider.BeatmapColours);
+            config.BindWith(OsuSetting.BeatmapHitsounds, rulesetSkinProvider.BeatmapHitsounds);
+
             GameplayClockContainer.Add(new GameplayScrollWheelHandling());
 
             // needs to exist in frame stable content, but is used by underlay layers so make sure assigned early.
@@ -520,22 +536,27 @@ namespace osu.Game.Screens.Play
 
         private Drawable createUnderlayComponents(WorkingBeatmap working)
         {
+            DimmableStoryboard = new DimmableStoryboard(GameplayState.Storyboard, GameplayState.Mods)
+            {
+                RelativeSizeAxes = Axes.Both
+            };
+
+            letterboxOverlay = new LetterboxOverlay
+            {
+                BreakTracker = breakTracker,
+                Alpha = working.Beatmap.LetterboxInBreaks ? 1 : 0,
+            };
+
+            var children = new List<Drawable> { DimmableStoryboard, letterboxOverlay };
+
+            // [Ez] 喷泉没有对应的用户设置，只能在极速模式下直接不构造。
+            if (!EzTurboMode.Active)
+                children.Add(new KiaiGameplayFountains());
+
             var container = new Container
             {
                 RelativeSizeAxes = Axes.Both,
-                Children = new Drawable[]
-                {
-                    DimmableStoryboard = new DimmableStoryboard(GameplayState.Storyboard, GameplayState.Mods)
-                    {
-                        RelativeSizeAxes = Axes.Both
-                    },
-                    letterboxOverlay = new LetterboxOverlay
-                    {
-                        BreakTracker = breakTracker,
-                        Alpha = working.Beatmap.LetterboxInBreaks ? 1 : 0,
-                    },
-                    new KiaiGameplayFountains(),
-                },
+                Children = children,
             };
 
             // Provide a stable background capture source for rulesets that require backdrop effects.
@@ -562,6 +583,9 @@ namespace osu.Game.Screens.Play
 
         private Drawable createOverlayComponents()
         {
+            bool allowGameplayKeySkip = GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.SkipWithGameplayKeys);
+            var gameplaySkipKeys = allowGameplayKeySkip ? buildGameplaySkipKeySet() : null;
+
             var container = new Container
             {
                 RelativeSizeAxes = Axes.Both,
@@ -597,10 +621,14 @@ namespace osu.Game.Screens.Play
                     SkipIntroOverlay = CreateSkipOverlay(DrawableRuleset.GameplayStartTime).With(o =>
                     {
                         o.RequestSkip = RequestIntroSkip;
+                        o.AllowGameplayKeySkip = allowGameplayKeySkip;
+                        o.AdditionalSkipKeys = gameplaySkipKeys;
                     }),
                     skipOutroOverlay = new SkipOverlay(GameplayState.Storyboard.LatestEventTime ?? 0)
                     {
                         RequestSkip = () => progressToResults(false),
+                        AllowGameplayKeySkip = allowGameplayKeySkip,
+                        AdditionalSkipKeys = gameplaySkipKeys,
                         Alpha = 0
                     },
                     DrawableRuleset.ResumeOverlay?.CreateProxy() ?? new Container(),
@@ -624,6 +652,35 @@ namespace osu.Game.Screens.Play
         }
 
         protected virtual SkipOverlay CreateSkipOverlay(double startTime) => new SkipOverlay(startTime);
+
+        private HashSet<InputKey> buildGameplaySkipKeySet()
+        {
+            var keys = new HashSet<InputKey>();
+
+            try
+            {
+                int variant = ruleset.GetVariantForBeatmap(Beatmap.Value.BeatmapInfo, GameplayState.Mods);
+                foreach (var binding in ruleset.GetDefaultKeyBindings(variant))
+                    appendBindingKeys(keys, binding);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[SkipOverlay] Failed to build gameplay skip key set, falling back to default skip hotkey only. {ex.Message}", level: LogLevel.Debug);
+            }
+
+            return keys;
+        }
+
+        private static void appendBindingKeys(HashSet<InputKey> keys, IKeyBinding binding)
+        {
+            foreach (InputKey key in binding.KeyCombination.Keys)
+            {
+                if (key == InputKey.None || !key.IsPhysical() || KeyCombination.IsModifierKey(key))
+                    continue;
+
+                keys.Add(key);
+            }
+        }
 
         private void onBreakTimeChanged(ValueChangedEvent<bool> isBreakTime)
         {
@@ -897,6 +954,11 @@ namespace osu.Game.Screens.Play
         private ScheduledDelegate resultsDisplayDelegate;
 
         /// <summary>
+        /// [Ez] When set, allows results preparation even if <see cref="JudgementProcessor.HasCompleted"/> is still false after a forced completion.
+        /// </summary>
+        private bool ezForceResultsImport;
+
+        /// <summary>
         /// The Time.Current value when the results were queued. Used for fallback timeout checks.
         /// </summary>
         private double resultsDisplayQueuedTime;
@@ -969,6 +1031,74 @@ namespace osu.Game.Screens.Play
         }
 
         /// <summary>
+        /// [Ez] Whether the pause-screen force-results button should be available.
+        /// </summary>
+        protected bool ShouldShowPauseForceResultsButton()
+        {
+            if (!Configuration.ShowResults || GameplayState.HasPassed || GameplayState.HasFailed)
+                return false;
+
+            const double near_end_buffer_ms = 5000;
+            double lastObjectTime = GameplayState.Beatmap.GetLastObjectTime();
+
+            if (GameplayClockContainer.CurrentTime >= lastObjectTime - near_end_buffer_ms)
+                return true;
+
+            int maxHits = ScoreProcessor.MaximumJudgements;
+            if (maxHits > 0 && ScoreProcessor.JudgedHits >= maxHits * 0.95)
+                return true;
+
+            return resultsDisplayDelegate != null && Time.Current - resultsDisplayQueuedTime > 2000;
+        }
+
+        /// <summary>
+        /// [Ez] Force-apply remaining misses and progress to the results screen from the pause menu.
+        /// </summary>
+        /// <param name="forceFailGrade">When true, the score is marked with <see cref="ScoreRank.F"/> regardless of accuracy.</param>
+        protected void ForceCompleteGameplayAndProgressToResults(bool forceFailGrade)
+        {
+            if (!Configuration.ShowResults || GameplayState.HasPassed || GameplayState.HasFailed)
+                return;
+
+            EzOsuGame.Diagnostics.EzTimingTrace.Record(
+                "ForceResults.Begin",
+                $"forceFail={forceFailGrade} judged={ScoreProcessor.JudgedHits}/{ScoreProcessor.MaximumJudgements} hasCompleted={ScoreProcessor.HasCompleted.Value} time={GameplayClockContainer.CurrentTime:F0}");
+
+            PauseOverlay.Hide();
+
+            EzGameplayForceCompleter.CompleteRemainingJudgements(
+                DrawableRuleset,
+                ScoreProcessor,
+                HealthProcessor,
+                GameplayClockContainer,
+                GameplayState.Beatmap);
+
+            if (!ScoreProcessor.HasCompleted.Value)
+            {
+                ezForceResultsImport = true;
+                EzOsuGame.Diagnostics.EzTimingTrace.Record(
+                    "ForceResults.BypassHasCompleted",
+                    $"judged={ScoreProcessor.JudgedHits}/{ScoreProcessor.MaximumJudgements} hasCompleted={ScoreProcessor.HasCompleted.Value}");
+            }
+
+            if (forceFailGrade)
+                ScoreProcessor.FailScore(Score.ScoreInfo);
+
+            GameplayState.HasPassed = true;
+            ValidForResume = false;
+            skipOutroOverlay.Hide();
+
+            progressToResults(false);
+
+            if (ezForceResultsImport)
+                prepareAndImportScoreAsync(forceImport: true);
+
+            EzOsuGame.Diagnostics.EzTimingTrace.Record(
+                "ForceResults.End",
+                $"judged={ScoreProcessor.JudgedHits}/{ScoreProcessor.MaximumJudgements} hasCompleted={ScoreProcessor.HasCompleted.Value} hasPassed={GameplayState.HasPassed} bypass={ezForceResultsImport} rank={ScoreProcessor.Rank.Value}");
+        }
+
+        /// <summary>
         /// Queue the results screen for display.
         /// </summary>
         /// <remarks>
@@ -1034,7 +1164,32 @@ namespace osu.Game.Screens.Play
                     // This player instance may already be in the process of exiting.
                     return;
 
+                // [Ez] 快速轮换：会话进行中时进入抽卡/过渡界面。
+                if (EzQuickRotationCoordinator.Session.IsActive)
+                {
+                    EzOsuGame.Diagnostics.EzTimingTrace.Record("ResultsDelegate.QuickRotation", "Navigating to quick rotation flow");
+                    LatencyTracker?.GenerateLatencyReport(postNotification: true);
+                    (GameplayClockContainer as MasterGameplayClockContainer)?.StopUsingBeatmapClock();
+
+                    if (Beatmap.Value.TrackLoaded)
+                        EzQuickRotationAudio.StopTrack(Beatmap.Value.Track);
+
+                    musicController.Stop();
+                    EzQuickRotationCoordinator.NavigateAfterPlay(this);
+                    return;
+                }
+
+                // [Ez] 心流：从选歌进入的单人游玩跳过结算，成绩已导入后直接回选歌。
+                if (EzFlowMode.ShouldSkipResults(this))
+                {
+                    EzOsuGame.Diagnostics.EzTimingTrace.Record("ResultsDelegate.FlowMode", "Skipping results screen – returning to song select");
+                    LatencyTracker?.GenerateLatencyReport(postNotification: true);
+                    EzFlowMode.ReturnToSongSelect(game as OsuGame);
+                    return;
+                }
+
                 EzOsuGame.Diagnostics.EzTimingTrace.Record("ResultsDelegate.Push", "Navigating to results screen");
+                LatencyTracker?.GenerateLatencyReport(postNotification: true);
                 OnShowingResults?.Invoke();
                 this.Push(CreateResults(prepareScoreForDisplayTask.GetResultSafely()));
             }, Time.Current + delay, 50);
@@ -1057,7 +1212,8 @@ namespace osu.Game.Screens.Play
                 return prepareScoreForDisplayTask;
 
             // We do not want to import the score in cases where we don't show results
-            bool canShowResults = Configuration.ShowResults && ScoreProcessor.HasCompleted.Value && GameplayState.HasPassed;
+            bool canShowResults = Configuration.ShowResults && GameplayState.HasPassed
+                                                            && (ScoreProcessor.HasCompleted.Value || ezForceResultsImport);
 
             // [Ez] Trace the canShowResults decision to expose HasCompleted race conditions.
             EzOsuGame.Diagnostics.EzTimingTrace.Record(
@@ -1066,6 +1222,9 @@ namespace osu.Game.Screens.Play
 
             if (!canShowResults && !forceImport)
                 return Task.FromResult<ScoreInfo>(null);
+
+            // Persist mania gameplay modes on the score before cloning for import/submission.
+            Score.ScoreInfo.ApplyManiaGameplayModes(DrawableRuleset);
 
             // Clone score before beginning any async processing.
             // - Must be run synchronously as the score may potentially be mutated in the background.
@@ -1265,6 +1424,8 @@ namespace osu.Game.Screens.Play
             if (!LoadedBeatmapSuccessfully)
                 return;
 
+            EzSongSelectEnterTrace.RecordPlayerEntered();
+
             Alpha = 0;
             this
                 .ScaleTo(0.7f)
@@ -1358,6 +1519,7 @@ namespace osu.Game.Screens.Play
             // Eagerly clean these up as disposal of child components is asynchronous and may leave sounds playing beyond user expectations.
             failAnimationContainer?.Stop();
             PauseOverlay?.StopAllSamples();
+            FailOverlay?.StopAllSamples();
 
             if (LoadedBeatmapSuccessfully && !GameplayState.HasPassed)
             {
@@ -1423,38 +1585,72 @@ namespace osu.Game.Screens.Play
         /// </summary>
         /// <param name="score">The <see cref="Scoring.Score"/> to import.</param>
         /// <returns>The imported score.</returns>
-        protected virtual Task ImportScore(Score score)
+        protected virtual async Task ImportScore(Score score)
         {
             // Replays are already populated and present in the game's database, so should not be re-imported.
             if (DrawableRuleset.ReplayScore != null)
-                return Task.CompletedTask;
+                return;
 
             ByteArrayArchiveReader replayReader = null;
 
             if (score.ScoreInfo.Ruleset.IsLegacyRuleset())
             {
+                // Internal source of truth: absolute-time frames. Round .osr is produced only on user export.
                 using (var stream = new MemoryStream())
                 {
-                    new LegacyScoreEncoder(score, GameplayState.Beatmap).Encode(stream);
-                    replayReader = new ByteArrayArchiveReader(stream.ToArray(), "replay.osr");
+                    EzHighPrecisionReplayFrames.Write(stream, score, GameplayState.Beatmap);
+                    replayReader = new ByteArrayArchiveReader(stream.ToArray(), EzHighPrecisionReplayFrames.FILENAME);
                 }
+            }
+
+            // Hidden skips bonus calculation only. The score itself still has to be imported.
+            if (EzScoreBonusTracker.IsEnabled)
+            {
+                IReadOnlyList<double> cachedKps = null;
+
+                if (ezAnalysisCache != null && score.ScoreInfo.BeatmapInfo is BeatmapInfo beatmapInfo)
+                {
+                    var analysis = await ezAnalysisCache.GetAnalysisAsync(beatmapInfo, score.ScoreInfo.Ruleset, score.ScoreInfo.Mods).ConfigureAwait(false);
+
+                    if (analysis is EzAnalysisResult result && result.KpsList.Count > 0)
+                        cachedKps = result.KpsList;
+                }
+
+                EzScoreBonusCalculator.Apply(score.ScoreInfo, GameplayState.Beatmap, cachedKps);
             }
 
             // the import process will re-attach managed beatmap/rulesets to this score. we don't want this for now, so create a temporary copy to import.
             var importableScore = score.ScoreInfo.DeepClone();
 
+            int maniaJudgeMode = importableScore.JudgeMode;
+            int maniaHealthMode = importableScore.HealthMode;
+
             var imported = scoreManager.Import(importableScore, replayReader);
             Debug.Assert(imported != null);
 
-            imported.PerformRead(s =>
+            imported!.PerformRead(s =>
             {
                 // because of the clone above, it's required that we copy back the post-import hash/ID to use for availability matching.
                 score.ScoreInfo.Hash = s.Hash;
                 score.ScoreInfo.ID = s.ID;
                 score.ScoreInfo.Files.AddRange(s.Files.Detach());
+                score.ScoreInfo.JudgeMode = s.JudgeMode;
+                score.ScoreInfo.HealthMode = s.HealthMode;
             });
 
-            return Task.CompletedTask;
+            imported.PerformWrite(s =>
+            {
+                s.JudgeMode = maniaJudgeMode;
+                s.HealthMode = maniaHealthMode;
+            });
+
+            if (EzScoreBonusTracker.IsEnabled)
+                EzScoreBonusProvider.Store(score.ScoreInfo, score.ScoreInfo.EzBonus);
+
+            // [Ez] The score is now in Realm, so fold it into the local profile analysis here — the same place the
+            // score lands. Fire-and-forget: the call only touches SQLite and returns, and it is idempotent, while
+            // the startup warmup re-derives the Realm-side skill rows from whatever the slice now holds.
+            ezLocalProfileService?.IngestSettledScore(score.ScoreInfo.ID);
         }
 
         /// <summary>

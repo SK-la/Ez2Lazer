@@ -4,7 +4,6 @@
 #nullable disable
 
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -20,8 +19,10 @@ using osu.Framework.Threading;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.EzOsuGame.Background;
+using osu.Game.EzOsuGame.Background.Pixiv;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
@@ -31,9 +32,9 @@ namespace osu.Game.Screens.Backgrounds
 {
     public partial class BackgroundScreenDefault : BackgroundScreen
     {
-        private bool storageTextureSourceAdded;
-
         private Background background;
+        private PixivAttributionBadge pixivAttribution;
+        private PixivIllustInfo pendingPixivAttribution;
 
         private int currentDisplay;
         private const int background_count = 8;
@@ -84,9 +85,6 @@ namespace osu.Game.Screens.Backgrounds
 
         public override void OnSuspending(ScreenTransitionEvent e)
         {
-            var backgroundScreenStack = Parent as BackgroundScreenStack;
-            Debug.Assert(backgroundScreenStack != null);
-
             if (background is BeatmapBackgroundWithStoryboard storyboardBackground)
                 storyboardUnloadDelegate = gameHost.UpdateThread.Scheduler.AddDelayed(storyboardBackground.UnloadStoryboard, TRANSITION_LENGTH);
 
@@ -143,21 +141,72 @@ namespace osu.Game.Screens.Backgrounds
             background?.FadeOut(800, Easing.OutQuint);
             background?.Expire();
 
+            removePixivAttribution();
+
             AddInternal(background = newBackground);
+
+            if (pendingPixivAttribution.IllustId > 0)
+                showPixivAttribution(pendingPixivAttribution);
+
+            pendingPixivAttribution = default;
             currentDisplay++;
+        }
+
+        [Resolved(CanBeNull = true)]
+        private OsuGame game { get; set; }
+
+        private void showPixivAttribution(PixivIllustInfo illust)
+        {
+            string artworkUrl = $"https://www.pixiv.net/artworks/{illust.IllustId}";
+
+            AddInternal(pixivAttribution = new PixivAttributionBadge(illust, () =>
+            {
+                if (game != null)
+                    game.OpenUrlExternally(artworkUrl);
+                else
+                    gameHost.OpenUrlExternally(artworkUrl);
+            }));
+        }
+
+        private void removePixivAttribution()
+        {
+            pixivAttribution?.FadeOut(400);
+            pixivAttribution?.Expire();
+            pixivAttribution = null;
         }
 
         [Resolved]
         private Storage storage { get; set; } = null!;
 
         [Resolved]
-        private TextureStore textures { get; set; } = null!;
+        private EzResourceStore resources { get; set; } = null!;
 
         [Resolved]
         private LargeTextureStore largeTextures { get; set; } = null!;
 
-        // Try to pick a random file from storage under a relative path.
-        // Returns storage-relative resourcePath (for textures) and fullPath (absolute on disk) for file-based consumers like Video.
+        [Resolved]
+        private PixivBackgroundCoordinator pixivCoordinator { get; set; } = null!;
+
+        private bool storageTextureSourceAdded;
+
+        private void ensureStorageTextureSource()
+        {
+            if (storageTextureSourceAdded)
+                return;
+
+            try
+            {
+                var loader = gameHost.CreateTextureLoaderStore(new StorageBackedResourceStore(storage));
+                largeTextures.AddTextureSource(loader);
+                storageTextureSourceAdded = true;
+            }
+            catch
+            {
+                // Ignore failure and let caller fall back to built-in backgrounds.
+            }
+        }
+
+        // 尝试获取路径，并在无路径时创建空文件夹，并通知路径可用。
         private bool tryGetRandomStorageFile(string relativePath, out string resourcePath, out string fullPath, string[] extensions = null)
         {
             resourcePath = null;
@@ -186,24 +235,6 @@ namespace osu.Game.Screens.Backgrounds
                         Logger.Log(EzSettingsStrings.STORAGE_FOLDER_EMPTY.Format(dataFolderPath), LoggingTarget.Information, LogLevel.Important);
 
                     return false;
-                }
-
-                // ensure textures can resolve storage-backed resources (only add once)
-                if (!storageTextureSourceAdded)
-                {
-                    try
-                    {
-                        var loader = gameHost.CreateTextureLoaderStore(new StorageBackedResourceStore(storage));
-                        textures.AddTextureSource(loader);
-
-                        largeTextures?.AddTextureSource(loader);
-
-                        storageTextureSourceAdded = true;
-                    }
-                    catch
-                    {
-                        // ignore failures; callers will fall back
-                    }
                 }
 
                 string file = files[RNG.Next(files.Length)];
@@ -244,25 +275,48 @@ namespace osu.Game.Screens.Backgrounds
         {
             switch (source.Value)
             {
-                case BackgroundSource.WebmSource:
+                case BackgroundSource.Video:
                 {
-                    string relativePath = Path.Combine("EzResources", "Webm");
-
-                    if (tryGetRandomStorageFile(relativePath, out string resourcePath, out string fullPath, new[] { ".webm", ".mp4", ".flv", ".mkv" }))
+                    if (tryGetRandomStorageFile(EzModifyPath.VIDEO_PATH, out string resourcePath, out string fullPath, new[] { ".webm", ".mp4", ".flv", ".mkv" }))
                         return new VideoBackgroundScreen(fullPath ?? resourcePath);
 
-                    Stream videoName = textures.GetStream("EzResources/default_video.webm");
-                    return new StreamVideoBackgroundScreen(videoName);
+                    Stream videoName = resources.GetEzResourceStream($"{EzModifyPath.VIDEO_PATH}/default_video.webm");
+
+                    if (videoName != null)
+                        return new StreamVideoBackgroundScreen(videoName);
+
+                    Logger.Log("Default video not found in EzResources/Video, falling back to static menu background.", LoggingTarget.Information, LogLevel.Important);
+                    return new Background($@"Backgrounds/bg{RNG.Next(0, 5) % 5 + 1}");
                 }
 
-                case BackgroundSource.Slides:
+                case BackgroundSource.Picture:
                 {
-                    string relativePath = Path.Combine("EzResources", "BG");
-
-                    if (tryGetRandomStorageFile(relativePath, out string resourcePath, out string _, new[] { ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff" }))
+                    if (tryGetRandomStorageFile(EzModifyPath.BG_PATH, out string resourcePath, out string _, new[] { ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff" }))
+                    {
+                        ensureStorageTextureSource();
                         return new Background(resourcePath);
+                    }
 
                     return new Background($@"Backgrounds/bg{RNG.Next(0, 5) % 5 + 1}");
+                }
+
+                case BackgroundSource.PixivFollow:
+                {
+                    ensureStorageTextureSource();
+
+                    bool hasLocal = pixivCoordinator.TryPickImmediateLocalBackground(out PixivIllustInfo illust, out string resourcePath);
+                    pendingPixivAttribution = hasLocal ? illust : default;
+
+                    var pixivBackground = new PixivBackground(hasLocal ? illust : null, hasLocal ? resourcePath : null);
+
+                    if (pixivBackground.Equals(background))
+                    {
+                        pendingPixivAttribution = default;
+                        return background;
+                    }
+
+                    pixivCoordinator.EnqueueSongChangeDownload();
+                    return pixivBackground;
                 }
             }
 
@@ -317,8 +371,8 @@ namespace osu.Game.Screens.Backgrounds
         {
             switch (introSequence.Value)
             {
-                case IntroSequence.Welcome:
-                    return @"Intro/Welcome/menu-background";
+                // case IntroSequence.Welcome:
+                //     return @"Intro/Welcome/menu-background";
 
                 default:
                     return $@"Menu/menu-background-{currentDisplay % background_count + 1}";

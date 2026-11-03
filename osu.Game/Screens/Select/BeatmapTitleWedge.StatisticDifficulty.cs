@@ -11,6 +11,7 @@ using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
@@ -80,7 +81,7 @@ namespace osu.Game.Screens.Select
                                     Height = 2f,
                                     Colour = Color4.Black,
                                     Masking = true,
-                                    CornerRadius = 1f,
+                                    CornerRadius = EzUIStyleV1.CORNER_RADIUS_MICRO,
                                     Depth = float.MaxValue,
                                 },
                                 bar = new Circle
@@ -89,7 +90,7 @@ namespace osu.Game.Screens.Select
                                     Width = 0f,
                                     Height = 2f,
                                     Masking = true,
-                                    CornerRadius = 1f,
+                                    CornerRadius = EzUIStyleV1.CORNER_RADIUS_MICRO,
                                 },
                                 adjustedBar = new Circle
                                 {
@@ -97,7 +98,7 @@ namespace osu.Game.Screens.Select
                                     Width = 0f,
                                     Height = 2f,
                                     Masking = true,
-                                    CornerRadius = 1f,
+                                    CornerRadius = EzUIStyleV1.CORNER_RADIUS_MICRO,
                                 },
                             },
                         },

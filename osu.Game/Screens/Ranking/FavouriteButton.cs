@@ -3,21 +3,26 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables.Cards;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Online;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests;
 using osu.Game.Online.API.Requests.Responses;
+using osu.Game.Overlays;
+using osu.Game.Overlays.Notifications;
 using osu.Game.Resources.Localisation.Web;
-using osuTK;
+using osu.Game.Screens.Footer;
 
 namespace osu.Game.Screens.Ranking
 {
-    public partial class FavouriteButton : GrayButton
+    public partial class FavouriteButton : ScreenFooterButton
     {
         public readonly BeatmapSetInfo BeatmapSetInfo;
         private APIBeatmapSet? beatmapSet;
@@ -34,13 +39,13 @@ namespace osu.Game.Screens.Ranking
         [Resolved]
         private OsuColour colours { get; set; } = null!;
 
+        [Resolved]
+        private INotificationOverlay? notifications { get; set; }
+
         public FavouriteButton(BeatmapSetInfo beatmapSetInfo)
-            : base(FontAwesome.Regular.Heart)
         {
             BeatmapSetInfo = beatmapSetInfo;
             current = new BindableWithCurrent<BeatmapSetFavouriteState>(new BeatmapSetFavouriteState(false, 0));
-
-            Size = new Vector2(75, 30);
         }
 
         [BackgroundDependencyLoader]
@@ -59,6 +64,9 @@ namespace osu.Game.Screens.Ranking
 
             localUser.BindTo(api.LocalUser);
             localUser.BindValueChanged(_ => updateUser(), true);
+
+            // 离线、连接中或本地账号下 LocalUser 可能不变，状态变化也要重新判定。
+            api.State.BindValueChanged(_ => updateUser(), true);
         }
 
         private void getBeatmapSet()
@@ -76,7 +84,8 @@ namespace osu.Game.Screens.Ranking
             };
             beatmapSetRequest.Failure += e =>
             {
-                Logger.Log($"Favourite button failed to fetch beatmap info: {e}", LoggingTarget.Network);
+                if (e is not LocalOnlyUnavailableException)
+                    Logger.Log($"Favourite button failed to fetch beatmap info: {e}", LoggingTarget.Network);
 
                 Schedule(() =>
                 {
@@ -100,7 +109,6 @@ namespace osu.Game.Screens.Ranking
 
             favouriteRequest?.Cancel();
             favouriteRequest = new PostBeatmapFavouriteRequest(beatmapSet.OnlineID, actionType);
-
             favouriteRequest.Success += () =>
             {
                 bool favourited = actionType == BeatmapFavouriteAction.Favourite;
@@ -113,7 +121,11 @@ namespace osu.Game.Screens.Ranking
             };
             favouriteRequest.Failure += e =>
             {
-                Logger.Error(e, $"Failed to {actionType.ToString().ToLowerInvariant()} beatmap: {e.Message}");
+                notifications?.Post(new SimpleNotification
+                {
+                    Text = e.Message,
+                    Icon = FontAwesome.Solid.Times,
+                });
 
                 Schedule(() =>
                 {
@@ -127,7 +139,17 @@ namespace osu.Game.Screens.Ranking
 
         private void updateUser()
         {
-            if (!(localUser.Value is GuestUser) && BeatmapSetInfo.OnlineID > 0)
+            if (api.IsLocalOnly)
+            {
+                Enabled.Value = false;
+                current.Value = new BeatmapSetFavouriteState(false, 0);
+                updateState();
+                TooltipText = "this beatmap cannot be favourited";
+                return;
+            }
+
+            // 状态非在线（登出、连接中）时 LocalUser 可能还是旧值，不应据此拉取收藏状态。
+            if (api.State.Value == APIState.Online && !(localUser.Value is GuestUser) && BeatmapSetInfo.OnlineID > 0)
                 getBeatmapSet();
             else
             {
@@ -142,16 +164,29 @@ namespace osu.Game.Screens.Ranking
         {
             if (current.Value.Favourited)
             {
-                Background.Colour = colours.Green;
-                Icon.Icon = FontAwesome.Solid.Heart;
+                AccentColour = colours.Lime1;
+                OverlayState.Value = Visibility.Visible;
+                Icon = FontAwesome.Solid.Heart;
+                Text = FavouriteStrings.UNFAVOURITE;
                 TooltipText = BeatmapsetsStrings.ShowDetailsUnfavourite;
             }
             else
             {
-                Background.Colour = colours.Gray4;
-                Icon.Icon = FontAwesome.Regular.Heart;
+                AccentColour = colours.Pink1;
+                OverlayState.Value = Visibility.Hidden;
+                Icon = FontAwesome.Regular.Heart;
+                Text = FavouriteStrings.FAVOURITE;
                 TooltipText = BeatmapsetsStrings.ShowDetailsFavourite;
             }
+        }
+
+        private static class FavouriteStrings
+        {
+            internal static readonly EzLocalizationManager.EzLocalisableString FAVOURITE = new EzLocalizationManager.EzLocalisableString(
+                "收藏", "Favourite");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString UNFAVOURITE = new EzLocalizationManager.EzLocalisableString(
+                "取消收藏", "Unfavourite");
         }
     }
 }

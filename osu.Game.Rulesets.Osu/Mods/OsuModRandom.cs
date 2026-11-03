@@ -6,10 +6,10 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
-using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mods;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Osu.Beatmaps;
 using osu.Game.Rulesets.Osu.Objects;
@@ -44,9 +44,9 @@ namespace osu.Game.Rulesets.Osu.Mods
             if (beatmap is not OsuBeatmap osuBeatmap)
                 return;
 
-            Seed.Value ??= RNG.Next();
+            int seed = EzModSeed.Resolve(Seed);
 
-            random = new Random((int)Seed.Value);
+            random = new Random(seed);
 
             var positionInfos = OsuHitObjectGenerationUtils.GeneratePositionInfos(osuBeatmap.HitObjects);
 

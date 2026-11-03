@@ -24,5 +24,67 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString DYNAMIC = new EzLocalizationManager.EzLocalisableString("动态预览", "Dynamic Preview");
         public static readonly LocalisableString STATIC_FULL_MAP = new EzLocalizationManager.EzLocalisableString("全图预览", "Full-map Preview");
         public static readonly LocalisableString STATIC_SCROLL = new EzLocalizationManager.EzLocalisableString("卷轴预览", "Scroll Preview");
+
+        public static readonly LocalisableString JUDGE_PRECEDENCE_COMBO = new EzLocalizationManager.EzLocalisableString("Combo优先(LR2风格)", "By Combo");
+        public static readonly LocalisableString JUDGE_PRECEDENCE_DURATION = new EzLocalizationManager.EzLocalisableString("时差优先(raja风格)", "By Duration");
+        public static readonly LocalisableString JUDGE_PRECEDENCE_EARLIEST = new EzLocalizationManager.EzLocalisableString("最早note优先(osu风格)", "By Earliest Note");
+        public static readonly LocalisableString JUDGE_PRECEDENCE_SCORE = new EzLocalizationManager.EzLocalisableString("分数优先(势利)", "By Score");
+
+        public static readonly LocalisableString SCORE_BONUS_TENDENCY_HIGH_JUDGE_RATIO = new EzLocalizationManager.EzLocalisableString(
+            "高判定比例",
+            "High Judge Ratio");
+
+        public static readonly LocalisableString SCORE_BONUS_TENDENCY_LOW_ERROR_RATE = new EzLocalizationManager.EzLocalisableString(
+            "低失误率",
+            "Low Error Rate");
+
+        public static readonly LocalisableString SCORE_BONUS_TENDENCY_HIDDEN = new EzLocalizationManager.EzLocalisableString(
+            "不展示",
+            "Hidden");
+
+        public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_NORMAL = new EzLocalizationManager.EzLocalisableString("正常", "Normal");
+        public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_IN_GAME_FOCUS = new EzLocalizationManager.EzLocalisableString("游戏内聚焦", "In-game focus");
+        public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_NEVER = new EzLocalizationManager.EzLocalisableString("永不通知", "Never notify");
+
+        public static readonly LocalisableString SCREENSHOT_ACTION_SAVE_ONLY = new EzLocalizationManager.EzLocalisableString("仅保存图片", "Save image only");
+        public static readonly LocalisableString SCREENSHOT_ACTION_SAVE_AND_COPY = new EzLocalizationManager.EzLocalisableString("保存图片并复制到剪贴板", "Save image and copy to clipboard");
+        public static readonly LocalisableString SCREENSHOT_ACTION_COPY_ONLY = new EzLocalizationManager.EzLocalisableString("仅将图片复制到剪贴板", "Copy image to clipboard only");
+
+        public static readonly LocalisableString IGNORE_BETTER = new EzLocalizationManager.EzLocalisableString("忽略更好", "Ignore Better");
+        public static readonly LocalisableString IGNORE_WORSE = new EzLocalizationManager.EzLocalisableString("忽略更差", "Ignore Worse");
+
+        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_TAGS = new EzLocalizationManager.EzLocalisableString("Realm Tag", "Realm Tag");
+        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_XXY = new EzLocalizationManager.EzLocalisableString("Realm Xxy 星级", "Realm Xxy SR");
+        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_PP = new EzLocalizationManager.EzLocalisableString("Realm PP", "Realm PP");
+        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_ALL = new EzLocalizationManager.EzLocalisableString("Realm 全部元数据", "Realm all metadata");
+        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_SCORES = new EzLocalizationManager.EzLocalisableString("Realm 成绩全量重算", "Realm full score recalculation");
+        public static readonly LocalisableString DATA_REBUILD_TARGET_SQLITE_MAIN = new EzLocalizationManager.EzLocalisableString("SQLite 主库 kps/KPC", "SQLite main kps/KPC");
+        public static readonly LocalisableString DATA_REBUILD_TARGET_SQLITE_BRANCHES = new EzLocalizationManager.EzLocalisableString("SQLite 分支曲库 xxy/PP", "SQLite songs branches xxy/PP");
+
+        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_CHART_MSD = new EzLocalizationManager.EzLocalisableString(
+            "Realm chart MSD",
+            "Realm chart MSD");
+
+        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_CHART_CSI_AND_DAN = new EzLocalizationManager.EzLocalisableString(
+            "Realm DualPanel谱面 (CSI+Dan)",
+            "Realm DualPanel chart (CSI+Dan)");
+
+        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_CHART_SKILL_CHAIN = new EzLocalizationManager.EzLocalisableString(
+            "Realm 谱面技能链 (MSD+CSI+Dan)",
+            "Realm chart skill chain (MSD+CSI+Dan)");
+
+        public static readonly LocalisableString LOGO_VIS_BARS = new EzLocalizationManager.EzLocalisableString("柱状", "Bars");
+        public static readonly LocalisableString LOGO_VIS_POLYLINE = new EzLocalizationManager.EzLocalisableString("折线", "Polyline");
+        public static readonly LocalisableString LOGO_VIS_WAVE = new EzLocalizationManager.EzLocalisableString("波形", "Waveform");
+        public static readonly LocalisableString LOGO_VIS_DOTS = new EzLocalizationManager.EzLocalisableString("圆点", "Dots");
+        public static readonly LocalisableString LOGO_VIS_NET = new EzLocalizationManager.EzLocalisableString("网状", "Net");
+        public static readonly LocalisableString LOGO_VIS_OFF = new EzLocalizationManager.EzLocalisableString("关闭", "Off");
+
+        // public static readonly LocalisableString LOGO_BACKDROP_LINKED = new EzLocalizationManager.EzLocalisableString("联动背景", "Linked");
+        public static readonly LocalisableString LOGO_BACKDROP_CLEAR = new EzLocalizationManager.EzLocalisableString("透明", "Clear");
+
+        public static readonly LocalisableString UI_MODE_DEFAULT = new EzLocalizationManager.EzLocalisableString("默认", "Default");
+        public static readonly LocalisableString UI_MODE_ACRYLIC = new EzLocalizationManager.EzLocalisableString("亚克力", "Acrylic");
+        public static readonly LocalisableString UI_MODE_LIQUID_GLASS = new EzLocalizationManager.EzLocalisableString("液态玻璃", "Liquid glass");
     }
 }

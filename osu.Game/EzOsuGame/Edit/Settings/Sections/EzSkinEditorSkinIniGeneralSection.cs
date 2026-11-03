@@ -1,0 +1,110 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System.Collections.Generic;
+using osu.Framework.Bindables;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
+using osuTK.Graphics;
+#if DEBUG
+using osu.Framework.Allocation;
+using osu.Framework.Graphics;
+using osu.Game.Graphics.UserInterface;
+#endif
+
+namespace osu.Game.EzOsuGame.Edit.Settings.Sections
+{
+    public partial class EzSkinEditorSkinIniGeneralSection : EzSkinEditorSkinIniSectionBase
+    {
+        private readonly Dictionary<string, Bindable<string>> textFields = new Dictionary<string, Bindable<string>>();
+        private readonly Dictionary<string, Bindable<bool>> boolFields = new Dictionary<string, Bindable<bool>>();
+
+        public EzSkinEditorSkinIniGeneralSection()
+            : base(EzEditorStrings.GROUP_GENERAL)
+        {
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            Add(new OsuSpriteText
+            {
+                Text = EzEditorStrings.SKIN_INI_GENERAL_HINT,
+                Font = OsuFont.Default.With(size: 14),
+                Colour = Color4.Gray,
+            });
+
+#if DEBUG
+            Add(new RawEditorPlaceholderButton
+            {
+                RelativeSizeAxes = Axes.X,
+                Height = 40,
+            });
+#endif
+
+            foreach (var field in EzSkinIniFieldCatalog.GeneralFields)
+            {
+                switch (field.Kind)
+                {
+                    case EzSkinIniFieldKind.Text:
+                        var textBindable = new Bindable<string>(string.Empty);
+                        textFields[field.Key] = textBindable;
+                        textBindable.ValueChanged += e => CommitGeneralField(field.Key, e.NewValue);
+                        Add(CreateTextField(field.Label, textBindable));
+                        break;
+
+                    case EzSkinIniFieldKind.Bool:
+                        var boolBindable = new Bindable<bool>();
+                        boolFields[field.Key] = boolBindable;
+                        boolBindable.ValueChanged += e => CommitGeneralBoolField(field.Key, e.NewValue);
+                        Add(CreateBoolField(field.Label, boolBindable));
+                        break;
+                }
+            }
+
+            WatchSession(reloadFromSession);
+        }
+
+        private void reloadFromSession()
+        {
+            WithApplying(() =>
+            {
+                var document = ParseDocument();
+                var snapshotDocument = ParseSnapshotDocument();
+
+                foreach (var (key, bindable) in textFields)
+                {
+                    string value = document?.GetValue(EzSkinIniDocument.GENERAL_SECTION, key) ?? string.Empty;
+                    bindable.Value = value;
+                    EzSkinIniBridge.SyncTextDefault(bindable, snapshotDocument?.GetValue(EzSkinIniDocument.GENERAL_SECTION, key), value);
+                }
+
+                foreach (var (key, bindable) in boolFields)
+                {
+                    bool value = document?.GetValue(EzSkinIniDocument.GENERAL_SECTION, key) == "1";
+                    bindable.Value = value;
+                    EzSkinIniBridge.SyncBoolDefault(bindable, snapshotDocument?.GetValue(EzSkinIniDocument.GENERAL_SECTION, key), value);
+                }
+            });
+        }
+
+#if DEBUG
+        private partial class RawEditorPlaceholderButton : OsuButton
+        {
+            public RawEditorPlaceholderButton()
+            {
+                Text = EzEditorStrings.SKIN_INI_RAW_EDITOR_PLACEHOLDER;
+                Enabled.Value = false;
+            }
+
+            [BackgroundDependencyLoader]
+            private void load(OsuColour colours)
+            {
+                BackgroundColour = colours.Blue3;
+            }
+        }
+#endif
+    }
+}

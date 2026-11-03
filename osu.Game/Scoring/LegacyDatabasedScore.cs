@@ -8,6 +8,8 @@ using System.Linq;
 using osu.Framework.IO.Stores;
 using osu.Game.Beatmaps;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Replays;
 using osu.Game.Rulesets;
 using osu.Game.Scoring.Legacy;
 
@@ -18,6 +20,24 @@ namespace osu.Game.Scoring
         public LegacyDatabasedScore(ScoreInfo score, RulesetStore rulesets, BeatmapManager beatmaps, IResourceStore<byte[]> store)
         {
             ScoreInfo = score;
+
+            string ezFramesPath = score.Files.FirstOrDefault(f => f.Filename.EndsWith(EzHighPrecisionReplayFrames.EXTENSION, StringComparison.OrdinalIgnoreCase))?.File.GetStoragePath();
+
+            if (ezFramesPath != null)
+            {
+                using (var stream = store.GetStream(ezFramesPath))
+                {
+                    if (stream != null && EzHighPrecisionReplayFrames.TryRead(stream, out var legacyFrames))
+                    {
+                        var ruleset = score.Ruleset.CreateInstance();
+                        var playable = beatmaps.GetWorkingBeatmap(score.BeatmapInfo).GetPlayableBeatmap(score.Ruleset, score.Mods);
+
+                        Replay = new Replay();
+                        EzHighPrecisionReplayFrames.PopulateReplay(Replay, legacyFrames, ruleset, playable);
+                        return;
+                    }
+                }
+            }
 
             string replayFilename = score.Files.FirstOrDefault(f => f.Filename.EndsWith(".osr", StringComparison.InvariantCultureIgnoreCase))?.File.GetStoragePath();
 

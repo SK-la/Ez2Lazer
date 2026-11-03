@@ -9,6 +9,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Graphics.Video;
+using osu.Framework.Logging;
 using osu.Framework.Utils;
 using osuTK;
 
@@ -40,12 +41,15 @@ namespace osu.Game.Storyboards.Drawables
         }
 
         [BackgroundDependencyLoader(true)]
-        private void load(TextureStore textureStore)
+        private void load(TextureStore textureStore, StoryboardTriggerController triggerController)
         {
             var stream = textureStore.GetStream(Video.Path);
 
             if (stream == null)
+            {
+                Logger.Log($"Storyboard video failed to open stream for '{Video.Path}'.", level: LogLevel.Important);
                 return;
+            }
 
             InternalChild = drawableVideo = new DrawableVideo(stream, false)
             {
@@ -56,7 +60,7 @@ namespace osu.Game.Storyboards.Drawables
                 Alpha = 0,
             };
 
-            Video.ApplyTransforms(drawableVideo);
+            Video.ApplyTransforms(drawableVideo, triggerController);
         }
 
         protected override void LoadComplete()

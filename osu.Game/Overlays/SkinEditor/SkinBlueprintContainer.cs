@@ -7,12 +7,10 @@ using System.Diagnostics;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Input.Events;
 using osu.Game.Rulesets.Edit;
 using osu.Game.Screens.Edit.Compose.Components;
 using osu.Game.Skinning;
 using osuTK;
-using osuTK.Input;
 
 namespace osu.Game.Overlays.SkinEditor
 {
@@ -82,43 +80,9 @@ namespace osu.Game.Overlays.SkinEditor
             base.AddBlueprintFor(item);
         }
 
-        protected override bool OnKeyDown(KeyDownEvent e)
-        {
-            switch (e.Key)
-            {
-                case Key.Left:
-                    moveSelection(new Vector2(-1, 0));
-                    return true;
-
-                case Key.Right:
-                    moveSelection(new Vector2(1, 0));
-                    return true;
-
-                case Key.Up:
-                    moveSelection(new Vector2(0, -1));
-                    return true;
-
-                case Key.Down:
-                    moveSelection(new Vector2(0, 1));
-                    return true;
-            }
-
-            return false;
-        }
-
         protected override void SelectAll()
         {
             SelectedItems.AddRange(targetComponents.SelectMany(list => list).Except(SelectedItems).ToArray());
-        }
-
-        protected override bool TryMoveBlueprints(DragEvent e, IList<(SelectionBlueprint<ISerialisableDrawable> blueprint, Vector2[] originalSnapPositions)> blueprints)
-        {
-            Vector2 distanceTravelled = e.ScreenSpaceMousePosition - e.ScreenSpaceMouseDownPosition;
-
-            // The final movement position, relative to movementBlueprintOriginalPosition.
-            var referenceBlueprint = blueprints.First().blueprint;
-            Vector2 movePosition = blueprints.First().originalSnapPositions.First() + distanceTravelled;
-            return SelectionHandler.HandleMovement(new MoveSelectionEvent<ISerialisableDrawable>(referenceBlueprint, movePosition - referenceBlueprint.ScreenSpaceSelectionPoint));
         }
 
         /// <summary>

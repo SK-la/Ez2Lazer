@@ -166,7 +166,7 @@ namespace osu.Game.Rulesets.UI.Scrolling
             base.LoadComplete();
 
             if (!(Playfield is ScrollingPlayfield))
-                throw new ArgumentException($"{nameof(Playfield)} must be a {nameof(ScrollingPlayfield)} when using {nameof(DrawableScrollingRuleset<TObject>)}.");
+                throw new ArgumentException($"{nameof(Playfield)} must be a {nameof(ScrollingPlayfield)} when using {nameof(DrawableScrollingRuleset<>)}.");
         }
 
         private ScrollVisualisationMethod visualisationMethod = ScrollVisualisationMethod.Sequential;
@@ -210,6 +210,7 @@ namespace osu.Game.Rulesets.UI.Scrolling
 
         /// <summary>
         /// Retrieves the amount to use for a single scroll speed adjustment input.
+        /// 改变调速时的步长，单位是速度级。
         /// </summary>
         protected virtual int GetScrollSpeedAdjustmentAmount(KeyBindingPressEvent<GlobalAction> e) => 1;
 

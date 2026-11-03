@@ -3,8 +3,10 @@
 
 #nullable disable
 
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -12,6 +14,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osuTK;
@@ -32,12 +35,19 @@ namespace osu.Game.Overlays.Settings
         public abstract Drawable CreateIcon();
         public abstract LocalisableString Header { get; }
 
+        /// <summary>
+        /// Whether a clickable index of this section's subsections is shown above its content.
+        /// </summary>
+        protected virtual bool ShowSubsectionIndex => true;
+
+        public bool UseSmallerSidebarButton { get; init; }
+
         public virtual IEnumerable<LocalisableString> FilterTerms => new[] { Header };
 
         public const int ITEM_SPACING = 14;
         public const int ITEM_SPACING_V2 = 4;
 
-        private const int header_size = 24;
+        private const int header_size = 30;
         private const int border_size = 2;
 
         private bool matchingFilter = true;
@@ -60,8 +70,23 @@ namespace osu.Game.Overlays.Settings
 
         public bool FilteringActive { get; set; }
 
+        private SettingsSubsection[] indexedSubsections;
+
         [Resolved(canBeNull: true)]
         private SettingsPanel settingsPanel { get; set; }
+
+        /// <summary>
+        /// Wall-clock cost of this section's background dependency load (self + all descendants).
+        /// Measured from the start of dependency injection until the async load finishes, i.e. the span
+        /// the async preload actually spends building elements. Reported through <see cref="EzStartupTrace"/>;
+        /// only meaningful on the settings startup path.
+        /// </summary>
+        private readonly Stopwatch loadStopwatch = Stopwatch.StartNew();
+
+        /// <summary>
+        /// Load duration in milliseconds, or -1 until the async load has finished.
+        /// </summary>
+        public long LoadDurationMs { get; private set; } = -1;
 
         protected SettingsSection()
         {
@@ -72,7 +97,7 @@ namespace osu.Game.Overlays.Settings
             {
                 Margin = new MarginPadding
                 {
-                    Top = 36
+                    Top = header_size + 6,
                 },
                 Spacing = new Vector2(0, ITEM_SPACING_V2),
                 Direction = FillDirection.Vertical,
@@ -132,6 +157,39 @@ namespace osu.Game.Overlays.Settings
 
             selectedSection = settingsPanel?.CurrentSection.GetBoundCopy() ?? new Bindable<SettingsSection>(this);
             selectedSection.BindValueChanged(_ => updateContentFade(), true);
+        }
+
+        /// <summary>
+        /// The subsections directly contained by this section, used to drive second-level sidebar navigation.
+        /// </summary>
+        public IReadOnlyList<SettingsSubsection> IndexedSubsections => indexedSubsections ?? Array.Empty<SettingsSubsection>();
+
+        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
+        {
+            // Runs at the very start of this section's load, before the [BackgroundDependencyLoader]
+            // methods of this section and its descendants. Restarting here measures exactly the
+            // background dependency load, not the time spent waiting to be mounted.
+            loadStopwatch.Restart();
+            return base.CreateChildDependencies(parent);
+        }
+
+        protected override void LoadAsyncComplete()
+        {
+            base.LoadAsyncComplete();
+
+            // The whole subtree's background dependency load has finished by now.
+            LoadDurationMs = loadStopwatch.ElapsedMilliseconds;
+            loadStopwatch.Stop();
+
+            EzStartupTrace.LogDiagnostic($"Settings.section load {LoadDurationMs}ms header=\"{Header}\"");
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            if (ShowSubsectionIndex)
+                indexedSubsections = FlowContent.Children.OfType<SettingsSubsection>().ToArray();
         }
 
         private bool isCurrentSection => selectedSection.Value == this;

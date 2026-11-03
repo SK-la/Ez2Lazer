@@ -1,19 +1,19 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Game.Rulesets.Mania.Objects;
 using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
-using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Mania.Beatmaps.Patterns;
 using osu.Game.Rulesets.Mania.Beatmaps.Patterns.Legacy;
+using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Legacy;
+using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring.Legacy;
 using osu.Game.Utils;
 using osuTK;
@@ -65,12 +65,7 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
             TargetColumns = getColumnCount(difficulty);
 
             if (IsForCurrentRuleset && TargetColumns > ManiaRuleset.MAX_STAGE_KEYS)
-            {
-                // If support for odd key counts above 10 (11 / 13 / 15 / 17K) is ever desired, this code needs to go.
-                // For now, it's probably fine, as stable doesn't support them outside of manual .osu edits either.
-                TargetColumns /= 2;
-                Dual = true;
-            }
+                TargetColumns = ManiaRuleset.MAX_STAGE_KEYS;
 
             static int getColumnCount(LegacyBeatmapConversionDifficultyInfo difficulty)
             {
@@ -107,11 +102,21 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
 
             if (mods != null)
             {
-                foreach (var m in mods.OfType<IApplicableToBeatmapConverter>())
+                foreach (var m in EzApplyOrder.Sort(mods.OfType<IApplicableToBeatmapConverter>()))
                     m.ApplyToBeatmapConverter(converter);
             }
 
-            return converter.TotalColumns;
+            int columns = converter.TotalColumns;
+
+            // 转换器阶段之后的改键 mod 不参与上面的 TotalColumns，只能按 ApplyOrder 逐个推算；
+            // 否则选歌键数会停在源谱列数，与实际游玩到的谱面不一致。
+            if (mods != null)
+            {
+                foreach (var m in EzApplyOrder.Sort(mods.OfType<IEzColumnCountMod>()))
+                    columns = m.ResolveColumnCount(columns);
+            }
+
+            return columns;
         }
 
         public override bool CanConvert() => Beatmap.HitObjects.All(h => h is IHasXPosition);
@@ -126,6 +131,13 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
             return beatmap;
         }
 
+        /// <summary>
+        /// 源谱面已是 mania 时（.osu mania 解码结果、编辑器构建的谱面、以 mania 谱面为源的转换），
+        /// 产物必须拥有自己的 HitObject：后转换 mod 会就地改 Column/时间，绑定会写 Judgement/HitWindows，
+        /// ApplyDefaults 会重建嵌套对象——复用源实例等于把这些写回解码谱面，并让同一份对象被多次转换共享。
+        /// </summary>
+        protected override ManiaHitObject ConvertCompatibleHitObject(ManiaHitObject obj) => (ManiaHitObject)obj.Clone();
+
         protected override IEnumerable<ManiaHitObject> ConvertHitObject(HitObject original, IBeatmap beatmap, CancellationToken cancellationToken)
         {
             LegacyHitObjectType legacyType;
@@ -134,7 +146,7 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
             {
                 case ManiaHitObject maniaObj:
                 {
-                    yield return maniaObj;
+                    yield return (ManiaHitObject)maniaObj.Clone();
 
                     yield break;
                 }

@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Development;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
@@ -21,13 +22,12 @@ using osu.Game.Screens.Play;
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
-    /// 启动阶段做一次全量扫描，补齐 analysis 主体与轻量 tag 结果。
-    /// 运行阶段通过单后台 worker 仅处理最新选中谱面的低优先级重算。
+    /// 启动时仅在 SQLite 主库需要版本/ schema 升级时自动补算；已匹配最新版文件时不自动预热。
+    /// 受 <see cref="Ez2Setting.EzAnalysisSqliteEnabled"/> 控制；选歌即时计算由 <see cref="Ez2Setting.EzAnalysisRecEnabled"/> 经 <see cref="EzAnalysisCache"/> 负责。
+    /// 其余 SQLite/分支库维护由设置页手动触发；Realm 基线仍由 BackgroundDataStoreProcessor 负责。
     /// </summary>
     public partial class EzAnalysisWarmupProcessor : Component
     {
-        protected Task ProcessingTask { get; private set; } = Task.CompletedTask;
-
         [Resolved]
         private BeatmapManager beatmapManager { get; set; } = null!;
 
@@ -52,18 +52,26 @@ namespace osu.Game.EzOsuGame.Analysis
         [Resolved]
         private IHighPerformanceSessionManager? highPerformanceSessionManager { get; set; }
 
+        [Resolved(CanBeNull = true)]
+        private BackgroundDataStoreProcessor? backgroundDataStoreProcessor { get; set; }
+
         private IBindable<bool> sqliteEnabledBindable = null!;
         private bool sqliteEnabled;
         private bool backgroundWorkersStarted;
-        private readonly object processingTaskLock = new object();
+        private readonly Lock sqliteManualRebuildLock = new Lock();
+        private bool sqliteMainRebuildQueued;
+        private bool sqliteSongsBranchesRebuildQueued;
 
         protected virtual int TimeToSleepDuringGameplay => 30000;
-
-        private readonly object pendingBeatmapLock = new object();
-        private readonly HashSet<Guid> pendingBeatmapIds = new HashSet<Guid>();
+        private readonly Lock pendingBeatmapLock = new Lock();
+        private readonly Queue<Guid> pendingBeatmapQueue = new Queue<Guid>();
         private readonly HashSet<Guid> inFlightBeatmapIds = new HashSet<Guid>();
         private ProgressNotification? startupWarmupProgressNotification;
         private int startupWarmupTotalCount;
+        private int startupWarmupProcessedCount;
+        private int lastStartupWarmupProgressReported = -1;
+
+        private const int warmup_progress_update_interval = 50;
         private readonly SemaphoreSlim startupWarmupSignal = new SemaphoreSlim(0, 1);
         private readonly SemaphoreSlim selectedBeatmapRecomputeSignal = new SemaphoreSlim(0, 1);
         private readonly CancellationTokenSource startupWarmupCancellationSource = new CancellationTokenSource();
@@ -78,6 +86,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private volatile bool pendingScanCompleted;
 
+        private Action? onBdspFinishedForSqliteWarmup;
+
         protected override void LoadComplete()
         {
             base.LoadComplete();
@@ -90,21 +100,62 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private void onSqliteEnabledChanged(bool enabled)
         {
+            if (DebugUtils.IsNUnitRunning)
+            {
+                sqliteEnabled = false;
+                pendingScanCompleted = false;
+                cancelPendingBeatmapProcessing();
+                return;
+            }
+
             sqliteEnabled = enabled;
 
             if (enabled)
             {
                 ensureBackgroundWorkersStarted();
-                triggerStartupWarmupScan();
+                pendingScanCompleted = true;
+                Schedule(() => queueSelectedBeatmapRecomputeIfRequired(currentBeatmap.Value));
+                scheduleSqliteWarmupAfterBdsp();
                 return;
             }
 
             pendingScanCompleted = false;
             cancelPendingBeatmapProcessing();
+            unsubscribeBdspForSqliteWarmup();
+        }
+
+        private void scheduleSqliteWarmupAfterBdsp()
+        {
+            if (!sqliteEnabled)
+                return;
+
+            if (backgroundDataStoreProcessor == null || backgroundDataStoreProcessor.IsStartupProcessingFinished)
+            {
+                tryQueueAutomaticSqliteUpgradeWarmup();
+                return;
+            }
+
+            onBdspFinishedForSqliteWarmup ??= onBdspStartupProcessingFinishedForSqliteWarmup;
+            backgroundDataStoreProcessor.StartupProcessingFinished += onBdspFinishedForSqliteWarmup;
+        }
+
+        private void onBdspStartupProcessingFinishedForSqliteWarmup()
+        {
+            unsubscribeBdspForSqliteWarmup();
+            tryQueueAutomaticSqliteUpgradeWarmup();
+        }
+
+        private void unsubscribeBdspForSqliteWarmup()
+        {
+            if (backgroundDataStoreProcessor != null && onBdspFinishedForSqliteWarmup != null)
+                backgroundDataStoreProcessor.StartupProcessingFinished -= onBdspFinishedForSqliteWarmup;
         }
 
         private void ensureBackgroundWorkersStarted()
         {
+            if (DebugUtils.IsNUnitRunning)
+                return;
+
             if (backgroundWorkersStarted)
                 return;
 
@@ -121,107 +172,113 @@ namespace osu.Game.EzOsuGame.Analysis
                 TaskScheduler.Default);
         }
 
-        private void triggerStartupWarmupScan()
+        private void tryQueueAutomaticSqliteUpgradeWarmup()
         {
-            if (!sqliteEnabled)
+            if (!sqliteEnabled || !analysisDatabase.ShouldRunAutomaticSqliteWarmup())
                 return;
 
-            lock (processingTaskLock)
+            Task.Factory.StartNew(() =>
             {
-                if (!ProcessingTask.IsCompleted)
-                    return;
-
-                pendingScanCompleted = false;
-
-                ProcessingTask = Task.Factory.StartNew(scanBeatmapsNeedingWarmup, TaskCreationOptions.LongRunning).ContinueWith(t =>
+                try
                 {
-                    if (t.Exception?.InnerException is ObjectDisposedException)
-                    {
-                        Logger.Log("Finished analysis startup scan aborted during shutdown", Ez2ConfigManager.LOGGER_NAME, LogLevel.Verbose);
-                        return;
-                    }
+                    Logger.Log("Automatic SQLite upgrade warmup started.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
 
-                    if (!sqliteEnabled)
-                        return;
+                    analysisDatabase.EnsureInitialised();
+                    executeSqliteMainRebuild(forceAll: false);
+                    executeSqliteSongsBranchesRebuild(forceAll: false);
 
-                    pendingScanCompleted = true;
-                    Schedule(() => queueSelectedBeatmapRecomputeIfRequired(currentBeatmap.Value));
-
-                    Logger.Log("Finished background analysis startup scan.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                });
-            }
+                    Logger.Log("Automatic SQLite upgrade warmup finished.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Automatic SQLite upgrade warmup failed.", Ez2ConfigManager.LOGGER_NAME);
+                }
+            }, TaskCreationOptions.LongRunning);
         }
 
-        private void scanBeatmapsNeedingWarmup()
+        public EzDataRebuildDispatchResult QueueSqliteMainRebuild(bool forceAll)
+        {
+            if (!sqliteEnabled)
+                return EzDataRebuildDispatchResult.SqliteDisabled;
+
+            lock (sqliteManualRebuildLock)
+            {
+                if (sqliteMainRebuildQueued)
+                {
+                    Logger.Log("SQLite main rebuild is already queued; ignoring duplicate request.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                    return EzDataRebuildDispatchResult.AlreadyRunning;
+                }
+
+                sqliteMainRebuildQueued = true;
+            }
+
+            Task.Factory.StartNew(() =>
+            {
+                try
+                {
+                    executeSqliteMainRebuild(forceAll);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "SQLite main rebuild failed.", Ez2ConfigManager.LOGGER_NAME);
+                }
+                finally
+                {
+                    lock (sqliteManualRebuildLock)
+                        sqliteMainRebuildQueued = false;
+                }
+            }, TaskCreationOptions.LongRunning);
+
+            return EzDataRebuildDispatchResult.Queued;
+        }
+
+        public EzDataRebuildDispatchResult QueueSqliteSongsBranchesRebuild(bool forceAll)
+        {
+            if (!sqliteEnabled)
+                return EzDataRebuildDispatchResult.SqliteDisabled;
+
+            lock (sqliteManualRebuildLock)
+            {
+                if (sqliteSongsBranchesRebuildQueued)
+                {
+                    Logger.Log("SQLite songs branch rebuild is already queued; ignoring duplicate request.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                    return EzDataRebuildDispatchResult.AlreadyRunning;
+                }
+
+                sqliteSongsBranchesRebuildQueued = true;
+            }
+
+            Task.Factory.StartNew(() =>
+            {
+                try
+                {
+                    executeSqliteSongsBranchesRebuild(forceAll);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "SQLite songs branch rebuild failed.", Ez2ConfigManager.LOGGER_NAME);
+                }
+                finally
+                {
+                    lock (sqliteManualRebuildLock)
+                        sqliteSongsBranchesRebuildQueued = false;
+                }
+            }, TaskCreationOptions.LongRunning);
+
+            return EzDataRebuildDispatchResult.Queued;
+        }
+
+        private void executeSqliteMainRebuild(bool forceAll)
         {
             if (!sqliteEnabled)
                 return;
 
-            List<(Guid id, string hash, int rulesetOnlineId)> beatmaps = new List<(Guid id, string hash, int rulesetOnlineId)>();
+            if (forceAll)
+                analysisDatabase.TrySetForceRecompute(true);
 
-            realmAccess.Run(r =>
-            {
-                int totalBeatmaps = 0;
-                int totalWithSet = 0;
-                int maniaTotal = 0;
-                int maniaWithSet = 0;
-                int maniaHidden = 0;
-
-                Dictionary<string, int> rulesetDistribution = new Dictionary<string, int>();
-
-                // Align with official BackgroundDataStoreProcessor: don't exclude Hidden beatmaps here.
-                // Hidden beatmaps can still be attached to sets and may contribute to cache hit rates.
-                foreach (var b in r.All<BeatmapInfo>())
-                {
-                    totalBeatmaps++;
-
-                    bool isMania = b.Ruleset.OnlineID == 3;
-
-                    if (isMania)
-                    {
-                        maniaTotal++;
-                        if (b.Hidden)
-                            maniaHidden++;
-                    }
-
-                    if (totalBeatmaps <= 2000)
-                    {
-                        string key = $"{b.Ruleset.ShortName}:{b.Ruleset.OnlineID}";
-                        rulesetDistribution.TryGetValue(key, out int count);
-                        rulesetDistribution[key] = count + 1;
-                    }
-
-                    if (b.BeatmapSet == null)
-                        continue;
-
-                    totalWithSet++;
-
-                    if (isMania)
-                        maniaWithSet++;
-
-                    beatmaps.Add((b.ID, b.Hash, b.Ruleset.OnlineID));
-                }
-
-                Logger.Log($"Startup scan beatmap summary: total={totalBeatmaps}, total_with_set={totalWithSet}, mania_total={maniaTotal}, mania_with_set={maniaWithSet}, mania_hidden={maniaHidden}",
-                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-
-                if (maniaTotal == 0)
-                {
-                    string dist = string.Join(", ", rulesetDistribution.OrderByDescending(kvp => kvp.Value).Take(10).Select(kvp => $"{kvp.Key}={kvp.Value}"));
-                    Logger.Log($"Startup scan ruleset distribution (first 2000): {dist}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                }
-            });
-
-            if (beatmaps.Count == 0)
-                return;
-
-            if (!sqliteEnabled)
-                return;
-
-            var needingRecompute = analysisDatabase.GetBeatmapsNeedingRecompute(beatmaps);
-
-            if (!sqliteEnabled)
-                return;
+            IReadOnlyList<Guid> needingRecompute = forceAll
+                ? collectAllBeatmapIdsForSqlite()
+                : collectBeatmapsNeedingMainSqliteBackfill();
 
             if (needingRecompute.Count == 0)
             {
@@ -229,14 +286,88 @@ namespace osu.Game.EzOsuGame.Analysis
                 return;
             }
 
+            Logger.Log($"Manual SQLite main rebuild queued {needingRecompute.Count} beatmap(s) (forceAll={forceAll}).",
+                Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+
+            queueBeatmapsForMainSqliteBackfill(needingRecompute);
+        }
+
+        private void executeSqliteSongsBranchesRebuild(bool forceAll)
+        {
+            if (!sqliteEnabled)
+                return;
+
+            var refreshPlans = forceAll
+                ? analysisDatabase.GetAllSongsBranchesForceRefreshPlans()
+                : analysisDatabase.GetSongsBranchesNeedingRefresh();
+
+            runSongsBranchRefreshPlans(refreshPlans);
+        }
+
+        private List<(Guid id, string hash, int rulesetOnlineId)> collectBeatmapDescriptorsForSqlite()
+        {
+            var beatmaps = new List<(Guid id, string hash, int rulesetOnlineId)>();
+
+            realmAccess.Run(r =>
+            {
+                foreach (var b in r.All<BeatmapInfo>())
+                {
+                    if (b.BeatmapSet == null)
+                        continue;
+
+                    if (b.BeatmapSet is { IsExternallyHosted: true })
+                        continue;
+
+                    beatmaps.Add((b.ID, b.Hash, b.Ruleset.OnlineID));
+                }
+            });
+
+            return beatmaps;
+        }
+
+        private IReadOnlyList<Guid> collectBeatmapsNeedingMainSqliteBackfill()
+        {
+            var beatmaps = collectBeatmapDescriptorsForSqlite();
+
+            if (beatmaps.Count == 0 || !sqliteEnabled)
+                return Array.Empty<Guid>();
+
+            return analysisDatabase.GetBeatmapsNeedingRecompute(beatmaps);
+        }
+
+        private IReadOnlyList<Guid> collectAllBeatmapIdsForSqlite()
+        {
+            var beatmapIds = new List<Guid>();
+
+            realmAccess.Run(r =>
+            {
+                foreach (var b in r.All<BeatmapInfo>())
+                {
+                    if (b.BeatmapSet == null)
+                        continue;
+
+                    if (b.BeatmapSet is { IsExternallyHosted: true })
+                        continue;
+
+                    beatmapIds.Add(b.ID);
+                }
+            });
+
+            return beatmapIds;
+        }
+
+        private void queueBeatmapsForMainSqliteBackfill(IReadOnlyList<Guid> beatmapIds)
+        {
             bool shouldSignalStartupWarmup = false;
 
             lock (pendingBeatmapLock)
             {
-                pendingBeatmapIds.Clear();
+                pendingBeatmapQueue.Clear();
+                startupWarmupProcessedCount = 0;
+                lastStartupWarmupProgressReported = -1;
 
-                foreach (Guid id in needingRecompute)
-                    pendingBeatmapIds.Add(id);
+                foreach (Guid id in beatmapIds)
+                    pendingBeatmapQueue.Enqueue(id);
 
                 if (!startupWarmupSignalPending)
                 {
@@ -248,7 +379,137 @@ namespace osu.Game.EzOsuGame.Analysis
             if (shouldSignalStartupWarmup)
                 startupWarmupSignal.Release();
 
-            postWarmupSummaryNotification(needingRecompute.Count);
+            postWarmupSummaryNotification(beatmapIds.Count);
+        }
+
+        private void runSongsBranchRefreshPlans(IReadOnlyList<EzAnalysisDatabase.SongsBranchRefreshPlan> refreshPlans)
+        {
+            if (!sqliteEnabled)
+                return;
+
+            if (refreshPlans.Count == 0)
+            {
+                Logger.Log("No songs branches require xxy/PP refresh.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                return;
+            }
+
+            int totalBeatmaps = refreshPlans.Sum(plan => plan.Branch.Metadata.BeatmapCount);
+            Logger.Log($"Songs branch refresh queued for {refreshPlans.Count} branch(es), ~{totalBeatmaps} beatmap(s).",
+                Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+
+            postSongsBranchRefreshNotification(refreshPlans.Count, totalBeatmaps);
+
+            int totalBranches = refreshPlans.Count;
+
+            for (int branchIndex = 0; branchIndex < totalBranches; branchIndex++)
+            {
+                if (!sqliteEnabled)
+                    return;
+
+                var plan = refreshPlans[branchIndex];
+
+                try
+                {
+                    using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(startupWarmupCancellationSource.Token);
+                    int index = branchIndex;
+                    analysisDatabase.RefreshSongsBranchAsync(plan,
+                        (processed, total) => updateSongsBranchRefreshProgress(index + 1, totalBranches, plan.Branch.Metadata.DisplayName, processed, total),
+                        linkedCancellation.Token).Wait(linkedCancellation.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, $"Songs branch refresh failed for \"{plan.Branch.Metadata.DisplayName}\".", Ez2ConfigManager.LOGGER_NAME);
+                }
+
+                updateSongsBranchRefreshProgress(branchIndex + 1, totalBranches, plan.Branch.Metadata.DisplayName, 0, 0);
+            }
+        }
+
+        private ProgressNotification? songsBranchRefreshProgressNotification;
+        private int lastSongsBranchBeatmapProgressReported = -1;
+
+        private void postSongsBranchRefreshNotification(int branchCount, int totalBeatmaps)
+        {
+            if (notificationOverlay == null || branchCount <= 0)
+                return;
+
+            Schedule(() =>
+            {
+                try
+                {
+                    if (totalBeatmaps < 10)
+                    {
+                        notificationOverlay.Post(new SimpleNotification
+                        {
+                            Text = $"Ez songs branch refresh queued for {branchCount} branch(es)."
+                        });
+                        return;
+                    }
+
+                    var notification = new ProgressNotification
+                    {
+                        Text = $"Ez songs branch refresh queued for {branchCount} branch(es) (~{totalBeatmaps} beatmaps)",
+                        CompletionText = "Songs branch refresh complete",
+                        CancelRequested = () => true,
+                        State = ProgressNotificationState.Active
+                    };
+
+                    songsBranchRefreshProgressNotification = notification;
+                    lastSongsBranchBeatmapProgressReported = -1;
+                    notificationOverlay.Post(notification);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to post songs branch refresh notification.");
+                }
+            });
+        }
+
+        private void updateSongsBranchRefreshProgress(int processedBranches, int totalBranches, string branchDisplayName, int processedBeatmaps, int branchBeatmapTotal)
+        {
+            if (songsBranchRefreshProgressNotification == null)
+                return;
+
+            if (processedBeatmaps > 0 && branchBeatmapTotal > 0)
+            {
+                bool shouldUpdate = processedBeatmaps >= branchBeatmapTotal
+                                    || processedBeatmaps - lastSongsBranchBeatmapProgressReported >= warmup_progress_update_interval;
+
+                if (!shouldUpdate)
+                    return;
+
+                lastSongsBranchBeatmapProgressReported = processedBeatmaps;
+            }
+            else
+            {
+                lastSongsBranchBeatmapProgressReported = -1;
+            }
+
+            Schedule(() =>
+            {
+                try
+                {
+                    if (processedBeatmaps > 0 && branchBeatmapTotal > 0)
+                    {
+                        songsBranchRefreshProgressNotification.Text =
+                            $"Refreshing songs branch \"{branchDisplayName}\" ({processedBeatmaps} of {branchBeatmapTotal}) — branch {processedBranches} of {totalBranches}";
+                        songsBranchRefreshProgressNotification.Progress = (float)processedBeatmaps / branchBeatmapTotal;
+                    }
+                    else if (processedBranches >= totalBranches)
+                    {
+                        songsBranchRefreshProgressNotification.CompletionText = "Songs branch refresh complete";
+                        songsBranchRefreshProgressNotification.State = ProgressNotificationState.Completed;
+                        songsBranchRefreshProgressNotification = null;
+                    }
+                }
+                catch
+                {
+                }
+            });
         }
 
         private void queueSelectedBeatmapRecomputeIfRequired(WorkingBeatmap? workingBeatmap)
@@ -294,8 +555,15 @@ namespace osu.Game.EzOsuGame.Analysis
 
                     while (sqliteEnabled && tryBeginAnyPendingBeatmap(out Guid beatmapId))
                     {
-                        using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, pendingBeatmapRecomputeCancellationSource.Token);
-                        recomputePendingBeatmap(beatmapId, includeTagData: true, skipExistingComparison: true, linkedCancellation.Token, "startup warmup");
+                        try
+                        {
+                            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, pendingBeatmapRecomputeCancellationSource.Token);
+                            recomputePendingBeatmap(beatmapId, skipExistingComparison: true, linkedCancellation.Token, source: "manual sqlite rebuild");
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            return;
+                        }
                     }
                 }
             }
@@ -330,7 +598,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     if (beatmapId.HasValue)
                     {
                         using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, pendingBeatmapRecomputeCancellationSource.Token);
-                        recomputePendingBeatmap(beatmapId.Value, includeTagData: true, skipExistingComparison: false, linkedCancellation.Token, "selected-beatmap warmup");
+                        recomputePendingBeatmap(beatmapId.Value, skipExistingComparison: false, linkedCancellation.Token, source: "selected-beatmap warmup");
                     }
                 }
             }
@@ -339,7 +607,7 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        private void recomputePendingBeatmap(Guid beatmapId, bool includeTagData, bool skipExistingComparison, CancellationToken cancellationToken, string source)
+        private void recomputePendingBeatmap(Guid beatmapId, bool skipExistingComparison, CancellationToken cancellationToken, string source)
         {
             BeatmapInfo? beatmap = null;
 
@@ -354,37 +622,15 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 if (beatmap == null)
                 {
-                    lock (pendingBeatmapLock)
-                        pendingBeatmapIds.Remove(beatmapId);
-
+                    updateStartupWarmupProgressNotification();
                     return;
                 }
 
-                analysisDatabase.BackfillStoredDataAsync(beatmap, includeTagData, skipExistingComparison, cancellationToken)
+                analysisDatabase.BackfillStoredDataAsync(beatmap, skipExistingComparison, cancellationToken)
                                 .GetAwaiter()
                                 .GetResult();
 
-                lock (pendingBeatmapLock)
-                {
-                    pendingBeatmapIds.Remove(beatmapId);
-
-                    int remaining = pendingBeatmapIds.Count;
-
-                    if (startupWarmupProgressNotification != null)
-                    {
-                        int processed = startupWarmupTotalCount > 0 ? startupWarmupTotalCount - remaining : 0;
-                        startupWarmupProgressNotification.Text = $"Ez analysis startup scan queued {startupWarmupTotalCount} beatmaps for recompute ({processed} of {startupWarmupTotalCount})";
-                        startupWarmupProgressNotification.Progress = startupWarmupTotalCount > 0 ? (float)processed / startupWarmupTotalCount : 1;
-
-                        if (remaining <= 0)
-                        {
-                            startupWarmupProgressNotification.CompletionText = $"{startupWarmupTotalCount} beatmaps' analysis recompute complete";
-                            startupWarmupProgressNotification.State = ProgressNotificationState.Completed;
-                            startupWarmupProgressNotification = null;
-                            startupWarmupTotalCount = 0;
-                        }
-                    }
-                }
+                updateStartupWarmupProgressNotification();
 
                 ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
 
@@ -409,13 +655,12 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             lock (pendingBeatmapLock)
             {
-                foreach (Guid pendingBeatmapId in pendingBeatmapIds)
+                while (pendingBeatmapQueue.Count > 0)
                 {
-                    if (!inFlightBeatmapIds.Add(pendingBeatmapId))
-                        continue;
+                    beatmapId = pendingBeatmapQueue.Dequeue();
 
-                    beatmapId = pendingBeatmapId;
-                    return true;
+                    if (inFlightBeatmapIds.Add(beatmapId))
+                        return true;
                 }
             }
 
@@ -426,7 +671,64 @@ namespace osu.Game.EzOsuGame.Analysis
         private int getPendingBeatmapCount()
         {
             lock (pendingBeatmapLock)
-                return pendingBeatmapIds.Count;
+                return pendingBeatmapQueue.Count + inFlightBeatmapIds.Count;
+        }
+
+        private void updateStartupWarmupProgressNotification()
+        {
+            ProgressNotification? notification;
+            int processed;
+            int total;
+
+            lock (pendingBeatmapLock)
+            {
+                startupWarmupProcessedCount++;
+                processed = startupWarmupProcessedCount;
+                total = startupWarmupTotalCount;
+                notification = startupWarmupProgressNotification;
+
+                if (notification == null)
+                    return;
+
+                bool isComplete = total > 0 && processed >= total;
+                bool shouldUpdate = total <= 10
+                                    || isComplete
+                                    || processed - lastStartupWarmupProgressReported >= warmup_progress_update_interval;
+
+                if (!shouldUpdate)
+                    return;
+
+                lastStartupWarmupProgressReported = processed;
+
+                if (isComplete)
+                {
+                    startupWarmupProgressNotification = null;
+                    startupWarmupTotalCount = 0;
+                    startupWarmupProcessedCount = 0;
+                    lastStartupWarmupProgressReported = -1;
+                }
+            }
+
+            Schedule(() =>
+            {
+                try
+                {
+                    if (notification.State == ProgressNotificationState.Cancelled)
+                        return;
+
+                    notification.Text = $"Ez analysis rebuild queued {total} beatmaps for recompute ({processed} of {total})";
+                    notification.Progress = total > 0 ? (float)processed / total : 1;
+
+                    if (processed >= total)
+                    {
+                        notification.CompletionText = $"{total} beatmaps' analysis recompute complete";
+                        notification.State = ProgressNotificationState.Completed;
+                    }
+                }
+                catch
+                {
+                }
+            });
         }
 
         private void cancelPendingBeatmapProcessing()
@@ -435,7 +737,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
             lock (pendingBeatmapLock)
             {
-                pendingBeatmapIds.Clear();
+                pendingBeatmapQueue.Clear();
+                startupWarmupProcessedCount = 0;
+                lastStartupWarmupProgressReported = -1;
                 queuedSelectedBeatmapId = null;
                 startupWarmupSignalPending = false;
                 selectedBeatmapRecomputeSignalPending = false;
@@ -468,7 +772,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     {
                         notificationOverlay.Post(new SimpleNotification
                         {
-                            Text = $"Ez analysis startup scan queued {totalCount} beatmaps for recompute. Background sqlite warmup is still processing {remainingCount} remaining result(s)."
+                            Text = $"Ez analysis rebuild queued {totalCount} beatmaps for recompute. Background sqlite processing is still working through {remainingCount} remaining result(s)."
                         });
 
                         return;
@@ -476,7 +780,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
                     var notification = new ProgressNotification
                     {
-                        Text = $"Ez analysis startup scan queued {totalCount} beatmaps for recompute ({totalCount - remainingCount} of {totalCount})",
+                        Text = $"Ez analysis rebuild queued {totalCount} beatmaps for recompute ({totalCount - remainingCount} of {totalCount})",
                         CompletionText = "beatmaps' analysis recompute is complete",
                         CancelRequested = () =>
                         {
@@ -490,6 +794,8 @@ namespace osu.Game.EzOsuGame.Analysis
                     {
                         startupWarmupProgressNotification = notification;
                         startupWarmupTotalCount = totalCount;
+                        startupWarmupProcessedCount = 0;
+                        lastStartupWarmupProgressReported = -1;
                     }
 
                     notificationOverlay.Post(notification);
@@ -516,6 +822,8 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             if (isDisposing)
             {
+                unsubscribeBdspForSqliteWarmup();
+
                 startupWarmupCancellationSource.Cancel();
                 selectedBeatmapRecomputeCancellationSource.Cancel();
                 pendingBeatmapRecomputeCancellationSource.Cancel();

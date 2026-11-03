@@ -6,15 +6,16 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using osu.Framework.Bindables;
-using osu.Framework.Logging;
 using osu.Framework.Localisation;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.Database;
+using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Online.API;
@@ -25,12 +26,16 @@ using osu.Game.Rulesets.UI;
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
-    /// 选歌分析数据库入口。
+    /// 选歌 Ez 分析持久化入口（主 SQLite + 分支库）。
     ///
-    /// 职责对齐官方选歌读取链路：
-    /// - SQLite 持久化结果作为选歌基线数据源。
-    /// - 运行时分析缓存仅负责当前 ruleset/mods 的动态修正。
-    /// - 启动预热与运行期补算由外部后台处理器驱动，不再挂在 cache 上。
+    /// 开关分工：
+    /// - <see cref="Ez2Setting.EzAnalysisSqliteEnabled"/>：主库与分支库的读写总开关。
+    /// - <see cref="Ez2Setting.EzAnalysisRecEnabled"/>：选歌时是否即时计算/补全 SQLite 体系内指标（经 <see cref="EzAnalysisCache"/>），关闭则只读已落盘数据。
+    ///
+    /// 数据层（见 <see cref="EzSongSelectAnalysisDisplay"/>）：
+    /// - L1 Realm：<see cref="BeatmapInfo.XxyStarRating"/> / <see cref="BeatmapInfo.PerformancePoints"/>，不受上述开关影响。
+    /// - L2 主 SQLite：NoMod kps + mania 列统计（不含 xxy/PP）。
+    /// - 分支库：预生成 Mod 快照 xxy/PP（及关联指标）；激活后只读，构建/刷新走维护流程。
     /// </summary>
     public class EzAnalysisDatabase
     {
@@ -41,13 +46,21 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private readonly EzAnalysisPersistentStore persistentStore;
         private readonly BeatmapManager beatmapManager;
+        private readonly RulesetStore rulesetStore;
         private readonly IBindable<bool> sqliteAnalysisEnabled;
         private readonly Bindable<string?> activeSongsBranchDisplayName = new Bindable<string?>();
         private readonly Bindable<int> activeSongsBranchVersion = new Bindable<int>();
-        private readonly object activeSongsBranchStateLock = new object();
+        private readonly Lock activeSongsBranchStateLock = new Lock();
         private readonly List<ActiveSongsBranchState> activeSongsBranches = new List<ActiveSongsBranchState>();
 
         private readonly record struct ActiveSongsBranchState(string DatabasePath, string DisplayName, int RulesetOnlineId, string ModsFingerprint);
+
+        public readonly record struct SongsBranchRefreshPlan(
+            EzAnalysisPersistentStore.SongsBranchDescriptor Branch,
+            bool RefreshXxy,
+            bool RefreshPp,
+            int CurrentXxyVersion,
+            int CurrentPpVersion);
 
         public readonly record struct SongsBranchBuildResult(
             bool Success,
@@ -57,15 +70,24 @@ namespace osu.Game.EzOsuGame.Analysis
             int RequestedBeatmapCount,
             int StoredBeatmapCount);
 
-        public EzAnalysisDatabase(EzAnalysisPersistentStore persistentStore, BeatmapManager beatmapManager, Ez2ConfigManager ezConfig)
+        public EzAnalysisDatabase(EzAnalysisPersistentStore persistentStore, BeatmapManager beatmapManager, RulesetStore rulesetStore, Ez2ConfigManager ezConfig)
         {
             this.persistentStore = persistentStore;
             this.beatmapManager = beatmapManager;
+            this.rulesetStore = rulesetStore;
 
             sqliteAnalysisEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
         }
 
-        public bool TryGetStoredAnalysis(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out EzAnalysisResult result)
+        /// <summary>
+        /// 主 SQLite 读写是否可用（设置开关与 <see cref="EzAnalysisPersistentStore.Enabled"/> 同时为 true）。
+        /// </summary>
+        public bool IsSqliteAnalysisEnabled => sqliteAnalysisEnabled.Value && EzAnalysisPersistentStore.Enabled;
+
+        /// <summary>
+        /// 读取主 SQLite 中的 kps/KPC 切片（NoMod）。不含 xxy/PP。
+        /// </summary>
+        public bool TryGetStoredSqliteSlice(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out EzAnalysisResult result)
         {
             result = default;
 
@@ -75,21 +97,55 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!tryCreateStoredLookup(beatmapInfo, rulesetInfo, mods: null, out var lookup))
                 return false;
 
-            return persistentStore.TryGet(lookup.BeatmapInfo, out result);
+            return persistentStore.TryGetMemoised(lookup.BeatmapInfo, out result);
+        }
+
+        /// <summary>
+        /// 外部规则集离线分析统一落盘：Realm NoMod 基线（Star/xxy/PP）+ 主 SQLite kps/KPC 切片。
+        /// 调用方负责将规则集私有分析结果转换为 <see cref="EzAnalysisResult"/>。
+        /// </summary>
+        /// <returns><see langword="true"/> when <paramref name="beatmapId"/> exists in Realm and at least one field or slice was written.</returns>
+        public bool TryCommitExternalOfflineAnalysis(RealmAccess realmAccess, Guid beatmapId, in EzExternalBeatmapAnalysisPayload payload)
+        {
+            bool committed = false;
+            var localPayload = payload;
+
+            try
+            {
+                realmAccess.Write(r =>
+                {
+                    var beatmap = r.Find<BeatmapInfo>(beatmapId);
+
+                    if (beatmap == null)
+                        return;
+
+                    if (tryApplyRealmBaseline(beatmap, localPayload))
+                        committed = true;
+
+                    if (tryStoreNoModSlice(beatmap, localPayload.NoModSlice))
+                        committed = true;
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, $"[EzAnalysisDatabase] External offline analysis commit failed for beatmap {beatmapId}.", Ez2ConfigManager.LOGGER_NAME);
+                return false;
+            }
+
+            return committed;
         }
 
         public bool TryGetXxySr(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double xxySr)
         {
             xxySr = 0;
 
-            if (!TryGetStoredAnalysis(beatmapInfo, rulesetInfo, out var result))
-                return false;
+            if (beatmapInfo is BeatmapInfo beatmap && beatmap.XxyStarRating >= 0)
+            {
+                xxySr = beatmap.XxyStarRating;
+                return true;
+            }
 
-            if (result.ManiaSummary?.XxySr is not double storedXxySr)
-                return false;
-
-            xxySr = storedXxySr;
-            return true;
+            return false;
         }
 
         public IBindable<string?> ActiveSongsBranchDisplayName => activeSongsBranchDisplayName;
@@ -132,11 +188,12 @@ namespace osu.Game.EzOsuGame.Analysis
             return getResolvedActiveBranchValues(beatmaps, rulesetInfo, createModsProfileFingerprint(mods), persistentStore.GetSongsBranchPpValues, empty_pp_values);
         }
 
-        public IReadOnlyDictionary<Guid, double> GetStoredXxySrValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
+        /// <summary>
+        /// NoMod 基线 xxy：直读 Realm（对齐 carousel 读 <see cref="BeatmapInfo.StarRating"/>）。
+        /// 有 mod 时仅返回已激活且指纹匹配的分支库值（需 SQLite 开关）。
+        /// </summary>
+        public IReadOnlyDictionary<Guid, double> GetBaselineXxySrFromRealm(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
         {
-            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
-                return empty_xxy_sr_values;
-
             var beatmapList = beatmaps.Distinct().ToList();
 
             if (beatmapList.Count == 0)
@@ -144,43 +201,44 @@ namespace osu.Game.EzOsuGame.Analysis
 
             if (IsActiveSongsBranchFor(rulesetInfo, mods))
             {
+                if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
+                    return empty_xxy_sr_values;
+
                 return getResolvedActiveBranchValues(beatmapList, rulesetInfo, createModsProfileFingerprint(mods), persistentStore.GetSongsBranchValues, empty_xxy_sr_values);
             }
 
             if (mods?.Any() == true)
                 return empty_xxy_sr_values;
 
-            var eligibleBeatmaps = beatmapList.Where(b => CanUseStoredAnalysis(b, rulesetInfo, mods: null)).ToList();
-
-            if (eligibleBeatmaps.Count == 0)
-                return empty_xxy_sr_values;
-
-            var resolvedValues = persistentStore.GetStoredXxySrValues(eligibleBeatmaps);
+            var resolvedValues = persistentStore.GetBaselineXxySrFromRealm(beatmapList);
             return resolvedValues.Count == 0 ? empty_xxy_sr_values : resolvedValues;
         }
 
         public IReadOnlyDictionary<Guid, double> GetStoredPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
         {
-            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
-                return empty_pp_values;
-
             var beatmapList = beatmaps.Distinct().ToList();
 
             if (beatmapList.Count == 0)
                 return empty_pp_values;
 
-            if (IsActiveSongsBranchFor(rulesetInfo, mods))
+            if (IsActiveSongsBranchFor(rulesetInfo, mods)
+                && sqliteAnalysisEnabled.Value
+                && EzAnalysisPersistentStore.Enabled)
+            {
                 return getResolvedActiveBranchValues(beatmapList, rulesetInfo, createModsProfileFingerprint(mods), persistentStore.GetSongsBranchPpValues, empty_pp_values);
+            }
 
             if (mods?.Any() == true)
                 return empty_pp_values;
 
-            var eligibleBeatmaps = beatmapList.Where(b => CanUseStoredAnalysis(b, rulesetInfo, mods)).ToList();
+            var resolvedValues = new Dictionary<Guid, double>();
 
-            if (eligibleBeatmaps.Count == 0)
-                return empty_pp_values;
+            foreach (var beatmap in beatmapList)
+            {
+                if (beatmap.PerformancePoints >= 0)
+                    resolvedValues[beatmap.ID] = beatmap.PerformancePoints;
+            }
 
-            var resolvedValues = persistentStore.GetStoredPpValues(eligibleBeatmaps);
             return resolvedValues.Count == 0 ? empty_pp_values : resolvedValues;
         }
 
@@ -326,7 +384,17 @@ namespace osu.Game.EzOsuGame.Analysis
                 try
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    persistentStore.StoreSongsBranch(databasePath, metadata, rows, sourceCollection, cancellationToken);
+
+                    int xxySrAlgorithmVersion = 0;
+                    int ppAlgorithmVersion = 0;
+
+                    if (EzXxyStarRatingSupport.TryGetXxyStarRatingVersion(localRulesetInfo, out int resolvedXxyVersion))
+                        xxySrAlgorithmVersion = resolvedXxyVersion;
+
+                    if (tryGetOfficialPerformancePointsVersion(localRulesetInfo, out int resolvedPpVersion))
+                        ppAlgorithmVersion = resolvedPpVersion;
+
+                    persistentStore.StoreSongsBranch(databasePath, metadata, rows, sourceCollection, xxySrAlgorithmVersion, ppAlgorithmVersion, cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
 
                     deleteBranchesForSourceCollection(resolvedSourceCollectionId, databasePath);
@@ -459,6 +527,234 @@ namespace osu.Game.EzOsuGame.Analysis
             return persistentStore.GetBeatmapsNeedingRecompute(beatmaps);
         }
 
+        public bool TrySetForceRecompute(bool force)
+        {
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
+                return false;
+
+            return persistentStore.TrySetForceRecompute(force);
+        }
+
+        public bool ShouldRunAutomaticSqliteWarmup()
+        {
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
+                return false;
+
+            string databasePath = persistentStore.GetMainDatabasePath();
+            return EzAnalysisSchemaManager.ShouldRunAutomaticSqliteWarmup(databasePath);
+        }
+
+        public void EnsureInitialised()
+            => persistentStore.Initialise();
+
+        /// <summary>
+        /// 扫描所有分支库：v2+ legacy 库补写版本 meta；v1 迁移后标记全量 refresh；返回 xxy 或 PP 算法落后、需要重算的分支计划。
+        /// </summary>
+        public IReadOnlyList<SongsBranchRefreshPlan> GetSongsBranchesNeedingRefresh()
+        {
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
+                return Array.Empty<SongsBranchRefreshPlan>();
+
+            var plans = new List<SongsBranchRefreshPlan>();
+
+            foreach (var branch in persistentStore.GetAvailableSongsBranches())
+            {
+                var rulesetInfo = rulesetStore.GetRuleset(branch.Metadata.RulesetOnlineId);
+
+                if (rulesetInfo is not RulesetInfo localRulesetInfo)
+                    continue;
+
+                bool supportsXxy = EzXxyStarRatingSupport.TryGetXxyStarRatingVersion(localRulesetInfo, out int currentXxyVersion);
+                bool supportsPp = tryGetOfficialPerformancePointsVersion(localRulesetInfo, out int currentPpVersion);
+
+                if (!supportsXxy && !supportsPp)
+                    continue;
+
+                if (persistentStore.TryGetSongsBranchRequiresPostMigrationRefresh(branch.DatabasePath, out bool requiresPostMigrationRefresh)
+                    && requiresPostMigrationRefresh)
+                {
+                    plans.Add(new SongsBranchRefreshPlan(
+                        branch,
+                        RefreshXxy: supportsXxy,
+                        RefreshPp: supportsPp,
+                        CurrentXxyVersion: supportsXxy ? currentXxyVersion : 0,
+                        CurrentPpVersion: supportsPp ? currentPpVersion : 0));
+                    continue;
+                }
+
+                int effectiveXxy = supportsXxy ? currentXxyVersion : 0;
+                int effectivePp = supportsPp ? currentPpVersion : 0;
+
+                if (persistentStore.SongsBranchContentHashMatches(branch.DatabasePath, branch.Metadata, effectiveXxy, effectivePp))
+                    continue;
+
+                persistentStore.TryGetSongsBranchStoredXxyVersion(branch.DatabasePath, out int storedXxyVersion);
+                persistentStore.TryGetSongsBranchStoredPpVersion(branch.DatabasePath, out int storedPpVersion);
+
+                if (supportsXxy && storedXxyVersion <= 0)
+                    persistentStore.EnsureSongsBranchXxyVersionMeta(branch.DatabasePath, currentXxyVersion);
+
+                if (supportsPp && storedPpVersion <= 0)
+                    persistentStore.EnsureSongsBranchPpVersionMeta(branch.DatabasePath, currentPpVersion);
+
+                // Legacy branches without content_hash get stamped during Ensure* above; re-check before planning work.
+                if (persistentStore.SongsBranchContentHashMatches(branch.DatabasePath, branch.Metadata, effectiveXxy, effectivePp))
+                    continue;
+
+                bool refreshXxy = supportsXxy && persistentStore.SongsBranchNeedsXxyRefresh(storedXxyVersion, currentXxyVersion);
+                bool refreshPp = supportsPp && persistentStore.SongsBranchNeedsPpRefresh(storedPpVersion, currentPpVersion);
+
+                if (refreshXxy || refreshPp)
+                {
+                    plans.Add(new SongsBranchRefreshPlan(
+                        branch,
+                        refreshXxy,
+                        refreshPp,
+                        supportsXxy ? currentXxyVersion : 0,
+                        supportsPp ? currentPpVersion : 0));
+                }
+            }
+
+            return plans;
+        }
+
+        /// <summary>
+        /// 为每个可用分支曲库生成强制 refresh 计划（忽略 stored 版本）。
+        /// </summary>
+        public IReadOnlyList<SongsBranchRefreshPlan> GetAllSongsBranchesForceRefreshPlans()
+        {
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
+                return Array.Empty<SongsBranchRefreshPlan>();
+
+            var plans = new List<SongsBranchRefreshPlan>();
+
+            foreach (var branch in persistentStore.GetAvailableSongsBranches())
+            {
+                var rulesetInfo = rulesetStore.GetRuleset(branch.Metadata.RulesetOnlineId);
+
+                if (rulesetInfo is not RulesetInfo localRulesetInfo)
+                    continue;
+
+                bool supportsXxy = EzXxyStarRatingSupport.TryGetXxyStarRatingVersion(localRulesetInfo, out int currentXxyVersion);
+                bool supportsPp = tryGetOfficialPerformancePointsVersion(localRulesetInfo, out int currentPpVersion);
+
+                if (!supportsXxy && !supportsPp)
+                    continue;
+
+                plans.Add(new SongsBranchRefreshPlan(
+                    branch,
+                    RefreshXxy: supportsXxy,
+                    RefreshPp: supportsPp,
+                    CurrentXxyVersion: supportsXxy ? currentXxyVersion : 0,
+                    CurrentPpVersion: supportsPp ? currentPpVersion : 0));
+            }
+
+            return plans;
+        }
+
+        public Task RefreshSongsBranchAsync(SongsBranchRefreshPlan plan, Action<int, int>? progress = null, CancellationToken cancellationToken = default)
+        {
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
+                return Task.CompletedTask;
+
+            if (!plan.RefreshXxy && !plan.RefreshPp)
+                return Task.CompletedTask;
+
+            return Task.Run(() =>
+            {
+                var rulesetInfo = rulesetStore.GetRuleset(plan.Branch.Metadata.RulesetOnlineId);
+
+                if (rulesetInfo is not RulesetInfo localRulesetInfo)
+                    return;
+
+                var storedRows = persistentStore.ReadAllSongsBranchRows(plan.Branch.DatabasePath);
+
+                if (storedRows.Count == 0)
+                {
+                    persistentStore.EnsureSongsBranchVersionMeta(plan.Branch.DatabasePath, plan.CurrentXxyVersion, plan.CurrentPpVersion);
+                    persistentStore.ClearSongsBranchPostMigrationRefresh(plan.Branch.DatabasePath);
+                    return;
+                }
+
+                var beatmapLookup = buildLocalBeatmapLookup();
+                var mods = restoreModsFromJson(localRulesetInfo, plan.Branch.Metadata.ModsJson);
+                var updatedRows = new List<EzAnalysisPersistentStore.SongsBranchRow>(storedRows.Count);
+                long lastProgressReportAt = Environment.TickCount64;
+
+                for (int i = 0; i < storedRows.Count; i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var storedRow = storedRows[i];
+                    double xxySr = storedRow.XxySr;
+                    double? pp = storedRow.Pp;
+
+                    if (beatmapLookup.TryGetValue(storedRow.BeatmapId, out var beatmap)
+                        && string.Equals(beatmap.Hash, storedRow.BeatmapHash, StringComparison.Ordinal))
+                    {
+                        try
+                        {
+                            var lookup = new EzAnalysisLookupCache(beatmap, localRulesetInfo, mods);
+
+                            if (plan.RefreshXxy
+                                && EzAnalysisComputation.TryComputeXxySr(beatmapManager, lookup, cancellationToken, out double computedXxySr))
+                            {
+                                xxySr = computedXxySr;
+                            }
+
+                            if (plan.RefreshPp
+                                && EzAnalysisComputation.TryComputePerformancePoints(beatmapManager, lookup, cancellationToken, out double computedPp))
+                            {
+                                pp = computedPp;
+                            }
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch (BeatmapInvalidForRulesetException)
+                        {
+                        }
+                        catch (Exception ex)
+                        {
+                            if (Interlocked.Increment(ref songsBranchComputeFailCount) <= 10)
+                            {
+                                Logger.Error(ex,
+                                    $"[EzAnalysisDatabase] RefreshSongsBranchAsync failed. beatmapId={beatmap.ID} branch=\"{plan.Branch.Metadata.DisplayName}\"",
+                                    Ez2ConfigManager.LOGGER_NAME);
+                            }
+                        }
+                    }
+
+                    updatedRows.Add(new EzAnalysisPersistentStore.SongsBranchRow(storedRow.BeatmapId, storedRow.BeatmapHash, storedRow.BeatmapMd5, xxySr, pp));
+
+                    long now = Environment.TickCount64;
+
+                    if (i == 0 || i + 1 == storedRows.Count || now - lastProgressReportAt >= 100)
+                    {
+                        lastProgressReportAt = now;
+                        progress?.Invoke(i + 1, storedRows.Count);
+                    }
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                persistentStore.UpdateSongsBranchRows(
+                    plan.Branch.DatabasePath,
+                    updatedRows,
+                    plan.RefreshXxy ? plan.CurrentXxyVersion : null,
+                    plan.RefreshPp ? plan.CurrentPpVersion : null);
+
+                persistentStore.ClearSongsBranchPostMigrationRefresh(plan.Branch.DatabasePath);
+
+                lock (activeSongsBranchStateLock)
+                {
+                    if (activeSongsBranches.Any(state => string.Equals(state.DatabasePath, plan.Branch.DatabasePath, StringComparison.OrdinalIgnoreCase)))
+                        activeSongsBranchVersion.Value++;
+                }
+            }, cancellationToken);
+        }
+
         public bool NeedsOnDemandBackfill(IBeatmapInfo beatmapInfo)
         {
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
@@ -467,8 +763,7 @@ namespace osu.Game.EzOsuGame.Analysis
             return beatmapInfo is BeatmapInfo localBeatmapInfo && persistentStore.NeedsOnDemandBackfill(localBeatmapInfo);
         }
 
-        public Task<EzAnalysisResult?> BackfillStoredDataAsync(BeatmapInfo beatmapInfo, bool includeTagData = false, bool skipExistingComparison = false,
-                                                               CancellationToken cancellationToken = default)
+        public Task<EzAnalysisResult?> BackfillStoredDataAsync(BeatmapInfo beatmapInfo, bool skipExistingComparison = false, CancellationToken cancellationToken = default)
         {
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
                 return Task.FromResult<EzAnalysisResult?>(null);
@@ -476,11 +771,11 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!tryCreateStoredLookup(beatmapInfo, beatmapInfo.Ruleset, mods: null, out var lookup))
                 return Task.FromResult<EzAnalysisResult?>(null);
 
-            return Task.Run(() => backfillStoredData(beatmapInfo, lookup, includeTagData, skipExistingComparison, cancellationToken), cancellationToken);
+            return Task.Run(() => backfillStoredData(beatmapInfo, lookup, skipExistingComparison, cancellationToken), cancellationToken);
         }
 
         public Task<EzAnalysisResult?> RecomputeStoredAnalysisAsync(BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
-            => BackfillStoredDataAsync(beatmapInfo, includeTagData: false, skipExistingComparison: false, cancellationToken);
+            => BackfillStoredDataAsync(beatmapInfo, skipExistingComparison: false, cancellationToken);
 
         internal static bool CanUseStoredAnalysis(BeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, IEnumerable<Mod>? mods)
         {
@@ -495,8 +790,7 @@ namespace osu.Game.EzOsuGame.Analysis
             return mods == null || !mods.Any();
         }
 
-        private EzAnalysisResult? backfillStoredData(BeatmapInfo beatmapInfo, EzAnalysisLookupCache lookup, bool includeTagData, bool skipExistingComparison,
-                                                     CancellationToken cancellationToken)
+        private EzAnalysisResult? backfillStoredData(BeatmapInfo beatmapInfo, EzAnalysisLookupCache lookup, bool skipExistingComparison, CancellationToken cancellationToken)
         {
             try
             {
@@ -504,24 +798,15 @@ namespace osu.Game.EzOsuGame.Analysis
                     ? existingAnalysis
                     : null;
 
-                var missingData = EzAnalysisPersistentStore.GetMissingData(storedAnalysis, beatmapInfo.Ruleset.OnlineID, includeTagData);
+                var missingData = EzAnalysisPersistentStore.GetMissingData(storedAnalysis, beatmapInfo.Ruleset.OnlineID);
                 bool needsAnalysis = EzAnalysisPersistentStore.RequiresAnalysisComputation(missingData);
-                bool needsTag = includeTagData && (missingData & EzAnalysisPersistentStore.MissingDataKind.Tag) != 0;
 
-                if (!needsAnalysis && !needsTag)
+                if (!needsAnalysis)
                     return storedAnalysis;
 
                 var workingBeatmap = beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo);
 
-                EzAnalysisResult result = needsAnalysis
-                    ? EzAnalysisComputation.Compute(workingBeatmap, lookup, cancellationToken)
-                    : storedAnalysis!.Value;
-
-                if (includeTagData && (needsAnalysis || needsTag))
-                    result = result.WithTagSummary(EzBeatmapTagParser.Parse(workingBeatmap));
-
-                if (!includeTagData && storedAnalysis?.TagSummary != null && result.TagSummary == null)
-                    result = result.WithTagSummary(storedAnalysis.Value.TagSummary);
+                EzAnalysisResult result = EzAnalysisComputation.ComputePersistedSqliteSlice(workingBeatmap, lookup, cancellationToken);
 
                 if (skipExistingComparison)
                     persistentStore.Store(beatmapInfo, result);
@@ -556,6 +841,59 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 return null;
             }
+        }
+
+        private static bool tryApplyRealmBaseline(BeatmapInfo beatmap, in EzExternalBeatmapAnalysisPayload payload)
+        {
+            bool wrote = false;
+
+            if (payload.StarRating is double star && double.IsFinite(star) && star >= 0)
+            {
+                beatmap.StarRating = star;
+                wrote = true;
+            }
+
+            if (payload.XxyStarRating is double xxy && double.IsFinite(xxy) && xxy >= 0)
+            {
+                beatmap.XxyStarRating = xxy;
+                wrote = true;
+            }
+
+            if (payload.PerformancePoints is double pp && double.IsFinite(pp) && pp >= 0)
+            {
+                beatmap.PerformancePoints = pp;
+                wrote = true;
+            }
+
+            return wrote;
+        }
+
+        private bool tryStoreNoModSlice(BeatmapInfo beatmap, EzAnalysisResult? slice)
+        {
+            if (!slice.HasValue)
+                return false;
+
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
+                return false;
+
+            EzAnalysisResult analysis = slice.Value;
+
+            if (analysis.CommonSummary == null)
+                return false;
+
+            if (!hasStorableNoModSlice(analysis))
+                return false;
+
+            persistentStore.Store(beatmap, analysis);
+            return true;
+        }
+
+        private static bool hasStorableNoModSlice(in EzAnalysisResult analysis)
+        {
+            if (analysis.KpsList.Count > 0)
+                return true;
+
+            return analysis.ManiaSummary?.ColumnCounts.Count > 0;
         }
 
         private static bool tryCreateStoredLookup(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, IEnumerable<Mod>? mods, out EzAnalysisLookupCache lookup)
@@ -767,7 +1105,7 @@ namespace osu.Game.EzOsuGame.Analysis
         #region 收藏夹隐藏功能
 
         public bool TryToggleCollectionHidden(Guid collectionId, string collectionName, IEnumerable<string> beatmapMd5Hashes, out LocalisableString message,
-                                              out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
+                                              out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets, long lastModifiedUnixMilliseconds = 0)
         {
             nonHideableBeatmapSets = Array.Empty<BeatmapSetInfo>();
 
@@ -786,12 +1124,14 @@ namespace osu.Game.EzOsuGame.Analysis
             if (hiddenApplied)
                 return tryRestoreCollectionHiddenState(collectionId, collectionName, localBeatmapsByMd5, collectionBeatmaps, out message);
 
-            return tryApplyCollectionHiddenState(collectionId, collectionName, beatmapMd5Hashes, localBeatmapsByMd5, collectionBeatmaps, out message, out nonHideableBeatmapSets);
+            return tryApplyCollectionHiddenState(collectionId, collectionName, beatmapMd5Hashes, localBeatmapsByMd5, collectionBeatmaps, out message, out nonHideableBeatmapSets,
+                lastModifiedUnixMilliseconds);
         }
 
         private bool tryApplyCollectionHiddenState(Guid collectionId, string collectionName, IEnumerable<string> beatmapMd5Hashes,
                                                    IReadOnlyDictionary<string, List<BeatmapInfo>> localBeatmapsByMd5, IReadOnlyList<BeatmapInfo> collectionBeatmaps,
-                                                   out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
+                                                   out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets,
+                                                   long lastModifiedUnixMilliseconds = 0)
         {
             HashSet<Guid> hiddenByOtherSources = getHiddenBeatmapIdsFromOtherSources(localBeatmapsByMd5, excludedCollectionId: collectionId);
             var preexistingHiddenBeatmapIds = new HashSet<Guid>();
@@ -823,7 +1163,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             nonHideableBeatmapSets = nonHideableBeatmapSetList;
 
-            if (!persistentStore.TrySetCollectionHideState(collectionId, true, preexistingHiddenBeatmapIds, beatmapMd5Hashes))
+            if (!persistentStore.TrySetCollectionHideState(collectionId, true, preexistingHiddenBeatmapIds, beatmapMd5Hashes, lastModifiedUnixMilliseconds))
             {
                 nonHideableBeatmapSets = Array.Empty<BeatmapSetInfo>();
                 message = SongsBranchStrings.HIDE_COLLECTION_FAILED;
@@ -1023,6 +1363,80 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 if (wasActive)
                     activateSongsBranch(existingBranch.DatabasePath, existingBranch.Metadata);
+            }
+        }
+
+        private Dictionary<Guid, BeatmapInfo> buildLocalBeatmapLookup()
+        {
+            return beatmapManager.GetAllUsableBeatmapSets()
+                                 .SelectMany(set => set.Beatmaps)
+                                 .GroupBy(beatmap => beatmap.ID)
+                                 .ToDictionary(group => group.Key, group => group.First());
+        }
+
+        private bool tryGetOfficialPerformancePointsVersion(RulesetInfo rulesetInfo, out int version)
+        {
+            version = 0;
+
+            var workingBeatmap = tryGetDifficultyCalculatorWorkingBeatmap();
+            return workingBeatmap != null && EzPerformancePointsSupport.TryGetPerformancePointsVersion(rulesetInfo, workingBeatmap, out version);
+        }
+
+        private IWorkingBeatmap? tryGetDifficultyCalculatorWorkingBeatmap()
+        {
+            var beatmapInfo = beatmapManager.GetAllUsableBeatmapSets()
+                                            .SelectMany(set => set.Beatmaps)
+                                            .FirstOrDefault();
+
+            return beatmapInfo != null ? beatmapManager.GetWorkingBeatmap(beatmapInfo) : null;
+        }
+
+        private static IReadOnlyList<Mod> restoreModsFromJson(RulesetInfo rulesetInfo, string modsJson)
+        {
+            if (string.IsNullOrWhiteSpace(modsJson))
+                return Array.Empty<Mod>();
+
+            try
+            {
+                var apiMods = JsonConvert.DeserializeObject<IEnumerable<APIMod>>(modsJson)?.ToArray();
+
+                if (apiMods == null || apiMods.Length == 0)
+                    return Array.Empty<Mod>();
+
+                var rulesetInstance = rulesetInfo.CreateInstance();
+                var restoredMods = new List<Mod>();
+
+                foreach (var apiMod in apiMods)
+                {
+                    Mod? restoredMod = rulesetInstance.CreateModFromAcronym(apiMod.Acronym);
+
+                    if (restoredMod == null)
+                        continue;
+
+                    foreach (var (_, property) in restoredMod.GetSettingsSourceProperties())
+                    {
+                        string settingKey = property.Name.ToSnakeCase();
+
+                        if (!apiMod.Settings.TryGetValue(settingKey, out object? settingValue))
+                            continue;
+
+                        try
+                        {
+                            restoredMod.CopyAdjustedSetting((IBindable)property.GetValue(restoredMod)!, settingValue);
+                        }
+                        catch
+                        {
+                        }
+                    }
+
+                    restoredMods.Add(restoredMod);
+                }
+
+                return restoredMods;
+            }
+            catch
+            {
+                return Array.Empty<Mod>();
             }
         }
 

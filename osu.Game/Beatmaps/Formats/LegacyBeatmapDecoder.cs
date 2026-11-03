@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using osu.Framework.Extensions;
@@ -60,6 +61,15 @@ namespace osu.Game.Beatmaps.Formats
         /// </summary>
         public bool ApplyOffsets = true;
 
+        /// <summary>
+        /// 是否完全跳过 hitobject。
+        /// </summary>
+        /// <remarks>
+        /// 对齐 osu!stable 的仅读头信息。导入用此读元数据，避免大谱面文件完整物化两次；
+        /// 难度与游玩始终需要真实物件。
+        /// </remarks>
+        public bool SkipHitObjects { get; set; }
+
         private readonly int offset;
 
         public LegacyBeatmapDecoder(int version = LATEST_VERSION)
@@ -81,7 +91,7 @@ namespace osu.Game.Beatmaps.Formats
             return templateBeatmap;
         }
 
-        protected override void ParseStreamInto(LineBufferedReader stream, Beatmap beatmap)
+        protected override void ParseStreamInto(LineBufferedReader stream, bool isPrimaryStream, Beatmap beatmap)
         {
             this.beatmap = beatmap;
             this.beatmap.BeatmapVersion = FormatVersion;
@@ -89,7 +99,7 @@ namespace osu.Game.Beatmaps.Formats
 
             ApplyLegacyDefaults(this.beatmap);
 
-            base.ParseStreamInto(stream, beatmap);
+            base.ParseStreamInto(stream, isPrimaryStream, beatmap);
 
             applyDifficultyRestrictions(beatmap.Difficulty, beatmap);
 
@@ -204,7 +214,7 @@ namespace osu.Game.Beatmaps.Formats
             beatmap.BeatmapInfo.Ruleset = RulesetStore?.GetRuleset(0) ?? beatmap.BeatmapInfo.Ruleset;
         }
 
-        protected override void ParseLine(Beatmap beatmap, Section section, string line)
+        protected override void ParseLine(Beatmap beatmap, Section section, string line, bool isPrimaryStream)
         {
             switch (section)
             {
@@ -237,7 +247,7 @@ namespace osu.Game.Beatmaps.Formats
                     return;
             }
 
-            base.ParseLine(beatmap, section, line);
+            base.ParseLine(beatmap, section, line, isPrimaryStream);
         }
 
         private void handleGeneral(string line)
@@ -316,7 +326,15 @@ namespace osu.Game.Beatmaps.Formats
                 case @"Bookmarks":
                     beatmap.Bookmarks = pair.Value.Split(',').Select(v =>
                     {
-                        bool result = int.TryParse(v, out int val);
+                        bool result = int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out int val);
+                        return new { result, val };
+                    }).Where(p => p.result).Select(p => p.val).ToArray();
+                    break;
+
+                case @"VelocityPresets":
+                    beatmap.SliderVelocityPresets = pair.Value.Split(',').Select(v =>
+                    {
+                        bool result = double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out double val);
                         return new { result, val };
                     }).Where(p => p.result).Select(p => p.val).ToArray();
                     break;
@@ -430,10 +448,6 @@ namespace osu.Game.Beatmaps.Formats
         {
             string[] split = line.Split(',');
 
-            // Until we have full storyboard encoder coverage, let's track any lines which aren't handled
-            // and store them to a temporary location such that they aren't lost on editor save / export.
-            bool lineSupportedByEncoder = false;
-
             if (Enum.TryParse(split[0], out LegacyEventType type))
             {
                 switch (type)
@@ -445,7 +459,6 @@ namespace osu.Game.Beatmaps.Formats
                         if (string.IsNullOrEmpty(beatmap.BeatmapInfo.Metadata.BackgroundFile))
                         {
                             beatmap.BeatmapInfo.Metadata.BackgroundFile = CleanFilename(split[3]);
-                            lineSupportedByEncoder = true;
                         }
 
                         break;
@@ -459,14 +472,12 @@ namespace osu.Game.Beatmaps.Formats
                         if (!SupportedExtensions.VIDEO_EXTENSIONS.Contains(Path.GetExtension(filename).ToLowerInvariant()))
                         {
                             beatmap.BeatmapInfo.Metadata.BackgroundFile = filename;
-                            lineSupportedByEncoder = true;
                         }
 
                         break;
 
                     case LegacyEventType.Background:
                         beatmap.BeatmapInfo.Metadata.BackgroundFile = CleanFilename(split[2]);
-                        lineSupportedByEncoder = true;
                         break;
 
                     case LegacyEventType.Break:
@@ -474,53 +485,55 @@ namespace osu.Game.Beatmaps.Formats
                         double end = Math.Max(start, getOffsetTime(Parsing.ParseDouble(split[2])));
 
                         beatmap.Breaks.Add(new BreakPeriod(start, end));
-                        lineSupportedByEncoder = true;
                         break;
                 }
             }
-
-            if (!lineSupportedByEncoder)
-                beatmap.UnhandledEventLines.Add(line);
         }
 
         private void handleTimingPoint(string line)
         {
             string[] split = line.Split(',');
 
-            double time = getOffsetTime(Parsing.ParseDouble(split[0].Trim()));
+            // Aspire 与损坏导出常写出远超 stable 的 timing 字段：超出 32 位的时间、负拍号分子、未定义采样组。
+            // 拒绝单个字段会丢掉整条控制点及其全部 timing 变更，因此宽松解析并钳制。
+            double time = getOffsetTime(Parsing.ParseDouble(split[0].Trim(), parseLimit: double.MaxValue));
 
             // beatLength is allowed to be NaN to handle an edge case in which some beatmaps use NaN slider velocity to disable slider tick generation (see LegacyDifficultyControlPoint).
-            double beatLength = Parsing.ParseDouble(split[1].Trim(), allowNaN: true);
+            // BMS / 损坏导出可能写出超出固定解析上限的 beatLength（如 6E+16）；接受有限 double，赋值时再钳制。
+            double beatLength = Parsing.ParseDouble(split[1].Trim(), parseLimit: double.MaxValue, allowNaN: true);
 
-            // If beatLength is NaN, speedMultiplier should still be 1 because all comparisons against NaN are false.
-            double speedMultiplier = beatLength < 0 ? 100.0 / -beatLength : 1;
+            // stable 的 BeatLengthAt 仅在继承值为负时相乘。NaN 不满足该判断，
+            // 因此保留红线拍长，本点只用于抑制 tick。
+            double speedMultiplier = stableSpeedMultiplier(beatLength);
 
             TimeSignature timeSignature = TimeSignature.SimpleQuadruple;
-            if (split.Length >= 3)
-                timeSignature = split[2][0] == '0' ? TimeSignature.SimpleQuadruple : new TimeSignature(Parsing.ParseInt(split[2]));
+
+            if (split.Length >= 3 && tryParseLenientInt(split[2], out int numerator) && numerator > 0)
+                timeSignature = numerator == 4 ? TimeSignature.SimpleQuadruple : new TimeSignature(numerator);
 
             LegacySampleBank sampleSet = defaultSampleBank;
-            if (split.Length >= 4)
-                sampleSet = (LegacySampleBank)Parsing.ParseInt(split[3]);
+
+            if (split.Length >= 4 && tryParseLenientInt(split[3], out int sampleBank) && Enum.IsDefined(typeof(LegacySampleBank), sampleBank))
+                sampleSet = (LegacySampleBank)sampleBank;
 
             int customSampleBank = 0;
-            if (split.Length >= 5)
-                customSampleBank = Parsing.ParseInt(split[4]);
+            if (split.Length >= 5 && tryParseLenientInt(split[4], out int parsedCustomSampleBank))
+                customSampleBank = Math.Max(0, parsedCustomSampleBank);
 
             int sampleVolume = defaultSampleVolume;
-            if (split.Length >= 6)
-                sampleVolume = Parsing.ParseInt(split[5]);
+            if (split.Length >= 6 && tryParseLenientInt(split[5], out int parsedVolume))
+                sampleVolume = Math.Clamp(parsedVolume, 0, 100);
 
             bool timingChange = true;
-            if (split.Length >= 7)
+            if (split.Length >= 7 && split[6].Length > 0)
                 timingChange = split[6][0] == '1';
 
             bool kiaiMode = false;
             bool omitFirstBarSignature = false;
 
-            if (split.Length >= 8)
+            if (split.Length >= 8 && tryParseLenientInt(split[7], out int effectFlagsValue))
             {
-                LegacyEffectFlags effectFlags = (LegacyEffectFlags)Parsing.ParseInt(split[7]);
+                var effectFlags = (LegacyEffectFlags)effectFlagsValue;
                 kiaiMode = effectFlags.HasFlag(LegacyEffectFlags.Kiai);
                 omitFirstBarSignature = effectFlags.HasFlag(LegacyEffectFlags.OmitFirstBarLine);
             }
@@ -536,7 +549,9 @@ namespace osu.Game.Beatmaps.Formats
 
                 var controlPoint = CreateTimingControlPoint();
 
-                controlPoint.BeatLength = beatLength;
+                // bindable 下限为 0.6ms。stable 保留写入值；Aspire 从此字段还原。
+                controlPoint.ParsedBeatLength = beatLength;
+                controlPoint.BeatLength = Math.Clamp(beatLength, controlPoint.BeatLengthBindable.MinValue, controlPoint.BeatLengthBindable.MaxValue);
                 controlPoint.TimeSignature = timeSignature;
                 controlPoint.OmitFirstBarLine = omitFirstBarSignature;
 
@@ -606,6 +621,9 @@ namespace osu.Game.Beatmaps.Formats
 
         private void handleHitObject(string line)
         {
+            if (SkipHitObjects)
+                return;
+
             var obj = parser.Parse(line);
             obj.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
 
@@ -613,6 +631,43 @@ namespace osu.Game.Beatmaps.Formats
         }
 
         private int getOffsetTime(int time) => time + (ApplyOffsets ? offset : 0);
+
+        /// <summary>
+        /// 难度点上存储的滑条速度。10–1000 的钳制仍在
+        /// <see cref="LegacyRulesetExtensions.GetPrecisionAdjustedBeatLength"/>，该方法期望此未钳制比值。
+        /// </summary>
+        /// <remarks>
+        /// stable 的 <c>BeatLengthAt</c> 仅在继承值为负时相乘。NaN 非负，
+        /// 因此贡献 1，由独立的 <c>GenerateTicks</c> 标志关闭 tick 生成。
+        /// </remarks>
+        private static double stableSpeedMultiplier(double beatLength)
+        {
+            if (!(beatLength < 0))
+                return 1;
+
+            return 100.0 / -beatLength;
+        }
+
+        /// <summary>
+        /// 解析 timing 点的辅助字段，且不因该字段失败而丢掉整条控制点。
+        /// </summary>
+        /// <remarks>
+        /// 超出 32 位范围的值钳制而非拒绝：该字段只影响元数据（小节线、采样组、音量），
+        /// 丢掉整行也会丢掉它所携带的 timing 与滑条速度变更。
+        /// </remarks>
+        private static bool tryParseLenientInt(string value, out int result)
+        {
+            result = 0;
+
+            if (!double.TryParse(value.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed))
+                return false;
+
+            if (double.IsNaN(parsed))
+                return false;
+
+            result = (int)Math.Clamp(parsed, int.MinValue, int.MaxValue);
+            return true;
+        }
 
         private double getOffsetTime() => ApplyOffsets ? offset : 0;
 

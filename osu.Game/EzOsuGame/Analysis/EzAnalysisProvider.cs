@@ -36,6 +36,23 @@ namespace osu.Game.EzOsuGame.Analysis
         bool TryCompute(in EzAnalysisRequest request, CancellationToken cancellationToken, out IEzAnalysis analysis);
     }
 
+    /// <summary>
+    /// 规则集通过 <see cref="Rulesets.Ruleset.CreateEzAnalysisProvider"/> 返回的实现此接口的 provider，声明支持 xxy 难度。
+    /// 是否对某张谱面计算由 <see cref="SupportsXxyStarRating"/> 决定；sqlite/Realm 仅为存储与消费者，不决定规则集能力。
+    /// </summary>
+    public interface IEzXxyStarRatingSupport
+    {
+        /// <summary>
+        /// yyyyMMdd revision of this ruleset's xxy SR algorithm. Bump when calculation logic changes.
+        /// </summary>
+        int XxyStarRatingVersion { get; }
+
+        /// <summary>
+        /// Whether xxy SR can be calculated for this beatmap (layout, key count, etc.).
+        /// </summary>
+        bool SupportsXxyStarRating(IBeatmap beatmap);
+    }
+
     public static class EzAnalysisFields
     {
         public static readonly EzAnalysisField<double> XXY_SR = new EzAnalysisField<double>("xxy_sr", EzAnalysisScope.XxySr);
@@ -77,6 +94,9 @@ namespace osu.Game.EzOsuGame.Analysis
         public static bool TryCreateProvider(IRulesetInfo rulesetInfo, out IEzAnalysisProvider provider)
         {
             provider = null!;
+
+            if (!EzXxyStarRatingSupport.IsRulesetAvailable(rulesetInfo))
+                return false;
 
             try
             {

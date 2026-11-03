@@ -11,6 +11,7 @@ using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Screens.Select;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
@@ -18,6 +19,7 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Edit;
+using osu.Game.Screens.Footer;
 using osu.Game.Screens.Play;
 using osu.Game.Users;
 using osu.Game.Utils;
@@ -58,6 +60,8 @@ namespace osu.Game.Screens.Select
             sampleConfirmSelection = audio.Samples.Get(@"SongSelect/confirm-selection");
 
             AddInternal(new SongSelectTouchInputDetector());
+            // 常规选曲界面：转盘转动 → 逐格选曲（等价 ↑/↓），见 Ez2Setting.ScratchAxisSongSelectEnabled
+            AddInternal(new EzSongSelectScratchAxisHandler(() => this.IsCurrentScreen()));
         }
 
         public override IEnumerable<OsuMenuItem> GetForwardActions(BeatmapInfo beatmap)
@@ -85,18 +89,20 @@ namespace osu.Game.Screens.Select
             else
                 yield return new OsuMenuItem(SongSelectStrings.RemoveFromPlayed, MenuItemType.Standard, () => beatmaps.MarkNotPlayed(beatmap)) { Icon = FontAwesome.Solid.TimesCircle };
 
-            yield return new OsuMenuItem(SongSelectStrings.ClearAllLocalScores, MenuItemType.Standard, () => dialogOverlay?.Push(new BeatmapClearScoresDialog(beatmap)))
+            yield return new OsuMenuItem(SongSelectStrings.ClearAllLocalScores, MenuItemType.Destructive, () => dialogOverlay?.Push(new BeatmapClearScoresDialog(beatmap)))
             {
                 Icon = FontAwesome.Solid.Eraser
             };
 
             if (beatmaps.CanHide(beatmap))
-                yield return new OsuMenuItem(WebCommonStrings.ButtonsHide.ToSentence(), MenuItemType.Destructive, () => beatmaps.Hide(beatmap));
+                yield return new OsuMenuItem(WebCommonStrings.ButtonsHide.ToSentence(), MenuItemType.Standard, () => beatmaps.Hide(beatmap));
         }
 
         protected override void OnStart()
         {
             if (playerLoader != null) return;
+
+            EzSoloSongSelect.TryBeginQuickRotation(beatmaps, Beatmap.Value, Ruleset, Mods, FilterControl);
 
             modsAtGameplayStart = Mods.Value.Select(m => m.DeepClone()).ToArray();
 
@@ -130,7 +136,7 @@ namespace osu.Game.Screens.Select
             {
                 Player player;
 
-                var replayGeneratingMod = Mods.Value.OfType<ICreateReplayData>().FirstOrDefault();
+                var replayGeneratingMod = Mods.Value.OfType<ICreateReplayData>().FirstOrDefault(m => m is not IConditionalReplayGeneration conditional || conditional.ReplayGenerationEnabled);
 
                 if (replayGeneratingMod != null)
                 {
@@ -155,6 +161,7 @@ namespace osu.Game.Screens.Select
 
         public override void OnResuming(ScreenTransitionEvent e)
         {
+            EzSoloSongSelect.EndSessionIfActive();
             base.OnResuming(e);
             revertMods();
         }
@@ -180,11 +187,10 @@ namespace osu.Game.Screens.Select
 
         private partial class PlayerLoader : Play.PlayerLoader
         {
-            public override bool ShowFooter => !QuickRestart;
-
             public PlayerLoader(Func<Player> createPlayer)
                 : base(createPlayer)
             {
+                FooterContent.Value = ScreenFooterContent.Argon();
             }
         }
     }

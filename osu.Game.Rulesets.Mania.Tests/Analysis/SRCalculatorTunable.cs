@@ -109,7 +109,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         public static double XxySRCalculateCoreTunable(ManiaBeatmap maniaBeatmap, int keyCount, double clockRate = 1.0)
         {
             double[]? cross = CrossMatrixProvider.GetMatrix(keyCount);
-            if (cross == null || cross[0] == -1) throw new NotSupportedException($"Key mode {keyCount}k is not supported by the SR algorithm.");
+            if (cross == null) throw new NotSupportedException($"Key mode {keyCount}k is not supported by the SR algorithm.");
 
             int estimatedNotes = maniaBeatmap.HitObjects.Count;
             if (estimatedNotes == 0) return 0.0;

@@ -6,7 +6,6 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
-using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 
 namespace osu.Game.EzOsuGame.Overlays
@@ -20,12 +19,19 @@ namespace osu.Game.EzOsuGame.Overlays
             Icon = OsuIcon.GameplayB
         };
 
+        protected override bool ShowSubsectionIndex => true;
+
         public EzGameSection()
         {
             Children = new Drawable[]
             {
                 new EzUISettings(),
-                new EzGameSettings(),
+                new EzPetSettings(),
+                new EzGameplaySettings(),
+                new EzQuickRotationSettings(),
+                new EzStdSettings(),
+                new EzGameModeSettings(),
+                new EzSkillSettings(),
                 new ServerSettings(),
                 new EzExperimentalSettings(),
             };

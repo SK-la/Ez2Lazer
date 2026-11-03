@@ -15,7 +15,7 @@ namespace osu.Game.Graphics.Containers.Markdown
         public OsuMarkdownImage(LinkInline linkInline)
             : base($"https://osu.ppy.sh/media-url?url={linkInline.Url}")
         {
-            TooltipText = linkInline.Title;
+            TooltipText = linkInline.Title ?? string.Empty;
         }
     }
 }

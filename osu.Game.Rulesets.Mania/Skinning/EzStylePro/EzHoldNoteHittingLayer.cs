@@ -1,17 +1,14 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
-using osu.Game.EzOsuGame.Configuration;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    internal partial class EzHoldNoteHittingLayer : EzNoteBase
+    public partial class EzHoldNoteHittingLayer : EzNoteBase
     {
         private static readonly BlendingParameters additive_preserve_alpha = new BlendingParameters
         {
@@ -24,9 +21,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         };
 
         public readonly Bindable<bool> IsHitting = new Bindable<bool>();
-        public IBindable<double> HitPosition = null!;
+        // public IBindable<double> HitPosition = null!;
 
-        private TextureAnimation? animation;
+        private Drawable? animation;
 
         public EzHoldNoteHittingLayer()
         {
@@ -36,18 +33,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             Blending = additive_preserve_alpha;
         }
 
-        [BackgroundDependencyLoader]
-        private void load(IEzSkinInfo ezSkinInfo)
-        {
-            HitPosition = ezSkinInfo.HitPosition;
-            HitPosition.BindValueChanged(_ => UpdateDrawable());
-        }
+        // [BackgroundDependencyLoader]
+        // private void load(IEzSkinInfo ezSkinInfo)
+        // {
+        //     HitPosition = ezSkinInfo.HitPosition;
+        //     HitPosition.BindValueChanged(_ => OnDrawableChanged());
+        // }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            Scheduler.AddOnce(UpdateDrawable);
+            Scheduler.AddOnce(OnDrawableChanged);
 
             if (animation == null)
                 UpdateTexture();
@@ -56,10 +53,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             {
                 ClearTransforms();
 
-                if (hitting.NewValue && animation.IsNotNull() && animation.FrameCount > 0)
+                if (hitting.NewValue && animation != null)
                 {
                     Alpha = 1;
-                    animation.Restart();
+
+                    if (animation is TextureAnimation textureAnimation)
+                        textureAnimation.Restart();
                 }
                 else
                 {
@@ -85,34 +84,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
                 if (animation != null)
                 {
-                    if (animation.FrameCount > 0)
-                    {
-                        animation.Loop = true;
-                        AddInternal(animation);
-                        break;
-                    }
+                    if (animation is TextureAnimation textureAnimation)
+                        textureAnimation.Loop = true;
 
-                    animation.Dispose();
+                    AddInternal(animation);
+                    break;
                 }
             }
         }
 
         protected override void UpdateDrawable()
         {
-            float v = -(float)HitPosition.Value - NoteHeight / 2;
+            float v =  -NoteHeight / 2;
             Position = new Vector2(0, v);
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-            {
-                HitPosition.UnbindBindings();
-            }
-
-            base.Dispose(isDisposing);
-
-            animation = null;
         }
     }
 }

@@ -214,11 +214,11 @@ namespace osu.Game.Graphics.Cursor
                 {
                     // 数字和空格使用等宽字体，其他字符使用普通字体
                     bool isDigitOrSpace = char.IsDigit(c) || c == ' ';
-                                            
+
                     text.AddText(c.ToString(), t =>
                     {
                         t.Font = OsuFont.GetFont(weight: FontWeight.Regular, fixedWidth: isDigitOrSpace);
-                        
+
                         // 对于空格字符，确保它不会被优化掉
                         if (c == ' ')
                         {

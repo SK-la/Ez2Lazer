@@ -3,6 +3,8 @@
 
 #nullable disable
 
+using osu.Game.Rulesets.Scoring;
+
 namespace osu.Game.Rulesets.Mania.Objects.Drawables
 {
     public partial class DrawableHoldNoteBody : DrawableManiaHitObject<HoldNoteBody>
@@ -21,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
         }
 
-        // 为Mod提供覆写，未来恢复此改动，使用更合适的方式实现Mod对LN判定的修改
+        // TODO: 为Mod提供覆写，未来恢复此改动，使用更合适的方式实现Mod对LN判定的修改
         internal virtual void TriggerResult(bool hit)
         {
             if (AllJudged) return;
@@ -31,5 +33,14 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             else
                 ApplyMinResult();
         }
+
+        /// <summary>
+        /// 补发瞬态判定：只进统计与 combo，不改变 Body 的判定态（一条 LN 多次断连时用）。
+        /// </summary>
+        /// <remarks>
+        /// 覆写 <see cref="TriggerResult"/> 重定义 Body 语义的 Mod（如无 LN / 全 LN）必须一并覆写本方法：
+        /// 否则每次提前松手都会绕过 Mod 口径补发一条 ComboBreak。
+        /// </remarks>
+        internal virtual void EzDispatchExtraResult(HitResult result) => DispatchNewResult(result);
     }
 }

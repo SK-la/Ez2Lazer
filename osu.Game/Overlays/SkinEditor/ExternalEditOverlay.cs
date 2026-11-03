@@ -13,6 +13,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
+using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
@@ -26,6 +27,7 @@ using osu.Game.Input.Bindings;
 using osu.Game.Localisation;
 using osu.Game.Online.Multiplayer;
 using osu.Game.Screens.OnlinePlay.Match.Components;
+using osu.Game.EzOsuGame.ScriptedSkin;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -49,6 +51,8 @@ namespace osu.Game.Overlays.SkinEditor
         private ExternalEditOperation<SkinInfo>? editOperation;
         private TaskCompletionSource? taskCompletionSource;
         private bool finishingEdit;
+        private bool scriptedEditMode;
+        private string? scriptedDirectory;
 
         protected override bool DimMainContent => false;
 
@@ -106,8 +110,11 @@ namespace osu.Game.Overlays.SkinEditor
             if (taskCompletionSource != null)
                 throw new InvalidOperationException("Cannot start multiple concurrent external edits!");
 
+            if (ScriptedSkinSupport.IsScriptedSkin(skinInfo))
+                throw new InvalidOperationException("Scripted skins must use BeginScripted instead of Realm external editing.");
+
             Show();
-            showSpinner("Mounting external skin...");
+            showSpinner(EditorStrings.ExternalEditExporting);
             setGlobalSkinDisabled(true);
 
             await Task.Delay(500).ConfigureAwait(true);
@@ -120,7 +127,7 @@ namespace osu.Game.Overlays.SkinEditor
             {
                 Logger.Log($"Failed to initialize external edit operation: {ex}", LoggingTarget.Database, LogLevel.Error);
                 setGlobalSkinDisabled(false);
-                Schedule(() => showSpinner("Export failed!"));
+                Schedule(() => showSpinner(EditorStrings.ExportFailed));
                 Scheduler.AddDelayed(Hide, 1000);
                 return Task.FromException(ex);
             }
@@ -131,7 +138,7 @@ namespace osu.Game.Overlays.SkinEditor
                 {
                     new OsuSpriteText
                     {
-                        Text = "Skin is mounted externally",
+                        Text = SkinEditorStrings.SkinMountedExternally,
                         Font = OsuFont.Default.With(size: 30),
                         Anchor = Anchor.TopCentre,
                         Origin = Anchor.TopCentre,
@@ -143,11 +150,11 @@ namespace osu.Game.Overlays.SkinEditor
                         Origin = Anchor.TopCentre,
                         Width = 350,
                         AutoSizeAxes = Axes.Y,
-                        Text = "Any changes made to the exported folder will be imported to the game, including file additions, modifications and deletions.",
+                        Text = EditorStrings.ExternalEditMountedExplanation,
                     },
                     new PurpleRoundedButton
                     {
-                        Text = "Open folder",
+                        Text = EditorStrings.OpenFolder,
                         Width = 350,
                         Anchor = Anchor.TopCentre,
                         Origin = Anchor.TopCentre,
@@ -175,8 +182,79 @@ namespace osu.Game.Overlays.SkinEditor
             return (taskCompletionSource = new TaskCompletionSource()).Task;
         }
 
+        /// <summary>
+        /// Open a scripted skin's on-disk directory for editing without Realm import.
+        /// </summary>
+        public Task<Task> BeginScripted(string scriptDirectory)
+        {
+            if (taskCompletionSource != null)
+                throw new InvalidOperationException("Cannot start multiple concurrent external edits!");
+
+            if (string.IsNullOrEmpty(scriptDirectory) || !Directory.Exists(scriptDirectory))
+                throw new DirectoryNotFoundException($"Scripted skin directory not found: {scriptDirectory}");
+
+            scriptedEditMode = true;
+            scriptedDirectory = scriptDirectory;
+
+            Show();
+            setGlobalSkinDisabled(true);
+
+            Schedule(() =>
+            {
+                flow.Children = new Drawable[]
+                {
+                    new OsuSpriteText
+                    {
+                        Text = "Scripted skin folder",
+                        Font = OsuFont.Default.With(size: 30),
+                        Anchor = Anchor.TopCentre,
+                        Origin = Anchor.TopCentre,
+                    },
+                    new OsuTextFlowContainer
+                    {
+                        Padding = new MarginPadding(5),
+                        Anchor = Anchor.TopCentre,
+                        Origin = Anchor.TopCentre,
+                        Width = 350,
+                        AutoSizeAxes = Axes.Y,
+                        Text = "Edit layout JSON, textures, and other files in the scripted skin folder. Changes are read from disk when you finish.",
+                    },
+                    new PurpleRoundedButton
+                    {
+                        Text = "Open folder",
+                        Width = 350,
+                        Anchor = Anchor.TopCentre,
+                        Origin = Anchor.TopCentre,
+                        Action = openDirectory,
+                        Enabled = { Value = true }
+                    },
+                    new DangerousRoundedButton
+                    {
+                        Text = EditorStrings.FinishEditingExternally,
+                        Width = 350,
+                        Anchor = Anchor.TopCentre,
+                        Origin = Anchor.TopCentre,
+                        Action = () => finish().FireAndForget(),
+                        Enabled = { Value = true }
+                    }
+                };
+            });
+
+            Scheduler.AddDelayed(openDirectory, 1000);
+            return Task.FromResult((taskCompletionSource = new TaskCompletionSource()).Task);
+        }
+
         private void openDirectory()
         {
+            if (scriptedEditMode)
+            {
+                if (string.IsNullOrEmpty(scriptedDirectory))
+                    return;
+
+                gameHost.OpenFileExternally(scriptedDirectory.TrimDirectorySeparator() + Path.DirectorySeparatorChar);
+                return;
+            }
+
             if (editOperation == null)
                 return;
 
@@ -185,7 +263,7 @@ namespace osu.Game.Overlays.SkinEditor
 
         private void tryFinishOnExit()
         {
-            if (editOperation != null && !finishingEdit)
+            if ((editOperation != null || scriptedEditMode) && !finishingEdit)
                 finish().FireAndForget(onSuccess: () => Schedule(() => finishingEdit = false));
         }
 
@@ -198,20 +276,48 @@ namespace osu.Game.Overlays.SkinEditor
 
             Debug.Assert(taskCompletionSource != null);
 
-            showSpinner("Cleaning up...");
+            showSpinner(EditorStrings.ExternalEditCleaningUp);
             await Task.Delay(500).ConfigureAwait(true);
+
+            if (scriptedEditMode)
+            {
+                Schedule(() =>
+                {
+                    setGlobalSkinDisabled(false);
+                    skinManager.ReloadCurrentScriptedSkinIfActive();
+                    Hide();
+                });
+
+                taskCompletionSource.SetResult();
+                taskCompletionSource = null;
+                return;
+            }
 
             try
             {
-                await editOperation!.Finish().ConfigureAwait(false);
+                var imported = await editOperation!.Finish().ConfigureAwait(false);
+
+                if (imported == null)
+                {
+                    Logger.Log("External skin edit finished without importing changes (skin not tracked in Realm).", LoggingTarget.Database, LogLevel.Error);
+                    Schedule(() =>
+                    {
+                        setGlobalSkinDisabled(false);
+                        showSpinner("Import failed!");
+                        Scheduler.AddDelayed(Hide, 1000);
+                    });
+                    taskCompletionSource?.SetException(new InvalidOperationException("Skin import failed because the skin is not tracked in Realm."));
+                    taskCompletionSource = null;
+                    return;
+                }
             }
             catch (Exception ex)
             {
                 Logger.Log($"Failed to finish external edit operation: {ex}", LoggingTarget.Database, LogLevel.Error);
-                showSpinner("Import failed!");
+                showSpinner(EditorStrings.ImportFailed);
                 Scheduler.AddDelayed(Hide, 1000);
                 setGlobalSkinDisabled(false);
-                taskCompletionSource.SetException(ex);
+                taskCompletionSource?.SetException(ex);
                 taskCompletionSource = null;
                 return;
             }
@@ -251,6 +357,8 @@ namespace osu.Game.Overlays.SkinEditor
             {
                 // Set everything to a clean state
                 editOperation = null;
+                scriptedEditMode = false;
+                scriptedDirectory = null;
                 finishingEdit = false;
                 flow.Children = Array.Empty<Drawable>();
             });
@@ -265,7 +373,7 @@ namespace osu.Game.Overlays.SkinEditor
             {
                 case GlobalAction.Back:
                 case GlobalAction.Select:
-                    if (editOperation == null)
+                    if (editOperation == null && !scriptedEditMode)
                         return false;
 
                     finish().FireAndForget();
@@ -275,7 +383,7 @@ namespace osu.Game.Overlays.SkinEditor
             return base.OnPressed(e);
         }
 
-        private void showSpinner(string text)
+        private void showSpinner(LocalisableString text)
         {
             foreach (var b in flow.ChildrenOfType<RoundedButton>())
                 b.Enabled.Value = false;

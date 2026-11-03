@@ -5,23 +5,31 @@
 
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
+using osu.Framework.Development;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Screens.Play;
 using osu.Game.Online;
 using osu.Game.Online.API;
 using osu.Game.Online.Multiplayer;
 using osu.Game.Online.Rooms;
 using osu.Game.Online.Spectator;
+using osu.Game.Overlays;
+using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
+using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Ranking;
 
 namespace osu.Game.Screens.Play
@@ -31,6 +39,11 @@ namespace osu.Game.Screens.Play
     /// </summary>
     public abstract partial class SubmittingPlayer : Player
     {
+        private ReplaySettingsOverlay pauseReplaySettingsOverlay;
+        private PauseSettingsPreviewHint pauseSettingsPreviewHint;
+        private PauseForceResultsButton pauseForceResultsButton;
+        private bool pauseSettingsPreviewActive;
+
         /// <summary>
         /// The token to be used for the current submission. This is fetched via a request created by <see cref="CreateTokenRequest"/>.
         /// </summary>
@@ -49,10 +62,14 @@ namespace osu.Game.Screens.Play
         [CanBeNull]
         private UserStatisticsWatcher userStatisticsWatcher { get; set; }
 
+        [Resolved(canBeNull: true)]
+        [CanBeNull]
+        private INotificationOverlay notifications { get; set; }
+
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; }
 
-        private readonly object scoreSubmissionLock = new object();
+        private readonly Lock scoreSubmissionLock = new Lock();
         private TaskCompletionSource<bool> scoreSubmissionSource;
 
         protected SubmittingPlayer(PlayerConfiguration configuration = null)
@@ -71,6 +88,20 @@ namespace osu.Game.Screens.Play
 
             AddInternal(new PlayerTouchInputDetector());
 
+            GameplayClockContainer.Add(pauseReplaySettingsOverlay = new ReplaySettingsOverlay
+            {
+                Alpha = 0
+            });
+            GameplayClockContainer.Add(pauseSettingsPreviewHint = new PauseSettingsPreviewHint());
+            GameplayClockContainer.Add(pauseForceResultsButton = new PauseForceResultsButton
+            {
+                Action = () =>
+                {
+                    bool durationMet = GameplayClockContainer.CurrentTime >= GameplayState.Beatmap.GetLastObjectTime();
+                    ForceCompleteGameplayAndProgressToResults(!durationMet);
+                },
+            });
+
             // We probably want to move this display to something more global.
             // Probably using the OSD somehow.
             AddInternal(new GameplayOffsetControl
@@ -81,9 +112,59 @@ namespace osu.Game.Screens.Play
             });
         }
 
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            if (DrawableRuleset == null)
+                return;
+
+            PauseOverlay.State.ValueChanged += state =>
+            {
+                bool visible = state.NewValue == Visibility.Visible;
+                pauseReplaySettingsOverlay.Alpha = visible ? 1 : 0;
+
+                if (!visible)
+                {
+                    pauseReplaySettingsOverlay.Expanded.Value = false;
+                    updatePauseSettingsPreview(false);
+                }
+
+                updatePauseForceResultsVisibility();
+            };
+            pauseReplaySettingsOverlay.Alpha = PauseOverlay.State.Value == Visibility.Visible ? 1 : 0;
+            updatePauseForceResultsVisibility();
+
+            pauseReplaySettingsOverlay.Expanded.BindValueChanged(e =>
+            {
+                if (PauseOverlay.State.Value != Visibility.Visible)
+                    return;
+
+                updatePauseSettingsPreview(e.NewValue);
+            });
+        }
+
+        private void updatePauseSettingsPreview(bool previewing)
+        {
+            pauseSettingsPreviewActive = previewing;
+            PauseOverlay.SetSettingsPreviewMode(previewing);
+            pauseSettingsPreviewHint.SetVisible(previewing);
+            updatePauseForceResultsVisibility();
+        }
+
+        private void updatePauseForceResultsVisibility()
+        {
+            if (pauseForceResultsButton == null)
+                return;
+
+            bool pauseVisible = PauseOverlay.State.Value == Visibility.Visible;
+            bool show = pauseVisible && !pauseSettingsPreviewActive && ShouldShowPauseForceResultsButton();
+            pauseForceResultsButton.SetVisible(show);
+        }
+
         protected override GameplayClockContainer CreateGameplayClockContainer(WorkingBeatmap beatmap, double gameplayStart) => new MasterGameplayClockContainer(beatmap, gameplayStart)
         {
-            ShouldValidatePlaybackRate = true,
+            ShouldValidatePlaybackRate = !DebugUtils.IsNUnitRunning,
         };
 
         protected override void LoadAsyncComplete()
@@ -110,9 +191,9 @@ namespace osu.Game.Screens.Play
                 return true;
             }
 
-            if (!api.IsLoggedIn)
+            if (!api.IsLoggedIn || api.State.Value == APIState.Failing)
             {
-                handleTokenFailure(new InvalidOperationException("API is not online."));
+                handleTokenFailure(new InvalidOperationException("Online functionality is not available."), displayNotification: api.State.Value == APIState.Failing);
                 return false;
             }
 
@@ -149,13 +230,13 @@ namespace osu.Game.Screens.Play
                 if (displayNotification || shouldExit)
                 {
                     string whatWillHappen = shouldExit
-                        ? "Play in this state is not permitted."
-                        : "Your score will not be submitted.";
+                        ? "Cannot start play"
+                        : "Score will not be submitted";
 
                     if (string.IsNullOrEmpty(exception.Message))
-                        Logger.Error(exception, $"Failed to retrieve a score submission token.\n\n{whatWillHappen}");
+                        notifications?.Post(new ScoreSubmissionFailureNotification(whatWillHappen, "Failed to retrieve a score submission token."));
                     else
-                        Logger.Log($"{getUserFacingAPIError(exception)}\n\n{whatWillHappen}", level: LogLevel.Important);
+                        notifications?.Post(new ScoreSubmissionFailureNotification(whatWillHappen, getUserFacingAPIError(exception)));
                 }
 
                 if (shouldExit)
@@ -176,24 +257,24 @@ namespace osu.Game.Screens.Play
         /// <returns>Whether gameplay should be immediately exited as a result. Returning false allows the gameplay session to continue. Defaults to true.</returns>
         protected virtual bool ShouldExitOnTokenRetrievalFailure(Exception exception) => true;
 
-        // 重写允许在游戏过程中调整关键设置（如速度修改器）大于10秒后、非休息时间且未暂停时不允许调整
-        // public override bool AllowCriticalSettingsAdjustment
-        // {
-        //     get
-        //     {
-        //         // General limitations to ensure players don't do anything too weird.
-        //         // These match stable for now.
-        //
-        //         // TODO: the blocking conditions should probably display a message.
-        //         if (!IsBreakTime.Value && GameplayClockContainer.CurrentTime - GameplayClockContainer.GameplayStartTime > 10000)
-        //             return false;
-        //
-        //         if (GameplayClockContainer.IsPaused.Value)
-        //             return false;
-        //
-        //         return base.AllowCriticalSettingsAdjustment;
-        //     }
-        // }
+        public override bool AllowCriticalSettingsAdjustment
+        {
+            get
+            {
+                // General limitations to ensure players don't do anything too weird.
+                // These match stable for now.
+
+                // 重写允许在游戏过程中调整关键设置（如速度修改器）大于10秒后、非休息时间且未暂停时不允许调整
+                // TODO: the blocking conditions should probably display a message.
+                // if (!IsBreakTime.Value && GameplayClockContainer.CurrentTime - GameplayClockContainer.GameplayStartTime > 10000)
+                //     return false;
+
+                if (GameplayClockContainer.IsPaused.Value)
+                    return false;
+
+                return base.AllowCriticalSettingsAdjustment;
+            }
+        }
 
         protected override async Task PrepareScoreForResultsAsync(Score score)
         {
@@ -202,7 +283,7 @@ namespace osu.Game.Screens.Play
             score.ScoreInfo.Date = DateTimeOffset.Now;
 
             await submitScore(score).ConfigureAwait(false);
-            spectatorClient.EndPlaying(GameplayState);
+            spectatorClient.EndPlaying(token, GameplayState);
             userStatisticsWatcher?.RegisterForStatisticsUpdateAfter(score.ScoreInfo);
         }
 
@@ -211,6 +292,8 @@ namespace osu.Game.Screens.Play
 
         protected override void StartGameplay()
         {
+            EzOnlineScoreSubmissionPolicy.ApplySessionSettingsSnapshot(Score.ScoreInfo, ezConfig);
+
             base.StartGameplay();
 
             // User expectation is that last played should be updated when entering the gameplay loop
@@ -218,8 +301,7 @@ namespace osu.Game.Screens.Play
             realm.WriteAsync(r =>
             {
                 var realmBeatmap = r.Find<BeatmapInfo>(Beatmap.Value.BeatmapInfo.ID);
-                if (realmBeatmap != null)
-                    realmBeatmap.LastPlayed = DateTimeOffset.Now;
+                realmBeatmap?.LastPlayed = DateTimeOffset.Now;
             });
 
             spectatorClient.BeginPlaying(token, GameplayState, Score);
@@ -246,11 +328,15 @@ namespace osu.Game.Screens.Play
         public override bool OnExiting(ScreenExitEvent e)
         {
             bool exiting = base.OnExiting(e);
-            submitFromFailOrQuit(Score);
+
+            // Passed plays already submit in PrepareScoreForResultsAsync; avoid a second submitScore that reads post-results settings.
+            if (GameplayState != null && (GameplayState.HasFailed || GameplayState.HasQuit))
+                submitFromFailOrQuit(Score);
+
             statics.SetValue(Static.LastLocalUserScore, Score?.ScoreInfo.DeepClone());
 
-            // 生成延迟报告
-            LatencyTracker?.GenerateLatencyReport();
+            // 退出：只打日志，不推送（打完一局的 toast 在 Results/抽卡/心流路径）
+            LatencyTracker?.GenerateLatencyReport(postNotification: false);
 
             return exiting;
         }
@@ -265,7 +351,7 @@ namespace osu.Game.Screens.Play
                 Task.Run(async () =>
                 {
                     await submitScore(scoreCopy).ConfigureAwait(false);
-                    spectatorClient.EndPlaying(GameplayState);
+                    spectatorClient.EndPlaying(token, GameplayState);
                 }).FireAndForget();
             }
         }
@@ -295,32 +381,9 @@ namespace osu.Game.Screens.Play
                 return Task.CompletedTask;
             }
 
-            var accCutoffABindable = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffA);
-            var accCutoffSBindable = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffS);
-            bool hasDefaultCutoffValues = accCutoffABindable.IsDefault || accCutoffSBindable.IsDefault;
-            // 如果当前所选的 HitMode 不是 Lazer，则强制跳过上传成绩
-            var hitMode = ezConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-
-            if (Ruleset.Value.OnlineID == 3 && (hitMode != EzEnumHitMode.Lazer || !hasDefaultCutoffValues))
+            if (!EzOnlineScoreSubmissionPolicy.AllowsOfficialSubmission(score.ScoreInfo, out string blockReason))
             {
-                Logger.Log($"[EzMania]Score submission blocked by custom rating settings (HitMode={hitMode}, CutoffA={accCutoffABindable.Value:0.####}, CutoffS={accCutoffSBindable.Value:0.####})."
-                  , Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                return Task.CompletedTask;
-            }
-
-            // 如果任一 offsetPlus 设置非0，则禁止上传成绩以防止不公平的分数提交
-            var offsetManiaBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
-            var offsetNonStdBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania);
-
-            if (Ruleset.Value.OnlineID == 3 && !offsetManiaBindable.IsDefault)
-            {
-                Logger.Log("[EzMania]Score submission blocked by offset settings.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                return Task.CompletedTask;
-            }
-
-            if (Ruleset.Value.OnlineID != 3 && !offsetNonStdBindable.IsDefault)
-            {
-                Logger.Log("[EzNoMania]Score submission blocked by offset settings.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                Logger.Log($"[Ez] Score submission blocked by session snapshot ({blockReason}).", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return Task.CompletedTask;
             }
 
@@ -363,6 +426,8 @@ namespace osu.Game.Screens.Play
             {
                 score.ScoreInfo.OnlineID = s.ID;
                 score.ScoreInfo.Position = s.Position;
+
+                queueEzManiaMetadataSubmission(score, s.ID);
 
                 scoreSubmissionSource.SetResult(true);
                 Logger.Log($"Score submission completed! (token:{token.Value} id:{s.ID})");

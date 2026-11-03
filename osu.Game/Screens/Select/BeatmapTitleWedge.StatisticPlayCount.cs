@@ -68,7 +68,7 @@ namespace osu.Game.Screens.Select
                 private void load()
                 {
                     AutoSizeAxes = Axes.Both;
-                    CornerRadius = 10;
+                    CornerRadius = CORNER_RADIUS;
                     Masking = true;
 
                     EdgeEffect = new EdgeEffectParameters

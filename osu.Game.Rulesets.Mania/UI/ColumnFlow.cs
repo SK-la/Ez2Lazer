@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using osu.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
@@ -12,9 +11,8 @@ using osu.Framework.Layout;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
-using osu.Game.Rulesets.Mania.Skinning;
+using osu.Game.Rulesets.Mania.EzMania;
 using osu.Game.Skinning;
-using osuTK;
 
 namespace osu.Game.Rulesets.Mania.UI
 {
@@ -33,6 +31,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private readonly FillFlowContainer<Container<TContent>> columns;
         private readonly StageDefinition stageDefinition;
+        private readonly int displayColumns;
 
         public new bool Masking
         {
@@ -45,7 +44,8 @@ namespace osu.Game.Rulesets.Mania.UI
         public ColumnFlow(StageDefinition stageDefinition)
         {
             this.stageDefinition = stageDefinition;
-            Content = new TContent[stageDefinition.Columns];
+            displayColumns = ManiaPlayfieldLayoutHelper.GetDisplayColumnCount(stageDefinition);
+            Content = new TContent[displayColumns];
 
             AutoSizeAxes = Axes.X;
 
@@ -58,7 +58,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 Direction = FillDirection.Horizontal,
             };
 
-            for (int i = 0; i < stageDefinition.Columns; i++)
+            for (int i = 0; i < displayColumns; i++)
                 columns.Add(new Container<TContent> { RelativeSizeAxes = Axes.Y });
 
             AddLayout(layout);
@@ -123,74 +123,31 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void updateColumnSize()
         {
-            float mobileAdjust = 1f;
+            float mobileAdjust = ManiaPlayfieldLayoutHelper.CalculateMobileAdjust(
+                stageDefinition.Columns,
+                mobileLayout.Value,
+                this.FindClosestParent<Stage>()?.Parent?.DrawSize);
 
-            if (RuntimeInfo.IsMobile && mobileLayout.Value == ManiaMobileLayout.LandscapeExpandedColumns)
+            for (int i = 0; i < displayColumns; i++)
             {
-                // GridContainer+CellContainer containing this stage (gets split up for dual stages).
-                Vector2? containingCell = this.FindClosestParent<Stage>()?.Parent?.DrawSize;
+                var columnSize = ManiaPlayfieldLayoutHelper.CalculateColumnSize(
+                    i,
+                    stageDefinition.Columns,
+                    skin,
+                    skinManager,
+                    ezSkinConfig,
+                    mobileAdjust,
+                    applyGlobalWidthSettings: true);
 
-                // Will be null in tests.
-                if (containingCell != null && containingCell.Value.X >= containingCell.Value.Y)
-                {
-                    float aspectRatio = containingCell.Value.X / containingCell.Value.Y;
-
-                    // 2.83 is a mostly arbitrary scale-up (170 / 60, based on original implementation for argon)
-                    mobileAdjust = 2.83f * Math.Min(1, 7f / stageDefinition.Columns);
-                    // 1.92 is a "reference" mobile screen aspect ratio for phones.
-                    // We should scale it back for cases like tablets which aren't so extreme.
-                    mobileAdjust *= aspectRatio / 1.92f;
-                }
-            }
-
-            for (int i = 0; i < stageDefinition.Columns; i++)
-            {
-                float leftSpacing = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                                            new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.LeftColumnSpacing, i))
-                                        ?.Value ?? Stage.COLUMN_SPACING;
-
-                float rightSpacing = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                                             new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.RightColumnSpacing, i))
-                                         ?.Value ?? Stage.COLUMN_SPACING;
-
-                columns[i].Margin = new MarginPadding { Left = leftSpacing, Right = rightSpacing };
-
-                float? width = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                                       new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnWidth, i))
-                                   ?.Value;
-
-                if (width == 0)
+                if (columnSize.Width == 0)
                 {
                     columns[i].Width = 0;
                     columns[i].Margin = new MarginPadding { Left = 0, Right = 0 };
-
                     continue;
                 }
 
-                bool isSpecialColumn = ezSkinConfig.IsSpecialColumnFast(stageDefinition.Columns, i);
-                float ezWidth = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1);
-
-                switch (ezColumnWidthStyle.Value)
-                {
-                    case ColumnWidthStyle.EzSkinOnly:
-                        var skinInfoType = skinManager.CurrentSkinInfo.Value.GetType();
-                        if (skinInfoType == typeof(EzStyleProSkin) || skinInfoType == typeof(Ez2Skin) || skinInfoType == typeof(SbISkin))
-                            width = ezWidth;
-                        break;
-
-                    case ColumnWidthStyle.GlobalWidth:
-                        width = ezWidth;
-                        break;
-
-                    case ColumnWidthStyle.GlobalTotalWidth:
-                        width = ezWidth * 10 / stageDefinition.Columns;
-                        break;
-                }
-
-                // only used by default skin (legacy skins get defaults set in LegacyManiaSkinConfiguration)
-                width ??= isSpecialColumn ? Column.SPECIAL_COLUMN_WIDTH : Column.COLUMN_WIDTH;
-
-                columns[i].Width = width.Value * mobileAdjust;
+                columns[i].Width = columnSize.Width;
+                columns[i].Margin = columnSize.Margin;
             }
         }
 

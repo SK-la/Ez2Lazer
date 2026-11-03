@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -11,6 +11,7 @@ using osu.Framework.Development;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.IPC;
 using osu.Game.Tournament;
 using SDL;
@@ -33,10 +34,14 @@ namespace osu.Desktop
         [STAThread]
         public static void Main(string[] args)
         {
+            // 第一件事：把 +Nms 的零点钉在进程启动，之后所有启动分段才可与别的启动横向比较。
+            EzStartupTrace.MarkProcessStart();
+
             // IMPORTANT DON'T IGNORE: For general sanity, velopack's setup needs to run before anything else.
             // This has bitten us in the rear before (bricked updater), and although the underlying issue from
             // last time has been fixed, let's not tempt fate.
             setupVelopack(args);
+            EzStartupTrace.LogDiagnostic("Velopack setup complete");
 
             if (OperatingSystem.IsWindows())
             {
@@ -53,20 +58,21 @@ namespace osu.Desktop
                         // We could also better detect compatibility mode if required:
                         // https://stackoverflow.com/questions/10744651/how-i-can-detect-if-my-application-is-running-under-compatibility-mode#comment58183249_10744730
                         SDL3.SDL_ShowSimpleMessageBox(SDL_MessageBoxFlags.SDL_MESSAGEBOX_ERROR,
-                            "Your operating system is too old to run osu!"u8,
-                            "This version of osu! requires at least Windows 8.1 to run.\n"u8
-                            + "Please upgrade your operating system or consider using an older version of osu!.\n\n"u8
-                            + "If you are running a newer version of windows, please check you don't have \"Compatibility mode\" turned on for osu!"u8, null);
+                            "Your operating system is too old to run Ez2Lazer"u8,
+                            "This version of Ez2Lazer requires at least Windows 8.1 to run.\n"u8
+                            + "Please upgrade your operating system or consider using an older version of Ez2Lazer.\n\n"u8
+                            + "If you are running a newer version of windows, please check you don't have \"Compatibility mode\" turned on for Ez2Lazer"u8, null);
                         return;
                     }
                 }
             }
 
             // NVIDIA profiles are based on the executable name of a process.
-            // Lazer and stable share the same executable name.
-            // Stable sets this setting to "Off", which may not be what we want, so let's force it back to the default "Auto" on startup.
             if (OperatingSystem.IsWindows())
                 NVAPI.ThreadedOptimisations = NvThreadControlSetting.OGL_THREAD_CONTROL_DEFAULT;
+
+            // This is a safe default. Localised usages should specify lower values as required.
+            AppDomain.CurrentDomain.SetData("REGEX_DEFAULT_MATCH_TIMEOUT", TimeSpan.FromMilliseconds(1000));
 
             // Back up the cwd before DesktopGameHost changes it
             string cwd = Environment.CurrentDirectory;
@@ -99,6 +105,13 @@ namespace osu.Desktop
                 }
             }
 
+            // GC 形态只能在进程启动时确定。若用户的实验设置与当前进程不符，则带环境变量重入并退出本进程。
+            // 必须在创建 host（占用 IPC 单实例锁）之前完成，否则新进程会因单实例冲突而自行退出。
+            if (EzGcModeBootstrap.EnsureRequestedGcMode(gameName, args))
+                return;
+
+            EzStartupTrace.LogDiagnostic("Host options resolved");
+
             var hostOptions = new HostOptions
             {
                 IPCPipeName = !tournamentClient ? OsuGame.IPC_PIPE_NAME : null,
@@ -115,7 +128,7 @@ namespace osu.Desktop
                     // we want to allow multiple instances to be started when in debug.
                     if (!DebugUtils.IsDebugBuild)
                     {
-                        Logger.Log(@"osu! does not support multiple running instances.", LoggingTarget.Runtime, LogLevel.Error);
+                        Logger.Log(@"Ez2Lazer does not support multiple running instances.", LoggingTarget.Runtime, LogLevel.Error);
                         return;
                     }
                 }
@@ -135,9 +148,13 @@ namespace osu.Desktop
                 }
 
                 if (tournamentClient)
+                {
+                    EzStartupTrace.LogDiagnostic("Host.Run begin (tournament)");
                     host.Run(new TournamentGame());
+                }
                 else
                 {
+                    EzStartupTrace.LogDiagnostic("Host.Run begin");
                     host.Run(new OsuGameDesktop(args)
                     {
                         IsFirstRun = isFirstRun,

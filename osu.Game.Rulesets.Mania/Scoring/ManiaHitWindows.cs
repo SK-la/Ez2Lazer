@@ -1,15 +1,16 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
+using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Scoring
 {
-    public readonly record struct ManiaModifyHitRange(double Perfect, double Great, double Good, double Ok, double Meh, double Miss, double Poor = 0);
+    public readonly record struct ManiaModifyHitRange(double Perfect, double Great, double Good, double Ok, double Meh, double Miss);
 
     /// <summary>
     /// 提供给Mod，实现自定义判定区间后刷新显示
@@ -31,13 +32,12 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private double speedMultiplier = 1;
 
-        public static double PerfectRange;
-        public static double GreatRange;
-        public static double GoodRange;
-        public static double OkRange;
-        public static double MehRange;
-        public static double MissRange;
-        public static double PoorRange;
+        private double perfectRange;
+        private double greatRange;
+        private double goodRange;
+        private double okRange;
+        private double mehRange;
+        private double missRange;
 
         /// <summary>
         /// Multiplier used to compensate for the playback speed of the track speeding up or slowing down.
@@ -77,6 +77,11 @@ namespace osu.Game.Rulesets.Mania.Scoring
         }
 
         private double totalMultiplier => speedMultiplier / difficultyMultiplier;
+
+        /// <summary>
+        /// Speed / difficulty 合成乘数（O2 press-time 判定用）。
+        /// </summary>
+        public double TotalMultiplier => totalMultiplier;
 
         private double overallDifficulty;
 
@@ -120,7 +125,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         /// <summary>
         /// 用于静态Mod覆写，设置后切换自定义判定区间
-        /// <see cref="WindowFor"/>将返回这些值，不受实例级计算影响。
         /// </summary>
         private static ManiaModifyHitRange? modOverride;
 
@@ -133,9 +137,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private double ok;
         private double meh;
         private double miss;
-        private double poor;
 
-        private static double bpm;
+        private double bpm;
 
         public double BPM
         {
@@ -143,18 +146,49 @@ namespace osu.Game.Rulesets.Mania.Scoring
             set
             {
                 bpm = value;
-                setHitMode();
+                setJudgeMode();
                 updateWindows();
             }
         }
 
-        public bool AllowPoorEnabled => GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.BmsPoorHitResultEnable);
+        private bool? poorEnabled;
 
-        public ManiaHitWindows()
+        /// <summary>
+        /// KPoor / <see cref="HitResult.Poor"/> 是否可用。与判定同源：BMS 系列血量模式 + BmsPoor 开关
+        /// （<see cref="HealthModeHelper.ComputeKPoorEnabled"/>）。只看开关会让选歌 wedge 等展示在任意模式下都列出 KPoor。
+        /// </summary>
+        /// <remarks>
+        /// 默认惰性取本机当前设置，供没有当局环境的展示路径消费（选歌 wedge、局内误差条）。
+        /// 当局 gameplay 由 <c>ManiaWindowBaker</c> 按冻结环境写入，之后不再跟随设置变更（回放取成绩里嵌入的血量模式）。
+        /// </remarks>
+        public bool PoorEnabled
         {
+            get => poorEnabled ??= HealthModeHelper.ComputeKPoorEnabled(
+                GlobalConfigStore.EzConfig.Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode),
+                GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.BmsPoorHitResultEnable));
+            set => poorEnabled = value;
+        }
+
+        /// <summary>
+        /// 当前 Mania 判定模式（统计与窗口逻辑会依赖此值）。
+        /// </summary>
+        public EzEnumJudgeMode ActiveJudgeMode { get; private set; }
+
+        // 模式的唯一来源是本对象的 ActiveJudgeMode（构造参数 / SetJudgeMode）。默认用 Lazer 起步只为满足字段初始化，
+        // 构造体随后立刻用 ActiveJudgeMode 覆盖；不要让默认值再去回读全局配置。
+        private readonly JudgeModeHelper helper = new JudgeModeHelper(EzEnumJudgeMode.Lazer);
+
+        public ManiaHitWindows(EzEnumJudgeMode? judgeModeOverride = null)
+        {
+            ActiveJudgeMode = judgeModeOverride ?? GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
+            helper.JudgeMode = ActiveJudgeMode;
             updateWindows();
         }
 
+        /// <summary>
+        /// 仅冷路径消费（<see cref="osu.Game.Rulesets.Scoring.HitWindows.GetAllAvailableWindows"/> 展示、选歌 wedge、局内误差条）。
+        /// 判定热路径不经过这里：非 Lazer 走 helper.ResultFor 直接比区间；Lazer 下六个标准判定恒有效。
+        /// </summary>
         public override bool IsHitResultAllowed(HitResult result)
         {
             switch (result)
@@ -165,13 +199,23 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case HitResult.Ok:
                 case HitResult.Meh:
                 case HitResult.Miss:
-                    return true;
+                    // 直接查静态有效判定表（单一数据源），无需额外的 per-result switch 副本。
+                    var valid = JudgeModeHelper.GetJudgeModeValidHitResults(ActiveJudgeMode);
+
+                    for (int i = 0; i < valid.Count; i++)
+                    {
+                        if (valid[i] == result)
+                            return true;
+                    }
+
+                    return false;
 
                 case HitResult.Poor:
-                    return AllowPoorEnabled;
-            }
+                    return PoorEnabled;
 
-            return false;
+                default:
+                    return false;
+            }
         }
 
         public override void SetDifficulty(double difficulty)
@@ -182,13 +226,12 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private void modifyManiaHitRange(double[] difficultyRangeArray)
         {
-            PerfectRange = difficultyRangeArray[0];
-            GreatRange = difficultyRangeArray[1];
-            GoodRange = difficultyRangeArray[2];
-            OkRange = difficultyRangeArray[3];
-            MehRange = difficultyRangeArray[4];
-            MissRange = difficultyRangeArray[5];
-            PoorRange = difficultyRangeArray[6] == 0 ? MissRange : difficultyRangeArray[6];
+            perfectRange = difficultyRangeArray[0];
+            greatRange = difficultyRangeArray[1];
+            goodRange = difficultyRangeArray[2];
+            okRange = difficultyRangeArray[3];
+            mehRange = difficultyRangeArray[4];
+            missRange = difficultyRangeArray[5];
         }
 
         public void ResetRange()
@@ -197,36 +240,42 @@ namespace osu.Game.Rulesets.Mania.Scoring
             updateWindows();
         }
 
-        private static readonly CustomHitWindowsHelper custom_helper = new CustomHitWindowsHelper();
-
-        private bool setHitMode()
+        private bool setJudgeMode()
         {
-            EzEnumHitMode hitMode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            // 需要先更新属性，保证数值同步
+            helper.IsConvert = isConvert;
+            helper.JudgeMode = ActiveJudgeMode;
+            helper.OverallDifficulty = overallDifficulty;
+            helper.TotalMultiplier = totalMultiplier;
 
-            if (hitMode == EzEnumHitMode.Lazer)
+            if (ActiveJudgeMode == EzEnumJudgeMode.O2Jam)
+                helper.BPM = BPM;
+
+            if (ActiveJudgeMode == EzEnumJudgeMode.Lazer)
                 return false;
 
-            if (hitMode == EzEnumHitMode.O2Jam)
-                custom_helper.BPM = BPM;
-
-            custom_helper.HitMode = hitMode;
-
-            modifyManiaHitRange(custom_helper.GetHitRangeList);
+            modifyManiaHitRange(helper.GetHitRangeList);
 
             return true;
         }
 
+        /// <summary>不对称 miss 早窗（ms）；AutoMissGate / ShouldDefer 热路径用，勿每帧调 helper。</summary>
+        public double MissEarlyWindow { get; private set; }
+
+        /// <summary>不对称 miss 晚窗（ms）。</summary>
+        public double MissLateWindow { get; private set; }
+
         private void updateWindows()
         {
-            if (setHitMode() && !HasReset)
+            if (setJudgeMode() && !HasReset)
             {
-                perfect = PerfectRange;
-                great = GreatRange;
-                good = GoodRange;
-                ok = OkRange;
-                meh = MehRange;
-                miss = MissRange;
-                poor = PoorRange;
+                perfect = perfectRange;
+                great = greatRange;
+                good = goodRange;
+                ok = okRange;
+                meh = mehRange;
+                miss = missRange;
+                refreshMissDirectionWindows();
                 return;
             }
 
@@ -262,31 +311,36 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 meh = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, meh_window_range) * totalMultiplier) + 0.5;
                 miss = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, miss_window_range) * totalMultiplier) + 0.5;
             }
+
+            refreshMissDirectionWindows();
+        }
+
+        private void refreshMissDirectionWindows()
+        {
+            // 与 WindowFor(Miss, isEarly) 语义一致，但在 update 时烘焙，避免每帧进 helper。
+            MissEarlyWindow = helper.WindowFor(HitResult.Miss, true);
+            MissLateWindow = helper.WindowFor(HitResult.Miss, false);
         }
 
         public override double WindowFor(HitResult result)
         {
-            // Mod override takes absolute priority — survives per-HitObject instance re-creation.
             if (modOverride is { } mo)
             {
                 return result switch
                 {
-                    HitResult.Poor => mo.Poor,
                     HitResult.Perfect => mo.Perfect,
                     HitResult.Great => mo.Great,
                     HitResult.Good => mo.Good,
                     HitResult.Ok => mo.Ok,
                     HitResult.Meh => mo.Meh,
                     HitResult.Miss => mo.Miss,
+                    HitResult.Poor => helper.WindowFor(HitResult.Poor),
                     _ => throw new ArgumentOutOfRangeException(nameof(result), result, null)
                 };
             }
 
             switch (result)
             {
-                case HitResult.Poor:
-                    return poor;
-
                 case HitResult.Perfect:
                     return perfect;
 
@@ -305,9 +359,46 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case HitResult.Miss:
                     return miss;
 
+                case HitResult.Poor:
+                    return helper.WindowFor(HitResult.Poor);
+
                 default:
                     throw new ArgumentOutOfRangeException(nameof(result), result, null);
             }
+        }
+
+        /// <summary>
+        /// Get window for a specific result and direction (early/late) for asymmetric windows
+        /// </summary>
+        public double WindowFor(HitResult result, bool isEarly)
+        {
+            if (result == HitResult.Miss)
+                return isEarly ? MissEarlyWindow : MissLateWindow;
+
+            return helper.WindowFor(result, isEarly);
+        }
+
+        public HitResult ResultFor(double timeOffset, bool? useHelper = null)
+        {
+            bool shouldUseHelper = useHelper ?? ActiveJudgeMode != EzEnumJudgeMode.Lazer;
+            return shouldUseHelper ? helper.ResultFor(timeOffset) : base.ResultFor(timeOffset);
+        }
+
+        public void SetJudgeMode(EzEnumJudgeMode mode)
+        {
+            if (ActiveJudgeMode == mode)
+                return;
+
+            ActiveJudgeMode = mode;
+            updateWindows();
+        }
+
+        public void UpdateO2JamBpmFromTime(double time)
+        {
+            if (ActiveJudgeMode != EzEnumJudgeMode.O2Jam)
+                return;
+
+            BPM = O2JudgeModeExtension.GetBPMAtTime(time);
         }
     }
 }

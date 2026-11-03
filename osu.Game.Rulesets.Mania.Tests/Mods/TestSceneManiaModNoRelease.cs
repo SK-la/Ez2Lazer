@@ -521,11 +521,9 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
                 new ManiaReplayFrame(beatmap.HitObjects[1].GetEndTime()),
             }, beatmap);
 
-            AddAssert("first hold note missed", () => judgementResults.Where(j => beatmap.HitObjects[0].NestedHitObjects.Contains(j.HitObject))
-                                                                      .All(j => !j.Type.IsHit()));
+            AddAssert("first hold note missed", () => judgementsOfNestedObjects(beatmap.HitObjects[0]).All(j => !j.Type.IsHit()));
 
-            AddAssert("second hold note hit", () => judgementResults.Where(j => beatmap.HitObjects[1].NestedHitObjects.Contains(j.HitObject))
-                                                                    .All(j => j.Type.IsHit()));
+            AddAssert("second hold note hit", () => judgementsOfNestedObjects(beatmap.HitObjects[1]).All(j => j.Type.IsHit()));
         }
 
         [Test]
@@ -551,12 +549,40 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
                 new ManiaReplayFrame(beatmap.HitObjects[0].GetEndTime() + 1),
             }, beatmap);
 
-            AddAssert("hold note hit", () => judgementResults.Where(j => beatmap.HitObjects[0].NestedHitObjects.Contains(j.HitObject))
-                                                             .All(j => j.Type.IsHit()));
+            AddAssert("hold note hit", () => judgementsOfNestedObjects(beatmap.HitObjects[0]).All(j => j.Type.IsHit()));
         }
 
         private void assertHitObjectJudgement(HitObject hitObject, HitResult result)
-            => AddAssert($"object judged as {result}", () => judgementResults.First(j => j.HitObject == hitObject).Type, () => Is.EqualTo(result));
+            => AddAssert($"object judged as {result}", () => judgementResults.First(j => isSameObject(j.HitObject, hitObject)).Type, () => Is.EqualTo(result));
+
+        /// <summary>
+        /// 被判定的对象属于转换产物，不是测试持有的源对象；post-conversion mod 还会换掉具体类型
+        /// （NoRelease 用 <c>NoReleaseHoldNote</c> 重建长条），所以按「同型 + 相同开始时间」认同一个对象。
+        /// </summary>
+        private static bool isSameObject(HitObject judged, HitObject source)
+        {
+            if (judged == null || judged.StartTime != source.StartTime)
+                return false;
+
+            return source is HoldNote
+                ? judged is HoldNote
+                : judged is Note && judged is not HeadNote && judged is not TailNote;
+        }
+
+        /// <summary>
+        /// 取被判定的长条的嵌套判定。源对象的 <see cref="HitObject.NestedHitObjects"/> 是空的——嵌套对象由
+        /// 产物自己的 ApplyDefaults 重建，不能再用源对象的列表来筛。
+        /// </summary>
+        private IEnumerable<JudgementResult> judgementsOfNestedObjects(HitObject source)
+        {
+            HitObject played = judgementResults.Select(j => j.HitObject).Distinct().Single(o => isSameObject(o, source));
+
+            List<JudgementResult> results = judgementResults.Where(j => played.NestedHitObjects.Contains(j.HitObject)).ToList();
+
+            Assert.That(results, Is.Not.Empty, "前置条件：被判定的长条应当有嵌套判定结果");
+
+            return results;
+        }
 
         private void assertHeadJudgement(HitResult result)
             => AddAssert($"head judged as {result}", () => judgementResults.First(j => j.HitObject is Note).Type, () => Is.EqualTo(result));

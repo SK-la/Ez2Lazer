@@ -12,6 +12,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Audio;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Input;
@@ -74,9 +75,9 @@ namespace osu.Game.Rulesets.UI
 
         public override Container Overlays { get; } = new Container { RelativeSizeAxes = Axes.Both };
 
-        public override IAdjustableAudioComponent Audio => audioContainer;
+        public override IAdjustableAudioComponent Audio => gameplayMixer;
 
-        private readonly AudioContainer audioContainer = new AudioContainer { RelativeSizeAxes = Axes.Both };
+        private readonly DrawableAudioMixer gameplayMixer = new DrawableAudioMixer { RelativeSizeAxes = Axes.Both, Name = "GameplayMixer" };
 
         public override Container FrameStableComponents { get; } = new Container { RelativeSizeAxes = Axes.Both };
 
@@ -104,14 +105,15 @@ namespace osu.Game.Rulesets.UI
 
         private bool frameStablePlayback = true;
 
+        private Bindable<double> hitsoundVolume;
+
         internal override bool FrameStablePlayback
         {
             get => frameStablePlayback;
             set
             {
                 frameStablePlayback = value;
-                if (frameStabilityContainer != null)
-                    frameStabilityContainer.FrameStablePlayback = value;
+                frameStabilityContainer?.FrameStablePlayback = value;
             }
         }
 
@@ -180,12 +182,19 @@ namespace osu.Game.Rulesets.UI
                 Children = new Drawable[]
                 {
                     FrameStableComponents,
-                    audioContainer.WithChild(KeyBindingInputManager
-                        .WithChildren(new Drawable[]
-                        {
-                            playfieldAdjustmentContainer.WithChild(Playfield),
-                            Overlays
-                        })),
+                    gameplayMixer.WithChildren(new Drawable[]
+                    {
+                        KeyBindingInputManager
+                            .WithChildren(new Drawable[]
+                            {
+                                playfieldAdjustmentContainer.WithChild(Playfield),
+                                Overlays
+                            }),
+                    }),
+                    // Samples kept by mods that removed the hit objects carrying them. Deliberately outside the
+                    // gameplay mixer's own hierarchy: an element binds the mixer itself when it is a hitsound, so it
+                    // plays under the chain of the note it came from rather than the storyboard volume chain.
+                    new DetachedSampleTrack(Beatmap.DetachedSamples, Beatmap.DetachedSampleIsHitsound),
                 }
             };
 
@@ -195,6 +204,9 @@ namespace osu.Game.Rulesets.UI
                     .WithChild(CreatePlayfieldAdjustmentContainer()
                         .WithChild(ResumeOverlay)));
             }
+
+            hitsoundVolume = config.GetBindable<double>(OsuSetting.HitsoundVolume);
+            gameplayMixer.Volume.BindTo(hitsoundVolume);
 
             applyRulesetMods(Mods, config);
 
@@ -316,8 +328,7 @@ namespace osu.Game.Rulesets.UI
 
             HasReplayLoaded.Value = replayInputManager.ReplayInputHandler != null;
 
-            if (replayInputManager.ReplayInputHandler != null)
-                replayInputManager.ReplayInputHandler.GamefieldToScreenSpace = Playfield.GamefieldToScreenSpace;
+            replayInputManager.ReplayInputHandler?.GamefieldToScreenSpace = Playfield.GamefieldToScreenSpace;
 
             if (!ProvidingUserCursor)
             {

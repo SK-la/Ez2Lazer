@@ -10,15 +10,20 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Objects.Legacy;
 using osu.Game.Rulesets.Osu.Beatmaps;
 using osu.Game.Rulesets.Osu.Configuration;
+using osu.Game.Rulesets.Osu.EzOsu.Judgement.Live;
+using osu.Game.Rulesets.Osu.EzOsu.StableClassic;
+using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Osu.Objects.Drawables;
 using osu.Game.Rulesets.Osu.Objects.Drawables.Connections;
+using osu.Game.Rulesets.Osu.Scoring;
 using osu.Game.Rulesets.Osu.UI.Cursor;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
@@ -34,6 +39,23 @@ namespace osu.Game.Rulesets.Osu.UI
         private readonly ProxyContainer approachCircles;
         private readonly ProxyContainer spinnerProxies;
         private readonly JudgementContainer<DrawableOsuJudgement> judgementLayer;
+
+        private OsuKernelDrawableAdapter? kernelAdapter;
+
+        /// <summary>本 playfield 是否由统一判定内核驱动。</summary>
+        internal bool JudgementKernelActive => kernelAdapter != null;
+
+        /// <summary>
+        /// 把 Drawable 已分发到的按下交给内核判定。返回 <see langword="false"/> 表示内核未启用，调用方应走原有自查。
+        /// </summary>
+        internal bool TryKernelPress(DrawableOsuHitObject drawable, OsuAction action)
+        {
+            if (kernelAdapter == null)
+                return false;
+
+            kernelAdapter.TryPress(drawable, action);
+            return true;
+        }
 
         private readonly JudgementPooler<DrawableOsuJudgement> judgementPooler;
 
@@ -92,6 +114,12 @@ namespace osu.Game.Rulesets.Osu.UI
 
         private IHitPolicy hitPolicy;
 
+        /// <summary>
+        /// 是否启用 stable note lock 的 Drawable 侧：已判中的滑条头遮挡其下方物件，直到整条滑条判完。
+        /// 只由判定档置位，与经典 mod 无关。
+        /// </summary>
+        public bool BlockInputUnderSliderHeads { get; set; }
+
         public IHitPolicy HitPolicy
         {
             get => hitPolicy;
@@ -107,9 +135,24 @@ namespace osu.Game.Rulesets.Osu.UI
         {
             ((DrawableOsuHitObject)drawable).CheckHittable = hitPolicy.CheckHittable;
 
+            if (BlockInputUnderSliderHeads && drawable is DrawableSliderHead head)
+                StableClassicNoteLock.BlockInputUnderSliderHead(head);
+
+            if (UseStableViewportBodies && drawable is DrawableSlider slider)
+                slider.UseStableViewportBody = true;
+
             Debug.Assert(!drawable.IsLoaded, $"Already loaded {nameof(DrawableHitObject)} is added to {nameof(OsuPlayfield)}");
             drawable.OnLoadComplete += onDrawableHitObjectLoaded;
         }
+
+        /// <summary>
+        /// 滑条身是否像 osu!stable 一样栅格化到一张窗口大小的画布上。
+        /// </summary>
+        /// <remarks>
+        /// 仅 aspire 谱面与 stable classic 判定档走此路径；普通 lazer 游玩不受影响。
+        /// 从 score processor 解析一次，与判定档同源。
+        /// </remarks>
+        private bool UseStableViewportBodies { get; set; }
 
         private void onDrawableHitObjectLoaded(Drawable drawable)
         {
@@ -132,9 +175,31 @@ namespace osu.Game.Rulesets.Osu.UI
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuRulesetConfigManager? config, IBeatmap? beatmap)
+        private void load(OsuRulesetConfigManager? config, IBeatmap? beatmap, ScoreProcessor? scoreProcessor, Ez2ConfigManager? ezConfig)
         {
             config?.BindWith(OsuRulesetSetting.PlayfieldBorderStyle, playfieldBorder.PlayfieldBorderStyle);
+
+            // 判定档是 stable 输入机制的开关：note lock 必须在任何 drawable 创建前定好，因此放在 pools 之前。
+            // 只认判定档，不认经典 mod。
+            if (scoreProcessor is OsuScoreProcessor osuScoreProcessor && OsuStableClassic.IsActive(osuScoreProcessor.JudgeMode))
+                OsuStableClassic.ApplyLiveRules(this, osuScoreProcessor.Mods.Value.Any(m => m is OsuModAutopilot));
+
+            // 滑条主体的绘制口径：aspire 谱面或 stable classic 判定档下按 stable 的方式绘制到一张窗口大小的画布上。
+            // 必须在 drawable 创建前定好，普通 lazer 游玩不受影响。
+            if (scoreProcessor is OsuScoreProcessor bodyScoreProcessor)
+            {
+                UseStableViewportBodies = OsuStableClassic.IsActive(bodyScoreProcessor.JudgeMode)
+                                          || bodyScoreProcessor.Mods.Value.Any(m => m is OsuModAspire);
+            }
+
+            // 内核必须在 drawable 创建前就位：drawable 依赖 playfield 的 JudgementKernelActive 关闭自查。
+            if (scoreProcessor is OsuScoreProcessor kernelScoreProcessor && beatmap != null)
+            {
+                AddInternal(kernelAdapter = new OsuKernelDrawableAdapter(this, beatmap, kernelScoreProcessor, ezConfig));
+
+                if (hitPolicy is LegacyHitPolicy legacyHitPolicy)
+                    legacyHitPolicy.KernelQuery = (hitObject, time) => kernelAdapter.CheckHittable(hitObject, time);
+            }
 
             var osuBeatmap = (OsuBeatmap?)beatmap;
 
@@ -156,8 +221,19 @@ namespace osu.Game.Rulesets.Osu.UI
             RegisterPool<Slider, DrawableSlider>(20, 100);
             RegisterPool<SliderHeadCircle, DrawableSliderHead>(20, 100);
             RegisterPool<SliderTailCircle, DrawableSliderTail>(20, 100);
-            RegisterPool<SliderTick, DrawableSliderTick>(Math.Max(maxTicksOnOneSlider, 20), Math.Max(maxTicksOnOneSlider, 200));
-            RegisterPool<SliderRepeat, DrawableSliderRepeat>(Math.Max(maxRepeatsOnOneSlider, 20), Math.Max(maxRepeatsOnOneSlider, 200));
+
+            // 池的初始大小是预先创建多少实例，最大值只限制能长到多大。
+            // 两者都跟谱面最大折返数走时，一条有数千折返的滑条会在加载时、尚未绘制前就准备数千 drawable。
+            // 预热有限数量，需要时再增长。
+            const int pool_warmup_limit = 200;
+
+            RegisterPool<SliderTick, DrawableSliderTick>(
+                Math.Min(Math.Max(maxTicksOnOneSlider, 20), pool_warmup_limit),
+                Math.Max(maxTicksOnOneSlider, 200));
+
+            RegisterPool<SliderRepeat, DrawableSliderRepeat>(
+                Math.Min(Math.Max(maxRepeatsOnOneSlider, 20), pool_warmup_limit),
+                Math.Max(maxRepeatsOnOneSlider, 200));
 
             RegisterPool<Spinner, DrawableSpinner>(2, 20);
             RegisterPool<SpinnerTick, DrawableSpinnerTick>(10, 200);
@@ -188,8 +264,9 @@ namespace osu.Game.Rulesets.Osu.UI
 
         private void onNewResult(DrawableHitObject judgedObject, JudgementResult result)
         {
-            // Hitobjects that block future hits should miss previous hitobjects if they're hit out-of-order.
-            hitPolicy.HandleHit(judgedObject);
+            // 内核驱动时 note lock 与强制 Miss 都由内核完成，Drawable 侧不再二次仲裁。
+            if (!JudgementKernelActive)
+                hitPolicy.HandleHit(judgedObject);
 
             if (!judgedObject.DisplayResult || !DisplayJudgements.Value)
                 return;
@@ -228,10 +305,26 @@ namespace osu.Game.Rulesets.Osu.UI
                 : base(hitObject)
             {
                 // Prevent past objects in idles states from remaining alive as their end times are skipped in non-frame-stable contexts.
-                LifetimeEnd = HitObject.GetEndTime() + HitObject.HitWindows.WindowFor(HitResult.Miss);
+                applyEnd();
+
+                // 解析规则与 defaults 可能在条目已存在后才落地。stable 结束时刻要等速度已知。
+                hitObject.DefaultsApplied += _ => applyEnd();
             }
 
             protected override double InitialLifetimeOffset => ((OsuHitObject)HitObject).TimePreempt;
+
+            private void applyEnd()
+            {
+                // stable 结束变成 int.MinValue 的滑条已经结束。若 LifetimeEnd 留在真实结束，drawable 与其身缓冲
+                // 会一直留在更新列表直到谱面结束。
+                if (HitObject is Slider slider && slider.RevealEndTimeWrapsUnderStableRules)
+                {
+                    LifetimeEnd = slider.StableRevealEndTime;
+                    return;
+                }
+
+                LifetimeEnd = HitObject.GetEndTime() + HitObject.HitWindows.WindowFor(HitResult.Miss);
+            }
         }
     }
 }

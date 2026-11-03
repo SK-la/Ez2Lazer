@@ -6,32 +6,64 @@ import shutil
 import zipfile
 import hashlib
 import platform
+import re
 from datetime import datetime
 
+VELOPACK_TOOL_VERSION = '0.0.1298'
+VELOPACK_PACK_ID = 'ez2lazer'
+VELOPACK_GITHUB_REPO_URL = 'https://github.com/SK-la/Ez2Lazer'
+MACOS_BUNDLE_ID = 'com.sk-la.ez2lazer'
 
-def run_publish(project_csproj: str, working_dir: str, config: str, out_dir: str, os_id: str = None) -> int:
+
+def format_date_tag(dt: datetime | None = None) -> str:
+    """Return a default date-based tag in the numeric dotted form used by this project.
+
+    Format: YYYY.MDD.0 where M is month (no leading zero) and DD is day (two digits, zero-padded).
+    Example: 2026.518.0 for 2026 May 18.
+    """
+    dt = dt or datetime.utcnow()
+    return f'{dt.year}.{dt.month}{dt.day:02d}.0'
+
+
+def resolve_arch(arch: str | None = None) -> str:
+    if arch in ('x64', 'arm64'):
+        return arch
+    machine = platform.machine().lower()
+    return 'arm64' if 'arm' in machine or 'aarch' in machine else 'x64'
+
+
+def run_publish(
+    project_csproj: str,
+    working_dir: str,
+    config: str,
+    out_dir: str,
+    os_id: str | None = None,
+    arch: str | None = None,
+    msbuild_properties: dict | None = None,
+) -> int:
     # Map simple os identifier to RID when possible (pass via -r)
     def _rid_for(os_id: str) -> str | None:
         if not os_id:
             return None
         low = str(os_id).lower()
-        machine = platform.machine().lower()
-        arch = 'x64'
-        if 'arm' in machine or 'aarch' in machine:
-            arch = 'arm64'
+        resolved_arch = resolve_arch(arch)
         if low in ('osx', 'macos', 'darwin'):
-            return f'osx-{arch}'
+            return f'osx-{resolved_arch}'
         if low in ('linux',):
-            return f'linux-{arch}'
+            return f'linux-{resolved_arch}'
         if low in ('win', 'windows'):
-            return f'win-{arch}'
+            return f'win-{resolved_arch}'
         # allow full RID passthrough
         return os_id
 
     rid = _rid_for(os_id)
-    cmd = ["dotnet", "publish", project_csproj, "-c", config, "-o", out_dir, "--self-contained", "true"]
+    cmd = ["dotnet", "publish", project_csproj, "-c", config, "-o", out_dir, "--self-contained", "false"]
     if rid:
         cmd.extend(["-r", rid])
+    if msbuild_properties:
+        for key, value in msbuild_properties.items():
+            # Quote values so dotted release tags (e.g. 2026.5.18) are not split by MSBuild.
+            cmd.append(f'-p:{key}="{value}"')
     print("Running:", " ".join(cmd))
     # Capture output for diagnostics in CI, but only print on failure to avoid excessive logs
     res = subprocess.run(cmd, cwd=working_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -50,7 +82,7 @@ def run_publish(project_csproj: str, working_dir: str, config: str, out_dir: str
     return res.returncode
 
 
-def run_cleanup(script_path: str, target_dir: str, platform: str = None) -> int:
+def run_cleanup(script_path: str, target_dir: str, platform: str = None, arch: str | None = None) -> int:
     # If an external script is provided and exists, run it. Otherwise use internal cleaner.
     if script_path and os.path.exists(script_path):
         print(f"Running external cleanup script: {script_path}")
@@ -58,10 +90,10 @@ def run_cleanup(script_path: str, target_dir: str, platform: str = None) -> int:
         return res.returncode
     else:
         print("External cleanup script not found, using internal cleanup logic")
-        return clean_publish_folder(target_dir, platform)
+        return clean_publish_folder(target_dir, platform, arch)
 
 
-def clean_publish_folder(release_dir=None, platform=None):
+def clean_publish_folder(release_dir=None, platform=None, arch: str | None = None):
     from pathlib import Path
     import fnmatch
 
@@ -106,17 +138,15 @@ def clean_publish_folder(release_dir=None, platform=None):
     if runtime_dir.exists():
         print(f"Processing runtime folder: {runtime_dir}")
         # choose keep list based on platform if provided
-        if platform is None:
-            keep_runtimes = {"win-x64", "win-x86"}
+        resolved_arch = resolve_arch(arch)
+        if platform == 'windows':
+            keep_runtimes = {f'win-{resolved_arch}', 'win-x86'}
+        elif platform == 'linux':
+            keep_runtimes = {f'linux-{resolved_arch}'}
+        elif platform == 'macos':
+            keep_runtimes = {f'osx-{resolved_arch}'}
         else:
-            if platform == 'windows':
-                keep_runtimes = {"win-x64", "win-x86"}
-            elif platform == 'linux':
-                keep_runtimes = {"linux-x64"}
-            elif platform == 'macos':
-                keep_runtimes = {"osx-x64", "osx-arm64"}
-            else:
-                keep_runtimes = {"win-x64", "win-x86"}
+            keep_runtimes = {f'win-{resolved_arch}', 'win-x86'}
 
         for runtime_folder in runtime_dir.iterdir():
             if runtime_folder.is_dir():
@@ -143,6 +173,24 @@ def _compute_sha256(path: str) -> str:
         for chunk in iter(lambda: f.read(8192), b''):
             h.update(chunk)
     return h.hexdigest()
+
+
+def _snapshot_files_by_pattern(root_dir: str, patterns: tuple[str, ...]) -> dict[str, tuple[int, str]]:
+    """Return a snapshot map: basename -> (size, sha256) for matched files."""
+    import glob
+
+    snapshot: dict[str, tuple[int, str]] = {}
+    for pattern in patterns:
+        for src in glob.glob(os.path.join(root_dir, '**', pattern), recursive=True):
+            if not os.path.isfile(src):
+                continue
+            name = os.path.basename(src)
+            try:
+                snapshot[name] = (os.path.getsize(src), _compute_sha256(src))
+            except Exception:
+                # Best-effort snapshot; skip unreadable files.
+                continue
+    return snapshot
 
 
 def zip_folder(src_dir: str, zip_path: str):
@@ -292,6 +340,180 @@ def _build_macos_launcher_script(executable_name: str | None) -> str:
     return '\n'.join(lines) + '\n'
 
 
+def velopack_framework_for(runtime: str) -> str | None:
+    """Velopack bootstrap frameworks for framework-dependent publishes (Windows only)."""
+    mapping = {
+        'win-x64': 'net10.0-x64-desktop',
+        'win-arm64': 'net10.0-arm64-desktop',
+    }
+    return mapping.get(runtime)
+
+
+def velopack_channel_for(target_platform: str, arch_name: str) -> str:
+    if target_platform == 'windows':
+        return 'win'
+    if target_platform == 'linux':
+        return 'linux'
+    return f'osx-{arch_name}'
+
+
+def resolve_main_exe(release_dir: str, target_platform: str) -> str:
+    if target_platform == 'windows':
+        return 'Ez2osu!.exe'
+
+    for candidate in ('Ez2osu!', 'osu.Desktop'):
+        path = os.path.join(release_dir, candidate)
+        if os.path.isfile(path):
+            return candidate
+
+    return 'Ez2osu!'
+
+
+def velopack_pack(
+    release_dir: str,
+    pack_version: str,
+    target_platform: str,
+    arch_name: str,
+    artifacts_dir: str,
+    workdir: str,
+    project_csproj: str,
+) -> int:
+    if not os.path.isdir(release_dir):
+        print(f'Velopack: release directory missing ({release_dir}), skipping')
+        return 1
+
+    runtime_by_platform = {
+        'windows': f'win-{arch_name}',
+        'linux': f'linux-{arch_name}',
+        'macos': f'osx-{arch_name}',
+    }
+    runtime = runtime_by_platform.get(target_platform)
+    if runtime is None:
+        print(f'Velopack: unsupported platform {target_platform}')
+        return 1
+
+    main_exe = resolve_main_exe(release_dir, target_platform)
+    channel = velopack_channel_for(target_platform, arch_name)
+    vpk_tool_dir = os.path.join(workdir, '.vpk-tools')
+    os.makedirs(vpk_tool_dir, exist_ok=True)
+    vpk_exe = os.path.join(vpk_tool_dir, 'vpk.exe' if os.name == 'nt' else 'vpk')
+
+    install_cmd = [
+        'dotnet', 'tool', 'install', 'vpk',
+        f'--version', VELOPACK_TOOL_VERSION,
+        '--tool-path', vpk_tool_dir,
+    ]
+    print('Running:', ' '.join(install_cmd))
+    subprocess.run(install_cmd, check=False)
+
+    if not os.path.isfile(vpk_exe):
+        print(f'Velopack: vpk CLI not found at {vpk_exe}')
+        return 1
+
+    vpk_out = os.path.join(artifacts_dir, f'velopack_{target_platform}_{arch_name}')
+    os.makedirs(vpk_out, exist_ok=True)
+
+    download_cmd = [
+        vpk_exe, 'download', 'github',
+        '--repoUrl', VELOPACK_GITHUB_REPO_URL,
+        '--outputDir', vpk_out,
+        '--channel', channel,
+    ]
+    github_token = os.environ.get('GITHUB_TOKEN')
+    if github_token:
+        download_cmd.extend(['--token', github_token])
+    else:
+        print('Velopack: GITHUB_TOKEN is not set; previous release download may be rate-limited and delta generation may be skipped')
+
+    print('Running:', ' '.join(download_cmd))
+    download_res = subprocess.run(download_cmd, cwd=workdir)
+    if download_res.returncode != 0:
+        print('Velopack: download previous release failed (continuing for first release)')
+
+    icon_path = os.path.join(os.path.dirname(project_csproj), 'lazer.ico')
+    pack_cmd = [
+        vpk_exe, 'pack',
+        '--packId', VELOPACK_PACK_ID,
+        '--packVersion', pack_version,
+        '--packDir', release_dir,
+        '--mainExe', main_exe,
+        '--packTitle', 'Ez2Lazer',
+        '--outputDir', vpk_out,
+        '--runtime', runtime,
+        '--channel', channel,
+    ]
+    # Windows: skip redundant Portable.zip (manual zip already provided).
+    if target_platform == 'windows':
+        pack_cmd.append('--noPortable')
+    # Linux: must produce AppImage (portable); --noPortable breaks vpk pack.
+    # macOS: skip unsigned .pkg installer (often fails on CI); portable + nupkg is enough.
+    elif target_platform == 'macos':
+        pack_cmd.extend(['--noInst', '--bundleId', MACOS_BUNDLE_ID])
+
+    bootstrap_framework = velopack_framework_for(runtime)
+    if bootstrap_framework:
+        pack_cmd.extend(['--framework', bootstrap_framework])
+    if target_platform == 'windows' and os.path.isfile(icon_path):
+        pack_cmd.extend(['--icon', icon_path])
+
+    output_patterns = ('*.nupkg', 'RELEASES', 'releases*.json', 'assets*.json', '*-Setup.exe', '*.AppImage')
+    before_pack_snapshot = _snapshot_files_by_pattern(vpk_out, output_patterns)
+
+    print('Running:', ' '.join(pack_cmd))
+    pack_res = subprocess.run(pack_cmd, cwd=workdir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if pack_res.returncode != 0:
+        try:
+            print('Velopack pack failed (stdout):')
+            print(pack_res.stdout.decode('utf-8', errors='replace'))
+            print('Velopack pack failed (stderr):')
+            print(pack_res.stderr.decode('utf-8', errors='replace'))
+        except Exception:
+            pass
+        print('Velopack: pack failed with code', pack_res.returncode)
+        return pack_res.returncode
+
+    # Flatten only files generated/updated by this pack invocation.
+    # This prevents previously downloaded release assets from polluting a new GitHub release.
+    import glob
+    copied_full = []
+    copied_delta = []
+    copied_manifest = []
+    for pattern in output_patterns:
+        for src in glob.glob(os.path.join(vpk_out, '**', pattern), recursive=True):
+            if not os.path.isfile(src):
+                continue
+
+            name = os.path.basename(src)
+            try:
+                current_signature = (os.path.getsize(src), _compute_sha256(src))
+            except Exception:
+                print('Velopack: skipped unreadable file', src)
+                continue
+
+            # Keep only files that are new or changed after packing.
+            if before_pack_snapshot.get(name) == current_signature:
+                continue
+
+            dest = os.path.join(artifacts_dir, os.path.basename(src))
+            shutil.copy2(src, dest)
+            print('Velopack: copied', dest)
+            lower = os.path.basename(dest).lower()
+            if lower.endswith('.nupkg'):
+                if '-delta.' in lower or '-delta-' in lower:
+                    copied_delta.append(dest)
+                elif '-full.' in lower or '-full-' in lower:
+                    copied_full.append(dest)
+            elif lower == 'releases' or lower.endswith('.json'):
+                copied_manifest.append(dest)
+
+    print(f'Velopack: copied {len(copied_full)} full package(s), {len(copied_delta)} delta package(s), {len(copied_manifest)} manifest file(s)')
+    if copied_full and not copied_delta:
+        print('Velopack: warning: no delta package generated. This is expected for a first release, or when previous assets cannot be downloaded for the same pack id/channel/runtime.')
+
+    print('Velopack: pack succeeded')
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description="Publish and package Ez2Lazer builds.")
     # Prefer the GITHUB_WORKSPACE env when present (CI), otherwise use the script directory
@@ -309,14 +531,21 @@ def main():
     parser.add_argument('--appimage', action='store_true', help='Build AppImage for linux from release output')
     parser.add_argument('--os', default=None, help='OS identifier forwarded to dotnet publish')
     parser.add_argument('--platform', default=None, help='Platform to include in package name')
-    parser.add_argument('--tag', default=None, help='Optional tag to include in asset name')
+    parser.add_argument('--tag', default=None, help='Release tag for asset names and versioning (for example: YYYY.MDD.0)')
+    parser.add_argument('--arch', default=None, choices=['x64', 'arm64'], help='Target CPU architecture for publish and Velopack')
+    parser.add_argument('--official-build', action='store_true', help='Mark build as official Ez2Lazer release (enables versioning + Velopack)')
+    parser.add_argument('--release-version', default=None, help='MSBuild ReleaseVersion (numeric dotted version only, for example: YYYY.MDD.0); defaults to --tag')
+    parser.add_argument('--pack-version', default=None, help='Velopack pack version; defaults to {tag}-ez2lazer')
+    parser.add_argument('--no-velopack', action='store_true', help='Skip Velopack packaging even for official builds')
+    parser.add_argument('--ready-to-run', dest='ready_to_run', action='store_true', default=None, help='Force ReadyToRun on (only valid for windows/x64)')
+    parser.add_argument('--no-ready-to-run', dest='ready_to_run', action='store_false', default=None, help='Force ReadyToRun off')
     parser.add_argument('--deps-path', default=None, help='Path to folder containing dependency DLLs to include')
     parser.add_argument('--deps-pattern', default='*.dll', help='Glob pattern for dependency files to copy')
     parser.add_argument('--deps-source', choices=['local','github','none'], default='local', help='Where to get dependency DLLs')
-    parser.add_argument('--deps-github-repo', default='SK-la/osu-framework', help='GitHub repo (owner/repo) to clone when --deps-source=github')
+    parser.add_argument('--deps-github-repo', default='SK-la/ez2lazer-framework', help='GitHub repo (owner/repo) to clone when --deps-source=github')
     parser.add_argument('--deps-github-branch', default='master', help='Branch or ref to checkout when cloning deps github repo')
     parser.add_argument('--deps-github-project', default='osu.Framework/osu.Framework.csproj', help='Path to csproj inside cloned deps repo to build')
-    parser.add_argument('--resources-github-repo', default='SK-la/osu-resources', help='GitHub repo for resources to clone')
+    parser.add_argument('--resources-github-repo', default='SK-la/ez2lazer-resources', help='GitHub repo for resources to clone')
     parser.add_argument('--resources-github-path', default='osu.Game.Resources/Resources', help='Path inside resources repo to copy')
     parser.add_argument('--resources-path', default=None, help='Local path to resources to include in package')
     args = parser.parse_args()
@@ -336,14 +565,140 @@ def main():
         # interactive invocation should default to release-only
         args.release_only = True
 
-    # Enforce that a tag is provided to avoid any implicit fallback tag generation
-    if not args.tag:
-        # default to today's date tag if not provided when running locally
-        today = datetime.utcnow()
-        args.tag = f"{today.year}-{today.month}-{today.day}"
-        print(f"No --tag provided; defaulting to {args.tag}")
+    def _parse_owner_repo_from_url(url: str) -> tuple[str, str] | None:
+        # expect forms like https://github.com/owner/repo or git@github.com:owner/repo.git
+        try:
+            if url.startswith('https://') or url.startswith('http://'):
+                parts = url.rstrip('/').split('/')
+                owner = parts[-2]
+                repo = parts[-1]
+                if repo.endswith('.git'):
+                    repo = repo[:-4]
+                return owner, repo
+            if url.startswith('git@'):
+                # git@github.com:owner/repo.git
+                path = url.split(':', 1)[1]
+                owner, repo = path.split('/')
+                if repo.endswith('.git'):
+                    repo = repo[:-4]
+                return owner, repo
+        except Exception:
+            pass
+        return None
+
+    def _github_tag_exists(owner: str, repo: str, tag: str) -> bool:
+        # Query GitHub Releases API for an exact tag. Requires GITHUB_TOKEN for higher rate limits
+        import urllib.request, urllib.error, json
+        api = f'https://api.github.com/repos/{owner}/{repo}/releases/tags/{tag}'
+        req = urllib.request.Request(api, headers={
+            'Accept': 'application/vnd.github.v3+json'
+        })
+        token = os.environ.get('GITHUB_TOKEN')
+        if token:
+            req.add_header('Authorization', f'token {token}')
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                # 200 means tag exists as a release
+                return resp.getcode() == 200
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return False
+            # on other errors, conservatively assume not found so we can continue with local checks
+            return False
+        except Exception:
+            return False
+
+    # def _git_tag_exists_local(tag: str) -> bool:
+    #     try:
+    #         res = subprocess.run(['git', 'tag', '--list', tag], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
+    #         out = res.stdout.decode('utf-8', errors='replace').strip()
+    #         return out == tag
+    #     except Exception:
+    #         return False
+
+    def resolve_tag(proposed: str | None) -> str:
+        # If user provided a tag, use it verbatim.
+        if proposed:
+            return proposed
+
+        # Start with date based tag
+        now = datetime.utcnow()
+        year = now.year
+        month = now.month
+        day = now.day
+        patch = 0
+        base_inner = f"{year}.{month}{day:02d}"
+
+        # determine owner/repo for remote checks
+        owner_repo = None
+        # prefer GITHUB_REPOSITORY env if present
+        gh_repo_env = os.environ.get('GITHUB_REPOSITORY')
+        if gh_repo_env and '/' in gh_repo_env:
+            owner_repo = tuple(gh_repo_env.split('/', 1))
+        else:
+            owner_repo = _parse_owner_repo_from_url(VELOPACK_GITHUB_REPO_URL)
+
+        while True:
+            candidate = f"{base_inner}.{patch}"
+            exists = False
+            # 1) check GitHub releases when we know owner/repo and token may be available
+            if owner_repo:
+                try:
+                    exists = _github_tag_exists(owner_repo[0], owner_repo[1], candidate)
+                except Exception:
+                    exists = False
+            # # 2) fallback to local git tags
+            # if not exists:
+            #     try:
+            #         exists = _git_tag_exists_local(candidate)
+            #     except Exception:
+            #         exists = False
+
+            if not exists:
+                print(f"No --tag provided; selected tag {candidate}")
+                return candidate
+
+            # tag exists, increment patch and try again
+            patch += 1
+
+    # Resolve tag (use provided tag or generate from UTC date and bump patch if necessary)
+    args.tag = resolve_tag(args.tag)
 
     tag_suffix = f"_{args.tag}"
+    arch_name = resolve_arch(args.arch)
+
+    msbuild_properties = None
+    if args.official_build:
+        release_version = args.release_version or args.tag
+        # Require strict 3-part numeric version for ReleaseVersion (e.g. 2026.522.0)
+        if not re.fullmatch(r'\d+\.\d+\.\d+', release_version):
+            print(f"Invalid release version '{release_version}'.")
+            print('For --official-build, --release-version (or --tag when --release-version is omitted) must be a 3-part numeric version, e.g. 2026.518.0')
+            sys.exit(2)
+
+        msbuild_properties = {
+            'OfficialEz2Build': 'true',
+            'ReleaseVersion': release_version,
+        }
+        print(f'Official build: ReleaseVersion={release_version}')
+        print(f'  AssemblyVersion will be: {release_version}')
+        print(f'  InformationalVersion will be: {release_version}-ez2lazer')
+
+    pack_version = args.pack_version or f'{args.tag}-ez2lazer'
+
+    # Velopack expects a 3-part SemVer core (major.minor.patch) with optional prerelease.
+    def _is_semver3_with_prerelease(v: str) -> bool:
+        return re.fullmatch(r"\d+\.\d+\.\d+(?:-[0-9A-Za-z-.]+)?", v) is not None
+
+    # Enforce strict 3-part tag core (e.g. 2026.522.0). Do not auto-normalize: fail fast so user provides correct tag.
+    if not re.fullmatch(r"\d+\.\d+\.\d+", args.tag or ""):
+        print(f"Invalid tag '{args.tag}'. Tags must be a 3-part numeric version like '2026.522.0'.")
+        print("If you need a different pack version, pass --pack-version explicitly (e.g. '2026.522.0-ez2lazer').")
+        sys.exit(2)
+
+    if not _is_semver3_with_prerelease(pack_version):
+        print(f"--packVersion contains an invalid package version '{pack_version}', it must be a 3-part SemVer2 compliant version string (e.g. 2026.522.0-ez2lazer).")
+        sys.exit(2)
 
     # determine host platform canonical name
     host_raw = platform.system().lower()
@@ -383,6 +738,21 @@ def main():
         print(f"Inferred platform '{target_platform}' from filename but current host is '{host_platform}'; skipping publish to avoid accidental cross-platform build.")
         sys.exit(0)
 
+    # ReadyToRun 只在 Windows x64 生效（osu.Desktop.csproj 里按 win RID 前缀默认打开）。
+    # macOS / Linux / arm64 一律显式关闭：crossgen2 的 runtime pack 与 Velopack 差分体积都还没验证过。
+    if args.ready_to_run is None:
+        ready_to_run = target_platform == 'windows' and arch_name == 'x64'
+    else:
+        ready_to_run = args.ready_to_run
+
+    if ready_to_run and not (target_platform == 'windows' and arch_name == 'x64'):
+        print(f'WARNING: ReadyToRun requested for {target_platform}/{arch_name}; only windows/x64 is validated. Disabling.')
+        ready_to_run = False
+
+    msbuild_properties = msbuild_properties or {}
+    msbuild_properties['PublishReadyToRun'] = 'true' if ready_to_run else 'false'
+    print(f'PublishReadyToRun={ready_to_run} (platform={target_platform} arch={arch_name})')
+
     # fixed folder names
     # Place all outputs under <outroot>/artifacts for a unified layout across platforms
     base_out = args.outroot
@@ -394,10 +764,6 @@ def main():
         print(f"Permission denied creating {artifacts_dir}, falling back to {fallback}")
         os.makedirs(fallback, exist_ok=True)
         artifacts_dir = fallback
-
-    # determine architecture for naming (x64 vs arm64)
-    machine = platform.machine().lower()
-    arch_name = 'arm64' if ('arm' in machine or 'aarch' in machine) else 'x64'
 
     # Use the target platform (not host) for artifact folder and asset naming
     release_dir = os.path.join(artifacts_dir, f'Ez2Lazer_release_{target_platform}_{arch_name}')
@@ -411,13 +777,13 @@ def main():
 
     # publish
     print('Publishing Release...')
-    rc = run_publish(args.project, args.workdir, 'Release', release_dir, target_platform)
+    rc = run_publish(args.project, args.workdir, 'Release', release_dir, target_platform, arch=arch_name, msbuild_properties=msbuild_properties)
     if rc != 0:
         print('Release publish failed with code', rc)
     else:
         print('Release publish succeeded')
         # optional cleanup (pass target platform so we don't remove required runtimes)
-        run_cleanup(args.cleanup_release, release_dir, target_platform)
+        run_cleanup(args.cleanup_release, release_dir, target_platform, arch_name)
         # cleanup done; removed verbose release_dir listing to reduce log noise
 
     if not args.release_only:
@@ -427,7 +793,7 @@ def main():
             print('Debug publish failed with code', rc2)
         else:
             print('Debug publish succeeded')
-            run_cleanup(args.cleanup_debug, debug_dir, target_platform)
+            run_cleanup(args.cleanup_debug, debug_dir, target_platform, arch_name)
 
     # Use asset names that match workflow-normalized names when tag present
     release_zip = os.path.join(artifacts_dir, f"Ez2Lazer_release_{target_platform}_{arch_name}{tag_suffix}.zip")
@@ -437,7 +803,6 @@ def main():
         if os.path.exists(release_dir):
             # handle deps source
             temp_dirs = []
-            deps_to_cleanup = []
             try:
                 if args.deps_source == 'local':
                     deps_src_path = args.deps_path
@@ -474,16 +839,16 @@ def main():
 
                     if proj_to_build:
                         print('Building dependency project', proj_to_build)
-                        bres = subprocess.run(["dotnet","build",proj_to_build,"-c","Release","-f","net8.0"])
+                        bres = subprocess.run(["dotnet","build",proj_to_build,"-c","Release","-f","net10.0"])
                         if bres.returncode != 0:
                             raise RuntimeError('dotnet build of deps failed')
-                        deps_src_path = os.path.join(os.path.dirname(proj_to_build), 'bin', 'Release', 'net8.0')
+                        deps_src_path = os.path.join(os.path.dirname(proj_to_build), 'bin', 'Release', 'net10.0')
                         if not os.path.exists(deps_src_path):
                             # sometimes the project is in a subfolder; search upwards
                             parent = os.path.dirname(proj_to_build)
                             found = False
                             for _ in range(4):
-                                candidate_bin = os.path.join(parent, 'bin', 'Release', 'net8.0')
+                                candidate_bin = os.path.join(parent, 'bin', 'Release', 'net10.0')
                                 if os.path.exists(candidate_bin):
                                     deps_src_path = candidate_bin
                                     found = True
@@ -493,7 +858,7 @@ def main():
                                 print('Warning: could not find built outputs in expected locations')
                     else:
                         print('Project path not found in cloned repo, attempting to find bin folder...')
-                        deps_src_path = os.path.join(tmp, 'bin', 'Release', 'net8.0')
+                        deps_src_path = os.path.join(tmp, 'bin', 'Release', 'net10.0')
                 else:
                     deps_src_path = None
 
@@ -731,11 +1096,12 @@ def main():
                             shutil.copy2(s, d)
 
                     # AppRun
+                    linux_main_exe = resolve_main_exe(release_dir, 'linux')
                     apprun_path = os.path.join(appdir, 'AppRun')
                     with open(apprun_path, 'w', encoding='utf-8') as f:
                         f.write('#!/bin/sh\n')
                         f.write('HERE="$(dirname "$(readlink -f "$0")")"\n')
-                        f.write('exec "$HERE"/usr/bin/osu.Desktop "$@"\n')
+                        f.write(f'exec "$HERE"/usr/bin/{linux_main_exe} "$@"\n')
                     try:
                         os.chmod(apprun_path, 0o755)
                     except Exception:
@@ -747,7 +1113,7 @@ def main():
                         f.write('[Desktop Entry]\n')
                         f.write('Type=Application\n')
                         f.write('Name=Ez2Lazer\n')
-                        f.write('Exec=osu.Desktop %u\n')
+                        f.write(f'Exec={linux_main_exe} %u\n')
                         f.write('Icon=ez2lazer\n')
                         f.write('Categories=Game;\n')
                         f.write('Terminal=false\n')
@@ -783,7 +1149,10 @@ def main():
 
                     # run appimagetool
                     # Run appimagetool and capture output for diagnostics
-                    rc_tool = subprocess.run([tool, appdir], cwd=base_out, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    appimage_env = os.environ.copy()
+                    appimage_env.setdefault('ARCH', 'aarch64' if arch_name == 'arm64' else 'x86_64')
+                    appimage_env.setdefault('APPIMAGE_EXTRACT_AND_RUN', '1')
+                    rc_tool = subprocess.run([tool, appdir], cwd=base_out, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=appimage_env)
                     if rc_tool.returncode != 0:
                         try:
                             out = rc_tool.stdout.decode('utf-8', errors='replace')
@@ -841,6 +1210,20 @@ def main():
             zip_folder(debug_dir, debug_zip)
         else:
             print('Debug folder missing, skipping zip')
+
+    if args.official_build and not args.no_velopack and os.path.exists(release_dir):
+        velopack_rc = velopack_pack(
+            release_dir,
+            pack_version,
+            target_platform,
+            arch_name,
+            artifacts_dir,
+            args.workdir,
+            args.project,
+        )
+        if velopack_rc != 0:
+            print('Velopack packaging failed')
+            sys.exit(velopack_rc)
 
     print('Done.')
 

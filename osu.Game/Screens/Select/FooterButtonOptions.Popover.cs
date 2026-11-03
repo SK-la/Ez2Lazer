@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -178,7 +179,7 @@ namespace osu.Game.Screens.Select
                 private void load()
                 {
                     SpriteText.Colour = TextColour ?? Color4.White;
-                    Content.CornerRadius = 10;
+                    Content.CornerRadius = EzUIStyleV1.CORNER_RADIUS_WEDGE;
 
                     Add(new SpriteIcon
                     {

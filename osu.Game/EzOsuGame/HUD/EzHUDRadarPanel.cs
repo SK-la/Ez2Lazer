@@ -6,35 +6,32 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Primitives;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Graphics.Textures;
-using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Logging;
+using osu.Framework.Threading;
 using osu.Game.Beatmaps;
-using osu.Game.Beatmaps.Drawables.Cards;
 using osu.Game.Configuration;
-using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Screens;
+using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.UserInterface;
+using osu.Game.EzOsuGame.UI;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Screens.Footer;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using Triangle = osu.Framework.Graphics.Primitives.Triangle;
+using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 
 namespace osu.Game.EzOsuGame.HUD
 {
@@ -47,7 +44,13 @@ namespace osu.Game.EzOsuGame.HUD
         KeyPattern,
 
         [Description("XxySR Pattern")]
-        XxySrPattern
+        XxySrPattern,
+
+        [Description("SkillDual")]
+        SkillDual,
+
+        [Description("SkillChart")]
+        SkillChart
     }
 
     /// <summary>
@@ -57,7 +60,6 @@ namespace osu.Game.EzOsuGame.HUD
     {
         // Layout constants
         private const float chart_size = 144f;
-        private const float corner_radius = ScreenFooterButton.CORNER_RADIUS;
         private const float axis_label_padding = 36f;
         private const float axis_label_offset = 24f; // Offset from chart edge to label center
         private const float axis_label_alpha = 1f;
@@ -103,16 +105,25 @@ namespace osu.Game.EzOsuGame.HUD
         public BindableColour4 LabelColour { get; } = new BindableColour4(new Color4(255, 230, 128, 255));
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
-        public BindableColour4 BaseLineColour { get; } = new BindableColour4(new Color4(255, 255, 210, 230));
+        public BindableColour4 BaseLineColour { get; } = new BindableColour4(new Color4(255, 255, 255, 51));
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_BASE_AREA_COLOUR), nameof(EzHUDStrings.RADAR_BASE_AREA_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
-        public BindableColour4 BaseAreaColour { get; } = new BindableColour4(new Color4(255, 255, 200, 128));
+        public BindableColour4 BaseAreaColour { get; } = new BindableColour4(new Color4(44, 44, 50, 128));
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_DATA_LINE_COLOUR), nameof(EzHUDStrings.RADAR_DATA_LINE_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
-        public BindableColour4 DataLineColour { get; } = new BindableColour4(new Color4(255, 230, 128, 230));
+        public BindableColour4 DataLineColour { get; } = new BindableColour4(new Color4(255, 217, 102, 230));
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_DATA_AREA_COLOUR), nameof(EzHUDStrings.RADAR_DATA_AREA_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
-        public BindableColour4 DataAreaColour { get; } = new BindableColour4(new Color4(255, 215, 0, 128));
+        public BindableColour4 DataAreaColour { get; } = new BindableColour4(new Color4(255, 217, 102, 128));
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_PLAYER_DATA_LINE_COLOUR), nameof(EzHUDStrings.RADAR_PLAYER_DATA_LINE_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
+        public BindableColour4 PlayerDataLineColour { get; } = new BindableColour4(new Color4(133, 196, 108, 230));
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_PLAYER_DATA_AREA_COLOUR), nameof(EzHUDStrings.RADAR_PLAYER_DATA_AREA_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
+        public BindableColour4 PlayerDataAreaColour { get; } = new BindableColour4(new Color4(133, 196, 108, 128));
+
+        /// <summary>Target player for Skill-mode SSR overlay. Externally bindable (e.g. EzAnalysis header).</summary>
+        public Bindable<string?> TargetUsername { get; } = new Bindable<string?>();
 
         public int AxisCount
         {
@@ -153,18 +164,52 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved]
         private BeatmapDifficultyCache difficultyCache { get; set; } = null!;
 
+        [Resolved]
+        private EzSkillProvider? skillProvider { get; set; }
+
+        [Resolved]
+        private EzAnalysisPlayerSelection? ezAnalysisPlayerSelection { get; set; }
+
         private IBindable<StarDifficulty>? difficultyBindable;
         private CancellationTokenSource? difficultyCancellationSource;
         private CancellationTokenSource? radarAnalysisCancellationSource;
         private ModSettingChangeTracker? modSettingTracker;
 
         private Container? axisLabelContainer;
-        private RadarChart? chart;
+        private EzRadarChart? chart;
         private Box background = null!;
         private FillFlowContainer[] axisLabelContainers = Array.Empty<FillFlowContainer>();
         private string[] activeAxisLabels = default_axis_labels;
         private string[] activeAxisFormats = default_axis_formats;
         private EzRulesetSpecificRadarResult? cachedRulesetSpecificRadarResult;
+
+        /// <summary>Cheap identity of the inputs the ruleset-specific radar was computed for (no mod deep-clone).</summary>
+        private EzRadarComputeKey? cachedRulesetSpecificRadarKey;
+
+        /// <summary>Last (beatmap, mods, mode) the ruleset-specific radar was kicked for; blocks duplicate kicks.</summary>
+        private EzRadarComputeKey? lastRulesetRadarKickKey;
+
+        /// <summary>Last successful live (beatmap, mods) chart snapshot, so a re-present keeps LN/RC without a flash.</summary>
+        private EzLiveChartSkillSnapshot? cachedLiveSkillSnapshot;
+
+        private EzRadarComputeKey? cachedLiveSkillSnapshotKey;
+
+        /// <summary>Last (beatmap, mods) the live skill pass was kicked for; blocks duplicate kicks.</summary>
+        private EzRadarComputeKey? lastLiveKickKey;
+
+        private ScheduledDelegate? liveKickDebounce;
+
+        /// <summary>
+        /// Song select fires placeholder then real star difficulty for the same chart; without a coalescing delay a
+        /// fast scroll runs the full playable + Mina/xxy pass for every chart passed over. Only the settled chart computes.
+        /// </summary>
+        private const double live_kick_debounce_ms = 100;
+
+        /// <summary>
+        /// Cheap cache/kick identity for both radar paths. <see cref="EzAnalysisLookupCache.ComputeModsSignature"/>
+        /// reads live mods directly (no <c>DeepClone</c>), which is what made the old key construction allocate.
+        /// </summary>
+        private readonly record struct EzRadarComputeKey(string Hash, int RulesetId, int ModsSignature, EzRadarDisplayMode Mode);
 
         public EzHUDRadarPanel()
         {
@@ -184,7 +229,7 @@ namespace osu.Game.EzOsuGame.HUD
                     Origin = Anchor.Centre,
                     RelativeSizeAxes = Axes.Both,
                     Masking = true,
-                    CornerRadius = corner_radius,
+                    CornerRadius = EzUIStyleV1.CORNER_RADIUS_WEDGE,
                     Children = new Drawable[]
                     {
                         background = new Box
@@ -194,10 +239,8 @@ namespace osu.Game.EzOsuGame.HUD
                         },
                     },
                 },
-                chart = new RadarChart
+                chart = new EzRadarChart
                 {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
                     AxisCount = parameterRatios.Length,
                     Size = new Vector2(chart_size),
                     GridLevels = 4,
@@ -225,10 +268,14 @@ namespace osu.Game.EzOsuGame.HUD
         {
             base.LoadComplete();
 
+            tryBindSharedPlayerSelection();
+
             bindPreserveAlpha(BaseLineColour);
             bindPreserveAlpha(BaseAreaColour);
             bindPreserveAlpha(DataLineColour);
             bindPreserveAlpha(DataAreaColour);
+            bindPreserveAlpha(PlayerDataLineColour);
+            bindPreserveAlpha(PlayerDataAreaColour);
             bindPreserveAlpha(BackgroundColour);
             bindPreserveAlpha(LabelColour);
 
@@ -240,19 +287,20 @@ namespace osu.Game.EzOsuGame.HUD
             BaseAreaColour.BindValueChanged(_ => applyChartColours(), true);
             DataLineColour.BindValueChanged(_ => applyChartColours(), true);
             DataAreaColour.BindValueChanged(_ => applyChartColours(), true);
+            PlayerDataLineColour.BindValueChanged(_ => applyChartColours(), true);
+            PlayerDataAreaColour.BindValueChanged(_ => applyChartColours(), true);
             BackgroundColour.BindValueChanged(e =>
             {
                 background.Colour = e.NewValue;
             }, true);
             LabelColour.BindValueChanged(_ => applyChartColours(), true);
-            RadarDisplayMode.BindValueChanged(_ =>
+            RadarDisplayMode.BindValueChanged(_ => refreshRadarPresentation(), true);
+            UseAbsoluteValue.BindValueChanged(_ => refreshRadarPresentation(), true);
+            TargetUsername.BindValueChanged(_ =>
             {
-                if (RadarDisplayMode.Value == EzRadarDisplayMode.Metadate)
-                    updateParameterRatios(difficultyBindable?.Value ?? default);
-                else
-                    updateRulesetSpecificRadarPresentation();
-            }, true);
-            UseAbsoluteValue.BindValueChanged(_ => updateRulesetSpecificRadarPresentation(), true);
+                if (isMinaSkillRadarMode())
+                    updateSkillRadarPresentation();
+            });
 
             chart?.SetData(parameterRatios);
             updateAxisTexts();
@@ -260,6 +308,8 @@ namespace osu.Game.EzOsuGame.HUD
             beatmap.BindValueChanged(b =>
             {
                 cachedRulesetSpecificRadarResult = null;
+                cachedRulesetSpecificRadarKey = null;
+                resetRadarKickGuards();
                 difficultyCancellationSource?.Cancel();
                 difficultyCancellationSource = new CancellationTokenSource();
 
@@ -274,6 +324,8 @@ namespace osu.Game.EzOsuGame.HUD
             mods.BindValueChanged(m =>
             {
                 cachedRulesetSpecificRadarResult = null;
+                cachedRulesetSpecificRadarKey = null;
+                resetRadarKickGuards();
                 modSettingTracker?.Dispose();
                 modSettingTracker = new ModSettingChangeTracker(m.NewValue)
                 {
@@ -285,8 +337,44 @@ namespace osu.Game.EzOsuGame.HUD
             ruleset.BindValueChanged(_ =>
             {
                 cachedRulesetSpecificRadarResult = null;
+                cachedRulesetSpecificRadarKey = null;
+                resetRadarKickGuards();
                 updateParameterRatios(difficultyBindable?.Value ?? default);
             }, true);
+        }
+
+        /// <summary>
+        /// SongSelect skin / wedge: follow shared Ez analysis player when host did not bind a username.
+        /// </summary>
+        private void tryBindSharedPlayerSelection()
+        {
+            if (ezAnalysisPlayerSelection == null)
+                return;
+
+            if (!string.IsNullOrEmpty(TargetUsername.Value))
+                return;
+
+            TargetUsername.BindTo(ezAnalysisPlayerSelection.Current);
+        }
+
+        private void refreshRadarPresentation()
+        {
+            // Leaving skill radar mode: drop any pending live kick rather than letting it land on the new mode.
+            if (!isMinaSkillRadarMode())
+                cancelLiveKick();
+
+            if (RadarDisplayMode.Value == EzRadarDisplayMode.Metadate)
+            {
+                chart?.ClearSecondaryData();
+                updateParameterRatios(difficultyBindable?.Value ?? default);
+            }
+            else if (isMinaSkillRadarMode())
+                updateSkillRadarPresentation();
+            else
+            {
+                chart?.ClearSecondaryData();
+                updateRulesetSpecificRadarPresentation();
+            }
         }
 
         private static void bindPreserveAlpha(BindableColour4 colourBindable)
@@ -310,39 +398,435 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void updateParameterRatios(StarDifficulty difficulty)
         {
-            if (RadarDisplayMode.Value != EzRadarDisplayMode.Metadate && beginRulesetSpecificRadarUpdate())
+            if (isMinaSkillRadarMode())
+            {
+                updateSkillRadarPresentation();
                 return;
+            }
+
+            if (RadarDisplayMode.Value != EzRadarDisplayMode.Metadate)
+            {
+                updateRulesetSpecificRadarPresentation();
+                return;
+            }
 
             cancelRadarAnalysis();
+            chart?.ClearSecondaryData();
             applyRadarData(createGeneralRadarData(difficulty), getGeneralAxisMaxValues());
         }
 
         private void updateRulesetSpecificRadarPresentation()
         {
-            if (RadarDisplayMode.Value == EzRadarDisplayMode.Metadate)
+            if (RadarDisplayMode.Value is EzRadarDisplayMode.Metadate or EzRadarDisplayMode.SkillDual or EzRadarDisplayMode.SkillChart)
                 return;
 
-            if (cachedRulesetSpecificRadarResult is EzRulesetSpecificRadarResult cachedResult)
-                applyRulesetSpecificRadarResult(cachedResult);
-            else
-                updateParameterRatios(difficultyBindable?.Value ?? default);
+            if (beatmap.Value.BeatmapInfo is BeatmapInfo beatmapInfo && isRulesetRadarCacheValid(beatmapInfo))
+            {
+                // Reuse the applied result instead of restarting the (expensive) ruleset compute on every
+                // star-difficulty rebind for the same chart + mods.
+                applyRulesetSpecificRadarResult(cachedRulesetSpecificRadarResult!.Value);
+                return;
+            }
+
+            if (!beginRulesetSpecificRadarUpdate())
+            {
+                // No analysis provider for this ruleset: keep the general star/CS/OD radar (pre-existing fallback).
+                cancelRadarAnalysis();
+                chart?.ClearSecondaryData();
+                applyRadarData(createGeneralRadarData(difficultyBindable?.Value ?? default), getGeneralAxisMaxValues());
+            }
         }
+
+        private void updateSkillRadarPresentation()
+        {
+            var beatmapInfo = beatmap.Value.BeatmapInfo;
+
+            if (beatmapInfo == null)
+            {
+                cancelLiveKick();
+                cancelRadarAnalysis();
+                clearChartData();
+                chart?.ClearSecondaryData();
+                return;
+            }
+
+            var profile = skillProvider?.GetProfile(beatmapInfo.Ruleset.OnlineID);
+
+            if (profile == null)
+            {
+                cancelLiveKick();
+                cancelRadarAnalysis();
+                clearChartData();
+                chart?.ClearSecondaryData();
+                return;
+            }
+
+            if (beatmapInfo.Ruleset.OnlineID != EzLocalProfileConstants.MANIA_RULESET_ID)
+            {
+                cancelLiveKick();
+                cancelRadarAnalysis();
+                clearChartData();
+                chart?.ClearSecondaryData();
+                return;
+            }
+
+            // Key locked to current beatmap CS (same-beatmap ChartDan only if CS missing).
+            // Live mods may override after async compute.
+            int keyCount = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
+
+            // One Realm read serves both the CS-missing key fallback and the LN pre-judgement below.
+            EzPersistedChartDan? persistedChartDan = null;
+
+            skillProvider?.TryGetPersistedChartDan(beatmapInfo, out persistedChartDan);
+
+            if (keyCount <= 0 && persistedChartDan is { KeyCount: > 0 })
+                keyCount = persistedChartDan.KeyCount;
+
+            string? username = TargetUsername.Value;
+            IReadOnlyList<Mod> localMods = mods.Value;
+
+            // Instant: Realm MSD (xxy L1).
+            IReadOnlyDictionary<string, double> msd = skillProvider?.GetBeatmapMsd(beatmapInfo.Hash)
+                                                      ?? new Dictionary<string, double>();
+
+            // Cheap (no mod deep-clone) identity of what the live pass would compute.
+            var liveCacheKey = createRadarKey(beatmapInfo, ruleset.Value, localMods, RadarDisplayMode.Value);
+            bool hasCachedLive = cachedLiveSkillSnapshotKey == liveCacheKey && cachedLiveSkillSnapshot != null;
+
+            // Decide LN vs RC *before* painting: the live LN compute lands a few frames later, and painting the RC
+            // radar first visibly morphs into the LN radar (different axis count + labels).
+            bool lnExpected = expectsLnSkillRadar(beatmapInfo, keyCount, msd, persistedChartDan);
+
+            if (hasCachedLive)
+            {
+                // Known result for this exact (beatmap, mods): paint it directly, no LN/RC frame to correct.
+                var cachedSnap = cachedLiveSkillSnapshot!;
+                applySkillRadarLayers(cachedSnap.KeyCount > 0 ? cachedSnap.KeyCount : keyCount, username, cachedSnap.Msd, cachedSnap);
+            }
+            else if (lnExpected)
+                applyLnSkillRadar(EzLnSkillRadar.BuildAxes(null, null, keyCount));
+            else
+                applySkillRadarLayers(keyCount, username, msd, live: null);
+
+            // Always live-recompute selected chart MSD (xxySR analysis rhythm), including nomod.
+            if (skillProvider == null)
+                return;
+
+            // Superseded: stop the previous chart's in-flight compute now; it no longer has a holder.
+            if (lastLiveKickKey != null && lastLiveKickKey != liveCacheKey)
+                cancelRadarAnalysis();
+
+            // Same (beatmap, mods) already painted or already in flight: the placeholder → real star-difficulty
+            // rebind must not restart the whole playable + Mina/xxy pass.
+            if (hasCachedLive || lastLiveKickKey == liveCacheKey)
+                return;
+
+            var provider = skillProvider;
+            lastLiveKickKey = liveCacheKey;
+
+            // Coalesce placeholder/repeat presentments and fast scrolling into one compute for the settled chart.
+            liveKickDebounce?.Cancel();
+            liveKickDebounce = Scheduler.AddDelayed(() =>
+            {
+                liveKickDebounce = null;
+
+                if (lastLiveKickKey != liveCacheKey)
+                    return;
+
+                cancelRadarAnalysis();
+                radarAnalysisCancellationSource = new CancellationTokenSource();
+                CancellationToken token = radarAnalysisCancellationSource.Token;
+
+                provider.GetOrComputeLiveChartSkillsAsync(beatmapInfo, localMods, token)
+                        .ContinueWith(task =>
+                        {
+                            Schedule(() =>
+                            {
+                                if (token.IsCancellationRequested)
+                                    return;
+
+                                if (task.IsCanceled || task.IsFaulted)
+                                    return;
+
+                                var snap = task.GetResultSafely();
+
+                                if (snap == null || snap.Msd.Count == 0)
+                                {
+                                    // Live compute unavailable: never leave the pre-judged LN frame empty — fall back to RC.
+                                    if (lnExpected)
+                                        applySkillRadarLayers(keyCount, TargetUsername.Value, msd, live: null);
+
+                                    // Allow a later re-presentation to retry rather than blocking on a failed kick.
+                                    if (lastLiveKickKey == liveCacheKey)
+                                        lastLiveKickKey = null;
+
+                                    return;
+                                }
+
+                                cachedLiveSkillSnapshotKey = liveCacheKey;
+                                cachedLiveSkillSnapshot = snap;
+
+                                applySkillRadarLayers(
+                                    snap.KeyCount > 0 ? snap.KeyCount : keyCount,
+                                    TargetUsername.Value,
+                                    snap.Msd,
+                                    snap);
+                            });
+                        }, token);
+            }, live_kick_debounce_ms);
+        }
+
+        /// <summary>
+        /// Synchronous LN/RC pre-judgement. Realm-persisted ChartDan with an LN half is authoritative
+        /// (written through the same hold gate); otherwise fall back to that gate using Realm MSD hold ratio
+        /// and the stored hold-object count.
+        /// </summary>
+        private bool expectsLnSkillRadar(BeatmapInfo beatmapInfo, int keyCount, IReadOnlyDictionary<string, double> msd, EzPersistedChartDan? persistedChartDan)
+        {
+            if (keyCount <= 0)
+                return false;
+
+            if (persistedChartDan != null && persistedChartDan.HasSide(EzDanSide.Ln))
+                return true;
+
+            double holdRatio = 0;
+
+            if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
+                holdRatio = Math.Clamp(cachedHold, 0, 1);
+
+            // MSD may pre-date the hold-ratio skill id; stored CSI carries the chart LN ratio.
+            if (holdRatio <= 0
+                && skillProvider != null
+                && skillProvider.TryGetStoredChartSkillInfo(beatmapInfo, out var chartInfo)
+                && chartInfo?.LnRatio is double lnRatio
+                && double.IsFinite(lnRatio))
+            {
+                holdRatio = Math.Clamp(lnRatio, 0, 1);
+            }
+
+            int holdCount = EzChartDanEstimator.TryHoldCountFromBeatmapInfo(beatmapInfo);
+
+            return EzDanAlgorithm.AllowsPersistedChartLnHalf(keyCount, holdRatio, holdCount);
+        }
+
+        private void applySkillRadarLayers(
+            int keyCount,
+            string? username,
+            IReadOnlyDictionary<string, double> msd,
+            EzLiveChartSkillSnapshot? live)
+        {
+            // LN skill: same gate as DualPanel / ChartDan LN half (hold count > 100 OR hub ratio).
+            if (live?.LnMetrics != null
+                && keyCount > 0
+                && EzDanAlgorithm.AllowsPersistedChartLnHalf(keyCount, live.HoldRatio, live.HoldCount))
+            {
+                applyLnSkillRadar(live.LnMetrics, live.LnSubtypeScores, keyCount);
+                return;
+            }
+
+            // All keys: Mina SSR ↔ MSD (same algorithm). No fabricated pattern yellow.
+            IReadOnlyDictionary<string, double> ssr = new Dictionary<string, double>();
+
+            if (!string.IsNullOrWhiteSpace(username) && keyCount > 0 && skillProvider != null)
+                ssr = skillProvider.GetPlayerSsrSnapshot(username, keyCount).Values;
+
+            bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.SkillChart;
+
+            var selected = new List<EzMinaSkillAxis>(skill_radar_axes.Length);
+
+            foreach (var axis in skill_radar_axes)
+            {
+                double chartValue = msd.GetValueOrDefault(axis.ToMsdSkillId(), 0);
+                // Same floor as the player SSR side / hub skillModeEntries: the generic n-key
+                // engine returns a ~0.18 sliver for skillsets it does not rate (Technical on
+                // 5K and 8K+), which is noise next to a real 10+ bar — not a spoke.
+                if (!double.IsFinite(chartValue) || chartValue < EzPatternRatings.DISPLAY_MIN)
+                    continue;
+
+                if (beatmapOnly)
+                {
+                    selected.Add(axis);
+                    continue;
+                }
+
+                double playerValue = ssr.GetValueOrDefault(axis.ToSsrSkillId(), 0);
+                if (!double.IsFinite(playerValue) || playerValue < EzPatternRatings.DISPLAY_MIN)
+                    continue;
+
+                // Dual: commonality only — both chart MSD and player SSR present.
+                selected.Add(axis);
+            }
+
+            // Beatmap: show every real MSD axis above the hub display floor (pad to 3 for EzRadarChart).
+            // Dual with no overlap: fall back to chart axes.
+            if (selected.Count == 0 && !beatmapOnly)
+            {
+                foreach (var axis in skill_radar_axes)
+                {
+                    double chartValue = msd.GetValueOrDefault(axis.ToMsdSkillId(), 0);
+                    if (double.IsFinite(chartValue) && chartValue >= EzPatternRatings.DISPLAY_MIN)
+                        selected.Add(axis);
+                }
+            }
+
+            if (selected.Count == 0)
+            {
+                clearChartData();
+                chart?.ClearSecondaryData();
+                return;
+            }
+
+            AxisCount = Math.Max(3, selected.Count);
+            activeAxisLabels = new string[AxisCount];
+            activeAxisFormats = Enumerable.Repeat("0.00", AxisCount).ToArray();
+
+            double maxMina = 0;
+            double[] chartValues = new double[AxisCount];
+            double[] playerValues = new double[AxisCount];
+
+            for (int i = 0; i < selected.Count; i++)
+            {
+                var axis = selected[i];
+                activeAxisLabels[i] = skillAxisDisplayName(axis);
+                double beatmapValue = msd.GetValueOrDefault(axis.ToMsdSkillId(), 0);
+                double playerValue = beatmapOnly ? 0 : ssr.GetValueOrDefault(axis.ToSsrSkillId(), 0);
+                if (playerValue < EzPatternRatings.DISPLAY_MIN)
+                    playerValue = 0;
+
+                chartValues[i] = beatmapValue;
+                playerValues[i] = playerValue;
+                parameterValues[i] = (float)beatmapValue;
+                maxMina = Math.Max(maxMina, Math.Max(beatmapValue, playerValue));
+            }
+
+            for (int i = selected.Count; i < AxisCount; i++)
+            {
+                activeAxisLabels[i] = string.Empty;
+                chartValues[i] = 0;
+                playerValues[i] = 0;
+                parameterValues[i] = 0;
+            }
+
+            if (maxMina <= 0)
+                maxMina = 1;
+
+            float[] beatmapRatios = new float[AxisCount];
+            float[] playerRatios = new float[AxisCount];
+
+            for (int i = 0; i < AxisCount; i++)
+            {
+                beatmapRatios[i] = (float)(chartValues[i] / maxMina);
+                playerRatios[i] = (float)(playerValues[i] / maxMina);
+            }
+
+            chart?.SetData(beatmapRatios);
+
+            if (beatmapOnly)
+                chart?.ClearSecondaryData();
+            else
+                chart?.SetSecondaryData(playerRatios);
+
+            updateAxisTexts();
+            applyChartColours();
+        }
+
+        private void applyLnSkillRadar(
+            EzDanFeatureMetrics metrics,
+            IReadOnlyDictionary<string, double>? subtypeScores,
+            int keyCount)
+            => applyLnSkillRadar(EzLnSkillRadar.BuildAxes(metrics, subtypeScores, keyCount));
+
+        private void applyLnSkillRadar(IReadOnlyList<EzLnSkillRadar.Axis> lnAxes)
+        {
+            AxisCount = lnAxes.Count;
+            activeAxisLabels = lnAxes.Select(static a => a.Label.ToString()).ToArray();
+            activeAxisFormats = Enumerable.Repeat("0.00", lnAxes.Count).ToArray();
+
+            float[] beatmapRatios = new float[lnAxes.Count];
+            float[] playerRatios = new float[lnAxes.Count];
+
+            for (int i = 0; i < lnAxes.Count; i++)
+            {
+                // Labels show per-axis normalized floats (comparable across different raw scales).
+                parameterValues[i] = lnAxes[i].Normalized;
+                beatmapRatios[i] = lnAxes[i].Normalized;
+                playerRatios[i] = 0;
+            }
+
+            chart?.SetData(beatmapRatios);
+            chart?.SetSecondaryData(playerRatios);
+            updateAxisTexts();
+            applyChartColours();
+        }
+
+        private bool isMinaSkillRadarMode()
+            => RadarDisplayMode.Value is EzRadarDisplayMode.SkillDual or EzRadarDisplayMode.SkillChart;
+
+        private static readonly EzMinaSkillAxis[] skill_radar_axes = EzMinaSkillAxisExtensions.RadarAxes;
+
+        private static string skillAxisDisplayName(EzMinaSkillAxis axis)
+            => axis.Chip().Name.ToString();
+
+        private static EzRadarComputeKey createRadarKey(BeatmapInfo beatmapInfo, RulesetInfo ruleset, IReadOnlyList<Mod>? mods, EzRadarDisplayMode mode)
+            => new EzRadarComputeKey(beatmapInfo.Hash, ruleset.OnlineID, EzAnalysisLookupCache.ComputeModsSignature(mods), mode);
+
+        private void cancelRadarAnalysis()
+        {
+            radarAnalysisCancellationSource?.Cancel();
+            radarAnalysisCancellationSource?.Dispose();
+            radarAnalysisCancellationSource = null;
+        }
+
+        /// <summary>
+        /// Drop pending debounce + kick guards. Called when the chart / mods / ruleset changed, so the next
+        /// presentation is allowed to kick again (a chart switched away from and back must not be blocked by a
+        /// cancelled in-flight kick).
+        /// </summary>
+        private void resetRadarKickGuards()
+        {
+            liveKickDebounce?.Cancel();
+            liveKickDebounce = null;
+            lastLiveKickKey = null;
+            lastRulesetRadarKickKey = null;
+        }
+
+        /// <summary>Cancel a pending (not yet started) live skill kick when leaving skill radar mode.</summary>
+        private void cancelLiveKick()
+        {
+            liveKickDebounce?.Cancel();
+            liveKickDebounce = null;
+            lastLiveKickKey = null;
+        }
+
+        private bool isRulesetRadarCacheValid(BeatmapInfo beatmapInfo)
+            => cachedRulesetSpecificRadarResult != null
+               && cachedRulesetSpecificRadarKey is { } key
+               && key == createRadarKey(beatmapInfo, ruleset.Value, mods.Value, RadarDisplayMode.Value);
 
         private bool beginRulesetSpecificRadarUpdate()
         {
             if (!EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value))
                 return false;
 
-            cancelRadarAnalysis();
-
             if (beatmap.Value.BeatmapInfo is not BeatmapInfo beatmapInfo)
             {
+                cancelRadarAnalysis();
+                lastRulesetRadarKickKey = null;
                 clearChartData();
                 return true;
             }
 
+            var key = createRadarKey(beatmapInfo, ruleset.Value, mods.Value, RadarDisplayMode.Value);
+
+            // Same chart + mods + mode already kicked: the first pass is still in flight (or has already been
+            // applied / is cached). Restarting here is what ran the full ruleset compute twice per song switch.
+            if (lastRulesetRadarKickKey == key)
+                return true;
+
+            cancelRadarAnalysis();
             clearChartData();
 
+            lastRulesetRadarKickKey = key;
             radarAnalysisCancellationSource = new CancellationTokenSource();
 
             CancellationToken cancellationToken = radarAnalysisCancellationSource.Token;
@@ -364,7 +848,13 @@ namespace osu.Game.EzOsuGame.HUD
                         if (radarResult != null)
                         {
                             cachedRulesetSpecificRadarResult = radarResult.Value;
+                            cachedRulesetSpecificRadarKey = key;
                             applyRulesetSpecificRadarResult(radarResult.Value);
+                        }
+                        else if (lastRulesetRadarKickKey == key)
+                        {
+                            // A failed / unavailable compute must not block a retry on the next presentation.
+                            lastRulesetRadarKickKey = null;
                         }
                     });
                 }, cancellationToken);
@@ -389,7 +879,7 @@ namespace osu.Game.EzOsuGame.HUD
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, $"[EzComRadarPanel] Failed to compute ruleset radar for beatmapId={beatmapInfo.ID}.");
+                Logger.Error(ex, $"[EzComRadarPanel] Failed to compute ruleset radar for beatmapId={beatmapInfo.ID}.", Ez2ConfigManager.LOGGER_NAME);
                 return null;
             }
         }
@@ -418,7 +908,9 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 EzRadarAxisValue<string> axis = radarData[i];
 
-                activeAxisLabels[i] = axis.Axis;
+                activeAxisLabels[i] = EzPatternAxisExtensions.TryParse(axis.Axis, out var pattern)
+                    ? pattern.DisplayName().ToString()
+                    : axis.Axis;
                 activeAxisFormats[i] = axis.Format;
                 parameterValues[i] = (float)axis.Value;
                 parameterRatios[i] = normalise(parameterValues[i], i < maxValues.Count ? maxValues[i] : 0);
@@ -431,11 +923,13 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             chart?.SetData(parameterRatios);
+            chart?.ClearSecondaryData();
             updateAxisTexts();
         }
 
         private void applyRulesetSpecificRadarResult(EzRulesetSpecificRadarResult radarResult)
         {
+            chart?.ClearSecondaryData();
             EzRadarChartData<string> displayedRadarData = createDisplayedRulesetRadarData(radarResult);
             applyRadarData(displayedRadarData, getRulesetSpecificAxisMaxValues());
         }
@@ -487,14 +981,8 @@ namespace osu.Game.EzOsuGame.HUD
             Array.Clear(parameterValues, 0, parameterValues.Length);
             Array.Clear(parameterRatios, 0, parameterRatios.Length);
             chart?.SetData(parameterRatios);
+            chart?.ClearSecondaryData();
             updateAxisTexts();
-        }
-
-        private void cancelRadarAnalysis()
-        {
-            radarAnalysisCancellationSource?.Cancel();
-            radarAnalysisCancellationSource?.Dispose();
-            radarAnalysisCancellationSource = null;
         }
 
         private static float normalise(float value, float maxValue)
@@ -516,7 +1004,10 @@ namespace osu.Game.EzOsuGame.HUD
             chart.DataStrokeColour = DataLineColour.Value;
             chart.DataPointColour = DataLineColour.Value;
             chart.DataFillColour = DataAreaColour.Value;
-            chart.Invalidate(Invalidation.DrawNode);
+            chart.SecondaryDataStrokeColour = PlayerDataLineColour.Value;
+            chart.SecondaryDataPointColour = PlayerDataLineColour.Value;
+            chart.SecondaryDataFillColour = PlayerDataAreaColour.Value;
+            chart.InvalidateChartGeometry();
 
             foreach (var container in axisLabelContainers)
             {
@@ -597,11 +1088,9 @@ namespace osu.Game.EzOsuGame.HUD
                 var labelText = axisLabelContainers[i].OfType<OsuSpriteText>().FirstOrDefault(t => t.Name == "LabelText");
                 var valueText = axisLabelContainers[i].OfType<OsuSpriteText>().FirstOrDefault(t => t.Name == "ValueText");
 
-                if (labelText != null)
-                    labelText.Text = getAxisLabel(i);
+                labelText?.Text = getAxisLabel(i);
 
-                if (valueText != null)
-                    valueText.Text = formatAxisValue(i);
+                valueText?.Text = formatAxisValue(i);
             }
         }
 
@@ -633,305 +1122,6 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             base.Dispose(isDisposing);
-        }
-    }
-
-    public partial class RadarChart : Drawable
-    {
-        private int axisCount = 6;
-        private float[] dataRatios = new float[6];
-        private Texture? whitePixel;
-
-        public int AxisCount
-        {
-            get => axisCount;
-            set
-            {
-                int clamped = Math.Max(3, value);
-
-                if (axisCount == clamped)
-                    return;
-
-                axisCount = clamped;
-                Array.Resize(ref dataRatios, axisCount);
-                Invalidate(Invalidation.DrawNode);
-            }
-        }
-
-        public int GridLevels { get; set; } = 4;
-
-        public float RadiusRatio { get; set; } = 0.82f;
-
-        public float GridThickness { get; set; } = 1.5f;
-
-        public float AxisThickness { get; set; } = 1.5f;
-
-        public float DataOutlineThickness { get; set; } = 2.2f;
-
-        public float DataPointSize { get; set; } = 5f;
-
-        public Color4 GridColour { get; set; } = new Color4(255, 255, 210, 110);
-
-        public Color4 AxisColour { get; set; } = new Color4(255, 255, 210, 95);
-
-        public Color4 BaseFillColour { get; set; } = new Color4(255, 255, 200, 30);
-
-        public Color4 DataFillColour { get; set; } = new Color4(255, 215, 0, 95);
-
-        public Color4 DataStrokeColour { get; set; } = new Color4(255, 230, 128, 230);
-
-        public Color4 DataPointColour { get; set; } = new Color4(255, 242, 176, 255);
-
-        public RadarChart()
-        {
-            Anchor = Anchor.Centre;
-            Origin = Anchor.Centre;
-        }
-
-        [BackgroundDependencyLoader]
-        private void load(IRenderer renderer)
-        {
-            whitePixel = createWhitePixelTexture(renderer);
-        }
-
-        private static Texture createWhitePixelTexture(IRenderer renderer)
-        {
-            var texture = renderer.CreateTexture(1, 1, true);
-            var image = new Image<Rgba32>(1, 1);
-            image[0, 0] = new Rgba32(255, 255, 255, 255);
-            texture.SetData(new TextureUpload(image));
-            return texture;
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-                whitePixel?.Dispose();
-
-            base.Dispose(isDisposing);
-        }
-
-        public void SetData(IReadOnlyList<float> ratios)
-        {
-            for (int i = 0; i < axisCount; i++)
-                dataRatios[i] = i < ratios.Count ? Math.Clamp(ratios[i], 0, 1) : 0;
-
-            Invalidate(Invalidation.DrawNode);
-        }
-
-        protected override DrawNode CreateDrawNode() => new RadarChartDrawNode(this);
-
-        private class RadarChartDrawNode : DrawNode
-        {
-            private readonly RadarChart source;
-
-            private float[] ratios = Array.Empty<float>();
-            private int axisCount;
-
-            private int gridLevels;
-            private float radiusRatio;
-            private float gridThickness;
-            private float axisThickness;
-            private float dataOutlineThickness;
-            private float dataPointSize;
-
-            private Color4 gridColour;
-            private Color4 axisColour;
-            private Color4 baseFillColour;
-            private Color4 dataFillColour;
-            private Color4 dataStrokeColour;
-            private Color4 dataPointColour;
-
-            private Vector2 drawSize;
-            private Texture? texture;
-
-            public RadarChartDrawNode(RadarChart chart)
-                : base(chart)
-            {
-                source = chart;
-            }
-
-            public override void ApplyState()
-            {
-                base.ApplyState();
-
-                texture = source.whitePixel;
-
-                drawSize = source.DrawSize;
-                axisCount = source.AxisCount;
-
-                if (ratios.Length != axisCount)
-                    Array.Resize(ref ratios, axisCount);
-
-                gridLevels = Math.Max(1, source.GridLevels);
-                radiusRatio = Math.Clamp(source.RadiusRatio, 0.1f, 1);
-                gridThickness = Math.Max(0.5f, source.GridThickness);
-                axisThickness = Math.Max(0.5f, source.AxisThickness);
-                dataOutlineThickness = Math.Max(0.5f, source.DataOutlineThickness);
-                dataPointSize = Math.Max(1, source.DataPointSize);
-
-                gridColour = source.GridColour;
-                axisColour = source.AxisColour;
-                baseFillColour = source.BaseFillColour;
-                dataFillColour = source.DataFillColour;
-                dataStrokeColour = source.DataStrokeColour;
-                dataPointColour = source.DataPointColour;
-
-                for (int i = 0; i < axisCount; i++)
-                    ratios[i] = source.dataRatios[i];
-            }
-
-            protected override void Draw(IRenderer renderer)
-            {
-                if (texture == null)
-                    return;
-
-                float radius = Math.Min(drawSize.X, drawSize.Y) * 0.5f * radiusRatio;
-                if (radius <= 0)
-                    return;
-
-                Vector2 center = drawSize * 0.5f;
-
-                renderer.PushLocalMatrix(DrawInfo.Matrix);
-
-                var outerVertices = createVertices(center, radius, 1);
-
-                drawPolygonFill(renderer, outerVertices, baseFillColour);
-
-                for (int level = 1; level <= gridLevels; level++)
-                {
-                    float ratio = level / (float)gridLevels;
-                    var levelVertices = createVertices(center, radius, ratio);
-                    drawPolygonOutline(renderer, levelVertices, gridColour, gridThickness);
-                }
-
-                for (int i = 0; i < axisCount; i++)
-                    drawLine(renderer, center, outerVertices[i], axisColour, axisThickness);
-
-                var dataVertices = createVertices(center, radius, ratios);
-
-                drawFanFill(renderer, center, dataVertices, dataFillColour);
-                drawPolygonOutline(renderer, dataVertices, dataStrokeColour, dataOutlineThickness);
-                drawPoints(renderer, dataVertices, dataPointColour, dataPointSize);
-
-                renderer.PopLocalMatrix();
-            }
-
-            private Vector2[] createVertices(Vector2 center, float radius, float ratio)
-            {
-                var vertices = new Vector2[axisCount];
-
-                for (int i = 0; i < axisCount; i++)
-                {
-                    float angle = MathHelper.DegreesToRadians(360f / axisCount * i - 90);
-                    vertices[i] = new Vector2(
-                        center.X + radius * ratio * (float)Math.Cos(angle),
-                        center.Y + radius * ratio * (float)Math.Sin(angle)
-                    );
-                }
-
-                return vertices;
-            }
-
-            private Vector2[] createVertices(Vector2 center, float radius, IReadOnlyList<float> axisRatios)
-            {
-                var vertices = new Vector2[axisCount];
-
-                for (int i = 0; i < axisCount; i++)
-                {
-                    float clampedRatio = Math.Clamp(axisRatios[i], 0, 1);
-                    float angle = MathHelper.DegreesToRadians(360f / axisCount * i - 90);
-                    vertices[i] = new Vector2(
-                        center.X + radius * clampedRatio * (float)Math.Cos(angle),
-                        center.Y + radius * clampedRatio * (float)Math.Sin(angle)
-                    );
-                }
-
-                return vertices;
-            }
-
-            private void drawPolygonFill(IRenderer renderer, IReadOnlyList<Vector2> polygonVertices, Color4 colour)
-            {
-                for (int i = 1; i < polygonVertices.Count - 1; i++)
-                {
-                    renderer.DrawTriangle(
-                        texture!,
-                        new Triangle(
-                            polygonVertices[0],
-                            polygonVertices[i],
-                            polygonVertices[i + 1]),
-                        colour);
-                }
-            }
-
-            private void drawFanFill(IRenderer renderer, Vector2 center, IReadOnlyList<Vector2> polygonVertices, Color4 colour)
-            {
-                for (int i = 0; i < polygonVertices.Count; i++)
-                {
-                    renderer.DrawTriangle(
-                        texture!,
-                        new Triangle(
-                            center,
-                            polygonVertices[i],
-                            polygonVertices[(i + 1) % polygonVertices.Count]),
-                        colour);
-                }
-            }
-
-            private void drawPolygonOutline(IRenderer renderer, IReadOnlyList<Vector2> polygonVertices, Color4 colour, float thickness)
-            {
-                for (int i = 0; i < polygonVertices.Count; i++)
-                {
-                    Vector2 start = polygonVertices[i];
-                    Vector2 end = polygonVertices[(i + 1) % polygonVertices.Count];
-                    drawLine(renderer, start, end, colour, thickness);
-                }
-            }
-
-            private void drawPoints(IRenderer renderer, IReadOnlyList<Vector2> polygonVertices, Color4 colour, float pointSize)
-            {
-                float half = pointSize * 0.5f;
-
-                for (int i = 0; i < polygonVertices.Count; i++)
-                {
-                    Vector2 point = polygonVertices[i];
-
-                    renderer.DrawTriangle(
-                        texture!,
-                        new Triangle(
-                            new Vector2(point.X - half, point.Y - half),
-                            new Vector2(point.X + half, point.Y - half),
-                            new Vector2(point.X + half, point.Y + half)),
-                        colour);
-
-                    renderer.DrawTriangle(
-                        texture!,
-                        new Triangle(
-                            new Vector2(point.X - half, point.Y - half),
-                            new Vector2(point.X + half, point.Y + half),
-                            new Vector2(point.X - half, point.Y + half)),
-                        colour);
-                }
-            }
-
-            private void drawLine(IRenderer renderer, Vector2 start, Vector2 end, Color4 colour, float thickness)
-            {
-                Vector2 direction = end - start;
-                if (direction.LengthSquared <= float.Epsilon)
-                    return;
-
-                direction.Normalize();
-                Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * (thickness * 0.5f);
-
-                renderer.DrawQuad(
-                    texture!,
-                    new Quad(
-                        start - perpendicular,
-                        start + perpendicular,
-                        end - perpendicular,
-                        end + perpendicular),
-                    colour);
-            }
         }
     }
 }

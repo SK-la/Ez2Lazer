@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Game.Audio;
 using osu.Game.Beatmaps.Timing;
 using osu.Game.Rulesets.Objects;
 using System.Collections.Generic;
@@ -14,7 +15,7 @@ using osu.Game.IO.Serialization.Converters;
 
 namespace osu.Game.Beatmaps
 {
-    public class Beatmap<T> : IBeatmap<T>
+    public class Beatmap<T> : IBeatmap<T>, IDetachedSampleHost
         where T : HitObject
     {
         private BeatmapDifficulty difficulty = new BeatmapDifficulty();
@@ -65,13 +66,45 @@ namespace osu.Game.Beatmaps
 
         public SortedList<BreakPeriod> Breaks { get; set; } = new SortedList<BreakPeriod>(Comparer<BreakPeriod>.Default);
 
-        public List<string> UnhandledEventLines { get; set; } = new List<string>();
-
         [JsonIgnore]
         public double TotalBreakTime => Breaks.Sum(b => b.Duration);
 
         [JsonConverter(typeof(TypedListConverter<HitObject>))]
         public List<T> HitObjects { get; set; } = new List<T>();
+
+        /// <summary>
+        /// Samples that hit objects removed or rewritten by a mod carried, kept so their audio still sounds at its
+        /// original time.
+        /// </summary>
+        /// <remarks>
+        /// Populated by <see cref="DetachedSampleLedger"/> on the playable copy a mod operated on; not serialised.
+        /// </remarks>
+        [JsonIgnore]
+        public List<DetachedNoteSample> DetachedSamples { get; } = new List<DetachedNoteSample>();
+
+        /// <summary>
+        /// Maps a hit object to the 0..1 playfield position its samples should be panned to.
+        /// </summary>
+        /// <remarks>
+        /// Rulesets with a horizontally laid out playfield override this so detached samples keep the column the
+        /// object occupied; objects without a horizontal placement are centred.
+        /// </remarks>
+        [JsonIgnore]
+        public Func<HitObject, float> SamplePositionResolver { get; set; } = _ => DetachedNoteSample.CENTRE;
+
+        /// <inheritdoc/>
+        [JsonIgnore]
+        public Func<HitObject, IEnumerable<(double Time, HitSampleInfo Sample)>> SampleTimelineResolver { get; set; } = DetachedSampleLedger.GetDefaultTimeline;
+
+        /// <summary>
+        /// Whether a detached sample counts as a hitsound rather than plain background audio.
+        /// </summary>
+        /// <remarks>
+        /// Note audio is a hitsound by default: it is what the note sounded as, and rulesets that want the audio
+        /// treated as background instead can override this.
+        /// </remarks>
+        [JsonIgnore]
+        public Func<ISampleInfo, bool> DetachedSampleIsHitsound { get; set; } = _ => true;
 
         IReadOnlyList<T> IBeatmap<T>.HitObjects => HitObjects;
 
@@ -147,6 +180,8 @@ namespace osu.Game.Beatmaps
         public int CountdownOffset { get; set; }
 
         public int[] Bookmarks { get; set; } = Array.Empty<int>();
+
+        public double[] SliderVelocityPresets { get; set; } = [0.75, 1, 1.5];
 
         public int BeatmapVersion { get; set; } = LegacyBeatmapEncoder.FIRST_LAZER_VERSION;
 

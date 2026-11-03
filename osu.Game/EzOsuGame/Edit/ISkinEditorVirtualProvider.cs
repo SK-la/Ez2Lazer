@@ -15,7 +15,7 @@ namespace osu.Game.EzOsuGame.Edit
         /// Creates the dynamic part (left) of the editor. Typically a virtual playfield
         /// which may depend on the beatmap.
         /// </summary>
-        Drawable CreateDynamicPart(ISkin skin);
+        Drawable CreateDynamicPart(ISkin skin, int keyCount);
 
         /// <summary>
         /// Creates the static part (center) of the editor. Typically shows current vs edited

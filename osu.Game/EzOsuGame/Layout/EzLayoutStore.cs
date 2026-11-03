@@ -1,0 +1,162 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using Newtonsoft.Json;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.IO.Serialization;
+using osu.Framework.Logging;
+using osu.Framework.Platform;
+using osu.Game.Skinning;
+
+namespace osu.Game.EzOsuGame.Layout
+{
+    /// <summary>
+    /// Loads and saves Ez client layout JSON under <see cref="EzModifyPath.CONFIG_LAYOUT_PATH"/>.
+    /// Independent of skin files and Realm skin storage.
+    /// </summary>
+    public class EzLayoutStore
+    {
+        private static readonly JsonSerializerSettings json_settings = new JsonSerializerSettings
+        {
+            Formatting = Formatting.Indented,
+            ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
+            Converters = new List<JsonConverter> { new Vector2Converter() },
+        };
+
+        private readonly Storage storage;
+
+        /// <summary>
+        /// Name of the layout set this store reads and writes (a folder under
+        /// <see cref="EzModifyPath.CONFIG_ROOT_PATH"/>). Defaults to
+        /// <see cref="EzModifyPath.LAYOUT_SET_DEFAULT"/> so existing installs keep their path.
+        /// </summary>
+        public string LayoutSetName { get; }
+
+        public EzLayoutStore(Storage gameStorage, string layoutSetName = EzModifyPath.LAYOUT_SET_DEFAULT)
+        {
+            LayoutSetName = layoutSetName;
+            storage = gameStorage.GetStorageForDirectory(EzModifyPath.LayoutSetPath(layoutSetName));
+        }
+
+        public SkinLayoutInfo Load(GlobalSkinnableContainers target)
+        {
+            string filename = getFilename(target);
+
+            if (!storage.Exists(filename))
+                return new SkinLayoutInfo();
+
+            try
+            {
+                using (var stream = storage.GetStream(filename))
+                {
+                    if (stream == null)
+                        return new SkinLayoutInfo();
+
+                    using (var reader = new StreamReader(stream, Encoding.UTF8))
+                    {
+                        string json = reader.ReadToEnd();
+                        return JsonConvert.DeserializeObject<SkinLayoutInfo>(json, json_settings) ?? new SkinLayoutInfo();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, $"Failed to load Ez layout {filename}");
+                return new SkinLayoutInfo();
+            }
+        }
+
+        public void Save(SkinnableContainer container)
+        {
+            var layout = Load(container.Lookup.Lookup);
+            layout.Update(container.Lookup.Ruleset, ((ISerialisableDrawableContainer)container).CreateSerialisedInfo().ToArray());
+            Save(container.Lookup.Lookup, layout);
+        }
+
+        public void Save(GlobalSkinnableContainers target, SkinLayoutInfo layout)
+        {
+            string filename = getFilename(target);
+            string json = JsonConvert.SerializeObject(layout, json_settings);
+
+            using (var stream = storage.CreateFileSafely(filename))
+            using (var writer = new StreamWriter(stream, Encoding.UTF8))
+                writer.Write(json);
+        }
+
+        public void Reset(GlobalSkinnableContainers target)
+        {
+            string filename = getFilename(target);
+
+            if (storage.Exists(filename))
+                storage.Delete(filename);
+        }
+
+        public ManiaPlayfieldLayout LoadManiaPlayfieldLayout()
+        {
+            if (!storage.Exists(ManiaPlayfieldLayout.FILENAME))
+                return new ManiaPlayfieldLayout();
+
+            try
+            {
+                using (var stream = storage.GetStream(ManiaPlayfieldLayout.FILENAME))
+                {
+                    if (stream == null)
+                        return new ManiaPlayfieldLayout();
+
+                    using (var reader = new StreamReader(stream, Encoding.UTF8))
+                        return ManiaPlayfieldLayout.Parse(reader.ReadToEnd());
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, $"Failed to load Ez mania playfield layout {ManiaPlayfieldLayout.FILENAME}");
+                return new ManiaPlayfieldLayout();
+            }
+        }
+
+        public void SaveManiaPlayfieldLayout(ManiaPlayfieldLayout layout)
+        {
+            using (var stream = storage.CreateFileSafely(ManiaPlayfieldLayout.FILENAME))
+            using (var writer = new StreamWriter(stream, Encoding.UTF8))
+                writer.Write(layout.Serialize());
+        }
+
+        public void Reset(GlobalSkinnableContainerLookup lookup)
+        {
+            var layout = Load(lookup.Lookup);
+            layout.Reset(lookup.Ruleset);
+
+            if (layout.DrawableInfo.Count == 0)
+                Reset(lookup.Lookup);
+            else
+                Save(lookup.Lookup, layout);
+        }
+
+        public Container CreateComponentsContainer(GlobalSkinnableContainerLookup lookup)
+        {
+            var layout = Load(lookup.Lookup);
+
+            if (!layout.TryGetDrawableInfo(lookup.Ruleset, out var drawableInfos) || drawableInfos.Length == 0)
+            {
+                return new Container
+                {
+                    RelativeSizeAxes = Axes.Both,
+                };
+            }
+
+            return new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+                ChildrenEnumerable = drawableInfos.Select(i => i.CreateInstance())
+            };
+        }
+
+        private static string getFilename(GlobalSkinnableContainers target) => $"{target}.json";
+    }
+}

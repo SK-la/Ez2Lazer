@@ -1,15 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Project">
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <OutputType>Library</OutputType>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Label="Nuget">
-    <Title>osu!</Title>
-    <PackageId>ppy.osu.Game</PackageId>
+    <Title>Ez2Lazer</Title>
+    <PackageId>ez2lazer.Game</PackageId>
+    <AssemblyName>osu.Game</AssemblyName>
     <Version>0.0.0</Version>
     <PackageIcon>icon.png</PackageIcon>
     <IsPackable>true</IsPackable>
+    <!-- Ez2Lazer 的 framework/resources 依赖恒为预发布版本，打包时无需提示。 -->
+    <NoWarn>$(NoWarn);NU5104</NoWarn>
   </PropertyGroup>
   <ItemGroup Label="Icon">
     <None Include="..\assets\lazer-nuget.png">
@@ -23,39 +26,72 @@
       <NoWarn>NU1903</NoWarn>
     </PackageReference>
     <PackageReference Include="DiffPlex" Version="1.9.0" />
-    <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
-    <!-- Held back due to .NET 9 requirement. See https://github.com/Humanizr/Humanizer?tab=readme-ov-file#supported-frameworks-->
-    <PackageReference Include="Humanizer" Version="2.14.1" />
-    <PackageReference Include="MessagePack" Version="3.1.4" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.5" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="10.0.5" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.NewtonsoftJson" Version="10.0.5" />
-    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.5" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.5" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.13.1" />
+    <PackageReference Include="Humanizer" Version="3.0.10" />
+    <PackageReference Include="MessagePack" Version="3.1.12" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.13" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="10.0.13" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.NewtonsoftJson" Version="10.0.13" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="5.9.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.13" />
     <PackageReference Include="Microsoft.Toolkit.HighPerformance" Version="7.1.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="ppy.LocalisationAnalyser" Version="2025.1208.0">
+    <PackageReference Include="ppy.LocalisationAnalyser" Version="2026.611.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Realm" Version="20.1.0" />
-<!--    <PackageReference Include="ppy.osu.Framework" Version="2026.428.0" />-->
-<!--    <PackageReference Include="ppy.osu.Game.Resources" Version="2026.427.0" />-->
-    <PackageReference Include="Sentry" Version="6.2.0" />
-    <!-- Held back due to 0.34.0 failing AOT compilation on ZstdSharp.dll dependency. -->
-    <PackageReference Include="SharpCompress" Version="0.47.0" />
-    <PackageReference Include="NUnit" Version="4.5.1" />
-    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.2" />
-    <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
-    <PackageReference Include="TagLibSharp" Version="2.3.0" />
+    <!-- Realm 只把 Fody 作为传递依赖带入，而 Fody 的编织目标位于 build/ 下，传递依赖不会导入它。
+         一旦还原记录里丢掉该资产，编织会静默不执行，产物运行期才报 Realm 错误。显式引用可保证导入。 -->
+    <PackageReference Include="Fody" Version="6.9.1">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Realm" Version="20.1.0"/>
+    <PackageReference Include="ez2lazer.Framework" Version="[$(Ez2LazerFrameworkVersion)]" Condition="'$(UseEz2LazerLocalFrameworkProject)' != 'true'"/>
+    <PackageReference Include="ez2lazer.Game.Resources" Version="[$(Ez2LazerGameResourcesVersion)]" Condition="'$(UseEz2LazerLocalResourcesProject)' != 'true'"/>
+    <PackageReference Include="Sentry" Version="6.12.1" />
+    <PackageReference Include="SharpCompress" Version="0.50.4"/>
+    <PackageReference Include="NUnit" Version="5.0.0" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5"/>
+    <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0"/>
+    <PackageReference Include="TagLibSharp" Version="2.3.0"/>
+    <PackageReference Include="Live2DCSharpSDK" Version="1.0.0.6"/>
+    <!-- In-process WebAssembly host for the vendored n-key MinaCalc (4-18K mania MSD/SSR). -->
+    <PackageReference Include="Wasmtime" Version="48.0.2" />
 
     <!-- Required since Veldrid references a library that depends on Microsoft.DotNet.PlatformAbstractions (2.0.3), which doesn't play nice with Realm. -->
-    <PackageReference Include="System.IO.FileSystem.Primitives" Version="4.3.0" />
-    <PackageReference Include="System.Runtime.InteropServices" Version="4.3.0" />
-    <PackageReference Include="System.Runtime.Handles" Version="4.3.0" />
+    <PackageReference Include="System.IO.FileSystem.Primitives" Version="4.3.0">
+      <NoWarn>NU1510</NoWarn>
+    </PackageReference>
+    <PackageReference Include="System.Runtime.InteropServices" Version="4.3.0">
+      <NoWarn>NU1510</NoWarn>
+    </PackageReference>
+    <PackageReference Include="System.Runtime.Handles" Version="4.3.0">
+      <NoWarn>NU1510</NoWarn>
+    </PackageReference>
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\osu-resources\osu.Game.Resources\osu.Game.Resources.csproj" />
-    <ProjectReference Include="..\..\osu-framework\osu.Framework\osu.Framework.csproj" />
+  <ItemGroup Condition="'$(UseEz2LazerLocalFrameworkProject)' == 'true'">
+    <ProjectReference Include="$(Ez2LazerFrameworkProjectPath)" />
   </ItemGroup>
+  <ItemGroup Condition="'$(UseEz2LazerLocalResourcesProject)' == 'true'">
+    <ProjectReference Include="$(Ez2LazerResourcesProjectPath)" />
+  </ItemGroup>
+  <ItemGroup Label="EzSkills">
+    <!-- Deterministic manifest name for the vendored n-key MinaCalc wasm (4-18K MSD/SSR). -->
+    <EmbeddedResource Update="Resources\EzSkills\minaclac-74.0.wasm" LogicalName="osu.Game.Resources.EzSkills.minaclac-74.0.wasm" />
+    <!-- Licence/provenance notes are not runtime payload. -->
+    <EmbeddedResource Remove="Resources\EzSkills\NOTICE.md" />
+  </ItemGroup>
+  <!-- Fody 的编织目标来自 Fody 包的 build/ 目录；一旦还原记录丢失该资源，编织会静默不执行，
+       产物在运行期才报 Realm 错误。$(FodyAssembly) 只在 Fody.targets 被导入时存在，用它提前拦截。 -->
+  <Target Name="ValidateEzFodyImport"
+          BeforeTargets="BeforeBuild"
+          Condition="'$(DisableFody)' != 'true' and '$(DesignTimeBuild)' != 'true' and Exists('$(MSBuildProjectDirectory)\FodyWeavers.xml')">
+    <Error Condition="'$(FodyAssembly)' == ''"
+           Text="Fody.targets 未被导入，$(AssemblyName) 不会被编织，Realm 会在运行期报错。请删除 osu.Game\obj 后重新还原并构建。" />
+  </Target>
+  <Target Name="ValidateEz2LazerSiblingProjects" BeforeTargets="BeforeBuild">
+    <Error Condition="'$(UseEz2LazerLocalFrameworkProject)' == 'true' and !Exists('$(Ez2LazerFrameworkProjectPath)')" Text="Missing sibling directory ez2lazer-framework. Please clone https://github.com/SK-la/ez2lazer-framework into $(MSBuildThisFileDirectory)..\..\ez2lazer-framework, or disable UseEz2LazerLocalFrameworkProject to rely on NuGet." />
+    <Error Condition="'$(UseEz2LazerLocalResourcesProject)' == 'true' and !Exists('$(Ez2LazerResourcesProjectPath)')" Text="Missing sibling directory ez2lazer-resources. Please clone https://github.com/SK-la/ez2lazer-resources into $(MSBuildThisFileDirectory)..\..\ez2lazer-resources, or disable UseEz2LazerLocalResourcesProject to rely on NuGet." />
+  </Target>
 </Project>

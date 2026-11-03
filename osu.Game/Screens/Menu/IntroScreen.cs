@@ -20,6 +20,7 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.Extensions;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
@@ -104,6 +105,9 @@ namespace osu.Game.Screens.Menu
             this.createNextScreen = createNextScreen;
         }
 
+        [Resolved(CanBeNull = true)]
+        private IEzStartupWorkCoordinator startupWorkCoordinator { get; set; }
+
         [Resolved]
         private BeatmapManager beatmaps { get; set; }
 
@@ -132,7 +136,8 @@ namespace osu.Game.Screens.Menu
 
                     if (setCount > 0)
                     {
-                        var found = usableBeatmapSets[RNG.Next(0, setCount - 1)].Beatmaps.FirstOrDefault();
+                        // 要选择活动规则集谱面，防止随机到第三方规则集谱面而发生报错。
+                        var found = usableBeatmapSets[RNG.Next(0, setCount - 1)].Beatmaps.FirstOrDefault(b => b.Ruleset.Available);
 
                         if (found != null)
                             initialBeatmap = beatmaps.GetWorkingBeatmap(found);
@@ -184,7 +189,7 @@ namespace osu.Game.Screens.Menu
                 return UsingThemedIntro = initialBeatmap != null;
             }
 
-            AddInternal(new GlobalScrollAdjustsVolume());
+            AddInternal(new ScrollAdjustsVolume());
         }
 
         public override void OnEntering(ScreenTransitionEvent e)
@@ -332,7 +337,9 @@ namespace osu.Game.Screens.Menu
                 // an exception is running ruleset tests, where the osu! ruleset may not be present (causing importing the intro to fail).
                 if (initialBeatmap != null)
                     beatmap.Value = initialBeatmap;
-                Track = beatmap.Value.Track;
+
+                if (beatmap.Value != null)
+                    Track = beatmap.Value.Track;
 
                 // ensure the track starts at maximum volume
                 musicController.CurrentTrack.FinishTransforms();
@@ -365,13 +372,23 @@ namespace osu.Game.Screens.Menu
             nextScreen = createNextScreen?.Invoke();
 
             if (nextScreen != null)
-                LoadComponentAsync(nextScreen);
+            {
+                LoadComponentAsync(nextScreen, loaded =>
+                {
+                    if (loaded is MainMenu mainMenu)
+                        startupWorkCoordinator?.OnMainMenuOffscreenReady(mainMenu);
+                });
+            }
+
+            startupWorkCoordinator?.OnPrepareMenuLoad();
         }
 
         protected void LoadMenu()
         {
             if (DidLoadMenu)
                 return;
+
+            startupWorkCoordinator?.OnLoadMenu();
 
             beatmap.Return();
 

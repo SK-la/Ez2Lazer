@@ -3,11 +3,13 @@
 
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.Overlays;
 using osu.Game.Screens.Ranking;
 using osuTK.Input;
 
@@ -15,6 +17,9 @@ namespace osu.Game.Tests.Visual.Ranking
 {
     public partial class TestSceneCollectionButton : OsuManualInputManagerTestScene
     {
+        [Cached]
+        private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Aquamarine);
+
         private CollectionButton? collectionButton;
         private readonly BeatmapInfo beatmapInfo = new BeatmapInfo { OnlineID = 88 };
 

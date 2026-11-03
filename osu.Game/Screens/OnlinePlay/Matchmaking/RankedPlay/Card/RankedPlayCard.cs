@@ -14,6 +14,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Logging;
 using osu.Game.Audio;
 using osu.Game.Database;
+using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Online.Rooms;
 using osuTK;
 using osuTK.Graphics;
@@ -192,6 +193,10 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.RankedPlay.Card
 
             SamplePlaybackHelper.PlayWithRandomPitch(cardFlipSample);
         }
+
+        public void LoadSongPreview(APIBeatmap beatmap, PreviewTrack track) => songPreviewContainer.LoadPreviewTrack(beatmap, track);
+
+        public void CompleteCardReveal() => cardRevealed.TrySetResult();
 
         #endregion
 

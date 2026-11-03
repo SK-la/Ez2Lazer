@@ -3,6 +3,7 @@
 
 #nullable disable
 
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
@@ -23,23 +24,51 @@ namespace osu.Game.IO.Archives
     {
         /// <summary>
         /// Archives created by osu!stable still write out as Shift-JIS.
-        /// We want to force this fallback rather than leave it up to the library/system.
-        /// In the future we may want to change exports to set the zip UTF-8 flag and use that instead.
+        /// We force CP932 as the non-UTF-8 fallback rather than leave it up to the library/system.
+        /// When the zip EFS (UTF-8) flag is set, SharpCompress still selects UTF-8 via <see cref="EncodingType.UTF8"/>.
+        /// Additionally, well-formed UTF-8 names without the EFS flag are recovered via <see cref="DecodeEntryName"/>.
         /// </summary>
         public static readonly ArchiveEncoding DEFAULT_ENCODING;
+
+        private static readonly Encoding utf8_strict;
+
+        private static readonly Encoding shift_jis;
 
         private readonly Stream archiveStream;
         private readonly IWritableArchive archive;
 
+        /// <summary>
+        /// Specifies the maximum permitted size of files (in bytes) in the archive.
+        /// If a ZIP archive specifies a file entry which exceeds this size,
+        /// attempting to access this file via <see cref="GetStream"/> will fail with <see cref="InsufficientMemoryException"/>.
+        /// </summary>
+        public long MaximumEntrySize { get; set; } = 100 * 1024 * 1024; // bytes
+
+        /// <summary>
+        /// 谱面（<c>.osu</c>）条目允许的最大字节数。
+        /// Aspire 谱可能有单个 .osu 超过 <see cref="MaximumEntrySize"/>，其余条目仍较小，
+        /// 因此谱面文件单独使用仍有上限的限制。
+        /// </summary>
+        public long MaximumBeatmapEntrySize { get; set; } = 128 * 1024 * 1024; // bytes
+
         static ZipArchiveReader()
         {
-            // Required to support rare code pages.
+            // Required to support rare code pages. Must run before any CP932 lookup, since static field
+            // initialisers would otherwise resolve before this constructor body.
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
+            utf8_strict = Encoding.GetEncoding(
+                "utf-8",
+                EncoderFallback.ExceptionFallback,
+                DecoderFallback.ExceptionFallback);
+            shift_jis = Encoding.GetEncoding(932);
 
             DEFAULT_ENCODING = new ArchiveEncoding
             {
-                Default = Encoding.GetEncoding(932),
-                Password = Encoding.GetEncoding(932),
+                Default = shift_jis,
+                Password = shift_jis,
+                UTF8 = Encoding.UTF8,
+                CustomDecoder = DecodeEntryName,
             };
         }
 
@@ -54,14 +83,52 @@ namespace osu.Game.IO.Archives
             });
         }
 
+        /// <summary>
+        /// Decode a zip entry name from raw header bytes.
+        /// </summary>
+        /// <remarks>
+        /// Prefer UTF-8 when the EFS flag is set, or when the bytes are valid UTF-8 containing non-ASCII
+        /// (common with modern packagers that omit the language encoding flag). Otherwise decode as CP932
+        /// for osu!stable / Japanese archives.
+        /// </remarks>
+        public static string DecodeEntryName(byte[] bytes, int index, int count, EncodingType type)
+        {
+            if (type == EncodingType.UTF8)
+                return Encoding.UTF8.GetString(bytes, index, count);
+
+            if (tryDecodeUtf8(bytes, index, count, out string utf8) && utf8.Any(static c => c > 127))
+                return utf8;
+
+            return shift_jis.GetString(bytes, index, count);
+        }
+
+        private static bool tryDecodeUtf8(byte[] bytes, int index, int count, out string result)
+        {
+            try
+            {
+                result = utf8_strict.GetString(bytes, index, count);
+                return true;
+            }
+            catch (DecoderFallbackException)
+            {
+                result = null;
+                return false;
+            }
+        }
+
         public override Stream GetStream(string name)
         {
             IArchiveEntry entry = archive.Entries.SingleOrDefault(e => e.Key == name);
             if (entry == null)
                 return null;
 
+            long maximumSize = name.EndsWith(".osu", StringComparison.OrdinalIgnoreCase) ? MaximumBeatmapEntrySize : MaximumEntrySize;
+
             using (Stream s = entry.OpenEntryStream())
             {
+                if (entry.Size > maximumSize)
+                    throw new InsufficientMemoryException($@"Size of file ""{name}"" exceeds allowable limit of {maximumSize} bytes");
+
                 if (entry.Size > 0)
                 {
                     var owner = MemoryAllocator.Default.Allocate<byte>((int)entry.Size);

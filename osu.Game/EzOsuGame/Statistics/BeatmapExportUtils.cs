@@ -51,7 +51,7 @@ namespace osu.Game.EzOsuGame.Statistics
             var stream = new MemoryStream();
 
             using (var writer = new StreamWriter(stream, Encoding.UTF8, 1024, true))
-                new LegacyBeatmapEncoder(beatmap, beatmapSkin).Encode(writer);
+                new LegacyBeatmapEncoder(beatmap, beatmapSkin, null).Encode(writer);
 
             stream.Position = 0;
             return stream;

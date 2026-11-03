@@ -1,0 +1,832 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.Collections.Generic;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.EzMania.Helper;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
+using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.Objects.Drawables;
+using osu.Game.Rulesets.Mania.Scoring;
+using osu.Game.Rulesets.Mania.UI;
+using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Scoring;
+
+namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
+{
+    /// <summary>
+    /// 列内 note-lock 状态机：有序目标 + 游标。全 JudgePrecedence 下 Drawable / Session 共用判定语义。
+    /// </summary>
+    public sealed class ManiaLaneController
+    {
+        private readonly List<ManiaLaneEntry> entries = new List<ManiaLaneEntry>();
+        private readonly Dictionary<DrawableHitObject, int> drawableIndices = new Dictionary<DrawableHitObject, int>();
+        private int cursor;
+
+        private readonly List<AutoMissEntry> autoMissEntries = new List<AutoMissEntry>();
+        private readonly Dictionary<DrawableManiaHitObject, AutoMissEntry> autoMissByDrawable = new Dictionary<DrawableManiaHitObject, AutoMissEntry>();
+        private int autoMissCursor;
+        private bool autoMissSchedulingEnabled;
+
+        private double lastSelectPressTime = double.NaN;
+        private EzEnumJudgePrecedence lastSelectPrecedence;
+        private ManiaLaneEntry? lastSelectResult;
+
+        /// <summary>
+        /// 判定状态代次：任何会改变列内「未判定/可击」集合的写入都自增。
+        /// 时间键控的缓存（Earliest 有效索引、press 目标）据此在状态变化后必然失效，
+        /// 避免同帧内「先判定后按键」读到旧 cursor 的结果。
+        /// </summary>
+        private long judgeGeneration;
+
+        private int cachedEarliestEffectiveIndex = -1;
+        private double cachedEarliestEffectiveTime = double.NaN;
+        private long cachedEarliestEffectiveGeneration = -1;
+
+        private JudgeModeHelper? missWindowHelper;
+        private double cachedMaxMissEarly;
+        private double cachedMaxMissLate;
+        private bool overlapSearchBoundsValid;
+        private readonly List<ManiaLaneEntry> overlapScratch = new List<ManiaLaneEntry>();
+
+        // 热路径避免每次 SelectPress 把实例方法转成新 Func。
+        private readonly Func<int, double, bool> isHittableEarliestIndexFunc;
+        private readonly Func<ManiaLaneEntry, double, bool> isWithinMissWindowFunc;
+
+        public ManiaLaneController()
+        {
+            isHittableEarliestIndexFunc = IsHittableEarliestIndex;
+            isWithinMissWindowFunc = isWithinMissWindow;
+        }
+
+        /// <summary>当前列是否处于 BMS hit mode（由 <see cref="ConfigureMissCollection"/> 自动设置）。</summary>
+        internal bool IsBmsMode { get; private set; }
+
+        /// <summary>是否允许 KPoor（post-Bad Poor）路由。通过 <see cref="SetPoorEnabled"/> 从 <see cref="ManiaJudgementRound"/> 同步。</summary>
+        internal bool PoorEnabled { get; private set; }
+
+        /// <summary>设置 <see cref="PoorEnabled"/>。由 <see cref="Column.resolvePressRouting"/> 在获取 round 时调用。</summary>
+        internal void SetPoorEnabled(bool value) => PoorEnabled = value;
+
+        public IReadOnlyList<ManiaLaneEntry> Entries => entries;
+
+        public void Register(DrawableHitObject drawable, bool scheduleAutoMiss = false)
+        {
+            if (scheduleAutoMiss || autoMissSchedulingEnabled)
+                registerAutoMiss(drawable);
+
+            if (!TryCreateEntry(drawable, out var entry))
+                return;
+
+            if (drawableIndices.ContainsKey(drawable))
+                Unregister(drawable);
+
+            int insertIndex = entries.BinarySearch(entry, ManiaLaneEntry.StartTimeComparer.INSTANCE);
+            if (insertIndex < 0)
+                insertIndex = ~insertIndex;
+
+            insertEntryAt(insertIndex, entry);
+            invalidateOverlapSearchBounds();
+        }
+
+        public void RegisterIfNeeded(DrawableHitObject drawable, bool scheduleAutoMiss = false)
+        {
+            if (scheduleAutoMiss || autoMissSchedulingEnabled)
+                registerAutoMiss(drawable);
+
+            if (!drawableIndices.ContainsKey(drawable))
+                Register(drawable, scheduleAutoMiss);
+        }
+
+        public void EnableAutoMissScheduling()
+        {
+            if (autoMissSchedulingEnabled)
+                return;
+
+            autoMissSchedulingEnabled = true;
+
+            foreach (var entry in entries)
+                registerAutoMiss(entry.Drawable);
+        }
+
+        public void Unregister(DrawableHitObject drawable)
+        {
+            unregisterAutoMiss(drawable);
+
+            if (!drawableIndices.TryGetValue(drawable, out int index))
+                return;
+
+            entries.RemoveAt(index);
+            drawableIndices.Remove(drawable);
+
+            for (int i = index; i < entries.Count; i++)
+                drawableIndices[entries[i].Drawable] = i;
+
+            if (index < cursor)
+                cursor--;
+
+            invalidateSelectPressCache();
+            invalidateOverlapSearchBounds();
+        }
+
+        /// <summary>
+        /// 仅检查已经越过 late miss 边界的对象。远期存活对象不再逐帧参与 Drawable 更新。
+        /// </summary>
+        public int ProcessAutoMiss(double time, bool evaluateResults = true)
+        {
+            int dueCount = 0;
+
+            for (int i = autoMissCursor; i < autoMissEntries.Count; i++)
+            {
+                var entry = autoMissEntries[i];
+
+                if (entry.EvaluationStartTime > time)
+                    break;
+
+                if (!entry.Drawable.Judged)
+                {
+                    dueCount++;
+
+                    if (evaluateResults)
+                    {
+                        // stable classic 单键的到点 Miss 早于 CanBeHit 失效，必须直接落判。
+                        if (isStableClassicNotePastDeadline(entry.Drawable))
+                            entry.Drawable.EzApplyPassiveMissWithStoredOffset();
+                        else
+                            entry.Drawable.EvaluateColumnAutoMiss();
+                    }
+                }
+            }
+
+            while (autoMissCursor < autoMissEntries.Count && autoMissEntries[autoMissCursor].Drawable.Judged)
+                autoMissCursor++;
+
+            return dueCount;
+        }
+
+        private static bool isStableClassicNotePastDeadline(DrawableManiaHitObject drawable)
+            => drawable.HitObject.HitWindows is ManiaHitWindows { ActiveJudgeMode: EzEnumJudgeMode.StableClassic }
+               && drawable.HitObject is Note and not HeadNote and not TailNote;
+
+        private void registerAutoMiss(DrawableHitObject drawable)
+        {
+            if (drawable is DrawableHoldNote hold)
+            {
+                registerAutoMissDrawable(hold.Head);
+                registerAutoMissDrawable(hold.Tail);
+                registerAutoMissDrawable(hold);
+                hold.Body.ColumnSchedulesAutoMiss = true;
+
+                foreach (var nested in hold.NestedHitObjects)
+                {
+                    if (nested is DrawableHoldNoteTick tick)
+                        tick.ColumnSchedulesAutoMiss = true;
+                }
+
+                return;
+            }
+
+            if (drawable is DrawableManiaHitObject maniaDrawable)
+                registerAutoMissDrawable(maniaDrawable);
+        }
+
+        private void registerAutoMissDrawable(DrawableManiaHitObject drawable)
+        {
+            if (autoMissByDrawable.ContainsKey(drawable))
+                return;
+
+            double evaluationStartTime = GetAutoMissEvaluationTime(drawable);
+
+            if (!double.IsFinite(evaluationStartTime))
+            {
+                // Body and other Empty-window auxiliaries are finalized by their owner.
+                drawable.ColumnSchedulesAutoMiss = true;
+                return;
+            }
+
+            var entry = new AutoMissEntry(drawable, evaluationStartTime);
+            int index = autoMissEntries.BinarySearch(entry, AutoMissEntry.StartTimeComparer.INSTANCE);
+
+            if (index < 0)
+                index = ~index;
+
+            autoMissEntries.Insert(index, entry);
+            autoMissByDrawable.Add(drawable, entry);
+            drawable.ColumnSchedulesAutoMiss = true;
+
+            if (index < autoMissCursor)
+                autoMissCursor = index;
+        }
+
+        private void unregisterAutoMiss(DrawableHitObject drawable)
+        {
+            if (drawable is DrawableHoldNote hold)
+            {
+                unregisterAutoMissDrawable(hold.Head);
+                unregisterAutoMissDrawable(hold.Tail);
+                unregisterAutoMissDrawable(hold);
+                hold.Body.ColumnSchedulesAutoMiss = false;
+
+                foreach (var nested in hold.NestedHitObjects)
+                {
+                    if (nested is DrawableHoldNoteTick tick)
+                        tick.ColumnSchedulesAutoMiss = false;
+                }
+
+                return;
+            }
+
+            if (drawable is DrawableManiaHitObject maniaDrawable)
+                unregisterAutoMissDrawable(maniaDrawable);
+        }
+
+        private void unregisterAutoMissDrawable(DrawableManiaHitObject drawable)
+        {
+            drawable.ColumnSchedulesAutoMiss = false;
+
+            if (!autoMissByDrawable.Remove(drawable, out var entry))
+                return;
+
+            int index = autoMissEntries.IndexOf(entry);
+
+            if (index < 0)
+                return;
+
+            autoMissEntries.RemoveAt(index);
+
+            if (index < autoMissCursor)
+                autoMissCursor--;
+        }
+
+        internal static double GetAutoMissEvaluationTime(DrawableManiaHitObject drawable)
+        {
+            if (drawable.HitObject.HitWindows is ManiaHitWindows windows)
+            {
+                // stable classic 的单键在 End + HitWindow100 就到点自动落 Miss，不等 Miss 窗。
+                if (windows.ActiveJudgeMode == EzEnumJudgeMode.StableClassic
+                    && drawable.HitObject is Note and not HeadNote and not TailNote)
+                {
+                    return drawable.HitObject.GetEndTime() + windows.WindowFor(HitResult.Ok);
+                }
+
+                return drawable.HitObject.GetEndTime() + windows.MissLateWindow;
+            }
+
+            if (drawable is DrawableHoldNote)
+                return drawable.HitObject.GetEndTime();
+
+            return double.PositiveInfinity;
+        }
+
+        public void UnregisterByHitObject(HitObject hitObject)
+        {
+            for (int i = entries.Count - 1; i >= 0; i--)
+            {
+                if (entries[i].Drawable.HitObject == hitObject)
+                    Unregister(entries[i].Drawable);
+            }
+        }
+
+        public void NotifyJudged(DrawableHitObject drawable)
+        {
+            drawable = resolveJudgedDrawable(drawable);
+
+            if (!drawableIndices.ContainsKey(drawable))
+                return;
+
+            advanceCursor();
+            invalidateSelectPressCache();
+        }
+
+        private static DrawableHitObject resolveJudgedDrawable(DrawableHitObject drawable)
+        {
+            if (drawable is DrawableHoldNoteHead head && head.ParentHold != null)
+                return head.ParentHold;
+
+            return drawable;
+        }
+
+        /// <summary>
+        /// Earliest note-lock：仅游标处未判定物件可击打，且不得越过更晚物件的 StartTime。
+        /// </summary>
+        /// <remarks>
+        /// <see cref="findEffectiveEarliestIndex"/> 的返回值已保证「未判定 + 在 miss 窗内 + 不被更晚物件阻挡」，
+        /// 因此下标相等即等价于原先的三项复核，无需重复扫描。
+        /// </remarks>
+        public bool IsHittableEarliest(DrawableHitObject drawable, double time)
+        {
+            if (!drawableIndices.TryGetValue(drawable, out int index))
+                return false;
+
+            return index == findEffectiveEarliestIndex(time);
+        }
+
+        /// <summary>
+        /// 首个可击条目的列内下标（-1 表示无可击条目）。
+        /// 结果按 <c>(time, judgeGeneration)</c> 缓存：同一帧内本列每条 note 都会问一次，
+        /// 未缓存时该查询是 O(alive)（内层再 O(alive)），缓存后同列后续 note 为 O(1)。
+        /// </summary>
+        private int findEffectiveEarliestIndex(double time)
+        {
+            if (cachedEarliestEffectiveGeneration == judgeGeneration && cachedEarliestEffectiveTime == time)
+            {
+                int cached = cachedEarliestEffectiveIndex;
+
+                // Result.HasResult 先于 OnNewResult 置位，极窄窗口内条目已判定但代次尚未自增；
+                // 条目「变已判定」只会让 blocker 前移（可击性约束只会更容易满足），故只需复核该条目自身。
+                if (cached < 0 || !entries[cached].IsPressJudged)
+                    return cached;
+            }
+
+            int computed = computeEffectiveEarliestIndex(time);
+
+            cachedEarliestEffectiveTime = time;
+            cachedEarliestEffectiveGeneration = judgeGeneration;
+            cachedEarliestEffectiveIndex = computed;
+
+            return computed;
+        }
+
+        /// <summary>
+        /// 首个可击条目的列内下标（-1 表示无可击条目）。
+        /// </summary>
+        /// <remarks>
+        /// 等价于原先「从 cursor 起逐个检查未判定 + 在 miss 窗内 + 不被更晚物件阻挡」，但只扫一遍：
+        /// 「不被更晚物件阻挡」即 <c>i &gt;= blocker</c>（blocker = StartTime &lt;= time 的最大未判定下标），
+        /// 因此起始位置直接跳到 <c>max(cursor, blocker)</c>，不再对每个候选重扫其后缀。
+        /// </remarks>
+        private int computeEffectiveEarliestIndex(double time)
+        {
+            if (entries.Count == 0)
+                return -1;
+
+            ensureOverlapSearchBounds();
+
+            int blocker = findEarliestBlocker(time);
+            int start = cursor > blocker ? cursor : blocker;
+
+            if (start < 0)
+                start = 0;
+
+            for (int i = start; i < entries.Count; i++)
+            {
+                // StartTime 升序：越过 miss 早窗上界的条目，其后都不可能在窗内。
+                if (entries[i].StartTime > time + cachedMaxMissEarly)
+                    break;
+
+                if (entries[i].IsPressJudged)
+                    continue;
+
+                if (!isWithinMissWindow(entries[i], time))
+                    continue;
+
+                return i;
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// 满足 <c>StartTime &lt;= time</c> 的最大未判定条目下标；不存在时返回 -1。
+        /// 即「更晚物件阻挡」判定的下界：任何 <c>i &lt; blocker</c> 的条目都会被它挡下。
+        /// </summary>
+        private int findEarliestBlocker(double time)
+        {
+            // StartTime 升序 → 先二分出 StartTime <= time 的前缀长度，再在该前缀内向前找未判定。
+            int lo = 0;
+            int hi = entries.Count;
+
+            while (lo < hi)
+            {
+                int mid = lo + (hi - lo) / 2;
+
+                if (entries[mid].StartTime <= time)
+                    lo = mid + 1;
+                else
+                    hi = mid;
+            }
+
+            for (int j = lo - 1; j >= 0; j--)
+            {
+                if (!entries[j].IsPressJudged)
+                    return j;
+            }
+
+            return -1;
+        }
+
+        public bool IsHittableEarliestIndex(int index, double time)
+            => ManiaLanePressSelector.IsHittableEarliest(entries, index, time, static e => e.IsPressJudged, static e => e.StartTime);
+
+        public void ConfigureMissCollection(EzEnumJudgeMode judgeMode, double overallDifficulty, double bpm = 180)
+        {
+            IsBmsMode = JudgeModeHelper.IsBMSJudgeMode(judgeMode);
+
+            missWindowHelper = new JudgeModeHelper(judgeMode)
+            {
+                OverallDifficulty = overallDifficulty,
+                BPM = bpm,
+            };
+
+            recomputeOverlapSearchBounds();
+            invalidateSelectPressCache();
+        }
+
+        public bool IsHittable(DrawableHitObject drawable, double time, EzEnumJudgePrecedence precedence)
+        {
+            if (precedence == EzEnumJudgePrecedence.Earliest)
+                return IsHittableEarliest(drawable, time);
+
+            var entry = selectPressEntry(time, precedence);
+
+            if (entry == null)
+                return true;
+
+            return ReferenceEquals(entry.RoutedObject, drawable);
+        }
+
+        public bool TryGetEntry(DrawableHitObject drawable, out ManiaLaneEntry entry)
+        {
+            if (drawableIndices.TryGetValue(drawable, out int index))
+            {
+                entry = entries[index];
+                return true;
+            }
+
+            entry = null!;
+            return false;
+        }
+
+        public DrawableHoldNote? ActiveHold { get; private set; }
+
+        internal void SetActiveHold(DrawableHoldNote? hold) => ActiveHold = hold;
+
+        /// <summary>
+        /// 收集开始时间早于 <paramref name="targetStartTime"/> 且未判定的 press 条目，写入调用方缓冲（不清空）。
+        /// </summary>
+        /// <remarks>
+        /// 命中热路径用的版本：写快照而不是惰性枚举，因此调用方在逐项处理时要自行按实时状态复核
+        /// （处理期间可能已经判掉条目）。
+        /// </remarks>
+        public void CollectForceMissBefore(double targetStartTime, List<ManiaLaneEntry> buffer)
+        {
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var entry = entries[i];
+
+                if (entry.IsPressJudged)
+                    continue;
+
+                if (entry.StartTime >= targetStartTime)
+                    break;
+
+                buffer.Add(entry);
+            }
+        }
+
+        /// <summary>
+        /// 收集 miss 窗内、未判定的列内 press 候选（O(log n + k)）。
+        /// 返回新列表（测试/外部可用）；热路径请走 <see cref="selectPressEntryCore"/> 的 scratch 复用。
+        /// </summary>
+        public List<ManiaLaneEntry> CollectOverlappingEntries(double time)
+        {
+            var result = new List<ManiaLaneEntry>();
+            collectOverlappingInto(time, result);
+            return result;
+        }
+
+        private void collectOverlappingInto(double time, List<ManiaLaneEntry> result)
+        {
+            result.Clear();
+
+            if (entries.Count == 0)
+                return;
+
+            ensureOverlapSearchBounds();
+
+            if (cachedMaxMissEarly == 0 && cachedMaxMissLate == 0)
+                return;
+
+            double searchLowerBound = time - cachedMaxMissLate;
+            int lo = 0;
+            int hi = entries.Count;
+
+            while (lo < hi)
+            {
+                int mid = lo + (hi - lo) / 2;
+
+                if (entries[mid].StartTime < searchLowerBound)
+                    lo = mid + 1;
+                else
+                    hi = mid;
+            }
+
+            double searchUpperBound = time + cachedMaxMissEarly;
+
+            for (int i = lo; i < entries.Count; i++)
+            {
+                var entry = entries[i];
+
+                if (entry.StartTime > searchUpperBound)
+                    break;
+
+                if (entry.IsPressJudged || entry.PressWindows == null)
+                    continue;
+
+                getMissWindows(entry, out double early, out double late);
+
+                if (time >= entry.StartTime - early && time <= entry.StartTime + late)
+                    result.Add(entry);
+            }
+        }
+
+        private void ensureOverlapSearchBounds()
+        {
+            if (!overlapSearchBoundsValid)
+                recomputeOverlapSearchBounds();
+        }
+
+        private void recomputeOverlapSearchBounds()
+        {
+            cachedMaxMissEarly = 0;
+            cachedMaxMissLate = 0;
+
+            if (missWindowHelper != null)
+            {
+                cachedMaxMissEarly = missWindowHelper.WindowFor(HitResult.Miss, true);
+                cachedMaxMissLate = missWindowHelper.WindowFor(HitResult.Miss, false);
+
+                if (IsBmsMode)
+                    BmsJudgeModeJudgement.ExpandMissCollectionWindows(missWindowHelper, 1, ref cachedMaxMissEarly, ref cachedMaxMissLate);
+            }
+            else
+            {
+                foreach (var entry in entries)
+                {
+                    if (entry.PressWindows == null)
+                        continue;
+
+                    getMissWindows(entry, out double early, out double late);
+                    cachedMaxMissEarly = Math.Max(cachedMaxMissEarly, early);
+                    cachedMaxMissLate = Math.Max(cachedMaxMissLate, late);
+                }
+            }
+
+            overlapSearchBoundsValid = true;
+        }
+
+        private void invalidateOverlapSearchBounds() => overlapSearchBoundsValid = false;
+
+        /// <summary>
+        /// 按 JudgePrecedence 选择本列 press 目标（含 BMS post-Bad KPoor）。
+        /// </summary>
+        public ManiaLaneEntry? SelectPressEntry(double time, EzEnumJudgePrecedence precedence)
+            => selectPressEntry(time, precedence);
+
+        private ManiaLaneEntry? selectPressEntry(double time, EzEnumJudgePrecedence precedence)
+        {
+            if (time == lastSelectPressTime && precedence == lastSelectPrecedence)
+                return lastSelectResult;
+
+            lastSelectPressTime = time;
+            lastSelectPrecedence = precedence;
+            lastSelectResult = selectPressEntryCore(time, precedence);
+            return lastSelectResult;
+        }
+
+        private ManiaLaneEntry? selectPressEntryCore(double time, EzEnumJudgePrecedence precedence)
+        {
+            bool tryPostBadRoute = IsBmsMode && PoorEnabled;
+
+            if (precedence == EzEnumJudgePrecedence.Earliest)
+            {
+                return ManiaLanePressSelector.SelectDrawablePressEntry(
+                    entries,
+                    cursor,
+                    time,
+                    precedence,
+                    tryPostBadRoute,
+                    Array.Empty<ManiaLaneEntry>(),
+                    isHittableEarliestIndexFunc,
+                    isWithinMissWindowFunc,
+                    isPostBadKPoorRoutable,
+                    distanceToNonBadWindow);
+            }
+
+            collectOverlappingInto(time, overlapScratch);
+
+            return ManiaLanePressSelector.SelectDrawablePressEntry(
+                entries,
+                cursor,
+                time,
+                precedence,
+                tryPostBadRoute,
+                overlapScratch,
+                isHittableEarliestIndexFunc,
+                isWithinMissWindowFunc,
+                isPostBadKPoorRoutable,
+                distanceToNonBadWindow);
+        }
+
+        private bool isWithinMissWindow(ManiaLaneEntry entry, double time)
+        {
+            if (entry.PressWindows == null)
+                return false;
+
+            getMissWindows(entry, out double early, out double late);
+            return time >= entry.StartTime - early && time <= entry.StartTime + late;
+        }
+
+        private void getMissWindows(ManiaLaneEntry entry, out double early, out double late)
+        {
+            early = entry.PressWindows!.WindowFor(HitResult.Miss, true);
+            late = entry.PressWindows.WindowFor(HitResult.Miss, false);
+
+            if (IsBmsMode && missWindowHelper != null)
+                BmsJudgeModeJudgement.ExpandMissCollectionWindows(missWindowHelper, 1, ref early, ref late);
+        }
+
+        private static bool isPostBadKPoorRoutable(ManiaLaneEntry entry)
+        {
+            if (!entry.IsPressJudged || !entry.BmsRoute.CanRouteToKPoor)
+                return false;
+
+            if (entry.RoutedObject is DrawableNote note)
+                return note.CanRouteToKPoor;
+
+            if (entry.RoutedObject is DrawableHoldNote hold && hold.Tail.Judged)
+                return hold.Tail.CanRouteToKPoor;
+
+            return false;
+        }
+
+        private static double distanceToNonBadWindow(DrawableHitObject obj, double pressTime)
+        {
+            var windows = obj.HitObject.HitWindows;
+
+            if (windows == null)
+                return double.PositiveInfinity;
+
+            double early = windows.WindowFor(HitResult.Good);
+            double late = windows.WindowFor(HitResult.Good);
+
+            if (windows is ManiaHitWindows maniaWindows)
+            {
+                early = maniaWindows.WindowFor(HitResult.Good, true);
+                late = maniaWindows.WindowFor(HitResult.Good, false);
+            }
+
+            double start = obj.HitObject.StartTime - early;
+            double end = obj.HitObject.StartTime + late;
+
+            if (pressTime < start)
+                return start - pressTime;
+
+            if (pressTime > end)
+                return pressTime - end;
+
+            return 0;
+        }
+
+        public static bool TryCreateEntry(DrawableHitObject drawable, out ManiaLaneEntry entry)
+        {
+            entry = null!;
+
+            if (drawable.HitObject == null)
+                return false;
+
+            if (drawable is DrawableHoldNoteHead or DrawableHoldNoteTail)
+                return false;
+
+            if (drawable is DrawableHoldNote hold)
+            {
+                if (hold.Judged || hold.Head.Judged)
+                    return false;
+
+                if (hold.Head.HitObject.HitWindows is not ManiaHitWindows headWindows || headWindows.WindowFor(HitResult.Miss) == 0)
+                    return false;
+
+                entry = new ManiaLaneEntry(hold, hold.Head, hold.Head.HitObject.StartTime, headWindows);
+                return true;
+            }
+
+            if (drawable.Judged)
+                return false;
+
+            if (drawable.HitObject.HitWindows is not ManiaHitWindows windows || windows.WindowFor(HitResult.Miss) == 0)
+                return false;
+
+            entry = new ManiaLaneEntry(drawable, drawable, drawable.HitObject.StartTime, windows);
+            return true;
+        }
+
+        private void advanceCursor()
+        {
+            while (cursor < entries.Count && entries[cursor].IsPressJudged)
+                cursor++;
+        }
+
+        private void insertEntryAt(int insertIndex, ManiaLaneEntry entry)
+        {
+            entries.Insert(insertIndex, entry);
+            drawableIndices[entry.Drawable] = insertIndex;
+
+            for (int i = insertIndex + 1; i < entries.Count; i++)
+                drawableIndices[entries[i].Drawable] = i;
+
+            if (insertIndex < cursor)
+                cursor++;
+
+            invalidateSelectPressCache();
+        }
+
+        private void invalidateSelectPressCache()
+        {
+            // 代次自增覆盖所有调用点（注册/注销/判定/窗口重配），使时间键控缓存一并失效。
+            judgeGeneration++;
+            lastSelectPressTime = double.NaN;
+            lastSelectResult = null;
+        }
+
+        private sealed class AutoMissEntry
+        {
+            public DrawableManiaHitObject Drawable { get; }
+
+            public double EvaluationStartTime { get; }
+
+            public AutoMissEntry(DrawableManiaHitObject drawable, double evaluationStartTime)
+            {
+                Drawable = drawable;
+                EvaluationStartTime = evaluationStartTime;
+            }
+
+            internal sealed class StartTimeComparer : IComparer<AutoMissEntry>
+            {
+                public static readonly StartTimeComparer INSTANCE = new StartTimeComparer();
+
+                public int Compare(AutoMissEntry? x, AutoMissEntry? y)
+                {
+                    if (ReferenceEquals(x, y))
+                        return 0;
+
+                    if (x is null)
+                        return -1;
+
+                    if (y is null)
+                        return 1;
+
+                    return x.EvaluationStartTime.CompareTo(y.EvaluationStartTime);
+                }
+            }
+        }
+    }
+
+    public sealed class ManiaLaneEntry
+    {
+        public DrawableHitObject Drawable { get; }
+
+        public DrawableHitObject RoutedObject { get; }
+
+        public DrawableHitObject JudgementObject { get; }
+
+        public double StartTime { get; }
+
+        public ManiaHitWindows? PressWindows { get; }
+
+        public BmsJudgeModeJudgement.BmsRouteState BmsRoute { get; } = new BmsJudgeModeJudgement.BmsRouteState();
+
+        public bool IsJudged => Drawable.Judged;
+
+        public bool IsPressJudged => RoutedObject.Judged || JudgementObject.Judged;
+
+        public ManiaLaneEntry(DrawableHitObject routedObject, DrawableHitObject judgementObject, double startTime, ManiaHitWindows? pressWindows)
+        {
+            Drawable = routedObject;
+            RoutedObject = routedObject;
+            JudgementObject = judgementObject;
+            StartTime = startTime;
+            PressWindows = pressWindows;
+        }
+
+        internal sealed class StartTimeComparer : IComparer<ManiaLaneEntry>
+        {
+            public static readonly StartTimeComparer INSTANCE = new StartTimeComparer();
+
+            public int Compare(ManiaLaneEntry? x, ManiaLaneEntry? y)
+            {
+                if (ReferenceEquals(x, y))
+                    return 0;
+
+                if (x is null)
+                    return -1;
+
+                if (y is null)
+                    return 1;
+
+                return x.StartTime.CompareTo(y.StartTime);
+            }
+        }
+    }
+}

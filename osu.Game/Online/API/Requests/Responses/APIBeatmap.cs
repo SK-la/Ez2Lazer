@@ -195,7 +195,8 @@ namespace osu.Game.Online.API.Requests.Responses
 
                         case 3: return "mania";
 
-                        default: throw new ArgumentOutOfRangeException();
+                        // Custom / unknown rulesets (e.g. OnlineID == -1 for Ez local APIBeatmap synthesis).
+                        default: return string.Empty;
                     }
                 }
             }

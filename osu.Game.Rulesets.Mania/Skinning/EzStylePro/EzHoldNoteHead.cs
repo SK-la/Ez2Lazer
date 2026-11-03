@@ -1,19 +1,21 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    internal partial class EzHoldNoteHead : EzNoteBase
+    public partial class EzHoldNoteHead : EzNoteBase
     {
+        protected override bool SupportsImprovedNoteDisplayColour => false;
+
         protected override bool UseColorization => true;
         protected override bool ShowSeparators => true;
 
-        private TextureAnimation? animation;
+        private Drawable? noteDrawable;
 
         [BackgroundDependencyLoader]
         private void load()
@@ -24,18 +26,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void UpdateTexture()
         {
-            animation = Factory.CreateAnimation(HeadName);
+            noteDrawable = Factory.CreateAnimation(HeadName);
 
-            if (animation.FrameCount == 0)
+            if (noteDrawable == null)
             {
-                animation.Dispose();
-                animation = Factory.CreateAnimation(NoteName);
+                noteDrawable = Factory.CreateAnimation(NoteName);
 
-                if (animation.FrameCount == 0)
-                {
-                    animation.Dispose();
+                if (noteDrawable == null)
                     return;
-                }
 
                 MainContainer.Anchor = Anchor.BottomCentre;
                 MainContainer.Origin = Anchor.BottomCentre;
@@ -47,12 +45,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     Origin = Anchor.BottomCentre,
                     RelativeSizeAxes = Axes.X,
                     Masking = true,
-                    Child = animation,
+                    Child = noteDrawable,
                 };
             }
             else
             {
-                MainContainer.Child = animation;
+                MainContainer.Child = noteDrawable;
             }
         }
 
@@ -60,18 +58,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             Height = NoteHeight;
 
+            if (!MainContainer.Children.Any())
+                return;
+
             if (MainContainer.Child is Container c)
             {
                 MainContainer.Height = NoteHeight / 2;
                 c.Height = NoteHeight;
             }
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            animation = null;
         }
     }
 }

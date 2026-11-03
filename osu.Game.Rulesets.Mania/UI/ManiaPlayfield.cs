@@ -11,6 +11,7 @@ using JetBrains.Annotations;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics.Primitives;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania.Audio;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -24,7 +25,14 @@ namespace osu.Game.Rulesets.Mania.UI
     {
         public IReadOnlyList<Stage> Stages => stages;
 
+        /// <summary>
+        /// note 命中音与按键预览音共用的发声池，随本 playfield 的生命周期创建与释放。
+        /// </summary>
+        internal EzManiaSampleChannelPool SampleChannels { get; }
+
         private readonly List<Stage> stages = new List<Stage>();
+        private readonly GridContainer playfieldGrid;
+        private readonly Container stageSpacingCell = new Container { Name = "Stage spacing" };
 
         public override Quad SkinnableComponentScreenSpaceDrawQuad
         {
@@ -60,7 +68,6 @@ namespace osu.Game.Rulesets.Mania.UI
             if (stageDefinitions.Count <= 0)
                 throw new ArgumentException("Can't have zero or fewer stages.");
 
-            GridContainer playfieldGrid;
             AddInternal(playfieldGrid = new GridContainer
             {
                 RelativeSizeAxes = Axes.Both,
@@ -81,6 +88,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
                 firstColumnIndex += newStage.Columns.Length;
             }
+
+            AddInternal(SampleChannels = new EzManiaSampleChannelPool(@"Mania"));
         }
 
         [Pure]
@@ -176,6 +185,30 @@ namespace osu.Game.Rulesets.Mania.UI
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Sets the horizontal gap between dual stages.
+        /// </summary>
+        public void SetStageSpacing(float spacing)
+        {
+            if (stages.Count != 2)
+                return;
+
+            if (spacing <= 0)
+            {
+                playfieldGrid.ColumnDimensions = Array.Empty<Dimension>();
+                playfieldGrid.Content = new[] { new Drawable[] { stages[0], stages[1] } };
+                return;
+            }
+
+            playfieldGrid.ColumnDimensions = new[]
+            {
+                new Dimension(GridSizeMode.Distributed),
+                new Dimension(GridSizeMode.Absolute, spacing, spacing, spacing),
+                new Dimension(GridSizeMode.Distributed),
+            };
+            playfieldGrid.Content = new[] { new Drawable[] { stages[0], stageSpacingCell, stages[1] } };
         }
     }
 }

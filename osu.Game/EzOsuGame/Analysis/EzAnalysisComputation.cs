@@ -8,6 +8,7 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
@@ -20,12 +21,28 @@ namespace osu.Game.EzOsuGame.Analysis
     // 不主动释放 workingCache，让框架自行决定。主动释放会频繁触发大量 Invalidating 日志。
     internal static class EzAnalysisComputation
     {
+        public static bool TryComputePerformancePoints(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken, out double performancePoints)
+        {
+            performancePoints = 0;
+
+            PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
+            IBeatmap analysisBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (tryComputePerfectPp(workingBeatmap, analysisBeatmap, lookup, cancellationToken) is not double resolvedPp)
+                return false;
+
+            performancePoints = resolvedPp;
+            return true;
+        }
+
         public static bool TryComputeXxySr(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken, out double xxySr)
         {
             xxySr = 0;
 
-            PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
-            IBeatmap analysisBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+            IBeatmap analysisBeatmap = EzPlayableBeatmapCache.GetShared(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo), lookup.Ruleset, lookup.OrderedMods,
+                cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -35,6 +52,59 @@ namespace osu.Game.EzOsuGame.Analysis
 
             xxySr = resolvedXxySr;
             return true;
+        }
+
+        /// <summary>
+        /// Same xxy path as song-select analysis panel, but reuses an already-built playable
+        /// (e.g. live ChartDan after key/rate mods). Does not write Realm.
+        /// </summary>
+        public static bool TryComputeXxySrFromPlayable(
+            IBeatmap playable,
+            IRulesetInfo ruleset,
+            IReadOnlyList<Mod> mods,
+            CancellationToken cancellationToken,
+            out double xxySr)
+        {
+            xxySr = 0;
+
+            if (!EzXxyStarRatingSupport.SupportsBeatmap(playable, ruleset))
+                return false;
+
+            if (playable.HitObjects.Count == 0)
+                return true;
+
+            double rate = getRateAdjustMultiplier(mods);
+
+            if (!EzAnalysisProviderBridge.TryGetValue(ruleset, new EzAnalysisRequest(playable, rate), EzAnalysisFields.XXY_SR, cancellationToken, out double sr)
+                || !double.IsFinite(sr)
+                || sr < 0)
+            {
+                return false;
+            }
+
+            xxySr = sr;
+            return true;
+        }
+
+        /// <summary>
+        /// Computes baseline NoMod xxy SR for persisting to <see cref="BeatmapInfo.XxyStarRating"/>.
+        /// Returns -1 when unsupported or failed, 0 for empty beatmaps.
+        /// </summary>
+        public static double ComputeBaselineXxyStarRatingForRealm(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
+        {
+            var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
+
+            if (!EzXxyStarRatingSupport.SupportsBeatmap(working.Beatmap, beatmapInfo.Ruleset))
+                return -1;
+
+            if (working.Beatmap.HitObjects.Count == 0)
+                return 0;
+
+            var lookup = new EzAnalysisLookupCache(beatmapInfo, beatmapInfo.Ruleset, mods: null);
+
+            return TryComputeXxySr(beatmapManager, lookup, cancellationToken, out double xxySr)
+                ? xxySr
+                : -1;
         }
 
         public static bool TryComputeXxySrAndPp(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
@@ -51,12 +121,53 @@ namespace osu.Game.EzOsuGame.Analysis
         public static EzAnalysisResult Compute(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
             => Compute(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo), lookup, cancellationToken);
 
+        /// <summary>
+        /// 主 SQLite 预热/回填专用：仅计算 kps 与 mania 列统计（NoMod），不写 xxy/PP（由 Realm 维护）。
+        /// </summary>
+        public static EzAnalysisResult ComputePersistedSqliteSlice(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup,
+                                                                   CancellationToken cancellationToken = default)
+            => ComputePersistedSqliteSlice(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo), lookup, cancellationToken);
+
+        public static EzAnalysisResult ComputePersistedSqliteSlice(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
+        {
+            bool onlyKps = !EzAnalysisProviderBridge.HasAnalysisProvider(lookup.Ruleset);
+            IBeatmap analysisBeatmap = EzPlayableBeatmapCache.GetShared(workingBeatmap, lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(analysisBeatmap, onlyKps: onlyKps);
+
+            double rate = getRateAdjustMultiplier(lookup.OrderedMods);
+
+            if (!Precision.AlmostEquals(rate, 1.0))
+            {
+                averageKps *= rate;
+                maxKps *= rate;
+
+                for (int i = 0; i < kpsList.Count; i++)
+                    kpsList[i] *= rate;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            kpsList = OptimizedBeatmapCalculator.DownsampleToFixedCount(kpsList, OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS);
+
+            var commonSummary = new KpsSummary(averageKps, maxKps, kpsList);
+            EzManiaSummary? maniaSummary = null;
+
+            if (!onlyKps)
+            {
+                padColumnCounts(lookup, columnCounts, holdNoteCounts);
+                maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts, xxySr: null);
+            }
+
+            return new EzAnalysisResult(commonSummary, pp: null, maniaSummary);
+        }
+
         public static EzAnalysisResult Compute(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
         {
-            PlayableCachedWorkingBeatmap playableWorkingBeatmap = new PlayableCachedWorkingBeatmap(workingBeatmap);
-
-            bool onlyKps = lookup.Ruleset.OnlineID != 3;
-            IBeatmap analysisBeatmap = playableWorkingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+            bool onlyKps = !EzAnalysisProviderBridge.HasAnalysisProvider(lookup.Ruleset);
+            IBeatmap analysisBeatmap = EzPlayableBeatmapCache.GetShared(workingBeatmap, lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -75,7 +186,6 @@ namespace osu.Game.EzOsuGame.Analysis
             }
 
             double? xxySr = null;
-            double? pp = tryComputePerfectPp(playableWorkingBeatmap, analysisBeatmap, lookup, cancellationToken);
 
             if (!onlyKps)
                 tryComputeXxySr(analysisBeatmap, lookup, cancellationToken, out xxySr);
@@ -85,11 +195,24 @@ namespace osu.Game.EzOsuGame.Analysis
             kpsList = OptimizedBeatmapCalculator.DownsampleToFixedCount(kpsList, OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS);
 
             var commonSummary = new KpsSummary(averageKps, maxKps, kpsList);
-            EzManiaSummary? maniaSummary = onlyKps
-                ? null
-                : new EzManiaSummary(columnCounts, holdNoteCounts, xxySr);
+            EzManiaSummary? maniaSummary = null;
 
-            return new EzAnalysisResult(commonSummary, pp, maniaSummary);
+            if (!onlyKps)
+            {
+                padColumnCounts(lookup, columnCounts, holdNoteCounts);
+                maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts, xxySr);
+            }
+
+            return new EzAnalysisResult(commonSummary, pp: null, maniaSummary);
+        }
+
+        /// <summary>
+        /// 把稀疏列统计补 0 到真实列数（仅 Mania 分析路径；0 note 谱面的空字典不补）。
+        /// </summary>
+        private static void padColumnCounts(in EzAnalysisLookupCache lookup, Dictionary<int, int> columnCounts, Dictionary<int, int> holdNoteCounts)
+        {
+            int realColumnCount = EzManiaColumnLayout.ResolveRealColumnCount(lookup.Ruleset, lookup.BeatmapInfo, lookup.OrderedMods);
+            EzManiaColumnLayout.PadToRealColumnCount(columnCounts, holdNoteCounts, realColumnCount);
         }
 
         public static bool TryComputeRulesetSpecificRadarData(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
@@ -97,8 +220,7 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             radarResult = default;
 
-            PlayableCachedWorkingBeatmap playableWorkingBeatmap = new PlayableCachedWorkingBeatmap(workingBeatmap);
-            IBeatmap analysisBeatmap = playableWorkingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+            IBeatmap analysisBeatmap = EzPlayableBeatmapCache.GetShared(workingBeatmap, lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -108,13 +230,13 @@ namespace osu.Game.EzOsuGame.Analysis
                 cancellationToken, out radarResult);
         }
 
-        private static double getRateAdjustMultiplier(Mod[] mods)
+        private static double getRateAdjustMultiplier(IReadOnlyList<Mod> mods)
         {
             try
             {
                 double rate = 1.0;
 
-                for (int i = 0; i < mods.Length; i++)
+                for (int i = 0; i < mods.Count; i++)
                 {
                     if (mods[i] is IApplicableToRate applicableToRate)
                         rate = applicableToRate.ApplyToRate(0, rate);
@@ -144,11 +266,14 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             xxySr = null;
 
-            if (analysisBeatmap.HitObjects.Count == 0)
+            if (!EzXxyStarRatingSupport.SupportsBeatmap(analysisBeatmap, lookup.Ruleset))
                 return false;
 
-            if (lookup.Ruleset.OnlineID != 3)
-                return false;
+            if (analysisBeatmap.HitObjects.Count == 0)
+            {
+                xxySr = 0;
+                return true;
+            }
 
             double rate = getRateAdjustMultiplier(lookup.OrderedMods);
 
@@ -162,9 +287,6 @@ namespace osu.Game.EzOsuGame.Analysis
                                                    in EzAnalysisLookupCache lookup, CancellationToken cancellationToken)
         {
             var ruleset = lookup.Ruleset.CreateInstance();
-
-            if (ruleset == null)
-                return null;
 
             var performanceCalculator = ruleset.CreatePerformanceCalculator();
 

@@ -13,6 +13,7 @@ using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
@@ -31,6 +32,13 @@ using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
+using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Scoring.Bonus;
+using osu.Game.EzOsuGame.UI;
+using osu.Game.Overlays.Dialog;
 using osu.Game.Scoring;
 using osu.Game.Users;
 using osu.Game.Users.Drawables;
@@ -73,6 +81,15 @@ namespace osu.Game.Screens.Select
         private ScoreManager scoreManager { get; set; } = null!;
 
         [Resolved]
+        private BeatmapManager beatmaps { get; set; } = null!;
+
+        [Resolved]
+        private IEzReplaySession replaySession { get; set; } = null!;
+
+        [Resolved]
+        private EzAnalysisCache? ezAnalysisCache { get; set; }
+
+        [Resolved]
         private OsuConfigManager config { get; set; } = null!;
 
         [Resolved]
@@ -88,7 +105,7 @@ namespace osu.Game.Screens.Select
         private const float statistics_compact_min_width = 90;
         private const float rank_label_width = 40;
 
-        private const int corner_radius = 10;
+        private const float corner_radius = EzUIStyleV1.CORNER_RADIUS_WEDGE;
         private const int transition_duration = 200;
 
         private static readonly Color4 personal_best_gradient_left = Color4Extensions.FromHex("#66FFCC");
@@ -196,10 +213,10 @@ namespace osu.Game.Screens.Select
                                     RelativeSizeAxes = Axes.Both,
                                     Colour = foregroundColour
                                 },
-                                new UserCoverBackground
+                                new CoverBackground
                                 {
                                     RelativeSizeAxes = Axes.Both,
-                                    User = Score.User,
+                                    Model = Score.User,
                                     Shear = sheared ? -OsuGame.SHEAR : Vector2.Zero,
                                     Anchor = Anchor.BottomLeft,
                                     Origin = Anchor.BottomLeft,
@@ -316,18 +333,19 @@ namespace osu.Game.Screens.Select
                                                 {
                                                     Name = @"Statistics container",
                                                     Padding = new MarginPadding { Right = 10 },
-                                                    Spacing = new Vector2(20, 0),
+                                                    Spacing = new Vector2(10, 0),
                                                     Shear = sheared ? -OsuGame.SHEAR : Vector2.Zero,
                                                     Anchor = Anchor.CentreRight,
                                                     Origin = Anchor.CentreRight,
                                                     AutoSizeAxes = Axes.Both,
                                                     Direction = FillDirection.Horizontal,
-                                                    Children = new Drawable[]
+                                                    Children = new[]
                                                     {
+                                                        EzScoreInfoExtensions.CreateDisplayDrawable(Score, fontSize: 12, anchor: Anchor.CentreLeft),
                                                         new ScoreComponentLabel(BeatmapsetsStrings.ShowScoreboardHeadersCombo.ToUpper(), $"{Score.MaxCombo.ToString()}x",
-                                                            Score.MaxCombo == Score.GetMaximumAchievableCombo(), 60),
+                                                            Score.IsPerfect(), 60),
                                                         new ScoreComponentLabel(BeatmapsetsStrings.ShowScoreboardHeadersAccuracy.ToUpper(), Score.DisplayAccuracy, Score.Accuracy == 1,
-                                                            55),
+                                                            45),
                                                     },
                                                     Alpha = 0,
                                                 }
@@ -443,14 +461,29 @@ namespace osu.Game.Screens.Select
                                                         Font = OsuFont.Style.Subtitle.With(weight: FontWeight.Light, fixedWidth: true),
                                                         Shear = sheared ? -OsuGame.SHEAR : Vector2.Zero,
                                                     },
-                                                    modsContainer = new FillFlowContainer<Drawable>
+                                                    new FillFlowContainer
                                                     {
                                                         Anchor = Anchor.TopRight,
                                                         Origin = Anchor.TopRight,
                                                         AutoSizeAxes = Axes.Both,
                                                         Direction = FillDirection.Horizontal,
-                                                        Spacing = new Vector2(-10, 0),
+                                                        Spacing = new Vector2(4, 0),
                                                         Shear = sheared ? -OsuGame.SHEAR : Vector2.Zero,
+                                                        Children = new Drawable[]
+                                                        {
+                                                            new EzScoreBonusChip(Score)
+                                                            {
+                                                                Anchor = Anchor.CentreRight, Origin = Anchor.CentreRight
+                                                            },
+                                                            modsContainer = new FillFlowContainer<Drawable>
+                                                            {
+                                                                Anchor = Anchor.CentreRight,
+                                                                Origin = Anchor.CentreRight,
+                                                                AutoSizeAxes = Axes.Both,
+                                                                Direction = FillDirection.Horizontal,
+                                                                Spacing = new Vector2(-10, 0),
+                                                            },
+                                                        }
                                                     },
                                                 }
                                             }
@@ -626,6 +659,12 @@ namespace osu.Game.Screens.Select
                 if (Score.OnlineID > 0)
                     items.Add(new OsuMenuItem(CommonStrings.CopyLink, MenuItemType.Standard, () => game?.CopyToClipboard($@"{api.Endpoints.WebsiteUrl}/scores/{Score.OnlineID}")));
 
+                items.Add(new OsuMenuItem(EzSongSelectStrings.RECALCULATE_SCORE_ORIGINAL_ENV, MenuItemType.Standard,
+                    () => _ = EzScoreRecalculationService.RecalculateAsync(scoreManager, beatmaps, replaySession, Score, ReplayRunPurpose.ForStored, analysisCache: ezAnalysisCache)));
+                items.Add(new OsuMenuItem(EzSongSelectStrings.RECALCULATE_SCORE_CURRENT_ENV, MenuItemType.Standard,
+                    () => _ = EzScoreRecalculationService.RecalculateAsync(scoreManager, beatmaps, replaySession, Score, ReplayRunPurpose.ForLive, analysisCache: ezAnalysisCache)));
+                items.Add(new OsuMenuItem(EzSongSelectStrings.RENAME_PLAYER, MenuItemType.Standard, () => dialogOverlay?.Push(new RenamePlayerDialog(Score, scoreManager))));
+
                 if (Score.Files.Count <= 0) return items.ToArray();
 
                 if (items.Count > 0)
@@ -743,6 +782,70 @@ namespace osu.Game.Screens.Select
         {
             Own,
             Friend,
+        }
+
+        private partial class RenamePlayerDialog : PopupDialog
+        {
+            private readonly ScoreInfo score;
+            private readonly ScoreManager scoreManager;
+            private readonly FocusedTextBox textBox;
+
+            public RenamePlayerDialog(ScoreInfo score, ScoreManager scoreManager)
+            {
+                this.score = score;
+                this.scoreManager = scoreManager;
+
+                HeaderText = EzSongSelectStrings.RENAME_PLAYER_HEADER;
+                BodyText = score.User.Username;
+                Icon = FontAwesome.Solid.User;
+
+                textBox = new FocusedTextBox
+                {
+                    PlaceholderText = EzSongSelectStrings.RENAME_PLAYER_PLACEHOLDER,
+                    RelativeSizeAxes = Axes.X,
+                    FontSize = OsuFont.DEFAULT_FONT_SIZE,
+                    SelectAllOnFocus = true,
+                    TabbableContentContainer = this,
+                };
+
+                MainContent.Child = new FillFlowContainer
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Direction = FillDirection.Vertical,
+                    Spacing = new Vector2(10),
+                    Padding = new MarginPadding { Horizontal = 15 },
+                    Children = new Drawable[]
+                    {
+                        textBox,
+                    }
+                };
+
+                Buttons = new PopupDialogButton[]
+                {
+                    new PopupDialogOkButton
+                    {
+                        Text = @"Save",
+                        Action = () =>
+                        {
+                            if (!string.IsNullOrWhiteSpace(textBox.Text))
+                                scoreManager.RenamePlayer(score, textBox.Text);
+                        }
+                    },
+                    new PopupDialogCancelButton
+                    {
+                        Text = @"Cancel",
+                    },
+                };
+
+                textBox.OnCommit += (_, _) => PerformOkAction();
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+                textBox.TakeFocus();
+            }
         }
     }
 }

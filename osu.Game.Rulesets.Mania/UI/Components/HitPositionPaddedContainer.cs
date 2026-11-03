@@ -7,7 +7,7 @@ using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Rulesets.Mania.Skinning;
+using osu.Game.Rulesets.Mania.EzMania;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Skinning;
 
@@ -48,11 +48,7 @@ namespace osu.Game.Rulesets.Mania.UI.Components
 
         protected virtual void UpdateHitPosition()
         {
-            float hitPosition = globalHitPosition.Value
-                ? (float)hitPositonBindable.Value
-                : skin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                      new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
-                  ?? (float)hitPositonBindable.Value;
+            float hitPosition = ManiaPlayfieldLayoutHelper.GetHitPosition(skin, globalHitPosition.Value, hitPositonBindable.Value);
 
             Padding = Direction.Value == ScrollingDirection.Up
                 ? new MarginPadding { Top = hitPosition }

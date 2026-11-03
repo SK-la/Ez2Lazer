@@ -28,6 +28,14 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
         /// </remarks>
         public float TotalRotation => 360 * completedSpins.Count + currentSpinMaxRotation;
 
+        /// <summary>
+        /// The number of complete spins performed so far.
+        /// </summary>
+        /// <remarks>
+        /// This is the authoritative source for bonus tick dispatch; it is decremented on rewind.
+        /// </remarks>
+        public int CompletedSpins => completedSpins.Count;
+
         private readonly Stack<CompletedSpin> completedSpins = new Stack<CompletedSpin>();
 
         /// <summary>

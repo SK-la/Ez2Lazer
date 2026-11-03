@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
+using osu.Game.EzOsuGame.Online;
 using osu.Game.Localisation;
 using osu.Game.Online.API.Requests;
 using osu.Game.Online.API.Requests.Responses;
@@ -21,6 +22,9 @@ namespace osu.Game.Online.API
         public const int DUMMY_USER_ID = 1001;
 
         public DummyLocalUserState LocalUserState { get; } = new DummyLocalUserState();
+
+        public string ScoreProcessingNoticeUrl { get; set; } = string.Empty;
+
         public Bindable<APIUser> LocalUser => LocalUserState.User;
 
         ILocalUserState IAPIProvider.LocalUserState => LocalUserState;
@@ -56,6 +60,8 @@ namespace osu.Game.Online.API
         /// </summary>
         public Func<APIRequest, bool>? HandleRequest;
 
+        private readonly ILocalOnlyRequestHandler localRequestHandler = new LocalOnlyRequestHandler();
+
         private readonly Bindable<APIState> state = new Bindable<APIState>(APIState.Online);
 
         private bool shouldFailNextLogin;
@@ -68,12 +74,20 @@ namespace osu.Game.Online.API
         /// </summary>
         public IBindable<APIState> State => state;
 
-        // Match IAPIProvider.IsLocalOnly
-        public bool IsLocalOnly { get; private set; }
+        public IBindable<string?> UserFacingOutageMessage { get; } = new Bindable<string?>();
+
+        /// <seealso cref="APIAccess.IsLocalOnly"/>
+        public bool IsLocalOnly => State.Value == APIState.LocalOnline;
 
         public virtual void Queue(APIRequest request)
         {
             request.AttachAPI(this);
+
+            if (IsLocalOnly)
+            {
+                Schedule(() => handleLocally(request));
+                return;
+            }
 
             Schedule(() =>
             {
@@ -96,12 +110,26 @@ namespace osu.Game.Online.API
         public void Perform(APIRequest request)
         {
             request.AttachAPI(this);
+
+            if (IsLocalOnly)
+            {
+                handleLocally(request);
+                return;
+            }
+
             HandleRequest?.Invoke(request);
         }
 
         public Task PerformAsync(APIRequest request)
         {
             request.AttachAPI(this);
+
+            if (IsLocalOnly)
+            {
+                handleLocally(request);
+                return Task.CompletedTask;
+            }
+
             HandleRequest?.Invoke(request);
             return Task.CompletedTask;
         }
@@ -132,8 +160,6 @@ namespace osu.Game.Online.API
                 Id = DUMMY_USER_ID,
             };
 
-            IsLocalOnly = false;
-
             if (SessionVerificationMethod != null)
             {
                 state.Value = APIState.RequiresSecondFactorAuth;
@@ -147,17 +173,15 @@ namespace osu.Game.Online.API
 
         public void LoginLocal(string username)
         {
-            // Simulate an immediate local login for tests.
+            // Match APIAccess: enter LocalOnline before notifying LocalUser subscribers,
+            // so UI that checks IsLocalOnly in the user-changed callback sees the right state.
+            LastLoginError = null;
+            state.Value = APIState.LocalOnline;
             LocalUser.Value = new APIUser
             {
                 Username = username,
                 Id = DUMMY_USER_ID,
             };
-
-            LastLoginError = null;
-            state.Value = APIState.Online;
-
-            IsLocalOnly = true;
         }
 
         public void AuthenticateSecondFactor(string code)
@@ -203,8 +227,6 @@ namespace osu.Game.Online.API
             // must happen after `state.Value` is changed such that subscribers to that bindable's value changes see the correct user.
             // compare: `APIAccess.Logout()`.
             LocalUser.Value = new GuestUser();
-
-            IsLocalOnly = false;
         }
 
         public void UpdateLocalFriends()
@@ -226,6 +248,12 @@ namespace osu.Game.Online.API
         }
 
         public void SetState(APIState newState) => state.Value = newState;
+
+        private void handleLocally(APIRequest request)
+        {
+            if (!localRequestHandler.Handle(request))
+                request.TriggerFailure(new LocalOnlyUnavailableException(request));
+        }
 
         /// <summary>
         /// Skip 2FA requirement for next login.

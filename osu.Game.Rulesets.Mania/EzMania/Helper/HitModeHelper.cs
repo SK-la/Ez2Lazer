@@ -1,0 +1,650 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
+using osu.Game.Rulesets.Scoring;
+using osu.Game.Scoring;
+
+// ReSharper disable InconsistentNaming
+
+namespace osu.Game.Rulesets.Mania.EzMania.Helper
+{
+    /// <summary>
+    /// BMS系列 数据统一使用 EX Score, 见: <see href="https://iidx.org/compendium/exscore"/>
+    /// <para></para>
+    /// EZ2AC 数据来自: <see href="https://namu.wiki/w/EZ2AC%20%EC%8B%9C%EB%A6%AC%EC%A6%88/%ED%8C%90%EC%A0%95%EA%B3%BC%20%EC%A0%90%EC%88%98%EC%B2%B4%EA%B3%84"/>
+    /// <para></para>
+    /// Malody 数据来自:  <see href="https://mzh.moegirl.org.cn/Malody#.E5.88.86.E6.95.B0"/>
+    /// <para></para>
+    /// O2Jam 由于机制过于复杂，这里简化忽略加成，只考虑50%比例；原始算法参考: <see href="https://games.sina.com.cn/o/z/jyt/2005-01-11/197476.shtml"/>/// </summary>
+    public partial class JudgeModeHelper
+    {
+        private static readonly double[,] hit_range_bms =
+        {
+            //  305  300    200     100     50e  Miss  Poor
+            // Kool  Cool   Good    -       Bad  Poor  KPoor
+            { 16.67, 33.33, 116.67, 116.67, 250, 250,  500 }, // IIDX
+            { 15.00, 30.00, 060.00, 060.00, 200, 200,  1000 }, // LR2 Hard
+            { 15.00, 45.00, 112.00, 112.00, 165, 165,  500 }, // raja normal (75%)
+            { 20.00, 60.00, 150.00, 150.00, 220, 220,  500 }, // raja easy (100%)
+        };
+
+        private static readonly double[,] hit_range_bms_late =
+        {
+            //  305    300     200     100   50l Miss   Poor
+            // Kool   Cool    Good       -  Bad  Poor  KPoor
+            { 16.67, 33.33, 116.67, 116.67, 250, 250,  150 }, // IIDX
+            { 15.00, 30.00, 060.00, 060.00, 200, 200,  150 }, // LR2 Hard
+            { 15.00, 45.00, 112.00, 112.00, 210, 210,  150 }, // raja normal
+            { 20.00, 60.00, 150.00, 150.00, 280, 280,  150 }, // raja easy (100%)
+        };
+
+        private static readonly DifficultyRange perfect_window_range = new DifficultyRange(22.4D, 19.4D, 13.9D);
+        private static readonly DifficultyRange great_window_range = new DifficultyRange(64, 49, 34);
+        private static readonly DifficultyRange good_window_range = new DifficultyRange(97, 82, 67);
+        private static readonly DifficultyRange ok_window_range = new DifficultyRange(127, 112, 97);
+        private static readonly DifficultyRange meh_window_range = new DifficultyRange(151, 136, 121);
+        private static readonly DifficultyRange miss_window_range = new DifficultyRange(188, 173, 158);
+
+        public double Range305 { get; private set; }
+        public double Range300 { get; private set; }
+        public double Range200 { get; private set; }
+        public double Range100 { get; private set; }
+        public double Range050 { get; private set; }
+        public double Range000 { get; private set; }
+
+        // public double RangePoor { get; private set; }
+
+        public (double early, double late) RangeKPR { get; private set; }
+        public (double early, double late) RangeBD { get; private set; }
+
+        private EzEnumJudgeMode judgeMode = EzEnumJudgeMode.Lazer;
+
+        public EzEnumJudgeMode JudgeMode
+        {
+            get => judgeMode;
+            set
+            {
+                judgeMode = value;
+                updateRanges();
+            }
+        }
+
+        private double totalMultiplier = 1.0;
+
+        // 改成调用独立更新函数
+        public double TotalMultiplier
+        {
+            get => totalMultiplier;
+            set
+            {
+                totalMultiplier = value;
+                updateRanges();
+            }
+        }
+
+        private double overallDifficulty = 1.0;
+
+        public double OverallDifficulty
+        {
+            get => overallDifficulty;
+            set
+            {
+                overallDifficulty = value;
+                updateRanges();
+            }
+        }
+
+        private double bpm;
+
+        public double BPM
+        {
+            get => bpm;
+            set
+            {
+                bpm = value;
+                updateRanges();
+            }
+        }
+
+        /// <summary>
+        /// 谱面是否为非 mania 原谱转换而来（stable 转谱判定窗分支用）。
+        /// </summary>
+        public bool IsConvert { get; set; }
+
+        public JudgeModeHelper(EzEnumJudgeMode judgeMode)
+        {
+            JudgeMode = judgeMode;
+            updateRanges();
+        }
+
+        // 仅在 updateWindows（冷路径）调用，直接分配即可。
+        public double[] GetHitRangeList => new[] { Range305, Range300, Range200, Range100, Range050, Range000 };
+
+        private void updateRanges()
+        {
+            RangeBD = (0, 0);
+            RangeKPR = (0, 0);
+
+            switch (judgeMode)
+            {
+                case EzEnumJudgeMode.O2Jam:
+                    double safeBpm = double.IsFinite(bpm) && bpm > 0 ? bpm : 75.0;
+                    Range305 = 7500.0 / safeBpm * TotalMultiplier;
+                    Range300 = Range305;
+                    Range200 = 22500.0 / safeBpm * TotalMultiplier;
+                    Range100 = Range200;
+                    Range050 = 31250.0 / safeBpm * TotalMultiplier;
+                    Range000 = Range050;
+                    break;
+
+                case EzEnumJudgeMode.EZ2AC:
+                    Range305 = 16.67 * TotalMultiplier;
+                    Range300 = 33.33 * TotalMultiplier;
+                    Range200 = 83.33 * TotalMultiplier;
+                    Range100 = Range200;
+                    Range050 = 100.0 * TotalMultiplier;
+                    Range000 = 116.67 * TotalMultiplier;
+                    break;
+
+                case EzEnumJudgeMode.IIDX_HD:
+                case EzEnumJudgeMode.LR2_HD:
+                case EzEnumJudgeMode.Raja_NM:
+                    int row = judgeMode == EzEnumJudgeMode.LR2_HD ? 1
+                        : judgeMode == EzEnumJudgeMode.Raja_NM ? 2
+                        : 0;
+
+                    Range305 = hit_range_bms[row, 0] * TotalMultiplier;
+                    Range300 = hit_range_bms[row, 1] * TotalMultiplier;
+                    Range200 = hit_range_bms[row, 2] * TotalMultiplier;
+                    Range100 = hit_range_bms[row, 3] * TotalMultiplier;
+                    Range050 = hit_range_bms[row, 4] * TotalMultiplier;
+
+                    double badEarly = hit_range_bms[row, 4] * TotalMultiplier;
+                    double badLate = hit_range_bms_late[row, 4] * TotalMultiplier;
+                    RangeBD = (badEarly, badLate);
+
+                    // BMS：不按单独 MS 档分支；Poor/Miss 窗与 Bad 对齐，区间 Miss 由 Drawable 逻辑处理。
+                    Range000 = Range050;
+
+                    double kPoorEarly = hit_range_bms[row, 6] * TotalMultiplier;
+                    double kPoorLate = hit_range_bms_late[row, 6] * TotalMultiplier;
+                    RangeKPR = (kPoorEarly, kPoorLate);
+                    break;
+
+                case EzEnumJudgeMode.Malody_E:
+                    Range305 = 20.0 * TotalMultiplier;
+                    Range300 = 60.0 * TotalMultiplier;
+                    Range200 = 94.0 * TotalMultiplier;
+                    Range100 = Range200;
+                    Range050 = Range200;
+                    Range000 = 150.0 * TotalMultiplier;
+                    break;
+
+                case EzEnumJudgeMode.Malody_B:
+                    Range305 = 44.0 * TotalMultiplier;
+                    Range300 = 84.0 * TotalMultiplier;
+                    Range200 = 118.0 * TotalMultiplier;
+                    Range100 = Range200;
+                    Range050 = Range200;
+                    Range000 = 150.0 * TotalMultiplier;
+                    break;
+
+                case EzEnumJudgeMode.StableClassic:
+                    var stable = StableManiaWindows.Create(OverallDifficulty, TotalMultiplier, IsConvert);
+                    Range305 = stable.Perfect300g;
+                    Range300 = stable.Great300;
+                    Range200 = stable.Good200;
+                    Range100 = stable.Ok100;
+                    Range050 = stable.Meh50;
+                    Range000 = stable.Miss;
+                    break;
+
+                case EzEnumJudgeMode.Lazer:
+                    Range305 = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, perfect_window_range) * TotalMultiplier) + 0.5;
+                    Range300 = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, great_window_range) * TotalMultiplier) + 0.5;
+                    Range200 = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, good_window_range) * TotalMultiplier) + 0.5;
+                    Range100 = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, ok_window_range) * TotalMultiplier) + 0.5;
+                    Range050 = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, meh_window_range) * TotalMultiplier) + 0.5;
+                    Range000 = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, miss_window_range) * TotalMultiplier) + 0.5;
+                    break;
+            }
+        }
+
+        // public virtual bool AllowPoorEnabled => GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.BmsPoorHitResultEnable);
+
+        public virtual bool IsHitResultAllowed(HitResult result)
+        {
+            switch (result)
+            {
+                case HitResult.Perfect:
+                case HitResult.Great:
+                case HitResult.Good:
+                case HitResult.Ok:
+                case HitResult.Meh:
+                case HitResult.Miss:
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
+        public HitResult ResultForClassic(double timeOffset)
+        {
+            timeOffset = Math.Abs(timeOffset);
+
+            for (var result = HitResult.Perfect; result >= HitResult.Poor; --result)
+            {
+                if (IsHitResultAllowed(result) && timeOffset <= WindowFor(result))
+                    return result;
+            }
+
+            return HitResult.None;
+        }
+
+        public HitResult ResultFor(double timeOffset)
+        {
+            if (judgeMode == EzEnumJudgeMode.StableClassic) return ResultForClassic(timeOffset);
+
+            double absOffset = Math.Abs(timeOffset);
+            if (absOffset <= Range305) return HitResult.Perfect;
+            if (absOffset <= Range300) return HitResult.Great;
+            if (absOffset <= Range200) return HitResult.Good;
+            if (absOffset <= Range100) return HitResult.Ok;
+
+            if (IsInRange(timeOffset, RangeBD, Range050)) return HitResult.Meh;
+            if (absOffset <= Range000) return HitResult.Miss;
+            // if (IsInRange(timeOffset, RangeKPR, RangePoor)) return HitResult.Poor;
+
+            return HitResult.None;
+        }
+
+        public bool IsInRange(double timeOffset, (double early, double late) range, double fallback)
+        {
+            bool isEarly = timeOffset < 0;
+            double early = range.early != 0 ? range.early : fallback;
+            double late = range.late != 0 ? range.late : fallback;
+
+            if (isEarly)
+            {
+                // Early判定：timeOffset是负数，需要在[-early, 0]范围内
+                return timeOffset >= -early;
+            }
+            else
+            {
+                // Late判定：timeOffset是正数，需要在[0, late]范围内
+                return timeOffset <= late;
+            }
+        }
+
+        public double WindowFor(HitResult result, bool? isEarly = null)
+        {
+            switch (result)
+            {
+                case HitResult.Perfect: return Range305;
+
+                case HitResult.Great: return Range300;
+
+                case HitResult.Good: return Range200;
+
+                case HitResult.Ok: return Range100;
+
+                case HitResult.Meh:
+                    if (isEarly == null) return Range050;
+
+                    double mehRange = (bool)isEarly ? RangeBD.early : RangeBD.late;
+                    return mehRange > 0 ? mehRange : Range050;
+
+                case HitResult.Miss:
+                    if (isEarly == null) return Range000;
+
+                    double missRange = (bool)isEarly ? RangeBD.early : RangeBD.late;
+                    return missRange > 0 ? missRange : Range000;
+
+                case HitResult.Poor:
+                    if (isEarly == null) return RangeKPR.early > 0 ? RangeKPR.early : Range000;
+
+                    double kPoorRange = (bool)isEarly ? RangeKPR.early : RangeKPR.late;
+                    return kPoorRange > 0 ? kPoorRange : Range000;
+
+                // case HitResult.Poor:
+                //     if (isEarly == null) return RangePoor;
+                //
+                //     double poorRange = (bool)isEarly ? RangeBD.early : RangeBD.late;
+                //     return poorRange > 0 ? poorRange : RangePoor;
+
+                default: throw new ArgumentOutOfRangeException(nameof(result), result, null);
+            }
+        }
+
+        #region 分数
+
+        private const int score_base = 300;
+
+        /// <summary>
+        /// 根据判定模式获取基础分数
+        /// </summary>
+        public static int GetBaseScoreForResult(EzEnumJudgeMode judgeMode, HitResult result)
+        {
+            switch (judgeMode)
+            {
+                case EzEnumJudgeMode.Lazer:
+                    return getLazerBaseScore(result);
+
+                case EzEnumJudgeMode.StableClassic:
+                    return getClassicBaseScore(result);
+
+                case EzEnumJudgeMode.EZ2AC:
+                    return getEZ2ACBaseScore(result);
+
+                case EzEnumJudgeMode.O2Jam:
+                    return getO2JamBaseScore(result);
+
+                case EzEnumJudgeMode.IIDX_HD:
+                case EzEnumJudgeMode.LR2_HD:
+                case EzEnumJudgeMode.Raja_NM:
+                    return getExScore(result);
+
+                case EzEnumJudgeMode.Malody_E:
+                    return getMalodyBaseScore(result, 1.2);
+
+                case EzEnumJudgeMode.Malody_B:
+                    return getMalodyBaseScore(result, 0.85);
+
+                default:
+                    return 0;
+            }
+        }
+
+        // Lazer 模式（对齐 ManiaScoreProcessor.GetBaseScoreForResult）
+        private static int getLazerBaseScore(HitResult result) => result switch
+        {
+            HitResult.Perfect => 305,
+            HitResult.Great => 300,
+            HitResult.Good => 200,
+            HitResult.Ok => 100,
+            HitResult.Meh => 50,
+            _ => 0,
+        };
+
+        // Stable经典模式
+        private static int getClassicBaseScore(HitResult result)
+        {
+            switch (result)
+            {
+                case HitResult.Perfect:
+                case HitResult.Great:
+                    return score_base;
+
+                case HitResult.Good:
+                    return 200;
+
+                case HitResult.Ok:
+                    return 100;
+
+                case HitResult.Meh:
+                    return 50;
+
+                default:
+                    return 0;
+            }
+        }
+
+        private static int getEZ2ACBaseScore(HitResult result)
+        {
+            switch (result)
+            {
+                case HitResult.Perfect:
+                    return 300;  // Kool
+
+                case HitResult.Great:
+                    return 150;  // Cool
+
+                case HitResult.Good:
+                    return 41;  // Good
+
+                // LN tick 只推 combo，不计 ACC/判定档分值
+                case HitResult.LargeTickHit:
+                case HitResult.LargeTickMiss:
+                case HitResult.SliderTailHit:
+                    return 0;
+
+                default:
+                    return 0;
+            }
+        }
+
+        private static int getO2JamBaseScore(HitResult result)
+        {
+            switch (result)
+            {
+                case HitResult.Perfect:
+                    return score_base;  // Cool
+
+                case HitResult.Good:
+                    return (int)(score_base * 0.5);  // Good
+
+                default:
+                    return 0;
+            }
+        }
+
+        private static int getExScore(HitResult result)
+        {
+            switch (result)
+            {
+                case HitResult.Perfect:
+                    return score_base;
+
+                case HitResult.Great:
+                    return (int)(score_base * 0.5);
+
+                default:
+                    return 0;
+            }
+        }
+
+        private static int getMalodyBaseScore(HitResult result, double scoreMultiplier = 1.0)
+        {
+            switch (result)
+            {
+                case HitResult.Perfect:
+                    return (int)(score_base * scoreMultiplier);  // Best
+
+                case HitResult.Great:
+                    return (int)(score_base * scoreMultiplier * 0.75);  // Cool
+
+                case HitResult.Good:
+                    return (int)(score_base * scoreMultiplier * 0.4);  // Good
+
+                default:
+                    return 0;
+            }
+        }
+
+        #endregion
+
+        #region 公共静态工具
+
+        public static bool IsBMSJudgeMode(EzEnumJudgeMode judgeMode)
+        {
+            return judgeMode == EzEnumJudgeMode.IIDX_HD ||
+                   judgeMode == EzEnumJudgeMode.LR2_HD ||
+                   judgeMode == EzEnumJudgeMode.Raja_NM;
+        }
+
+        /// <summary>
+        /// 在指定 JudgeMode 下，<see cref="HitResult.Meh"/> 是否打断 Combo。
+        /// BMS / O2Jam 模式下 Meh 断 Combo，其余不断。
+        /// </summary>
+        public static bool MehBreaksCombo(EzEnumJudgeMode judgeMode)
+        {
+            switch (judgeMode)
+            {
+                case EzEnumJudgeMode.IIDX_HD:
+                case EzEnumJudgeMode.LR2_HD:
+                case EzEnumJudgeMode.Raja_NM:
+                case EzEnumJudgeMode.O2Jam:
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// 早按侧 KPoor（空出し）：是否仍在机台规定的「note 判定时刻前可识别」范围内。
+        /// osu 中 <paramref name="timeOffsetFromHit"/> = 当前时间 - 物件判定时刻，负值为提前按下。
+        /// IIDX 无提前上限；LR2 为判定时刻前 1000ms 内；Raja 为前 500ms 内。
+        /// 晚按侧 KPoor 不由本方法约束，由 Bad 外与 <c>badLate</c> 衔接的逻辑单独处理。
+        /// </summary>
+        public static bool IsWithinEarlyKPoorRecognitionWindow(EzEnumJudgeMode mode, double timeOffsetFromHit)
+        {
+            if (timeOffsetFromHit >= 0)
+                return true;
+
+            if (!IsBMSJudgeMode(mode))
+                return true;
+
+            double maxEarlyMs = mode switch
+            {
+                EzEnumJudgeMode.LR2_HD => 1000,
+                EzEnumJudgeMode.Raja_NM => 500,
+                _ => double.PositiveInfinity,
+            };
+
+            return timeOffsetFromHit >= -maxEarlyMs;
+        }
+
+        // ResultFor → IsHitResultAllowed 每候选多次调用；禁止每次 new[]。
+        private static readonly HitResult[] valid_results_o2jam =
+        {
+            HitResult.Perfect,
+            HitResult.Good,
+            HitResult.Meh,
+            HitResult.Miss,
+            HitResult.IgnoreHit,
+            HitResult.ComboBreak,
+            HitResult.IgnoreMiss,
+        };
+
+        private static readonly HitResult[] valid_results_ez2ac =
+        {
+            HitResult.Perfect,
+            HitResult.Great,
+            HitResult.Good,
+            HitResult.Meh,
+            HitResult.Miss,
+            HitResult.IgnoreHit,
+            HitResult.ComboBreak,
+            HitResult.IgnoreMiss,
+        };
+
+        private static readonly HitResult[] valid_results_bms_family =
+        {
+            HitResult.Perfect,
+            HitResult.Great,
+            HitResult.Good,
+            HitResult.Meh,
+            HitResult.Miss,
+            HitResult.Poor,
+            HitResult.IgnoreHit,
+            HitResult.ComboBreak,
+            HitResult.IgnoreMiss,
+        };
+
+        private static readonly HitResult[] valid_results_malody =
+        {
+            HitResult.Perfect,
+            HitResult.Great,
+            HitResult.Good,
+            HitResult.Miss,
+            HitResult.IgnoreHit,
+            HitResult.ComboBreak,
+            HitResult.IgnoreMiss,
+        };
+
+        private static readonly HitResult[] valid_results_lazer_classic =
+        {
+            HitResult.Perfect,
+            HitResult.Great,
+            HitResult.Good,
+            HitResult.Ok,
+            HitResult.Meh,
+            HitResult.Miss,
+            HitResult.IgnoreHit,
+            HitResult.ComboBreak,
+            HitResult.IgnoreMiss,
+        };
+
+        /// <summary>
+        /// 任一 JudgeMode 下可能出现的判定并集（判定池预热用）。
+        /// </summary>
+        /// <remarks>
+        /// 池缺项时 <c>JudgementPooler.Get</c> 返回 null，该判定会被静默跳过不显示；而当局用的
+        /// JudgeMode / 血量模式取自冻结环境（回放是成绩里嵌入的模式），可能与展示时的当前设置不同，
+        /// 所以池内容不能按当前设置推导。
+        /// </remarks>
+        public static IReadOnlyList<HitResult> AllModeValidHitResults { get; } = Enum.GetValues<EzEnumJudgeMode>()
+                                                                                     .SelectMany(GetJudgeModeValidHitResults)
+                                                                                     .Distinct()
+                                                                                     .ToArray();
+
+        /// <summary>
+        /// <see cref="AllModeValidHitResults"/> 中真正会渲染成判定图的子集（判定池实际预热的内容）。
+        /// </summary>
+        /// <remarks>
+        /// <see cref="HitResult.IgnoreHit"/> / <see cref="HitResult.IgnoreMiss"/> / <see cref="HitResult.ComboBreak"/>
+        /// 只为分数统计存在，不作为判定图展示。放进池除了白建 drawable，还会让大多数没有对应判定资源的皮肤
+        /// 回退到默认文字判定，把内部结果名（IGNOREHIT / IGNOREMISS）直接画到屏幕上。
+        /// </remarks>
+        public static IReadOnlyList<HitResult> AllModeDisplayableHitResults { get; } =
+            AllModeValidHitResults.Where(r => r.IsBasic()).ToArray();
+
+        public static IReadOnlyList<HitResult> GetJudgeModeValidHitResults(EzEnumJudgeMode mode)
+        {
+            switch (mode)
+            {
+                case EzEnumJudgeMode.O2Jam:
+                    return valid_results_o2jam;
+
+                case EzEnumJudgeMode.EZ2AC:
+                    return valid_results_ez2ac;
+
+                case EzEnumJudgeMode.IIDX_HD:
+                case EzEnumJudgeMode.LR2_HD:
+                case EzEnumJudgeMode.Raja_NM:
+                    return valid_results_bms_family;
+
+                case EzEnumJudgeMode.Malody_E:
+                case EzEnumJudgeMode.Malody_B:
+                    return valid_results_malody;
+
+                case EzEnumJudgeMode.Lazer:
+                default:
+                    return valid_results_lazer_classic;
+            }
+        }
+
+        public static IReadOnlyList<HitResult> GetJudgeModeValidHitResults()
+        {
+            var mode = GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
+            return GetJudgeModeValidHitResults(mode);
+        }
+
+        /// <summary>
+        /// 按 <see cref="EzScoreInfoExtensions.ResolveDisplayJudgeMode"/> 解析展示用 JudgeMode 后返回有效判定集合。
+        /// </summary>
+        public static IReadOnlyList<HitResult> GetJudgeModeValidHitResultsForDisplay(ScoreInfo? score)
+            => GetJudgeModeValidHitResults(EzScoreInfoExtensions.ResolveDisplayJudgeMode(score));
+
+        #endregion
+    }
+}

@@ -5,12 +5,14 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Development;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
@@ -18,6 +20,12 @@ using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Database;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
@@ -36,6 +44,26 @@ namespace osu.Game.Database
     public partial class BackgroundDataStoreProcessor : Component
     {
         protected Task ProcessingTask { get; private set; } = null!;
+
+        /// <summary>
+        /// Whether the initial startup processing pass has completed (success, failure, or skipped).
+        /// </summary>
+        public bool IsStartupProcessingFinished { get; private set; }
+
+        /// <summary>
+        /// Fired on the update thread once when <see cref="IsStartupProcessingFinished"/> becomes true.
+        /// </summary>
+        public event Action? StartupProcessingFinished;
+
+        private void markStartupProcessingFinished()
+        {
+            if (IsStartupProcessingFinished)
+                return;
+
+            IsStartupProcessingFinished = true;
+            EzStartupTrace.Log("BDSP finished");
+            StartupProcessingFinished?.Invoke();
+        }
 
         [Resolved]
         private RulesetStore rulesetStore { get; set; } = null!;
@@ -64,6 +92,12 @@ namespace osu.Game.Database
         [Resolved]
         private INotificationOverlay? notificationOverlay { get; set; }
 
+        /// <summary>
+        /// [Ez] 全量成绩重算的 Session 入口（选歌右键同款）。
+        /// </summary>
+        [Resolved]
+        private IEzReplaySession? ezReplaySession { get; set; }
+
         [Resolved]
         private IAPIProvider api { get; set; } = null!;
 
@@ -73,30 +107,467 @@ namespace osu.Game.Database
         [Resolved]
         private OsuConfigManager config { get; set; } = null!;
 
+        [Resolved]
+        private EzBeatmapMsdComputer beatmapMsdComputer { get; set; } = null!;
+
+        [Resolved]
+        private EzSkillStore skillStore { get; set; } = null!;
+
+        [Resolved]
+        private EzSkillProvider skillProvider { get; set; } = null!;
+
         private LocalCachedBeatmapMetadataSource localMetadataSource = null!;
 
+        private readonly Lock ezRealmMetadataBackfillLock = new Lock();
+        private bool ezRealmMetadataBackfillQueued;
+
+        /// <summary>
+        /// Request that arrived while a backfill was already running. Kept (rather than dropped) so
+        /// "a version bump is recomputed on the next launch" holds even when the startup pass loses the
+        /// race with a manual queue. Merged with any earlier deferred request; drained by the running
+        /// task before it releases the slot.
+        /// </summary>
+        private EzRealmMetadataScope? deferredEzRealmMetadataScope;
+
+        private bool deferredEzRealmMetadataForceAll;
+
         protected virtual int TimeToSleepDuringGameplay => 30000;
+
+        /// <summary>
+        /// How long to wait for the API to finish connecting before giving up on online metadata lookups for this run.
+        /// </summary>
+        protected virtual int APISettleTimeout => 30000;
+
+        protected virtual bool SkipProcessing => DebugUtils.IsNUnitRunning;
+
+        /// <summary>
+        /// 进主循环前等待，避免选歌刚出现就遭遇 Ez/官方 backfill 的 Invalidate/Replace 风暴。
+        /// 默认 0（<see cref="EzStartupTuning.BdspStartupBackfillDelaySeconds"/>）以便在 intro 期间消化 Realm 写入。
+        /// 测试覆写为 <see cref="TimeSpan.Zero"/>；开发期可增大该值做 A/B 对比。
+        /// </summary>
+        protected virtual TimeSpan StartupBackfillDelay => TimeSpan.FromSeconds(EzStartupTuning.BdspStartupBackfillDelaySeconds);
+
+        /// <summary>
+        /// Whether Ez Realm metadata backfill is currently running (startup or manual queue).
+        /// </summary>
+        public bool IsEzRealmMetadataBackfillRunning
+        {
+            get
+            {
+                lock (ezRealmMetadataBackfillLock)
+                    return ezRealmMetadataBackfillQueued;
+            }
+        }
+
+        /// <summary>
+        /// Queue Ez Realm metadata backfill (Tag / XxySR / PP / MSD) on a background thread.
+        /// </summary>
+        /// <param name="forceAll">When true, clears persisted values first so all supported beatmaps are recomputed.</param>
+        public EzDataRebuildDispatchResult QueueEzRealmMetadataBackfill(bool forceAll = false)
+            => QueueEzRealmMetadataRebuild(EzRealmMetadataScope.All, forceAll);
+
+        /// <summary>
+        /// Queue scoped Ez Realm metadata rebuild on a background thread.
+        /// </summary>
+        public EzDataRebuildDispatchResult QueueEzRealmMetadataRebuild(EzRealmMetadataScope scope, bool forceAll)
+        {
+            if (!tryBeginEzRealmMetadataBackfill())
+            {
+                deferEzRealmMetadataRebuild(scope, forceAll);
+                Logger.Log($"Ez Realm metadata backfill is already running; deferring {scope} (forceAll={forceAll}) to the end of that run.");
+                return EzDataRebuildDispatchResult.AlreadyRunning;
+            }
+
+            Task.Factory.StartNew(() => runEzRealmMetadataBackfillTask(scope, forceAll), TaskCreationOptions.LongRunning);
+
+            return EzDataRebuildDispatchResult.Queued;
+        }
+
+        /// <summary>
+        /// Runs one scoped backfill, then drains anything deferred while it ran, repeating until nothing
+        /// is pending. Requests therefore pile up as a union of scopes instead of being discarded.
+        /// </summary>
+        private void runEzRealmMetadataBackfillTask(EzRealmMetadataScope scope, bool forceAll)
+        {
+            try
+            {
+                while (true)
+                {
+                    try
+                    {
+                        if (forceAll)
+                            clearEzRealmMetadata(scope);
+
+                        runEzRealmMetadataBackfill(scope);
+                    }
+                    catch (Exception e)
+                    {
+                        // A failing scope must not strand the ones deferred behind it.
+                        Logger.Log($"Ez Realm metadata backfill failed: {e}");
+                    }
+
+                    if (!finishEzRealmMetadataBackfillOrTakeDeferred(out scope, out forceAll))
+                        return;
+                }
+            }
+            finally
+            {
+                endEzRealmMetadataBackfill();
+            }
+        }
+
+        /// <summary>
+        /// Records <paramref name="scope"/> as the deferred request, unioned with any already deferred.
+        /// Caller must not hold <see cref="ezRealmMetadataBackfillLock"/>.
+        /// </summary>
+        private void deferEzRealmMetadataRebuild(EzRealmMetadataScope scope, bool forceAll)
+        {
+            lock (ezRealmMetadataBackfillLock)
+            {
+                deferredEzRealmMetadataScope = deferredEzRealmMetadataScope == null
+                    ? scope
+                    : deferredEzRealmMetadataScope.Value | scope;
+
+                deferredEzRealmMetadataForceAll |= forceAll;
+            }
+        }
+
+        /// <summary>
+        /// Atomically takes the deferred request if there is one. Otherwise releases the running slot as
+        /// part of the same lock, so a request arriving right now starts a fresh task instead of being
+        /// deferred into a task that is already exiting.
+        /// </summary>
+        private bool finishEzRealmMetadataBackfillOrTakeDeferred(out EzRealmMetadataScope scope, out bool forceAll)
+        {
+            lock (ezRealmMetadataBackfillLock)
+            {
+                if (deferredEzRealmMetadataScope == null)
+                {
+                    ezRealmMetadataBackfillQueued = false;
+                    scope = default;
+                    forceAll = false;
+                    return false;
+                }
+
+                scope = deferredEzRealmMetadataScope.Value;
+                forceAll = deferredEzRealmMetadataForceAll;
+                deferredEzRealmMetadataScope = null;
+                deferredEzRealmMetadataForceAll = false;
+                return true;
+            }
+        }
+
+        private bool tryBeginEzRealmMetadataBackfill()
+        {
+            lock (ezRealmMetadataBackfillLock)
+            {
+                if (ezRealmMetadataBackfillQueued)
+                    return false;
+
+                ezRealmMetadataBackfillQueued = true;
+                return true;
+            }
+        }
+
+        private void endEzRealmMetadataBackfill()
+        {
+            lock (ezRealmMetadataBackfillLock)
+                ezRealmMetadataBackfillQueued = false;
+
+            // Raised off the update thread, after the whole drain loop (including deferred scopes) has finished.
+            // Consumers use it to notice that chart-side rows they were waiting on now exist.
+            EzRealmMetadataBackfillFinished?.Invoke();
+        }
+
+        /// <summary>
+        /// Raised once an Ez Realm metadata backfill (startup or queued) has fully drained, including any scopes
+        /// deferred into that run. Fires on the worker thread.
+        /// </summary>
+        public event Action? EzRealmMetadataBackfillFinished;
+
+        private readonly Lock ezScoreRecalculationLock = new Lock();
+        private bool ezScoreRecalculationQueued;
+
+        /// <summary>
+        /// [Ez] Realm 维护：全量成绩重算（修复被错误后台转换破坏的本地成绩）。
+        /// <list type="bullet">
+        /// <item>mania 且有 replay：Session ForStored 重算（与选歌右键「原始环境重算」同款路径）。</item>
+        /// <item>stable legacy 且无 replay：重走干净的官方 <see cref="StandardisedScoreMigrationTools.UpdateFromLegacy(ScoreInfo, WorkingBeatmap)"/>（从 LegacyTotalScore 重转，修复被写坏的 Total/Acc/Rank）。</item>
+        /// <item>嵌入 Ez 模式但无 replay：跳过（官方算法不理解 Ez 判定语义，重算只会二次破坏）。</item>
+        /// <item>其余：官方 <see cref="ScoreManager.Recalculate"/>。</item>
+        /// </list>
+        /// </summary>
+        /// <param name="includeAllRulesets">false 仅处理 mania 成绩（对应设置「尝试补算」）；true 处理当前已加载规则集（「完全重算」）。</param>
+        public EzDataRebuildDispatchResult QueueEzScoreFullRecalculation(bool includeAllRulesets)
+        {
+            lock (ezScoreRecalculationLock)
+            {
+                if (ezScoreRecalculationQueued)
+                {
+                    Logger.Log("Ez full score recalculation is already running; ignoring duplicate request.");
+                    return EzDataRebuildDispatchResult.AlreadyRunning;
+                }
+
+                ezScoreRecalculationQueued = true;
+            }
+
+            EzScoreScanStamp.Invalidate(storage);
+
+            Task.Factory.StartNew(() =>
+            {
+                try
+                {
+                    runEzScoreFullRecalculation(includeAllRulesets);
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Ez full score recalculation failed: {e}");
+                }
+                finally
+                {
+                    lock (ezScoreRecalculationLock)
+                        ezScoreRecalculationQueued = false;
+                }
+            }, TaskCreationOptions.LongRunning);
+
+            return EzDataRebuildDispatchResult.Queued;
+        }
+
+        private void runEzScoreFullRecalculation(bool includeAllRulesets)
+        {
+            Logger.Log($"Querying local scores for full recalculation (all available rulesets: {includeAllRulesets})...");
+
+            int skippedUnavailable = 0;
+
+            List<Guid> scoreIds = realmAccess.Run(r =>
+            {
+                var ids = new List<Guid>();
+
+                foreach (var score in r.All<ScoreInfo>().Where(s => !s.DeletePending))
+                {
+                    if (!includeAllRulesets)
+                    {
+                        if (score.Ruleset.OnlineID != 3)
+                            continue;
+                    }
+                    else if (!score.Ruleset.Available)
+                    {
+                        skippedUnavailable++;
+                        continue;
+                    }
+
+                    ids.Add(score.ID);
+                }
+
+                return ids;
+            });
+
+            if (skippedUnavailable > 0)
+                Logger.Log($"Skipped {skippedUnavailable} scores whose rulesets are not currently loaded.");
+
+            Logger.Log($"Found {scoreIds.Count} local scores for full recalculation.");
+
+            if (scoreIds.Count == 0)
+                return;
+
+            var notification = showProgressNotification(scoreIds.Count, "Recalculating local scores", "local scores have been recalculated");
+
+            int processedCount = 0;
+            int failedCount = 0;
+
+            foreach (var id in scoreIds)
+            {
+                if (notification?.State == ProgressNotificationState.Cancelled)
+                    break;
+
+                updateNotificationProgress(notification, processedCount, scoreIds.Count);
+
+                sleepIfRequired();
+
+                try
+                {
+                    if (recalculateSingleScore(id))
+                        ++processedCount;
+                    else
+                        ++failedCount;
+                }
+                catch (ObjectDisposedException)
+                {
+                    throw;
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Failed to recalculate score {id}: {e}");
+                    ++failedCount;
+                }
+            }
+
+            completeNotification(notification, processedCount, scoreIds.Count, failedCount);
+        }
+
+        private bool recalculateSingleScore(Guid id)
+        {
+            (ScoreInfo? score, bool hasReplay) = realmAccess.Run(r =>
+            {
+                var s = r.Find<ScoreInfo>(id);
+                return s == null ? (null, false) : (s.Detach(), s.Files.Count > 0);
+            });
+
+            if (score == null)
+            {
+                Logger.Log($"Score {id} no longer exists, skipping.");
+                return false;
+            }
+
+            if (!score.Ruleset.Available)
+            {
+                Logger.Log($"Skipping score {id}: ruleset '{score.Ruleset.ShortName}' is not currently loaded.");
+                return false;
+            }
+
+            if (score.Ruleset.OnlineID == 3 && hasReplay && ezReplaySession != null)
+            {
+                try
+                {
+                    // 与选歌右键「原始环境重算」一致：Session ForStored（嵌入 HM/HM；无嵌入按双 Lazer）。
+                    // 后台线程串行执行，同步阻塞等待即可。
+                    EzScoreRecalculationService.RecalculateAsync(scoreManager, beatmapManager, ezReplaySession, score, ReplayRunPurpose.ForStored)
+                                               .GetAwaiter().GetResult();
+                    return true;
+                }
+                catch (LegacyScoreDecoder.BeatmapNotFoundException)
+                {
+                    // replay 头引用的谱面 MD5 不在本地（谱面被删/更新过版本），Session 无法重放。
+                    // 退回下方无 replay 的官方路径（legacy 转换 / Recalculate）尽量修复。
+                    Logger.Log($"Score {id}: replay references a beatmap not present locally, falling back to non-replay recalculation.");
+                }
+                catch (TimeoutException)
+                {
+                    // 批量后台负载下的偶发谱面加载超时（WorkingBeatmap 10s），谱面已进缓存后重试一次通常可过。
+                    Logger.Log($"Score {id}: beatmap load timed out, retrying once...");
+                    EzScoreRecalculationService.RecalculateAsync(scoreManager, beatmapManager, ezReplaySession, score, ReplayRunPurpose.ForStored)
+                                               .GetAwaiter().GetResult();
+                    return true;
+                }
+            }
+
+            if (score.JudgeMode > (int)EzEnumJudgeMode.Lazer)
+            {
+                // 非官方判定语义成绩且无 replay：官方算法不理解 Ez 判定权重，重算只会破坏，保持原值。
+                // 双 Lazer（JudgeMode=0）是官方语义，继续走下方官方路径。
+                Logger.Log($"Skipping Ez gameplay-mode score {id} without replay (official recalculation not applicable).");
+                return true;
+            }
+
+            if (score.IsLegacyScore && score.Ruleset.IsLegacyRuleset())
+            {
+                // stable 成绩无 replay：重新走干净的官方 legacy 转换（从 LegacyTotalScore），
+                // 普通 Recalculate 修不了被污染转换写坏的 TotalScoreWithoutMods。
+                return realmAccess.Write(r =>
+                {
+                    var s = r.Find<ScoreInfo>(id);
+
+                    if (s == null)
+                        return false;
+
+                    StandardisedScoreMigrationTools.UpdateFromLegacy(s, beatmapManager.GetWorkingBeatmap(s.BeatmapInfo));
+                    s.TotalScoreVersion = LegacyScoreEncoder.LATEST_VERSION;
+                    s.BackgroundReprocessingFailed = false;
+                    return true;
+                });
+            }
+
+            scoreManager.Recalculate(score);
+            return true;
+        }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
+            if (SkipProcessing)
+            {
+                markStartupProcessingFinished();
+                return;
+            }
+
             localMetadataSource = new LocalCachedBeatmapMetadataSource(storage);
 
             ProcessingTask = Task.Factory.StartNew(() =>
             {
-                Logger.Log("Beginning background data store processing..");
+                try
+                {
+                    Logger.Log("Beginning background data store processing..");
+                    EzStartupTrace.Log("BDSP processing begin");
 
-                clearOutdatedStarRatings();
-                populateMissingStarRatings();
-                processOnlineBeatmapSetsWithNoUpdate();
-                // Note that the previous method will also update these on a fresh run.
-                processBeatmapsWithMissingObjectCounts();
-                processScoresWithMissingStatistics();
-                convertLegacyTotalScoreToStandardised();
-                upgradeScoreRanks();
-                backpopulateMissingSubmissionAndRankDates();
-                backpopulateUserTags();
+                    // Let SongSelect settle before Invalidate storms from Ez/official backfill
+                    // (users see a 3–5s FPS cliff when unlimited carousel Replaces land in one burst).
+                    Thread.Sleep(StartupBackfillDelay);
+                    sleepIfRequired();
+
+                    clearOutdatedStarRatings();
+                    clearOutdatedXxyStarRatings();
+                    clearOutdatedManiaBeatmapMsd();
+
+                    // Run Ez Realm backfill before official star population so it is not blocked for long periods.
+                    if (tryBeginEzRealmMetadataBackfill())
+                    {
+                        try
+                        {
+                            runEzRealmMetadataBackfill();
+                        }
+                        finally
+                        {
+                            endEzRealmMetadataBackfill();
+                        }
+                    }
+                    else
+                    {
+                        // Another pass (manual queue) holds the slot. Defer instead of dropping, so a
+                        // version bump is still recomputed on this launch once that pass finishes.
+                        deferEzRealmMetadataRebuild(EzRealmMetadataScope.All, forceAll: false);
+                        Logger.Log("Startup Ez Realm metadata backfill deferred: another backfill is running; it will run again when that one finishes.");
+                    }
+
+                    populateMissingStarRatings();
+                    processOnlineBeatmapSetsWithNoUpdate();
+                    // Note that the previous method will also update these on a fresh run.
+                    processBeatmapsWithMissingObjectCounts();
+
+                    // [Ez] 淘汰 Classic 判定档的数据驱动 pass：每次启动都跑，不绑版本号、不绑 stamp。
+                    // 选行条件本身就是「未完成」标记，无 replay / 谱面缺失的行原样保留，下次启动自动重试。
+                    recalculateLegacyClassicScores();
+
+                    // [Ez] Skip full score-upgrade table scans when a prior clean pass left a matching stamp.
+                    var scoreScanSnapshot = readScoreScanSnapshot();
+
+                    if (EzScoreScanStamp.Matches(storage, scoreScanSnapshot))
+                    {
+                        Logger.Log("Ez score scan stamp matched; skipping startup score upgrade passes.");
+                    }
+                    else
+                    {
+                        processScoresWithMissingStatistics();
+                        // [Ez] Must run before all official score upgrade passes: scores judged under an Ez
+                        // gameplay mode must never be rewritten by official conversion algorithms.
+                        stampEzGameplayModeScores();
+                        // ordering significant, `upgradeModMultipliers()` should run first as it will handle all scores
+                        // (rather than only lazer scores, if it was called after `convertLegacyTotalScoreToStandardised()`)
+                        upgradeModMultipliers();
+                        convertLegacyTotalScoreToStandardised();
+                        upgradeScoreRanks();
+
+                        EzScoreScanStamp.Write(storage, readScoreScanSnapshot());
+                        Logger.Log("Ez score scan stamp written after startup score upgrade passes.");
+                    }
+
+                    backpopulateMissingSubmissionAndRankDates();
+                    backpopulateUserTags();
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Background data store processing failed: {e}");
+                }
             }, TaskCreationOptions.LongRunning).ContinueWith(t =>
             {
                 if (t.Exception?.InnerException is ObjectDisposedException)
@@ -106,12 +577,14 @@ namespace osu.Game.Database
                 }
 
                 Logger.Log("Finished background data store processing!");
+                Scheduler.Add(markStartupProcessingFinished);
             });
         }
 
         /// <summary>
         /// Check whether the databased difficulty calculation version matches the latest ruleset provided version.
         /// If it doesn't, clear out any existing difficulties so they can be incrementally recalculated.
+        /// Baseline PP (<see cref="BeatmapInfo.PerformancePoints"/>) is invalidated alongside star ratings.
         /// </summary>
         private void clearOutdatedStarRatings()
         {
@@ -122,7 +595,7 @@ namespace osu.Game.Database
 
                 if (ruleset.LastAppliedDifficultyVersion < currentVersion)
                 {
-                    Logger.Log($"Resetting star ratings for {ruleset.Name} (difficulty calculation version updated from {ruleset.LastAppliedDifficultyVersion} to {currentVersion})");
+                    Logger.Log($"Resetting star ratings and baseline PP for {ruleset.Name} (difficulty calculation version updated from {ruleset.LastAppliedDifficultyVersion} to {currentVersion})");
 
                     int countReset = 0;
 
@@ -133,6 +606,7 @@ namespace osu.Game.Database
                             if (b.Ruleset.ShortName == ruleset.ShortName)
                             {
                                 b.StarRating = -1;
+                                b.PerformancePoints = -1;
                                 countReset++;
                             }
                         }
@@ -140,10 +614,276 @@ namespace osu.Game.Database
                         r.Find<RulesetInfo>(ruleset.ShortName)!.LastAppliedDifficultyVersion = currentVersion;
                     });
 
-                    Logger.Log($"Finished resetting {countReset} beatmap sets for {ruleset.Name}");
+                    Logger.Log($"Finished resetting {countReset} beatmaps for {ruleset.Name}");
                 }
             }
         }
+
+        /// <summary>
+        /// Check whether the databased xxy calculation version matches the latest ruleset provided version.
+        /// If it doesn't, clear out existing xxy values so they can be incrementally recalculated.
+        /// </summary>
+        private void clearOutdatedXxyStarRatings()
+        {
+            foreach (var ruleset in rulesetStore.AvailableRulesets)
+            {
+                if (!EzXxyStarRatingSupport.TryGetXxyStarRatingVersion(ruleset, out int currentVersion))
+                    continue;
+
+                if (ruleset.LastAppliedXxySrVersion < currentVersion)
+                {
+                    Logger.Log($"Resetting XxyStarRatings for {ruleset.Name} (xxy SR version updated from {ruleset.LastAppliedXxySrVersion} to {currentVersion})");
+
+                    int countReset = 0;
+
+                    realmAccess.Write(r =>
+                    {
+                        foreach (var b in r.All<BeatmapInfo>())
+                        {
+                            if (b.Ruleset.ShortName == ruleset.ShortName)
+                            {
+                                b.XxyStarRating = -1;
+                                countReset++;
+                            }
+                        }
+
+                        r.Find<RulesetInfo>(ruleset.ShortName)!.LastAppliedXxySrVersion = currentVersion;
+                    });
+
+                    // Mania ChartDan is read off xxy SR (the 4K Sunny intervals lookup), so a new xxy
+                    // version retires those rows. Unlike the MSD chain, the chart-chain revisions do not
+                    // fold the xxy version in (xxy lives on BeatmapInfo and this ruleset scalar), so the
+                    // stale rows have to be dropped explicitly - otherwise the incremental ChartDan pass
+                    // keeps skipping hashes that already have a row.
+                    if (ruleset.OnlineID == 3)
+                    {
+                        Logger.Log($"Resetting mania ChartDan for xxy version {ruleset.LastAppliedXxySrVersion} -> {currentVersion}");
+                        skillStore.ClearChartDan();
+                    }
+
+                    Logger.Log($"Finished resetting {countReset} beatmaps for xxy {ruleset.Name}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// When the mania skill algorithm version advances, clear persisted beatmap MSD so startup backfill can recompute.
+        /// </summary>
+        private void clearOutdatedManiaBeatmapMsd()
+        {
+            const int current_version = EzManiaSkillAlgorithm.VERSION;
+
+            // Read the live Realm row — AvailableRulesets clones historically omitted
+            // LastAppliedManiaSkillVersion and would wipe MSD on every startup.
+            var liveState = realmAccess.Run(r =>
+            {
+                var live = r.All<RulesetInfo>().FirstOrDefault(x => x.OnlineID == 3);
+                return live == null
+                    ? ((string?)null, 0)
+                    : (live.ShortName, live.LastAppliedManiaSkillVersion);
+            });
+
+            if (liveState.Item1 == null)
+                return;
+
+            if (liveState.Item2 >= current_version)
+                return;
+
+            Logger.Log($"Resetting beatmap MSD for mania (mania skill version updated from {liveState.Item2} to {current_version})");
+
+            // Only MSD is cleared here. ChartSkillInfo and ChartDan rows read MSD, but both are stamped
+            // with EzAnalysisRevision.ChartSkillInfo/ChartDan, which fold EzManiaSkillAlgorithm.VERSION -
+            // so they already read as stale and the ordinary incremental passes recompute them. Bulk
+            // clearing them would erase the "stale" evidence the status UI reports.
+            skillStore.ClearBeatmapMsd();
+
+            realmAccess.Write(r =>
+            {
+                if (r.Find<RulesetInfo>(liveState.Item1) is RulesetInfo live)
+                    live.LastAppliedManiaSkillVersion = current_version;
+            });
+
+            Logger.Log("Finished resetting beatmap MSD for mania");
+        }
+
+        private void runEzRealmMetadataBackfill()
+            => runEzRealmMetadataBackfill(EzRealmMetadataScope.All);
+
+        private void runEzRealmMetadataBackfill(EzRealmMetadataScope scope)
+        {
+            EzStartupTrace.Log($"BDSP EzRealm backfill begin scope={scope}");
+
+            if (scope.HasFlag(EzRealmMetadataScope.Xxy))
+                populateMissingXxyStarRatings();
+
+            if (scope.HasFlag(EzRealmMetadataScope.Pp))
+                populateMissingPerformancePoints();
+
+            if (scope.HasFlag(EzRealmMetadataScope.Tags))
+                populateMissingBeatmapTagFlags();
+
+            // Chart chain in dependency order: MSD -> CSI -> ChartDan. Every stage is a true
+            // incremental pass keyed on its facet revision (EzAnalysisRevision), so bumping a stage
+            // version (or an upstream one) retires exactly the affected rows and this job recomputes
+            // them - no bulk clearing, and "stale" stays observable.
+            if (scope.HasFlag(EzRealmMetadataScope.Msd)
+                || scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo)
+                || scope.HasFlag(EzRealmMetadataScope.ChartDan))
+            {
+                // Names the revisions in force, so a version bump reads as an explanation for the
+                // recompute instead of the job appearing to act for no reason. Rows stamped with an
+                // older revision are simply "missing" to the incremental passes below (nothing is
+                // bulk-cleared), so this line plus the per-stage progress notifications are the
+                // whole startup signal.
+                Logger.Log("Ez chart chain revisions: "
+                           + $"MSD v{EzAnalysisRevision.Msd}, "
+                           + $"CSI v{EzAnalysisRevision.ChartSkillInfo} ({EzAnalysisRevision.DescribeChartSkillInfo(EzAnalysisRevision.ChartSkillInfo)}), "
+                           + $"Dan v{EzAnalysisRevision.ChartDan} ({EzAnalysisRevision.DescribeChartDan(EzAnalysisRevision.ChartDan)}).");
+            }
+
+            // Defer the MSD side-upsert whenever CSI shares this job: the chain-end Dan pass owns the
+            // write then, so the row is stamped with CSI included. EzBeatmapMsdComputer independently
+            // refuses to stamp a Dan row while CSI is unsettled, so a MSD-only job cannot produce a
+            // CSI-less Dan row either.
+            bool deferChartDanSideUpsert = scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo)
+                                           || scope.HasFlag(EzRealmMetadataScope.ChartDan);
+
+            bool needsChartChain = scope.HasFlag(EzRealmMetadataScope.Msd)
+                                   || scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo)
+                                   || scope.HasFlag(EzRealmMetadataScope.ChartDan);
+
+            EzChartChainState? chartChain = needsChartChain
+                ? skillStore.CollectChartChainState("BDSP")
+                : null;
+
+            if (scope.HasFlag(EzRealmMetadataScope.Msd))
+            {
+                beatmapMsdComputer.SuppressChartDanSideUpsert = deferChartDanSideUpsert;
+
+                try
+                {
+                    if (populateMissingBeatmapMsd(chartChain!)
+                        && (scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo) || scope.HasFlag(EzRealmMetadataScope.ChartDan)))
+                        chartChain = skillStore.CollectChartChainState("BDSP");
+                }
+                finally
+                {
+                    beatmapMsdComputer.SuppressChartDanSideUpsert = false;
+                }
+            }
+
+            if (scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo))
+            {
+                if (populateMissingChartSkillInfo(chartChain!)
+                    && scope.HasFlag(EzRealmMetadataScope.ChartDan))
+                    chartChain = skillStore.CollectChartChainState("BDSP");
+            }
+
+            if (scope.HasFlag(EzRealmMetadataScope.ChartDan))
+                populateMissingChartDan(chartChain!);
+
+            EzStartupTrace.Log($"BDSP EzRealm backfill end scope={scope}");
+        }
+
+        private void clearEzRealmMetadata(EzRealmMetadataScope scope)
+        {
+            Logger.Log($"Forcing Ez Realm metadata recalculation ({scope})...");
+
+            if (scope.HasFlag(EzRealmMetadataScope.Msd))
+            {
+                Logger.Log("Clearing persisted beatmap MSD skill values...");
+                skillStore.ClearBeatmapMsd();
+            }
+
+            if (scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo))
+            {
+                Logger.Log("Clearing persisted ChartSkillInfo rows...");
+                skillStore.ClearChartSkillInfo();
+            }
+
+            if (scope.HasFlag(EzRealmMetadataScope.ChartDan))
+            {
+                Logger.Log("Clearing persisted ChartDan rows...");
+                skillStore.ClearChartDan();
+            }
+
+            bool clearBeatmapInfoFields = scope.HasFlag(EzRealmMetadataScope.Tags)
+                                          || scope.HasFlag(EzRealmMetadataScope.Xxy)
+                                          || scope.HasFlag(EzRealmMetadataScope.Pp);
+
+            if (!clearBeatmapInfoFields)
+            {
+                Logger.Log($"Marked skill Realm rows for recalculation ({scope}).");
+                return;
+            }
+
+            // Read phase: collect all eligible beatmap IDs (no write lock).
+            List<Guid> allIds = new List<Guid>();
+
+            realmAccess.Run(r =>
+            {
+                allIds = r.All<BeatmapInfo>()
+                          .Where(b => b.BeatmapSet != null)
+                          .AsEnumerable()
+                          .Select(b => b.ID)
+                          .ToList();
+            });
+
+            if (allIds.Count == 0)
+            {
+                Logger.Log("No beatmaps to clear.");
+                return;
+            }
+
+            const int batch_size = 500;
+            int totalProcessed = 0;
+
+            for (int i = 0; i < allIds.Count; i += batch_size)
+            {
+                var batchIds = allIds.Skip(i).Take(batch_size).ToList();
+
+                realmAccess.Write(r =>
+                {
+                    foreach (var id in batchIds)
+                    {
+                        var beatmap = r.Find<BeatmapInfo>(id);
+
+                        if (beatmap == null)
+                            continue;
+
+                        if (scope.HasFlag(EzRealmMetadataScope.Tags))
+                        {
+                            beatmap.HasVideo = null;
+                            beatmap.HasStoryboard = null;
+                        }
+
+                        // Third-party / unavailable rulesets: keep persisted xxy/pp until the assembly is loadable again.
+                        if (!EzXxyStarRatingSupport.IsRulesetAvailable(beatmap.Ruleset))
+                        {
+                            totalProcessed++;
+                            continue;
+                        }
+
+                        if (scope.HasFlag(EzRealmMetadataScope.Pp))
+                            beatmap.PerformancePoints = -1;
+
+                        if (scope.HasFlag(EzRealmMetadataScope.Xxy) && EzXxyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
+                            beatmap.XxyStarRating = -1;
+
+                        totalProcessed++;
+                    }
+                });
+
+                // Yield between batches so Realm change notifications can be processed on the update thread,
+                // preventing the UI from freezing during bulk clear operations.
+                sleepIfRequired();
+            }
+
+            Logger.Log($"Marked {totalProcessed} beatmaps for Ez Realm metadata recalculation ({scope}).");
+        }
+
+        private void forceEzRealmMetadataRecalculation()
+            => clearEzRealmMetadata(EzRealmMetadataScope.All);
 
         /// <remarks>
         /// This is split out from <see cref="processOnlineBeatmapSetsWithNoUpdate"/> as a separate process to prevent high server-side load
@@ -194,7 +934,10 @@ namespace osu.Game.Database
                 var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
 
                 if (beatmap == null)
-                    return;
+                {
+                    ++failedCount;
+                    continue;
+                }
 
                 try
                 {
@@ -224,25 +967,626 @@ namespace osu.Game.Database
             completeNotification(notification, processedCount, beatmapIds.Count, failedCount);
         }
 
+        /// <summary>
+        /// Incrementally backfill missing baseline xxy star ratings on <see cref="BeatmapInfo"/>.
+        /// Behaviour intentionally mirrors <see cref="populateMissingStarRatings"/>: beatmap-level query, beatmap-level compute and write.
+        /// </summary>
+        private void populateMissingXxyStarRatings()
+        {
+            HashSet<Guid> beatmapIds = new HashSet<Guid>();
+
+            Logger.Log("Querying for beatmaps with missing xxy star ratings...");
+
+            realmAccess.Run(r =>
+            {
+                foreach (var b in r.All<BeatmapInfo>())
+                {
+                    if (b.BeatmapSet == null)
+                        continue;
+
+                    if (b.XxyStarRating >= 0)
+                        continue;
+
+                    if (!EzXxyStarRatingSupport.SupportsRuleset(b.Ruleset))
+                        continue;
+
+                    beatmapIds.Add(b.ID);
+                }
+            });
+
+            if (beatmapIds.Count == 0)
+                return;
+
+            Logger.Log($"Found {beatmapIds.Count} beatmaps which require xxy star rating reprocessing.");
+
+            var notification = showProgressNotification(beatmapIds.Count, "Reprocessing xxy star rating for beatmaps", "beatmaps' xxy star ratings have been updated");
+
+            int processedCount = 0;
+            int failedCount = 0;
+
+            foreach (Guid id in beatmapIds)
+            {
+                if (notification?.State == ProgressNotificationState.Cancelled)
+                    break;
+
+                updateNotificationProgress(notification, processedCount, beatmapIds.Count);
+
+                sleepIfRequired();
+
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+
+                if (beatmap == null)
+                {
+                    ++failedCount;
+                    continue;
+                }
+
+                try
+                {
+                    double xxyStarRating = EzAnalysisComputation.ComputeBaselineXxyStarRatingForRealm(beatmapManager, beatmap, CancellationToken.None);
+
+                    realmAccess.Write(r =>
+                    {
+                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
+                            liveBeatmapInfo.XxyStarRating = xxyStarRating;
+                    });
+                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+                    ++processedCount;
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Background xxy processing failed on {beatmap}: {e}");
+                    ++failedCount;
+                }
+            }
+
+            completeNotification(notification, processedCount, beatmapIds.Count, failedCount);
+        }
+
+        /// <summary>
+        /// Backfill NoMod 1.0x beatmap MSD axes into <see cref="EzBeatmapSkillValue"/>.
+        /// Behaviour mirrors <see cref="populateMissingXxyStarRatings"/>: beatmap-level query, compute and write.
+        /// </summary>
+        private bool populateMissingBeatmapMsd(EzChartChainState chain)
+        {
+            Logger.Log("Querying for mania beatmaps with missing MSD...");
+
+            // The chain's candidate universe already excludes the keymodes the n-key engine cannot rate (the same
+            // gate the write path uses), so they never enter the missing set - a loop-only skip left them as
+            // perpetual false-missing every launch.
+            var missing = chain.MsdOwed.ToList();
+
+            if (missing.Count == 0)
+                return false;
+
+            Logger.Log($"Found {missing.Count} beatmaps which require MSD reprocessing (revision {EzAnalysisRevision.Msd}).");
+
+            var notification = showProgressNotification(missing.Count, "Reprocessing beatmap MSD", "beatmaps' MSD have been updated");
+
+            int processedCount = 0;
+            int failedCount = 0;
+            int attemptedCount = 0;
+            const int log_every = 25;
+
+            foreach (string hash in missing)
+            {
+                if (notification?.State == ProgressNotificationState.Cancelled)
+                    break;
+
+                sleepIfRequired();
+
+                if (!chain.RateableBeatmapIds.TryGetValue(hash, out Guid id))
+                {
+                    ++failedCount;
+                    ++attemptedCount;
+                    updateNotificationProgress(notification, attemptedCount, missing.Count);
+                    continue;
+                }
+
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+
+                if (beatmap == null)
+                {
+                    ++failedCount;
+                    ++attemptedCount;
+                    updateNotificationProgress(notification, attemptedCount, missing.Count);
+                    continue;
+                }
+
+                try
+                {
+                    if (beatmapMsdComputer.ComputeAndStore(beatmap) == null)
+                    {
+                        // Zero-vector charts write __unrateable and count as settled, not failure.
+                        var skills = skillStore.GetBeatmapSkills(beatmap.Hash, EzSkillSystems.BEATMAP_MSD);
+                        if (EzBeatmapMsdComputer.IsUnrateableMsd(skills))
+                            ++processedCount;
+                        else
+                            ++failedCount;
+                    }
+                    else
+                        ++processedCount;
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Background MSD processing failed on {beatmap}: {e}");
+                    ++failedCount;
+                }
+
+                ++attemptedCount;
+                updateNotificationProgress(notification, attemptedCount, missing.Count);
+
+                if (attemptedCount % log_every == 0 || attemptedCount >= missing.Count)
+                    Logger.Log($"MSD backfill progress: {attemptedCount} of {missing.Count} (ok={processedCount}, fail={failedCount})");
+            }
+
+            completeNotification(notification, processedCount, missing.Count, failedCount);
+            return processedCount > 0;
+        }
+
+        /// <summary>
+        /// Backfill typed <see cref="EzBeatmapChartSkillInfo"/> for mania beatmaps (EZ9 debt: schema without warm).
+        /// Requires the chart's MSD to be settled first: <c>HandstreamEndurance</c> is derived from the
+        /// stored axes, so a CSI row computed without MSD would silently stamp a wrong value. Candidates
+        /// whose MSD is still pending are deferred to a later run rather than analysed on partial input.
+        /// </summary>
+        private bool populateMissingChartSkillInfo(EzChartChainState chain)
+        {
+            Logger.Log("Querying for mania beatmaps with missing ChartSkillInfo...");
+
+            int waitingOnMsd = chain.RateableChartCount - chain.SettledMsd.Count;
+
+            if (waitingOnMsd > 0)
+                Logger.Log($"Deferring {waitingOnMsd} ChartSkillInfo candidates until MSD is complete (run Realm MSD first).");
+
+            // Settled includes a stamped unavailable stub: that stub exists precisely so a chart which
+            // cannot be loaded is not re-converted on every run. A complete CSI row that an unrateable MSD
+            // invalidated is the one settled case still owed work, and the derivation folds it in here.
+            var missing = chain.ChartSkillInfoOwed.ToList();
+
+            if (missing.Count == 0)
+            {
+                Logger.Log($"ChartSkillInfo backfill: nothing ready (have CSI or waiting on MSD). waitingOnMsd={waitingOnMsd}");
+                return false;
+            }
+
+            Logger.Log($"Found {missing.Count} beatmaps which require ChartSkillInfo reprocessing (revision {EzAnalysisRevision.ChartSkillInfo}).");
+
+            var notification = showProgressNotification(missing.Count, "Reprocessing ChartSkillInfo", "beatmaps' ChartSkillInfo have been updated");
+
+            int processedCount = 0;
+            int failedCount = 0;
+            int attemptedCount = 0;
+            const int log_every = 25;
+
+            foreach (string hash in missing)
+            {
+                if (notification?.State == ProgressNotificationState.Cancelled)
+                    break;
+
+                sleepIfRequired();
+
+                if (!chain.RateableBeatmapIds.TryGetValue(hash, out Guid id))
+                {
+                    ++failedCount;
+                    ++attemptedCount;
+                    updateNotificationProgress(notification, attemptedCount, missing.Count);
+                    continue;
+                }
+
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+
+                if (beatmap == null)
+                {
+                    ++failedCount;
+                    ++attemptedCount;
+                    updateNotificationProgress(notification, attemptedCount, missing.Count);
+                    continue;
+                }
+
+                try
+                {
+                    if (!beatmap.Ruleset.Available)
+                        beatmap.Ruleset.Available = true;
+
+                    // True = settled afterwards (computed now, or stamped unavailable because the
+                    // chart cannot be loaded). False = transient failure, retried on a later run.
+                    if (skillProvider.TryEnsureChartSkillInfoForBackfill(beatmap))
+                        ++processedCount;
+                    else
+                        ++failedCount;
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Background ChartSkillInfo processing failed on {beatmap}: {e}");
+                    ++failedCount;
+                }
+
+                ++attemptedCount;
+                updateNotificationProgress(notification, attemptedCount, missing.Count);
+
+                if (attemptedCount % log_every == 0 || attemptedCount >= missing.Count)
+                    Logger.Log($"ChartSkillInfo backfill progress: {attemptedCount} of {missing.Count} (ok={processedCount}, fail={failedCount})");
+            }
+
+            completeNotification(notification, processedCount, missing.Count, failedCount);
+            return processedCount > 0;
+        }
+
+        /// <summary>
+        /// Backfill nomod <see cref="EzBeatmapChartDan"/> from stored MSD (+ CSI / xxy when present).
+        /// Prefer no <c>GetPlayable</c> — hold from MSD <c>hold_ratio</c> or CSI <c>LnRatio</c>.
+        /// <para>
+        /// True incremental pass: candidate set mirrors MSD (supported keymodes, complete MSD) and a row
+        /// is skipped when <see cref="EzAnalysisRevision.ChartDan"/> already matches. When the dan
+        /// algorithm, CSI, or MSD version changes, the revision changes and those rows fall back into the
+        /// missing set — there is no separate "refresh everything" mode, which is what made the manual
+        /// backfill recompute the whole library.
+        /// </para>
+        /// </summary>
+        private void populateMissingChartDan(EzChartChainState chain)
+        {
+            Logger.Log("Querying for mania beatmaps with missing ChartDan...");
+
+            // The derivation applies the dan stage's own gates: the chain's candidate universe (which already
+            // excludes unrateable keymodes), a settled MSD, and the write path's own "can these inputs produce a
+            // dan at all" check. A chart that fails the last one is settled rather than missing, so it is not
+            // re-attempted and re-notified on every launch.
+            var missing = chain.ChartDanOwed.ToList();
+
+            int waitingOnMsd = chain.RateableChartCount - chain.SettledMsd.Count;
+            int unrateableMsd = chain.SettledMsd.Count - chain.CompleteMsd.Count;
+
+            if (waitingOnMsd > 0)
+                Logger.Log($"Deferring {waitingOnMsd} ChartDan candidates until MSD is complete (run Realm MSD first).");
+
+            if (unrateableMsd > 0)
+                Logger.Log($"Skipping {unrateableMsd} ChartDan candidates with unrateable MSD.");
+
+            if (chain.UnresolvableChartDan.Count > 0)
+                Logger.Log($"Skipping {chain.UnresolvableChartDan.Count} ChartDan candidates whose stored inputs resolve to no dan.");
+
+            if (missing.Count == 0)
+            {
+                Logger.Log($"ChartDan backfill: nothing ready (have ChartDan, waiting on MSD, or settled). waitingOnMsd={waitingOnMsd}, unrateableMsd={unrateableMsd}, unresolvable={chain.UnresolvableChartDan.Count}");
+                return;
+            }
+
+            Logger.Log($"Found {missing.Count} beatmaps which require ChartDan reprocessing (revision {EzAnalysisRevision.ChartDan}, have complete MSD).");
+
+            var notification = showProgressNotification(missing.Count, "Reprocessing ChartDan", "beatmaps' ChartDan have been updated");
+
+            int processedCount = 0;
+            int failedCount = 0;
+            int attemptedCount = 0;
+            const int log_every = 25;
+
+            foreach (string hash in missing)
+            {
+                if (notification?.State == ProgressNotificationState.Cancelled)
+                    break;
+
+                sleepIfRequired();
+
+                if (!chain.RateableBeatmapIds.TryGetValue(hash, out Guid id))
+                {
+                    ++failedCount;
+                    ++attemptedCount;
+                    updateNotificationProgress(notification, attemptedCount, missing.Count);
+                    continue;
+                }
+
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+
+                if (beatmap == null)
+                {
+                    ++failedCount;
+                    ++attemptedCount;
+                    updateNotificationProgress(notification, attemptedCount, missing.Count);
+                    continue;
+                }
+
+                try
+                {
+                    var msd = skillStore.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MSD);
+
+                    // completeMsd already filtered; re-check guards races / version drift mid-run.
+                    if (!EzBeatmapMsdComputer.IsCurrentMsdCache(msd))
+                    {
+                        ++failedCount;
+                        ++attemptedCount;
+                        updateNotificationProgress(notification, attemptedCount, missing.Count);
+                        continue;
+                    }
+
+                    int keyCount = (int)Math.Round(beatmap.Difficulty.CircleSize);
+                    if (keyCount <= 0)
+                        keyCount = 4;
+
+                    double holdRatio = 0;
+                    if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
+                        holdRatio = Math.Clamp(cachedHold, 0, 1);
+                    else if (skillStore.TryGetChartSkillInfo(hash, out var csiHold) && csiHold?.LnRatio is double lnRatio && double.IsFinite(lnRatio))
+                        holdRatio = Math.Clamp(lnRatio, 0, 1);
+
+                    // An unavailable stub is not usable input; fall back to the MSD-derived values.
+                    skillStore.TryGetChartSkillInfo(hash, out var chartInfo);
+                    if (chartInfo is { IsUnavailable: true })
+                        chartInfo = null;
+
+                    double? xxySr = beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : null;
+
+                    // Same Realm int as song-select ln> (EndTimeObjectCount) — no MSD hold_count / GetPlayable.
+                    int holdCount = EzChartDanEstimator.TryHoldCountFromBeatmapInfo(beatmap);
+
+                    var persisted = EzPersistedChartDan.TryComputeFromStored(
+                        hash,
+                        beatmap.ID,
+                        msd,
+                        keyCount,
+                        holdRatio,
+                        xxySr,
+                        chartInfo,
+                        holdCount);
+
+                    if (persisted == null)
+                    {
+                        ++failedCount;
+                    }
+                    else
+                    {
+                        skillStore.UpsertChartDan(persisted);
+                        ++processedCount;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Background ChartDan processing failed on {beatmap}: {e}");
+                    ++failedCount;
+                }
+
+                ++attemptedCount;
+                updateNotificationProgress(notification, attemptedCount, missing.Count);
+
+                if (attemptedCount % log_every == 0 || attemptedCount >= missing.Count)
+                    Logger.Log($"ChartDan backfill progress: {attemptedCount} of {missing.Count} (ok={processedCount}, fail={failedCount}; deferredNoMsd={waitingOnMsd}, unrateableMsd={unrateableMsd}, unresolvable={chain.UnresolvableChartDan.Count})");
+            }
+
+            completeNotification(notification, processedCount, missing.Count, failedCount);
+            Logger.Log($"ChartDan backfill finished: ok={processedCount}, fail={failedCount}, deferredNoMsd={waitingOnMsd}, unrateableMsd={unrateableMsd}, unresolvable={chain.UnresolvableChartDan.Count}");
+        }
+
+        /// <summary>
+        /// Backfill Ez Realm tag columns on <see cref="BeatmapInfo"/> (baseline HasVideo/HasStoryboard).
+        /// This method is intentionally separated from <see cref="BeatmapUpdater.Process"/> so we don't accidentally
+        /// recompute unrelated fields (star / xxy / pp) during PP/xxy backfills.
+        /// </summary>
+        private void populateMissingBeatmapTagFlags()
+        {
+            Logger.Log("Querying for beatmaps requiring Ez Realm tag backfill...");
+
+            // Read phase: collect beatmaps by set (no write lock, lightweight Realm query).
+            // Grouping by BeatmapSetID allows us to reuse one WorkingBeatmap per set instead of creating
+            // one per difficulty, dramatically reducing GC pressure during forceAll recalculation.
+            Dictionary<Guid, (Guid firstBeatmapId, List<(Guid id, string? path)> difficulties)> bySet = null!;
+
+            realmAccess.Run(r =>
+            {
+                bySet = r.All<BeatmapInfo>()
+                         .AsEnumerable()
+                         .Where(b => b.BeatmapSet != null && (b.HasVideo == null || b.HasStoryboard == null))
+                         .GroupBy(b => b.BeatmapSet!.ID)
+                         .ToDictionary(
+                             g => g.Key,
+                             g =>
+                             {
+                                 var diffs = g.Select(b => (b.ID, b.Path)).ToList();
+                                 return (diffs[0].ID, diffs);
+                             });
+            });
+
+            if (bySet == null || bySet.Count == 0)
+                return;
+
+            int totalBeatmaps = bySet.Sum(kv => kv.Value.difficulties.Count);
+            Logger.Log($"Found {totalBeatmaps} beatmaps across {bySet.Count} sets which require Ez Realm tag population.");
+
+            var notification = showProgressNotification(
+                totalBeatmaps,
+                "Populating Ez beatmap tags in Realm",
+                "beatmaps have been updated with Ez tags");
+
+            int processedCount = 0;
+            int failedCount = 0;
+
+            foreach (var (setId, (firstBeatmapId, difficulties)) in bySet)
+            {
+                if (notification?.State == ProgressNotificationState.Cancelled)
+                    break;
+
+                // Get one WorkingBeatmap per set and reuse its stream provider for all difficulties.
+                WorkingBeatmap? working;
+
+                var firstDetached = realmAccess.Run(r => r.Find<BeatmapInfo>(firstBeatmapId)?.Detach());
+
+                if (firstDetached == null)
+                {
+                    failedCount += difficulties.Count;
+                    continue;
+                }
+
+                try
+                {
+                    working = beatmapManager.GetWorkingBeatmap(firstDetached);
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Failed to create working beatmap for set {setId}: {e}");
+                    failedCount += difficulties.Count;
+                    continue;
+                }
+
+                // Use the WorkingBeatmap's BeatmapSetInfo (includes populated Files list) and GetStream.
+                var beatmapSet = working.BeatmapSetInfo;
+                Func<string, Stream?> getStream = working.GetStream;
+
+                // Cache the parser results for batch write.
+                var results = new List<(Guid id, EzBeatmapTagSummary summary)>(
+                    difficulties.Count < 256 ? difficulties.Count : 256);
+
+                foreach (var (difficultyId, path) in difficulties)
+                {
+                    try
+                    {
+                        var tagSummary = EzBeatmapTagParser.Parse(beatmapSet, path, getStream);
+                        results.Add((difficultyId, tagSummary));
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Log($"Tag parsing failed for beatmap {difficultyId}: {e}");
+                        ++failedCount;
+                    }
+                }
+
+                // Batch write all results for this set in a single transaction.
+                if (results.Count > 0)
+                {
+                    realmAccess.Write(r =>
+                    {
+                        foreach (var (difficultyId, tagSummary) in results)
+                        {
+                            if (r.Find<BeatmapInfo>(difficultyId) is BeatmapInfo liveBeatmapInfo)
+                            {
+                                liveBeatmapInfo.HasVideo = tagSummary.HasVideo;
+                                liveBeatmapInfo.HasStoryboard = tagSummary.HasStoryboard;
+                            }
+                        }
+                    });
+                }
+
+                processedCount += results.Count;
+
+                updateNotificationProgress(notification, processedCount, totalBeatmaps);
+                sleepIfRequired();
+            }
+
+            completeNotification(notification, processedCount, totalBeatmaps, failedCount);
+        }
+
+        private void populateMissingPerformancePoints()
+        {
+            HashSet<Guid> beatmapIds = new HashSet<Guid>();
+
+            Logger.Log("Querying for beatmaps with missing baseline PP...");
+
+            realmAccess.Run(r =>
+            {
+                foreach (var b in r.All<BeatmapInfo>().Where(b => b.PerformancePoints < 0 && b.BeatmapSet != null))
+                {
+                    if (!EzXxyStarRatingSupport.IsRulesetAvailable(b.Ruleset))
+                        continue;
+
+                    beatmapIds.Add(b.ID);
+                }
+            });
+
+            if (beatmapIds.Count == 0)
+                return;
+
+            Logger.Log($"Found {beatmapIds.Count} beatmaps which require PP reprocessing.");
+
+            var notification = showProgressNotification(beatmapIds.Count, "Reprocessing baseline PP for beatmaps", "beatmaps' baseline PP has been updated");
+
+            int processedCount = 0;
+            int failedCount = 0;
+
+            foreach (Guid id in beatmapIds)
+            {
+                if (notification?.State == ProgressNotificationState.Cancelled)
+                    break;
+
+                updateNotificationProgress(notification, processedCount, beatmapIds.Count);
+
+                sleepIfRequired();
+
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+
+                if (beatmap == null)
+                {
+                    ++failedCount;
+                    continue;
+                }
+
+                try
+                {
+                    var lookup = new EzAnalysisLookupCache(beatmap, beatmap.Ruleset, mods: null);
+
+                    double performancePoints = EzAnalysisComputation.TryComputePerformancePoints(beatmapManager, lookup, CancellationToken.None, out double computedPp)
+                        ? computedPp
+                        : -1;
+
+                    realmAccess.Write(r =>
+                    {
+                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
+                            liveBeatmapInfo.PerformancePoints = performancePoints;
+                    });
+
+                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+                    ++processedCount;
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Background PP processing failed on {beatmap}: {e}");
+                    ++failedCount;
+                }
+            }
+
+            completeNotification(notification, processedCount, beatmapIds.Count, failedCount);
+        }
+
         private void processOnlineBeatmapSetsWithNoUpdate()
         {
+            // BeatmapProcessor is responsible for both online and local processing, so a set queued here pays for a
+            // full difficulty recalculation whether or not the online lookup ends up resolving. A lookup that cannot
+            // resolve also leaves LastOnlineUpdate null, which re-queues the very same sets on the next startup.
+            //
+            // Deciding this up front rather than per set is therefore what keeps the redundant work from recurring.
+            // Note that no login is required: the local cache is downloaded from assets.ppy.sh anonymously, same as
+            // the user tag backpopulation below.
+            bool apiAvailable = waitForAPIToSettle();
+            bool cacheAvailable = localMetadataSource.Available;
+
+            // the cache is the only source that works without a login, so it's worth fetching when the API can't
+            // serve lookups by itself. Otherwise leave the (sizeable) download alone.
+            if (!cacheAvailable && !apiAvailable)
+                cacheAvailable = fetchLocalMetadataCache();
+
+            if (!apiAvailable && !cacheAvailable)
+            {
+                Logger.Log("Skipping online beatmap updates because no metadata source is available.");
+                return;
+            }
+
             HashSet<Guid> beatmapSetIds = new HashSet<Guid>();
 
             Logger.Log("Querying for beatmap sets to reprocess...");
 
             realmAccess.Run(r =>
             {
-                // BeatmapProcessor is responsible for both online and local processing.
-                // In the case a user isn't logged in, it won't update LastOnlineUpdate and therefore re-queue,
-                // causing overhead from the non-online processing to redundantly run every startup.
-                //
-                // We may eventually consider making the Process call more specific (or avoid this in any number
-                // of other possible ways), but for now avoid queueing if the user isn't logged in at startup.
-                if (api.IsLoggedIn)
+                var candidates = r.All<BeatmapInfo>().Where(b => b.OnlineID > 0 && b.LastOnlineUpdate == null && b.BeatmapSet != null);
+
+                // The local cache only holds ranked/approved/loved beatmaps, so with no API to give a definitive
+                // answer, nothing else can ever resolve. Queueing those anyway would repeat a full difficulty
+                // recalculation on every startup for no possible gain.
+                if (!apiAvailable)
                 {
-                    foreach (var b in r.All<BeatmapInfo>().Where(b => b.OnlineID > 0 && b.LastOnlineUpdate == null && b.BeatmapSet != null))
-                        beatmapSetIds.Add(b.BeatmapSet!.ID);
+                    candidates = candidates.Where(b => b.StatusInt == (int)BeatmapOnlineStatus.Ranked
+                                                       || b.StatusInt == (int)BeatmapOnlineStatus.Approved
+                                                       || b.StatusInt == (int)BeatmapOnlineStatus.Loved);
                 }
+
+                foreach (var b in candidates)
+                    beatmapSetIds.Add(b.BeatmapSet!.ID);
             });
 
             if (beatmapSetIds.Count == 0)
@@ -282,9 +1626,51 @@ namespace osu.Game.Database
                         }
                     }
                 });
+
+                updateNotificationProgress(notification, processedCount, beatmapSetIds.Count);
             }
 
             completeNotification(notification, processedCount, beatmapSetIds.Count, failedCount);
+        }
+
+        /// <summary>
+        /// Blocks until the API has settled into a state which tells us whether online lookups can be performed.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="IAPIProvider.IsLoggedIn"/> is not usable for this, as it becomes <see langword="true"/> at
+        /// <see cref="APIState.Connecting"/>, while <see cref="APIBeatmapMetadataSource"/> requires
+        /// <see cref="APIState.Online"/>. Acting on the former during startup means every lookup fails inconclusively.
+        /// </remarks>
+        /// <returns>Whether the API can serve lookups.</returns>
+        private bool waitForAPIToSettle()
+        {
+            var timeout = Stopwatch.StartNew();
+
+            while (api.State.Value == APIState.Connecting && timeout.ElapsedMilliseconds < APISettleTimeout)
+                Thread.Sleep(500);
+
+            // matches APIBeatmapMetadataSource.Available.
+            if (api.State.Value == APIState.Online)
+                return true;
+
+            Logger.Log($"API is unavailable for online metadata lookups (state: {api.State.Value}).");
+            return false;
+        }
+
+        /// <summary>
+        /// Fetches the local metadata cache. Requires no login, as it is downloaded anonymously.
+        /// </summary>
+        /// <returns>Whether the local cache can serve lookups.</returns>
+        private bool fetchLocalMetadataCache()
+        {
+            Logger.Log("Local metadata cache doesn't exist, attempting refetch...");
+            localMetadataSource.FetchCache().WaitSafely();
+
+            if (localMetadataSource.Available)
+                return true;
+
+            Logger.Log("Local metadata cache refetch failed.");
+            return false;
         }
 
         private void processBeatmapsWithMissingObjectCounts()
@@ -341,6 +1727,16 @@ namespace osu.Game.Database
             completeNotification(notification, processedCount, beatmapIds.Count, failedCount);
         }
 
+        private EzScoreScanStamp.Snapshot readScoreScanSnapshot()
+        {
+            return realmAccess.Run(r =>
+            {
+                int scoreCount = r.All<ScoreInfo>().Count(s => !s.DeletePending);
+                int failedCount = r.All<ScoreInfo>().Count(s => !s.DeletePending && s.BackgroundReprocessingFailed);
+                return new EzScoreScanStamp.Snapshot(scoreCount, failedCount);
+            });
+        }
+
         private void processScoresWithMissingStatistics()
         {
             HashSet<Guid> scoreIds = new HashSet<Guid>();
@@ -349,14 +1745,17 @@ namespace osu.Game.Database
 
             realmAccess.Run(r =>
             {
-                foreach (var score in r.All<ScoreInfo>().Where(s => !s.BackgroundReprocessingFailed))
+                // Filter on persisted JSON strings so we never deserialize Statistics for the whole table.
+                foreach (var score in r.All<ScoreInfo>().Where(s => !s.BackgroundReprocessingFailed
+                                                                   && !s.DeletePending
+                                                                   && s.BeatmapInfo != null
+                                                                   && (s.MaximumStatisticsJson == string.Empty
+                                                                       || s.MaximumStatisticsJson == "{}")))
                 {
-                    if (score.BeatmapInfo != null
-                        && score.Statistics.Sum(kvp => kvp.Value) > 0
-                        && score.MaximumStatistics.Sum(kvp => kvp.Value) == 0)
-                    {
-                        scoreIds.Add(score.ID);
-                    }
+                    if (string.IsNullOrEmpty(score.StatisticsJson) || score.StatisticsJson == "{}")
+                        continue;
+
+                    scoreIds.Add(score.ID);
                 }
             });
 
@@ -392,8 +1791,7 @@ namespace osu.Game.Database
                         realmAccess.Write(r =>
                         {
                             var s = r.Find<ScoreInfo>(id);
-                            if (s != null)
-                                s.MaximumStatisticsJson = JsonConvert.SerializeObject(score.MaximumStatistics);
+                            s?.MaximumStatisticsJson = JsonConvert.SerializeObject(score.MaximumStatistics);
                         });
 
                         ++processedCount;
@@ -408,8 +1806,7 @@ namespace osu.Game.Database
                             realmAccess.Write(r =>
                             {
                                 var s = r.Find<ScoreInfo>(id);
-                                if (s != null)
-                                    s.BackgroundReprocessingFailed = true;
+                                s?.BackgroundReprocessingFailed = true;
                             });
                         }
                         catch (Exception ex)
@@ -433,8 +1830,7 @@ namespace osu.Game.Database
                         realmAccess.Write(r =>
                         {
                             var s = r.Find<ScoreInfo>(id);
-                            if (s != null)
-                                s.BackgroundReprocessingFailed = true;
+                            s?.BackgroundReprocessingFailed = true;
                         });
                     }
                     catch (Exception ex)
@@ -442,6 +1838,197 @@ namespace osu.Game.Database
                         Logger.Log($"Failed to mark score {id} as failed: {ex}");
                     }
 
+                    ++failedCount;
+                }
+            }
+
+            completeNotification(notification, processedCount, scoreIds.Count, failedCount);
+        }
+
+        /// <summary>
+        /// [Ez] 把残留的 38（旧 Mania Classic 判定档）按规范化环境重放成 StableClassic(1)。
+        /// </summary>
+        /// <remarks>
+        /// 只调用 <see cref="EzScoreRecalculationService.RecalculateWithPinnedJudgeModeAsync"/>：无 replay / 谱面缺失时
+        /// 不回落到官方算法（那会用官方语义重写 Ez 成绩），下一轮启动继续尝试。
+        /// 另记 <c>JudgeMode == 8</c> 的残余条数：非 Ez 模式库不会执行 <c>case 11</c>，8 会留下，需要可见。
+        /// </remarks>
+        private void recalculateLegacyClassicScores()
+        {
+            const int legacy_judge_mode = RealmAccess.LEGACY_CLASSIC_JUDGE_MODE;
+
+            List<Guid> idList = realmAccess.Run(r => r.All<ScoreInfo>()
+                                                      .Where(s => s.JudgeMode == legacy_judge_mode)
+                                                      .AsEnumerable()
+                                                      // Realm 不支持嵌套属性谓词，规则集与删除标记在物化后判断。
+                                                      .Where(s => s.Ruleset.OnlineID == 3 && !s.DeletePending)
+                                                      .Select(s => s.ID)
+                                                      .ToList());
+
+            int leftoverPreRemap = realmAccess.Run(r => r.All<ScoreInfo>().Where(s => s.JudgeMode == 8).Count());
+
+            if (leftoverPreRemap > 0)
+                Logger.Log($"{leftoverPreRemap} score(s) still carry the pre-v11 judge mode 8; the v11 migration has not run on this database.");
+
+            if (idList.Count == 0)
+                return;
+
+            Logger.Log($"Found {idList.Count} legacy Mania Classic (38) score(s); replaying into StableClassic.");
+
+            if (ezReplaySession == null)
+            {
+                Logger.Log("Replay session unavailable; deferring legacy Classic score migration to next launch.");
+                return;
+            }
+
+            const int batch_size = 500;
+
+            int processedCount = 0;
+            int failedCount = 0;
+
+            for (int i = 0; i < idList.Count; i += batch_size)
+            {
+                sleepIfRequired();
+
+                foreach (var id in idList.Skip(i).Take(batch_size))
+                {
+                    try
+                    {
+                        ScoreInfo? score = realmAccess.Run(r => r.Find<ScoreInfo>(id)?.Detach());
+
+                        if (score == null)
+                            continue;
+
+                        if (EzScoreRecalculationService.RecalculateWithPinnedJudgeModeAsync(
+                                scoreManager, beatmapManager, ezReplaySession, score, EzEnumJudgeMode.StableClassic)
+                            .GetAwaiter().GetResult())
+                            ++processedCount;
+                        else
+                            ++failedCount;
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        throw;
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Log($"Failed to migrate legacy Classic score {id}: {e}");
+                        ++failedCount;
+                    }
+                }
+            }
+
+            Logger.Log($"Legacy Classic score migration finished: converted={processedCount}, deferred={failedCount}.");
+        }
+
+        /// <summary>
+        /// [Ez] 带非官方判定语义（JudgeMode &gt; Lazer，即 StableClassic 与 EZ2AC / O2Jam / IIDX / … / Classic）的成绩
+        /// 不参与官方分数升级：官方 legacy 转换 / rank 重算 / mod 倍率升级都不理解 Ez 判定与计分语义
+        /// （曾把成绩错转为 D + 超低分）。这里直接把 TotalScoreVersion 盖到最新，避免每次启动重查；
+        /// 此类成绩仅能通过 Ez Session 重算刷新。
+        /// 注意：Lazer（0，含存量 -1 的旧行）是官方语义，必须跟随 ppy 上游升级，
+        /// 因此判据只看 JudgeMode &gt; 0；HealthMode 只影响血量、与计分无关，不参与判断。
+        /// </summary>
+        private void stampEzGameplayModeScores()
+        {
+            Logger.Log("Querying for Ez gameplay-mode scores to exempt from official score upgrades...");
+
+            HashSet<Guid> scoreIds = realmAccess.Run(r => new HashSet<Guid>(
+                r.All<ScoreInfo>()
+                 .Where(s => s.TotalScoreVersion < LegacyScoreEncoder.LATEST_VERSION
+                             && s.JudgeMode > (int)EzEnumJudgeMode.Lazer)
+                 .AsEnumerable()
+                 .Select(s => s.ID)));
+
+            if (scoreIds.Count == 0)
+                return;
+
+            Logger.Log($"Found {scoreIds.Count} Ez gameplay-mode scores; stamping TotalScoreVersion without official conversion.");
+
+            const int batch_size = 500;
+            var idList = scoreIds.ToList();
+
+            for (int i = 0; i < idList.Count; i += batch_size)
+            {
+                var batch = idList.Skip(i).Take(batch_size).ToList();
+
+                sleepIfRequired();
+
+                realmAccess.Write(r =>
+                {
+                    foreach (var id in batch)
+                    {
+                        var s = r.Find<ScoreInfo>(id);
+                        s?.TotalScoreVersion = LegacyScoreEncoder.LATEST_VERSION;
+                    }
+                });
+            }
+
+            Logger.Log($"Finished stamping {scoreIds.Count} Ez gameplay-mode scores.");
+        }
+
+        private void upgradeModMultipliers()
+        {
+            Logger.Log("Querying for scores that need mod multiplier upgrade...");
+
+            HashSet<Guid> scoreIds = realmAccess.Run(r => new HashSet<Guid>(
+                r.All<ScoreInfo>()
+                 .Where(s => !s.BackgroundReprocessingFailed
+                             && s.BeatmapInfo != null
+                             && s.TotalScoreVersion < EzScoreScanStamp.MOD_MULTIPLIER_GATE_VERSION
+                             && s.TotalScoreWithoutMods > 0
+                             // [Ez] non-official judge semantics are exempt from official upgrades (see stampEzGameplayModeScores).
+                             // Lazer (0) and unset (-1) both follow ppy upstream behaviour.
+                             && s.JudgeMode <= (int)EzEnumJudgeMode.Lazer)
+                 .AsEnumerable()
+                 // must be done after materialisation, as realm doesn't want to support
+                 // nested property predicates
+                 .Where(s => s.Ruleset.IsLegacyRuleset())
+                 .Select(s => s.ID)));
+
+            Logger.Log($"Found {scoreIds.Count} scores which require mod multiplier upgrade.");
+
+            if (scoreIds.Count == 0)
+                return;
+
+            var notification = showProgressNotification(scoreIds.Count, "Upgrading scores to new mod multipliers", "scores have been upgraded to the new mod multipliers");
+
+            int processedCount = 0;
+            int failedCount = 0;
+
+            foreach (var id in scoreIds)
+            {
+                if (notification?.State == ProgressNotificationState.Cancelled)
+                    break;
+
+                updateNotificationProgress(notification, processedCount, scoreIds.Count);
+
+                sleepIfRequired();
+
+                try
+                {
+                    // Can't use async overload because we're not on the update thread.
+                    // ReSharper disable once MethodHasAsyncOverload
+                    realmAccess.Write(r =>
+                    {
+                        ScoreInfo s = r.Find<ScoreInfo>(id)!;
+                        if (s.BeatmapInfo == null)
+                            return;
+
+                        StandardisedScoreMigrationTools.UpdateToLatestScoreMultipliers(s, s.BeatmapInfo.Difficulty);
+                        s.TotalScoreVersion = LegacyScoreEncoder.LATEST_VERSION;
+                    });
+
+                    ++processedCount;
+                }
+                catch (ObjectDisposedException)
+                {
+                    throw;
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Failed to upgrade mod multipliers for {id}: {e}");
+                    realmAccess.Write(r => r.Find<ScoreInfo>(id)!.BackgroundReprocessingFailed = true);
                     ++failedCount;
                 }
             }
@@ -458,7 +2045,10 @@ namespace osu.Game.Database
                  .Where(s => !s.BackgroundReprocessingFailed
                              && s.BeatmapInfo != null
                              && s.IsLegacyScore
-                             && s.TotalScoreVersion < LegacyScoreEncoder.LATEST_VERSION)
+                             && s.TotalScoreVersion < LegacyScoreEncoder.LATEST_VERSION
+                             // [Ez] non-official judge semantics are exempt from official upgrades (see stampEzGameplayModeScores).
+                             // Lazer (0) and unset (-1) both follow ppy upstream behaviour.
+                             && s.JudgeMode <= (int)EzEnumJudgeMode.Lazer)
                  .AsEnumerable()
                  // must be done after materialisation, as realm doesn't want to support
                  // nested property predicates
@@ -521,8 +2111,7 @@ namespace osu.Game.Database
                         realmAccess.Write(r =>
                         {
                             var s = r.Find<ScoreInfo>(id);
-                            if (s != null)
-                                s.BackgroundReprocessingFailed = true;
+                            s?.BackgroundReprocessingFailed = true;
                         });
                     }
                     catch (Exception ex)
@@ -543,7 +2132,11 @@ namespace osu.Game.Database
 
             HashSet<Guid> scoreIds = realmAccess.Run(r => new HashSet<Guid>(
                 r.All<ScoreInfo>()
-                 .Where(s => s.TotalScoreVersion < 30000013 && !s.BackgroundReprocessingFailed) // last total score version with a significant change to ranks
+                 .Where(s => s.TotalScoreVersion < EzScoreScanStamp.RANK_GATE_VERSION
+                             && !s.BackgroundReprocessingFailed
+                             // [Ez] non-official judge semantics are exempt from official upgrades (see stampEzGameplayModeScores).
+                             // Lazer (0) and unset (-1) both follow ppy upstream behaviour.
+                             && s.JudgeMode <= (int)EzEnumJudgeMode.Lazer)
                  .AsEnumerable()
                  // must be done after materialisation, as realm doesn't support
                  // filtering on nested property predicates or projection via `.Select()`
@@ -606,8 +2199,7 @@ namespace osu.Game.Database
                         realmAccess.Write(r =>
                         {
                             var s = r.Find<ScoreInfo>(id);
-                            if (s != null)
-                                s.BackgroundReprocessingFailed = true;
+                            s?.BackgroundReprocessingFailed = true;
                         });
                     }
                     catch (Exception ex)
@@ -740,7 +2332,7 @@ namespace osu.Game.Database
         {
             if (!localMetadataSource.Available || !localMetadataSource.IsAtLeastVersion(3))
             {
-                Logger.Log(@"Local metadata cache has too low version to backpopulate user tags, attempting refetch...");
+                Logger.Log(@"Local metadata cache doesn't exist, or has too low version to backpopulate user tags, attempting refetch...");
                 localMetadataSource.FetchCache().WaitSafely();
 
                 if (!localMetadataSource.Available || !localMetadataSource.IsAtLeastVersion(3))
@@ -764,23 +2356,22 @@ namespace osu.Game.Database
                 return;
             }
 
-            Logger.Log(@"Querying for beatmaps that do not have user tags");
+            Logger.Log(@"Updating user tags");
 
-            // it is not an abnormal situation for a map not to have user tags.
             // while this is constrained to run every month or so (every time a new online.db cache is retrieved), there's some chance that this will still run much too often and be annoying to users.
             // if that turns out to be the case we may need a better way to debounce this (or just delete the backpopulation logic after some time has passed?)
             HashSet<Guid> beatmapIds = realmAccess.Run(r => new HashSet<Guid>(
                 r.All<BeatmapInfo>()
-                 .Filter($"{nameof(BeatmapInfo.Metadata)}.{nameof(BeatmapMetadata.UserTags)}.@count == 0 AND {nameof(BeatmapInfo.StatusInt)} IN {{ 1,2,4 }}")
+                 .Filter($"{nameof(BeatmapInfo.StatusInt)} IN {{ 1,2,4 }}")
                  .AsEnumerable()
                  .Select(b => b.ID)));
 
             if (beatmapIds.Count == 0)
                 return;
 
-            Logger.Log($@"Found {beatmapIds.Count} beatmaps with missing user tags.");
+            Logger.Log($@"Checking for tag updates for {beatmapIds.Count} beatmaps.");
 
-            var notification = showProgressNotification(beatmapIds.Count, @"Populating missing user tags",
+            var notification = showProgressNotification(beatmapIds.Count, @"Updating user tags",
                 @"beatmaps have had their tags updated. This runs once a month to allow searching user tags.");
 
             int processedCount = 0;
@@ -849,16 +2440,39 @@ namespace osu.Game.Database
             config.SetValue(OsuSetting.LastOnlineTagsPopulation, metadataSourceFetchDate);
         }
 
+        private int lastNotificationProgressReported = -1;
+
+        private const int notification_progress_update_interval = 25;
+
         private void updateNotificationProgress(ProgressNotification? notification, int processedCount, int totalCount)
         {
             if (notification == null)
                 return;
 
-            notification.Text = notification.Text.ToString().Split('(').First().TrimEnd() + $" ({processedCount} of {totalCount})";
-            notification.Progress = (float)processedCount / totalCount;
+            // a fixed interval means batches smaller than it never report anything between the initial 0 and
+            // completion, which reads as a permanently stuck progress bar.
+            int updateInterval = Math.Max(1, Math.Min(notification_progress_update_interval, totalCount / 20));
 
-            if (processedCount > 0 && processedCount % 100 == 0)
-                Logger.Log(notification.Text.ToString());
+            bool shouldUpdate = processedCount == 0 ||
+                                processedCount >= totalCount ||
+                                processedCount - lastNotificationProgressReported >= updateInterval;
+
+            if (!shouldUpdate)
+                return;
+
+            lastNotificationProgressReported = processedCount;
+
+            Schedule(() =>
+            {
+                if (notification.State == ProgressNotificationState.Cancelled)
+                    return;
+
+                notification.Text = notification.Text.ToString().Split('(').First().TrimEnd() + $" ({processedCount} of {totalCount})";
+                notification.Progress = (float)processedCount / totalCount;
+            });
+
+            if (processedCount > 0 && processedCount % 25 == 0)
+                Logger.Log($"Background progress: {processedCount} of {totalCount}");
         }
 
         private void completeNotification(ProgressNotification? notification, int processedCount, int totalCount, int? failedCount = null)
@@ -866,35 +2480,38 @@ namespace osu.Game.Database
             if (notification == null)
                 return;
 
-            if (totalCount == 0)
+            Schedule(() =>
             {
-                notification.CompleteSilently();
-            }
-            else if (processedCount == totalCount)
-            {
-                notification.CompletionText = $"{processedCount} {notification.CompletionText}";
-                notification.Progress = 1;
-                notification.State = ProgressNotificationState.Completed;
-            }
-            else
-            {
-                notification.Text = $"{processedCount} of {totalCount} {notification.CompletionText}";
+                if (totalCount == 0)
+                {
+                    notification.CompleteSilently();
+                }
+                else if (processedCount == totalCount)
+                {
+                    notification.CompletionText = $"{processedCount} {notification.CompletionText}";
+                    notification.Progress = 1;
+                    notification.State = ProgressNotificationState.Completed;
+                }
+                else
+                {
+                    notification.Text = $"{processedCount} of {totalCount} {notification.CompletionText}";
 
-                // We may have arrived here due to user cancellation or completion with failures.
-                if (failedCount > 0)
-                    notification.Text += $" Check logs for issues with {failedCount} failed items.";
+                    // We may have arrived here due to user cancellation or completion with failures.
+                    if (failedCount > 0)
+                        notification.Text += $" Check logs for issues with {failedCount} failed items.";
 
-                notification.State = ProgressNotificationState.Cancelled;
-            }
+                    notification.State = ProgressNotificationState.Cancelled;
+                }
+            });
         }
 
         private ProgressNotification? showProgressNotification(int totalCount, string running, string completed)
         {
             if (notificationOverlay == null)
+            {
+                Logger.Log("Background progress notification skipped because INotificationOverlay is unavailable.");
                 return null;
-
-            if (totalCount < 10)
-                return null;
+            }
 
             ProgressNotification notification = new ProgressNotification
             {
@@ -903,7 +2520,9 @@ namespace osu.Game.Database
                 State = ProgressNotificationState.Active
             };
 
-            notificationOverlay?.Post(notification);
+            lastNotificationProgressReported = -1;
+
+            Schedule(() => notificationOverlay?.Post(notification));
 
             return notification;
         }

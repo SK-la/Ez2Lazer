@@ -36,7 +36,7 @@ namespace osu.Game.Tournament.Screens.Setup
             };
             folderButton.Action = () => storage.PresentExternally();
 
-            ButtonText = "Close osu!";
+            ButtonText = "Close Ez2Lazer";
         }
 
         protected override Drawable CreateComponent()

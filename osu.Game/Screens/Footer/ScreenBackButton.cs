@@ -2,22 +2,24 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Graphics;
-using osu.Game.Graphics.Sprites;
-using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
 using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.Screens.Footer
 {
-    public partial class ScreenBackButton : ShearedButton
+    public partial class ScreenBackButton : ScreenFooterButton
     {
-        public const float BUTTON_WIDTH = 240;
+        // The back button is wider than a regular footer button so that screens which place a button
+        // directly above it (EzQuickRotationPickScreen) can align to the same width.
+        public new const float BUTTON_WIDTH = 240;
+
+        public ScreenBackButton()
+        {
+            Width = BUTTON_WIDTH;
+        }
 
         public sealed override bool ReceivePositionalInputAt(Vector2 screenSpacePos)
         {
@@ -25,47 +27,20 @@ namespace osu.Game.Screens.Footer
             // Need to apply more than 1x inflation due to shear.
             var inputRectangle = DrawRectangle.Inflate(new MarginPadding
             {
-                Left = OsuGame.SCREEN_EDGE_MARGIN * 2,
-                Bottom = OsuGame.SCREEN_EDGE_MARGIN * 2,
+                Left = OsuGame.SCREEN_EDGE_MARGIN,
+                // Bottom = OsuGame.SCREEN_EDGE_MARGIN * 2,
             });
 
             return inputRectangle.Contains(ToLocalSpace(screenSpacePos));
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(OsuColour colours)
         {
-            Width = BUTTON_WIDTH;
-
-            ButtonContent.Child = new FillFlowContainer
-            {
-                X = -10f,
-                RelativeSizeAxes = Axes.Both,
-                Direction = FillDirection.Horizontal,
-                Spacing = new Vector2(20f, 0f),
-                Children = new Drawable[]
-                {
-                    new SpriteIcon
-                    {
-                        Anchor = Anchor.Centre,
-                        Origin = Anchor.Centre,
-                        Size = new Vector2(17f),
-                        Icon = FontAwesome.Solid.ChevronLeft,
-                    },
-                    new OsuSpriteText
-                    {
-                        Anchor = Anchor.Centre,
-                        Origin = Anchor.Centre,
-                        Font = OsuFont.TorusAlternate.With(size: 17),
-                        Text = CommonStrings.Back,
-                        UseFullGlyphHeight = false,
-                    }
-                }
-            };
-
-            DarkerColour = Color4Extensions.FromHex("#DE31AE");
-            LighterColour = Color4Extensions.FromHex("#FF86DD");
-            TextColour = Color4.White;
+            Icon = FontAwesome.Solid.ChevronLeft;
+            Text = CommonStrings.Back;
+            TooltipText = CommonStrings.Back;
+            AccentColour = colours.Pink;
         }
     }
 }

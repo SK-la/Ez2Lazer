@@ -46,6 +46,23 @@ namespace osu.Game.Tests.Database
             }
         }
 
+        protected void RunTestWithOfficialRealm([InstantHandle] Action<OfficialRealmAccess, OsuStorage> testAction, [CallerMemberName] string caller = "")
+        {
+            using (HeadlessGameHost host = new CleanRunHeadlessGameHost(callingMethodName: caller))
+            {
+                host.Run(new RealmTestGame(() =>
+                {
+                    var testStorage = new OsuStorage(host, host.Storage);
+
+                    using (var official = new OfficialRealmAccess(testStorage, "official-sync-test"))
+                    {
+                        Logger.Log($"Running official realm test using {testStorage.GetFullPath(official.Filename)}");
+                        testAction(official, testStorage);
+                    }
+                }));
+            }
+        }
+
         protected void RunTestWithRealmAsync(Func<RealmAccess, Storage, Task> testAction, [CallerMemberName] string caller = "")
         {
             using (HeadlessGameHost host = new CleanRunHeadlessGameHost(callingMethodName: caller))

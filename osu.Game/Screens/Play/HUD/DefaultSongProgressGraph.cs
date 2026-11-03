@@ -3,9 +3,10 @@
 
 #nullable disable
 
-using System.Linq;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
 
@@ -36,12 +37,12 @@ namespace osu.Game.Screens.Play.HUD
 
                 foreach (var h in objects)
                 {
-                    double endTime = h.GetEndTime();
+                    double endTime = h.GetPlayableEndTime();
 
                     Debug.Assert(endTime >= h.StartTime);
 
-                    int startRange = (int)((h.StartTime - firstHit) / interval);
-                    int endRange = (int)((endTime - firstHit) / interval);
+                    int startRange = Math.Clamp((int)((h.StartTime - firstHit) / interval), 0, granularity - 1);
+                    int endRange = Math.Clamp((int)((endTime - firstHit) / interval), 0, granularity - 1);
                     for (int i = startRange; i <= endRange; i++)
                         Values[i]++;
                 }

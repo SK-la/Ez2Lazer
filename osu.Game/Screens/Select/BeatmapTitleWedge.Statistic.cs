@@ -57,7 +57,7 @@ namespace osu.Game.Screens.Select
             private void load(OverlayColourProvider colourProvider)
             {
                 Masking = true;
-                CornerRadius = 5;
+                CornerRadius = CORNER_RADIUS / 2;
                 Shear = background ? OsuGame.SHEAR : Vector2.Zero;
 
                 InternalChildren = new Drawable[]

@@ -11,6 +11,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
+using osu.Framework.Development;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
@@ -24,6 +25,8 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Screens.Visualizer;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
@@ -61,8 +64,6 @@ namespace osu.Game.Screens.Menu
         public override bool AllowExternalScreenChange => true;
 
         public override bool? AllowGlobalTrackControl => true;
-
-        private MenuSideFlashes sideFlashes;
 
         protected ButtonSystem Buttons;
 
@@ -115,6 +116,12 @@ namespace osu.Game.Screens.Menu
 
         private Sample reappearSampleSwoosh;
 
+        [Resolved(CanBeNull = true)]
+        private IEzStartupWorkCoordinator startupWorkCoordinator { get; set; }
+
+        [Resolved(CanBeNull = true)]
+        private IEzStartupContentPreloader startupContentPreloader { get; set; }
+
         [Resolved(canBeNull: true)]
         private SkinEditorOverlay skinEditor { get; set; }
 
@@ -144,7 +151,7 @@ namespace osu.Game.Screens.Menu
             AddRangeInternal(new[]
             {
                 SeasonalUIConfig.ENABLED ? new MainMenuSeasonalLighting() : Empty(),
-                new GlobalScrollAdjustsVolume(),
+                new ScrollAdjustsVolume(),
                 buttonsContainer = new ParallaxContainer
                 {
                     ParallaxAmount = 0.01f,
@@ -182,7 +189,6 @@ namespace osu.Game.Screens.Menu
                     }
                 },
                 logoTarget = new Container { RelativeSizeAxes = Axes.Both, },
-                sideFlashes = SeasonalUIConfig.ENABLED ? new SeasonalMenuSideFlashes() : new MenuSideFlashes(),
                 songTicker = new SongTicker
                 {
                     Anchor = Anchor.TopRight,
@@ -267,8 +273,20 @@ namespace osu.Game.Screens.Menu
 
         public override void OnEntering(ScreenTransitionEvent e)
         {
+            double enterBegin = Clock.CurrentTime;
+
             base.OnEntering(e);
+
+            NotifyMainMenuEnteredForStartup();
+            startupWorkCoordinator?.OnMainMenuEntered(this);
+
+            // Diagnostic: sample the post-startup frame-rate dip from main-menu entry. Debug-only.
+            if (DebugUtils.IsDebugBuild)
+                AddInternal(new EzStartupFrameSampler { Depth = float.MinValue });
             Buttons.FadeInFromZero(500);
+
+            Scheduler.Add(() =>
+                EzStartupTrace.Log($"MainMenu.OnEntering frameCost={(Clock.CurrentTime - enterBegin):0}ms"));
 
             if (e.Last is IntroScreen && musicController.TrackLoaded)
             {
@@ -299,6 +317,7 @@ namespace osu.Game.Screens.Menu
             logo.FadeIn(100, Easing.OutQuint);
 
             logoProxy = logo.ProxyToContainer(logoTarget);
+            logo.ActionOnFullyShrunk = tryEnterVisualizer;
 
             if (resuming)
             {
@@ -306,8 +325,6 @@ namespace osu.Game.Screens.Menu
 
                 this.FadeIn(FADE_IN_DURATION, Easing.OutQuint);
                 buttonsContainer.MoveTo(new Vector2(0, 0), FADE_IN_DURATION, Easing.OutQuint);
-
-                sideFlashes.Delay(FADE_IN_DURATION).FadeIn(64, Easing.InQuint);
             }
             else
             {
@@ -319,6 +336,19 @@ namespace osu.Game.Screens.Menu
                 // this ensures that the OsuLogo sample does not play when it is not desired.
                 logo.Action = () => onLogoClick(previousAction);
             }
+        }
+
+        private bool tryEnterVisualizer()
+        {
+            switch (Buttons.State)
+            {
+                case ButtonSystemState.Exit:
+                case ButtonSystemState.EnteringMode:
+                    return false;
+            }
+
+            this.Push(new EzVisualizerScreen());
+            return true;
         }
 
         private bool onLogoClick(Func<bool> originalAction)
@@ -355,6 +385,8 @@ namespace osu.Game.Screens.Menu
 
         protected override void LogoSuspending(OsuLogo logo)
         {
+            logo.ActionOnFullyShrunk = null;
+
             var seq = logo.FadeOut(300, Easing.InSine)
                           .ScaleTo(0.2f, 300, Easing.InSine);
 
@@ -369,6 +401,8 @@ namespace osu.Game.Screens.Menu
         {
             base.LogoExiting(logo);
 
+            logo.ActionOnFullyShrunk = null;
+
             logoProxy?.Dispose();
             logoProxy = null;
         }
@@ -381,8 +415,6 @@ namespace osu.Game.Screens.Menu
 
             this.FadeOut(FADE_OUT_DURATION, Easing.InSine);
             buttonsContainer.MoveTo(new Vector2(-800, 0), FADE_OUT_DURATION, Easing.InSine);
-
-            sideFlashes.FadeOut(64, Easing.OutQuint);
 
             bottomElementsFlow
                 .ScaleTo(0.9f, 1000, Easing.OutQuint)
@@ -498,7 +530,18 @@ namespace osu.Game.Screens.Menu
         {
         }
 
-        private void loadSongSelect() => this.Push(new SoloSongSelect());
+        private void loadSongSelect()
+        {
+            startupContentPreloader?.LogStatus("MainMenu.loadSongSelect");
+
+            bool preloadHit = TryConsumePreloadedSongSelect(out var screen);
+            EzSongSelectEnterTrace.RecordPlayPressed(preloadHit);
+
+            if (preloadHit)
+                this.Push(screen!);
+            else
+                this.Push(new SoloSongSelect());
+        }
 
         private void loadQuickPlay() => this.Push(new OnlinePlay.Matchmaking.Intro.ScreenIntro(MatchmakingPoolType.QuickPlay));
 

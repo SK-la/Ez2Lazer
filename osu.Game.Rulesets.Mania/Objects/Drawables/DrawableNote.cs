@@ -13,8 +13,11 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.Configuration;
+using osu.Game.Rulesets.Mania.EzMania.Helper;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.Skinning.Default;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Skinning;
@@ -33,11 +36,15 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         [Resolved(canBeNull: true)]
         private IBeatmap beatmap { get; set; }
 
+        [Resolved(canBeNull: true)]
+        private Column column { get; set; }
+
         private readonly Bindable<bool> configTimingBasedNoteColouring = new Bindable<bool>();
-        private readonly Bindable<double> timingBasedNoteColouringTargetGrayscale = new Bindable<double>(Ez2ConfigManager.DEFAULT_TIMING_BASED_NOTE_TARGET_GRAYSCALE);
-        private readonly Bindable<double> timingBasedNoteColouringColourAlpha = new Bindable<double>(Ez2ConfigManager.DEFAULT_TIMING_BASED_NOTE_COLOUR_ALPHA);
 
         protected virtual ManiaSkinComponents Component => ManiaSkinComponents.Note;
+
+        protected virtual bool SupportsImprovedNoteDisplayColour => Component == ManiaSkinComponents.Note;
+
         protected virtual bool SupportsTimingBasedNoteColouring => true;
 
         private Drawable headPiece;
@@ -54,16 +61,14 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         }
 
         [BackgroundDependencyLoader(true)]
-        private void load(ManiaRulesetConfigManager rulesetConfig, Ez2ConfigManager ezConfig)
+        private void load(ManiaRulesetConfigManager rulesetConfig)
         {
             rulesetConfig?.BindWith(ManiaRulesetSetting.TimingBasedNoteColouring, configTimingBasedNoteColouring);
-            ezConfig?.BindWith(Ez2Setting.TimingBasedNoteColouringTargetGrayscale, timingBasedNoteColouringTargetGrayscale);
-            ezConfig?.BindWith(Ez2Setting.TimingBasedNoteColouringColourAlpha, timingBasedNoteColouringColourAlpha);
 
             AddInternal(headPiece = new SkinnableDrawable(new ManiaSkinComponentLookup(Component), _ => new DefaultNotePiece())
             {
                 RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y,
+                AutoSizeAxes = Axes.Y
             });
         }
 
@@ -72,15 +77,18 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             base.LoadComplete();
 
             configTimingBasedNoteColouring.BindValueChanged(_ => updateSnapColour());
-            timingBasedNoteColouringTargetGrayscale.BindValueChanged(_ => updateSnapColour());
-            timingBasedNoteColouringColourAlpha.BindValueChanged(_ => updateSnapColour());
             StartTimeBindable.BindValueChanged(_ => updateSnapColour(), true);
+
+            if (column != null)
+            {
+                column.ColorSettingsEnabledBindable.BindValueChanged(_ => updateSnapColour());
+                column.EzNoteColourBindable.BindValueChanged(_ => updateSnapColour());
+            }
         }
 
         protected override void OnApply()
         {
             base.OnApply();
-
             updateSnapColour();
         }
 
@@ -93,12 +101,15 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            if (UsesEzJudgement && ManiaEzDrawableJudgement.TryJudgeModeCheckForResult(this, userTriggered, timeOffset))
+                return;
+
             Debug.Assert(HitObject.HitWindows != null);
 
             if (!userTriggered)
             {
                 if (!HitObject.HitWindows.CanBeHit(timeOffset))
-                    ApplyMinResult();
+                    EzApplyPassiveMissWithStoredOffset();
 
                 return;
             }
@@ -119,14 +130,22 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         public virtual bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
         {
+            if (ShouldSkipColumnRoutedPress?.Invoke(this) == true)
+                return false;
+
+            if (e.Action == Action.Value && ManiaEzDrawableJudgement.TryBmsOnPressed(this, e))
+                return true;
+
             if (e.Action != Action.Value)
                 return false;
 
             if (CheckHittable?.Invoke(this, Time.Current) == false)
                 return false;
 
-            return UpdateResult(true);
+            return ApplyColumnRoutedPress();
         }
+
+        internal bool ApplyColumnRoutedPress() => UpdateResult(true);
 
         public virtual void OnReleased(KeyBindingReleaseEvent<ManiaAction> e)
         {
@@ -134,18 +153,53 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         private void updateSnapColour()
         {
-            if (!SupportsTimingBasedNoteColouring || !configTimingBasedNoteColouring.Value || beatmap == null || HitObject == null)
+            if (headPiece == null)
+                return;
+
+            if (!SupportsImprovedNoteDisplayColour)
             {
                 headPiece.Colour = Color4.White;
                 return;
             }
 
-            headPiece.Colour = ManiaTimingBasedNoteColour.GetColourFor(
-                beatmap,
-                HitObject.StartTime,
-                colours,
-                timingBasedNoteColouringTargetGrayscale.Value,
-                timingBasedNoteColouringColourAlpha.Value);
+            if (SupportsTimingBasedNoteColouring
+                && configTimingBasedNoteColouring.Value
+                && beatmap != null
+                && HitObject != null)
+            {
+                headPiece.Colour = ManiaNoteDisplayColour.ResolveTimingColour(
+                    true,
+                    beatmap,
+                    HitObject.StartTime,
+                    colours);
+                return;
+            }
+
+            if (column != null && column.ColorSettingsEnabledBindable.Value)
+            {
+                headPiece.Colour = ManiaNoteDisplayColour.ResolveColumnColour(column.EzNoteColourBindable.Value);
+                return;
+            }
+
+            headPiece.Colour = Color4.White;
         }
+
+        public bool CanRouteToKPoor => ManiaEzDrawableJudgement.CanRouteToKPoor(this);
+
+        internal virtual void EzApplyFinalResult(HitResult result, EzEnumJudgeMode judgeMode)
+        {
+            ApplyResult(static (r, data) =>
+            {
+                r.Type = data.result;
+
+                if (data.result == HitResult.Miss
+                    || (data.result == HitResult.Meh && JudgeModeHelper.MehBreaksCombo(data.judgeMode)))
+                {
+                    r.IsComboHit = false;
+                }
+            }, (result, judgeMode));
+        }
+
+        internal void EzDispatchExtraResult(HitResult result) => DispatchNewResult(result);
     }
 }

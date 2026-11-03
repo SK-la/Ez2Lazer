@@ -14,6 +14,8 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
+using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.ExternalLibraries;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mods;
@@ -26,6 +28,9 @@ namespace osu.Game.Storyboards.Drawables
     {
         [Cached(typeof(Storyboard))]
         public Storyboard Storyboard { get; }
+
+        [Cached(typeof(StoryboardTriggerController))]
+        public StoryboardTriggerController TriggerController { get; }
 
         /// <summary>
         /// Whether the storyboard is considered finished.
@@ -91,6 +96,10 @@ namespace osu.Game.Storyboards.Drawables
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
             });
+            AddInternal(TriggerController = new StoryboardTriggerController
+            {
+                Passing = passing,
+            });
         }
 
         [BackgroundDependencyLoader]
@@ -120,7 +129,14 @@ namespace osu.Game.Storyboards.Drawables
         {
             base.LoadComplete();
 
-            health.BindValueChanged(val => passing.Value = val.NewValue >= 0.5, true);
+            health.BindValueChanged(val =>
+            {
+                // TODO: this is very arbitrary and doesn't work how it is historically supposed to.
+                // - For taiko ruleset, this will cause the first half of a perfect play to be "failing".
+                // - For all cases, it can flip-flop states too often (on stable it only updated at end of combo).
+                // - Also, in stable a different condition was used for non-break-time passing state (local combo performance).
+                passing.Value = val.NewValue >= 0.5;
+            }, true);
             passing.BindValueChanged(_ => updateLayerVisibility(), true);
         }
 
@@ -140,49 +156,96 @@ namespace osu.Game.Storyboards.Drawables
                 layer.Enabled = passing.Value ? layer.Layer.VisibleWhenPassing : layer.Layer.VisibleWhenFailing;
         }
 
-        private class StoryboardResourceLookupStore : IResourceStore<byte[]>
+        public class StoryboardResourceLookupStore : IResourceStore<byte[]>
         {
             private readonly IResourceStore<byte[]> realmFileStore;
             private readonly Storyboard storyboard;
+            private readonly RealmAccess realm;
+            private IResourceStore<byte[]>? externalFileStore;
+            private bool externalStoreResolved;
 
             public StoryboardResourceLookupStore(Storyboard storyboard, RealmAccess realm, GameHost host)
             {
                 realmFileStore = new RealmFileStore(realm, host.Storage).Store;
                 this.storyboard = storyboard;
+                this.realm = realm;
             }
 
-            public void Dispose() =>
+            public void Dispose()
+            {
                 realmFileStore.Dispose();
+                externalFileStore?.Dispose();
+            }
 
             public byte[] Get(string name)
             {
-                string? storagePath = storyboard.GetStoragePathFromStoryboardPath(name);
+                using var stream = GetStream(name);
+                if (stream == null)
+                    return null!;
 
-                return string.IsNullOrEmpty(storagePath)
-                    ? null!
-                    : realmFileStore.Get(storagePath);
+                using var memory = new MemoryStream();
+                stream.CopyTo(memory);
+                return memory.ToArray();
             }
 
             public Task<byte[]> GetAsync(string name, CancellationToken cancellationToken = new CancellationToken())
-            {
-                string? storagePath = storyboard.GetStoragePathFromStoryboardPath(name);
-
-                return string.IsNullOrEmpty(storagePath)
-                    ? Task.FromResult<byte[]>(null!)
-                    : realmFileStore.GetAsync(storagePath, cancellationToken);
-            }
+                => Task.FromResult(Get(name));
 
             public Stream? GetStream(string name)
             {
                 string? storagePath = storyboard.GetStoragePathFromStoryboardPath(name);
 
-                return string.IsNullOrEmpty(storagePath)
-                    ? null
-                    : realmFileStore.GetStream(storagePath);
+                if (!string.IsNullOrEmpty(storagePath))
+                {
+                    Stream? realmStream = realmFileStore.GetStream(storagePath);
+                    if (realmStream != null)
+                        return realmStream;
+                }
+
+                IResourceStore<byte[]>? external = getExternalFileStore();
+                if (external == null)
+                    return null;
+
+                if (!string.IsNullOrEmpty(storagePath))
+                {
+                    Stream? mapped = external.GetStream(storagePath);
+                    if (mapped != null)
+                        return mapped;
+                }
+
+                // Fall back to relative / basename lookup used by ExternalBeatmapFileStore.
+                return external.GetStream(name);
             }
 
             public IEnumerable<string> GetAvailableResources() =>
                 realmFileStore.GetAvailableResources();
+
+            private IResourceStore<byte[]>? getExternalFileStore()
+            {
+                if (externalStoreResolved)
+                    return externalFileStore;
+
+                externalStoreResolved = true;
+
+                if (storyboard.BeatmapInfo.BeatmapSet is not BeatmapSetInfo beatmapSet)
+                    return null;
+
+                if (!beatmapSet.IsExternallyHosted && !ExternalBeatmapPathEncoding.IsExternalSetHash(beatmapSet.Hash))
+                    return null;
+
+                if (!ExternalBeatmapPathEncoding.TryResolveContentRoot(beatmapSet, out string contentRoot))
+                {
+                    if (ExternalBeatmapPathEncoding.IsExternalSetHash(beatmapSet.Hash))
+                        ExternalBeatmapPathEncoding.TryPopulateExternalHosting(beatmapSet);
+
+                    if (!ExternalBeatmapPathEncoding.TryResolveContentRoot(beatmapSet, out contentRoot))
+                        return null;
+                }
+
+                return externalFileStore = new ExternalBeatmapFileStore(
+                    contentRoot,
+                    ExternalBeatmapFileMappingsBuilder.Build(storyboard.BeatmapInfo, realm));
+            }
         }
     }
 }

@@ -3,19 +3,24 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit.Settings;
+using osu.Game.EzOsuGame.Extensions;
+using osu.Game.EzOsuGame.Layout;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Extensions;
-using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Edit.Components;
 using osu.Game.Skinning;
@@ -41,6 +46,12 @@ namespace osu.Game.EzOsuGame.Screens
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         [Resolved]
+        private Storage storage { get; set; } = null!;
+
+        [Resolved]
+        private ManiaPlayfieldLayoutConfig playfieldLayout { get; set; } = null!;
+
+        [Resolved]
         private Bindable<WorkingBeatmap> beatmap { get; set; } = null!;
 
         [Resolved]
@@ -61,6 +72,24 @@ namespace osu.Game.EzOsuGame.Screens
             colorBindables[Ez2Setting.ColumnTypeE] = createColorBindable(Ez2Setting.ColumnTypeE);
             colorBindables[Ez2Setting.ColumnTypeP] = createColorBindable(Ez2Setting.ColumnTypeP);
 
+            var panelItems = new List<string> { string.Empty };
+            panelItems.AddRange(EzResourceDiscovery.ListPanelImages(storage));
+
+            string currentPanel = ezSkinConfig.Get<string>(Ez2Setting.StageBackground);
+
+            if (!string.IsNullOrEmpty(currentPanel) && !panelItems.Contains(currentPanel))
+                panelItems.Insert(1, currentPanel);
+
+            var columnItems = EzResourceDiscovery.ListColumnSets(storage).ToList();
+
+            if (!columnItems.Contains("EzColumnLight"))
+                columnItems.Insert(0, "EzColumnLight");
+
+            string currentColumn = ezSkinConfig.Get<string>(Ez2Setting.ColumnLightName);
+
+            if (!string.IsNullOrEmpty(currentColumn) && !columnItems.Contains(currentColumn))
+                columnItems.Insert(0, currentColumn);
+
             InternalChild = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
@@ -69,6 +98,27 @@ namespace osu.Game.EzOsuGame.Screens
                 Spacing = new Vector2(5),
                 Children = new Drawable[]
                 {
+                    new EzOptionalStringDropdown
+                    {
+                        LabelText = EzColumnStrings.STAGE_BACKGROUND,
+                        TooltipText = EzColumnStrings.STAGE_BACKGROUND_TOOLTIP,
+                        EmptyLabel = "None",
+                        Current = ezSkinConfig.GetBindable<string>(Ez2Setting.StageBackground),
+                        Items = panelItems,
+                    },
+                    new EzSettingsColour
+                    {
+                        LabelText = EzColumnStrings.STAGE_BACKGROUND_COLOUR,
+                        TooltipText = EzColumnStrings.STAGE_BACKGROUND_COLOUR_TOOLTIP,
+                        Current = ezSkinConfig.GetBindable<Colour4>(Ez2Setting.StageBackgroundColour),
+                    },
+                    new SettingsDropdown<string>
+                    {
+                        LabelText = EzColumnStrings.COLUMN_SET,
+                        TooltipText = EzColumnStrings.COLUMN_SET_TOOLTIP,
+                        Current = ezSkinConfig.GetBindable<string>(Ez2Setting.ColumnLightName),
+                        Items = columnItems,
+                    },
                     new SettingsSlider<double>
                     {
                         LabelText = EzColumnStrings.STAGE_DIAGONAL_LANE_ANGLE,
@@ -76,6 +126,22 @@ namespace osu.Game.EzOsuGame.Screens
                         Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaPseudo3DRotation),
                         KeyboardStep = 1f,
                         DisplayAsPercentage = false
+                    },
+                    new SettingsSlider<float>
+                    {
+                        LabelText = EzColumnStrings.STAGE_POSITION_X,
+                        TooltipText = EzColumnStrings.STAGE_POSITION_X_TOOLTIP,
+                        Current = playfieldLayout.StageX,
+                        KeyboardStep = 1f,
+                        DisplayAsPercentage = true
+                    },
+                    new SettingsSlider<float>
+                    {
+                        LabelText = EzColumnStrings.STAGE_POSITION_Y,
+                        TooltipText = EzColumnStrings.STAGE_POSITION_Y_TOOLTIP,
+                        Current = playfieldLayout.StageY,
+                        KeyboardStep = 1f,
+                        DisplayAsPercentage = true
                     },
                     new SettingsSlider<double>
                     {

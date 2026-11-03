@@ -23,7 +23,6 @@ using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osuTK;
 using osuTK.Graphics;
-using osuTK.Input;
 
 namespace osu.Game.Screens.Edit.Components
 {
@@ -31,7 +30,7 @@ namespace osu.Game.Screens.Edit.Components
     {
         private LoopPointButton setAButton = null!;
         private LoopPointButton setBButton = null!;
-        private IconButton loopButton = null!;
+        private LoopPointButton loopButton = null!;
 
         private IconButton playButton = null!;
         private PlaybackSpeedControl playbackSpeedControl = null!;
@@ -59,27 +58,27 @@ namespace osu.Game.Screens.Edit.Components
                     Spacing = new Vector2(5, 0),
                     Children = new Drawable[]
                     {
-                        setAButton = new LoopPointButton("A")
+                        setAButton = new LoopPointButton("🅰")
                         {
                             Anchor = Anchor.CentreLeft,
                             Origin = Anchor.CentreLeft,
                             Scale = new Vector2(1.2f),
                             Action = setLoopStartToCurrentTime,
                         },
-                        setBButton = new LoopPointButton("B")
+                        setBButton = new LoopPointButton("🅱")
                         {
                             Anchor = Anchor.CentreLeft,
                             Origin = Anchor.CentreLeft,
                             Scale = new Vector2(1.2f),
                             Action = setLoopEndToCurrentTime,
                         },
-                        loopButton = new IconButton
+                        loopButton = new LoopPointButton("🆎")
                         {
                             Anchor = Anchor.CentreLeft,
                             Origin = Anchor.CentreLeft,
                             Scale = new Vector2(1.2f),
-                            IconScale = new Vector2(1.2f),
-                            Icon = FontAwesome.Solid.SyncAlt,
+                            // IconScale = new Vector2(1.2f),
+                            // Icon = FontAwesome.Solid.SyncAlt,
                             Action = toggleLoop,
                         },
                         playButton = new IconButton
@@ -153,21 +152,6 @@ namespace osu.Game.Screens.Edit.Components
                 editorClock.AudioAdjustments.RemoveAdjustment(AdjustableProperty.Tempo, tempoAdjustment);
 
             base.Dispose(isDisposing);
-        }
-
-        protected override bool OnKeyDown(KeyDownEvent e)
-        {
-            if (e.Repeat)
-                return false;
-
-            switch (e.Key)
-            {
-                case Key.Space:
-                    togglePause();
-                    return true;
-            }
-
-            return base.OnKeyDown(e);
         }
 
         private void togglePause()
@@ -247,7 +231,7 @@ namespace osu.Game.Screens.Edit.Components
             base.Update();
 
             playButton.Icon = editorClock.IsRunning ? pause_icon : play_icon;
-            loopButton.Icon = loopEnabled.Value ? loop_on_icon : loop_off_icon;
+            // loopButton.Text = loopEnabled.Value ? loop_on_icon : loop_off_icon;
         }
 
         private partial class LoopPointButton : OsuAnimatedButton

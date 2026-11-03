@@ -14,11 +14,13 @@ using osu.Framework.Testing;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.Graphics.Cursor;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Models;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays;
+using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Scoring;
@@ -55,15 +57,23 @@ namespace osu.Game.Tests.Visual.UserInterface
         {
             Children = new Drawable[]
             {
-                leaderboard = new BeatmapLeaderboardWedge
+                new OsuContextMenuContainer
                 {
-                    Origin = Anchor.Centre,
-                    Anchor = Anchor.Centre,
-                    Size = new Vector2(0.6f),
+                    RelativeSizeAxes = Axes.Both,
+                    Child = leaderboard = new BeatmapLeaderboardWedge
+                    {
+                        Origin = Anchor.Centre,
+                        Anchor = Anchor.Centre,
+                        Size = new Vector2(0.6f),
+                    },
                 },
                 dialogOverlay = new DialogOverlay()
             };
         }
+
+        private DrawableOsuMenuItem getDeleteMenuItem() =>
+            this.ChildrenOfType<DrawableOsuMenuItem>()
+                .First(i => i.Item.Text.Value.ToString() == CommonStrings.ButtonsDelete.ToString());
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
         {
@@ -131,6 +141,7 @@ namespace osu.Game.Tests.Visual.UserInterface
             // Ensure the leaderboard items have finished showing up
             AddStep("finish transforms", () => leaderboard.FinishTransforms(true));
             AddUntilStep("wait for drawables", () => leaderboard.ChildrenOfType<BeatmapLeaderboardScore>().Any());
+            AddUntilStep("wait for loaded", () => leaderboard.ChildrenOfType<BeatmapLeaderboardScore>().All(s => s.IsLoaded));
         }
 
         [Test]
@@ -150,10 +161,11 @@ namespace osu.Game.Tests.Visual.UserInterface
             // Ensure the context menu has finished showing
             AddStep("finish transforms", () => leaderboard.FinishTransforms(true));
 
+            AddUntilStep("context menu has delete", () => this.ChildrenOfType<DrawableOsuMenuItem>()
+                                                                   .Any(i => i.Item is OsuMenuItem menu && menu.Type == MenuItemType.Destructive));
             AddStep("click delete option", () =>
             {
-                InputManager.MoveMouseTo(leaderboard.ChildrenOfType<DrawableOsuMenuItem>()
-                                                    .First(i => string.Equals(i.Item.Text.Value.ToString(), "delete", System.StringComparison.OrdinalIgnoreCase)));
+                InputManager.MoveMouseTo(getDeleteMenuItem());
                 InputManager.Click(MouseButton.Left);
             });
 
@@ -168,6 +180,63 @@ namespace osu.Game.Tests.Visual.UserInterface
 
             AddUntilStep("wait for fetch", () => scores.Any());
             AddUntilStep("score removed from leaderboard", () => scores.All(s => s.OnlineID != scoreBeingDeleted.OnlineID));
+
+            // "Clean up"
+            AddStep("release left mouse button", () => InputManager.ReleaseButton(MouseButton.Left));
+        }
+
+        [Test]
+        public void TestDeleteViaRightClickWithMalformedMods()
+        {
+            ScoreInfo scoreBeingDeleted = null!;
+            AddStep("corrupt top score mods json", () =>
+            {
+                var leaderboardScore = leaderboard.ChildrenOfType<BeatmapLeaderboardScore>().First();
+                var scoreId = leaderboardScore.Score.ID;
+
+                Realm.Write(r =>
+                {
+                    scoreBeingDeleted = r.Find<ScoreInfo>(scoreId)!;
+                    scoreBeingDeleted.ModsJson = "{ definitely not valid json }";
+                });
+            });
+
+            AddStep("refresh leaderboard", () =>
+            {
+                leaderboard.Hide();
+                leaderboard.Show();
+            });
+
+            AddUntilStep("wait for drawables", () => leaderboard.ChildrenOfType<BeatmapLeaderboardScore>().Any());
+
+            AddStep("open menu for corrupted score", () =>
+            {
+                var leaderboardScore = leaderboard.ChildrenOfType<BeatmapLeaderboardScore>()
+                                                  .First(s => s.Score.ID == scoreBeingDeleted.ID);
+
+                InputManager.MoveMouseTo(leaderboardScore);
+                InputManager.Click(MouseButton.Right);
+            });
+
+            // Ensure the context menu and delete dialog are shown without crashing.
+            AddStep("finish transforms", () => leaderboard.FinishTransforms(true));
+            AddUntilStep("context menu has delete", () => this.ChildrenOfType<DrawableOsuMenuItem>()
+                                                                .Any(i => i.Item.Text.Value.ToString() == CommonStrings.ButtonsDelete.ToString()));
+            AddStep("click delete option", () =>
+            {
+                InputManager.MoveMouseTo(getDeleteMenuItem());
+                InputManager.Click(MouseButton.Left);
+            });
+            AddStep("finish transforms", () => dialogOverlay.FinishTransforms(true));
+            AddUntilStep("wait for delete dialog", () => dialogOverlay.ChildrenOfType<DialogButton>().Any());
+            AddStep("click delete button", () =>
+            {
+                InputManager.MoveMouseTo(dialogOverlay.ChildrenOfType<DialogButton>().First());
+                InputManager.PressButton(MouseButton.Left);
+            });
+
+            AddUntilStep("wait for fetch", () => scores.Any());
+            AddUntilStep("score removed from leaderboard", () => scores.All(s => s.ID != scoreBeingDeleted.ID));
 
             // "Clean up"
             AddStep("release left mouse button", () => InputManager.ReleaseButton(MouseButton.Left));

@@ -16,13 +16,15 @@ using osu.Framework.Localisation;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
-using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
@@ -48,6 +50,9 @@ namespace osu.Game.Screens.Select
         [Resolved]
         private ISongSelect? songSelect { get; set; }
 
+        [Resolved(canBeNull: true)]
+        private IPanelAccentColourProvider? accentColourProvider { get; set; }
+
         [Resolved]
         private BeatmapManager beatmaps { get; set; } = null!;
 
@@ -57,25 +62,30 @@ namespace osu.Game.Screens.Select
         #region Ez功能
 
         [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        [Resolved]
         private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
 
         [Resolved]
-        private Ez2ConfigManager ezConfig { get; set; } = null!;
+        private EzAnalysisDatabase ezAnalysisDatabase { get; set; } = null!;
 
+        private FillFlowContainer panelMetaFlow = null!;
         private EzDisplayKpsGraph ezDisplayKpsGraph = null!;
         private EzDisplayKps ezDisplayKps = null!;
         private EzDisplayKpc ezDisplayKpc = null!;
         private EzDisplaySR displaySR = null!;
         private EzDisplayTag ezDisplayTag = null!;
+        private EzDisplaySkillsDan ezDisplaySkillsDan = null!;
 
         private IBindable<EzAnalysisResult>? ezAnalysisBindable;
         private CancellationTokenSource? ezAnalysisCancellationSource;
-        private ScheduledDelegate? scheduledEzAnalysisUpdate;
 
-        private bool ezAnalysisEnabled;
         private string? scratchText;
 
-        private const int mania_ui_update_throttle_ms = 15;
+        private Bindable<EzMaterialUiMode> materialUiMode = null!;
+
+        private bool supportsEzAnalysis => EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value);
 
         #endregion
 
@@ -92,7 +102,7 @@ namespace osu.Game.Screens.Select
 
         private ConstrainedIconContainer difficultyIcon = null!;
         private StarRatingDisplay starRatingDisplay = null!;
-        private SpreadDisplay spreadDisplay = null!;
+
         private PanelLocalRankDisplay localRank = null!;
         private OsuSpriteText keyCountText = null!;
         private OsuSpriteText difficultyText = null!;
@@ -113,6 +123,8 @@ namespace osu.Game.Screens.Select
         private void load()
         {
             Height = HEIGHT;
+
+            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
 
             Icon = difficultyIcon = new ConstrainedIconContainer
             {
@@ -145,11 +157,32 @@ namespace osu.Game.Screens.Select
                     Direction = FillDirection.Horizontal,
                     Children = new Drawable[]
                     {
-                        localRank = new PanelLocalRankDisplay
+                        new FillFlowContainer
                         {
-                            Scale = new Vector2(0.8f),
-                            Origin = Anchor.CentreLeft,
+                            AutoSizeAxes = Axes.Both,
                             Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Direction = FillDirection.Vertical,
+                            Spacing = new Vector2(0, 2),
+                            Children = new Drawable[]
+                            {
+                                localRank = new PanelLocalRankDisplay
+                                {
+                                    Scale = new Vector2(0.8f),
+                                    Origin = Anchor.TopCentre,
+                                    Anchor = Anchor.TopCentre,
+                                },
+                                ezDisplaySkillsDan = new EzDisplaySkillsDan
+                                {
+                                    LayoutDirection = FillDirection.Vertical,
+                                    PreferDanImage = true,
+                                    Scale = new Vector2(0.85f),
+                                    Origin = Anchor.TopCentre,
+                                    Anchor = Anchor.TopCentre,
+                                    Alpha = 0,
+                                    BypassAutoSizeAxes = Axes.Both,
+                                },
+                            },
                         },
                         mainFill = new FillFlowContainer
                         {
@@ -167,70 +200,71 @@ namespace osu.Game.Screens.Select
                                 artistText = new OsuSpriteText
                                 {
                                     Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold),
-                                    Padding = new MarginPadding { Top = -2 },
+                                    Padding = new MarginPadding { Top = -2, Bottom = -2 },
                                 },
-                                new FillFlowContainer
+                                new Container
                                 {
-                                    Direction = FillDirection.Horizontal,
                                     AutoSizeAxes = Axes.Both,
-                                    Padding = new MarginPadding { Top = 2, Bottom = 2 },
                                     Children = new Drawable[]
                                     {
-                                        statusPill = new BeatmapSetOnlineStatusPill
+                                        panelMetaFlow = new FillFlowContainer
                                         {
-                                            Animated = false,
-                                            Origin = Anchor.BottomLeft,
-                                            Anchor = Anchor.BottomLeft,
-                                            TextSize = OsuFont.Style.Caption2.Size,
-                                            Margin = new MarginPadding { Right = 4f },
+                                            Direction = FillDirection.Horizontal,
+                                            AutoSizeAxes = Axes.Both,
+                                            Padding = new MarginPadding { Top = 2, Bottom = 2 },
+                                            Children = new Drawable[]
+                                            {
+                                                statusPill = new BeatmapSetOnlineStatusPill
+                                                {
+                                                    Animated = false,
+                                                    Origin = Anchor.BottomLeft,
+                                                    Anchor = Anchor.BottomLeft,
+                                                    TextSize = OsuFont.Style.Caption2.Size,
+                                                    Margin = new MarginPadding { Right = 4f },
+                                                },
+                                                updateButton = new PanelUpdateBeatmapButton
+                                                {
+                                                    Scale = new Vector2(0.8f),
+                                                    Anchor = Anchor.BottomLeft,
+                                                    Origin = Anchor.BottomLeft,
+                                                    Margin = new MarginPadding { Right = 4f, Bottom = -1f },
+                                                },
+                                                keyCountText = new OsuSpriteText
+                                                {
+                                                    Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
+                                                    Anchor = Anchor.BottomLeft,
+                                                    Origin = Anchor.BottomLeft,
+                                                    Alpha = 0,
+                                                },
+                                                difficultyText = new OsuSpriteText
+                                                {
+                                                    Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
+                                                    Anchor = Anchor.BottomLeft,
+                                                    Origin = Anchor.BottomLeft,
+                                                    Margin = new MarginPadding { Right = 3f },
+                                                },
+                                                authorText = new OsuSpriteText
+                                                {
+                                                    Colour = colourProvider.Content2,
+                                                    Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold),
+                                                    Anchor = Anchor.BottomLeft,
+                                                    Origin = Anchor.BottomLeft
+                                                },
+                                            }
                                         },
-                                        updateButton = new PanelUpdateBeatmapButton
-                                        {
-                                            Scale = new Vector2(0.8f),
-                                            Anchor = Anchor.BottomLeft,
-                                            Origin = Anchor.BottomLeft,
-                                            Margin = new MarginPadding { Right = 4f, Bottom = -1f },
-                                        },
-                                        keyCountText = new OsuSpriteText
-                                        {
-                                            Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
-                                            Anchor = Anchor.BottomLeft,
-                                            Origin = Anchor.BottomLeft,
-                                            Alpha = 0,
-                                        },
-                                        difficultyText = new OsuSpriteText
-                                        {
-                                            Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
-                                            Anchor = Anchor.BottomLeft,
-                                            Origin = Anchor.BottomLeft,
-                                            Margin = new MarginPadding { Right = 3f },
-                                        },
-                                        authorText = new OsuSpriteText
-                                        {
-                                            Colour = colourProvider.Content2,
-                                            Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold),
-                                            Anchor = Anchor.BottomLeft,
-                                            Origin = Anchor.BottomLeft
-                                        },
-                                        ezDisplayKps = new EzDisplayKps
-                                        {
-                                            Anchor = Anchor.BottomLeft,
-                                            Origin = Anchor.BottomLeft,
-                                            Scale = new Vector2(0.875f),
-                                        },
-                                        Empty(),
                                         ezDisplayKpsGraph = new EzDisplayKpsGraph
                                         {
+                                            ExcludeFromParentAutoSize = true,
+                                            OverlayAnchorRow = panelMetaFlow,
                                             Size = new Vector2(300, 20),
                                             Blending = BlendingParameters.Mixture,
-                                            Anchor = Anchor.BottomLeft,
-                                            Origin = Anchor.BottomLeft,
                                         },
                                     }
                                 },
                                 new FillFlowContainer
                                 {
                                     Direction = FillDirection.Horizontal,
+                                    Padding = new MarginPadding { Top = 2, Bottom = 2 },
                                     Spacing = new Vector2(3),
                                     AutoSizeAxes = Axes.Both,
                                     Children = new Drawable[]
@@ -247,15 +281,23 @@ namespace osu.Game.Screens.Select
                                             Anchor = Anchor.CentreLeft,
                                             Scale = new Vector2(0.875f),
                                         },
-                                        spreadDisplay = new SpreadDisplay
+                                        // spreadDisplay = new SpreadDisplay
+                                        // {
+                                        //     Origin = Anchor.CentreLeft,
+                                        //     Anchor = Anchor.CentreLeft,
+                                        //     Selected = { BindTarget = Selected },
+                                        // },
+                                        ezDisplayKps = new EzDisplayKps
                                         {
-                                            Origin = Anchor.CentreLeft,
-                                            Anchor = Anchor.CentreLeft,
+                                            Anchor = Anchor.BottomLeft,
+                                            Origin = Anchor.BottomLeft,
+                                            Scale = new Vector2(0.875f),
                                         },
                                         ezDisplayKpc = new EzDisplayKpc
                                         {
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
+                                            Margin = new MarginPadding(0f),
                                         },
                                     },
                                 },
@@ -269,22 +311,18 @@ namespace osu.Game.Screens.Select
                     }
                 }
             };
+
+            // Cover art is skipped under acrylic; the dim layer is only useful over panel sprites.
+            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(backgroundDim, materialUiMode);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            ezConfig.BindWith(Ez2Setting.KpcDisplayMode, ezDisplayKpc.KpcDisplayModeBindable);
-            // 不订阅 ez 分析开关变更；统一依赖 panel 生命周期（PrepareForUse/FreeAfterUse）进行刷新。
-            // 这样可减少滚动场景下的回调抖动与绑定链复杂度。
-            bool ezAnalysisCacheEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisRecEnabled);
-            bool ezAnalysisSqliteEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
-
             ruleset.BindValueChanged(_ =>
             {
-                ezAnalysisEnabled = ezAnalysisCacheEnabled || ezAnalysisSqliteEnabled;
-
+                scratchText = null;
                 resetEzDisplay();
                 updateKeyCount();
             }, true);
@@ -294,7 +332,6 @@ namespace osu.Game.Screens.Select
             Selected.BindValueChanged(s =>
             {
                 Expanded.Value = s.NewValue;
-                spreadDisplay.Enabled.Value = s.NewValue;
             }, true);
         }
 
@@ -304,16 +341,10 @@ namespace osu.Game.Screens.Select
 
             var beatmapSet = beatmap.BeatmapSet!;
 
-            scheduledBackgroundRetrieval = Scheduler.AddDelayed(b =>
-            {
-                var workingBeatmap = beatmaps.GetWorkingBeatmap(b);
-                beatmapBackground.Beatmap = workingBeatmap;
-                ezDisplayTag.TagSummary = null;
-                ezDisplayTag.Working = workingBeatmap;
-            }, beatmap, 50);
+            scheduledBackgroundRetrieval = Scheduler.AddDelayed(b => beatmapBackground.Beatmap = beatmaps.GetWorkingBeatmap(b), beatmap, 50);
 
-            titleText.Text = new RomanisableString(beatmapSet.Metadata.TitleUnicode, beatmapSet.Metadata.Title);
-            artistText.Text = new RomanisableString(beatmapSet.Metadata.ArtistUnicode, beatmapSet.Metadata.Artist);
+            titleText.Text = new RomanisableString(beatmap.Metadata.TitleUnicode, beatmap.Metadata.Title);
+            artistText.Text = new RomanisableString(beatmap.Metadata.ArtistUnicode, beatmap.Metadata.Artist);
             updateButton.BeatmapSet = beatmapSet;
             statusPill.Status = beatmap.Status;
 
@@ -324,25 +355,44 @@ namespace osu.Game.Screens.Select
             difficultyText.Text = beatmap.DifficultyName;
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
+            applyPanelKps(EzSongSelectAnalysisDisplay.Empty);
+            ezDisplayKps.SetPp(EzPanelPerformancePoints.ResolveRealmBaselinePp(beatmap));
+
+            if (ruleset.Value is RulesetInfo rulesetInfo
+                && EzPanelKpsMetrics.TryResolveBaselineFromSqlite(ezAnalysisDatabase, beatmap, rulesetInfo, mods.Value, out var baselineKps))
+                applyPanelKps(baselineKps);
+
             computeStarRating();
-            spreadDisplay.Beatmap.Value = beatmap;
+            // spreadDisplay.Beatmap.Value = beatmap;
             updateKeyCount();
+
+            resetEzDisplay();
+            ezDisplaySkillsDan.Beatmap = beatmap;
+            ezDisplayTag.Beatmap = beatmap;
+
+            if (supportsEzAnalysis && beatmap.SupportsXxyStarRating())
+                displaySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay();
 
             computeEzAnalysis();
         }
 
         private void resetEzDisplay()
         {
-            if (ezAnalysisEnabled && ruleset.Value.OnlineID == 3)
-            {
+            if (Item?.IsVisible != true)
+                return;
+
+            bool showXxy = supportsEzAnalysis && beatmap.SupportsXxyStarRating();
+
+            if (showXxy)
                 displaySR.Show();
-            }
             else
             {
-                ezDisplayKpc.ManiaSummary = null;
                 displaySR.Current.Value = EzManiaSummary.EMPTY;
                 displaySR.Hide();
             }
+
+            ezDisplayKpc.ManiaSummary = null;
+            ezDisplayKpc.Hide();
         }
 
         protected override void FreeAfterUse()
@@ -355,7 +405,7 @@ namespace osu.Game.Screens.Select
             updateButton.BeatmapSet = null;
             localRank.Beatmap = null;
             starDifficultyBindable = null;
-            spreadDisplay.Beatmap.Value = null;
+            // spreadDisplay.Beatmap.Value = null;
 
             starDifficultyCancellationSource?.Cancel();
             starDifficultyCancellationSource?.Dispose();
@@ -366,9 +416,6 @@ namespace osu.Game.Screens.Select
 
         private void clearEzAnalysisBinding(bool resetDisplay = true)
         {
-            scheduledEzAnalysisUpdate?.Cancel();
-            scheduledEzAnalysisUpdate = null;
-
             ezAnalysisBindable?.UnbindAll();
             ezAnalysisBindable = null;
 
@@ -379,64 +426,86 @@ namespace osu.Game.Screens.Select
             if (!resetDisplay)
                 return;
 
-            ezDisplayTag.Working = null;
-            ezDisplayTag.TagSummary = null;
+            ezDisplaySkillsDan.Beatmap = null;
+            ezDisplayTag.Beatmap = null;
             scratchText = null;
 
             displaySR.Current.Value = EzManiaSummary.EMPTY;
             ezDisplayKpc.ManiaSummary = null;
+            ezDisplayKpc.Hide();
+            applyPanelKps(EzSongSelectAnalysisDisplay.Empty);
+            ezDisplayKps.SetPp(null);
+        }
+
+        private void applyPanelKps(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
+        {
+            ezDisplayKpsGraph.SetPoints(metrics.KpsList);
+            ezDisplayKps.SetKpsMetrics(metrics);
+        }
+
+        private void applyPanelKpc(EzManiaSummary? maniaSummary)
+        {
+            if (maniaSummary?.ColumnCounts.Count > 0)
+            {
+                ezDisplayKpc.ManiaSummary = maniaSummary;
+                ezDisplayKpc.Show();
+            }
+            else
+            {
+                ezDisplayKpc.ManiaSummary = null;
+                ezDisplayKpc.Hide();
+            }
         }
 
         private void updateKPS(EzAnalysisResult ezAnalysisResult)
         {
-            double avgKPS = ezAnalysisResult.AverageKps;
-            double maxKps = ezAnalysisResult.MaxKps;
-            IReadOnlyList<double> kpsList = ezAnalysisResult.KpsList;
-            ezDisplayKps.SetKps(ezAnalysisResult.Pp, avgKPS, maxKps);
-            ezDisplayKpsGraph.SetPoints(kpsList);
+            if (Item == null)
+                return;
 
-            if (ezAnalysisEnabled && ezAnalysisResult.TagSummary != null)
-                ezDisplayTag.TagSummary = ezAnalysisResult.TagSummary;
+            if (!EzSongSelectAnalysisDisplay.ShouldApplyPanelKpsUpdate(ezAnalysisResult, mods.Value))
+                return;
 
-            if (ezAnalysisEnabled && ruleset.Value.OnlineID == 3)
-            {
-                var maniaSummary = ezAnalysisResult.ManiaSummary;
-                var columnCounts = maniaSummary?.ColumnCounts ?? new Dictionary<int, int>();
+            var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, ezAnalysisResult, mods.Value);
+            applyPanelKps(metrics);
 
-                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
-                updateKeyCount();
-                ezDisplayKpc.ManiaSummary = maniaSummary;
-                displaySR.Current.Value = maniaSummary ?? EzManiaSummary.EMPTY;
-            }
+            if (!supportsEzAnalysis || !beatmap.SupportsXxyStarRating())
+                return;
+
+            var maniaSummary = metrics.ManiaSummary;
+            var columnCounts = maniaSummary?.ColumnCounts;
+
+            applyPanelKpc(maniaSummary);
+
+            string? scratch = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, metrics.MaxKps);
+
+            if (scratch != null)
+                scratchText = scratch;
+
+            updateKeyCount();
+
+            var summaryForDisplay = maniaSummary ?? EzManiaSummary.EMPTY;
+            if (displaySR.Current.Value.XxySr != summaryForDisplay.XxySr)
+                displaySR.Current.Value = summaryForDisplay;
         }
 
         private void computeEzAnalysis()
         {
-            if (!ezAnalysisEnabled)
-                return;
-
-            ezAnalysisCancellationSource?.Cancel();
-            ezAnalysisCancellationSource?.Dispose();
-            ezAnalysisCancellationSource = new CancellationTokenSource();
-
             if (Item == null)
                 return;
 
-            resetEzDisplay();
+            clearEzAnalysisBinding(resetDisplay: false);
+
+            ezAnalysisCancellationSource = new CancellationTokenSource();
+
             ezAnalysisBindable = ezAnalysisCache.GetBindableAnalysis(beatmap, ezAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
-            ezAnalysisBindable.BindValueChanged(result =>
-            {
-                scheduledEzAnalysisUpdate?.Cancel();
-                scheduledEzAnalysisUpdate = Scheduler.AddDelayed(() =>
-                {
-                    updateKPS(result.NewValue);
-                    scheduledEzAnalysisUpdate = null;
-                }, mania_ui_update_throttle_ms);
-            }, true);
+            ezAnalysisBindable.BindValueChanged(result => updateKPS(result.NewValue), true);
         }
 
         private void computeStarRating()
         {
+            starDifficultyBindable?.UnbindAll();
+            starDifficultyBindable = null;
+
             starDifficultyCancellationSource?.Cancel();
             starDifficultyCancellationSource?.Dispose();
             starDifficultyCancellationSource = new CancellationTokenSource();
@@ -447,8 +516,12 @@ namespace osu.Game.Screens.Select
             starDifficultyBindable = difficultyCache.GetBindableDifficulty(beatmap, starDifficultyCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
             starDifficultyBindable.BindValueChanged(starDifficulty =>
             {
+                if (Item?.IsVisible != true)
+                    return;
+
                 starRatingDisplay.Current.Value = starDifficulty.NewValue;
-                spreadDisplay.StarDifficulty.Value = starDifficulty.NewValue;
+
+                ezDisplayKps.SetPp(EzPanelPerformancePoints.ResolvePanelPp(starDifficulty.NewValue, beatmap));
             }, true);
         }
 
@@ -471,12 +544,20 @@ namespace osu.Game.Screens.Select
             // I can't find a better way to do this.
             mainFill.Margin = new MarginPadding { Left = 1 / starRatingDisplay.Scale.X * (localRank.HasRank ? 0 : -3) };
 
-            var diffColour = starRatingDisplay.DisplayedDifficultyColour;
+            // Ruleset-supplied accent (e.g. BMS lamp colour) wins; otherwise fall back to the
+            // standard star-rating colour. spread display keeps the star-rating gradient so the
+            // difficulty spread bar still maps to star colours visually.
+            // `beatmap` resolves through Item!.Model, so guard the pool-recycled state where
+            // Item is null (FreeAfterUse) to avoid NRE.
+            var starColour = starRatingDisplay.DisplayedDifficultyColour;
+            var diffColour = Item != null
+                ? accentColourProvider?.GetAccentColourFor(beatmap) ?? starColour
+                : starColour;
 
             AccentColour = diffColour;
-            spreadDisplay.Current.Colour = diffColour;
+            // spreadDisplay.Current.Colour = starColour;
 
-            backgroundBorder.Colour = diffColour;
+            ApplyAcrylicIconStripBackground(backgroundBorder, EzMaterialOverlayAlpha.IsEnabled(materialUiMode.Value), diffColour);
             difficultyIcon.Colour = starRatingDisplay.DisplayedDifficultyTextColour;
         }
 
@@ -487,13 +568,21 @@ namespace osu.Game.Screens.Select
 
             var rulesetInstance = ruleset.Value.CreateInstance();
 
-            if (rulesetInstance.AvailableVariants.Count() > 1)
+            if (rulesetInstance.GameplayVariants.Count() > 1)
             {
+                if (scratchText != null)
+                {
+                    keyCountText.Alpha = 1;
+                    keyCountText.Text =LocalisableString.Interpolate($"[{scratchText}] ");
+                    keyCountText.Colour = Colour4.LightPink.ToLinear();
+                    return;
+                }
+
                 int variant = rulesetInstance.GetVariantForBeatmap(beatmap, mods.Value);
                 var variantName = rulesetInstance.GetVariantName(variant);
 
                 keyCountText.Alpha = 1;
-                keyCountText.Text = scratchText ?? LocalisableString.Interpolate($"[{variantName}] ");
+                keyCountText.Text = LocalisableString.Interpolate($"[{variantName}] ");
                 keyCountText.Colour = Colour4.LightPink.ToLinear();
             }
             else

@@ -13,9 +13,10 @@ namespace osu.Game.Storyboards
 {
     public class StoryboardSprite : IStoryboardElementWithDuration
     {
-        private readonly List<StoryboardLoopingGroup> loopingGroups = new List<StoryboardLoopingGroup>();
-        private readonly List<StoryboardTriggerGroup> triggerGroups = new List<StoryboardTriggerGroup>();
+        public readonly List<StoryboardLoopingGroup> LoopingGroups = new List<StoryboardLoopingGroup>();
+        public readonly List<StoryboardTriggerGroup> TriggerGroups = new List<StoryboardTriggerGroup>();
 
+        public StoryboardElementSource Source { get; }
         public string Path { get; }
         public virtual bool IsDrawable => HasCommands;
 
@@ -41,7 +42,7 @@ namespace osu.Game.Storyboards
                         break;
                 }
 
-                foreach (var loop in loopingGroups)
+                foreach (var loop in LoopingGroups)
                 {
                     foreach (var command in loop.Alpha)
                     {
@@ -76,7 +77,7 @@ namespace osu.Game.Storyboards
                 // If we got to this point, either no alpha commands were present, or the earliest had a non-zero start value.
                 // The sprite's StartTime will be determined by the earliest command, regardless of type.
                 double earliestStartTime = Commands.StartTime;
-                foreach (var l in loopingGroups)
+                foreach (var l in LoopingGroups)
                     earliestStartTime = Math.Min(earliestStartTime, l.StartTime);
                 return earliestStartTime;
             }
@@ -88,7 +89,7 @@ namespace osu.Game.Storyboards
             {
                 double latestEndTime = Commands.EndTime;
 
-                foreach (var l in loopingGroups)
+                foreach (var l in LoopingGroups)
                     latestEndTime = Math.Max(latestEndTime, l.EndTime);
 
                 return latestEndTime;
@@ -101,11 +102,11 @@ namespace osu.Game.Storyboards
             {
                 double latestEndTime = Commands.EndTime;
 
-                foreach (var l in loopingGroups)
+                foreach (var l in LoopingGroups)
                     latestEndTime = Math.Max(latestEndTime, l.StartTime + l.Duration * l.TotalIterations);
 
                 var alphaCommands = Commands.Alpha.Select(command => (command, displayEndTime: command.EndTime))
-                                            .Concat(loopingGroups.SelectMany(loop => loop.Alpha.Select(command => (command, displayEndTime: command.EndTime + loop.Duration * (loop.TotalIterations - 1)))))
+                                            .Concat(LoopingGroups.SelectMany(loop => loop.Alpha.Select(command => (command, displayEndTime: command.EndTime + loop.Duration * (loop.TotalIterations - 1)))))
                                             .ToList();
 
                 if (alphaCommands.Count > 0)
@@ -113,7 +114,8 @@ namespace osu.Game.Storyboards
                     // Similar to StartTime, limit the drawable lifetime to the last point where the sprite can still be visible.
                     // This avoids keeping fully transparent sprites alive solely because trailing non-visual transforms continue later.
                     var lastAlpha = alphaCommands.MaxBy(c => c.displayEndTime);
-                    var lastRealAlpha = alphaCommands.Where(c => visibleAtStartOrEnd(c.command)).MaxBy(c => c.displayEndTime);
+                    var visibleAlphaCommands = alphaCommands.Where(c => visibleAtStartOrEnd(c.command)).ToList();
+                    var lastRealAlpha = visibleAlphaCommands.Count > 0 ? visibleAlphaCommands.MaxBy(c => c.displayEndTime) : default;
 
                     if (lastAlpha.command.EndValue == 0 && lastRealAlpha.command != null)
                         return lastRealAlpha.displayEndTime;
@@ -125,10 +127,11 @@ namespace osu.Game.Storyboards
             }
         }
 
-        public bool HasCommands => Commands.HasCommands || loopingGroups.Any(l => l.HasCommands);
+        public bool HasCommands => Commands.HasCommands || LoopingGroups.Any(l => l.HasCommands);
 
-        public StoryboardSprite(string path, Anchor origin, Vector2 initialPosition)
+        public StoryboardSprite(StoryboardElementSource source, string path, Anchor origin, Vector2 initialPosition)
         {
+            Source = source;
             Path = path;
             Origin = origin;
             InitialPosition = initialPosition;
@@ -139,18 +142,18 @@ namespace osu.Game.Storyboards
         public StoryboardLoopingGroup AddLoopingGroup(double loopStartTime, int repeatCount)
         {
             var loop = new StoryboardLoopingGroup(loopStartTime, repeatCount);
-            loopingGroups.Add(loop);
+            LoopingGroups.Add(loop);
             return loop;
         }
 
         public StoryboardTriggerGroup AddTriggerGroup(string triggerName, double startTime, double endTime, int groupNumber)
         {
             var trigger = new StoryboardTriggerGroup(triggerName, startTime, endTime, groupNumber);
-            triggerGroups.Add(trigger);
+            TriggerGroups.Add(trigger);
             return trigger;
         }
 
-        public void ApplyTransforms<TDrawable>(TDrawable drawable)
+        public void ApplyTransforms<TDrawable>(TDrawable drawable, StoryboardTriggerController triggerController)
             where TDrawable : Drawable, IFlippable, IVectorScalable
         {
             HashSet<string> appliedProperties = new HashSet<string>();
@@ -158,7 +161,7 @@ namespace osu.Game.Storyboards
             // For performance reasons, we need to apply the commands in chronological order.
             // Not doing so will cause many functions to be interleaved, resulting in O(n^2) complexity.
             IEnumerable<IStoryboardCommand> commands = Commands.AllCommands;
-            commands = commands.Concat(loopingGroups.SelectMany(l => l.AllCommands));
+            commands = commands.Concat(LoopingGroups.SelectMany(l => l.AllCommands));
 
             foreach (var command in commands.OrderBy(c => c.StartTime))
             {
@@ -168,6 +171,9 @@ namespace osu.Game.Storyboards
                 using (drawable.BeginAbsoluteSequence(command.StartTime))
                     command.ApplyTransforms(drawable);
             }
+
+            foreach (var triggerGroup in TriggerGroups)
+                triggerController.Bind(drawable, triggerGroup);
         }
     }
 }

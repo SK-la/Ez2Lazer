@@ -50,6 +50,9 @@ namespace osu.Game.Utils
             if (Environment.GetEnvironmentVariable("OSU_DISABLE_ERROR_REPORTING") == "1")
                 return;
 
+            if (!game.SubmitErrorsToSentry)
+                return;
+
             if (DebugUtils.IsNUnitRunning)
                 return;
 
@@ -58,7 +61,7 @@ namespace osu.Game.Utils
 
             sentrySession = SentrySdk.Init(options =>
             {
-                options.Dsn = "https://localhost";
+                options.Dsn = string.Empty;
                 options.AutoSessionTracking = true;
                 options.IsEnvironmentUser = false;
                 options.IsGlobalModeEnabled = true;

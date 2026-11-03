@@ -4,6 +4,7 @@
 using System;
 using System.Diagnostics;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Graphics;
@@ -12,6 +13,8 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.Sprites;
@@ -42,10 +45,17 @@ namespace osu.Game.Screens.Select
         private TrianglesV2 triangles = null!;
         private Box glow = null!;
 
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        private Bindable<EzMaterialUiMode> materialUiMode = null!;
+
         [BackgroundDependencyLoader]
         private void load()
         {
             Height = PanelGroup.HEIGHT;
+
+            materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
 
             Icon = iconContainer = new Container
             {
@@ -68,24 +78,34 @@ namespace osu.Game.Screens.Select
             };
 
             AccentColour = colourProvider.Highlight1;
+
+            Container colourOverlays;
+
             Content.Children = new Drawable[]
             {
-                contentBackground = new Box
+                colourOverlays = new Container
                 {
                     RelativeSizeAxes = Axes.Both,
-                },
-                triangles = new TrianglesV2
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Thickness = 0.02f,
-                    SpawnRatio = 0.6f,
-                    Colour = ColourInfo.GradientHorizontal(colourProvider.Background6, colourProvider.Background5)
-                },
-                glow = new Box
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Width = 0.5f,
-                    Colour = ColourInfo.GradientHorizontal(colourProvider.Highlight1, colourProvider.Highlight1.Opacity(0f)),
+                    Children = new Drawable[]
+                    {
+                        contentBackground = new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                        },
+                        triangles = new TrianglesV2
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Thickness = 0.02f,
+                            SpawnRatio = 0.6f,
+                            Colour = ColourInfo.GradientHorizontal(colourProvider.Background6, colourProvider.Background5)
+                        },
+                        glow = new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Width = 0.5f,
+                            Colour = ColourInfo.GradientHorizontal(colourProvider.Highlight1, colourProvider.Highlight1.Opacity(0f)),
+                        },
+                    }
                 },
                 new FillFlowContainer
                 {
@@ -129,6 +149,8 @@ namespace osu.Game.Screens.Select
                     },
                 }
             };
+
+            EzMaterialOverlayAlpha.BindHiddenWhenAcrylic(colourOverlays, materialUiMode);
         }
 
         protected override void LoadComplete()
@@ -155,22 +177,6 @@ namespace osu.Game.Screens.Select
             backgroundBorder.Colour = ratingColour;
             contentBackground.Colour = ratingColour.Darken(1f);
             glow.Colour = ColourInfo.GradientHorizontal(ratingColour, ratingColour.Opacity(0f));
-
-            switch (starNumber)
-            {
-                case 0:
-                    starRatingText.Text = @"Below 1 Star";
-                    break;
-
-                case 1:
-                    starRatingText.Text = @"1 Star";
-                    break;
-
-                default:
-                    starRatingText.Text = $"{starNumber} Stars";
-                    break;
-            }
-
             iconContainer.Colour = starNumber >= 7 ? colourProvider.Content1 : colourProvider.Background5;
             starRatingText.Colour = colourProvider.Content1;
             starRatingText.Text = group.Title;
@@ -202,6 +208,8 @@ namespace osu.Game.Screens.Select
         protected override void Update()
         {
             base.Update();
+
+            ApplyAcrylicIconStripBackground(backgroundBorder, EzMaterialOverlayAlpha.IsEnabled(materialUiMode.Value), AccentColour ?? colourProvider.Highlight1);
 
             // Move the count pill in the opposite direction to keep it pinned to the screen regardless of the X position of TopLevelContent.
             countPill.X = -TopLevelContent.X;

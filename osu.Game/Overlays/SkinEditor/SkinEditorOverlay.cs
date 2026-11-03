@@ -14,13 +14,15 @@ using osu.Framework.Input;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Layout;
+using osu.Framework.Logging;
 using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.Database;
+using osu.Game.EzOsuGame.Edit;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
-using osu.Game.EzOsuGame.Edit;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -45,7 +47,7 @@ namespace osu.Game.Overlays.SkinEditor
 
         protected override bool BlockNonPositionalInput => true;
 
-        private SkinEditor? skinEditor;
+        protected SkinEditor? Editor;
 
         [Resolved]
         private IPerformFromScreenRunner? performer { get; set; }
@@ -63,6 +65,9 @@ namespace osu.Game.Overlays.SkinEditor
         private OsuGame game { get; set; } = null!;
 
         [Resolved]
+        private EzSkinEditorOverlay ezSkinEditor { get; set; } = null!;
+
+        [Resolved]
         private MusicController music { get; set; } = null!;
 
         [Resolved]
@@ -74,7 +79,15 @@ namespace osu.Game.Overlays.SkinEditor
         [Resolved]
         private IBindable<WorkingBeatmap> beatmap { get; set; } = null!;
 
-        private OsuScreen? lastTargetScreen;
+        [Resolved]
+        private BeatmapManager beatmaps { get; set; } = null!;
+
+        [Resolved]
+        private RealmAccess realm { get; set; } = null!;
+
+        private EzSkinEditorBeatmapPicker? beatmapPicker;
+
+        protected OsuScreen? LastTargetScreen;
         private InvokeOnDisposal? nestedInputManagerDisable;
         private IDisposable? externalEditOverlayRegistration;
 
@@ -107,7 +120,7 @@ namespace osu.Game.Overlays.SkinEditor
             switch (e.Action)
             {
                 case GlobalAction.Back:
-                    if (skinEditor?.State.Value != Visibility.Visible)
+                    if (Editor?.State.Value != Visibility.Visible)
                         break;
 
                     Hide();
@@ -117,47 +130,56 @@ namespace osu.Game.Overlays.SkinEditor
             return false;
         }
 
+        protected virtual bool PresentsGameplayFromMainMenu => true;
+
+        protected virtual SkinEditor CreateEditor() => new SkinEditor();
+
         protected override void PopIn()
         {
+            OnEditorOpening();
             overrideSkinEditorRelevantSettings();
 
-            if (skinEditor != null)
+            if (Editor != null)
             {
                 disableNestedInputManagers();
-                skinEditor.Show();
+                Editor.Show();
 
-                if (lastTargetScreen is MainMenu)
+                if (PresentsGameplayFromMainMenu && LastTargetScreen is MainMenu)
                     PresentGameplay();
 
                 return;
             }
 
-            var editor = new SkinEditor();
+            var editor = CreateEditor();
 
             editor.State.BindValueChanged(_ => updateComponentVisibility());
 
-            skinEditor = editor;
+            Editor = editor;
 
             LoadComponentAsync(editor, _ =>
             {
-                if (editor != skinEditor)
+                if (editor != Editor)
                     return;
 
                 AddInternal(editor);
 
-                if (lastTargetScreen is MainMenu)
+                if (PresentsGameplayFromMainMenu && LastTargetScreen is MainMenu)
                     PresentGameplay();
 
-                Debug.Assert(lastTargetScreen != null);
+                Debug.Assert(LastTargetScreen != null);
 
-                SetTarget(lastTargetScreen);
+                SetTarget(LastTargetScreen);
             });
+        }
+
+        protected virtual void OnEditorOpening()
+        {
         }
 
         protected override void PopOut()
         {
-            skinEditor?.Save(false);
-            skinEditor?.Hide();
+            Editor?.Save(false);
+            Editor?.Hide();
             nestedInputManagerDisable?.Dispose();
             nestedInputManagerDisable = null;
 
@@ -165,23 +187,38 @@ namespace osu.Game.Overlays.SkinEditor
         }
 
         /// <summary>
-        /// 在皮肤编辑器内切换 EzSkinEditorScreen。
+        /// 关闭官方 HUD 编辑器并打开 Ez 皮肤编辑器盖层（缩放插拔当前屏，不 Push）。
         /// </summary>
         public void ToggleEzSkinEditor()
         {
+            Hide();
+            ezSkinEditor.Toggle();
+        }
+
+        public void PresentGameplay() => presentGameplay(false);
+
+        /// <summary>
+        /// Switch global ruleset (and a matching preview beatmap), then open / restart endless gameplay for skin editing.
+        /// </summary>
+        public void PresentGameplayForRuleset(RulesetInfo rulesetInfo)
+        {
+            if (ruleset is Bindable<RulesetInfo> writable && !writable.Disabled)
+                writable.Value = rulesetInfo;
+
+            if (!tryUseBeatmapForActiveRuleset())
+                return;
+
             performer?.PerformFromScreen(screen =>
             {
                 if (State.Value != Visibility.Visible)
                     return;
 
-                if (screen is EzSkinEditorScreen)
-                    return;
+                if (screen is Player player)
+                    player.Exit();
 
-                screen.Push(new EzSkinEditorScreen());
-            }, new[] { typeof(EzSkinEditorScreen) });
+                Schedule(() => presentGameplay(false));
+            }, new[] { typeof(Player), typeof(SoloSongSelect) });
         }
-
-        public void PresentGameplay() => presentGameplay(false);
 
         private void presentGameplay(bool attemptedBeatmapSwitch)
         {
@@ -190,44 +227,95 @@ namespace osu.Game.Overlays.SkinEditor
                 if (State.Value != Visibility.Visible)
                     return;
 
-                if (beatmap.Value is DummyWorkingBeatmap)
-                {
-                    // presume we don't have anything good to play and just bail.
-                    return;
-                }
-
-                // If we're playing the intro, switch away to another beatmap.
-                if (beatmap.Value.BeatmapSetInfo.Protected)
-                {
-                    if (!attemptedBeatmapSwitch)
-                    {
-                        music.NextTrack();
-                        Schedule(() => presentGameplay(true));
-                    }
-
-                    return;
-                }
-
                 if (screen is Player)
                     return;
 
-                // the validity of the current game-wide beatmap + ruleset combination is enforced by song select.
-                // if we're anywhere else, the state is unknown and may not make sense, so forcibly set something that does.
+                // Song select already holds a valid beatmap and ruleset pair, including converts.
+                // Anywhere else, the global track may still be the intro, so choose a beatmap for the active ruleset.
                 if (screen is not SoloSongSelect)
-                    ruleset.Value = beatmap.Value.BeatmapInfo.Ruleset;
-                var replayGeneratingMod = ruleset.Value.CreateInstance().GetAutoplayMod();
+                {
+                    if (!tryUseBeatmapForActiveRuleset())
+                        return;
+                }
+                else if (!ensureCurrentBeatmapPlayable(attemptedBeatmapSwitch))
+                    return;
 
-                IReadOnlyList<Mod> usableMods = mods.Value;
+                if (ruleset.Value?.Available != true)
+                    return;
 
-                if (replayGeneratingMod != null)
-                    usableMods = usableMods.Append(replayGeneratingMod).ToArray();
+                ModAutoplay? replayGeneratingMod;
+
+                try
+                {
+                    replayGeneratingMod = ruleset.Value.CreateInstance().GetAutoplayMod();
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Skin editor skipped gameplay for ruleset '{ruleset.Value.ShortName}': {e.Message}");
+                    return;
+                }
+
+                if (replayGeneratingMod == null)
+                    return;
+
+                IReadOnlyList<Mod> usableMods = mods.Value.Append(replayGeneratingMod).ToArray();
 
                 if (!ModUtils.CheckCompatibleSet(usableMods, out var invalid))
                     mods.Value = mods.Value.Except(invalid).ToArray();
 
-                if (replayGeneratingMod != null)
-                    screen.Push(new EndlessPlayer(replayGeneratingMod.CreateScoreFromReplayData));
+                screen.Push(new EndlessPlayer(replayGeneratingMod.CreateScoreFromReplayData));
             }, new[] { typeof(Player), typeof(SoloSongSelect) });
+        }
+
+        private bool tryUseBeatmapForActiveRuleset()
+        {
+            if (ruleset.Value is not RulesetInfo active || !active.Available)
+                return false;
+
+            if (isPlayableForRuleset(beatmap.Value, active))
+                return true;
+
+            beatmapPicker ??= new EzSkinEditorBeatmapPicker(realm, beatmaps);
+
+            if (!beatmapPicker.TryPickRandom(active, out var working) || working is not WorkingBeatmap picked)
+                return false;
+
+            if (beatmap is not Bindable<WorkingBeatmap> writable || writable.Disabled)
+                return false;
+
+            writable.Value = picked;
+            return isPlayableForRuleset(picked, active);
+        }
+
+        private bool ensureCurrentBeatmapPlayable(bool attemptedBeatmapSwitch)
+        {
+            if (beatmap.Value is DummyWorkingBeatmap)
+                return false;
+
+            if (!beatmap.Value.BeatmapSetInfo.Protected)
+                return true;
+
+            if (!attemptedBeatmapSwitch)
+            {
+                music.NextTrack();
+                Schedule(() => presentGameplay(true));
+            }
+
+            return false;
+        }
+
+        private static bool isPlayableForRuleset(WorkingBeatmap working, RulesetInfo active)
+        {
+            if (working is DummyWorkingBeatmap)
+                return false;
+
+            if (working.BeatmapSetInfo.Protected)
+                return false;
+
+            if (!active.Equals(working.BeatmapInfo.Ruleset))
+                return false;
+
+            return working.BeatmapInfo.TotalObjectCount != 0;
         }
 
         protected override void Update()
@@ -243,7 +331,7 @@ namespace osu.Game.Overlays.SkinEditor
 
         private void updateScreenSizing()
         {
-            if (skinEditor?.State.Value != Visibility.Visible) return;
+            if (Editor?.State.Value != Visibility.Visible) return;
 
             const float padding = 10;
 
@@ -282,9 +370,9 @@ namespace osu.Game.Overlays.SkinEditor
 
         private void updateComponentVisibility()
         {
-            Debug.Assert(skinEditor != null);
+            Debug.Assert(Editor != null);
 
-            if (skinEditor.State.Value == Visibility.Visible)
+            if (Editor.State.Value == Visibility.Visible)
             {
                 Scheduler.AddOnce(updateScreenSizing);
 
@@ -296,7 +384,7 @@ namespace osu.Game.Overlays.SkinEditor
             {
                 scalingContainer.SetCustomRect(null);
 
-                if (lastTargetScreen?.HideOverlaysOnEnter != true)
+                if (LastTargetScreen?.HideOverlaysOnEnter != true)
                     game.Toolbar.Show();
             }
         }
@@ -308,17 +396,14 @@ namespace osu.Game.Overlays.SkinEditor
         /// <summary>
         /// Set a new target screen which will be used to find skinnable components.
         /// </summary>
-        public void SetTarget(OsuScreen screen)
+        public virtual void SetTarget(OsuScreen screen)
         {
-            if (screen is EzSkinEditorScreen)
-                return;
-
             nestedInputManagerDisable?.Dispose();
             nestedInputManagerDisable = null;
 
-            lastTargetScreen = screen;
+            LastTargetScreen = screen;
 
-            if (skinEditor == null) return;
+            if (Editor == null) return;
 
             // ensure the toolbar is re-hidden even if a new screen decides to try and show it.
             updateComponentVisibility();
@@ -327,40 +412,42 @@ namespace osu.Game.Overlays.SkinEditor
             Scheduler.AddOnce(setTarget, screen);
         }
 
+        protected virtual Drawable GetEditorTarget(OsuScreen screen) => screen;
+
         private void setTarget(OsuScreen? target)
         {
             if (target == null)
                 return;
 
-            Debug.Assert(skinEditor != null);
+            Debug.Assert(Editor != null);
 
-            if (!target.IsLoaded || !skinEditor.IsLoaded)
+            if (!target.IsLoaded || !Editor.IsLoaded)
             {
                 Scheduler.AddOnce(setTarget, target);
                 return;
             }
 
-            if (skinEditor.State.Value == Visibility.Visible)
+            if (Editor.State.Value == Visibility.Visible)
             {
                 if (externalEditOverlay.State.Value != Visibility.Visible)
-                    skinEditor.Save(false);
-                skinEditor.UpdateTargetScreen(target);
+                    Editor.Save(false);
+                Editor.UpdateTargetScreen(GetEditorTarget(target));
                 disableNestedInputManagers();
             }
             else
             {
-                skinEditor.Hide();
-                skinEditor.Expire();
-                skinEditor = null;
+                Editor.Hide();
+                Editor.Expire();
+                Editor = null;
             }
         }
 
         private void disableNestedInputManagers()
         {
-            if (lastTargetScreen == null)
+            if (LastTargetScreen == null)
                 return;
 
-            var nestedInputManagers = lastTargetScreen.ChildrenOfType<PassThroughInputManager>().Where(manager => manager.UseParentInput).ToArray();
+            var nestedInputManagers = LastTargetScreen.ChildrenOfType<PassThroughInputManager>().Where(manager => manager.UseParentInput).ToArray();
             foreach (var inputManager in nestedInputManagers)
                 inputManager.UseParentInput = false;
             nestedInputManagerDisable = new InvokeOnDisposal(() =>
@@ -404,7 +491,7 @@ namespace osu.Game.Overlays.SkinEditor
 
         public new void ToggleVisibility()
         {
-            if (skinEditor?.ExternalEditInProgress == true)
+            if (Editor?.ExternalEditInProgress == true)
                 return;
 
             base.ToggleVisibility();

@@ -17,8 +17,12 @@ namespace osu.Game.Overlays.Settings
     {
         public readonly Bindable<Data?> Current = new Bindable<Data?>();
 
-        private Box background = null!;
-        private OsuTextFlowContainer text = null!;
+        // Built on first non-null value. Most settings items never show a note, so building the box and
+        // text flow up-front (and then hiding them) wastes a non-trivial amount of every settings load.
+        private Box? background;
+        private OsuTextFlowContainer? text;
+
+        private bool hasContent;
 
         [Resolved]
         private OsuColour colours { get; set; } = null!;
@@ -31,6 +35,65 @@ namespace osu.Game.Overlays.Settings
         {
             AutoSizeDuration = 300;
             AutoSizeEasing = Easing.OutQuint;
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            Current.BindValueChanged(_ => updateDisplay(), true);
+            FinishTransforms(true);
+        }
+
+        private void updateDisplay()
+        {
+            // Never shown and still empty: nothing to collapse, so skip the transform bookkeeping entirely.
+            if (!hasContent && Current.Value == null)
+                return;
+
+            // Explicitly use ClearTransforms to clear any existing auto-size transform before modifying size / flag.
+            // TODO: This is dodgy as hell and needs to go.
+            ClearTransforms(false, @"baseSize");
+            ClearTransforms(false, nameof(Height));
+
+            if (Current.Value == null)
+            {
+                AutoSizeAxes = Axes.None;
+                this.ResizeHeightTo(0, 300, Easing.OutQuint);
+                this.FadeOut(250, Easing.OutQuint);
+                return;
+            }
+
+            if (!hasContent)
+                buildContent();
+
+            AutoSizeAxes = Axes.Y;
+            this.FadeIn(250, Easing.OutQuint);
+
+            switch (Current.Value.Type)
+            {
+                case Type.Informational:
+                    background!.Colour = colourProvider.Dark2;
+                    text!.Colour = colourProvider.Content2;
+                    break;
+
+                case Type.Warning:
+                    background!.Colour = colours.Orange1;
+                    text!.Colour = colourProvider.Background5;
+                    break;
+
+                case Type.Critical:
+                    background!.Colour = colours.Red1;
+                    text!.Colour = colourProvider.Background5;
+                    break;
+            }
+
+            text!.Text = Current.Value.Text;
+        }
+
+        private void buildContent()
+        {
+            hasContent = true;
 
             InternalChild = new Container
             {
@@ -60,53 +123,6 @@ namespace osu.Game.Overlays.Settings
                     }
                 },
             };
-        }
-
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            Current.BindValueChanged(_ => updateDisplay(), true);
-            FinishTransforms(true);
-        }
-
-        private void updateDisplay()
-        {
-            // Explicitly use ClearTransforms to clear any existing auto-size transform before modifying size / flag.
-            // TODO: This is dodgy as hell and needs to go.
-            ClearTransforms(false, @"baseSize");
-            ClearTransforms(false, nameof(Height));
-
-            if (Current.Value == null)
-            {
-                AutoSizeAxes = Axes.None;
-                this.ResizeHeightTo(0, 300, Easing.OutQuint);
-                this.FadeOut(250, Easing.OutQuint);
-                return;
-            }
-
-            AutoSizeAxes = Axes.Y;
-            this.FadeIn(250, Easing.OutQuint);
-
-            switch (Current.Value.Type)
-            {
-                case Type.Informational:
-                    background.Colour = colourProvider.Dark2;
-                    text.Colour = colourProvider.Content2;
-                    break;
-
-                case Type.Warning:
-                    background.Colour = colours.Orange1;
-                    text.Colour = colourProvider.Background5;
-                    break;
-
-                case Type.Critical:
-                    background.Colour = colours.Red1;
-                    text.Colour = colourProvider.Background5;
-                    break;
-            }
-
-            text.Text = Current.Value.Text;
         }
 
         public record Data(LocalisableString Text, Type Type);

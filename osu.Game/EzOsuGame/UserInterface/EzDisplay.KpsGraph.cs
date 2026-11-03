@@ -5,44 +5,57 @@
 
 using System;
 using System.Collections.Generic;
-using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Rendering;
-using osu.Framework.Graphics.Rendering.Vertices;
-using osu.Framework.Graphics.Shaders;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Events;
+using osu.Framework.Layout;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.UserInterface
 {
     /// <summary>
     /// KPS折线图
     /// </summary>
-    /// 支持可选的尾部补零与热力颜色渲染，默认关闭。
+    /// 支持可选的尾部补零，单色抗锯齿折线直接画到屏幕。
     public partial class EzDisplayKpsGraph : CompositeDrawable
     {
         private const float line_thickness = 1.5f;
         private const int max_display_points = 128;
 
-        private readonly KpsLineDrawable graphDrawable;
+        private readonly Container graphColourContainer;
+        private readonly KpsStroke stroke;
 
         private float[] values;
+        private Color4 lineColour = Colour4.CornflowerBlue;
 
         public float ActualMaxValue { get; private set; } = float.NaN;
         public float ActualMinValue { get; private set; } = float.NaN;
         public float? MaxValue { get; set; }
         public float? MinValue { get; set; }
 
+        public Color4 LineColour
+        {
+            get => lineColour;
+            set
+            {
+                if (lineColour == value)
+                    return;
+
+                lineColour = value;
+                graphColourContainer.Colour = ColourInfo.SingleColour(value);
+            }
+        }
+
         private int valuesCount;
         private bool hasData;
         private bool lastExtendToBaseline;
-        private bool lastHeatmapEnabled;
         private double lastSourceLengthMs;
         private double lastBaselineLengthMs;
 
@@ -70,17 +83,54 @@ namespace osu.Game.EzOsuGame.UserInterface
         private OsuSpriteText hoverText = null!;
         private bool hoverCreated;
 
+        private readonly LayoutValue pathCached = new LayoutValue(Invalidation.DrawSize);
+
+        /// <summary>
+        /// 不参与父级 AutoSize（用于谱面 Panel 等紧凑布局：折线叠在指标行右侧，不撑开上下行）。
+        /// </summary>
+        public bool ExcludeFromParentAutoSize
+        {
+            get => BypassAutoSizeAxes == Axes.Both;
+            set => BypassAutoSizeAxes = value ? Axes.Both : Axes.None;
+        }
+
+        /// <summary>
+        /// 与 <see cref="ExcludeFromParentAutoSize"/> 配合：折线叠在该行右侧并随其尺寸更新。
+        /// </summary>
+        public Drawable OverlayAnchorRow { get; set; }
+
+        public float OverlayLeftMargin { get; set; } = 4f;
+
+        /// <summary>
+        /// 将折线叠在已排版指标行右侧（需 <see cref="ExcludeFromParentAutoSize"/>）。
+        /// </summary>
+        public void AlignBesideRow(Drawable row, float leftMargin = 4f)
+        {
+            float y = (row.DrawHeight - DrawHeight) * 0.5f;
+            var next = new Vector2(row.DrawWidth + leftMargin, y);
+
+            if (Position == next)
+                return;
+
+            Position = next;
+        }
+
         public EzDisplayKpsGraph()
         {
-            AddInternal(new Container
+            Blending = BlendingParameters.Additive;
+
+            AddInternal(graphColourContainer = new Container
             {
                 Masking = true,
                 RelativeSizeAxes = Axes.Both,
-                Child = graphDrawable = new KpsLineDrawable
+                Colour = ColourInfo.SingleColour(lineColour),
+                Child = stroke = new KpsStroke
                 {
                     RelativeSizeAxes = Axes.Both,
                 }
             });
+
+            AddLayout(pathCached);
         }
 
         private void createHoverContainers()
@@ -99,15 +149,20 @@ namespace osu.Game.EzOsuGame.UserInterface
                         Origin = Anchor.TopCentre,
                         Position = new Vector2(0, -4),
                         Masking = true,
-                        CornerRadius = 4,
+                        CornerRadius = EzUIStyleV1.CORNER_RADIUS_CHIP,
                         Children = new Drawable[]
                         {
-                            new Box { RelativeSizeAxes = Axes.Both, Colour = Colour4.Black, Alpha = 0.8f },
+                            new Box
+                            {
+                                RelativeSizeAxes = Axes.Both,
+                                Colour = Colour4.Black, Alpha = 0.35f
+                            },
                             hoverText = new OsuSpriteText
                             {
                                 Anchor = Anchor.Centre,
                                 Origin = Anchor.Centre,
                                 Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
+                                Margin = new MarginPadding(4),
                                 Colour = Colour4.White,
                             }
                         }
@@ -119,7 +174,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             hoverCreated = true;
         }
 
-        public void SetPoints(IReadOnlyList<double> source, double sourceLengthMs = 0, double baselineLengthMs = 0, bool extendToBaseline = false, bool heatmapEnabled = false)
+        public void SetPoints(IReadOnlyList<double> source, double sourceLengthMs = 0, double baselineLengthMs = 0, bool extendToBaseline = false)
         {
             if (source == null)
                 return;
@@ -137,11 +192,9 @@ namespace osu.Game.EzOsuGame.UserInterface
                 ActualMaxValue = float.NaN;
                 ActualMinValue = float.NaN;
 
-                // maskingContainer.ClearTransforms();
-                // maskingContainer.Width = 1;
-                graphDrawable.Clear();
+                stroke.ClearPoints();
+                pathCached.Invalidate();
                 lastExtendToBaseline = extendToBaseline;
-                lastHeatmapEnabled = heatmapEnabled;
                 lastSourceLengthMs = sourceLengthMs;
                 lastBaselineLengthMs = baselineLengthMs;
                 return;
@@ -166,7 +219,7 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             float max = float.MinValue;
             float min = float.MaxValue;
-            bool same = hasData && valuesCount == sampledCount && lastExtendToBaseline == extendToBaseline && lastHeatmapEnabled == heatmapEnabled;
+            bool same = hasData && valuesCount == sampledCount && lastExtendToBaseline == extendToBaseline;
 
             if (same && extendToBaseline)
                 same = lastSourceLengthMs == sourceLengthMs && lastBaselineLengthMs == baselineLengthMs;
@@ -193,18 +246,51 @@ namespace osu.Game.EzOsuGame.UserInterface
             hasData = true;
             valuesCount = sampledCount;
             lastExtendToBaseline = extendToBaseline;
-            lastHeatmapEnabled = heatmapEnabled;
             lastSourceLengthMs = sourceLengthMs;
             lastBaselineLengthMs = baselineLengthMs;
 
             if (same)
                 return;
 
-            graphDrawable.SetValues(values, valuesCount, ActualMinValue, ActualMaxValue, line_thickness, heatmapEnabled);
+            pathCached.Invalidate();
+        }
 
-            // // 直接显示完整图表，避免从左到右的展开动画。
-            // maskingContainer.ClearTransforms();
-            // maskingContainer.Width = 1;
+        protected override void Update()
+        {
+            base.Update();
+
+            if (!pathCached.IsValid)
+            {
+                applyPath();
+                pathCached.Validate();
+            }
+
+            if (OverlayAnchorRow != null && ExcludeFromParentAutoSize)
+                AlignBesideRow(OverlayAnchorRow, OverlayLeftMargin);
+        }
+
+        private void applyPath()
+        {
+            if (valuesCount < 2)
+            {
+                stroke.ClearPoints();
+                return;
+            }
+
+            float inset = line_thickness;
+            float availableWidth = Math.Max(0, stroke.DrawWidth - inset);
+            float availableHeight = Math.Max(0, stroke.DrawHeight - inset);
+            int denominator = Math.Max(1, valuesCount - 1);
+            var points = stroke.PreparePoints(valuesCount);
+
+            for (int i = 0; i < valuesCount; i++)
+            {
+                float x = i / (float)denominator * availableWidth;
+                float y = getYPosition(values[i]) * availableHeight;
+                points[i] = new Vector2(x, y);
+            }
+
+            stroke.CommitPoints();
         }
 
         private static int getSourceIndex(int index, int sampledCount, int sourceCount)
@@ -262,9 +348,9 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             // 将屏幕空间坐标转换到图表容器的本地坐标，以匹配当前线段布局。
             var thisLocal = ToLocalSpace(screenSpaceMousePos);
-            var graphLocal = graphDrawable.ToLocalSpace(screenSpaceMousePos);
+            var graphLocal = graphColourContainer.ToLocalSpace(screenSpaceMousePos);
 
-            float availableWidth = Math.Max(0, graphDrawable.DrawWidth);
+            float availableWidth = Math.Max(0, graphColourContainer.DrawWidth);
             if (availableWidth <= 0) availableWidth = Math.Max(0, DrawWidth);
 
             float xInAvailable = Math.Clamp(graphLocal.X, 0, availableWidth);
@@ -282,215 +368,77 @@ namespace osu.Game.EzOsuGame.UserInterface
             hoverLabel.Y = -(hoverLabel.DrawHeight + 4);
         }
 
-        private partial class KpsLineDrawable : Drawable
+        private static float getYPosition(float value, float minValue, float maxValue)
         {
-            private float[] points = Array.Empty<float>();
-            private float minValue;
-            private float maxValue;
-            private float thickness;
-            private bool heatmapEnabled;
-            private long version;
+            if (maxValue == minValue)
+                return value > 1 ? 0 : 1;
 
-            private Texture texture = null!;
-            private IShader shader = null!;
+            return (maxValue - value) / (maxValue - minValue);
+        }
 
-            [BackgroundDependencyLoader]
-            private void load(IRenderer renderer, ShaderManager shaders)
+        private float getYPosition(float value) => getYPosition(value, ActualMinValue, ActualMaxValue);
+
+        private partial class KpsStroke : Drawable
+        {
+            private Vector2[] points = Array.Empty<Vector2>();
+            private int pointCount;
+
+            public void ClearPoints()
             {
-                texture = renderer.WhitePixel;
-                shader = shaders.Load(VertexShaderDescriptor.TEXTURE_2, FragmentShaderDescriptor.TEXTURE);
-            }
-
-            public void SetValues(float[] source, int count, float minValue, float maxValue, float thickness, bool heatmapEnabled)
-            {
-                float[] snapshot = new float[count];
-                Array.Copy(source, snapshot, count);
-
-                points = snapshot;
-
-                this.minValue = minValue;
-                this.maxValue = maxValue;
-                this.thickness = thickness;
-                this.heatmapEnabled = heatmapEnabled;
-                version++;
-
-                Invalidate(Invalidation.DrawNode);
-            }
-
-            public void Clear()
-            {
-                if (points.Length == 0)
+                if (pointCount == 0)
                     return;
 
-                points = Array.Empty<float>();
-                version++;
+                pointCount = 0;
                 Invalidate(Invalidation.DrawNode);
             }
 
-            protected override void Dispose(bool isDisposing)
+            public Span<Vector2> PreparePoints(int count)
             {
-                if (isDisposing)
-                {
-                    // 使用数组快照，避免绘制线程遍历时被更新线程改写导致越界。
-                    points = Array.Empty<float>();
-                    texture = null!;
-                    shader = null!;
-                }
+                if (points.Length < count)
+                    Array.Resize(ref points, count);
 
-                base.Dispose(isDisposing);
+                pointCount = count;
+                return points.AsSpan(0, count);
             }
 
-            protected override DrawNode CreateDrawNode() => new KpsLineDrawNode(this);
+            public void CommitPoints() => Invalidate(Invalidation.DrawNode);
 
-            private class KpsLineDrawNode : DrawNode
+            protected override DrawNode CreateDrawNode() => new KpsStrokeDrawNode(this);
+
+            private class KpsStrokeDrawNode : DrawNode
             {
-                private Texture texture = null!;
-                private IShader shader = null!;
-                private float[] points = Array.Empty<float>();
-                private Vector2 drawSize;
-                private float minValue;
-                private float maxValue;
-                private float thickness;
-                private bool heatmapEnabled;
-                private long version = -1;
+                private readonly KpsStroke source;
+                private Vector2[] points = Array.Empty<Vector2>();
+                private int pointCount;
 
-                private IVertexBatch<TexturedVertex2D> quadBatch;
-
-                protected new KpsLineDrawable Source => (KpsLineDrawable)base.Source;
-
-                public KpsLineDrawNode(KpsLineDrawable source)
+                public KpsStrokeDrawNode(KpsStroke source)
                     : base(source)
                 {
+                    this.source = source;
                 }
 
                 public override void ApplyState()
                 {
                     base.ApplyState();
 
-                    texture = Source.texture;
-                    shader = Source.shader;
-                    drawSize = Source.DrawSize;
-                    minValue = Source.minValue;
-                    maxValue = Source.maxValue;
-                    thickness = Source.thickness;
-                    heatmapEnabled = Source.heatmapEnabled;
+                    pointCount = source.pointCount;
 
-                    if (version == Source.version)
-                        return;
+                    if (points.Length < pointCount)
+                        Array.Resize(ref points, pointCount);
 
-                    points = Source.points;
-                    version = Source.version;
+                    if (pointCount > 0)
+                        Array.Copy(source.points, points, pointCount);
                 }
 
                 protected override void Draw(IRenderer renderer)
                 {
-                    base.Draw(renderer);
-
-                    float[] localPoints = points;
-                    int pointCount = localPoints.Length;
-
-                    if (pointCount < 2 || !texture.Available)
+                    if (pointCount < 2)
                         return;
 
-                    shader.Bind();
-
-                    if (!renderer.BindTexture(texture))
-                        return;
-
-                    quadBatch ??= renderer.CreateQuadBatch<TexturedVertex2D>(Math.Min(pointCount - 1, 1024), 4);
-
+                    Color4 colour = DrawColourInfo.Colour.TopLeft;
                     renderer.PushLocalMatrix(DrawInfo.Matrix);
-
-                    RectangleF textureRect = texture.GetTextureRect();
-                    Vector4 textureRectangle = new Vector4(0, 0, 1, 1);
-                    Vector2 blendRange = Vector2.One;
-                    var add = quadBatch.AddAction;
-
-                    float halfThickness = thickness / 2f;
-                    int denominator = Math.Max(1, pointCount - 1);
-
-                    for (int i = 0; i < pointCount - 1; i++)
-                    {
-                        Vector2 start = new Vector2(i / (float)denominator * drawSize.X, getYPosition(localPoints[i]) * drawSize.Y);
-                        Vector2 end = new Vector2((i + 1) / (float)denominator * drawSize.X, getYPosition(localPoints[i + 1]) * drawSize.Y);
-                        Colour4 startColour = heatmapEnabled ? getHeatColour(localPoints[i]) : Colour4.CornflowerBlue;
-                        Colour4 endColour = heatmapEnabled ? getHeatColour(localPoints[i + 1]) : Colour4.CornflowerBlue;
-
-                        Vector2 direction = end - start;
-                        float length = direction.Length;
-
-                        if (length <= 0)
-                            continue;
-
-                        direction /= length;
-                        Vector2 extension = direction * halfThickness;
-                        Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * halfThickness;
-
-                        Vector2 topLeft = start - extension - perpendicular;
-                        Vector2 topRight = end + extension - perpendicular;
-                        Vector2 bottomRight = end + extension + perpendicular;
-                        Vector2 bottomLeft = start - extension + perpendicular;
-
-                        add(new TexturedVertex2D(renderer)
-                        {
-                            Position = topLeft,
-                            TexturePosition = textureRect.TopLeft,
-                            TextureRect = textureRectangle,
-                            BlendRange = blendRange,
-                            Colour = startColour
-                        });
-                        add(new TexturedVertex2D(renderer)
-                        {
-                            Position = topRight,
-                            TexturePosition = textureRect.TopRight,
-                            TextureRect = textureRectangle,
-                            BlendRange = blendRange,
-                            Colour = endColour
-                        });
-                        add(new TexturedVertex2D(renderer)
-                        {
-                            Position = bottomRight,
-                            TexturePosition = textureRect.BottomRight,
-                            TextureRect = textureRectangle,
-                            BlendRange = blendRange,
-                            Colour = endColour
-                        });
-                        add(new TexturedVertex2D(renderer)
-                        {
-                            Position = bottomLeft,
-                            TexturePosition = textureRect.BottomLeft,
-                            TextureRect = textureRectangle,
-                            BlendRange = blendRange,
-                            Colour = startColour
-                        });
-                    }
-
-                    quadBatch.Draw();
+                    EzSoftStroke.Draw(renderer, renderer.WhitePixel, points.AsSpan(0, pointCount), line_thickness, colour, false);
                     renderer.PopLocalMatrix();
-                    shader.Unbind();
-                }
-
-                private float getYPosition(float value)
-                {
-                    if (maxValue == minValue)
-                        return value > 1 ? 0 : 1;
-
-                    return (maxValue - value) / (maxValue - minValue);
-                }
-
-                private Colour4 getHeatColour(float value)
-                {
-                    if (value <= 0 || maxValue <= 0)
-                        return Colour4.White;
-
-                    float t = Math.Clamp(value / maxValue, 0, 1);
-                    return new Colour4(1f, 1f - t, 1f - t, 1f);
-                }
-
-                protected override void Dispose(bool isDisposing)
-                {
-                    base.Dispose(isDisposing);
-                    quadBatch?.Dispose();
                 }
             }
         }

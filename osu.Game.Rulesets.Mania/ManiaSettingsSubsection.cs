@@ -7,7 +7,6 @@ using osu.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Localisation;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Localisation;
@@ -21,7 +20,6 @@ namespace osu.Game.Rulesets.Mania
 {
     public partial class ManiaSettingsSubsection : RulesetSettingsSubsection
     {
-        protected override LocalisableString Header => "osu!mania";
         protected Bindable<double> BaseSpeedBindable = null!;
         protected Bindable<double> TimePerSpeedBindable = null!;
         protected Bindable<double> SpeedBindable = null!;
@@ -121,28 +119,6 @@ namespace osu.Game.Rulesets.Mania
                 })
                 {
                     Keywords = new[] { "color" },
-                },
-                new SettingsItemV2(new FormSliderBar<double>
-                {
-                    Caption = EzManiaSettingsStrings.TIMING_BASED_NOTE_TARGET_GRAYSCALE,
-                    HintText = EzManiaSettingsStrings.TIMING_BASED_NOTE_TARGET_GRAYSCALE_TOOLTIP,
-                    Current = ezConfig.GetBindable<double>(Ez2Setting.TimingBasedNoteColouringTargetGrayscale),
-                    KeyboardStep = 0.01f,
-                    LabelFormat = v => $"{v:0.00}x",
-                })
-                {
-                    Keywords = new[] { "color", "colour", "timing" },
-                },
-                new SettingsItemV2(new FormSliderBar<double>
-                {
-                    Caption = EzManiaSettingsStrings.TIMING_BASED_NOTE_COLOUR_ALPHA,
-                    HintText = EzManiaSettingsStrings.TIMING_BASED_NOTE_COLOUR_ALPHA_TOOLTIP,
-                    Current = ezConfig.GetBindable<double>(Ez2Setting.TimingBasedNoteColouringColourAlpha),
-                    KeyboardStep = 0.01f,
-                    DisplayAsPercentage = true,
-                })
-                {
-                    Keywords = new[] { "color", "colour", "timing" },
                 },
             };
 

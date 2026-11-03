@@ -1,20 +1,22 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern;
 using osu.Game.Rulesets.Mania.EzMania.Analysis.SR4Pattern;
-using osu.Game.Rulesets.Mania.Beatmaps;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 {
-    public class EzManiaAnalysisProvider : IEzAnalysisProvider
+    public class EzManiaAnalysisProvider : IEzAnalysisProvider, IEzXxyStarRatingSupport
     {
+        public int XxyStarRatingVersion => EzManiaXxyStarRating.VERSION;
+
+        public bool SupportsXxyStarRating(IBeatmap beatmap) => EzManiaXxyStarRating.IsPatternSupported(beatmap);
+
         public bool TryCompute(in EzAnalysisRequest request, CancellationToken cancellationToken, out IEzAnalysis analysis)
         {
             analysis = null!;
@@ -55,8 +57,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         {
             sr = 0;
 
-            if (!isXxySrPatternSupported(beatmap))
+            if (!EzManiaXxyStarRating.IsPatternSupported(beatmap))
                 return false;
+
+            if (beatmap.HitObjects.Count == 0)
+                return true;
 
             sr = SRCalculator.CalculateSR(beatmap, clockRate);
             return !double.IsNaN(sr) && !double.IsInfinity(sr);
@@ -83,20 +88,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 
         private static EzRadarChartData<string> computeXxySrPatternRadarData(ManiaBeatmap beatmap, double clockRate)
         {
-            if (!isXxySrPatternSupported(beatmap))
+            if (!EzManiaXxyStarRating.IsPatternSupported(beatmap))
                 return createXxySrPatternRadarData(0, 0, 0, 0, 0, 0);
 
             EzManiaSR4PatternSnapshot snapshot = SRCalculator.CalculateSR4PatternSnapshot(beatmap, clockRate);
             return EzManiaSR4PatternRadarBuilder.Create(snapshot);
-        }
-
-        private static bool isXxySrPatternSupported(IBeatmap beatmap)
-        {
-            int keyCount = beatmap is ManiaBeatmap maniaBeatmap && maniaBeatmap.TotalColumns > 0
-                ? maniaBeatmap.TotalColumns
-                : Math.Max(1, (int)Math.Round(beatmap.BeatmapInfo.Difficulty.CircleSize));
-
-            return keyCount < 11 || keyCount % 2 == 0;
         }
 
         private static EzRadarChartData<string> createKeyPatternRadarData(double bracket, double chord, double longNoteRatio, double jack, double delay, double dump)

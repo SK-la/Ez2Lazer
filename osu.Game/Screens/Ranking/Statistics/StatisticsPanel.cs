@@ -12,13 +12,12 @@ using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Effects;
 using osu.Framework.Input.Events;
-using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Extensions;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Statistics;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
@@ -35,7 +34,7 @@ namespace osu.Game.Screens.Ranking.Statistics
 {
     public partial class StatisticsPanel : VisibilityContainer
     {
-        public const float SIDE_PADDING = 30;
+        public const float SIDE_PADDING = 20;
 
         public readonly Bindable<ScoreInfo?> Score = new Bindable<ScoreInfo?>();
 
@@ -60,9 +59,11 @@ namespace osu.Game.Screens.Ranking.Statistics
         [Resolved]
         private IAPIProvider api { get; set; } = null!;
 
+        [Resolved]
+        protected IEzReplaySession ReplaySession { get; private set; } = null!;
+
         private readonly Container content;
         private readonly LoadingSpinner spinner;
-        private readonly EzScoreServer.AnalysisHost analysisHost;
 
         private bool wasOpened;
         private Sample? popInSample;
@@ -78,14 +79,11 @@ namespace osu.Game.Screens.Ranking.Statistics
                 {
                     Left = ScorePanel.EXPANDED_WIDTH + SIDE_PADDING * 2,
                     Right = SIDE_PADDING,
-                    Top = ScorePanel.EXPANDED_TOP_LAYER_HEIGHT,
-                    Bottom = 15 // Approximate padding to the bottom of the score panel.
                 },
                 Children = new Drawable[]
                 {
                     content = new Container { RelativeSizeAxes = Axes.Both },
-                    spinner = new LoadingSpinner(),
-                    analysisHost = new EzScoreServer.AnalysisHost(),
+                    spinner = new LoadingSpinner()
                 }
             };
         }
@@ -103,7 +101,6 @@ namespace osu.Game.Screens.Ranking.Statistics
         {
             loadCancellation?.Cancel();
             loadCancellation = null;
-            analysisHost.CancelPendingAnalysis();
 
             foreach (var child in content)
                 child.FadeOut(150).Expire();
@@ -122,7 +119,7 @@ namespace osu.Game.Screens.Ranking.Statistics
             var workingBeatmap = beatmapManager.GetWorkingBeatmap(newScore.BeatmapInfo);
 
             // Todo: The placement of this is temporary. Eventually we'll both generate the playable beatmap _and_ run through it in a background task to generate the hit events.
-            Task.Run(() =>
+            Task.Run(async () =>
             {
                 // 结算后加载一次分数，后台计算
                 var playable = workingBeatmap.GetPlayableBeatmap(newScore.Ruleset, newScore.Mods);
@@ -135,19 +132,7 @@ namespace osu.Game.Screens.Ranking.Statistics
                     var databasedScore = scoreManager.GetScore(newScore);
 
                     if (databasedScore != null)
-                    {
-                        Logger.Log($"[EzScore] Score null: {newScore.OnlineID} ({databasedScore.ScoreInfo.HitEvents.Count}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-
-                        // try
-                        // {
-                        //     generatedHitEvents = analysisHost.GenerateAsync(databasedScore, loadCancellation.Token).GetResultSafely();
-                        // }
-                        // catch
-                        // {
-                        EzScoreReloadBridge.InitializeAllGenerators();
-                        generatedHitEvents = EzScoreReloadBridge.TryGenerate(databasedScore, playable, loadCancellation.Token);
-                        // }
-                    }
+                        generatedHitEvents = await ReplaySession.RunHitEventsAsync(databasedScore, playable, ReplayRunPurpose.ForStored, loadCancellation.Token).ConfigureAwait(true);
 
                     if (generatedHitEvents != null)
                         newScore.HitEvents = generatedHitEvents;
@@ -156,6 +141,9 @@ namespace osu.Game.Screens.Ranking.Statistics
                 return playable;
             }, loadCancellation.Token).ContinueWith(task => Schedule(() =>
             {
+                if (task.IsCanceled)
+                    return;
+
                 bool hitEventsAvailable = newScore.HitEvents.Count != 0;
                 Container<Drawable> container;
 
@@ -184,6 +172,9 @@ namespace osu.Game.Screens.Ranking.Statistics
                 else
                 {
                     FillFlowContainer flow;
+                    // Independent vertical scroll for the expanded statistics region (left list stays horizontal).
+                    // Restored after #38643 removed this container; outer ResultsScreen VerticalScrollContainer
+                    // intentionally does not wheel-scroll the whole page.
                     container = new OsuScrollContainer(Direction.Vertical)
                     {
                         RelativeSizeAxes = Axes.Both,
@@ -192,15 +183,11 @@ namespace osu.Game.Screens.Ranking.Statistics
                         Masking = false,
                         ScrollbarOverlapsContent = false,
                         Alpha = 0,
-                        Children = new[]
+                        Child = flow = new FillFlowContainer
                         {
-                            flow = new FillFlowContainer
-                            {
-                                RelativeSizeAxes = Axes.X,
-                                AutoSizeAxes = Axes.Y,
-                                Spacing = new Vector2(30, 10),
-                                Direction = FillDirection.Full,
-                            }
+                            RelativeSizeAxes = Axes.X,
+                            AutoSizeAxes = Axes.Y,
+                            Direction = FillDirection.Full,
                         }
                     };
 
@@ -306,7 +293,7 @@ namespace osu.Game.Screens.Ranking.Statistics
 
                 if (preventTaggingReason == null)
                 {
-                    yield return new StatisticItem("Tag the beatmap!", () => new UserTagControl(newScore.BeatmapInfo)
+                    yield return new StatisticItem("Beatmap tags", () => new UserTagControl(newScore.BeatmapInfo)
                     {
                         Writable = true,
                         RelativeSizeAxes = Axes.X,
@@ -316,31 +303,42 @@ namespace osu.Game.Screens.Ranking.Statistics
                 }
                 else
                 {
-                    yield return new StatisticItem("Tag the beatmap!", () => new FillFlowContainer<CompositeDrawable>
+                    yield return new StatisticItem("Beatmap tags", () => new Container
                     {
-                        Children = new CompositeDrawable[]
+                        Children = new Drawable[]
                         {
-                            new OsuTextFlowContainer(cp => cp.Font = OsuFont.GetFont(size: StatisticItem.FONT_SIZE, weight: FontWeight.SemiBold))
-                            {
-                                RelativeSizeAxes = Axes.X,
-                                AutoSizeAxes = Axes.Y,
-                                TextAnchor = Anchor.Centre,
-                                Text = preventTaggingReason,
-                                Anchor = Anchor.Centre,
-                                Origin = Anchor.Centre,
-                            },
                             new UserTagControl(newScore.BeatmapInfo)
                             {
                                 Writable = false,
                                 RelativeSizeAxes = Axes.X,
+                                Anchor = Anchor.TopCentre,
+                                Origin = Anchor.TopCentre,
+                            },
+                            new Container
+                            {
                                 Anchor = Anchor.Centre,
                                 Origin = Anchor.Centre,
-                            }
+                                AutoSizeAxes = Axes.Both,
+                                Masking = true,
+                                EdgeEffect = new EdgeEffectParameters
+                                {
+                                    Radius = 60,
+                                    Roundness = 8,
+                                    Colour = OsuColour.Gray(0.18f),
+                                    Type = EdgeEffectType.Shadow,
+                                },
+                                Children = new Drawable[]
+                                {
+                                    new OsuTextFlowContainer(cp => cp.Font = OsuFont.GetFont(size: StatisticItem.FONT_SIZE, weight: FontWeight.SemiBold))
+                                    {
+                                        AutoSizeAxes = Axes.Both,
+                                        Text = preventTaggingReason,
+                                    },
+                                }
+                            },
                         },
                         RelativeSizeAxes = Axes.X,
                         AutoSizeAxes = Axes.Y,
-                        Direction = FillDirection.Vertical,
-                        Spacing = new Vector2(4),
                     });
                 }
             }

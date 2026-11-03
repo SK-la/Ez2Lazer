@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania.Skinning
@@ -11,7 +12,7 @@ namespace osu.Game.Rulesets.Mania.Skinning
     /// <summary>
     /// 列级更新广播接口，使用<see cref="ColumnWatcher"/>
     /// </summary>
-    internal interface IColumnNote
+    public interface IColumnNote
     {
         void ForwardOnNoteSetChanged();
         void ForwardOnNoteSizeChanged();
@@ -24,7 +25,7 @@ namespace osu.Game.Rulesets.Mania.Skinning
     /// ColumnWatcher.Remove(Column, this); // 释放
     /// </code>
     /// </summary>
-    internal class ColumnWatcher
+    public class ColumnWatcher
     {
         private readonly Column column;
         private readonly List<WeakReference<IColumnNote>> notes = new List<WeakReference<IColumnNote>>();
@@ -105,7 +106,7 @@ namespace osu.Game.Rulesets.Mania.Skinning
         public bool IsEmpty => notes.All(wr => !wr.TryGetTarget(out _));
 
         private static readonly Dictionary<WeakReference<Column>, ColumnWatcher> watchers = new Dictionary<WeakReference<Column>, ColumnWatcher>();
-        private static readonly object watcher_lock = new object();
+        private static readonly Lock watcher_lock = new Lock();
 
         public static ColumnWatcher GetOrCreate(Column c)
         {

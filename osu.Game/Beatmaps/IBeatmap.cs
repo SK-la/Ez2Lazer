@@ -45,12 +45,6 @@ namespace osu.Game.Beatmaps
         SortedList<BreakPeriod> Breaks { get; set; }
 
         /// <summary>
-        /// All lines from the [Events] section which aren't handled in the encoding process yet.
-        /// These lines should be written out to the beatmap file on save or export.
-        /// </summary>
-        List<string> UnhandledEventLines { get; }
-
-        /// <summary>
         /// Total amount of break time in the beatmap.
         /// </summary>
         double TotalBreakTime { get; }
@@ -108,6 +102,8 @@ namespace osu.Game.Beatmaps
         int CountdownOffset { get; internal set; }
 
         int[] Bookmarks { get; internal set; }
+
+        double[] SliderVelocityPresets { get; internal set; }
 
         int BeatmapVersion { get; }
 
@@ -198,6 +194,19 @@ namespace osu.Game.Beatmaps
         }
 
         /// <summary>
+        /// hitobject 停止占用谱面时间的时间戳。
+        /// </summary>
+        /// <remarks>
+        /// 这是物件对可玩区域贡献的唯一定义。若与 <see cref="HitObjectExtensions.GetEndTime"/> 混用，
+        /// 可能得到超过自身算出区域末端的时间；凡相对
+        /// <see cref="CalculatePlayableBounds(IEnumerable{HitObject})"/> 排布物件的调用方应改用本方法。
+        /// </remarks>
+        public static double GetPlayableEndTime(this HitObject hitObject)
+            => hitObject is IExcludeEndTimeFromPlayableLength { ExcludeEndTimeFromPlayableLength: true }
+                ? hitObject.StartTime
+                : hitObject.GetEndTime();
+
+        /// <summary>
         /// Find the timestamps in milliseconds of the start and end of the playable region.
         /// </summary>
         public static (double start, double end) CalculatePlayableBounds(IEnumerable<HitObject> objects)
@@ -205,7 +214,7 @@ namespace osu.Game.Beatmaps
             if (!objects.Any())
                 return (0, 0);
 
-            double lastObjectTime = objects.Max(o => o.GetEndTime());
+            double lastObjectTime = objects.Max(o => o.GetPlayableEndTime());
             double firstObjectTime = objects.First().StartTime;
 
             return (firstObjectTime, lastObjectTime);

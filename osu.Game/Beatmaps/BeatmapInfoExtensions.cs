@@ -72,6 +72,9 @@ namespace osu.Game.Beatmaps
             if (beatmap.Ruleset.ShortName == ruleset.ShortName)
                 return true;
 
+            if (beatmap.BeatmapSet is BeatmapSetInfo { IsExternallyHosted: true })
+                return false;
+
             if (allowConversion && beatmap.Ruleset.OnlineID == 0 && ruleset.OnlineID != 0)
                 return true;
 

@@ -66,7 +66,7 @@ namespace osu.Game.Screens.Select
             private void load()
             {
                 Masking = true;
-                CornerRadius = 5;
+                CornerRadius = CORNER_RADIUS / 2;
                 Shear = OsuGame.SHEAR;
 
                 AddRange(new Drawable[]
@@ -161,7 +161,17 @@ namespace osu.Game.Screens.Select
                 hoverLayer.FadeOut(500, Easing.OutQuint);
             }
 
-            public override LocalisableString TooltipText => isFavourite.Value ? BeatmapsetsStrings.ShowDetailsUnfavourite.ToSentence() : BeatmapsetsStrings.ShowDetailsFavourite.ToSentence();
+            public override LocalisableString TooltipText
+            {
+                get
+                {
+                    if (!Enabled.Value) return string.Empty;
+
+                    return isFavourite.Value
+                        ? BeatmapsetsStrings.ShowDetailsUnfavourite.ToSentence()
+                        : BeatmapsetsStrings.ShowDetailsFavourite.ToSentence();
+                }
+            }
 
             // Note: `setLoading()` and `setBeatmapSet()` are called externally via their public counterparts by song select when the beatmap changes,
             // as well as internally in order to display the progress and result of the (un)favourite operation when the button is clicked.

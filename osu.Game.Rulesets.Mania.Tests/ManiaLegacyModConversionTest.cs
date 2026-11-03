@@ -6,6 +6,8 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Tests.Beatmaps;
@@ -34,7 +36,7 @@ namespace osu.Game.Rulesets.Mania.Tests
             new object[] { LegacyMods.FadeIn, new[] { typeof(ManiaModFadeIn) } },
             new object[] { LegacyMods.Random, new[] { typeof(ManiaModRandom) } },
             new object[] { LegacyMods.Key9, new[] { typeof(ManiaModKey9) } },
-            new object[] { LegacyMods.KeyCoop, new[] { typeof(ManiaModDualStages) } },
+            new object[] { LegacyMods.KeyCoop, new[] { typeof(ManiaModSplitStages) } },
             new object[] { LegacyMods.Key1, new[] { typeof(ManiaModKey1) } },
             new object[] { LegacyMods.Key3, new[] { typeof(ManiaModKey3) } },
             new object[] { LegacyMods.Key2, new[] { typeof(ManiaModKey2) } },
@@ -64,29 +66,52 @@ namespace osu.Game.Rulesets.Mania.Tests
             var ruleset = (ManiaRuleset)CreateRuleset();
             var conversionMods = ruleset.GetModsFor(ModType.Conversion).ToList();
 
-            Assert.That(conversionMods.Any(mod => mod is ManiaModDualStages), Is.False);
+            Assert.That(conversionMods.Any(mod => mod is ManiaModSplitStages), Is.True);
 
             var keyModGroup = conversionMods.OfType<MultiMod>().Single(mod => mod.Mods.OfType<ManiaKeyMod>().Any());
 
-            Assert.That(keyModGroup.Mods.OfType<ManiaKeyMod>().Select(mod => mod.KeyCount), Is.EqualTo(Enumerable.Range(1, ManiaRuleset.MAX_STAGE_KEYS)));
+            Assert.That(keyModGroup.Mods.OfType<ManiaKeyMod>().Select(mod => mod.KeyCount), Is.EqualTo(Enumerable.Range(1, 10)));
         }
 
         [TestCase(12)]
         [TestCase(14)]
         [TestCase(16)]
         [TestCase(18)]
-        public void TestHigherSingleStageKeyModsAdjustConvertedKeyCount(int keyCount)
+        public void TestSplitStagesModPreservesTotalKeyCount(int keyCount)
         {
             var ruleset = (ManiaRuleset)CreateRuleset();
-            var beatmapInfo = new BeatmapInfo(new RulesetInfo { ShortName = "osu" }, new BeatmapDifficulty { CircleSize = 4, OverallDifficulty = 4 });
+            var beatmapInfo = new BeatmapInfo(new RulesetInfo { ShortName = ManiaRuleset.SHORT_NAME }, new BeatmapDifficulty { CircleSize = keyCount });
 
-            var keyMod = ruleset.GetModsFor(ModType.Conversion)
-                                .OfType<MultiMod>()
-                                .SelectMany(mod => mod.Mods)
-                                .OfType<ManiaKeyMod>()
-                                .Single(mod => mod.KeyCount == keyCount);
+            var mod = new ManiaModSplitStages();
+            Assert.That(ruleset.GetKeyCount(beatmapInfo, new[] { mod }), Is.EqualTo(keyCount));
 
-            Assert.That(ruleset.GetKeyCount(beatmapInfo, new[] { keyMod }), Is.EqualTo(keyCount));
+            var beatmap = new ManiaBeatmap(new StageDefinition(keyCount)) { BeatmapInfo = beatmapInfo };
+            var converter = new ManiaBeatmapConverter(beatmap, ruleset);
+            mod.ApplyToBeatmapConverter(converter);
+
+            Assert.That(converter.Dual, Is.True);
+            Assert.That(converter.TargetColumns, Is.EqualTo(keyCount / 2));
+            Assert.That(converter.TotalColumns, Is.EqualTo(keyCount));
+            Assert.That(mod.PlayfieldType, Is.EqualTo(PlayfieldType.Dual));
+        }
+
+        [TestCase(11)]
+        [TestCase(13)]
+        [TestCase(15)]
+        [TestCase(17)]
+        public void TestSplitStagesModDoesNotEnableDualForOddKeyCount(int keyCount)
+        {
+            var mod = new ManiaModSplitStages();
+            var beatmapInfo = new BeatmapInfo(new RulesetInfo { ShortName = ManiaRuleset.SHORT_NAME }, new BeatmapDifficulty { CircleSize = keyCount });
+            var beatmap = new ManiaBeatmap(new StageDefinition(keyCount)) { BeatmapInfo = beatmapInfo };
+            var converter = new ManiaBeatmapConverter(beatmap, CreateRuleset());
+
+            mod.ApplyToBeatmapConverter(converter);
+
+            Assert.That(converter.Dual, Is.False);
+            Assert.That(converter.TargetColumns, Is.EqualTo(keyCount));
+            Assert.That(converter.TotalColumns, Is.EqualTo(keyCount));
+            Assert.That(mod.PlayfieldType, Is.EqualTo(PlayfieldType.Single));
         }
 
         protected override Ruleset CreateRuleset() => new ManiaRuleset();

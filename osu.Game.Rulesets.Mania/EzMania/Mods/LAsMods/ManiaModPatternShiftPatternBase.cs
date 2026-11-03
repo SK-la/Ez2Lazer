@@ -6,14 +6,15 @@ using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania.Mods.ModHelp;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
+using osu.Game.EzOsuGame.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 {
@@ -45,8 +46,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public override string Name => $"Pattern Shift {PatternName}";
 
         public override string Acronym => PatternAcronym;
-
-        public override double ScoreMultiplier => 1;
 
         public override LocalisableString Description => PatternShiftStrings.PATTERN_SHIFT_DESCRIPTION;
 
@@ -155,9 +154,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             if (Level.Value <= 0)
                 return;
 
-            Seed.Value ??= RNG.Next();
+            int seed = EzModSeed.Resolve(Seed);
 
-            var oscillator = new EzOscillator(Seed.Value.Value, ezWaveform: Waveform.Value);
+            var oscillator = new EzOscillator(seed, ezWaveform: Waveform.Value);
 
             var maniaBeatmap = (ManiaBeatmap)beatmap;
 
@@ -168,7 +167,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 WindowProcessInterval = WindowProcessInterval,
                 WindowProcessOffset = WindowProcessOffset,
                 MaxIterationsPerWindow = MaxIterationsPerWindow,
-                Seed = Seed.Value.Value,
+                Seed = seed,
                 FineCountThreshold = SkipFineThreshold.Value,
                 QuarterLineDivisor = SkipQuarterDivisor.Value
             };
@@ -178,7 +177,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 psSettings,
                 oscillator,
                 ApplyPatternForWindow);
-            ManiaNoteCleanupTool.CleanupBeatmap(maniaBeatmap, seed: Seed.Value.Value);
         }
     }
 }

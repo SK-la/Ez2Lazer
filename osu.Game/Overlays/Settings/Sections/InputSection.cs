@@ -1,6 +1,7 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
@@ -14,7 +15,7 @@ namespace osu.Game.Overlays.Settings.Sections
 {
     public partial class InputSection : SettingsSection
     {
-        private readonly KeyBindingPanel keyConfig;
+        private readonly Action openKeyConfig;
 
         public override LocalisableString Header => InputSettingsStrings.InputSectionHeader;
 
@@ -23,9 +24,9 @@ namespace osu.Game.Overlays.Settings.Sections
             Icon = OsuIcon.Input
         };
 
-        public InputSection(KeyBindingPanel keyConfig)
+        public InputSection(Action openKeyConfig)
         {
-            this.keyConfig = keyConfig;
+            this.openKeyConfig = openKeyConfig;
         }
 
         [BackgroundDependencyLoader]
@@ -33,7 +34,7 @@ namespace osu.Game.Overlays.Settings.Sections
         {
             Children = new Drawable[]
             {
-                new BindingSettings(keyConfig),
+                new BindingSettings(openKeyConfig),
             };
 
             foreach (var handler in host.AvailableInputHandlers)

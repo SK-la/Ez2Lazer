@@ -15,10 +15,12 @@ using osu.Framework.IO.Stores;
 using osu.Framework.Localisation;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.Formats;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Configuration;
@@ -33,6 +35,7 @@ using osu.Game.Scoring;
 using osu.Game.Screens.Edit.Setup;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
+using osu.Game.Storyboards;
 using osu.Game.Users;
 using osuTK;
 
@@ -48,8 +51,15 @@ namespace osu.Game.Rulesets
         /// Version history:
         /// 2022.205.0   FramedReplayInputHandler.CollectPendingInputs renamed to FramedReplayHandler.CollectReplayInputs.
         /// 2022.822.0   All strings return values have been converted to LocalisableString to allow for localisation support.
+        /// 2026.818.0   Support for ruleset-specific key bindings in editor:
+        ///              - `Ruleset.AvailableVariants` renamed to <see cref="GameplayVariants"/>
+        ///              - Variant ID <see cref="EDITOR_VARIANT"/> reserved for editor key bindings
+        ///              - Overriders of <see cref="GetVariantName"/> should ensure to return an appropriate string for <see cref="EDITOR_VARIANT"/>
+        ///              - <see cref="HitObjectComposer{TObject,TAction}"/> gains a second generic parameter, representing the enumeration type with relevant actions
+        ///                (it is strongly encouraged to keep it the same as the type in <see cref="RulesetInputManager{T}"/>,
+        ///                as the same ID space is used in realm for storing them)
         /// </summary>
-        public const string CURRENT_RULESET_API_VERSION = "2022.822.0";
+        public const string CURRENT_RULESET_API_VERSION = "2026.818.0";
 
         /// <summary>
         /// Define the ruleset API version supported by this ruleset.
@@ -212,6 +222,11 @@ namespace osu.Game.Rulesets
         public ModTouchDevice? GetTouchDeviceMod() => CreateMod<ModTouchDevice>();
 
         /// <summary>
+        /// Creates a <see cref="ScoreMultiplierCalculator"/> relevant to this ruleset.
+        /// </summary>
+        public virtual ScoreMultiplierCalculator CreateScoreMultiplierCalculator(ScoreMultiplierContext context) => new ScoreMultiplierCalculator(context);
+
+        /// <summary>
         /// Create a transformer which adds lookups specific to a ruleset to skin sources.
         /// </summary>
         /// <param name="skin">The source skin.</param>
@@ -220,6 +235,7 @@ namespace osu.Game.Rulesets
         public virtual ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap) => null;
 
         public virtual IEzAnalysisProvider? CreateEzAnalysisProvider() => null;
+        public virtual IEzReplaySession? CreateEzReplaySession() => null;
 
         protected Ruleset()
         {
@@ -277,6 +293,12 @@ namespace osu.Game.Rulesets
 
         public virtual HitObjectComposer? CreateHitObjectComposer() => null;
 
+        /// <summary>
+        /// Optional encoder used by the editor for save and undo snapshots.
+        /// Returning a value enables save/undo without implementing <see cref="ILegacyRuleset"/>.
+        /// </summary>
+        public virtual IBeatmapEncoder? CreateBeatmapEncoder(IBeatmap beatmap, ISkin? skin, Storyboard? storyboard) => null;
+
         public virtual IBeatmapVerifier? CreateBeatmapVerifier() => null;
 
         public virtual Drawable CreateIcon() => new SpriteIcon { Icon = FontAwesome.Solid.QuestionCircle };
@@ -304,9 +326,20 @@ namespace osu.Game.Rulesets
         public virtual string PlayingVerb => "Playing";
 
         /// <summary>
-        /// A list of available variant ids.
+        /// A list of available gameplay variant IDs.
         /// </summary>
-        public virtual IEnumerable<int> AvailableVariants => new[] { 0 };
+        public virtual IEnumerable<int> GameplayVariants => new[] { 0 };
+
+        /// <summary>
+        /// A list of all available variants.
+        /// Includes special variants like <see cref="EDITOR_VARIANT"/>.
+        /// </summary>
+        public IEnumerable<int> AllVariants => GameplayVariants.Append(EDITOR_VARIANT);
+
+        /// <summary>
+        /// A special variant used for supporting editor-specific customisable key bindings.
+        /// </summary>
+        public const int EDITOR_VARIANT = int.MaxValue;
 
         /// <summary>
         /// Get a list of default keys for the specified variant.
@@ -359,10 +392,42 @@ namespace osu.Game.Rulesets
         /// <returns>
         /// All relevant <see cref="HitResult"/>s along with a display-friendly name.
         /// </returns>
-        public IEnumerable<(HitResult result, LocalisableString displayName)> GetHitResultsForDisplay()
+        public IEnumerable<(HitResult result, LocalisableString displayName)> GetHitResultsForDisplay(ScoreInfo? score = null)
         {
-            var validResults = GetValidHitResults();
+            var validResults = GetValidHitResults(score).ToHashSet();
 
+            return enumerateDisplayableHitResults(validResults.Contains, _ => score);
+        }
+
+        /// <summary>
+        /// Get all <see cref="HitResult"/>s to display for a set of scores, using the union of each score's own valid results.
+        /// </summary>
+        /// <remarks>
+        /// 多份成绩的展示集合必须逐份按成绩自身解析后取并集：这些成绩可能来自不同的 Ez 游玩环境
+        /// （例如同一张谱面既有 Lazer 成绩也有 BMS 成绩）。改用单份成绩重载（缺省等价于「当前全局 Ez 游玩环境」）
+        /// 会让集合窄于成绩本身，例如全局是 Lazer 时 <see cref="HitResult.Poor"/> 不在有效集合里，
+        /// 表格会整列丢掉 BMS 成绩的 KPoor。
+        /// </remarks>
+        public IEnumerable<(HitResult result, LocalisableString displayName)> GetHitResultsForDisplay(IEnumerable<ScoreInfo> scores)
+        {
+            ArgumentNullException.ThrowIfNull(scores);
+
+            var perScore = scores.Select(score => (score, validResults: GetValidHitResults(score).ToHashSet())).ToArray();
+
+            // 没有成绩时退回单份重载的语义（全局环境），而不是返回空集合。
+            if (perScore.Length == 0)
+                return GetHitResultsForDisplay();
+
+            var union = perScore.SelectMany(p => p.validResults).ToHashSet();
+
+            // 显示名取「有效集合含该判定的第一份成绩」所用的模式；判定不在任何成绩的有效集合里时不会被列出，
+            // 所以这里的缺省值只是兜底。
+            return enumerateDisplayableHitResults(union.Contains, result => perScore.FirstOrDefault(p => p.validResults.Contains(result)).score);
+        }
+
+        private IEnumerable<(HitResult result, LocalisableString displayName)> enumerateDisplayableHitResults(Func<HitResult, bool> isValid,
+                                                                                                              Func<HitResult, ScoreInfo?> nameSource)
+        {
             // enumerate over ordered list to guarantee return order is stable.
             foreach (var result in EnumExtensions.GetValuesInOrder<HitResult>())
             {
@@ -379,8 +444,8 @@ namespace osu.Game.Rulesets
                         continue;
                 }
 
-                if (result == HitResult.Miss || validResults.Contains(result))
-                    yield return (result, GetDisplayNameForHitResult(result));
+                if (result == HitResult.Miss || isValid(result))
+                    yield return (result, GetDisplayNameForHitResult(result, nameSource(result)));
             }
         }
 
@@ -392,11 +457,24 @@ namespace osu.Game.Rulesets
         public virtual IEnumerable<HitResult> GetValidHitResults() => EnumExtensions.GetValuesInOrder<HitResult>();
 
         /// <summary>
+        /// Get all valid <see cref="HitResult"/>s for displaying the specified score.
+        /// </summary>
+        /// <remarks>
+        /// Rulesets with score-specific judgement environments may override this to use metadata embedded in the score.
+        /// </remarks>
+        public virtual IEnumerable<HitResult> GetValidHitResults(ScoreInfo? score) => GetValidHitResults();
+
+        /// <summary>
         /// Get a display friendly name for the specified result type.
         /// </summary>
         /// <param name="result">The result type to get the name for.</param>
         /// <returns>The display name.</returns>
         public virtual LocalisableString GetDisplayNameForHitResult(HitResult result) => result.GetLocalisableDescription();
+
+        /// <summary>
+        /// Get a display friendly name for the specified result type and score.
+        /// </summary>
+        public virtual LocalisableString GetDisplayNameForHitResult(HitResult result, ScoreInfo? score) => GetDisplayNameForHitResult(result);
 
         /// <summary>
         /// Applies changes to difficulty attributes for presenting to a user a rough estimate of how mods affect difficulty.
@@ -432,6 +510,12 @@ namespace osu.Game.Rulesets
             yield return new RulesetBeatmapAttribute(SongSelectStrings.Accuracy, @"OD", originalDifficulty.OverallDifficulty, adjustedDifficulty.OverallDifficulty, 10);
             yield return new RulesetBeatmapAttribute(SongSelectStrings.HPDrain, @"HP", originalDifficulty.DrainRate, adjustedDifficulty.DrainRate, 10);
         }
+
+        /// <summary>
+        /// Overload of <see cref="GetAdjustedDisplayDifficulty"/> for display on Ranked Cards
+        /// </summary>
+        public virtual IEnumerable<RulesetBeatmapAttribute> GetBeatmapAttributesForRankedPlayCard(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods) =>
+            GetBeatmapAttributesForDisplay(beatmapInfo, mods);
 
         /// <summary>
         /// Creates ruleset-specific beatmap filter criteria to be used on the song select screen.

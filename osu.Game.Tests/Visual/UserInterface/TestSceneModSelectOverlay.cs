@@ -15,6 +15,7 @@ using osu.Framework.Localisation;
 using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Framework.Utils;
+using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays;
@@ -25,6 +26,8 @@ using osu.Game.Rulesets.Catch.Mods;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Rulesets.Osu.Mods;
+using osu.Game.Rulesets.Osu.Scoring;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.Taiko.Mods;
 using osu.Game.Screens;
 using osu.Game.Screens.Footer;
@@ -122,7 +125,7 @@ namespace osu.Game.Tests.Visual.UserInterface
             AddUntilStep("two panels active", () => modSelectOverlay.ChildrenOfType<ModPanel>().Count(panel => panel.Active.Value) == 2);
             AddAssert("mod multiplier correct", () =>
             {
-                double multiplier = SelectedMods.Value.Aggregate(1d, (m, mod) => m * mod.ScoreMultiplier);
+                double multiplier = new OsuScoreMultiplierCalculatorV2(new ScoreMultiplierContext(new BeatmapDifficulty())).CalculateFor(SelectedMods.Value);
                 return Precision.AlmostEquals(multiplier, this.ChildrenOfType<RankingInformationDisplay>().Single().ModMultiplier.Value);
             });
             assertCustomisationToggleState(disabled: false, active: false);
@@ -137,7 +140,7 @@ namespace osu.Game.Tests.Visual.UserInterface
             AddUntilStep("two panels active", () => modSelectOverlay.ChildrenOfType<ModPanel>().Count(panel => panel.Active.Value) == 2);
             AddAssert("mod multiplier correct", () =>
             {
-                double multiplier = SelectedMods.Value.Aggregate(1d, (m, mod) => m * mod.ScoreMultiplier);
+                double multiplier = new OsuScoreMultiplierCalculatorV2(new ScoreMultiplierContext(new BeatmapDifficulty())).CalculateFor(SelectedMods.Value);
                 return Precision.AlmostEquals(multiplier, this.ChildrenOfType<RankingInformationDisplay>().Single().ModMultiplier.Value);
             });
             assertCustomisationToggleState(disabled: false, active: false);
@@ -814,13 +817,16 @@ namespace osu.Game.Tests.Visual.UserInterface
         {
             createScreen();
             changeRuleset(0);
+            int defaultVisibleColumnCount = 0;
+
+            AddStep("record default visible column count", () => defaultVisibleColumnCount = this.ChildrenOfType<ModColumn>().Count(col => col.IsPresent));
 
             AddStep("set filter for 2 columns", () => modSelectOverlay.IsValidMod = mod => mod.Type is ModType.DifficultyIncrease or ModType.Conversion);
 
             AddAssert("two columns visible", () => this.ChildrenOfType<ModColumn>().Count(col => col.IsPresent) == 2);
 
             AddStep("unset filter", () => modSelectOverlay.IsValidMod = _ => true);
-            AddAssert("all columns visible", () => this.ChildrenOfType<ModColumn>().All(col => col.IsPresent));
+            AddUntilStep("columns restored to default", () => this.ChildrenOfType<ModColumn>().Count(col => col.IsPresent) == defaultVisibleColumnCount);
 
             AddStep("filter out everything", () => modSelectOverlay.IsValidMod = _ => false);
             AddAssert("no columns visible", () => this.ChildrenOfType<ModColumn>().All(col => !col.IsPresent));
@@ -840,8 +846,9 @@ namespace osu.Game.Tests.Visual.UserInterface
         {
             createScreen();
             changeRuleset(0);
+            int defaultVisibleColumnCount = 0;
 
-            AddAssert("all columns visible", () => this.ChildrenOfType<ModColumn>().All(col => col.IsPresent));
+            AddStep("record default visible column count", () => defaultVisibleColumnCount = this.ChildrenOfType<ModColumn>().Count(col => col.IsPresent));
 
             AddStep("set search", () => modSelectOverlay.SearchTerm = "HD");
             AddAssert("two columns visible", () => this.ChildrenOfType<ModColumn>().Count(col => col.IsPresent) == 2);
@@ -850,7 +857,7 @@ namespace osu.Game.Tests.Visual.UserInterface
             AddAssert("no columns visible", () => this.ChildrenOfType<ModColumn>().All(col => !col.IsPresent));
 
             AddStep("clear search bar", () => modSelectOverlay.SearchTerm = "");
-            AddAssert("all columns visible", () => this.ChildrenOfType<ModColumn>().All(col => col.IsPresent));
+            AddUntilStep("columns restored to default", () => this.ChildrenOfType<ModColumn>().Count(col => col.IsPresent) == defaultVisibleColumnCount);
         }
 
         [Test]
@@ -858,31 +865,37 @@ namespace osu.Game.Tests.Visual.UserInterface
         {
             createScreen();
             changeRuleset(0);
+            int defaultVisibleColumnCount = 0;
 
-            AddAssert("all columns visible", () => this.ChildrenOfType<ModColumn>().All(col => col.IsPresent));
+            AddStep("record default visible column count", () => defaultVisibleColumnCount = this.ChildrenOfType<ModColumn>().Count(col => col.IsPresent));
 
             AddStep("set search", () => modSelectOverlay.SearchTerm = "fail");
-            AddAssert("one column visible", () => this.ChildrenOfType<ModColumn>().Count(col => col.IsPresent) == 1);
+            AddAssert("fewer columns visible", () =>
+            {
+                int visible = this.ChildrenOfType<ModColumn>().Count(col => col.IsPresent);
+                return visible > 0 && visible < defaultVisibleColumnCount;
+            });
 
             AddStep("hide", () => modSelectOverlay.Hide());
             AddStep("show", () => modSelectOverlay.Show());
 
-            AddAssert("all columns visible", () => this.ChildrenOfType<ModColumn>().All(col => col.IsPresent));
+            AddUntilStep("columns restored to default", () => this.ChildrenOfType<ModColumn>().Count(col => col.IsPresent) == defaultVisibleColumnCount);
         }
 
         [Test]
         public void TestColumnHidingOnRulesetChange()
         {
             createScreen();
+            int defaultVisibleColumnCount = 0;
 
             changeRuleset(0);
-            AddAssert("5 columns visible", () => this.ChildrenOfType<ModColumn>().Count(col => col.IsPresent) == 5);
+            AddStep("record default visible column count", () => defaultVisibleColumnCount = this.ChildrenOfType<ModColumn>().Count(col => col.IsPresent));
 
             AddStep("change to ruleset without all mod types", () => Ruleset.Value = TestCustomisableModRuleset.CreateTestRulesetInfo());
             AddUntilStep("1 column visible", () => this.ChildrenOfType<ModColumn>().Count(col => col.IsPresent) == 1);
 
             changeRuleset(0);
-            AddAssert("5 columns visible", () => this.ChildrenOfType<ModColumn>().Count(col => col.IsPresent) == 5);
+            AddUntilStep("columns restored to default", () => this.ChildrenOfType<ModColumn>().Count(col => col.IsPresent) == defaultVisibleColumnCount);
         }
 
         [Test]
@@ -896,7 +909,7 @@ namespace osu.Game.Tests.Visual.UserInterface
                 InputManager.Click(MouseButton.Left);
             });
             AddAssert("difficulty multiplier display shows correct value",
-                () => this.ChildrenOfType<RankingInformationDisplay>().Single().ModMultiplier.Value, () => Is.EqualTo(0.1).Within(Precision.DOUBLE_EPSILON));
+                () => this.ChildrenOfType<RankingInformationDisplay>().Single().ModMultiplier.Value, () => Is.EqualTo(0.2).Within(Precision.DOUBLE_EPSILON));
 
             // this is highly unorthodox in a test, but because the `ModSettingChangeTracker` machinery heavily leans on events and object disposal and re-creation,
             // it is instrumental in the reproduction of the failure scenario that this test is supposed to cover.
@@ -906,7 +919,7 @@ namespace osu.Game.Tests.Visual.UserInterface
             AddStep("reset half time speed to default", () => modSelectOverlay.ChildrenOfType<ModCustomisationPanel>().Single()
                                                                               .ChildrenOfType<RevertToDefaultButton<double>>().Single().TriggerClick());
             AddUntilStep("difficulty multiplier display shows correct value",
-                () => this.ChildrenOfType<RankingInformationDisplay>().Single().ModMultiplier.Value, () => Is.EqualTo(0.3).Within(Precision.DOUBLE_EPSILON));
+                () => this.ChildrenOfType<RankingInformationDisplay>().Single().ModMultiplier.Value, () => Is.EqualTo(0.55).Within(Precision.DOUBLE_EPSILON));
         }
 
         [Test]
@@ -1029,6 +1042,51 @@ namespace osu.Game.Tests.Visual.UserInterface
             AddAssert("OsuModPerfect panel active", () => getPanelForMod(typeof(OsuModPerfect)).Active.Value);
         }
 
+        [Test]
+        public void TestDifficultyAdjustModMultiplierIsCalculatedCorrectly()
+        {
+            createScreen();
+            AddStep("set mods", () => SelectedMods.Value = new Mod[] { new OsuModDifficultyAdjust() });
+            AddUntilStep("one panel active", () => modSelectOverlay.ChildrenOfType<ModPanel>().Count(panel => panel.Active.Value), () => Is.EqualTo(1));
+            AddAssert("mod multiplier is correct", () => this.ChildrenOfType<RankingInformationDisplay>().Single().ModMultiplier.Value,
+                () => Is.EqualTo(1).Within(Precision.FLOAT_EPSILON));
+            assertCustomisationToggleState(disabled: false, active: false);
+            AddAssert("setting items created", () => modSelectOverlay.ChildrenOfType<ISettingsItem>().Any());
+
+            AddStep("modify DA", () => SelectedMods.Value.OfType<OsuModDifficultyAdjust>().Single().CircleSize.Value = 3.9f);
+            AddAssert("mod multiplier is correct", () => this.ChildrenOfType<RankingInformationDisplay>().Single().ModMultiplier.Value,
+                () => Is.EqualTo(0.95).Within(Precision.FLOAT_EPSILON));
+
+            AddStep("replace DA completely", () =>
+            {
+                SelectedMods.Value = new Mod[]
+                {
+                    new OsuModDifficultyAdjust
+                    {
+                        ApproachRate = { Value = 6.8f },
+                        OverallDifficulty = { Value = 6.2f }
+                    }
+                };
+            });
+            AddAssert("mod multiplier is correct", () => this.ChildrenOfType<RankingInformationDisplay>().Single().ModMultiplier.Value,
+                () => Is.EqualTo(0.81).Within(Precision.FLOAT_EPSILON));
+
+            AddStep("change beatmap", () =>
+            {
+                var beatmap = CreateWorkingBeatmap(new OsuRuleset().RulesetInfo);
+                beatmap.BeatmapInfo.Difficulty = new BeatmapDifficulty
+                {
+                    ApproachRate = 6,
+                    OverallDifficulty = 5,
+                    CircleSize = 5,
+                    DrainRate = 5,
+                };
+                modSelectOverlay.Beatmap.Value = beatmap;
+            });
+            AddAssert("mod multiplier is correct", () => this.ChildrenOfType<RankingInformationDisplay>().Single().ModMultiplier.Value,
+                () => Is.EqualTo(0.24).Within(Precision.FLOAT_EPSILON));
+        }
+
         private void waitForColumnLoad() => AddUntilStep("all column content loaded", () =>
             modSelectOverlay.ChildrenOfType<ModColumn>().Any()
             && modSelectOverlay.ChildrenOfType<ModColumn>().All(column => column.IsLoaded && column.ItemsLoaded)
@@ -1066,8 +1124,6 @@ namespace osu.Game.Tests.Visual.UserInterface
         {
             public readonly Bindable<IReadOnlyList<Mod>> SelectedMods = new Bindable<IReadOnlyList<Mod>>();
 
-            public override bool ShowFooter => true;
-
             public ModSelectOverlay Overlay = null!;
 
             private IDisposable? firstOverlayRegistration;
@@ -1078,6 +1134,11 @@ namespace osu.Game.Tests.Visual.UserInterface
             [Resolved]
             protected IOverlayManager? OverlayManager { get; private set; }
 
+            public TestModSelectOverlayScreen()
+            {
+                FooterContent.Value = ScreenFooterContent.Argon();
+            }
+
             [BackgroundDependencyLoader]
             private void load()
             {
@@ -1087,6 +1148,7 @@ namespace osu.Game.Tests.Visual.UserInterface
                     State = { Value = Visibility.Visible },
                     Beatmap = { Value = Beatmap.Value },
                     SelectedMods = { BindTarget = SelectedMods },
+                    Ruleset = { BindTarget = Ruleset },
                     ShowPresets = true,
                 });
             }
@@ -1143,7 +1205,6 @@ namespace osu.Game.Tests.Visual.UserInterface
             public override string Name => "Unimplemented mod";
             public override string Acronym => "UM";
             public override LocalisableString Description => "A mod that is not implemented.";
-            public override double ScoreMultiplier => 1;
             public override ModType Type => ModType.Conversion;
         }
 

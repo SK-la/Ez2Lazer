@@ -10,21 +10,22 @@ using JetBrains.Annotations;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Timing;
+using osu.Framework.Input.Bindings;
 using osu.Game.Audio;
-using osu.Game.Rulesets.Objects.Drawables;
-using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.EzMania.Helper;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
+using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mania.UI;
+using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.Mania.Objects.Drawables
 {
     public abstract partial class DrawableManiaHitObject : DrawableHitObject<ManiaHitObject>
     {
-        private const int cleanup_interval = 64;
-
-        private static readonly Dictionary<string, SampleTriggerMarker> last_sample_triggers = new Dictionary<string, SampleTriggerMarker>();
-        private static int playInvocationCount;
-
         /// <summary>
         /// The <see cref="ManiaAction"/> which causes this <see cref="DrawableManiaHitObject{TObject}"/> to be hit.
         /// </summary>
@@ -34,6 +35,22 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         [Resolved(canBeNull: true)]
         private ManiaPlayfield playfield { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private DrawableManiaRuleset drawableManiaRuleset { get; set; }
+
+        internal DrawableManiaRuleset EzDrawableManiaRuleset => drawableManiaRuleset;
+
+        protected bool UsesEzJudgement { get; private set; }
+
+        /// <summary>
+        /// 本地完整规则集由 Column 到期队列统一驱动 automiss；detached / 预览场景仍沿用 Drawable 自身更新。
+        /// </summary>
+        internal bool ColumnSchedulesAutoMiss
+        {
+            get => AutomissHandledExternally;
+            set => AutomissHandledExternally = value;
+        }
 
         protected override float SamplePlaybackPosition
         {
@@ -51,6 +68,11 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         /// If non-null, judgements will be ignored whilst the function returns false.
         /// </summary>
         public Func<DrawableHitObject, double, bool> CheckHittable;
+
+        /// <summary>
+        /// 列级按键已路由到其它 drawable 时跳过本物件的 <see cref="IKeyBindingHandler{T}.OnPressed"/>。
+        /// </summary>
+        public Func<DrawableHitObject, bool> ShouldSkipColumnRoutedPress;
 
         protected DrawableManiaHitObject(ManiaHitObject hitObject)
             : base(hitObject)
@@ -71,42 +93,24 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
             base.LoadComplete();
 
+            drawableManiaRuleset ??= this.FindClosestParent<DrawableManiaRuleset>();
+
+            // 判定由 Ez 内核派发的档位（BMS / O2 / EZ2AC / Malody / StableClassic）由策略决定走不走内核；
+            // Lazer / Classic 没有策略，走 vanilla 判定。
+            var judgementRound = drawableManiaRuleset?.JudgementRound;
+
+            UsesEzJudgement = judgementRound != null
+                ? judgementRound.Strategy != null
+                : HitObject.HitWindows is ManiaHitWindows windows
+                  && windows.ActiveJudgeMode is not (EzEnumJudgeMode.Lazer or EzEnumJudgeMode.StableClassic);
+            ColumnSchedulesAutoMiss = drawableManiaRuleset?.ColumnRoutesInput == true;
+
             Direction.BindValueChanged(OnDirectionChanged, true);
         }
 
         protected virtual void OnDirectionChanged(ValueChangedEvent<ScrollingDirection> e)
         {
             Anchor = Origin = e.NewValue == ScrollingDirection.Up ? Anchor.TopCentre : Anchor.BottomCentre;
-        }
-
-        // 在同一时间点上，note 不叠加播放重复的音效
-        public override void PlaySamples()
-        {
-            if (Samples == null)
-                return;
-
-            if (++playInvocationCount % cleanup_interval == 0)
-                cleanupStaleSampleMarkers();
-
-            string sampleSetKey = getSampleSetKey();
-            double hitObjectTime = HitObject.StartTime;
-            double triggerTime = Time.Current;
-            IClock clock = Clock;
-
-            if (last_sample_triggers.TryGetValue(sampleSetKey, out var marker))
-            {
-                if (marker.ClockReference.TryGetTarget(out var markerClock) && ReferenceEquals(markerClock, clock))
-                {
-                    bool rewound = triggerTime < marker.TriggerTime;
-
-                    if (!rewound && Math.Abs(marker.HitObjectTime - hitObjectTime) < 0.01)
-                        return;
-                }
-            }
-
-            last_sample_triggers[sampleSetKey] = new SampleTriggerMarker(new WeakReference<IClock>(clock), hitObjectTime, triggerTime);
-
-            base.PlaySamples();
         }
 
         protected override void UpdateHitStateTransforms(ArmedState state)
@@ -123,39 +127,100 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             }
         }
 
+        #region note 音交由 ManiaPlayfield 的按文件名通道池统一发声
+
+        [Resolved(canBeNull: true)]
+        private GameplayState gameplayState { get; set; }
+
+        /// <summary>
+        /// 池可用时不向每条 note 自带的样本容器装载：note 音由池按文件名发声，
+        /// 逐 note 装载每个 sample 的池化采样包装纯属浪费。
+        /// 无池场景（皮肤预览、编辑器）仍走基类装载，否则 <see cref="PlaySamples"/> 的回退路径会无声。
+        /// </summary>
+        protected override void LoadSamples()
+        {
+            if (playfield?.SampleChannels == null)
+                base.LoadSamples();
+        }
+
+        public override void PlaySamples()
+        {
+            var pool = playfield?.SampleChannels;
+
+            if (pool == null)
+            {
+                // 非 gameplay（皮肤预览、编辑器等）没有 playfield 池，沿用每条 note 自带的样本播放。
+                base.PlaySamples();
+                return;
+            }
+
+            // [Ez] mania 的 GetSamples() 就是 HitObject.Samples（ICollection），可精确预分配、无需 Cast 迭代器。
+            // 显式构造 ISampleInfo[] 而不是协变转换：HitSampleInfo[] 传给 GameplayState.ApplySamples 后，
+            // 下游一旦写入就会抛 ArrayTypeMismatchException。数组仍每次新建，
+            // 因为 GameplayState.ApplySamples 靠引用不等触发绑定变更。
+            var hitSamples = GetSamples();
+            ICollection<HitSampleInfo> source = hitSamples as ICollection<HitSampleInfo> ?? hitSamples.ToArray();
+
+            if (source.Count == 0)
+                return;
+
+            var samples = new ISampleInfo[source.Count];
+            int index = 0;
+
+            foreach (var sample in source)
+                samples[index++] = sample;
+
+            double balance = CalculateSamplePlaybackBalance(SamplePlaybackPosition);
+
+            foreach (var sample in samples)
+                pool.Play(sample, balance);
+
+            gameplayState?.ApplySamples(samples);
+        }
+
+        #endregion
+
+        internal bool EvaluateColumnAutoMiss() => UpdateResult(false);
+
+        /// <summary>
+        /// 被动 miss：在通知 <see cref="ScoreProcessor"/> 前写入 stored TimeOffset（与 Session end-sweep 对齐）。
+        /// </summary>
+        /// <param name="result">
+        /// 落判档位。默认 <see cref="HitResult.Miss"/>；StableClassic 的 LN 头压成 Ignore 档位时由调用方传入。
+        /// </param>
+        internal void EzApplyPassiveMissWithStoredOffset(HitResult result = HitResult.Miss)
+        {
+            ApplyResultWithStoredTiming(
+                static (r, data) =>
+                {
+                    r.Type = data;
+                    r.IsComboHit = false;
+                },
+                result,
+                ManiaDrawableMissTiming.ResolveStoredOffset(this));
+        }
+
+        internal void EzApplyBmsAutoMissFinalWithStoredOffset(HitResult result, EzEnumJudgeMode judgeMode)
+        {
+            ApplyResultWithStoredTiming(
+                static (r, data) =>
+                {
+                    r.Type = data.result;
+
+                    if (data.result == HitResult.Miss
+                        || (data.result == HitResult.Meh && JudgeModeHelper.MehBreaksCombo(data.judgeMode)))
+                    {
+                        r.IsComboHit = false;
+                    }
+                },
+                (result, judgeMode: judgeMode),
+                ManiaDrawableMissTiming.ResolveStoredOffset(this));
+        }
+
         /// <summary>
         /// Causes this <see cref="DrawableManiaHitObject"/> to get missed, disregarding all conditions in implementations of <see cref="DrawableHitObject.CheckForResult"/>.
         /// </summary>
         public virtual void MissForcefully() => ApplyMinResult();
-
-        private string getSampleSetKey()
-            => string.Join("|", HitObject.Samples.Cast<ISampleInfo>().Select(sample => string.Join(",", sample.LookupNames)));
-
-        // 清理掉已经失效的 sample trigger marker，避免字典无限增长
-        private static void cleanupStaleSampleMarkers()
-        {
-            if (last_sample_triggers.Count == 0)
-                return;
-
-            List<string> staleKeys = null;
-
-            foreach ((string key, var marker) in last_sample_triggers)
-            {
-                if (marker.ClockReference.TryGetTarget(out _))
-                    continue;
-
-                staleKeys ??= new List<string>();
-                staleKeys.Add(key);
-            }
-
-            if (staleKeys == null)
-                return;
-
-            foreach (string key in staleKeys)
-                last_sample_triggers.Remove(key);
-        }
-
-        private readonly record struct SampleTriggerMarker(WeakReference<IClock> ClockReference, double HitObjectTime, double TriggerTime);
     }
 
     public abstract partial class DrawableManiaHitObject<TObject> : DrawableManiaHitObject

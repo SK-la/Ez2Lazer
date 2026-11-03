@@ -91,92 +91,39 @@ namespace osu.Game.Tests.Visual.SongSelect
         }
 
         [Test]
-        public async Task TestSortingPpUsesSetMax()
+        public async Task TestSortByBpmUsesTitleAsTiebreaker()
         {
-            var beatmapSets = new List<BeatmapSetInfo>
+            List<BeatmapSetInfo> beatmapSets = [];
+
+            // 2 sets with same BPM but different titles
+            const int diff_count = 1;
             {
-                TestResources.CreateTestBeatmapSetInfo(2),
-                TestResources.CreateTestBeatmapSetInfo(2),
-                TestResources.CreateTestBeatmapSetInfo(2)
-            };
-
-            var ppValues = new Dictionary<BeatmapInfo, double>
+                var set = TestResources.CreateTestBeatmapSetInfo(diff_count);
+                set.DateAdded = new DateTimeOffset(2025, 6, 11, 10, 0, 0, TimeSpan.Zero);
+                set.Beatmaps.ForEach(b =>
+                {
+                    b.ID = Guid.Parse("00000000-0000-0000-0000-000000000000");
+                    b.BPM = 175;
+                    b.Metadata.Title = "ZZZ";
+                });
+                beatmapSets.Add(set);
+            }
             {
-                [beatmapSets[0].Beatmaps[0]] = 100,
-                [beatmapSets[0].Beatmaps[1]] = 150,
-                [beatmapSets[1].Beatmaps[0]] = 160,
-                [beatmapSets[1].Beatmaps[1]] = 170,
-                [beatmapSets[2].Beatmaps[0]] = 120,
-                [beatmapSets[2].Beatmaps[1]] = 130,
-            };
+                var set = TestResources.CreateTestBeatmapSetInfo(diff_count);
+                set.DateAdded = new DateTimeOffset(2025, 6, 10, 10, 0, 0, TimeSpan.Zero);
+                set.Beatmaps.ForEach(b =>
+                {
+                    b.ID = Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff");
+                    b.BPM = 175;
+                    b.Metadata.Title = "AAA";
+                });
+                beatmapSets.Add(set);
+            }
 
-            var results = (await runSorting(SortMode.PP, beatmapSets, ppValueProvider: beatmaps => beatmaps.ToDictionary(b => b, b => ppValues[b]))).ToList();
+            var results = (await runSorting(SortMode.BPM, beatmapSets)).ToList();
 
-            Assert.That(results.Take(2).All(b => EqualityComparer<BeatmapSetInfo>.Default.Equals(b.BeatmapSet, beatmapSets[2])));
-            Assert.That(results.Skip(2).Take(2).All(b => EqualityComparer<BeatmapSetInfo>.Default.Equals(b.BeatmapSet, beatmapSets[0])));
-            Assert.That(results.Skip(4).All(b => EqualityComparer<BeatmapSetInfo>.Default.Equals(b.BeatmapSet, beatmapSets[1])));
-        }
-
-        [Test]
-        public async Task TestGroupedSetSortingUsesOperationDifficultyWithinSet()
-        {
-            var beatmapSets = new List<BeatmapSetInfo>
-            {
-                TestResources.CreateTestBeatmapSetInfo(2),
-                TestResources.CreateTestBeatmapSetInfo(2)
-            };
-
-            beatmapSets[0].Beatmaps.ForEach(b => b.Metadata.Artist = "AAA");
-            beatmapSets[1].Beatmaps.ForEach(b => b.Metadata.Artist = "BBB");
-
-            beatmapSets[0].Beatmaps[0].StarRating = 7;
-            beatmapSets[0].Beatmaps[1].StarRating = 3;
-
-            var difficultyValues = new Dictionary<BeatmapInfo, double>
-            {
-                [beatmapSets[0].Beatmaps[0]] = 1,
-                [beatmapSets[0].Beatmaps[1]] = 9,
-                [beatmapSets[1].Beatmaps[0]] = 2,
-                [beatmapSets[1].Beatmaps[1]] = 8,
-            };
-
-            var results = (await runSorting(
-                SortMode.Artist,
-                beatmapSets,
-                shouldUseXxyDifficulty: true,
-                difficultyValueProvider: beatmaps => beatmaps.ToDictionary(b => b, b => difficultyValues[b]))).ToList();
-
-            Assert.That(results[0], Is.SameAs(beatmapSets[0].Beatmaps[0]));
-            Assert.That(results[1], Is.SameAs(beatmapSets[0].Beatmaps[1]));
-        }
-
-        [Test]
-        public async Task TestGroupedSetSortingUsesPpWithinSet()
-        {
-            var beatmapSets = new List<BeatmapSetInfo>
-            {
-                TestResources.CreateTestBeatmapSetInfo(2),
-                TestResources.CreateTestBeatmapSetInfo(2)
-            };
-
-            beatmapSets[0].Beatmaps.ForEach(b => b.Metadata.Artist = "AAA");
-            beatmapSets[1].Beatmaps.ForEach(b => b.Metadata.Artist = "BBB");
-
-            var ppValues = new Dictionary<BeatmapInfo, double>
-            {
-                [beatmapSets[0].Beatmaps[0]] = 300,
-                [beatmapSets[0].Beatmaps[1]] = 100,
-                [beatmapSets[1].Beatmaps[0]] = 450,
-                [beatmapSets[1].Beatmaps[1]] = 400,
-            };
-
-            var results = (await runSorting(
-                SortMode.PP,
-                beatmapSets,
-                ppValueProvider: beatmaps => beatmaps.ToDictionary(b => b, b => ppValues[b]))).ToList();
-
-            Assert.That(results[0], Is.SameAs(beatmapSets[0].Beatmaps[1]));
-            Assert.That(results[1], Is.SameAs(beatmapSets[0].Beatmaps[0]));
+            Assert.That(results[0].Metadata.Title, Is.EqualTo("AAA"));
+            Assert.That(results[1].Metadata.Title, Is.EqualTo("ZZZ"));
         }
 
         [Test]
@@ -258,15 +205,60 @@ namespace osu.Game.Tests.Visual.SongSelect
             Assert.That(results.Select(b => b.BeatmapSet!.DateAdded), Is.Ordered.Descending);
         }
 
+        [Test]
+        public async Task TestSortByXxyStarRatingUsesProvidedValues()
+        {
+            var beatmapSets = new List<BeatmapSetInfo>();
+
+            addBeatmapSet(applyXxy(1.0, 5.0), beatmapSets, out var lowXxyHighSr);
+            addBeatmapSet(applyXxy(9.0, 1.0), beatmapSets, out var highXxyLowSr);
+
+            var results = await runSorting(SortMode.XxyStarRating, beatmapSets, xxyValueProvider: beatmaps => beatmaps.ToDictionary(b => b, resolveXxy));
+
+            Assert.That(results.Last(), Is.EqualTo(highXxyLowSr.Beatmaps[0]));
+            Assert.That(results.First(), Is.EqualTo(lowXxyHighSr.Beatmaps[0]));
+        }
+
+        [Test]
+        public async Task TestSortByDifficultyUsesOfficialStarRating()
+        {
+            var beatmapSets = new List<BeatmapSetInfo>();
+
+            addBeatmapSet(applyXxy(9.0, 1.0), beatmapSets, out var highXxyLowSr);
+            addBeatmapSet(applyXxy(1.0, 9.0), beatmapSets, out var lowXxyHighSr);
+
+            var results = await runSorting(SortMode.Difficulty, beatmapSets, xxyValueProvider: beatmaps => beatmaps.ToDictionary(b => b, resolveXxy));
+
+            Assert.That(results.Last(), Is.EqualTo(lowXxyHighSr.Beatmaps[0]));
+            Assert.That(results.First(), Is.EqualTo(highXxyLowSr.Beatmaps[0]));
+        }
+
+        private static void addBeatmapSet(Action<BeatmapSetInfo> change, List<BeatmapSetInfo> list, out BeatmapSetInfo added)
+        {
+            var set = TestResources.CreateTestBeatmapSetInfo(1);
+            change(set);
+            list.Add(set);
+            added = set;
+        }
+
+        private static Action<BeatmapSetInfo> applyXxy(double xxy, double starRating)
+        {
+            return s => s.Beatmaps.ForEach(b =>
+            {
+                b.XxyStarRating = xxy;
+                b.StarRating = starRating;
+            });
+        }
+
+        private static double resolveXxy(BeatmapInfo beatmap) => beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : beatmap.StarRating;
+
         private static async Task<IEnumerable<BeatmapInfo>> runSorting(SortMode sort, List<BeatmapSetInfo> beatmapSets,
-                                                                       bool shouldUseXxyDifficulty = false,
-                                                                       Func<IEnumerable<BeatmapInfo>, IReadOnlyDictionary<BeatmapInfo, double>>? difficultyValueProvider = null,
+                                                                       Func<IEnumerable<BeatmapInfo>, IReadOnlyDictionary<BeatmapInfo, double>>? xxyValueProvider = null,
                                                                        Func<IEnumerable<BeatmapInfo>, IReadOnlyDictionary<BeatmapInfo, double>>? ppValueProvider = null)
         {
             var sorter = new BeatmapCarouselFilterSorting(
                 () => new FilterCriteria { Sort = sort },
-                () => shouldUseXxyDifficulty,
-                (beatmaps, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(difficultyValueProvider?.Invoke(beatmaps) ?? beatmaps.ToDictionary(b => b, b => b.StarRating)),
+                (beatmaps, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(xxyValueProvider?.Invoke(beatmaps) ?? beatmaps.ToDictionary(b => b, resolveXxy)),
                 (beatmaps, _) => Task.FromResult(ppValueProvider?.Invoke(beatmaps) ?? new Dictionary<BeatmapInfo, double>()));
             var carouselItems = await sorter.Run(beatmapSets.SelectMany(s => s.Beatmaps.Select(b => new CarouselItem(b))), CancellationToken.None);
             return carouselItems.Select(ci => ci.Model).OfType<BeatmapInfo>();

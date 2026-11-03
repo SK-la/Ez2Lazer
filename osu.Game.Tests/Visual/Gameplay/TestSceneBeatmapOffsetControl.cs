@@ -6,14 +6,12 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -307,8 +305,7 @@ namespace osu.Game.Tests.Visual.Gameplay
             });
 
             AddAssert("no calibration button", () => !offsetControl.ChildrenOfType<SettingsButton>().Any(b => b.IsPresent));
-            AddAssert("offset adjustment text displayed", () => offsetControl.ChildrenOfType<IHasText>().Any(t => t.Text.ToString().Contains("adjusted")));
-            AddAssert("offset adjusted", () => offsetControl.Current.Value == -average_error);
+            AddAssert("offset automatically adjusted", () => offsetControl.Current.Value == -average_error);
 
             AddStep("set reference score", () =>
             {
@@ -320,8 +317,7 @@ namespace osu.Game.Tests.Visual.Gameplay
             });
 
             AddAssert("no calibration button", () => !offsetControl.ChildrenOfType<SettingsButton>().Any(b => b.IsPresent));
-            AddAssert("offset adjustment text not displayed", () => !offsetControl.ChildrenOfType<IHasText>().Any(t => t.Text.ToString().Contains("adjusted")));
-            AddAssert("offset still", () => offsetControl.Current.Value == -average_error);
+            AddAssert("offset unchanged after neutral median", () => offsetControl.Current.Value == -average_error);
 
             AddStep("adjust offset manually", () => offsetControl.Current.Value = 0);
             AddUntilStep("calibration button displayed", () => offsetControl.ChildrenOfType<SettingsButton>().Any());
@@ -347,7 +343,7 @@ namespace osu.Game.Tests.Visual.Gameplay
                 {
                     // distribute the hit events such that it produces ~147 UR. setup taken from UnstableRateTest.
                     HitEvents = Enumerable.Range((int)average_error - spread, spread * 2 + 1)
-                                          .Select(t => new HitEvent(t, 1.0, HitResult.Great, new HitObject(), null, null))
+                                          .Select(t => new HitEvent(t, 1.0, HitResult.Great, new HitCircle(), null, null))
                                           .ToList(),
 
                     BeatmapInfo = Beatmap.Value.BeatmapInfo,
@@ -355,8 +351,7 @@ namespace osu.Game.Tests.Visual.Gameplay
             });
 
             AddAssert("no calibration button", () => !offsetControl.ChildrenOfType<SettingsButton>().Any(b => b.IsPresent));
-            AddAssert("offset adjustment text displayed", () => offsetControl.ChildrenOfType<IHasText>().Any(t => t.Text.ToString().Contains("adjusted")));
-            AddAssert("offset adjusted", () => offsetControl.Current.Value == expected_offset);
+            AddAssert("offset automatically adjusted", () => offsetControl.Current.Value == expected_offset);
 
             AddStep("adjust offset manually", () => offsetControl.Current.Value = 0);
             AddUntilStep("calibration button displayed", () => offsetControl.ChildrenOfType<SettingsButton>().Any());

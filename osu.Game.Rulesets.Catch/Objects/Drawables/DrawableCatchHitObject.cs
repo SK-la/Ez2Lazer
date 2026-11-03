@@ -56,17 +56,25 @@ namespace osu.Game.Rulesets.Catch.Objects.Drawables
         [CanBeNull]
         public Func<CatchHitObject, bool> CheckPosition;
 
+        [CanBeNull]
+        public Func<bool> IsScratchJudgmentAssistActive;
+
         protected override JudgementResult CreateResult(Judgement judgement) => new CatchJudgementResult(HitObject, judgement);
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
             if (CheckPosition == null) return;
 
-            if (timeOffset >= 0 && Result != null)
+            bool assist = IsScratchJudgmentAssistActive?.Invoke() == true;
+
+            if (!CatchScratchJudgmentWindow.ShouldBeginChecking(timeOffset, assist))
+                return;
+
+            if (Result != null)
             {
                 if (CheckPosition.Invoke(HitObject))
                     ApplyMaxResult();
-                else
+                else if (CatchScratchJudgmentWindow.ShouldApplyMiss(timeOffset, assist))
                     ApplyMinResult();
             }
         }

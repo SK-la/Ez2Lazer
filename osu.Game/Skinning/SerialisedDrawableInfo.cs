@@ -27,6 +27,7 @@ namespace osu.Game.Skinning
     [Serializable]
     public sealed class SerialisedDrawableInfo
     {
+        [JsonConverter(typeof(TypeNameJsonConverter))]
         public Type Type { get; set; } = null!;
 
         public Vector2 Position { get; set; }
@@ -79,11 +80,11 @@ namespace osu.Game.Skinning
             if (component is ISerialisableDrawable serialisableDrawable)
                 UsesFixedAnchor = serialisableDrawable.UsesFixedAnchor;
 
-            foreach (var (_, property) in component.GetSettingsSourceProperties())
+            foreach (var entry in component.GetSkinSettingEntries())
             {
-                var bindable = (IBindable)property.GetValue(component)!;
+                var bindable = (IBindable)entry.Property.GetValue(entry.Target)!;
 
-                Settings.Add(property.Name.ToSnakeCase(), bindable.GetUnderlyingSettingValue());
+                Settings.Add(entry.StorageName.ToSnakeCase(), bindable.GetUnderlyingSettingValue());
             }
 
             if (component is Container<Drawable> container)
@@ -118,12 +119,20 @@ namespace osu.Game.Skinning
         /// <param name="ruleset">The ruleset to filter results to. If <c>null</c>, global components will be returned instead.</param>
         public static Type[] GetAllAvailableDrawables(RulesetInfo? ruleset = null)
         {
-            return (ruleset?.CreateInstance().GetType() ?? typeof(OsuGame))
-                   .Assembly.GetTypes()
-                   .Where(t => !t.IsInterface && !t.IsAbstract && t.IsPublic)
-                   .Where(t => typeof(ISerialisableDrawable).IsAssignableFrom(t))
-                   .OrderBy(t => t.Name)
-                   .ToArray();
+            try
+            {
+                return (ruleset?.CreateInstance().GetType() ?? typeof(OsuGame))
+                       .Assembly.GetTypes()
+                       .Where(t => !t.IsInterface && !t.IsAbstract && t.IsPublic)
+                       .Where(t => typeof(ISerialisableDrawable).IsAssignableFrom(t))
+                       .OrderBy(t => t.Name)
+                       .ToArray();
+            }
+            catch (Exception e)
+            {
+                Logger.Log($"Could not list skinnable components for ruleset '{ruleset?.ShortName}': {e.Message}");
+                return Array.Empty<Type>();
+            }
         }
     }
 }

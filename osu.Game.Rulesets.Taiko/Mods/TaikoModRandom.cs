@@ -4,9 +4,9 @@
 using System;
 using System.Linq;
 using osu.Framework.Localisation;
-using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Mods;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Rulesets.Taiko.Beatmaps;
 using osu.Game.Rulesets.Taiko.Objects;
 
@@ -21,8 +21,8 @@ namespace osu.Game.Rulesets.Taiko.Mods
         {
             var taikoBeatmap = (TaikoBeatmap)beatmap;
 
-            Seed.Value ??= RNG.Next();
-            var rng = new Random((int)Seed.Value);
+            int seed = EzModSeed.Resolve(Seed);
+            var rng = new Random(seed);
 
             foreach (var obj in taikoBeatmap.HitObjects)
             {

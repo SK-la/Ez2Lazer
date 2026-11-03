@@ -22,6 +22,12 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString RADAR_DATA_AREA_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达数据区色", "Radar Data Area Colour");
         public static readonly LocalisableString RADAR_DATA_AREA_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("数据填充区域的颜色", "Colour of data filled area.");
 
+        public static readonly LocalisableString RADAR_PLAYER_DATA_LINE_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达玩家数据线色", "Radar Player Data Line Colour");
+        public static readonly LocalisableString RADAR_PLAYER_DATA_LINE_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("Skill 模式下玩家 SSR 层轮廓线与顶点颜色", "Stroke/point colour for the player SSR layer in Skill mode.");
+
+        public static readonly LocalisableString RADAR_PLAYER_DATA_AREA_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达玩家数据区色", "Radar Player Data Area Colour");
+        public static readonly LocalisableString RADAR_PLAYER_DATA_AREA_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("Skill 模式下玩家 SSR 层填充颜色", "Fill colour for the player SSR layer in Skill mode.");
+
         public static readonly LocalisableString BACKGROUND_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达背景色", "Radar Background Colour");
         public static readonly LocalisableString RADAR_BOX_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("雷达图圆角背景的颜色，设置为透明可隐藏背景", "Colour of radar chart rounded background. Set to transparent to hide background.");
 
@@ -34,12 +40,15 @@ namespace osu.Game.EzOsuGame.Localization
             "切换不同数据源的显示模式："
             + "\n- 全局：显示常规Metadate数据。"
             + "\n- Key Pattern: 显示类PS Mod风格的并行键型数据。衡量谱面中不同键型的相对难度关系。"
-            + "\n- xxySR Pattern: 显示xxySR星级分析的键型数据。衡量谱面中不同键型变化的难度系数，提现谱中键型变化差异程度，这里的bracket除了切指外还视为常规类型。",
+            + "\n- xxySR Pattern: 显示xxySR星级分析的键型数据。衡量谱面中不同键型变化的难度系数，提现谱中键型变化差异程度，这里的bracket除了切指外还视为常规类型。"
+            + "\n- Skill: 黄=谱面 MSD、绿=玩家 SSR，只展示两边都有值的共性轴（同算法浮点对比）。"
+            + "\n- Beatmap: 只展示谱面 MSD 真实有值的轴（有多少显示多少），无玩家层。",
             "Switch between different data sources to display:"
             + "\n- Global: Display the standard Metadata data."
             + "\n- Key Pattern: Display the parallel key type data of the PS Mod style."
             + "\n- xxySR Pattern: Display the key type data of the xxySR star rating analysis."
-            + "\n- xxySR Pattern: Display the key type data of the xxySR star rating analysis.");
+            + "\n- Skill: Yellow=beatmap MSD, green=player SSR; shared axes only (same-algorithm floats)."
+            + "\n- Beatmap: Chart MSD axes with real values only (as many as exist); no player layer.");
 
         public static readonly LocalisableString RADAR_USE_ABSOLUTE_VALUE = new EzLocalizationManager.EzLocalisableString("使用星数绝对值", "Use Star Absolute Value");
 
@@ -53,6 +62,20 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString ALPHA_LABEL = new EzLocalizationManager.EzLocalisableString("透明度", "Alpha");
         public static readonly LocalisableString ALPHA_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("组件的透明度值", "The alpha value of this component.");
 
+        public static readonly LocalisableString BLUR_STRENGTH_LABEL = new EzLocalizationManager.EzLocalisableString("虚化强度", "Blur Strength");
+
+        public static readonly LocalisableString BLUR_STRENGTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "背景虚化的模糊强度。设为 0 等效于关闭虚化。",
+            "Blur strength for the backdrop effect. A value of 0 is equivalent to disabling blur.");
+
+        public static readonly LocalisableString BACKDROP_BLUR_LABEL = new EzLocalizationManager.EzLocalisableString("穿透虚化", "Backdrop Blur");
+
+        public static readonly LocalisableString BACKDROP_BLUR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "开启后虚化下方已绘制内容（壁纸、选歌 UI、游戏 HUD/playfield 等）。"
+            + "\n不含 footer、Logo、设置/通知浮层；关闭或强度为 0 时不声明离屏承载层、无额外 GPU 开销。",
+            "When enabled, acrylic-blurs content already rendered within OsuScreenStack beneath the box (wallpaper, song select UI, gameplay HUD/playfield, etc.)."
+            + "\nExcludes footer, logo, and global settings/notification overlays; no offscreen buffer when disabled or strength is 0.");
+
         // EzComO2JamPillUI
         public static readonly LocalisableString PILL_SPRITE_LABEL = new EzLocalizationManager.EzLocalisableString("药丸图标", "Pill Sprite");
         public static readonly LocalisableString PILL_SPRITE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择药丸图标的样式", "Select the pill sprite style.");
@@ -62,6 +85,12 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString BACKGROUND_ALPHA_LABEL = new EzLocalizationManager.EzLocalisableString("背景透明度", "Box Element Alpha");
         public static readonly LocalisableString BOX_ELEMENT_ALPHA_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("背景框的透明度值", "The alpha value of background.");
+
+        public static readonly LocalisableString BOX_ELEMENT_WIDTH_LABEL = new EzLocalizationManager.EzLocalisableString("宽度", "Width");
+        public static readonly LocalisableString BOX_ELEMENT_WIDTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("背景框的宽度", "The width of the background box.");
+
+        public static readonly LocalisableString BOX_ELEMENT_HEIGHT_LABEL = new EzLocalizationManager.EzLocalisableString("高度", "Height");
+        public static readonly LocalisableString BOX_ELEMENT_HEIGHT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("背景框的高度", "The height of the background box.");
 
         // EzHUDAccuracyCounter
         public static readonly LocalisableString FILL_DIRECTION_LABEL = new EzLocalizationManager.EzLocalisableString("排列方向", "Fill Direction");
@@ -74,8 +103,78 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString HITRESULT_TEXT_FONT_LABEL = new EzLocalizationManager.EzLocalisableString("判定文本字体", "HitResult Text Font");
         public static readonly LocalisableString HITRESULT_TEXT_FONT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择判定文本的字体样式", "Select the font style for hit result text.");
 
+        public static readonly LocalisableString HITRESULT_VISUAL_THEME_PICK_LABEL = new EzLocalizationManager.EzLocalisableString("大图选择主题", "Visual theme picker");
+
+        public static readonly LocalisableString HITRESULT_VISUAL_THEME_PICK_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "打开覆盖层预览并切换全局 GameTheme（与 Ez 皮肤纹理一致）。", "Opens the visual picker overlay to change global GameTheme (Ez skin textures).");
+
         public static readonly LocalisableString PLAYBACK_FPS_LABEL = new EzLocalizationManager.EzLocalisableString("播放帧率", "Playback FPS");
         public static readonly LocalisableString PLAYBACK_FPS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动画的帧率值", "The FPS value of this animation.");
+
+        public static readonly LocalisableString HITRESULT_ANIMATION_TEMPLATE_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "动画路径模板", "Animation Path Template");
+
+        public static readonly LocalisableString HITRESULT_FORCE_DEFORM_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "强制变形动画", "Force Deform Animation");
+
+        public static readonly LocalisableString HITRESULT_FORCE_DEFORM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "开启后，按下方选择的变形模板播放。"
+            + "\n多帧在变形期间循环播放，结束时机由变形动画决定。"
+            + "\n关闭后按资源本身播放，播完即结束。",
+            "When enabled, the deformation template selected below is played."
+            + "\nMultiple frames loop during deformation; the end timing is determined by the deformation animation."
+            + "\nWhen disabled, the animation plays according to the resource itself and ends once finished.");
+
+        public static readonly LocalisableString HITRESULT_DEFORM_TEMPLATE_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "变形模板", "Deform Template");
+
+        public static readonly LocalisableString HITRESULT_DEFORM_TEMPLATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "强制变形开启后使用的动画，与判定字体分开选择。"
+            + "\n内置为手写压扁。其余项是该主题提取出的判定曲线；该主题没有曲线时仍用手写压扁。",
+            "Animation used while force deform is on. Chosen separately from the judgement font."
+            + "\nBuilt-in is the handwritten squash. Other entries are that theme's extracted judgement curves; a theme with no curves still uses the handwritten squash.");
+
+        public static readonly LocalisableString HITRESULT_DEFORM_TEMPLATE_BUILTIN = new EzLocalizationManager.EzLocalisableString(
+            "内置", "Built-in");
+
+        public static readonly LocalisableString HITRESULT_ANIMATION_TEMPLATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "在 GameTheme/{theme}/judgement/ 下的帧模板。默认 {result}/{000}，只查子目录里从 000.png 起的一组。"
+            + "\n找不到时只再试 {result}.gif、{result}.png，不再试同目录的其它帧。"
+            + "\n留空则按子目录帧、同层连字符帧、gif、png 的顺序探测。"
+            + "\n帧号只认 {0} 和 {000}。",
+            "Frame template under GameTheme/{theme}/judgement/. Default {result}/{000} loads the subdirectory sequence starting at 000.png."
+            + "\nIf that misses, only {result}.gif then {result}.png are tried."
+            + "\nAn empty template runs subdirectory frames, same-level hyphen frames, gif, then png."
+            + "\nFrame indices accept {0} and {000} only.");
+
+        public static readonly LocalisableString HITRESULT_BLENDING_LABEL = new EzLocalizationManager.EzLocalisableString("混合模式", "Blending Mode");
+        public static readonly LocalisableString HITRESULT_BLENDING_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设置混合模式", "Set the blending mode.");
+
+        public static readonly LocalisableString FULLCOMBO_EFFECT_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "开启Full Combo效果", "Enable Full Combo Effect");
+
+        public static readonly LocalisableString FULLCOMBO_EFFECT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "结尾时检查Full Combo，满足条件时在屏幕中心加载贴图及音效。"
+            + "\n资源路径：EzResources/FullComb/"
+            + "\n图片名称full-combo.png, 支持-0动画；音频名称full-combo-sound", "Use hit colour.");
+
+        public static readonly LocalisableString HITRESULT_AUTO_MAP_JUDGEMODE_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "自动映射 JudgeMode", "Auto Map JudgeMode");
+
+        public static readonly LocalisableString HITRESULT_AUTO_MAP_JUDGEMODE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "开启后根据当前的 JudgeMode 配置自动选择判定贴图命名模板；"
+            + "\n关闭后将使用下方手动选择的模板。",
+            "When enabled, the judgement texture mapping template is auto-selected based on current JudgeMode setting."
+            + "\nWhen disabled, the manually selected template below is used.");
+
+        public static readonly LocalisableString HITRESULT_JUDGEMODE_TEMPLATE_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "JudgeMode 映射模板", "JudgeMode Mapping Template");
+
+        public static readonly LocalisableString HITRESULT_JUDGEMODE_TEMPLATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "手动指定判定贴图命名模板。"
+            + "\n仅在「自动映射 JudgeMode」关闭时生效。",
+            "Manually pick the judgement texture naming template."
+            + "\nOnly takes effect when 'Auto Map JudgeMode' is disabled.");
 
         // EzHUDScoreCounter
         public static readonly LocalisableString SCORE_FONT_LABEL = new EzLocalizationManager.EzLocalisableString("分数文本字体", "Score Font");
@@ -83,5 +182,196 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SKIP_BETTER_JUDGEMENT = new EzLocalizationManager.EzLocalisableString(
             "跳过更好的判定结果", "Skip Better Judgment");
+
+        public static readonly LocalisableString SKIP_BETTER_JUDGEMENT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "跳过判定质量高于设定值的结果。", "Skip hit results that are better than the set value.");
+
+        // EzHUDSpritePlus
+        public static readonly LocalisableString SPRITE_PLUS_PATH_LABEL = new EzLocalizationManager.EzLocalisableString("路径", "Path");
+        public static readonly LocalisableString SPRITE_PLUS_PATH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("相对 Modify 的路径。留空表示 Modify 根目录。", "Path relative to Modify. Leave empty to use Modify root.");
+
+        public static readonly LocalisableString SPRITE_PLUS_FRAME_TEMPLATE_LABEL = new EzLocalizationManager.EzLocalisableString("动画帧模板", "Frame Template");
+        public static readonly LocalisableString SPRITE_PLUS_FRAME_TEMPLATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("默认 {0}。示例：{0}、{000}、{1}。不使用 {} 时按普通后缀处理。", "Default is {0}. Examples: {0}, {000}, {1}. Without {}, it is treated as a normal suffix.");
+
+        public static readonly LocalisableString PAUSE_SETTINGS_PREVIEW_PAUSED = new EzLocalizationManager.EzLocalisableString("暂停中", "Paused");
+        public static readonly LocalisableString PAUSE_SETTINGS_PREVIEW_LABEL = new EzLocalizationManager.EzLocalisableString("预览", "Preview");
+
+        public static readonly LocalisableString PAUSE_FORCE_RESULTS_LABEL = new EzLocalizationManager.EzLocalisableString("强制进入结算", "Force results");
+        public static readonly LocalisableString PAUSE_FORCE_RESULTS_HOLDING = new EzLocalizationManager.EzLocalisableString("按住 2 秒…", "Hold for 2 seconds…");
+
+        // Replay input note overlay
+        public static readonly LocalisableString REPLAY_INPUT_NOTE_TITLE = new EzLocalizationManager.EzLocalisableString("回放按键", "Replay Input Notes");
+
+        public static readonly LocalisableString REPLAY_INPUT_NOTE_ENABLED_LABEL = new EzLocalizationManager.EzLocalisableString("启用覆盖层", "Enable overlay");
+
+        public static readonly LocalisableString REPLAY_INPUT_NOTE_ENABLED_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "总开关。关闭后不绘制任何回放按键 note，谱面本身不受影响。",
+            "Master switch. When off, no replay input notes are drawn; the beatmap itself is unaffected.");
+
+        public static readonly LocalisableString REPLAY_INPUT_NOTE_COLOUR_LABEL = new EzLocalizationManager.EzLocalisableString("关联 HitResult 颜色", "Colour by hit result");
+
+        public static readonly LocalisableString REPLAY_INPUT_NOTE_COLOUR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "按键按本次判定着色；未命中任何物件的按键显示为灰色；命中 LN 时区分头部与其余部分。",
+            "Colour presses by their judgement; presses that hit nothing are grey, and LN presses distinguish the head from the rest.");
+
+        public static readonly LocalisableString REPLAY_INPUT_NOTE_ONLY_JUDGED_LABEL = new EzLocalizationManager.EzLocalisableString("仅显示 note 判定按键", "Only show judged notes");
+
+        public static readonly LocalisableString REPLAY_INPUT_NOTE_ONLY_JUDGED_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "只绘制命中物件的按键，忽略空按与 ignore 判定；普通 note 使用扩展列 note 样式，LN 仍按按住时长绘制。",
+            "Only draw presses that hit an object, dropping stray presses and ignored judgements; plain notes use the extension note style, LNs keep the held duration.");
+
+        // EzHUDDynamicSpeedDisplay
+        public static readonly LocalisableString DYNAMIC_SPEED_SHOW_LINE_LABEL = new EzLocalizationManager.EzLocalisableString("显示速度折线", "Show Speed Line");
+
+        public static readonly LocalisableString DYNAMIC_SPEED_SHOW_LINE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "是否显示速度折线图区域。",
+            "Whether to show the speed line chart area.");
+
+        public static readonly LocalisableString DYNAMIC_SPEED_LINE_WIDTH_LABEL = new EzLocalizationManager.EzLocalisableString("速度折线宽度", "Speed Line Width");
+
+        public static readonly LocalisableString DYNAMIC_SPEED_LINE_WIDTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "速度折线图的总绘制宽度（像素）。",
+            "Total draw width of the speed line chart in pixels.");
+
+        public static readonly LocalisableString DYNAMIC_SPEED_LINE_HEIGHT_LABEL = new EzLocalizationManager.EzLocalisableString("速度区间高度", "Speed Range Height");
+
+        public static readonly LocalisableString DYNAMIC_SPEED_LINE_HEIGHT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "速度折线区域的垂直高度。联动 mod 时上下边为 mod 速度区间；否则以进图速度居中，每 0.01x 对应 2px。",
+            "Vertical height of the speed line area. With a linked mod, top/bottom match the mod speed range; otherwise centred on entry speed at 2px per 0.01x.");
+
+        public static readonly LocalisableString DYNAMIC_SPEED_ENDPOINT_BLINK_LABEL = new EzLocalizationManager.EzLocalisableString("端点闪烁", "Endpoint Blink");
+
+        public static readonly LocalisableString DYNAMIC_SPEED_ENDPOINT_BLINK_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "速度变化时在折线右端显示不显眼的闪烁白点。",
+            "Show a subtle blinking white dot at the line endpoint while speed is changing.");
+
+        public static readonly LocalisableString SCORE_COMPARE_CONDITION1_LABEL = new EzLocalizationManager.EzLocalisableString("对比条件 1", "Compare Condition 1");
+        public static readonly LocalisableString SCORE_COMPARE_CONDITION1_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("按此条件筛选第一条对比成绩（柱高始终为分数）", "Pick the first comparison score by this criterion (bar height is always score).");
+        public static readonly LocalisableString SCORE_COMPARE_CONDITION2_LABEL = new EzLocalizationManager.EzLocalisableString("对比条件 2", "Compare Condition 2");
+        public static readonly LocalisableString SCORE_COMPARE_CONDITION2_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("按此条件筛选第二条对比成绩（柱高始终为分数）", "Pick the second comparison score by this criterion (bar height is always score).");
+        public static readonly LocalisableString SCORE_COMPARE_BAR_HEIGHT_LABEL = new EzLocalizationManager.EzLocalisableString("柱状图高度", "Bar Height");
+        public static readonly LocalisableString SCORE_COMPARE_BAR_HEIGHT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("柱体主轴像素高度；满柱对应整谱理论满分", "Pixel height of the bar axis; full bar equals theoretical max score.");
+        public static readonly LocalisableString SCORE_COMPARE_BAR_WIDTH_LABEL = new EzLocalizationManager.EzLocalisableString("柱状图宽度", "Bar Width");
+        public static readonly LocalisableString SCORE_COMPARE_BAR_WIDTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("单根柱体的像素宽度", "Pixel width of each bar.");
+        public static readonly LocalisableString SCORE_COMPARE_NOW_LABEL = new EzLocalizationManager.EzLocalisableString("当前", "Now");
+
+        public static readonly LocalisableString SCORE_COMPARE_BACKGROUND_VISIBLE_LABEL = new EzLocalizationManager.EzLocalisableString("显示背景", "Show Background");
+
+        public static readonly LocalisableString SCORE_COMPARE_BACKGROUND_VISIBLE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "显示整块圆角背景框（不含单柱分区底色）。",
+            "Show a single rounded background behind all bars (not per-bar track colours).");
+
+        public static readonly LocalisableString SCORE_RACE_MOD_FILTER_LABEL = new EzLocalizationManager.EzLocalisableString("Mod 过滤", "Mod Filter");
+        public static readonly LocalisableString SCORE_RACE_MOD_FILTER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("对比成绩的 Mod 范围", "Which mod combinations to include when selecting scores.");
+        public static readonly LocalisableString SCORE_RACE_BAR_DIRECTION_LABEL = new EzLocalizationManager.EzLocalisableString("柱图方向", "Bar Direction");
+        public static readonly LocalisableString SCORE_RACE_BAR_DIRECTION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("柱体向上或向下增长", "Bars grow upward or downward.");
+        public static readonly LocalisableString SCORE_RACE_SHOW_LABELS_LABEL = new EzLocalizationManager.EzLocalisableString("显示标签", "Show Labels");
+        public static readonly LocalisableString SCORE_RACE_SHOW_LABELS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("显示柱下条件与统计标签", "Show criterion and stat labels under bars.");
+        public static readonly LocalisableString SCORE_RACE_MAX_ENTRIES_LABEL = new EzLocalizationManager.EzLocalisableString("列表条目数", "List Entry Count");
+        public static readonly LocalisableString SCORE_RACE_MAX_ENTRIES_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("角逐排行榜显示的最大成绩数", "Maximum scores shown in the race leaderboard.");
+        public static readonly LocalisableString SCORE_RACE_SORT_CRITERION_LABEL = new EzLocalizationManager.EzLocalisableString("排序依据", "Sort By");
+        public static readonly LocalisableString SCORE_RACE_SORT_CRITERION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("角逐榜实时排名的比较指标（分数 / Acc / Combo / Miss）", "Metric used to rank entries during the race (score / acc / combo / miss).");
+        public static readonly LocalisableString SCORE_RACE_LOADING_LABEL = new EzLocalizationManager.EzLocalisableString("正在加载角逐成绩…", "Loading race scores…");
+
+        public static readonly LocalisableString SCORE_RACE_LEADERBOARD_COMPONENT_NAME = new EzLocalizationManager.EzLocalisableString("角逐排行榜", "Score Race Leaderboard");
+        public static readonly LocalisableString SCORE_COMPARE_BARS_COMPONENT_NAME = new EzLocalizationManager.EzLocalisableString("分数对比柱", "Score Compare Bars");
+
+        public static readonly LocalisableString SONG_PROGRESS_SHOW_MISS_MARKERS_LABEL = new EzLocalizationManager.EzLocalisableString("回放时显示 miss 标记", "Show miss markers in replay");
+
+        public static readonly LocalisableString SONG_PROGRESS_SHOW_MISS_MARKERS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "在回放进度条上用红色区间标出 miss；悬停时显示引线与密集 miss 计数。",
+            "Tint miss intervals on the replay progress bar in red; hover to show stems and clustered miss counts.");
+
+        public static readonly LocalisableString SONG_PROGRESS_SHOW_REST_MARKERS_LABEL = new EzLocalizationManager.EzLocalisableString("游戏时显示休息标记", "Show rest markers in gameplay");
+
+        public static readonly LocalisableString SONG_PROGRESS_SHOW_REST_MARKERS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "在进度条主体上用淡绿→淡黄渐变标出谱面休息区间。",
+            "Tint rest intervals on the progress bar with a light-green to light-yellow gradient.");
+
+        public static readonly LocalisableString DAN_PANEL_DATA_SOURCE = new EzLocalizationManager.EzLocalisableString("段位数据源", "Dan Data Source");
+
+        public static readonly LocalisableString DAN_PANEL_DATA_SOURCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "Chart：谱面 MSD；Player：玩家 SSR/段位；Both：双源叠加（对齐 Skill 雷达黄/绿层）。",
+            "Chart: beatmap MSD; Player: SSR/dan; Both: overlay both (Skill radar yellow/green).");
+
+        public static readonly LocalisableString DAN_PANEL_DUAL_LAYOUT = new EzLocalizationManager.EzLocalisableString("RC|LN 布局", "RC|LN Layout");
+
+        public static readonly LocalisableString DAN_PANEL_DUAL_LAYOUT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "Auto：按宽度切换；Horizontal：左右分列；Vertical：上下堆叠。",
+            "Auto by width; Horizontal side-by-side; Vertical stacked.");
+
+        public static readonly LocalisableString DAN_PANEL_RATING = new EzLocalizationManager.EzLocalisableString("Rating", "Rating");
+
+        public static readonly LocalisableString CAMERA_SOURCE_LABEL = new EzLocalizationManager.EzLocalisableString("来源类型", "Source");
+        public static readonly LocalisableString CAMERA_SOURCE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("物理摄像头或虚拟摄像头。", "Physical camera or virtual camera.");
+        public static readonly LocalisableString CAMERA_SOURCE_PHYSICAL = new EzLocalizationManager.EzLocalisableString("物理", "Physical");
+        public static readonly LocalisableString CAMERA_SOURCE_VIRTUAL = new EzLocalizationManager.EzLocalisableString("虚拟", "Virtual");
+
+        public static readonly LocalisableString CAMERA_DEVICE_LABEL = new EzLocalizationManager.EzLocalisableString("设备", "Device");
+        public static readonly LocalisableString CAMERA_DEVICE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("按来源类型过滤。留空则使用该类型的第一台设备。", "Filtered by source. Empty uses the first device of that kind.");
+        public static readonly LocalisableString CAMERA_DEVICE_DEFAULT = new EzLocalizationManager.EzLocalisableString("默认（该类型第一台）", "Default (first of this kind)");
+
+        public static readonly LocalisableString CAMERA_AUTO_FOCUS_LABEL = new EzLocalizationManager.EzLocalisableString("自动对焦", "Auto focus");
+        public static readonly LocalisableString CAMERA_AUTO_FOCUS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设备不支持时不会生效。", "Ignored when the device does not support it.");
+        public static readonly LocalisableString CAMERA_FOCUS_LABEL = new EzLocalizationManager.EzLocalisableString("手动对焦", "Manual focus");
+        public static readonly LocalisableString CAMERA_FOCUS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("关闭自动对焦后，在设备支持的范围内调节。", "Used when auto focus is off, mapped across the device range.");
+
+        public static readonly LocalisableString CAMERA_AUTO_EXPOSURE_LABEL = new EzLocalizationManager.EzLocalisableString("自动曝光", "Auto exposure");
+        public static readonly LocalisableString CAMERA_AUTO_EXPOSURE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设备不支持时不会生效。", "Ignored when the device does not support it.");
+        public static readonly LocalisableString CAMERA_EXPOSURE_LABEL = new EzLocalizationManager.EzLocalisableString("曝光", "Exposure");
+        public static readonly LocalisableString CAMERA_EXPOSURE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("关闭自动曝光后，在设备支持的范围内调节。", "Used when auto exposure is off, mapped across the device range.");
+
+        public static readonly LocalisableString CAMERA_AUTO_WHITE_BALANCE_LABEL = new EzLocalizationManager.EzLocalisableString("自动白平衡", "Auto white balance");
+        public static readonly LocalisableString CAMERA_AUTO_WHITE_BALANCE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设备不支持时不会生效。", "Ignored when the device does not support it.");
+        public static readonly LocalisableString CAMERA_WHITE_BALANCE_LABEL = new EzLocalizationManager.EzLocalisableString("白平衡", "White balance");
+        public static readonly LocalisableString CAMERA_WHITE_BALANCE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("关闭自动白平衡后，在设备色温范围内调节。", "Used when auto white balance is off, mapped across the device kelvin range.");
+
+        public static readonly LocalisableString CAMERA_FPS_LABEL = new EzLocalizationManager.EzLocalisableString("目标帧率", "Target frame rate");
+        public static readonly LocalisableString CAMERA_FPS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "采集优先不超过 720p，并尽量贴近此帧率。60 更耗上传带宽。",
+            "Capture prefers ≤720p and the closest rate. 60 costs more to upload.");
+        public static readonly LocalisableString CAMERA_FPS_15 = new EzLocalizationManager.EzLocalisableString("15", "15");
+        public static readonly LocalisableString CAMERA_FPS_24 = new EzLocalizationManager.EzLocalisableString("24", "24");
+        public static readonly LocalisableString CAMERA_FPS_30 = new EzLocalizationManager.EzLocalisableString("30", "30");
+        public static readonly LocalisableString CAMERA_FPS_60 = new EzLocalizationManager.EzLocalisableString("60（更耗）", "60 (higher cost)");
+
+        public static readonly LocalisableString CAMERA_CORNER_RADIUS_LABEL = new EzLocalizationManager.EzLocalisableString("圆角", "Corner radius");
+        public static readonly LocalisableString CAMERA_CORNER_RADIUS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("相对短边的圆角比例。", "Corner radius as a fraction of the shorter side.");
+
+        public static readonly LocalisableString CAMERA_UNAVAILABLE = new EzLocalizationManager.EzLocalisableString("摄像头未能打开。", "The camera could not be opened.");
+        public static readonly LocalisableString CAMERA_PLATFORM_UNSUPPORTED = new EzLocalizationManager.EzLocalisableString("当前平台没有本地摄像头后端。", "This platform has no local camera backend.");
+
+        public static readonly LocalisableString EFFECT_TYPE_LABEL = new EzLocalizationManager.EzLocalisableString("动画效果", "Animation Effect");
+        public static readonly LocalisableString EFFECT_TYPE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择动画效果类型", "Select animation effect type.");
+
+        public static readonly LocalisableString EFFECT_START_FACTOR_LABEL = new EzLocalizationManager.EzLocalisableString("动效起始系数", "Effect Start Factor");
+        public static readonly LocalisableString EFFECT_START_FACTOR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动画开始时的缩放或位移系数", "Scaling or displacement factor at animation start.");
+
+        public static readonly LocalisableString EFFECT_END_FACTOR_LABEL = new EzLocalizationManager.EzLocalisableString("动效结束系数", "Effect End Factor");
+        public static readonly LocalisableString EFFECT_END_FACTOR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动画结束时的缩放或位移系数", "Scaling or displacement factor at animation end.");
+
+        public static readonly LocalisableString EFFECT_START_DURATION_LABEL = new EzLocalizationManager.EzLocalisableString("动效起始时长", "Effect Start Duration");
+        public static readonly LocalisableString EFFECT_START_DURATION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动画开始阶段的持续时间（毫秒）", "Duration of the animation start phase (milliseconds).");
+
+        public static readonly LocalisableString EFFECT_END_DURATION_LABEL = new EzLocalizationManager.EzLocalisableString("动效结束时长", "Effect End Duration");
+        public static readonly LocalisableString EFFECT_END_DURATION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动画结束阶段的持续时间（毫秒）", "Duration of the animation end phase (milliseconds).");
+
+        public static readonly LocalisableString BOUNCE_PEAK_LABEL = new EzLocalizationManager.EzLocalisableString("弹跳顶点", "Bounce Peak");
+        public static readonly LocalisableString BOUNCE_PEAK_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("相对静止位置的上下位移，向下为正。", "Vertical offset from rest. Positive is downward.");
+
+        public static readonly LocalisableString BOUNCE_ALPHA_LABEL = new EzLocalizationManager.EzLocalisableString("弹跳透明度", "Bounce Alpha");
+        public static readonly LocalisableString BOUNCE_ALPHA_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("弹出后收到的透明度。", "Alpha reached after the pop.");
+
+        public static readonly LocalisableString BOUNCE_RETURN_LABEL = new EzLocalizationManager.EzLocalisableString("回到原位时长", "Return Duration");
+        public static readonly LocalisableString BOUNCE_RETURN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("从顶点回到静止位置的时间（毫秒）。", "Time to return from the peak to rest (milliseconds).");
+
+        public static readonly LocalisableString BOUNCE_EASING_LABEL = new EzLocalizationManager.EzLocalisableString("弹跳缓动", "Bounce Easing");
+        public static readonly LocalisableString BOUNCE_EASING_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("关键帧之间的缓动。直线为 None。", "Easing between keys. None is linear.");
+
+        public static readonly LocalisableString BOUNCE_OVERSHOOT_LABEL = new EzLocalizationManager.EzLocalisableString("回弹位移", "Overshoot");
+        public static readonly LocalisableString BOUNCE_OVERSHOOT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("回到原位后再走的位移，0 为不回弹。向下为正。", "Extra offset after returning to rest. Zero skips it. Positive is downward.");
+
+        public static readonly LocalisableString BOUNCE_START_ALPHA_LABEL = new EzLocalizationManager.EzLocalisableString("起始透明度", "Start Alpha");
+        public static readonly LocalisableString BOUNCE_START_ALPHA_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("弹出开始时的透明度。", "Alpha at the start of the pop.");
     }
 }

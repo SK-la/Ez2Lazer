@@ -4,8 +4,8 @@
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
-using osu.Game.Graphics.UserInterface;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Graphics.UserInterface;
 
 namespace osu.Game.EzOsuGame.UserInterface
 {

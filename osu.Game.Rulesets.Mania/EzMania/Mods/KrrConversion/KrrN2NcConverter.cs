@@ -44,7 +44,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
             int speedIndex = options?.BeatSpeed ?? 4;
             int seedValue = options?.Seed ?? KrrConversionHelper.ComputeSeedFromBeatmap(beatmap);
 
-            int originalKeys = (int)beatmap.BeatmapInfo.Difficulty.CircleSize;
+            // 当前键数以 stages 为准，参考 PS：排在前面按 ApplyOrder 跑过的改键 mod 只写 Difficulty / Stages，
+            // 读 BeatmapInfo.Difficulty 会拿到转换开始时的源谱快照；CircleSize 只是每 stage 的键数。
+            int originalKeys = beatmap.ResolveColumnCount();
             if (originalKeys == targetKeys) return;
 
             var rng = new Random(seedValue);
@@ -59,10 +61,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
 
             double convertTime = KrrConversionHelper.ComputeConvertTime(speedIndex, bpm);
 
-            List<ManiaHitObject> notes = beatmap.HitObjects.ToList();
+            // 直接引用 beatmap.HitObjects：矩阵里的索引都指向它，而重建只在全部读取完成后发生，
+            // 所以不需要一份 ToList 快照（原实现每次转换都要复制整份列表）。
+            List<ManiaHitObject> notes = beatmap.HitObjects;
 
             bool expandHoldBody = targetKeys - originalKeys < 0;
             (NoteMatrix matrix, List<int> timeAxisTemp) = buildMatrix(beatmap, notes, originalKeys, expandHoldBody);
+
+            // 空谱面（0 行）没有 note 可转换：下游的键数扩展路径只为「有 note」的输入设计（convertMtx 对 0 行直接抛异常），
+            // 这里直接结束——「空谱面 + 改键数」应该是空结果，而不是一次转换失败。
+            if (matrix.Rows == 0)
+                return;
+
             Span<int> timeAxis = CollectionsMarshal.AsSpan(timeAxisTemp);
 
             NoteMatrix processedMatrix = processMatrix(matrix, timeAxis, beatmap, notes, originalKeys, targetKeys, maxKeys, minKeys, convertTime, rng);
@@ -89,7 +99,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
 
         private static void applyChangesToHitObjects(ManiaBeatmap beatmap, List<ManiaHitObject> notes, NoteMatrix processedMatrix)
         {
-            var newObjects = new List<ManiaHitObject>();
+            var newObjects = new List<ManiaHitObject>(notes.Count);
             int targetKeys = processedMatrix.Cols;
             Span<int> matrixSpan = processedMatrix.AsSpan();
 
@@ -99,36 +109,78 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
                 int col = i % targetKeys;
 
                 if (oldIndex >= 0 && oldIndex < notes.Count)
-                {
-                    var original = notes[oldIndex];
-                    newObjects.Add(KrrConversionHelper.CloneWithColumn(original, col));
-                }
+                    newObjects.Add(KrrConversionHelper.CloneWithColumn(notes[oldIndex], col));
             }
 
+            // 矩阵按行（时间升序）扫描、行内按列升序，落键本就是 (StartTime, Column) 升序；
+            // 只有确实乱序时才付一次排序代价，避免每次转换都走 OrderBy().ThenBy() 的三段缓冲。
+            IEnumerable<ManiaHitObject> ordered = isOrderedByStartTimeThenColumn(newObjects)
+                ? newObjects
+                : newObjects.OrderBy(h => h.StartTime).ThenBy(h => h.Column);
+
             beatmap.HitObjects.Clear();
-            beatmap.HitObjects.AddRange(newObjects.OrderBy(h => h.StartTime).ThenBy(h => h.Column));
+            beatmap.HitObjects.AddRange(ordered);
+            ManiaNoteCleanupTool.CleanupBeatmap(beatmap);
+        }
+
+        private static bool isOrderedByStartTimeThenColumn(List<ManiaHitObject> notes)
+        {
+            for (int i = 1; i < notes.Count; i++)
+            {
+                ManiaHitObject previous = notes[i - 1];
+                ManiaHitObject current = notes[i];
+
+                if (current.StartTime < previous.StartTime)
+                    return false;
+
+                if (current.StartTime == previous.StartTime && current.Column < previous.Column)
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static bool isOrderedByStartTime(List<ManiaHitObject> notes)
+        {
+            for (int i = 1; i < notes.Count; i++)
+            {
+                if (notes[i].StartTime < notes[i - 1].StartTime)
+                    return false;
+            }
+
+            return true;
         }
 
         private static (NoteMatrix, List<int>) buildMatrix(ManiaBeatmap beatmap, List<ManiaHitObject> notes, int cols, bool expandHoldBody)
         {
             // getMTXandTimeAxis(): unique start times only, ordered
-            List<int> uniqueStartTimes = notes
-                                         .Select(n => toTimeKey(n.StartTime))
-                                         .Distinct()
-                                         .OrderBy(t => t)
-                                         .ToList();
+            var seenStartTimes = new HashSet<int>();
+            var uniqueStartTimes = new List<int>(notes.Count);
+
+            foreach (var note in notes)
+            {
+                if (seenStartTimes.Add(toTimeKey(note.StartTime)))
+                    uniqueStartTimes.Add(toTimeKey(note.StartTime));
+            }
+
+            uniqueStartTimes.Sort();
 
             int timeCount = uniqueStartTimes.Count;
             var matrix = new NoteMatrix(timeCount, cols);
 
+            // timeKey → 行号：原实现对每个 note 做一次 IndexOf，整段是 O(notes × rows)。
+            var timeIndexByKey = new Dictionary<int, int>(timeCount);
+
+            for (int i = 0; i < timeCount; i++)
+                timeIndexByKey[uniqueStartTimes[i]] = i;
+
             for (int i = 0; i < notes.Count; i++)
             {
                 var note = notes[i];
-                int timeIndex = uniqueStartTimes.IndexOf(toTimeKey(note.StartTime));
                 int colIndex = Math.Clamp(note.Column, 0, cols - 1);
 
-                if (timeIndex >= 0)
-                    matrix[timeIndex, colIndex] = i;
+                // 时间轴就是所有起始时刻的去重集合，所以这里必定命中。
+                matrix[timeIndexByKey[toTimeKey(note.StartTime)], colIndex] = i;
             }
 
             if (!expandHoldBody)
@@ -140,10 +192,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
         private static (NoteMatrix, List<int>) expandHoldBodyMatrix(NoteMatrix matrix, List<int> timeAxis, List<ManiaHitObject> notes, int cols)
         {
             var allTimes = new HashSet<int>(timeAxis);
-            foreach (int endTime in getEndTimeList(notes))
-                allTimes.Add(endTime);
 
-            var newTimeAxis = allTimes.OrderBy(t => t).ToList();
+            foreach (var note in notes)
+                allTimes.Add(toTimeKey(note is HoldNote hold ? hold.EndTime : note.StartTime));
+
+            var newTimeAxis = new List<int>(allTimes);
+            newTimeAxis.Sort();
+
+            var newTimeIndexByKey = new Dictionary<int, int>(newTimeAxis.Count);
+
+            for (int i = 0; i < newTimeAxis.Count; i++)
+                newTimeIndexByKey[newTimeAxis[i]] = i;
+
             var newMatrix = new NoteMatrix(newTimeAxis.Count, cols);
 
             int oldTimeIndex = 0;
@@ -184,8 +244,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
             {
                 if (note is HoldNote hold && hold.EndTime > hold.StartTime)
                 {
-                    int startIndex = newTimeAxis.IndexOf(toTimeKey(hold.StartTime));
-                    int endIndex = newTimeAxis.IndexOf(toTimeKey(hold.EndTime));
+                    // 新时间轴是所有起始时刻与长条结束时刻的并集，头尾都必定在其中。
+                    int startIndex = newTimeIndexByKey[toTimeKey(hold.StartTime)];
+                    int endIndex = newTimeIndexByKey[toTimeKey(hold.EndTime)];
                     int colIndex = Math.Clamp(hold.Column, 0, cols - 1);
 
                     for (int i = startIndex + 1; i <= endIndex; i++)
@@ -199,56 +260,45 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
             return (newMatrix, newTimeAxis);
         }
 
-        private static List<int> getEndTimeList(List<ManiaHitObject> notes)
-        {
-            var uniqueEndTimes = new HashSet<int>();
-
-            foreach (var note in notes)
-            {
-                if (note is HoldNote hold)
-                    uniqueEndTimes.Add(toTimeKey(hold.EndTime));
-                else
-                    uniqueEndTimes.Add(toTimeKey(note.StartTime));
-            }
-
-            return uniqueEndTimes.OrderBy(t => t).ToList();
-        }
-
         private static int toTimeKey(double time) => (int)Math.Round(time);
 
         private static Span<double> generateBeatLengthAxis(Span<int> timeAxis, List<ManiaHitObject> maniaObjects, ManiaBeatmap beatmap)
         {
-            List<double> result1 = Enumerable.Repeat(-1.0, timeAxis.Length).ToList();
+            double[] result = new double[timeAxis.Length];
+            result.AsSpan().Fill(-1.0);
 
-            var sortedNotes = maniaObjects
-                              .Select((note, index) => new { Note = note, Index = index })
-                              .OrderBy(x => x.Note.StartTime)
-                              .ToList();
+            // 时间轴是 note 起始时刻的升序去重，所以按 StartTime 升序单趟推进即可对齐；
+            // 原实现为此建了匿名类型再 OrderBy 一趟（排序结果只用来取值，索引字段根本没用上）。
+            IEnumerable<ManiaHitObject> ordered = isOrderedByStartTime(maniaObjects) ? maniaObjects : maniaObjects.OrderBy(n => n.StartTime);
 
             int currentTimeAxisIndex = 0;
 
-            foreach (var item in sortedNotes)
+            foreach (var note in ordered)
             {
-                int startTime = toTimeKey(item.Note.StartTime);
+                int startTime = toTimeKey(note.StartTime);
 
                 while (currentTimeAxisIndex < timeAxis.Length &&
                        timeAxis[currentTimeAxisIndex] < startTime)
                     currentTimeAxisIndex++;
 
                 if (currentTimeAxisIndex < timeAxis.Length && timeAxis[currentTimeAxisIndex] == startTime)
-                    result1[currentTimeAxisIndex] = beatmap.ControlPointInfo.TimingPointAt(item.Note.StartTime).BeatLength;
+                    result[currentTimeAxisIndex] = beatmap.ControlPointInfo.TimingPointAt(note.StartTime).BeatLength;
             }
 
-            return CollectionsMarshal.AsSpan(result1);
+            return result;
         }
 
         private static Span<int> generateEndTimeIndex(List<ManiaHitObject> maniaObjects)
         {
-            var result = new List<int>();
-            foreach (var item in maniaObjects)
-                result.Add(toTimeKey(item is HoldNote h ? h.EndTime : item.StartTime));
+            int[] result = new int[maniaObjects.Count];
 
-            return CollectionsMarshal.AsSpan(result);
+            for (int i = 0; i < maniaObjects.Count; i++)
+            {
+                ManiaHitObject item = maniaObjects[i];
+                result[i] = toTimeKey(item is HoldNote h ? h.EndTime : item.StartTime);
+            }
+
+            return result;
         }
 
         private static Span<int> generateOrgColIndex(NoteMatrix matrix)
@@ -257,11 +307,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
             Span<int> matrixSpan = matrix.AsSpan();
 
             int maxIndex = -1;
+
             for (int i = 0; i < matrixSpan.Length; i++)
                 maxIndex = Math.Max(maxIndex, matrixSpan[i]);
 
             if (maxIndex < 0)
-                return CollectionsMarshal.AsSpan(new List<int>());
+                return Span<int>.Empty;
 
             int[] orgColIndex = new int[maxIndex + 1];
             Array.Fill(orgColIndex, -1);
@@ -406,10 +457,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
         {
             var newMatrix = new NoteMatrix(rows, targetKeys);
 
+            // 原实现每行都 new int[targetKeys]：缓冲搬到循环外，每行显式重置成 EMPTY 即可。
+            int[] tempRow = new int[targetKeys];
+
             for (int i = 0; i < rows; i++)
             {
-                int[] tempRow = new int[targetKeys];
-                for (int k = 0; k < targetKeys; k++) tempRow[k] = NoteMatrix.EMPTY;
+                tempRow.AsSpan().Fill(NoteMatrix.EMPTY);
 
                 Span<int> orgCurrentRow = matrix.GetRowSpan(i);
                 for (int j = 0; j < originalCols && j < targetKeys; j++) tempRow[j] = orgCurrentRow[j];
@@ -446,9 +499,50 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
             var mark = new BoolMatrix(newMatrix.Rows, newMatrix.Cols);
             Span<bool> markSpan = mark.AsSpan();
             Span<int> newMatrixSpan = newMatrix.AsSpan();
-            var endTimeTempRow = new Span<int>(new int[targetKeys]);
-            var convertTimePointRow = new Span<int>(new int[targetKeys]);
-            var orgColIndexRow = new Span<int>(new int[targetKeys]);
+
+            // 三行小缓冲只在本次调用内使用：小键数走栈上分配，不再每次转换都产生三个堆数组。
+            // 长度为异常大（列数来自谱面，不保证在 mod 设置的 18 以内）时回退堆数组：栈只有 1MB，不能按谱面数据定长。
+            const int stack_buffer_limit = 64;
+
+            if (targetKeys <= stack_buffer_limit)
+            {
+                Span<int> endTimeTempRow = stackalloc int[stack_buffer_limit];
+                Span<int> convertTimePointRow = stackalloc int[stack_buffer_limit];
+                Span<int> orgColIndexRow = stackalloc int[stack_buffer_limit];
+
+                fillDeleteMark(newMatrixSpan, markSpan, timeAxis, endTimeIndexAxis, beatLengthAxis, orgColIndexAxis, targetKeys,
+                    endTimeTempRow, convertTimePointRow, orgColIndexRow);
+            }
+            else
+            {
+                int[] heapBuffers = new int[targetKeys * 3];
+
+                fillDeleteMark(newMatrixSpan, markSpan, timeAxis, endTimeIndexAxis, beatLengthAxis, orgColIndexAxis, targetKeys,
+                    heapBuffers.AsSpan(0, targetKeys),
+                    heapBuffers.AsSpan(targetKeys, targetKeys),
+                    heapBuffers.AsSpan(targetKeys * 2, targetKeys));
+            }
+
+            return mark;
+        }
+
+        private static void fillDeleteMark(Span<int> newMatrixSpan,
+                                           Span<bool> markSpan,
+                                           Span<int> timeAxis,
+                                           Span<int> endTimeIndexAxis,
+                                           Span<double> beatLengthAxis,
+                                           Span<int> orgColIndexAxis,
+                                           int targetKeys,
+                                           Span<int> endTimeTempRow,
+                                           Span<int> convertTimePointRow,
+                                           Span<int> orgColIndexRow)
+        {
+            // 栈路径给的缓冲可能比 targetKeys 长：只用前 targetKeys 项，语义与堆路径完全一致。
+            endTimeTempRow = endTimeTempRow[..targetKeys];
+            convertTimePointRow = convertTimePointRow[..targetKeys];
+            orgColIndexRow = orgColIndexRow[..targetKeys];
+
+            endTimeTempRow.Clear();
             convertTimePointRow.Fill(timeAxis[0]);
             orgColIndexRow.Fill(-1);
 
@@ -459,12 +553,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
                 int preOldIndex = newMatrixSpan[preRowI];
                 int row = i / targetKeys;
                 int col = i % targetKeys;
-                double space = beatLengthAxis[row - 1] / 4;
+                // 单点和换列保持 1/4 拍。1/8 拍只放宽长条头，避免把原来会删掉的单点留成双倍密度。
+                double beat = beatLengthAxis[row - 1];
+                double space = beat / 4;
+                double tailSpace = oldIndex >= 0 && endTimeIndexAxis[oldIndex] > timeAxis[row] ? beat / 8 : space;
 
                 if (preOldIndex >= 0)
                     endTimeTempRow[col] = Math.Max(endTimeIndexAxis[preOldIndex], endTimeTempRow[col]);
 
-                if (timeAxis[row] < endTimeTempRow[col] + space - 10)
+                if (timeAxis[row] < endTimeTempRow[col] + tailSpace - 10)
                     markSpan[i] = true;
 
                 if (oldIndex >= 0 && orgColIndexAxis[oldIndex] != orgColIndexRow[col])
@@ -476,8 +573,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
                 if (timeAxis[row] < convertTimePointRow[col] + space + 10)
                     markSpan[i] = true;
             }
-
-            return mark;
         }
 
         private static void applyPositionBasedDeletion(NoteMatrix newMatrix, BoolMatrix mark)
@@ -515,9 +610,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
 
             int[] columnDeletionCounts = new int[cols];
 
+            // 原实现每行都 new 两个 List、每轮淘汰都 new 一个 double[]：缓冲搬到循环外，逐次 Clear 复用。
+            var activeNotes = new List<int>(cols);
+            var candidates = new List<int>(cols);
+            double[] weights = new double[cols];
+
             for (int i = 0; i < rows; i++)
             {
-                var activeNotes = new List<int>();
+                activeNotes.Clear();
 
                 for (int j = 0; j < cols; j++)
                 {
@@ -538,11 +638,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
                 int toRemove = Math.Max(0, activeNotes.Count - targetNotes);
                 if (toRemove <= 0) continue;
 
-                var candidates = new List<int>(activeNotes);
+                candidates.Clear();
+                candidates.AddRange(activeNotes);
 
                 for (int r = 0; r < toRemove && candidates.Count > 0; r++)
                 {
-                    double[] weights = new double[candidates.Count];
                     double totalWeight = 0;
 
                     for (int j = 0; j < candidates.Count; j++)
@@ -671,6 +771,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
 
         private static void applyRandomAdjustmentToColumnSelection(List<int> columnsToRemove, int[] columnWeights, int originalCols, Random random)
         {
+            // 原实现每轮调整都 new 一个候选表：整个循环只有一个候选表被用到，搬到循环外复用。
+            var candidates = new List<int>();
+
             for (int i = 0; i < columnsToRemove.Count; i++)
             {
                 if (random.NextDouble() < 0.25)
@@ -678,7 +781,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
                     int currentCol = columnsToRemove[i];
                     int currentWeight = columnWeights[currentCol];
 
-                    var candidates = new List<int>();
+                    candidates.Clear();
 
                     for (int col = 0; col < originalCols; col++)
                     {
@@ -697,6 +800,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
 
         private static void applyMinimumNotesConstraint(NoteMatrix matrix, NoteMatrix orgMtx, int startRow, int endRow, int targetCols, Span<int> timeAxis, Span<double> beatLengthAxis, Random random)
         {
+            // 每个空行都要两个候选列表：搬到行循环外复用，原实现是每行各 new 两个 List。
+            var candidateNotes = new List<int>();
+            var availablePositions = new List<int>();
+
             for (int row = startRow; row <= endRow; row++)
             {
                 bool hasNote = false;
@@ -712,7 +819,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
 
                 if (!hasNote)
                 {
-                    var candidateNotes = new List<int>();
+                    candidateNotes.Clear();
                     int originalCols = orgMtx.Cols;
 
                     for (int col = 0; col < originalCols; col++)
@@ -725,15 +832,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
                     {
                         int selectedOrgCol = candidateNotes[random.Next(candidateNotes.Count)];
 
-                        var availablePositions = new List<int>();
+                        availablePositions.Clear();
 
                         for (int col = 0; col < targetCols; col++)
                         {
                             if (isPositionAvailableForEmptyRow(matrix, timeAxis, row, col, beatLengthAxis[row]))
-                            {
-                                if (!isHoldNoteTailTooClose(matrix, orgMtx, timeAxis, row, selectedOrgCol, col, beatLengthAxis[row]))
-                                    availablePositions.Add(col);
-                            }
+                                availablePositions.Add(col);
                         }
 
                         if (availablePositions.Count > 0)
@@ -765,17 +869,28 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
                 columnList.Add((i, weight, risk));
             }
 
-            columnList.Sort((a, b) =>
-            {
-                int weightComparison = a.weight.CompareTo(b.weight);
-                if (weightComparison != 0)
-                    return weightComparison;
+            columnList.Sort(column_comparer);
 
-                return a.risk.CompareTo(b.risk);
-            });
+            var result = new List<int>(Math.Min(colsToRemove, columnList.Count));
 
-            return columnList.Take(colsToRemove).Select(x => x.index).ToList();
+            for (int i = 0; i < colsToRemove && i < columnList.Count; i++)
+                result.Add(columnList[i].index);
+
+            return result;
         }
+
+        /// <summary>
+        /// 与原来的 <c>List.Sort(comparison)</c> 语义一致（权重优先，其次风险），只是把比较委托从每次调用改成静态字段。
+        /// </summary>
+        private static readonly Comparison<(int index, int weight, double risk)> column_comparer = (a, b) =>
+        {
+            int weightComparison = a.weight.CompareTo(b.weight);
+
+            if (weightComparison != 0)
+                return weightComparison;
+
+            return a.risk.CompareTo(b.risk);
+        };
 
         private static double calculateColumnRisk(NoteMatrix matrix,
                                                   int colIndex,
@@ -875,9 +990,26 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
 
             while (row < totalRows && orgMtx[row, oldCol] == NoteMatrix.HOLD_BODY)
             {
-                if (newCol < newMatrix.Cols) newMatrix[row, newCol] = NoteMatrix.HOLD_BODY;
+                // 已经落下的 note 留给收尾的 NCL 去截断长条，这里盖掉就会整段消失。
+                if (newCol < newMatrix.Cols && newMatrix[row, newCol] < 0)
+                    newMatrix[row, newCol] = NoteMatrix.HOLD_BODY;
+
                 row++;
             }
+        }
+
+        /// <summary>
+        /// 空档补齐阶段复用的缓冲。过近时不再清掉旁边的 note，收尾交给 NCL。
+        /// </summary>
+        /// <remarks>
+        /// 这些容器原本都建在按行、按列的循环内部，一张长谱面能翻出成千上万个小对象；复用只是把「每次 new」
+        /// 换成「每次清空」，写入顺序与 <see cref="Random"/> 的调用次序都保持不变。
+        /// </remarks>
+        private sealed class EmptyRowBuffers
+        {
+            public readonly List<int> AvailableCols = new List<int>();
+            public readonly List<int> CandidateCols = new List<int>();
+            public readonly List<int> CandidateValues = new List<int>();
         }
 
         private static void processEmptyRows(NoteMatrix orgMtx,
@@ -889,6 +1021,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
             int rows = newMatrix.Rows;
             int targetCols = newMatrix.Cols;
             int originalCols = orgMtx.Cols;
+
+            var buffers = new EmptyRowBuffers();
 
             for (int row = 0; row < rows; row++)
             {
@@ -904,12 +1038,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
                 }
 
                 if (isEmptyRow)
-                {
-                    if (tryInsertNoteDirectly(newMatrix, orgMtx, timeAxis, row, targetCols, originalCols, beatLengthAxis[row], random))
-                        continue;
-
-                    tryClearSpaceAndInsert(orgMtx, newMatrix, timeAxis, row, targetCols, originalCols, beatLengthAxis[row], random);
-                }
+                    tryInsertNoteDirectly(newMatrix, orgMtx, timeAxis, row, targetCols, originalCols, beatLengthAxis[row], random, buffers);
             }
         }
 
@@ -920,9 +1049,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
                                                   int targetCols,
                                                   int originalCols,
                                                   double beatLength,
-                                                  Random random)
+                                                  Random random,
+                                                  EmptyRowBuffers buffers)
         {
-            var availableCols = new List<int>();
+            List<int> availableCols = buffers.AvailableCols;
+            List<int> candidateCols = buffers.CandidateCols;
+            List<int> candidateValues = buffers.CandidateValues;
+
+            availableCols.Clear();
+            candidateCols.Clear();
+            candidateValues.Clear();
 
             for (int col = 0; col < targetCols; col++)
             {
@@ -933,154 +1069,27 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
             if (availableCols.Count == 0)
                 return false;
 
-            var candidateNotes = new List<(int orgCol, int noteIndex)>();
-
             for (int orgCol = 0; orgCol < originalCols; orgCol++)
             {
-                if (orgMtx[row, orgCol] >= 0)
-                    candidateNotes.Add((orgCol, orgMtx[row, orgCol]));
+                int noteIndex = orgMtx[row, orgCol];
+
+                if (noteIndex >= 0)
+                {
+                    candidateCols.Add(orgCol);
+                    candidateValues.Add(noteIndex);
+                }
             }
 
-            if (candidateNotes.Count == 0)
+            if (candidateCols.Count == 0)
                 return false;
 
             int targetCol = availableCols[random.Next(availableCols.Count)];
-            (int orgCol, int noteIndex) selectedNote = candidateNotes[random.Next(candidateNotes.Count)];
+            int candidate = random.Next(candidateCols.Count);
+            int selectedNoteIndex = candidateValues[candidate];
 
-            if (isHoldNoteTailTooClose(newMatrix, orgMtx, timeAxis, row, selectedNote.orgCol, targetCol, beatLength))
-                return false;
-
-            newMatrix[row, targetCol] = selectedNote.noteIndex;
+            newMatrix[row, targetCol] = selectedNoteIndex;
 
             return true;
-        }
-
-        private static bool isHoldNoteTailTooClose(NoteMatrix newMatrix,
-                                                   NoteMatrix orgMtx,
-                                                   Span<int> timeAxis,
-                                                   int row,
-                                                   int orgCol,
-                                                   int targetCol,
-                                                   double beatLength)
-        {
-            double minTimeDistance = (beatLength / 2.5) - 10;
-
-            int rows = orgMtx.Rows;
-            int holdLength = 0;
-
-            for (int r = row + 1; r < rows; r++)
-            {
-                if (orgMtx[r, orgCol] == NoteMatrix.HOLD_BODY)
-                    holdLength++;
-                else
-                    break;
-            }
-
-            bool isHoldNote = holdLength > 0;
-
-            if (!isHoldNote || holdLength == 0)
-                return false;
-
-            int tailRow = row + holdLength;
-
-            if (tailRow < timeAxis.Length && tailRow < newMatrix.Rows)
-            {
-                for (int r = row + 1; r <= tailRow; r++)
-                {
-                    if (r < newMatrix.Rows && newMatrix[r, targetCol] >= 0)
-                    {
-                        double timeDistance = timeAxis[r] - timeAxis[row + holdLength];
-                        if (timeDistance < minTimeDistance) return true;
-
-                        break;
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        private static void tryClearSpaceAndInsert(NoteMatrix orgMtx, NoteMatrix newMatrix, Span<int> timeAxis, int emptyRow, int targetCols, int originalCols, double beatLength, Random random)
-        {
-            double timeThreshold = (beatLength / 14) + 10;
-            var processedCols = new HashSet<int>();
-
-            var timeRangeRows = new List<int>();
-
-            for (int row = 0; row < newMatrix.Rows; row++)
-            {
-                if (Math.Abs(timeAxis[row] - timeAxis[emptyRow]) <= timeThreshold)
-                    timeRangeRows.Add(row);
-            }
-
-            if (timeRangeRows.Count == 0)
-                return;
-
-            List<int> colsToTry = Enumerable.Range(0, targetCols).ToList();
-            shuffleList(colsToTry, random);
-
-            foreach (int col in colsToTry)
-            {
-                if (processedCols.Contains(col)) continue;
-
-                bool hasNotesToRemove = false;
-
-                foreach (int row in timeRangeRows)
-                {
-                    if (newMatrix[row, col] >= 0)
-                    {
-                        hasNotesToRemove = true;
-                        break;
-                    }
-                }
-
-                if (!hasNotesToRemove)
-                    continue;
-
-                var originalValues = new Dictionary<int, int>();
-                foreach (int row in timeRangeRows) originalValues[row] = newMatrix[row, col];
-
-                foreach (int row in timeRangeRows)
-                {
-                    if (newMatrix[row, col] >= 0)
-                        newMatrix[row, col] = NoteMatrix.EMPTY;
-                }
-
-                bool createsEmptyRows = false;
-
-                foreach (int row in timeRangeRows)
-                {
-                    bool isEmptyRow = true;
-
-                    for (int c = 0; c < targetCols; c++)
-                    {
-                        if (newMatrix[row, c] != NoteMatrix.EMPTY)
-                        {
-                            isEmptyRow = false;
-                            break;
-                        }
-                    }
-
-                    if (isEmptyRow)
-                    {
-                        createsEmptyRows = true;
-                        break;
-                    }
-                }
-
-                if (createsEmptyRows)
-                {
-                    foreach (KeyValuePair<int, int> kvp in originalValues) newMatrix[kvp.Key, col] = kvp.Value;
-                    processedCols.Add(col);
-                    continue;
-                }
-
-                if (tryInsertNoteDirectly(newMatrix, orgMtx, timeAxis, emptyRow, targetCols, originalCols, beatLength, random))
-                    return;
-
-                foreach (KeyValuePair<int, int> kvp in originalValues) newMatrix[kvp.Key, col] = kvp.Value;
-                processedCols.Add(col);
-            }
         }
 
         private static bool isPositionAvailableForEmptyRow(NoteMatrix matrix,
@@ -1113,15 +1122,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
             }
 
             return true;
-        }
-
-        private static void shuffleList<T>(List<T> list, Random random)
-        {
-            for (int i = list.Count - 1; i > 0; i--)
-            {
-                int j = random.Next(i + 1);
-                (list[i], list[j]) = (list[j], list[i]);
-            }
         }
     }
 }

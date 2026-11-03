@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
@@ -27,9 +28,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public override string Name => "Space Body";
 
         public override string Acronym => "SB";
-        public override double ScoreMultiplier => 1;
 
         public override LocalisableString Description => SpaceBodyStrings.SPACE_BODY_DESCRIPTION;
+
+        public override IconUsage? Icon => FontAwesome.Solid.GripLinesVertical;
 
         public override ModType Type => ModType.LA_Mod;
 

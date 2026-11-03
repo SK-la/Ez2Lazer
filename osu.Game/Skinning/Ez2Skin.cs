@@ -67,20 +67,12 @@ namespace osu.Game.Skinning
                 case GlobalSkinnableContainerLookup containerLookup:
                     switch (containerLookup.Lookup)
                     {
-                        case GlobalSkinnableContainers.SongSelect:
-                            var songSelectComponents = new DefaultSkinComponentsContainer(c =>
-                            {
-                                var dim = c.OfType<EzHUDRadarPanel>().FirstOrDefault();
-
-                                if (dim != null)
-                                {
-                                    dim.Anchor = Anchor.BottomCentre;
-                                    dim.Origin = Anchor.Centre;
-                                    dim.Position = new Vector2(-80, -150);
-                                }
-                            });
-
-                            return songSelectComponents;
+                        // case GlobalSkinnableContainers.SongSelect:
+                        //     var songSelectComponents = new DefaultSkinComponentsContainer(c =>
+                        //     {
+                        //     });
+                        //
+                        //     return songSelectComponents;
 
                         case GlobalSkinnableContainers.MainHUDComponents:
 
@@ -90,7 +82,7 @@ namespace osu.Game.Skinning
                                 var score = container.OfType<EzHUDScoreCounter>().FirstOrDefault();
                                 var acc = container.OfType<ArgonAccuracyCounter>().FirstOrDefault();
                                 var pps = container.OfType<ArgonPerformancePointsCounter>().FirstOrDefault();
-                                var songProgress = container.OfType<ArgonSongProgress>().FirstOrDefault();
+                                var songProgress = container.OfType<SongProgress>().FirstOrDefault();
 
                                 const float x_offset = 20;
                                 const float padding = 10;
@@ -119,7 +111,7 @@ namespace osu.Game.Skinning
                                         score.Origin = Anchor.TopLeft;
                                         score.Position = new Vector2(x_offset, x_offset);
                                         score.ShowLabel.Value = false;
-                                        score.ThemeName.Value = EzEnumGameThemeName.Celeste_Lumiere;
+                                        score.ThemeName.Value = EzGameThemeNames.DEFAULT;
                                     }
 
                                     var attributeTexts = container.OfType<BeatmapAttributeText>().ToArray();
@@ -190,7 +182,7 @@ namespace osu.Game.Skinning
                                     {
                                         WireframeOpacity = { Value = 0 },
                                     },
-                                    new ArgonSongProgress(),
+                                    new EzArgonSongProgress(),
                                     new JudgementCounterDisplay
                                     {
                                         FillMode = FillMode.Fill,

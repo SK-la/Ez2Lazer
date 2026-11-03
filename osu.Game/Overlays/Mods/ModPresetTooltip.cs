@@ -7,6 +7,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Mods;
 using osuTK;
@@ -32,7 +33,7 @@ namespace osu.Game.Overlays.Mods
             AutoSizeAxes = Axes.Y;
 
             Masking = true;
-            CornerRadius = 7;
+            CornerRadius = EzUIStyleV1.CORNER_RADIUS_SHEARED;
 
             InternalChildren = new Drawable[]
             {

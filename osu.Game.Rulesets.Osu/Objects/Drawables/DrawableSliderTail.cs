@@ -1,16 +1,16 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-#nullable disable
-
 using System.Diagnostics;
-using JetBrains.Annotations;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Utils;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Objects.Types;
+using osu.Game.Rulesets.Osu.Configuration;
+using osu.Game.Rulesets.Osu.Skinning;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -21,10 +21,9 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
     {
         public new SliderTailCircle HitObject => (SliderTailCircle)base.HitObject;
 
-        [CanBeNull]
-        public Slider Slider => DrawableSlider?.HitObject;
+        public Slider? Slider => DrawableSlider?.HitObject;
 
-        protected DrawableSlider DrawableSlider => (DrawableSlider)ParentHitObject;
+        protected DrawableSlider? DrawableSlider => ParentHitObject as DrawableSlider;
 
         /// <summary>
         /// Whether the hit samples only play on successful hits.
@@ -32,9 +31,9 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
         /// </summary>
         public bool SamplePlaysOnlyOnHit { get; set; } = true;
 
-        public SkinnableDrawable CirclePiece { get; private set; }
+        public SkinnableDrawable? CirclePiece { get; private set; }
 
-        private Container scaleContainer;
+        private Container scaleContainer = null!;
 
         public DrawableSliderTail()
             : base(null)
@@ -46,9 +45,13 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
         {
         }
 
+        private readonly Bindable<bool> hitAnimations = new Bindable<bool>(true);
+
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(OsuRulesetConfigManager? osuConfig)
         {
+            osuConfig?.BindWith(OsuRulesetSetting.HitAnimations, hitAnimations);
+
             Origin = Anchor.Centre;
             Size = OsuHitObject.OBJECT_DIMENSIONS;
 
@@ -106,20 +109,54 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
                     break;
 
                 case ArmedState.Hit:
-                    // todo: temporary / arbitrary
-                    this.Delay(800).FadeOut();
+                    if (!hitAnimations.Value)
+                        this.FadeOut(60, Easing.Out);
+                    else
+                    {
+                        // todo: temporary / arbitrary
+                        this.Delay(800).FadeOut();
+                    }
+
                     break;
             }
         }
 
-        protected override void CheckForResult(bool userTriggered, double timeOffset) => DrawableSlider.SliderInputManager.TryJudgeNestedObject(this, timeOffset);
+        protected override void Update()
+        {
+            base.Update();
+
+            // Transform 在 OnApply 后淡入尾。stable 放不下的尾必须保持隐藏：
+            // 否则淡入会在卡住 GPU 的坐标提交它。
+            if (Slider != null && !StableViewportBody.CanPlaceFieldPosition(Slider.CurvePositionAt(HitObject.RepeatIndex % 2 == 0 ? 1 : 0)))
+                Alpha = 0;
+        }
+
+        private void placeAlongPath(Vector2 position)
+        {
+            if (!StableViewportBody.CanPlaceFieldPosition(position))
+            {
+                Position = Vector2.Zero;
+                Alpha = 0;
+                return;
+            }
+
+            Position = position;
+        }
+
+        protected override void CheckForResult(bool userTriggered, double timeOffset)
+        {
+            if (JudgementKernelDriven)
+                return;
+
+            DrawableSlider!.SliderInputManager.TryJudgeNestedObject(this);
+        }
 
         protected override void OnApply()
         {
             base.OnApply();
 
             if (Slider != null)
-                Position = Slider.CurvePositionAt(HitObject.RepeatIndex % 2 == 0 ? 1 : 0);
+                placeAlongPath(Slider.CurvePositionAt(HitObject.RepeatIndex % 2 == 0 ? 1 : 0));
         }
 
         #region FOR EDITOR USE ONLY, DO NOT USE FOR ANY OTHER PURPOSE

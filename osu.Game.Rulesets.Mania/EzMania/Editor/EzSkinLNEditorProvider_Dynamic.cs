@@ -8,125 +8,192 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.EzOsuGame.Edit;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
-using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Rulesets.UI.Scrolling;
-using osu.Game.Screens.Play;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Editor
 {
     public partial class EzSkinLNEditorProvider
     {
-        private Drawable createDynamicPartImpl(ISkin skin)
+        private Drawable createDynamicPartImpl(ISkin skin, int keyCount)
         {
-            var transformedSkin = createTransformedSkin(skin);
+            var transformedSkin = createTransformedSkin(skin, keyCount);
 
             return new SkinProvidingContainer(transformedSkin)
             {
                 RelativeSizeAxes = Axes.Both,
-                Child = new ScrollingPreview()
+                Child = new VirtualPlayfieldPreview(keyCount),
             };
         }
 
-        private sealed partial class ScrollingPreview : CompositeDrawable
+        /// <summary>
+        /// One phrase from [HitObjects] (times relative to 750ms), 5K x→column, looped every <see cref="loop_pattern_period"/> ms.
+        /// Entry: (relativeStart, column, duration); duration 0 = tap.
+        /// </summary>
+        private static readonly (double time, int column, double duration)[] loop_pattern =
         {
-            private static int timeSpeed { get; set; } = 3000;
-            private static int holdDuration { get; set; } = 1000;
-            private int cycleLength { get; } = holdDuration * preview_key_count;
+            (0, 0, 0), (62.5, 1, 0), (125, 2, 0), (187.5, 3, 0),
+            (250, 0, 125), (250, 4, 0), (250, 0, 0),
+            (312.5, 1, 125), (312.5, 1, 0),
+            (375, 2, 125), (375, 2, 0),
+            (437.5, 3, 125), (437.5, 3, 0),
+            (500, 4, 125), (500, 4, 0),
+            (625, 0, 0), (687.5, 1, 0), (750, 2, 0),
+            (750, 0, 125), (812.5, 3, 0), (812.5, 1, 125),
+            (875, 4, 0), (875, 2, 125), (937.5, 3, 125),
+            (1000, 4, 125), (1000, 0, 0),
+            (1062.5, 1, 0), (1125, 2, 0), (1187.5, 3, 0), (1250, 4, 0),
+        };
 
-            private readonly PreviewScrollingInfo scrollingInfo = new PreviewScrollingInfo();
-            private readonly PreviewGameplayClock gameplayClockDependency = new PreviewGameplayClock();
-            private readonly StageDefinition stageDefinition = new StageDefinition(preview_key_count);
-            private readonly IBeatmap beatmapDependency;
+        private const double loop_pattern_period = 1250;
+        private const int loop_pattern_cycles = 8;
 
-            private readonly StopwatchClock playbackClock = new StopwatchClock(true);
-            private readonly ManualClock manualClock = new ManualClock();
+        private static ManiaBeatmap buildVirtualPreviewBeatmap(int keyCount)
+        {
+            var stageDefinition = new StageDefinition(keyCount);
+            var beatmap = new ManiaBeatmap(stageDefinition);
+            var controlPoints = new ControlPointInfo();
+            var difficulty = new BeatmapDifficulty();
 
-            private Stage stage = null!;
-            private int nextCycleIndex;
-            private double lastAddedStart = double.NegativeInfinity;
-
-            public ScrollingPreview()
+            for (int cycle = 0; cycle < loop_pattern_cycles; cycle++)
             {
-                beatmapDependency = new ManiaBeatmap(stageDefinition);
+                double offset = cycle * loop_pattern_period;
 
-                RelativeSizeAxes = Axes.Both;
-                Clock = new FramedClock(manualClock);
+                foreach ((double time, int column, double duration) in loop_pattern)
+                {
+                    if (column >= keyCount)
+                        continue;
+
+                    if (ManiaPlayfieldLayoutHelper.ShouldSkipBeatmapColumn(stageDefinition, column))
+                        continue;
+
+                    // Skip the period-boundary tap on non-first cycles — it coincides with the next phrase's t=0.
+                    if (cycle > 0 && time >= loop_pattern_period)
+                        continue;
+
+                    ManiaHitObject hitObject = duration > 0
+                        ? new HoldNote
+                        {
+                            Column = column,
+                            StartTime = offset + time,
+                            Duration = duration,
+                        }
+                        : new Note
+                        {
+                            Column = column,
+                            StartTime = offset + time,
+                        };
+
+                    hitObject.ApplyDefaults(controlPoints, difficulty);
+                    beatmap.HitObjects.Add(hitObject);
+                }
             }
 
-            protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
+            return beatmap;
+        }
+
+        private sealed partial class VirtualPlayfieldPreview : Container, IEzSkinEditorScenePlaybackSource
+        {
+            private readonly int keyCount;
+            private readonly StopwatchClock playbackClock = new StopwatchClock(true);
+            private readonly FramedClock framedClock;
+
+            private DrawableRuleset drawableRuleset = null!;
+            private ManiaBeatmap previewBeatmap = null!;
+            private double beatmapMinTime;
+            private double beatmapMaxTime;
+            private double? pendingSeekTime;
+
+            public VirtualPlayfieldPreview(int keyCount)
             {
-                var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
-                dependencies.CacheAs<IScrollingInfo>(scrollingInfo);
-                dependencies.Cache(stageDefinition);
-                dependencies.CacheAs(beatmapDependency);
-                dependencies.CacheAs<IGameplayClock>(gameplayClockDependency);
-                return dependencies;
+                this.keyCount = keyCount;
+                framedClock = new FramedClock(playbackClock);
+                RelativeSizeAxes = Axes.Both;
             }
 
             [BackgroundDependencyLoader]
             private void load()
             {
-                scrollingInfo.TimeRangeBindable.Value = timeSpeed;
+                previewBeatmap = buildVirtualPreviewBeatmap(keyCount);
+                beatmapMinTime = 0;
+                // Wrap on the phrase boundary (not last-object+padding) so playback is seamless/infinite.
+                beatmapMaxTime = loop_pattern_period * loop_pattern_cycles;
 
-                ManiaAction action = ManiaAction.Key1;
-                stage = new Stage(0, stageDefinition, ref action)
-                {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    RelativeSizeAxes = Axes.Y,
-                    Height = 1,
-                };
+                var ruleset = new ManiaRuleset();
+                Mod? autoplayMod = ruleset.GetAutoplayMod();
 
-                InternalChild = stage;
+                drawableRuleset = ruleset.CreateDrawableRulesetWith(
+                    previewBeatmap,
+                    autoplayMod != null ? new[] { autoplayMod } : null);
 
-                // Add a small number of initial cycles; further cycles will be added on-demand
-                // during Update to ensure a continuous stream of upcoming hitobjects.
-                for (int r = 0; r < 3; r++)
-                {
-                    addCycle(r);
-                }
+                drawableRuleset.Clock = framedClock;
+                drawableRuleset.Playfield.DisplayJudgements.Value = true;
 
-                nextCycleIndex = 3;
+                Child = drawableRuleset;
             }
 
-            private void addCycle(int r)
+            protected override void LoadComplete()
             {
-                for (int i = 0; i < preview_key_count; i++)
-                {
-                    var hold = new HoldNote
-                    {
-                        StartTime = r * cycleLength + (1 + i) * holdDuration,
-                        Duration = holdDuration,
-                        Column = i,
-                    };
-
-                    hold.ApplyDefaults(new ControlPointInfo(), new BeatmapDifficulty());
-                    stage.Add(hold);
-                    lastAddedStart = Math.Max(lastAddedStart, hold.StartTime);
-                }
+                base.LoadComplete();
+                EzSkinEditorRulesetPreviewBootstrap.ApplyAutoplayReplay(drawableRuleset, previewBeatmap);
             }
 
             protected override void Update()
             {
                 base.Update();
 
-                // Use the continuous playback clock as the gameplay clock so notes
-                // scroll smoothly. Ensure we always have upcoming cycles generated
-                // up to a small buffer beyond the visible TimeRange.
-                double currentTime = playbackClock.CurrentTime;
-                // Add cycles on-demand to cover current time + visible range + buffer.
-                double requiredUpTo = currentTime + scrollingInfo.TimeRangeBindable.Value + cycleLength * 2;
+                if (!playbackClock.IsRunning)
+                    return;
 
-                while (lastAddedStart < requiredUpTo)
-                {
-                    addCycle(nextCycleIndex++);
-                }
+                // Infinite loop: jump back one full buffer when the clock reaches the end of materialised phrases.
+                double wrapAt = loop_pattern_period * loop_pattern_cycles;
+                double loopBack = loop_pattern_period * Math.Max(1, loop_pattern_cycles / 2);
 
-                manualClock.CurrentTime = currentTime;
-                gameplayClockDependency.CurrentTime = currentTime;
+                while (playbackClock.CurrentTime >= wrapAt)
+                    playbackClock.Seek(playbackClock.CurrentTime - loopBack);
+            }
+
+            bool IEzSkinEditorScenePlaybackSource.IsActive => IsLoaded && !IsDisposed;
+
+            double IEzSkinEditorScenePlaybackSource.BeatmapMinTime => beatmapMinTime;
+
+            double IEzSkinEditorScenePlaybackSource.BeatmapMaxTime => beatmapMaxTime;
+
+            double IEzSkinEditorScenePlaybackSource.CurrentTime => playbackClock.CurrentTime;
+
+            bool IEzSkinEditorScenePlaybackSource.IsPlaying => playbackClock.IsRunning;
+
+            void IEzSkinEditorScenePlaybackSource.Seek(double time)
+            {
+                double span = loop_pattern_period * loop_pattern_cycles;
+                double wrapped = time % span;
+                if (wrapped < 0)
+                    wrapped += span;
+
+                // ProgressBar fires seek every move; coalesce to one clock jump per frame.
+                pendingSeekTime = wrapped;
+                Scheduler.AddOnce(applyPendingSeek);
+            }
+
+            private void applyPendingSeek()
+            {
+                if (pendingSeekTime is not double time || IsDisposed)
+                    return;
+
+                pendingSeekTime = null;
+                playbackClock.Seek(time);
+            }
+
+            void IEzSkinEditorScenePlaybackSource.SetPlaying(bool playing)
+            {
+                if (playing)
+                    playbackClock.Start();
+                else
+                    playbackClock.Stop();
             }
         }
     }

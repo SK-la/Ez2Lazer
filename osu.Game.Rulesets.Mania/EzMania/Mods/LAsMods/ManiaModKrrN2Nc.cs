@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
@@ -17,7 +18,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 {
-    public class ManiaModKrrN2Nc : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IEzApplyOrder
+    public class ManiaModKrrN2Nc : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IEzApplyOrder, IEzColumnCountMod
     {
         public override string Name => "Krr N2N Converter";
 
@@ -25,7 +26,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         public override LocalisableString Description => KrrN2NcStrings.KRR_N2N_DESCRIPTION;
 
-        public override double ScoreMultiplier => 1;
+        public override IconUsage? Icon => FontAwesome.Solid.ExchangeAlt;
 
         public override ModType Type => ModType.LA_Mod;
 
@@ -65,13 +66,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public Bindable<int?> Seed { get; } = new Bindable<int?>(114514);
 
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
-        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(-10)
         {
-            MinValue = 0,
+            MinValue = -100,
             MaxValue = 100
         };
 
         public int ApplyOrder => ApplyOrderIndex.Value;
+
+        public int ResolveColumnCount(int currentColumns) => TargetKeys.Value;
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
@@ -110,9 +113,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             // 最后更新谱面总列数，避免越界
             try
             {
-                maniaBeatmap.Stages.Clear();
-                maniaBeatmap.Stages.Add(new StageDefinition(options.TargetKeys));
-                maniaBeatmap.Difficulty.CircleSize = options.TargetKeys;
+                maniaBeatmap.SetColumnCount(options.TargetKeys);
             }
             catch (Exception ex)
             {

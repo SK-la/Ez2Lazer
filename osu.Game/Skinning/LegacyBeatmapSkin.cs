@@ -33,8 +33,9 @@ namespace osu.Game.Skinning
         /// </summary>
         /// <param name="beatmapInfo">The model for this beatmap.</param>
         /// <param name="resources">Access to raw game resources.</param>
-        public LegacyBeatmapSkin(BeatmapInfo beatmapInfo, IStorageResourceProvider? resources)
-            : base(createSkinInfo(beatmapInfo), resources, createRealmBackedStore(beatmapInfo, resources), beatmapInfo.Path.AsNonNull())
+        /// <param name="beatmapFileStore">Optional beatmap file store. When provided (external hosting), used instead of the internal Realm-backed store.</param>
+        public LegacyBeatmapSkin(BeatmapInfo beatmapInfo, IStorageResourceProvider? resources, IResourceStore<byte[]>? beatmapFileStore = null)
+            : base(createSkinInfo(beatmapInfo), resources, beatmapFileStore ?? createRealmBackedStore(beatmapInfo, resources), beatmapInfo.Path.AsNonNull())
         {
             // Disallow default colours fallback on beatmap skins to allow using parent skin combo colours. (via SkinProvidingContainer)
             Configuration.AllowDefaultComboColoursFallback = false;

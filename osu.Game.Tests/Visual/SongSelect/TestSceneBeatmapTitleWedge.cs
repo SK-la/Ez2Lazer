@@ -328,22 +328,29 @@ namespace osu.Game.Tests.Visual.SongSelect
             for (double i = 0; i < 50000; i += 1000)
                 objects.Add(new TestHitObject { StartTime = i });
 
+            var metadata = new BeatmapMetadata
+            {
+                Author = { Username = $"{ruleset.ShortName}Author" },
+                Artist = $"{ruleset.ShortName}Artist",
+                Source = $"{ruleset.ShortName}Source",
+                Title = $"{ruleset.ShortName}Title"
+            };
+
+            var beatmapSet = new BeatmapSetInfo();
+            var beatmapInfo = new BeatmapInfo
+            {
+                Metadata = metadata,
+                Ruleset = ruleset,
+                StarRating = 6,
+                DifficultyName = $"{ruleset.ShortName}Version",
+                Difficulty = new BeatmapDifficulty(),
+                BeatmapSet = beatmapSet,
+            };
+            beatmapSet.Beatmaps.Add(beatmapInfo);
+
             return new Beatmap
             {
-                BeatmapInfo = new BeatmapInfo
-                {
-                    Metadata = new BeatmapMetadata
-                    {
-                        Author = { Username = $"{ruleset.ShortName}Author" },
-                        Artist = $"{ruleset.ShortName}Artist",
-                        Source = $"{ruleset.ShortName}Source",
-                        Title = $"{ruleset.ShortName}Title"
-                    },
-                    Ruleset = ruleset,
-                    StarRating = 6,
-                    DifficultyName = $"{ruleset.ShortName}Version",
-                    Difficulty = new BeatmapDifficulty()
-                },
+                BeatmapInfo = beatmapInfo,
                 HitObjects = objects
             };
         }

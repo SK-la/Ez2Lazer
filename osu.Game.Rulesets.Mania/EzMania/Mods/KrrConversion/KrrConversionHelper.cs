@@ -6,12 +6,12 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Audio;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
+using osu.Game.Rulesets.Mania.EzMania.Mods.ModHelp;
 using osu.Game.Rulesets.Mania.Objects;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
 {
-    public class KrrConversionHelper
+    public static class KrrConversionHelper
     {
         public static readonly double[] BEAT_SPEED_VALUES = { 0.125, 0.25, 0.5, 0.75, 1, 2, 3, 4, 999 };
 
@@ -36,11 +36,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
 
         public static int InferOriginalKeys(ManiaBeatmap beatmap, int fallback)
         {
-            double cs = beatmap.BeatmapInfo.Difficulty.CircleSize;
-            if (cs > 0)
-                return Math.Max(1, (int)Math.Round(cs));
+            int cs = beatmap.ResolveColumnCount();
 
-            return fallback;
+            return cs > 0 ? cs : fallback;
         }
 
         public static ManiaHitObject CloneWithColumn(ManiaHitObject src, int col)

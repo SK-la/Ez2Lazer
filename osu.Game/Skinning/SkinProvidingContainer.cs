@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
@@ -45,7 +46,7 @@ namespace osu.Game.Skinning
 
         protected virtual bool AllowColourLookup => true;
 
-        private readonly object sourceSetLock = new object();
+        private readonly Lock sourceSetLock = new Lock();
 
         /// <summary>
         /// A dictionary mapping each <see cref="ISkin"/> source to a wrapper which handles lookup allowances.
@@ -153,11 +154,16 @@ namespace osu.Game.Skinning
                     return sourceSample;
             }
 
-            if (!AllowFallingBackToParent)
+            if (!AllowFallingBackToParent || !AllowParentSampleFallback(sampleInfo))
                 return null;
 
             return ParentSource?.GetSample(sampleInfo);
         }
+
+        /// <summary>
+        /// Whether a sample lookup that missed on local sources may fall back to the parent <see cref="ISkinSource"/>.
+        /// </summary>
+        protected virtual bool AllowParentSampleFallback(ISampleInfo sampleInfo) => true;
 
         public IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
             where TLookup : notnull

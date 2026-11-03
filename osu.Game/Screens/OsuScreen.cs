@@ -39,8 +39,6 @@ namespace osu.Game.Screens
 
         public virtual bool AllowUserExit => true;
 
-        public virtual bool ShowFooter => false;
-
         public virtual bool AllowExternalScreenChange => false;
 
         public virtual bool HideOverlaysOnEnter => false;
@@ -58,14 +56,9 @@ namespace osu.Game.Screens
 
         IBindable<OverlayActivation> IOsuScreen.OverlayActivationMode => OverlayActivationMode;
 
-        /// <summary>
-        /// The initial visibility state of the back button when this screen is entered for the first time.
-        /// </summary>
-        protected virtual bool InitialBackButtonVisibility => AllowUserExit;
+        public readonly Bindable<ScreenFooterContent> FooterContent;
 
-        public readonly Bindable<bool> BackButtonVisibility;
-
-        IBindable<bool> IOsuScreen.BackButtonVisibility => BackButtonVisibility;
+        IBindable<ScreenFooterContent> IOsuScreen.FooterContent => FooterContent;
 
         public virtual bool CursorVisible => true;
 
@@ -167,7 +160,7 @@ namespace osu.Game.Screens
             Origin = Anchor.Centre;
 
             OverlayActivationMode = new Bindable<OverlayActivation>(InitialOverlayActivationMode);
-            BackButtonVisibility = new Bindable<bool>(InitialBackButtonVisibility);
+            FooterContent = new Bindable<ScreenFooterContent>(ScreenFooterContent.Legacy(showBackButton: AllowUserExit));
         }
 
         [BackgroundDependencyLoader(true)]
@@ -317,9 +310,75 @@ namespace osu.Game.Screens
         /// Override to create a BackgroundMode for the current screen.
         /// Note that the instance created may not be the used instance if it matches the BackgroundMode equality clause.
         /// </summary>
+        [CanBeNull]
         protected virtual BackgroundScreen CreateBackground() => null;
 
-        public virtual IReadOnlyList<ScreenFooterButton> CreateFooterButtons() => Array.Empty<ScreenFooterButton>();
+        /// <summary>
+        /// Exits the background this screen pushed, so the one below (e.g. the global menu background)
+        /// becomes current again. Used while the Ez skin editor is open.
+        /// </summary>
+        internal void DetachOwnedBackground()
+        {
+            if (backgroundStack == null)
+                return;
+
+            // Exiting hands the screen over to the background stack, which expires it once the exit
+            // transition completes. Disposing it here would free its draw node while the transition
+            // is still drawing it.
+            if (ownedBackground != null && backgroundStack.CurrentScreen == ownedBackground)
+            {
+                backgroundStack.Exit();
+                ownedBackground = null;
+            }
+
+            background = backgroundStack.CurrentScreen as BackgroundScreen;
+        }
+
+        /// <summary>
+        /// Replace this screen's background using <see cref="CreateBackground"/>.
+        /// A new instance that equals the current background is not pushed.
+        /// </summary>
+        protected void RefreshBackground()
+        {
+            if (backgroundStack == null || !this.IsCurrentScreen())
+                return;
+
+            BackgroundScreen next = CreateBackground();
+
+            if (next == null)
+                return;
+
+            if (backgroundStack.CurrentScreen is BackgroundScreen current && current.Equals(next))
+            {
+                next.Dispose();
+                background = current;
+                return;
+            }
+
+            if (ownedBackground != null && backgroundStack.CurrentScreen == ownedBackground)
+            {
+                backgroundStack.Exit();
+                ownedBackground = null;
+            }
+
+            if (backgroundStack.CurrentScreen is BackgroundScreen revealed && revealed.Equals(next))
+            {
+                next.Dispose();
+                background = revealed;
+                return;
+            }
+
+            if (backgroundStack.Push(next))
+            {
+                ownedBackground = next;
+                background = next;
+                return;
+            }
+
+            next.Dispose();
+            ownedBackground = null;
+            background = backgroundStack.CurrentScreen as BackgroundScreen;
+        }
 
         public virtual bool OnBackButton() => false;
     }

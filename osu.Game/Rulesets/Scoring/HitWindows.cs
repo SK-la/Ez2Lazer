@@ -54,6 +54,10 @@ namespace osu.Game.Rulesets.Scoring
         /// </summary>
         public IEnumerable<(HitResult result, double length)> GetAllAvailableWindows()
         {
+            // 补充显示区间
+            if (IsHitResultAllowed(HitResult.Poor))
+                yield return (HitResult.Poor, WindowFor(HitResult.Poor));
+
             for (var result = HitResult.Miss; result <= HitResult.Perfect; ++result)
             {
                 if (IsHitResultAllowed(result))
@@ -66,7 +70,7 @@ namespace osu.Game.Rulesets.Scoring
         /// </summary>
         /// <param name="result">The result type to check.</param>
         /// <returns>Whether the <see cref="HitResult"/> can be achieved.</returns>
-        public virtual bool IsHitResultAllowed(HitResult result) => true;
+        public virtual bool IsHitResultAllowed(HitResult result) => result != HitResult.Poor;
 
         /// <summary>
         /// Sets hit windows with values that correspond to a difficulty parameter.
@@ -79,7 +83,7 @@ namespace osu.Game.Rulesets.Scoring
         /// </summary>
         /// <param name="timeOffset">The time offset.</param>
         /// <returns>The hit result, or <see cref="HitResult.None"/> if <paramref name="timeOffset"/> doesn't result in a judgement.</returns>
-        public HitResult ResultFor(double timeOffset)
+        public virtual HitResult ResultFor(double timeOffset)
         {
             timeOffset = Math.Abs(timeOffset);
 

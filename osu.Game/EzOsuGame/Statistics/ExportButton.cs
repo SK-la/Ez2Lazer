@@ -19,40 +19,41 @@ using osu.Game.Beatmaps.Formats;
 using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
-using osu.Game.IO.Archives;
 using osu.Game.IO;
+using osu.Game.IO.Archives;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Screens.Footer;
 using osu.Game.Utils;
-using osuTK;
 using SharpCompress.Common;
 using SharpCompress.Writers;
 using SharpCompress.Writers.Zip;
 
 namespace osu.Game.EzOsuGame.Statistics
 {
-    public partial class ExportButton : GrayButton, IHasPopover
+    public partial class ExportButton : ScreenFooterButton, IHasPopover
     {
         private readonly BeatmapInfo beatmapInfo;
         private readonly IReadOnlyList<Mod> mods;
 
         public ExportButton(BeatmapInfo beatmapInfo, IReadOnlyList<Mod> mods)
-            : base(FontAwesome.Solid.Download)
         {
             this.beatmapInfo = beatmapInfo;
             this.mods = mods;
-
-            Size = new Vector2(75, 30);
-            TooltipText = ExportStrings.EXPORT_BUTTON_TOOLTIP;
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(OsuColour colours)
         {
+            Icon = FontAwesome.Solid.FileExport;
+            AccentColour = colours.Orange1;
+            Text = ExportStrings.EXPORT_BUTTON;
+            TooltipText = ExportStrings.EXPORT_BUTTON_TOOLTIP;
             Action = this.ShowPopover;
         }
 
@@ -155,7 +156,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
                     using (var outStream = exportStorage.CreateFileSafely(filename))
                     using (var writer = new StreamWriter(outStream, Encoding.UTF8, 1024, true))
-                        new LegacyBeatmapEncoder(playableBeatmap, workingBeatmap.Skin).Encode(writer);
+                        new LegacyBeatmapEncoder(playableBeatmap, workingBeatmap.Skin, workingBeatmap.Storyboard).Encode(writer);
                 }
                 catch
                 {
@@ -251,7 +252,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
                 var stream = new MemoryStream();
                 using (var sw = new StreamWriter(stream, Encoding.UTF8, 1024, true))
-                    new LegacyBeatmapEncoder(playableBeatmap, workingBeatmap.Skin).Encode(sw);
+                    new LegacyBeatmapEncoder(playableBeatmap, workingBeatmap.Skin, workingBeatmap.Storyboard).Encode(sw);
 
                 stream.Seek(0, SeekOrigin.Begin);
                 return stream;
@@ -266,7 +267,8 @@ namespace osu.Game.EzOsuGame.Statistics
 
         private static class ExportStrings
         {
-            // internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_BUTTON = new EzLocalizationManager.EzLocalisableString("导出", "Export");
+            internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_BUTTON = new EzLocalizationManager.EzLocalisableString(
+                "导出", "Export");
 
             internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_BUTTON_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
                 "导出当前Mods转换后的谱面", "Export the currently converted beatmap with mods applied");

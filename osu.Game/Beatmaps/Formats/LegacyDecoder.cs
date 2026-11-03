@@ -35,14 +35,20 @@ namespace osu.Game.Beatmaps.Formats
             FormatVersion = version;
         }
 
-        protected override void ParseStreamInto(LineBufferedReader stream, T output)
+        protected override void ParseStreamInto(LineBufferedReader stream, bool isPrimaryStream, T output)
         {
             Section section = Section.General;
 
             string? line;
+            int lineNumber = 0;
+            // [Ez] Cap per-decode failure spam (corrupt TimingPoints etc.) to avoid log OOM during analysis reloads.
+            const int max_logged_line_failures = 5;
+            int lineFailureCount = 0;
 
             while ((line = stream.ReadLine()) != null)
             {
+                lineNumber++;
+
                 if (ShouldSkipLine(line))
                     continue;
 
@@ -65,13 +71,22 @@ namespace osu.Game.Beatmaps.Formats
 
                 try
                 {
-                    ParseLine(output, section, line);
+                    ParseLine(output, section, line, isPrimaryStream);
                 }
                 catch (Exception e)
                 {
-                    Logger.Log($"Failed to process line \"{line}\" into \"{output}\": {e.Message}");
+                    lineFailureCount++;
+
+                    if (lineFailureCount <= max_logged_line_failures)
+                    {
+                        const int line_length_limit = 50;
+                        Logger.Log($"Failed to process line {lineNumber} \"{(line.Length <= line_length_limit ? line : string.Concat(line.AsSpan(0, line_length_limit), "…"))}\" into \"{output}\": {e.Message}");
+                    }
                 }
             }
+
+            if (lineFailureCount > max_logged_line_failures)
+                Logger.Log($"Failed to process {lineFailureCount - max_logged_line_failures} more line(s) into \"{output}\"");
         }
 
         protected virtual bool ShouldSkipLine(string line) => string.IsNullOrWhiteSpace(line) || line.AsSpan().TrimStart().StartsWith("//".AsSpan(), StringComparison.Ordinal);
@@ -84,7 +99,7 @@ namespace osu.Game.Beatmaps.Formats
         {
         }
 
-        protected virtual void ParseLine(T output, Section section, string line)
+        protected virtual void ParseLine(T output, Section section, string line, bool isPrimaryStream)
         {
             switch (section)
             {

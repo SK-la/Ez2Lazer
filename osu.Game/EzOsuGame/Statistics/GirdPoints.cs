@@ -46,8 +46,6 @@ namespace osu.Game.EzOsuGame.Statistics
 
             Invalidate(Invalidation.DrawNode);
             Invalidate(Invalidation.DrawInfo);
-
-            Schedule(() => Invalidate(Invalidation.DrawNode));
         }
 
         protected override DrawNode CreateDrawNode() => new ScorePointsDrawNode(this);

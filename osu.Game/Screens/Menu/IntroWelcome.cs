@@ -12,8 +12,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Graphics.Textures;
 using osu.Game.Audio;
+using osu.Game.EzOsuGame;
 using osu.Game.Online.API;
 using osu.Game.Skinning;
 using osuTK;
@@ -111,7 +111,7 @@ namespace osu.Game.Screens.Menu
             public LogoVisualisation LogoVisualisation { get; private set; }
 
             [BackgroundDependencyLoader]
-            private void load(TextureStore textures, IAPIProvider api)
+            private void load(EzResourceStore resources, IAPIProvider api)
             {
                 Origin = Anchor.Centre;
                 Anchor = Anchor.Centre;
@@ -147,7 +147,7 @@ namespace osu.Game.Screens.Menu
                 if (api.LocalUser.Value.IsSupporter)
                     scaleContainer.Add(welcomeText = new SkinnableSprite(@"Intro/Welcome/welcome_text"));
                 else
-                    scaleContainer.Add(welcomeText = new Sprite { Texture = textures.Get(@"Intro/Welcome/welcome_text") });
+                    scaleContainer.Add(welcomeText = new Sprite { Texture = resources.Get(@"Intro/Welcome/welcome_text", EzTextureUsage.Shell) });
 
                 welcomeText.Anchor = Anchor.Centre;
                 welcomeText.Origin = Anchor.Centre;

@@ -35,9 +35,6 @@ using osu.Game.Overlays.Mods;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Toolbar;
 using osu.Game.Overlays.Volume;
-using osu.Game.Rulesets;
-using osu.Game.Rulesets.Mania;
-using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Osu.Mods;
@@ -255,7 +252,9 @@ namespace osu.Game.Tests.Visual.Navigation
             SoloSongSelect songSelect = null;
             double scrollPosition = 0;
 
+            AddStep("move to screen centre", () => InputManager.MoveMouseTo(Game));
             AddStep("set game volume to max", () => Game.Dependencies.Get<FrameworkConfigManager>().SetValue(FrameworkSetting.VolumeUniversal, 1d));
+            AddStep("set effect volume to max", () => Game.Dependencies.Get<FrameworkConfigManager>().SetValue(FrameworkSetting.VolumeEffect, 1d));
             AddUntilStep("wait for volume overlay to hide", () => Game.ChildrenOfType<VolumeOverlay>().SingleOrDefault()?.State.Value, () => Is.EqualTo(Visibility.Hidden));
             PushAndConfirm(() => songSelect = new SoloSongSelect());
             AddUntilStep("wait for song select", () => songSelect.IsLoaded);
@@ -294,7 +293,7 @@ namespace osu.Game.Tests.Visual.Navigation
                 InputManager.ScrollVerticalBy(-1);
                 InputManager.ReleaseKey(Key.AltLeft);
             }, 5);
-            AddAssert("game volume decreased", () => Game.Dependencies.Get<FrameworkConfigManager>().Get<double>(FrameworkSetting.VolumeUniversal), () => Is.LessThan(1));
+            AddAssert("effect volume decreased", () => Game.Dependencies.Get<FrameworkConfigManager>().Get<double>(FrameworkSetting.VolumeEffect), () => Is.LessThan(1));
 
             AddStep("move to carousel", () => InputManager.MoveMouseTo(songSelect.ChildrenOfType<BeatmapCarousel>().Single()));
             AddStep("scroll down", () => InputManager.ScrollVerticalBy(-1));
@@ -313,6 +312,26 @@ namespace osu.Game.Tests.Visual.Navigation
             PushAndConfirm(() => new SoloSongSelect());
             AddStep("Show mods overlay", () => InputManager.Key(Key.F1));
             AddAssert("Overlay was shown", () => Game!.ChildrenOfType<ModSelectOverlay>().Single().State.Value == Visibility.Visible);
+        }
+
+        [Test]
+        public void TestFooterButtonsAfterModSelectForceExit()
+        {
+            Screens.Select.SongSelect songSelect = null;
+            MainMenu mainMenu = null;
+
+            AddUntilStep("get main menu", () => (mainMenu = Game.ScreenStack.CurrentScreen as MainMenu) != null);
+            PushAndConfirm(() => songSelect = new SoloSongSelect());
+            AddStep("show mods overlay", () => InputManager.Key(Key.F1));
+
+            // follows alt-f4 code path behavior, can't use home or `game.AttemptExit()` as those run `CloseAllOverlays()`
+            AddStep("force exit song select", () => mainMenu.MakeCurrent());
+
+            AddStep("import beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).GetResultSafely());
+            PushAndConfirm(() => songSelect = new SoloSongSelect());
+            AddUntilStep("wait for song select", () => songSelect.CarouselItemsPresented);
+            AddStep("show options", () => InputManager.Key(Key.F3));
+            AddAssert("options is shown", () => Game!.ChildrenOfType<FooterButtonOptions.Popover>().Single().State.Value, () => Is.EqualTo(Visibility.Visible));
         }
 
         [Test]
@@ -418,7 +437,7 @@ namespace osu.Game.Tests.Visual.Navigation
 
             void checkOffset(double offset)
             {
-                AddUntilStep($"control offset is {offset}", () => this.ChildrenOfType<GameplayOffsetControl>().Single().ChildrenOfType<BeatmapOffsetControl>().Single().Current.Value,
+                AddUntilStep($"control offset is {offset}", () => Game.ChildrenOfType<GameplayOffsetControl>().Single().ChildrenOfType<BeatmapOffsetControl>().Single().Current.Value,
                     () => Is.EqualTo(offset));
                 AddUntilStep($"database offset is {offset}", () => Game.BeatmapManager.QueryBeatmap(b => b.ID == Game.Beatmap.Value.BeatmapInfo.ID)!.UserSettings.Offset,
                     () => Is.EqualTo(offset));
@@ -429,12 +448,15 @@ namespace osu.Game.Tests.Visual.Navigation
         public void TestScrollSpeedAdjustDuringGameplay()
         {
             Player player = null;
+            double initialTimeRange = 0;
 
             Screens.Select.SongSelect songSelect = null;
             PushAndConfirm(() => songSelect = new SoloSongSelect());
             AddUntilStep("wait for song select", () => songSelect.CarouselItemsPresented);
 
-            AddStep("import beatmap", () => BeatmapImportHelper.LoadOszIntoOsu(Game).WaitSafely());
+            AddStep("enable converted beatmaps", () => Game.LocalConfig.SetValue(OsuSetting.ShowConvertedBeatmaps, true));
+
+            AddStep("import beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).WaitSafely());
 
             AddUntilStep("wait for selected", () => !Game.Beatmap.IsDefault);
 
@@ -444,6 +466,8 @@ namespace osu.Game.Tests.Visual.Navigation
                 InputManager.Key(Key.Number4);
                 InputManager.ReleaseKey(Key.LControl);
             });
+
+            AddUntilStep("wait for mania ruleset", () => Game.Ruleset.Value.OnlineID == 3);
 
             AddStep("set mods", () => Game.SelectedMods.Value = new Mod[] { new OsuModNoFail() });
             AddStep("press enter", () => InputManager.Key(Key.Enter));
@@ -456,27 +480,21 @@ namespace osu.Game.Tests.Visual.Navigation
             });
 
             AddUntilStep("wait for track playing", () => Game.Beatmap.Value.Track.IsRunning);
-            checkScrollSpeed(8, 8);
+
+            AddStep("store initial scroll time range", () => initialTimeRange = Game.ChildrenOfType<DrawableManiaRuleset>().Single().TargetTimeRange);
 
             AddStep("adjust scroll speed via keyboard", () => InputManager.Key(Key.F4));
-            checkScrollSpeed(9, 9);
+            AddUntilStep("scroll speed changed", () => Game.ChildrenOfType<DrawableManiaRuleset>().Single().TargetTimeRange, () => Is.Not.EqualTo(initialTimeRange));
 
             AddStep("seek beyond 10 seconds", () => player.ChildrenOfType<GameplayClockContainer>().First().Seek(10500));
             AddUntilStep("wait for seek", () => player.ChildrenOfType<GameplayClockContainer>().First().CurrentTime, () => Is.GreaterThan(10600));
-            AddStep("attempt adjust offset via keyboard", () => InputManager.Key(Key.F4));
-            checkScrollSpeed(9, 9);
 
-            AddStep("attempt adjust offset via config change", () => getConfigManager().SetValue(ManiaRulesetSetting.ScrollSpeed, 10.0));
-            checkScrollSpeed(10, 9);
+            double timeRangeAfterSeek = 0;
+            AddStep("store scroll time range after seek", () => timeRangeAfterSeek = Game.ChildrenOfType<DrawableManiaRuleset>().Single().TargetTimeRange);
 
-            void checkScrollSpeed(double configValue, double gameplayValue)
-            {
-                AddUntilStep($"config value is {configValue}", () => getConfigManager().Get<double>(ManiaRulesetSetting.ScrollSpeed), () => Is.EqualTo(configValue));
-                AddUntilStep($"gameplay value is {gameplayValue}", () => this.ChildrenOfType<DrawableManiaRuleset>().Single().TargetTimeRange,
-                    () => Is.EqualTo(DrawableManiaRuleset.ComputeScrollTime(gameplayValue, 200, 5)));
-            }
-
-            ManiaRulesetConfigManager getConfigManager() => ((ManiaRulesetConfigManager)Game.Dependencies.Get<IRulesetConfigCache>().GetConfigFor(new ManiaRuleset())!);
+            // Ez allows scroll speed adjustment after 10 seconds (upstream 10s lock is commented out in SubmittingPlayer).
+            AddStep("adjust scroll speed via keyboard after seek", () => InputManager.Key(Key.F4));
+            AddUntilStep("scroll speed changed after seek", () => Game.ChildrenOfType<DrawableManiaRuleset>().Single().TargetTimeRange, () => Is.Not.EqualTo(timeRangeAfterSeek));
         }
 
         [Test]
@@ -510,12 +528,14 @@ namespace osu.Game.Tests.Visual.Navigation
 
             AddStep("seek beyond 10 seconds", () => player.ChildrenOfType<GameplayClockContainer>().First().Seek(10500));
             AddUntilStep("wait for seek", () => player.ChildrenOfType<GameplayClockContainer>().First().CurrentTime, () => Is.GreaterThan(10600));
-            AddStep("attempt adjust offset via keyboard", () => InputManager.Key(Key.Minus));
-            checkOffset(-1);
+
+            // Ez allows offset adjustment after 10 seconds (upstream lock is commented out in SubmittingPlayer).
+            AddStep("adjust offset via keyboard after seek", () => InputManager.Key(Key.Minus));
+            checkOffset(-2);
 
             void checkOffset(double offset)
             {
-                AddUntilStep($"control offset is {offset}", () => this.ChildrenOfType<GameplayOffsetControl>().Single().ChildrenOfType<BeatmapOffsetControl>().Single().Current.Value,
+                AddUntilStep($"control offset is {offset}", () => Game.ChildrenOfType<GameplayOffsetControl>().Single().ChildrenOfType<BeatmapOffsetControl>().Single().Current.Value,
                     () => Is.EqualTo(offset));
                 AddUntilStep($"database offset is {offset}", () => Game.BeatmapManager.QueryBeatmap(b => b.ID == Game.Beatmap.Value.BeatmapInfo.ID)!.UserSettings.Offset,
                     () => Is.EqualTo(offset));
@@ -549,7 +569,7 @@ namespace osu.Game.Tests.Visual.Navigation
             // todo: see https://github.com/ppy/osu/issues/22220
             // tests are supposed to be immune to this edge case by the logic in TestPlayer,
             // but we're running a full game instance here, so we have to work around it manually.
-            AddStep("end spectator before retry", () => Game.SpectatorClient.EndPlaying(player.GameplayState));
+            AddStep("end spectator before retry", () => Game.SpectatorClient.EndPlaying(null, player.GameplayState));
 
             AddStep("attempt to retry", () => player.ChildrenOfType<HotkeyRetryOverlay>().First().Action());
             AddAssert("old player score marked failed", () => player.Score.ScoreInfo.Rank, () => Is.EqualTo(ScoreRank.F));
@@ -640,10 +660,14 @@ namespace osu.Game.Tests.Visual.Navigation
 
             AddStep("press back button", () => Game.ChildrenOfType<BackButton>().First().Action!.Invoke());
 
+            AddUntilStep("wait for song select", () => Game.ScreenStack.CurrentScreen is SoloSongSelect);
+
             AddStep("show local scores",
                 () => Game.ChildrenOfType<Dropdown<BeatmapLeaderboardScope>>().First().Current.Value = BeatmapLeaderboardScope.Local);
 
-            AddUntilStep("wait for score displayed", () => (scorePanel = Game.ChildrenOfType<BeatmapLeaderboardScore>().FirstOrDefault(s => s.Score.Equals(score))) != null);
+            AddUntilStep("wait for leaderboard populated", () => Game.ChildrenOfType<BeatmapLeaderboardScore>().Any());
+
+            AddUntilStep("wait for score displayed", () => (scorePanel = Game.ChildrenOfType<BeatmapLeaderboardScore>().FirstOrDefault(s => s.Score.ID == score.ID)) != null);
 
             AddStep("Clear all scores", () => Game.Dependencies.Get<ScoreManager>().Delete());
 
@@ -667,10 +691,14 @@ namespace osu.Game.Tests.Visual.Navigation
 
             AddStep("press back button", () => Game.ChildrenOfType<BackButton>().First().Action!.Invoke());
 
+            AddUntilStep("wait for song select", () => Game.ScreenStack.CurrentScreen is SoloSongSelect);
+
             AddStep("show local scores",
                 () => Game.ChildrenOfType<Dropdown<BeatmapLeaderboardScope>>().First().Current.Value = BeatmapLeaderboardScope.Local);
 
-            AddUntilStep("wait for score displayed", () => (scorePanel = Game.ChildrenOfType<BeatmapLeaderboardScore>().FirstOrDefault(s => s.Score.Equals(score))) != null);
+            AddUntilStep("wait for leaderboard populated", () => Game.ChildrenOfType<BeatmapLeaderboardScore>().Any());
+
+            AddUntilStep("wait for score displayed", () => (scorePanel = Game.ChildrenOfType<BeatmapLeaderboardScore>().FirstOrDefault(s => s.Score.ID == score.ID)) != null);
 
             AddStep("right click panel", () =>
             {

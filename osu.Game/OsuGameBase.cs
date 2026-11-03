@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
@@ -33,6 +34,7 @@ using osu.Framework.IO.Stores;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
+using osu.Framework.Screens;
 using osu.Framework.Timing;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
@@ -41,16 +43,30 @@ using osu.Game.Beatmaps.Formats;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Audio;
+using osu.Game.EzOsuGame.Background.Pixiv;
+using osu.Game.EzOsuGame.Camera;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.ExternalRulesets;
+using osu.Game.EzOsuGame.Fonts;
+using osu.Game.EzOsuGame.Input;
+using osu.Game.EzOsuGame.Layout;
+using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Mods;
+using osu.Game.EzOsuGame.Online;
+using osu.Game.EzOsuGame.Playback;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Startup;
+using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input;
 using osu.Game.Input.Bindings;
 using osu.Game.IO;
-using osu.Game.EzOsuGame;
-using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Online;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.API;
@@ -83,9 +99,9 @@ namespace osu.Game
     public partial class OsuGameBase : Framework.Game, ICanAcceptFiles, IBeatSyncProvider
     {
 #if DEBUG
-        public const string GAME_NAME = "ez2osu! (development)";
+        public const string GAME_NAME = "Ez2Lazer (development)";
 #else
-        public const string GAME_NAME = "ez2osu!";
+        public const string GAME_NAME = "Ez2Lazer";
 #endif
 
         public const string OSU_PROTOCOL = "osu://";
@@ -113,6 +129,9 @@ namespace osu.Game
 
         public virtual EndpointConfiguration CreateEndpoints()
         {
+            if (UseDevelopmentServer && GlobalConfigStore.UseDevelopmentEndpointsForTests)
+                return new DevelopmentEndpointConfiguration();
+
             // 如果Ez2ConfigManager已初始化，根据服务器预设选择对应的配置
             if (Ez2ConfigManager != null)
             {
@@ -121,7 +140,7 @@ namespace osu.Game
 
                 return serverPreset switch
                 {
-                    ServerPreset.Gu => new GuServerEndpointConfiguration(),
+                    ServerPreset.g0v0 => new GuServerEndpointConfiguration(),
                     ServerPreset.Manual => new ManualServerEndpointConfiguration(Ez2ConfigManager),
                     _ => new ProductionEndpointConfiguration()
                 };
@@ -144,6 +163,11 @@ namespace osu.Game
 
         public bool IsDeployedBuild => AssemblyVersion.Major > 0;
 
+        /// <summary>
+        /// When true, unhandled errors may be submitted to ppy Sentry. Disabled for Ez2Lazer.
+        /// </summary>
+        public virtual bool SubmitErrorsToSentry => false;
+
         public virtual string Version
         {
             get
@@ -160,7 +184,7 @@ namespace osu.Game
                     return informationalVersion.Split('+').First();
 
                 Version version = AssemblyVersion;
-                return $@"{version.Major}.{version.Minor}.{version.Build}-lazer";
+                return $@"{version.Major}.{version.Minor}.{version.Build}-ez2lazer";
             }
         }
 
@@ -194,17 +218,46 @@ namespace osu.Game
 
         protected MusicController MusicController { get; private set; }
 
+        /// <summary>
+        /// Functional-layer transport shared by playback UIs. Lives here with <see cref="MusicController"/> so all
+        /// hosts provide it; the base resolves no gameplay target because only <see cref="OsuGame"/> has a screen stack.
+        /// </summary>
+        protected EzPlaybackController EzPlayback { get; private set; }
+
+        /// <summary>
+        /// The screen the playback transport should follow for a gameplay target, or <c>null</c> when the host has
+        /// no screen stack (e.g. the test browser). Overridden by <see cref="OsuGame"/>.
+        /// </summary>
+        protected virtual IScreen CurrentScreen => null;
+
         protected IAPIProvider API { get; set; }
 
         protected Storage Storage { get; set; }
 
         protected Ez2ConfigManager Ez2ConfigManager { get; private set; }
 
+        private EzCameraHost ezCameraHost;
+
+        /// <summary>
+        /// Desktop overrides this so the Windows capture assembly can be loaded after the camera HUD switch is turned on.
+        /// The assembly is not loaded until that switch is on.
+        /// </summary>
+        protected virtual bool EnableWindowsCameraBackend => false;
+
         protected EzSkinInfo EzSkinInfo { get; private set; }
 
-        protected EzLocalTextureFactory NoteFactory { get; private set; }
+        protected EzResourceStore EzResourceStore { get; private set; }
 
-        protected EzResourceProvider EzResourceProvider { get; private set; }
+        protected EzGameplayWarmUpService EzGameplayWarmUp { get; private set; }
+
+        protected IEzReplaySession ReplaySession { get; private set; }
+
+        private Bindable<FrameSync> ezUpdateFrameLimiter = null!;
+        private Bindable<FrameSync> ezDrawFrameLimiter = null!;
+        private Bindable<double> ezBaseFrameLimiter = null!;
+        private bool ezFrameLimiterDisplayModeBound;
+
+        private Bindable<bool> ezAnalysisSqliteEnabled = null!;
 
         /// <summary>
         /// The language in which the game is currently displayed in.
@@ -241,6 +294,7 @@ namespace osu.Game
         private EzAnalysisPersistentStore ezAnalysisPersistentStore;
         private EzAnalysisCache ezAnalysisCache;
         private IBeatmapUpdater beatmapUpdater;
+        private OnlineAssetCachingStore onlineAssetStore;
 
         private UserLookupCache userCache;
         private BeatmapLookupCache beatmapCache;
@@ -275,7 +329,6 @@ namespace osu.Game
         private readonly BindableNumber<double> globalTrackVolumeAdjust = new BindableNumber<double>(global_track_volume_adjust);
 
         private Bindable<string> frameworkLocale = null!;
-        private IBindable<bool> ezAnalysisSqliteEnabled;
 
         private IBindable<LocalisationParameters> localisationParameters = null!;
 
@@ -315,26 +368,37 @@ namespace osu.Game
 
             // 初始化并注册EzSkinSettingsManager
             Ez2ConfigManager = new Ez2ConfigManager(Storage);
-            ezAnalysisSqliteEnabled = Ez2ConfigManager.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
-            EzAnalysisPersistentStore.Enabled = ezAnalysisSqliteEnabled.Value;
-            ezAnalysisSqliteEnabled.BindValueChanged(v => EzAnalysisPersistentStore.Enabled = v.NewValue, true);
-
             GlobalConfigStore.Config = LocalConfig;
             GlobalConfigStore.EzConfig = Ez2ConfigManager;
             dependencies.Cache(Ez2ConfigManager);
+
+            // 记录实际生效的 GC 形态。选择项的启动引导在 osu.Desktop 侧，之后仅靠本行即可确认是否已应用。
+            EzStartupTrace.Log($"GC server={GCSettings.IsServerGC} latency={GCSettings.LatencyMode}");
+            dependencies.Cache(new PixivBackgroundCoordinator(Storage, Ez2ConfigManager));
+            // dependencies.Cache(new EzLogoBackdropSampler());
+
+            Func<IEzCameraBackend> cameraFactory = null;
+
+            if (EnableWindowsCameraBackend && OperatingSystem.IsWindows())
+                cameraFactory = EzCameraBackendLoader.Create;
+
+            ezCameraHost = new EzCameraHost(Ez2ConfigManager.GetBindable<bool>(Ez2Setting.EzHudCameraEnabled), cameraFactory);
+            dependencies.Cache(ezCameraHost);
+
+            bindFrameLimiter(Ez2ConfigManager, frameworkConfig);
             EzSkinInfo = new EzSkinInfo(Ez2ConfigManager);
             dependencies.CacheAs<IEzSkinInfo>(EzSkinInfo);
-            dependencies.Cache(NoteFactory = new EzLocalTextureFactory(
-                Ez2ConfigManager,
-                Host.Renderer,
-                Storage));
-            dependencies.CacheAs(EzResourceProvider = new EzResourceProvider(Ez2ConfigManager, Host.Renderer, Audio, Storage, realm));
-            dependencies.CacheAs<IStorageResourceProvider>(EzResourceProvider);
+            dependencies.CacheAs(EzResourceStore = new EzResourceStore(Ez2ConfigManager, Host.Renderer, Audio, Storage, realm));
+            dependencies.CacheAs<IStorageResourceProvider>(EzResourceStore);
+            dependencies.Cache(new EzLocalTextureFactory(Ez2ConfigManager, EzResourceStore));
+            dependencies.Cache(new ManiaPlayfieldLayoutConfig(Storage));
+            dependencies.Cache(EzGameplayWarmUp = new EzGameplayWarmUpService());
 
             dependencies.Cache(realm = new RealmAccess(Storage, CLIENT_DATABASE_FILENAME, Host.UpdateThread));
 
-            dependencies.CacheAs<RulesetStore>(RulesetStore = new RealmRulesetStore(realm, Storage));
+            dependencies.CacheAs<RulesetStore>(RulesetStore = new EzRealmRulesetStore(realm, Storage));
             dependencies.CacheAs<IRulesetStore>(RulesetStore);
+            dependencies.CacheAs<IEzExternalRulesetCatalog>((EzRealmRulesetStore)RulesetStore);
 
             Decoder.RegisterDependencies(RulesetStore);
 
@@ -344,16 +408,26 @@ namespace osu.Game
             largeStore.AddTextureSource(Host.CreateTextureLoaderStore(CreateOnlineStore()));
             dependencies.Cache(largeStore);
 
+            dependencies.Cache(onlineAssetStore = new OnlineAssetCachingStore(Host, realm));
+
             dependencies.CacheAs(LocalConfig);
             dependencies.CacheAs<IGameplaySettings>(LocalConfig);
 
+            // The catalog scan opens every installed font; reuse the persisted name map when possible.
+            EzSystemFontCatalog.AttachCache(Storage);
             InitialiseFonts();
+            EzUiFontBootstrap.Apply(this, Ez2ConfigManager);
 
             addFilesWarning();
 
             Audio.Samples.PlaybackConcurrency = SAMPLE_CONCURRENCY;
 
-            dependencies.Cache(SkinManager = new SkinManager(Storage, realm, Host, Resources, Audio, Scheduler));
+            // Process-level ASIO configuration, applied once as the audio manager becomes available.
+            // Previously this ran from the settings panel's background load, which pulled audio init into
+            // the settings preload window and depended on that panel ever being constructed.
+            Audio.ApplyEzAsioDefaults();
+
+            dependencies.Cache(SkinManager = new SkinManager(Storage, realm, Host, Resources, Audio, Scheduler, Ez2ConfigManager));
             dependencies.CacheAs<ISkinSource>(SkinManager);
 
             EndpointConfiguration endpoints = CreateEndpoints();
@@ -381,12 +455,48 @@ namespace osu.Game
             dependencies.Cache(BeatmapManager = new BeatmapManager(Storage, realm, API, Audio, Resources, Host, defaultBeatmap, difficultyCache, performOnlineLookups: true));
             dependencies.CacheAs<IWorkingBeatmapCache>(BeatmapManager);
 
+            ezAnalysisSqliteEnabled = Ez2ConfigManager.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
+            ezAnalysisSqliteEnabled.BindValueChanged(v => EzAnalysisPersistentStore.Enabled = v.NewValue, true);
+            // EzAnalysisPersistentStore.Enabled = ezAnalysisSqliteEnabled.Value;
+
             ezAnalysisPersistentStore = new EzAnalysisPersistentStore(Storage);
-            var ezAnalysisDatabase = new EzAnalysisDatabase(ezAnalysisPersistentStore, BeatmapManager, Ez2ConfigManager);
-            ezAnalysisCache = new EzAnalysisCache(ezAnalysisDatabase, Ez2ConfigManager);
+            var ezAnalysisDatabase = new EzAnalysisDatabase(ezAnalysisPersistentStore, BeatmapManager, RulesetStore, Ez2ConfigManager);
             dependencies.Cache(ezAnalysisPersistentStore);
             dependencies.Cache(ezAnalysisDatabase);
-            dependencies.Cache(ezAnalysisCache);
+            dependencies.Cache(ezAnalysisCache = new EzAnalysisCache());
+            ReplaySession = new EzReplaySessionRouter(RulesetStore.AvailableRulesets, BeatmapManager);
+            dependencies.CacheAs<IEzReplaySession>(ReplaySession);
+
+            // Skill metrics: MSD (beatmap), SSR + Dan (player). Read via EzSkillProvider; writers stay separate.
+            // See EzSkillSystems. Dan is a player skill for Profile, but uses its own estimate table/algorithm.
+            var skillRegistry = new EzSkillRegistry();
+            var skillStore = new EzSkillStore(realm);
+            var beatmapMsdComputer = new EzBeatmapMsdComputer(BeatmapManager, skillStore);
+            var chartDanEstimator = new EzChartDanEstimator(BeatmapManager, beatmapMsdComputer);
+            var localProfileStore = new EzLocalProfileStore(Storage);
+            // Skill aggregators reuse localProfileStore as the per-play SSR / Dan cache (incremental backfill).
+            var playerSsrAggregator = new EzPlayerSsrAggregator(BeatmapManager, skillStore, localProfileStore);
+            var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanEstimator, skillStore, localProfileStore);
+            var skillProvider = new EzSkillProvider(skillStore, skillRegistry, chartDanEstimator, localProfileStore, BeatmapManager);
+
+            dependencies.Cache(skillRegistry);
+            dependencies.Cache(skillStore);
+            dependencies.Cache(localProfileStore);
+            dependencies.Cache(skillProvider);
+            // Write-side services still cached for LocalProfile / analysis pipelines.
+            dependencies.Cache(beatmapMsdComputer);
+            dependencies.Cache(chartDanEstimator);
+            dependencies.Cache(playerSsrAggregator);
+            dependencies.Cache(playerDanAggregator);
+
+            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, playerSsrAggregator, playerDanAggregator, localProfileStore, skillProvider));
+            dependencies.Cache(new EzLocalProfileOnlinePullService(API, ScoreManager, BeatmapManager, realm, Storage));
+            dependencies.Cache(new EzAnalysisPlayerSelection());
+
+            if (Ez2ConfigManager.Get<bool>(Ez2Setting.EzScoreRaceServiceEnabled))
+            {
+                // TODO：Score Race Service
+            }
 
             dependencies.Cache(BeatmapDownloader = new BeatmapModelDownloader(BeatmapManager, API));
             dependencies.Cache(ScoreDownloader = new ScoreModelDownloader(ScoreManager, API));
@@ -455,6 +565,11 @@ namespace osu.Game
             base.Content.Add(MusicController = new MusicController());
             dependencies.CacheAs(MusicController);
 
+            // Functional-layer transport for playback UIs (editor progress bar, visualizer ring). Registered here
+            // alongside MusicController so every host — the game and test runners alike — can resolve it.
+            base.Content.Add(EzPlayback = new EzPlaybackController(() => CurrentScreen));
+            dependencies.CacheAs(EzPlayback);
+
             MusicController.TrackChanged += onTrackChanged;
             base.Content.Add(beatmapClock);
 
@@ -485,6 +600,10 @@ namespace osu.Game
 
             base.Content.Add(new TouchInputInterceptor());
             base.Content.Add(hitErrorTracker);
+
+            var scratchAxisTracker = new ScratchAxisDeviceTracker();
+            dependencies.Cache(scratchAxisTracker);
+            base.Content.Add(scratchAxisTracker);
 
             KeyBindingStore = new RealmKeyBindingStore(realm, keyCombinationProvider);
             KeyBindingStore.Register(globalBindings, RulesetStore.AvailableRulesets);
@@ -550,6 +669,9 @@ namespace osu.Game
             AddFont(Resources, @"Fonts/Inter/Inter-Bold");
             AddFont(Resources, @"Fonts/Inter/Inter-BoldItalic");
 
+            // Localized system outline faces must precede Noto CJK so empty-name scans prefer them.
+            EzUiFontBootstrap.RegisterLocalizedFallbacks(this, Ez2ConfigManager);
+
             AddFont(Resources, @"Fonts/Noto/Noto-Basic");
             AddFont(Resources, @"Fonts/Noto/Noto-Bopomofo");
             AddFont(Resources, @"Fonts/Noto/Noto-CJK-Basic");
@@ -557,11 +679,66 @@ namespace osu.Game
             AddFont(Resources, @"Fonts/Noto/Noto-Hangul");
             AddFont(Resources, @"Fonts/Noto/Noto-Thai");
 
+            // Emoji glyph fallback order (empty FontName scan): system colour emoji → packaged
+            // Twemoji / NotoColorEmoji → BMFont Noto-Emoji (monochrome).
+            EzUiFontBootstrap.RegisterSystemEmojiFallback(this, Ez2ConfigManager);
+
+            const string twemoji = @"Fonts/Twemoji/Twemoji.Mozilla";
+
+            if (resourcesContainFont(twemoji))
+            {
+                try
+                {
+                    AddOutlineFont(Resources, twemoji);
+                }
+                catch
+                {
+                    // Optional packaged colour emoji (CC BY 4.0 Twemoji / Mozilla COLR).
+                }
+            }
+
+            const string color_emoji = @"Fonts/Emoji/NotoColorEmoji-Regular";
+
+            if (resourcesContainFont(color_emoji))
+            {
+                try
+                {
+                    AddOutlineFont(Resources, color_emoji);
+                }
+                catch
+                {
+                    // Optional extra outline fallback after system / Twemoji.
+                }
+            }
+
+            try
+            {
+                Fonts.AddTextureSource(new GlyphStore(Resources, @"Fonts/Emoji/Noto-Emoji", Host.CreateTextureLoaderStore(Resources)));
+            }
+            catch
+            {
+                // Silent BMFont hole-fill when system / outline colour sources miss a codepoint.
+            }
+
             AddFont(Resources, @"Fonts/Venera/Venera-Light");
             AddFont(Resources, @"Fonts/Venera/Venera-Bold");
             AddFont(Resources, @"Fonts/Venera/Venera-Black");
 
             Fonts.AddStore(new OsuIcon.OsuIconStore(Textures));
+        }
+
+        private bool resourcesContainFont(string assetName)
+        {
+            // OutlineFont ResourceStore probes these extensions.
+            foreach (string ext in new[] { ".ttf", ".otf", ".ttc", ".woff", string.Empty })
+            {
+                using var stream = Resources.GetStream(assetName + ext);
+
+                if (stream != null)
+                    return true;
+            }
+
+            return false;
         }
 
         protected override void LoadComplete()
@@ -589,6 +766,16 @@ namespace osu.Game
             }).Where(m => m != null);
 
             Localisation.AddLocaleMappings(localeMappings);
+
+            // 启动脚本皮肤文件监控
+            var skinManager = Dependencies.Get<SkinManager>();
+            skinManager.StartScriptWatching();
+
+            ensureFrameLimiterDisplayModeBinding();
+            scheduleFrameLimiterApply();
+
+            // Nullable mod Seed writes must reach SettingsNumberBox on the update thread only.
+            EzModSeed.BindUpdateScheduler(Host.UpdateThread.Scheduler);
         }
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent) =>
@@ -602,10 +789,46 @@ namespace osu.Game
             Storage ??= host.Storage;
 
             LocalConfig ??= UseDevelopmentServer
-                ? new DevelopmentOsuConfigManager(Storage, host)
-                : new OsuConfigManager(Storage, host);
+                ? new DevelopmentOsuConfigManager(Storage)
+                : new OsuConfigManager(Storage);
 
             host.ExceptionThrown += onExceptionThrown;
+        }
+
+        private void bindFrameLimiter(Ez2ConfigManager ezConfig, FrameworkConfigManager frameworkConfig)
+        {
+            ezUpdateFrameLimiter = ezConfig.GetBindable<FrameSync>(Ez2Setting.UpdateFrameLimiter);
+            ezDrawFrameLimiter = frameworkConfig.GetBindable<FrameSync>(FrameworkSetting.FrameSync);
+            ezBaseFrameLimiter = ezConfig.GetBindable<double>(Ez2Setting.FrameLimiterBase);
+
+            ezUpdateFrameLimiter.BindValueChanged(_ => scheduleFrameLimiterApply(), true);
+            ezDrawFrameLimiter.BindValueChanged(_ => scheduleFrameLimiterApply(), true);
+            ezBaseFrameLimiter.BindValueChanged(_ => scheduleFrameLimiterApply(), true);
+
+            ensureFrameLimiterDisplayModeBinding();
+        }
+
+        private void ensureFrameLimiterDisplayModeBinding()
+        {
+            if (ezFrameLimiterDisplayModeBound || Host.Window == null)
+                return;
+
+            Host.Window.CurrentDisplayMode.BindValueChanged(_ => scheduleFrameLimiterApply());
+            ezFrameLimiterDisplayModeBound = true;
+        }
+
+        private void scheduleFrameLimiterApply()
+        {
+            // Defer to the update thread so we apply after GameHost.updateFrameSyncMode() during startup.
+            Host?.UpdateThread.Scheduler.Add(applyFrameLimiter);
+        }
+
+        private void applyFrameLimiter()
+        {
+            if (Host == null)
+                return;
+
+            EzFrameLimiter.Apply(Host, ezUpdateFrameLimiter.Value, ezDrawFrameLimiter.Value, ezBaseFrameLimiter);
         }
 
         #region Exit handling
@@ -651,9 +874,9 @@ namespace osu.Game
         /// <param name="path">The path to migrate to.</param>
         /// <returns>Whether migration succeeded to completion. If <c>false</c>, some files were left behind.</returns>
         /// <exception cref="TimeoutException"></exception>
-        public bool Migrate(string path)
+        public bool MigrateUserData(string path)
         {
-            Logger.Log($@"Migrating osu! data from ""{Storage.GetFullPath(string.Empty)}"" to ""{path}""...");
+            Logger.Log($@"Migrating Ez2Lazer data from ""{Storage.GetFullPath(string.Empty)}"" to ""{path}""...");
 
             IDisposable realmBlocker = null;
 
@@ -846,11 +1069,14 @@ namespace osu.Game
             base.Dispose(isDisposing);
 
             ezAnalysisPersistentStore?.Dispose();
+            ezCameraHost?.Dispose();
 
             RulesetStore?.Dispose();
             LocalConfig?.Dispose();
 
             beatmapUpdater?.Dispose();
+
+            onlineAssetStore?.Dispose();
 
             realm?.Dispose();
 

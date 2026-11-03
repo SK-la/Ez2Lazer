@@ -1,0 +1,84 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.Collections.Generic;
+using osu.Framework.Bindables;
+using osu.Framework.Localisation;
+using osu.Framework.Platform;
+
+namespace osu.Game.EzOsuGame.Overlays
+{
+    /// <summary>
+    /// 一次资源选择会话：候选键、预览品类、选中写回回调。
+    /// </summary>
+    public sealed class EzResourcePickerDescriptor
+    {
+        public required LocalisableString Title { get; init; }
+
+        public required EzResourcePickerCategory Category { get; init; }
+
+        public required IReadOnlyList<string> Items { get; init; }
+
+        public string? CurrentKey { get; init; }
+
+        public required Action<string> Commit { get; init; }
+
+        public static EzResourcePickerDescriptor ForGameTheme(Storage storage, Bindable<string> bindable)
+        {
+            EzGameThemeCandidates.Refresh(storage);
+            var items = EzGameThemeCandidates.CreateDropdownItems(bindable);
+
+            return new EzResourcePickerDescriptor
+            {
+                Title = @"GameTheme",
+                Category = EzResourcePickerCategory.GameTheme,
+                Items = items,
+                CurrentKey = bindable.Value,
+                Commit = key => bindable.Value = key
+            };
+        }
+
+        public static EzResourcePickerDescriptor ForNoteSet(Storage storage, Bindable<string> bindable)
+        {
+            var items = EzResourceDiscovery.ListNoteSetCandidates(storage);
+
+            return new EzResourcePickerDescriptor
+            {
+                Title = @"Note Set",
+                Category = EzResourcePickerCategory.NoteSet,
+                Items = items,
+                CurrentKey = bindable.Value,
+                Commit = key => bindable.Value = key
+            };
+        }
+
+        public static EzResourcePickerDescriptor ForStage(Storage storage, Bindable<string> bindable)
+        {
+            var items = EzResourceDiscovery.ListStageCandidates(storage);
+
+            return new EzResourcePickerDescriptor
+            {
+                Title = @"Stage",
+                Category = EzResourcePickerCategory.Stage,
+                Items = items,
+                CurrentKey = bindable.Value,
+                Commit = key => bindable.Value = key
+            };
+        }
+
+        public static EzResourcePickerDescriptor ForJudgementLine(Storage storage, Bindable<string> bindable)
+        {
+            var items = EzResourceDiscovery.ListJudgementLineCandidates(storage);
+
+            return new EzResourcePickerDescriptor
+            {
+                Title = @"JudgementLine",
+                Category = EzResourcePickerCategory.JudgementLine,
+                Items = items,
+                CurrentKey = bindable.Value,
+                Commit = key => bindable.Value = key
+            };
+        }
+    }
+}

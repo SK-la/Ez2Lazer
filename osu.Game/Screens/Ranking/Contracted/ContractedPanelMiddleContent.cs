@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps.Drawables;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Online.Leaderboards;
@@ -78,10 +79,10 @@ namespace osu.Game.Screens.Ranking.Contracted
                                     RelativeSizeAxes = Axes.Both,
                                     Colour = Color4Extensions.FromHex("444")
                                 },
-                                new UserCoverBackground
+                                new CoverBackground
                                 {
                                     RelativeSizeAxes = Axes.Both,
-                                    User = score.User,
+                                    Model = score.User,
                                     Colour = ColourInfo.GradientVertical(Color4.White.Opacity(0.5f), Color4Extensions.FromHex("#444").Opacity(0))
                                 },
                                 new FillFlowContainer
@@ -90,7 +91,7 @@ namespace osu.Game.Screens.Ranking.Contracted
                                     Padding = new MarginPadding(10),
                                     Direction = FillDirection.Vertical,
                                     Spacing = new Vector2(0, 10),
-                                    Children = new Drawable[]
+                                    Children = new[]
                                     {
                                         new UpdateableAvatar(score.User)
                                         {
@@ -159,9 +160,10 @@ namespace osu.Game.Screens.Ranking.Contracted
                                                     Origin = Anchor.TopCentre,
                                                     Scale = new Vector2(0.3f),
                                                     Margin = new MarginPadding { Top = -6 }
-                                                })
+                                                }),
                                             ]
-                                        }
+                                        },
+                                        EzScoreInfoExtensions.CreateDisplayDrawable(score, fontSize: 10, anchor: Anchor.TopLeft)
                                     }
                                 }
                             }

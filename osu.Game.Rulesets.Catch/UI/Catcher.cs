@@ -13,6 +13,7 @@ using osu.Framework.Graphics.Pooling;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.Rulesets.Catch.EzCatch.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Catch.Judgements;
 using osu.Game.Rulesets.Catch.Objects;
 using osu.Game.Rulesets.Catch.Objects.Drawables;
@@ -107,6 +108,15 @@ namespace osu.Game.Rulesets.Catch.UI
         public bool Dashing { get; set; }
 
         /// <summary>
+        /// Whether a mod controls the catcher position directly.
+        /// </summary>
+        /// <remarks>
+        /// While this is true the beatmap-driven hyper-dash movement and speed adaptation are suppressed,
+        /// as they would otherwise move or accelerate the catcher out from under the direct input.
+        /// </remarks>
+        public bool TouchControlled { get; set; }
+
+        /// <summary>
         /// The currently facing direction.
         /// </summary>
         public Direction VisualDirection { get; set; } = Direction.Right;
@@ -194,12 +204,10 @@ namespace osu.Game.Rulesets.Catch.UI
         /// </summary>
         public bool CanCatch(CatchHitObject hitObject)
         {
-            if (!(hitObject is PalpableCatchHitObject fruit))
+            if (hitObject is not PalpableCatchHitObject fruit)
                 return false;
 
-            float halfCatchWidth = CatchWidth * 0.5f;
-            return fruit.EffectiveX >= X - halfCatchWidth &&
-                   fruit.EffectiveX <= X + halfCatchWidth;
+            return CatchPlateJudgement.CanCatch(fruit, X, CatchWidth * 0.5f);
         }
 
         public void OnNewResult(DrawableCatchHitObject drawableObject, JudgementResult result)
@@ -284,6 +292,19 @@ namespace osu.Game.Rulesets.Catch.UI
         /// <param name="targetPosition">When this catcher crosses this position, this catcher ends hyper-dashing.</param>
         public void SetHyperDashState(double modifier = 1, float targetPosition = -1)
         {
+            // Direct positioning must not be overridden by beatmap-driven hyper-dash movement.
+            if (TouchControlled)
+            {
+                if (HyperDashing)
+                    runHyperDashStateTransition(false);
+
+                hyperDashModifier = 1;
+                hyperDashDirection = 0;
+                hyperDashTargetPosition = -1;
+                lastHyperDashStartTime = null;
+                return;
+            }
+
             bool wasHyperDashing = HyperDashing;
 
             if (modifier <= 1 || X == targetPosition)

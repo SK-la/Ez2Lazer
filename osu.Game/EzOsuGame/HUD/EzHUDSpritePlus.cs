@@ -1,0 +1,494 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Animations;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Sprites;
+using osu.Framework.Graphics.Textures;
+using osu.Framework.Platform;
+using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Mods;
+using osu.Game.EzOsuGame.Screens;
+using osu.Game.EzOsuGame.WarmUp;
+using osu.Game.Localisation.SkinComponents;
+using osu.Game.Overlays.Settings;
+using osu.Game.Skinning;
+using osu.Game.Utils;
+
+namespace osu.Game.EzOsuGame.HUD
+{
+    /// <summary>
+    /// A skinnable sprite that always loads from EzResources/Modify via <see cref="EzResourceStore"/>.
+    /// Supports both single-image and frame animation loading.
+    /// </summary>
+    public partial class EzHUDSpritePlus : CompositeDrawable, ISerialisableDrawable, IEzGameplayWarmUp
+    {
+        private const string modify_root = "Modify";
+        private const int max_animation_frames = 240;
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SPRITE_PLUS_PATH_LABEL), nameof(EzHUDStrings.SPRITE_PLUS_PATH_DESCRIPTION), SettingControlType = typeof(ModifyPathSelectorControl))]
+        public Bindable<string> ModifyPath { get; } = new Bindable<string>("Tachie");
+
+        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.SpriteName), SettingControlType = typeof(ModifySpriteSelectorControl))]
+        public Bindable<string> SpriteName { get; } = new Bindable<string>(string.Empty);
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SPRITE_PLUS_FRAME_TEMPLATE_LABEL), nameof(EzHUDStrings.SPRITE_PLUS_FRAME_TEMPLATE_DESCRIPTION), SettingControlType = typeof(SettingsTextBox))]
+        public Bindable<string> FrameTemplate { get; } = new Bindable<string>("{0}");
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.PLAYBACK_FPS_LABEL), nameof(EzHUDStrings.PLAYBACK_FPS_DESCRIPTION))]
+        public BindableNumber<float> FPS { get; } = new BindableNumber<float>(60)
+        {
+            MinValue = 1,
+            MaxValue = 240,
+            Precision = 1f
+        };
+
+        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), SettingControlType = typeof(EzSettingsColour))]
+        public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_BLENDING_LABEL), nameof(EzHUDStrings.HITRESULT_BLENDING_DESCRIPTION))]
+        public Bindable<BlendMode> Blend { get; } = new Bindable<BlendMode>(BlendMode.Mixture);
+
+        [SettingSource("Use Beatmap BPM")]
+        public Bindable<bool> UseBeatmapBPM { get; } = new Bindable<bool>(false);
+
+        [SettingSource("Beat Division (1/n)")]
+        public BindableNumber<int> BeatDivision { get; } = new BindableNumber<int>(4)
+        {
+            MinValue = 1,
+            MaxValue = 32,
+            Precision = 1
+        };
+
+        public bool UsesFixedAnchor { get; set; }
+
+        [Resolved]
+        private EzResourceStore resource { get; set; } = null!;
+
+        /// <summary>预热登记用的服务；只有进图会话期间登记才生效。</summary>
+        [Resolved]
+        private EzGameplayWarmUpService warmUpService { get; set; } = null!;
+
+        private bool warmUpRegistered;
+
+        /// <summary>
+        /// The beat length and rate the beat-synced playback follows, taken from the shared tracker: it resolves the
+        /// timing section being played (or the selection, in song select) and the rate the music is actually played
+        /// at, so neither has to be re-derived from the beatmap and mods here.
+        /// </summary>
+        private EzBeatmapSpeedTracker speedTracker = null!;
+
+        private Drawable? currentDrawable;
+        private TextureAnimation? currentAnimation;
+
+        // Frames are baked once at this length; every playback speed influence is applied on top of it.
+        private const double base_frame_length = 1000.0 / 60.0;
+
+        // Accumulated playback position, in animation time.
+        private double playbackTime;
+
+        public EzHUDSpritePlus()
+        {
+            RelativeSizeAxes = Axes.None;
+            AutoSizeAxes = Axes.Both;
+        }
+
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            // 在 BDL（而不是 LoadComplete）里登记：PlayerLoader 门控是在 Player 达到 `Ready` 时取快照的，
+            // 而 LoadComplete 跑在 `Ready` 之后，那时登记就已经晚了一帧、会被漏掉。
+            warmUpService.Register(this);
+            warmUpRegistered = true;
+
+            AddInternal(speedTracker = new EzBeatmapSpeedTracker());
+
+            scheduleReload();
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            ModifyPath.BindValueChanged(_ => scheduleReload());
+            SpriteName.BindValueChanged(_ => scheduleReload());
+            FrameTemplate.BindValueChanged(_ => scheduleReload());
+
+            AccentColour.BindValueChanged(_ => applyVisualSettings(), true);
+            Blend.BindValueChanged(_ => applyVisualSettings(), true);
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (currentAnimation == null)
+                return;
+
+            double duration = currentAnimation.Duration;
+
+            if (duration <= 0)
+                return;
+
+            // Playback is driven here instead of by the framework's own advance (see createAnimatedDrawable), so
+            // every speed influence only has to end up in getPlaybackSpeed().
+            playbackTime = Math.Max(0, playbackTime + Clock.ElapsedFrameTime * getPlaybackSpeed());
+            currentAnimation.PlaybackPosition = playbackTime % duration;
+        }
+
+        // 1 means one reference frame per base frame length; FPS, beat division and rate all feed into it.
+        private double getPlaybackSpeed()
+        {
+            if (UseBeatmapBPM.Value)
+            {
+                // The animation is clocked in real time while BeatLength is song time, so Rate is what converts
+                // between them: a faster (or longer) beat makes the frames advance proportionally faster.
+                double beatLength = speedTracker.BeatLength.Value;
+
+                if (beatLength > 0)
+                    return base_frame_length * BeatDivision.Value * speedTracker.Rate.Value / beatLength;
+            }
+
+            return FPS.Value * base_frame_length / 1000;
+        }
+
+        private void scheduleReload() => Schedule(reloadDrawable);
+
+        private void reloadDrawable()
+        {
+            string spriteName = SpriteName.Value?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrEmpty(spriteName))
+            {
+                clearDrawable();
+                return;
+            }
+
+            Texture[] frames = getFrames(spriteName);
+
+            // Keep the current drawable if a transient settings state cannot resolve a texture.
+            // This avoids flickering/reset when dropdowns are rebuilding their item sources.
+            if (frames.Length == 0)
+                return;
+
+            clearDrawable();
+            currentDrawable = createDrawable(frames);
+            currentAnimation = currentDrawable as TextureAnimation;
+            playbackTime = 0;
+
+            AddInternal(currentDrawable);
+            applyVisualSettings();
+        }
+
+        // 帧加载请求：模板留空即走层2 三模板默认，否则按用户模板解析。
+        // 默认模板值 {0} 会展开成 {name}{0}，即允许「无连接符」——这是本组件刻意的特例
+        // （见 docs/EzSkinSystemNotes.md 三模板一节），默认三模板并不认这种命名。
+        private EzAnimationRequest buildRequest(string spriteName) => new EzAnimationRequest
+        {
+            Path = buildBaseLookup(spriteName),
+            FrameTemplate = string.IsNullOrWhiteSpace(FrameTemplate.Value) ? null : FrameTemplate.Value.Trim(),
+            MaxFrames = max_animation_frames,
+        };
+
+        private Texture[] getFrames(string spriteName) => resource.GetTextureFrames(buildRequest(spriteName));
+
+        public Task WarmUpAsync(CancellationToken cancellationToken)
+        {
+            string spriteName = SpriteName.Value?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrEmpty(spriteName))
+                return Task.CompletedTask;
+
+            // 与 reloadDrawable 取同一份请求：解析命中同一帧集缓存，解码只发生一次，
+            // 且预热解出来的必然是进局会用的那些，不会多解也不会漏。
+            // 这里刻意不创建 / 挂载 drawable：Player 在门控放行之前不在场景树里，Schedule 出来的更新不会跑。
+            return EzGameplayWarmUpService.RunBlocking(() => getFrames(spriteName), cancellationToken);
+        }
+
+        // Only the sprite is swapped out: the speed tracker is an internal child too, so a blanket ClearInternal would
+        // dispose it along with the frames.
+        private void clearDrawable()
+        {
+            if (currentDrawable != null)
+                RemoveInternal(currentDrawable, disposeImmediately: true);
+
+            currentDrawable = null;
+            currentAnimation = null;
+        }
+
+        private static Drawable createDrawable(Texture[] frames)
+        {
+            if (frames.Length == 1)
+                return new Sprite { Texture = frames[0] };
+
+            var animation = new TextureAnimation
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Loop = true,
+                DefaultFrameLength = base_frame_length,
+
+                // Playback speed is driven by the owning drawable instead, so that it can change at any time
+                // without having to clear and re-add every frame.
+                IsPlaying = false,
+            };
+
+            animation.AddFrames(frames);
+            return animation;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            // 登记发生在 BDL；加载被取消时 BDL 可能没跑到那一行。
+            if (warmUpRegistered)
+                warmUpService.Unregister(this);
+        }
+
+        private void applyVisualSettings()
+        {
+            if (currentDrawable != null)
+            {
+                currentDrawable.Colour = AccentColour.Value;
+                currentDrawable.Blending = getBlendingParameters(Blend.Value);
+            }
+        }
+
+        private static BlendingParameters getBlendingParameters(BlendMode mode)
+        {
+            return mode switch
+            {
+                BlendMode.Inherit => BlendingParameters.Inherit,
+                BlendMode.Mixture => BlendingParameters.Mixture,
+                BlendMode.Additive => BlendingParameters.Additive,
+                BlendMode.None => BlendingParameters.None,
+                _ => BlendingParameters.Mixture,
+            };
+        }
+
+        public enum BlendMode
+        {
+            Inherit,
+            Mixture,
+            Additive,
+            None
+        }
+
+        private string buildBaseLookup(string spriteName)
+        {
+            string path = normaliseModifyPath(ModifyPath.Value);
+            return string.IsNullOrEmpty(path) ? $"{modify_root}/{spriteName}" : $"{modify_root}/{path}/{spriteName}";
+        }
+
+        private static string normaliseModifyPath(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return string.Empty;
+
+            return path.Trim()
+                       .Replace('\\', '/')
+                       .Trim('/');
+        }
+
+        /// <summary>
+        /// Ensures <paramref name="current"/> is present in <paramref name="items"/> before assigning to a Dropdown,
+        /// so <c>ensureItemSelectionIsValid</c> cannot rewrite the bound setting on settings-panel rebuild.
+        /// </summary>
+        private static void ensureCurrentInItems(Bindable<string> current, List<string> items, bool normaliseAsPath)
+        {
+            string value = normaliseAsPath
+                ? normaliseModifyPath(current.Value)
+                : (current.Value?.Trim() ?? string.Empty);
+
+            int existing = items.FindIndex(i => string.Equals(i, value, StringComparison.OrdinalIgnoreCase));
+
+            if (existing >= 0)
+            {
+                if (current.Value != items[existing])
+                    current.Value = items[existing];
+                return;
+            }
+
+            if (value.Length > 0)
+            {
+                items.Insert(0, value);
+                if (current.Value != value)
+                    current.Value = value;
+                return;
+            }
+
+            if (items.Count == 0)
+                items.Add(string.Empty);
+
+            current.Value = items[0];
+        }
+
+        public partial class ModifyPathSelectorControl : SettingsDropdown<string>
+        {
+            [Resolved]
+            private Storage storage { get; set; } = null!;
+
+            private EzHUDSpritePlus source = null!;
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+
+                source = (EzHUDSpritePlus)SettingSourceObject;
+                refreshItems();
+            }
+
+            private void refreshItems()
+            {
+                var list = new List<string>();
+
+                try
+                {
+                    string modifyRoot = storage.GetFullPath("EzResources/Modify");
+
+                    if (Directory.Exists(modifyRoot))
+                    {
+                        list.AddRange(Directory.GetDirectories(modifyRoot, "*", SearchOption.AllDirectories)
+                                               .Select(path => Path.GetRelativePath(modifyRoot, path))
+                                               .Select(normaliseModifyPath)
+                                               .Where(path => path.Length > 0)
+                                               .Distinct(StringComparer.OrdinalIgnoreCase)
+                                               .OrderBy(path => path.Count(c => c == '/'))
+                                               .ThenBy(path => path, StringComparer.OrdinalIgnoreCase));
+                    }
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+
+                ensureCurrentInItems(source.ModifyPath, list, normaliseAsPath: true);
+                Items = list;
+            }
+        }
+
+        public partial class ModifySpriteSelectorControl : SettingsDropdown<string>
+        {
+            [Resolved]
+            private Storage storage { get; set; } = null!;
+
+            private EzHUDSpritePlus source = null!;
+            private static readonly Regex selector_frame_template_regex = new Regex(@"^\{(0{1,3})\}$", RegexOptions.Compiled);
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+
+                source = (EzHUDSpritePlus)SettingSourceObject;
+                refreshItems();
+                source.ModifyPath.BindValueChanged(_ => refreshItems());
+                source.FrameTemplate.BindValueChanged(_ => refreshItems());
+            }
+
+            private void refreshItems()
+            {
+                var list = new List<string>();
+
+                try
+                {
+                    string path = source.ModifyPath.Value?.Trim() ?? string.Empty;
+                    string fullDir = storage.GetFullPath(buildModifyDirectory(path));
+
+                    if (Directory.Exists(fullDir))
+                    {
+                        string[] rawFileNames = Directory.GetFiles(fullDir)
+                                                         .Where(file => SupportedExtensions.IMAGE_EXTENSIONS.Contains(Path.GetExtension(file).ToLowerInvariant()))
+                                                         .Select(file => Path.GetFileNameWithoutExtension(file))
+                                                         .Where(name => !string.IsNullOrEmpty(name))
+                                                         .ToArray();
+
+                        var rawFileNameSet = new HashSet<string>(rawFileNames, StringComparer.OrdinalIgnoreCase);
+
+                        list.AddRange(rawFileNames.Select(name => resolveDisplayName(name, rawFileNameSet))
+                                                  .Distinct(StringComparer.OrdinalIgnoreCase)
+                                                  .OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
+                    }
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+
+                ensureCurrentInItems(source.SpriteName, list, normaliseAsPath: false);
+                Items = list;
+            }
+
+            private static string buildModifyDirectory(string relativePath)
+            {
+                string normalised = normaliseModifyPath(relativePath);
+                return string.IsNullOrEmpty(normalised)
+                    ? "EzResources/Modify"
+                    : $"EzResources/Modify/{normalised}";
+            }
+
+            private string resolveDisplayName(string fileNameWithoutExtension, HashSet<string> allNames)
+            {
+                string template = source.FrameTemplate.Value?.Trim() ?? string.Empty;
+                if (!tryParseSelectorAnimationTemplate(template, out int start, out int width))
+                    return fileNameWithoutExtension;
+
+                if (fileNameWithoutExtension.Length < width)
+                    return fileNameWithoutExtension;
+
+                string suffix = fileNameWithoutExtension[^width..];
+                if (!suffix.All(char.IsDigit))
+                    return fileNameWithoutExtension;
+
+                if (!int.TryParse(suffix, out int frame) || frame < start || frame > 239)
+                    return fileNameWithoutExtension;
+
+                string baseName = fileNameWithoutExtension[..^width];
+                if (string.IsNullOrEmpty(baseName))
+                    return fileNameWithoutExtension;
+
+                // Avoid treating numeric IDs as animation frames.
+                string previousFrame = frame > start ? $"{baseName}{(frame - 1).ToString($"D{width}")}" : string.Empty;
+                string nextFrame = frame < 239 ? $"{baseName}{(frame + 1).ToString($"D{width}")}" : string.Empty;
+
+                bool hasNeighbourFrame = (previousFrame.Length > 0 && allNames.Contains(previousFrame))
+                                         || (nextFrame.Length > 0 && allNames.Contains(nextFrame));
+
+                return hasNeighbourFrame ? baseName : fileNameWithoutExtension;
+            }
+
+            private static bool tryParseSelectorAnimationTemplate(string template, out int start, out int width)
+            {
+                start = 0;
+                width = 1;
+
+                Match match = selector_frame_template_regex.Match(template);
+                if (!match.Success)
+                    return false;
+
+                string digits = match.Groups[1].Value;
+                if (digits.Length == 0 || digits.Length > 3)
+                    return false;
+
+                start = 0;
+                width = digits.Length;
+                return true;
+            }
+        }
+    }
+}

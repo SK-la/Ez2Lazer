@@ -1,0 +1,122 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using osu.Framework.Bindables;
+using osu.Game.Rulesets.Mods;
+
+namespace osu.Game.EzOsuGame.Mods
+{
+    /// <summary>
+    /// Shared DT/HT rate resolution for MSD/SSR/Dan (clamp matches lazer ModRateAdjust bounds).
+    /// </summary>
+    public static class EzModRate
+    {
+        /// <summary>
+        /// Resolves the effective rate multiplier from a set of mods, optionally clamping the result to a specified range.
+        /// </summary>
+        /// <remarks>
+        /// Difficulty-facing: only <see cref="ModRateAdjust"/> participates and the result is clamped to
+        /// <paramref name="min"/>..<paramref name="max"/> by default. For the rate the game actually plays at, use
+        /// <see cref="ResolvePlaybackRate"/> instead — the two intentionally disagree.
+        /// </remarks>
+        public static float Resolve(IEnumerable<Mod>? mods, bool clamp = true, double min = 0.5, double max = 2.0)
+        {
+            double rate = 1;
+
+            if (mods != null)
+            {
+                foreach (var mod in mods)
+                {
+                    if (mod is ModRateAdjust rateAdjust)
+                        rate *= rateAdjust.SpeedChange.Value;
+                }
+            }
+
+            return clamp ? (float)Math.Clamp(rate, min, max) : (float)rate;
+        }
+
+        /// <summary>
+        /// Resolves the mods' contribution to the rate the game is actually played at, from every
+        /// <see cref="IApplicableToRate"/> mod rather than only <see cref="ModRateAdjust"/>.
+        /// </summary>
+        /// <remarks>
+        /// This is the song-select口径 (the same value <c>ModUtils.CalculateRateWithMods</c> feeds the title BPM):
+        /// it is deliberately not clamped, because real rate ranges (0.1-3.0 for Nice BPM, 0.4-2.5 for the
+        /// adaptive-speed family) are wider than <see cref="Resolve"/>'s difficulty-facing bounds, and it also does not
+        /// whitelist mod types, so Wind Up / Adaptive Speed / mania Change Speed by Accuracy participate too.
+        /// <para>
+        /// A single scalar cannot describe a ramp, so mods whose rate keeps changing (Wind Up, Adaptive Speed, the
+        /// adaptive Ez mods) contribute their <b>initial</b> rate here. Consumers that want the rate actually being
+        /// played should read <see cref="EzBeatmapSpeedTracker.Rate"/>, which follows the live aggregate of the audio
+        /// being played — this method is its fallback for when there is no audio to read at all.
+        /// </para>
+        /// </remarks>
+        public static double ResolvePlaybackRate(IEnumerable<Mod>? mods)
+        {
+            double rate = 1;
+
+            if (mods != null)
+            {
+                foreach (var mod in mods.OfType<IApplicableToRate>())
+                    rate = mod.ApplyToRate(0, rate);
+            }
+
+            return rate;
+        }
+
+        /// <summary>
+        /// Resolves the effective rate multiplier from a set of mods, returning a bindable value that stays in sync with live rate changes.
+        /// </summary>
+        public static Bindable<float> ResolveBindable(IEnumerable<Mod>? mods, bool clamp = true, double min = 0.5, double max = 2.0)
+        {
+            var rateAdjustMods = mods?.OfType<ModRateAdjust>().ToArray() ?? Array.Empty<ModRateAdjust>();
+            var bindable = new Bindable<float>(Resolve(rateAdjustMods, clamp, min, max));
+
+            void updateValue() => bindable.Value = Resolve(rateAdjustMods, clamp, min, max);
+
+            foreach (var mod in rateAdjustMods)
+                mod.SpeedChange.BindValueChanged(_ => updateValue(), true);
+
+            return bindable;
+        }
+
+        public static bool IsNoModRate(float rate) => Math.Abs(rate - 1f) < 0.001f;
+
+        /// <summary>
+        /// Mods that change playable layout, rate, or difficulty — song-select Skill radar / DualPanel
+        /// should live-recompute chart MSD/ChartDan (same idea as xxySR analysis).
+        /// </summary>
+        public static bool AffectsChartSkills(IEnumerable<Mod>? mods)
+        {
+            if (mods == null)
+                return false;
+
+            return mods.Any(AffectsChartSkills);
+        }
+
+        public static bool AffectsChartSkills(Mod mod)
+            => mod is IApplicableToRate
+                      or IApplicableToBeatmapConverter
+                      or IApplicableAfterBeatmapConversion
+                      or IApplicableToDifficulty
+                      or IApplicableToBeatmapProcessor
+                      or IApplicableToHitObject
+                      or IApplicableToBeatmap;
+
+        /// <summary>Key-conversion / post-convert mods — persisted xxySR must not be reused.</summary>
+        public static bool ChangesPlayableKeys(IEnumerable<Mod>? mods)
+        {
+            if (mods == null)
+                return false;
+
+            return mods.Any(static m => m is IApplicableToBeatmapConverter or IApplicableAfterBeatmapConversion);
+        }
+
+        /// <summary>Whether BeatmapInfo.XxyStarRating (nomod baseline) may be reused without live recompute.</summary>
+        public static bool CanUsePersistedXxy(IEnumerable<Mod>? mods)
+            => IsNoModRate(Resolve(mods)) && !ChangesPlayableKeys(mods);
+    }
+}

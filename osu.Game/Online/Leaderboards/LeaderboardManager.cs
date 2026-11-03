@@ -169,8 +169,7 @@ namespace osu.Game.Online.Leaderboards
             Debug.Assert(CurrentCriteria != null);
 
             // This subscription may fire from changes to linked beatmaps, which we don't care about.
-            // It's currently not possible for a score to be modified after insertion, so we can safely ignore callbacks with only modifications.
-            if (changes?.HasCollectionChanges() == false)
+            if (changes != null && !changes.HasCollectionChanges() && changes.ModifiedIndices.Length == 0)
                 return;
 
             var newScores = sender.AsEnumerable();

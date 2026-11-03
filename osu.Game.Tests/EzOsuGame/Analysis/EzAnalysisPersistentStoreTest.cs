@@ -13,34 +13,19 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [Test]
         public void TestMissingDataRequiresWholeAnalysisWhenStoredResultIsMissing()
         {
-            var missing = EzAnalysisPersistentStore.GetMissingData(null, 3, requireTagData: true);
+            var missing = EzAnalysisPersistentStore.GetMissingData(null, 3);
 
             Assert.That(missing & EzAnalysisPersistentStore.MissingDataKind.Common, Is.Not.EqualTo(EzAnalysisPersistentStore.MissingDataKind.None));
-            Assert.That(missing & EzAnalysisPersistentStore.MissingDataKind.Pp, Is.Not.EqualTo(EzAnalysisPersistentStore.MissingDataKind.None));
-            Assert.That(missing & EzAnalysisPersistentStore.MissingDataKind.Tag, Is.Not.EqualTo(EzAnalysisPersistentStore.MissingDataKind.None));
             Assert.That(missing & EzAnalysisPersistentStore.MissingDataKind.Mania, Is.Not.EqualTo(EzAnalysisPersistentStore.MissingDataKind.None));
             Assert.That(EzAnalysisPersistentStore.RequiresAnalysisComputation(missing), Is.True);
         }
 
         [Test]
-        public void TestMissingDataTracksPpAndTagIndependently()
+        public void TestMissingDataCompleteWhenCommonPresent()
         {
             var stored = new EzAnalysisResult(new KpsSummary(1, 2, Array.Empty<double>()));
 
-            var missing = EzAnalysisPersistentStore.GetMissingData(stored, 0, requireTagData: true);
-
-            Assert.That(missing & EzAnalysisPersistentStore.MissingDataKind.Pp, Is.Not.EqualTo(EzAnalysisPersistentStore.MissingDataKind.None));
-            Assert.That(missing & EzAnalysisPersistentStore.MissingDataKind.Tag, Is.Not.EqualTo(EzAnalysisPersistentStore.MissingDataKind.None));
-            Assert.That(missing & EzAnalysisPersistentStore.MissingDataKind.Mania, Is.EqualTo(EzAnalysisPersistentStore.MissingDataKind.None));
-            Assert.That(EzAnalysisPersistentStore.RequiresAnalysisComputation(missing), Is.True);
-        }
-
-        [Test]
-        public void TestMissingDataIgnoresTagWhenNotRequested()
-        {
-            var stored = new EzAnalysisResult(new KpsSummary(1, 2, Array.Empty<double>()), 123.45);
-
-            var missing = EzAnalysisPersistentStore.GetMissingData(stored, 0, requireTagData: false);
+            var missing = EzAnalysisPersistentStore.GetMissingData(stored, 0);
 
             Assert.That(missing, Is.EqualTo(EzAnalysisPersistentStore.MissingDataKind.None));
             Assert.That(EzAnalysisPersistentStore.RequiresAnalysisComputation(missing), Is.False);
@@ -49,9 +34,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [Test]
         public void TestMissingDataRequiresManiaSliceOnlyForManiaRulesets()
         {
-            var stored = new EzAnalysisResult(new KpsSummary(1, 2, Array.Empty<double>()), 123.45, tagSummary: EzBeatmapTagSummary.EMPTY);
+            var stored = new EzAnalysisResult(new KpsSummary(1, 2, Array.Empty<double>()), 123.45);
 
-            var missing = EzAnalysisPersistentStore.GetMissingData(stored, 3, requireTagData: true);
+            var missing = EzAnalysisPersistentStore.GetMissingData(stored, 3);
 
             Assert.That(missing, Is.EqualTo(EzAnalysisPersistentStore.MissingDataKind.Mania));
             Assert.That(EzAnalysisPersistentStore.RequiresAnalysisComputation(missing), Is.True);

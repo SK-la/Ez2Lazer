@@ -10,6 +10,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.TypeExtensions;
@@ -19,14 +20,16 @@ using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
 using osu.Game.Audio;
+using osu.Game.Beatmaps.Formats;
 using osu.Game.Database;
 using osu.Game.IO;
 using osu.Game.Rulesets;
 using osu.Game.Screens.Play.HUD;
+using osuTK.Graphics;
 
 namespace osu.Game.Skinning
 {
-    public abstract class Skin : IDisposable, ISkin
+    public abstract class Skin : IDisposable, ISkin, IHasComboColours, IHasCustomColours
     {
         private readonly IStorageResourceProvider? resources;
 
@@ -38,7 +41,17 @@ namespace osu.Game.Skinning
         /// <summary>
         /// A sample store which can be used to perform user file lookups for this skin.
         /// </summary>
-        protected internal ISampleStore? Samples { get; private set; }
+        private ISampleStore? samples;
+
+        private ISampleStore? hitSamples;
+
+        private readonly ISampleStore? resourceHitSamples;
+
+        public IEnumerable<string> AllAvailableSamples => hitSamples?.GetAvailableResources() ?? Array.Empty<string>();
+
+        protected internal ISample? GetSampleFromSkinFiles(string lookup, bool isHitsound) => (isHitsound ? hitSamples : samples)?.Get(lookup);
+
+        protected internal ISample? GetSampleFromResourceFiles(string lookup, bool isHitsound) => (isHitsound ? resourceHitSamples : resources?.AudioManager?.Samples)?.Get(lookup);
 
         public readonly Live<SkinInfo> SkinInfo;
 
@@ -75,11 +88,21 @@ namespace osu.Game.Skinning
         protected Skin(SkinInfo skin, IStorageResourceProvider? resources, IResourceStore<byte[]>? fallbackStore = null, string configurationFilename = @"skin.ini")
         {
             this.resources = resources;
-
             Name = skin.Name;
 
             if (resources != null)
             {
+                resourceHitSamples = resources.AudioManager?.GetSampleStore(applyGlobalAdjustments: false);
+
+                if (resourceHitSamples != null)
+                {
+                    resourceHitSamples.PlaybackConcurrency = OsuGameBase.SAMPLE_CONCURRENCY;
+
+                    // osu-stable performs audio lookups in order of wav -> mp3 -> ogg.
+                    // The GetSampleStore() call above internally adds wav and mp3, so ogg is added at the end to ensure expected ordering.
+                    resourceHitSamples.AddExtension(@"ogg");
+                }
+
                 SkinInfo = skin.ToLive(resources.RealmAccess);
 
                 store.AddStore(new RealmBackedResourceStore<SkinInfo>(SkinInfo, resources.Files, resources.RealmAccess));
@@ -112,6 +135,7 @@ namespace osu.Game.Skinning
                     // generally won't be hit as we always write a `skin.ini` on import, but best be safe than sorry.
                     // see https://github.com/peppy/osu-stable-reference/blob/1531237b63392e82c003c712faa028406073aa8f/osu!/Graphics/Skinning/SkinManager.cs#L297-L298
                     LegacyVersion = SkinConfiguration.LATEST_VERSION,
+                    IsLatestVersion = true,
                 };
             }
 
@@ -143,16 +167,17 @@ namespace osu.Game.Skinning
         }
 
         /// <summary>
-        /// Recreates <see cref="Samples"/>.
+        /// Recreates <see cref="samples"/>.
         /// All users of samples from the skin are expected to manually re-retrieve their samples from this skin after this is called.
         /// Exposed as public for the purpose of e.g. editing flows where the skin's set of available samples changes.
         /// In such a scenario a full recycle of the store is required to avoid accidentally retrieving stale samples that don't exist in the skin anymore.
         /// </summary>
         public void RecycleSamples()
         {
-            Samples?.Dispose();
+            samples?.Dispose();
+            hitSamples?.Dispose();
 
-            var samples = resources?.AudioManager?.GetSampleStore(store);
+            samples = resources?.AudioManager?.GetSampleStore(store, applyGlobalAdjustments: true);
 
             if (samples != null)
             {
@@ -163,7 +188,16 @@ namespace osu.Game.Skinning
                 samples.AddExtension(@"ogg");
             }
 
-            Samples = samples;
+            hitSamples = resources?.AudioManager?.GetSampleStore(store, applyGlobalAdjustments: false);
+
+            if (hitSamples != null)
+            {
+                hitSamples.PlaybackConcurrency = OsuGameBase.SAMPLE_CONCURRENCY;
+
+                // osu-stable performs audio lookups in order of wav -> mp3 -> ogg.
+                // The GetSampleStore() call above internally adds wav and mp3, so ogg is added at the end to ensure expected ordering.
+                hitSamples.AddExtension(@"ogg");
+            }
         }
 
         protected virtual IResourceStore<TextureUpload> CreateTextureLoaderStore(IStorageResourceProvider resources, IResourceStore<byte[]> storage)
@@ -252,15 +286,38 @@ namespace osu.Game.Skinning
             // If deserialisation using SkinLayoutInfo fails, attempt to deserialise using the old naked list.
             if (layout == null)
             {
-                var deserializedContent = JsonConvert.DeserializeObject<IEnumerable<SerialisedDrawableInfo>>(jsonContent);
-                if (deserializedContent == null)
-                    return null;
+                try
+                {
+                    var deserializedContent = JsonConvert.DeserializeObject<IEnumerable<SerialisedDrawableInfo>>(jsonContent)?.ToArray();
 
-                layout = new SkinLayoutInfo { Version = 0 };
-                layout.Update(null, deserializedContent.ToArray());
+                    if (deserializedContent != null)
+                    {
+                        layout = new SkinLayoutInfo { Version = 0 };
+                        layout.Update(null, deserializedContent);
 
-                Logger.Log($"Ferrying {deserializedContent.Count()} components in {target} to global section of new {nameof(SkinLayoutInfo)} format");
+                        Logger.Log($"Ferrying {deserializedContent.Length} components in {target} to global section of new {nameof(SkinLayoutInfo)} format");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Deserialising skin layout to {nameof(SerialisedDrawableInfo)}[] failed. Attempting object migration fallback.\nDetails: {ex}");
+                }
             }
+
+            if (layout == null)
+            {
+                try
+                {
+                    layout = tryParseLegacyObjectLayout(jsonContent, target);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Object migration fallback for skin layout failed.\nDetails: {ex}");
+                }
+            }
+
+            if (layout == null)
+                return null;
 
             for (int i = layout.Version + 1; i <= SkinLayoutInfo.LATEST_VERSION; i++)
                 applyMigration(layout, target, i);
@@ -276,6 +333,55 @@ namespace osu.Game.Skinning
                 }
             }
 
+            return layout;
+        }
+
+        private static SkinLayoutInfo? tryParseLegacyObjectLayout(string jsonContent, GlobalSkinnableContainers target)
+        {
+            var root = JObject.Parse(jsonContent);
+
+            var layout = new SkinLayoutInfo
+            {
+                Version = root.Value<int?>("Version") ?? 0
+            };
+
+            // Some historical formats may store drawable arrays directly under "DrawableInfo" as an array.
+            if (root.TryGetValue("DrawableInfo", out var drawableInfoToken))
+            {
+                if (drawableInfoToken is JArray globalArray)
+                {
+                    var globalDrawables = globalArray.ToObject<SerialisedDrawableInfo[]>();
+                    if (globalDrawables != null)
+                        layout.Update(null, globalDrawables);
+                }
+                else if (drawableInfoToken is JObject drawableMap)
+                {
+                    foreach ((string key, JToken? value) in drawableMap)
+                    {
+                        var drawables = value?.ToObject<SerialisedDrawableInfo[]>();
+                        if (drawables != null)
+                            layout.DrawableInfo[key] = drawables;
+                    }
+                }
+            }
+            else
+            {
+                // Legacy object style: { "Version": 1, "global": [...], "osu": [...] }.
+                foreach ((string key, JToken? value) in root)
+                {
+                    if (key == "Version" || value is not JArray array)
+                        continue;
+
+                    var drawables = array.ToObject<SerialisedDrawableInfo[]>();
+                    if (drawables != null)
+                        layout.DrawableInfo[key] = drawables;
+                }
+            }
+
+            if (layout.DrawableInfo.Count == 0)
+                return null;
+
+            Logger.Log($"Ferrying {layout.AllDrawables.Count()} components in {target} via object migration fallback");
             return layout;
         }
 
@@ -354,7 +460,9 @@ namespace osu.Game.Skinning
             isDisposed = true;
 
             Textures?.Dispose();
-            Samples?.Dispose();
+            samples?.Dispose();
+            resourceHitSamples?.Dispose();
+            hitSamples?.Dispose();
             FallbackStore?.Dispose();
 
             store.Dispose();
@@ -406,5 +514,13 @@ namespace osu.Game.Skinning
             Enter,
             Exit
         }
+
+        #region Delegated colour access
+
+        IReadOnlyList<Color4>? IHasComboColours.ComboColours => Configuration.ComboColours;
+        List<Color4> IHasComboColours.CustomComboColours => Configuration.CustomComboColours;
+        Dictionary<string, Color4> IHasCustomColours.CustomColours => Configuration.CustomColours;
+
+        #endregion
     }
 }

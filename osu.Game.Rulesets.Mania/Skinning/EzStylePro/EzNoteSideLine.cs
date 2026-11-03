@@ -6,7 +6,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Graphics.Textures;
+using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osuTK;
 
@@ -20,12 +20,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Sprite? sprite;
 
         [BackgroundDependencyLoader]
-        private void load(TextureStore textures, Ez2ConfigManager ezConfig)
+        private void load(EzResourceStore textures, Ez2ConfigManager ezConfig)
         {
             AlwaysPresent = true;
 
             // 使用共享纹理避免重复加载
-            var texture = textures.Get("EzResources/note/NoteSideLine.png");
+            var texture = textures.Get("EzResources/Column/NoteSideLine");
 
             sprite = new Sprite
             {

@@ -3,7 +3,7 @@
 
 using NUnit.Framework;
 using osu.Game.Beatmaps;
-using osu.Game.Rulesets.Mania.Mods;
+using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Tests.Beatmaps;
 using osu.Game.Tests.Visual;
@@ -29,7 +29,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestDualStage()
         {
-            AddStep("Load dual stage", () => LoadPlayer(new Mod[] { new ManiaModDualStages() }));
+            AddStep("Load split stages", () => LoadPlayer(new Mod[] { new ManiaModSplitStages() }));
             AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         }
     }

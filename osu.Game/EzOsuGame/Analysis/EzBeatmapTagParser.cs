@@ -14,7 +14,7 @@ namespace osu.Game.EzOsuGame.Analysis
     /// 轻量读取谱面中的视频与故事板标记。
     /// 只扫描事件文本，不触发完整 storyboard 对象解码。
     /// </summary>
-    internal static class EzBeatmapTagParser
+    public static class EzBeatmapTagParser
     {
         public static EzBeatmapTagSummary Parse(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo)
             => Parse(beatmapManager.GetWorkingBeatmap(beatmapInfo));
@@ -24,24 +24,39 @@ namespace osu.Game.EzOsuGame.Analysis
             if (workingBeatmap == null)
                 return EzBeatmapTagSummary.EMPTY;
 
+            BeatmapSetInfo? beatmapSet = workingBeatmap.BeatmapInfo.BeatmapSet;
+
+            if (beatmapSet == null)
+                return EzBeatmapTagSummary.EMPTY;
+
+            return Parse(beatmapSet, workingBeatmap.BeatmapInfo.Path, workingBeatmap.GetStream);
+        }
+
+        /// <summary>
+        /// Low-allocation overload that avoids creating a <see cref="WorkingBeatmap"/>.
+        /// Use this in bulk backfill scenarios to reduce GC pressure from heavyweight <see cref="WorkingBeatmap"/> objects.
+        /// </summary>
+        /// <param name="beatmapSet">The beatmap set containing file metadata.</param>
+        /// <param name="beatmapPath">The relative path of the .osu file within the set (from <see cref="BeatmapInfo.Path"/>). Can be null.</param>
+        /// <param name="getStream">A function that opens a stream for a given storage path.</param>
+        public static EzBeatmapTagSummary Parse(
+            BeatmapSetInfo beatmapSet,
+            string? beatmapPath,
+            Func<string, Stream?> getStream)
+        {
             bool hasVideo = false;
             bool hasStoryboard = false;
 
-            scanEventLines(workingBeatmap.Beatmap?.UnhandledEventLines, ref hasVideo, ref hasStoryboard);
+            scanMainStoryboardFile(beatmapSet, getStream, ref hasVideo, ref hasStoryboard);
 
             if (!hasVideo || !hasStoryboard)
-                scanMainStoryboardFile(workingBeatmap, ref hasVideo, ref hasStoryboard);
+                scanBeatmapEventLines(beatmapSet, beatmapPath, getStream, ref hasVideo, ref hasStoryboard);
 
             return new EzBeatmapTagSummary(hasVideo, hasStoryboard);
         }
 
-        private static void scanMainStoryboardFile(WorkingBeatmap workingBeatmap, ref bool hasVideo, ref bool hasStoryboard)
+        private static void scanMainStoryboardFile(BeatmapSetInfo beatmapSet, Func<string, Stream?> getStream, ref bool hasVideo, ref bool hasStoryboard)
         {
-            BeatmapSetInfo? beatmapSet = workingBeatmap.BeatmapInfo.BeatmapSet;
-
-            if (beatmapSet == null)
-                return;
-
             string storyboardFilename = getMainStoryboardFilename(beatmapSet.Metadata);
 
             if (beatmapSet.GetFile(storyboardFilename)?.Filename is not string resolvedFilename)
@@ -52,7 +67,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (string.IsNullOrWhiteSpace(storagePath))
                 return;
 
-            using Stream? stream = workingBeatmap.GetStream(storagePath);
+            using Stream? stream = getStream(storagePath);
 
             if (stream == null)
                 return;
@@ -83,6 +98,75 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 scanSingleEventLine(trimmed, ref hasVideo, ref hasStoryboard);
             }
+        }
+
+        private static void scanBeatmapEventLines(BeatmapSetInfo beatmapSet, string? beatmapPath, Func<string, Stream?> getStream, ref bool hasVideo, ref bool hasStoryboard)
+        {
+            if (string.IsNullOrWhiteSpace(beatmapPath))
+                return;
+
+            string? storagePath = beatmapSet.GetPathForFile(beatmapPath);
+
+            if (string.IsNullOrWhiteSpace(storagePath))
+                return;
+
+            using Stream? stream = getStream(storagePath);
+
+            if (stream == null)
+                return;
+
+            using var reader = new StreamReader(stream);
+            bool inEventsSection = false;
+
+            while (!reader.EndOfStream && (!hasVideo || !hasStoryboard))
+            {
+                string? line = reader.ReadLine();
+
+                if (line == null)
+                    break;
+
+                string trimmed = line.Trim();
+
+                if (trimmed.Length == 0)
+                    continue;
+
+                if (trimmed[0] == '[')
+                {
+                    inEventsSection = trimmed.Equals("[Events]", StringComparison.OrdinalIgnoreCase);
+                    continue;
+                }
+
+                if (!inEventsSection)
+                    continue;
+
+                scanSingleEventLine(trimmed, ref hasVideo, ref hasStoryboard);
+            }
+        }
+
+        /// <summary>
+        /// Scan the shared .osb storyboard file via a <see cref="WorkingBeatmap"/>.
+        /// </summary>
+        private static void scanMainStoryboardFile(WorkingBeatmap workingBeatmap, ref bool hasVideo, ref bool hasStoryboard)
+        {
+            BeatmapSetInfo? beatmapSet = workingBeatmap.BeatmapInfo.BeatmapSet;
+
+            if (beatmapSet == null)
+                return;
+
+            scanMainStoryboardFile(beatmapSet, workingBeatmap.GetStream, ref hasVideo, ref hasStoryboard);
+        }
+
+        /// <summary>
+        /// Scan the .osu beatmap file's [Events] section via a <see cref="WorkingBeatmap"/>.
+        /// </summary>
+        private static void scanBeatmapEventLines(WorkingBeatmap workingBeatmap, ref bool hasVideo, ref bool hasStoryboard)
+        {
+            BeatmapSetInfo? beatmapSet = workingBeatmap.BeatmapInfo.BeatmapSet;
+
+            if (beatmapSet == null)
+                return;
+
+            scanBeatmapEventLines(beatmapSet, workingBeatmap.BeatmapInfo.Path, workingBeatmap.GetStream, ref hasVideo, ref hasStoryboard);
         }
 
         private static void scanEventLines(IEnumerable<string>? lines, ref bool hasVideo, ref bool hasStoryboard)

@@ -30,7 +30,18 @@ namespace osu.Game.EzOsuGame.Analysis
     }
 
     /// <summary>
-    /// mania 专属分析概要。
+    /// Mania-specific analysis summary for Mania (column-based) beatmaps.
+    ///
+    /// Contract (unified):
+    /// - <see cref="ColumnCounts"/> contains the total number of hit objects in each column, including long notes (LNs).
+    /// - <see cref="HoldNoteCounts"/> contains the number of long notes (LNs) in each column.
+    ///
+    /// Invariants:
+    /// - For any column index c: 0 &lt;= HoldNoteCounts[c] &lt;= ColumnCounts[c].
+    /// - Regular (non-LN) count for column c can be derived as ColumnCounts[c] - HoldNoteCounts[c].
+    ///
+    /// Producers which populate these dictionaries must follow the above contract so that UI code can
+    /// consistently render bar heights as: totalHeight = ColumnCounts[c] / max(ColumnCounts).
     /// </summary>
     public readonly record struct EzManiaSummary
     {
@@ -47,9 +58,23 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public double? XxySrFullLN8 { get; }
 
+        /// <summary>
+        /// Total number of hit objects in each column (includes both regular notes and LNs).
+        /// Key: column index; Value: total hit object count for that column.
+        /// </summary>
         public Dictionary<int, int> ColumnCounts => columnCounts ?? empty_counts;
 
+        /// <summary>
+        /// Number of long notes (LNs) in each column.
+        /// Key: column index; Value: LN count for that column.
+        /// </summary>
         public Dictionary<int, int> HoldNoteCounts => holdNoteCounts ?? empty_counts;
+
+        /// <summary>
+        /// Whether <see cref="HoldNoteCounts"/> were supplied by the producer.
+        /// When false, consumers should not treat an empty hold map as "zero LNs".
+        /// </summary>
+        public bool HasHoldNoteCounts => holdNoteCounts != null;
 
         public EzManiaSummary(Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts, double? xxySr,
                               double? xxySrFullLN4 = null, double? xxySrFullLN8 = null)

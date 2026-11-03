@@ -15,9 +15,9 @@ namespace osu.Game.Localisation
         public static LocalisableString Header => new TranslatableString(getKey(@"header"), @"Obtaining Beatmaps");
 
         /// <summary>
-        /// "&quot;Beatmaps&quot; are what we call sets of playable levels. osu! doesn&#39;t come with any beatmaps pre-loaded. This step will help you get started on your beatmap collection."
+        /// "&quot;Beatmaps&quot; are what we call sets of playable levels. Ez2Lazer doesn&#39;t come with any beatmaps pre-loaded. This step will help you get started on your beatmap collection."
         /// </summary>
-        public static LocalisableString Description => new TranslatableString(getKey(@"description"), @"""Beatmaps"" are what we call sets of playable levels. osu! doesn't come with any beatmaps pre-loaded. This step will help you get started on your beatmap collection.");
+        public static LocalisableString Description => new TranslatableString(getKey(@"description"), @"""Beatmaps"" are what we call sets of playable levels. Ez2Lazer doesn't come with any beatmaps pre-loaded. This step will help you get started on your beatmap collection.");
 
         /// <summary>
         /// "If you are a new player, we recommend playing through the tutorial to get accustomed to the gameplay."
@@ -50,9 +50,9 @@ namespace osu.Game.Localisation
         public static LocalisableString ObtainMoreBeatmaps => new TranslatableString(getKey(@"obtain_more_beatmaps"), @"You can also obtain more beatmaps from the main menu ""browse"" button at any time.");
 
         /// <summary>
-        /// "You currently have {0} beatmap(s) loaded!"
+        /// "You currently have {0} beatmap loaded!|You currently have {0} beatmaps loaded!"
         /// </summary>
-        public static LocalisableString CurrentlyLoadedBeatmaps(int beatmaps) => new TranslatableString(getKey(@"currently_loaded_beatmaps"), @"You currently have {0} beatmap(s) loaded!", beatmaps);
+        public static LocalisableString CurrentlyLoadedBeatmaps(int beatmaps) => new PluralisableString(new TranslatableString(getKey(@"currently_loaded_beatmaps"), @"You currently have {0} beatmap loaded!|You currently have {0} beatmaps loaded!", beatmaps), beatmaps, '|');
 
         private static string getKey(string key) => $@"{prefix}:{key}";
     }

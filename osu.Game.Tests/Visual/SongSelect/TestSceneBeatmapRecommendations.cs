@@ -216,7 +216,11 @@ namespace osu.Game.Tests.Visual.SongSelect
 
             void checkRecommendedDifficulty(double starRating)
                 => AddAssert($"recommended difficulty is {starRating}",
-                    () => Game.ChildrenOfType<BeatmapSearchGeneralFilterRow>().Single().ChildrenOfType<OsuSpriteText>().ElementAt(1).Text.ToString(),
+                    () => Game.ChildrenOfType<BeatmapSearchGeneralFilterRow>().Single()
+                              .ChildrenOfType<FilterTabItem<SearchGeneral>>()
+                              .Single(t => t.Value == SearchGeneral.Recommended)
+                              .ChildrenOfType<OsuSpriteText>().Single()
+                              .Text.ToString(),
                     () => Is.EqualTo($"Recommended difficulty ({starRating.FormatStarRating()})"));
         }
 

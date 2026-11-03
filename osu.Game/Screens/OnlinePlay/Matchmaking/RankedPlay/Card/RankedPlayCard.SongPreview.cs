@@ -107,19 +107,21 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.RankedPlay.Card
 
             private PreviewTrack? previewTrack;
 
-            public void LoadPreview(APIBeatmap beatmap)
+            public void LoadPreview(APIBeatmap beatmap) => LoadPreviewTrack(beatmap, previewTrackManager.Get(beatmap.BeatmapSet!));
+
+            public void LoadPreviewTrack(APIBeatmap beatmap, PreviewTrack track)
             {
                 Debug.Assert(previewTrack == null);
 
-                LoadComponentAsync(previewTrack = previewTrackManager.Get(beatmap.BeatmapSet!), track =>
+                LoadComponentAsync(previewTrack = track, loadedTrack =>
                 {
-                    AddInternal(track);
+                    AddInternal(loadedTrack);
 
-                    track.Looping = true;
-                    track.Started += () => Schedule(() => trackRunning.Value = true);
-                    track.Stopped += () => Schedule(() => trackRunning.Value = false);
+                    loadedTrack.Looping = true;
+                    loadedTrack.Started += () => Schedule(() => trackRunning.Value = true);
+                    loadedTrack.Stopped += () => Schedule(() => trackRunning.Value = false);
 
-                    setupBeatSyncProvider(track, beatmap);
+                    setupBeatSyncProvider(loadedTrack, beatmap);
 
                     var cardColours = new RankedPlayCardContent.CardColours(beatmap, colours);
 

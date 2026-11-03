@@ -73,6 +73,7 @@ namespace osu.Game.Online
                     break;
 
                 case APIState.Online:
+                case APIState.LocalOnline:
                     PopContentIn(Content);
                     placeholder.FadeOut(transform_duration / 2, Easing.OutQuint);
                     LoadingSpinner.Hide();

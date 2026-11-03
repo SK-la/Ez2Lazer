@@ -11,6 +11,7 @@ using System.Net.Http;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using JetBrains.Annotations;
 using Newtonsoft.Json.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Development;
@@ -20,16 +21,20 @@ using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Online;
 using osu.Game.Localisation;
 using osu.Game.Online.API.Requests;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Online.Chat;
 using osu.Game.Online.Notifications.WebSocket;
+using osu.Game.Overlays.Notifications;
 
 namespace osu.Game.Online.API
 {
     public partial class APIAccess : CompositeComponent, IAPIProvider
     {
+        private const string local_token_marker = "__local__";
+
         private readonly OsuGameBase game;
         private readonly OsuConfigManager config;
 
@@ -51,6 +56,8 @@ namespace osu.Game.Online.API
 
         public string ProvidedUsername { get; private set; }
 
+        public string ScoreProcessingNoticeUrl { get; private set; } = string.Empty;
+
         public SessionVerificationMethod? SessionVerificationMethod { get; private set; }
 
         public string SecondFactorCode { get; private set; }
@@ -70,6 +77,9 @@ namespace osu.Game.Online.API
 
         private readonly CancellationTokenSource cancellationToken = new CancellationTokenSource();
         private readonly Logger log;
+
+        [CanBeNull]
+        public Action<Notification> PostNotification { get; set; }
 
         public APIAccess(OsuGameBase game, OsuConfigManager config, EndpointConfiguration endpoints, string versionHash)
         {
@@ -95,13 +105,20 @@ namespace osu.Game.Online.API
             log.Add($@"API request version: {APIVersion}");
 
             ProvidedUsername = config.Get<string>(OsuSetting.Username);
-
-            authentication.TokenString = config.Get<string>(OsuSetting.Token);
+            string configuredToken = config.Get<string>(OsuSetting.Token);
+            authentication.TokenString = configuredToken;
             authentication.Token.ValueChanged += onTokenChanged;
 
             AddInternal(localUserState = new LocalUserState(this, config));
 
-            if (HasLogin)
+            if (!DebugUtils.IsNUnitRunning && isPersistedLocalSession(ProvidedUsername, configuredToken))
+            {
+                // Restore the local account session without any network activity.
+                password = local_token_marker;
+                state.Value = APIState.LocalOnline;
+                localUserState.SetPlaceholderLocalUser(ProvidedUsername, true);
+            }
+            else if (HasLogin)
             {
                 // Early call to ensure the local user / "logged in" state is correct immediately.
                 localUserState.SetPlaceholderLocalUser(ProvidedUsername);
@@ -115,6 +132,13 @@ namespace osu.Game.Online.API
                 Name = "APIAccess",
                 IsBackground = true
             };
+
+            state.BindValueChanged(val =>
+            {
+                // assume that any change from a failing state means that the previously set outage message is no longer valid.
+                if (val.NewValue != APIState.Failing)
+                    userFacingOutageMessage.Value = null;
+            });
 
             thread.Start();
         }
@@ -133,8 +157,7 @@ namespace osu.Game.Online.API
                         break;
 
                     case @"logout":
-                        // 在本地-only 模式下忽略来自服务器的 logout 事件，避免远程推送导致本地实验性登录被撤销。
-                        if (state.Value == APIState.Online && !IsLocalOnly)
+                        if (state.Value == APIState.Online)
                             Logout();
 
                         break;
@@ -157,6 +180,8 @@ namespace osu.Game.Online.API
         /// </summary>
         private int failureCount;
 
+        private readonly Stopwatch livenessStopwatch = new Stopwatch();
+
         /// <summary>
         /// The main API thread loop, which will continue to run until the game is shut down.
         /// </summary>
@@ -166,10 +191,14 @@ namespace osu.Game.Online.API
             {
                 if (state.Value == APIState.Failing)
                 {
-                    // To recover from a failing state, falling through and running the full reconnection process seems safest for now.
-                    // This could probably be replaced with a ping-style request if we want to avoid the reconnection overheads.
                     log.Add($@"{nameof(APIAccess)} is in a failing state, waiting a bit before we try again...");
                     Thread.Sleep(5000);
+
+                    // if the liveness probe actively returns a failure state, there's no need to be retrying anything
+                    if (!probeLiveness(out _))
+                        continue;
+
+                    // In any other circumstance, let's attempt the full reconnection flow.
                 }
 
                 // Ensure that we have valid credentials.
@@ -183,6 +212,13 @@ namespace osu.Game.Online.API
 
                 Debug.Assert(HasLogin);
 
+                // 本地账号不需要连接、access token 或存活探测，请求已在 Queue() 中就地应答。
+                if (state.Value == APIState.LocalOnline)
+                {
+                    Thread.Sleep(50);
+                    continue;
+                }
+
                 // Ensure that we are in an online state. If not, attempt to connect.
                 if (state.Value != APIState.Online)
                 {
@@ -195,20 +231,84 @@ namespace osu.Game.Online.API
                     }
                 }
 
-                // 如果无法获取有效的 access token，则通常会强制登出。
-                // 对于本地-only 模式不需要 access token，因此在该模式下应避免登出操作。
+                // Ensure that we have a valid access token. If not, force a logout to require user interaction.
                 if (authentication.RequestAccessToken() == null)
                 {
-                    if (!IsLocalOnly)
+                    Logout();
+                    continue;
+                }
+
+                if (livenessStopwatch.Elapsed.TotalMinutes >= 1)
+                {
+                    bool alive = probeLiveness(out string reason);
+
+                    if (!alive)
                     {
-                        Logout();
+                        triggerOutage(reason);
+                        livenessStopwatch.Stop();
                         continue;
                     }
+
+                    livenessStopwatch.Restart();
                 }
 
                 processQueuedRequests();
                 Thread.Sleep(50);
             }
+        }
+
+        /// <summary>
+        /// Query the liveness probe to check whether to transition to / remain in <see cref="APIState.Failing"/> state.
+        /// </summary>
+        /// <returns>
+        /// <see langword="true"/> if the liveness probe is disabled, returns that online functions are available, returns an unknown response, or cannot be reached.
+        /// <see langword="false"/> if the liveness probe explicitly returns that online functions are not available. A user-facing message may be returned via <paramref name="reason"/>.
+        /// </returns>
+        private bool probeLiveness([CanBeNull] out string reason)
+        {
+            if (Endpoints.LivenessProbeUrl == null)
+            {
+                reason = null;
+                return true;
+            }
+
+            var req = new OsuJsonWebRequest<LivenessProbeResponse>(Endpoints.LivenessProbeUrl);
+
+            try
+            {
+                req.Perform();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Liveness probe failed: {ex}", LoggingTarget.Network);
+                reason = null;
+                return true;
+            }
+
+            if (req.Aborted || req.ResponseObject == null)
+            {
+                reason = null;
+                return true;
+            }
+
+            reason = req.ResponseObject.Reason;
+            return req.ResponseObject.Status != LivenessProbeResponse.LivenessStatus.Down;
+        }
+
+        private void triggerOutage(string reason)
+        {
+            state.Value = APIState.Failing;
+            string userFacingMessage = reason ?? "Online functionality is not available due to an outage. Sorry for the inconvenience.";
+
+            userFacingOutageMessage.Value = userFacingMessage;
+
+            Schedule(() =>
+            {
+                if (PostNotification != null)
+                    PostNotification?.Invoke(new OutageNotification(userFacingMessage));
+                else
+                    log.Add(userFacingMessage, LogLevel.Important);
+            });
         }
 
         /// <summary>
@@ -250,7 +350,16 @@ namespace osu.Game.Online.API
             // save the username at this point, if the user requested for it to be.
             config.SetValue(OsuSetting.Username, config.Get<bool>(OsuSetting.SaveUsername) ? ProvidedUsername : string.Empty);
 
-            if (!authentication.HasValidAccessToken && HasLogin)
+            // only check the liveness probe when actually connecting, and not when waiting for the second factor.
+            // `attemptConnect()` runs on a tight 50ms loop while waiting for the second factor,
+            // so probing during that time would result in a lot of traffic hitting the probe.
+            if (state.Value != APIState.RequiresSecondFactorAuth && !probeLiveness(out string reason))
+            {
+                triggerOutage(reason);
+                return;
+            }
+
+            if (!authentication.HasValidAccessToken)
             {
                 state.Value = APIState.Connecting;
                 LastLoginError = null;
@@ -344,8 +453,10 @@ namespace osu.Game.Online.API
                         Debug.Assert(ThreadSafety.IsUpdateThread);
 
                         localUserState.SetLocalUser(me);
+                        ScoreProcessingNoticeUrl = me.ScoreProcessingNoticeUrl;
                         SessionVerificationMethod = me.SessionVerificationMethod;
                         state.Value = SessionVerificationMethod == null ? APIState.Online : APIState.RequiresSecondFactorAuth;
+                        livenessStopwatch.Restart();
                         failureCount = 0;
                     };
 
@@ -370,10 +481,14 @@ namespace osu.Game.Online.API
         {
             try
             {
-                if (IsLocalOnly)
-                    return;
-
                 request.AttachAPI(this);
+
+                if (state.Value == APIState.LocalOnline)
+                {
+                    handleLocally(request);
+                    return;
+                }
+
                 request.Perform();
             }
             catch (Exception e)
@@ -392,7 +507,6 @@ namespace osu.Game.Online.API
 
             ProvidedUsername = username;
             this.password = password;
-            IsLocalOnly = false;
         }
 
         public void LoginLocal(string username)
@@ -400,12 +514,15 @@ namespace osu.Game.Online.API
             NotificationsClient.Disconnect();
 
             ProvidedUsername = username;
-            password = "__local__";
-            IsLocalOnly = true;
+            password = local_token_marker;
+
+            // Persist local account session so restart can directly restore local login state.
+            config.SetValue(OsuSetting.Username, ProvidedUsername);
+            config.SetValue(OsuSetting.Token, createLocalTokenString());
 
             Schedule(() => localUserState.SetPlaceholderLocalUser(ProvidedUsername, true));
             LastLoginError = null;
-            state.Value = APIState.Online;
+            state.Value = APIState.LocalOnline;
         }
 
         public void AuthenticateSecondFactor(string code)
@@ -533,6 +650,10 @@ namespace osu.Game.Online.API
         /// </summary>
         public IBindable<APIState> State => state;
 
+        public IBindable<string> UserFacingOutageMessage => userFacingOutageMessage;
+
+        private readonly Bindable<string> userFacingOutageMessage = new Bindable<string>(string.Empty);
+
         private void handleWebException(WebException we)
         {
             HttpStatusCode statusCode = (we.Response as HttpWebResponse)?.StatusCode
@@ -573,7 +694,21 @@ namespace osu.Game.Online.API
 
         public bool IsLoggedIn => State.Value > APIState.Offline;
 
-        public bool IsLocalOnly { get; private set; }
+        public bool IsLocalOnly => State.Value == APIState.LocalOnline;
+
+        /// <summary>
+        /// Responds to requests locally while in <see cref="APIState.LocalOnline"/>.
+        /// </summary>
+        public ILocalOnlyRequestHandler LocalRequestHandler { get; set; } = new LocalOnlyRequestHandler();
+
+        private void handleLocally(APIRequest request)
+        {
+            if (!LocalRequestHandler.Handle(request))
+            {
+                // 本地账号无法访问的请求是预期短路，不要走 Fail() 的 "Failing request" 网络日志。
+                request.TriggerFailure(new LocalOnlyUnavailableException(request));
+            }
+        }
 
         public void Queue(APIRequest request)
         {
@@ -581,8 +716,12 @@ namespace osu.Game.Online.API
             {
                 request.AttachAPI(this);
 
-                if (IsLocalOnly)
+                if (state.Value == APIState.LocalOnline)
+                {
+                    // Schedule to avoid running completion callbacks from within the caller's stack.
+                    Schedule(() => handleLocally(request));
                     return;
+                }
 
                 if (state.Value == APIState.Offline)
                 {
@@ -617,7 +756,6 @@ namespace osu.Game.Online.API
             authentication.Clear();
 
             localUserState.ClearLocalUser();
-            IsLocalOnly = false;
 
             state.Value = APIState.Offline;
             flushQueue();
@@ -637,6 +775,20 @@ namespace osu.Game.Online.API
                 : base($@"Request failed from flush operation (state {state})")
             {
             }
+        }
+
+        private static string createLocalTokenString()
+            => $@"{local_token_marker}|{DateTimeOffset.UtcNow.AddYears(10).ToUnixTimeSeconds()}|{local_token_marker}";
+
+        private static bool isPersistedLocalSession(string username, string token)
+        {
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(token))
+                return false;
+
+            OAuthToken parsed = OAuthToken.Parse(token);
+            return parsed != null
+                   && string.Equals(parsed.AccessToken, local_token_marker, StringComparison.Ordinal)
+                   && string.Equals(parsed.RefreshToken, local_token_marker, StringComparison.Ordinal);
         }
     }
 
@@ -674,6 +826,13 @@ namespace osu.Game.Online.API
         /// <summary>
         /// We are online.
         /// </summary>
-        Online
+        Online,
+
+        /// <summary>
+        /// 已登录到本机（未来的局域网 / P2P）账号，不与 osu! 服务器通信。
+        /// 视作「已登录」（排在 <see cref="Offline"/> 之后使 <see cref="IAPIProvider.IsLoggedIn"/> 成立），
+        /// 但任何 <c>== <see cref="Online"/></c> 的判断都不会成立，因此需要真实网络的功能会自动被排除。
+        /// </summary>
+        LocalOnline
     }
 }

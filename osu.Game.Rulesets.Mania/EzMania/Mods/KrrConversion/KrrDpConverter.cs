@@ -16,7 +16,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
 
         public static void Transform(ManiaBeatmap beatmap, KrrDpOptions options)
         {
-            int originalKeys = (int)beatmap.Difficulty.CircleSize;
+            int originalKeys = beatmap.ResolveColumnCount();
             int targetKeys = options.ModifyKeys ?? originalKeys;
 
             bool useStartOnly = options.ModifyKeys.HasValue && targetKeys - originalKeys >= 0;

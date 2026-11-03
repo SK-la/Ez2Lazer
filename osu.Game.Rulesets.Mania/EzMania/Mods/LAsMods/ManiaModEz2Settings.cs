@@ -1,15 +1,11 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-// #pragma warning disable
-
 using System.Collections.Generic;
 using System.Linq;
-using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Beatmaps.Legacy;
@@ -20,11 +16,10 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Objects.Legacy;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 {
-    public class ManiaModEz2Settings : Mod, IApplicableToDifficulty, IApplicableToBeatmap //, IApplicableToSample //, IStoryboardElement
+    public class ManiaModEz2Settings : Mod, IApplicableToDifficulty, IApplicableToBeatmap
     {
         public override string Name => "Ez2 Settings";
         public override string Acronym => "ES";
@@ -33,7 +28,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public override IconUsage? Icon => FontAwesome.Solid.Tools;
 
         public override bool Ranked => false;
-        public override double ScoreMultiplier => 1;
 
         [SettingSource(typeof(Ez2SettingsStrings), nameof(Ez2SettingsStrings.NO_SCRATCH_LABEL), nameof(Ez2SettingsStrings.NO_SCRATCH_DESCRIPTION))]
         public BindableBool NoScratch { get; } = new BindableBool();
@@ -105,7 +99,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         {
             this.beatmap = beatmap;
             var maniaBeatmap = (ManiaBeatmap)beatmap;
-            int keys = (int)maniaBeatmap.Difficulty.CircleSize;
+            int keys = maniaBeatmap.ResolveColumnCount();
 
             if (HealthScratch.Value)
             {
@@ -222,24 +216,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         {
             SampleControlPoint sampleControlPoint = (beatmap.ControlPointInfo as LegacyControlPointInfo)?.SamplePointAt(hitObject.GetEndTime() + 5)
                                                     ?? SampleControlPoint.DEFAULT;
-            hitObject.Samples = hitObject.Samples.Select(o => sampleControlPoint.ApplyTo(o)).ToList();
+            hitObject.Samples = hitObject.Samples.Select(sampleControlPoint.ApplyTo).ToList();
         }
-
-        public ISample GetSample(ISampleInfo sampleInfo)
-        {
-            if (sampleInfo is ConvertHitObjectParser.LegacyHitSampleInfo legacySample && legacySample.IsLayered)
-                return new SampleVirtual();
-
-            return GetSample(sampleInfo);
-        }
-
-        // public class RemovedNoteSample
-        // {
-        //     public double StartTime { get; set; }
-        //     public required string Sample { get; set; }
-        // }
-
-        // public void ApplyToSample(IAdjustableAudioComponent sample) { }
 
         public void ApplyToDifficulty(BeatmapDifficulty difficulty) { }
 

@@ -93,17 +93,33 @@ namespace osu.Game.Graphics
         public static IconUsage EditorHitCircle => get(OsuIconMapping.EditorHitCircle);
         public static IconUsage EditorSlider => get(OsuIconMapping.EditorSlider);
         public static IconUsage EditorSpinner => get(OsuIconMapping.EditorSpinner);
+        public static IconUsage EditorHit => get(OsuIconMapping.EditorHit);
+        public static IconUsage EditorDrumRoll => get(OsuIconMapping.EditorDrumRoll);
+        public static IconUsage EditorSwell => get(OsuIconMapping.EditorSwell);
+        public static IconUsage EditorFruit => get(OsuIconMapping.EditorFruit);
+        public static IconUsage EditorJuiceStream => get(OsuIconMapping.EditorJuiceStream);
+        public static IconUsage EditorNote => get(OsuIconMapping.EditorNote);
+        public static IconUsage EditorHoldNote => get(OsuIconMapping.EditorHoldNote);
+        public static IconUsage EditorBananaShower => get(OsuIconMapping.EditorBananaShower);
         public static IconUsage EditorGrid => get(OsuIconMapping.EditorGrid);
         public static IconUsage EditorAddControlPoint => get(OsuIconMapping.EditorAddControlPoint);
         public static IconUsage EditorConvertToStream => get(OsuIconMapping.EditorConvertToStream);
         public static IconUsage EditorDistanceSnap => get(OsuIconMapping.EditorDistanceSnap);
         public static IconUsage EditorFinish => get(OsuIconMapping.EditorFinish);
         public static IconUsage EditorGridSnap => get(OsuIconMapping.EditorGridSnap);
-        public static IconUsage EditorNewCombo => get(OsuIconMapping.EditorNewCombo);
+        public static IconUsage EditorNewComboSparkles => get(OsuIconMapping.EditorNewComboSparkles);
         public static IconUsage EditorSelect => get(OsuIconMapping.EditorSelect);
         public static IconUsage EditorSound => get(OsuIconMapping.EditorSound);
         public static IconUsage EditorWhistle => get(OsuIconMapping.EditorWhistle);
         public static IconUsage EditorClap => get(OsuIconMapping.EditorClap);
+        public static IconUsage EditorBankAuto => get(OsuIconMapping.EditorBankAuto);
+        public static IconUsage EditorBankAutoCompact => get(OsuIconMapping.EditorBankAutoCompact);
+        public static IconUsage EditorBankNormal => get(OsuIconMapping.EditorBankNormal);
+        public static IconUsage EditorBankNormalCompact => get(OsuIconMapping.EditorBankNormalCompact);
+        public static IconUsage EditorBankSoft => get(OsuIconMapping.EditorBankSoft);
+        public static IconUsage EditorBankSoftCompact => get(OsuIconMapping.EditorBankSoftCompact);
+        public static IconUsage EditorBankDrum => get(OsuIconMapping.EditorBankDrum);
+        public static IconUsage EditorBankDrumCompact => get(OsuIconMapping.EditorBankDrumCompact);
         public static IconUsage Tortoise => get(OsuIconMapping.Tortoise);
         public static IconUsage Hare => get(OsuIconMapping.Hare);
 
@@ -409,6 +425,30 @@ namespace osu.Game.Graphics
             [Description(@"Editor/spinner")]
             EditorSpinner,
 
+            [Description(@"Editor/hit")]
+            EditorHit,
+
+            [Description(@"Editor/drum-roll")]
+            EditorDrumRoll,
+
+            [Description(@"Editor/swell")]
+            EditorSwell,
+
+            [Description(@"Editor/fruit")]
+            EditorFruit,
+
+            [Description(@"Editor/juice-stream")]
+            EditorJuiceStream,
+
+            [Description(@"Editor/banana-shower")]
+            EditorBananaShower,
+
+            [Description(@"Editor/note")]
+            EditorNote,
+
+            [Description(@"Editor/hold-note")]
+            EditorHoldNote,
+
             [Description(@"Editor/grid")]
             EditorGrid,
 
@@ -427,8 +467,8 @@ namespace osu.Game.Graphics
             [Description(@"Editor/grid-snap")]
             EditorGridSnap,
 
-            [Description(@"Editor/new-combo")]
-            EditorNewCombo,
+            [Description(@"Editor/new-combo-sparkles")]
+            EditorNewComboSparkles,
 
             [Description(@"Editor/select")]
             EditorSelect,
@@ -441,6 +481,30 @@ namespace osu.Game.Graphics
 
             [Description(@"Editor/clap")]
             EditorClap,
+
+            [Description(@"Editor/bank-auto")]
+            EditorBankAuto,
+
+            [Description(@"Editor/bank-auto-compact")]
+            EditorBankAutoCompact,
+
+            [Description(@"Editor/bank-normal")]
+            EditorBankNormal,
+
+            [Description(@"Editor/bank-normal-compact")]
+            EditorBankNormalCompact,
+
+            [Description(@"Editor/bank-soft")]
+            EditorBankSoft,
+
+            [Description(@"Editor/bank-soft-compact")]
+            EditorBankSoftCompact,
+
+            [Description(@"Editor/bank-drum")]
+            EditorBankDrum,
+
+            [Description(@"Editor/bank-drum-compact")]
+            EditorBankDrumCompact,
 
             [Description(@"tortoise")]
             Tortoise,
@@ -684,7 +748,11 @@ namespace osu.Game.Graphics
                 return null;
             }
 
+            // 有限的特殊字符集，用于emoji解析
+            public ITexturedCharacterGlyph? Get(string? fontName, int codepoint) => codepoint <= char.MaxValue ? Get(fontName, (char)codepoint) : null;
+
             public Task<ITexturedCharacterGlyph?> GetAsync(string fontName, char character) => Task.Run(() => Get(fontName, character));
+            public Task<ITexturedCharacterGlyph?> GetAsync(string fontName, int codepoint) => Task.Run(() => Get(fontName, codepoint));
 
             public Texture? Get(string name, WrapMode wrapModeS, WrapMode wrapModeT) => null;
 
@@ -704,6 +772,7 @@ namespace osu.Game.Graphics
                 public float YOffset => 0;
                 public float XAdvance => 0;
                 public float Baseline => 0;
+                public int Codepoint => 0;
                 public char Character => '\0';
 
                 public float GetKerning<T>(T lastGlyph) where T : ICharacterGlyph => throw new NotImplementedException();

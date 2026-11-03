@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <!-- Use in Rider: Settings → Unit Testing → Default test settings file, or per-session .runsettings picker. -->
+  <RunConfiguration>
+    <EnvironmentVariables>
+      <DOTNET_CLI_UI_LANGUAGE>en-US</DOTNET_CLI_UI_LANGUAGE>
+      <LANG>en-US.UTF-8</LANG>
+    </EnvironmentVariables>
+  </RunConfiguration>
+</RunSettings>

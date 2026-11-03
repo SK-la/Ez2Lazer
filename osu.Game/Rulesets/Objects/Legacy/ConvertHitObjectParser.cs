@@ -1,20 +1,21 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osuTK;
-using osu.Game.Rulesets.Objects.Types;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
-using osu.Game.Beatmaps.Formats;
-using osu.Game.Audio;
 using System.Linq;
 using osu.Framework.Utils;
+using osu.Game.Audio;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.Beatmaps.Formats;
 using osu.Game.Beatmaps.Legacy;
+using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Skinning;
 using osu.Game.Utils;
-using System.Buffers;
+using osuTK;
 
 namespace osu.Game.Rulesets.Objects.Legacy
 {
@@ -53,10 +54,13 @@ namespace osu.Game.Rulesets.Objects.Legacy
         {
             string[] split = text.Split(',');
 
-            Vector2 pos =
-                formatVersion >= LegacyBeatmapEncoder.FIRST_LAZER_VERSION
-                    ? new Vector2(Parsing.ParseFloat(split[0], Parsing.MAX_COORDINATE_VALUE), Parsing.ParseFloat(split[1], Parsing.MAX_COORDINATE_VALUE))
-                    : new Vector2((int)Parsing.ParseFloat(split[0], Parsing.MAX_COORDINATE_VALUE), (int)Parsing.ParseFloat(split[1], Parsing.MAX_COORDINATE_VALUE));
+            // compare: https://github.com/peppy/osu-stable-reference/blob/baa8705f782c0de2b10a7387d78014c61c8b17fb/osu!/GameplayElements/HitObjectManager_LoadSave.cs#L837-L838
+            float x = Math.Clamp(Parsing.ParseFloat(split[0], Parsing.MAX_COORDINATE_VALUE), 0, 512);
+            float y = Math.Clamp(Parsing.ParseFloat(split[1], Parsing.MAX_COORDINATE_VALUE), 0, 512);
+
+            Vector2 pos = formatVersion >= LegacyBeatmapEncoder.FIRST_LAZER_VERSION
+                ? new Vector2(x, y)
+                : new Vector2((int)x, (int)y);
 
             double startTime = Parsing.ParseDouble(split[2]) + offset;
 
@@ -94,7 +98,8 @@ namespace osu.Game.Rulesets.Objects.Legacy
 
                 if (split.Length > 7)
                 {
-                    length = Math.Max(0, Parsing.ParseDouble(split[7], Parsing.MAX_COORDINATE_VALUE));
+                    // Aspire 谱面滑条长度远超坐标范围；解析时不施加坐标上限。
+                    length = Math.Max(0, Parsing.ParseDouble(split[7], double.MaxValue));
                     if (length == 0)
                         length = null;
                 }
@@ -234,7 +239,7 @@ namespace osu.Game.Rulesets.Objects.Legacy
             bankInfo.Filename = split.Length > 4 ? split[4] : null;
         }
 
-        private PathType convertPathType(string input)
+        private PathType convertPathType(ReadOnlySpan<char> input)
         {
             switch (input[0])
             {
@@ -243,7 +248,7 @@ namespace osu.Game.Rulesets.Objects.Legacy
                     return PathType.CATMULL;
 
                 case 'B':
-                    if (input.Length > 1 && int.TryParse(input.AsSpan(1), out int degree) && degree > 0)
+                    if (input.Length > 1 && int.TryParse(input[1..], NumberStyles.Integer, CultureInfo.InvariantCulture, out int degree) && degree > 0)
                         return PathType.BSpline(degree);
 
                     return PathType.BEZIER;
@@ -280,17 +285,33 @@ namespace osu.Game.Rulesets.Objects.Legacy
         private PathControlPoint[] convertPathString(string pointString, Vector2 offset)
         {
             // This code takes on the responsibility of handling explicit segments of the path ("X" & "Y" from above). Implicit segments are handled by calls to convertPoints().
-            string[] pointStringSplit = pointString.Split('|');
+            // 用 span 切片而非 Split：aspire 谱面可有数百万控制点，每个点一个子字符串
+            // （坐标再各一个）会主导解码时间与分配。
+            ReadOnlySpan<char> remaining = pointString;
+            int pointStringCount = 1;
 
-            var pointsBuffer = ArrayPool<Vector2>.Shared.Rent(pointStringSplit.Length);
-            var segmentsBuffer = ArrayPool<(PathType Type, int StartIndex)>.Shared.Rent(pointStringSplit.Length);
+            foreach (char c in remaining)
+            {
+                if (c == '|')
+                    pointStringCount++;
+            }
+
+            var pointsBuffer = ArrayPool<Vector2>.Shared.Rent(pointStringCount);
+            var segmentsBuffer = ArrayPool<(PathType Type, int StartIndex)>.Shared.Rent(pointStringCount);
             int currentPointsIndex = 0;
             int currentSegmentsIndex = 0;
 
             try
             {
-                foreach (string s in pointStringSplit)
+                while (!remaining.IsEmpty)
                 {
+                    int separator = remaining.IndexOf('|');
+                    ReadOnlySpan<char> s = separator < 0 ? remaining : remaining[..separator];
+                    remaining = separator < 0 ? ReadOnlySpan<char>.Empty : remaining[(separator + 1)..];
+
+                    if (s.IsEmpty)
+                        continue;
+
                     if (char.IsLetter(s[0]))
                     {
                         // The start of a new segment(indicated by having an alpha character at position 0).
@@ -335,13 +356,19 @@ namespace osu.Game.Rulesets.Objects.Legacy
                 ArrayPool<(PathType, int)>.Shared.Return(segmentsBuffer);
             }
 
-            Vector2 readPoint(string value, Vector2 startPos)
+            Vector2 readPoint(ReadOnlySpan<char> value, Vector2 startPos)
             {
-                string[] vertexSplit = value.Split(':');
+                int separator = value.IndexOf(':');
+                ReadOnlySpan<char> xSpan = separator < 0 ? value : value[..separator];
+                ReadOnlySpan<char> ySpan = separator < 0 ? ReadOnlySpan<char>.Empty : value[(separator + 1)..];
+
+                // Aspire 谱面控制点远在游玩区域外；解析时不施加坐标上限。
+                float x = Parsing.ParseFloat(xSpan, float.MaxValue);
+                float y = Parsing.ParseFloat(ySpan, float.MaxValue);
 
                 Vector2 pos = formatVersion >= LegacyBeatmapEncoder.FIRST_LAZER_VERSION
-                    ? new Vector2(Parsing.ParseFloat(vertexSplit[0], Parsing.MAX_COORDINATE_VALUE), Parsing.ParseFloat(vertexSplit[1], Parsing.MAX_COORDINATE_VALUE))
-                    : new Vector2((int)Parsing.ParseFloat(vertexSplit[0], Parsing.MAX_COORDINATE_VALUE), (int)Parsing.ParseFloat(vertexSplit[1], Parsing.MAX_COORDINATE_VALUE));
+                    ? new Vector2(x, y)
+                    : new Vector2((int)x, (int)y);
                 pos -= startPos;
                 return pos;
             }
@@ -488,7 +515,9 @@ namespace osu.Game.Rulesets.Objects.Legacy
             // and *will* fail conversion mapping tests, but again, this is supposed to be a least-worst measure to prevent exploits.
             // it is also applied centrally to all rulesets rather than in specific ruleset converters because this failure scenario
             // translates across rulesets (osu! and catch are both affected).
-            if (Precision.AlmostEquals(path.Distance, 0))
+            // 仅在有需要重置的 repeat 时探测路径：无 repeat 的滑条下面分支是空操作，
+            // 而急切求 `Distance` 会强制完整路径近似（aspire 谱面可有数百万控制点）。
+            if (repeatCount > 0 && Precision.AlmostEquals(path.Distance, 0))
             {
                 repeatCount = 0;
                 nodeSamples = [nodeSamples[0], nodeSamples[^1]];

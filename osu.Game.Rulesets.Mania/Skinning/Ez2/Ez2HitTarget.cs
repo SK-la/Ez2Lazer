@@ -5,40 +5,56 @@ using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Game.Beatmaps;
+using osu.Framework.Platform;
+using osu.Framework.Timing;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Play;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
-    internal partial class Ez2HitTarget : Ez2NotePiece
+    public partial class Ez2HitTarget : Ez2NotePiece
     {
+        private readonly IBindable<double> hitTargetFloatFixed = new Bindable<double>();
+        private readonly IBindable<double> hitTargetAlpha = new Bindable<double>();
+
         private IBindable<ScrollingDirection> direction = null!;
 
-        private double bpm;
-
-        [Resolved]
-        private IBeatmap beatmap { get; set; } = null!;
+        private double beatPhase;
 
         [Resolved]
         private IGameplayClock gameplayClock { get; set; } = null!;
 
+        /// <summary>
+        /// The beat this bobs to. Taking it from the shared tracker (rather than a BPM captured once at load) is what
+        /// makes it follow every timing section and any live rate change.
+        /// </summary>
+        private EzBeatmapSpeedTracker speedTracker = null!;
+
+        private IFrameBasedClock? hostClock;
+
         [BackgroundDependencyLoader]
-        private void load(IScrollingInfo scrollingInfo)
+        private void load(IScrollingInfo scrollingInfo, IEzSkinInfo ezSkinInfo, GameHost host)
         {
             RelativeSizeAxes = Axes.X;
-            // Masking = true;
             Height = NoteHeight * NOTE_ACCENT_RATIO;
             CornerRadius = NoteHeight;
-            Alpha = 0.3f;
             Blending = BlendingParameters.Mixture;
             Colour = Color4.Gray;
+
+            // Host update clock keeps bobbing while gameplay is paused (same as EzStylePro).
+            hostClock = host.UpdateThread.Clock;
 
             direction = scrollingInfo.Direction;
             direction.BindValueChanged(onDirectionChanged, true);
 
-            bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
+            AddInternal(speedTracker = new EzBeatmapSpeedTracker());
+
+            hitTargetFloatFixed.BindTo(ezSkinInfo.HitTargetFloatFixed);
+            hitTargetAlpha.BindTo(ezSkinInfo.HitTargetAlpha);
+            hitTargetAlpha.BindValueChanged(v => Alpha = (float)v.NewValue, true);
         }
 
         protected override void Update()
@@ -46,29 +62,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             base.Update();
             Height = DrawWidth;
 
-            double interval = 60000 / bpm;
-            const double amplitude = 6.0;
-            double progress = (gameplayClock.CurrentTime % interval) / interval;
+            double beatLength = speedTracker.BeatLength.Value;
 
-            double smoothValue = smoothSineWave(progress);
-            Y = (float)(smoothValue * amplitude);
-        }
+            if (beatLength <= 0)
+                return;
 
-        private double smoothSineWave(double t)
-        {
-            const double frequency = 1;
-            const double amplitude = 0.3;
-            return amplitude * Math.Sin(frequency * t * 2 * Math.PI);
+            beatPhase = hostClock != null
+                ? EzBeatmapSpeedTracker.AdvanceBeatPhase(beatPhase, hostClock.ElapsedFrameTime, beatLength, speedTracker.Rate.Value)
+                : EzBeatmapSpeedTracker.AdvanceBeatPhase(beatPhase, gameplayClock.ElapsedFrameTime, beatLength);
+
+            double smoothValue = 0.3 * Math.Sin(beatPhase * 2 * Math.PI);
+            Y = (float)(smoothValue * hitTargetFloatFixed.Value);
         }
-        //     double elasticValue = elasticEaseOut(progress);
-        //     Y = (float)(elasticValue * amplitude);
-        // }
-        //
-        // private double elasticEaseOut(double t) //弹性缓动函数
-        // {
-        //     double p = 0.3;
-        //     return Math.Pow(2, -10 * t) * Math.Sin((t - p / 4) * (2 * Math.PI) / p) + 1;
-        // }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
         {

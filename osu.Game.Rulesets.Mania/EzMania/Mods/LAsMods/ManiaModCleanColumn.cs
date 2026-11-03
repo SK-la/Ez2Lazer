@@ -8,6 +8,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
+using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -21,13 +22,11 @@ using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 {
-    public class ManiaModCleanColumn : Mod, IApplicableAfterBeatmapConversion, IEzApplyOrder
+    public class ManiaModCleanColumn : Mod, IApplicableAfterBeatmapConversion, IEzApplyOrder, IHasSeed
     {
         public override string Name => "Clean Column";
 
         public override string Acronym => "CC";
-
-        public override double ScoreMultiplier => 1;
 
         public override LocalisableString Description => CleanColumnStrings.CLEAN_COLUMN_DESCRIPTION;
 
@@ -58,12 +57,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.ENABLE_CUSTOM_REORDER_LABEL), nameof(CleanColumnStrings.ENABLE_CUSTOM_REORDER_DESCRIPTION))]
         public BindableBool EnableCustomReorder { get; } = new BindableBool();
 
-        [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.USE_HEALTH_CAP_REDUCTION_LABEL), nameof(CleanColumnStrings.USE_HEALTH_CAP_REDUCTION_DESCRIPTION))]
-        public BindableBool UseHealthCapReduction { get; } = new BindableBool();
-
         [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.CUSTOM_REORDER_COLUMN_LABEL), nameof(CleanColumnStrings.CUSTOM_REORDER_COLUMN_DESCRIPTION),
             SettingControlType = typeof(SettingsTextBox))]
         public Bindable<string> CustomReorderColumn { get; } = new Bindable<string>(string.Empty);
+
+        [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.USE_HEALTH_CAP_REDUCTION_LABEL), nameof(CleanColumnStrings.USE_HEALTH_CAP_REDUCTION_DESCRIPTION))]
+        public BindableBool UseHealthCapReduction { get; } = new BindableBool();
+
+        [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.USE_ROW_RANDOM_LABEL), nameof(CleanColumnStrings.USE_ROW_RANDOM_DESCRIPTION))]
+        public BindableBool UseRowRandom { get; } = new BindableBool();
+
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
+        public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
         public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
@@ -73,6 +78,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         };
 
         public int ApplyOrder => ApplyOrderIndex.Value;
+
+        /// <summary>
+        /// 诊断日志只在真的会被写盘时才构造。
+        /// </summary>
+        /// <remarks>
+        /// 下面这些消息内容是 <c>string.Join</c>、逐列统计与 O(谱面长度 × 列数) 的 <c>Count()</c>，
+        /// 而正式构建里 <see cref="Logger.Level"/> 高于 <see cref="LogLevel.Debug"/>，消息一律被丢弃——
+        /// 不挡掉就等于每次转换白烧一遍 CPU 与 GC。
+        /// </remarks>
+        private static bool DiagnosticLoggingEnabled => Logger.Enabled && Logger.Level <= LogLevel.Debug;
 
         private HashSet<int>? columnsToDelete;
         private int keys1;
@@ -87,26 +102,29 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 if (DeletePColumn.Value) yield return (CleanColumnStrings.DELETE_P_COLUMN_LABEL, "On");
                 if (DeleteEColumn.Value) yield return (CleanColumnStrings.DELETE_E_COLUMN_LABEL, "On");
                 if (EnableCustomDelete.Value) yield return (CleanColumnStrings.ENABLE_CUSTOM_DELETE_LABEL, string.IsNullOrWhiteSpace(CustomDeleteColumn.Value) ? "Enabled" : CustomDeleteColumn.Value);
-                if (EnableCustomReorder.Value) yield return (CleanColumnStrings.ENABLE_CUSTOM_REORDER_LABEL, string.IsNullOrWhiteSpace(CustomReorderColumn.Value) ? "Enabled" : CustomReorderColumn.Value);
+                if (EnableCustomReorder.Value)
+                    yield return (CleanColumnStrings.ENABLE_CUSTOM_REORDER_LABEL, string.IsNullOrWhiteSpace(CustomReorderColumn.Value) ? "Enabled" : CustomReorderColumn.Value);
                 if (UseHealthCapReduction.Value) yield return (CleanColumnStrings.USE_HEALTH_CAP_REDUCTION_LABEL, "On");
 
+                yield return (EzCommonModStrings.SEED_LABEL, Seed.Value?.ToString() ?? "Random");
                 yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
             }
         }
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
+            // TODO: 需要考虑是否把类型删除提前，实现先删盘子，后转谱，再自定义删除
             try
             {
                 var maniaBeatmap = (ManiaBeatmap)beatmap;
-                keys1 = (int)maniaBeatmap.Difficulty.CircleSize;
+                keys1 = maniaBeatmap.ResolveColumnCount();
 
                 // 处理自定义列重排
                 if (EnableCustomReorder.Value && !string.IsNullOrWhiteSpace(CustomReorderColumn.Value) && !customReorderApplied)
                 {
                     Logger.Log($"[ManiaModCleanColumn] Calling applyCustomReorder with reorderRule: {CustomReorderColumn.Value}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                     applyCustomReorder(maniaBeatmap, CustomReorderColumn.Value, keys1);
-                    keys2 = (int)maniaBeatmap.Difficulty.CircleSize;
+                    keys2 = maniaBeatmap.ResolveColumnCount();
                     customReorderApplied = true;
                 }
 
@@ -147,21 +165,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 {
                     foreach (char c in CustomDeleteColumn.Value)
                     {
-                        if (char.IsDigit(c))
-                        {
-                            int colIndex = c == '0' ? 9 : (c - '1'); // 0表示第10列，1-9表示第1-9列
-                            if (colIndex >= 0 && colIndex < keys1)
-                                columnsToDelete.Add(colIndex);
-                        }
+                        if (tryParseColumnToken(c, keys1, out int colIndex))
+                            columnsToDelete.Add(colIndex);
                     }
                 }
 
                 // 执行删除操作（后执行删除） —— 一次性过滤以避免大量 Remove 调用导致的 O(n*m) 行为
-                if (columnsToDelete.Any())
+                if (columnsToDelete.Count > 0)
                 {
-                    maniaBeatmap.HitObjects = maniaBeatmap.HitObjects
-                                                          .Where(h => !(h is ManiaHitObject maniaHitObject && columnsToDelete.Contains(maniaHitObject.Column)))
-                                                          .ToList();
+                    var kept = new List<ManiaHitObject>(maniaBeatmap.HitObjects.Count);
+
+                    foreach (var hitObject in maniaBeatmap.HitObjects)
+                    {
+                        if (!columnsToDelete.Contains(hitObject.Column))
+                            kept.Add(hitObject);
+                    }
+
+                    maniaBeatmap.HitObjects = kept;
                 }
             }
             catch
@@ -194,19 +214,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     return;
 
                 // 使用当前（转换后）hit objects作为输入，并按时间重建新谱面（类似 ManiaModNtoM 的做法）
-                var sourceHitObjects = beatmap.HitObjects.ToList();
-                Logger.Log($"[ManiaModCleanColumn] Using {sourceHitObjects.Count} source hit objects for reordering", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                // 不在开头复制一份：beatmap.HitObjects 直到本方法末尾才被整体替换，中途只读。
+                var sourceHitObjects = beatmap.HitObjects;
+
+                if (DiagnosticLoggingEnabled)
+                    Logger.Log($"[ManiaModCleanColumn] Using {sourceHitObjects.Count} source hit objects for reordering", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
                 // 构建列映射、清空列表和长按列表
                 Dictionary<int, int> columnMapping = new Dictionary<int, int>();
                 HashSet<int> clearColumns = new HashSet<int>();
                 HashSet<int> holdColumns = new HashSet<int>();
+                HashSet<int> rowRandomColumns = new HashSet<int>();
 
                 // 计算实际的源列数（以源 HitObjects 中出现的最大列号为准），避免传入的 totalColumns 失准导致空列
                 int sourceColumns = sourceHitObjects.Count > 0 ? sourceHitObjects.Max(h => h.Column) + 1 : totalColumns;
 
-                // 创建随机数生成器，使用当前时间作为种子确保每次运行都不同
-                var random = new Random((int)DateTime.Now.Ticks);
+                int oscSeed = Seed.Value ?? RNG.Next();
+                var random = new Random(oscSeed);
 
                 for (int targetPos = 0; targetPos < reorderRule.Length; targetPos++)
                 {
@@ -222,37 +246,25 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     }
                     else if (c == '?')
                     {
-                        int randomSourceCol = sourceColumns > 0 ? random.Next(0, sourceColumns) : 0;
-                        columnMapping[targetPos] = randomSourceCol;
-                        Logger.Log($"[ManiaModCleanColumn] Column {targetPos} randomly mapped to source column {randomSourceCol}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                        if (UseRowRandom.Value)
+                        {
+                            rowRandomColumns.Add(targetPos);
+                        }
+                        else
+                        {
+                            int randomSourceCol = sourceColumns > 0 ? random.Next(0, sourceColumns) : 0;
+                            columnMapping[targetPos] = randomSourceCol;
+                            Logger.Log($"[ManiaModCleanColumn] Column {targetPos} randomly mapped to source column {randomSourceCol}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                        }
                     }
-                    else if (char.IsDigit(c))
+                    else if (tryParseColumnToken(c, sourceColumns, out int sourceCol))
                     {
-                        int digitValue = c - '0';
-                        int desired = digitValue == 0 ? 10 : digitValue; // '0' means 10th column
-                        int sourceCol = desired - 1;
-
-                        if (sourceColumns <= 0)
-                        {
-                            sourceCol = 0;
-                        }
-                        else if (sourceCol < 0)
-                        {
-                            sourceCol = 0;
-                        }
-                        else if (sourceCol >= sourceColumns)
-                        {
-                            Logger.Log($"[ManiaModCleanColumn] Digit mapping at pos {targetPos} ({desired}) out of range, clamping to last source column {sourceColumns - 1}",
-                                Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                            sourceCol = sourceColumns - 1;
-                        }
-
                         columnMapping[targetPos] = sourceCol;
                     }
                 }
 
                 // 如果没有有效映射，则不进行任何操作
-                if (columnMapping.Count == 0 && clearColumns.Count == 0 && holdColumns.Count == 0)
+                if (columnMapping.Count == 0 && clearColumns.Count == 0 && holdColumns.Count == 0 && rowRandomColumns.Count == 0)
                     return;
 
                 // 计算谱面的时间范围，用于创建贯穿的长按note
@@ -264,18 +276,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 var newObjects = new List<ManiaHitObject>(sourceHitObjects.Count);
 
                 // 显示实际源列的 note 分布（一次遍历统计以避免每列重复遍历）
-                int[] counts = new int[sourceColumns];
-
-                foreach (var h in sourceHitObjects)
+                if (DiagnosticLoggingEnabled)
                 {
-                    if (h.Column >= 0 && h.Column < sourceColumns)
-                        counts[h.Column]++;
+                    int[] sourceCounts = new int[sourceColumns];
+
+                    foreach (var h in sourceHitObjects)
+                    {
+                        if (h.Column >= 0 && h.Column < sourceColumns)
+                            sourceCounts[h.Column]++;
+                    }
+
+                    for (int i = 0; i < sourceColumns; i++)
+                        Logger.Log($"[ManiaModCleanColumn] Original column {i} has {sourceCounts[i]} notes", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+
+                    Logger.Log($"[ManiaModCleanColumn] Column mapping: {string.Join(", ", columnMapping.Select(kv => $"{kv.Key}->{kv.Value}"))}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 }
-
-                for (int i = 0; i < sourceColumns; i++)
-                    Logger.Log($"[ManiaModCleanColumn] Original column {i} has {counts[i]} notes", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-
-                Logger.Log($"[ManiaModCleanColumn] Column mapping: {string.Join(", ", columnMapping.Select(kv => $"{kv.Key}->{kv.Value}"))}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
                 // 按时间重建：先把所有源 note 转为时间序列 locations，然后根据反向映射把 note 放到目标列
                 var locations = sourceHitObjects.OfType<Note>().Select(n => (
@@ -338,6 +353,65 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     }
                 }
 
+                if (rowRandomColumns.Count > 0)
+                {
+                    if (DiagnosticLoggingEnabled)
+                    {
+                        Logger.Log($"[ManiaModCleanColumn] Row-random enabled for target columns: {string.Join(", ", rowRandomColumns.OrderBy(c => c))}",
+                            Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                    }
+
+                    // 按每个起始时间作为一行：对每个 ? 目标列，从该行原始 note 随机抽取一个（也可能抽空）。
+                    // locations 已按 (startTime, column) 升序，同刻行是连续的一段，单趟扫描即可，
+                    // 不必再 GroupBy + OrderBy + 每行 ToList。
+                    int rowStart = 0;
+
+                    while (rowStart < locations.Count)
+                    {
+                        double rowTime = locations[rowStart].startTime;
+                        int rowEnd = rowStart + 1;
+
+                        while (rowEnd < locations.Count && locations[rowEnd].startTime == rowTime)
+                            rowEnd++;
+
+                        int rowCount = rowEnd - rowStart;
+
+                        foreach (int target in rowRandomColumns)
+                        {
+                            // 额外一个“空白”槽位，表示本行该 ? 目标列不放 note（可有可无）。
+                            int pick = random.Next(0, rowCount + 1);
+
+                            if (pick == rowCount)
+                                continue;
+
+                            var loc = locations[rowStart + pick];
+
+                            if (loc.isHold)
+                            {
+                                var hn = new HoldNote
+                                {
+                                    Column = target,
+                                    StartTime = loc.startTime,
+                                    Duration = loc.endTime - loc.startTime,
+                                    NodeSamples = new List<IList<HitSampleInfo>> { loc.samples, new List<HitSampleInfo>() }
+                                };
+                                newObjects.Add(hn);
+                            }
+                            else
+                            {
+                                newObjects.Add(new Note
+                                {
+                                    Column = target,
+                                    StartTime = loc.startTime,
+                                    Samples = loc.samples
+                                });
+                            }
+                        }
+
+                        rowStart = rowEnd;
+                    }
+                }
+
                 // 添加贯穿长按列
                 foreach (int hc in holdColumns)
                 {
@@ -351,34 +425,47 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     });
                 }
 
-                Logger.Log($"[ManiaModCleanColumn] Final result: {newObjects.Count} notes in {reorderRule.Length} columns", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-
-                // 记录每个目标列的来源与最终 note 数量，便于调试空列问题
-                for (int t = 0; t < reorderRule.Length; t++)
+                if (DiagnosticLoggingEnabled)
                 {
-                    string info;
-                    if (clearColumns.Contains(t))
-                        info = "cleared (-)";
-                    else if (holdColumns.Contains(t))
-                        info = "hold (|)";
-                    else if (columnMapping.TryGetValue(t, out int value))
-                        info = $"mapped from source {value}";
-                    else
-                        info = "no mapping";
+                    Logger.Log($"[ManiaModCleanColumn] Final result: {newObjects.Count} notes in {reorderRule.Length} columns", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
-                    int count = newObjects.Count(h => h.Column == t);
-                    if (count == 0)
-                        Logger.Log($"[ManiaModCleanColumn] WARNING: target column {t} ({info}) has 0 notes after rebuild", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                    else
-                        Logger.Log($"[ManiaModCleanColumn] target column {t} ({info}) has {count} notes", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                    // 记录每个目标列的来源与最终 note 数量，便于调试空列问题。
+                    // 单趟统计，避免每列各扫一遍 newObjects。
+                    int[] produced = new int[reorderRule.Length];
+
+                    foreach (var o in newObjects)
+                    {
+                        if (o.Column >= 0 && o.Column < produced.Length)
+                            produced[o.Column]++;
+                    }
+
+                    for (int t = 0; t < reorderRule.Length; t++)
+                    {
+                        string info;
+                        if (clearColumns.Contains(t))
+                            info = "cleared (-)";
+                        else if (holdColumns.Contains(t))
+                            info = "hold (|)";
+                        else if (rowRandomColumns.Contains(t))
+                            info = "row-random (?)";
+                        else if (columnMapping.TryGetValue(t, out int value))
+                            info = $"mapped from source {value}";
+                        else
+                            info = "no mapping";
+
+                        int count = produced[t];
+
+                        if (count == 0)
+                            Logger.Log($"[ManiaModCleanColumn] WARNING: target column {t} ({info}) has 0 notes after rebuild", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                        else
+                            Logger.Log($"[ManiaModCleanColumn] target column {t} ({info}) has {count} notes", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                    }
                 }
 
                 // 更新谱面总列数以匹配重排后的列数，避免难度计算中基于 TotalColumns 分配数组时发生越界
                 try
                 {
-                    beatmap.Stages.Clear();
-                    beatmap.Stages.Add(new StageDefinition(reorderRule.Length));
-                    beatmap.Difficulty.CircleSize = reorderRule.Length;
+                    beatmap.SetColumnCount(reorderRule.Length);
                     Logger.Log($"[ManiaModCleanColumn] Updated beatmap stages and Difficulty.CircleSize to {reorderRule.Length}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 }
                 catch (Exception ex)
@@ -392,6 +479,64 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             {
                 // 如果处理失败，保持原谱面不变
             }
+        }
+
+        private static bool tryParseColumnToken(char token, int totalColumns, out int column)
+        {
+            column = -1;
+
+            if (totalColumns <= 0)
+                return false;
+
+            if (totalColumns <= 10)
+            {
+                if (token is >= '1' and <= '9')
+                {
+                    int index = token - '1';
+
+                    if (index < totalColumns)
+                    {
+                        column = index;
+                        return true;
+                    }
+                }
+                else if (token == '0' && totalColumns >= 10)
+                {
+                    column = 9;
+                    return true;
+                }
+
+                return false;
+            }
+
+            if (totalColumns >= 12)
+            {
+                int sideCount = Math.Min(9, totalColumns / 2);
+                char rightToken = char.ToLowerInvariant(token);
+
+                if (token is >= '1' and <= '9')
+                {
+                    int sideIndex = token - '1';
+
+                    if (sideIndex < sideCount)
+                    {
+                        column = sideIndex;
+                        return true;
+                    }
+                }
+                else if (rightToken is >= 'a' and <= 'i')
+                {
+                    int sideIndex = rightToken - 'a';
+
+                    if (sideIndex < sideCount)
+                    {
+                        column = totalColumns - 1 - sideIndex;
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
     }
 
@@ -422,8 +567,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public static readonly LocalisableString CUSTOM_DELETE_COLUMN_LABEL = new EzLocalizationManager.EzLocalisableString("删除列序号", "Delete Column Indexes");
 
         public static readonly LocalisableString CUSTOM_DELETE_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "输入要删除的列序号，支持多个数字。如'2468'删除2、4、6、8列。超过谱面列数的数字将被忽略。支持最多10k（0表示第10列）",
-            "Input the column indexes to delete, support multiple digits. E.g. '2468' deletes columns 2, 4, 6, 8. Indexes exceeding the beatmap's column count will be ignored. Support up to 10k (0 means column 10)");
+            "输入要删除的列序号，支持多个字符。"
+            + "\n10k及以下的索引：1~0（0表示第10列）；"
+            + "\n12k及以上的索引：左侧1~9，右侧a~i(对称指令)"
+            + "\n超过谱面列数的索引将被忽略。",
+            "Input the column indexes to delete, supports multiple tokens."
+            + "\nFor 10k or below: 1~0 (0 means column 10)."
+            + "\nFor 12k or above: left 1~9, right a~i (symmetric instruction)."
+            + "\nIndexes exceeding the beatmap's column count are ignored.");
 
         public static readonly LocalisableString ENABLE_CUSTOM_REORDER_LABEL = new EzLocalizationManager.EzLocalisableString("自定义列重排", "Enable Custom Reorder");
 
@@ -434,21 +585,22 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public static readonly LocalisableString CUSTOM_REORDER_COLUMN_LABEL = new EzLocalizationManager.EzLocalisableString("列重排规则", "Column Reorder Rule");
 
         public static readonly LocalisableString CUSTOM_REORDER_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "处理Column，自定义排序、复制、删除或置空列中的note。"
-            + "\n执行顺序：先重排，后删除。支持最多10k（0表示第10列）；"
-            + "\n'-'表示该新列位置清空，"
-            + "\n'|'表示该新列位置放置贯穿全谱面的长按note，"
-            + "\n'?'表示该新列保持原列位置不变。"
-            + "\n字符串长度决定新的列数（修改长度必须重新启用开关）。每位数字代表新列使用原谱面的哪一列内容，可重复以复制列。"
-            + "\n如果输入包含超出原列数的数字，该位会被忽略并保持为空列。"
-            + "\n示例：原谱面5k，输入 2|30-? 转换为6k："
-            + "\n- 新列1=原列2；新列2=锁手长按；新列3=原列3；"
-            + "\n- 新列4=原列10（超出，忽略，空列）；新列5='-'清空；"
-            + "\n- 新列6=随机的原列",
-            "Process Column: custom reorder, copy, delete, or clear notes in columns."
-            + "\nExecution order: first reorder, then delete. Support up to 10k (0 means column 10); '-' clears the new column; '|' places a hold note spanning the entire beatmap in that new column; '?' keeps the original column in place."
-            + "\nString length determines the new column count (must re-enable when changing length). Each digit maps the new column to an original column; duplicates copy columns."
-            + "\nDigits exceeding the original column count are ignored and remain empty."
+            "按列批处理，自定义排序、复制、删除或修改。先重排，后删除。"
+            + "\n10k及以下的索引：1~0（0表示第10列）；"
+            + "\n12k及以上的索引：左侧1~9，右侧a~i(对称指令)"
+            + "\n'-': 此列清空；"
+            + "\n'|': 此列放一个全谱长度的LN；"
+            + "\n'?': 此列随机（默认按列）。"
+            + "\n输入字符的位置代表新谱的列号，数字对应原谱匹配列号的内容，总长度决定转谱的列数（须重启开关）。"
+            + "\n示例：原谱面5k(原始1-5列)，输入 2|30-? 转换为6k："
+            + "\n- 新列1=原列2；新列2=锁手长按；新列3=原列3；新列4=原列10（超出，忽略，空列）；新列5='-'清空；新列6=随机的原列。",
+            "Batch process columns, custom reorder, copy, delete or modify. First reorder, then delete."
+            + "\n10k or less index: 1~0 (0 means column 10);"
+            + "\n12k or more index: left 1~9, right a~i(symmetric instruction)"
+            + "\n'-': This column is cleared;"
+            + "\n'|': This column puts a full-length LN;"
+            + "\n'?': This column is random (default by column)."
+            + "\nThe position of the input character represents the new column number, the number corresponds to the original column number. The total length determines the number of columns in the new beatmap (must restart the switch)."
             + "\nExample: original 5k, input " + '"' + "2|30-1" + '"' + " converts to 6k:"
             + "\n- New col1 = orig col2;"
             + "\n- New col2 = full-length hold;"
@@ -457,10 +609,19 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             + "\n- New col5 = '-' cleared;"
             + "\n- New col6 = orig col1.");
 
-        public static readonly LocalisableString USE_HEALTH_CAP_REDUCTION_LABEL = new EzLocalizationManager.EzLocalisableString("血量上限降低模式", "Health Cap Reduction Mode");
+        public static readonly LocalisableString USE_HEALTH_CAP_REDUCTION_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "|操作符: 血量上限降低",
+            "Health Cap Reduction Mode");
 
         public static readonly LocalisableString USE_HEALTH_CAP_REDUCTION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "开启后锁手面的combo break降低血量上限15%而不是直接扣血，最低40%上限",
-            "When enabled, Lock LN's combo breaks reduce the maximum health cap by 15% instead of direct health deduction, down to a minimum of 40%.");
+            "开启后, |操作符添加的锁手LN，在combo break时，降低血量上限15%而不是直接扣血，最低40%上限",
+            "Enable this to reduce health cap when | operation is added. When combo break, health cap will be reduced by 15% instead of being directly deducted, minimum 40% cap.");
+
+        public static readonly LocalisableString USE_ROW_RANDOM_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "?操作符: 按行随机", "? operation: Row Random");
+
+        public static readonly LocalisableString USE_ROW_RANDOM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "开启后，?操作符处理时，按节拍从原谱整行中随机抽取，类似官方Random的单列做法。",
+            "When enabled, ? operation will randomly select from the original beatmap's whole row, similar to the single-column Random behavior in official Random.");
     }
 }

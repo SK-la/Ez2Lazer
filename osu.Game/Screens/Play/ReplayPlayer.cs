@@ -12,6 +12,7 @@ using osu.Framework.Input.Events;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Screens.Play;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
@@ -44,6 +45,8 @@ namespace osu.Game.Screens.Play
         private bool isAutoplayPlayback => GameplayState.Mods.OfType<ModAutoplay>().Any();
 
         private double? lastFrameTime;
+
+        private double userPlaybackRateBeforeFastForward;
 
         private ReplayFailIndicator? failIndicator;
         private PlaybackSettings? playbackSettings;
@@ -106,6 +109,14 @@ namespace osu.Game.Screens.Play
 
             ReplayOverlay.Settings.AddAtStart(playbackSettings);
 
+            // [Ez] Replay/autoplay playback cannot be paused, so the pause-screen force-results button is unreachable.
+            // Expose the same hold-to-confirm action at the bottom of the sidebar so a replay that never settles can
+            // still be forced through to results.
+            ReplayOverlay.Settings.AddAtEnd(new EzForceResultsSettingsGroup
+            {
+                Action = () => ForceCompleteGameplayAndProgressToResults(GameplayClockContainer.CurrentTime < GameplayState.Beatmap.GetLastObjectTime()),
+            });
+
             OsuTextFlowContainer message = new OsuTextFlowContainer(cp => cp.Font = OsuFont.Style.Body) { AutoSizeAxes = Axes.Both };
             message.AddText("Watching ");
             message.AddText(Score.ScoreInfo.User.Username, s => s.Font = s.Font.With(weight: FontWeight.SemiBold));
@@ -124,7 +135,8 @@ namespace osu.Game.Screens.Play
                 Origin = Anchor.TopCentre,
             });
 
-            AddInternal(new RulesetSkinProvidingContainer(GameplayState.Ruleset, GameplayState.Beatmap, Beatmap.Value.Skin)
+            RulesetSkinProvidingContainer rulesetSkinProvider;
+            AddInternal(rulesetSkinProvider = new RulesetSkinProvidingContainer(GameplayState.Ruleset, GameplayState.Beatmap, Beatmap.Value.Skin)
             {
                 Child = failIndicator = new ReplayFailIndicator(GameplayClockContainer)
                 {
@@ -138,6 +150,9 @@ namespace osu.Game.Screens.Play
                     }
                 }
             });
+            config.BindWith(OsuSetting.BeatmapSkins, rulesetSkinProvider.BeatmapSkins);
+            config.BindWith(OsuSetting.BeatmapColours, rulesetSkinProvider.BeatmapColours);
+            config.BindWith(OsuSetting.BeatmapHitsounds, rulesetSkinProvider.BeatmapHitsounds);
         }
 
         protected override void PrepareReplay()
@@ -187,6 +202,13 @@ namespace osu.Game.Screens.Play
                     else
                         GameplayClockContainer.Stop();
                     return true;
+
+                case GlobalAction.FastForwardReplay:
+                    if (e.Repeat) return false;
+
+                    userPlaybackRateBeforeFastForward = playbackSettings!.UserPlaybackRate.Value;
+                    playbackSettings!.UserPlaybackRate.Value *= 2;
+                    return true;
             }
 
             return false;
@@ -216,6 +238,12 @@ namespace osu.Game.Screens.Play
 
         public void OnReleased(KeyBindingReleaseEvent<GlobalAction> e)
         {
+            switch (e.Action)
+            {
+                case GlobalAction.FastForwardReplay:
+                    playbackSettings!.UserPlaybackRate.Value = userPlaybackRateBeforeFastForward;
+                    return;
+            }
         }
 
         protected override void PerformFail()

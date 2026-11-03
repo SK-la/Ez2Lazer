@@ -6,9 +6,13 @@
 using System;
 using JetBrains.Annotations;
 using osu.Framework;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osuTK;
 
@@ -92,17 +96,46 @@ namespace osu.Game.Screens.Menu
         [CanBeNull]
         public event Action<Visibility> StateChanged;
 
-        private partial class ButtonAreaBackground : Box, IStateful<ButtonAreaBackgroundState>
+        private partial class ButtonAreaBackground : Container, IStateful<ButtonAreaBackgroundState>
         {
             private ButtonAreaBackgroundState state;
+
+            private readonly Box classicBackground;
+            private readonly EzMaterialPanelBackground materialBackground;
+            private Bindable<EzMaterialUiMode> materialUiMode = null!;
 
             public ButtonAreaBackground()
             {
                 RelativeSizeAxes = Axes.Both;
                 Size = new Vector2(2, 1);
-                Colour = OsuColour.Gray(50);
                 Anchor = Anchor.Centre;
                 Origin = Anchor.Centre;
+
+                Children = new Drawable[]
+                {
+                    materialBackground = new EzMaterialPanelBackground(EzUIStyleV1.FooterVeil)
+                    {
+                        MaterialCaptureVisible = false,
+                    },
+                    classicBackground = new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = OsuColour.Gray(50),
+                    },
+                };
+            }
+
+            [BackgroundDependencyLoader]
+            private void load(Ez2ConfigManager ezConfig)
+            {
+                materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+
+                EzMaterialOverlayAlpha.BindExclusive(classicBackground, materialBackground, materialUiMode);
             }
 
             public ButtonAreaBackgroundState State
@@ -137,15 +170,23 @@ namespace osu.Game.Screens.Menu
                     {
                         default:
                             State = ButtonAreaBackgroundState.Normal;
+                            setAcrylicCaptureVisible(true);
                             break;
 
                         case ButtonSystemState.Initial:
                         case ButtonSystemState.Exit:
                         case ButtonSystemState.EnteringMode:
                             State = ButtonAreaBackgroundState.Flat;
+                            setAcrylicCaptureVisible(false);
                             break;
                     }
                 }
+            }
+
+            private void setAcrylicCaptureVisible(bool visible)
+            {
+                materialBackground.MaterialCaptureVisible = visible;
+                materialBackground.SyncMaterialCaptureState();
             }
 
             [CanBeNull]

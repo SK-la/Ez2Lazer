@@ -94,7 +94,10 @@ namespace osu.Game.Rulesets.UI
 
                 // the above de-duplication is done at `FrameDataBundle` level in `SpectatorClient`.
                 // it's not 100% matching because of the possibility of duplicated frames crossing a bundle boundary, but it's close and simple enough.
-                spectatorClient?.HandleFrame(frame);
+                // [Ez] Only push to spectator while the hub session is active. Local replay frames are always kept.
+                // After BeginPlayingInternal fails, clearScoreState clears IsStreaming; without this gate every Update would HandleFrame and spam ignore logs.
+                if (spectatorClient?.IsStreaming.Value == true)
+                    spectatorClient.HandleFrame(frame);
             }
         }
 

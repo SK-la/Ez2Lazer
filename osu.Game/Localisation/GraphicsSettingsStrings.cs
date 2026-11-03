@@ -130,9 +130,9 @@ namespace osu.Game.Localisation
         public static LocalisableString ShowCursorInScreenshots => new TranslatableString(getKey(@"show_cursor_in_screenshots"), @"Show menu cursor in screenshots");
 
         /// <summary>
-        /// "Video"
+        /// "Video Playback"
         /// </summary>
-        public static LocalisableString VideoHeader => new TranslatableString(getKey(@"video_header"), @"Video");
+        public static LocalisableString VideoHeader => new TranslatableString(getKey(@"video_header"), @"Video Playback");
 
         /// <summary>
         /// "Use hardware acceleration"
@@ -155,9 +155,9 @@ namespace osu.Game.Localisation
         public static LocalisableString ChangeRendererConfirmation => new TranslatableString(getKey(@"change_renderer_configuration"), @"In order to change the renderer, the game will close. Please open it again.");
 
         /// <summary>
-        /// "Minimise osu! when switching to another app"
+        /// "Minimise Ez2Lazer when switching to another app"
         /// </summary>
-        public static LocalisableString MinimiseOnFocusLoss => new TranslatableString(getKey(@"minimise_on_focus_loss"), @"Minimise osu! when switching to another app");
+        public static LocalisableString MinimiseOnFocusLoss => new TranslatableString(getKey(@"minimise_on_focus_loss"), @"Minimise Ez2Lazer when switching to another app");
 
         /// <summary>
         /// "Shrink game to avoid cameras and notches"

@@ -1,0 +1,512 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using osu.Framework.Bindables;
+using osu.Framework.Graphics.Sprites;
+using osu.Framework.Localisation;
+using osu.Framework.Logging;
+using osu.Game.Audio;
+using osu.Game.Beatmaps;
+using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Mods;
+using osu.Game.Overlays.Settings;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mods;
+
+namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
+{
+    public class ManiaModNtoMAnother : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IEzApplyOrder, IEzColumnCountMod
+    {
+        public const double INTERVAL = 50;
+
+        public const double LN_INTERVAL = 10;
+
+        public const double ERROR = 1.5;
+
+        public override string Name => "Nk to Mk Converter Another";
+
+        public override string Acronym => "NtMA";
+
+        public override LocalisableString Description => NtoMAnotherStrings.NTOM_ANOTHER_DESCRIPTION;
+
+        public override IconUsage? Icon => FontAwesome.Solid.CloudRain;
+
+        public override ModType Type => ModType.CommunityMod;
+
+        public override bool Ranked => false;
+        public override bool ValidForMultiplayer => true;
+        public override bool ValidForFreestyleAsRequiredMod => false;
+
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return (EzCommonModStrings.KEY_LABEL, $"{Key.Value}");
+                yield return (NtoMAnotherStrings.BLANK_COLUMN_LABEL, $"{BlankColumn.Value}");
+                yield return (NtoMAnotherStrings.NTOM_GAP_LABEL, $"{Gap.Value}");
+
+                if (Clean.Value)
+                {
+                    yield return (NtoMAnotherStrings.CLEAN_LABEL, Clean.Value ? "On" : "Off");
+                    yield return (NtoMAnotherStrings.CLEAN_DIVIDE_LABEL, $"1/{CleanDivide.Value}");
+                }
+
+                if (Adjust4Jack.Value)
+                {
+                    yield return (NtoMAnotherStrings.ADJUST_4_JACK_LABEL, Adjust4Jack.Value ? "On" : "Off");
+                }
+
+                if (Adjust4Speed.Value)
+                {
+                    yield return (NtoMAnotherStrings.ADJUST_4_SPEED_LABEL, Adjust4Speed.Value ? "On" : "Off");
+                }
+
+                yield return (EzCommonModStrings.SEED_LABEL, $"Seed {(Seed.Value is null ? "Null" : Seed.Value)}");
+                yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
+            }
+        }
+
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.KEY_LABEL), nameof(EzCommonModStrings.KEY_DESCRIPTION))]
+        public BindableNumber<int> Key { get; set; } = new BindableInt(8)
+        {
+            MinValue = 2,
+            MaxValue = 10,
+            Precision = 1
+        };
+
+        [SettingSource(typeof(NtoMAnotherStrings), nameof(NtoMAnotherStrings.BLANK_COLUMN_LABEL), nameof(NtoMAnotherStrings.BLANK_COLUMN_DESCRIPTION))]
+        public BindableNumber<int> BlankColumn { get; set; } = new BindableInt(0)
+        {
+            MinValue = 0,
+            MaxValue = 10,
+            Precision = 1
+        };
+
+        [SettingSource(typeof(NtoMAnotherStrings), nameof(NtoMAnotherStrings.NTOM_GAP_LABEL), nameof(NtoMAnotherStrings.NTOM_GAP_DESCRIPTION))]
+        public BindableInt Gap { get; set; } = new BindableInt(10)
+        {
+            MinValue = 0,
+            MaxValue = 20,
+            Precision = 1
+        };
+
+        [SettingSource(typeof(NtoMAnotherStrings), nameof(NtoMAnotherStrings.CLEAN_LABEL), nameof(NtoMAnotherStrings.CLEAN_DESCRIPTION))]
+        public BindableBool Clean { get; set; } = new BindableBool(true);
+
+        [SettingSource(typeof(NtoMAnotherStrings), nameof(NtoMAnotherStrings.CLEAN_DIVIDE_LABEL), nameof(NtoMAnotherStrings.CLEAN_DIVIDE_DESCRIPTION))]
+        public BindableInt CleanDivide { get; set; } = new BindableInt(4)
+        {
+            MinValue = 0,
+            MaxValue = 16,
+            Precision = 1
+        };
+
+        [SettingSource(typeof(NtoMAnotherStrings), nameof(NtoMAnotherStrings.ADJUST_4_JACK_LABEL), nameof(NtoMAnotherStrings.ADJUST_4_JACK_DESCRIPTION))]
+        public BindableBool Adjust4Jack { get; set; } = new BindableBool(false);
+
+        [SettingSource(typeof(NtoMAnotherStrings), nameof(NtoMAnotherStrings.ADJUST_4_SPEED_LABEL), nameof(NtoMAnotherStrings.ADJUST_4_SPEED_DESCRIPTION))]
+        public BindableBool Adjust4Speed { get; set; } = new BindableBool(false);
+
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
+        public Bindable<int?> Seed { get; } = new Bindable<int?>();
+
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(-10)
+        {
+            MinValue = -100,
+            MaxValue = 100
+        };
+
+        public int ApplyOrder => ApplyOrderIndex.Value;
+
+        public int ResolveColumnCount(int currentColumns) => currentColumns is > 0 and <= 9 && Key.Value > currentColumns ? Key.Value : currentColumns;
+
+        public void ApplyToBeatmap(IBeatmap beatmap)
+        {
+            int seed = EzModSeed.Resolve(Seed);
+            var rng = new Random(seed);
+
+            var maniaBeatmap = (ManiaBeatmap)beatmap;
+
+            // 读当前列数并按 ApplyOrder 处理，参考 PS：排在前面（ApplyOrder 更小）的改键 mod 结果才是这一步的输入。
+            int keys = maniaBeatmap.ResolveColumnCount();
+
+            if (keys <= 0 || keys > 9 || Key.Value <= keys)
+            {
+                return;
+            }
+
+            int blank = Math.Min(BlankColumn.Value, Key.Value - keys);
+
+            // 与 NtoM 同理：目标列数先落地，后续列清理按它取列数基线。
+            maniaBeatmap.SetColumnCount(Key.Value);
+
+            var newObjects = new List<ManiaHitObject>();
+
+            var locations = maniaBeatmap.HitObjects.OfType<Note>().Select(n => (
+                                            column: n.Column,
+                                            startTime: n.StartTime,
+                                            endTime: n.StartTime,
+                                            samples: n.Samples
+                                        ))
+                                        .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h => (
+                                            column: h.Column,
+                                            startTime: h.StartTime,
+                                            endTime: h.EndTime,
+                                            samples: h.Samples
+                                        ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
+
+            // 没有 Note/HoldNote 可转（空谱面、纯 tick/barline，或已被前置 mod 清空）时直接退出。
+            if (locations.Count == 0)
+                return;
+
+            var confirmNull = new List<bool>();
+            var nullColumnList = new List<int>();
+
+            for (int i = 0; i <= Key.Value; i++)
+            {
+                confirmNull.Add(false);
+            }
+
+            foreach (var column in maniaBeatmap.HitObjects.GroupBy(h => h.Column))
+            {
+                int count = column.Count();
+
+                // 列号可能落在 [0, Key.Value] 之外（源谱面 CircleSize 与实际列数不一致）；
+                // 跳过该列即可，越界访问会把整张图的 SR 计算打崩。
+                if (column.Key < 0 || column.Key > Key.Value)
+                {
+                    Logger.Log($"[ManiaModNtoMAnother] column {column.Key} outside [0, {Key.Value}], skipped", Ez2ConfigManager.LOGGER_NAME);
+                    continue;
+                }
+
+                if (!confirmNull[column.Key] && count != 0)
+                {
+                    confirmNull[column.Key] = true;
+                }
+            }
+
+            for (int i = 0; i < Key.Value; i++)
+            {
+                if (!confirmNull[i])
+                {
+                    nullColumnList.Add(i);
+                }
+            }
+
+            for (int i = 0; i < locations.Count; i++)
+            {
+                int minusColumn = 0;
+
+                foreach (int nul in nullColumnList)
+                {
+                    if (locations[i].column > nul)
+                    {
+                        minusColumn++;
+                    }
+                }
+
+                var thisLocations = locations[i];
+                thisLocations.column -= minusColumn;
+                locations[i] = thisLocations;
+            }
+
+            List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)> area = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
+            List<ManiaHitObject> checkList = new List<ManiaHitObject>();
+
+            // locations 已经按 (开始时间, 列) 排好序（上面的列号修正不动开始时间），这里不必再排一遍；原实现多了一次 OrderBy + ToList。
+            var tempObjects = locations;
+
+            // gap 只取决于 Gap 设置，原实现每个时间点都重算一次 Math.Pow。
+            double areaGap = Gap.Value == 0 ? double.MaxValue : 29998.8584 * Math.Pow(Math.E, -0.3176 * Gap.Value) + 347.7248;
+
+            double sumTime = 0;
+            double lastTime = 0;
+
+            // 原来是 GroupBy(startTime)：每个时间点分配一个分组对象与内部列表。tempObjects 按开始时间非降序，
+            // 等值分组与连续段扫描等价，段内顺序（列升序）也已经是原 OrderBy(Column) 的结果。
+            for (int i = 0; i < tempObjects.Count;)
+            {
+                double timingPoint = tempObjects[i].startTime;
+                int runEnd = i + 1;
+
+                while (runEnd < tempObjects.Count && tempObjects[runEnd].startTime.Equals(timingPoint))
+                    runEnd++;
+
+                for (int j = i; j < runEnd; j++)
+                    area.Add(tempObjects[j]);
+
+                sumTime += timingPoint - lastTime;
+                lastTime = timingPoint;
+                i = runEnd;
+
+                if (sumTime >= areaGap)
+                {
+                    sumTime = 0;
+                    // Process area
+                    int cleanDivide = CleanDivide.Value;
+
+                    if (Adjust4Jack.Value)
+                    {
+                        cleanDivide *= 2;
+                    }
+
+                    if (Adjust4Speed.Value)
+                    {
+                        cleanDivide /= 2;
+                    }
+
+                    var processed = ProcessArea(maniaBeatmap, rng, area, keys, Key.Value, blank, cleanDivide, ERROR, checkList);
+                    newObjects.AddRange(processed.result);
+                    checkList = processed.checkList;
+                    area.Clear();
+                }
+            }
+
+            if (area.Count > 0)
+            {
+                int cleanDivide = CleanDivide.Value;
+
+                if (Adjust4Jack.Value)
+                {
+                    cleanDivide *= 2;
+                }
+
+                if (Adjust4Speed.Value)
+                {
+                    cleanDivide /= 2;
+                }
+
+                var processed = ProcessArea(maniaBeatmap, rng, area, keys, Key.Value, blank, cleanDivide, ERROR, checkList);
+                newObjects.AddRange(processed.result);
+            }
+
+            newObjects = newObjects.OrderBy(h => h.StartTime).ToList();
+
+            var cleanObjects = new List<ManiaHitObject>();
+
+            foreach (var column in newObjects.GroupBy(h => h.Column))
+            {
+                var newColumnObjects = new List<ManiaHitObject>();
+
+                var cleanLocations = column.OfType<Note>().Select(n => (startTime: n.StartTime, samples: n.Samples, endTime: n.StartTime))
+                                           .Concat(column.OfType<HoldNote>().Select(h => (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)))
+                                           .OrderBy(h => h.startTime).ToList();
+
+                // 该列理论上至少有一个 Note/HoldNote；万一没有（前置 mod 残留了其它类型），跳过而不是越界。
+                if (cleanLocations.Count == 0)
+                {
+                    Logger.Log($"[ManiaModNtoMAnother] column {column.Key} has no Note/HoldNote to clean, skipped", Ez2ConfigManager.LOGGER_NAME);
+                    continue;
+                }
+
+                double lastStartTime = cleanLocations[0].startTime;
+                double lastEndTime = cleanLocations[0].endTime;
+                var lastSample = cleanLocations[0].samples;
+
+                // 原来对被删元素做 RemoveAt(i)（每次搬移整条尾部）后再 i-- 重读同一下标，
+                // 等价于「单纯按顺序跳过被删元素」，而 cleanLocations 在循环后不再被使用，
+                // 因此这里不再真的删除，只保留同一套判定顺序。
+                for (int i = 1; i < cleanLocations.Count; i++)
+                {
+                    if (cleanLocations[i].startTime >= lastStartTime && cleanLocations[i].startTime <= lastEndTime)
+                    {
+                        continue;
+                    } // if the note in a LN
+
+                    if (Math.Abs(cleanLocations[i].startTime - lastStartTime) <= INTERVAL)
+                    {
+                        lastStartTime = cleanLocations[i].startTime;
+                        lastEndTime = cleanLocations[i].endTime;
+                        lastSample = cleanLocations[i].samples;
+                        continue;
+                    } // interval judgement
+
+                    if (Math.Abs(cleanLocations[i].startTime - lastEndTime) <= LN_INTERVAL)
+                    {
+                        lastStartTime = cleanLocations[i].startTime;
+                        lastEndTime = cleanLocations[i].endTime;
+                        lastSample = cleanLocations[i].samples;
+                        continue;
+                    } // LN interval judgement
+
+                    newColumnObjects.AddNote(lastSample, column.Key, lastStartTime, lastEndTime);
+                    lastStartTime = cleanLocations[i].startTime;
+                    lastEndTime = cleanLocations[i].endTime;
+                    lastSample = cleanLocations[i].samples;
+                }
+
+                newColumnObjects.AddNote(lastSample, column.Key, lastStartTime, lastEndTime);
+
+                cleanObjects.AddRange(newColumnObjects);
+            }
+
+            if (Clean.Value)
+            {
+                maniaBeatmap.HitObjects = cleanObjects.OrderBy(h => h.StartTime).ToList();
+            }
+            else
+            {
+                // newObjects 在上面已经按开始时间排过序，这里再排一次是多余的。
+                maniaBeatmap.HitObjects = newObjects;
+            }
+        }
+
+        public (List<ManiaHitObject> result, List<ManiaHitObject> checkList) ProcessArea(ManiaBeatmap beatmap,
+                                                                                         Random rng,
+                                                                                         List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)> hitObjects,
+                                                                                         int fromKeys,
+                                                                                         int toKeys,
+                                                                                         int blankNum = 0,
+                                                                                         int clean = 0,
+                                                                                         double error = 0,
+                                                                                         List<ManiaHitObject>? checkList = null)
+        {
+            List<ManiaHitObject> newObjects = new List<ManiaHitObject>();
+            List<(int column, bool isBlank)> copyColumn = [];
+            List<int> insertColumn = [];
+            List<ManiaHitObject> checkColumn = [];
+            bool isFirst = true;
+
+            int num = toKeys - fromKeys - blankNum;
+
+            while (num > 0)
+            {
+                int copy = rng.Next(fromKeys);
+
+                if (!copyColumn.Contains((copy, false)))
+                {
+                    copyColumn.Add((copy, false));
+                    num--;
+                }
+            }
+
+            num = blankNum;
+
+            while (num > 0)
+            {
+                const int copy = -1;
+                copyColumn.Add((copy, true));
+                num--;
+            }
+
+            num = toKeys - fromKeys;
+
+            while (num > 0)
+            {
+                int insert = rng.Next(toKeys);
+
+                if (!insertColumn.Contains(insert))
+                {
+                    insertColumn.Add(insert);
+                    num--;
+                }
+            }
+
+            insertColumn = insertColumn.OrderBy(c => c).ToList();
+
+            foreach (var timingPoint in hitObjects.GroupBy(h => h.startTime))
+            {
+                var locations = timingPoint.ToList();
+                var tempObjects = new List<ManiaHitObject>();
+                int length = copyColumn.Count;
+
+                for (int i = 0; i < locations.Count; i++)
+                {
+                    int column = locations[i].column;
+
+                    for (int j = 0; j < length; j++)
+                    {
+                        if (column == copyColumn[j].column && !copyColumn[j].isBlank)
+                        {
+                            int clampedColumn = Math.Clamp(insertColumn[j], 0, toKeys - 1);
+                            tempObjects.AddNote(locations[i].samples, clampedColumn, locations[i].startTime, locations[i].endTime);
+                        }
+
+                        if (locations[i].column >= insertColumn[j])
+                        {
+                            locations[i] = (locations[i].column + 1, locations[i].startTime, locations[i].endTime, locations[i].samples);
+                        }
+                    }
+
+                    int finalColumn = Math.Clamp(locations[i].column, 0, toKeys - 1);
+                    tempObjects.AddNote(locations[i].samples, finalColumn, locations[i].startTime, locations[i].endTime);
+                }
+
+                if (isFirst && checkList is not null && checkList.Count > 0 && clean > 0)
+                {
+                    var checkC = checkList.Select(h => h.Column).ToList();
+                    var checkS = checkList.Select(h => h.StartTime).ToList();
+
+                    for (int i = 0; i < tempObjects.Count; i++)
+                    {
+                        if (checkC.Contains(tempObjects[i].Column))
+                        {
+                            double beatLength = beatmap.ControlPointInfo.TimingPointAt(tempObjects[i].StartTime).BeatLength;
+                            double timeDivide = beatLength / clean;
+                            int index = checkC.IndexOf(tempObjects[i].Column);
+
+                            if (tempObjects[i].StartTime - checkS[index] < timeDivide + error)
+                            {
+                                tempObjects.RemoveAt(i);
+                                i--;
+                            }
+                        }
+                    }
+
+                    isFirst = false;
+                }
+
+                checkColumn.Clear();
+                checkColumn.AddRange(tempObjects);
+                newObjects.AddRange(tempObjects);
+            }
+
+            return (newObjects, checkColumn);
+        }
+    }
+
+    public static class NtoMAnotherStrings
+    {
+        public static readonly LocalisableString NTOM_ANOTHER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("转Key，来自krrcream的工具（有一些bug，请使用Clean设置来清理）",
+            "From krrcream's Tool (It has some bugs, please use Clean settings to clean it.)");
+
+        public static readonly LocalisableString BLANK_COLUMN_LABEL = new EzLocalizationManager.EzLocalisableString("空白列", "Blank Column");
+
+        public static readonly LocalisableString BLANK_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "要添加的空白列数。（注意：如果按键数-圆形大小小于空白列数，则不会添加。）",
+            "Number of blank columns to add. (Notice: If the number of Key - CircleSize is less than the number of blank columns, it won't be added.)");
+
+        public static readonly LocalisableString NTOM_GAP_LABEL = new EzLocalizationManager.EzLocalisableString("间隙", "Gap");
+
+        public static readonly LocalisableString NTOM_GAP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "在每个区域重新排列音符。（间隙越大，音符分布越广。）",
+            "Rearrange the notes in every area. (If Gap is bigger, the notes will be more spread out.)");
+
+        public static readonly LocalisableString CLEAN_LABEL = new EzLocalizationManager.EzLocalisableString("清理", "Clean");
+        public static readonly LocalisableString CLEAN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("尝试清理谱面中的一些音符。", "Try to clean some notes in the map.");
+        public static readonly LocalisableString CLEAN_DIVIDE_LABEL = new EzLocalizationManager.EzLocalisableString("清理分割", "Clean Divide");
+
+        public static readonly LocalisableString CLEAN_DIVIDE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "选择清理的分割（0表示不分割清理，4推荐用于流，8推荐用于Jack）。（如果清理为false，此设置不会被使用。）",
+            "Choose the divide(0 For no Divide Clean, 4 is Recommended for Stream, 8 is Recommended for Jack) of cleaning. (If Clean is false, this setting won't be used.)");
+
+        public static readonly LocalisableString ADJUST_4_JACK_LABEL = new EzLocalizationManager.EzLocalisableString("1/4 Jack", "1/4 Jack");
+
+        public static readonly LocalisableString ADJUST_4_JACK_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "（如100+ BPM 1/4 Jack）清理分割 * 1/2，用于1/4 Jack，避免清理1/4 Jack。",
+            "(Like 100+ BPM 1/4 Jack)Clean Divide * 1/2, for 1/4 Jack, avoiding cleaning 1/4 Jack.");
+
+        public static readonly LocalisableString ADJUST_4_SPEED_LABEL = new EzLocalizationManager.EzLocalisableString("1/4 Speed", "1/4 Speed");
+
+        public static readonly LocalisableString ADJUST_4_SPEED_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "（如300+ BPM 1/4 Speed）清理分割 * 2，用于1/4 Speed，避免额外的1/2 Jack。",
+            "(Like 300+ BPM 1/4 Speed)Clean Divide * 2, for 1/4 Speed, avoiding additional 1/2 Jack.");
+    }
+}

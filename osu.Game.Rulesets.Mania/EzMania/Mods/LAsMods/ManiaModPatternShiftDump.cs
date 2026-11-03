@@ -8,6 +8,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania.Mods.ModHelp;
 using osu.Game.Rulesets.Mania.Objects;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
@@ -235,7 +236,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
             for (int col = clampedMin; col <= clampedMax; col++)
             {
-                if ((forbiddenColumn.HasValue && col == forbiddenColumn.Value) || !isColumnAvailable(beatmap, obj, col, time))
+                if ((col == forbiddenColumn) || !isColumnAvailable(beatmap, obj, col, time))
                     continue;
 
                 int dist = Math.Abs(col - obj.Column);

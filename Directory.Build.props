@@ -1,15 +1,26 @@
 ﻿<!-- Contains required properties for osu!framework projects. -->
 <Project>
   <PropertyGroup Label="C#">
-    <LangVersion>12.0</LangVersion>
+    <LangVersion>14.0</LangVersion>
     <Nullable>enable</Nullable>
     <!-- Stabilises hot reload, see: https://platform.uno/docs/articles/studio/Hot%20Reload/hot-reload-overview.html?tabs=vswin%2Cwindows%2Cskia-desktop%2Ccommon-issues -->
     <GenerateAssemblyInfo Condition="'$(Configuration)'=='Debug'">false</GenerateAssemblyInfo>
     <!-- Required due to the above  -->
     <NoWarn Condition="'$(Configuration)'=='Debug'">$(NoWarn);CA1416</NoWarn>
+    <!-- https://github.com/dotnet/runtime/issues/129562 -->
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
   </PropertyGroup>
   <PropertyGroup>
     <ApplicationManifest>$(MSBuildThisFileDirectory)app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <PropertyGroup Label="Build Hygiene">
+    <!-- Make reproducibility settings explicit instead of relying on SDK defaults. -->
+    <Deterministic>true</Deterministic>
+    <!-- Use compiler-invocation isolation to avoid stale compiler server state. -->
+    <UseSharedCompilation>false</UseSharedCompilation>
+    <!-- Keep output folder partitioning explicit for multi-target and RID builds. -->
+    <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>true</AppendRuntimeIdentifierToOutputPath>
   </PropertyGroup>
   <ItemGroup Label="License">
     <None Include="$(MSBuildThisFileDirectory)osu.licenseheader">
@@ -20,7 +31,11 @@
     <EmbeddedResource Include="Resources\**\*.*" />
   </ItemGroup>
   <ItemGroup Label="Code Analysis">
-    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="3.3.4" PrivateAssets="All" />
+    <!-- Temporary solution for not being able to roll forward i# release due to licencing changes. -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12">
+      <NoWarn>NU1902,NU1903</NoWarn>
+    </PackageReference>
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0" PrivateAssets="All" />
     <AdditionalFiles Include="$(MSBuildThisFileDirectory)CodeAnalysis\BannedSymbols.txt" />
     <!-- Rider compatibility: .globalconfig needs to be explicitly referenced instead of using the global file name. -->
     <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)CodeAnalysis\osu.globalconfig" />
@@ -42,15 +57,16 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
+  <Import Project="$(MSBuildThisFileDirectory)Ez2Lazer.Dependencies.props" />
   <PropertyGroup Label="Nuget">
     <IsPackable>false</IsPackable>
-    <Authors>ppy Pty Ltd</Authors>
+    <Authors>SK-la</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/ppy/osu</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/ppy/osu</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/SK-la/osu</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/SK-la/osu</RepositoryUrl>
     <PackageReleaseNotes>Automated release.</PackageReleaseNotes>
-    <Company>ppy Pty Ltd</Company>
-    <Copyright>Copyright (c) 2025 ppy Pty Ltd</Copyright>
-    <PackageTags>osu game</PackageTags>
+    <Company>SK-la</Company>
+    <Copyright>Copyright (c) 2025 ppy Pty Ltd. Ez2Lazer modifications by SK-la.</Copyright>
+    <PackageTags>ez2lazer game</PackageTags>
   </PropertyGroup>
 </Project>

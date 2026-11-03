@@ -15,8 +15,12 @@ using osu.Framework.Input;
 using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Framework.Threading;
-using osu.Game.Online.API;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Edit;
+using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.EzOsuGame.Edit.Screens;
+using osu.Game.EzOsuGame.Layout;
+using osu.Game.Online.API;
 using osu.Game.Overlays.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Overlays.SkinEditor;
@@ -24,9 +28,9 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Screens.Edit.Components;
+using osu.Game.Screens.Menu;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Play.HUD;
-using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Screens.Select;
 using osu.Game.Skinning;
 using osu.Game.Tests.Beatmaps.IO;
@@ -42,6 +46,108 @@ namespace osu.Game.Tests.Visual.Navigation
 
         private SkinEditor skinEditor => Game.ChildrenOfType<SkinEditor>().FirstOrDefault();
 
+        private EzSkinEditorOverlay ezSkinEditor => Game.ChildrenOfType<EzSkinEditorOverlay>().Single();
+
+        private SkinEditorOverlay skinEditorOverlay => Game.Dependencies.Get<SkinEditorOverlay>();
+
+        [Test]
+        public void TestEzEditorKeepsLastEditedSongSelect()
+        {
+            advanceToSongSelect();
+            AddStep("select beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).WaitSafely());
+            AddUntilStep("beatmap selected", () => !Game.Beatmap.IsDefault);
+
+            AddUntilStep("Ez editor overlay available", () => Game.ChildrenOfType<EzSkinEditorOverlay>().Any());
+            AddStep("open Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("editor workspace ready", () => ezSkinEditor.Workspace?.IsLoaded == true);
+            AddAssert("song select scene selected", () => ezSkinEditor.Workspace!.CurrentScene.Value == EzSkinEditorSceneType.SongSelectHud);
+            AddStep("close Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("last scene screen remains current", () => Game.ScreenStack.CurrentScreen is SoloSongSelect);
+            AddAssert("selected beatmap retained", () => !Game.Beatmap.IsDefault);
+        }
+
+        [Test]
+        public void TestEzEditorKeepsLastEditedGameplay()
+        {
+            AddStep("import editor beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).WaitSafely());
+            AddUntilStep("editor beatmap ready", () => !Game.Beatmap.IsDefault);
+
+            AddUntilStep("main menu current", () => Game.ScreenStack.CurrentScreen is MainMenu);
+            AddUntilStep("Ez editor overlay available", () => Game.ChildrenOfType<EzSkinEditorOverlay>().Any());
+            AddStep("open Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("editor gameplay current", () => Game.ScreenStack.CurrentScreen is Player);
+            AddUntilStep("Ez editor visible", () => ezSkinEditor.State.Value == Visibility.Visible);
+            AddStep("close Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("editor gameplay stays current", () => Game.ScreenStack.CurrentScreen is Player);
+        }
+
+        [Test]
+        public void TestEzEditorSwitchesFromGameplayToSongSelectWithoutCrash()
+        {
+            AddStep("import editor beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).WaitSafely());
+            AddUntilStep("editor beatmap ready", () => !Game.Beatmap.IsDefault);
+
+            AddUntilStep("main menu current", () => Game.ScreenStack.CurrentScreen is MainMenu);
+            AddUntilStep("Ez editor overlay available", () => Game.ChildrenOfType<EzSkinEditorOverlay>().Any());
+            AddStep("open Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("editor gameplay current", () => Game.ScreenStack.CurrentScreen is Player);
+
+            AddStep("switch to song select scene", () => ezSkinEditor.Workspace!.CurrentScene.Value = EzSkinEditorSceneType.SongSelectHud);
+            AddUntilStep("real song select current", () => Game.ScreenStack.CurrentScreen is SoloSongSelect);
+            AddUntilStep("no residual gameplay", () => Game.ScreenStack.CurrentScreen is not Player);
+
+            AddStep("close Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("song select remains current", () => Game.ScreenStack.CurrentScreen is SoloSongSelect);
+        }
+
+        [Test]
+        public void TestEzEditorSwitchesBackFromSongSelectToGameplay()
+        {
+            AddStep("import editor beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).WaitSafely());
+            AddUntilStep("editor beatmap ready", () => !Game.Beatmap.IsDefault);
+
+            AddUntilStep("main menu current", () => Game.ScreenStack.CurrentScreen is MainMenu);
+            AddUntilStep("Ez editor overlay available", () => Game.ChildrenOfType<EzSkinEditorOverlay>().Any());
+            AddStep("open Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("editor gameplay current", () => Game.ScreenStack.CurrentScreen is Player);
+
+            AddStep("switch to song select scene", () => ezSkinEditor.Workspace!.CurrentScene.Value = EzSkinEditorSceneType.SongSelectHud);
+            AddUntilStep("real song select current", () => Game.ScreenStack.CurrentScreen is SoloSongSelect);
+
+            AddStep("switch back to gameplay scene", () => ezSkinEditor.Workspace!.CurrentScene.Value = EzSkinEditorSceneType.GameplayHud);
+            AddUntilStep("editor gameplay current again", () => Game.ScreenStack.CurrentScreen is Player);
+
+            AddStep("close Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("gameplay remains current", () => Game.ScreenStack.CurrentScreen is Player);
+        }
+
+        [Test]
+        public void TestOfficialSkinEditorHotkeyClosesEzEditor()
+        {
+            advanceToSongSelect();
+            openEzEditor();
+            AddUntilStep("Ez editor visible", () => ezSkinEditor.State.Value == Visibility.Visible);
+
+            // 官方编辑器的热键入口不经过 Ez 盖层，须由 OsuGame 的互斥兜住。
+            toggleSkinEditor();
+
+            AddUntilStep("official skin editor visible", () => skinEditorOverlay.State.Value == Visibility.Visible);
+            AddUntilStep("Ez editor hidden", () => ezSkinEditor.State.Value == Visibility.Hidden);
+        }
+
+        [Test]
+        public void TestOpeningEzEditorClosesOfficialSkinEditor()
+        {
+            advanceToSongSelect();
+            openSkinEditor();
+
+            // 官方场景栏的 "Ez Skin" 按钮走的就是这个入口。
+            AddStep("open Ez editor from official editor", () => skinEditorOverlay.ToggleEzSkinEditor());
+
+            AddUntilStep("Ez editor visible", () => ezSkinEditor.State.Value == Visibility.Visible);
+            AddUntilStep("official skin editor hidden", () => skinEditorOverlay.State.Value == Visibility.Hidden);
+        }
+
         [Test]
         public void TestEditComponentFromGameplayScene()
         {
@@ -53,35 +159,36 @@ namespace osu.Game.Tests.Visual.Navigation
 
             switchToGameplayScene();
 
-            BarHitErrorMeter hitErrorMeter = null;
+            ArgonAccuracyCounter accuracyCounter = null;
 
-            AddUntilStep("select bar hit error blueprint", () =>
+            AddUntilStep("select argon accuracy counter blueprint", () =>
             {
-                var blueprint = skinEditor.ChildrenOfType<SkinBlueprint>().FirstOrDefault(b => b.Item is BarHitErrorMeter);
+                var blueprint = skinEditor.ChildrenOfType<SkinBlueprint>().FirstOrDefault(b => b.Item is ArgonAccuracyCounter);
 
                 if (blueprint == null)
                     return false;
 
-                hitErrorMeter = (BarHitErrorMeter)blueprint.Item;
+                accuracyCounter = (ArgonAccuracyCounter)blueprint.Item;
                 skinEditor.SelectedComponents.Clear();
                 skinEditor.SelectedComponents.Add(blueprint.Item);
                 return true;
             });
 
-            AddAssert("value is default", () => hitErrorMeter.JudgementLineThickness.IsDefault);
+            AddAssert("value is default", () => accuracyCounter.WireframeOpacity.IsDefault);
 
-            AddStep("hover first slider", () =>
+            AddStep("hover judgement line thickness slider", () =>
             {
                 InputManager.MoveMouseTo(
                     skinEditor.ChildrenOfType<SkinSettingsToolbox>().First()
-                              .ChildrenOfType<SettingsSlider<float>>().First()
+                              .ChildrenOfType<SettingsSlider<float>>()
+                              .First(s => s.LabelText.ToString() == "Wireframe opacity")
                               .ChildrenOfType<SliderBar<float>>().First()
                 );
             });
 
             AddStep("adjust slider via keyboard", () => InputManager.Key(Key.Left));
 
-            AddAssert("value is less than default", () => hitErrorMeter.JudgementLineThickness.Value < hitErrorMeter.JudgementLineThickness.Default);
+            AddAssert("value is less than default", () => accuracyCounter.WireframeOpacity.Value < accuracyCounter.WireframeOpacity.Default);
         }
 
         [Test]
@@ -435,6 +542,153 @@ namespace osu.Game.Tests.Visual.Navigation
             AddStep("change back to modified skin", () => Game.Dependencies.Get<SkinManager>().SetSkinFromConfiguration(editedSkinId.ToString()));
             AddUntilStep("components loaded", () => Game.ChildrenOfType<SkinnableContainer>().All(c => c.ComponentsLoaded));
             AddUntilStep("changes saved", () => skinEditor.ChildrenOfType<SkinBlueprint>().Any());
+        }
+
+        [Test]
+        public void TestEzEditorLayerDropdownSwitchesLayer()
+        {
+            AddStep("import editor beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).WaitSafely());
+            AddUntilStep("editor beatmap ready", () => !Game.Beatmap.IsDefault);
+
+            AddUntilStep("main menu current", () => Game.ScreenStack.CurrentScreen is MainMenu);
+            AddUntilStep("Ez editor overlay available", () => Game.ChildrenOfType<EzSkinEditorOverlay>().Any());
+            AddStep("open Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("editor gameplay current", () => Game.ScreenStack.CurrentScreen is Player);
+            AddUntilStep("editor workspace ready", () => ezSkinEditor.Workspace?.IsLoaded == true);
+            AddUntilStep("gameplay scene selected", () => ezSkinEditor.Workspace!.CurrentScene.Value == EzSkinEditorSceneType.GameplayHud);
+
+            AddUntilStep("layer button present", () => ezSkinEditor.Workspace!.ChildrenOfType<EzEditorLayerButton>().Any());
+            AddUntilStep("editor resolved a ruleset", () =>
+                ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorSceneBar>().Single().Ruleset.Value != null);
+
+            AddStep("open layer dropdown", () =>
+            {
+                var button = ezSkinEditor.Workspace!.ChildrenOfType<EzEditorLayerButton>().Single();
+                InputManager.MoveMouseTo(button);
+                InputManager.Click(MouseButton.Left);
+            });
+
+            AddUntilStep("popover shown", () =>
+                ezSkinEditor.Workspace!.ChildrenOfType<osu.Framework.Graphics.Cursor.PopoverContainer>().Any(p => p.CurrentPopover != null));
+
+            AddStep("click ruleset layer option", () =>
+            {
+                var options = ezSkinEditor.Workspace!.ChildrenOfType<EzEditorLayerButton.LayerListPopover.LayerSelectButton>().ToArray();
+                TestContext.Progress.WriteLine("OPTIONS=" + string.Join(" | ", options.Select(o => o.Text.ToString())));
+
+                string rulesetLayerLabel = EzSkinEditorLayerOptions.GetDisplayName(EzHUDLayer.EzHudRuleset,
+                    ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorSceneBar>().Single().Ruleset.Value).ToString();
+                var option = options.SingleOrDefault(b => b.Text.ToString() == rulesetLayerLabel);
+                Assert.That(option, Is.Not.Null, $"ruleset layer option ({rulesetLayerLabel}) not found: " + string.Join(" | ", options.Select(o => o.Text.ToString())));
+
+                InputManager.MoveMouseTo(option!);
+                InputManager.Click(MouseButton.Left);
+            });
+
+            AddUntilStep("layer changed to ruleset", () => ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorSceneBar>().Single().ActiveLayer.Value == EzHUDLayer.EzHudRuleset);
+        }
+
+        [Test]
+        public void TestSongSelectSceneEditsTheSongSelectContainer()
+        {
+            advanceToSongSelect();
+            openEzEditor();
+            AddUntilStep("song select scene selected", () => ezSkinEditor.Workspace!.CurrentScene.Value == EzSkinEditorSceneType.SongSelectHud);
+
+            AddUntilStep("song select container is an editing target", () =>
+                ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorHudLayer>().Single()
+                            .EnumerateTargets().Any(c => c.Lookup.Lookup == GlobalSkinnableContainers.SongSelect));
+        }
+
+        [Test]
+        public void TestBeatmapPreviewScenePushesFullMapPreviewScreen()
+        {
+            BeatmapSetInfo beatmapSet = null!;
+
+            AddStep("import editor beatmap", () => beatmapSet = BeatmapImportHelper.LoadQuickOszIntoOsu(Game).GetResultSafely());
+            AddStep("select mania difficulty", () =>
+            {
+                var mania = beatmapSet.Beatmaps.First(b => b.Ruleset.OnlineID == 3);
+                Game.Beatmap.Value = Game.BeatmapManager.GetWorkingBeatmap(mania);
+            });
+            AddUntilStep("mania beatmap selected", () => Game.Beatmap.Value.BeatmapInfo.Ruleset.OnlineID == 3);
+
+            openEzEditor();
+            AddUntilStep("editor workspace ready", () => ezSkinEditor.Workspace?.IsLoaded == true);
+
+            AddStep("switch to song select scene", () => ezSkinEditor.Workspace!.CurrentScene.Value = EzSkinEditorSceneType.SongSelectHud);
+            AddUntilStep("real song select current", () => Game.ScreenStack.CurrentScreen is SoloSongSelect);
+
+            AddStep("switch to beatmap preview scene", () => ezSkinEditor.Workspace!.CurrentScene.Value = EzSkinEditorSceneType.BeatmapPreview);
+            AddUntilStep("full map preview screen current", () => Game.ScreenStack.CurrentScreen is EzSkinEditorPreviewManiaScreen);
+            AddUntilStep("song select was exited", () => Game.ScreenStack.CurrentScreen is not SoloSongSelect);
+        }
+
+        [Test]
+        public void TestBeatmapPreviewScenePresentsWithoutManualSelection()
+        {
+            // 默认导入的谱面是 osu!std。不做「选择模式」手动切歌，直接点谱面预览二级场景也应能呈现
+            // （非 mania 由屏内占位提示），而不是静默驳回、看起来像没反应。
+            AddStep("import editor beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).WaitSafely());
+            AddUntilStep("editor beatmap ready", () => !Game.Beatmap.IsDefault);
+            AddAssert("selected difficulty is not mania", () => Game.Beatmap.Value.BeatmapInfo.Ruleset.OnlineID != 3);
+
+            openEzEditor();
+            AddUntilStep("editor workspace ready", () => ezSkinEditor.Workspace?.IsLoaded == true);
+
+            AddStep("switch to beatmap preview scene", () => ezSkinEditor.Workspace!.CurrentScene.Value = EzSkinEditorSceneType.BeatmapPreview);
+            AddUntilStep("scene stayed on beatmap preview", () => ezSkinEditor.Workspace!.CurrentScene.Value == EzSkinEditorSceneType.BeatmapPreview);
+            AddUntilStep("full map preview screen current", () => Game.ScreenStack.CurrentScreen is EzSkinEditorPreviewManiaScreen);
+        }
+
+        [Test]
+        public void TestGameplayGlobalLayerEditsTheGlobalContainer()
+        {
+            AddStep("import editor beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).WaitSafely());
+            AddUntilStep("editor beatmap ready", () => !Game.Beatmap.IsDefault);
+
+            AddUntilStep("main menu current", () => Game.ScreenStack.CurrentScreen is MainMenu);
+            openEzEditor();
+            AddUntilStep("editor gameplay current", () => Game.ScreenStack.CurrentScreen is Player);
+            AddUntilStep("gameplay scene selected", () => ezSkinEditor.Workspace!.CurrentScene.Value == EzSkinEditorSceneType.GameplayHud);
+
+            AddUntilStep("global layer edits the global hud container", () =>
+            {
+                var hudLayer = ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorHudLayer>().Single();
+                return hudLayer.EnumerateTargets().Any(c => c.Lookup.Lookup == GlobalSkinnableContainers.MainHUDComponents && c.Lookup.Ruleset == null);
+            });
+        }
+
+        [Test]
+        public void TestGameplayRulesetLayerResolvesFromLiveScreen()
+        {
+            AddStep("import editor beatmap", () => BeatmapImportHelper.LoadQuickOszIntoOsu(Game).WaitSafely());
+            AddUntilStep("editor beatmap ready", () => !Game.Beatmap.IsDefault);
+
+            AddUntilStep("main menu current", () => Game.ScreenStack.CurrentScreen is MainMenu);
+            openEzEditor();
+            AddUntilStep("editor gameplay current", () => Game.ScreenStack.CurrentScreen is Player);
+            AddUntilStep("gameplay scene selected", () => ezSkinEditor.Workspace!.CurrentScene.Value == EzSkinEditorSceneType.GameplayHud);
+
+            AddUntilStep("wait for gameplay containers", () =>
+                Game.ChildrenOfType<EzLayoutLayer>().Single().LayoutContainers.Count() > 1);
+
+            AddUntilStep("editor picks up the live ruleset", () =>
+                ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorSceneBar>().Single().Ruleset.Value != null);
+
+            AddStep("select ruleset hud layer", () =>
+                ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorSceneBar>().Single().ActiveLayer.Value = EzHUDLayer.EzHudRuleset);
+
+            AddUntilStep("ruleset layer edits the live ruleset container", () =>
+                ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorHudLayer>().Single()
+                            .EnumerateTargets().Any(c => c.Lookup.Lookup == GlobalSkinnableContainers.MainHUDComponents && c.Lookup.Ruleset != null));
+        }
+
+        private void openEzEditor()
+        {
+            AddUntilStep("Ez editor overlay available", () => Game.ChildrenOfType<EzSkinEditorOverlay>().Any());
+            AddStep("open Ez editor", () => ezSkinEditor.Toggle());
+            AddUntilStep("editor workspace ready", () => ezSkinEditor.Workspace?.IsLoaded == true);
         }
 
         private void advanceToSongSelect()

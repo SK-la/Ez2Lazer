@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -22,9 +23,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         public override LocalisableString Description => SRAdjustStrings.SR_DESCRIPTION;
 
-        public override ModType Type => ModType.LA_Mod;
+        public override IconUsage? Icon => FontAwesome.Solid.StarHalfAlt;
 
-        public override double ScoreMultiplier => 1;
+        public override ModType Type => ModType.LA_Mod;
 
         public override bool Ranked => false;
 

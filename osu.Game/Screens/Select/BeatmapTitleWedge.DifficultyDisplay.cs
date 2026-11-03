@@ -19,6 +19,8 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Beatmaps;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Online;
@@ -26,6 +28,7 @@ using osu.Game.Online.Chat;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Screens.Select
@@ -45,22 +48,22 @@ namespace osu.Game.Screens.Select
             [Resolved]
             private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
 
-            [Resolved]
-            private EzAnalysisDatabase analysisDatabase { get; set; } = null!;
-
-            private EzDisplayKpc ezDisplayKpc = null!;
-
             private ModSettingChangeTracker? settingChangeTracker;
 
             [Resolved]
             private BeatmapDifficultyCache difficultyCache { get; set; } = null!;
 
-            private StarRatingDisplay starRatingDisplay = null!;
+            private StarRatingDisplay starRatingDisplay => dualDifficultyDisplay.Official;
+
+            private EzDualDifficultyDisplay dualDifficultyDisplay = null!;
             private FillFlowContainer nameLine = null!;
             private OsuSpriteText difficultyText = null!;
             private OsuSpriteText mappedByText = null!;
             private OsuHoverContainer mapperLink = null!;
             private OsuSpriteText mapperText = null!;
+
+            private EzDisplayKpc ezDisplayKpc = null!;
+            private SpreadDisplay spreadDisplay = null!;
 
             private GridContainer ratingAndNameContainer = null!;
             private DifficultyStatisticsDisplay countStatisticsDisplay = null!;
@@ -78,12 +81,12 @@ namespace osu.Game.Screens.Select
             private void load(OverlayColourProvider colourProvider)
             {
                 Masking = true;
-                CornerRadius = 10;
+                CornerRadius = CORNER_RADIUS;
                 Shear = OsuGame.SHEAR;
 
                 InternalChildren = new Drawable[]
                 {
-                    new WedgeBackground(),
+                    new EzSongSelectWedgeBackground(),
                     new FillFlowContainer
                     {
                         RelativeSizeAxes = Axes.X,
@@ -105,12 +108,13 @@ namespace osu.Game.Screens.Select
                                     new Dimension(GridSizeMode.AutoSize),
                                     new Dimension(GridSizeMode.Absolute, 6),
                                     new Dimension(),
+                                    new Dimension(GridSizeMode.AutoSize, maxSize: 160),
                                 },
                                 Content = new[]
                                 {
                                     new[]
                                     {
-                                        starRatingDisplay = new StarRatingDisplay(default, animated: true)
+                                        dualDifficultyDisplay = new EzDualDifficultyDisplay(animated: true)
                                         {
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
@@ -152,6 +156,12 @@ namespace osu.Game.Screens.Select
                                                 },
                                             },
                                         },
+                                        spreadDisplay = new SpreadDisplay
+                                        {
+                                            Anchor = Anchor.CentreLeft,
+                                            Origin = Anchor.CentreLeft,
+                                            Margin = new MarginPadding { Left = 8f, Right = 10f },
+                                        },
                                     }
                                 },
                             }),
@@ -166,7 +176,7 @@ namespace osu.Game.Screens.Select
                                     RelativeSizeAxes = Axes.X,
                                     AutoSizeAxes = Axes.Y,
                                     Masking = true,
-                                    CornerRadius = 10 - border_weight,
+                                    CornerRadius = EzUIStyleV1.CORNER_RADIUS_WEDGE - border_weight,
                                     Shear = OsuGame.SHEAR,
                                     Children = new Drawable[]
                                     {
@@ -204,7 +214,8 @@ namespace osu.Game.Screens.Select
                                                     {
                                                         Anchor = Anchor.CentreLeft,
                                                         Origin = Anchor.CentreLeft,
-                                                        RelativeSizeAxes = Axes.Y,
+                                                        Scale = new Vector2(1.25f),
+                                                        ShowBackground = false,
                                                     },
                                                     Empty(),
                                                     difficultyStatisticsDisplay = new DifficultyStatisticsDisplay(autoSize: true),
@@ -259,6 +270,9 @@ namespace osu.Game.Screens.Select
                 {
                     ratingAndNameContainer.FadeOut(300, Easing.OutQuint);
                     countStatisticsDisplay.FadeOut(300, Easing.OutQuint);
+                    spreadDisplay.Beatmap.Value = null;
+                    spreadDisplay.StarDifficulty.UnbindAll();
+                    dualDifficultyDisplay.ResetXxy();
                 }
                 else
                 {
@@ -266,12 +280,39 @@ namespace osu.Game.Screens.Select
                     difficultyText.Text = beatmap.Value.BeatmapInfo.DifficultyName;
                     mapperLink.Action = () => linkHandler?.HandleLink(new LinkDetails(LinkAction.OpenUserProfile, beatmap.Value.Metadata.Author));
                     mapperText.Text = beatmap.Value.Metadata.Author.Username;
+                    spreadDisplay.Beatmap.Value = beatmap.Value.BeatmapInfo;
+
+                    if (beatmap.Value.BeatmapInfo is BeatmapInfo beatmapInfo)
+                        dualDifficultyDisplay.UpdateFromBeatmap(beatmapInfo);
                 }
 
-                starRatingDisplay.Current = (Bindable<StarDifficulty>)difficultyCache.GetBindableDifficulty(beatmap.Value.BeatmapInfo, cancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+                dualDifficultyDisplay.Official.Current = (Bindable<StarDifficulty>)difficultyCache.GetBindableDifficulty(beatmap.Value.BeatmapInfo, cancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+
+                if (!beatmap.IsDefault)
+                {
+                    spreadDisplay.StarDifficulty.UnbindAll();
+                    spreadDisplay.StarDifficulty.BindTo(dualDifficultyDisplay.Official.Current);
+                }
 
                 updateCountStatistics(cancellationSource.Token);
                 updateDifficultyStatistics();
+            }
+
+            public void ApplyKpcMetrics(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
+            {
+                if (beatmap.IsDefault || beatmap.Value.BeatmapInfo is not BeatmapInfo beatmapInfo
+                    || !EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value)
+                    || !beatmapInfo.SupportsXxyStarRating())
+                {
+                    ezDisplayKpc.ManiaSummary = null;
+                    ezDisplayKpc.Hide();
+                    dualDifficultyDisplay.ResetXxy();
+                    return;
+                }
+
+                ezDisplayKpc.ManiaSummary = metrics.ManiaSummary;
+                ezDisplayKpc.Show();
+                dualDifficultyDisplay.ApplyAnalysisMetrics(beatmapInfo, metrics);
             }
 
             private void updateCountStatistics(CancellationToken cancellationToken)
@@ -279,7 +320,6 @@ namespace osu.Game.Screens.Select
                 if (beatmap.IsDefault)
                 {
                     countStatisticsDisplay.FadeOut(300, Easing.OutQuint);
-                    ezDisplayKpc.ManiaSummary = null;
                     return;
                 }
 
@@ -291,45 +331,14 @@ namespace osu.Game.Screens.Select
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    bool hasMods = selectedMods.Length > 0;
-                    EzManiaSummary? maniaSummary = null;
-
-                    if (!hasMods
-                        && selectedRuleset != null
-                        && selectedRuleset.OnlineID == 3
-                        && analysisDatabase.TryGetStoredAnalysis(selectedBeatmap.BeatmapInfo, selectedRuleset, out var storedAnalysis))
-                    {
-                        maniaSummary = storedAnalysis.ManiaSummary;
-                    }
-
-                    // This can take time as it is a synchronous task.
-                    // 使用可取消重载，避免快速切歌时后台任务继续持有旧谱面对象。
-                    var playableBeatmap = selectedBeatmap.GetPlayableBeatmap(selectedRuleset, Array.Empty<Mod>(), cancellationToken);
+                    // 只读消费者：选歌界面的统计展示与难度/分析/预览共用同一次转换。
+                    var playableBeatmap = EzPlayableBeatmapCache.GetShared(selectedBeatmap, selectedRuleset, selectedMods, cancellationToken);
 
                     cancellationToken.ThrowIfCancellationRequested();
 
                     var statistics = playableBeatmap.GetStatistics()
                                                     .Select(s => new StatisticDifficulty.Data(s.Name, s.BarDisplayLength ?? 0, s.BarDisplayLength ?? 0, 1, s.Content))
                                                     .ToList();
-
-                    maniaSummary ??= OptimizedBeatmapCalculator.GetEzManiaSummary(playableBeatmap);
-
-                    // 如果是 mania，则计算列计数并更新中间的 KPC 药丸组件
-                    if (selectedRuleset != null && selectedRuleset.OnlineID == 3)
-                    {
-                        Schedule(() =>
-                        {
-                            if (cancellationToken.IsCancellationRequested)
-                                return;
-
-                            ezDisplayKpc.ManiaSummary = maniaSummary;
-                        });
-                    }
-                    else
-                    {
-                        // 非 Mania 情况隐藏组件
-                        Schedule(() => ezDisplayKpc.ManiaSummary = null);
-                    }
 
                     Schedule(() =>
                     {
@@ -363,10 +372,11 @@ namespace osu.Game.Screens.Select
                 difficultyText.MaxWidth = Math.Max(nameLine.DrawWidth - mappedByText.DrawWidth - mapperText.DrawWidth - 20, 0);
 
                 // Use difficulty colour until it gets too dark to be visible against dark backgrounds.
-                Color4 col = starRatingDisplay.DisplayedStars.Value >= OsuColour.STAR_DIFFICULTY_DEFINED_COLOUR_CUTOFF ? starRatingDisplay.DisplayedDifficultyTextColour : starRatingDisplay.DisplayedDifficultyColour;
+                Color4 col = starRatingDisplay.ForegroundTextColour;
 
                 difficultyText.Colour = col;
                 mappedByText.Colour = Colour4.WhiteSmoke;
+                spreadDisplay.Current.Colour = starRatingDisplay.DisplayedDifficultyColour;
                 countStatisticsDisplay.AccentColour = col;
                 difficultyStatisticsDisplay.AccentColour = col;
             }

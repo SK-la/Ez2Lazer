@@ -17,7 +17,7 @@ namespace osu.Game.Skinning
     {
         public double Length => !DrawableSamples.Any() ? 0 : DrawableSamples.Max(sample => sample.Length);
 
-        public bool RequestedPlaying { get; private set; }
+        public bool RequestedPlaying { get; protected set; }
 
         public PausableSkinnableSound()
         {
@@ -34,6 +34,11 @@ namespace osu.Game.Skinning
         }
 
         private readonly IBindable<bool> samplePlaybackDisabled = new Bindable<bool>();
+
+        /// <summary>
+        /// Whether sample playback is currently suppressed, e.g. during a pause.
+        /// </summary>
+        protected bool SamplePlaybackDisabled => samplePlaybackDisabled.Value;
 
         private ScheduledDelegate scheduledStart;
 

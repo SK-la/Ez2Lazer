@@ -2,9 +2,12 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using osu.Framework.Bindables;
 using osu.Framework.Utils;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Scoring
 {
@@ -32,6 +35,11 @@ namespace osu.Game.Rulesets.Scoring
         public bool HasFailed { get; private set; }
 
         /// <summary>
+        /// List of <see cref="HealthValue"/>s which constitute a health graph.
+        /// </summary>
+        private List<HealthValue> healthGraph { get; } = new List<HealthValue>();
+
+        /// <summary>
         /// Immediately triggers a failure for this HealthProcessor.
         /// </summary>
         public void TriggerFailure()
@@ -43,6 +51,19 @@ namespace osu.Game.Rulesets.Scoring
                 HasFailed = true;
         }
 
+        /// <summary>
+        /// [Ez] gameplay 入口调用：将当前全局 Ez 游玩环境（如 mania 血量模式）冻结注入本处理器。
+        /// 必须在 <see cref="JudgementProcessor.ApplyBeatmap"/> 之前调用。
+        /// 无头/转换路径不得调用，以保持 ppy 上游官方行为；未调用时按各规则集的默认模式处理。
+        /// </summary>
+        /// <remarks>
+        /// 与 <see cref="ScoreProcessor.ApplyEzGameplayEnvironment"/> 同源：调用方只看这一处，
+        /// 局内行为一律读注入后的实例状态，不再回读全局配置。
+        /// </remarks>
+        public virtual void ApplyEzGameplayEnvironment()
+        {
+        }
+
         protected override void ApplyResultInternal(JudgementResult result)
         {
             result.HealthAtJudgement = Health.Value;
@@ -52,6 +73,7 @@ namespace osu.Game.Rulesets.Scoring
                 return;
 
             Health.Value += GetHealthIncreaseFor(result);
+            healthGraph.Add(new HealthValue(result.TimeAbsolute, Health.Value));
 
             if (meetsAnyFailCondition(result))
                 TriggerFailure();
@@ -65,6 +87,8 @@ namespace osu.Game.Rulesets.Scoring
                 return;
 
             Health.Value = result.HealthAtJudgement;
+            Debug.Assert(healthGraph.Count > 0);
+            healthGraph.RemoveAt(healthGraph.Count - 1);
         }
 
         /// <summary>
@@ -102,12 +126,18 @@ namespace osu.Game.Rulesets.Scoring
             return false;
         }
 
+        public void PopulateScore(ScoreInfo score)
+        {
+            score.HealthGraph = healthGraph;
+        }
+
         protected override void Reset(bool storeResults)
         {
             base.Reset(storeResults);
 
             Health.Value = 1;
             HasFailed = false;
+            healthGraph.Clear();
         }
     }
 }

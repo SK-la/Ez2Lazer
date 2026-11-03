@@ -12,8 +12,16 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString GLOBAL_TEXTURE_NAME_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "统一修改当前皮肤中所有Ez-HUD组件的纹理名称, 如score、combo、判定等纹理。"
-            + "\n在本地EzResources/GameTheme/中，不支持增减子文件夹。",
-            "Set a global texture name for all EZ-HUD components in the current skin. Such as: score, combo, judgement, etc.");
+            + "\n在本地 EzResources/GameTheme/ 中，支持自定义子文件夹增减修改，选项会在重扫时重新读取文件夹名称。",
+            "Set a global texture name for all EZ-HUD components in the current skin. Such as: score, combo, judgement, etc."
+            + "\nSupports adding or removing subfolders under local EzResources/GameTheme/. Use rescan to reload folder names.");
+
+        public static readonly LocalisableString RESCAN_GAME_THEME_LIST = new EzLocalizationManager.EzLocalisableString(
+            "重扫 GameTheme 列表", "Rescan GameTheme folders");
+
+        public static readonly LocalisableString RESCAN_GAME_THEME_LIST_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "重新读取 EzResources/GameTheme/ 下的子文件夹名称，更新下拉与预览卡片；不会修改当前选中的主题名。",
+            "Re-read subfolders under EzResources/GameTheme/ and refresh dropdowns and preview cards without changing the current selection.");
 
         public static readonly LocalisableString STAGE_SET = new EzLocalizationManager.EzLocalisableString(
             "[EzPro] Stage Set", "[EzPro] Stage Set");
@@ -28,6 +36,54 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString NOTE_SET = new EzLocalizationManager.EzLocalisableString(
             "[EzPro] Note Set", "[EzPro] Note Set");
+
+        public static readonly LocalisableString JUDGEMENT_LINE_NAME = new EzLocalizationManager.EzLocalisableString(
+            "[EzPro] 判定线贴图", "[EzPro] Judgement Line");
+
+        public static readonly LocalisableString JUDGEMENT_LINE_NAME_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "覆盖舞台判定线贴图，取自本地 EzResources/JudgementLine/，贴图底边对齐判定线。"
+            + "\n留空时用各 stage layout 里定义的判定线；选择后覆盖 layout 指定的图。",
+            "Overrides the stage judgement line image from local EzResources/JudgementLine/; the image's bottom edge aligns with the judgement line."
+            + "\nLeave empty to use the line declared by each stage layout; a selection overrides the layout image.");
+
+        public static readonly LocalisableString JUDGEMENT_LINE_NONE = new EzLocalizationManager.EzLocalisableString(
+            "（不覆盖）", "(no override)");
+
+        public static readonly LocalisableString COMPONENT_TYPE_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "组件类型", "Component type");
+
+        public static readonly LocalisableString COMPONENT_TYPE_NOTE = new EzLocalizationManager.EzLocalisableString(
+            "Note", "Note");
+
+        public static readonly LocalisableString COMPONENT_TYPE_STAGE = new EzLocalizationManager.EzLocalisableString(
+            "Stage", "Stage");
+
+        public static readonly LocalisableString COMPONENT_TYPE_PANEL = new EzLocalizationManager.EzLocalisableString(
+            "Panel", "Panel");
+
+        public static readonly LocalisableString COMPONENT_TYPE_EARLY_LATE = new EzLocalizationManager.EzLocalisableString(
+            "Early/Late", "Early/Late");
+
+        public static readonly LocalisableString COMPONENT_TYPE_JUDGEMENT = new EzLocalizationManager.EzLocalisableString(
+            "Judgement", "Judgement");
+
+        public static readonly LocalisableString COMPONENT_TYPE_COMBO = new EzLocalizationManager.EzLocalisableString(
+            "Combo", "Combo");
+
+        public static readonly LocalisableString COMPONENT_TYPE_JUDGEMENT_LINE = new EzLocalizationManager.EzLocalisableString(
+            "JudgementLine", "JudgementLine");
+
+        public static readonly LocalisableString COMPONENT_TYPE_COLUMN_LIGHT = new EzLocalizationManager.EzLocalisableString(
+            "ColumnLight", "ColumnLight");
+
+        public static readonly LocalisableString VISUAL_PICKER_GAME_THEME_BUTTON = new EzLocalizationManager.EzLocalisableString(
+            "大图选择：全局纹理主题", "Visual picker: global GameTheme");
+
+        public static readonly LocalisableString VISUAL_PICKER_NOTE_SET_BUTTON = new EzLocalizationManager.EzLocalisableString(
+            "大图选择：Note Set", "Visual picker: Note Set");
+
+        public static readonly LocalisableString VISUAL_PICKER_STAGE_BUTTON = new EzLocalizationManager.EzLocalisableString(
+            "大图选择：Stage Set", "Visual picker: Stage Set");
 
         public static readonly LocalisableString NOTE_SET_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "修改EzPro皮肤中的整套note, 含所有note和打击光效。"
@@ -73,17 +129,18 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString HIT_POSITION_TOOLTIP = new EzLocalizationManager.EzLocalisableString("设置可视的判定线位置", "Set the visible hit position");
 
         public static readonly LocalisableString HIT_TARGET_ALPHA = new EzLocalizationManager.EzLocalisableString(
-            "[EzPro] 命中靶透明度", "[EzPro] Hit-Target Alpha");
+            "[Ez] 命中靶透明度", "[Ez] Hit-Target Alpha");
 
         public static readonly LocalisableString HIT_TARGET_ALPHA_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "设置Ez Style Pro皮肤中note命中靶的透明度, 可见判定线上与note一样的判定板",
-            "Set the transparency of the note Hit-Target in Ez Style Pro skin, making the hit plate on the hit position visible like the note");
+            "设置 EzStylePro / Ez2Circle 命中靶透明度，使判定线上可见与 note 类似的判定板。",
+            "Hit-target alpha for EzStylePro / Ez2Circle, so the plate on the hit position stays visible like a note.");
 
-        public static readonly LocalisableString HIT_TARGET_FLOAT_FIXED = new EzLocalizationManager.EzLocalisableString("[EzPro] 命中靶浮动修正", "[EzPro] Hit-Target Float Fixed");
+        public static readonly LocalisableString HIT_TARGET_FLOAT_FIXED = new EzLocalizationManager.EzLocalisableString(
+            "[Ez] 命中靶浮动修正", "[Ez] Hit-Target Float Fixed");
 
         public static readonly LocalisableString HIT_TARGET_FLOAT_FIXED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "设置Ez Style Pro皮肤中note命中靶, 修改浮动效果的正弦函数运动范围",
-            "Set the note Hit-Target in Ez Style Pro skin, modifying the sine function motion range of the floating effect");
+            "设置 EzStylePro / Ez2Circle 命中靶浮动幅度（正弦运动范围）。",
+            "Hit-target bob amplitude for EzStylePro / Ez2Circle (sine motion range).");
 
         public static readonly LocalisableString NOTE_HEIGHT_SCALE = new EzLocalizationManager.EzLocalisableString(
             "note 高度比例", "Note Height Scale");
@@ -112,11 +169,22 @@ namespace osu.Game.EzOsuGame.Localization
             + "You must enable this switch to use the true opportunistic tail below.");
 
         public static readonly LocalisableString LN_GRADIENT_TAIL_HEIGHT = new EzLocalizationManager.EzLocalisableString(
-            "调整投皮面尾的幅度", "Adjust LN Tail Gradient Length");
+            "投皮距离档位", "LN Tail Mask Beats");
 
         public static readonly LocalisableString LN_GRADIENT_TAIL_HEIGHT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "(投皮) 缩短面条中部, 不改变面尾形状",
-            "(Gradient LN) Shorten the middle of the hold tail without changing its shape");
+            "UI 0~8，x/32 × BPM。"
+            + "\n0 为关闭投皮；进局时确认状态，局内不会动态变化。"
+            + "\n需先开启伪面尾，body 再按此档位判定是否投皮。",
+            "UI 0–8; (x ÷ 32) × BPM."
+            + "\n0 disables tail‑mask projection; the state is confirmed when entering play and will not change during gameplay."
+            + "\nPseudo‑tail must be enabled first; the body then judges based on this level whether to project the mask.");
+
+        public static readonly LocalisableString LN_DYNAMIC_TAIL = new EzLocalizationManager.EzLocalisableString(
+            "动态投皮", "Dynamic LN Tail Mask");
+
+        public static readonly LocalisableString LN_DYNAMIC_TAIL_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "进局时确认，局内不跟随设置变更。关闭时整局用主 BPM 拍长；开启后按当前拍长动态调整投皮距离。",
+            "Snapshotted when entering play; in-play setting changes are ignored. Off uses the main BPM beat length for the whole play; on follows the live beat length.");
 
         public static readonly LocalisableString NOTE_TRACK_LINE = new EzLocalizationManager.EzLocalisableString(
             "[EzPro] Note侧轨道线", "EzPro] Note Track Line");

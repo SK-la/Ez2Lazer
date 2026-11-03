@@ -9,16 +9,19 @@ using System.Diagnostics;
 using System.Linq;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
-using osu.Framework.Threading;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.ListExtensions;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Extensions.TypeExtensions;
 using osu.Framework.Graphics;
+using osu.Framework.Input;
 using osu.Framework.Lists;
 using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Diagnostics;
+using osu.Game.EzOsuGame.Timing;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Pooling;
@@ -27,7 +30,6 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
-using osu.Game.EzOsuGame.Configuration;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Objects.Drawables
@@ -143,7 +145,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
         protected override bool RequiresChildrenUpdate => true;
 
-        public override bool IsPresent => base.IsPresent || (State.Value == ArmedState.Idle && Clock.IsNotNull() && Clock.CurrentTime >= LifetimeStart);
+        public override bool IsPresent => base.IsPresent || State.Value == ArmedState.Idle && Clock.IsNotNull() && Clock.CurrentTime >= LifetimeStart;
 
         private readonly Bindable<ArmedState> state = new Bindable<ArmedState>();
 
@@ -159,14 +161,20 @@ namespace osu.Game.Rulesets.Objects.Drawables
         private IPooledHitObjectProvider pooledObjectProvider { get; set; }
 
         [Resolved(CanBeNull = true)]
+        [CanBeNull]
+        private GameplayState gameplayState { get; set; }
+
+        [Resolved(CanBeNull = true)]
         private DrawableRuleset drawableRuleset { get; set; }
 
         [Resolved(CanBeNull = true)]
         private Ez2ConfigManager ezConfig { get; set; }
 
-        private bool autoplaySampleTriggered;
-        private IBindable<double> offsetBindable;
-        private IBindable<bool> hitObjectLifetimeUsesOwnTimeBindable = new BindableBool();
+        private bool autoPlayPlusSampleTriggered;
+        private bool autoPlayPlusSamplePlayed;
+        private bool autoplayPlusEnabled;
+        private bool ownerLifetime;
+        private double ezOffset;
 
         /// <summary>
         /// Whether the initialization logic in <see cref="Playfield" /> has applied.
@@ -226,15 +234,16 @@ namespace osu.Game.Rulesets.Objects.Drawables
             // Choose the appropriate offset bindable once during load to avoid runtime reflection/namespace checks.
             if (ezConfig != null)
             {
-                hitObjectLifetimeUsesOwnTimeBindable = ezConfig.GetBindable<bool>(Ez2Setting.HitObjectLifetimeUsesOwnTime);
+                ownerLifetime = ezConfig.Get<bool>(Ez2Setting.HitObjectLifetimeUsesOwnTime);
+                autoplayPlusEnabled = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode) == KeySoundPreviewMode.AutoPlayPlus;
 
                 if (drawableRuleset != null)
                 {
                     int onlineId = drawableRuleset.Ruleset.RulesetInfo.OnlineID;
-                    if (onlineId == 3) // Mania legacy ruleset id
-                        offsetBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
-                    else
-                        offsetBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania);
+
+                    ezOffset = onlineId == 3
+                        ? ezConfig.Get<double>(Ez2Setting.OffsetPlusMania)
+                        : ezConfig.Get<double>(Ez2Setting.OffsetPlusNonMania);
                 }
             }
         }
@@ -341,7 +350,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 UpdateComboColour();
             }
 
-            autoplaySampleTriggered = false;
+            resetAutoPlayPlusSampleState();
         }
 
         private void updateStateFromResult()
@@ -369,7 +378,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
             samplesBindable.UnbindFrom(HitObject.SamplesBindable);
 
             // 回收时一并重置自动播样状态。
-            autoplaySampleTriggered = false;
+            resetAutoPlayPlusSampleState();
 
             // Release the samples for other hitobjects to use.
             samplesLoaded = false;
@@ -433,7 +442,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
         private void onRevertResult()
         {
-            autoplaySampleTriggered = false;
+            resetAutoPlayPlusSampleState();
             UpdateState(ArmedState.Idle);
             OnRevertResult?.Invoke(this, Result);
         }
@@ -503,7 +512,6 @@ namespace osu.Game.Rulesets.Objects.Drawables
             clearExistingStateTransforms();
 
             double initialTransformsTime = HitObject.StartTime - InitialLifetimeOffset;
-            double hitStateUpdateTime = HitStateUpdateTime;
 
             AnimationStartTime.Value = initialTransformsTime;
 
@@ -513,18 +521,26 @@ namespace osu.Game.Rulesets.Objects.Drawables
             using (BeginAbsoluteSequence(StateUpdateTime))
                 UpdateStartTimeStateTransforms();
 
-            using (BeginAbsoluteSequence(hitStateUpdateTime))
+            using (BeginAbsoluteSequence(HitStateUpdateTime))
                 UpdateHitStateTransforms(newState);
+
+            // 未判定也不结束生命周期：判定与输入继续按原时间进行，只把视觉在自身结束时间处收掉。
+            if (newState == ArmedState.Idle && HideVisualsAfterOwnTime)
+            {
+                using (BeginAbsoluteSequence(HitStateUpdateTime))
+                    this.FadeOut();
+            }
 
             state.Value = newState;
 
             if (LifetimeEnd == double.MaxValue && (state.Value != ArmedState.Idle || HitObject.HitWindows == null))
-                LifetimeEnd = Math.Max(LatestTransformEndTime, hitStateUpdateTime + (Samples?.Length ?? 0));
+                LifetimeEnd = Math.Max(LatestTransformEndTime, HitStateUpdateTime + (Samples?.Length ?? 0));
 
             // apply any custom state overrides
             ApplyCustomUpdateState?.Invoke(this, newState);
 
-            if (!force && newState == ArmedState.Hit)
+            // AutoPlayPlus 已在物件时刻为它发过声，命中判定不再重复触发。
+            if (!force && newState == ArmedState.Hit && !autoPlayPlusSamplePlayed)
                 PlaySamples();
         }
 
@@ -630,8 +646,16 @@ namespace osu.Game.Rulesets.Objects.Drawables
         /// </summary>
         /// <param name="position">The lookup X position. Generally should be <see cref="SamplePlaybackPosition"/>.</param>
         protected double CalculateSamplePlaybackBalance(double position)
+            => CalculateSamplePlaybackBalance(position, positionalHitsoundsLevel.Value);
+
+        /// <summary>
+        /// Calculate a sample's balance from a 0..1 playfield position and the user's positional hitsounds setting.
+        /// </summary>
+        /// <param name="position">The lookup X position (0 for far-left, 0.5 for centre, 1 for far-right).</param>
+        /// <param name="positionalHitsoundsLevel">The user's positional hitsounds strength.</param>
+        public static double CalculateSamplePlaybackBalance(double position, double positionalHitsoundsLevel)
         {
-            float balanceAdjustAmount = positionalHitsoundsLevel.Value * 2;
+            double balanceAdjustAmount = positionalHitsoundsLevel * 2;
             double returnedValue = balanceAdjustAmount * (position - 0.5f);
 
             // Rounded to reduce the overhead of audio adjustments (which are currently bindable heavy).
@@ -649,6 +673,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
             {
                 Samples.Balance.Value = CalculateSamplePlaybackBalance(SamplePlaybackPosition);
                 Samples.Play();
+                gameplayState?.ApplySamples(Samples.Samples);
             }
         }
 
@@ -662,27 +687,27 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 Samples.Stop();
         }
 
-        private void updateAutoplaySamplePlayback()
+        private void resetAutoPlayPlusSampleState()
         {
-            if (Entry == null)
-                return;
+            autoPlayPlusSampleTriggered = false;
+            autoPlayPlusSamplePlayed = false;
+        }
 
-            if (GlobalConfigStore.EzConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode) != KeySoundPreviewMode.AutoPlayPlus)
-            {
-                autoplaySampleTriggered = false;
+        private void updateAutoPlayPlusSamplePlayback()
+        {
+            if (!autoplayPlusEnabled || Entry == null)
                 return;
-            }
 
             if (Judged)
                 return;
 
             if (Time.Current < HitObject.StartTime)
             {
-                autoplaySampleTriggered = false;
+                resetAutoPlayPlusSampleState();
                 return;
             }
 
-            if (autoplaySampleTriggered || Time.Current - Time.Elapsed > HitObject.StartTime)
+            if (autoPlayPlusSampleTriggered || Time.Current - Time.Elapsed > HitObject.StartTime)
                 return;
 
             if (!samplesLoaded)
@@ -691,7 +716,8 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 LoadSamples();
             }
 
-            autoplaySampleTriggered = true;
+            autoPlayPlusSampleTriggered = true;
+            autoPlayPlusSamplePlayed = true;
             PlaySamples();
         }
 
@@ -721,18 +747,24 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 LoadSamples();
             }
 
-            updateAutoplaySamplePlayback();
+            updateAutoPlayPlusSamplePlayback();
 
             base.Update();
         }
 
         public override bool UpdateSubTreeMasking() => false;
 
+        /// <summary>
+        /// Whether automiss timing is driven by an owning ruleset scheduler.
+        /// </summary>
+        protected bool AutomissHandledExternally { get; set; }
+
         protected override void UpdateAfterChildren()
         {
             base.UpdateAfterChildren();
 
-            UpdateResult(false);
+            if (!AutomissHandledExternally)
+                UpdateResult(false);
         }
 
         /// <summary>
@@ -753,7 +785,14 @@ namespace osu.Game.Rulesets.Objects.Drawables
         /// <summary>
         /// 控制命中后状态变换是否固定使用物件自身时间作为基准。
         /// </summary>
-        protected virtual bool HitObjectLifetimeUsesOwnTime => hitObjectLifetimeUsesOwnTimeBindable.Value;
+        protected virtual bool HitObjectLifetimeUsesOwnTime => ownerLifetime;
+
+        /// <summary>
+        /// 是否在物件自身结束时间到达时收掉视觉。
+        /// 与生命周期无关：判定与输入仍按原时间进行，只影响“超过判定线后是否还看得见”。
+        /// 嵌套物件的显隐由父物件管理，因此默认只作用于顶层物件。
+        /// </summary>
+        protected virtual bool HideVisualsAfterOwnTime => HitObjectLifetimeUsesOwnTime && ParentHitObject == null;
 
         /// <summary>
         /// 当前物件命中后状态变换所使用的时间基准。
@@ -793,6 +832,13 @@ namespace osu.Game.Rulesets.Objects.Drawables
         /// to apply a result, so that it can remain a `static` delegate and thus not allocate.
         /// </param>
         protected void ApplyResult<T>(Action<JudgementResult, T> application, T state)
+            => ApplyResult(application, state, Time.Current);
+
+        /// <summary>
+        /// Applies the <see cref="Result"/> of this <see cref="DrawableHitObject"/> using an explicit raw time.
+        /// Used by kernel-driven judgement so the authoritative event time is preserved instead of the frame clock.
+        /// </summary>
+        protected void ApplyResult<T>(Action<JudgementResult, T> application, T state, double rawTime)
         {
             if (Result.HasResult)
                 throw new InvalidOperationException("Cannot apply result on a hitobject that already has a result.");
@@ -810,11 +856,11 @@ namespace osu.Game.Rulesets.Objects.Drawables
                     $"{GetType().ReadableName()} applied an invalid hit result (was: {Result.Type}, expected: [{Result.Judgement.MinResult} ... {Result.Judgement.MaxResult}]).");
             }
 
-            Result.RawTime = Time.Current;
+            Result.RawTime = rawTime;
             Result.GameplayRate = (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate;
 
             // 已命中后不应再触发自动播样。
-            autoplaySampleTriggered = true;
+            autoPlayPlusSampleTriggered = true;
 
             if (Result.HasResult)
                 UpdateState(Result.IsHit ? ArmedState.Hit : ArmedState.Miss);
@@ -879,20 +925,22 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
             double timeOffset = Time.Current - HitObject.GetEndTime();
 
-            if (offsetBindable != null)
-                timeOffset += offsetBindable.Value;
+            if (ezOffset != 0)
+                timeOffset += ezOffset;
 
-            // [Ez] Sub-frame timing correction: compensate for judgment using previous frame's clock value.
-            // The key was pressed between the last FSC clock update and now; interpolate to the actual press time.
+            // [Ez] 子帧时间修正：使用上一帧的时钟值进行判断后进行补偿。
+            // 按键在上一次 FSC 时钟更新和现在之间被按下；插值到实际按键时间。
+            long keyTs = 0;
+
             if (userTriggered)
             {
-                long keyTs = Framework.Input.InputManager.EzSubFrameTimestamp;
+                keyTs = InputManager.EzSubFrameTimestamp;
                 double rate = (Clock as IGameplayClock)?.Rate ?? 1.0;
-                timeOffset += EzOsuGame.Timing.EzSubFrameCorrection.GetCorrectionMs(keyTs, rate);
+                timeOffset += EzSubFrameCorrection.GetCorrectionMs(keyTs, rate);
             }
 
             // === Ez judgment timing diagnostics ===
-            if (userTriggered && EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled)
+            if (userTriggered && EzJudgmentDiagnostics.Enabled)
             {
                 double interpDrift = 0, bassSource = 0, frameElapsed = Clock.ElapsedFrameTime;
 
@@ -903,14 +951,26 @@ namespace osu.Game.Rulesets.Objects.Drawables
                     bassSource = gcc.BassSourceCurrentTime;
                 }
 
-                EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Record(
+                double inputToJudgeMs = double.NaN;
+
+                if (keyTs > 0)
+                {
+                    inputToJudgeMs = (Stopwatch.GetTimestamp() - keyTs) / (double)Stopwatch.Frequency * 1000.0;
+
+                    // Sanity: ignore absurd gaps (stale key stamp / unrelated press).
+                    if (inputToJudgeMs < 0 || inputToJudgeMs > 1000)
+                        inputToJudgeMs = double.NaN;
+                }
+
+                EzJudgmentDiagnostics.Record(
                     Time.Current,
                     HitObject.GetEndTime(),
                     timeOffset,
                     Time.Current, // interpClockTime = FSC ManualClock time
                     bassSource,
                     interpDrift,
-                    frameElapsed);
+                    frameElapsed,
+                    inputToJudgeMs);
             }
 
             CheckForResult(userTriggered, timeOffset);
@@ -922,7 +982,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
         /// Checks if a scoring result has occurred for this <see cref="DrawableHitObject"/>.
         /// </summary>
         /// <remarks>
-        /// If a scoring result has occurred, this method must invoke <see cref="ApplyResult{T}"/> to update the result and notify responders.
+        /// If a scoring result has occurred, this method must invoke ApplyResult to update the result and notify responders.
         /// </remarks>
         /// <param name="userTriggered">Whether the user triggered this check.</param>
         /// <param name="timeOffset">The offset from the end time of the <see cref="HitObject"/> at which this check occurred.

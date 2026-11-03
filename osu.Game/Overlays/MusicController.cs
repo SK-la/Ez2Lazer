@@ -50,6 +50,14 @@ namespace osu.Game.Overlays
         /// </summary>
         public readonly BindableBool AllowTrackControl = new BindableBool(true);
 
+        /// <summary>
+        /// Playlist advancement mode for global music.
+        /// </summary>
+        public readonly Bindable<MusicLoopMode> LoopMode = new Bindable<MusicLoopMode>(MusicLoopMode.Shuffle);
+
+        /// <summary>
+        /// Whether random selection is active. Kept for compatibility; prefer <see cref="LoopMode"/>.
+        /// </summary>
         public readonly BindableBool Shuffle = new BindableBool(true);
 
         /// <summary>
@@ -100,6 +108,38 @@ namespace osu.Game.Overlays
                     changeBeatmap(b.NewValue);
             }, true);
             mods.BindValueChanged(_ => ResetTrackAdjustments(), true);
+
+            LoopMode.BindValueChanged(mode =>
+            {
+                Shuffle.Value = mode.NewValue == MusicLoopMode.Shuffle;
+            }, true);
+
+            // Tests / callers that still toggle Shuffle map onto LoopMode.
+            Shuffle.BindValueChanged(shuffle =>
+            {
+                if (shuffle.NewValue)
+                {
+                    if (LoopMode.Value != MusicLoopMode.Shuffle)
+                        LoopMode.Value = MusicLoopMode.Shuffle;
+                }
+                else if (LoopMode.Value == MusicLoopMode.Shuffle)
+                {
+                    LoopMode.Value = MusicLoopMode.Sequential;
+                }
+            });
+        }
+
+        /// <summary>
+        /// Cycles <see cref="LoopMode"/>: Single → Sequential → Shuffle → Single.
+        /// </summary>
+        public void CycleLoopMode()
+        {
+            LoopMode.Value = LoopMode.Value switch
+            {
+                MusicLoopMode.Single => MusicLoopMode.Sequential,
+                MusicLoopMode.Sequential => MusicLoopMode.Shuffle,
+                _ => MusicLoopMode.Single,
+            };
         }
 
         /// <summary>
@@ -256,7 +296,7 @@ namespace osu.Game.Overlays
 
             Live<BeatmapSetInfo>? playableSet;
 
-            if (Shuffle.Value)
+            if (LoopMode.Value == MusicLoopMode.Shuffle)
                 playableSet = getNextRandom(-1, allowProtectedTracks);
             else
             {
@@ -352,7 +392,7 @@ namespace osu.Game.Overlays
 
             Live<BeatmapSetInfo>? playableSet;
 
-            if (Shuffle.Value)
+            if (LoopMode.Value == MusicLoopMode.Shuffle)
                 playableSet = getNextRandom(1, allowProtectedTracks);
             else
             {
@@ -460,7 +500,8 @@ namespace osu.Game.Overlays
             realm.Realm.All<BeatmapSetInfo>().Where(s => !s.DeletePending)
                  .AsEnumerable()
                  .Select(s => new RealmLive<BeatmapSetInfo>(s, realm))
-                 .Where(i => (allowProtectedTracks || !i.Value.Protected)
+                 .Where(i => i.Value.HostingKind != BeatmapSetHostingKind.External
+                             && (allowProtectedTracks || !i.Value.Protected)
                              && (SeasonalUIConfig.ENABLED || i.Value.Hash != IntroChristmas.CHRISTMAS_BEATMAP_SET_HASH));
 
         private void changeBeatmap(WorkingBeatmap newWorking)
@@ -543,8 +584,18 @@ namespace osu.Game.Overlays
 
         private void onTrackCompleted()
         {
-            if (!CurrentTrack.Looping && !beatmap.Disabled && AllowTrackControl.Value)
-                NextTrack(allowProtectedTracks: true);
+            // Respect consumers that set Looping (e.g. song select PrepareTrackForPreview).
+            // LoopMode must not write CurrentTrack.Looping — that overwrites preview looping.
+            if (CurrentTrack.Looping || beatmap.Disabled || !AllowTrackControl.Value)
+                return;
+
+            if (LoopMode.Value == MusicLoopMode.Single)
+            {
+                Schedule(() => CurrentTrack.RestartAsync());
+                return;
+            }
+
+            NextTrack(allowProtectedTracks: true);
         }
 
         private bool applyModTrackAdjustments;
@@ -628,6 +679,24 @@ namespace osu.Game.Overlays
         /// Defaults to <see cref="Easing.In"/>.
         /// </summary>
         public Easing RestoreEasing = Easing.In;
+    }
+
+    public enum MusicLoopMode
+    {
+        /// <summary>
+        /// Repeat the current track.
+        /// </summary>
+        Single,
+
+        /// <summary>
+        /// Advance through beatmap sets in library order.
+        /// </summary>
+        Sequential,
+
+        /// <summary>
+        /// Advance through beatmap sets randomly.
+        /// </summary>
+        Shuffle,
     }
 
     public enum TrackChangeDirection

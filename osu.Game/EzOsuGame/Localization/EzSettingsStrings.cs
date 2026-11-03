@@ -7,7 +7,7 @@ namespace osu.Game.EzOsuGame.Localization
 {
     public static class EzSettingsStrings
     {
-#region 分散设置
+        #region 分散设置
 
         public static readonly EzLocalizationManager.EzLocalisableString SCALING_GAME_MODE = new EzLocalizationManager.EzLocalisableString("缩放游戏模式", "Scaling Game Mode");
 
@@ -31,10 +31,71 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString SAVE_BUTTON = new EzLocalizationManager.EzLocalisableString("保存", "Save");
         public static readonly EzLocalizationManager.EzLocalisableString CANCEL_BUTTON = new EzLocalizationManager.EzLocalisableString("取消", "Cancel");
 
-#endregion
+        #endregion
 
-        public static readonly EzLocalizationManager.EzLocalisableString EZ_GAME_SECTION_HEADER = new EzLocalizationManager.EzLocalisableString("Ez游玩设置", "Ez Gameplay");
-        public static readonly EzLocalizationManager.EzLocalisableString EZ_UI_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("Ez 界面设置", "Ez UI Settings");
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_GAME_SECTION_HEADER = new EzLocalizationManager.EzLocalisableString("Ez 游玩", "Ez Gameplay");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_UI_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("Ez UI", "Ez UI");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_GAMEPLAY_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("Ez Gameplay", "Ez Gameplay");
+
+        public static readonly EzLocalizationManager.EzLocalisableString FRAME_LIMITER_BASE =
+            new EzLocalizationManager.EzLocalisableString("帧率基数", "Frame limiter");
+
+        public static readonly EzLocalizationManager.EzLocalisableString FRAME_LIMITER_BASE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "Update / Draw 帧率限制中 Nx 倍率的基础值。首次使用时会自动填入当前显示器刷新率；之后可自定义（例如设为 200 且选择 2x 时，上限为 400 Hz）。",
+            "Base value for Nx frame limiters on Update and Draw. On first use, the current display refresh rate is applied; afterwards you can customise it (e.g. 200 with 2x gives a 400 Hz cap).");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UPDATE_FRAME_LIMITER =
+            new EzLocalizationManager.EzLocalisableString("Update 帧率限制", "Update frame limiter");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UPDATE_FRAME_LIMITER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "限制游戏逻辑更新（Update）线程的最高帧率。Draw 帧率仍由图形设置中的「帧率限制」控制。",
+            "Limits the maximum update rate of the game logic thread. Draw frame rate is still controlled by the \"Frame limiter\" setting in Graphics.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_CENTRE_TEXT =
+            new EzLocalizationManager.EzLocalisableString("Logo 中心文字", "Logo centre text");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_CENTRE_TEXT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "叠在 logo 正中。格式：文本,字号，例如 123,12 显示「123」、字号 12。支持颜文字；可用中文逗号。省略字号时默认 80。留空则不显示。字号是 logo 贴图坐标系下的像素（中间约 80–160 较合适）。",
+            "Drawn in the centre of the logo. Format: text,size — e.g. 123,12 shows \"123\" at size 12. Kaomoji are supported; a Chinese comma also works. Size defaults to 80 if omitted. Leave empty to hide. Size is in logo-texture pixels (about 80–160 looks right in the hole).");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_CENTRE_TEXT_PLACEHOLDER =
+            new EzLocalizationManager.EzLocalisableString("123,12 或 (´・ω・｀),80", "123,12 or (´・ω・｀),80");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_VISUALISATION =
+            new EzLocalizationManager.EzLocalisableString("Logo 可视化", "Logo Visualiser");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_VISUALISATION_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "主菜单与选歌界面 logo 外圈的音频抖动样式。",
+            "Audio visualiser style around the logo on the main menu and song select.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_BACKDROP =
+            new EzLocalizationManager.EzLocalisableString("Logo 背景", "Logo background");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_BACKDROP_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "主界面大 logo 圆圈里的底色。",
+            "Fill inside the large logo on the main menu.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_BACKDROP_COLOUR =
+            new EzLocalizationManager.EzLocalisableString("颜色", "Colour");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_BACKDROP_BLUR =
+            new EzLocalizationManager.EzLocalisableString("虚化程度", "Blur");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_BACKDROP_OPACITY =
+            new EzLocalizationManager.EzLocalisableString("不透明度", "Opacity");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_BACKDROP_OPACITY_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "联动取色叠在圆圈上的不透明度。1 为完全不透明，0 为完全透明。",
+            "Opacity of the colour sampled from the background. 1 is opaque, 0 is clear.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SONG_SELECT_EZ_BACKGROUND =
+            new EzLocalizationManager.EzLocalisableString("仅使用 Ez 背景", "Ez background only");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SONG_SELECT_EZ_BACKGROUND_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后，选歌界面沿用主页背景，不再单独铺当前谱面的背景。主页来源是图片、视频或 Pixiv 时，选歌看到的是同一套。",
+            "When enabled, song select keeps the main menu background instead of loading the current beatmap background. Picture, video and Pixiv sources match the menu.");
 
         public static readonly EzLocalizationManager.EzLocalisableString HIDE_MAIN_MENU_ONLINE_BANNER =
             new EzLocalizationManager.EzLocalisableString("屏蔽主界面底部新闻广告", "Hide main menu bottom news banner");
@@ -42,6 +103,217 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString HIDE_MAIN_MENU_ONLINE_BANNER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "开启后将隐藏主界面底部的在线新闻/广告轮播图。",
             "When enabled, the online news/advertisement banner at the bottom of the main menu will be hidden.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString TURBO_MODE =
+            new EzLocalizationManager.EzLocalisableString("极速模式", "Turbo mode");
+
+        public static readonly EzLocalizationManager.EzLocalisableString TURBO_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "压制皮肤以外的每帧开销以提高帧数：关闭故事板与视频、背景不再绘制、关闭背景与列模糊、"
+            + "毛玻璃 UI、打击闪光、星星喷泉、按键显示、游戏内排行榜、季节背景与选歌背景虚化，并让角逐服务空转。"
+            + "\n不会降低任何线程频率，也不会锁帧——提高帧数的目的是降低延迟。"
+            + "\n开启后全程生效，不随进出游玩切换。被压制的设置项会在设置里变灰，关闭本项后自动还原成你原来的值。"
+            + "\n注意：列模糊属于舞台外观，是本模式唯一会改变皮肤观感的一项。",
+            "Suppresses per-frame cost outside the skin to raise frame rate: disables storyboard and video, stops drawing the background, "
+            + "turns off background and column blur, acrylic UI, hit lighting, star fountains, key overlay, the gameplay leaderboard, "
+            + "seasonal backgrounds and song select background blur, and makes the score race service inert."
+            + "\nDoes not lower any thread rate and does not cap frames — the point of more frames is lower latency."
+            + "\nStays active everywhere rather than toggling as you enter and leave gameplay. Suppressed settings appear greyed out, "
+            + "and your original values are restored when this is turned off."
+            + "\nNote: column blur is part of the stage look, and is the only item here that changes skin appearance.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString TURBO_MODE_MANAGED_NOTE = new EzLocalizationManager.EzLocalisableString(
+            "由极速模式接管。关闭极速模式后会还原成你原来的值。",
+            "Managed by turbo mode. Your original value is restored when turbo mode is turned off.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString FLOW_MODE =
+            new EzLocalizationManager.EzLocalisableString("心流", "Zen Flow");
+
+        public static readonly EzLocalizationManager.EzLocalisableString FLOW_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "专注过程，淡化成绩。"
+            + "\n开启后，游戏结束将直接返回选曲界面，成绩依然保留但不显示结算。选曲界面禁用切换到成绩排名页。",
+            "Focus on play, not results."
+            + "\nWhen enabled, the game skips the results screen after play. Scores are saved but not shown. Ranking view is disabled in song select.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_SECTION_HEADER =
+            new EzLocalizationManager.EzLocalisableString("快速轮换", "Quick Rotation");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_ENABLED =
+            new EzLocalizationManager.EzLocalisableString("快速轮换", "Quick Rotation");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "从选歌进入的单人局结束后，在专用抽卡界面连续游玩相似难度的谱面，全程不回到选歌界面。",
+            "After solo play from song select, continue in a dedicated card-pick screen with similar difficulty. Never returns to song select until ended.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_DIFFICULTY_TOLERANCE =
+            new EzLocalizationManager.EzLocalisableString("难度容差", "Difficulty tolerance");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_DIFFICULTY_TOLERANCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "抽卡后通过 Nice BPM 调速，使有效难度落在首次进入时基准难度的 ± 此值范围内。",
+            "After picking a card, Nice BPM adjusts speed so effective difficulty stays within ± this value of the baseline from your first chart.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_CROSS_KEY_MODE =
+            new EzLocalizationManager.EzLocalisableString("跨键数轮换", "Cross key-count rotation");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_CROSS_KEY_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "仅 Mania。开启后候选池可含 4–10K；关闭则整段会话锁定首轮谱面的键数。",
+            "Mania only. When enabled, the pool may include 4–10K charts. When disabled, key count is locked to the first chart.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_CANDIDATE_COUNT =
+            new EzLocalizationManager.EzLocalisableString("候选卡片数", "Candidate card count");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_CANDIDATE_COUNT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "每轮抽卡界面展示的谱面数量（3–6）。",
+            "Number of beatmap cards shown each pick round (3–6).");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_UI_MODE =
+            new EzLocalizationManager.EzLocalisableString("穿透材质", "Backdrop material");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_UI_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "选择选歌面板、footer、菜单按钮与 HUD 背板的穿透材质。"
+            + "\n毛玻璃：只做穿透模糊。液态玻璃：额外带边缘折射与高光。"
+            + "\n默认：恢复经典不透明样式。非默认档位会启用全屏 capture 缓冲，仅建议在选歌界面使用。",
+            "Backdrop material for song select panels, footer, menu buttons and HUD backdrops."
+            + "\nAcrylic: blur only. Liquid glass: adds edge refraction and highlights."
+            + "\nDefault: restores the classic opaque chrome. Any other mode allocates a full-screen capture buffer while visible on song select.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_UI_BLUR =
+            new EzLocalizationManager.EzLocalisableString("穿透材质虚化强度", "Backdrop material blur strength");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_UI_BLUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "穿透材质的模糊强度。过大时模糊图内没有可被折射的细节，边缘折射会看不见。",
+            "Blur strength for backdrop materials. Too high leaves no detail for the edge refraction to bend, so refraction stops being visible.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_REFRACTION_DEPTH =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃折射带宽度", "Glass refraction band width");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_REFRACTION_DEPTH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "从边缘往内的折射过渡宽度（屏幕像素）。越小越像薄玻璃，边缘转折越硬。",
+            "How far the refraction transition reaches inward from the edge, in screen pixels. Smaller reads as thinner glass with a harder edge.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_REFRACTION_STRENGTH =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃折射强度", "Glass refraction strength");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_REFRACTION_STRENGTH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "边缘采样的最大位移（屏幕像素）。0 关闭折射。",
+            "Maximum edge sample displacement in screen pixels. 0 disables refraction.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_CHROMATIC =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃色散", "Glass chromatic dispersion");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_CHROMATIC_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "R/G/B 三通道折射位移差。越大边缘彩边越明显。",
+            "Difference in refraction displacement between R/G/B. Higher shows more colour fringing at the edge.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_EDGE_HIGHLIGHT =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃边缘高光", "Glass edge highlight");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_EDGE_HIGHLIGHT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "朝光侧边缘的增亮强度。",
+            "Brightness added along the edge facing the light.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_INNER_SHADOW =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃内阴影", "Glass inner shadow");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_INNER_SHADOW_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "背光侧边缘的压暗强度。",
+            "Darkening along the edge facing away from the light.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_TINT_STRENGTH =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃染色强度", "Glass tint strength");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_TINT_STRENGTH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "玻璃本体染色权重。0 表示只做折射与高光，颜色交给面板遮罩。",
+            "Weight of the glass tint. 0 leaves refraction and highlights only, letting the panel veil supply the colour.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_EDGE_SATURATION =
+            new EzLocalizationManager.EzLocalisableString("液态玻璃边缘饱和", "Glass edge saturation");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MATERIAL_GLASS_EDGE_SATURATION_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "边缘带的饱和度提升量，制造厚玻璃的体积感。0 表示不改变饱和度。",
+            "Extra saturation along the edge band, giving the glass its thickness. 0 leaves saturation unchanged.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_MODIFY =
+            new EzLocalizationManager.EzLocalisableString("修改字体", "Modify fonts");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_MODIFY_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "选择系统字体：英文主字体 + 本地化缺字回退 + 系统 emoji（空=平台自动）。英语界面时英/本地化合一。更改下次启动生效。",
+            "Pick system fonts: English primary + localized fallback + system emoji (empty = platform auto). English UI merges EN/localized. Applies on next launch.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_DIALOG_HEADER =
+            new EzLocalizationManager.EzLocalisableString("字体设置", "Font settings");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_NEXT_LAUNCH =
+            new EzLocalizationManager.EzLocalisableString("下次启动时生效", "Takes effect on next launch");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_SLOT_DEFAULT =
+            new EzLocalizationManager.EzLocalisableString("UI 默认", "UI default");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_SLOT_DEFAULT_EN =
+            new EzLocalizationManager.EzLocalisableString("UI 英文", "UI English");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_SLOT_DEFAULT_LOC =
+            new EzLocalizationManager.EzLocalisableString("UI 本地化", "UI localized");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_SLOT_TITLE =
+            new EzLocalizationManager.EzLocalisableString("标题花体", "Title / alternate");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_SLOT_TITLE_EN =
+            new EzLocalizationManager.EzLocalisableString("标题英文", "Title English");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_SLOT_TITLE_LOC =
+            new EzLocalizationManager.EzLocalisableString("标题本地化", "Title localized");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_SLOT_NUMERIC =
+            new EzLocalizationManager.EzLocalisableString("数字", "Numeric");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_SLOT_EMOJI =
+            new EzLocalizationManager.EzLocalisableString("系统 Emoji", "System emoji");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_NONE =
+            new EzLocalizationManager.EzLocalisableString("（未覆盖，使用内置）", "(No override — use built-in)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_EMOJI_AUTO =
+            new EzLocalizationManager.EzLocalisableString("（自动：平台默认彩色 emoji）", "(Auto — platform colour emoji)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_SEARCH =
+            new EzLocalizationManager.EzLocalisableString("搜索字体…", "Search fonts…");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_PREVIEW_DEFAULT =
+            new EzLocalizationManager.EzLocalisableString("选歌与设置 Aa 测试", "Song select & settings Aa");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_PREVIEW_TITLE =
+            new EzLocalizationManager.EzLocalisableString("Heading 标题", "Heading Title");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_PREVIEW_NUMERIC =
+            new EzLocalizationManager.EzLocalisableString("0123456789", "0123456789");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_PREVIEW_EMOJI =
+            new EzLocalizationManager.EzLocalisableString("😀🎉✨👍🔥", "😀🎉✨👍🔥");
+
+        public static readonly EzLocalizationManager.EzLocalisableString UI_FONT_CLOSE =
+            new EzLocalizationManager.EzLocalisableString("关闭", "Close");
+
+        public static readonly EzLocalizationManager.EzLocalisableString NOTIFICATION_BEHAVIOUR =
+            new EzLocalizationManager.EzLocalisableString("通知行为", "Notification behaviour");
+
+        public static readonly EzLocalizationManager.EzLocalisableString NOTIFICATION_BEHAVIOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "控制通知弹窗与提示音；任何选项都不会丢弃通知，仍可在通知中心查看。"
+            + "\n正常：与 osu! lazer 默认行为一致（可弹窗与提示音）。"
+            + "\n游戏内聚焦：进入谱面游玩（含加载与暂停）后不弹窗、无提示音，通知仍写入通知中心。"
+            + "\n永不通知：任何时候都不弹窗、无提示音，通知仍写入通知中心。",
+            "Controls notification toasts and sounds; no option discards notifications (they remain in the notification centre)."
+            + "\nNormal: same as default osu! lazer (toasts and sounds allowed)."
+            + "\nIn-game focus: while playing a beatmap (including load and pause), no toast or sound; notifications are still stored."
+            + "\nNever notify: never toast or play sounds; notifications are still stored.");
+
+        public static readonly LocalisableString SCREENSHOT_ACTION =
+            new EzLocalizationManager.EzLocalisableString("截图行为", "Screenshot action");
+
+        public static readonly LocalisableString SCREENSHOT_COPIED_TO_CLIPBOARD =
+            new EzLocalizationManager.EzLocalisableString("截图已复制到剪贴板！", "Screenshot copied to clipboard!");
+
+        public static LocalisableString ScreenshotSaved(string filename) =>
+            new EzLocalizationManager.EzLocalisableString($"截图已保存！点此处查看：\n{filename}", $"Screenshot saved! Click to view.\n{filename}");
 
         public static readonly EzLocalizationManager.EzLocalisableString STORYBOARD_VIDEO_AUTO_SIZE =
             new EzLocalizationManager.EzLocalisableString("故事板视频自适应填满", "Storyboard video auto-size to fill");
@@ -52,28 +324,189 @@ namespace osu.Game.EzOsuGame.Localization
             + "which may crop some of the video but will better adapt to different resolutions and screen ratios.");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_REC_ENABLED =
-            new EzLocalizationManager.EzLocalisableString("启用 Ez 分析重算", "Enable Ez analysis recomputation");
+            new EzLocalizationManager.EzLocalisableString("启用 Ez 分析即时计算", "Enable Ez analysis on-demand computation");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_REC_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "开启后允许选歌界面进行实时分析并刷新显示，纳入Mod转换结果的分析。"
-            + "\n注意：该开关不控制 SQLite 本地读取与预热（由下方 SQLite 开关单独控制）。",
-            "When enabled, allows real-time analysis and display refresh in the song selection screen, including analysis of Mod conversion results."
-            + "\nNote: This switch does not control SQLite local reading and warmup (which is controlled separately by the SQLite switch below).");
+            "控制 Ez SQLite 体系内指标在选歌时是否按需即时计算："
+            + "\n· 主库：NoMod 的 kps/KPC（及 mania 列统计）缺失时 debounce 后补算；"
+            + "\n· 有 Mod：按当前 Mod 即时计算 kps/xxy 等（无匹配分支快照时）；"
+            + "\n· 分支库：仍读取已激活分支的预生成快照，本开关不替代分支构建。"
+            + "\n关闭时仅读已落盘 SQLite 数据，不触发选歌实时计算。"
+            + "\n不影响 Realm 元数据回填；Panel PP 随官方星级缓存（BeatmapDifficultyCache），与开关无关。",
+            "Controls whether Ez SQLite metrics are computed on demand during song select:"
+            + "\n· Main DB: backfill missing NoMod kps/KPC (and mania column stats) after debounce;"
+            + "\n· With mods: compute kps/xxy live for the current mod set when no matching branch snapshot exists;"
+            + "\n· Branch DB: still reads precomputed snapshots from the active branch; this switch does not replace branch builds."
+            + "\nWhen disabled, only stored SQLite values are read; no live song-select computation."
+            + "\nDoes not affect Realm metadata backfill; panel PP follows the official star cache (BeatmapDifficultyCache) and is not gated by this switch.");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SQLITE_ENABLED =
-            new EzLocalizationManager.EzLocalisableString("启用 Ez 分析本地数据（SQLite）", "Enable Ez analysis local data (SQLite)");
+            new EzLocalizationManager.EzLocalisableString("启用 Ez 分析 SQLite", "Enable Ez analysis SQLite");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SQLITE_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "启用独立控制的 SQLite 本地储存，启动时预热器。（No-Mod）"
-            + "\n开启：面板直读本地数据，在exe启动时执行预热列队分析加载（进入游戏中会暂停进度），但不会考虑Mod转换结果。"
-            + "\n关闭：不读取 SQLite 本地数据，也不执行预热。",
-            "Enable independently controlled SQLite local storage and warmup on startup (No-Mod)"
-            + "\nWhen enabled: Panels read local data directly, and perform warmup queue analysis loading on exe startup (progress will pause when entering gameplay), but Mod conversion results will not be considered."
-            + "\nWhen disabled: Do not read SQLite local data, and do not perform warmup.");
+            "启用 Ez 分析 SQLite 主库与分支曲库的读写（kps/KPC、分支 xxy/PP 快照等）。"
+            + "\n关闭后不加载、不写入上述本地缓存。"
+            + "\n自动预热仅在缺少当前版本库或需 schema 升级时触发；已有匹配库时请用下方维护控件手动补算。"
+            + "\n即时计算行为由「Ez 分析即时计算」开关单独控制。",
+            "Enables read/write for the Ez analysis main SQLite database and songs branch libraries (kps/KPC, branch xxy/PP snapshots, etc.)."
+            + "\nWhen disabled, stored local caches are neither loaded nor written."
+            + "\nAuto-warmup runs only when the current database is missing or needs a schema upgrade; use maintenance controls below when a matching file already exists."
+            + "\nOn-demand computation is controlled separately by \"Enable Ez analysis on-demand computation\".");
 
-#region 机制类
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_TARGET =
+            new EzLocalizationManager.EzLocalisableString("数据维护目标", "Data maintenance target");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_TARGET_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "选择要维护的数据范围。SQLite 在已有匹配的最新版文件时不会自动预热；Realm 缺失项仍会在启动时自动补算。"
+            + "\n成绩全量重算：有 replay 的 mania 成绩走 Session 原始环境重算（与选歌右键一致）；stable 旧成绩无 replay 时重走官方转换。"
+            + "\n「尝试补算」仅处理 mania 成绩；「完全重算」处理当前已加载的规则集（跳过未加载程序集的历史成绩）。"
+            + "\n技能场景：Realm MSD = 4K 雷达黄层 + DualPanel Rating + Dan 供料；"
+            + "DualPanel谱面 = CSI 分格 + ChartDan（不含 Rating）；"
+            + "谱面技能链 = MSD+CSI+Dan 一键。雷达绿层（玩家 SSR/图案）只走 Local Profile 重算。",
+            "Choose which data to maintain. SQLite is not auto-warmed when a matching current database exists; Realm missing values are still filled at startup."
+            + "\nFull score recalculation: mania scores with replays are recalculated via Session in their stored environment (same as the song select context menu); legacy scores without replays are re-converted officially."
+            + "\n\"Backfill\" processes mania scores only; \"Force rebuild\" processes currently loaded (Available) rulesets and skips scores for unloaded assemblies."
+            + "\nSkill scenes: Realm MSD = 4K radar yellow + DualPanel Rating + Dan feed; "
+            + "DualPanel chart = CSI slots + ChartDan (no Rating); "
+            + "chart skill chain = MSD+CSI+Dan. Radar green (player SSR/patterns) is Local Profile recalc only.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_EXECUTE =
+            new EzLocalizationManager.EzLocalisableString("执行", "Execute");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_EXECUTE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "确认后可选补算缺失或完全重算。大库可能耗时较长，请留意右上角进度通知。",
+            "Choose backfill missing or force full rebuild. Large libraries may take a while; watch the progress notification in the top-right corner.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_HEADER =
+            new EzLocalizationManager.EzLocalisableString("数据维护", "Data maintenance");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_BODY = new EzLocalizationManager.EzLocalisableString(
+            "即将对所选目标执行后台维护。\n补算缺失仅处理未写入的数据；完全重算会先清除已有结果再全部重算。",
+            "Background maintenance will run for the selected target.\nBackfill missing only fills gaps; force rebuild clears existing results first.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_BACKFILL =
+            new EzLocalizationManager.EzLocalisableString("尝试补算", "Backfill missing");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_FORCE =
+            new EzLocalizationManager.EzLocalisableString("完全重算", "Force rebuild");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_UNAVAILABLE = new EzLocalizationManager.EzLocalisableString(
+            "无法执行数据维护：所需后台处理器不可用。",
+            "Cannot run data maintenance: the required background processor is unavailable.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_ALREADY_RUNNING = new EzLocalizationManager.EzLocalisableString(
+            "数据维护已在后台运行，请等待当前任务完成。",
+            "Data maintenance is already running in the background. Wait for the current task to finish.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_SQLITE_DISABLED = new EzLocalizationManager.EzLocalisableString(
+            "SQLite 分析缓存已关闭，请在上方启用后再执行。",
+            "SQLite analysis cache is disabled. Enable it above before running this action.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_UNAVAILABLE = new EzLocalizationManager.EzLocalisableString(
+            "无法打开确认对话框，请稍后重试。",
+            "Cannot open the confirmation dialog. Try again later.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL =
+            new EzLocalizationManager.EzLocalisableString("补算 Realm 元数据（Tag / XxySR / PP）", "Backfill Realm metadata (Tag / XxySR / PP)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_BUTTON =
+            new EzLocalizationManager.EzLocalisableString("立即补算", "Backfill now");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "在后台补算选歌面板所需的 Realm 字段：谱面 Tag（视频/Storyboard）、Xxy 星级、PP。"
+            + "\n启动时也会自动执行；若看不到进度通知，可点此手动触发。",
+            "Backfill Realm fields used by song select: beatmap tags (video/storyboard), Xxy star rating, and PP."
+            + "\nAlso runs automatically at startup; use this if progress notifications did not appear.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_FORCE =
+            new EzLocalizationManager.EzLocalisableString("强制全部重算 Realm 元数据", "Force full Realm metadata recalculation");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_FORCE_BUTTON =
+            new EzLocalizationManager.EzLocalisableString("强制重算", "Force recalculate");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_FORCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "先将所有谱面的 Tag / XxySR / PP 标记为未计算，再执行完整补算。"
+            + "\n谱面较多时耗时较长，请留意右上角进度通知。",
+            "Marks all beatmaps' Tag / XxySR / PP as uncomputed, then runs a full backfill."
+            + "\nMay take a long time for large libraries; watch the progress notification in the top-right corner.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS =
+            new EzLocalizationManager.EzLocalisableString("技能数据状态", "Skill data status");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_REFRESH =
+            new EzLocalizationManager.EzLocalisableString("刷新技能数据状态", "Refresh skill data status");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_REFRESH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "重新统计谱面技能链（MSD → CSI → Dan）当前版本的覆盖情况并刷新状态标记。"
+            + "\n打开设置页时会自动统计一次；补算完成后可用此按钮再查。大库可能耗时数秒。"
+            + "\n就绪 = 已是当前版本；不可评分 = 该谱面确定算不出，已结算不再重试；"
+            + "过期 = 旧版本留下的行（改过算法后会出现）；缺失 = 还没算过。"
+            + "\n健康 = 过期 + 缺失；三项独立统计，上游换版会使其下游整体变为过期。"
+            + "\n玩家技能 = 玩家链（成绩 → SSR/Dan），没有组合版本号：一局结算后其技能行会被标为过期，"
+            + "由手动「计算本地成绩」（及图表链回折）刷新；这里显示还有多少玩家待刷新。"
+            + "\n蓝色 = 已对齐；橙色 = 仍有待补算；红色 = 统计失败。",
+            "Re-measures chart-skill-chain coverage (MSD -> CSI -> Dan) at the current revision and refreshes the status marker."
+            + "\nIt is also measured automatically when the settings panel opens; use this button only to re-check after a backfill. May take a few seconds on a large library."
+            + "\nready = already at the current revision; unrateable = deterministically unratable and settled (no longer retried);"
+            + " stale = a row left by an older revision (appears after an algorithm change); missing = never computed."
+            + "\nPending = stale + missing. The three facets are counted independently; bumping an upstream one turns its downstream facets stale."
+            + "\nPlayer skills = the player chain (plays -> SSR/Dan), which has no composed revision: a settled play flags the player's"
+            + " rows and the manual compute / chart-chain follow-up refreshes them. This shows how many players are still waiting."
+            + "\nBlue = in sync; orange = work still pending; red = measurement failed.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_MEASURING =
+            new EzLocalizationManager.EzLocalisableString("正在统计…", "Measuring...");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_FAILED =
+            new EzLocalizationManager.EzLocalisableString("统计失败，详见日志。", "Measurement failed - see the logs.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_RUNNING =
+            new EzLocalizationManager.EzLocalisableString("（补算进行中）", " (backfill running)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_CHARTS =
+            new EzLocalizationManager.EzLocalisableString("谱面", "charts");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_READY =
+            new EzLocalizationManager.EzLocalisableString("就绪", "ready");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_UNRATEABLE =
+            new EzLocalizationManager.EzLocalisableString("不可评分", "unrateable");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_STALE =
+            new EzLocalizationManager.EzLocalisableString("过期", "stale");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_MISSING =
+            new EzLocalizationManager.EzLocalisableString("缺失", "missing");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_PENDING =
+            new EzLocalizationManager.EzLocalisableString("待补算", "pending");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_ALL_CURRENT =
+            new EzLocalizationManager.EzLocalisableString("无待补算", "nothing pending");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_PLAYERS =
+            new EzLocalizationManager.EzLocalisableString("玩家技能", "player skills");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_PLAYERS_ALL_CURRENT =
+            new EzLocalizationManager.EzLocalisableString("已对齐", "in sync");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_BEHIND =
+            new EzLocalizationManager.EzLocalisableString("落后账本", "behind the ledger");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_WRITTEN_AT =
+            new EzLocalizationManager.EzLocalisableString("值写于", "values written");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_WAITING_CHART =
+            new EzLocalizationManager.EzLocalisableString("等图表链", "waiting on chart chain");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_WAITING_MSD =
+            new EzLocalizationManager.EzLocalisableString("其中卡在 MSD", "of which stuck on MSD");
+
+        #region 机制类
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_GAME_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("Ez Mania 设置", "Ez Mania Settings");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_STD_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("Ez Osu 设置", "Ez Osu Settings");
 
         public static readonly EzLocalizationManager.EzLocalisableString SCORE_SUBMIT_WARNING = new EzLocalizationManager.EzLocalisableString("当前已锁定成绩上传", "Currently locked score submission");
         public static readonly EzLocalizationManager.EzLocalisableString ACCURACY_CUTOFF_S = new EzLocalizationManager.EzLocalisableString("Acc S评级线(Mania)", "Accuracy Cutoff S (Mania)");
@@ -104,7 +537,151 @@ namespace osu.Game.EzOsuGame.Localization
             "When enabled, hit-state transforms and hit object lifetime end will use the hit object's own time instead of the actual judged interaction time."
             + "\nNotes will disappear consistently at the judgement line. Applies to all game modes.");
 
+        public static readonly LocalisableString SKIP_EMPTY_EDGE_COLUMNS = new EzLocalizationManager.EzLocalisableString("使用Ez2Ac 10k2s1p", "Use Ez2Ac 10k2s1p");
+
+        public static readonly LocalisableString SKIP_EMPTY_EDGE_COLUMNS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "若最后一列有音符，请关闭此选项。"
+            + "\n开启后，用于游玩 Ez2Ac 街机谱面，以及一些街机风格内容。"
+            + "\n14k 且最后一列为空时，谱面按 13k 显示。"
+            + "\n启用 10k2s1p 等街机显示类型。"
+            + "\nEz2Cicle 皮肤将转为使用内置街机风格色彩模版。",
+            "Disable this if the last column contains notes."
+            + "\nWhen enabled, used for playing Ez2Ac arcade maps and some arcade-style content."
+            + "\nWhen enabled, 14K beatmaps display as 13K (last column hidden) if the last column is empty."
+            + "\nEnables arcade display types such as 10K2S1P."
+            + "\nEz2Cicle skin will switch to using built-in arcade-style color templates.");
+
+        public static readonly LocalisableString SCRATCH_AXIS_ENABLED = new EzLocalizationManager.EzLocalisableString(
+            "启用转盘轴（L/R Scratch）",
+            "Enable turntable axis (L/R Scratch)");
+
+        public static readonly LocalisableString SCRATCH_AXIS_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后 L/R 转盘轴可用于 Mania 与 Catch（共用下方绑定与死区/停转设置）："
+            + "\n• Mania：转动 L/R 转盘 → 对应首尾列按下；停止 = 松开。"
+            + "\n  12K：列 0/11；16K：列 0/15；14K：列 0/13（10k2s1p 为 0/12）。"
+            + "\n• Catch：逆时针 → 左移，顺时针 → 右移；转动期间判定放宽（早 10ms / 晚 20ms）；Dash 键照常。"
+            + "\n• 单盘：只绑定 L 或 R 其中一个即可，顺/逆控制两个方向。"
+            + "\n• 双盘：L/R 可各自顺逆；同时转动时以最近转动为准。"
+            + "\n请勿把同一轴再绑到其它键位。",
+            "When enabled, L/R turntable axes work in Mania and Catch (shared bindings and deadzone/stop settings below):"
+            + "\n• Mania: spin L/R → press edge columns; stop = release."
+            + "\n  12K: cols 0/11; 16K: cols 0/15; 14K: cols 0/13 (10k2s1p: 0/12)."
+            + "\n• Catch: CCW → move left, CW → move right; judgment assist while spinning (10ms early / 20ms late); Dash keys unchanged."
+            + "\n• Single deck: bind only L or R; both directions via spin direction."
+            + "\n• Dual deck: each spins independently; if both active, the most recent spin wins."
+            + "\nDo not bind the same axis to other keys.");
+
+        public static readonly LocalisableString CATCH_SCRATCH_EZ2_ENABLED = new EzLocalizationManager.EzLocalisableString(
+            "启用 Ez2Catch 转盘增强",
+            "Enable Ez2Catch turntable enhancement");
+
+        public static readonly LocalisableString CATCH_SCRATCH_EZ2_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "Catch 专用增强（需先开启上方转盘轴）："
+            + "\n• 死区减半、1 帧即开始移动（默认需连续 2 帧同向超过死区才动，故小转一圈才有反应）。"
+            + "\n• 转速越快移动越快，最高约 1.5× Dash 速度；Dash 键照常。"
+            + "\n不影响 Mania scratch。",
+            "Catch-only enhancement (requires turntable axis above):"
+            + "\n• Half deadzone, 1-frame activation (default needs 2 consecutive frames above deadzone — why small spins feel dead)."
+            + "\n• Faster spin = faster movement, up to ~1.5× Dash; Dash keys unchanged."
+            + "\nDoes not affect Mania scratch.");
+
+        public static readonly LocalisableString CATCH_SCRATCH_DASH_ENTER_ACCELERATION = new EzLocalizationManager.EzLocalisableString(
+            "进入加速阈值",
+            "Enter dash acceleration threshold");
+
+        public static readonly LocalisableString CATCH_SCRATCH_DASH_ENTER_ACCELERATION_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "角加速度达到此值时进入 Dash（模拟按住加速键）。滑条显示值为实际阈值×1000。",
+            "Enter Dash when angular acceleration reaches this value (simulates holding Dash). Slider shows actual threshold ×1000.");
+
+        public static readonly LocalisableString CATCH_SCRATCH_DASH_EXIT_VELOCITY = new EzLocalizationManager.EzLocalisableString(
+            "重置速度阈值",
+            "Reset dash velocity threshold");
+
+        public static readonly LocalisableString CATCH_SCRATCH_DASH_EXIT_VELOCITY_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "平滑角速度低于此值时退出 Dash（模拟松开加速键）。滑条显示值为实际阈值×1000。",
+            "Exit Dash when smoothed angular velocity drops below this value (simulates releasing Dash). Slider shows actual threshold ×1000.");
+
+        public static readonly LocalisableString SCRATCH_AXIS_L = new EzLocalizationManager.EzLocalisableString("L-Scratch 轴", "L-Scratch Axis");
+
+        public static readonly LocalisableString SCRATCH_AXIS_R = new EzLocalizationManager.EzLocalisableString("R-Scratch 轴", "R-Scratch Axis");
+
+        public static readonly LocalisableString SCRATCH_AXIS_BIND_HINT = new EzLocalizationManager.EzLocalisableString(
+            "转动转盘以绑定…（再点取消 / Esc）",
+            "Spin turntable to bind… (click again / Esc to cancel)");
+
+        public static readonly LocalisableString SCRATCH_AXIS_BIND_IDLE_HINT = new EzLocalizationManager.EzLocalisableString(
+            "点击 L/R 后转动对应转盘；仅累计位移，停靠位置不会触发绑定。Catch 单盘只需绑一侧。",
+            "Click L/R then spin the turntable; only movement is counted, resting position does not bind. For Catch, binding one side is enough.");
+
+        public static readonly LocalisableString SCRATCH_AXIS_BIND_LISTENING_HINT = new EzLocalizationManager.EzLocalisableString(
+            "正在听轴… 累计位移 {0} / {1}",
+            "Listening… travel {0} / {1}");
+
+        public static readonly LocalisableString SCRATCH_AXIS_DEADZONE = new EzLocalizationManager.EzLocalisableString(
+            "最小位移阈值",
+            "Min movement delta");
+
+        public static readonly LocalisableString SCRATCH_AXIS_STOP_THRESHOLD = new EzLocalizationManager.EzLocalisableString(
+            "停转判定（毫秒）",
+            "Stop threshold (ms)");
+
+        public static readonly LocalisableString SCRATCH_AXIS_STOP_THRESHOLD_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "距上次有效转动超过此时长后视为松开。停靠在任意轴位置都不是按下，只有转动位移才算。",
+            "Release after this many milliseconds without significant spin. Resting at any axis position is idle; only movement counts.");
+
+        public static readonly LocalisableString SCRATCH_AXIS_DEADZONE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "相邻两次采样之间的最小 |Δ|（轴约 [-1,1]，对应 0–100 归一化后）。"
+            + "\n不是摇杆「离中心」死区。beatoraja tick≈0.009；推荐 0.001–0.01。"
+            + "\n过大（如 0.02+）会导致转盘无响应；过小（0）易被噪声连打。",
+            "Minimum |Δ| between consecutive samples (axis ≈ [-1,1], i.e. normalised 0–100)."
+            + "\nNot stick-from-centre deadzone. beatoraja tick ≈ 0.009; try 0.001–0.01."
+            + "\nToo large (e.g. 0.02+) ignores real spins; 0 lets noise spam presses.");
+
+        public static readonly LocalisableString SCRATCH_AXIS_STATUS_IDLE = new EzLocalizationManager.EzLocalisableString("状态：空闲", "Status: Idle");
+
+        public static readonly LocalisableString SCRATCH_AXIS_STATUS_CW = new EzLocalizationManager.EzLocalisableString("状态：顺时针（按下）", "Status: Clockwise (pressed)");
+
+        public static readonly LocalisableString SCRATCH_AXIS_STATUS_CCW = new EzLocalizationManager.EzLocalisableString("状态：逆时针（按下）", "Status: Counter-clockwise (pressed)");
+
+        public static readonly LocalisableString SCRATCH_AXIS_INVERT = new EzLocalizationManager.EzLocalisableString(
+            "反转转盘方向",
+            "Invert turntable direction");
+
+        public static readonly LocalisableString SCRATCH_AXIS_INVERT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后交换转盘顺/逆时针的含义："
+            + "\n• Catch：逆时针 = 右移、顺时针 = 左移（默认为逆时针左、顺时针右）。"
+            + "\n• 选歌界面：逆时针 = 下一首、顺时针 = 上一首。"
+            + "\n• Mania 顺逆均视为按下，不受影响。",
+            "When enabled, swaps the clockwise / counter-clockwise meaning of the turntable:"
+            + "\n• Catch: CCW = move right, CW = move left (default is CCW left / CW right)."
+            + "\n• Song select: CCW = next, CW = previous."
+            + "\n• Mania treats both directions as presses, so it is unaffected.");
+
+        public static readonly LocalisableString SKIP_WITH_GAMEPLAY_KEYS = new EzLocalizationManager.EzLocalisableString(
+            "跳过可由游戏按键触发",
+            "Allow gameplay keys to trigger skip");
+
+        public static readonly LocalisableString SKIP_WITH_GAMEPLAY_KEYS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后，在可跳过阶段按下当前模式的游玩按键也会触发跳过。"
+            + "\n会读取你当前规则集与变体（如 mania 几 K）的实际键位设置。",
+            "When enabled, pressing gameplay keys for the current mode also triggers skip during skippable periods."
+            + "\nUses your current ruleset/variant key bindings (for example, mania key count bindings).");
+
+        // public static readonly LocalisableString SKIP_EMPTY_EDGE_COLUMNS = new EzLocalizationManager.EzLocalisableString("跳过空边缘列", "Skip Empty Edge Columns");
+        //
+        // public static readonly LocalisableString SKIP_EMPTY_EDGE_COLUMNS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+        //     "开启后，如果谱面第一列或最后一列是空的（没有音符），则实际加载时跳过这些空列，不显示它们。\n"
+        //     + "主要面向伪14k的13k谱面，隐藏空列按实际结果显示。",
+        //     "When enabled, if the first or last column of the beatmap is empty (no notes), those empty columns will be skipped during loading and not displayed.\n"
+        //     + "This fixes the issue where the last column of some 14K beatmaps was incorrectly hidden when it actually had content.");
+
         public static readonly LocalisableString HIT_MODE = new EzLocalizationManager.EzLocalisableString("Mania 判定系统", "Mania Hit Mode");
+
+        public static readonly LocalisableString OSU_JUDGEMENT_TRACK = new EzLocalizationManager.EzLocalisableString("Osu 判定轨", "Osu Judgement Track");
+
+        public static readonly LocalisableString OSU_JUDGEMENT_TRACK_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "Lazer = 现行判定窗口与计分；Classic Native = stable OD 窗口 + classic 总分算法（实验，Session/Drawable 同调）。",
+            "Lazer = current windows/scoring; Classic Native = stable OD windows + classic total score (experimental; Session/Drawable aligned).");
 
         public static readonly LocalisableString HIT_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             @"
@@ -114,11 +691,11 @@ namespace osu.Game.EzOsuGame.Localization
 |  1/8 | -    |   3/8 | -   | 25/48 | NoHit | -      | BeatLength |
 | Kool | Cool |  Good |      |  Miss | Fail |        | Ez2Ac |
 | 1/60 | 2/60 |  5/60 | -    |  6/60 | 7/60 | -      | Frame |
-| Kool | Cool |  Good |      |  Bad |  Poor | []Poor |  BMS |
-| 16.7 | 33.3 | 116.7 | -    |  250 |   250 |    500 | IIDX |
-| 15.0 | 30.0 |  60.0 | -    |  200 |  1000 |   1000 | LR2 Hard |
-| 15.0 | 45.0 | 112.0 | -    |  165 |   500 |    500 | Raja Normal |
-| 20.0 | 60.0 | 150.0 | -    |  500 |   500 |    500 | Raja Easy |
+| Kool | Cool |  Good |      | Bad       |      Poor | KPoor  |  BMS |
+| 16.7 | 33.3 | 116.7 | -    | ±250      | -500/+150 | NoNote | IIDX |
+| 15.0 | 30.0 |  60.0 | -    | ±200      |     -1000 | NoNote | LR2 Hard |
+| 15.0 | 45.0 | 112.0 | -    | -165/+210 | -500/+150 | NoNote | Raja Normal |
+| 20.0 | 60.0 | 150.0 | -    | -220/+280 | -500/+150 | NoNote | Raja Easy |
 | Best | Cool |  Good |      |      |  Miss |        |  Malody |
 | 20.0 | 60.0 |  94.0 | -    | -    |   150 | -      | E(Hard) |
 | 44.0 | 84.0 | 118.0 | -    | -    |   150 | -      | B(Easy+) |");
@@ -133,10 +710,10 @@ namespace osu.Game.EzOsuGame.Localization
 | 0.3% | -    | 0.2% |    - |  -1% |  -5% |    - | O2 Easy
 | 0.2% | -    | 0.1% |    - |  -7% |  -4% |    - | O2 Normal |
 | 0.1% | -    | 0.0% |    - |  -5% |  -3% |    - | O2 Hard |
-| Kool | Cool | Good |      |  Bad | Poor | []Poor | BMS |
-| 1.6% | 1.6% |    - |   -  |  -5% |  -9% |  -5% | IIDX Hard |
-| 1.0% | 1.0% | 0.5% |   -  |  -6% | -10% |  -2% | LR2 Hard |
-| 1.2% | 1.2% | 0.6% |   -  |  -3% |  -6% |  -2% | Raja Normal |");
+|  Kool |  Cool |  Good |      |  Bad | Poor | []Poor | BMS |
+| 0.16% | 0.16% |     - |   -  |  -5% |  -9% |    -5% | IIDX Hard |
+| 0.10% | 0.10% | 0.05% |   -  |  -6% | -10% |    -2% | LR2 Hard |
+| 0.15% | 0.12% | 0.03% |   -  |  -5% | -10% |    -5% | Raja Hard |");
 
         public static readonly LocalisableString POOR_HIT_RESULT = new EzLocalizationManager.EzLocalisableString("增加 Poor 判定类型", "Additional Poor HitResult");
 
@@ -146,39 +723,45 @@ namespace osu.Game.EzOsuGame.Localization
             "The Poor HitResult type only takes effect under the BMS Health Mode, used for strict health deduction, does not affect Combo or Score\n"
             + "One note can trigger multiple Poor hit results, and it will only trigger if it is earlier than Miss, there is no late Poor");
 
-#endregion
+        public static readonly LocalisableString JUDGE_PRECEDENCE = new EzLocalizationManager.EzLocalisableString(
+            "判定优先级",
+            "Judge Precedence");
 
-#region 音频设备设置
+        public static readonly LocalisableString SCORE_BONUS_TENDENCY = new EzLocalizationManager.EzLocalisableString(
+            "附加分倾向",
+            "Score Bonus Tendency");
 
-        public static readonly EzLocalizationManager.EzLocalisableString AUDIO_DEVICE_OUTPUT_HINT = new EzLocalizationManager.EzLocalisableString(
-            "ASIO 处于测试阶段！"
-            + "\n对于虚拟声卡，如VoiceMeeter，可能需要先切换到物理输出设备，之后再切换回VM。"
-            + "\n请不要以为ASIO4All这类虚拟ASIO比WASAPI更好，软件桥接并不提供真正的ASIO低延迟。"
-            + "\n硬件ASIO在 wasapi/VM 下，低延迟也依然是更好的。",
-            "ASIO is testing! "
-            + "\nFor virtual sound cards like VoiceMeeter, you may need to switch to a physical output device first, and then switch back to VM."
-            + "\nPlease don't assume that virtual ASIO like ASIO4All is better than WASAPI, software bridging does not provide true ASIO low latency."
-            + "\nHardware ASIO under wasapi/VM, low latency is still better.");
+        public static readonly LocalisableString SCORE_BONUS_TENDENCY_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "选择附加分（加成和罚分）的计算倾向。"
+            + "\n系统会根据每项『判定误差』，以及所在节拍区间的 KPS 来修正累计价值。"
+            + "\n高判定比：极致判定更有价值（6ms为上限），且『漏判』比『Miss』更糟糕。"
+            + "\n低失误率：减少『Good及以下的判定』更有价值，且『OK以下』的罚分近似『Miss』。",
+            "Choose the calculation tendency of additional scores (bonus and malus)."
+            + "\nThe system will adjust the cumulative value of each HitResult based on its 'hit offset' and the KPS of the beat interval."
+            + "\nHigh Judge Ratio: extreme Judge are more valuable (6ms as the upper limit), and 'No-Hit' is worse than 'Miss'."
+            + "\nLow Error Rate: reducing 'near or below Good' is more valuable, and malus for 'near or below OK' are nearly equivalent to 'Miss'.");
 
-        public static readonly EzLocalizationManager.EzLocalisableString ASIO_SAMPLE_RATE_LABEL = new EzLocalizationManager.EzLocalisableString(
-            "ASIO 采样率（测试）",
-            "ASIO Sample Rate (Testing)");
+        public static readonly LocalisableString SCORE_BONUS_CROSS = new EzLocalizationManager.EzLocalisableString(
+            "附加分分界",
+            "Bonus boundary");
 
-        public static readonly EzLocalizationManager.EzLocalisableString ASIO_SAMPLE_RATE_HINT = new EzLocalizationManager.EzLocalisableString(
-            "48k 更佳，过高的值会导致延迟和时钟同步错误。",
-            "48k is better, too high a value will cause delays and clock synchronization errors.");
+        public static readonly LocalisableString SCORE_BONUS_CROSS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "该毫秒及以内记入判定加成，超过记入 Error Malus。",
+            "Offsets at or within this value count as timing bonus. Beyond it they count as Error Malus.");
 
-        public static readonly EzLocalizationManager.EzLocalisableString ASIO_BUFFER_SIZE_LABEL = new EzLocalizationManager.EzLocalisableString(
-            "ASIO 缓冲区大小（测试）",
-            "ASIO Buffer Size (Testing)");
+        public static readonly LocalisableString JUDGE_PRECEDENCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "设置优先级算法。当按键点在多个note的判定重叠区时，选择如何计算判定。"
+            + "\n Combo优先(LR2风格): 选择对score有利的note进行判定；"
+            + "\n 时差优先(raja风格): 根据按键时间点，选择距离最近的note进行判定；"
+            + "\n 最早note优先(osu风格): 选择重叠区时间最靠前的note进行判定。(注意可能因连续Late,导致极易出大量poor判而暴毙)",
+            "Set the judge precedence algorithm. When the key press point overlaps with multiple notes, how to calculate the judge."
+            + "\n Combo Priority (LR2 Style): Select the note that is most advantageous for score; "
+            + "\n Duration Priority (Raja Style): Select the note closest to the key press time; "
+            + "\n Earliest Note Priority (osu Style): Select the note with the earliest overlap time. (Note: This may result in a large number of poor judgments due to consecutive late notes, leading to a quick loss.)");
 
-        public static readonly EzLocalizationManager.EzLocalisableString ASIO_BUFFER_SIZE_HINT = new EzLocalizationManager.EzLocalisableString(
-            "数值越低延迟越低，但过低可能会导致爆音或无法启动。默认为 128。",
-            "Lower is lower latency, but too low may crackle or fail to start. Default is 128.");
+        #endregion
 
-#endregion
-
-#region 实验性功能
+        #region 实验性功能
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_ACCOUNT = new EzLocalizationManager.EzLocalisableString(
             "本地账户（实验性）", "Local Account (Testing)");
@@ -187,6 +770,79 @@ namespace osu.Game.EzOsuGame.Localization
             "允许无密码登录本地账户。跳过一切成绩上传、网络账户检查。",
             "Allows local account login without password. Skip all score submissions and online account checks.");
 
-#endregion
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER =
+            new EzLocalizationManager.EzLocalisableString("外部规则集管理器", "External Ruleset Manager");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "管理 rulesets/ 目录下的第三方规则集：启用/禁用加载，以及显式 OnlineID（≥4）的排序与映射。修改后需重启游戏。",
+            "Manage third-party rulesets in rulesets/: enable/disable loading and order explicit OnlineIDs (>=4). Restart required after saving.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_HEADER =
+            new EzLocalizationManager.EzLocalisableString("外部规则集管理", "External Ruleset Management");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_BODY = new EzLocalizationManager.EzLocalisableString(
+            "仅影响 rulesets/ 目录中的用户 DLL。未定义 OnlineID（-1）的规则集不会被分配新 ID。",
+            "Only affects user DLLs in rulesets/. Rulesets without an explicit OnlineID (-1) are not assigned new IDs.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_SAVE =
+            new EzLocalizationManager.EzLocalisableString("保存", "Save");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_SAVED =
+            new EzLocalizationManager.EzLocalisableString("外部规则集配置已保存，请重启游戏后生效。", "External ruleset config saved. Restart the game to apply.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_RESTART_HINT = new EzLocalizationManager.EzLocalisableString(
+            "保存后请重启游戏使配置生效。",
+            "Restart the game after saving to apply changes.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_EMPTY = new EzLocalizationManager.EzLocalisableString(
+            "rulesets/ 目录下暂无外部规则集 DLL。\n请将 osu.Game.Rulesets.*.dll 放入该目录后重新打开本窗口。",
+            "No external ruleset DLLs in rulesets/.\nPlace osu.Game.Rulesets.*.dll there, then reopen this window.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_OPEN_FOLDER =
+            new EzLocalizationManager.EzLocalisableString("打开 rulesets 文件夹", "Open rulesets folder");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_OPEN_FOLDER_FAILED =
+            new EzLocalizationManager.EzLocalisableString("无法打开 rulesets 文件夹。", "Could not open the rulesets folder.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_NO_DEFINED_ID =
+            new EzLocalizationManager.EzLocalisableString("未定义 ID", "No ID defined");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_ENABLED =
+            new EzLocalizationManager.EzLocalisableString("启用", "Enabled");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_ID_LABEL =
+            new EzLocalizationManager.EzLocalisableString("ID", "ID");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_INVALID_ONLINE_ID = new EzLocalizationManager.EzLocalisableString(
+            "OnlineID 必须为 -1 或 ≥4（不能使用 0~3）。",
+            "OnlineID must be -1 or ≥4 (0~3 are reserved).");
+
+        #endregion
+
+        #region Ez 技能
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_SKILL_SECTION_HEADER =
+            new EzLocalizationManager.EzLocalisableString("Ez 技能", "Ez Skill");
+
+        public static readonly LocalisableString SKILL_LN_CHART_MIN_HOLD_OBJECTS = new EzLocalizationManager.EzLocalisableString(
+            "LN 谱面最小 Hold 数",
+            "LN chart min hold objects");
+
+        public static readonly LocalisableString SKILL_LN_CHART_MIN_HOLD_OBJECTS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "ChartDan「LN 半」的绝对门槛：hold 物件数大于此值时，即使 hold 占比未达比例线也认定为 LN。"
+            + "\n与比例线 LnPrimaryMinRatioFor 是「或」关系：hold 数 > 本阈值，或 hold 占比 ≥ 比例线"
+            + "（4K 及其它键数 = 45%，7K = 37.5%）。"
+            + "\n降低 → 更多 hold 多但占比低的谱面获得 LN 半；提高 → 更依赖比例线，低占比谱面退回 RC。"
+            + "\n影响：Ez ChartDan / DualPanel、选歌面板与 HUD 雷达的 LN 标签，以及 Realm 中持久化的 ChartDan LN half。"
+            + "\n已落盘的 ChartDan / CSI 不会自动追溯更新，需重算（数据重建 → Realm 谱面技能链）后生效。",
+            "Absolute gate for the ChartDan LN half: when hold objects exceed this value the chart counts as LN "
+            + "even if its hold ratio is below the ratio line."
+            + "\nOR relationship with the ratio line LnPrimaryMinRatioFor: hold count > this threshold, OR hold ratio >= the ratio line "
+            + "(45% for 4K and other key counts, 37.5% for 7K)."
+            + "\nLower = more hold-heavy but low-ratio charts get an LN half; higher = the ratio line dominates and low-ratio charts fall back to RC."
+            + "\nAffects: Ez ChartDan / DualPanel, song-select and HUD radar LN labels, and the persisted ChartDan LN half in Realm."
+            + "\nAlready-persisted ChartDan / CSI is not retroactively updated; rebuild (Data rebuild -> Realm chart skill chain) to apply.");
+
+        #endregion
     }
 }

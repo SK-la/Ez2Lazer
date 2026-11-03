@@ -18,16 +18,14 @@ namespace osu.Game.Screens.Select
         public int BeatmapItemsCount { get; private set; }
 
         private readonly Func<FilterCriteria> getCriteria;
-        private readonly Func<bool> shouldUseXxySrForDifficultyOperations;
         private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync;
         private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getPpForOperationsAsync;
 
-        public BeatmapCarouselFilterSorting(Func<FilterCriteria> getCriteria, Func<bool> shouldUseXxySrForDifficultyOperations,
+        public BeatmapCarouselFilterSorting(Func<FilterCriteria> getCriteria,
                                             Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync,
                                             Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>>? getPpForOperationsAsync = null)
         {
             this.getCriteria = getCriteria;
-            this.shouldUseXxySrForDifficultyOperations = shouldUseXxySrForDifficultyOperations;
             this.getDifficultiesForOperationsAsync = getDifficultiesForOperationsAsync;
             this.getPpForOperationsAsync = getPpForOperationsAsync ?? ((_, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(new Dictionary<BeatmapInfo, double>()));
         }
@@ -38,11 +36,10 @@ namespace osu.Game.Screens.Select
             var itemList = items.ToList();
 
             bool groupedSets = BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);
-            bool useXxyDifficultyValues = shouldUseXxySrForDifficultyOperations()
-                                          && (criteria.Sort == SortMode.Difficulty || groupedSets);
+            bool useXxySort = criteria.Sort == SortMode.XxyStarRating;
             bool usePpValues = criteria.Sort == SortMode.PP;
             bool useSortOperationValues = itemList.Count > 1
-                                          && (useXxyDifficultyValues || usePpValues);
+                                          && (useXxySort || usePpValues);
 
             IReadOnlyDictionary<BeatmapInfo, double>? operationSortValues = null;
 
@@ -59,7 +56,13 @@ namespace osu.Game.Screens.Select
                 if (operationSortValues != null && operationSortValues.TryGetValue(beatmap, out double sortValue))
                     return sortValue;
 
-                return criteria.Sort == SortMode.PP ? 0 : beatmap.StarRating;
+                if (criteria.Sort == SortMode.PP)
+                    return beatmap.PerformancePoints >= 0 ? beatmap.PerformancePoints : -1;
+
+                if (criteria.Sort == SortMode.XxyStarRating)
+                    return beatmap.XxyStarRating;
+
+                return beatmap.StarRating;
             }
 
             BeatmapItemsCount = itemList.Count;
@@ -107,6 +110,7 @@ namespace osu.Game.Screens.Select
                     break;
 
                 case SortMode.Difficulty:
+                case SortMode.XxyStarRating:
                     comparison = getSortValue(a).CompareTo(getSortValue(b));
                     break;
 
@@ -154,12 +158,15 @@ namespace osu.Game.Screens.Select
                     throw new ArgumentOutOfRangeException();
             }
 
-            // If the initial sort could not differentiate, attempt to use DateAdded to order sets in a stable fashion.
+            // If the initial sort could not differentiate, attempt to use Title then DateAdded to order sets in a stable fashion.
+            if (comparison == 0)
+                comparison = OrdinalSortByCaseStringComparer.DEFAULT.Compare(a.BeatmapSet!.Metadata.Title, b.BeatmapSet!.Metadata.Title);
+
             // The directionality of this matches the current SortMode.DateAdded, but we may want to reconsider if that becomes a user decision (ie. asc / desc).
             if (comparison == 0)
                 comparison = b.BeatmapSet!.DateAdded.CompareTo(a.BeatmapSet!.DateAdded);
 
-            // If DateAdded fails to break the tie, fallback to our internal GUID for stability.
+            // If both failed to break the tie, fallback to our internal GUID for stability.
             // This basically means it's a stable random sort.
             if (comparison == 0)
                 comparison = b.BeatmapSet!.ID.CompareTo(a.BeatmapSet!.ID);

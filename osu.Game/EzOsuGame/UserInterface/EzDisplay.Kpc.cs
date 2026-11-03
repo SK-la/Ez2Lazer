@@ -4,25 +4,27 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
-using System.Globalization;
-using osu.Framework.Allocation;
-using osu.Framework.Bindables;
+using System.Text;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Sprites;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.UI;
+using osu.Game.Graphics.UserInterfaceV2;
 using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.UserInterface
 {
-    public partial class EzDisplayKpc : CompositeDrawable
+    public partial class EzDisplayKpc : CompositeDrawable, IHasCustomTooltip<LocalisableString>
     {
-        public Bindable<EzEnumChartDisplay> KpcDisplayModeBindable { get; } = new Bindable<EzEnumChartDisplay>(EzEnumChartDisplay.BarChart);
+        internal static readonly LocalisableString KPC_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "每列Note数:蓝色是note，黄色是LN",
+            "Notes per column: blue is notes, yellow is LNs");
 
         private EzManiaSummary? maniaSummary;
 
@@ -38,22 +40,41 @@ namespace osu.Game.EzOsuGame.UserInterface
                     return;
                 }
 
-                bool dataChanged = maniaSummary != value;
                 maniaSummary = value;
 
-                // 只在数据真正变化时才更新显示
-                if (dataChanged)
-                    onDataChanged();
+                var summary = value.Value;
+                var columnCounts = summary.ColumnCounts;
+
+                if (columnCounts.Count == 0)
+                {
+                    clear();
+                    return;
+                }
+
+                // Analysis may resend column totals without LN breakdown (e.g. partial cache refresh).
+                // Do not wipe previously rendered LN segments when holds were omitted.
+                if (!summary.HasHoldNoteCounts)
+                {
+                    if (columnsMatchCached(columnCounts))
+                        return;
+
+                    onDataChanged(preserveCachedHolds: true);
+                    return;
+                }
+
+                var holdCounts = summary.HoldNoteCounts;
+
+                if (countsMatchCached(columnCounts, holdCounts))
+                    return;
+
+                onDataChanged();
             }
         }
 
+        private readonly Box background;
         private readonly FillFlowContainer columnNotesContainer;
-        private readonly OsuSpriteText notesText;
 
-        private List<NumberColumnEntry>? numberEntries;
         private List<BarChartColumnEntry>? barEntries;
-
-        private EzEnumChartDisplay mode;
 
         // 用于缓存列数，以避免每次更新都重建 UI
         private int currentColumnCount;
@@ -63,6 +84,21 @@ namespace osu.Game.EzOsuGame.UserInterface
         private int[]? lastKnownHolds;
         private int lastKnownCount;
 
+        /// <summary>
+        /// Whether the capsule background is shown.
+        /// </summary>
+        public bool ShowBackground
+        {
+            get => background.IsPresent;
+            set
+            {
+                if (value)
+                    background.Show();
+                else
+                    background.Hide();
+            }
+        }
+
         public EzDisplayKpc()
         {
             AutoSizeAxes = Axes.X;
@@ -71,41 +107,31 @@ namespace osu.Game.EzOsuGame.UserInterface
             InternalChild = new Container
             {
                 Masking = true,
-                CornerRadius = 5,
+                CornerRadius = EzUIStyleV1.CORNER_RADIUS_CHIP,
                 AutoSizeAxes = Axes.X,
                 RelativeSizeAxes = Axes.Y,
                 Children = new Drawable[]
                 {
-                    new Box
+                    background = new Box
                     {
                         RelativeSizeAxes = Axes.Both,
-                        Colour = Colour4.Black.Opacity(0.6f),
+                        Colour = Color4Extensions.FromHex("303d47"),
                     },
                     new Container
                     {
                         Anchor = Anchor.CentreLeft,
                         Origin = Anchor.CentreLeft,
                         AutoSizeAxes = Axes.Both,
+                        Margin = new MarginPadding { Horizontal = 7f, Vertical = 1.5f },
                         Children = new[]
                         {
-                            notesText = new OsuSpriteText
-                            {
-                                Text = "[Notes]",
-                                Font = OsuFont.GetFont(size: 14),
-                                Colour = Colour4.GhostWhite,
-                                Anchor = Anchor.CentreLeft,
-                                Origin = Anchor.CentreLeft,
-                                Alpha = 0f
-                            },
-                            Empty(),
                             columnNotesContainer = new FillFlowContainer
                             {
                                 AutoSizeAxes = Axes.Both,
                                 Anchor = Anchor.CentreLeft,
                                 Origin = Anchor.CentreLeft,
                                 Direction = FillDirection.Horizontal,
-                                Spacing = new Vector2(5f, 0),
-                                Padding = new MarginPadding { Horizontal = 0 },
+                                Spacing = new Vector2(5f, 0f),
                             },
                         }
                     }
@@ -113,73 +139,81 @@ namespace osu.Game.EzOsuGame.UserInterface
             };
         }
 
-        [BackgroundDependencyLoader]
-        private void load()
-        {
-            mode = KpcDisplayModeBindable.Value;
-        }
-
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            KpcDisplayModeBindable.BindValueChanged(onDisplayModeChanged, true);
-        }
-
-        /// <summary>
-        /// 处理显示模式切换
-        /// </summary>
-        private void onDisplayModeChanged(ValueChangedEvent<EzEnumChartDisplay> v)
-        {
-            mode = v.NewValue;
-
-            // 更新 UI 可见性
-            updateModeVisibility();
-
-            // 如果有数据，用新模弍重新渲染
-            if (maniaSummary != null && lastKnownColumns != null)
-                rebuildAndRender(lastKnownColumns, lastKnownHolds, lastKnownCount);
-        }
-
         /// <summary>
         /// 数据变化时调用（ManiaSummary setter）
         /// </summary>
-        private void onDataChanged()
+        private void onDataChanged(bool preserveCachedHolds = false)
         {
             if (maniaSummary == null)
                 return;
 
-            // 解析并缓存数据
-            parseAndCacheData(maniaSummary.Value.ColumnCounts, maniaSummary.Value.HoldNoteCounts);
+            parseAndCacheData(maniaSummary.Value.ColumnCounts, maniaSummary.Value.HasHoldNoteCounts ? maniaSummary.Value.HoldNoteCounts : null, preserveCachedHolds);
 
-            // 渲染显示
             if (lastKnownColumns != null)
                 rebuildAndRender(lastKnownColumns, lastKnownHolds, lastKnownCount);
         }
 
-        /// <summary>
-        /// 更新模式相关的 UI 可见性
-        /// </summary>
-        private void updateModeVisibility()
+        private bool columnsMatchCached(Dictionary<int, int> columnNoteCounts)
         {
-            switch (mode)
-            {
-                case EzEnumChartDisplay.Numbers:
-                    notesText.Alpha = 1f;
-                    columnNotesContainer.Margin = new MarginPadding { Left = notesText.DrawWidth + 5f, Right = 0 };
-                    break;
+            if (lastKnownColumns == null)
+                return false;
 
-                case EzEnumChartDisplay.BarChart:
-                    notesText.Alpha = 0f;
-                    columnNotesContainer.Margin = new MarginPadding { Horizontal = 5f };
-                    break;
+            int maxKey = 0;
+
+            foreach (int k in columnNoteCounts.Keys)
+            {
+                if (k > maxKey)
+                    maxKey = k;
             }
+
+            int kc = maxKey + 1;
+
+            if (lastKnownCount != kc)
+                return false;
+
+            for (int i = 0; i < kc; i++)
+            {
+                if (lastKnownColumns[i] != columnNoteCounts.GetValueOrDefault(i))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private bool countsMatchCached(Dictionary<int, int> columnNoteCounts, Dictionary<int, int> holdNoteCounts)
+        {
+            if (lastKnownColumns == null)
+                return false;
+
+            int maxKey = 0;
+
+            foreach (int k in columnNoteCounts.Keys)
+            {
+                if (k > maxKey)
+                    maxKey = k;
+            }
+
+            int kc = maxKey + 1;
+
+            if (lastKnownCount != kc)
+                return false;
+
+            for (int i = 0; i < kc; i++)
+            {
+                if (lastKnownColumns[i] != columnNoteCounts.GetValueOrDefault(i))
+                    return false;
+
+                if ((lastKnownHolds?[i] ?? 0) != holdNoteCounts.GetValueOrDefault(i))
+                    return false;
+            }
+
+            return true;
         }
 
         /// <summary>
         /// 解析并缓存数据
         /// </summary>
-        private void parseAndCacheData(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
+        private void parseAndCacheData(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null, bool preserveCachedHolds = false)
         {
             if (columnNoteCounts.Count == 0)
             {
@@ -187,7 +221,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 return;
             }
 
-            // 从 columnNoteCounts 的最大 key + 1 推断列数
+            // 列统计为 dense（末尾空列已补 0），最大 key + 1 即真实列数 N。
             int maxKey = 0;
 
             foreach (int k in columnNoteCounts.Keys)
@@ -206,7 +240,11 @@ namespace osu.Game.EzOsuGame.UserInterface
                 for (int i = 0; i < kc; i++)
                 {
                     normalized[i] = columnNoteCounts.GetValueOrDefault(i);
-                    normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
+
+                    if (preserveCachedHolds && holdNoteCounts == null && lastKnownHolds != null && i < lastKnownCount)
+                        normalizedHold[i] = lastKnownHolds[i];
+                    else
+                        normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
                 }
 
                 // 缓存数据
@@ -230,13 +268,17 @@ namespace osu.Game.EzOsuGame.UserInterface
         /// <summary>
         /// 根据当前模式和列数重建 UI 并渲染数值
         /// </summary>
-        private void rebuildAndRender(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
+        private void rebuildAndRender(int[] columnNoteCounts, int[]? holdNoteCounts, int realColumns)
         {
+            // 数据侧用真实列数 N（缓存身份 / tooltip），渲染侧用显示列数：
+            // 10k2s1p 开启时 14k 只画 13 根柱（第 14 列是 ez2ac 的 alpha 列）。
+            int displayColumns = EzManiaColumnLayout.GetDisplayColumnCount(realColumns);
+
             // 步骤 1: 确保 UI 元素数量与列数匹配
-            ensureColumnEntries(columns);
+            ensureColumnEntries(displayColumns);
 
             // 步骤 2: 更新数值显示
-            renderValues(columnNoteCounts, holdNoteCounts, columns);
+            renderValues(columnNoteCounts, holdNoteCounts, displayColumns);
         }
 
         /// <summary>
@@ -250,13 +292,6 @@ namespace osu.Game.EzOsuGame.UserInterface
             // 清空容器并释放旧 Entry
             columnNotesContainer.Clear();
 
-            if (numberEntries != null)
-            {
-                foreach (var entry in numberEntries)
-                    entry.Dispose();
-                numberEntries = null;
-            }
-
             if (barEntries != null)
             {
                 foreach (var entry in barEntries)
@@ -264,32 +299,14 @@ namespace osu.Game.EzOsuGame.UserInterface
                 barEntries = null;
             }
 
-            // 根据目标列数创建新的列表
-            switch (mode)
+            // 创建新的 BarChart Entry 列表
+            barEntries = new List<BarChartColumnEntry>(targetColumns);
+
+            for (int i = 0; i < targetColumns; i++)
             {
-                case EzEnumChartDisplay.Numbers:
-                    numberEntries = new List<NumberColumnEntry>(targetColumns);
-
-                    for (int i = 0; i < targetColumns; i++)
-                    {
-                        var entry = new NumberColumnEntry(i);
-                        numberEntries.Add(entry);
-                        columnNotesContainer.Add(entry.Container);
-                    }
-
-                    break;
-
-                case EzEnumChartDisplay.BarChart:
-                    barEntries = new List<BarChartColumnEntry>(targetColumns);
-
-                    for (int i = 0; i < targetColumns; i++)
-                    {
-                        var entry = new BarChartColumnEntry(i);
-                        barEntries.Add(entry);
-                        columnNotesContainer.Add(entry.Container);
-                    }
-
-                    break;
+                var entry = new BarChartColumnEntry();
+                barEntries.Add(entry);
+                columnNotesContainer.Add(entry.Container);
             }
 
             currentColumnCount = targetColumns;
@@ -300,33 +317,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         /// </summary>
         private void renderValues(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
         {
-            switch (mode)
-            {
-                case EzEnumChartDisplay.Numbers:
-                    renderNumbersValues(columnNoteCounts, holdNoteCounts, columns);
-                    break;
-
-                case EzEnumChartDisplay.BarChart:
-                    renderBarChartValues(columnNoteCounts, holdNoteCounts, columns);
-                    break;
-            }
-        }
-
-        /// <summary>
-        /// 渲染 Numbers 模式的数值
-        /// </summary>
-        private void renderNumbersValues(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
-        {
-            if (numberEntries == null) return;
-
-            for (int i = 0; i < currentColumnCount; i++)
-            {
-                int total = i < columns ? columnNoteCounts[i] : 0;
-                int hold = (holdNoteCounts != null && i < columns) ? holdNoteCounts[i] : 0;
-                var c = numberEntries[i].Container;
-                if (c.Alpha < 0.99f) c.Show();
-                numberEntries[i].SetValues(total, hold);
-            }
+            renderBarChartValues(columnNoteCounts, holdNoteCounts, columns);
         }
 
         /// <summary>
@@ -336,24 +327,22 @@ namespace osu.Game.EzOsuGame.UserInterface
         {
             if (barEntries == null) return;
 
-            // 计算最大值用于归一化
+            // 计算最大值用于归一化。
+            // 对齐: columnNoteCounts already contains total hit objects for the column (includes LNs).
+            // 因此归一化应基于 total，而不是 total + hold（否则会重复计入 LN）。
             int maxCount = 0;
 
             for (int i = 0; i < currentColumnCount; i++)
             {
                 int total = i < columns ? columnNoteCounts[i] : 0;
-                int hold = (holdNoteCounts != null && i < columns) ? holdNoteCounts[i] : 0;
-                int sum = total + hold;
-                if (sum > maxCount)
-                    maxCount = sum;
+                if (total > maxCount)
+                    maxCount = total;
             }
 
             if (maxCount == 0)
             {
                 for (int i = 0; i < currentColumnCount; i++)
                 {
-                    var c = barEntries[i].Container;
-                    if (c.Alpha < 0.99f) c.Show();
                     barEntries[i].SetValues(0, 0, 1);
                 }
 
@@ -364,94 +353,12 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 int total = i < columns ? columnNoteCounts[i] : 0;
                 int hold = (holdNoteCounts != null && i < columns) ? holdNoteCounts[i] : 0;
-                var c = barEntries[i].Container;
-                if (c.Alpha < 0.99f) c.Show();
+
                 barEntries[i].SetValues(total, hold, maxCount);
             }
         }
 
         #region ColumnEntry
-
-        private class NumberColumnEntry : IDisposable
-        {
-            public readonly Container Container;
-
-            private readonly OsuSpriteText indexText;
-            private readonly OsuSpriteText valueText;
-            private readonly OsuSpriteText holdText;
-
-            private int lastTotal = int.MinValue;
-            private int lastHold = int.MinValue;
-
-            public NumberColumnEntry(int index)
-            {
-                Container = new Container
-                {
-                    AutoSizeAxes = Axes.Both,
-                    Anchor = Anchor.CentreLeft,
-                    Origin = Anchor.CentreLeft,
-                };
-
-                indexText = new OsuSpriteText
-                {
-                    Text = $"{index + 1}/",
-                    Font = OsuFont.GetFont(size: 12),
-                    Colour = Color4.Gray,
-                    Anchor = Anchor.CentreLeft,
-                    Origin = Anchor.CentreLeft,
-                };
-
-                valueText = new OsuSpriteText
-                {
-                    Font = OsuFont.GetFont(size: 14),
-                    Colour = Color4.LightCoral,
-                    Anchor = Anchor.CentreLeft,
-                    Origin = Anchor.CentreLeft,
-                };
-
-                holdText = new OsuSpriteText
-                {
-                    Font = OsuFont.GetFont(size: 12),
-                    Colour = Color4.LightGoldenrodYellow.Darken(0.2f),
-                    Anchor = Anchor.CentreLeft,
-                    Origin = Anchor.CentreLeft,
-                };
-
-                Container.AddRange(new Drawable[] { indexText, valueText, holdText });
-            }
-
-            public void SetValues(int total, int hold)
-            {
-                if (lastTotal != total)
-                {
-                    lastTotal = total;
-                    valueText.Text = total.ToString(CultureInfo.InvariantCulture);
-                }
-
-                if (lastHold != hold)
-                {
-                    lastHold = hold;
-                    holdText.Text = hold > 0 ? $"/{hold.ToString(CultureInfo.InvariantCulture)} " : " ";
-                }
-
-                // Manual lightweight layout: position texts horizontally based on measured widths.
-                // This avoids FillFlowContainer's per-frame layout overhead.
-                float x = 0f;
-                indexText.X = x;
-                x += indexText.DrawWidth;
-
-                valueText.X = x;
-                x += valueText.DrawWidth;
-
-                holdText.X = x + 2f; // small spacing
-            }
-
-            public void Dispose()
-            {
-                // Container 会从父容器移除时自动清理，这里不需要额外操作
-                // 但如果需要手动清理资源，可以在这里添加
-            }
-        }
 
         private class BarChartColumnEntry : IDisposable
         {
@@ -464,13 +371,11 @@ namespace osu.Game.EzOsuGame.UserInterface
             private readonly Box regularBox;
             private readonly Box holdBox;
 
-            // private readonly OsuSpriteText? valueText;
-
             private int lastTotalNotes = int.MinValue;
             private int lastHoldNotes = int.MinValue;
             private int lastMaxCount = int.MinValue;
 
-            public BarChartColumnEntry(int index, bool showText = false)
+            public BarChartColumnEntry()
             {
                 // Match SpreadDisplay's largest dot: width 7, height 12 (maxBarHeight).
                 Container = new Container
@@ -523,35 +428,13 @@ namespace osu.Game.EzOsuGame.UserInterface
                     barArea,
                 };
 
-                // if (showText)
-                // {
-                //     var idxText = new OsuSpriteText
-                //     {
-                //         Text = (index + 1).ToString(),
-                //         Font = OsuFont.GetFont(size: 12),
-                //         Colour = Color4.Gray,
-                //         Anchor = Anchor.BottomCentre,
-                //         Origin = Anchor.BottomCentre,
-                //         Margin = new MarginPadding { Bottom = 2 }
-                //     };
-                //
-                //     valueText = new OsuSpriteText
-                //     {
-                //         Font = OsuFont.GetFont(size: 10),
-                //         Colour = Color4.White,
-                //         Anchor = Anchor.BottomCentre,
-                //         Origin = Anchor.BottomCentre,
-                //     };
-                //
-                //     children.Add(idxText);
-                //     children.Add(valueText);
-                // }
-
                 Container.Children = children.ToArray();
             }
 
             public void SetValues(int totalNotes, int holdNotes, int maxCount)
             {
+                holdNotes = Math.Clamp(holdNotes, 0, totalNotes);
+
                 if (lastTotalNotes == totalNotes && lastHoldNotes == holdNotes && lastMaxCount == maxCount)
                     return;
 
@@ -561,26 +444,43 @@ namespace osu.Game.EzOsuGame.UserInterface
 
                 int regularNotes = totalNotes - holdNotes;
 
-                float totalHeight = maxCount > 0 ? (float)totalNotes / maxCount * max_bar_height : 0;
-                float regularHeight = maxCount > 0 ? (float)regularNotes / maxCount * max_bar_height : 0;
+                float regularHeight = 0;
+                float holdHeight = 0;
 
-                float holdHeight = Math.Max(0, totalHeight - regularHeight);
+                if (maxCount > 0)
+                {
+                    float scale = max_bar_height / maxCount;
+                    regularHeight = regularNotes * scale;
+
+                    if (holdNotes > 0)
+                    {
+                        holdHeight = holdNotes * scale;
+
+                        // Keep tiny LN segments visible instead of flickering at sub-pixel heights.
+                        if (holdHeight > 0 && holdHeight < 1f)
+                            holdHeight = 1f;
+                    }
+                }
+
+                float combinedHeight = regularHeight + holdHeight;
+
+                if (combinedHeight > max_bar_height)
+                {
+                    float ratio = max_bar_height / combinedHeight;
+                    regularHeight *= ratio;
+                    holdHeight *= ratio;
+                }
+
+                if (holdNotes > 0 && holdHeight > 0 && holdHeight < 1f)
+                    holdHeight = 1f;
+
                 regularBox.Height = regularHeight;
                 holdBox.Height = holdHeight;
                 holdBox.Margin = new MarginPadding { Bottom = regularHeight };
-
-                // if (valueText != null)
-                // {
-                //     valueText.Text = holdNotes > 0
-                //         ? $"{totalNotes.ToString(CultureInfo.InvariantCulture)}({holdNotes.ToString(CultureInfo.InvariantCulture)})"
-                //         : totalNotes.ToString(CultureInfo.InvariantCulture);
-                //     valueText.Y = -(totalHeight + 6);
-                // }
             }
 
             public void Dispose()
             {
-                // Container 会从父容器移除时自动清理
             }
         }
 
@@ -589,13 +489,6 @@ namespace osu.Game.EzOsuGame.UserInterface
         private void clear()
         {
             // 释放 Entry 对象
-            if (numberEntries != null)
-            {
-                foreach (var entry in numberEntries)
-                    entry.Dispose();
-                numberEntries = null;
-            }
-
             if (barEntries != null)
             {
                 foreach (var entry in barEntries)
@@ -624,5 +517,71 @@ namespace osu.Game.EzOsuGame.UserInterface
                 clear();
             }
         }
+
+#region Tooltip 文本生成
+
+        /// <summary>
+        /// 生成动态的 tooltip 文本（Markdown 表格格式）
+        /// </summary>
+        private LocalisableString generateTooltipText()
+        {
+            if (maniaSummary == null || lastKnownColumns == null)
+                return KPC_TOOLTIP;
+
+            // 构建 Markdown 表格
+            var sb = new StringBuilder();
+
+            // 表头（第一列为空）
+            sb.Append("|  | ");
+
+            for (int i = 0; i < lastKnownCount; i++)
+            {
+                sb.Append($"N{i + 1} | ");
+            }
+
+            sb.AppendLine();
+
+            // 分隔线（第一列为空）
+            sb.Append("| --- |");
+
+            for (int i = 0; i < lastKnownCount; i++)
+            {
+                sb.Append(" ------ |");
+            }
+
+            sb.AppendLine();
+
+            // Note 行 —— 显示普通 note（regular = total - hold），遵循口径 A（ColumnCounts 为总数）
+            sb.Append("| notes |");
+
+            for (int i = 0; i < lastKnownCount; i++)
+            {
+                int total = lastKnownColumns[i];
+                int hold = lastKnownHolds?[i] ?? 0;
+                int regular = Math.Max(0, total - hold);
+                sb.Append($" {(regular > 0 ? regular.ToString() : "-")} |");
+            }
+
+            sb.AppendLine();
+
+            // LN 行
+            sb.Append("| LNs |");
+
+            for (int i = 0; i < lastKnownCount; i++)
+            {
+                int count = lastKnownHolds?[i] ?? 0;
+                sb.Append($" {(count > 0 ? count.ToString() : "-")} |");
+            }
+
+            sb.AppendLine();
+
+            return sb.ToString();
+        }
+
+        public ITooltip<LocalisableString> GetCustomTooltip() => new MarkdownTooltip();
+
+        public LocalisableString TooltipContent => generateTooltipText();
+
+#endregion
     }
 }

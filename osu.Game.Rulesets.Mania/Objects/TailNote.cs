@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Judgements;
 
@@ -21,20 +20,7 @@ namespace osu.Game.Rulesets.Mania.Objects
         /// </summary>
         public static double RELEASE_WINDOW_LENIENCE { get; set; } = 1.5D;
 
-        public override Judgement CreateJudgement()
-        {
-            var hitMode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-
-            switch (hitMode)
-            {
-                case EzEnumHitMode.Malody_E:
-                case EzEnumHitMode.Malody_B:
-                    return new HoldNoteBodyJudgement();
-
-                default:
-                    return new ManiaJudgement();
-            }
-        }
+        public override Judgement CreateJudgement() => new ManiaJudgement();
 
         public override double MaximumJudgementOffset => base.MaximumJudgementOffset * RELEASE_WINDOW_LENIENCE;
     }

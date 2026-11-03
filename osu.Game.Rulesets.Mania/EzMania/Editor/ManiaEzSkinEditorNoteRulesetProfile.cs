@@ -1,0 +1,112 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System.Collections.Generic;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Textures;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit.Note;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Skinning;
+
+namespace osu.Game.Rulesets.Mania.EzMania.Editor
+{
+    public partial class ManiaEzSkinEditorNoteRulesetProfile : IEzSkinEditorNoteRulesetProfile
+    {
+        private static readonly EzManiaNotePart[] supported_parts =
+        {
+            EzManiaNotePart.Note,
+            EzManiaNotePart.HoldHead,
+            EzManiaNotePart.HoldBody,
+            EzManiaNotePart.HoldTail,
+        };
+
+        private static readonly EzSkinEditorNoteVariant[] legacy_variants =
+        {
+            new EzSkinEditorNoteVariant("1", "1"),
+            new EzSkinEditorNoteVariant("2", "2"),
+            new EzSkinEditorNoteVariant("S", "S"),
+        };
+
+        private static readonly EzSkinEditorNoteVariant[] ez_variants =
+        {
+            new EzSkinEditorNoteVariant(nameof(EzColumnType.A), "A"),
+            new EzSkinEditorNoteVariant(nameof(EzColumnType.B), "B"),
+            new EzSkinEditorNoteVariant(nameof(EzColumnType.S), "S"),
+            new EzSkinEditorNoteVariant(nameof(EzColumnType.E), "E"),
+            new EzSkinEditorNoteVariant(nameof(EzColumnType.P), "P"),
+        };
+
+        public int RulesetOnlineId => new ManiaRuleset().RulesetInfo.OnlineID;
+
+        public RulesetInfo RulesetInfo => new ManiaRuleset().RulesetInfo;
+
+        public IReadOnlyList<EzManiaNotePart> SupportedParts => supported_parts;
+
+        public IReadOnlyList<EzSkinEditorNoteVariant> GetVariants(bool useEzNoteVariants, EzManiaNotePart part) =>
+            useEzNoteVariants ? ez_variants : legacy_variants;
+
+        public string GetDefaultVariantId(bool useEzNoteVariants, EzManiaNotePart part) =>
+            useEzNoteVariants ? nameof(EzColumnType.A) : "1";
+
+        public string ResolveTextureName(bool useEzNoteVariants, EzManiaNotePart part, string variantId) =>
+            useEzNoteVariants
+                ? resolveEzTextureName(part, variantId)
+                : resolveLegacyTextureName(part, variantId);
+
+        public Texture? GetNoteTexture(ISkin skin, EzSkinEditorNotePreviewRequest request, EzManiaNotePart part)
+        {
+            string variantId = string.IsNullOrEmpty(request.VariantId)
+                ? GetDefaultVariantId(request.UseEzNoteVariants, part)
+                : request.VariantId;
+
+            string textureName = ResolveTextureName(request.UseEzNoteVariants, part, variantId);
+
+            var maniaRuleset = new ManiaRuleset();
+            var beatmap = new ManiaBeatmap(new StageDefinition(4));
+            var resolvedSkin = maniaRuleset.CreateSkinTransformer(skin, beatmap) ?? skin;
+            return resolvedSkin.GetTexture(textureName) ?? skin.GetTexture(textureName);
+        }
+
+        public Drawable CreateDrawableComparisonPreview(ISkin skin, EzSkinEditorNotePreviewRequest request) =>
+            ManiaEzSkinEditorNoteDrawablePreviewBuilder.Create(skin, request);
+
+        public Drawable? CreateRulesetSettingsContent() => null;
+
+        private static string resolveLegacyTextureName(EzManiaNotePart part, string variantId)
+        {
+            string index = variantId switch
+            {
+                "2" => "2",
+                "S" => "S",
+                _ => "1",
+            };
+
+            return part switch
+            {
+                EzManiaNotePart.HoldHead => $"mania-note{index}H",
+                EzManiaNotePart.HoldBody => $"mania-note{index}L",
+                EzManiaNotePart.HoldTail => $"mania-note{index}T",
+                _ => $"mania-note{index}",
+            };
+        }
+
+        private static string resolveEzTextureName(EzManiaNotePart part, string variantId)
+        {
+            string prefix = variantId switch
+            {
+                nameof(EzColumnType.B) => "blue",
+                nameof(EzColumnType.S) or nameof(EzColumnType.P) => "green",
+                _ => "white",
+            };
+
+            return part switch
+            {
+                EzManiaNotePart.HoldHead => $"{prefix}longnote/head",
+                EzManiaNotePart.HoldBody => $"{prefix}longnote/middle",
+                EzManiaNotePart.HoldTail => $"{prefix}longnote/tail",
+                _ => $"{prefix}note",
+            };
+        }
+    }
+}

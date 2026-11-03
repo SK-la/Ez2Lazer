@@ -78,6 +78,11 @@ namespace osu.Game.Graphics.Carousel
         public bool AbsoluteScrolling => Scroll.AbsoluteScrolling;
 
         /// <summary>
+        /// Whether the user has manually overridden the carousel scroll position.
+        /// </summary>
+        public bool UserScrolling => Scroll.UserScrolling;
+
+        /// <summary>
         /// The number of times filter operations have been triggered.
         /// </summary>
         public int FilterCount { get; private set; }
@@ -445,8 +450,7 @@ namespace osu.Game.Graphics.Carousel
             if (spacing > 0)
             {
                 item.CarouselInputLenienceAbove = spacing / 2;
-                if (previousVisible != null)
-                    previousVisible.CarouselInputLenienceBelow = item.CarouselInputLenienceAbove;
+                previousVisible?.CarouselInputLenienceBelow = item.CarouselInputLenienceAbove;
             }
 
             if (item.IsVisible)
@@ -1162,6 +1166,11 @@ namespace osu.Game.Graphics.Carousel
             carouselPanel.KeyboardSelected.Value = false;
             carouselPanel.Expanded.Value = false;
         }
+
+        /// <summary>
+        /// Force <see cref="refreshAfterSelection"/> so panel Y positions recompute (e.g. spacing policy change).
+        /// </summary>
+        protected void InvalidateSelectionLayout() => selectionValid.Invalidate();
 
         protected override bool OnInvalidate(Invalidation invalidation, InvalidationSource source)
         {

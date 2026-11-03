@@ -42,6 +42,9 @@ namespace osu.Game.Rulesets.Catch.UI
 
         internal CatcherArea CatcherArea { get; private set; } = null!;
 
+        [Resolved(CanBeNull = true)]
+        private CatchInputManager? catchInputManager { get; set; }
+
         public Container UnderlayElements { get; private set; } = null!;
 
         private readonly IBeatmapDifficultyInfo difficulty;
@@ -102,7 +105,9 @@ namespace osu.Game.Rulesets.Catch.UI
 
         protected override void OnNewDrawableHitObject(DrawableHitObject d)
         {
-            ((DrawableCatchHitObject)d).CheckPosition = checkIfWeCanCatch;
+            var catchObject = (DrawableCatchHitObject)d;
+            catchObject.CheckPosition = checkIfWeCanCatch;
+            catchObject.IsScratchJudgmentAssistActive = () => catchInputManager?.ScratchJudgmentAssistActive == true;
         }
 
         private bool checkIfWeCanCatch(CatchHitObject obj) => Catcher.CanCatch(obj);

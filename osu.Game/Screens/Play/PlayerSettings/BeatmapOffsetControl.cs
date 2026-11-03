@@ -13,6 +13,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Framework.Logging;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -190,6 +191,18 @@ namespace osu.Game.Screens.Play.PlayerSettings
 
         protected override void Dispose(bool isDisposing)
         {
+            if (realmWriteTask != null && !realmWriteTask.IsCompleted)
+            {
+                try
+                {
+                    realmWriteTask.Wait(5000);
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Waiting for pending beatmap offset write failed: {e}");
+                }
+            }
+
             base.Dispose(isDisposing);
             beatmapOffsetSubscription?.Dispose();
         }

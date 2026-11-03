@@ -231,7 +231,9 @@ namespace osu.Game.Graphics.UserInterface
 
         private void updateFpsDisplay()
         {
-            counterDrawFPS.Colour = getColour(displayedFpsCount / aimDrawFPS);
+            counterDrawFPS.Colour = displayedFpsCount > 1000
+                ? colours.Lime0
+                : getColour(displayedFpsCount / aimDrawFPS);
             counterDrawFPS.Text = $"{displayedFpsCount:#,0} fps";
         }
 
@@ -241,7 +243,10 @@ namespace osu.Game.Graphics.UserInterface
                 ? $"{displayedFrameTime:N1} ms"
                 : $"{displayedFrameTime:N0} ms";
 
-            counterUpdateFrameTime.Colour = getColour((1000 / displayedFrameTime) / aimUpdateFPS);
+            double displayedUpdateFps = 1000 / displayedFrameTime;
+            counterUpdateFrameTime.Colour = displayedUpdateFps > 1000
+                ? colours.Lime0
+                : getColour(displayedUpdateFps / aimUpdateFPS);
         }
 
         private bool updateAimFPS()

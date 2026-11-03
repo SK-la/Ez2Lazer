@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -10,6 +11,8 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -29,7 +32,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
     {
         private Drawable createStaticPartImpl(ISkin skin)
         {
-            var transformedSkin = createTransformedSkin(skin);
+            var transformedSkin = createTransformedSkin(skin, preview_key_count);
 
             return new SkinProvidingContainer(transformedSkin)
             {
@@ -38,47 +41,44 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
                 RelativeSizeAxes = Axes.Both,
                 Child = new FillFlowContainer
                 {
-                    RelativeSizeAxes = Axes.Y,
-                    AutoSizeAxes = Axes.X,
+                    RelativeSizeAxes = Axes.Both,
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Direction = FillDirection.Horizontal,
-                    Spacing = new Vector2(15, 0),
+                    Direction = FillDirection.Vertical,
+                    Spacing = new Vector2(0, 10),
                     Padding = new MarginPadding(10),
                     Children = new[]
                     {
-                        createColumn(skin, useTransformed: false, "Before"),
-                        createColumn(skin, useTransformed: true, "After"),
+                        createPreviewRow(skin, "Note", isHold: false),
+                        createPreviewRow(skin, "LN", isHold: true),
                     }
                 }
             };
         }
 
-        private SkinProvidingContainer createColumn(ISkin skin, bool useTransformed, string label)
+        private Drawable createPreviewRow(ISkin skin, string label, bool isHold, int columnIndex = 0, bool isSpecial = false)
         {
-            var skinToProvide = useTransformed ? createTransformedSkin(skin) : skin;
-            var hold = new HoldNote { StartTime = 0, Duration = 500, Column = 0 };
-            hold.ApplyDefaults(new ControlPointInfo(), new BeatmapDifficulty());
+            var transformedSkin = createTransformedSkin(skin, preview_key_count);
 
-            return new SkinProvidingContainer(skinToProvide)
+            ManiaHitObject hitObject = isHold
+                ? new HoldNote { StartTime = 0, Duration = 500, Column = columnIndex }
+                : new Note { StartTime = 0, Column = columnIndex };
+
+            hitObject.ApplyDefaults(new ControlPointInfo(), new BeatmapDifficulty());
+
+            DrawableHitObject drawable = isHold
+                ? new DrawableHoldNote((HoldNote)hitObject)
+                : new DrawableNote((Note)hitObject);
+
+            return new SkinProvidingContainer(transformedSkin)
             {
-                RelativeSizeAxes = Axes.Y,
-                Width = preview_column_width + 10,
-                Child = new Container
+                RelativeSizeAxes = Axes.X,
+                Height = 260,
+                Child = new PreviewDependencyContainer(preview_key_count, columnIndex, ManiaAction.Key1, isSpecial)
                 {
-                    RelativeSizeAxes = Axes.Both,
-                    Children = new Drawable[]
+                    Child = new EzNoteContainer(ScrollingDirection.Down, label)
                     {
-                        new PreviewDependencyContainer(preview_key_count, 0, ManiaAction.Key1)
-                        {
-                            Child = new EzNoteContainer(ScrollingDirection.Down, label)
-                            {
-                                Child = new DrawableHoldNote(hold)
-                                {
-                                    RelativeSizeAxes = Axes.Both,
-                                }
-                            }
-                        },
+                        Child = drawable,
                     }
                 }
             };
@@ -175,6 +175,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
         // Registers a `StageDefinition`, `ManiaBeatmap` and `Column` so hit-object drawables resolve correctly.
         internal sealed partial class PreviewDependencyContainer : Container
         {
+            // Matches FastNoteBase.UnitHeight: DrawWidth * 0.5f * scale.
+            private const float fast_note_unit_height_factor = 0.5f;
+
             private readonly Container content;
             protected override Container<Drawable> Content => content;
 
@@ -183,15 +186,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             private readonly Column columnDependency;
             private readonly PreviewGameplayClock gameplayClockDependency = new PreviewGameplayClock();
             private readonly ManualClock previewClock = new ManualClock();
+            private readonly EzSkinEditorNotePreviewRequest? previewRequest;
 
-            public PreviewDependencyContainer(int keyCount, int column, ManiaAction action)
+            [Resolved(CanBeNull = true)]
+            private Ez2ConfigManager? ezConfig { get; set; }
+
+            public PreviewDependencyContainer(int keyCount, int column, ManiaAction action, bool isSpecial = false, EzSkinEditorNotePreviewRequest? previewRequest = null)
             {
                 RelativeSizeAxes = Axes.Both;
                 Clock = new FramedClock(previewClock);
 
+                this.previewRequest = previewRequest;
+
                 stageDefinition = new StageDefinition(keyCount);
                 beatmapDependency = new ManiaBeatmap(stageDefinition);
-                columnDependency = new Column(column, isSpecial: false);
+                columnDependency = new Column(column, isSpecial: isSpecial);
                 columnDependency.Action.Value = action;
 
                 InternalChildren = new Drawable[]
@@ -222,7 +231,37 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
                 dependencies.CacheAs(beatmapDependency);
                 dependencies.Cache(columnDependency);
                 dependencies.CacheAs<IBindable<ManiaAction>>(columnDependency.Action);
+
+                // Note skins derive their height from the column width times this scale. Give the preview a scoped copy so
+                // the drawn note follows the request instead of the live config (the shared bindables stay untouched).
+                if (previewRequest is { } request && ezConfig != null)
+                {
+                    var skinInfo = new EzSkinInfo(ezConfig);
+
+                    if (request.Width > 0)
+                        skinInfo.NoteHeightScaleToWidth.Value = request.Height / (request.Width * fast_note_unit_height_factor);
+
+                    dependencies.CacheAs<IEzSkinInfo>(skinInfo);
+                }
+
                 return dependencies;
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+
+                if (previewRequest is not { } request)
+                    return;
+
+                // Replace the preview column's shared note bindables with request-scoped copies. Only this throwaway column
+                // is affected, and the column's own listeners are not needed for a static preview.
+                columnDependency.EzNoteSizeBindable = new Bindable<Vector2>(new Vector2((float)request.Width, (float)request.Height));
+                columnDependency.ColorSettingsEnabledBindable = new Bindable<bool>(true);
+                columnDependency.EzNoteColourBindable = new Bindable<Colour4>(request.NoteColour);
+
+                if (request.UseEzNoteVariants && Enum.TryParse(request.VariantId, out EzColumnType type))
+                    columnDependency.EzNoteTypeBindable = new Bindable<EzColumnType>(type);
             }
 
             protected override void Update()

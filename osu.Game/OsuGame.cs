@@ -26,27 +26,42 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
+using osu.Framework.Input.Handlers.Mouse;
+using osu.Framework.Input.Handlers.Pen;
 using osu.Framework.Input.Handlers.Tablet;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Framework.Threading;
+using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
-using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Background.Pixiv;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit;
+using osu.Game.EzOsuGame.Layout;
+using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Material;
 using osu.Game.EzOsuGame.Overlays;
+using osu.Game.EzOsuGame.Performance;
+using osu.Game.EzOsuGame.Pets;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Screens.Play;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input;
 using osu.Game.Input.Bindings;
 using osu.Game.IO;
+using osu.Game.IPC;
+using osu.Game.IPC.DataSources;
 using osu.Game.Localisation;
 using osu.Game.Online;
+using osu.Game.Online.API;
 using osu.Game.Online.API.Requests;
 using osu.Game.Online.Chat;
 using osu.Game.Online.Leaderboards;
@@ -59,6 +74,7 @@ using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.OSD;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Overlays.Toolbar;
+using osu.Game.Overlays.Volume;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Scoring.Legacy;
@@ -136,6 +152,10 @@ namespace osu.Game
 
         private UserProfileOverlay userProfile;
 
+        private LoginOverlay loginOverlay;
+
+        private NowPlayingOverlay nowPlayingOverlay;
+
         private BeatmapSetOverlay beatmapSetOverlay;
 
         private WikiOverlay wikiOverlay;
@@ -143,6 +163,12 @@ namespace osu.Game
         private ChangelogOverlay changelogOverlay;
 
         private SkinEditorOverlay skinEditor;
+
+        private EzSkinEditorOverlay ezSkinEditor;
+
+        private EzLocalProfileOverlay ezLocalProfile;
+
+        private EzTurboMode turboMode;
 
         private Container overlayContent;
 
@@ -161,6 +187,8 @@ namespace osu.Game
         private Container overlayOffsetContainer;
 
         private OnScreenDisplay onScreenDisplay;
+
+        private DialogOverlay dialogOverlay;
 
         [Resolved]
         private FrameworkConfigManager frameworkConfig { get; set; }
@@ -196,6 +224,11 @@ namespace osu.Game
         protected readonly Bindable<LocalUserPlayingState> UserPlayingState = new Bindable<LocalUserPlayingState>();
 
         public OsuScreenStack ScreenStack { get; private set; }
+
+        protected override IScreen CurrentScreen => ScreenStack?.CurrentScreen;
+
+        private MaterialCaptureScope materialCaptureScope;
+        private Container screenCaptureContent;
 
         protected BackButton BackButton => screenStackFooter.BackButton;
         protected ScreenFooter ScreenFooter => screenStackFooter.Footer;
@@ -343,10 +376,10 @@ namespace osu.Game
             return userInputManager;
         }
 
-        private DependencyContainer dependencies;
+        protected new DependencyContainer Dependencies { get; private set; }
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent) =>
-            dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
+            Dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
 
         private readonly List<string> dragDropFiles = new List<string>();
         private ScheduledDelegate dragDropImportSchedule;
@@ -409,9 +442,9 @@ namespace osu.Game
             sentryLogger.AttachUser(API.LocalUser);
 
             if (SeasonalUIConfig.ENABLED)
-                dependencies.CacheAs(osuLogo = new OsuLogoChristmas { Alpha = 0 });
+                Dependencies.CacheAs(osuLogo = new OsuLogoChristmas { Alpha = 0 });
             else
-                dependencies.CacheAs(osuLogo = new OsuLogo { Alpha = 0 });
+                Dependencies.CacheAs(osuLogo = new OsuLogo { Alpha = 0 });
 
             // bind config int to database RulesetInfo
             configRuleset = LocalConfig.GetBindable<string>(OsuSetting.Ruleset);
@@ -441,6 +474,7 @@ namespace osu.Game
 
             // Transfer any runtime changes back to configuration file.
             SkinManager.CurrentSkinInfo.ValueChanged += skin => configSkin.Value = skin.NewValue.ID.ToString();
+            SkinManager.CurrentSkinInfo.ValueChanged += onCurrentSkinChangedForEzJson;
 
             UserPlayingState.BindValueChanged(p =>
             {
@@ -448,6 +482,8 @@ namespace osu.Game
                 SkinManager.PauseImports = p.NewValue != LocalUserPlayingState.NotPlaying;
                 ScoreManager.PauseImports = p.NewValue != LocalUserPlayingState.NotPlaying;
             }, true);
+
+            turboMode = new EzTurboMode(LocalConfig, Ez2ConfigManager);
 
             IsActive.BindValueChanged(active => updateActiveState(active.NewValue), true);
 
@@ -559,7 +595,7 @@ namespace osu.Game
 
         public void CopyToClipboard(string value) => waitForReady(() => onScreenDisplay, _ =>
         {
-            dependencies.Get<Clipboard>().SetText(value);
+            Dependencies.Get<Clipboard>().SetText(value);
             onScreenDisplay.Display(new CopiedToClipboardToast());
         });
 
@@ -591,7 +627,16 @@ namespace osu.Game
         /// Show a user's profile as an overlay.
         /// </summary>
         /// <param name="user">The user to display.</param>
-        public void ShowUser(IUser user) => waitForReady(() => userProfile, _ => userProfile.ShowUser(user));
+        public void ShowUser(IUser user) => waitForReady(() => userProfile, _ =>
+        {
+            if (API.IsLocalOnly && ReferenceEquals(user, API.LocalUser.Value))
+            {
+                ezLocalProfile.Show();
+                return;
+            }
+
+            userProfile.ShowUser(user);
+        });
 
         /// <summary>
         /// Show a beatmap's set as an overlay, displaying the given beatmap.
@@ -1027,6 +1072,9 @@ namespace osu.Game
             // To reproduce, run `TestSceneButtonSystemNavigation` ensuring `TestConstructor` runs before `TestFastShortcutKeys`.
             detachedBeatmapStore?.Dispose();
 
+            // 必须在配置管理器落盘前还原，否则压制值会被当成用户设置持久化。
+            turboMode?.Dispose();
+
             base.Dispose(isDisposing);
 
             sentryLogger.Dispose();
@@ -1044,11 +1092,23 @@ namespace osu.Game
             {
                 // General expectation that osu! starts in fullscreen by default (also gives the most predictable performance).
                 // However, macOS is bound to have issues when using exclusive fullscreen as it takes full control away from OS, therefore borderless is default there.
-                { FrameworkSetting.WindowMode, RuntimeInfo.OS == RuntimeInfo.Platform.macOS ? WindowMode.Borderless : WindowMode.Fullscreen },
+                { FrameworkSetting.WindowMode, WindowMode.Borderless }, // Ez2Lazer 默认无边框
                 { FrameworkSetting.VolumeUniversal, 0.6 },
                 { FrameworkSetting.VolumeMusic, 0.6 },
                 { FrameworkSetting.VolumeEffect, 0.6 },
+                { FrameworkSetting.AudioUseExperimentalWasapi, false }, // Ez2Lazer 默认使用传统音频，针对 ASIO / BASS 设备调优
             };
+        }
+
+        private void onCurrentSkinChangedForEzJson(ValueChangedEvent<Live<SkinInfo>> skin)
+        {
+            if (ezSkinEditor?.State.Value == Visibility.Visible)
+                return;
+
+            if (!Ez2ConfigManager.Get<bool>(Ez2Setting.EzSkinJsonAutoApplyOnSkinChange))
+                return;
+
+            EzSkinJsonAutoApply.TryApplyForSkin(SkinManager, skin.NewValue, Ez2ConfigManager);
         }
 
         protected override void LoadComplete()
@@ -1076,9 +1136,12 @@ namespace osu.Game
             MultiplayerClient.PostNotification = n => Notifications.Post(n);
             MultiplayerClient.PresentMatch = PresentMultiplayerMatch;
 
+            if (API is APIAccess api)
+                api.PostNotification = n => Notifications.Post(n);
+
             ScreenFooter.BackReceptor backReceptor;
 
-            dependencies.CacheAs(idleTracker = new GameIdleTracker(6000));
+            Dependencies.CacheAs(idleTracker = new GameIdleTracker(6000));
 
             var sessionIdleTracker = new GameIdleTracker(300000);
             sessionIdleTracker.IsIdle.BindValueChanged(idle =>
@@ -1106,27 +1169,40 @@ namespace osu.Game
                             Children = new Drawable[]
                             {
                                 backReceptor = new ScreenFooter.BackReceptor(),
-                                ScreenStack = new OsuScreenStack { RelativeSizeAxes = Axes.Both },
-                                logoContainer = new Container { RelativeSizeAxes = Axes.Both },
-                                // TODO: what is this? why is this?
-                                // TODO: this is being screen scaled even though it's probably AN OVERLAY.
-                                footerBasedOverlayContent = new Container
+                                // Footer / Mod 覆盖层位于 ScreenStack 之外，但必须共享相同的离屏缓冲区，以便 AcrylicBackdropDrawable 可以对歌曲选择界面进行采样。
+                                materialCaptureScope = new MaterialCaptureScope(screenCaptureContent = new Container
                                 {
-                                    Depth = -1,
                                     RelativeSizeAxes = Axes.Both,
-                                },
-                                new PopoverContainer
-                                {
-                                    // Ensure the footer is displayed above any content and/or overlays.
-                                    Depth = -1,
-                                    RelativeSizeAxes = Axes.Both,
-                                    Child = screenStackFooter = new ScreenStackFooter(ScreenStack, backReceptor)
+                                    Children = new Drawable[]
                                     {
-                                        // TODO: this is really really weird and should not exist.
-                                        RequestLogoInFront = inFront => ScreenContainer.ChangeChildDepth(logoContainer, inFront ? float.MinValue : 0),
-                                        BackButtonPressed = handleBackButton
-                                    },
-                                },
+                                        ScreenStack = new OsuScreenStack
+                                        {
+                                            RelativeSizeAxes = Axes.Both,
+                                            // Behind logo / footer overlays inside the capture buffer.
+                                            Depth = 1,
+                                        },
+                                        logoContainer = new Container { RelativeSizeAxes = Axes.Both },
+                                        // TODO: what is this? why is this?
+                                        // TODO: this is being screen scaled even though it's probably AN OVERLAY.
+                                        footerBasedOverlayContent = new Container
+                                        {
+                                            Depth = -1,
+                                            RelativeSizeAxes = Axes.Both,
+                                        },
+                                        new PopoverContainer
+                                        {
+                                            // Ensure the footer is displayed above any content and/or overlays.
+                                            Depth = -1,
+                                            RelativeSizeAxes = Axes.Both,
+                                            Child = screenStackFooter = new ScreenStackFooter(ScreenStack, backReceptor)
+                                            {
+                                                // TODO: this is really really weird and should not exist.
+                                                RequestLogoInFront = inFront => screenCaptureContent.ChangeChildDepth(logoContainer, inFront ? float.MinValue : 0),
+                                                BackButtonPressed = handleBackButton
+                                            },
+                                        },
+                                    }
+                                }),
                             }
                         },
                     }
@@ -1143,10 +1219,16 @@ namespace osu.Game
                 },
                 topMostOverlayContent = new Container { RelativeSizeAxes = Axes.Both },
                 idleTracker,
-                new ConfineMouseTracker()
+                new ConfineMouseTracker(),
             });
 
-            dependencies.Cache(ScreenFooter);
+            Dependencies.CacheAs<IMaterialCaptureRegistrar>(materialCaptureScope);
+
+            // Load volume overlay before anything else, so users can adjust volume as soon as feasible after startup.
+            loadComponentSingleFile(volume = new VolumeOverlay(), leftFloatingOverlayContent.Add, true);
+            Add(new ScrollAdjustsVolume(requireAltPressed: true));
+
+            Dependencies.Cache(ScreenFooter);
 
             ScreenStack.ScreenPushed += screenPushed;
             ScreenStack.ScreenExited += screenExited;
@@ -1185,7 +1267,8 @@ namespace osu.Game
                 },
             }, topMostOverlayContent.Add);
 
-            loadComponentSingleFile(volume = new VolumeOverlay(), leftFloatingOverlayContent.Add, true);
+            // TODO：如果支持启动动画模型，再另外考虑加载顺序。
+            loadComponentSingleFile(new EzDesktopPetLayer(), topMostOverlayContent.Add, true);
 
             onScreenDisplay = new OnScreenDisplay();
 
@@ -1218,33 +1301,69 @@ namespace osu.Game
             loadComponentSingleFile(channelManager = new ChannelManager(API), Add, true);
             loadComponentSingleFile(chatOverlay = new ChatOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(new MessageNotifier(), Add, true);
+            loadComponentSingleFile(new EzExternalRulesetManagerDialog(), overlayContent.Add, true);
+            loadComponentSingleFile(new EzFontSettingsOverlay(), topMostOverlayContent.Add, true);
             loadComponentSingleFile(Settings = new SettingsOverlay(), leftFloatingOverlayContent.Add, true);
             loadComponentSingleFile(changelogOverlay = new ChangelogOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(userProfile = new UserProfileOverlay(), overlayContent.Add, true);
+            loadComponentSingleFile(ezLocalProfile = new EzLocalProfileOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(beatmapSetOverlay = new BeatmapSetOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(wikiOverlay = new WikiOverlay(), overlayContent.Add, true);
+            // Above screens, below logo / footer / sheared overlays (higher Depth = further back).
+            loadComponentSingleFile(new EzLayoutLayer { Depth = 0.5f }, screenCaptureContent.Add, true);
+            // Ez 编辑器须先于官方 SkinEditor 入树，供 SkinEditorOverlay [Resolved] 注入。
+            loadComponentSingleFile(ezSkinEditor = new EzSkinEditorOverlay(ScreenContainer), overlayContent.Add, true);
             loadComponentSingleFile(skinEditor = new SkinEditorOverlay(ScreenContainer), overlayContent.Add, true);
 
-            loadComponentSingleFile(new LoginOverlay
+            // 官方皮肤编辑器可由热键直接打开，不一定经过 Ez 盖层的入口，故在此兜一互斥。
+            // 反向（打开 Ez 盖层时关官方）由各入口显式 Hide() 保证，不在这里回灌。
+            skinEditor.State.ValueChanged += state =>
+            {
+                if (state.NewValue == Visibility.Visible)
+                    ezSkinEditor.Hide();
+            };
+
+            loadComponentSingleFile(loginOverlay = new LoginOverlay
             {
                 Anchor = Anchor.TopRight,
                 Origin = Anchor.TopRight,
             }, rightFloatingOverlayContent.Add, true);
 
-            loadComponentSingleFile(new NowPlayingOverlay
+            loadComponentSingleFile(nowPlayingOverlay = new NowPlayingOverlay
             {
                 Anchor = Anchor.TopRight,
                 Origin = Anchor.TopRight,
             }, rightFloatingOverlayContent.Add, true);
 
             loadComponentSingleFile(new AccountCreationOverlay(), topMostOverlayContent.Add, true);
-            loadComponentSingleFile<IDialogOverlay>(new DialogOverlay(), topMostOverlayContent.Add, true);
+            loadComponentSingleFile<IDialogOverlay>(dialogOverlay = new DialogOverlay(), topMostOverlayContent.Add, true);
             loadComponentSingleFile(new MedalOverlay(), topMostOverlayContent.Add);
 
-            loadComponentSingleFile(new BackgroundDataStoreProcessor(), Add);
-            loadComponentSingleFile(new EzAnalysisWarmupProcessor(), Add);
+            // 缓存供 realm重算 使用，必须在 BackgroundDataStoreProcessor 之前注册。
+            loadComponentSingleFile(new BackgroundDataStoreProcessor(), Add, true);
             loadComponentSingleFile<BeatmapStore>(detachedBeatmapStore = new RealmDetachedBeatmapStore(), Add, true);
             loadComponentSingleFile(new QueueController(), Add, true);
+
+            if (Ez2ConfigManager.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled))
+                loadComponentSingleFile(new EzAnalysisWarmupProcessor(), Add, true);
+
+            // 角逐服务：仅实验开关开启时注册 DI 并挂载；关闭时 DI 解析为 null，进程内零实例零开销。
+            EzScoreRaceService scoreRaceService = null;
+
+            if (Ez2ConfigManager.Get<bool>(Ez2Setting.EzScoreRaceServiceEnabled))
+            {
+                scoreRaceService = new EzScoreRaceService();
+                loadComponentSingleFile(scoreRaceService, Add, true);
+            }
+
+            var loaderStartGate = new EzPlayerLoaderStartGate(scoreRaceService);
+            loadComponentSingleFile(loaderStartGate, Add, true);
+            Dependencies.CacheAs<IEzScoreRacePlayerStartGate>(loaderStartGate);
+
+            if (Ez2ConfigManager.Get<bool>(Ez2Setting.PixivAutoDownloadEnabled))
+                loadComponentSingleFile(new PixivAutoDownloadProcessor(), Add, true);
+
+            loadStartupContentPreloader();
 
             Add(externalLinkOpener = new ExternalLinkOpener());
             Add(new MusicKeyBindingHandler());
@@ -1252,7 +1371,7 @@ namespace osu.Game
             Add(new FriendPresenceNotifier());
 
             // side overlays which cancel each other.
-            var singleDisplaySideOverlays = new OverlayContainer[] { Settings, Notifications, FirstRunOverlay };
+            var singleDisplaySideOverlays = new OverlayContainer[] { Settings, Notifications, FirstRunOverlay, loginOverlay, nowPlayingOverlay };
 
             foreach (var overlay in singleDisplaySideOverlays)
             {
@@ -1265,7 +1384,7 @@ namespace osu.Game
             }
 
             // eventually informational overlays should be displayed in a stack, but for now let's only allow one to stay open at a time.
-            var informationalOverlays = new OverlayContainer[] { beatmapSetOverlay, userProfile };
+            var informationalOverlays = new OverlayContainer[] { beatmapSetOverlay, userProfile, ezLocalProfile };
 
             foreach (var overlay in informationalOverlays)
             {
@@ -1298,6 +1417,98 @@ namespace osu.Game
 
             // Importantly, this should be run after binding PostNotification to the import handlers so they can present the import after game startup.
             handleStartupImport();
+
+            applyConfigMigrations();
+
+            string lastVersion = LocalConfig.Get<string>(OsuSetting.Version);
+            string version = Version;
+
+            // only show a notification if we've previously saved a version to the config file (ie. not the first run).
+            if (IsDeployedBuild && !string.IsNullOrEmpty(lastVersion) && version != lastVersion)
+                Notifications.Post(new UpdateCompleteNotification(version));
+
+            // finally, update the version stored to the configuration.
+            // this MUST happen after `applyConfigMigrations()` call, as it relies on comparing the previous version.
+            // debug / local compilations will reset to a non-release string.
+            LocalConfig.SetValue(OsuSetting.Version, version);
+
+            var webSocketProvider = Dependencies.Get<IWebSocketProvider>();
+
+            if (webSocketProvider != null)
+            {
+                AddRange([
+                    new UserActivityWebSocketDataSource(webSocketProvider),
+                    new BeatmapStateWebSocketDataSource(webSocketProvider)
+                ]);
+            }
+        }
+
+        /// <summary>
+        /// Apply any migrations to configuration.
+        /// </summary>
+        /// <remarks>
+        /// For database migrations, see <see cref="RealmAccess.applyMigrationsForVersion"/>.
+        /// </remarks>
+        private void applyConfigMigrations()
+        {
+            // arrives as 2020.123.0-lazer
+            string rawVersion = LocalConfig.Get<string>(OsuSetting.Version);
+
+            if (rawVersion.Length < 6)
+                return;
+
+            string[] pieces = rawVersion.Split('.');
+
+            // on a fresh install or when coming from a non-release build, execution will end here.
+            // we don't want to run migrations in such cases.
+            if (!int.TryParse(pieces[0], out int year)) return;
+            if (!int.TryParse(pieces[1], out int monthDay)) return;
+
+            int combined = year * 10000 + monthDay;
+
+            if (combined < 20250214)
+            {
+                // UI scaling on mobile platforms has been internally adjusted such that 1x UI scale looks correctly zoomed in than before.
+                if (RuntimeInfo.IsMobile)
+                    LocalConfig.GetBindable<float>(OsuSetting.UIScale).SetDefault();
+            }
+
+            if (combined < 20260520)
+            {
+                // Pen tablet sensitivity is now separated from cursor sensitivity.
+                // Most users will want the default to be what they already had set on cursor sensitivity so let's transfer it.
+                var mouseHandler = Host?.AvailableInputHandlers.OfType<MouseHandler>().SingleOrDefault();
+                var penHandler = Host?.AvailableInputHandlers.OfType<PenHandler>().SingleOrDefault();
+
+                if (penHandler != null && mouseHandler != null && penHandler.Sensitivity.IsDefault)
+                    penHandler.Sensitivity.Value = mouseHandler.Sensitivity.Value;
+            }
+
+            if (combined < 20260521 && RuntimeInfo.OS == RuntimeInfo.Platform.Windows)
+            {
+                bool wasAlreadyUsing = Audio.UseExperimentalWasapi.Value;
+
+                // see application of FramedBeatmapClock.WINDOWS_EXPERIMENTAL_AUDIO_OFFSET in FramedBeatmapClock.
+                // this basically undoes this new offset assuming that users which have been using this setting for a while
+                // already have had things tuned.
+                if (wasAlreadyUsing)
+                    LocalConfig.SetValue(OsuSetting.AudioOffset, LocalConfig.Get<double>(OsuSetting.AudioOffset) - FramedBeatmapClock.WINDOWS_EXPERIMENTAL_AUDIO_OFFSET);
+
+                // 屏蔽这些，不需要删除
+                // Audio.UseExperimentalWasapi.Value = true;
+                //
+                // // TODO: can be removed 20270101.
+                // // leave the migration but just stop telling users about it. if they haven't been playing for this long they are more likely
+                // // to setup offset again, or even have different hardware.
+                // dialogOverlay.Push(new MigrateNewAudioDialog(wasAlreadyUsing));
+            }
+
+            if (combined < 20260728)
+            {
+#pragma warning disable CS0612 // Type or member is obsolete (MenuParallax exists solely to make this migration work, it should not be used anywhere else)
+                LocalConfig.SetValue<float>(OsuSetting.MenuParallaxScale, LocalConfig.Get<bool>(OsuSetting.MenuParallax) ? 1 : 0);
+#pragma warning restore CS0612 // Type or member is obsolete
+            }
         }
 
         private void handleBackButton()
@@ -1357,9 +1568,8 @@ namespace osu.Game
             if (entry.Exception is SentryOnlyDiagnosticsException)
                 return;
 
-            // Custom builds may hit server-side gating for online features.
-            // These messages are not actionable for end-users of this fork, so avoid spamming notifications.
-            if (entry.Message?.Contains("Realtime online functionality is not supported on this version of the game", StringComparison.OrdinalIgnoreCase) == true)
+            // Ez2Lazer屏蔽一些服务器向非官方客户端发送的通知噪音
+            if (entry.Message?.Contains("is not supported on this version of the game", StringComparison.OrdinalIgnoreCase) == true)
                 return;
 
             if (entry.Message?.Contains("Please ensure that you are using the latest version of the official game releases", StringComparison.OrdinalIgnoreCase) == true)
@@ -1381,7 +1591,7 @@ namespace osu.Game
             {
                 LocalisableString message;
 
-                if (entry.Exception != null && IsDeployedBuild)
+                if (entry.Exception != null && SubmitErrorsToSentry)
                     message = LocalisableString.Interpolate($"{entry.Message.Truncate(256)}\n\n{NotificationsStrings.ErrorAutomaticallyReported}");
                 else
                     message = entry.Message.Truncate(256);
@@ -1474,7 +1684,7 @@ namespace osu.Game
             where T : class
         {
             if (cache)
-                dependencies.CacheAs(component);
+                Dependencies.CacheAs(component);
 
             var drawableComponent = component as Drawable ?? throw new ArgumentException($"Component must be a {nameof(Drawable)}", nameof(component));
 
@@ -1569,6 +1779,16 @@ namespace osu.Game
                     return true;
 
                 case GlobalAction.ToggleProfile:
+                    if (API.IsLocalOnly)
+                    {
+                        if (ezLocalProfile.State.Value == Visibility.Visible)
+                            ezLocalProfile.Hide();
+                        else
+                            ezLocalProfile.Show();
+
+                        return true;
+                    }
+
                     if (userProfile.State.Value == Visibility.Visible)
                         userProfile.Hide();
                     else
@@ -1664,20 +1884,32 @@ namespace osu.Game
             ScreenOffsetContainer.Padding = new MarginPadding { Top = toolbarOffset };
             overlayOffsetContainer.Padding = new MarginPadding { Top = toolbarOffset };
 
-            float horizontalOffset = 0f;
-
-            // Content.ToLocalSpace() is used instead of this.ToLocalSpace() to correctly calculate the offset with scaling modes active.
-            // Content is a child of a scaling container with ScalingMode.Everything set, while the game itself is never scaled.
-            // this avoids a visible jump in the positioning of the screen offset container.
-            if (Settings.IsLoaded && Settings.IsPresent)
-                horizontalOffset += Content.ToLocalSpace(Settings.ScreenSpaceDrawQuad.TopRight).X * SIDE_OVERLAY_OFFSET_RATIO;
-            if (Notifications.IsLoaded && Notifications.IsPresent)
-                horizontalOffset += (Content.ToLocalSpace(Notifications.ScreenSpaceDrawQuad.TopLeft).X - Content.DrawWidth) * SIDE_OVERLAY_OFFSET_RATIO;
-
-            ScreenOffsetContainer.X = horizontalOffset;
-            overlayContent.X = horizontalOffset * 1.2f;
+            adjustGlobalScreenOffset();
 
             GlobalCursorDisplay.ShowCursor = (ScreenStack.CurrentScreen as IOsuScreen)?.CursorVisible ?? false;
+        }
+
+        private float horizontalOffsetAdjust;
+
+        /// <summary>
+        /// When a screen-edge overlay is present, we push the game content slightly in its direction to create a sense of depth.
+        /// </summary>
+        private void adjustGlobalScreenOffset()
+        {
+            float adjust = 0f;
+
+            if (Settings.IsLoaded && Settings.State.Value == Visibility.Visible)
+                adjust += SettingsPanel.WIDTH * SIDE_OVERLAY_OFFSET_RATIO;
+            if (Notifications.IsLoaded && Notifications.State.Value == Visibility.Visible)
+                adjust -= NotificationOverlay.WIDTH * SIDE_OVERLAY_OFFSET_RATIO;
+
+            horizontalOffsetAdjust = (float)Interpolation.DampContinuously(horizontalOffsetAdjust, adjust, 100, Time.Elapsed);
+            // Avoid having everything on the screen moving by miniscule amounts (can create overhead on busy screens).
+            if (adjust == 0 && Math.Abs(horizontalOffsetAdjust) < 0.2f)
+                horizontalOffsetAdjust = 0;
+
+            ScreenOffsetContainer.X = horizontalOffsetAdjust;
+            overlayContent.X = horizontalOffsetAdjust * 1.2f;
         }
 
         protected virtual void ScreenChanged([CanBeNull] IOsuScreen current, [CanBeNull] IOsuScreen newScreen)
@@ -1753,6 +1985,7 @@ namespace osu.Game
         private void screenExited(IScreen lastScreen, IScreen newScreen)
         {
             ScreenChanged((OsuScreen)lastScreen, (OsuScreen)newScreen);
+            startupSongSelectPreload((OsuScreen)lastScreen, (OsuScreen)newScreen);
 
             if (newScreen == null)
                 Exit();

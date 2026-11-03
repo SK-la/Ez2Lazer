@@ -2,18 +2,21 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Input.Events;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
 using osu.Game.Overlays.Settings;
@@ -46,6 +49,9 @@ namespace osu.Game.Overlays.Login
 
         [Resolved]
         private OsuConfigManager config { get; set; } = null!;
+
+        [Resolved]
+        private EzLocalProfileOverlay? localProfileOverlay { get; set; }
 
         public override RectangleF BoundingBox => bounding ? base.BoundingBox : RectangleF.Empty;
 
@@ -118,15 +124,69 @@ namespace osu.Game.Overlays.Login
                                 Origin = Anchor.TopCentre,
                                 TextAnchor = Anchor.TopCentre,
                                 AutoSizeAxes = Axes.Both,
-                                Text = state.NewValue == APIState.Failing ? ToolbarStrings.AttemptingToReconnect : ToolbarStrings.Connecting,
                             },
                         },
                     };
 
-                    linkFlow.AddLink(Resources.Localisation.Web.CommonStrings.ButtonsCancel.ToLower(), api.Logout, string.Empty);
+                    if (!string.IsNullOrEmpty(api.UserFacingOutageMessage.Value))
+                    {
+                        linkFlow.AddText("Server outage in progress".ToUpperInvariant(), s =>
+                        {
+                            s.Font = OsuFont.Style.Caption2.With(weight: FontWeight.Bold);
+                            s.Colour = Colour4.Orange;
+                        });
+
+                        linkFlow.AddParagraph(api.UserFacingOutageMessage.Value, s => s.Font = OsuFont.Style.Caption1);
+                    }
+                    else if (state.NewValue == APIState.Failing)
+                    {
+                        linkFlow.AddParagraph(state.NewValue == APIState.Failing ? ToolbarStrings.AttemptingToReconnect : ToolbarStrings.Connecting, s =>
+                        {
+                            s.Font = OsuFont.Style.Caption2.With(weight: FontWeight.Bold);
+                            s.Colour = Colour4.Orange;
+                        });
+                    }
+                    else
+                    {
+                        linkFlow.AddParagraph(ToolbarStrings.Connecting, s =>
+                            s.Font = OsuFont.Style.Caption2.With(weight: FontWeight.Bold));
+                    }
+
+                    linkFlow.NewParagraph();
+                    linkFlow.AddLink(LoginPanelStrings.SignOut, api.Logout, string.Empty, s => s.Font = OsuFont.Style.Caption2);
                     break;
 
                 case APIState.Online:
+                case APIState.LocalOnline:
+                {
+                    var signedInChildren = new List<Drawable>
+                    {
+                        new OsuSpriteText
+                        {
+                            Anchor = Anchor.TopCentre,
+                            Origin = Anchor.TopCentre,
+                            Text = LoginPanelStrings.SignedIn,
+                            Font = OsuFont.GetFont(size: 18, weight: FontWeight.Bold),
+                        },
+                        new UserRankPanel(api.LocalUser.Value)
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            Action = RequestHide
+                        },
+                        new RoundedButton
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            Text = EzSettingsProfile.LOCAL_PROFILE_PANEL_BUTTON,
+                            Action = () =>
+                            {
+                                RequestHide?.Invoke();
+                                localProfileOverlay?.Show();
+                            },
+                        },
+                    };
+
+                    signedInChildren.Add(dropdown = new UserDropdown { RelativeSizeAxes = Axes.X });
+
                     Child = new FillFlowContainer
                     {
                         RelativeSizeAxes = Axes.X,
@@ -134,22 +194,7 @@ namespace osu.Game.Overlays.Login
                         Padding = new MarginPadding { Horizontal = SettingsPanel.CONTENT_MARGINS },
                         Direction = FillDirection.Vertical,
                         Spacing = new Vector2(0f, SettingsSection.ITEM_SPACING),
-                        Children = new Drawable[]
-                        {
-                            new OsuSpriteText
-                            {
-                                Anchor = Anchor.TopCentre,
-                                Origin = Anchor.TopCentre,
-                                Text = LoginPanelStrings.SignedIn,
-                                Font = OsuFont.GetFont(size: 18, weight: FontWeight.Bold),
-                            },
-                            new UserRankPanel(api.LocalUser.Value)
-                            {
-                                RelativeSizeAxes = Axes.X,
-                                Action = RequestHide
-                            },
-                            dropdown = new UserDropdown { RelativeSizeAxes = Axes.X },
-                        },
+                        Children = signedInChildren,
                     };
 
                     updateDropdownCurrent(configUserStatus.Value);
@@ -179,6 +224,7 @@ namespace osu.Game.Overlays.Login
                     }, true);
 
                     break;
+                }
             }
 
             if (form != null)

@@ -25,6 +25,21 @@ namespace osu.Game.Rulesets.Objects
 
         public static IEnumerable<SliderEventDescriptor> Generate(double startTime, double spanDuration, double velocity, double tickDistance, double totalDistance, int spanCount,
                                                                   CancellationToken cancellationToken = default)
+            => Generate(startTime, spanDuration, velocity, tickDistance, totalDistance, spanCount, velocity * 10, cancellationToken);
+
+        /// <summary>
+        /// 生成滑条事件，并在路径末端使用显式边距（该边距内不放置 tick）。
+        /// </summary>
+        /// <param name="minDistanceFromEnd">
+        /// 路径末端停止放置 tick 的距离。osu!stable 停在 <c>0.01 * velocity</c>，
+        /// 而非默认使用的更大边距。
+        /// </param>
+        /// <param name="skipRepeatsOnShortSpans">
+        /// 无法容纳评分点的 span 是否不产生折返；osu!stable 由实际放下的评分点推导折返，结果即如此。
+        /// </param>
+        public static IEnumerable<SliderEventDescriptor> Generate(double startTime, double spanDuration, double velocity, double tickDistance, double totalDistance, int spanCount,
+                                                                  double minDistanceFromEnd, CancellationToken cancellationToken = default,
+                                                                  bool skipRepeatsOnShortSpans = false)
         {
             // A very lenient maximum length of a slider for ticks to be generated.
             // This exists for edge cases such as /b/1573664 where the beatmap has been edited by the user, and should never be reached in normal usage.
@@ -32,8 +47,6 @@ namespace osu.Game.Rulesets.Objects
 
             double length = Math.Min(max_length, totalDistance);
             tickDistance = Math.Clamp(tickDistance, 0, length);
-
-            double minDistanceFromEnd = velocity * 10;
 
             yield return new SliderEventDescriptor
             {
@@ -67,6 +80,12 @@ namespace osu.Game.Rulesets.Objects
 
                 if (span < spanCount - 1)
                 {
+                    // osu!stable 按放下的评分点计数标记折返，无法容纳评分点的 span 完全没有折返标记。
+                    // 两种情况：tick 被禁用，或不够走完一个评分距离并保留末端边距。
+                    // Aspire 把数千 span 挤进不足一单位，每个都是这种状态，stable 因此完全不显示折返。
+                    if (skipRepeatsOnShortSpans && !(length > tickDistance + minDistanceFromEnd))
+                        continue;
+
                     yield return new SliderEventDescriptor
                     {
                         Type = SliderEventType.Repeat,

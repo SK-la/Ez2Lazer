@@ -1,24 +1,24 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
-using System.Linq;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Game.Configuration;
+using osu.Framework.Logging;
+using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania;
+using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
-using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mania.Skinning;
+using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Mania.UI.Components;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -38,6 +38,12 @@ namespace osu.Game.Rulesets.Mania.UI
         [Cached]
         public readonly StageDefinition Definition;
 
+        /// <summary>
+        /// 每列按键的按下状态。舞台板上的按键贴图读它，输入仍由各列的 <see cref="EzKeyArea"/> 写入。
+        /// </summary>
+        [Cached]
+        public readonly EzStageKeyState KeyState;
+
         public const float COLUMN_SPACING = 1;
 
         public const float HIT_TARGET_POSITION = 110;
@@ -47,6 +53,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private readonly JudgementContainer<DrawableManiaJudgement> judgements;
         private readonly JudgementPooler<DrawableManiaJudgement> judgementPooler;
+
+        private readonly ManiaJudgementLine judgementLine;
 
         private readonly Drawable barLineContainer;
 
@@ -68,27 +76,28 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
-        [Resolved]
-        private OsuConfigManager osuConfig { get; set; } = null!;
-
-        [Resolved(canBeNull: true)]
-        private IBackdropCaptureSourceProvider? backdropCaptureSourceProvider { get; set; }
-
         // private Bindable<double> osuConfigDim = null!;
         private Bindable<double> columnDim = null!;
-        private Bindable<double> columnBlur = null!;
-        private bool blurEnabledByConfig;
-
-        private bool showBlur => GlobalConfigStore.EzConfig.Get<double>(Ez2Setting.ColumnBlur) > 0;
 
         private readonly Box dimBox;
-        private readonly BackdropBlurDrawable? stageBackdropBlur;
-        private readonly SkinnableDrawable stageForeground;
+        public readonly SkinnableDrawable StageBackground;
+        public readonly SkinnableDrawable StageForeground;
+
+        /// <summary>
+        /// Whether the stage panel may be shown at all. Stages used by the ruleset editor override this.
+        /// </summary>
+        protected virtual bool AllowStagePanel => true;
+
+        /// <summary>
+        /// Whether the JudgementLine should be shown.
+        /// </summary>
+        protected virtual bool ShowJudgementLine => false;
 
         public Stage(int firstColumnIndex, StageDefinition definition, ref ManiaAction columnStartAction)
         {
             this.firstColumnIndex = firstColumnIndex;
             Definition = definition;
+            KeyState = new EzStageKeyState(ManiaPlayfieldLayoutHelper.GetDisplayColumnCount(definition));
 
             Name = "Stage";
 
@@ -102,18 +111,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
             InternalChildren = new Drawable[]
             {
-                (stageBackdropBlur = showBlur
-                    ? new BackdropBlurDrawable
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                        Anchor = Anchor.Centre,
-                        Origin = Anchor.Centre,
-                        EffectEnabled = false,
-                        // FrameBufferScale = new Vector2(0.2f),
-                        CaptureFrameInterval = 3,
-                        MaxCapturesPerSecond = 300,
-                    }
-                    : null) ?? Empty(),
+                new EzStageBackdrop(),
                 dimBox = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
@@ -127,7 +125,7 @@ namespace osu.Game.Rulesets.Mania.UI
                     AutoSizeAxes = Axes.X,
                     Children = new Drawable[]
                     {
-                        new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.StageBackground), _ => new DefaultStageBackground())
+                        StageBackground = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.StageBackground), _ => new DefaultStageBackground())
                         {
                             RelativeSizeAxes = Axes.Both
                         },
@@ -158,28 +156,37 @@ namespace osu.Game.Rulesets.Mania.UI
                         {
                             RelativeSizeAxes = Axes.Y,
                         },
-                        stageForeground = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.StageForeground))
+                        StageForeground = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.StageForeground))
                         {
                             RelativeSizeAxes = Axes.Both
                         },
                         new HitPositionPaddedContainer
                         {
                             RelativeSizeAxes = Axes.Both,
-                            Child = judgements = new JudgementContainer<DrawableManiaJudgement>
+                            Children = new Drawable[]
                             {
-                                RelativeSizeAxes = Axes.Both,
-                            },
+                                judgements = new JudgementContainer<DrawableManiaJudgement>
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                },
+                                judgementLine = new ManiaJudgementLine
+                                {
+                                    // Always present so the playfield and the extension columns can show the same line;
+                                    // the editor enables it, gameplay keeps it invisible.
+                                    Alpha = ShowJudgementLine ? ManiaJudgementLine.LINE_ALPHA : 0,
+                                }
+                            }
                         },
                         topLevelContainer = new Container { RelativeSizeAxes = Axes.Both }
                     }
                 }
             };
 
-            for (int i = 0; i < definition.Columns; i++)
+            int displayColumns = ManiaPlayfieldLayoutHelper.GetDisplayColumnCount(definition);
+
+            for (int i = 0; i < displayColumns; i++)
             {
                 bool isSpecial = definition.IsSpecialColumn(i);
-                // 必须使用全局静态，类型构造时无法获取自动注入
-                // bool isSpecial = GlobalConfigStore.EzConfig.IsSpecialColumnFast(definition.Columns, i);
 
                 var action = columnStartAction;
                 columnStartAction++;
@@ -196,9 +203,12 @@ namespace osu.Game.Rulesets.Mania.UI
                 AddNested(column);
             }
 
-            var hitWindows = new ManiaHitWindows();
-
-            AddInternal(judgementPooler = new JudgementPooler<DrawableManiaJudgement>(Enum.GetValues<HitResult>().Where(hitWindows.IsHitResultAllowed)));
+            // [Ez] 池按「任一 JudgeMode 下可能出现的判定」预热，不能按当前设置的 ManiaHitWindows 推导：
+            // 当局用的 JudgeMode / 血量模式取自冻结环境（回放是成绩里嵌入的模式），池缺项时
+            // JudgementPooler.Get 返回 null，该判定会被静默跳过不显示。
+            // 但只预热能作为判定图展示的判定：IgnoreHit / IgnoreMiss / ComboBreak 仅供计分，
+            // 进池既白建 drawable，又会让缺资源的皮肤回退成默认文字判定（把内部结果名画到屏幕上）。
+            AddInternal(judgementPooler = new JudgementPooler<DrawableManiaJudgement>(JudgeModeHelper.AllModeDisplayableHitResults));
 
             RegisterPool<BarLine, DrawableBarLine>(50, 200);
         }
@@ -210,9 +220,6 @@ namespace osu.Game.Rulesets.Mania.UI
         private void load(ISkinSource skin)
         {
             currentSkin = skin;
-
-            if (stageBackdropBlur != null)
-                stageBackdropBlur.CaptureSourceProvider = backdropCaptureSourceProvider;
 
             currentSkin.SourceChanged += onSkinChanged;
             onSkinChanged();
@@ -226,27 +233,30 @@ namespace osu.Game.Rulesets.Mania.UI
                 dimBox.Alpha = (float)v.NewValue;
             }, true);
 
-            columnBlur = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnBlur);
-            columnBlur.BindValueChanged(v =>
-            {
-                float sigma = (float)v.NewValue * 50;
-                blurEnabledByConfig = sigma > 0.01f;
-
-                if (stageBackdropBlur != null)
-                {
-                    stageBackdropBlur.BlurSigma = new Vector2(sigma);
-                    updateBackdropBlurState();
-                }
-            }, true);
-
             var stagePanelEnabled = ezSkinConfig.GetBindable<bool>(Ez2Setting.StagePanelEnabled);
-            stagePanelEnabled.BindValueChanged(e =>
+            stagePanelEnabled.BindValueChanged(setStagePanelVisible, true);
+        }
+
+        private void setStagePanelVisible(ValueChangedEvent<bool> b)
+        {
+            if (!AllowStagePanel)
             {
-                if (e.NewValue)
-                    stageForeground.Show();
+                StageBackground.Alpha = 0;
+                StageForeground.Alpha = 0;
+            }
+            else
+            {
+                if (b.NewValue)
+                {
+                    StageBackground.Show();
+                    StageForeground.Show();
+                }
                 else
-                    stageForeground.Hide();
-            }, true);
+                {
+                    StageBackground.Hide();
+                    StageForeground.Hide();
+                }
+            }
         }
 
         private void onSkinChanged()
@@ -266,21 +276,6 @@ namespace osu.Game.Rulesets.Mania.UI
             // must happen before children are disposed in base call to prevent illegal accesses to the judgement pool.
             NewResult -= OnNewResult;
 
-            // 清理模糊容器的引用，释放 D3D11 渲染目标资源
-            if (stageBackdropBlur != null)
-            {
-                // 先禁用效果，防止清理过程中继续捕获
-                stageBackdropBlur.EffectEnabled = false;
-
-                // 断开所有捕获目标
-                stageBackdropBlur.CaptureSourceProvider = null;
-                stageBackdropBlur.CaptureTarget = null;
-                stageBackdropBlur.CaptureTargets.Clear();
-
-                // 强制过期并移除
-                stageBackdropBlur.Expire();
-            }
-
             base.Dispose(isDisposing);
 
             if (currentSkin.IsNotNull())
@@ -293,13 +288,53 @@ namespace osu.Game.Rulesets.Mania.UI
             NewResult += OnNewResult;
         }
 
-        public override void Add(HitObject hitObject) => Columns[((ManiaHitObject)hitObject).Column - firstColumnIndex].Add(hitObject);
+        public override void Add(HitObject hitObject)
+        {
+            if (!tryGetColumnForHitObject((ManiaHitObject)hitObject, out var column))
+                return;
 
-        public override bool Remove(HitObject hitObject) => Columns[((ManiaHitObject)hitObject).Column - firstColumnIndex].Remove(hitObject);
+            column.Add(hitObject);
+        }
 
-        public override void Add(DrawableHitObject h) => Columns[((ManiaHitObject)h.HitObject).Column - firstColumnIndex].Add(h);
+        public override bool Remove(HitObject hitObject)
+        {
+            if (!tryGetColumnForHitObject((ManiaHitObject)hitObject, out var column))
+                return false;
 
-        public override bool Remove(DrawableHitObject h) => Columns[((ManiaHitObject)h.HitObject).Column - firstColumnIndex].Remove(h);
+            return column.Remove(hitObject);
+        }
+
+        public override void Add(DrawableHitObject h)
+        {
+            if (!tryGetColumnForHitObject((ManiaHitObject)h.HitObject, out var column))
+                return;
+
+            column.Add(h);
+        }
+
+        public override bool Remove(DrawableHitObject h)
+        {
+            if (!tryGetColumnForHitObject((ManiaHitObject)h.HitObject, out var column))
+                return false;
+
+            return column.Remove(h);
+        }
+
+        private bool tryGetColumnForHitObject(ManiaHitObject hitObject, out Column column)
+        {
+            column = null!;
+
+            int localColumn = hitObject.Column - firstColumnIndex;
+
+            if (ManiaPlayfieldLayoutHelper.ShouldSkipBeatmapColumn(Definition, localColumn))
+            {
+                Logger.Log($"Skipping hit object in column {hitObject.Column} because Ez2Ac mode hides the last column of 14K beatmaps.");
+                return false;
+            }
+
+            column = Columns[localColumn];
+            return true;
+        }
 
         public void Add(BarLine barLine) => base.Add(barLine);
 
@@ -308,11 +343,22 @@ namespace osu.Game.Rulesets.Mania.UI
             if (!judgedObject.DisplayResult || !DisplayJudgements.Value)
                 return;
 
+            // IgnoreHit / IgnoreMiss / ComboBreak 只是供分数统计使用的辅助结果（如 EZ2AC / Malody 的 LN 尾、
+            // HoldNote 父物件、tick 等），不是真正打在玩家身上的判定档。池里本就不该有它们（见 Stage 构造），
+            // 这里再兜一层：一旦被放进来，缺资源的皮肤会回退成默认文字判定，把内部结果名画到屏幕上。
+            if (!result.Type.IsBasic())
+                return;
+
             judgements.Clear(false);
 
-            var drawableJudgement = judgementPooler.Get(result.Type, j => j.Apply(result, judgedObject));
+            // 不用 setup 委托：`Apply` 只做字段赋值，真正的动画在下一帧 PrepareForUse 里跑。
+            // 但 JudgementContainer.Add 会同步读 JudgedHitObject，所以赋值必须在 Add 之前。
+            var drawableJudgement = judgementPooler.Get(result.Type, null);
+
             if (drawableJudgement == null)
                 return;
+
+            drawableJudgement.Apply(result, judgedObject);
 
             judgements.Add(drawableJudgement);
         }
@@ -322,14 +368,6 @@ namespace osu.Game.Rulesets.Mania.UI
             // Due to masking differences, it is not possible to get the width of the columns container automatically
             // While masking on effectively only the Y-axis, so we need to set the width of the bar line container manually
             barLineContainer.Width = columnFlow.Width;
-        }
-
-        private void updateBackdropBlurState()
-        {
-            if (stageBackdropBlur == null)
-                return;
-
-            stageBackdropBlur.EffectEnabled = blurEnabledByConfig;
         }
     }
 }

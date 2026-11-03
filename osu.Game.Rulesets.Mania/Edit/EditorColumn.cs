@@ -1,7 +1,9 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Shapes;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -13,6 +15,21 @@ namespace osu.Game.Rulesets.Mania.Edit
         public EditorColumn(int index, bool isSpecial)
             : base(index, isSpecial)
         {
+        }
+
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            // With the skin's column background gone, column boundaries have to be marked here. Drawn behind the notes
+            // (the column background layer is proxied below the playfield) so it reads as a divider, not an overlay.
+            BackgroundContainer.Add(new Box
+            {
+                RelativeSizeAxes = Axes.Y,
+                Width = 1,
+                Anchor = Anchor.TopRight,
+                Origin = Anchor.TopRight,
+                Colour = Colour4.White.Opacity(0.25f),
+            });
         }
 
         protected override void OnNewDrawableHitObject(DrawableHitObject drawableHitObject)

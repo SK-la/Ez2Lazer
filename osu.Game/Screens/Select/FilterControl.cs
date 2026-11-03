@@ -16,18 +16,21 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.UI;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Input.Bindings;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Localization;
-using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
@@ -43,22 +46,21 @@ namespace osu.Game.Screens.Select
     public sealed partial class FilterControl : OverlayContainer
     {
         // taken from draw visualiser. used for carousel alignment purposes.
-        public const float HEIGHT_FROM_SCREEN_TOP = 171 - corner_radius;
+        public const float HEIGHT_FROM_SCREEN_TOP = 171 - CORNER_RADIUS;
 
-        private const float corner_radius = 10;
+        public const float CORNER_RADIUS = EzUIStyleV1.CORNER_RADIUS_WEDGE;
 
         public IBindable<BeatmapSetInfo?> ScopedBeatmapSet { get; } = new Bindable<BeatmapSetInfo?>();
 
         private SongSelectSearchTextBox searchTextBox = null!;
         private ShearedToggleButton showConvertedBeatmapsButton = null!;
         private DifficultyRangeSlider difficultyRangeSlider = null!;
-        private ShearedDropdown<SortMode> sortDropdown = null!;
+        private SortModeDropdown sortDropdown = null!; // Ez功能
         private ShearedDropdown<GroupModeDropdownItem> groupDropdown = null!;
-        private CollectionDropdown collectionDropdown = null!;
         private EzKeyModeSelector csSelector = null!;
         private ShearedKSPreviewButton ksPreviewButton = null!;
-        private ShearedToggleButton sqliteFilterButton = null!;
-        private ShearedDropdown<EzEnumChartDisplay> kpcDropdown = null!;
+        private ShearedToggleButton ezAnalysisFilterButton = null!;
+        private readonly Bindable<string> configCollectionFilter = new Bindable<string>();
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
@@ -108,16 +110,16 @@ namespace osu.Game.Screens.Select
             AutoSizeAxes = Axes.Y;
 
             Shear = OsuGame.SHEAR;
-            Margin = new MarginPadding { Top = -corner_radius, Right = -40 };
+            Margin = new MarginPadding { Top = -CORNER_RADIUS, Right = -40 };
 
             InternalChildren = new Drawable[]
             {
                 new Container
                 {
                     RelativeSizeAxes = Axes.Both,
-                    CornerRadius = corner_radius,
+                    CornerRadius = CORNER_RADIUS,
                     Masking = true,
-                    Child = new WedgeBackground
+                    Child = new EzSongSelectWedgeBackground
                     {
                         Anchor = Anchor.TopRight,
                         Scale = new Vector2(-1, 1),
@@ -129,7 +131,7 @@ namespace osu.Game.Screens.Select
                     AutoSizeAxes = Axes.Y,
                     Direction = FillDirection.Vertical,
                     Spacing = new Vector2(0f, 5f),
-                    Padding = new MarginPadding { Top = corner_radius + 5, Bottom = 2, Right = 40f, Left = 2f },
+                    Padding = new MarginPadding { Top = CORNER_RADIUS - 0.5f, Bottom = 2, Right = 40f, Left = 2f },
                     Children = new Drawable[]
                     {
                         new ReverseChildIDFillFlowContainer<Drawable>
@@ -137,7 +139,7 @@ namespace osu.Game.Screens.Select
                             RelativeSizeAxes = Axes.X,
                             AutoSizeAxes = Axes.Y,
                             Direction = FillDirection.Vertical,
-                            Spacing = new Vector2(0f, 5f),
+                            Spacing = new Vector2(0f, 0.5f),
                             Children = new Drawable[]
                             {
                                 new Container
@@ -208,17 +210,15 @@ namespace osu.Game.Screens.Select
                                         new Dimension(maxSize: 180),
                                         new Dimension(GridSizeMode.Absolute, 5),
                                         new Dimension(),
-                                        new Dimension(maxSize: 120),
                                         new Dimension(GridSizeMode.AutoSize),
                                     },
                                     Content = new[]
                                     {
                                         new[]
                                         {
-                                            sortDropdown = new ShearedDropdown<SortMode>(SongSelectStrings.Sort)
+                                            sortDropdown = new SortModeDropdown(SongSelectStrings.Sort)
                                             {
                                                 RelativeSizeAxes = Axes.X,
-                                                Items = Enum.GetValues<SortMode>(),
                                             },
                                             Empty(),
                                             groupDropdown = new GroupModeDropdown(SongSelectStrings.Group)
@@ -226,14 +226,9 @@ namespace osu.Game.Screens.Select
                                                 RelativeSizeAxes = Axes.X,
                                             },
                                             Empty(),
-                                            collectionDropdown = new CollectionDropdown
+                                            new CollectionDropdown
                                             {
                                                 RelativeSizeAxes = Axes.X,
-                                            },
-                                            kpcDropdown = new ShearedDropdown<EzEnumChartDisplay>("KPC")
-                                            {
-                                                RelativeSizeAxes = Axes.X,
-                                                Items = Enum.GetValues<EzEnumChartDisplay>(),
                                             },
                                         }
                                     }
@@ -259,13 +254,13 @@ namespace osu.Game.Screens.Select
                                                 RelativeSizeAxes = Axes.X,
                                             },
                                             Empty(),
-                                            sqliteFilterButton = new ShearedToggleButton
+                                            ezAnalysisFilterButton = new ShearedToggleButton
                                             {
                                                 Anchor = Anchor.Centre,
                                                 Origin = Anchor.Centre,
                                                 AutoSizeAxes = Axes.X,
-                                                Text = "sqlite",
-                                                TooltipText = EzSongSelectStrings.SQLITE_FILTER_TOOLTIP,
+                                                Text = EzSongSelectStrings.EZ_ANALYSIS_FILTER,
+                                                TooltipText = EzSongSelectStrings.EZ_ANALYSIS_FILTER_TOOLTIP,
                                                 Height = 30f,
                                             },
                                         },
@@ -293,9 +288,9 @@ namespace osu.Game.Screens.Select
             difficultyRangeSlider.UpperBound = config.GetBindable<double>(OsuSetting.DisplayStarsMaximum);
             config.BindWith(OsuSetting.ShowConvertedBeatmaps, showConvertedBeatmapsButton.Active);
             config.BindWith(OsuSetting.SongSelectSortingMode, sortDropdown.Current);
+            config.BindWith(OsuSetting.SongSelectCollectionFilter, configCollectionFilter);
 
-            ezConfig.BindWith(Ez2Setting.KpcDisplayMode, kpcDropdown.Current);
-            ezConfig.BindWith(Ez2Setting.SqliteFilter, sqliteFilterButton.Active);
+            ezConfig.BindWith(Ez2Setting.EzAnalysisFilter, ezAnalysisFilterButton.Active);
             ezConfig.BindWith(Ez2Setting.KeySoundPreviewMode, ksPreviewButton.State);
 
             ruleset.BindValueChanged(_ =>
@@ -315,7 +310,7 @@ namespace osu.Game.Screens.Select
                     return;
 
                 var rulesetCriteria = currentCriteria.RulesetCriteria;
-                if (sortDropdown.Current.Value == SortMode.PP || rulesetCriteria?.FilterMayChangeFromMods(currentCriteria, m) == true)
+                if (sortDropdown.Current.Value is SortMode.PP or SortMode.XxyStarRating || rulesetCriteria?.FilterMayChangeFromMods(currentCriteria, m) == true)
                     updateCriteria();
             });
 
@@ -332,21 +327,25 @@ namespace osu.Game.Screens.Select
 
                 manageCollectionsDialog.Show();
             };
-            difficultyRangeSlider.LowerBound.BindValueChanged(_ => updateCriteria());
-            difficultyRangeSlider.UpperBound.BindValueChanged(_ => updateCriteria());
+
+            ScheduledDelegate? sliderDebounce = null;
+
+            // For slider dragging (where input events can arrive very often), even creating criteria can have
+            // overhead, especially when a collection is selected (see ToImmutableHashSet() call).
+            void debouncedUpdateCriteria()
+            {
+                sliderDebounce?.Cancel();
+                sliderDebounce = Scheduler.AddDelayed(() => updateCriteria(), 50);
+            }
+
+            difficultyRangeSlider.LowerBound.BindValueChanged(_ => debouncedUpdateCriteria());
+            difficultyRangeSlider.UpperBound.BindValueChanged(_ => debouncedUpdateCriteria());
+
             showConvertedBeatmapsButton.Active.BindValueChanged(_ => updateCriteria());
             sortDropdown.Current.BindValueChanged(_ => updateCriteria());
             groupDropdown.Current.BindValueChanged(_ => updateCriteria());
-            collectionDropdown.Current.BindValueChanged(v =>
-            {
-                // The hope would be that this never arrives here, but due to bindings receiving changes before
-                // local ValueChanged events, that's not the case (see https://github.com/ppy/osu-framework/pull/1545).
-                if (v.NewValue is ManageCollectionsFilterMenuItem || v.OldValue is ManageCollectionsFilterMenuItem)
-                    return;
-
-                updateCriteria();
-            });
-            collectionsSubscription = realm.RegisterForNotifications(r => r.All<BeatmapCollection>(), (collections, changeSet) =>
+            configCollectionFilter.BindValueChanged(_ => updateCriteria());
+            collectionsSubscription = realm.RegisterForNotifications(r => r.All<BeatmapCollection>(), (_, changeSet) =>
             {
                 if (changeSet != null && groupDropdown.Current.Value.Value == GroupMode.Collections)
                     updateCriteria();
@@ -357,7 +356,7 @@ namespace osu.Game.Screens.Select
             ScopedBeatmapSet.BindValueChanged(_ => updateCriteria(clearScopedSet: false));
 
             csSelector.Current.BindValueChanged(_ => updateCriteria());
-            sqliteFilterButton.Active.BindValueChanged(_ => updateCriteria());
+            ezAnalysisFilterButton.Active.BindValueChanged(_ => updateCriteria());
 
             updateEzControlVisibility();
             updateVisibleResultsActionAvailability();
@@ -371,7 +370,6 @@ namespace osu.Game.Screens.Select
             if (id == 3)
             {
                 csSelector.Show();
-                kpcDropdown.Show();
 
                 return;
             }
@@ -379,13 +377,11 @@ namespace osu.Game.Screens.Select
             if (id == 1) // Taiko
             {
                 csSelector.Hide();
-                kpcDropdown.Show();
 
                 return;
             }
 
             csSelector.Show();
-            kpcDropdown.Hide();
         }
 
         private void updateVisibleResultsActionAvailability()
@@ -408,6 +404,11 @@ namespace osu.Game.Screens.Select
             string query = searchTextBox.Current.Value;
             bool isValidUser = localUser.Value.Id > 1;
 
+            IEnumerable<string>? collectionBeatmapMD5Hashes = null;
+
+            if (Guid.TryParse(configCollectionFilter.Value, out var collectionId))
+                collectionBeatmapMD5Hashes = realm.Run(r => r.Find<BeatmapCollection>(collectionId)?.BeatmapMD5Hashes.ToImmutableHashSet());
+
             var criteria = new FilterCriteria
             {
                 SelectedBeatmapSet = ScopedBeatmapSet.Value,
@@ -416,7 +417,7 @@ namespace osu.Game.Screens.Select
                 AllowConvertedBeatmaps = showConvertedBeatmapsButton.Active.Value,
                 Ruleset = ruleset.Value,
                 Mods = mods.Value,
-                CollectionBeatmapMD5Hashes = collectionDropdown.Current.Value?.Collection?.PerformRead(c => c.BeatmapMD5Hashes).ToImmutableHashSet(),
+                CollectionBeatmapMD5Hashes = collectionBeatmapMD5Hashes,
                 LocalUserId = isValidUser ? localUser.Value.Id : null,
                 LocalUserUsername = isValidUser ? localUser.Value.Username : null,
             };
@@ -438,39 +439,8 @@ namespace osu.Game.Screens.Select
             return criteria;
         }
 
-        private void applyCircleSizeFilter(FilterCriteria criteria)
-        {
-            var selectedModeIds = csSelector.SelectedModeIds;
-
-            if (selectedModeIds.Count == 0)
-                return;
-
-            var selectedModes = CsItemIds.LIST
-                                         .Where(m => selectedModeIds.Contains(m.Id) && m.CsValue.HasValue)
-                                         .Select(m => m.CsValue!.Value)
-                                         .ToList();
-
-            if (selectedModes.Count == 0)
-                return;
-
-            // 通过 TryParseCustomKeywordCriteria 隐式设置过滤条件（不在搜索框显示）
-            if (criteria.RulesetCriteria != null && ruleset.Value.OnlineID == 3)
-            {
-                string keyValues = string.Join(",", selectedModes.Select(m => m.ToString("0")));
-                criteria.RulesetCriteria.TryParseCustomKeywordCriteria("keys", Operator.Equal, keyValues);
-            }
-            else if (ruleset.Value.OnlineID != 3)
-            {
-                // For no mania rulesets, ±0.5 is an intuitive range.
-                criteria.CircleSize = new FilterCriteria.OptionalRange<float>
-                {
-                    Min = selectedModes.Min() - 0.5f,
-                    Max = selectedModes.Max() + 0.5f,
-                    IsLowerInclusive = false,
-                    IsUpperInclusive = false
-                };
-            }
-        }
+        private void applyCircleSizeFilter(FilterCriteria criteria) =>
+            csSelector.ApplyToFilterCriteria(criteria);
 
         private void updateCriteria(bool clearScopedSet = true)
         {
@@ -493,6 +463,22 @@ namespace osu.Game.Screens.Select
         public void Search(string query)
         {
             searchTextBox.Current.Value = query;
+        }
+
+        /// <summary>
+        /// Set the query to the search text box.
+        /// </summary>
+        /// <param name="query">The string to search.</param>
+        public void AddToSearch(string query)
+        {
+            string existingQuery = searchTextBox.Current.Value;
+
+            if (existingQuery.Contains(query))
+                return;
+
+            searchTextBox.Current.Value = string.IsNullOrWhiteSpace(existingQuery)
+                ? query
+                : string.Join(' ', existingQuery.Trim(), query);
         }
 
         protected override void PopIn()
@@ -578,7 +564,7 @@ namespace osu.Game.Screens.Select
                 {
                     RelativeSizeAxes = Axes.Y;
                     Width = 50;
-                    CornerRadius = 7;
+                    CornerRadius = EzUIStyleV1.CORNER_RADIUS_SHEARED;
                     Masking = true;
 
                     Child = background = new Box
@@ -623,6 +609,84 @@ namespace osu.Game.Screens.Select
                     background.FadeColour(normalColour, 100, Easing.Out);
                     base.OnHoverLost(e);
                 }
+            }
+        }
+
+        private partial class SortModeDropdown : ShearedDropdown<SortMode>
+        {
+            [Resolved]
+            private IBindable<RulesetInfo> ruleset { get; set; } = null!;
+
+            private Bindable<SortMode> configSortMode { get; } = new Bindable<SortMode>();
+
+            public SortModeDropdown(LocalisableString label)
+                : base(label)
+            {
+            }
+
+            [BackgroundDependencyLoader]
+            private void load(OsuConfigManager config)
+            {
+                config.BindWith(OsuSetting.SongSelectSortingMode, configSortMode);
+            }
+
+            protected override void LoadAsyncComplete()
+            {
+                ruleset.BindValueChanged(_ =>
+                {
+                    updateAvailableItems();
+                    updateCurrentFromConfig();
+                }, true);
+                configSortMode.BindValueChanged(_ => updateCurrentFromConfig());
+                Current.BindValueChanged(currentChanged);
+
+                base.LoadAsyncComplete();
+            }
+
+            private void updateAvailableItems()
+            {
+                var items = new List<SortMode>();
+
+                foreach (var item in Enum.GetValues<SortMode>())
+                {
+                    if (item == SortMode.XxyStarRating && !EzXxyStarRatingSupport.SupportsRuleset(ruleset.Value))
+                        continue;
+
+                    items.Add(item);
+                }
+
+                Items = items.ToArray();
+            }
+
+            private bool synchronisingBindables;
+
+            private void updateCurrentFromConfig()
+            {
+                if (synchronisingBindables)
+                    return;
+
+                synchronisingBindables = true;
+                Current.Value = Items.Contains(configSortMode.Value) ? configSortMode.Value : SortMode.Title;
+                synchronisingBindables = false;
+            }
+
+            private void currentChanged(ValueChangedEvent<SortMode> current)
+            {
+                if (synchronisingBindables)
+                    return;
+
+                if (current.NewValue == SortMode.XxyStarRating && !Items.Contains(SortMode.XxyStarRating))
+                    return;
+
+                configSortMode.Value = current.NewValue;
+            }
+
+            protected override LocalisableString GenerateItemText(SortMode item)
+            {
+                if (item == SortMode.XxyStarRating)
+                    return EzSongSelectStrings.XXY_STAR_RATING;
+
+                return item.GetLocalisableDescription();
             }
         }
 
@@ -674,12 +738,19 @@ namespace osu.Game.Screens.Select
                             items.Add(new GroupModeDropdownItem(GroupMode.PP, "PP"));
                             break;
 
+                        case GroupMode.XxyStarRating:
+                            if (!EzXxyStarRatingSupport.SupportsRuleset(ruleset.Value))
+                                break;
+
+                            items.Add(new GroupModeDropdownItem(GroupMode.XxyStarRating, EzSongSelectStrings.XXY_STAR_RATING));
+                            break;
+
                         default:
                             items.Add(new GroupModeDropdownItem(item, item.GetLocalisableDescription()));
                             break;
 
                         case GroupMode.Variant:
-                            if (rulesetInstance.AvailableVariants.Count() <= 1)
+                            if (rulesetInstance.GameplayVariants.Count() <= 1)
                                 break;
 
                             items.Add(new GroupModeDropdownItem(GroupMode.Variant, rulesetInstance.VariantDescription));

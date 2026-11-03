@@ -10,6 +10,9 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Layout;
+#if DEBUG
+using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
+#endif
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Objects.Drawables;
 using osuTK.Graphics;
@@ -56,11 +59,24 @@ namespace osu.Game.Rulesets.Mania.Skinning.Default
 
         public void Recycle() => foregroundContainer.Child = CreateForeground();
 
-        protected virtual Drawable CreateForeground() => new ForegroundPiece
+        protected virtual Drawable CreateForeground()
         {
-            AccentColour = { BindTarget = AccentColour },
-            IsHitting = { BindTarget = IsHitting }
-        };
+#if DEBUG
+            if (ManiaHoldAblation.DisableSubtractionStroke)
+            {
+                return new Box
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Colour = AccentColour.Value.Opacity(0.5f)
+                };
+            }
+#endif
+            return new ForegroundPiece
+            {
+                AccentColour = { BindTarget = AccentColour },
+                IsHitting = { BindTarget = IsHitting }
+            };
+        }
 
         private void onAccentChanged(ValueChangedEvent<Color4> accent) => Background.Colour = accent.NewValue.Opacity(0.7f);
 
@@ -118,7 +134,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.Default
                 };
 
                 AccentColour.BindValueChanged(onAccentChanged, true);
-                IsHitting.BindValueChanged(_ => onAccentChanged(new ValueChangedEvent<Color4>(AccentColour.Value, AccentColour.Value)), true);
+                IsHitting.BindValueChanged(hitting =>
+                {
+                    onAccentChanged(new ValueChangedEvent<Color4>(AccentColour.Value, AccentColour.Value));
+
+                    // 按住时 body 高度每帧变，两层 cached FBO + EdgeEffect 会 ForceRedraw。
+                    if (hitting.NewValue)
+                        subtractionBuffer.Hide();
+                    else
+                    {
+                        subtractionBuffer.Show();
+                        subtractionCache.Invalidate();
+                    }
+                }, true);
             }
 
             private void onAccentChanged(ValueChangedEvent<Color4> accent)
@@ -144,6 +172,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Default
             {
                 base.Update();
 
+                if (IsHitting.Value)
+                {
+                    subtractionCache.Validate();
+                    return;
+                }
+
                 if (!subtractionCache.IsValid)
                 {
                     subtractionLayer.Width = 5;
@@ -157,6 +191,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Default
 
                     foregroundBuffer.ForceRedraw();
                     subtractionBuffer.ForceRedraw();
+#if DEBUG
+                    ManiaJudgeHotPathTrace.RecordHoldBodyForceRedraw();
+#endif
 
                     subtractionCache.Validate();
                 }

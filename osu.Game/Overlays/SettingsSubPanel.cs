@@ -12,6 +12,8 @@ namespace osu.Game.Overlays
         {
         }
 
+        protected override bool ShowSubsectionNavColumn => false;
+
         [BackgroundDependencyLoader]
         private void load()
         {

@@ -71,18 +71,21 @@ namespace osu.Game.Graphics.UserInterfaceV2
 
             if (TooltipText != default)
             {
+                // Use a space to pad the icon drawable, so that it does not have
+                // an awkward left margin if it gets pushed to a new line.
+                textFlow.AddText(" ", t => t.Width = 5);
                 textFlow.AddArbitraryDrawable(new SpriteIcon
                 {
                     Anchor = Anchor.BottomLeft,
                     Origin = Anchor.BottomLeft,
                     Size = new Vector2(10),
                     Icon = FontAwesome.Solid.QuestionCircle,
-                    Margin = new MarginPadding { Left = 5 },
                     Y = 1f,
                 });
             }
         }
 
+        // 增加了一个接口实现，提供了一个自定义的工具提示组件（MarkdownTooltip），并将工具提示内容设置为TooltipText属性的值。
         ITooltip IHasCustomTooltip.GetCustomTooltip() => new MarkdownTooltip();
 
         ITooltip<LocalisableString> IHasCustomTooltip<LocalisableString>.GetCustomTooltip() => new MarkdownTooltip();

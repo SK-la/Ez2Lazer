@@ -1,0 +1,75 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System.Collections.Generic;
+using osu.Framework.Bindables;
+using osu.Framework.Graphics;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
+using osuTK.Graphics;
+
+namespace osu.Game.EzOsuGame.Edit.Settings.Sections
+{
+    /// <summary>
+    /// Edits the legacy <c>[Colours]</c> section. Independent from Ez colour settings.
+    /// </summary>
+    public partial class EzSkinEditorSkinIniColoursSection : EzSkinEditorSkinIniSectionBase
+    {
+        private readonly Dictionary<string, Bindable<Colour4>> colourFields = new Dictionary<string, Bindable<Colour4>>();
+
+        public EzSkinEditorSkinIniColoursSection()
+            : base(EzEditorStrings.GROUP_COLOURS)
+        {
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            Add(new OsuSpriteText
+            {
+                Text = EzEditorStrings.SKIN_INI_COLOURS_HINT,
+                Font = OsuFont.Default.With(size: 14),
+                Colour = Color4.Gray,
+            });
+
+            foreach (string key in EzSkinIniFieldCatalog.ColourKeys)
+            {
+                var bindable = new Bindable<Colour4>(Colour4.White);
+                colourFields[key] = bindable;
+                bindable.ValueChanged += e => CommitColourField(key, e.NewValue);
+                Add(CreateColourField(key, bindable));
+            }
+
+            WatchSession(reloadFromSession);
+        }
+
+        private void reloadFromSession()
+        {
+            WithApplying(() =>
+            {
+                var document = ParseDocument();
+                var snapshotDocument = ParseSnapshotDocument();
+
+                foreach (var (key, bindable) in colourFields)
+                {
+                    Colour4 value;
+
+                    if (document != null && document.TryGetColourValue(key, out var colour))
+                        value = colour;
+                    else
+                        value = Colour4.White;
+
+                    bindable.Value = value;
+
+                    Colour4? snapshotColour = snapshotDocument != null && snapshotDocument.TryGetColourValue(key, out var parsedSnapshotColour)
+                        ? parsedSnapshotColour
+                        : null;
+
+                    EzSkinIniBridge.SyncColourDefault(bindable, snapshotColour, value);
+                }
+            });
+        }
+    }
+}

@@ -19,12 +19,15 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.RankedPlay.Card
 {
     public partial class RankedPlayCardContent
     {
-        private partial class AttributeListing(APIBeatmap beatmap) : CompositeDrawable
+        protected virtual Drawable CreateAttributeListing() =>
+            new AttributeListing(Beatmap) { RelativeSizeAxes = Axes.Both };
+
+        protected partial class AttributeListing(APIBeatmap beatmap, RulesetInfo? rulesetOverride = null) : CompositeDrawable
         {
             [BackgroundDependencyLoader]
             private void load(RulesetStore rulesets)
             {
-                var rulesetInfo = rulesets.GetRuleset(beatmap.RulesetID);
+                var rulesetInfo = rulesetOverride ?? rulesets.GetRuleset(beatmap.RulesetID);
                 Debug.Assert(rulesetInfo != null);
                 var ruleset = rulesetInfo.CreateInstance();
 
@@ -97,8 +100,7 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.RankedPlay.Card
                                 },
                             ]
                         },
-                        ..ruleset.GetBeatmapAttributesForDisplay(beatmap, [])
-                                 .Select(attribute => new AttributeRow(attribute))
+                        .. ruleset.GetBeatmapAttributesForRankedPlayCard(beatmap, []).Select(attribute => new AttributeRow(attribute))
                     ]
                 };
             }
@@ -126,7 +128,9 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.RankedPlay.Card
                     new OsuSpriteText
                     {
                         RelativePositionAxes = Axes.X,
-                        Text = attribute.AdjustedValue.ToStandardFormattedString(maxDecimalDigits: 1),
+                        Text = string.IsNullOrEmpty(attribute.ValueFormat)
+                            ? attribute.AdjustedValue.ToStandardFormattedString(maxDecimalDigits: 1)
+                            : attribute.AdjustedValue.ToString(attribute.ValueFormat),
                         Font = OsuFont.GetFont(size: 9, weight: FontWeight.SemiBold),
                         Anchor = Anchor.CentreLeft,
                         Origin = Anchor.CentreRight,

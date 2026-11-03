@@ -7,6 +7,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Framework.Screens;
+using osu.Game.EzOsuGame.Online;
 using osu.Game.Graphics.Containers;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
@@ -73,7 +74,7 @@ namespace osu.Game.Screens.OnlinePlay
 
         private void onlineStateChanged(ValueChangedEvent<APIState> state) => Schedule(() =>
         {
-            if (state.NewValue != APIState.Online)
+            if (!state.NewValue.IsSessionActive())
                 Schedule(forcefullyExit);
         });
 
