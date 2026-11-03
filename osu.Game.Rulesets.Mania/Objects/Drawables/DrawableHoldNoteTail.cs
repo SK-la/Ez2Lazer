@@ -29,6 +29,10 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         protected override ManiaSkinComponents Component => ManiaSkinComponents.HoldNoteTail;
 
+        protected override bool SupportsImprovedNoteDisplayColour => false;
+
+        protected override bool SupportsTimingBasedNoteColouring => false;
+
         protected internal DrawableHoldNote HoldNote => (DrawableHoldNote)ParentHitObject;
 
         public DrawableHoldNoteTail()
@@ -111,7 +115,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 {
                     r.IsComboHit = false;
                 }
-            }, (result, judgeMode: judgeMode));
+            }, (result, judgeMode));
         }
 
         internal new void EzDispatchExtraResult(HitResult result) => DispatchNewResult(result);

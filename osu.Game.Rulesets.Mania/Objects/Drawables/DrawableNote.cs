@@ -10,15 +10,16 @@ using osu.Framework.Graphics;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
-using osu.Game.Graphics;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.Configuration;
-using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
+using osu.Game.Rulesets.Mania.Skinning;
+using osu.Game.Rulesets.Mania.Skinning.Default;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI.Scrolling;
-using osu.Game.Screens.Edit;
 using osu.Game.Skinning;
 using osuTK.Graphics;
 
@@ -35,9 +36,16 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         [Resolved(canBeNull: true)]
         private IBeatmap beatmap { get; set; }
 
+        [Resolved(canBeNull: true)]
+        private Column column { get; set; }
+
         private readonly Bindable<bool> configTimingBasedNoteColouring = new Bindable<bool>();
 
         protected virtual ManiaSkinComponents Component => ManiaSkinComponents.Note;
+
+        protected virtual bool SupportsImprovedNoteDisplayColour => Component == ManiaSkinComponents.Note;
+
+        protected virtual bool SupportsTimingBasedNoteColouring => true;
 
         private Drawable headPiece;
 
@@ -70,6 +78,12 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
             configTimingBasedNoteColouring.BindValueChanged(_ => updateSnapColour());
             StartTimeBindable.BindValueChanged(_ => updateSnapColour(), true);
+
+            if (column != null)
+            {
+                column.ColorSettingsEnabledBindable.BindValueChanged(_ => updateSnapColour());
+                column.EzNoteColourBindable.BindValueChanged(_ => updateSnapColour());
+            }
         }
 
         protected override void OnApply()
@@ -139,11 +153,35 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         private void updateSnapColour()
         {
-            if (beatmap == null || HitObject == null) return;
+            if (headPiece == null)
+                return;
 
-            int snapDivisor = beatmap.ControlPointInfo.GetClosestBeatDivisor(HitObject.StartTime);
+            if (!SupportsImprovedNoteDisplayColour)
+            {
+                headPiece.Colour = Color4.White;
+                return;
+            }
 
-            Colour = configTimingBasedNoteColouring.Value ? BindableBeatDivisor.GetColourFor(snapDivisor, colours) : Color4.White;
+            if (SupportsTimingBasedNoteColouring
+                && configTimingBasedNoteColouring.Value
+                && beatmap != null
+                && HitObject != null)
+            {
+                headPiece.Colour = ManiaNoteDisplayColour.ResolveTimingColour(
+                    true,
+                    beatmap,
+                    HitObject.StartTime,
+                    colours);
+                return;
+            }
+
+            if (column != null && column.ColorSettingsEnabledBindable.Value)
+            {
+                headPiece.Colour = ManiaNoteDisplayColour.ResolveColumnColour(column.EzNoteColourBindable.Value);
+                return;
+            }
+
+            headPiece.Colour = Color4.White;
         }
 
         public bool CanRouteToKPoor => ManiaEzDrawableJudgement.CanRouteToKPoor(this);
@@ -159,7 +197,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 {
                     r.IsComboHit = false;
                 }
-            }, (result, judgeMode: judgeMode));
+            }, (result, judgeMode));
         }
 
         internal void EzDispatchExtraResult(HitResult result) => DispatchNewResult(result);
