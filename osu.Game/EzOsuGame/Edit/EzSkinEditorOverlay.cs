@@ -13,6 +13,7 @@ using osu.Framework.Input.Events;
 using osu.Framework.Layout;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Screens;
@@ -85,6 +86,12 @@ namespace osu.Game.EzOsuGame.Edit
 
         private EzSkinEditorBeatmapPicker? beatmapPicker;
 
+        private readonly Bindable<bool> beatmapSkins = new Bindable<bool>();
+        private LeasedBindable<bool>? leasedBeatmapSkins;
+
+        private readonly Bindable<HUDVisibilityMode> configVisibilityMode = new Bindable<HUDVisibilityMode>();
+        private LeasedBindable<HUDVisibilityMode>? leasedVisibilityMode;
+
         protected override bool BlockNonPositionalInput => true;
 
         public EzSkinEditorOverlay(ScalingContainer scalingContainer)
@@ -92,6 +99,13 @@ namespace osu.Game.EzOsuGame.Edit
             this.scalingContainer = scalingContainer;
             RelativeSizeAxes = Axes.Both;
             AddLayout(drawSizeLayout = new LayoutValue(Invalidation.DrawSize));
+        }
+
+        [BackgroundDependencyLoader]
+        private void load(OsuConfigManager config)
+        {
+            config.BindWith(OsuSetting.BeatmapSkins, beatmapSkins);
+            config.BindWith(OsuSetting.HUDVisibilityMode, configVisibilityMode);
         }
 
         public EzSkinEditorScreen? Workspace { get; private set; }
@@ -107,6 +121,7 @@ namespace osu.Game.EzOsuGame.Edit
         protected override void PopIn()
         {
             sessionTarget = game.ScreenStack.CurrentScreen as OsuScreen;
+            overrideSkinEditorRelevantSettings();
 
             // Keep the global (main menu) background alive behind plugged screens: stop screens from
             // pushing their own beatmap background, and drop the one already on the stack.
@@ -152,6 +167,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         protected override void PopOut()
         {
+            restoreSkinEditorRelevantSettings();
             sceneCoordinator?.Close();
             sceneCoordinator = null;
 
@@ -409,6 +425,27 @@ namespace osu.Game.EzOsuGame.Edit
                 officialSkinEditor.Show();
 
             officialSkinEditor.PresentGameplay();
+        }
+
+        private void overrideSkinEditorRelevantSettings()
+        {
+            if (!beatmapSkins.Disabled)
+            {
+                leasedBeatmapSkins = beatmapSkins.BeginLease(true);
+                leasedBeatmapSkins.Value = false;
+            }
+
+            leasedVisibilityMode = configVisibilityMode.BeginLease(true);
+            leasedVisibilityMode.Value = HUDVisibilityMode.Always;
+        }
+
+        private void restoreSkinEditorRelevantSettings()
+        {
+            leasedBeatmapSkins?.Return();
+            leasedBeatmapSkins = null;
+
+            leasedVisibilityMode?.Return();
+            leasedVisibilityMode = null;
         }
 
         private partial class EzEditorEndlessPlayer : ReplayPlayer

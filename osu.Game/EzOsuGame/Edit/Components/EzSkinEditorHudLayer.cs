@@ -9,15 +9,12 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
 using osu.Game.Screens.Edit;
-using osu.Game.Screens.Play;
-using osu.Game.Screens.Select;
 using osu.Game.Skinning;
 
 namespace osu.Game.EzOsuGame.Edit.Components
@@ -28,6 +25,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// </summary>
     public partial class EzSkinEditorHudLayer : CompositeDrawable, IEditorChangeHandler
     {
+        private const double hud_fade_duration = 200;
+
         /// <summary>
         /// 蓝图是否接受输入。由场景是否为 HUD 场景与 HUD layer 开关共同决定；与蓝图是否显示无关。
         /// </summary>
@@ -111,13 +110,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private EzEditorSceneType scene = EzEditorSceneType.GameplayHud;
         private EzHUDLayer layer = EzHUDLayer.EzHud;
 
-        private HUDOverlay? boundHudOverlay;
-        private LeasedBindable<bool>? leasedShowHud;
-
-        private SkinnableContainer? boundSongSelectSkinLayer;
-        private float rememberedSongSelectSkinAlpha = 1;
-        private bool? appliedSongSelectSkinHidden;
-
         public EzSkinEditorHudLayer()
         {
             RelativeSizeAxes = Axes.Both;
@@ -133,12 +125,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            LayerVisible.BindValueChanged(_ =>
-            {
-                updateLayoutLayerVisibility();
-                updateSkinLayerVisibility();
-                refreshBlueprints();
-            }, true);
+            LayerVisible.BindValueChanged(_ => applyVisibility(), true);
         }
 
         /// <summary>
@@ -153,6 +140,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// </summary>
         public void Apply(EzEditorSceneType scene, OsuScreen? screen, EzLayoutLayer? ezLayout, EzHUDLayer activeLayer)
         {
+            if (!ReferenceEquals(liveScreen, screen))
+                resetSkinLayerTargetAlphas(liveScreen);
+
             if (!ReferenceEquals(layoutLayer, ezLayout))
             {
                 if (layoutLayer != null)
@@ -171,17 +161,31 @@ namespace osu.Game.EzOsuGame.Edit.Components
             liveScreen = screen;
             layer = EzSkinEditorLayerOptions.Normalize(scene, activeLayer);
 
+            applyVisibility();
+        }
+
+        private void applyVisibility()
+        {
             updateLayoutLayerVisibility();
-            updateSkinLayerVisibility();
             refreshBlueprints();
+            applyHudLayerVisibility();
         }
 
         public void DetachLiveTargets() => Apply(scene, null, null, layer);
 
         private void onLayoutTargetsChanged()
         {
-            if (IsLoaded)
-                Schedule(refreshBlueprints);
+            if (!IsLoaded)
+                return;
+
+            // 容器往往在第一次套用显隐之后才出现。下拉值没有再变，必须在这里按当前开关重刷。
+            Scheduler.AddOnce(refreshAfterLayoutTargetsChanged);
+        }
+
+        private void refreshAfterLayoutTargetsChanged()
+        {
+            refreshBlueprints();
+            applyHudLayerVisibility();
         }
 
         public void SetRuleset(RulesetInfo? newRuleset)
@@ -193,11 +197,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             refreshBlueprints();
         }
 
-        public void SetVisible(bool visible)
-        {
-            LayerVisible.Value = visible;
-            this.FadeTo(visible ? 1 : 0, 200, Easing.OutQuint);
-        }
+        public void SetVisible(bool visible) => LayerVisible.Value = visible;
 
         private void refreshBlueprints()
         {
@@ -414,100 +414,34 @@ namespace osu.Game.EzOsuGame.Edit.Components
             layoutLayer?.EditorHidden = !LayerVisible.Value;
         }
 
-        /// <summary>
-        /// 皮肤层 HUD 只临时跟随 layer 开关显隐；不写回皮肤，也不进入蓝图。
-        /// </summary>
-        private void updateSkinLayerVisibility()
+        private void applyHudLayerVisibility()
         {
-            updateGameplaySkinLayer();
-            updateSongSelectSkinLayer();
+            float alpha = LayerVisible.Value ? 1 : 0;
+            fadeSkinLayerTargets(liveScreen, alpha);
+
+            if (Math.Abs(blueprintHost.Alpha - alpha) > 0.001f)
+                blueprintHost.FadeTo(alpha, hud_fade_duration, Easing.OutQuint);
         }
 
-        private void updateGameplaySkinLayer()
+        private static void fadeSkinLayerTargets(OsuScreen? screen, float alpha)
         {
-            // 只认当前屏：退场中的 Player 仍能被 ChildrenOfType 找到，但屏幕退场会走
-            // UnbindAllBindablesSubTree，连同我们从 ShowHud 租的 lease 一并归还；再写就会抛「已归还」。
-            HUDOverlay? overlay = liveScreen is Player player && player.IsCurrentScreen()
-                ? player.ChildrenOfType<HUDOverlay>().FirstOrDefault()
-                : null;
+            if (screen == null || !screen.IsLoaded)
+                return;
 
-            if (!ReferenceEquals(boundHudOverlay, overlay))
+            foreach (var container in screen.ChildrenOfType<SkinnableContainer>())
             {
-                leasedShowHud?.Return();
-                leasedShowHud = null;
-                boundHudOverlay = overlay;
+                if (Math.Abs(container.Alpha - alpha) > 0.001f)
+                    container.FadeTo(alpha, hud_fade_duration, Easing.OutQuint);
             }
-
-            if (overlay == null)
-                return;
-
-            // ShowHud 同时是显隐与输入的总闸；lease 期间配置与「按住显示 HUD」都不会把它改回来。
-            if (leasedShowHud != null)
-            {
-                leasedShowHud.Value = LayerVisible.Value;
-                return;
-            }
-
-            // 已被其他机制接管（例如 cinema / 无 HUD 规则集）时不要插手。
-            if (overlay.ShowHud.Disabled)
-                return;
-
-            leasedShowHud = overlay.ShowHud.BeginLease(true);
-            leasedShowHud.Value = LayerVisible.Value;
         }
 
-        private void updateSongSelectSkinLayer()
+        private static void resetSkinLayerTargetAlphas(OsuScreen? screen)
         {
-            SkinnableContainer? container = liveScreen is SongSelect songSelect
-                ? songSelect.ChildrenOfType<SkinnableContainer>().FirstOrDefault(c => c.Lookup.Lookup == GlobalSkinnableContainers.SongSelect)
-                : null;
-
-            if (!ReferenceEquals(boundSongSelectSkinLayer, container))
-            {
-                if (boundSongSelectSkinLayer != null)
-                {
-                    boundSongSelectSkinLayer.Alpha = rememberedSongSelectSkinAlpha;
-                    appliedSongSelectSkinHidden = null;
-                }
-
-                boundSongSelectSkinLayer = container;
-                rememberedSongSelectSkinAlpha = container?.Alpha ?? 1;
-            }
-
-            if (container == null)
+            if (screen == null || !screen.IsLoaded)
                 return;
 
-            bool hidden = !LayerVisible.Value;
-
-            if (appliedSongSelectSkinHidden == hidden)
-                return;
-
-            if (hidden)
-            {
-                rememberedSongSelectSkinAlpha = container.Alpha;
-                container.Alpha = 0;
-            }
-            else if (appliedSongSelectSkinHidden == true)
-                container.Alpha = rememberedSongSelectSkinAlpha;
-
-            appliedSongSelectSkinHidden = hidden;
-        }
-
-        private void releaseSkinLayer()
-        {
-            leasedShowHud?.Return();
-            leasedShowHud = null;
-            boundHudOverlay = null;
-
-            if (boundSongSelectSkinLayer != null)
-            {
-                if (appliedSongSelectSkinHidden == true)
-                    boundSongSelectSkinLayer.Alpha = rememberedSongSelectSkinAlpha;
-
-                boundSongSelectSkinLayer = null;
-            }
-
-            appliedSongSelectSkinHidden = null;
+            foreach (var container in screen.ChildrenOfType<SkinnableContainer>())
+                container.Alpha = 1;
         }
 
         protected override void Dispose(bool isDisposing)
@@ -522,8 +456,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 layoutLayer.LayoutTargetsChanged -= onLayoutTargetsChanged;
                 layoutLayer.EditorHidden = false;
             }
-
-            releaseSkinLayer();
         }
     }
 }
