@@ -149,7 +149,7 @@ namespace osu.Game.Rulesets.Mania.UI
         public Bindable<bool> ColorSettingsEnabledBindable = null!;
         public Bindable<Colour4> EzNoteColourBindable = null!;
 
-        // GetNoteColour 的列色分支只读此缓存，更新时不广播。
+        // 列色分支只读此缓存。写入后经 NoteColourChanged 通知音符。
         internal Colour4 NoteDisplayColour { get; private set; }
         public Bindable<Vector2> EzNoteSizeBindable = null!;
         public Bindable<EzColumnType> EzNoteTypeBindable = null!;
@@ -256,9 +256,10 @@ namespace osu.Game.Rulesets.Mania.UI
             keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
         }
 
-        private void refreshNoteDisplayColour(ValueChangedEvent<Colour4> _)
+        private void refreshNoteDisplayColour(ValueChangedEvent<Colour4> change)
         {
-            NoteDisplayColour = ManiaNoteDisplayColour.ForColumnNoteDisplayTint(EzNoteColourBindable.Value);
+            NoteDisplayColour = ManiaNoteDisplayColour.ForColumnNoteDisplayTint(change.NewValue);
+            NoteColourChanged?.Invoke();
         }
 
         private void onSourceChanged()

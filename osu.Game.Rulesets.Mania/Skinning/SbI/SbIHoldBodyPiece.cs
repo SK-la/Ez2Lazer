@@ -169,15 +169,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             if (headInnerContainer == null)
                 return;
 
-            headInnerContainer.Colour = NoteColor;
-            bodyContainer.Colour = NoteColor;
+            headInnerContainer.Colour = Colour4.White;
+            bodyContainer.Colour = Colour4.White;
 
             if (!lnGradient || topClipContainer == null)
                 return;
 
             topInnerContainer.Colour = ColourInfo.GradientVertical(
-                NoteColor.Opacity((float)tailAlpha.Value),
-                NoteColor);
+                Colour4.White.Opacity((float)tailAlpha.Value),
+                Colour4.White);
         }
 
         protected override void Update()

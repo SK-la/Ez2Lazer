@@ -3,12 +3,14 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzNote : EzNoteBase
     {
-        protected override bool UseColorization => true;
+        protected override ManiaNoteDisplayColourPart DisplayColourPart => ManiaNoteDisplayColourPart.Note;
+
         protected override bool ShowSeparators => true;
 
         private Drawable? noteDrawable;

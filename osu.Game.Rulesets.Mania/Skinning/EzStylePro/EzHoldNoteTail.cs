@@ -9,6 +9,7 @@ using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects.Drawables;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -18,7 +19,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     /// </summary>
     public partial class EzHoldNoteTail : EzNote
     {
-        protected override bool UseColorization => true;
+        protected override ManiaNoteDisplayColourPart DisplayColourPart => ManiaNoteDisplayColourPart.HoldBody;
 
         protected override bool ShowSeparators => false;
 
@@ -149,8 +150,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 return;
 
             MainContainer.Colour = ColourInfo.GradientVertical(
-                NoteColor.Opacity((float)tailAlpha.Value),
-                NoteColor);
+                Colour4.White.Opacity((float)tailAlpha.Value),
+                Colour4.White);
         }
 
         private void hitObjectApplied(DrawableHitObject drawableHitObject)

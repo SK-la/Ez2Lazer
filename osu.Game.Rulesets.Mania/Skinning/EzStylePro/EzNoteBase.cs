@@ -12,10 +12,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public abstract partial class EzNoteBase : CompositeDrawable, IColumnNote
     {
-        protected virtual bool UseColorization => false;
-        protected virtual bool ShowSeparators => false;
+        protected virtual ManiaNoteDisplayColourPart DisplayColourPart => ManiaNoteDisplayColourPart.None;
 
-        protected virtual bool SupportsImprovedNoteDisplayColour => true;
+        protected virtual bool ShowSeparators => false;
 
         [Resolved(CanBeNull = true)]
         protected Column Column { get; private set; } = null!;
@@ -23,21 +22,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved(CanBeNull = true)]
         private ManiaPlayfieldNoteDisplayTint? noteDisplayTint { get; set; }
 
-        private bool divisorNoteColouringEnabled => noteDisplayTint?.DivisorNoteColouringEnabled == true;
-
         [Resolved]
         protected EzLocalTextureFactory Factory { get; private set; } = null!;
-
-        // Read through the column instead of caching the shared bindables: a drawable that stores a shared bindable in a field
-        // would unbind it from everyone else when disposed (see Drawable.UnbindAllBindables).
-        private bool colorizationEnabled => Column.ColorSettingsEnabledBindable.Value;
-
-        private Colour4 columnNoteColour => Column.EzNoteColourBindable.Value;
 
         private EzColumnType columnNoteType => Column.EzNoteTypeBindable.Value;
 
         protected Container MainContainer { get; private set; } = null!;
         private Container? lineContainer;
+
+        private bool tintBaseApplied;
 
         [BackgroundDependencyLoader]
         private void load()
@@ -63,50 +56,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected float NoteHeight => Column.EzNoteSizeBindable.Value.Y;
 
-        protected Colour4 NoteColor
-        {
-            get
-            {
-                if (!SupportsImprovedNoteDisplayColour)
-                {
-                    if (colorizationEnabled && UseColorization && !divisorNoteColouringEnabled)
-                        return columnNoteColour;
-
-                    return Colour4.White;
-                }
-
-                if (colorizationEnabled && UseColorization && !divisorNoteColouringEnabled)
-                    return ManiaNoteDisplayColour.ForColumnNoteDisplayTint(columnNoteColour);
-
-                return Colour4.White;
-            }
-        }
-
         protected string NoteName => ColorPrefix + "note";
         protected string HeadName => ColorPrefix + "longnote/head";
         protected string TailName => ColorPrefix + "longnote/tail";
 
-        protected string ColorPrefix
+        protected virtual string ColorPrefix
         {
             get
             {
-                if ((colorizationEnabled && UseColorization) || !UseColorization || divisorNoteColouringEnabled)
+                if (noteDisplayTint?.UseTintBaseTexture(DisplayColourPart, Column) == true)
                     return "white";
 
-                if (!SupportsImprovedNoteDisplayColour)
-                {
-                    return columnNoteType switch
-                    {
-                        EzColumnType.A => "white",
-                        EzColumnType.B => "blue",
-                        EzColumnType.S => "green",
-                        EzColumnType.E => "white",
-                        EzColumnType.P => "green",
-                        _ => "white",
-                    };
-                }
-
-                if (ManiaNoteTextureColouring.ShouldUseTintBaseNoteTextures(colorizationEnabled, divisorNoteColouringEnabled))
+                if (!Column.ColorSettingsEnabledBindable.Value)
                     return "white";
 
                 return columnNoteType switch
@@ -126,7 +87,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected virtual void UpdateColor()
         {
-            MainContainer.Colour = NoteColor;
         }
 
         protected void OnLoadChanged()
@@ -135,10 +95,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (!IsAlive || IsDisposed)
                 return;
 
+            tintBaseApplied = noteDisplayTint?.UseTintBaseTexture(DisplayColourPart, Column) == true;
             MainContainer.Clear();
             UpdateTexture();
             OnDrawableChanged();
-            OnColourChanged();
+            UpdateColor();
         }
 
         protected void OnDrawableChanged()
@@ -148,8 +109,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected void OnColourChanged()
         {
-            if (UseColorization || !divisorNoteColouringEnabled)
-                UpdateColor();
+            if (!IsAlive || IsDisposed)
+                return;
+
+            bool tintBase = noteDisplayTint?.UseTintBaseTexture(DisplayColourPart, Column) == true;
+
+            if (tintBaseApplied != tintBase)
+            {
+                OnLoadChanged();
+                return;
+            }
+
+            UpdateColor();
         }
 
         private void createSeparators()

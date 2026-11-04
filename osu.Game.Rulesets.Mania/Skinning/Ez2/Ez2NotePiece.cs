@@ -148,6 +148,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
         protected override void UpdateColor()
         {
+            if (!OwnsDisplayColour)
+            {
+                colouredBox.Colour = Colour4.White;
+                return;
+            }
+
             colouredBox.Colour = ColourInfo.GradientVertical(
                 NoteColor.Lighten(0.1f),
                 NoteColor

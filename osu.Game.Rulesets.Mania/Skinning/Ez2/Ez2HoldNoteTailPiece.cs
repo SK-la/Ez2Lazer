@@ -86,6 +86,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
         protected override void UpdateColor()
         {
+            if (!OwnsDisplayColour)
+            {
+                foreground.Colour = Colour4.White;
+                foregroundAdditive.Colour = ColourInfo.GradientVertical(Colour4.White.Opacity(0.4f), Colour4.White.Opacity(0));
+                return;
+            }
+
             var noteColour = NoteColor;
 
             foreground.Colour = noteColour.Darken(0.6f); // matches body

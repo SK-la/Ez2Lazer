@@ -19,6 +19,24 @@ using osuTK.Graphics;
 namespace osu.Game.Rulesets.Mania.UI
 {
     /// <summary>
+    /// Which note parts receive display colour. Tail uses <see cref="COLOUR_HOLD_BODY"/>.
+    /// </summary>
+    public static class ManiaNoteDisplayColourParts
+    {
+        public const bool COLOUR_NOTE = true;
+        public const bool COLOUR_HOLD_HEAD = false;
+        public const bool COLOUR_HOLD_BODY = false;
+    }
+
+    public enum ManiaNoteDisplayColourPart
+    {
+        None,
+        Note,
+        HoldHead,
+        HoldBody,
+    }
+
+    /// <summary>
     /// Playfield-scoped note display colour: one divisor-switch and palette subscription, shared snap caches for all columns.
     /// </summary>
     [Cached]
@@ -57,6 +75,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private Bindable<bool> editorDivisorNoteColouring = null!;
         private Bindable<bool> gameplayDivisorNoteColouring = null!;
+        private Bindable<bool> builtInColourTemplate = null!;
+        private Action<ValueChangedEvent<bool>>? onBuiltInColourTemplateChanged;
 
         private readonly Dictionary<long, int> lineDivisorBySnapMs = new Dictionary<long, int>();
         private readonly Dictionary<int, Color4> tintByLineDivisor = new Dictionary<int, Color4>();
@@ -65,13 +85,14 @@ namespace osu.Game.Rulesets.Mania.UI
         private bool cachedFixedGrid;
 
         /// <summary>
-        /// Beat-line tint when <paramref name="allowBeatLineTint"/> and <see cref="DivisorNoteColouringEnabled"/> are both set,
-        /// otherwise the column's cached display colour when column colouring is enabled, otherwise white.
-        /// Caller supplies a non-null <paramref name="column"/>.
+        /// Display colour for <paramref name="part"/>. White when that part is disabled or <paramref name="column"/> is missing.
         /// </summary>
-        public Color4 GetNoteColour(Column column, double startTime, bool allowBeatLineTint)
+        public Color4 GetDisplayColour(ManiaNoteDisplayColourPart part, Column column, double startTime)
         {
-            if (allowBeatLineTint && DivisorNoteColouringEnabled)
+            if (!AllowsDisplayColour(part))
+                return Color4.White;
+
+            if (DivisorNoteColouringEnabled)
                 return getNoteTint(startTime);
 
             if (column.ColorSettingsEnabledBindable.Value)
@@ -79,6 +100,18 @@ namespace osu.Game.Rulesets.Mania.UI
 
             return Color4.White;
         }
+
+        public bool UseTintBaseTexture(ManiaNoteDisplayColourPart part, Column column)
+            => AllowsDisplayColour(part)
+               && (DivisorNoteColouringEnabled || column.ColorSettingsEnabledBindable.Value);
+
+        public static bool AllowsDisplayColour(ManiaNoteDisplayColourPart part) => part switch
+        {
+            ManiaNoteDisplayColourPart.Note => ManiaNoteDisplayColourParts.COLOUR_NOTE,
+            ManiaNoteDisplayColourPart.HoldHead => ManiaNoteDisplayColourParts.COLOUR_HOLD_HEAD,
+            ManiaNoteDisplayColourPart.HoldBody => ManiaNoteDisplayColourParts.COLOUR_HOLD_BODY,
+            _ => false,
+        };
 
         [BackgroundDependencyLoader]
         private void load()
@@ -89,6 +122,10 @@ namespace osu.Game.Rulesets.Mania.UI
             onDivisorNoteColouringChanged = syncDivisorNoteColouring;
             editorDivisorNoteColouring.BindValueChanged(onDivisorNoteColouringChanged);
             gameplayDivisorNoteColouring.BindValueChanged(onDivisorNoteColouringChanged);
+
+            builtInColourTemplate = ezConfig.GetBindable<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns);
+            onBuiltInColourTemplateChanged = _ => Changed?.Invoke();
+            builtInColourTemplate.BindValueChanged(onBuiltInColourTemplateChanged);
 
             paletteBinding = new ManiaEditorDivisorPaletteBinding(configStore);
             onPaletteChanged = invalidateTintColours;
@@ -113,6 +150,9 @@ namespace osu.Game.Rulesets.Mania.UI
                     editorDivisorNoteColouring.ValueChanged -= onDivisorNoteColouringChanged;
                     gameplayDivisorNoteColouring.ValueChanged -= onDivisorNoteColouringChanged;
                 }
+
+                if (onBuiltInColourTemplateChanged != null)
+                    builtInColourTemplate.ValueChanged -= onBuiltInColourTemplateChanged;
             }
 
             base.Dispose(isDisposing);
@@ -172,7 +212,6 @@ namespace osu.Game.Rulesets.Mania.UI
             cachedFixedGrid = fixedGrid;
             lineDivisorBySnapMs.Clear();
             tintByLineDivisor.Clear();
-            Changed?.Invoke();
         }
 
         private int resolveGridBeatDivisor()

@@ -5,17 +5,19 @@ using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Mods;
-using osu.Game.Screens.Play;
 using osu.Framework.Platform;
 using osu.Framework.Timing;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Mods;
+using osu.Game.Rulesets.Mania.UI;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzHitTarget : EzNote
     {
-        protected override bool UseColorization => false;
+        protected override ManiaNoteDisplayColourPart DisplayColourPart => ManiaNoteDisplayColourPart.None;
+
         protected override bool ShowSeparators => false;
 
         private readonly IBindable<double> hitTargetFloatFixed = new Bindable<double>();

@@ -2,16 +2,13 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
     public partial class Ez2HoldNoteHittingLayer : CompositeDrawable
     {
-        public IBindable<Color4> AccentColour { get; private set; } = null!;
         public readonly Bindable<bool> IsHitting = new Bindable<bool>();
 
         private readonly Ez2HoldBodyPiece bodyPiece;
@@ -24,11 +21,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             Origin = Anchor.TopCentre;
             Blending = BlendingParameters.Mixture;
             Alpha = 0;
-        }
-
-        public void BindAccentColour(IBindable<Color4> source)
-        {
-            AccentColour = source;
         }
 
         protected override void LoadComplete()
@@ -59,12 +51,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                     }
 
                     this.FadeIn(animation_length);
-                    bodyPiece.UpdateAppearance(Color4.White.Opacity(0.8f), Color4.Gray.Darken(0.3f).Opacity(0.5f), 0.9f);
+                    bodyPiece.BeginHoldHighlight();
                 }
                 else
                 {
                     this.FadeOut(animation_length);
-                    bodyPiece.UpdateAppearance(AccentColour.Value.Opacity(1f), AccentColour.Value.Opacity(1f), 1f);
+                    bodyPiece.EndHoldHighlight();
                 }
             }, true);
         }

@@ -94,8 +94,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 return;
 
             note.Colour = ColourInfo.GradientVertical(
-                NoteColor.Opacity((float)tailAlphaBindable.Value),
-                NoteColor);
+                Colour4.White.Opacity((float)tailAlphaBindable.Value),
+                Colour4.White);
         }
     }
 }
