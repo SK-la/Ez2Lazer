@@ -3,6 +3,7 @@
 
 using System.Diagnostics;
 using System.Threading;
+using osu.Game.EzOsuGame.Diagnostics;
 
 namespace osu.Game.EzOsuGame.Timing
 {
@@ -27,9 +28,21 @@ namespace osu.Game.EzOsuGame.Timing
         private static long fscUpdateTimestamp;
 
         /// <summary>
+        /// Number of FSC clock updates recorded so far. Doubles as a monotone "gameplay frame id"
+        /// for the press-latency probe: presses handled between two updates share an id.
+        /// </summary>
+        private static long updateCount;
+
+        /// <summary>
         /// Whether sub-frame correction is enabled.
         /// </summary>
         public static bool Enabled = true;
+
+        /// <summary>[探针] 与 <see cref="GetCorrectionMs"/> 同源的「上一帧时钟墙钟戳」。</summary>
+        public static long LastUpdateTimestamp => Interlocked.Read(ref fscUpdateTimestamp);
+
+        /// <summary>[探针] 已记录的 FSC 时钟更新次数（单调递增，用作帧号）。</summary>
+        public static long UpdateCount => Interlocked.Read(ref updateCount);
 
         /// <summary>
         /// Called by FrameStabilityContainer when it updates the ManualClock.
@@ -37,6 +50,10 @@ namespace osu.Game.EzOsuGame.Timing
         public static void RecordFscUpdate()
         {
             Interlocked.Exchange(ref fscUpdateTimestamp, Stopwatch.GetTimestamp());
+
+            // 帧号只服务按键延迟探针；探针关掉时保持热路径零额外写入。
+            if (EzPressLatencyDiagnostics.Enabled)
+                Interlocked.Increment(ref updateCount);
         }
 
         /// <summary>

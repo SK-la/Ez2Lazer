@@ -11,6 +11,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Timing;
+using osu.Game.EzOsuGame.Diagnostics;
 using osu.Game.Input.Handlers;
 using osu.Game.Screens.Play;
 
@@ -108,18 +109,35 @@ namespace osu.Game.Rulesets.UI
         {
             stopwatch.Restart();
 
+            // [Ez] 一轮 update 的三段归因（时钟 / 子树 / 其余）与帧边界采样都收在探针里，这里只标测量点。
+            EzFrameStallDiagnostics.LoopScope loop = EzFrameStallDiagnostics.LoopScope.Begin();
+
+            int iterations = 0;
+
             do
             {
+                iterations++;
+
+                loop.BeforeClock();
+
                 // update clock is always trying to approach the aim time.
                 // it should be provided as the original value each loop.
                 updateClock();
 
+                loop.AfterClock();
+
                 if (state == PlaybackState.NotValid)
                     break;
 
+                loop.BeforeSubtree();
+
                 base.UpdateSubTree();
                 UpdateSubTreeMasking();
+
+                loop.AfterSubtree();
             } while (state == PlaybackState.RequiresCatchUp && stopwatch.ElapsedMilliseconds < max_catchup_milliseconds);
+
+            loop.Complete(iterations, ParentGameplayClock as GameplayClockContainer);
 
             return true;
         }
