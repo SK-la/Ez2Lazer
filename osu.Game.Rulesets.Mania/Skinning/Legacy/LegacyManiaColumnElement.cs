@@ -27,6 +27,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         /// </summary>
         protected string FallbackColumnIndex { get; private set; } = null!;
 
+        protected bool DivisorNoteColouringEnabled { get; private set; }
+
+        protected string ResolveNoteTextureFileIndex(bool columnColourEnabled)
+            => ManiaNoteTextureColouring.ShouldUseTintBaseNoteTextures(columnColourEnabled, DivisorNoteColouringEnabled)
+                ? "1"
+                : FallbackColumnIndex;
+
         [BackgroundDependencyLoader]
         private void load()
         {
@@ -34,14 +41,57 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
                 FallbackColumnIndex = "S";
             else
             {
-                // Account for cases like dual-stage (assume that all stages have the same column count for now).
                 int columnInStage = Column.Index % stage.Columns;
                 int distanceToEdge = Math.Min(columnInStage, (stage.Columns - 1) - columnInStage);
                 FallbackColumnIndex = distanceToEdge % 2 == 0 ? "1" : "2";
             }
+
+            syncDivisorNoteColouringFromColumn();
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            Column.NoteColourChanged += onColumnDivisorNoteColouringChanged;
+
+            // Subclasses (e.g. LegacyNotePiece) build children in load(); notify only after the hierarchy is ready.
+            OnDivisorNoteColouringChanged();
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+                Column.NoteColourChanged -= onColumnDivisorNoteColouringChanged;
+
+            base.Dispose(isDisposing);
+        }
+
+        private void onColumnDivisorNoteColouringChanged()
+        {
+            if (!syncDivisorNoteColouringFromColumn())
+                return;
+
+            OnDivisorNoteColouringChanged();
+        }
+
+        private bool syncDivisorNoteColouringFromColumn()
+        {
+            bool enabled = Column.ConfigTimingBasedNoteColouring;
+
+            if (DivisorNoteColouringEnabled == enabled)
+                return false;
+
+            DivisorNoteColouringEnabled = enabled;
+            return true;
+        }
+
+        protected virtual void OnDivisorNoteColouringChanged()
+        {
         }
 
         protected IBindable<T>? GetColumnSkinConfig<T>(ISkin skin, LegacyManiaSkinConfigurationLookups lookup) where T : notnull
             => skin.GetManiaSkinConfig<T>(lookup, Column.Index);
     }
 }
+

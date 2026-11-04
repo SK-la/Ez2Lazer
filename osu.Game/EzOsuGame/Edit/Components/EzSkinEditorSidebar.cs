@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
@@ -17,6 +18,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
+using osu.Game.Rulesets;
 using osuTK;
 using osuTK.Graphics;
 
@@ -104,6 +106,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
         internal float FooterReservedHeight => footerContainer.Height;
 
         internal float ContentBottomPadding => contentFlow.Padding.Bottom;
+
+        [Resolved]
+        private IRulesetStore rulesets { get; set; } = null!;
 
         public EzSkinEditorSidebar()
         {
@@ -278,6 +283,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             detachSections();
             shownStrategy = strategy;
+
+            strategy.AttachRulesets(rulesets.AvailableRulesets.Select(info => info.CreateInstance()).ToArray());
 
             foreach (var section in strategy.Sections)
             {

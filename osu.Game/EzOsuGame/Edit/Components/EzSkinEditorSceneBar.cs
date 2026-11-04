@@ -172,6 +172,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private static LocalisableString getGroupTitle(EzEditorSceneGroup group) => group switch
         {
             EzEditorSceneGroup.SongSelect => EzEditorStrings.SCENE_GROUP_SONG_SELECT,
+            EzEditorSceneGroup.BeatmapEditor => EzEditorStrings.SCENE_GROUP_BEATMAP_EDITOR,
             _ => EzEditorStrings.SCENE_GROUP_GAMEPLAY,
         };
 

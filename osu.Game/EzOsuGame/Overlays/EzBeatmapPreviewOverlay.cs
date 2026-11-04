@@ -67,6 +67,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private const float settings_dock_gap = 0;
 
         private readonly StopwatchClock previewClock = new StopwatchClock();
+        private bool playbackSuspended;
         private readonly FramedClock framedPreviewClock;
         private readonly Bindable<EzBeatmapPreviewMode> previewMode = new Bindable<EzBeatmapPreviewMode>();
 
@@ -399,11 +400,29 @@ namespace osu.Game.EzOsuGame.Overlays
                 expand();
         }
 
+        // The full-map preview keeps a masked playfield. Hide it while the skin editor is bound to
+        // this already-open song select; a song select pushed after the editor opens does not have one yet.
+        internal void SetPlaybackSuspended(bool suspended)
+        {
+            if (playbackSuspended == suspended)
+                return;
+
+            playbackSuspended = suspended;
+            stageScaleContainer.Alpha = suspended ? 0 : 1;
+
+            if (suspended || !expanded)
+                previewClock.Stop();
+            else
+                previewClock.Start();
+        }
+
         private void expand()
         {
             if (expanded)
                 return;
 
+            playbackSuspended = false;
+            stageScaleContainer.Alpha = 1;
             expanded = true;
             ExpandedState.Value = true;
             panelBackground.MaterialCaptureVisible = true;

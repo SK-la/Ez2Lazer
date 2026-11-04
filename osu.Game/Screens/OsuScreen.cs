@@ -16,6 +16,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Screens.Backgrounds;
 using osu.Game.Screens.Footer;
 using osu.Game.Screens.Menu;
 using osu.Game.Users;
@@ -313,6 +314,8 @@ namespace osu.Game.Screens
         [CanBeNull]
         protected virtual BackgroundScreen CreateBackground() => null;
 
+        internal BackgroundScreen CurrentBackgroundScreen => background;
+
         /// <summary>
         /// Exits the background this screen pushed, so the one below (e.g. the global menu background)
         /// becomes current again. Used while the Ez skin editor is open.
@@ -331,7 +334,35 @@ namespace osu.Game.Screens
                 ownedBackground = null;
             }
 
+            // Song select skips pushing when an equal beatmap background is already current, so this
+            // screen does not own it. That background (and any beatmap background resumed underneath)
+            // still draws inside the editor rect. Drop them; the menu background below stays.
+            while (backgroundStack.CurrentScreen is BackgroundScreenBeatmap beatmapBackground)
+            {
+                beatmapBackground.BlurAmount.Value = 0;
+
+                var before = backgroundStack.CurrentScreen;
+                backgroundStack.Exit();
+
+                if (ReferenceEquals(ownedBackground, before))
+                    ownedBackground = null;
+
+                if (ReferenceEquals(backgroundStack.CurrentScreen, before))
+                    break;
+            }
+
             background = backgroundStack.CurrentScreen as BackgroundScreen;
+        }
+
+        /// <summary>
+        /// Pushes this screen's own background again after the Ez skin editor detached it.
+        /// </summary>
+        internal void RestoreOwnedBackground()
+        {
+            if (!this.IsCurrentScreen())
+                return;
+
+            RefreshBackground();
         }
 
         /// <summary>

@@ -4,6 +4,7 @@
 using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets;
+using osu.Game.Screens.Edit;
 
 namespace osu.Game.EzOsuGame.Edit
 {
@@ -30,6 +31,11 @@ namespace osu.Game.EzOsuGame.Edit
         public BindableBool LoopBeatmap { get; } = new BindableBool();
 
         public Bindable<IWorkingBeatmap?> PreviewBeatmap { get; } = new Bindable<IWorkingBeatmap?>();
+
+        /// <summary>
+        /// Session-only beat divisor for the beatmap-editor compose preview grid. Not synced with the real editor snap.
+        /// </summary>
+        public BindableBeatDivisor PreviewGridBeatDivisor { get; } = new BindableBeatDivisor();
 
         public void SetBeatmap(IWorkingBeatmap workingBeatmap, RulesetInfo ruleset)
         {

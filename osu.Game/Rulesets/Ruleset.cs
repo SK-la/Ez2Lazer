@@ -20,6 +20,7 @@ using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
@@ -292,6 +293,16 @@ namespace osu.Game.Rulesets
         public virtual PerformanceCalculator? CreatePerformanceCalculator() => null;
 
         public virtual HitObjectComposer? CreateHitObjectComposer() => null;
+
+        /// <summary>
+        /// Read-only compose used by the Ez skin editor beatmap preview. Defaults to <see cref="CreateHitObjectComposer"/>.
+        /// </summary>
+        public virtual HitObjectComposer? CreateSkinEditorComposePreview() => CreateHitObjectComposer();
+
+        /// <summary>
+        /// Sidebar groups for the skin editor beatmap colouring scene. Inserted between the grid preview and beat-line palette.
+        /// </summary>
+        public virtual IEnumerable<EzSkinEditorSettingsGroup> CreateSkinEditorColouringSections() => [];
 
         /// <summary>
         /// Optional encoder used by the editor for save and undo snapshots.

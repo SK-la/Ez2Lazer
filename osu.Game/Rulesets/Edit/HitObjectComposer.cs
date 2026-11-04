@@ -352,9 +352,28 @@ namespace osu.Game.Rulesets.Edit
             }, true);
         }
 
+        /// <summary>
+        /// When false, compose toolboxes are hidden and the playfield uses the full width (skin editor preview).
+        /// </summary>
+        protected virtual bool IncludeComposeToolboxes => true;
+
         protected override void Update()
         {
             base.Update();
+
+            if (!IncludeComposeToolboxes)
+            {
+                LeftToolbox.Hide();
+                RightToolbox.Hide();
+                leftToolboxBackground.Hide();
+                rightToolboxBackground.Hide();
+
+                PlayfieldContentContainer.Anchor = Anchor.Centre;
+                PlayfieldContentContainer.Origin = Anchor.Centre;
+                PlayfieldContentContainer.Width = Math.Max(1024, DrawWidth);
+                PlayfieldContentContainer.X = 0;
+                return;
+            }
 
             if (ApplyHorizontalCentering)
             {
@@ -436,7 +455,15 @@ namespace osu.Game.Rulesets.Edit
             Scheduler.AddOnce(UpdateTernaryStates);
         }
 
-        public void SetSelectTool() => toolboxCollection.Items.First().Select();
+        public void SetSelectTool()
+        {
+            var selectButton = toolboxCollection.Items.FirstOrDefault();
+
+            if (selectButton == null || selectButton.Selected.Disabled)
+                return;
+
+            selectButton.Select();
+        }
 
         public void SetLastTool() => (lastTool ?? toolboxCollection.Items.First()).Select();
 

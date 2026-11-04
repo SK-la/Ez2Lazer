@@ -10,8 +10,7 @@ namespace osu.Game.EzOsuGame.Edit
     {
         SongSelect,
         Gameplay,
-        // TODO: 需要实现的场景。
-        // BeatmapEditor
+        BeatmapEditor
     }
 
     /// <summary>
@@ -27,5 +26,6 @@ namespace osu.Game.EzOsuGame.Edit
         Note,
         SkinIni,
         SkinSpecific,
+        EditorColouring,
     }
 }

@@ -1092,9 +1092,25 @@ namespace osu.Game.Screens.Select
             return useEzBackground.Value ? new BackgroundScreenDefault() : new BackgroundScreenBeatmap(Beatmap.Value);
         }
 
+        // Drops the beatmap background already on screen and hides the menu background resumed under it.
+        internal void SuspendForSkinEditor()
+        {
+            DetachOwnedBackground();
+            EzSkinEditorActiveState.SuppressBackgroundDraw(CurrentBackgroundScreen);
+            ezBeatmapPreviewOverlay.SetPlaybackSuspended(true);
+        }
+
+        internal void ResumeFromSkinEditor()
+        {
+            EzSkinEditorActiveState.RestoreBackgroundDraw();
+            ezBeatmapPreviewOverlay.SetPlaybackSuspended(false);
+        }
+
         private void updateBackgroundDim()
         {
-            if (useEzBackground.Value)
+            // Reapplying dim here would push blur back onto a beatmap background the editor just dropped,
+            // and ApplyToBackground throws once that background is gone.
+            if (useEzBackground.Value || EzSkinEditorActiveState.Active || CurrentBackgroundScreen == null)
                 return;
 
             ApplyToBackground(backgroundModeBeatmap =>

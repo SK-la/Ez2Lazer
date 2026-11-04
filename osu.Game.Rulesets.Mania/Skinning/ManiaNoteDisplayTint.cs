@@ -3,8 +3,8 @@
 
 using osu.Framework.Graphics;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Edit.Settings;
 using osu.Game.Graphics;
-using osu.Game.Screens.Edit;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning
@@ -19,12 +19,25 @@ namespace osu.Game.Rulesets.Mania.Skinning
         public const double DEFAULT_COLOUR_ALPHA = 0.8;
 
         public static Color4 GetDivisorNoteColour(IBeatmap beatmap, double startTime, OsuColour colours)
-            => GetDivisorNoteColour(beatmap, startTime, colours, DEFAULT_TARGET_GRAYSCALE, DEFAULT_COLOUR_ALPHA);
+            => GetDivisorNoteColour(beatmap, startTime, colours, null);
+
+        public static Color4 GetDivisorNoteColour(IBeatmap beatmap, double startTime, OsuColour colours, ManiaEditorBeatLinePalette? palette)
+            => GetDivisorNoteColour(beatmap, startTime, colours, palette, DEFAULT_TARGET_GRAYSCALE, DEFAULT_COLOUR_ALPHA);
 
         public static Color4 GetDivisorNoteColour(IBeatmap beatmap, double startTime, OsuColour colours, double targetGrayscale, double colourAlpha)
+            => GetDivisorNoteColour(beatmap, startTime, colours, null, targetGrayscale, colourAlpha);
+
+        public static Color4 GetDivisorNoteColour(
+            IBeatmap beatmap,
+            double startTime,
+            OsuColour colours,
+            ManiaEditorBeatLinePalette? palette,
+            double targetGrayscale,
+            double colourAlpha)
         {
             int snapDivisor = beatmap.ControlPointInfo.GetClosestBeatDivisor(startTime);
-            return ApplyTo(BindableBeatDivisor.GetColourFor(snapDivisor, colours), targetGrayscale, colourAlpha);
+            Color4 source = ManiaEditorBeatLinePalette.LineColour(snapDivisor, colours, palette);
+            return ApplyTo(source, targetGrayscale, colourAlpha);
         }
 
         public static Color4 ApplyTo(Color4 sourceColour, double targetGrayscale, double colourAlpha)

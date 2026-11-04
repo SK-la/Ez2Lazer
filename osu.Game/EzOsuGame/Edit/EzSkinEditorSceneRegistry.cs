@@ -26,6 +26,7 @@ namespace osu.Game.EzOsuGame.Edit
             new NoteSceneStrategy(),
             new SkinIniSceneStrategy(),
             new SkinSpecificSceneStrategy(),
+            new EditorColouringSceneStrategy(),
         };
 
         /// <summary>
@@ -35,6 +36,7 @@ namespace osu.Game.EzOsuGame.Edit
         {
             EzEditorSceneGroup.SongSelect,
             EzEditorSceneGroup.Gameplay,
+            EzEditorSceneGroup.BeatmapEditor
         };
 
         public static IEnumerable<IEzSkinEditorSceneStrategy> ForGroup(EzEditorSceneGroup group) => All.Where(s => s.Group == group);

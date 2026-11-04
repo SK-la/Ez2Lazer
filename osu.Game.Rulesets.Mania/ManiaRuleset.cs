@@ -12,14 +12,13 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
-using osu.Game.Graphics;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.WarmUp;
-using osu.Game.Rulesets.Mania.EzMania.Editor;
-using osu.Game.Rulesets.Mania.EzMania.WarmUp;
+using osu.Game.Graphics;
 using osu.Game.Localisation;
 using osu.Game.Localisation.Mania;
 using osu.Game.Overlays.Settings;
@@ -33,11 +32,13 @@ using osu.Game.Rulesets.Mania.Difficulty;
 using osu.Game.Rulesets.Mania.Edit;
 using osu.Game.Rulesets.Mania.Edit.Setup;
 using osu.Game.Rulesets.Mania.EzMania.Analysis;
+using osu.Game.Rulesets.Mania.EzMania.Editor;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
-using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
+using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.Statistics;
+using osu.Game.Rulesets.Mania.EzMania.WarmUp;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mania.Scoring;
@@ -90,6 +91,13 @@ namespace osu.Game.Rulesets.Mania
         public override string RulesetAPIVersionSupported => CURRENT_RULESET_API_VERSION;
 
         public override HitObjectComposer CreateHitObjectComposer() => new ManiaHitObjectComposer(this);
+
+        public override HitObjectComposer CreateSkinEditorComposePreview() => new EzSkinEditorPreviewManiaHitObjectComposer(this);
+
+        public override IEnumerable<EzSkinEditorSettingsGroup> CreateSkinEditorColouringSections()
+        {
+            yield return new EzSkinEditorEditorDivisorNoteColouringSection();
+        }
 
         public override IBeatmapVerifier CreateBeatmapVerifier() => new ManiaBeatmapVerifier();
 

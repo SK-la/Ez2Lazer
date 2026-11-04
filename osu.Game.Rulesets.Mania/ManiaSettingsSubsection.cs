@@ -7,8 +7,8 @@ using osu.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Configuration;
@@ -110,15 +110,6 @@ namespace osu.Game.Rulesets.Mania
                 })
                 {
                     Keywords = new[] { "mania" }
-                },
-
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = RulesetSettingsStrings.TimingBasedColouring,
-                    Current = config.GetBindable<bool>(ManiaRulesetSetting.TimingBasedNoteColouring),
-                })
-                {
-                    Keywords = new[] { "color" },
                 },
             };
 

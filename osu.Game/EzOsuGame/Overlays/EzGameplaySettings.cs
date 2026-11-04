@@ -65,6 +65,15 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "flow", "zen", "心流", "results", "ranking", "song select" }
                 },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.GAMEPLAY_DIVISOR_NOTE_COLOURING,
+                    HintText = EzSettingsStrings.GAMEPLAY_DIVISOR_NOTE_COLOURING_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.GameplayDivisorNoteColouring),
+                })
+                {
+                    Keywords = new[] { "colour", "divisor", "mania", "note", "gameplay" }
+                },
             });
         }
     }

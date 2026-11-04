@@ -51,5 +51,14 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
             Assert.That(hub.G, Is.EqualTo(direct.G).Within(0.001));
             Assert.That(hub.B, Is.EqualTo(direct.B).Within(0.001));
         }
+
+        [Test]
+        public void TestDivisorEnabledRespectsEditorCompose()
+        {
+            Assert.That(ManiaDivisorNoteColouring.IsEnabled(true, false, true), Is.True);
+            Assert.That(ManiaDivisorNoteColouring.IsEnabled(true, true, false), Is.False);
+            Assert.That(ManiaDivisorNoteColouring.IsEnabled(false, true, true), Is.True);
+            Assert.That(ManiaDivisorNoteColouring.IsEnabled(false, false, true), Is.False);
+        }
     }
 }

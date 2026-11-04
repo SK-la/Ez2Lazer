@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
+using osu.Game.EzOsuGame.Edit.Settings;
 using osu.Game.EzOsuGame.Overlays.Preview;
 
 namespace osu.Game.EzOsuGame.Layout
@@ -27,71 +28,168 @@ namespace osu.Game.EzOsuGame.Layout
 
         private readonly Storage storage;
         private readonly Lock saveLock = new Lock();
-        private int lastSave;
+        private int lastPreviewSave;
+        private int lastBeatmapEditorSave;
         private bool suppressSave;
 
         public EzPreviewManiaSettings PreviewManiaSettings { get; }
+
+        public BeatmapEditorSettings BeatmapEditor { get; }
 
         public EzConfigStore(Storage gameStorage)
         {
             storage = gameStorage.GetStorageForDirectory(EzModifyPath.CONFIG_ROOT_PATH);
             PreviewManiaSettings = new EzPreviewManiaSettings();
+            BeatmapEditor = new BeatmapEditorSettings();
             reloadPreview();
+            reloadBeatmapEditor();
 
-            PreviewManiaSettings.Style.BindValueChanged(_ => queueSave(), false);
-            PreviewManiaSettings.NoteColour.BindValueChanged(_ => queueSave(), false);
-            PreviewManiaSettings.HoldHeadColour.BindValueChanged(_ => queueSave(), false);
-            PreviewManiaSettings.HoldBodyColour.BindValueChanged(_ => queueSave(), false);
-            PreviewManiaSettings.LaneBackgroundColour.BindValueChanged(_ => queueSave(), false);
-            PreviewManiaSettings.ThicknessScale.BindValueChanged(_ => queueSave(), false);
+            PreviewManiaSettings.Style.BindValueChanged(_ => queuePreviewSave(), false);
+            PreviewManiaSettings.NoteColour.BindValueChanged(_ => queuePreviewSave(), false);
+            PreviewManiaSettings.HoldHeadColour.BindValueChanged(_ => queuePreviewSave(), false);
+            PreviewManiaSettings.HoldBodyColour.BindValueChanged(_ => queuePreviewSave(), false);
+            PreviewManiaSettings.LaneBackgroundColour.BindValueChanged(_ => queuePreviewSave(), false);
+            PreviewManiaSettings.ThicknessScale.BindValueChanged(_ => queuePreviewSave(), false);
+
+            foreach (var bindable in BeatmapEditor.Colouring.BeatLines.AllBindables)
+                bindable.BindValueChanged(_ => queueBeatmapEditorSave(), false);
         }
 
         public void Save()
         {
             lock (saveLock)
             {
-                writeText(EzPreviewManiaSettings.FILENAME, JsonConvert.SerializeObject(EzPreviewManiaSettingsDocument.From(PreviewManiaSettings), json_settings));
+                if (suppressSave)
+                    return;
+
+                writePreviewUnlocked();
+            }
+        }
+
+        internal void SaveBeatmapEditor()
+        {
+            lock (saveLock)
+            {
+                if (suppressSave)
+                    return;
+
+                writeBeatmapEditorUnlocked();
             }
         }
 
         private void reloadPreview()
         {
-            suppressSave = true;
-
-            try
+            lock (saveLock)
             {
-                string? json = readText(EzPreviewManiaSettings.FILENAME);
+                suppressSave = true;
 
-                if (string.IsNullOrEmpty(json))
-                    return;
+                try
+                {
+                    string? json = readTextUnlocked(EzPreviewManiaSettings.FILENAME);
 
-                PreviewManiaSettings.ApplyDocument(JsonConvert.DeserializeObject<EzPreviewManiaSettingsDocument>(json, json_settings));
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, $"Failed to load Ez full map preview settings {EzPreviewManiaSettings.FILENAME}");
-            }
-            finally
-            {
-                suppressSave = false;
+                    if (string.IsNullOrEmpty(json))
+                        return;
+
+                    PreviewManiaSettings.ApplyDocument(JsonConvert.DeserializeObject<EzPreviewManiaSettingsDocument>(json, json_settings));
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, $"Failed to load Ez full map preview settings {EzPreviewManiaSettings.FILENAME}");
+                }
+                finally
+                {
+                    suppressSave = false;
+                }
             }
         }
 
-        private void queueSave()
+        private void reloadBeatmapEditor()
         {
-            if (suppressSave)
-                return;
+            lock (saveLock)
+            {
+                suppressSave = true;
 
-            int current = Interlocked.Increment(ref lastSave);
+                try
+                {
+                    string? json = readTextUnlocked(BeatmapEditorSettings.FILENAME);
+
+                    if (string.IsNullOrEmpty(json))
+                        return;
+
+                    JsonConvert.DeserializeObject<BeatmapEditorSettingsDocument>(json, json_settings)?.ApplyTo(BeatmapEditor);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, $"Failed to load Ez beatmap editor settings {BeatmapEditorSettings.FILENAME}");
+                }
+                finally
+                {
+                    suppressSave = false;
+                }
+            }
+        }
+
+        private void queuePreviewSave()
+        {
+            lock (saveLock)
+            {
+                if (suppressSave)
+                    return;
+            }
+
+            int current = Interlocked.Increment(ref lastPreviewSave);
 
             Task.Delay(save_debounce_ms).ContinueWith(_ =>
             {
-                if (current == lastSave)
-                    Save();
+                if (current != lastPreviewSave)
+                    return;
+
+                lock (saveLock)
+                {
+                    if (suppressSave)
+                        return;
+
+                    writePreviewUnlocked();
+                }
             });
         }
 
-        private string? readText(string filename)
+        private void queueBeatmapEditorSave()
+        {
+            lock (saveLock)
+            {
+                if (suppressSave)
+                    return;
+            }
+
+            int current = Interlocked.Increment(ref lastBeatmapEditorSave);
+
+            Task.Delay(save_debounce_ms).ContinueWith(_ =>
+            {
+                if (current != lastBeatmapEditorSave)
+                    return;
+
+                lock (saveLock)
+                {
+                    if (suppressSave)
+                        return;
+
+                    writeBeatmapEditorUnlocked();
+                }
+            });
+        }
+
+        private void writePreviewUnlocked()
+        {
+            writeText(EzPreviewManiaSettings.FILENAME, JsonConvert.SerializeObject(EzPreviewManiaSettingsDocument.From(PreviewManiaSettings), json_settings));
+        }
+
+        private void writeBeatmapEditorUnlocked()
+        {
+            writeText(BeatmapEditorSettings.FILENAME, JsonConvert.SerializeObject(BeatmapEditorSettingsDocument.From(BeatmapEditor), json_settings));
+        }
+
+        private string? readTextUnlocked(string filename)
         {
             if (!storage.Exists(filename))
                 return null;

@@ -20,6 +20,12 @@ namespace osu.Game.Rulesets.Mania.UI.Components
 
         private readonly Container content;
 
+        /// <summary>
+        /// Hit-position padded scroll area hosting each column's scrolling hit objects.
+        /// Beat snap lines must be parented here so their scroll space matches notes.
+        /// </summary>
+        internal Container BeatSnapGridTarget => content;
+
         public ColumnHitObjectArea()
         {
             AddRangeInternal(new[]

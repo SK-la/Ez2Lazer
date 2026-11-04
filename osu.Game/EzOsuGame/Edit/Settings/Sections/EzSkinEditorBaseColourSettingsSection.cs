@@ -22,13 +22,14 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         private readonly Dictionary<Ez2Setting, BindableColour4> colorBindables = new Dictionary<Ez2Setting, BindableColour4>();
 
         private FillFlowContainer baseColorsContainer = null!;
-        private Bindable<bool> colorSettingsEnabled = null!;
+        private Bindable<bool> columnColorEnabled = null!;
+        private Bindable<bool> divisorColorEnabled = null!;
 
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         public EzSkinEditorBaseColourSettingsSection()
-            : base(EzEditorStrings.GROUP_BASE_COLOURS)
+            : base(EzEditorStrings.COLUMN_COLOURING)
         {
             Spacing = new Vector2(8);
         }
@@ -36,7 +37,8 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         [BackgroundDependencyLoader]
         private void load()
         {
-            colorSettingsEnabled = ezSkinConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+            columnColorEnabled = ezSkinConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+            divisorColorEnabled = ezSkinConfig.GetBindable<bool>(Ez2Setting.GameplayDivisorNoteColouring);
 
             colorBindables[Ez2Setting.ColumnTypeA] = createColorBindable(Ez2Setting.ColumnTypeA);
             colorBindables[Ez2Setting.ColumnTypeB] = createColorBindable(Ez2Setting.ColumnTypeB);
@@ -48,9 +50,15 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             {
                 new SettingsCheckbox
                 {
-                    LabelText = EzColumnStrings.COLOUR_ENABLE_BUTTON,
-                    TooltipText = EzColumnStrings.COLOUR_ENABLE_BUTTON_TOOLTIP,
-                    Current = colorSettingsEnabled,
+                    LabelText = EzSettingsStrings.GAMEPLAY_DIVISOR_NOTE_COLOURING,
+                    TooltipText = EzSettingsStrings.GAMEPLAY_DIVISOR_NOTE_COLOURING_TOOLTIP,
+                    Current = divisorColorEnabled,
+                },
+                new SettingsCheckbox
+                {
+                    LabelText = EzColumnStrings.COLUMN_COLOURING_ENABLE_BUTTON,
+                    TooltipText = EzColumnStrings.COLUMN_COLOURING_ENABLE_BUTTON_TOOLTIP,
+                    Current = columnColorEnabled,
                 },
                 baseColorsContainer = new FillFlowContainer
                 {
@@ -78,23 +86,13 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            colorSettingsEnabled.BindValueChanged(e =>
+            columnColorEnabled.BindValueChanged(e =>
             {
                 if (e.NewValue)
                     baseColorsContainer.Show();
                 else
                     baseColorsContainer.Hide();
             }, true);
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            colorSettingsEnabled.UnbindAll();
-
-            foreach (var bindable in colorBindables.Values)
-                bindable.UnbindAll();
-
-            base.Dispose(isDisposing);
         }
 
         private BindableColour4 createColorBindable(Ez2Setting setting)

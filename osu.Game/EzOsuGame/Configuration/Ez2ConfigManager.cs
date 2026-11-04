@@ -169,6 +169,8 @@ namespace osu.Game.EzOsuGame.Configuration
             // 宽或高 <= 0 表示对应轴未手动调整，打开时使用默认宽度 / 最大高度。
             SetDefault(Ez2Setting.BeatmapPreviewPanelSize, new Size(-1, -1), null);
             SetDefault(Ez2Setting.EditorSyncTimelineSpacing, true);
+            SetDefault(Ez2Setting.GameplayDivisorNoteColouring, false);
+            SetDefault(Ez2Setting.EditorDivisorNoteColouring, false);
             SetDefault(Ez2Setting.SkinEditorHudSnapEnabled, false);
             SetDefault(Ez2Setting.SkinEditorHudSnapDistance, 20, 10, 50, 5);
             SetDefault(Ez2Setting.SkinEditorHudSnapPixelFlush, false);
@@ -1219,6 +1221,16 @@ namespace osu.Game.EzOsuGame.Configuration
         BeatmapPreviewPanelSize,
 
         EditorSyncTimelineSpacing,
+
+        /// <summary>
+        /// Colour mania notes by beat divisor during gameplay.
+        /// </summary>
+        GameplayDivisorNoteColouring,
+
+        /// <summary>
+        /// Colour mania notes by beat divisor in the beatmap editor compose view.
+        /// </summary>
+        EditorDivisorNoteColouring,
 
         /// <summary>
         /// Skin editor HUD magnetic snap (overlay layout editor).

@@ -264,6 +264,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SCENE_GROUP_GAMEPLAY = new EzLocalizationManager.EzLocalisableString("游玩", "Gameplay");
 
+        public static readonly LocalisableString SCENE_GROUP_BEATMAP_EDITOR = new EzLocalizationManager.EzLocalisableString("谱面编辑器", "Beatmap editor");
+
         public static readonly LocalisableString SCENE_OFFICIAL_HUD = new EzLocalizationManager.EzLocalisableString("官方 HUD", "Official HUD");
 
         public static readonly LocalisableString SCENE_EZ_SKIN = new EzLocalizationManager.EzLocalisableString("Ez Skin", "Ez Skin");
@@ -297,6 +299,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString TAB_BEATMAP_PREVIEW = new EzLocalizationManager.EzLocalisableString("谱面预览", "Beatmap preview");
 
+        public static readonly LocalisableString TAB_EDITOR_COLOURING = new EzLocalizationManager.EzLocalisableString("配色", "Colouring");
+
         #endregion
 
         #region Sidebar groups
@@ -311,9 +315,9 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString GROUP_SCRIPTED_SKIN = new EzLocalizationManager.EzLocalisableString("脚本皮肤", "Scripted skin");
 
-        public static readonly LocalisableString GROUP_BASE_COLOURS = new EzLocalizationManager.EzLocalisableString("基础颜色", "Base colours");
+        public static readonly LocalisableString COLUMN_COLOURING = new EzLocalizationManager.EzLocalisableString("列配色", "Column colours");
 
-        public static readonly LocalisableString GROUP_COLUMN_COLOURS = new EzLocalizationManager.EzLocalisableString("列配色", "Column colours");
+        public static readonly LocalisableString COLUMN_TYPE = new EzLocalizationManager.EzLocalisableString("列类型", "Column type");
 
         public static readonly LocalisableString GROUP_BEATMAP_PREVIEW_MANIA = new EzLocalizationManager.EzLocalisableString("全谱外观", "Full-map appearance");
 
@@ -326,6 +330,19 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString GROUP_NOTE_RULESET = new EzLocalizationManager.EzLocalisableString("规则集", "Ruleset");
 
         public static readonly LocalisableString GROUP_NOTE_EDIT = new EzLocalizationManager.EzLocalisableString("Note 编辑", "Note edit");
+
+        public static readonly LocalisableString GROUP_BEAT_SNAP_LINES = new EzLocalizationManager.EzLocalisableString("节拍线", "Beat snap lines");
+
+        public static readonly LocalisableString GROUP_COMPOSE_GRID_PREVIEW = new EzLocalizationManager.EzLocalisableString("网格预览", "Grid preview");
+
+        public static readonly LocalisableString GROUP_EDITOR_DIVISOR_NOTE_COLOURING = new EzLocalizationManager.EzLocalisableString("Note 分母色", "Note divisor colours");
+
+        public static readonly LocalisableString BEATMAP_EDITOR_COMPOSE_READONLY_WATERMARK = new EzLocalizationManager.EzLocalisableString(
+            "此界面不会修改谱面",
+            "This view will not modify the beatmap");
+
+        public static LocalisableString GetBeatSnapLineDivisorLabel(int divisor) =>
+            new EzLocalizationManager.EzLocalisableString($"分母 {divisor}", $"Divisor {divisor}");
 
         #endregion
 

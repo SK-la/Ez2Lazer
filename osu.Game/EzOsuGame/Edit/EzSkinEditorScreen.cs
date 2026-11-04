@@ -262,6 +262,7 @@ namespace osu.Game.EzOsuGame.Edit
             dependencies.CacheAs(hudLayer);
             dependencies.CacheAs<IEditorChangeHandler>(hudLayer);
             dependencies.CacheAs(PreviewState);
+            dependencies.CacheAs(PreviewState.PreviewGridBeatDivisor);
             dependencies.CacheAs(NoteSessionForTesting);
             dependencies.CacheAs(ComparisonSnapshotForTesting);
             SkinIniSession = new EzSkinIniSession(skinManager);
@@ -505,7 +506,8 @@ namespace osu.Game.EzOsuGame.Edit
         /// <summary>
         /// 只有插拔进来的真实游玩屏在当前时，播放条才有意义；选歌/主菜单场景隐藏。
         /// </summary>
-        private bool isGameplayPlaybackActive() => playback.ActiveTarget.Value == EzPlaybackTarget.Gameplay;
+        private bool isGameplayPlaybackActive() =>
+            playback.ActiveTarget.Value is EzPlaybackTarget.Gameplay or EzPlaybackTarget.Editor;
 
         private void onSceneChanged(ValueChangedEvent<EzEditorSceneType> change)
         {
@@ -522,7 +524,8 @@ namespace osu.Game.EzOsuGame.Edit
 
             rememberedScene[EzSkinEditorSceneRegistry.GroupOf(change.NewValue)] = change.NewValue;
 
-            if (change.NewValue == EzEditorSceneType.BeatmapPreview)
+            if (change.NewValue == EzEditorSceneType.BeatmapPreview
+                || change.NewValue == EzEditorSceneType.EditorColouring)
                 syncPreviewStateFromGlobalBeatmap();
 
             Schedule(() =>
