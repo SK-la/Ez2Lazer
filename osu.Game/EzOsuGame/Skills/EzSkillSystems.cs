@@ -71,8 +71,9 @@ namespace osu.Game.EzOsuGame.Skills
     }
 
     /// <summary>
-    /// Bump when osu chart/player skill mapping or aggregation semantics change.
-    /// 2: PP+-shaped axes + stub engine (was official Diff aim/speed/FL/reading).
+    /// Legacy single version for PP+ rows. PPP chart/player skills use
+    /// <see cref="EzPppSkillVersions"/> per skill id and do not bump this constant.
+    /// 2: PP+-shaped axes (was official Diff aim/speed/FL/reading).
     /// </summary>
     public static class EzOsuSkillAlgorithm
     {

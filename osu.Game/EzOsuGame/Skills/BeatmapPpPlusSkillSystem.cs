@@ -7,7 +7,8 @@ using osu.Game.EzOsuGame.LocalProfile;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// osu!standard chart-side PP+-shaped axes (Jump / Flow / Precision / Speed / Stamina / Accuracy + Aim Total).
+    /// Chart-side PPP skills for osu, taiko, catch, and mania.
+    /// Mania keeps MSD as the default radar; the other three rulesets default to PPP.
     /// </summary>
     public sealed class BeatmapPpPlusSkillSystem : IEzSkillSystem
     {
@@ -15,29 +16,14 @@ namespace osu.Game.EzOsuGame.Skills
 
         public EzSkillScope Scope => EzSkillScope.Beatmap;
 
-        public bool IsDefaultRadar => true;
+        public bool IsDefaultRadar => false;
 
-        public IReadOnlyList<EzSkillDefinition> Skills { get; } = createSkills();
+        public bool IsDefaultRadarFor(int rulesetOnlineId)
+            => AppliesToRuleset(rulesetOnlineId) && rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID;
+
+        public IReadOnlyList<EzSkillDefinition> Skills { get; } = EzPppSkillCatalog.CreateDefinitions(EzSkillScope.Beatmap);
 
         public bool AppliesToRuleset(int rulesetOnlineId)
-            => rulesetOnlineId == EzLocalProfileConstants.OSU_RULESET_ID;
-
-        private static IReadOnlyList<EzSkillDefinition> createSkills()
-        {
-            var list = new List<EzSkillDefinition>(EzOsuSkillAxisExtensions.ChartAxes.Length);
-
-            foreach (var axis in EzOsuSkillAxisExtensions.ChartAxes)
-            {
-                var chip = axis.Chip();
-                list.Add(new EzSkillDefinition(
-                    EzSkillSystems.BEATMAP_PPPLUS,
-                    axis.ToChartSkillId(),
-                    chip.Name,
-                    EzSkillScope.Beatmap,
-                    chip.AccentHex));
-            }
-
-            return list;
-        }
+            => EzPppSkillCatalog.SupportsRuleset(rulesetOnlineId);
     }
 }

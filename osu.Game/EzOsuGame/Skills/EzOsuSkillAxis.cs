@@ -29,8 +29,12 @@ namespace osu.Game.EzOsuGame.Skills
         [EzSkillMeta("stamina", "耐力", "Stamina", "#ad6b5d")]
         Stamina,
 
+        /// <summary>Rhythm-complexity accuracy difficulty (not part of the star-rating sum).</summary>
         [EzSkillMeta("accuracy", "准度", "Accuracy", "#c59a5c")]
         Accuracy,
+
+        [EzSkillMeta("star_rating", "星级", "Stars", "#c9cfdd", InRadar = false)]
+        StarRating,
     }
 
     public static class EzOsuSkillAxisExtensions

@@ -41,15 +41,43 @@ namespace osu.Game.EzOsuGame.Skills
         public EzSkillProfile? GetProfile(int rulesetOnlineId)
             => EzSkillProfile.TryBuild(rulesetOnlineId, this);
 
+        /// <summary>Last segment of a skill id (<c>beatmap_ppplus.jump_aim</c> → <c>jump_aim</c>).</summary>
+        public static bool TryGetMetricId(string? skillId, out string metricId)
+        {
+            metricId = string.Empty;
+
+            if (string.IsNullOrEmpty(skillId))
+                return false;
+
+            int dot = skillId.LastIndexOf('.');
+
+            if (dot < 0 || dot >= skillId.Length - 1)
+                return false;
+
+            metricId = skillId[(dot + 1)..];
+            return true;
+        }
+
+        /// <summary>Every registered skill whose id ends with <c>.{metricId}</c>.</summary>
+        public IEnumerable<EzSkillDefinition> EnumerateByMetric(string metricId)
+        {
+            if (string.IsNullOrEmpty(metricId))
+                yield break;
+
+            foreach (var skill in AllSkills)
+            {
+                if (TryGetMetricId(skill.SkillId, out string metric) && metric == metricId)
+                    yield return skill;
+            }
+        }
+
         public static IEnumerable<IEzSkillSystem> CreateDefaultSystems()
         {
-            // Mania plugins
             yield return new BeatmapMsdSkillSystem();
             yield return new PlayerSsrSkillSystem();
             yield return new PlayerPatternSkillSystem();
             yield return new DanSkillSystem();
 
-            // osu!standard plugins (PP+-shaped; stub engine until authorised)
             yield return new BeatmapPpPlusSkillSystem();
             yield return new PlayerPpPlusSkillSystem();
         }
