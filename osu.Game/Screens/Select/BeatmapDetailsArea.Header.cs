@@ -414,6 +414,12 @@ namespace osu.Game.Screens.Select
                     if (item == EzRadarDisplayMode.SkillDual)
                         return EzSongSelectStrings.RADAR_MODE_SKILL;
 
+                    if (item == EzRadarDisplayMode.PppSkillDual)
+                        return EzSongSelectStrings.RADAR_MODE_PPP;
+
+                    if (item == EzRadarDisplayMode.PppSkillChart)
+                        return EzSongSelectStrings.RADAR_MODE_PPP_CHART;
+
                     var attr = typeof(EzRadarDisplayMode).GetField(item.ToString())
                                                          ?.GetCustomAttributes(typeof(DescriptionAttribute), false)
                                                          .OfType<DescriptionAttribute>()
