@@ -59,6 +59,7 @@ using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Playback;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Ppp;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Graphics;
@@ -469,10 +470,10 @@ namespace osu.Game
             dependencies.CacheAs<IEzReplaySession>(ReplaySession);
 
             // Skill metrics: ruleset plugins via EzSkillRegistry / EzSkillProfile.
-            // Mania: MSD / SSR / pattern / Dan. Osu: PP+ chart / player (stub engine). Read via EzSkillProvider; writers stay separate.
+            // Mania: MSD / SSR / pattern / Dan. PPP chart / player skills cover osu, taiko, catch, and mania.
             var skillRegistry = new EzSkillRegistry();
             var skillStore = new EzSkillStore(realm);
-            var ppPlusEngine = new EzPpPlusStubEngine();
+            var ppPlusEngine = new EzPpPlusEngine();
             var beatmapMsdComputer = new EzBeatmapMsdComputer(BeatmapManager, skillStore);
             var beatmapPpPlusComputer = new EzBeatmapPpPlusComputer(BeatmapManager, skillStore, ppPlusEngine);
             var chartDanEstimator = new EzChartDanEstimator(BeatmapManager, beatmapMsdComputer);

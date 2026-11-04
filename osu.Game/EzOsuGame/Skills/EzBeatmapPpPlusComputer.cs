@@ -6,13 +6,13 @@ using System.Collections.Generic;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Skills.Ppp;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Computes NoMod osu PP+-shaped chart axes via <see cref="IEzPpPlusEngine"/> and writes Realm skills.
+    /// Computes NoMod PPP chart skills and writes one Realm row per skill id, each with its own algorithm version.
     /// </summary>
     public sealed class EzBeatmapPpPlusComputer
     {
@@ -24,19 +24,19 @@ namespace osu.Game.EzOsuGame.Skills
         {
             this.beatmapManager = beatmapManager;
             this.skillStore = skillStore;
-            this.engine = engine ?? new EzPpPlusStubEngine();
+            this.engine = engine ?? new EzPpPlusEngine();
         }
 
         public IReadOnlyDictionary<string, double>? TryGetOrCompute(BeatmapInfo beatmapInfo)
         {
             ArgumentNullException.ThrowIfNull(beatmapInfo);
 
-            if (beatmapInfo.Ruleset.OnlineID != EzLocalProfileConstants.OSU_RULESET_ID)
+            if (!EzPppSkillCatalog.SupportsRuleset(beatmapInfo.Ruleset.OnlineID))
                 return null;
 
-            var existing = skillStore.GetBeatmapSkills(beatmapInfo.Hash, EzSkillSystems.BEATMAP_PPPLUS);
+            var existing = skillStore.GetBeatmapSkillsAtCurrentVersions(beatmapInfo.Hash, EzSkillSystems.BEATMAP_PPPLUS);
 
-            if (EzPpPlusAttributes.IsCompleteChartCache(existing))
+            if (EzPppSkillCatalog.IsCompleteChart(beatmapInfo.Ruleset.OnlineID, existing))
                 return existing;
 
             return ComputeAndStore(beatmapInfo);
@@ -46,7 +46,9 @@ namespace osu.Game.EzOsuGame.Skills
         {
             ArgumentNullException.ThrowIfNull(beatmapInfo);
 
-            if (beatmapInfo.Ruleset.OnlineID != EzLocalProfileConstants.OSU_RULESET_ID)
+            int rulesetId = beatmapInfo.Ruleset.OnlineID;
+
+            if (!EzPppSkillCatalog.SupportsRuleset(rulesetId))
                 return null;
 
             if (!beatmapInfo.Ruleset.Available)
@@ -59,24 +61,22 @@ namespace osu.Game.EzOsuGame.Skills
                 if (!working.BeatmapInfo.Ruleset.Available)
                     working.BeatmapInfo.Ruleset.Available = true;
 
-                var ruleset = beatmapInfo.Ruleset.CreateInstance();
-                var calculator = ruleset.CreateDifficultyCalculator(working);
-                var attributes = calculator.Calculate(mods ?? Array.Empty<Mod>());
-                double lengthSeconds = Math.Max(0, beatmapInfo.Length / 1000.0);
-                var chart = engine.CalculateChart(attributes, beatmapInfo.Difficulty, lengthSeconds);
-                var skills = chart.ToChartSkills();
+                IReadOnlyList<Mod> modList = mods ?? Array.Empty<Mod>();
+                var playable = working.GetPlayableBeatmap(beatmapInfo.Ruleset, modList);
+                var skills = engine.CalculateChart(playable, modList);
 
                 skillStore.WriteBeatmapSystemSkills(
                     beatmapInfo.Hash,
                     EzSkillSystems.BEATMAP_PPPLUS,
                     skills,
-                    beatmapInfo.ID);
+                    beatmapInfo.ID,
+                    skillVersions: EzPppSkillVersions.For(skills.Keys));
 
                 return skills;
             }
             catch (Exception e)
             {
-                Logger.Log($"[EzSkills] osu PP+ chart compute failed for {beatmapInfo}: {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
+                Logger.Log($"[EzSkills] PPP chart compute failed for {beatmapInfo}: {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                 return null;
             }
         }
