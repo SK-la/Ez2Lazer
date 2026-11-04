@@ -293,8 +293,9 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ExperimentalLocalAccount, false);
 
             SetDefault(Ez2Setting.EzJudgmentDiagEnabled, false);
-            SetDefault(Ez2Setting.EzSubFrameCorrectionEnabled, false);
             SetDefault(Ez2Setting.EzTimingTraceEnabled, false);
+
+            SetDefault(Ez2Setting.EzSubFrameCorrectionEnabled, false);
             SetDefault(Ez2Setting.EzScoreRaceServiceEnabled, true);
             SetDefault(Ez2Setting.EzScoreRaceFeedMode, EzReplayFeedMode.BatchAllEvents);
             SetDefault(Ez2Setting.EzHudCameraEnabled, false);
@@ -1396,7 +1397,14 @@ namespace osu.Game.EzOsuGame.Configuration
         GcMode,
 
         // 判定时序诊断与校正
+        /// <summary>
+        /// 诊断套件总开关：决定整套诊断是否工作。跑哪些内容由 <c>EZ_DIAG_PROBES</c>
+        /// 环境变量选择（见 <c>EzDiagnosticSwitches.Enabled</c> 的赋值），不落成设置项 ——
+        /// 「这次实验想验什么」是实验意图，不是用户偏好。
+        /// 与子项选择一样，进局前一口断定、本局内不再变化，所以改完下一局生效。
+        /// </summary>
         EzJudgmentDiagEnabled,
+
         EzSubFrameCorrectionEnabled,
         EzTimingTraceEnabled,
 
