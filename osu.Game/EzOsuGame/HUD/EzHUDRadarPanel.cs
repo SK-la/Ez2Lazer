@@ -22,8 +22,8 @@ using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.EzOsuGame.Skills;
-using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.EzOsuGame.UI;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
@@ -50,7 +50,13 @@ namespace osu.Game.EzOsuGame.HUD
         SkillDual,
 
         [Description("SkillChart")]
-        SkillChart
+        SkillChart,
+
+        [Description("PPP Skill")]
+        PppSkillDual,
+
+        [Description("PPP Chart")]
+        PppSkillChart
     }
 
     /// <summary>
@@ -303,6 +309,8 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 if (isMinaSkillRadarMode())
                     updateSkillRadarPresentation();
+                else if (isPppSkillRadarMode())
+                    updatePppSkillRadarPresentation();
             });
 
             chart?.SetData(parameterRatios);
@@ -373,6 +381,8 @@ namespace osu.Game.EzOsuGame.HUD
             }
             else if (isMinaSkillRadarMode())
                 updateSkillRadarPresentation();
+            else if (isPppSkillRadarMode())
+                updatePppSkillRadarPresentation();
             else
             {
                 chart?.ClearSecondaryData();
@@ -407,6 +417,12 @@ namespace osu.Game.EzOsuGame.HUD
                 return;
             }
 
+            if (isPppSkillRadarMode())
+            {
+                updatePppSkillRadarPresentation();
+                return;
+            }
+
             if (RadarDisplayMode.Value != EzRadarDisplayMode.Metadate)
             {
                 updateRulesetSpecificRadarPresentation();
@@ -420,7 +436,8 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void updateRulesetSpecificRadarPresentation()
         {
-            if (RadarDisplayMode.Value is EzRadarDisplayMode.Metadate or EzRadarDisplayMode.SkillDual or EzRadarDisplayMode.SkillChart)
+            if (RadarDisplayMode.Value is EzRadarDisplayMode.Metadate or EzRadarDisplayMode.SkillDual or EzRadarDisplayMode.SkillChart
+                or EzRadarDisplayMode.PppSkillDual or EzRadarDisplayMode.PppSkillChart)
                 return;
 
             if (beatmap.Value.BeatmapInfo is BeatmapInfo beatmapInfo && isRulesetRadarCacheValid(beatmapInfo))
@@ -883,6 +900,151 @@ namespace osu.Game.EzOsuGame.HUD
 
         private bool isMinaSkillRadarMode()
             => RadarDisplayMode.Value is EzRadarDisplayMode.SkillDual or EzRadarDisplayMode.SkillChart;
+
+        private bool isPppSkillRadarMode()
+            => RadarDisplayMode.Value is EzRadarDisplayMode.PppSkillDual or EzRadarDisplayMode.PppSkillChart;
+
+        private void updatePppSkillRadarPresentation()
+        {
+            var beatmapInfo = beatmap.Value.BeatmapInfo;
+
+            if (beatmapInfo == null || !EzPppSkillCatalog.SupportsRuleset(beatmapInfo.Ruleset.OnlineID))
+            {
+                cancelLiveKick();
+                cancelRadarAnalysis();
+                clearChartData();
+                chart?.ClearSecondaryData();
+                return;
+            }
+
+            cancelLiveKick();
+            cancelRadarAnalysis();
+
+            int rulesetId = beatmapInfo.Ruleset.OnlineID;
+            IReadOnlyDictionary<string, double> chartSkills =
+                beatmapPpPlusComputer?.TryGetOrCompute(beatmapInfo)
+                ?? skillProvider?.GetBeatmapSystemSkills(beatmapInfo.Hash, EzSkillSystems.BEATMAP_PPPLUS)
+                ?? new Dictionary<string, double>();
+
+            int keyCount = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
+            int slice = EzPppSkillCatalog.PlayerSliceKey(rulesetId, keyCount);
+            string? username = TargetUsername.Value;
+            IReadOnlyDictionary<string, double> playerSkills = new Dictionary<string, double>();
+
+            if (!string.IsNullOrWhiteSpace(username) && skillProvider != null)
+                playerSkills = skillProvider.GetPlayerSystemSkills(username, slice, EzSkillSystems.PLAYER_PPPLUS);
+
+            bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.PppSkillChart;
+            var axes = EzPppSkillCatalog.RadarAxes(rulesetId);
+            const double display_min = 0.01;
+            var selected = new List<EzPppSkillSpec>();
+
+            foreach (var axis in axes)
+            {
+                if (axis.MetricId.StartsWith("_pad", StringComparison.Ordinal))
+                {
+                    selected.Add(axis);
+                    continue;
+                }
+
+                double chartValue = chartSkills.GetValueOrDefault(axis.ChartSkillId, 0);
+
+                if (!double.IsFinite(chartValue) || chartValue < display_min)
+                    continue;
+
+                if (beatmapOnly)
+                {
+                    selected.Add(axis);
+                    continue;
+                }
+
+                double playerValue = playerSkills.GetValueOrDefault(axis.PlayerSkillId, 0);
+
+                if (!double.IsFinite(playerValue) || playerValue < display_min)
+                    continue;
+
+                selected.Add(axis);
+            }
+
+            if (selected.Count == 0 && !beatmapOnly)
+            {
+                foreach (var axis in axes)
+                {
+                    if (axis.MetricId.StartsWith("_pad", StringComparison.Ordinal))
+                        continue;
+
+                    double chartValue = chartSkills.GetValueOrDefault(axis.ChartSkillId, 0);
+
+                    if (double.IsFinite(chartValue) && chartValue >= display_min)
+                        selected.Add(axis);
+                }
+            }
+
+            while (selected.Count < 3)
+                selected.Add(new EzPppSkillSpec($"_pad{selected.Count}", string.Empty, string.Empty, "#000000", false));
+
+            if (selected.Count == 0)
+            {
+                clearChartData();
+                chart?.ClearSecondaryData();
+                return;
+            }
+
+            AxisCount = Math.Max(3, selected.Count);
+            activeAxisLabels = new string[AxisCount];
+            activeAxisFormats = Enumerable.Repeat("0.00", AxisCount).ToArray();
+
+            double maxValue = 0;
+            double[] chartValues = new double[AxisCount];
+            double[] playerValues = new double[AxisCount];
+
+            for (int i = 0; i < selected.Count; i++)
+            {
+                var axis = selected[i];
+                activeAxisLabels[i] = axis.NameEn;
+                bool padded = axis.MetricId.StartsWith("_pad", StringComparison.Ordinal);
+                double beatmapValue = padded ? 0 : chartSkills.GetValueOrDefault(axis.ChartSkillId, 0);
+                double playerValue = beatmapOnly || padded ? 0 : playerSkills.GetValueOrDefault(axis.PlayerSkillId, 0);
+
+                if (playerValue < display_min)
+                    playerValue = 0;
+
+                chartValues[i] = beatmapValue;
+                playerValues[i] = playerValue;
+                parameterValues[i] = (float)beatmapValue;
+                maxValue = Math.Max(maxValue, Math.Max(beatmapValue, playerValue));
+            }
+
+            for (int i = selected.Count; i < AxisCount; i++)
+            {
+                activeAxisLabels[i] = string.Empty;
+                chartValues[i] = 0;
+                playerValues[i] = 0;
+                parameterValues[i] = 0;
+            }
+
+            if (maxValue <= 0)
+                maxValue = 1;
+
+            float[] beatmapRatios = new float[AxisCount];
+            float[] playerRatios = new float[AxisCount];
+
+            for (int i = 0; i < AxisCount; i++)
+            {
+                beatmapRatios[i] = (float)(chartValues[i] / maxValue);
+                playerRatios[i] = (float)(playerValues[i] / maxValue);
+            }
+
+            chart?.SetData(beatmapRatios);
+
+            if (beatmapOnly)
+                chart?.ClearSecondaryData();
+            else
+                chart?.SetSecondaryData(playerRatios);
+
+            updateAxisTexts();
+            applyChartColours();
+        }
 
         private static readonly EzMinaSkillAxis[] skill_radar_axes = EzMinaSkillAxisExtensions.RadarAxes;
 

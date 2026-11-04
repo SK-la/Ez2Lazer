@@ -88,6 +88,14 @@ namespace osu.Game.EzOsuGame.Localization
             "Skill",
             "Skill");
 
+        public static readonly LocalisableString RADAR_MODE_PPP = new EzLocalizationManager.EzLocalisableString(
+            "PPP",
+            "PPP");
+
+        public static readonly LocalisableString RADAR_MODE_PPP_CHART = new EzLocalizationManager.EzLocalisableString(
+            "PPP 谱面",
+            "PPP Chart");
+
         public static readonly LocalisableString RESTORE_MOD_SELECTION = new EzLocalizationManager.EzLocalisableString(
             "恢复上一次选择",
             "Restore previous selection");
