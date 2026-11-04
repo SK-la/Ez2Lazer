@@ -23,11 +23,17 @@ namespace osu.Game.Rulesets.Mania.Skinning
         }
 
         /// <summary>
-        ///     Snap-divisor note tint from the beat line palette.
+        ///     Beat-line note tint from <c>BeatmapEditor.json</c> (or official defaults when a palette entry is unset).
         /// </summary>
-        public static Color4 ForDivisorNoteDisplayTint(IBeatmap beatmap, double startTime, OsuColour colours, ManiaEditorBeatLinePalette? palette = null)
+        public static Color4 ForBeatLineDivisorNoteDisplayTint(
+            IBeatmap beatmap,
+            double startTime,
+            int beatDivisor,
+            bool fixedGrid,
+            OsuColour colours,
+            ManiaEditorBeatLinePalette? palette = null)
         {
-            return ManiaNoteDisplayTint.GetDivisorNoteColour(beatmap, startTime, colours, palette);
+            return ManiaNoteDisplayTint.GetBeatLineDivisorNoteColour(beatmap, startTime, beatDivisor, fixedGrid, colours, palette);
         }
     }
 }

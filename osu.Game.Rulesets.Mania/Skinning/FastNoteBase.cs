@@ -30,6 +30,11 @@ namespace osu.Game.Rulesets.Mania.Skinning
         [Resolved]
         protected Column Column { get; private set; } = null!;
 
+        [Resolved(CanBeNull = true)]
+        private ManiaPlayfieldNoteDisplayTint? noteDisplayTint { get; set; }
+
+        private bool divisorNoteColouringEnabled => noteDisplayTint?.DivisorNoteColouringEnabled == true;
+
         // [Resolved]
         // private OsuColour colours { get; set; }
 
@@ -95,7 +100,7 @@ namespace osu.Game.Rulesets.Mania.Skinning
                 if (BuiltInColourTemplateSwitch?.Value == true)
                     return BuiltInColourTemplate;
 
-                if (EnabledColorBindable.Value && UseColorization && !Column.ConfigTimingBasedNoteColouring)
+                if (EnabledColorBindable.Value && UseColorization && !divisorNoteColouringEnabled)
                     return ManiaNoteDisplayColour.ForColumnNoteDisplayTint(NoteColourBindable.Value);
 
                 return Color4.White;

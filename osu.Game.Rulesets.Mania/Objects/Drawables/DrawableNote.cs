@@ -9,10 +9,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
-using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Graphics;
-using osu.Game.Rulesets.Mania.Edit;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Skinning;
@@ -31,13 +28,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
     public partial class DrawableNote : DrawableManiaHitObject<Note>, IKeyBindingHandler<ManiaAction>
     {
         [Resolved(CanBeNull = true)]
-        private ManiaEditorDivisorPaletteBinding? divisorPalette { get; set; }
-
-        [Resolved]
-        private OsuColour colours { get; set; }
-
-        [Resolved(canBeNull: true)]
-        private IBeatmap beatmap { get; set; }
+        private ManiaPlayfieldNoteDisplayTint noteDisplayTint { get; set; }
 
         [Resolved(canBeNull: true)]
         private Column column { get; set; }
@@ -134,9 +125,6 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             ApplyResult(result);
         }
 
-        /// <summary>
-        /// Some objects in mania may want to limit the max result.
-        /// </summary>
         protected virtual HitResult GetCappedResult(HitResult result) => result;
 
         public virtual bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
@@ -173,23 +161,17 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 return;
             }
 
-            bool columnColourEnabled = column != null && column.ColorSettingsEnabledBindable.Value;
-            bool divisorNoteColouringEnabled = column?.ConfigTimingBasedNoteColouring ?? false;
+            if (noteDisplayTint == null || column == null)
+            {
+                if (column != null && column.ColorSettingsEnabledBindable.Value)
+                    headPiece.Colour = ManiaNoteDisplayColour.ForColumnNoteDisplayTint(column.EzNoteColourBindable.Value);
+                else
+                    headPiece.Colour = Color4.White;
 
-            if (SupportsDivisorNoteDisplayTint && divisorNoteColouringEnabled && beatmap != null)
-            {
-                headPiece.Colour = ManiaNoteDisplayColour.ForDivisorNoteDisplayTint(
-                    beatmap,
-                    HitObject?.StartTime ?? 0,
-                    colours,
-                    divisorPalette?.Palette);
+                return;
             }
-            else if (columnColourEnabled)
-            {
-                headPiece.Colour = ManiaNoteDisplayColour.ForColumnNoteDisplayTint(column!.EzNoteColourBindable.Value);
-            }
-            else
-                headPiece.Colour = Color4.White;
+
+            headPiece.Colour = noteDisplayTint.GetNoteColour(column, HitObject?.StartTime ?? 0, SupportsDivisorNoteDisplayTint);
         }
 
         public bool CanRouteToKPoor => ManiaEzDrawableJudgement.CanRouteToKPoor(this);

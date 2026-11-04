@@ -3,12 +3,12 @@
 
 #nullable disable
 
-using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania.Audio;
@@ -23,6 +23,8 @@ namespace osu.Game.Rulesets.Mania.UI
     [Cached]
     public partial class ManiaPlayfield : ScrollingPlayfield
     {
+        public ManiaPlayfieldNoteDisplayTint BeatLineNoteTint { get; }
+
         public IReadOnlyList<Stage> Stages => stages;
 
         /// <summary>
@@ -90,6 +92,14 @@ namespace osu.Game.Rulesets.Mania.UI
             }
 
             AddInternal(SampleChannels = new EzManiaSampleChannelPool(@"Mania"));
+            AddInternal(BeatLineNoteTint = new ManiaPlayfieldNoteDisplayTint());
+        }
+
+        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
+        {
+            var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
+            dependencies.CacheAs(BeatLineNoteTint);
+            return dependencies;
         }
 
         [Pure]

@@ -35,7 +35,6 @@ using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
-using osu.Game.Screens.Edit;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -108,6 +107,9 @@ namespace osu.Game.Rulesets.Mania.UI
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
+        private ManiaPlayfieldNoteDisplayTint beatLineNoteTint { get; set; } = null!;
+
+        [Resolved]
         private SkinManager skinManager { get; set; } = null!;
 
         [Resolved]
@@ -121,9 +123,6 @@ namespace osu.Game.Rulesets.Mania.UI
 
         [Resolved(canBeNull: true)]
         private DrawableManiaRuleset? drawableRuleset { get; set; }
-
-        [Resolved(canBeNull: true)]
-        private EditorBeatmap? editorBeatmap { get; set; }
 
         internal ManiaLaneController LaneController { get; private set; } = null!;
 
@@ -149,6 +148,9 @@ namespace osu.Game.Rulesets.Mania.UI
         public Bindable<string> NoteSetNameBindable = null!;
         public Bindable<bool> ColorSettingsEnabledBindable = null!;
         public Bindable<Colour4> EzNoteColourBindable = null!;
+
+        // GetNoteColour 的列色分支只读此缓存，更新时不广播。
+        internal Colour4 NoteDisplayColour { get; private set; }
         public Bindable<Vector2> EzNoteSizeBindable = null!;
         public Bindable<EzColumnType> EzNoteTypeBindable = null!;
 
@@ -158,10 +160,16 @@ namespace osu.Game.Rulesets.Mania.UI
         private Action? onNoteDrawableChangedHandler;
         private Action? onNoteSizeChangedHandler;
         private Action? onNoteColourChangedHandler;
+        private Action? onBeatLineNoteTintChangedHandler;
+        private Action<ValueChangedEvent<Colour4>>? onEzNoteColourChanged;
 
         // 缓存计算参数，避免闭包捕获
         public int KeyMode;
-        public bool ConfigTimingBasedNoteColouring;
+
+        /// <summary>
+        /// Whether this column is under an editor beatmap compose context (editor or skin compose preview).
+        /// </summary>
+        public bool IsEditorCompose => beatLineNoteTint.IsEditorCompose;
 
         protected override ScrollingHitObjectContainer CreateScrollingHitObjectContainer()
             => new LaneTrackingScrollingHitObjectContainer(this);
@@ -196,23 +204,13 @@ namespace osu.Game.Rulesets.Mania.UI
             EzNoteTypeBindable = ezConfig.GetColumnTypeBindable(KeyMode, Index);
             EzNoteSizeBindable = ezFactory.GetNoteSizeBindable(KeyMode, Index);
             EzNoteColourBindable = ezConfig.GetColumnColorBindable(KeyMode, Index);
+            onEzNoteColourChanged = refreshNoteDisplayColour;
+            EzNoteColourBindable.BindValueChanged(onEzNoteColourChanged, true);
             NoteSetNameBindable = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
             ColorSettingsEnabledBindable = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
 
-            var editorDivisorNoteColouring = ezConfig.GetBindable<bool>(Ez2Setting.EditorDivisorNoteColouring);
-            var gameDivisorNoteColouring = ezConfig.GetBindable<bool>(Ez2Setting.GameplayDivisorNoteColouring);
-
-            void syncDivisorNoteColouringConfig()
-            {
-                ConfigTimingBasedNoteColouring = ManiaDivisorNoteColouring.IsEnabled(
-                    editorBeatmap != null,
-                    gameDivisorNoteColouring.Value,
-                    editorDivisorNoteColouring.Value);
-                NoteColourChanged?.Invoke();
-            }
-
-            gameDivisorNoteColouring.BindValueChanged(_ => syncDivisorNoteColouringConfig());
-            editorDivisorNoteColouring.BindValueChanged(_ => syncDivisorNoteColouringConfig(), true);
+            onBeatLineNoteTintChangedHandler = () => NoteColourChanged?.Invoke();
+            beatLineNoteTint.Changed += onBeatLineNoteTintChangedHandler;
 
             SkinnableDrawable keyArea;
 
@@ -256,6 +254,11 @@ namespace osu.Game.Rulesets.Mania.UI
                 touchOverlay = rulesetConfig.GetBindable<bool>(ManiaRulesetSetting.TouchOverlay);
 
             keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
+        }
+
+        private void refreshNoteDisplayColour(ValueChangedEvent<Colour4> _)
+        {
+            NoteDisplayColour = ManiaNoteDisplayColour.ForColumnNoteDisplayTint(EzNoteColourBindable.Value);
         }
 
         private void onSourceChanged()
@@ -335,6 +338,12 @@ namespace osu.Game.Rulesets.Mania.UI
 
             if (onNoteColourChangedHandler != null)
                 ezFactory.OnNoteColourChanged -= onNoteColourChangedHandler;
+
+            if (onBeatLineNoteTintChangedHandler != null)
+                beatLineNoteTint.Changed -= onBeatLineNoteTintChangedHandler;
+
+            if (onEzNoteColourChanged != null)
+                EzNoteColourBindable.ValueChanged -= onEzNoteColourChanged;
 
             base.Dispose(isDisposing);
 

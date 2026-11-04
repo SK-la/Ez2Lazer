@@ -20,6 +20,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved(CanBeNull = true)]
         protected Column Column { get; private set; } = null!;
 
+        [Resolved(CanBeNull = true)]
+        private ManiaPlayfieldNoteDisplayTint? noteDisplayTint { get; set; }
+
+        private bool divisorNoteColouringEnabled => noteDisplayTint?.DivisorNoteColouringEnabled == true;
+
         [Resolved]
         protected EzLocalTextureFactory Factory { get; private set; } = null!;
 
@@ -64,13 +69,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             {
                 if (!SupportsImprovedNoteDisplayColour)
                 {
-                    if (colorizationEnabled && UseColorization && !Column.ConfigTimingBasedNoteColouring)
+                    if (colorizationEnabled && UseColorization && !divisorNoteColouringEnabled)
                         return columnNoteColour;
 
                     return Colour4.White;
                 }
 
-                if (colorizationEnabled && UseColorization && !Column.ConfigTimingBasedNoteColouring)
+                if (colorizationEnabled && UseColorization && !divisorNoteColouringEnabled)
                     return ManiaNoteDisplayColour.ForColumnNoteDisplayTint(columnNoteColour);
 
                 return Colour4.White;
@@ -85,7 +90,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             get
             {
-                if ((colorizationEnabled && UseColorization) || !UseColorization || Column.ConfigTimingBasedNoteColouring)
+                if ((colorizationEnabled && UseColorization) || !UseColorization || divisorNoteColouringEnabled)
                     return "white";
 
                 if (!SupportsImprovedNoteDisplayColour)
@@ -101,7 +106,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     };
                 }
 
-                if (ManiaNoteTextureColouring.ShouldUseTintBaseNoteTextures(colorizationEnabled, Column.ConfigTimingBasedNoteColouring))
+                if (ManiaNoteTextureColouring.ShouldUseTintBaseNoteTextures(colorizationEnabled, divisorNoteColouringEnabled))
                     return "white";
 
                 return columnNoteType switch
@@ -143,7 +148,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected void OnColourChanged()
         {
-            if (UseColorization || !Column.ConfigTimingBasedNoteColouring)
+            if (UseColorization || !divisorNoteColouringEnabled)
                 UpdateColor();
         }
 

@@ -19,6 +19,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         [Resolved]
         protected Column Column { get; private set; } = null!;
 
+        [Resolved(CanBeNull = true)]
+        private ManiaPlayfieldNoteDisplayTint? noteDisplayTint { get; set; }
+
         [Resolved]
         private StageDefinition stage { get; set; } = null!;
 
@@ -77,7 +80,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
 
         private bool syncDivisorNoteColouringFromColumn()
         {
-            bool enabled = Column.ConfigTimingBasedNoteColouring;
+            bool enabled = noteDisplayTint?.DivisorNoteColouringEnabled == true;
 
             if (DivisorNoteColouringEnabled == enabled)
                 return false;
@@ -94,4 +97,3 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
             => skin.GetManiaSkinConfig<T>(lookup, Column.Index);
     }
 }
-
