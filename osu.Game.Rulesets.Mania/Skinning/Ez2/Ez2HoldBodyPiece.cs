@@ -3,13 +3,11 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.EzMania;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -19,28 +17,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
     public partial class Ez2HoldBodyPiece : FastNoteBase, IHoldNoteBody
     {
-        /// <summary>
-        /// 本列当前颜色的 live 副本，供按住高亮层（<see cref="Ez2HoldNoteHittingLayer"/>）在松手后还原。
-        /// </summary>
-        public IBindable<Color4> LiveColour => liveColour;
-
-        private readonly Bindable<Color4> liveColour = new Bindable<Color4>();
+        private static readonly ColourInfo idle_gradient = ColourInfo.GradientVertical(Colour4.White.Opacity(0.35f), Colour4.White.Opacity(1f));
 
         private Drawable background = null!;
         private Container tailContainer = null!;
 
         private Ez2HoldNoteHittingLayer hittingLayer = null!;
-
-        [Resolved]
-        private Ez2ConfigManager ezConfig { get; set; } = null!;
-
-        [Resolved]
-        private StageDefinition stageDefinition { get; set; } = null!;
-
-        // 10k2s1p 开启时用 Ez 内置色彩模板，关闭时回到 FastNoteBase 的编辑器列色。
-        protected override IBindable<bool>? BuiltInColourTemplateSwitch => ezConfig.GetBindable<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns);
-
-        protected override Colour4 BuiltInColourTemplate => stageDefinition.GetColourForLayout(Column.Index);
 
         public Ez2HoldBodyPiece()
         {
@@ -48,7 +30,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             Anchor = Anchor.BottomCentre;
             Origin = Anchor.BottomCentre;
             Masking = true;
-            Colour = ColourInfo.GradientVertical(Colour4.White.Opacity(0.35f), Colour4.White.Opacity(1.0f));
+            Colour = idle_gradient;
         }
 
         [BackgroundDependencyLoader(true)]
@@ -91,21 +73,21 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             };
 
             hittingLayer = new Ez2HoldNoteHittingLayer(this);
-            hittingLayer.BindAccentColour(LiveColour);
             AddInternal(hittingLayer);
 
             if (drawableObject is DrawableHoldNote holdNote)
                 ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNote.IsHolding);
         }
 
-        protected override void UpdateColor()
+        public void BeginHoldHighlight()
         {
-            var noteColour = NoteColor;
+            UpdateAppearance(Color4.White.Opacity(0.8f), Color4.Gray.Darken(0.3f).Opacity(0.5f), 0.9f);
+        }
 
-            liveColour.Value = noteColour;
-
-            background.Colour = noteColour.Opacity(1f);
-            tailContainer.Colour = ColourInfo.GradientVertical(noteColour.Opacity(1f), noteColour.Opacity(1f));
+        public void EndHoldHighlight()
+        {
+            this.FadeColour(idle_gradient, 200, Easing.OutQuint);
+            this.FadeTo(1f, 200, Easing.OutQuint);
         }
 
         protected override void Update()
@@ -125,6 +107,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         public void Recycle()
         {
             hittingLayer.Recycle();
+            ClearTransforms(targetMember: nameof(Colour));
+            ClearTransforms(targetMember: nameof(Alpha));
+            Colour = idle_gradient;
+            Alpha = 1;
         }
     }
 }

@@ -19,7 +19,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzHoldNoteMiddle : EzNoteBase, IHoldNoteBody
     {
-        protected override bool UseColorization => true;
+        protected override ManiaNoteDisplayColourPart DisplayColourPart => ManiaNoteDisplayColourPart.HoldBody;
+
         protected override bool ShowSeparators => true;
 
         private IBindable<bool> isHitting = null!;
@@ -188,16 +189,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             if (!lnGradient)
             {
-                bodyContainer?.Colour = NoteColor;
+                bodyContainer?.Colour = Colour4.White;
 
                 return;
             }
 
             topContainer?.Colour = ColourInfo.GradientVertical(
-                NoteColor.Opacity((float)tailAlpha.Value),
-                NoteColor);
+                Colour4.White.Opacity((float)tailAlpha.Value),
+                Colour4.White);
 
-            bodyContainer?.Colour = NoteColor;
+            bodyContainer?.Colour = Colour4.White;
         }
 
         protected override void Update()

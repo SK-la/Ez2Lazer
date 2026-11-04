@@ -19,6 +19,7 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.UI;
+using osu.Game.Skinning;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.Mania.Tests
@@ -69,18 +70,21 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestToggleOffScreen()
         {
+            AddStep("disable column colouring", () => ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled).Value = false);
             AddStep("enable", () => configTimingBasedNoteColouring.Value = true);
 
             seekTo(10000);
             AddStep("disable", () => configTimingBasedNoteColouring.Value = false);
             seekTo(0);
-            AddAssert("all notes not coloured", () => this.ChildrenOfType<DrawableNote>().All(note => note.Colour == Colour4.White));
+            AddAssert("all notes not coloured", () => this.ChildrenOfType<DrawableNote>().All(note => headColour(note) == Colour4.White));
 
             seekTo(10000);
             AddStep("enable again", () => configTimingBasedNoteColouring.Value = true);
             seekTo(0);
-            AddAssert("some notes coloured", () => this.ChildrenOfType<DrawableNote>().Any(note => note.Colour != Colour4.White));
+            AddAssert("some notes coloured", () => this.ChildrenOfType<DrawableNote>().Any(note => headColour(note) != Colour4.White));
         }
+
+        private static Colour4 headColour(DrawableNote note) => note.ChildrenOfType<SkinnableDrawable>().First().Colour;
 
         private void seekTo(double time)
         {

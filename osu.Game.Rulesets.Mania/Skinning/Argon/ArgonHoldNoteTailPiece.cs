@@ -9,6 +9,7 @@ using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI.Scrolling;
 using osuTK;
@@ -23,6 +24,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Argon
 
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
         private readonly IBindable<Color4> accentColour = new Bindable<Color4>();
+        private readonly Bindable<Color4> paintColour = new Bindable<Color4>(Color4.White);
+
+        [Resolved(CanBeNull = true)]
+        private ManiaPlayfieldNoteDisplayTint? noteDisplayTint { get; set; }
 
         private readonly Box foreground;
         private readonly ArgonHoldNoteHittingLayer hittingLayer;
@@ -87,7 +92,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Argon
             if (drawableObject != null)
             {
                 accentColour.BindTo(drawableObject.AccentColour);
-                accentColour.BindValueChanged(onAccentChanged, true);
+                accentColour.BindValueChanged(_ => refreshPaint(), true);
+                hittingLayer.AccentColour.BindTo(paintColour);
 
                 drawableObject.HitObjectApplied += hitObjectApplied;
             }
@@ -100,7 +106,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Argon
             hittingLayer.Recycle();
 
             hittingLayer.AccentColour.UnbindBindings();
-            hittingLayer.AccentColour.BindTo(holdNoteTail.HoldNote.AccentColour);
+            hittingLayer.AccentColour.BindTo(paintColour);
 
             hittingLayer.IsHitting.UnbindBindings();
             ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNoteTail.HoldNote.IsHolding);
@@ -111,18 +117,33 @@ namespace osu.Game.Rulesets.Mania.Skinning.Argon
             Scale = new Vector2(1, direction.NewValue == ScrollingDirection.Up ? -1 : 1);
         }
 
-        private void onAccentChanged(ValueChangedEvent<Color4> accent)
+        protected override void LoadComplete()
         {
-            foreground.Colour = accent.NewValue.Darken(0.6f); // matches body
+            base.LoadComplete();
+
+            if (noteDisplayTint != null)
+                noteDisplayTint.Changed += refreshPaint;
+
+            refreshPaint();
+        }
+
+        private void refreshPaint()
+        {
+            Color4 accent = noteDisplayTint?.DisplayTintActive == true ? Color4.White : accentColour.Value;
+            paintColour.Value = accent;
+            foreground.Colour = accent.Darken(0.6f);
 
             foregroundAdditive.Colour = ColourInfo.GradientVertical(
-                accent.NewValue.Opacity(0.4f),
-                accent.NewValue.Opacity(0)
+                accent.Opacity(0.4f),
+                accent.Opacity(0)
             );
         }
 
         protected override void Dispose(bool isDisposing)
         {
+            if (isDisposing && noteDisplayTint != null)
+                noteDisplayTint.Changed -= refreshPaint;
+
             base.Dispose(isDisposing);
 
             if (drawableObject != null)

@@ -12,6 +12,7 @@ using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 #endif
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Objects.Drawables
@@ -29,9 +30,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         protected override ManiaSkinComponents Component => ManiaSkinComponents.HoldNoteTail;
 
-        protected override bool SupportsImprovedNoteDisplayColour => false;
-
-        protected override bool SupportsDivisorNoteDisplayTint => false;
+        protected override ManiaNoteDisplayColourPart DisplayColourPart => ManiaNoteDisplayColourPart.HoldBody;
 
         protected internal DrawableHoldNote HoldNote => (DrawableHoldNote)ParentHitObject;
 

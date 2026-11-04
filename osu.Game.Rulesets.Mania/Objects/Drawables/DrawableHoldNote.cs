@@ -23,6 +23,7 @@ using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
@@ -48,6 +49,16 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         public IBindable<bool> IsHolding => isHolding;
 
         private readonly Bindable<bool> isHolding = new Bindable<bool>();
+
+        [Resolved(CanBeNull = true)]
+        private ManiaPlayfieldNoteDisplayTint noteDisplayTint { get; set; }
+
+        [Resolved(CanBeNull = true)]
+        private Column column { get; set; }
+
+        protected virtual bool UseColorization => true;
+
+        private bool displayColourBound;
 
         /// <summary>
         /// The time at which the user starting missing the hold note.
@@ -143,6 +154,19 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             base.LoadComplete();
 
             isHolding.BindValueChanged(updateSlidingSample, true);
+
+            if (receivesBodyColour())
+            {
+                StartTimeBindable.BindValueChanged(_ => updateBodyColour(), true);
+
+                if (column != null)
+                {
+                    column.NoteColourChanged += updateBodyColour;
+                    displayColourBound = true;
+                }
+            }
+
+            updateBodyColour();
         }
 
         protected override void OnApply()
@@ -150,6 +174,32 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             base.OnApply();
 
             sizingContainer.Size = Vector2.One;
+            updateBodyColour();
+        }
+
+        private bool receivesBodyColour()
+            => UseColorization && ManiaPlayfieldNoteDisplayTint.AllowsDisplayColour(ManiaNoteDisplayColourPart.HoldBody);
+
+        private void updateBodyColour()
+        {
+            if (bodyPiece == null)
+                return;
+
+            if (!receivesBodyColour() || noteDisplayTint == null || column == null)
+            {
+                bodyPiece.Colour = Colour4.White;
+                return;
+            }
+
+            bodyPiece.Colour = noteDisplayTint.GetDisplayColour(ManiaNoteDisplayColourPart.HoldBody, column, HitObject?.StartTime ?? 0);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing && displayColourBound && column != null)
+                column.NoteColourChanged -= updateBodyColour;
+
+            base.Dispose(isDisposing);
         }
 
         protected override void AddNestedHitObject(DrawableHitObject hitObject)

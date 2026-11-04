@@ -13,22 +13,16 @@ namespace osu.Game.Rulesets.Mania.Skinning
 {
     public abstract partial class FastNoteBase : CompositeDrawable, IColumnNote
     {
-        protected virtual bool UseColorization => true;
-
         /// <summary>
-        /// 内置色彩模板开关（关联游戏设置，需为实时 bindable）。非 null 时接管列色来源：
-        /// true → <see cref="BuiltInColourTemplate"/>；false → 皮肤编辑器的列色配置。
-        /// <para>默认 null，即不启用模板、始终使用编辑器列色（SbI 原行为）。</para>
-        /// </summary>
-        protected virtual IBindable<bool>? BuiltInColourTemplateSwitch => null;
-
-        /// <summary>
-        /// <see cref="BuiltInColourTemplateSwitch"/> 为 true 时的模板色，默认白色。
+        /// <see cref="ManiaPlayfieldNoteDisplayTint.BuiltInLayoutTemplateColourEnabled"/> 为 true 时的模板色，默认白色。
         /// </summary>
         protected virtual Colour4 BuiltInColourTemplate => Colour4.White;
 
         [Resolved]
         protected Column Column { get; private set; } = null!;
+
+        [Resolved(CanBeNull = true)]
+        private ManiaPlayfieldNoteDisplayTint? noteDisplayTint { get; set; }
 
         // [Resolved]
         // private OsuColour colours { get; set; }
@@ -40,16 +34,11 @@ namespace osu.Game.Rulesets.Mania.Skinning
         protected readonly Bindable<double> NoteHeightScaleBindable = new Bindable<double>();
         protected readonly Bindable<double> CornerRadiusBindable = new Bindable<double>();
 
-        // 只依赖外部的 Bindable —— 在 load() 时赋值，不要自己 new
-        protected IBindable<bool> EnabledColorBindable = null!;
-        protected IBindable<Colour4> NoteColourBindable = null!;
-
         protected Container MainContainer { get; private set; } = null!;
 
-        /// <summary><see cref="BuiltInColourTemplateSwitch"/> 的持有副本（弱绑定需自行保活）。</summary>
-        private IBindable<bool>? builtInColourTemplateSwitch;
-
         protected float UnitHeight => DrawWidth * 0.5f * (float)NoteHeightScaleBindable.Value;
+
+        public bool OwnsDisplayColour => noteDisplayTint?.BuiltInLayoutTemplateColourEnabled == true;
 
         [BackgroundDependencyLoader]
         private void load(IEzSkinInfo ezSkinInfo)
@@ -66,10 +55,6 @@ namespace osu.Game.Rulesets.Mania.Skinning
             NoteHeightScaleBindable.BindTo(ezSkinInfo.NoteHeightScaleToWidth);
             CornerRadiusBindable.BindTo(ezSkinInfo.NoteCornerRadius);
 
-            // 外部 Bindable 直接赋值
-            EnabledColorBindable = Column.ColorSettingsEnabledBindable;
-            NoteColourBindable = Column.EzNoteColourBindable;
-
             // 只对本地 Bindable 添加监听
             CornerRadiusBindable.BindValueChanged(_ => UpdateDrawable());
             NoteHeightScaleBindable.BindValueChanged(_ => UpdateDrawable());
@@ -81,9 +66,8 @@ namespace osu.Game.Rulesets.Mania.Skinning
 
             ColumnWatcher.GetOrCreate(Column).Add(this);
 
-            // 在 LoadComplete 订阅：子类覆写的该属性可能依赖其自身 [Resolved]（构造/load 期间未必已注入）。
-            builtInColourTemplateSwitch = BuiltInColourTemplateSwitch?.GetBoundCopy();
-            builtInColourTemplateSwitch?.BindValueChanged(_ => OnColourChanged());
+            if (noteDisplayTint != null)
+                noteDisplayTint.Changed += OnColourChanged;
 
             Scheduler.AddOnce(OnLoadChanged);
         }
@@ -92,11 +76,8 @@ namespace osu.Game.Rulesets.Mania.Skinning
         {
             get
             {
-                if (BuiltInColourTemplateSwitch?.Value == true)
+                if (OwnsDisplayColour)
                     return BuiltInColourTemplate;
-
-                if (EnabledColorBindable.Value && UseColorization && !Column.ConfigTimingBasedNoteColouring)
-                    return ManiaNoteDisplayColour.ForColumnNoteDisplayTint(NoteColourBindable.Value);
 
                 return Color4.White;
             }
@@ -128,10 +109,7 @@ namespace osu.Game.Rulesets.Mania.Skinning
 
         private void OnColourChanged()
         {
-            if (UseColorization)
-            {
-                UpdateColor();
-            }
+            UpdateColor();
         }
 
         protected override void Dispose(bool isDisposing)
@@ -139,7 +117,9 @@ namespace osu.Game.Rulesets.Mania.Skinning
             if (isDisposing)
             {
                 ColumnWatcher.Remove(Column, this);
-                builtInColourTemplateSwitch?.UnbindAll();
+
+                if (noteDisplayTint != null)
+                    noteDisplayTint.Changed -= OnColourChanged;
             }
 
             base.Dispose(isDisposing);

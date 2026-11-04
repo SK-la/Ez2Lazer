@@ -8,7 +8,7 @@ using osu.Game.EzOsuGame.Layout;
 namespace osu.Game.Rulesets.Mania.Edit
 {
     /// <summary>
-    /// Mania editor compose scope: shared <see cref="ManiaEditorBeatLinePalette"/> from <see cref="EzConfigStore"/> and change notifications.
+    /// Shared <see cref="ManiaEditorBeatLinePalette"/> from <see cref="EzConfigStore"/> (<c>BeatmapEditor.json</c>) and change notifications.
     /// </summary>
     public sealed class ManiaEditorDivisorPaletteBinding
     {

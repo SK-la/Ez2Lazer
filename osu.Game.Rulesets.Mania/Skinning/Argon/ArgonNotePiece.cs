@@ -9,6 +9,7 @@ using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI.Scrolling;
 using osuTK;
@@ -24,6 +25,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Argon
 
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
         private readonly IBindable<Color4> accentColour = new Bindable<Color4>();
+
+        [Resolved(CanBeNull = true)]
+        private ManiaPlayfieldNoteDisplayTint? noteDisplayTint { get; set; }
 
         private readonly Box colouredBox;
 
@@ -90,9 +94,29 @@ namespace osu.Game.Rulesets.Mania.Skinning.Argon
             if (drawableObject != null)
             {
                 accentColour.BindTo(drawableObject.AccentColour);
-                accentColour.BindValueChanged(onAccentChanged, true);
+                accentColour.BindValueChanged(_ => applyPaint(), true);
             }
         }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            if (noteDisplayTint != null)
+                noteDisplayTint.Changed += applyPaint;
+
+            applyPaint();
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing && noteDisplayTint != null)
+                noteDisplayTint.Changed -= applyPaint;
+
+            base.Dispose(isDisposing);
+        }
+
+        private void applyPaint() => onAccentChanged(noteDisplayTint?.DisplayTintActive == true ? Color4.White : accentColour.Value);
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
         {
@@ -103,11 +127,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Argon
             Scale = new Vector2(1, direction.NewValue == ScrollingDirection.Up ? -1 : 1);
         }
 
-        private void onAccentChanged(ValueChangedEvent<Color4> accent)
+        private void onAccentChanged(Color4 accent)
         {
             colouredBox.Colour = ColourInfo.GradientVertical(
-                accent.NewValue.Lighten(0.1f),
-                accent.NewValue
+                accent.Lighten(0.1f),
+                accent
             );
         }
     }

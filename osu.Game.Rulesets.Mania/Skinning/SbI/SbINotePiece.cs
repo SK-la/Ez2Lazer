@@ -50,10 +50,5 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             Container.Height = height;
             Container.CornerRadius = radius;
         }
-
-        protected override void UpdateColor()
-        {
-            Note.Colour = NoteColor;
-        }
     }
 }
