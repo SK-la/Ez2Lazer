@@ -126,16 +126,19 @@ namespace osu.Game.EzOsuGame.Edit
             // Keep the global (main menu) background alive behind plugged screens: stop screens from
             // pushing their own beatmap background, and drop the one already on the stack.
             EzSkinEditorActiveState.SetActive(true);
-            Schedule(() =>
-            {
-                if (!EzSkinEditorActiveState.Active)
-                    return;
 
-                if (sessionTarget is SongSelect songSelect)
-                    songSelect.SuspendForSkinEditor();
-                else
+            if (sessionTarget is SongSelect songSelect)
+                songSelect.SuspendForSkinEditor();
+            else
+            {
+                Schedule(() =>
+                {
+                    if (!EzSkinEditorActiveState.Active)
+                        return;
+
                     sessionTarget?.DetachOwnedBackground();
-            });
+                });
+            }
 
             if (Workspace == null)
             {
@@ -154,15 +157,18 @@ namespace osu.Game.EzOsuGame.Edit
 
                     loaded.Activate();
                     initializeSceneCoordinator(loaded);
+                    applyScreenSizing();
                 });
             }
             else
             {
                 Workspace.Activate();
                 initializeSceneCoordinator(Workspace);
+                applyScreenSizing();
             }
 
             this.FadeIn(200, Easing.OutQuint);
+            applyScreenSizing();
         }
 
         protected override void PopOut()
@@ -260,7 +266,12 @@ namespace osu.Game.EzOsuGame.Edit
             performer?.PerformFromScreen(screen =>
             {
                 if (screen is SongSelect)
+                {
+                    // Same re-plug path as leaving gameplay: drop expanded preview / carousel state on the old instance.
+                    screen.Exit();
+                    Schedule(enterSongSelect);
                     return;
+                }
 
                 if (screen is Player player)
                 {
@@ -375,14 +386,16 @@ namespace osu.Game.EzOsuGame.Edit
             }, new[] { typeof(SoloSongSelect), typeof(MainMenu) });
         }
 
-        private void updateScreenSizing()
+        private void updateScreenSizing() => applyScreenSizing();
+
+        private void applyScreenSizing()
         {
-            if (State.Value != Visibility.Visible || Workspace?.IsLoaded != true)
+            if (State.Value != Visibility.Visible)
                 return;
 
             const float toolbar_height = EzSkinEditorSceneBar.HEIGHT + global::osu.Game.Overlays.SkinEditor.SkinEditor.MENU_HEIGHT;
-            float leftRailWidth = Workspace.SceneRailReservedWidth;
-            float reservedWidth = Workspace.SidebarReservedWidth.Value;
+            float leftRailWidth = Workspace?.IsLoaded == true ? Workspace.SceneRailReservedWidth : EzVerticalRail.WIDTH;
+            float reservedWidth = Workspace?.IsLoaded == true ? Workspace.SidebarReservedWidth.Value : 0;
 
             scalingContainer.SetCustomRect(EzSkinEditorSceneSizing.ComputeSceneRect(DrawSize, toolbar_height, leftRailWidth, reservedWidth), true);
         }

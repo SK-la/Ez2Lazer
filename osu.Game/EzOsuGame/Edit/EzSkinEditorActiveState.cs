@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Game.Screens;
+using osu.Game.Screens.Backgrounds;
 
 namespace osu.Game.EzOsuGame.Edit
 {
@@ -22,9 +23,14 @@ namespace osu.Game.EzOsuGame.Edit
 
         // Opening from the menu already exited this background. Opening from song select resumes it,
         // and that full-screen draw stays inside the scaled scene.
+        // Hide beatmap backgrounds still referenced on the stack so the menu background below stays visible.
+        // Do not touch BackgroundScreenDefault — re-plugged song select often has only that on top.
         internal static void SuppressBackgroundDraw(BackgroundScreen screen)
         {
-            if (screen == null || !screen.IsAlive)
+            if (screen is not BackgroundScreenBeatmap)
+                return;
+
+            if (!screen.IsAlive)
                 return;
 
             if (!ReferenceEquals(suppressedBackground, screen))

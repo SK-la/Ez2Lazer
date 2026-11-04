@@ -184,14 +184,9 @@ namespace osu.Game.EzOsuGame.Edit
             workspace.SetSceneHost(null);
             updateScreenSizing();
 
-            if (getCurrentScreen() is SongSelect songSelect && songSelect.IsLoaded)
-                bindSongSelect(songSelect);
-            else
-            {
-                boundSongSelect = null;
-                workspace.BindHudToTarget(null, layoutLayer);
-                enterSongSelect();
-            }
+            boundSongSelect = null;
+            workspace.BindHudToTarget(null, layoutLayer);
+            enterSongSelect();
         }
 
         /// <summary>
