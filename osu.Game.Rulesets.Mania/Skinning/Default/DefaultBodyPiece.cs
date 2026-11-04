@@ -14,6 +14,7 @@ using osu.Framework.Layout;
 using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 #endif
 using osu.Game.Rulesets.Mania.Objects.Drawables;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects.Drawables;
 using osuTK.Graphics;
 
@@ -25,7 +26,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Default
     public partial class DefaultBodyPiece : CompositeDrawable, IHoldNoteBody
     {
         protected readonly Bindable<Color4> AccentColour = new Bindable<Color4>();
+        private readonly Bindable<Color4> paintColour = new Bindable<Color4>(Color4.White);
         protected readonly IBindable<bool> IsHitting = new Bindable<bool>();
+
+        [Resolved(CanBeNull = true)]
+        private ManiaPlayfieldNoteDisplayTint? noteDisplayTint { get; set; }
 
         protected Drawable Background { get; private set; } = null!;
         private Container foregroundContainer = null!;
@@ -52,9 +57,33 @@ namespace osu.Game.Rulesets.Mania.Skinning.Default
                 IsHitting.BindTo(holdNote.IsHolding);
             }
 
-            AccentColour.BindValueChanged(onAccentChanged, true);
+            AccentColour.BindValueChanged(_ => refreshPaint(), true);
 
             Recycle();
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            if (noteDisplayTint != null)
+                noteDisplayTint.Changed += refreshPaint;
+
+            refreshPaint();
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing && noteDisplayTint != null)
+                noteDisplayTint.Changed -= refreshPaint;
+
+            base.Dispose(isDisposing);
+        }
+
+        private void refreshPaint()
+        {
+            paintColour.Value = noteDisplayTint?.DisplayTintActive == true ? Color4.White : AccentColour.Value;
+            onAccentChanged(new ValueChangedEvent<Color4>(paintColour.Value, paintColour.Value));
         }
 
         public void Recycle() => foregroundContainer.Child = CreateForeground();
@@ -67,13 +96,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.Default
                 return new Box
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = AccentColour.Value.Opacity(0.5f)
+                    Colour = paintColour.Value.Opacity(0.5f)
                 };
             }
 #endif
             return new ForegroundPiece
             {
-                AccentColour = { BindTarget = AccentColour },
+                AccentColour = { BindTarget = paintColour },
                 IsHitting = { BindTarget = IsHitting }
             };
         }

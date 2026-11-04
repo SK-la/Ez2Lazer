@@ -14,18 +14,15 @@ namespace osu.Game.Rulesets.Mania.Skinning
     public abstract partial class FastNoteBase : CompositeDrawable, IColumnNote
     {
         /// <summary>
-        /// 内置色彩模板开关。非 null 且为 true 时，note 图形使用 <see cref="BuiltInColourTemplate"/>。
-        /// 列色和节拍线色由外层 <c>headPiece</c> 提供。
-        /// </summary>
-        protected virtual IBindable<bool>? BuiltInColourTemplateSwitch => null;
-
-        /// <summary>
-        /// <see cref="BuiltInColourTemplateSwitch"/> 为 true 时的模板色，默认白色。
+        /// <see cref="ManiaPlayfieldNoteDisplayTint.BuiltInLayoutTemplateColourEnabled"/> 为 true 时的模板色，默认白色。
         /// </summary>
         protected virtual Colour4 BuiltInColourTemplate => Colour4.White;
 
         [Resolved]
         protected Column Column { get; private set; } = null!;
+
+        [Resolved(CanBeNull = true)]
+        private ManiaPlayfieldNoteDisplayTint? noteDisplayTint { get; set; }
 
         // [Resolved]
         // private OsuColour colours { get; set; }
@@ -41,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.Skinning
 
         protected float UnitHeight => DrawWidth * 0.5f * (float)NoteHeightScaleBindable.Value;
 
-        public bool OwnsDisplayColour => BuiltInColourTemplateSwitch?.Value == true;
+        public bool OwnsDisplayColour => noteDisplayTint?.BuiltInLayoutTemplateColourEnabled == true;
 
         [BackgroundDependencyLoader]
         private void load(IEzSkinInfo ezSkinInfo)
@@ -69,6 +66,9 @@ namespace osu.Game.Rulesets.Mania.Skinning
 
             ColumnWatcher.GetOrCreate(Column).Add(this);
 
+            if (noteDisplayTint != null)
+                noteDisplayTint.Changed += OnColourChanged;
+
             Scheduler.AddOnce(OnLoadChanged);
         }
 
@@ -76,7 +76,7 @@ namespace osu.Game.Rulesets.Mania.Skinning
         {
             get
             {
-                if (BuiltInColourTemplateSwitch?.Value == true)
+                if (OwnsDisplayColour)
                     return BuiltInColourTemplate;
 
                 return Color4.White;
@@ -115,7 +115,12 @@ namespace osu.Game.Rulesets.Mania.Skinning
         protected override void Dispose(bool isDisposing)
         {
             if (isDisposing)
+            {
                 ColumnWatcher.Remove(Column, this);
+
+                if (noteDisplayTint != null)
+                    noteDisplayTint.Changed -= OnColourChanged;
+            }
 
             base.Dispose(isDisposing);
         }

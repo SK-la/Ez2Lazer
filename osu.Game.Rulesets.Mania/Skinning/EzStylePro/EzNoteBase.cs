@@ -5,7 +5,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -25,12 +24,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         protected EzLocalTextureFactory Factory { get; private set; } = null!;
 
-        private EzColumnType columnNoteType => Column.EzNoteTypeBindable.Value;
-
         protected Container MainContainer { get; private set; } = null!;
         private Container? lineContainer;
 
         private bool tintBaseApplied;
+        private string appliedPrefix = string.Empty;
 
         [BackgroundDependencyLoader]
         private void load()
@@ -51,6 +49,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             base.LoadComplete();
 
             ColumnWatcher.GetOrCreate(Column).Add(this);
+
+            if (noteDisplayTint != null)
+                noteDisplayTint.Changed += OnColourChanged;
+
             Scheduler.AddOnce(OnLoadChanged);
         }
 
@@ -61,26 +63,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected string TailName => ColorPrefix + "longnote/tail";
 
         protected virtual string ColorPrefix
-        {
-            get
-            {
-                if (noteDisplayTint?.UseTintBaseTexture(DisplayColourPart, Column) == true)
-                    return "white";
-
-                if (!Column.ColorSettingsEnabledBindable.Value)
-                    return "white";
-
-                return columnNoteType switch
-                {
-                    EzColumnType.A => "white",
-                    EzColumnType.B => "blue",
-                    EzColumnType.S => "green",
-                    EzColumnType.E => "white",
-                    EzColumnType.P => "green",
-                    _ => "white",
-                };
-            }
-        }
+            => noteDisplayTint?.GetEzProTextureColourPrefix(DisplayColourPart, Column) ?? "white";
 
         protected virtual void UpdateTexture() { }
         protected virtual void UpdateDrawable() { }
@@ -96,6 +79,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 return;
 
             tintBaseApplied = noteDisplayTint?.UseTintBaseTexture(DisplayColourPart, Column) == true;
+            appliedPrefix = ColorPrefix;
             MainContainer.Clear();
             UpdateTexture();
             OnDrawableChanged();
@@ -113,8 +97,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 return;
 
             bool tintBase = noteDisplayTint?.UseTintBaseTexture(DisplayColourPart, Column) == true;
+            string prefix = ColorPrefix;
 
-            if (tintBaseApplied != tintBase)
+            if (tintBaseApplied != tintBase || appliedPrefix != prefix)
             {
                 OnLoadChanged();
                 return;
@@ -159,7 +144,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void Dispose(bool isDisposing)
         {
             if (isDisposing)
+            {
                 ColumnWatcher.Remove(Column, this);
+
+                if (noteDisplayTint != null)
+                    noteDisplayTint.Changed -= OnColourChanged;
+            }
             base.Dispose(isDisposing);
         }
 

@@ -8,6 +8,7 @@ using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Skinning;
 using osuTK;
@@ -17,7 +18,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
     public partial class LegacyNotePiece : LegacyManiaColumnElement
     {
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-        private readonly Bindable<bool> colorSettingsEnabled = new Bindable<bool>();
 
         private Container directionContainer = null!;
 
@@ -37,8 +37,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         {
             this.skin = skin;
 
-            colorSettingsEnabled.BindTo(Column.ColorSettingsEnabledBindable);
-
             widthForNoteHeightScale = skin.GetConfig<ManiaSkinConfigurationLookup, float>(new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale))?.Value;
 
             InternalChild = directionContainer = new Container
@@ -54,17 +52,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
             direction.BindValueChanged(OnDirectionChanged, true);
         }
 
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            colorSettingsEnabled.BindValueChanged(_ =>
-            {
-                reloadAnimation();
-            });
-        }
-
-        protected override void OnDivisorNoteColouringChanged()
+        protected override void OnTintDisplaySettingsChanged()
         {
             reloadAnimation();
         }
@@ -127,9 +115,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
             }
 
             string noteImage = GetColumnSkinConfig<string>(skin, lookup)?.Value
-                               ?? $"mania-note{ResolveNoteTextureFileIndex(colorSettingsEnabled.Value)}{suffix}";
+                               ?? $"mania-note{ResolveNoteTextureFileIndex(partForLookup(lookup))}{suffix}";
 
             return skin.GetAnimation(noteImage, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true);
         }
+
+        private static ManiaNoteDisplayColourPart partForLookup(LegacyManiaSkinConfigurationLookups lookup) => lookup switch
+        {
+            LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage => ManiaNoteDisplayColourPart.HoldHead,
+            LegacyManiaSkinConfigurationLookups.HoldNoteTailImage => ManiaNoteDisplayColourPart.HoldBody,
+            _ => ManiaNoteDisplayColourPart.Note,
+        };
     }
 }

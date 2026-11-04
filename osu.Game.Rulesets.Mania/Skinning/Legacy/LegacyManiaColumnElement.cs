@@ -30,10 +30,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         /// </summary>
         protected string FallbackColumnIndex { get; private set; } = null!;
 
-        protected bool DivisorNoteColouringEnabled { get; private set; }
-
-        protected string ResolveNoteTextureFileIndex(bool columnColourEnabled)
-            => ManiaNoteTextureColouring.ShouldUseTintBaseNoteTextures(columnColourEnabled, DivisorNoteColouringEnabled)
+        protected string ResolveNoteTextureFileIndex(ManiaNoteDisplayColourPart part)
+            => noteDisplayTint?.UseTintBaseTexture(part, Column) == true
                 ? "1"
                 : FallbackColumnIndex;
 
@@ -48,48 +46,28 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
                 int distanceToEdge = Math.Min(columnInStage, (stage.Columns - 1) - columnInStage);
                 FallbackColumnIndex = distanceToEdge % 2 == 0 ? "1" : "2";
             }
-
-            syncDivisorNoteColouringFromColumn();
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            Column.NoteColourChanged += onColumnDivisorNoteColouringChanged;
+            if (noteDisplayTint != null)
+                noteDisplayTint.Changed += OnTintDisplaySettingsChanged;
 
             // Subclasses (e.g. LegacyNotePiece) build children in load(); notify only after the hierarchy is ready.
-            OnDivisorNoteColouringChanged();
+            OnTintDisplaySettingsChanged();
         }
 
         protected override void Dispose(bool isDisposing)
         {
-            if (isDisposing)
-                Column.NoteColourChanged -= onColumnDivisorNoteColouringChanged;
+            if (isDisposing && noteDisplayTint != null)
+                noteDisplayTint.Changed -= OnTintDisplaySettingsChanged;
 
             base.Dispose(isDisposing);
         }
 
-        private void onColumnDivisorNoteColouringChanged()
-        {
-            if (!syncDivisorNoteColouringFromColumn())
-                return;
-
-            OnDivisorNoteColouringChanged();
-        }
-
-        private bool syncDivisorNoteColouringFromColumn()
-        {
-            bool enabled = noteDisplayTint?.DivisorNoteColouringEnabled == true;
-
-            if (DivisorNoteColouringEnabled == enabled)
-                return false;
-
-            DivisorNoteColouringEnabled = enabled;
-            return true;
-        }
-
-        protected virtual void OnDivisorNoteColouringChanged()
+        protected virtual void OnTintDisplaySettingsChanged()
         {
         }
 

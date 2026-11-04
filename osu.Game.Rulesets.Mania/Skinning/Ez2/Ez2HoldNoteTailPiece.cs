@@ -2,12 +2,10 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania;
 
@@ -19,13 +17,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private Box foregroundAdditive = null!;
 
         [Resolved]
-        private Ez2ConfigManager ezConfig { get; set; } = null!;
-
-        [Resolved]
         private StageDefinition stageDefinition { get; set; } = null!;
-
-        // 10k2s1p 开启时用 Ez 内置色彩模板，关闭时回到 FastNoteBase 的编辑器列色。
-        protected override IBindable<bool>? BuiltInColourTemplateSwitch => ezConfig.GetBindable<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns);
 
         protected override Colour4 BuiltInColourTemplate => stageDefinition.GetColourForLayout(Column.Index);
 
