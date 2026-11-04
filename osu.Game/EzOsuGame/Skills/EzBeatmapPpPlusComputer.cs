@@ -70,7 +70,7 @@ namespace osu.Game.EzOsuGame.Skills
                     EzSkillSystems.BEATMAP_PPPLUS,
                     skills,
                     beatmapInfo.ID,
-                    skillVersions: EzPppSkillVersions.For(skills.Keys));
+                    pppRulesetOnlineId: rulesetId);
 
                 return skills;
             }

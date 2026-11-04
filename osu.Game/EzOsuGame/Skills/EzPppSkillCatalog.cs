@@ -10,22 +10,17 @@ using osu.Game.EzOsuGame.LocalProfile;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// One PPP metric. <see cref="MetricId"/> is the last segment of a skill id
+    /// Skill metric. <see cref="MetricId"/> is the last segment of a skill id
     /// (<c>beatmap_ppplus.jump_aim</c> → <c>jump_aim</c>) so a future <c>Skill-{metric}</c> filter
     /// can group chart and player rows without hard-coding a system prefix.
     /// </summary>
-    public readonly record struct EzPppSkillSpec(
-        string MetricId,
-        string NameZh,
-        string NameEn,
-        string AccentHex,
-        bool InRadar)
+    public readonly record struct EzSkillSpec(string MetricId, LocalisableString DisplayName, string AccentHex, bool InRadar)
     {
-        public LocalisableString DisplayName => new EzLocalizationManager.EzLocalisableString(NameZh, NameEn);
-
         public string ChartSkillId => EzPppSkillCatalog.ChartSkillId(MetricId);
 
         public string PlayerSkillId => EzPppSkillCatalog.PlayerSkillId(MetricId);
+
+        public static EzSkillSpec Pad(int index) => new EzSkillSpec($"_pad{index}", string.Empty, "#000000", false);
     }
 
     /// <summary>
@@ -43,25 +38,29 @@ namespace osu.Game.EzOsuGame.Skills
         public const string COLOUR = "colour";
         public const string MOVEMENT = "movement";
         public const string STRAIN = "strain";
+        public const string STAMINA = "stamina";
 
-        private static readonly EzPppSkillSpec[] taiko_metrics =
+        private static LocalisableString pppName(string zh, string en)
+            => new EzLocalizationManager.EzLocalisableString(zh, en);
+
+        private static readonly EzSkillSpec[] taiko_metrics =
         {
-            new EzPppSkillSpec(RHYTHM, "节奏", "Rhythm", "#8f6bd8", true),
-            new EzPppSkillSpec(COLOUR, "颜色", "Colour", "#6f87d8", true),
-            new EzPppSkillSpec("stamina", "耐力", "Stamina", "#ad6b5d", true),
-            new EzPppSkillSpec(STAR_RATING, "星级", "Stars", "#c9cfdd", false),
+            new EzSkillSpec(RHYTHM, pppName("节奏", "Rhythm"), "#8f6bd8", true),
+            new EzSkillSpec(COLOUR, pppName("颜色", "Colour"), "#6f87d8", true),
+            new EzSkillSpec(STAMINA, pppName("耐力", "Stamina"), "#ad6b5d", true),
+            new EzSkillSpec(STAR_RATING, pppName("星级", "Stars"), "#c9cfdd", false),
         };
 
-        private static readonly EzPppSkillSpec[] catch_metrics =
+        private static readonly EzSkillSpec[] catch_metrics =
         {
-            new EzPppSkillSpec(MOVEMENT, "移动", "Movement", "#6f87d8", true),
-            new EzPppSkillSpec(STAR_RATING, "星级", "Stars", "#c9cfdd", false),
+            new EzSkillSpec(MOVEMENT, pppName("移动", "Movement"), "#6f87d8", true),
+            new EzSkillSpec(STAR_RATING, pppName("星级", "Stars"), "#c9cfdd", false),
         };
 
-        private static readonly EzPppSkillSpec[] mania_metrics =
+        private static readonly EzSkillSpec[] mania_metrics =
         {
-            new EzPppSkillSpec(STRAIN, "密度", "Strain", "#ec6a9c", true),
-            new EzPppSkillSpec(STAR_RATING, "星级", "Stars", "#c9cfdd", false),
+            new EzSkillSpec(STRAIN, pppName("密度", "Strain"), "#ec6a9c", true),
+            new EzSkillSpec(STAR_RATING, pppName("星级", "Stars"), "#c9cfdd", false),
         };
 
         public static bool SupportsRuleset(int rulesetOnlineId)
@@ -70,7 +69,7 @@ namespace osu.Game.EzOsuGame.Skills
                || rulesetOnlineId == CATCH_RULESET_ID
                || rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID;
 
-        public static IReadOnlyList<EzPppSkillSpec> MetricsFor(int rulesetOnlineId)
+        public static IReadOnlyList<EzSkillSpec> MetricsFor(int rulesetOnlineId)
         {
             if (rulesetOnlineId == EzLocalProfileConstants.OSU_RULESET_ID)
                 return osuMetrics();
@@ -84,13 +83,13 @@ namespace osu.Game.EzOsuGame.Skills
             if (rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID)
                 return mania_metrics;
 
-            return Array.Empty<EzPppSkillSpec>();
+            return Array.Empty<EzSkillSpec>();
         }
 
         public static IReadOnlyList<string> RequiredChartSkillIds(int rulesetOnlineId)
         {
             var metrics = MetricsFor(rulesetOnlineId);
-            var ids = new string[metrics.Count];
+            string[] ids = new string[metrics.Count];
 
             for (int i = 0; i < metrics.Count; i++)
                 ids[i] = metrics[i].ChartSkillId;
@@ -191,10 +190,10 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>Radar axes for a ruleset. Fewer than three axes are padded with star rating, then blank slots.</summary>
-        public static IReadOnlyList<EzPppSkillSpec> RadarAxes(int rulesetOnlineId)
+        public static IReadOnlyList<EzSkillSpec> RadarAxes(int rulesetOnlineId)
         {
             var metrics = MetricsFor(rulesetOnlineId);
-            var selected = new List<EzPppSkillSpec>(metrics.Count);
+            var selected = new List<EzSkillSpec>(metrics.Count);
 
             foreach (var spec in metrics)
             {
@@ -212,23 +211,23 @@ namespace osu.Game.EzOsuGame.Skills
             }
 
             while (selected.Count < 3)
-                selected.Add(new EzPppSkillSpec($"_pad{selected.Count}", string.Empty, string.Empty, "#000000", false));
+                selected.Add(EzSkillSpec.Pad(selected.Count));
 
             return selected;
         }
 
-        private static EzPppSkillSpec[] osuMetrics()
+        private static EzSkillSpec[] osuMetrics()
         {
             var axes = EzOsuSkillAxisExtensions.All;
-            var specs = new EzPppSkillSpec[axes.Length + 1];
+            var specs = new EzSkillSpec[axes.Length + 1];
 
             for (int i = 0; i < axes.Length; i++)
             {
                 var meta = axes[i].Meta();
-                specs[i] = new EzPppSkillSpec(meta.Id, meta.NameZh, meta.NameEn, meta.AccentHex, meta.InRadar);
+                specs[i] = new EzSkillSpec(meta.Id, meta.DisplayName, meta.AccentHex, meta.InRadar);
             }
 
-            specs[^1] = new EzPppSkillSpec(ACCURACY_DIFFICULTY, "节奏准度", "Accuracy difficulty", "#c59a5c", false);
+            specs[^1] = new EzSkillSpec(ACCURACY_DIFFICULTY, pppName("节奏准度", "Accuracy difficulty"), "#c59a5c", false);
             return specs;
         }
     }

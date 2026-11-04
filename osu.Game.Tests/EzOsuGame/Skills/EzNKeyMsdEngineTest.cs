@@ -274,7 +274,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(mania!.DefaultChartSystemId, Is.EqualTo(EzSkillSystems.BEATMAP_MSD));
             Assert.That(mania.DefaultPlayerSystemId, Is.EqualTo(EzSkillSystems.PLAYER_SSR));
             Assert.That(mania.ContainsSystem(EzSkillSystems.DAN), Is.True);
-            Assert.That(mania.ContainsSystem(EzSkillSystems.BEATMAP_PPPLUS), Is.False);
+            Assert.That(mania.ContainsSystem(EzSkillSystems.BEATMAP_PPPLUS), Is.True);
+            Assert.That(mania.DefaultChartSystemId, Is.EqualTo(EzSkillSystems.BEATMAP_MSD));
 
             var osu = registry.GetProfile(EzLocalProfileConstants.OSU_RULESET_ID);
             Assert.That(osu, Is.Not.Null);
@@ -282,8 +283,17 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(osu.DefaultPlayerSystemId, Is.EqualTo(EzSkillSystems.PLAYER_PPPLUS));
             Assert.That(osu.ContainsSystem(EzSkillSystems.BEATMAP_MSD), Is.False);
 
-            Assert.That(registry.GetProfile(1), Is.Null); // taiko — no plugin yet
-            Assert.That(registry.GetProfile(2), Is.Null); // catch
+            var taiko = registry.GetProfile(1);
+            Assert.That(taiko, Is.Not.Null);
+            Assert.That(taiko!.DefaultChartSystemId, Is.EqualTo(EzSkillSystems.BEATMAP_PPPLUS));
+            Assert.That(taiko.DefaultPlayerSystemId, Is.EqualTo(EzSkillSystems.PLAYER_PPPLUS));
+
+            var @catch = registry.GetProfile(2);
+            Assert.That(@catch, Is.Not.Null);
+            Assert.That(@catch!.DefaultChartSystemId, Is.EqualTo(EzSkillSystems.BEATMAP_PPPLUS));
+
+            Assert.That(registry.EnumerateByMetric("stamina").Select(s => s.SkillId), Does.Contain(EzOsuSkillAxis.Stamina.ToChartSkillId()));
+            Assert.That(registry.EnumerateByMetric("jump_aim").Count(), Is.EqualTo(2));
         }
     }
 

@@ -16,12 +16,12 @@ namespace osu.Game.EzOsuGame.Skills.Ppp
     /// </summary>
     public sealed class EzPpPlusEngine : IEzPpPlusEngine
     {
-        public IReadOnlyDictionary<string, double> CalculateChart(IBeatmap beatmap, IReadOnlyList<Mod> mods)
+        public IReadOnlyDictionary<string, double> CalculateChart(IBeatmap beatmap, IReadOnlyList<Mod>? mods)
         {
             ArgumentNullException.ThrowIfNull(beatmap);
             mods ??= Array.Empty<Mod>();
 
-            int rulesetId = beatmap.BeatmapInfo?.Ruleset?.OnlineID ?? -1;
+            int rulesetId = beatmap.BeatmapInfo.Ruleset.OnlineID;
 
             if (!EzPppSkillCatalog.SupportsRuleset(rulesetId))
                 return new Dictionary<string, double>(StringComparer.Ordinal);

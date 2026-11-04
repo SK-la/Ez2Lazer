@@ -937,7 +937,7 @@ namespace osu.Game.EzOsuGame.HUD
             bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.PppSkillChart;
             var axes = EzPppSkillCatalog.RadarAxes(rulesetId);
             const double display_min = 0.01;
-            var selected = new List<EzPppSkillSpec>();
+            var selected = new List<EzSkillSpec>();
 
             foreach (var axis in axes)
             {
@@ -981,7 +981,7 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             while (selected.Count < 3)
-                selected.Add(new EzPppSkillSpec($"_pad{selected.Count}", string.Empty, string.Empty, "#000000", false));
+                selected.Add(EzSkillSpec.Pad(selected.Count));
 
             if (selected.Count == 0)
             {
@@ -1001,7 +1001,7 @@ namespace osu.Game.EzOsuGame.HUD
             for (int i = 0; i < selected.Count; i++)
             {
                 var axis = selected[i];
-                activeAxisLabels[i] = axis.NameEn;
+                activeAxisLabels[i] = axis.DisplayName.ToString();
                 bool padded = axis.MetricId.StartsWith("_pad", StringComparison.Ordinal);
                 double beatmapValue = padded ? 0 : chartSkills.GetValueOrDefault(axis.ChartSkillId, 0);
                 double playerValue = beatmapOnly || padded ? 0 : playerSkills.GetValueOrDefault(axis.PlayerSkillId, 0);
