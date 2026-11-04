@@ -71,8 +71,8 @@ namespace osu.Game.EzOsuGame.Skills
     }
 
     /// <summary>
-    /// Legacy single version for PP+ rows. PPP chart/player skills use
-    /// <see cref="EzPppSkillVersions"/> per skill id and do not bump this constant.
+    /// Legacy single version for PP+ rows. PPP uses
+    /// <see cref="EzPppSkillVersions"/> per ruleset bundle and do not bump this constant.
     /// 2: PP+-shaped axes (was official Diff aim/speed/FL/reading).
     /// </summary>
     public static class EzOsuSkillAlgorithm

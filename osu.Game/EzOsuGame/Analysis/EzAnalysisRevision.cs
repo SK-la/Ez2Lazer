@@ -43,7 +43,7 @@ namespace osu.Game.EzOsuGame.Analysis
         Aggregation = 1 << 5,
 
         /// <summary>PPP chart skills (<c>beatmap_ppplus</c>). Not part of the mania MSD chain.</summary>
-        PppChart = 1 << 6,
+        PPPAlgorithm = 1 << 6,
     }
 
     /// <summary>

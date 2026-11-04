@@ -42,12 +42,18 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// PPP rows whose <see cref="EzBeatmapSkillValue.AlgorithmVersion"/> matches <see cref="EzPppSkillVersions.Current"/>.
+        /// PPP rows whose <see cref="EzBeatmapSkillValue.AlgorithmVersion"/> matches the bundle revision for that beatmap's ruleset.
         /// </summary>
         public IReadOnlyDictionary<string, double> GetBeatmapSkillsAtCurrentVersions(string beatmapHash, string systemId)
         {
             return realmAccess.Run(r =>
             {
+                int rulesetId = resolveRulesetForBeatmapHash(r, beatmapHash);
+                int bundle = EzPppSkillVersions.ForRuleset(rulesetId);
+
+                if (bundle <= 0)
+                    return new Dictionary<string, double>(StringComparer.Ordinal);
+
                 var rows = r.All<EzBeatmapSkillValue>()
                             .Where(v => v.BeatmapHash == beatmapHash && v.SystemId == systemId);
 
@@ -55,7 +61,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                 foreach (var row in rows)
                 {
-                    if (row.AlgorithmVersion == EzPppSkillVersions.Current(row.SkillId))
+                    if (row.AlgorithmVersion == bundle)
                         result[row.SkillId] = row.Value;
                 }
 
@@ -134,7 +140,8 @@ namespace osu.Game.EzOsuGame.Skills
             Guid beatmapId = default,
             DateTimeOffset? computedAt = null,
             int? algorithmVersion = null,
-            IReadOnlyDictionary<string, int>? skillVersions = null)
+            IReadOnlyDictionary<string, int>? skillVersions = null,
+            int? pppRulesetOnlineId = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(beatmapHash);
             ArgumentException.ThrowIfNullOrWhiteSpace(systemId);
@@ -154,7 +161,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                 foreach (var (skillId, value) in skills)
                 {
-                    int rowVersion = rowVersionFor(systemId, skillId, version, skillVersions);
+                    int rowVersion = rowVersionFor(systemId, skillId, version, skillVersions, pppRulesetOnlineId);
 
                     r.Add(new EzBeatmapSkillValue
                     {
@@ -403,7 +410,7 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// PPP player rows whose algorithm version matches <see cref="EzPppSkillVersions.Current"/>.
+        /// PPP player rows whose algorithm version matches the bundle revision for that skill's metric.
         /// </summary>
         public IReadOnlyDictionary<string, double> GetPlayerSkillsAtCurrentVersions(string username, int keyCount, string systemId)
         {
@@ -418,7 +425,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                 foreach (var row in rows)
                 {
-                    if (row.AlgorithmVersion == EzPppSkillVersions.Current(row.SkillId))
+                    if (row.AlgorithmVersion == EzPppSkillVersions.ForSkillId(row.SkillId))
                         result[row.SkillId] = row.Value;
                 }
 
@@ -443,7 +450,7 @@ namespace osu.Game.EzOsuGame.Skills
                     ? r.All<EzPlayerSkillValue>()
                        .Where(v => v.Username == username && v.KeyCount == keyCount && v.SystemId == systemId)
                        .AsEnumerable()
-                       .FirstOrDefault(v => v.AlgorithmVersion == EzPppSkillVersions.Current(v.SkillId))
+                       .FirstOrDefault(v => v.AlgorithmVersion == EzPppSkillVersions.ForSkillId(v.SkillId))
                     : r.All<EzPlayerSkillValue>()
                        .FirstOrDefault(v => v.Username == username
                                             && v.KeyCount == keyCount
@@ -1121,7 +1128,7 @@ namespace osu.Game.EzOsuGame.Skills
                 var facet = new EzDataStateFacet
                 {
                     Id = "PPP",
-                    Facet = EzAnalysisFacet.PppChart,
+                    Facet = EzAnalysisFacet.PPPAlgorithm,
                     CurrentRevision = EzPppSkillVersions.FACET_REVISION,
                     UniverseCount = candidates.Count,
                     Rows = rows,
@@ -1131,17 +1138,30 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
-        private static int rowVersionFor(string systemId, string skillId, int fallback, IReadOnlyDictionary<string, int>? skillVersions)
+        private static int rowVersionFor(
+            string systemId,
+            string skillId,
+            int fallback,
+            IReadOnlyDictionary<string, int>? skillVersions,
+            int? pppRulesetOnlineId = null)
         {
             if (skillVersions != null && skillVersions.TryGetValue(skillId, out int specific))
                 return specific;
 
-            if (systemId is EzSkillSystems.BEATMAP_PPPLUS or EzSkillSystems.PLAYER_PPPLUS)
+            if (systemId == EzSkillSystems.BEATMAP_PPPLUS && pppRulesetOnlineId is int chartRuleset)
             {
-                int current = EzPppSkillVersions.Current(skillId);
+                int bundle = EzPppSkillVersions.ForRuleset(chartRuleset);
 
-                if (current > 0)
-                    return current;
+                if (bundle > 0)
+                    return bundle;
+            }
+
+            if (systemId == EzSkillSystems.PLAYER_PPPLUS)
+            {
+                int bundle = EzPppSkillVersions.ForSkillId(skillId);
+
+                if (bundle > 0)
+                    return bundle;
             }
 
             return fallback;
@@ -1152,11 +1172,16 @@ namespace osu.Game.EzOsuGame.Skills
             if (stored == null || stored.Count == 0)
                 return false;
 
+            int bundle = EzPppSkillVersions.ForRuleset(rulesetId);
+
+            if (bundle <= 0)
+                return false;
+
             var present = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (var row in stored)
             {
-                if (row.AlgorithmVersion == EzPppSkillVersions.Current(row.SkillId))
+                if (row.AlgorithmVersion == bundle)
                     present.Add(row.SkillId);
             }
 
@@ -1170,6 +1195,12 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         private readonly record struct PppChartScan(List<Guid> OwedIds, EzFacetStatus Status);
+
+        private static int resolveRulesetForBeatmapHash(Realm r, string beatmapHash)
+        {
+            var beatmap = r.All<BeatmapInfo>().FirstOrDefault(b => b.Hash == beatmapHash);
+            return beatmap?.Ruleset.OnlineID ?? -1;
+        }
 
         /// <summary>
         /// Batch-read typed ChartSkillInfo rows for many hashes in one Realm run.

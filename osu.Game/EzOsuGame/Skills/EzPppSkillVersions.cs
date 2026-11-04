@@ -2,107 +2,83 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
+using osu.Game.EzOsuGame.LocalProfile;
 
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Per-skill algorithm version for PPP rows. Bump one constant to retire that skill id only.
-    /// <see cref="EzOsuSkillAlgorithm.VERSION"/> stays unchanged.
+    /// Per-ruleset PPP bundle revision (all chart/player skills for that mode share one version).
+    /// Bump one constant to retire every <c>beatmap_ppplus</c> / <c>player_ppplus</c> row for that ruleset.
+    /// <see cref="EzOsuSkillAlgorithm.VERSION"/> is not used as the PPP staleness stamp.
     /// </summary>
     public static class EzPppSkillVersions
     {
-        /// <summary>Facet stamp for a chart whose required skills are all at <see cref="Current"/>.</summary>
+        public const int OSU = 1;
+        public const int TAIKO = 1;
+        public const int CATCH = 1;
+        public const int MANIA = 1;
+
+        /// <summary>Max bundle revision across modes (data-status facet stamp).</summary>
         public const int FACET_REVISION = 1;
 
-        public const int CHART_AIM = 1;
-        public const int CHART_JUMP_AIM = 1;
-        public const int CHART_FLOW_AIM = 1;
-        public const int CHART_PRECISION = 1;
-        public const int CHART_SPEED = 1;
-        public const int CHART_STAMINA = 1;
-        public const int CHART_ACCURACY = 1;
-        public const int CHART_STAR_RATING = 1;
-        public const int CHART_ACCURACY_DIFFICULTY = 1;
-        public const int CHART_RHYTHM = 1;
-        public const int CHART_COLOUR = 1;
-        public const int CHART_MOVEMENT = 1;
-        public const int CHART_STRAIN = 1;
-
-        public const int PLAYER_AIM = 1;
-        public const int PLAYER_JUMP_AIM = 1;
-        public const int PLAYER_FLOW_AIM = 1;
-        public const int PLAYER_PRECISION = 1;
-        public const int PLAYER_SPEED = 1;
-        public const int PLAYER_STAMINA = 1;
-        public const int PLAYER_ACCURACY = 1;
-        public const int PLAYER_STAR_RATING = 1;
-        public const int PLAYER_ACCURACY_DIFFICULTY = 1;
-        public const int PLAYER_RHYTHM = 1;
-        public const int PLAYER_COLOUR = 1;
-        public const int PLAYER_MOVEMENT = 1;
-        public const int PLAYER_STRAIN = 1;
-
-        public static int Current(string skillId)
+        public static int ForRuleset(int rulesetOnlineId)
         {
-            if (!EzPppSkillCatalog.TrySplit(skillId, out bool player, out string metric))
-                return 0;
+            if (rulesetOnlineId == EzLocalProfileConstants.OSU_RULESET_ID)
+                return OSU;
 
-            if (player)
-            {
-                return metric switch
-                {
-                    "aim" => PLAYER_AIM,
-                    "jump_aim" => PLAYER_JUMP_AIM,
-                    "flow_aim" => PLAYER_FLOW_AIM,
-                    "precision" => PLAYER_PRECISION,
-                    "speed" => PLAYER_SPEED,
-                    "stamina" => PLAYER_STAMINA,
-                    "accuracy" => PLAYER_ACCURACY,
-                    "star_rating" => PLAYER_STAR_RATING,
-                    "accuracy_difficulty" => PLAYER_ACCURACY_DIFFICULTY,
-                    "rhythm" => PLAYER_RHYTHM,
-                    "colour" => PLAYER_COLOUR,
-                    "movement" => PLAYER_MOVEMENT,
-                    "strain" => PLAYER_STRAIN,
-                    _ => 0,
-                };
-            }
+            if (rulesetOnlineId == EzPppSkillCatalog.TAIKO_RULESET_ID)
+                return TAIKO;
 
-            return metric switch
-            {
-                "aim" => CHART_AIM,
-                "jump_aim" => CHART_JUMP_AIM,
-                "flow_aim" => CHART_FLOW_AIM,
-                "precision" => CHART_PRECISION,
-                "speed" => CHART_SPEED,
-                "stamina" => CHART_STAMINA,
-                "accuracy" => CHART_ACCURACY,
-                "star_rating" => CHART_STAR_RATING,
-                "accuracy_difficulty" => CHART_ACCURACY_DIFFICULTY,
-                "rhythm" => CHART_RHYTHM,
-                "colour" => CHART_COLOUR,
-                "movement" => CHART_MOVEMENT,
-                "strain" => CHART_STRAIN,
-                _ => 0,
-            };
+            if (rulesetOnlineId == EzPppSkillCatalog.CATCH_RULESET_ID)
+                return CATCH;
+
+            if (rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID)
+                return MANIA;
+
+            return 0;
         }
 
-        public static Dictionary<string, int> For(IEnumerable<string> skillIds)
+        /// <summary>Expected row version for a PPP skill id (player/chart metric suffix).</summary>
+        public static int ForSkillId(string skillId)
         {
-            ArgumentNullException.ThrowIfNull(skillIds);
+            if (!EzPppSkillCatalog.TrySplit(skillId, out _, out string metric))
+                return 0;
 
-            var versions = new Dictionary<string, int>(StringComparer.Ordinal);
+            return ForMetric(metric);
+        }
 
-            foreach (string skillId in skillIds)
+        /// <summary>
+        /// Bundle revision for a metric. Shared ids (<see cref="EzPppSkillCatalog.STAMINA"/>, <see cref="EzPppSkillCatalog.STAR_RATING"/>) invalidate when any owning mode bumps.
+        /// </summary>
+        public static int ForMetric(string metricId)
+        {
+            switch (metricId)
             {
-                int version = Current(skillId);
+                case EzPppSkillCatalog.RHYTHM:
+                case EzPppSkillCatalog.COLOUR:
+                    return TAIKO;
 
-                if (version > 0)
-                    versions[skillId] = version;
+                case EzPppSkillCatalog.MOVEMENT:
+                    return CATCH;
+
+                case EzPppSkillCatalog.STRAIN:
+                    return MANIA;
+
+                case EzPppSkillCatalog.STAR_RATING:
+                    return Math.Max(Math.Max(OSU, TAIKO), Math.Max(CATCH, MANIA));
+
+                case EzPppSkillCatalog.STAMINA:
+                    return Math.Max(OSU, TAIKO);
+
+                case EzPppSkillCatalog.ACCURACY_DIFFICULTY:
+                    return OSU;
+
+                default:
+                    if (EzOsuSkillAxisExtensions.TryParse(metricId, out _))
+                        return OSU;
+
+                    return 0;
             }
-
-            return versions;
         }
     }
 }

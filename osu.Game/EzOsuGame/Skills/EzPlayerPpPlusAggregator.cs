@@ -105,8 +105,7 @@ namespace osu.Game.EzOsuGame.Skills
                     EzSkillSystems.OSU_SLICE_KEY,
                     EzSkillSystems.PLAYER_PPPLUS,
                     new Dictionary<string, double>(StringComparer.Ordinal),
-                    0,
-                    skillVersions: new Dictionary<string, int>(StringComparer.Ordinal));
+                    0);
                 return;
             }
 
@@ -122,8 +121,7 @@ namespace osu.Game.EzOsuGame.Skills
                     slice,
                     EzSkillSystems.PLAYER_PPPLUS,
                     aggregated,
-                    analyzed.GetValueOrDefault(slice),
-                    skillVersions: EzPppSkillVersions.For(aggregated.Keys));
+                    analyzed.GetValueOrDefault(slice));
             }
         }
 
