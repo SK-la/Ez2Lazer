@@ -150,8 +150,8 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
 
         private static double getProvisionalBaseline(BeatmapInfo beatmap, RulesetInfo ruleset)
         {
-            if (EzQuickRotationDifficultyHelper.UsesXxyStarRating(ruleset))
-                return beatmap.GetPersistedXxyStarRating() ?? beatmap.StarRating;
+            if (EzQuickRotationDifficultyHelper.UsesSunnyStarRating(ruleset))
+                return beatmap.GetPersistedSunnyStarRating() ?? beatmap.StarRating;
 
             return beatmap.StarRating;
         }

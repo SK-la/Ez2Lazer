@@ -90,7 +90,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
             const int key_count = CrossMatrixProvider.MAX_SUPPORTED_KEY_COUNT + 1;
             var beatmap = createBeatmap(key_count);
 
-            Assert.That(EzManiaXxyStarRating.IsPatternSupported(beatmap), Is.False);
+            Assert.That(EzManiaSunnyStarRating.IsPatternSupported(beatmap), Is.False);
         }
 
         [Test]
@@ -215,7 +215,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         public void IsPatternSupported_AllSupportedKeyCounts_ReturnsTrue()
         {
             for (int keyCount = 1; keyCount <= CrossMatrixProvider.MAX_SUPPORTED_KEY_COUNT; keyCount++)
-                Assert.That(EzManiaXxyStarRating.IsPatternSupported(createBeatmap(keyCount)), Is.True, $"K={keyCount}");
+                Assert.That(EzManiaSunnyStarRating.IsPatternSupported(createBeatmap(keyCount)), Is.True, $"K={keyCount}");
         }
 
         [TestCase(11)]

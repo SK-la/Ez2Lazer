@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -95,9 +95,31 @@ namespace osu.Game.Beatmaps
         public double StarRating { get; set; } = -1;
 
         /// <summary>
-        /// Ez2Lazer: Baseline mania xxy star rating (no mods). Defaults to -1 (not yet calculated). Populated by <see cref="BeatmapUpdater"/>.
+        /// Ez2Lazer: baseline Sunny star rating (no mods). Defaults to -1 (not yet calculated).
         /// </summary>
-        public double XxyStarRating { get; set; } = -1;
+        public double SunnyStarRating { get; set; } = -1;
+
+        /// <summary>
+        /// Ez2Lazer: baseline perfect-play performance points from the Sunny star rating (no mods).
+        /// Defaults to -1 (not yet calculated).
+        /// </summary>
+        public double SunnyPerformancePoints { get; set; } = -1;
+
+        /// <summary>
+        /// Ez2Lazer: baseline PP+ star rating (no mods). Defaults to -1 (not yet calculated).
+        /// </summary>
+        public double PPPStarRating { get; set; } = -1;
+
+        /// <summary>
+        /// Ez2Lazer: baseline perfect-play performance points from the PP+ star rating (no mods).
+        /// Defaults to -1 (not yet calculated).
+        /// </summary>
+        public double PPPPerformancePoints { get; set; } = -1;
+
+        /// <summary>
+        /// Ez2Lazer: baseline Mina rating (no mods). Defaults to -1 (not yet calculated).
+        /// </summary>
+        public double MinaRating { get; set; } = -1;
 
         /// <summary>
         /// Ez2Lazer: Baseline perfect-play performance points (no mods). Defaults to -1 (not yet calculated).

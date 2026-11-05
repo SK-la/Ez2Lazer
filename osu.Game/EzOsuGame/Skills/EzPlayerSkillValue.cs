@@ -24,10 +24,19 @@ namespace osu.Game.EzOsuGame.Skills
         [Indexed]
         public string SystemId { get; set; } = string.Empty;
 
+        /// <summary>
+        /// Ruleset the value belongs to. Player rows for different rulesets must not share a slice.
+        /// </summary>
+        [Indexed]
+        public int RulesetOnlineId { get; set; } = -1;
+
         [Indexed]
         public string SkillId { get; set; } = string.Empty;
 
         public double Value { get; set; }
+
+        /// <summary>Whether this row represents a computed value or a settled miss.</summary>
+        public int State { get; set; }
 
         public int AnalyzedPlays { get; set; }
 

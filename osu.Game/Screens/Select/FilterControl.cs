@@ -7,8 +7,8 @@ using System.Collections.Immutable;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Extensions;
+using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -310,7 +310,7 @@ namespace osu.Game.Screens.Select
                     return;
 
                 var rulesetCriteria = currentCriteria.RulesetCriteria;
-                if (sortDropdown.Current.Value is SortMode.PP or SortMode.XxyStarRating || rulesetCriteria?.FilterMayChangeFromMods(currentCriteria, m) == true)
+                if (sortDropdown.Current.Value is SortMode.PP or SortMode.SunnyStarRating || rulesetCriteria?.FilterMayChangeFromMods(currentCriteria, m) == true)
                     updateCriteria();
             });
 
@@ -649,7 +649,7 @@ namespace osu.Game.Screens.Select
 
                 foreach (var item in Enum.GetValues<SortMode>())
                 {
-                    if (item == SortMode.XxyStarRating && !EzXxyStarRatingSupport.SupportsRuleset(ruleset.Value))
+                    if (item == SortMode.SunnyStarRating && !EzSunnyStarRatingSupport.SupportsRuleset(ruleset.Value))
                         continue;
 
                     items.Add(item);
@@ -675,7 +675,7 @@ namespace osu.Game.Screens.Select
                 if (synchronisingBindables)
                     return;
 
-                if (current.NewValue == SortMode.XxyStarRating && !Items.Contains(SortMode.XxyStarRating))
+                if (current.NewValue == SortMode.SunnyStarRating && !Items.Contains(SortMode.SunnyStarRating))
                     return;
 
                 configSortMode.Value = current.NewValue;
@@ -683,7 +683,7 @@ namespace osu.Game.Screens.Select
 
             protected override LocalisableString GenerateItemText(SortMode item)
             {
-                if (item == SortMode.XxyStarRating)
+                if (item == SortMode.SunnyStarRating)
                     return EzSongSelectStrings.XXY_STAR_RATING;
 
                 return item.GetLocalisableDescription();
@@ -738,11 +738,11 @@ namespace osu.Game.Screens.Select
                             items.Add(new GroupModeDropdownItem(GroupMode.PP, "PP"));
                             break;
 
-                        case GroupMode.XxyStarRating:
-                            if (!EzXxyStarRatingSupport.SupportsRuleset(ruleset.Value))
+                        case GroupMode.SunnyStarRating:
+                            if (!EzSunnyStarRatingSupport.SupportsRuleset(ruleset.Value))
                                 break;
 
-                            items.Add(new GroupModeDropdownItem(GroupMode.XxyStarRating, EzSongSelectStrings.XXY_STAR_RATING));
+                            items.Add(new GroupModeDropdownItem(GroupMode.SunnyStarRating, EzSongSelectStrings.XXY_STAR_RATING));
                             break;
 
                         default:

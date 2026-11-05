@@ -8,19 +8,19 @@ namespace osu.Game.EzOsuGame.Beatmaps
 {
     public static class EzBeatmapXxyExtensions
     {
-        public static bool SupportsXxyStarRating(this BeatmapInfo beatmap)
-            => EzXxyStarRatingSupport.SupportsBeatmapInfo(beatmap);
+        public static bool SupportsSunnyStarRating(this BeatmapInfo beatmap)
+            => EzSunnyStarRatingSupport.SupportsBeatmapInfo(beatmap);
 
-        public static bool HasPersistedXxyStarRating(this BeatmapInfo beatmap) => beatmap.XxyStarRating >= 0;
+        public static bool HasPersistedSunnyStarRating(this BeatmapInfo beatmap) => beatmap.SunnyStarRating >= 0;
 
-        public static double? GetPersistedXxyStarRating(this BeatmapInfo beatmap)
-            => beatmap.HasPersistedXxyStarRating() ? beatmap.XxyStarRating : null;
+        public static double? GetPersistedSunnyStarRating(this BeatmapInfo beatmap)
+            => beatmap.HasPersistedSunnyStarRating() ? beatmap.SunnyStarRating : null;
 
         public static EzManiaSummary ToEzManiaSummaryForDisplay(this BeatmapInfo beatmap, EzManiaSummary? analysisSummary = null, bool preferAnalysisValues = false)
         {
             double? xxy = preferAnalysisValues && analysisSummary?.XxySr is double analysisXxy
                 ? analysisXxy
-                : beatmap.GetPersistedXxyStarRating() ?? analysisSummary?.XxySr;
+                : beatmap.GetPersistedSunnyStarRating() ?? analysisSummary?.XxySr;
 
             if (!analysisSummary.HasValue)
                 return new EzManiaSummary(null, null, xxy);

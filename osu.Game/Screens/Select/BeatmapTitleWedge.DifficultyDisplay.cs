@@ -15,13 +15,13 @@ using osu.Framework.Graphics.Shapes;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
 using osu.Game.Configuration;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Containers;
-using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.Chat;
@@ -302,7 +302,7 @@ namespace osu.Game.Screens.Select
             {
                 if (beatmap.IsDefault || beatmap.Value.BeatmapInfo is not BeatmapInfo beatmapInfo
                     || !EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value)
-                    || !beatmapInfo.SupportsXxyStarRating())
+                    || !beatmapInfo.SupportsSunnyStarRating())
                 {
                     ezDisplayKpc.ManiaSummary = null;
                     ezDisplayKpc.Hide();

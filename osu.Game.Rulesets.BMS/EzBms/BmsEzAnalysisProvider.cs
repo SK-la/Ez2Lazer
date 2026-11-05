@@ -13,17 +13,17 @@ namespace osu.Game.Rulesets.BMS.EzBms
     /// <summary>
     /// Routes BMS beatmaps through mania conversion before delegating to <see cref="EzManiaAnalysisProvider"/>.
     /// </summary>
-    public sealed class BmsEzAnalysisProvider : IEzAnalysisProvider, IEzXxyStarRatingSupport
+    public sealed class BmsEzAnalysisProvider : IEzAnalysisProvider, IEzSunnyStarRatingSupport
     {
         private readonly EzManiaAnalysisProvider inner = new EzManiaAnalysisProvider();
-        public int XxyStarRatingVersion => inner.XxyStarRatingVersion;
+        public int SunnyStarRatingVersion => inner.SunnyStarRatingVersion;
 
-        public bool SupportsXxyStarRating(IBeatmap beatmap)
+        public bool SupportsSunnyStarRating(IBeatmap beatmap)
         {
             if (beatmap is BMSBeatmap || beatmap.HitObjects.Any(h => h is BMSHitObject))
                 return true;
 
-            return inner.SupportsXxyStarRating(beatmap);
+            return inner.SupportsSunnyStarRating(beatmap);
         }
 
         public bool TryCompute(in EzAnalysisRequest request, CancellationToken cancellationToken, out IEzAnalysis analysis)

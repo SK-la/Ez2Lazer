@@ -38,7 +38,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Revision stamped on chart-side Mina axis rows.</summary>
         private int minaChartRevision => registry.RevisionOf(EzMetricProducers.MINA_CHART, EzLocalProfileConstants.MANIA_RULESET_ID);
 
-        public IReadOnlyDictionary<string, double> GetBeatmapSkills(string beatmapHash, string systemId, int? algorithmVersion = null)
+        public IReadOnlyDictionary<string, double> GetBeatmapSkills(string beatmapHash, string systemId, int? algorithmVersion = null, int rulesetOnlineId = -1)
         {
             int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
 
@@ -48,6 +48,9 @@ namespace osu.Game.EzOsuGame.Skills
                             .Where(v => v.BeatmapHash == beatmapHash
                                         && v.SystemId == systemId
                                         && v.AlgorithmVersion == version);
+
+                if (rulesetOnlineId >= 0)
+                    rows = rows.Where(v => v.RulesetOnlineId == rulesetOnlineId);
 
                 return rows.ToDictionary(v => v.SkillId, v => v.Value, StringComparer.Ordinal);
             });
@@ -151,6 +154,10 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>
         /// Replace all beatmap skill rows for <paramref name="systemId"/> with <paramref name="skills"/>.
         /// </summary>
+        /// <param name="rulesetOnlineId">
+        /// Ruleset the rows belong to. Pass a negative value when the caller cannot name one; reads then treat the
+        /// rows as unqualified rather than attributing them to a ruleset.
+        /// </param>
         public void WriteBeatmapSystemSkills(
             string beatmapHash,
             string systemId,
@@ -159,7 +166,8 @@ namespace osu.Game.EzOsuGame.Skills
             DateTimeOffset? computedAt = null,
             int? algorithmVersion = null,
             IReadOnlyDictionary<string, int>? skillVersions = null,
-            int? pppRulesetOnlineId = null)
+            int? pppRulesetOnlineId = null,
+            int rulesetOnlineId = -1)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(beatmapHash);
             ArgumentException.ThrowIfNullOrWhiteSpace(systemId);
@@ -186,6 +194,7 @@ namespace osu.Game.EzOsuGame.Skills
                         BeatmapHash = beatmapHash,
                         BeatmapId = beatmapId,
                         SystemId = systemId,
+                        RulesetOnlineId = rulesetOnlineId,
                         SkillId = skillId,
                         Value = value,
                         AlgorithmVersion = rowVersion,
@@ -208,7 +217,8 @@ namespace osu.Game.EzOsuGame.Skills
             bool stale = false,
             DateTimeOffset? computedAt = null,
             int? algorithmVersion = null,
-            IReadOnlyDictionary<string, int>? skillVersions = null)
+            IReadOnlyDictionary<string, int>? skillVersions = null,
+            int rulesetOnlineId = -1)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
             ArgumentException.ThrowIfNullOrWhiteSpace(systemId);
@@ -222,7 +232,8 @@ namespace osu.Game.EzOsuGame.Skills
                 var existing = r.All<EzPlayerSkillValue>()
                                 .Where(v => v.Username == username
                                             && v.KeyCount == sliceKey
-                                            && v.SystemId == systemId)
+                                            && v.SystemId == systemId
+                                            && v.RulesetOnlineId == rulesetOnlineId)
                                 .ToList();
 
                 foreach (var row in existing)
@@ -237,6 +248,7 @@ namespace osu.Game.EzOsuGame.Skills
                         Username = username,
                         KeyCount = sliceKey,
                         SystemId = systemId,
+                        RulesetOnlineId = rulesetOnlineId,
                         SkillId = skillId,
                         Value = value,
                         AnalyzedPlays = analyzedPlays,
@@ -270,6 +282,7 @@ namespace osu.Game.EzOsuGame.Skills
                         BeatmapHash = beatmapHash,
                         BeatmapId = beatmapId,
                         SystemId = EzSkillSystems.BEATMAP_MINA,
+                        RulesetOnlineId = EzLocalProfileConstants.MANIA_RULESET_ID,
                         SkillId = axis.ToMsdSkillId(),
                         Value = value,
                         AlgorithmVersion = version,
@@ -304,6 +317,7 @@ namespace osu.Game.EzOsuGame.Skills
                     BeatmapHash = beatmapHash,
                     BeatmapId = beatmapId,
                     SystemId = EzSkillSystems.BEATMAP_MINA,
+                    RulesetOnlineId = EzLocalProfileConstants.MANIA_RULESET_ID,
                     SkillId = EzSkillSystems.MinaUnrateableSkillId,
                     Value = 1,
                     AlgorithmVersion = version,
@@ -397,7 +411,7 @@ namespace osu.Game.EzOsuGame.Skills
                                          .ToHashSet(StringComparer.Ordinal));
         }
 
-        public IReadOnlyDictionary<string, double> GetPlayerSkills(string username, int keyCount, string systemId, int? algorithmVersion = null)
+        public IReadOnlyDictionary<string, double> GetPlayerSkills(string username, int keyCount, string systemId, int? algorithmVersion = null, int rulesetOnlineId = -1)
         {
             int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
 
@@ -408,6 +422,9 @@ namespace osu.Game.EzOsuGame.Skills
                                         && v.KeyCount == keyCount
                                         && v.SystemId == systemId
                                         && v.AlgorithmVersion == version);
+
+                if (rulesetOnlineId >= 0)
+                    rows = rows.Where(v => v.RulesetOnlineId == rulesetOnlineId);
 
                 return rows.ToDictionary(v => v.SkillId, v => v.Value, StringComparer.Ordinal);
             });
@@ -477,6 +494,7 @@ namespace osu.Game.EzOsuGame.Skills
                             .Where(v => v.Username == username
                                         && v.KeyCount == keyCount
                                         && v.SystemId == EzSkillSystems.PLAYER_MINA
+                                        && v.RulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID
                                         && v.AlgorithmVersion == version)
                             .ToList();
 
@@ -580,7 +598,8 @@ namespace osu.Game.EzOsuGame.Skills
             var existing = r.All<EzPlayerSkillValue>()
                             .Where(v => v.Username == username
                                         && v.KeyCount == keyCount
-                                        && v.SystemId == EzSkillSystems.PLAYER_MINA)
+                                        && v.SystemId == EzSkillSystems.PLAYER_MINA
+                                        && v.RulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID)
                             .ToList();
 
             foreach (var row in existing)
@@ -595,6 +614,7 @@ namespace osu.Game.EzOsuGame.Skills
                     Username = username,
                     KeyCount = keyCount,
                     SystemId = EzSkillSystems.PLAYER_MINA,
+                    RulesetOnlineId = EzLocalProfileConstants.MANIA_RULESET_ID,
                     SkillId = skillId,
                     Value = value,
                     AnalyzedPlays = analyzedPlays,

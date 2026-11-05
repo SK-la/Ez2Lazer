@@ -67,16 +67,16 @@ namespace osu.Game.Tests.Database
                         continue;
                     }
 
-                    if (EzXxyStarRatingSupport.TryGetXxyStarRatingVersion(ruleset, out int xxyVersion))
-                        ruleset.LastAppliedXxySrVersion = xxyVersion;
+                    if (EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(ruleset, out int ssrVersion))
+                        ruleset.LastAppliedSSRVersion = ssrVersion;
                 }
 
                 foreach (var beatmap in r.All<BeatmapInfo>())
                 {
-                    if (beatmap.XxyStarRating < 0 && EzXxyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
-                        beatmap.XxyStarRating = beatmap.StarRating >= 0 ? beatmap.StarRating : 0;
+                    if (beatmap.SunnyStarRating < 0 && EzSunnyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
+                        beatmap.SunnyStarRating = beatmap.StarRating >= 0 ? beatmap.StarRating : 0;
 
-                    if (beatmap.PerformancePoints < 0 && EzXxyStarRatingSupport.IsRulesetAvailable(beatmap.Ruleset))
+                    if (beatmap.PerformancePoints < 0 && EzSunnyStarRatingSupport.IsRulesetAvailable(beatmap.Ruleset))
                         beatmap.PerformancePoints = 0;
 
                     beatmap.HasVideo ??= false;

@@ -67,8 +67,8 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
             if (constraints.StarRatingMin is not double min)
                 return true;
 
-            double star = EzQuickRotationDifficultyHelper.UsesXxyStarRating(constraints.Ruleset)
-                ? beatmap.GetPersistedXxyStarRating() ?? beatmap.StarRating
+            double star = EzQuickRotationDifficultyHelper.UsesSunnyStarRating(constraints.Ruleset)
+                ? beatmap.GetPersistedSunnyStarRating() ?? beatmap.StarRating
                 : beatmap.StarRating;
 
             return star >= min;

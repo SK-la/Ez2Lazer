@@ -33,9 +33,9 @@ namespace osu.Game.Screens.Select.Filter
         Difficulty,
 
         /// <summary>
-        /// Ez: group by <see cref="Beatmaps.BeatmapInfo.XxyStarRating"/> from Realm (baseline, no mod).
+        /// Ez: group by <see cref="Beatmaps.BeatmapInfo.SunnyStarRating"/> from Realm (baseline, no mod).
         /// </summary>
-        XxyStarRating,
+        SunnyStarRating,
 
         PP,
 

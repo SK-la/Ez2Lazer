@@ -19,7 +19,7 @@ namespace osu.Game.Tests.Visual.SongSelect
     public partial class BeatmapCarouselFilterMatchingTest
     {
         [Test]
-        public async Task TestStarFilterUsesXxyWhenSortByXxyStarRating()
+        public async Task TestStarFilterUsesXxyWhenSortBySunnyStarRating()
         {
             var inRange = createBeatmap(xxy: 5.0, starRating: 1.0);
             var outOfRange = createBeatmap(xxy: 1.0, starRating: 9.0);
@@ -27,7 +27,7 @@ namespace osu.Game.Tests.Visual.SongSelect
             var results = await runMatching(
                 new FilterCriteria
                 {
-                    Sort = SortMode.XxyStarRating,
+                    Sort = SortMode.SunnyStarRating,
                     StarDifficulty = new FilterCriteria.OptionalRange<double> { Min = 4, Max = 6, IsLowerInclusive = true, IsUpperInclusive = true },
                 },
                 [inRange, outOfRange],
@@ -63,7 +63,7 @@ namespace osu.Game.Tests.Visual.SongSelect
             var results = await runMatching(
                 new FilterCriteria
                 {
-                    Sort = SortMode.XxyStarRating,
+                    Sort = SortMode.SunnyStarRating,
                     StarDifficulty = new FilterCriteria.OptionalRange<double> { Min = 4, Max = 6, IsLowerInclusive = true, IsUpperInclusive = true },
                 },
                 [inRange, outOfRange],
@@ -76,12 +76,12 @@ namespace osu.Game.Tests.Visual.SongSelect
         {
             var set = TestResources.CreateTestBeatmapSetInfo(1);
             var beatmap = set.Beatmaps[0];
-            beatmap.XxyStarRating = xxy;
+            beatmap.SunnyStarRating = xxy;
             beatmap.StarRating = starRating;
             return beatmap;
         }
 
-        private static double resolveXxy(BeatmapInfo beatmap) => beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : beatmap.StarRating;
+        private static double resolveXxy(BeatmapInfo beatmap) => beatmap.SunnyStarRating >= 0 ? beatmap.SunnyStarRating : beatmap.StarRating;
 
         private static async Task<IEnumerable<BeatmapInfo>> runMatching(
             FilterCriteria criteria,

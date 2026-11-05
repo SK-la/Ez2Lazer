@@ -69,11 +69,11 @@ namespace osu.Game.Screens.Select
 
                 // xxy_SR is only required when difficulty is the active grouping key.
                 // For 0/1 item, grouping key does not affect output.
-                bool useXxyStarRatingGrouping = itemList.Count > 1
-                                                && criteria.Group == GroupMode.XxyStarRating;
+                bool useSunnyStarRatingGrouping = itemList.Count > 1
+                                                  && criteria.Group == GroupMode.SunnyStarRating;
                 bool usePpGrouping = criteria.Group == GroupMode.PP && itemList.Count > 0;
 
-                if (useXxyStarRatingGrouping)
+                if (useSunnyStarRatingGrouping)
                 {
                     var uniqueBeatmaps = itemList.Select(i => (BeatmapInfo)i.Model).Distinct().ToList();
                     operationDifficulties = GetDifficultiesForOperationsAsync(uniqueBeatmaps, cancellationToken)
@@ -96,8 +96,8 @@ namespace osu.Game.Screens.Select
                     if (operationDifficulties != null && operationDifficulties.TryGetValue(beatmap, out double difficulty))
                         return difficulty;
 
-                    if (criteria.Group == GroupMode.XxyStarRating)
-                        return beatmap.XxyStarRating;
+                    if (criteria.Group == GroupMode.SunnyStarRating)
+                        return beatmap.SunnyStarRating;
 
                     return beatmap.StarRating;
                 }
@@ -202,8 +202,8 @@ namespace osu.Game.Screens.Select
         {
             // In certain cases, we intentionally split out difficulties
             // where it's more relevant or convenient to view them as individual items.
-            if (criteria.Sort is SortMode.Difficulty or SortMode.XxyStarRating
-                || criteria.Group is GroupMode.Difficulty or GroupMode.XxyStarRating or GroupMode.PP)
+            if (criteria.Sort is SortMode.Difficulty or SortMode.SunnyStarRating
+                || criteria.Group is GroupMode.Difficulty or GroupMode.SunnyStarRating or GroupMode.PP)
                 return false;
             if (criteria.Sort == SortMode.LastPlayed && criteria.Group == GroupMode.LastPlayed)
                 return false;
@@ -254,7 +254,7 @@ namespace osu.Game.Screens.Select
                     return getGroupsBy(b => defineGroupByBPM(FormatUtils.RoundBPM(b.BPM)), items);
 
                 case GroupMode.Difficulty:
-                case GroupMode.XxyStarRating:
+                case GroupMode.SunnyStarRating:
                     return getGroupsBy(b => defineGroupByStars(getDifficulty(b)), items);
 
                 case GroupMode.PP:

@@ -10,11 +10,11 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
     public static class EzQuickRotationCardDifficultyDisplay
     {
         public static double ResolveBadgeRating(BeatmapInfo beatmap)
-            => beatmap.SupportsXxyStarRating()
-                ? beatmap.GetPersistedXxyStarRating() ?? beatmap.StarRating
+            => beatmap.SupportsSunnyStarRating()
+                ? beatmap.GetPersistedSunnyStarRating() ?? beatmap.StarRating
                 : beatmap.StarRating;
 
         public static IconUsage ResolveBadgeIcon(BeatmapInfo beatmap)
-            => beatmap.SupportsXxyStarRating() ? FontAwesome.Solid.Moon : FontAwesome.Solid.Star;
+            => beatmap.SupportsSunnyStarRating() ? FontAwesome.Solid.Moon : FontAwesome.Solid.Star;
     }
 }

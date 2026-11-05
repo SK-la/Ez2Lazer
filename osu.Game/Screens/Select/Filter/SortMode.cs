@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Localisation;
@@ -30,9 +30,9 @@ namespace osu.Game.Screens.Select.Filter
         Difficulty,
 
         /// <summary>
-        /// Ez: sort by <see cref="Beatmaps.BeatmapInfo.XxyStarRating"/> from Realm (baseline, no mod).
+        /// Ez: sort by <see cref="Beatmaps.BeatmapInfo.SunnyStarRating"/> from Realm (baseline, no mod).
         /// </summary>
-        XxyStarRating,
+        SunnyStarRating,
 
         PP,
 

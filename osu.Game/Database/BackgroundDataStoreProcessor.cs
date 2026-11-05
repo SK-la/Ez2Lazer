@@ -26,6 +26,8 @@ using osu.Game.EzOsuGame.Database;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.Online.API;
@@ -508,8 +510,10 @@ namespace osu.Game.Database
                     sleepIfRequired();
 
                     clearOutdatedStarRatings();
-                    clearOutdatedXxyStarRatings();
-                    clearOutdatedManiaBeatmapMsd();
+
+                    // [Ez] 独立计算
+                    clearOutdatedManiaBeatmapSSR();
+                    clearOutdatedManiaBeatmapMSD();
 
                     // Run Ez Realm backfill before official star population so it is not blocked for long periods.
                     if (tryBeginEzRealmMetadataBackfill())
@@ -532,6 +536,7 @@ namespace osu.Game.Database
                     }
 
                     populateMissingStarRatings();
+                    populateMissingMultiSystemBaselines();
                     processOnlineBeatmapSetsWithNoUpdate();
                     // Note that the previous method will also update these on a fresh run.
                     processBeatmapsWithMissingObjectCounts();
@@ -625,16 +630,16 @@ namespace osu.Game.Database
         /// Check whether the databased xxy calculation version matches the latest ruleset provided version.
         /// If it doesn't, clear out existing xxy values so they can be incrementally recalculated.
         /// </summary>
-        private void clearOutdatedXxyStarRatings()
+        private void clearOutdatedManiaBeatmapSSR()
         {
             foreach (var ruleset in rulesetStore.AvailableRulesets)
             {
-                if (!EzXxyStarRatingSupport.TryGetXxyStarRatingVersion(ruleset, out int currentVersion))
+                if (!EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(ruleset, out int currentVersion))
                     continue;
 
-                if (ruleset.LastAppliedXxySrVersion < currentVersion)
+                if (ruleset.LastAppliedSSRVersion < currentVersion)
                 {
-                    Logger.Log($"Resetting XxyStarRatings for {ruleset.Name} (xxy SR version updated from {ruleset.LastAppliedXxySrVersion} to {currentVersion})");
+                    Logger.Log($"Resetting SunnyStarRatings for {ruleset.Name} (xxy SR version updated from {ruleset.LastAppliedSSRVersion} to {currentVersion})");
 
                     int countReset = 0;
 
@@ -644,12 +649,12 @@ namespace osu.Game.Database
                         {
                             if (b.Ruleset.ShortName == ruleset.ShortName)
                             {
-                                b.XxyStarRating = -1;
+                                b.SunnyStarRating = -1;
                                 countReset++;
                             }
                         }
 
-                        r.Find<RulesetInfo>(ruleset.ShortName)!.LastAppliedXxySrVersion = currentVersion;
+                        r.Find<RulesetInfo>(ruleset.ShortName)!.LastAppliedSSRVersion = currentVersion;
                     });
 
                     // Mania ChartDan is read off xxy SR (the 4K Sunny intervals lookup), so a new xxy
@@ -659,7 +664,7 @@ namespace osu.Game.Database
                     // keeps skipping hashes that already have a row.
                     if (ruleset.OnlineID == 3)
                     {
-                        Logger.Log($"Resetting mania ChartDan for xxy version {ruleset.LastAppliedXxySrVersion} -> {currentVersion}");
+                        Logger.Log($"Resetting mania ChartDan for xxy version {ruleset.LastAppliedSSRVersion} -> {currentVersion}");
                         skillStore.ClearChartDan();
                     }
 
@@ -671,7 +676,7 @@ namespace osu.Game.Database
         /// <summary>
         /// When the mania skill algorithm version advances, clear persisted beatmap MSD so startup backfill can recompute.
         /// </summary>
-        private void clearOutdatedManiaBeatmapMsd()
+        private void clearOutdatedManiaBeatmapMSD()
         {
             const int current_version = EzMinaSkillAlgorithm.VERSION;
 
@@ -716,7 +721,7 @@ namespace osu.Game.Database
             EzStartupTrace.Log($"BDSP EzRealm backfill begin scope={scope}");
 
             if (scope.HasFlag(EzRealmMetadataScope.Xxy))
-                populateMissingXxyStarRatings();
+                populateMissingSunnyStarRatings();
 
             if (scope.HasFlag(EzRealmMetadataScope.Pp))
                 populateMissingPerformancePoints();
@@ -842,7 +847,7 @@ namespace osu.Game.Database
                         }
 
                         // Third-party / unavailable rulesets: keep persisted xxy/pp until the assembly is loadable again.
-                        if (!EzXxyStarRatingSupport.IsRulesetAvailable(beatmap.Ruleset))
+                        if (!EzSunnyStarRatingSupport.IsRulesetAvailable(beatmap.Ruleset))
                         {
                             totalProcessed++;
                             continue;
@@ -851,8 +856,8 @@ namespace osu.Game.Database
                         if (scope.HasFlag(EzRealmMetadataScope.Pp))
                             beatmap.PerformancePoints = -1;
 
-                        if (scope.HasFlag(EzRealmMetadataScope.Xxy) && EzXxyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
-                            beatmap.XxyStarRating = -1;
+                        if (scope.HasFlag(EzRealmMetadataScope.Xxy) && EzSunnyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
+                            beatmap.SunnyStarRating = -1;
 
                         totalProcessed++;
                     }
@@ -955,7 +960,7 @@ namespace osu.Game.Database
         /// Incrementally backfill missing baseline xxy star ratings on <see cref="BeatmapInfo"/>.
         /// Behaviour intentionally mirrors <see cref="populateMissingStarRatings"/>: beatmap-level query, beatmap-level compute and write.
         /// </summary>
-        private void populateMissingXxyStarRatings()
+        private void populateMissingSunnyStarRatings()
         {
             HashSet<Guid> beatmapIds = new HashSet<Guid>();
 
@@ -968,10 +973,10 @@ namespace osu.Game.Database
                     if (b.BeatmapSet == null)
                         continue;
 
-                    if (b.XxyStarRating >= 0)
+                    if (b.SunnyStarRating >= 0)
                         continue;
 
-                    if (!EzXxyStarRatingSupport.SupportsRuleset(b.Ruleset))
+                    if (!EzSunnyStarRatingSupport.SupportsRuleset(b.Ruleset))
                         continue;
 
                     beatmapIds.Add(b.ID);
@@ -1007,12 +1012,12 @@ namespace osu.Game.Database
 
                 try
                 {
-                    double xxyStarRating = EzAnalysisComputation.ComputeBaselineXxyStarRatingForRealm(beatmapManager, beatmap, CancellationToken.None);
+                    double ssr = EzAnalysisComputation.ComputeBaselineSSRForRealm(beatmapManager, beatmap, CancellationToken.None);
 
                     realmAccess.Write(r =>
                     {
                         if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
-                            liveBeatmapInfo.XxyStarRating = xxyStarRating;
+                            liveBeatmapInfo.SunnyStarRating = ssr;
                     });
                     ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
                     ++processedCount;
@@ -1029,7 +1034,7 @@ namespace osu.Game.Database
 
         /// <summary>
         /// Backfill NoMod 1.0x beatmap MSD axes into <see cref="EzBeatmapSkillValue"/>.
-        /// Behaviour mirrors <see cref="populateMissingXxyStarRatings"/>: beatmap-level query, compute and write.
+        /// Behaviour mirrors <see cref="populateMissingSunnyStarRatings"/>: beatmap-level query, compute and write.
         /// </summary>
         private bool populateMissingBeatmapMsd(EzChartChainState chain)
         {
@@ -1290,7 +1295,7 @@ namespace osu.Game.Database
                     if (chartInfo is { IsUnavailable: true })
                         chartInfo = null;
 
-                    double? xxySr = beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : null;
+                    double? xxySr = beatmap.SunnyStarRating >= 0 ? beatmap.SunnyStarRating : null;
 
                     // Same Realm int as song-select ln> (EndTimeObjectCount) — no MSD hold_count / GetPlayable.
                     int holdCount = EzChartDanEstimator.TryHoldCountFromBeatmapInfo(beatmap);
@@ -1459,7 +1464,7 @@ namespace osu.Game.Database
             {
                 foreach (var b in r.All<BeatmapInfo>().Where(b => b.PerformancePoints < 0 && b.BeatmapSet != null))
                 {
-                    if (!EzXxyStarRatingSupport.IsRulesetAvailable(b.Ruleset))
+                    if (!EzSunnyStarRatingSupport.IsRulesetAvailable(b.Ruleset))
                         continue;
 
                     beatmapIds.Add(b.ID);
@@ -1518,6 +1523,95 @@ namespace osu.Game.Database
             }
 
             completeNotification(notification, processedCount, beatmapIds.Count, failedCount);
+        }
+
+        /// <summary>
+        /// Fills the per-system baseline columns (Sunny pp, PP+ star and pp, Mina rating) from what is already stored.
+        /// </summary>
+        /// <remarks>
+        /// These are read-side convenience columns: each value already exists in a value table or can be derived from
+        /// a stored star rating, so filling them never re-runs an analysis that has not already run.
+        /// </remarks>
+        private void populateMissingMultiSystemBaselines()
+        {
+            var candidates = new List<(Guid Id, string Hash, int RulesetId)>();
+
+            realmAccess.Run(r =>
+            {
+                foreach (var b in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null))
+                {
+                    if (b.SunnyPerformancePoints >= 0 && b.PPPStarRating >= 0 && b.PPPPerformancePoints >= 0 && b.MinaRating >= 0)
+                        continue;
+
+                    candidates.Add((b.ID, b.Hash, b.Ruleset.OnlineID));
+                }
+            });
+
+            if (candidates.Count == 0)
+                return;
+
+            Logger.Log($"Found {candidates.Count} beatmaps which require per-system baseline columns.");
+
+            var notification = showProgressNotification(candidates.Count, "Filling per-system baselines", "beatmaps' per-system baselines have been updated");
+
+            int processedCount = 0;
+
+            foreach (var (id, hash, rulesetId) in candidates)
+            {
+                if (notification?.State == ProgressNotificationState.Cancelled)
+                    break;
+
+                updateNotificationProgress(notification, processedCount, candidates.Count);
+
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+
+                if (beatmap == null)
+                    continue;
+
+                try
+                {
+                    double sunnyPp = beatmap.SunnyPerformancePoints;
+                    double pppStar = beatmap.PPPStarRating;
+                    double pppPp = beatmap.PPPPerformancePoints;
+                    double minaRating = beatmap.MinaRating;
+
+                    if (sunnyPp < 0)
+                        sunnyPp = EzAnalysisComputation.ComputeBaselineSunnyPerformancePointsForRealm(beatmapManager, beatmap, CancellationToken.None);
+
+                    // PP+ and Mina already store their scalars; reading them back is cheaper than recomputing.
+                    var pppRows = skillStore.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_PPP);
+                    if (pppStar < 0 && pppRows.TryGetValue(EzPPPSkillCatalog.ChartSkillId(EzPPPSkillCatalog.STAR_RATING), out double storedPppStar))
+                        pppStar = storedPppStar;
+
+                    if (pppPp < 0)
+                        pppPp = EzAnalysisComputation.ComputeBaselinePerformancePointsForRating(beatmapManager, beatmap, pppStar, CancellationToken.None);
+
+                    var minaRows = skillStore.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MINA);
+                    if (minaRating < 0 && minaRows.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double storedMina))
+                        minaRating = storedMina;
+
+                    realmAccess.Write(r =>
+                    {
+                        if (r.Find<BeatmapInfo>(id) is not BeatmapInfo liveBeatmapInfo)
+                            return;
+
+                        liveBeatmapInfo.SunnyPerformancePoints = sunnyPp;
+                        liveBeatmapInfo.PPPStarRating = pppStar;
+                        liveBeatmapInfo.PPPPerformancePoints = pppPp;
+                        liveBeatmapInfo.MinaRating = minaRating;
+                    });
+
+                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Per-system baseline fill failed on {beatmap}: {e}");
+                }
+
+                ++processedCount;
+            }
+
+            completeNotification(notification, processedCount, candidates.Count);
         }
 
         private void processOnlineBeatmapSetsWithNoUpdate()
@@ -1723,10 +1817,10 @@ namespace osu.Game.Database
             {
                 // Filter on persisted JSON strings so we never deserialize Statistics for the whole table.
                 foreach (var score in r.All<ScoreInfo>().Where(s => !s.BackgroundReprocessingFailed
-                                                                   && !s.DeletePending
-                                                                   && s.BeatmapInfo != null
-                                                                   && (s.MaximumStatisticsJson == string.Empty
-                                                                       || s.MaximumStatisticsJson == "{}")))
+                                                                    && !s.DeletePending
+                                                                    && s.BeatmapInfo != null
+                                                                    && (s.MaximumStatisticsJson == string.Empty
+                                                                        || s.MaximumStatisticsJson == "{}")))
                 {
                     if (string.IsNullOrEmpty(score.StatisticsJson) || score.StatisticsJson == "{}")
                         continue;
@@ -1841,7 +1935,7 @@ namespace osu.Game.Database
                                                       .Select(s => s.ID)
                                                       .ToList());
 
-            int leftoverPreRemap = realmAccess.Run(r => r.All<ScoreInfo>().Where(s => s.JudgeMode == 8).Count());
+            int leftoverPreRemap = realmAccess.Run(r => r.All<ScoreInfo>().Count(s => s.JudgeMode == 8));
 
             if (leftoverPreRemap > 0)
                 Logger.Log($"{leftoverPreRemap} score(s) still carry the pre-v11 judge mode 8; the v11 migration has not run on this database.");
@@ -1875,9 +1969,8 @@ namespace osu.Game.Database
                         if (score == null)
                             continue;
 
-                        if (EzScoreRecalculationService.RecalculateWithPinnedJudgeModeAsync(
-                                scoreManager, beatmapManager, ezReplaySession, score, EzEnumJudgeMode.StableClassic)
-                            .GetAwaiter().GetResult())
+                        if (EzScoreRecalculationService.RecalculateWithPinnedJudgeModeAsync(scoreManager, beatmapManager, ezReplaySession, score, EzEnumJudgeMode.StableClassic)
+                                                       .GetAwaiter().GetResult())
                             ++processedCount;
                         else
                             ++failedCount;

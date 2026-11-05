@@ -37,7 +37,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                             beatmap.StarRating = star;
 
                         if (result.XxySr is double xxy && xxy >= 0)
-                            beatmap.XxyStarRating = xxy;
+                            beatmap.SunnyStarRating = xxy;
 
                         if (result.Pp is double pp && pp >= 0)
                             beatmap.PerformancePoints = pp;

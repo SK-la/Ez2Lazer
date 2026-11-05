@@ -75,7 +75,7 @@ namespace osu.Game.Beatmaps
                     beatmap.HasVideo = tagSummary.HasVideo;
                     beatmap.HasStoryboard = tagSummary.HasStoryboard;
 
-                    updateXxyStarRating(beatmap);
+                    updateSunnyStarRating(beatmap);
                     updatePerformancePoints(beatmap, working);
                 }
 
@@ -102,12 +102,12 @@ namespace osu.Game.Beatmaps
             });
         }
 
-        private void updateXxyStarRating(BeatmapInfo beatmap)
+        private void updateSunnyStarRating(BeatmapInfo beatmap)
         {
             if (beatmapManager == null)
                 return;
 
-            beatmap.XxyStarRating = EzAnalysisComputation.ComputeBaselineXxyStarRatingForRealm(beatmapManager, beatmap);
+            beatmap.SunnyStarRating = EzAnalysisComputation.ComputeBaselineSSRForRealm(beatmapManager, beatmap);
         }
 
         private void updatePerformancePoints(BeatmapInfo beatmap, WorkingBeatmap working)

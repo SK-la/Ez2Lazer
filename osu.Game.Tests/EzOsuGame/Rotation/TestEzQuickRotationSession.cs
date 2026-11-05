@@ -24,7 +24,7 @@ namespace osu.Game.Tests.EzOsuGame.Rotation
                 ID = Guid.NewGuid(),
                 Ruleset = new ManiaRuleset().RulesetInfo,
                 StarRating = 4.2,
-                XxyStarRating = 5.5,
+                SunnyStarRating = 5.5,
             };
 
             session.Begin(null!, new FilterCriteria(), beatmap, beatmap.Ruleset, Array.Empty<Mod>());
@@ -53,7 +53,7 @@ namespace osu.Game.Tests.EzOsuGame.Rotation
                 ID = Guid.NewGuid(),
                 Ruleset = new ManiaRuleset().RulesetInfo,
                 StarRating = 2.0,
-                XxyStarRating = 3.0,
+                SunnyStarRating = 3.0,
             };
 
             var second = new BeatmapInfo

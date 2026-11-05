@@ -17,11 +17,11 @@ using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 {
-    public class EzManiaAnalysisProvider : IEzAnalysisProvider, IEzXxyStarRatingSupport
+    public class EzManiaAnalysisProvider : IEzAnalysisProvider, IEzSunnyStarRatingSupport
     {
-        public int XxyStarRatingVersion => EzManiaXxyStarRating.VERSION;
+        public int SunnyStarRatingVersion => EzManiaSunnyStarRating.VERSION;
 
-        public bool SupportsXxyStarRating(IBeatmap beatmap) => EzManiaXxyStarRating.IsPatternSupported(beatmap);
+        public bool SupportsSunnyStarRating(IBeatmap beatmap) => EzManiaSunnyStarRating.IsPatternSupported(beatmap);
 
         public bool TryCompute(in EzAnalysisRequest request, CancellationToken cancellationToken, out IEzAnalysis analysis)
         {
@@ -101,7 +101,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         {
             sr = 0;
 
-            if (!EzManiaXxyStarRating.IsPatternSupported(beatmap))
+            if (!EzManiaSunnyStarRating.IsPatternSupported(beatmap))
                 return false;
 
             if (beatmap.HitObjects.Count == 0)
@@ -132,7 +132,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 
         private static EzRadarChartData<string> computeXxySrPatternRadarData(ManiaBeatmap beatmap, double clockRate)
         {
-            if (!EzManiaXxyStarRating.IsPatternSupported(beatmap))
+            if (!EzManiaSunnyStarRating.IsPatternSupported(beatmap))
                 return createXxySrPatternRadarData(0, 0, 0, 0, 0, 0);
 
             EzManiaSR4PatternSnapshot snapshot = SRCalculator.CalculateSR4PatternSnapshot(beatmap, clockRate);

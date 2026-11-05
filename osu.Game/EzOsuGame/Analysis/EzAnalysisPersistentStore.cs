@@ -458,7 +458,7 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// NoMod 基线 xxy：从 <see cref="BeatmapInfo.XxyStarRating"/> 聚合（非 SQLite）。
+        /// NoMod 基线 xxy：从 <see cref="BeatmapInfo.SunnyStarRating"/> 聚合（非 SQLite）。
         /// </summary>
         public IReadOnlyDictionary<Guid, double> GetBaselineXxySrFromRealm(IEnumerable<BeatmapInfo> beatmaps)
         {
@@ -471,8 +471,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
             foreach (var beatmap in beatmapList)
             {
-                if (beatmap.XxyStarRating >= 0)
-                    resolvedValues[beatmap.ID] = beatmap.XxyStarRating;
+                if (beatmap.SunnyStarRating >= 0)
+                    resolvedValues[beatmap.ID] = beatmap.SunnyStarRating;
             }
 
             return resolvedValues;

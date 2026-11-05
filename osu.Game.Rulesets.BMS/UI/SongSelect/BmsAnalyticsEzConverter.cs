@@ -3,6 +3,7 @@
 
 using System.Text.Json;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics;
 
 namespace osu.Game.Rulesets.BMS.UI.SongSelect
@@ -34,7 +35,22 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             }
 
             var maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts: null, xxySr: record.XxySr);
-            return new EzAnalysisResult(kpsSummary, record.Pp, maniaSummary);
+
+            // The stored pp is a chart-level baseline, which is what the official performance producer carries.
+            Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>? axes = null;
+
+            if (record.Pp is double pp && double.IsFinite(pp) && pp > 0)
+            {
+                axes = new Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>
+                {
+                    [EzMetricProducers.OFFICIAL_PERFORMANCE] = new Dictionary<string, double>
+                    {
+                        [EzMetricProducers.PERFORMANCE_POINTS] = pp,
+                    },
+                };
+            }
+
+            return new EzAnalysisResult(kpsSummary, maniaSummary, axes: axes);
         }
 
         private static IReadOnlyList<double> tryDeserializeKpsList(string? json)

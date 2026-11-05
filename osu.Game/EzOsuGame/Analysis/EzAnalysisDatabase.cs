@@ -33,7 +33,7 @@ namespace osu.Game.EzOsuGame.Analysis
     /// - <see cref="Ez2Setting.EzAnalysisRecEnabled"/>：选歌时是否即时计算/补全 SQLite 体系内指标（经 <see cref="EzAnalysisCache"/>），关闭则只读已落盘数据。
     ///
     /// 数据层（见 <see cref="EzSongSelectAnalysisDisplay"/>）：
-    /// - L1 Realm：<see cref="BeatmapInfo.XxyStarRating"/> / <see cref="BeatmapInfo.PerformancePoints"/>，不受上述开关影响。
+    /// - L1 Realm：<see cref="BeatmapInfo.SunnyStarRating"/> / <see cref="BeatmapInfo.PerformancePoints"/>，不受上述开关影响。
     /// - L2 主 SQLite：NoMod kps + mania 列统计（不含 xxy/PP）。
     /// - 分支库：预生成 Mod 快照 xxy/PP（及关联指标）；激活后只读，构建/刷新走维护流程。
     /// </summary>
@@ -139,9 +139,9 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             xxySr = 0;
 
-            if (beatmapInfo is BeatmapInfo beatmap && beatmap.XxyStarRating >= 0)
+            if (beatmapInfo is BeatmapInfo beatmap && beatmap.SunnyStarRating >= 0)
             {
-                xxySr = beatmap.XxyStarRating;
+                xxySr = beatmap.SunnyStarRating;
                 return true;
             }
 
@@ -388,7 +388,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     int xxySrAlgorithmVersion = 0;
                     int ppAlgorithmVersion = 0;
 
-                    if (EzXxyStarRatingSupport.TryGetXxyStarRatingVersion(localRulesetInfo, out int resolvedXxyVersion))
+                    if (EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(localRulesetInfo, out int resolvedXxyVersion))
                         xxySrAlgorithmVersion = resolvedXxyVersion;
 
                     if (tryGetOfficialPerformancePointsVersion(localRulesetInfo, out int resolvedPpVersion))
@@ -564,7 +564,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 if (rulesetInfo is not RulesetInfo localRulesetInfo)
                     continue;
 
-                bool supportsXxy = EzXxyStarRatingSupport.TryGetXxyStarRatingVersion(localRulesetInfo, out int currentXxyVersion);
+                bool supportsXxy = EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(localRulesetInfo, out int currentXxyVersion);
                 bool supportsPp = tryGetOfficialPerformancePointsVersion(localRulesetInfo, out int currentPpVersion);
 
                 if (!supportsXxy && !supportsPp)
@@ -635,7 +635,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 if (rulesetInfo is not RulesetInfo localRulesetInfo)
                     continue;
 
-                bool supportsXxy = EzXxyStarRatingSupport.TryGetXxyStarRatingVersion(localRulesetInfo, out int currentXxyVersion);
+                bool supportsXxy = EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(localRulesetInfo, out int currentXxyVersion);
                 bool supportsPp = tryGetOfficialPerformancePointsVersion(localRulesetInfo, out int currentPpVersion);
 
                 if (!supportsXxy && !supportsPp)
@@ -853,9 +853,9 @@ namespace osu.Game.EzOsuGame.Analysis
                 wrote = true;
             }
 
-            if (payload.XxyStarRating is double xxy && double.IsFinite(xxy) && xxy >= 0)
+            if (payload.SunnyStarRating is double xxy && double.IsFinite(xxy) && xxy >= 0)
             {
-                beatmap.XxyStarRating = xxy;
+                beatmap.SunnyStarRating = xxy;
                 wrote = true;
             }
 

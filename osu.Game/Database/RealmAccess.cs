@@ -25,6 +25,7 @@ using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.Input;
 using osu.Game.Input.Bindings;
 using osu.Game.Models;
@@ -117,10 +118,10 @@ namespace osu.Game.Database
         /// The on-disk Realm schema version is <see cref="EzFileSchemaVersion"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 52010).
         /// Ez v1: Add ScoreInfo hit/health mode (later renamed: Judgement=>JudgeMode, health kept).
         /// Ez v2: Add BeatmapInfo.HasVideo and HasStoryboard.
-        /// Ez v3: Add BeatmapInfo.XxyStarRating.
+        /// Ez v3: Add BeatmapInfo.SunnyStarRating.
         /// Ez v4: Add BeatmapInfo.PerformancePoints.
         /// Ez v5: Change BeatmapInfo.HasVideo/HasStoryboard to nullable (null = unknown).
-        /// Ez v6: Add RulesetInfo.LastAppliedXxySrVersion.
+        /// Ez v6: Add RulesetInfo.LastAppliedSSRVersion.
         /// Ez v7: Normalize BeatmapSetInfo external hosting paths.
         /// Ez v8: Add mania skill RealmObjects (EzBeatmapSkillValue, EzPlayerSkillValue, EzDanEstimate,
         /// EzPlayerSkillHistoryPoint) with extended dan/provisional fields; RulesetInfo.LastAppliedManiaSkillVersion.
@@ -129,7 +130,7 @@ namespace osu.Game.Database
         /// Ez v11: Reorder EzEnumJudgeMode/EzEnumHealthMode (StableClassic = 1; Mania private modes at 31+);
         ///         add canonical ScoreInfo.JudgeMode/HealthMode columns and migrate the legacy ManiaHitMode/ManiaHealthMode data into them.
         /// </summary>
-        public const int EZ_REALM_SCHEMA_VERSION = 11;
+        public const int EZ_REALM_SCHEMA_VERSION = 12;
 
         public static int EzFileSchemaVersion => schema_version * 1000 + EZ_REALM_SCHEMA_VERSION;
 
@@ -1535,7 +1536,7 @@ namespace osu.Game.Database
 
                 case 3:
                     foreach (var beatmap in migration.NewRealm.All<BeatmapInfo>())
-                        beatmap.XxyStarRating = -1;
+                        beatmap.SunnyStarRating = -1;
 
                     break;
 
@@ -1556,7 +1557,7 @@ namespace osu.Game.Database
 
                 case 6:
                     foreach (var ruleset in migration.NewRealm.All<RulesetInfo>())
-                        ruleset.LastAppliedXxySrVersion = 0;
+                        ruleset.LastAppliedSSRVersion = 0;
 
                     break;
 
@@ -1619,6 +1620,36 @@ namespace osu.Game.Database
                             newScores[i].JudgeMode = RemapEzJudgeMode(oldJudge);
                             newScores[i].HealthMode = RemapEzHealthMode(oldHealth);
                         }
+                    }
+
+                    break;
+                }
+
+                case 12:
+                {
+                    // EzBeatmapSkillValue / EzPlayerSkillValue 新增 RulesetOnlineId / State：旧行没有规则集归属，而系统键值同时要改，
+                    // 逐行猜测比直接清表更危险。开发期库没有兼容负担，交由回填重建。
+                    migration.NewRealm.RemoveAll<EzBeatmapSkillValue>();
+                    migration.NewRealm.RemoveAll<EzPlayerSkillValue>();
+
+                    // XxyStarRating 改名 SunnyStarRating：把旧列的值搬到新列，其余新增列保持默认 -1。
+                    string beatmapClassName = getMappedOrOriginalName(typeof(BeatmapInfo));
+
+                    if (!migration.OldRealm.Schema.TryFindObjectSchema(beatmapClassName, out var beatmapSchema)
+                        || !beatmapSchema.Any(p => p.Name == "XxyStarRating"))
+                    {
+                        break;
+                    }
+
+                    dynamic oldBeatmaps = migration.OldRealm.DynamicApi.All(beatmapClassName);
+                    var newBeatmaps = migration.NewRealm.All<BeatmapInfo>().ToList();
+
+                    for (int i = 0; i < newBeatmaps.Count; i++)
+                    {
+                        double legacy = oldBeatmaps[i].XxyStarRating;
+
+                        if (double.IsFinite(legacy))
+                            newBeatmaps[i].SunnyStarRating = legacy;
                     }
 
                     break;

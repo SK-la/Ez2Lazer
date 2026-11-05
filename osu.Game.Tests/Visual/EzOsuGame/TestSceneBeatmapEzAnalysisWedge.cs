@@ -169,7 +169,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             wedge.DanPanel.DualLayout.Value = EzDanPanelDualLayout.Horizontal;
             var beatmap = CreateWorkingBeatmap(new TestBeatmap(new ManiaRuleset().RulesetInfo));
             beatmap.BeatmapInfo.Difficulty.CircleSize = test_keys;
-            beatmap.BeatmapInfo.XxyStarRating = 18.5;
+            beatmap.BeatmapInfo.SunnyStarRating = 18.5;
 
             string hash = beatmap.BeatmapInfo.Hash;
 

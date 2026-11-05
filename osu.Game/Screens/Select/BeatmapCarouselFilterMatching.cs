@@ -37,7 +37,7 @@ namespace osu.Game.Screens.Select
             int countMatching = 0;
             var matchedItems = new List<CarouselItem>();
 
-            bool useXxyForStarFilter = usesXxyStarRatingOperations(criteria);
+            bool useXxyForStarFilter = usesSunnyStarRatingOperations(criteria);
             bool requiresXxyForFiltering = useXxyForStarFilter
                                            && (criteria.StarDifficulty.HasFilter || criteria.UserStarDifficulty.HasFilter);
             bool requiresPpForFiltering = criteria.Pp.HasFilter;
@@ -65,7 +65,7 @@ namespace osu.Game.Screens.Select
                 if (beatmap.Hidden)
                     continue;
 
-                double starDifficultyForFilter = useXxyForStarFilter ? beatmap.XxyStarRating : beatmap.StarRating;
+                double starDifficultyForFilter = useXxyForStarFilter ? beatmap.SunnyStarRating : beatmap.StarRating;
 
                 if (operationDifficulties != null && operationDifficulties.TryGetValue(beatmap, out double operationDifficulty))
                     starDifficultyForFilter = operationDifficulty;
@@ -81,8 +81,8 @@ namespace osu.Game.Screens.Select
             return matchedItems;
         }
 
-        private static bool usesXxyStarRatingOperations(FilterCriteria criteria)
-            => criteria.Sort == SortMode.XxyStarRating || criteria.Group == GroupMode.XxyStarRating;
+        private static bool usesSunnyStarRatingOperations(FilterCriteria criteria)
+            => criteria.Sort == SortMode.SunnyStarRating || criteria.Group == GroupMode.SunnyStarRating;
 
         public static bool CheckCriteriaMatch(BeatmapInfo beatmap, FilterCriteria criteria, double starDifficultyForFilter, double? ppForFilter = null)
         {

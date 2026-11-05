@@ -10,7 +10,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
     /// <summary>
     /// Mania-specific constraints for whether sunnyxxy SR can be calculated for a beatmap.
     /// </summary>
-    public static class EzManiaXxyStarRating
+    public static class EzManiaSunnyStarRating
     {
         /// <summary>
         /// yyyyMMdd revision of the Mania xxy SR algorithm. Bump when calculation logic changes (independent of official <see cref="Difficulty.ManiaDifficultyCalculator.Version"/>).

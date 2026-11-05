@@ -61,7 +61,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             if (msd == null || msd.Count == 0)
                 return null;
 
-            double? xxySr = beatmapInfo.XxyStarRating >= 0 ? beatmapInfo.XxyStarRating : null;
+            double? xxySr = beatmapInfo.SunnyStarRating >= 0 ? beatmapInfo.SunnyStarRating : null;
             return FromMsdAndPlayable(msd, playable, xxySr);
         }
 
@@ -104,8 +104,8 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 && liveXxy > 0)
                 return liveXxy;
 
-            return EzModRate.CanUsePersistedXxy(mods) && beatmapInfo.XxyStarRating >= 0
-                ? beatmapInfo.XxyStarRating
+            return EzModRate.CanUsePersistedXxy(mods) && beatmapInfo.SunnyStarRating >= 0
+                ? beatmapInfo.SunnyStarRating
                 : null;
         }
 

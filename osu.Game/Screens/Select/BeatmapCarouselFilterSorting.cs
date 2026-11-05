@@ -36,7 +36,7 @@ namespace osu.Game.Screens.Select
             var itemList = items.ToList();
 
             bool groupedSets = BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);
-            bool useXxySort = criteria.Sort == SortMode.XxyStarRating;
+            bool useXxySort = criteria.Sort == SortMode.SunnyStarRating;
             bool usePpValues = criteria.Sort == SortMode.PP;
             bool useSortOperationValues = itemList.Count > 1
                                           && (useXxySort || usePpValues);
@@ -59,8 +59,8 @@ namespace osu.Game.Screens.Select
                 if (criteria.Sort == SortMode.PP)
                     return beatmap.PerformancePoints >= 0 ? beatmap.PerformancePoints : -1;
 
-                if (criteria.Sort == SortMode.XxyStarRating)
-                    return beatmap.XxyStarRating;
+                if (criteria.Sort == SortMode.SunnyStarRating)
+                    return beatmap.SunnyStarRating;
 
                 return beatmap.StarRating;
             }
@@ -110,7 +110,7 @@ namespace osu.Game.Screens.Select
                     break;
 
                 case SortMode.Difficulty:
-                case SortMode.XxyStarRating:
+                case SortMode.SunnyStarRating:
                     comparison = getSortValue(a).CompareTo(getSortValue(b));
                     break;
 

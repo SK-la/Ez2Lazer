@@ -33,13 +33,13 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         private readonly struct RateableChartMeta
         {
             public readonly int KeyCount;
-            public readonly double? XxyStarRating;
+            public readonly double? SunnyStarRating;
             public readonly double HoldRatio;
 
-            public RateableChartMeta(int keyCount, double? xxyStarRating, double holdRatio)
+            public RateableChartMeta(int keyCount, double? SunnyStarRating, double holdRatio)
             {
                 KeyCount = keyCount;
-                XxyStarRating = xxyStarRating;
+                SunnyStarRating = SunnyStarRating;
                 HoldRatio = holdRatio;
             }
         }
@@ -178,7 +178,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 rateableBeatmapIds[beatmap.Hash] = beatmap.ID;
 
                 int keyCount = (int)Math.Round(beatmap.Difficulty.CircleSize);
-                double? xxySr = beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : null;
+                double? xxySr = beatmap.SunnyStarRating >= 0 ? beatmap.SunnyStarRating : null;
                 double holdRatio = EzHoldMetrics.HoldRatio(beatmap);
 
                 if (double.IsNaN(holdRatio))
@@ -339,7 +339,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 // The hold ratio is a hitobject ratio carried on the scan-time meta, not a stored metric.
                 double holdRatio = meta.HoldRatio;
 
-                if (EzChartDanEstimator.FromMsd(msd, keyCount, holdRatio, meta.XxyStarRating) == null)
+                if (EzChartDanEstimator.FromMsd(msd, keyCount, holdRatio, meta.SunnyStarRating) == null)
                     unresolvable.Add(hash);
             }
 

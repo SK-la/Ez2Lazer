@@ -1735,7 +1735,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 cmd.Parameters["$mapper_username"].Value = row.MapperUsername;
                 cmd.Parameters["$beatmap_status"].Value = (int)row.BeatmapStatus;
                 cmd.Parameters["$star_rating"].Value = row.StarRating;
-                cmd.Parameters["$xxy_star_rating"].Value = row.XxyStarRating;
+                cmd.Parameters["$xxy_star_rating"].Value = row.SunnyStarRating;
                 cmd.Parameters["$map_performance_points"].Value = row.MapPerformancePoints;
                 cmd.Parameters["$kps_avg"].Value = row.KpsAvg;
                 cmd.Parameters["$kps_max"].Value = row.KpsMax;
@@ -1944,7 +1944,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     MapperUsername = reader.GetString(18),
                     BeatmapStatus = (BeatmapOnlineStatus)reader.GetInt32(19),
                     StarRating = reader.GetDouble(20),
-                    XxyStarRating = reader.GetDouble(21),
+                    SunnyStarRating = reader.GetDouble(21),
                     MapPerformancePoints = reader.GetDouble(22),
                     KpsAvg = reader.GetDouble(23),
                     KpsMax = reader.GetDouble(24),
