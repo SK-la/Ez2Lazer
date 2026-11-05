@@ -91,13 +91,13 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             {
                 var store = new EzSkillStore(realm);
 
-                store.WriteDanSkillsetVerdicts("tester", 4, DanSkillSystem.SIDE_RC, new Dictionary<string, EzDanSkillsetVerdict>
+                store.WriteDanSkillsetVerdicts("tester", 4, EzDanSide.Rc.ToId(), new Dictionary<string, EzDanSkillsetVerdict>
                 {
                     [EzDanSkillsetBuckets.JACK] = new EzDanSkillsetVerdict(EzDanSkillsetBuckets.JACK, 12.5, "Chuudan", 3),
                 });
 
-                Assert.That(store.HasDanSkillsetCache("tester", 4, DanSkillSystem.SIDE_RC), Is.True);
-                var rows = store.GetDanSkillsetValues("tester", 4, DanSkillSystem.SIDE_RC);
+                Assert.That(store.HasDanSkillsetCache("tester", 4, EzDanSide.Rc.ToId()), Is.True);
+                var rows = store.GetDanSkillsetValues("tester", 4, EzDanSide.Rc.ToId());
                 Assert.That(rows, Has.Count.EqualTo(1));
                 Assert.That(rows[0].SkillsetId, Is.EqualTo(EzDanSkillsetBuckets.JACK));
                 Assert.That(rows[0].RawDan, Is.EqualTo(12.5).Within(1e-9));
@@ -113,16 +113,16 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             {
                 var store = new EzSkillStore(realm);
 
-                store.WriteDanSkillsetVerdicts("tester", 4, DanSkillSystem.SIDE_RC, new Dictionary<string, EzDanSkillsetVerdict>
+                store.WriteDanSkillsetVerdicts("tester", 4, EzDanSide.Rc.ToId(), new Dictionary<string, EzDanSkillsetVerdict>
                 {
                     [EzDanSkillsetBuckets.JACK] = new EzDanSkillsetVerdict(EzDanSkillsetBuckets.JACK, 10, "Shodan", 4),
                 });
-                Assert.That(store.HasDanSkillsetCache("tester", 4, DanSkillSystem.SIDE_RC), Is.True);
+                Assert.That(store.HasDanSkillsetCache("tester", 4, EzDanSide.Rc.ToId()), Is.True);
 
-                store.WriteDanSkillsetVerdicts("tester", 4, DanSkillSystem.SIDE_RC, new Dictionary<string, EzDanSkillsetVerdict>());
+                store.WriteDanSkillsetVerdicts("tester", 4, EzDanSide.Rc.ToId(), new Dictionary<string, EzDanSkillsetVerdict>());
 
-                Assert.That(store.HasDanSkillsetCache("tester", 4, DanSkillSystem.SIDE_RC), Is.False);
-                Assert.That(store.GetDanSkillsetValues("tester", 4, DanSkillSystem.SIDE_RC), Is.Empty);
+                Assert.That(store.HasDanSkillsetCache("tester", 4, EzDanSide.Rc.ToId()), Is.False);
+                Assert.That(store.GetDanSkillsetValues("tester", 4, EzDanSide.Rc.ToId()), Is.Empty);
 
                 realm.Run(r =>
                 {
@@ -145,7 +145,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     {
                         Username = "legacy",
                         KeyCount = 7,
-                        Side = DanSkillSystem.SIDE_LN,
+                        Side = EzDanSide.Ln.ToId(),
                         SkillsetId = EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL,
                         RawDan = -1,
                         AlgorithmVersion = EzDanAlgorithm.VERSION,
@@ -153,8 +153,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     });
                 });
 
-                Assert.That(store.HasDanSkillsetCache("legacy", 7, DanSkillSystem.SIDE_LN), Is.False);
-                Assert.That(store.GetDanSkillsetValues("legacy", 7, DanSkillSystem.SIDE_LN), Is.Empty);
+                Assert.That(store.HasDanSkillsetCache("legacy", 7, EzDanSide.Ln.ToId()), Is.False);
+                Assert.That(store.GetDanSkillsetValues("legacy", 7, EzDanSide.Ln.ToId()), Is.Empty);
 
                 realm.Run(r =>
                 {
@@ -170,13 +170,13 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             RunTestWithRealm((realm, _) =>
             {
                 var store = new EzSkillStore(realm);
-                store.WriteDanSkillsetVerdicts("cached-user", 4, DanSkillSystem.SIDE_RC, new Dictionary<string, EzDanSkillsetVerdict>
+                store.WriteDanSkillsetVerdicts("cached-user", 4, EzDanSide.Rc.ToId(), new Dictionary<string, EzDanSkillsetVerdict>
                 {
                     [EzDanSkillsetBuckets.TECH] = new EzDanSkillsetVerdict(EzDanSkillsetBuckets.TECH, 9.1, "Shodan", 5),
                 });
 
                 var provider = new EzSkillProvider(store);
-                var verdicts = provider.GetDanSkillsets("cached-user", 4, DanSkillSystem.SIDE_RC);
+                var verdicts = provider.GetDanSkillsets("cached-user", 4, EzDanSide.Rc.ToId());
 
                 Assert.That(verdicts, Has.Count.EqualTo(1));
                 Assert.That(verdicts[EzDanSkillsetBuckets.TECH].RawDan, Is.EqualTo(9.1).Within(1e-9));
@@ -192,10 +192,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 var store = new EzSkillStore(realm);
                 var provider = new EzSkillProvider(store);
 
-                var verdicts = provider.GetDanSkillsets("no-clears-user", 4, DanSkillSystem.SIDE_RC);
+                var verdicts = provider.GetDanSkillsets("no-clears-user", 4, EzDanSide.Rc.ToId());
 
                 Assert.That(verdicts, Is.Empty);
-                Assert.That(store.HasDanSkillsetCache("no-clears-user", 4, DanSkillSystem.SIDE_RC), Is.False);
+                Assert.That(store.HasDanSkillsetCache("no-clears-user", 4, EzDanSide.Rc.ToId()), Is.False);
             });
         }
 
@@ -231,7 +231,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     r.Add(new EzBeatmapChartSkillInfo
                     {
                         BeatmapHash = legacy_stub_hash,
-                        InfoVersion = EzChartSkillInfo.VERSION,
+                        InfoVersion = EzChartSkillInfo.VERSION - 1,
                         ComputedAt = DateTimeOffset.UtcNow,
                         KeyCount = -1,
                         DanEligible = false,
@@ -252,7 +252,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 Assert.That(chain.SettledChartSkillInfo.Contains(real_hash), Is.True);
                 Assert.That(chain.SettledChartSkillInfo.Contains(stub_hash), Is.True);
-                // A row stamped with the bare CSI constant (pre-revision / upstream-bumped) is not settled.
+                // A row stamped with a superseded revision is not settled.
                 Assert.That(chain.SettledChartSkillInfo.Contains(legacy_stub_hash), Is.False);
             });
         }
@@ -266,8 +266,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 const string hash_a = "batch-hash-a";
                 const string hash_b = "batch-hash-b";
 
-                store.WriteBeatmapMsd(hash_a, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
-                store.WriteBeatmapMsd(hash_b, new EzMinaSkillAxisVector(11, 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1), holdRatio: 0.3);
+                store.WriteBeatmapMsd(hash_a, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
+                store.WriteBeatmapMsd(hash_b, new EzMinaSkillAxisVector(11, 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1));
 
                 store.UpsertChartSkillInfo(hash_a, new EzChartSkillInfo
                 {
@@ -281,7 +281,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 var msdBatch = store.GetBeatmapSkillsForHashes(new[] { hash_a, hash_b, "missing" }, EzSkillSystems.BEATMAP_MINA);
                 Assert.That(msdBatch.Keys, Is.EquivalentTo(new[] { hash_a, hash_b }));
-                Assert.That(msdBatch[hash_a][EzSkillSystems.MinaHoldRatioSkillId], Is.EqualTo(0.2).Within(1e-9));
+                Assert.That(msdBatch[hash_a][EzMinaSkillAxis.Overall.ToMsdSkillId()], Is.EqualTo(10).Within(1e-9));
                 Assert.That(msdBatch[hash_b][EzMinaSkillAxis.Overall.ToMsdSkillId()], Is.EqualTo(11).Within(1e-9));
 
                 var chartBatch = store.GetChartSkillInfoForHashes(new[] { hash_a, hash_b, "missing" });
@@ -358,7 +358,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 const string live_hash = "rated-msd-hash";
 
                 store.WriteBeatmapMsdUnrateable(dead_hash, Guid.NewGuid());
-                store.WriteBeatmapMsd(live_hash, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
+                store.WriteBeatmapMsd(live_hash, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
 
                 var provider = new EzSkillProvider(store);
 

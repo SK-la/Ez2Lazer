@@ -37,10 +37,10 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
 
         public static double PatternTagMinScore(string patternId)
         {
-            if (patternId == "chordjack")
+            if (patternId == EzManiaRCAxis.Chordjack.ToId())
                 return CHORDJACK_TAG_MIN_SCORE;
 
-            if (patternId == "delay")
+            if (patternId == EzManiaRCAxis.Delay.ToId())
                 return DELAY_TAG_MIN_SCORE;
 
             return PATTERN_TAG_MIN_SCORE;

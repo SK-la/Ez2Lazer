@@ -1,13 +1,19 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.Difficulty;
 using osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern;
 using osu.Game.Rulesets.Mania.EzMania.Analysis.SR4Pattern;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Scoring;
+using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 {
@@ -49,8 +55,46 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
                     hasXxySr ? xxySr : null));
             }
 
+            if (request.RequestedScopes.HasFlag(EzAnalysisScope.PerformancePoints))
+            {
+                if (tryCalculatePerformancePoints(beatmap, request.StarRatingOverride, out double pp))
+                    bag.Set(EzAnalysisFields.PERFORMANCE_POINTS, pp);
+            }
+
             analysis = bag;
             return true;
+        }
+
+        /// <summary>
+        /// Mania pp at a given star rating. Mania performance reads only the star rating and the judgement counts,
+        /// so a substituted rating can be scored without re-deriving the difficulty at all.
+        /// </summary>
+        private static bool tryCalculatePerformancePoints(ManiaBeatmap beatmap, double? starRating, out double pp)
+        {
+            pp = 0;
+
+            if (starRating is not double star || !double.IsFinite(star) || star <= 0)
+                return false;
+
+            int totalHits = beatmap.HitObjects.Count;
+
+            if (totalHits == 0)
+                return false;
+
+            var ruleset = new ManiaRuleset();
+
+            var score = new ScoreInfo(null, ruleset.RulesetInfo)
+            {
+                Passed = true,
+                Accuracy = 1,
+                Statistics = new Dictionary<HitResult, int> { [HitResult.Perfect] = totalHits },
+                Mods = Array.Empty<Mod>(),
+            };
+
+            var performance = new ManiaPerformanceCalculator().Calculate(score, new ManiaDifficultyAttributes { StarRating = star });
+
+            pp = performance.Total;
+            return double.IsFinite(pp) && pp > 0;
         }
 
         private static bool tryCalculateXxySr(IBeatmap beatmap, double clockRate, out double sr)

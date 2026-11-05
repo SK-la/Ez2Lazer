@@ -18,10 +18,16 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
     /// </summary>
     public static class EzChartSkillInfoComputer
     {
-        private static readonly HashSet<string> ln_pattern_ids = new HashSet<string>(StringComparer.Ordinal)
+        private static readonly HashSet<string> ln_pattern_ids = createLnPatternIds();
+
+        private static HashSet<string> createLnPatternIds()
         {
-            "ln", "lngeneral", "lnrelease", "lninverse", "lntech"
-        };
+            var ids = new HashSet<string>(EzManiaLNAxisExtensions.SubtypeIds, StringComparer.Ordinal)
+            {
+                EzManiaRCAxis.Ln.ToId(),
+            };
+            return ids;
+        }
 
         public static EzChartSkillInfo Compute(
             EzManiaChartInput chart,
@@ -48,8 +54,8 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             bool? handstreamCluster = leo != null ? EzLeoBlackClusterMetrics.HandstreamCluster(leo.Category) : null;
 
             int keyCount = chart.KeyCount;
-            double chordjackScore = patternScores.GetValueOrDefault("chordjack");
-            double jackScore = patternScores.GetValueOrDefault("jack");
+            double chordjackScore = patternScores.GetValueOrDefault(EzManiaRCAxis.Chordjack.ToId());
+            double jackScore = patternScores.GetValueOrDefault(EzManiaRCAxis.Jack.ToId());
             bool isJack = EzPatternTagRules.ChartIsJack(keyCount, chordjackScore, jackScore, jackShare);
             bool vetoesTech = EzPatternTagRules.JackVetoesTech(keyCount, chordjackScore, jackScore, jackShare);
             double lnRatio = features.Metrics.HoldRatio;
@@ -58,13 +64,13 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             var patternIds = patternScores
                              .Where(kvp =>
                                  kvp.Value >= EzPatternTagRules.PatternTagMinScore(kvp.Key)
-                                 && !(kvp.Key == "tech" && vetoesTech)
+                                 && !(kvp.Key == EzManiaRCAxis.Tech.ToId() && vetoesTech)
                                  && !(ln_pattern_ids.Contains(kvp.Key) && !chartIsLn))
                              .Select(kvp => kvp.Key)
                              .ToList();
 
-            if (EzPatternTagRules.UsesPatternSkillAxes(keyCount) && isJack && !patternIds.Contains("jack"))
-                patternIds.Add("jack");
+            if (EzPatternTagRules.UsesPatternSkillAxes(keyCount) && isJack && !patternIds.Contains(EzManiaRCAxis.Jack.ToId()))
+                patternIds.Add(EzManiaRCAxis.Jack.ToId());
 
             var jackDemandClusters = new List<EzFourKeyJackDemand.Cluster>(leoClusters.Count);
 
@@ -104,7 +110,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                 TechCategory = techCategory,
                 ClusterTrill = clusterTrill,
                 HandstreamCluster = handstreamCluster,
-                TechScore = vetoesTech ? 0 : patternScores.GetValueOrDefault("tech"),
+                TechScore = vetoesTech ? 0 : patternScores.GetValueOrDefault(EzManiaRCAxis.Tech.ToId()),
                 ChordjackScore = chordjackScore,
                 JackScore = jackScore > 0 ? jackScore : null,
                 Motion = EzCSIMotionComputer.Compute(features.Notes, keyCount),
@@ -120,7 +126,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         {
             ArgumentNullException.ThrowIfNull(playable);
 
-            int keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
+            int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
             var notes = new List<EzManiaNote>();
             double lastTime = 0;
 

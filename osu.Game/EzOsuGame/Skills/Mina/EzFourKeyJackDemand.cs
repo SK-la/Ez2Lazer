@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.Skills.Mina
 {
@@ -86,14 +87,14 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                                            && jackableSpeed
                                            && meanClusterBpm != null
                                            && jackClusterShare >= JACK_CLUSTER_CORROBORATED_SHARE_MIN
-                                           && patternScore(input.Patterns, "chordjack") >= JACK_CLUSTER_CORROBORATED_CHORDJACK_MIN
+                                           && patternScore(input.Patterns, EzManiaRCAxis.Chordjack.ToId()) >= JACK_CLUSTER_CORROBORATED_CHORDJACK_MIN
                                            && input.JackPressure >= JACK_CLUSTER_CORROBORATED_PRESSURE_MIN;
             if (jackClusterCorroborated)
                 reasons.Add("jack_cluster_corroborated");
 
             bool jackMarathon = jackableSpeed
                                 && input.DurationMs >= MARATHON_DURATION_MIN_MS
-                                && patternScore(input.Patterns, "jack") >= MARATHON_JACK_SCORE_MIN
+                                && patternScore(input.Patterns, EzManiaRCAxis.Jack.ToId()) >= MARATHON_JACK_SCORE_MIN
                                 && input.JackPressure >= MARATHON_JACK_PRESSURE_MIN
                                 && input.ChordRatio >= MARATHON_CHORD_RATIO_MIN
                                 && input.ChordColumnOverlapRatio >= MARATHON_CHORD_OVERLAP_MIN;

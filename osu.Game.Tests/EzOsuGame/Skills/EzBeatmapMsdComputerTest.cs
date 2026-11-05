@@ -12,12 +12,13 @@ namespace osu.Game.Tests.EzOsuGame.Skills
     public class EzBeatmapMsdComputerTest
     {
         [Test]
-        public void TestIsCurrentMinaCacheRequiresHoldRatio()
+        public void Completeness_ignores_the_hold_ratio()
         {
+            // The hold ratio is a hitobject ratio, not a Mina axis: it must not gate the Mina stage.
             var skills = buildCompleteSkills();
-            skills.Remove(EzSkillSystems.MinaHoldRatioSkillId);
 
-            Assert.That(EzBeatmapMinaComputer.IsCurrentMinaCache(skills), Is.False);
+            Assert.That(skills.ContainsKey("beatmap_msd.__hold_ratio"), Is.False);
+            Assert.That(EzBeatmapMinaComputer.IsCurrentMinaCache(skills), Is.True);
         }
 
         [Test]
@@ -61,10 +62,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
         private static Dictionary<string, double> buildCompleteSkills()
         {
-            var skills = new Dictionary<string, double>
-            {
-                [EzSkillSystems.MinaHoldRatioSkillId] = 0.25,
-            };
+            var skills = new Dictionary<string, double>();
 
             foreach (var axis in EzMinaSkillAxisExtensions.All)
                 skills[axis.ToMsdSkillId()] = 10;

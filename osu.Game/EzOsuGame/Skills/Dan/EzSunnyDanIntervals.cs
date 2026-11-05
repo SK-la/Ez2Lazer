@@ -75,7 +75,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         private static (double Lower, double Upper, string Name)[]? getTable(int keyCount, string side)
         {
-            bool ln = side == DanSkillSystem.SIDE_LN;
+            bool ln = side == EzDanSide.Ln.ToId();
             return keyCount switch
             {
                 4 => ln ? EzSunnyDanIntervalTables.Ln4K : EzSunnyDanIntervalTables.Rc4K,

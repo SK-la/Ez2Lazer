@@ -9,7 +9,6 @@ namespace osu.Game.EzOsuGame.Skills.Mina
     /// <summary>
     /// Default MinaCalc / Etterna skillset axes (RcMina module).
     /// Metadata lives on each field via <see cref="EzSkillMetaAttribute"/>; use <see cref="EzMinaSkillAxisExtensions.All"/>.
-    /// Per-keymode alternate axis sets register via <see cref="IEzSkillSystem"/> / <see cref="EzSkillRegistry"/>.
     /// LN pattern skills are a separate future module — do not merge into this enum.
     /// </summary>
     public enum EzMinaSkillAxis

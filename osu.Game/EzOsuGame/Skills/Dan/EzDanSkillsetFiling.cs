@@ -62,7 +62,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         private static readonly string[] stamina_hold_rivals = { "Technical", "Jumpstream", "Handstream" };
 
-        private static readonly string[] inverse_mod_patterns = { "ln", "lninverse" };
+        private static readonly string[] inverse_mod_patterns = { EzManiaRCAxis.Ln.ToId(), EzManiaLNAxis.Inverse.ToId() };
 
         private static readonly (double Mean, double Sd, double Weight)[] speed_tech_terms =
         {
@@ -335,14 +335,14 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         public static bool ChartBelongsToTagBucket(EzDanSkillsetBucketDef bucket, EzChartSkillInfo? chart)
         {
-            if (bucket.ClusterFamily == "tech")
+            if (bucket.ClusterFamily == EzDanSkillsetBuckets.TECH)
             {
                 if (chart?.TechCategory != null)
                     return chart.TechCategory.Value;
             }
             else if (bucket.ClusterFamily != null)
             {
-                double? share = bucket.ClusterFamily == "jack" ? chart?.JackShare : chart?.StreamShare;
+                double? share = bucket.ClusterFamily == EzDanSkillsetBuckets.JACK ? chart?.JackShare : chart?.StreamShare;
                 if (share != null)
                     return share >= CLUSTER_SHARE_MIN;
             }
@@ -430,7 +430,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 return null;
 
             return (
-                probability >= 0.5 ? "tech" : "speed",
+                probability >= 0.5 ? EzDanSkillsetBuckets.TECH : EzDanSkillsetBuckets.SPEED,
                 probability > SPEED_TECH_DUAL_LOW && probability < SPEED_TECH_DUAL_HIGH
             );
         }
@@ -601,7 +601,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 if (!modelled.Value.Shared)
                     return new[] { decided };
 
-                string otherId = modelled.Value.Primary == "tech" ? "speed" : "tech";
+                string otherId = modelled.Value.Primary == EzDanSkillsetBuckets.TECH ? EzDanSkillsetBuckets.SPEED : EzDanSkillsetBuckets.TECH;
                 var other = buckets.FirstOrDefault(b => b.Id == otherId && b.Skillsets != null);
                 return other != null ? new[] { decided, other } : new[] { decided };
             }
@@ -616,10 +616,10 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                     return filed;
 
                 var modelled = SpeedTechTiles(values, chart?.Motion, chart?.TechScore ?? 0);
-                if (modelled == null || modelled.Value.Primary != "tech")
+                if (modelled == null || modelled.Value.Primary != EzDanSkillsetBuckets.TECH)
                     return filed;
 
-                return add("tech");
+                return add(EzDanSkillsetBuckets.TECH);
             }
 
             return filed;
@@ -636,10 +636,10 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 {
                     return new[]
                     {
-                        new EzDanSkillsetBucketDef("lngeneral", new[] { "lngeneral", "ln" }, anchor: true),
-                        new EzDanSkillsetBucketDef("lntech", new[] { "lntech" }),
-                        new EzDanSkillsetBucketDef("lninverse", new[] { "lninverse" }),
-                        new EzDanSkillsetBucketDef("lnrelease", new[] { "lnrelease" }),
+                        new EzDanSkillsetBucketDef(EzDanSkillsetBuckets.LNGeneral, new[] { EzDanSkillsetBuckets.LNGeneral, EzManiaRCAxis.Ln.ToId() }, anchor: true),
+                        new EzDanSkillsetBucketDef(EzDanSkillsetBuckets.LNTech, new[] { EzDanSkillsetBuckets.LNTech }),
+                        new EzDanSkillsetBucketDef(EzDanSkillsetBuckets.LNInverse, new[] { EzDanSkillsetBuckets.LNInverse }),
+                        new EzDanSkillsetBucketDef(EzDanSkillsetBuckets.LNRelease, new[] { EzDanSkillsetBuckets.LNRelease }),
                     };
                 }
 
@@ -650,23 +650,24 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             {
                 return new[]
                 {
-                    new EzDanSkillsetBucketDef("jack", new[] { "chordjack", "speedjack" },
+                    new EzDanSkillsetBucketDef(EzDanSkillsetBuckets.JACK, new[] { EzManiaRCAxis.Chordjack.ToId(), EzManiaRCAxis.Speedjack.ToId() },
                         skillsets: new[] { "JackSpeed", "Chordjack" }),
-                    new EzDanSkillsetBucketDef("tech", Array.Empty<string>(),
+                    new EzDanSkillsetBucketDef(EzDanSkillsetBuckets.TECH, Array.Empty<string>(),
                         skillsets: new[] { "Technical", "Jumpstream" }),
-                    new EzDanSkillsetBucketDef("speed", Array.Empty<string>(),
+                    new EzDanSkillsetBucketDef(EzDanSkillsetBuckets.SPEED, Array.Empty<string>(),
                         skillsets: new[] { "Stream" }),
-                    new EzDanSkillsetBucketDef("stamina", Array.Empty<string>(),
+                    new EzDanSkillsetBucketDef(EzDanSkillsetBuckets.STAMINA, Array.Empty<string>(),
                         skillsets: new[] { "Handstream", "Stamina" }),
                 };
             }
 
             return new[]
             {
-                new EzDanSkillsetBucketDef("jack", new[] { "jack" }, clusterFamily: "jack"),
-                new EzDanSkillsetBucketDef("tech", new[] { "tech" }, clusterFamily: "tech"),
-                new EzDanSkillsetBucketDef("speed", new[] { "delay" }),
-                new EzDanSkillsetBucketDef("stream", new[] { "chordstream", "bracket" }, clusterFamily: "stream"),
+                new EzDanSkillsetBucketDef(EzDanSkillsetBuckets.JACK, new[] { EzManiaRCAxis.Jack.ToId() }, clusterFamily: EzDanSkillsetBuckets.JACK),
+                new EzDanSkillsetBucketDef(EzDanSkillsetBuckets.TECH, new[] { EzManiaRCAxis.Tech.ToId() }, clusterFamily: EzDanSkillsetBuckets.TECH),
+                new EzDanSkillsetBucketDef(EzDanSkillsetBuckets.SPEED, new[] { EzManiaRCAxis.Delay.ToId() }),
+                new EzDanSkillsetBucketDef(EzDanSkillsetBuckets.STREAM, new[] { EzManiaRCAxis.Chordstream.ToId(), EzManiaRCAxis.Bracket.ToId() },
+                    clusterFamily: EzDanSkillsetBuckets.STREAM),
             };
         }
 

@@ -3,8 +3,10 @@
 
 using System.Collections.Generic;
 using NUnit.Framework;
+using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.PPP;
+using osu.Game.Rulesets;
 using osu.Game.Tests.Database;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
@@ -37,7 +39,13 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                         [speed] = EzPPPSkillVersions.ForRuleset(0),
                     });
 
-                var current = store.GetBeatmapSkillsAtCurrentVersions(hash, EzSkillSystems.BEATMAP_PPP);
+                var beatmapInfo = new BeatmapInfo
+                {
+                    Hash = hash,
+                    Ruleset = new RulesetInfo("osu", "osu!", "osu.Game.Rulesets.Osu.OsuRuleset, osu.Game.Rulesets.Osu", 0),
+                };
+
+                var current = store.GetBeatmapSkillsAtCurrentVersions(beatmapInfo, EzSkillSystems.BEATMAP_PPP);
 
                 Assert.That(current.ContainsKey(aim), Is.False);
                 Assert.That(current[speed], Is.EqualTo(2.5));

@@ -10,8 +10,6 @@ using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills.Mina;
-using osu.Game.EzOsuGame.Skills.Pattern;
-using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Skills.Dan
@@ -34,8 +32,10 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         /// <summary>
         /// Estimates chart dan for player clear credit (hub exclusive RC/LN primary).
-        /// Mods that affect playable/rate recompute MSD from playable; nomod uses persisted MSD when available.
         /// </summary>
+        /// <remarks>
+        /// Mods that affect the playable are rated from it directly; otherwise the stored axes are used.
+        /// </remarks>
         public EzChartDanVerdict? TryEstimate(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
         {
             ArgumentNullException.ThrowIfNull(beatmapInfo);
@@ -49,20 +49,14 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
             var playable = EzPlayableBeatmapCache.GetShared(working, beatmapInfo.Ruleset, mods);
 
-            IReadOnlyDictionary<string, double>? msd;
-
-            if (!live)
+            if (live)
             {
-                msd = msdComputer.TryGetOrCompute(beatmapInfo);
-            }
-            else
-            {
-                var snap = TryComputeLiveSnapshot(beatmapInfo, mods);
-                if (snap == null)
-                    return null;
+                var liveAxes = computeLiveAxes(playable, mods);
 
-                return FromMsdAndPlayable(snap.Msd, playable, xxySr: snap.XxySr);
+                return liveAxes == null ? null : FromMsdAndPlayable(liveAxes, playable, resolveLiveXxy(playable, beatmapInfo, mods));
             }
+
+            var msd = msdComputer.TryGetOrCompute(beatmapInfo);
 
             if (msd == null || msd.Count == 0)
                 return null;
@@ -72,159 +66,47 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         }
 
         /// <summary>
-        /// Song-select DualPanel / Skill radar: temporary MSD + dual-half ChartDan from playable + mods.
-        /// Always computes (including empty mods) — same rhythm as xxySR analysis on the selected chart.
-        /// Never writes Realm.
+        /// Axis values measured on a playable under the given mods, keyed by stored skill id.
         /// </summary>
-        /// <param name="chartInfo">Optional CSI for skillset stamps; omit when live keyCount differs from CS.</param>
-        public EzLiveChartSkillSnapshot? TryComputeLiveSnapshot(
-            BeatmapInfo beatmapInfo,
-            IReadOnlyList<Mod>? mods = null,
-            EzChartSkillInfo? chartInfo = null,
-            CancellationToken cancellationToken = default)
+        private static IReadOnlyDictionary<string, double>? computeLiveAxes(IBeatmap playable, IReadOnlyList<Mod> mods)
         {
-            ArgumentNullException.ThrowIfNull(beatmapInfo);
+            int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
 
-            if (beatmapInfo.Ruleset.OnlineID != 3)
-                return null;
-
-            mods ??= Array.Empty<Mod>();
-            // EzModSeed.Resolve makes Seed writes update-thread safe; use SelectedMods as-is so UI seed matches.
-            float rate = EzModRate.Resolve(mods);
-
-            var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-            var playable = EzPlayableBeatmapCache.GetShared(working, beatmapInfo.Ruleset, mods);
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            int keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
             if (keyCount <= 0)
                 return null;
 
             using var calc = new EzMinaEngine();
-            EzMinaSkillAxisVector vector;
 
             if (!calc.SupportsKeyCount(keyCount))
                 return null;
 
             try
             {
-                vector = calc.CalculateMsd(EzMinaNoteConverter.Convert(playable), keyCount, rate);
+                var vector = calc.CalculateMsd(EzMinaNoteConverter.Convert(playable), keyCount, EzModRate.Resolve(mods));
+
+                if (vector.Overall <= 0 && vector.Stream <= 0)
+                    return null;
+
+                return VectorToMsdDict(vector);
             }
-            catch (Exception)
+            catch
             {
                 return null;
             }
+        }
 
-            // The Mina pass above is not interruptible; bail before the (also expensive) xxy/pattern work
-            // if the caller already moved on to another chart.
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (vector.Overall <= 0 && vector.Stream <= 0)
-                return null;
-
-            var msd = withHoldRatio(VectorToMsdDict(vector), ComputeHoldRatio(playable));
-            double holdRatio = ComputeHoldRatio(playable);
-            int holdCount = ComputeHoldCount(playable);
-
-            // Same live xxy as song-select analysis panel (playable + rate/key mods). Fallback to Realm nomod xxy only when usable.
-            double? xxySr = null;
-
+        /// <summary>
+        /// Sunny star rating for the current mods, or the stored baseline when it still applies.
+        /// </summary>
+        private static double? resolveLiveXxy(IBeatmap playable, BeatmapInfo beatmapInfo, IReadOnlyList<Mod> mods)
+        {
             if (EzAnalysisComputation.TryComputeXxySrFromPlayable(playable, beatmapInfo.Ruleset, mods, CancellationToken.None, out double liveXxy)
                 && liveXxy > 0)
-            {
-                xxySr = liveXxy;
-            }
-            else if (EzModRate.CanUsePersistedXxy(mods) && beatmapInfo.XxyStarRating >= 0)
-            {
-                xxySr = beatmapInfo.XxyStarRating;
-            }
+                return liveXxy;
 
-            // Without Sunny/xxy, MSD→SrToRawDan invents finish/stellium — never for live DualPanel.
-            var chartDan = EzPersistedChartDan.TryComputeFromStored(
-                beatmapInfo.Hash,
-                beatmapInfo.ID,
-                msd,
-                keyCount,
-                holdRatio,
-                xxySr,
-                chartInfo,
-                holdCount,
-                allowMsdHeuristicLabels: xxySr != null);
-
-            var chartInput = EzChartSkillInfoComputer.FromPlayable(playable);
-            var features = EzChartFeatureExtractor.Extract(chartInput, rate);
-            var patternAnalysis = EzPatternAnalyzer.Analyze(chartInput, rate, features);
-            var lnSubtypeScores = collectLnSubtypeScores(patternAnalysis);
-            var rcPatternScores = collectRcPatternScores(patternAnalysis);
-
-            return new EzLiveChartSkillSnapshot
-            {
-                Msd = msd,
-                ChartDan = chartDan,
-                KeyCount = keyCount,
-                HoldRatio = holdRatio,
-                HoldCount = holdCount,
-                XxySr = xxySr,
-                IsLiveFromMods = true,
-                LnMetrics = features.Metrics,
-                LnSubtypeScores = lnSubtypeScores,
-                RcPatternScores = rcPatternScores,
-            };
-        }
-
-        private static IReadOnlyDictionary<string, double> collectLnSubtypeScores(EzPatternAnalysis analysis)
-        {
-            var result = new Dictionary<string, double>(StringComparer.Ordinal);
-
-            foreach (var hit in analysis.AllPatterns)
-            {
-                if (hit.Id is not ("lngeneral" or "lntech" or "lninverse" or "lnrelease"))
-                    continue;
-
-                if (!double.IsFinite(hit.Score) || hit.Score <= 0)
-                    continue;
-
-                result[hit.Id] = hit.Score;
-            }
-
-            return result;
-        }
-
-        private static IReadOnlyDictionary<string, double> collectRcPatternScores(EzPatternAnalysis analysis)
-        {
-            var result = new Dictionary<string, double>(StringComparer.Ordinal);
-
-            foreach (var axis in EzPlayerPatternAxisExtensions.All)
-            {
-                string id = axis.ToId();
-
-                foreach (var hit in analysis.AllPatterns)
-                {
-                    if (!string.Equals(hit.Id, id, StringComparison.Ordinal))
-                        continue;
-
-                    if (!double.IsFinite(hit.Score) || hit.Score <= 0)
-                        continue;
-
-                    result[id] = hit.Score;
-                    break;
-                }
-            }
-
-            return result;
-        }
-
-        private static IReadOnlyDictionary<string, double> withHoldRatio(IReadOnlyDictionary<string, double> msd, double holdRatio)
-        {
-            if (!double.IsFinite(holdRatio))
-                return msd;
-
-            var copy = new Dictionary<string, double>(msd, StringComparer.Ordinal)
-            {
-                [EzSkillSystems.MinaHoldRatioSkillId] = Math.Clamp(holdRatio, 0, 1),
-            };
-            return copy;
+            return EzModRate.CanUsePersistedXxy(mods) && beatmapInfo.XxyStarRating >= 0
+                ? beatmapInfo.XxyStarRating
+                : null;
         }
 
         public static EzChartDanVerdict? FromMsdAndPlayable(
@@ -238,7 +120,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             if (!msd.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double overall) || overall <= 0)
                 return null;
 
-            int keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
+            int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
             if (keyCount <= 0)
                 return null;
 

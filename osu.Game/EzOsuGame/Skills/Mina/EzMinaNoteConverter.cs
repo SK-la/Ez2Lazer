@@ -62,22 +62,5 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 
             return rows;
         }
-
-        public static int ResolveKeyCount(IBeatmap beatmap)
-        {
-            int fromCs = (int)Math.Round(beatmap.Difficulty.CircleSize);
-            if (fromCs is >= 1 and <= 18)
-                return fromCs;
-
-            int maxColumn = -1;
-
-            foreach (HitObject obj in beatmap.HitObjects)
-            {
-                if (obj is IHasColumn columnObj)
-                    maxColumn = Math.Max(maxColumn, columnObj.Column);
-            }
-
-            return maxColumn >= 0 ? maxColumn + 1 : 4;
-        }
     }
 }

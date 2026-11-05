@@ -36,7 +36,7 @@ namespace osu.Game.EzOsuGame.Skills.PPP
             IEnumerable<EzSkillPlayRow> plays,
             Func<Guid, ScoreInfo?>? resolveScore,
             CancellationToken cancellationToken = default,
-            Action? afterEachScore = default)
+            Action? afterEachScore = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 

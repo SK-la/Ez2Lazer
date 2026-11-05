@@ -609,7 +609,7 @@ LIMIT 1;
                         ? new EzManiaSummary(columnCounts, holdNoteCounts, xxySr: null)
                         : null;
 
-                    result = new EzAnalysisResult(new KpsSummary(averageKps, maxKps, kpsList), pp: null, maniaSummary);
+                    result = new EzAnalysisResult(new KpsSummary(averageKps, maxKps, kpsList), maniaSummary);
 
                     if (pending is not null && string.Equals(pending.Hash, beatmap.Hash, StringComparison.Ordinal))
                         result = mergeAnalysisResult(result, pending.Analysis);

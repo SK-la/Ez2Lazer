@@ -5,10 +5,8 @@ using System;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Mina;
-using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 
@@ -242,64 +240,6 @@ namespace osu.Game.Tests.EzOsuGame.Skills
     }
 
     [TestFixture]
-    public class EzSkillRegistryTest
-    {
-        [Test]
-        public void Default_systems_keep_msd_ssr_and_dan_separate()
-        {
-            var registry = new EzSkillRegistry();
-
-            Assert.That(registry.GetSystem(EzSkillSystems.BEATMAP_MINA), Is.Not.Null);
-            Assert.That(registry.GetSystem(EzSkillSystems.PLAYER_MINA), Is.Not.Null);
-            Assert.That(registry.GetSystem(EzSkillSystems.DAN), Is.Not.Null);
-            Assert.That(registry.GetSystem(EzSkillSystems.BEATMAP_PPP), Is.Not.Null);
-            Assert.That(registry.GetSystem(EzSkillSystems.PLAYER_PPP), Is.Not.Null);
-
-            Assert.That(registry.AllSkills.Any(s => s.SkillId.StartsWith($"{EzSkillSystems.BEATMAP_MINA}.", StringComparison.Ordinal)));
-            Assert.That(registry.AllSkills.Any(s => s.SkillId.StartsWith($"{EzSkillSystems.PLAYER_MINA}.", StringComparison.Ordinal)));
-            Assert.That(registry.AllSkills.Any(s => s.SkillId.StartsWith($"{EzSkillSystems.DAN}.", StringComparison.Ordinal)));
-            Assert.That(registry.AllSkills.Any(s => s.SkillId.StartsWith($"{EzSkillSystems.BEATMAP_PPP}.", StringComparison.Ordinal)));
-            Assert.That(registry.AllSkills.Any(s => s.SkillId.StartsWith($"{EzSkillSystems.PLAYER_PPP}.", StringComparison.Ordinal)));
-
-            // No skill id is shared across systems.
-            var ids = registry.AllSkills.Select(s => s.SkillId).ToList();
-            Assert.That(ids.Distinct().Count(), Is.EqualTo(ids.Count));
-        }
-
-        [Test]
-        public void Profiles_split_mania_and_osu_plugins()
-        {
-            var registry = new EzSkillRegistry();
-
-            var mania = registry.GetProfile(EzLocalProfileConstants.MANIA_RULESET_ID);
-            Assert.That(mania, Is.Not.Null);
-            Assert.That(mania!.DefaultChartSystemId, Is.EqualTo(EzSkillSystems.BEATMAP_MINA));
-            Assert.That(mania.DefaultPlayerSystemId, Is.EqualTo(EzSkillSystems.PLAYER_MINA));
-            Assert.That(mania.ContainsSystem(EzSkillSystems.DAN), Is.True);
-            Assert.That(mania.ContainsSystem(EzSkillSystems.BEATMAP_PPP), Is.True);
-            Assert.That(mania.DefaultChartSystemId, Is.EqualTo(EzSkillSystems.BEATMAP_MINA));
-
-            var osu = registry.GetProfile(EzLocalProfileConstants.OSU_RULESET_ID);
-            Assert.That(osu, Is.Not.Null);
-            Assert.That(osu!.DefaultChartSystemId, Is.EqualTo(EzSkillSystems.BEATMAP_PPP));
-            Assert.That(osu.DefaultPlayerSystemId, Is.EqualTo(EzSkillSystems.PLAYER_PPP));
-            Assert.That(osu.ContainsSystem(EzSkillSystems.BEATMAP_MINA), Is.False);
-
-            var taiko = registry.GetProfile(1);
-            Assert.That(taiko, Is.Not.Null);
-            Assert.That(taiko!.DefaultChartSystemId, Is.EqualTo(EzSkillSystems.BEATMAP_PPP));
-            Assert.That(taiko.DefaultPlayerSystemId, Is.EqualTo(EzSkillSystems.PLAYER_PPP));
-
-            var @catch = registry.GetProfile(2);
-            Assert.That(@catch, Is.Not.Null);
-            Assert.That(@catch!.DefaultChartSystemId, Is.EqualTo(EzSkillSystems.BEATMAP_PPP));
-
-            Assert.That(registry.EnumerateByMetric("stamina").Select(s => s.SkillId), Does.Contain(EzPPPSkillAxis.Stamina.ToChartSkillId()));
-            Assert.That(registry.EnumerateByMetric("jump_aim").Count(), Is.EqualTo(2));
-        }
-    }
-
-    [TestFixture]
     public class EzMinaNoteConverterTest
     {
         [Test]
@@ -365,7 +305,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var beatmap = new Beatmap { Difficulty = { CircleSize = 7 } };
             beatmap.HitObjects.Add(new TestColumnObject(0, 0));
 
-            Assert.That(EzMinaNoteConverter.ResolveKeyCount(beatmap), Is.EqualTo(7));
+            Assert.That(EzHoldMetrics.ResolveKeyCount(beatmap), Is.EqualTo(7));
         }
 
         [Test]
@@ -375,7 +315,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             beatmap.HitObjects.Add(new TestColumnObject(0, 0));
             beatmap.HitObjects.Add(new TestColumnObject(10, 5));
 
-            Assert.That(EzMinaNoteConverter.ResolveKeyCount(beatmap), Is.EqualTo(6));
+            Assert.That(EzHoldMetrics.ResolveKeyCount(beatmap), Is.EqualTo(6));
         }
 
         [Test]
@@ -383,7 +323,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var beatmap = new Beatmap { Difficulty = { CircleSize = 0 } };
 
-            Assert.That(EzMinaNoteConverter.ResolveKeyCount(beatmap), Is.EqualTo(4));
+            Assert.That(EzHoldMetrics.ResolveKeyCount(beatmap), Is.EqualTo(4));
         }
 
         private class TestColumnObject : HitObject, IHasColumn

@@ -27,21 +27,6 @@ namespace osu.Game.EzOsuGame.Skills
             this.engine = engine ?? new EzPPPEngine();
         }
 
-        public IReadOnlyDictionary<string, double>? TryGetOrCompute(BeatmapInfo beatmapInfo)
-        {
-            ArgumentNullException.ThrowIfNull(beatmapInfo);
-
-            if (!EzPPPSkillCatalog.SupportsRuleset(beatmapInfo.Ruleset.OnlineID))
-                return null;
-
-            var existing = skillStore.GetBeatmapSkillsAtCurrentVersions(beatmapInfo.Hash, EzSkillSystems.BEATMAP_PPP);
-
-            if (EzPPPSkillCatalog.IsCompleteChart(beatmapInfo.Ruleset.OnlineID, existing))
-                return existing;
-
-            return ComputeAndStore(beatmapInfo);
-        }
-
         public IReadOnlyDictionary<string, double>? ComputeAndStore(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
         {
             ArgumentNullException.ThrowIfNull(beatmapInfo);

@@ -126,78 +126,19 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             int holdCount = -1,
             bool allowMsdHeuristicLabels = true)
         {
-            if (string.IsNullOrEmpty(beatmapHash) || keyCount <= 0 || msd.Count == 0)
+            if (string.IsNullOrEmpty(beatmapHash))
                 return null;
 
+            var set = EzDanSet.Create(msd, keyCount, holdRatio, xxySr, chartInfo, holdCount, allowMsdHeuristicLabels);
             var primary = EzChartDanEstimator.FromMsd(msd, keyCount, holdRatio, xxySr);
-            if (primary == null)
+
+            // A chart the tables cannot rate still has a rating axis; keep it so callers can display the
+            // overall value even when no side resolves.
+            if (set == null && primary == null)
                 return null;
 
-            double? lengthSeconds = chartInfo?.LengthSeconds;
-            var dominantAxis = primary.DominantAxis;
-
-            double rcRaw = -1;
-            string rcLabel = string.Empty;
-            double lnRaw = -1;
-            string lnLabel = string.Empty;
-            var rcLabels = new Dictionary<string, string>(StringComparer.Ordinal);
-            var lnLabels = new Dictionary<string, string>(StringComparer.Ordinal);
-
-            foreach (EzDanSide side in new[] { EzDanSide.Rc, EzDanSide.Ln })
-            {
-                if (side == EzDanSide.Ln
-                    && !EzDanAlgorithm.AllowsPersistedChartLnHalf(keyCount, holdRatio, holdCount))
-                {
-                    continue;
-                }
-
-                double rawDan = -1;
-                string? aggregateLabel = null;
-
-                if (xxySr is double sr
-                    && sr >= 0 && double.IsFinite(sr)
-                    && EzSunnyDanIntervals.TryLookup(keyCount, side.ToId(), sr, out var sunny)
-                    && !string.IsNullOrEmpty(sunny.DisplayLabel))
-                {
-                    rawDan = sunny.RawDan;
-                    aggregateLabel = sunny.DisplayLabel;
-                }
-                else if (allowMsdHeuristicLabels && primary.Side == side && !string.IsNullOrEmpty(primary.Label))
-                {
-                    rawDan = primary.RawDan;
-                    aggregateLabel = primary.Label;
-                }
-                else if (allowMsdHeuristicLabels
-                         && EzDanLabels.TryResolveFallbackDan(keyCount, side, primary.OverallMsd, dominantAxis, xxySr) is EzDanLabels.DanLookup fallback)
-                {
-                    // Other side: same resolution on that side's table (Ez dual halves).
-                    rawDan = fallback.RawDan;
-                    aggregateLabel = fallback.Label;
-                }
-
-                if (string.IsNullOrEmpty(aggregateLabel) || rawDan < 0)
-                    continue;
-
-                var buckets = EzDanSkillsetFiling.BucketsForValues(
-                    keyCount, side, msd, lengthSeconds, rate: 1, chartInfo);
-
-                var stamps = new Dictionary<string, string>(StringComparer.Ordinal);
-                foreach (string id in buckets)
-                    stamps[id] = aggregateLabel;
-
-                if (side == EzDanSide.Ln)
-                {
-                    lnRaw = rawDan;
-                    lnLabel = aggregateLabel;
-                    lnLabels = stamps;
-                }
-                else
-                {
-                    rcRaw = rawDan;
-                    rcLabel = aggregateLabel;
-                    rcLabels = stamps;
-                }
-            }
+            var rc = set?.For(EzDanSide.Rc);
+            var ln = set?.For(EzDanSide.Ln);
 
             return new EzPersistedChartDan
             {
@@ -206,13 +147,13 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 AlgorithmVersion = EzDanAlgorithm.VERSION,
                 KeyCount = keyCount,
                 HoldRatio = holdRatio,
-                OverallMsd = primary.OverallMsd,
-                RcRawDan = rcRaw,
-                RcLabel = rcLabel,
-                LnRawDan = lnRaw,
-                LnLabel = lnLabel,
-                RcSkillsetLabels = rcLabels,
-                LnSkillsetLabels = lnLabels,
+                OverallMsd = primary?.OverallMsd ?? 0,
+                RcRawDan = rc?.RawDan ?? -1,
+                RcLabel = rc?.Label ?? string.Empty,
+                LnRawDan = ln?.RawDan ?? -1,
+                LnLabel = ln?.Label ?? string.Empty,
+                RcSkillsetLabels = rc?.SkillsetLabels ?? new Dictionary<string, string>(),
+                LnSkillsetLabels = ln?.SkillsetLabels ?? new Dictionary<string, string>(),
                 ComputedAt = DateTimeOffset.UtcNow,
             };
         }

@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Metrics;
 
 namespace osu.Game.EzOsuGame.Skills.PPP
 {
@@ -142,18 +143,12 @@ namespace osu.Game.EzOsuGame.Skills.PPP
         public static bool TrySplit(string? skillId, out bool player, out string metricId)
         {
             player = false;
-            metricId = string.Empty;
 
-            if (string.IsNullOrEmpty(skillId))
+            if (!EzMetricSkillId.TrySplit(skillId, out string system, out metricId))
+            {
+                metricId = string.Empty;
                 return false;
-
-            int dot = skillId.LastIndexOf('.');
-
-            if (dot <= 0 || dot >= skillId.Length - 1)
-                return false;
-
-            string system = skillId[..dot];
-            metricId = skillId[(dot + 1)..];
+            }
 
             if (system == EzSkillSystems.BEATMAP_PPP)
                 return true;
@@ -176,28 +171,6 @@ namespace osu.Game.EzOsuGame.Skills.PPP
                 result[spec.ChartSkillId] = 0;
 
             return result;
-        }
-
-        /// <summary>Unique chart and player definitions across every PPP ruleset.</summary>
-        public static IReadOnlyList<EzSkillDefinition> CreateDefinitions(EzSkillScope scope)
-        {
-            var seen = new HashSet<string>(StringComparer.Ordinal);
-            var list = new List<EzSkillDefinition>();
-
-            foreach (int ruleset in new[] { EzLocalProfileConstants.OSU_RULESET_ID, EzLocalProfileConstants.TAIKO_RULESET_ID, EzLocalProfileConstants.CATCH_RULESET_ID, EzLocalProfileConstants.MANIA_RULESET_ID })
-            {
-                foreach (var spec in MetricsFor(ruleset))
-                {
-                    string skillId = scope == EzSkillScope.Player ? spec.PlayerSkillId : spec.ChartSkillId;
-
-                    if (!seen.Add(skillId))
-                        continue;
-
-                    list.Add(new EzSkillDefinition(scope == EzSkillScope.Player ? EzSkillSystems.PLAYER_PPP : EzSkillSystems.BEATMAP_PPP, skillId, spec.DisplayName, scope, spec.AccentHex));
-                }
-            }
-
-            return list;
         }
 
         /// <summary>Radar axes for a ruleset. Fewer than three axes are padded with star rating, then blank slots.</summary>

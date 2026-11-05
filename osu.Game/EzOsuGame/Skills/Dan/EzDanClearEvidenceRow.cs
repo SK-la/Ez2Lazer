@@ -12,7 +12,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
     {
         public string Username { get; init; } = string.Empty;
         public int KeyCount { get; init; }
-        public string Side { get; init; } = DanSkillSystem.SIDE_RC;
+        public string Side { get; init; } = EzDanSide.Rc.ToId();
         public string BeatmapHash { get; init; } = string.Empty;
         public double Rate { get; init; } = 1;
         public double CreditedDan { get; init; }

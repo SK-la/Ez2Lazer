@@ -28,7 +28,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         ///         4K RC: jack/tech/speed/stamina (play SSR + chart overrides);
         ///         6/7K RC: jack/tech/speed/stream (pattern tags; LeoBlack clusters when filled — see DATA-LeoBlack-Clusters);
         ///         4K/6K LN: DualPanel still shows LN danskill name column (layout); hub filing remains 7K-only;
-        ///         7K LN: lngeneral/lntech/lninverse/lnrelease (LN pattern tags when chart present).
+        ///         7K LN: ln_general/ln_tech/ln_inverse/ln_release_pattern (LN pattern tags when chart present).
     ///     </para>
     /// </summary>
     public static class EzDanSkillsetBuckets
@@ -38,10 +38,11 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         public const string SPEED = "speed";
         public const string STAMINA = "stamina";
         public const string STREAM = "stream";
-        public const string LN_GENERAL = "lngeneral";
-        public const string LN_TECH = "lntech";
-        public const string LN_INVERSE = "lninverse";
-        public const string LN_RELEASE = "lnrelease";
+
+        public static string LNGeneral => EzManiaLNAxis.General.ToId();
+        public static string LNTech => EzManiaLNAxis.Tech.ToId();
+        public static string LNInverse => EzManiaLNAxis.Inverse.ToId();
+        public static string LNRelease => EzManiaLNAxis.ReleaseSubtype.ToId();
 
         /// <summary>
         /// Legacy empty-cache stamp (<c>__empty__</c>). No longer written; readers purge it and treat as miss.
@@ -66,10 +67,10 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         private static readonly EzDanSkillsetSlot[] ln_7k =
         {
-            new EzDanSkillsetSlot(LN_GENERAL, "General", "#f07474"),
-            new EzDanSkillsetSlot(LN_TECH, "Tech", "#83cf6b"),
-            new EzDanSkillsetSlot(LN_INVERSE, "Inverse", "#c59a5c"),
-            new EzDanSkillsetSlot(LN_RELEASE, "Release", "#46c7b8")
+            new EzDanSkillsetSlot(LNGeneral, "General", "#f07474"),
+            new EzDanSkillsetSlot(LNTech, "Tech", "#83cf6b"),
+            new EzDanSkillsetSlot(LNInverse, "Inverse", "#c59a5c"),
+            new EzDanSkillsetSlot(LNRelease, "Release", "#46c7b8")
         };
 
         /// <summary>

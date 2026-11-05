@@ -308,7 +308,7 @@ namespace osu.Game.Tests.EzOsuGame.LocalProfile
         {
             Username = username,
             KeyCount = 4,
-            Side = DanSkillSystem.SIDE_RC,
+            Side = EzDanSide.Rc.ToId(),
             BeatmapHash = $"hash-{username}",
             CreditedDan = creditedDan,
             Accuracy = 0.98,

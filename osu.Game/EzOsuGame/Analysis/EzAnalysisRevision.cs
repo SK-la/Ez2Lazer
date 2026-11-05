@@ -2,9 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using osu.Game.EzOsuGame.Skills;
-using osu.Game.EzOsuGame.Skills.Dan;
-using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Metrics;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
@@ -51,53 +50,48 @@ namespace osu.Game.EzOsuGame.Analysis
     /// <summary>
     /// Facet-scoped revision numbers for the Ez chart skill chain.
     /// <para>
-    /// CSI and MSD are independent inputs; Dan reads both. The chain is therefore
-    /// <c>MSD -> ChartDan</c> and <c>CSI -> ChartDan</c> in parallel, not a three-stage cascade.
+    /// The numbers come from <see cref="EzMetricProducerRegistry"/>, which folds every declared data
+    /// dependency of a producer. A producer that reads no other producer's rows keeps its own probe,
+    /// so installing the registry does not move numbers that are already on disk.
     /// </para>
     /// <para>
-    /// Each revision encodes the facet's own version constant plus every upstream constant it reads,
-    /// into base-100 slots. A persisted row stores the revision of the moment it was produced, so a
-    /// plain equality read is a staleness test: bumping any input makes old rows read as a miss and
-    /// the normal incremental backfill recomputes them. No schema change, no bulk clearing, and
-    /// "stale" stays observable (it is just "row revision != current revision").
+    /// A persisted row stores the revision of the moment it was produced, so a plain equality read is
+    /// a staleness test: bumping any input makes old rows read as a miss and the normal incremental
+    /// backfill recomputes them. No schema change, no bulk clearing, and "stale" stays observable
+    /// (it is just "row revision != current revision").
     /// </para>
     /// <para>
-    /// This intentionally deviates from the star / xxysr shape (one applied scalar per ruleset that
-    /// is compared and then reset to -1). Those two are siblings sharing one
+    /// This intentionally deviates from the star / xxysr shape (one applied scalar per ruleset that is
+    /// compared and then reset to -1). Those two are siblings sharing one
     /// <c>LastAppliedDifficultyVersion</c>; the chart chain has real fan-in into Dan, which a single
     /// scalar cannot express without also invalidating a sibling on an unrelated bump.
     /// </para>
     /// </summary>
     public static class EzAnalysisRevision
     {
-        /// <summary>
-        /// Policy slots: bump when a facet's production changes in a way none of the algorithm
-        /// constants capture (a new dependency edge, a changed read path). Slot 1 is the first
-        /// stamped-on value, which retires every pre-revision row exactly once.
-        /// </summary>
-        internal const int CSI_POLICY = 1;
-
-        /// <inheritdoc cref="CSI_POLICY"/>
-        internal const int DAN_POLICY = 1;
-
-        /// <summary>Number base of each slot. Every input constant must stay below this.</summary>
-        internal const int SLOT_RADIX = 100;
+        private const int chain_ruleset = EzLocalProfileConstants.MANIA_RULESET_ID;
 
         /// <summary>
-        /// MSD rows keep the raw <see cref="EzMinaSkillAlgorithm.VERSION"/>: <see cref="EzBeatmapSkillValue"/>
-        /// is shared with player SSR / pattern rows and several readers pass the algorithm version
-        /// explicitly, so composing it would be a cross-facet hazard. MSD staleness is already handled
-        /// by the <c>RulesetInfo.LastAppliedManiaSkillVersion</c> scalar.
+        /// Installs the registry that supplies the revisions. Call once during startup, before any row
+        /// is stamped; the pre-install default has no upstream revisions, which keeps unit tests free of
+        /// a ruleset database.
         /// </summary>
-        public static int Msd => EzMinaSkillAlgorithm.VERSION;
+        public static void Configure(EzMetricProducerRegistry producerRegistry)
+        {
+            ArgumentNullException.ThrowIfNull(producerRegistry);
+            Registry = producerRegistry;
+        }
+
+        public static EzMetricProducerRegistry Registry { get; private set; } = EzMetricProducers.CreateDefault(EzNullUpstreamRevisions.INSTANCE);
+
+        /// <summary>Revision stamped on the mania Mina axis rows.</summary>
+        public static int Msd => Registry.RevisionOf(EzMetricProducers.MINA_CHART, chain_ruleset);
 
         /// <summary>Revision stamped on <c>EzBeatmapChartSkillInfo.InfoVersion</c>.</summary>
-        public static int ChartSkillInfo
-            => compose(CSI_POLICY, EzChartSkillInfo.VERSION);
+        public static int ChartSkillInfo => Registry.RevisionOf(EzMetricProducers.CSI_CHART, chain_ruleset);
 
         /// <summary>Revision stamped on <c>EzBeatmapChartDan.AlgorithmVersion</c>.</summary>
-        public static int ChartDan
-            => compose(DAN_POLICY, EzDanAlgorithm.VERSION, EzChartSkillInfo.VERSION, EzMinaSkillAlgorithm.VERSION);
+        public static int ChartDan => Registry.RevisionOf(EzMetricProducers.DAN_CHART, chain_ruleset);
 
         /// <summary>Current revision for a single chart-chain facet. Returns 0 for non-chart facets.</summary>
         public static int For(EzAnalysisFacet facet)
@@ -134,32 +128,10 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        public static string DescribeChartSkillInfo(int revision)
-            => $"policy={slotAt(revision, 2, 0)} csi={slotAt(revision, 2, 1)}";
+        /// <summary>Human-readable breakdown of the CSI revision inputs.</summary>
+        public static string DescribeChartSkillInfo() => Registry.DescribeRevision(EzMetricProducers.CSI_CHART, chain_ruleset);
 
-        public static string DescribeChartDan(int revision)
-            => $"policy={slotAt(revision, 4, 0)} dan={slotAt(revision, 4, 1)} csi={slotAt(revision, 4, 2)} msd={slotAt(revision, 4, 3)}";
-
-        /// <summary>Base-100 composition of ordered slots (most significant first).</summary>
-        private static int compose(params int[] slots)
-        {
-            int value = 0;
-
-            foreach (int slot in slots)
-                value = value * SLOT_RADIX + slot;
-
-            return value;
-        }
-
-        /// <summary>Reads one slot out of a composed revision, where index 0 is the most significant.</summary>
-        private static int slotAt(int revision, int totalSlots, int index)
-        {
-            int divisor = 1;
-
-            for (int i = totalSlots - 1 - index; i > 0; i--)
-                divisor *= SLOT_RADIX;
-
-            return revision / divisor % SLOT_RADIX;
-        }
+        /// <summary>Human-readable breakdown of the dan revision inputs.</summary>
+        public static string DescribeChartDan() => Registry.DescribeRevision(EzMetricProducers.DAN_CHART, chain_ruleset);
     }
 }

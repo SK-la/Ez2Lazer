@@ -34,7 +34,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [Test]
         public void TestMissingDataRequiresManiaSliceOnlyForManiaRulesets()
         {
-            var stored = new EzAnalysisResult(new KpsSummary(1, 2, Array.Empty<double>()), 123.45);
+            var stored = new EzAnalysisResult(new KpsSummary(1, 2, Array.Empty<double>()));
 
             var missing = EzAnalysisPersistentStore.GetMissingData(stored, 3);
 

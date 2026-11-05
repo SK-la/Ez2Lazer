@@ -23,9 +23,9 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         [Indexed]
         public int KeyCount { get; set; }
 
-        /// <summary><see cref="DanSkillSystem.SIDE_RC"/> or <see cref="DanSkillSystem.SIDE_LN"/>.</summary>
+        /// <summary><see cref="EzDanSide.Rc.ToId()"/> or <see cref="EzDanSide.Ln.ToId()"/>.</summary>
         [Indexed]
-        public string Side { get; set; } = DanSkillSystem.SIDE_RC;
+        public string Side { get; set; } = EzDanSide.Rc.ToId();
 
         [Indexed]
         public string SkillsetId { get; set; } = string.Empty;

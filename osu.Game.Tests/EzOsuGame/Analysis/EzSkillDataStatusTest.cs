@@ -58,7 +58,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 var store = new EzSkillStore(realm);
 
                 // MSD: a complete, b settled-unrateable, c missing.
-                store.WriteBeatmapMsd(mania_a, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
+                store.WriteBeatmapMsd(mania_a, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
                 store.WriteBeatmapMsdUnrateable(mania_b, Guid.NewGuid());
 
                 // CSI: a complete, b settled stub, c missing.
@@ -128,7 +128,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 var store = new EzSkillStore(realm);
 
                 // A non-mania chart with a full set of rows must not inflate the report either way.
-                store.WriteBeatmapMsd(osu_hash, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
+                store.WriteBeatmapMsd(osu_hash, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
                 store.UpsertChartSkillInfo(osu_hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
 
                 var status = store.GetSkillDataStatus();

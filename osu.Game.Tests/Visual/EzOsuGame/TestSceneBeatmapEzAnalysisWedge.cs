@@ -200,7 +200,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 Chordjack: 16.5,
                 Technical: 20.0);
 
-            skillStore.WriteBeatmapMsd(hash, chartMsd, beatmap.BeatmapInfo.ID, holdRatio: 0.22);
+            skillStore.WriteBeatmapMsd(hash, chartMsd, beatmap.BeatmapInfo.ID);
             skillStore.WritePlayerSsr(test_player, test_keys, playerSsr, analyzedPlays: 40, provisional: false);
 
             writeDan(test_player, EzDanSide.Rc, chartMsd.Overall, clears: 12);

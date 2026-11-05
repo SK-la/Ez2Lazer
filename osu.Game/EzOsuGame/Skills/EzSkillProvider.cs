@@ -6,14 +6,13 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
@@ -44,17 +43,14 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Session-only CSI compute failures — keep miss in Realm so BDSP can retry next launch.</summary>
         private readonly HashSet<string> chartSkillInfoSessionMisses = new HashSet<string>(StringComparer.Ordinal);
 
-        /// <summary>Session MSD cache (complete rows only). Not written to disk.</summary>
-        private readonly ConcurrentDictionary<string, IReadOnlyDictionary<string, double>> msdSessionCache
-            = new ConcurrentDictionary<string, IReadOnlyDictionary<string, double>>(StringComparer.Ordinal);
+        /// <summary>Session-only values computed on read paths. Never persisted.</summary>
+        private readonly EzAnalysisLiveCache liveCache;
 
         /// <summary>
         /// Session ChartDan cache. May hold Realm copies or DualPanel memory-only computes (never auto-upserted).
         /// </summary>
         private readonly ConcurrentDictionary<string, EzPersistedChartDan> chartDanSessionCache
             = new ConcurrentDictionary<string, EzPersistedChartDan>(StringComparer.Ordinal);
-
-        private const int live_chart_skills_cache_limit = 128;
 
         /// <summary>
         /// Short-lived player SSR memo (see <see cref="GetPlayerSsrSnapshot"/>). Keyed by (username, keyCount).
@@ -72,35 +68,26 @@ namespace osu.Game.EzOsuGame.Skills
 
         private const double display_memo_seconds = 2;
 
-        /// <summary>
-        /// Session live-chart-skills dedupe. The value is the in-flight task (not a finished result) so that
-        /// surfaces which all kick on the same song switch (Skill radar + DualPanel) share one playable +
-        /// Mina/xxy + pattern pass instead of each racing an identical one. Keyed by inputs that determine
-        /// the result; keyCount is deliberately not part of it (it is derived from the playable, not an input).
-        /// </summary>
-        private readonly ConcurrentDictionary<EzLiveChartSkillsKey, Task<EzLiveChartSkillSnapshot?>> liveChartSkillsCache
-            = new ConcurrentDictionary<EzLiveChartSkillsKey, Task<EzLiveChartSkillSnapshot?>>();
-
-        private readonly record struct EzLiveChartSkillsKey(string BeatmapHash, int RulesetOnlineId, int ModsSignature);
-
         public EzSkillProvider(
             EzSkillStore store,
-            EzSkillRegistry? registry = null,
+            EzMetricProducerRegistry? registry = null,
             EzChartDanEstimator? chartDanEstimator = null,
             EzLocalProfileStore? localProfileStore = null,
-            BeatmapManager? beatmapManager = null)
+            BeatmapManager? beatmapManager = null,
+            EzAnalysisLiveCache? liveCache = null)
         {
             Store = store;
             this.chartDanEstimator = chartDanEstimator;
             this.localProfileStore = localProfileStore;
             this.beatmapManager = beatmapManager;
-            Registry = registry ?? new EzSkillRegistry();
+            this.liveCache = liveCache ?? new EzAnalysisLiveCache();
+            Registry = registry ?? EzAnalysisRevision.Registry;
             PlayerSkills = new PlayerSkillMaintenance(this);
         }
 
-        public EzSkillRegistry Registry { get; }
+        public EzMetricProducerRegistry Registry { get; }
 
-        /// <summary>Ruleset skill wiring (systems + default radar). Null when no plugin applies.</summary>
+        /// <summary>Ruleset skill wiring (systems + default radar). Null when no producer applies.</summary>
         public EzSkillProfile? GetProfile(int rulesetOnlineId)
             => Registry.GetProfile(rulesetOnlineId);
 
@@ -108,15 +95,17 @@ namespace osu.Game.EzOsuGame.Skills
         /// Generic beatmap skill read for any registered <paramref name="systemId"/>.
         /// Prefer this over mania-specific helpers when the caller already knows the system.
         /// </summary>
-        public IReadOnlyDictionary<string, double> GetBeatmapSystemSkills(string beatmapHash, string systemId)
+        public IReadOnlyDictionary<string, double> GetBeatmapSystemSkills(BeatmapInfo beatmapInfo, string systemId)
         {
-            if (string.IsNullOrEmpty(beatmapHash) || string.IsNullOrEmpty(systemId))
+            ArgumentNullException.ThrowIfNull(beatmapInfo);
+
+            if (string.IsNullOrEmpty(beatmapInfo.Hash) || string.IsNullOrEmpty(systemId))
                 return new Dictionary<string, double>(StringComparer.Ordinal);
 
             if (systemId == EzSkillSystems.BEATMAP_PPP)
-                return Store.GetBeatmapSkillsAtCurrentVersions(beatmapHash, systemId);
+                return Store.GetBeatmapSkillsAtCurrentVersions(beatmapInfo, systemId);
 
-            return Store.GetBeatmapSkills(beatmapHash, systemId);
+            return Store.GetBeatmapSkills(beatmapInfo.Hash, systemId);
         }
 
         /// <summary>
@@ -151,18 +140,12 @@ namespace osu.Game.EzOsuGame.Skills
             if (string.IsNullOrEmpty(beatmapHash))
                 return new Dictionary<string, double>(StringComparer.Ordinal);
 
-            if (msdSessionCache.TryGetValue(beatmapHash, out var cached))
-                return cached;
-
             var msd = Store.GetBeatmapSkills(beatmapHash, EzSkillSystems.BEATMAP_MINA);
 
             // A settled unrateable marker is not an axis set: handing it on as MSD input is what let the CSI stage
             // stamp a full row from a chart the engine refused (see EzChartChainCoverage).
             if (EzBeatmapMinaComputer.IsUnrateableMina(msd))
                 return new Dictionary<string, double>(StringComparer.Ordinal);
-
-            if (EzBeatmapMinaComputer.IsCurrentMinaCache(msd))
-                msdSessionCache[beatmapHash] = msd;
 
             return msd;
         }
@@ -176,11 +159,19 @@ namespace osu.Game.EzOsuGame.Skills
         private bool isSettledUnrateableMina(string beatmapHash)
             => EzBeatmapMinaComputer.IsUnrateableMina(Store.GetBeatmapSkills(beatmapHash, EzSkillSystems.BEATMAP_MINA));
 
-        /// <summary>Drop session MSD entry so the next read refreshes from Realm (e.g. after WriteBeatmapMsd).</summary>
-        public void InvalidateMsdSession(string beatmapHash)
+        /// <summary>
+        /// Drop session-only values so the next read reflects a row written or cleared elsewhere.
+        /// Pass a hash after that chart changed; omit to clear everything.
+        /// </summary>
+        public void InvalidateLiveMetrics(string? beatmapHash = null)
         {
-            if (!string.IsNullOrEmpty(beatmapHash))
-                msdSessionCache.TryRemove(beatmapHash, out _);
+            if (string.IsNullOrEmpty(beatmapHash))
+            {
+                liveCache.Clear();
+                return;
+            }
+
+            liveCache.InvalidateSubject(beatmapHash);
         }
 
         /// <summary>Drop session ChartDan entry (e.g. after Realm UpsertChartDan).</summary>
@@ -188,25 +179,6 @@ namespace osu.Game.EzOsuGame.Skills
         {
             if (!string.IsNullOrEmpty(beatmapHash))
                 chartDanSessionCache.TryRemove(beatmapHash, out _);
-        }
-
-        /// <summary>
-        /// Drop session live-chart-skills entries. Pass a hash after CSI heal / ChartDan upsert so a snapshot
-        /// stamped before the heal is not served as a cache hit; omit to clear everything.
-        /// </summary>
-        public void InvalidateLiveChartSkillsCache(string? beatmapHash = null)
-        {
-            if (string.IsNullOrEmpty(beatmapHash))
-            {
-                liveChartSkillsCache.Clear();
-                return;
-            }
-
-            foreach (var key in liveChartSkillsCache.Keys)
-            {
-                if (string.Equals(key.BeatmapHash, beatmapHash, StringComparison.Ordinal))
-                    liveChartSkillsCache.TryRemove(key, out _);
-            }
         }
 
         /// <summary>
@@ -226,9 +198,10 @@ namespace osu.Game.EzOsuGame.Skills
             if (keyCount <= 0)
                 keyCount = 4;
 
-            double holdRatio = 0;
-            if (msd.TryGetValue(EzSkillSystems.MinaHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
-                holdRatio = Math.Clamp(cachedHold, 0, 1);
+            double holdRatio = EzHoldMetrics.HoldRatio(beatmapInfo);
+
+            if (double.IsNaN(holdRatio))
+                holdRatio = 0;
 
             double? xxySr = beatmapInfo.XxyStarRating >= 0 ? beatmapInfo.XxyStarRating : null;
             return EzChartDanEstimator.FromMsd(msd, keyCount, holdRatio, xxySr);
@@ -690,9 +663,10 @@ namespace osu.Game.EzOsuGame.Skills
             float rate = EzModRate.Resolve(mods);
 
             var msd = GetBeatmapMsd(beatmapInfo.Hash);
-            double holdRatio = 0;
-            if (msd.TryGetValue(EzSkillSystems.MinaHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
-                holdRatio = Math.Clamp(cachedHold, 0, 1);
+            double holdRatio = EzHoldMetrics.HoldRatio(beatmapInfo);
+
+            if (double.IsNaN(holdRatio))
+                holdRatio = 0;
 
             var chartVerdict = TryGetChartDan(beatmapInfo, mods) ?? TryGetCachedChartDan(beatmapInfo);
             if (holdRatio <= 0 && chartVerdict != null && double.IsFinite(chartVerdict.HoldRatio))
@@ -807,130 +781,6 @@ namespace osu.Game.EzOsuGame.Skills
             return false;
         }
 
-        /// <summary>
-        /// Temporary chart MSD + ChartDan from playable for the selected beatmap (xxySR-style live overlay).
-        /// Always computes — including empty mods. Never writes Realm.
-        /// <para>
-        /// Session-deduped: the heavy pass (playable + Mina/xxy + pattern) is shared per
-        /// (beatmap, ruleset, mods) for the session, so the Skill radar and the DualPanel no longer each run an
-        /// identical compute on the same song switch. Prefer <see cref="GetOrComputeLiveChartSkillsAsync"/>;
-        /// this blocking overload exists for callers already on a background thread.
-        /// </para>
-        /// </summary>
-        public EzLiveChartSkillSnapshot? TryComputeLiveChartSkills(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods)
-            => GetOrComputeLiveChartSkillsAsync(beatmapInfo, mods, CancellationToken.None).GetAwaiter().GetResult();
-
-        /// <summary>
-        /// Asynchronous, session-deduped live chart skills. Concurrent callers for the same chart + mods await a
-        /// single in-flight compute; <paramref name="cancellationToken"/> only abandons this caller's wait (the
-        /// shared compute is owned by whichever caller created it, so cancelling one surface cannot tear down
-        /// work another is still waiting on).
-        /// </summary>
-        public async Task<EzLiveChartSkillSnapshot?> GetOrComputeLiveChartSkillsAsync(
-            BeatmapInfo beatmapInfo,
-            IReadOnlyList<Mod>? mods,
-            CancellationToken cancellationToken = default)
-        {
-            if (chartDanEstimator == null || beatmapInfo.Ruleset.OnlineID != 3)
-                return null;
-
-            var key = new EzLiveChartSkillsKey(beatmapInfo.Hash, beatmapInfo.Ruleset.OnlineID, EzAnalysisLookupCache.ComputeModsSignature(mods));
-
-            if (!liveChartSkillsCache.TryGetValue(key, out var task))
-            {
-                // The compute runs with the creator's token so a chart that is switched away from does not keep
-                // burning CPU; it never writes Realm, so an abandoned run is harmless.
-                var created = Task.Run(() => computeLiveChartSkills(beatmapInfo, mods, cancellationToken), CancellationToken.None);
-                task = liveChartSkillsCache.GetOrAdd(key, created);
-
-                if (ReferenceEquals(task, created))
-                {
-                    trimLiveChartSkillsCache();
-
-                    // A failed / cancelled compute must not be served as a cache hit later.
-                    // NotOnRanToCompletion covers both faults and cancellations (the OnlyOn* options are
-                    // mutually exclusive and cannot be OR-ed together). TryRemove(KeyValuePair) also only
-                    // drops the entry if it is still this exact task.
-                    _ = task.ContinueWith(
-                        completed =>
-                        {
-                            // Read the aggregate so an abandoned failure/cancellation is marked observed
-                            // instead of surfacing as UnobservedTaskException when no surface awaits it.
-                            _ = completed.Exception;
-
-                            liveChartSkillsCache.TryRemove(new KeyValuePair<EzLiveChartSkillsKey, Task<EzLiveChartSkillSnapshot?>>(key, task));
-                        },
-                        CancellationToken.None, TaskContinuationOptions.NotOnRanToCompletion, TaskScheduler.Default);
-                }
-            }
-
-            return await task.WaitAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        private void trimLiveChartSkillsCache()
-        {
-            // Song select walks a very large number of charts; the cache only needs to cover the recent swing.
-            if (liveChartSkillsCache.Count > live_chart_skills_cache_limit)
-                liveChartSkillsCache.Clear();
-        }
-
-        private EzLiveChartSkillSnapshot? computeLiveChartSkills(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods, CancellationToken cancellationToken)
-        {
-            var estimator = chartDanEstimator;
-
-            if (estimator == null)
-                return null;
-
-            int csKeys = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
-            EzChartSkillInfo? chartInfo = null;
-
-            if (Store.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored is { IsUnavailable: false })
-                chartInfo = stored;
-
-            // First pass without CSI if we cannot know key match yet — compute then stamp.
-            var snap = estimator.TryComputeLiveSnapshot(beatmapInfo, mods, chartInfo: null, cancellationToken);
-            if (snap == null)
-                return null;
-
-            if (chartInfo != null && csKeys > 0 && snap.KeyCount == csKeys)
-            {
-                double? xxySr = snap.XxySr
-                                ?? (EzModRate.CanUsePersistedXxy(mods) && beatmapInfo.XxyStarRating >= 0
-                                    ? beatmapInfo.XxyStarRating
-                                    : null);
-
-                var stamped = EzPersistedChartDan.TryComputeFromStored(
-                    beatmapInfo.Hash,
-                    beatmapInfo.ID,
-                    snap.Msd,
-                    snap.KeyCount,
-                    snap.HoldRatio,
-                    xxySr,
-                    chartInfo,
-                    snap.HoldCount,
-                    allowMsdHeuristicLabels: xxySr != null);
-
-                if (stamped != null)
-                {
-                    return new EzLiveChartSkillSnapshot
-                    {
-                        Msd = snap.Msd,
-                        ChartDan = stamped,
-                        KeyCount = snap.KeyCount,
-                        HoldRatio = snap.HoldRatio,
-                        HoldCount = snap.HoldCount,
-                        XxySr = xxySr,
-                        IsLiveFromMods = true,
-                        LnMetrics = snap.LnMetrics,
-                        LnSubtypeScores = snap.LnSubtypeScores,
-                        RcPatternScores = snap.RcPatternScores,
-                    };
-                }
-            }
-
-            return snap;
-        }
-
         /// <summary>Current-version Realm ChartDan row (nomod). Also warms session cache. Miss when absent or algorithm mismatch.</summary>
         public bool TryGetPersistedChartDan(BeatmapInfo beatmapInfo, out EzPersistedChartDan? chartDan)
             => TryGetChartDanForUi(beatmapInfo, out chartDan, allowMemoryCompute: false);
@@ -964,18 +814,15 @@ namespace osu.Game.EzOsuGame.Skills
             if (keyCount <= 0)
                 keyCount = 4;
 
-            double holdRatio = 0;
-            if (msd.TryGetValue(EzSkillSystems.MinaHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
-                holdRatio = Math.Clamp(cachedHold, 0, 1);
+            double holdRatio = EzHoldMetrics.HoldRatio(beatmapInfo);
+
+            if (double.IsNaN(holdRatio))
+                holdRatio = 0;
 
             EzChartSkillInfo? chartInfo = null;
 
             if (Store.TryGetChartSkillInfo(beatmapInfo.Hash, out var storedCsi) && storedCsi is { IsUnavailable: false })
-            {
                 chartInfo = storedCsi;
-                if (holdRatio <= 0 && chartInfo.LnRatio is double lnRatio && double.IsFinite(lnRatio))
-                    holdRatio = Math.Clamp(lnRatio, 0, 1);
-            }
 
             double? xxySr = beatmapInfo.XxyStarRating >= 0 ? beatmapInfo.XxyStarRating : null;
 
@@ -1018,12 +865,10 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Stored chart skill info, or compute+upsert when a playable (or WorkingBeatmap) is available.
+        /// Stored chart skill info, or a session-only compute when a playable (or WorkingBeatmap) is available.
         /// <para>
-        /// A settled stub (<see cref="EzChartSkillInfo.IsUnavailable"/>, written by the BDSP backfill for
-        /// a chart that cannot be converted) is respected: with no playable in hand the read path returns
-        /// miss rather than re-attempting the conversion. A caller that already has a playable may still
-        /// self-heal it. Transient compute failures stay Realm miss.
+        /// Read paths never persist: durable rows are owned by the background backfill, which is the only writer
+        /// that can stamp a settled stub. A computed row lives in memory until it is invalidated.
         /// </para>
         /// </summary>
         public EzChartSkillInfo? TryGetOrComputeChartSkillInfo(
@@ -1077,10 +922,9 @@ namespace osu.Game.EzOsuGame.Skills
                 var input = EzChartSkillInfoComputer.FromPlayable(map);
                 // Motion / pattern shares are rate-invariant; always measure at 1.0x like hub.
                 var info = EzChartSkillInfoComputer.Compute(input, rate: 1);
-                Store.UpsertChartSkillInfo(beatmapInfo.Hash, info, beatmapInfo.ID);
                 chartSkillInfoSessionMisses.Remove(beatmapInfo.Hash);
-                // Stamped live snapshots built before this CSI existed must not be served as cache hits.
-                InvalidateLiveChartSkillsCache(beatmapInfo.Hash);
+                // Live snapshots built before this CSI existed must not be served as cache hits.
+                InvalidateLiveMetrics(beatmapInfo.Hash);
                 return info;
             }
             catch
@@ -1113,6 +957,7 @@ namespace osu.Game.EzOsuGame.Skills
                     Logger.Log($"[EzSkills] CSI not derived for {beatmapInfo}: MSD settled as unrateable; settling as unavailable.",
                         Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                     Store.WriteChartSkillInfoUnavailable(beatmapInfo.Hash, beatmapInfo.ID);
+                    InvalidateLiveMetrics(beatmapInfo.Hash);
                 }
 
                 return true;
@@ -1120,7 +965,10 @@ namespace osu.Game.EzOsuGame.Skills
 
             // Complete row, or a stub a previous backfill already settled.
             if (Store.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored != null)
+            {
+                InvalidateLiveMetrics(beatmapInfo.Hash);
                 return true;
+            }
 
             IBeatmap map;
 
@@ -1139,6 +987,7 @@ namespace osu.Game.EzOsuGame.Skills
                 Logger.Log($"[EzSkills] CSI backfill cannot load {beatmapInfo} ({e.Message}); settling as unavailable.",
                     Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 Store.WriteChartSkillInfoUnavailable(beatmapInfo.Hash, beatmapInfo.ID);
+                InvalidateLiveMetrics(beatmapInfo.Hash);
                 return true;
             }
 
@@ -1149,8 +998,9 @@ namespace osu.Game.EzOsuGame.Skills
                 var info = EzChartSkillInfoComputer.Compute(input, rate: 1);
                 Store.UpsertChartSkillInfo(beatmapInfo.Hash, info, beatmapInfo.ID);
                 chartSkillInfoSessionMisses.Remove(beatmapInfo.Hash);
+                InvalidateLiveMetrics(beatmapInfo.Hash);
                 // Stamped live snapshots built before this CSI existed must not be served as cache hits.
-                InvalidateLiveChartSkillsCache(beatmapInfo.Hash);
+                InvalidateLiveMetrics(beatmapInfo.Hash);
                 return true;
             }
             catch (Exception e)

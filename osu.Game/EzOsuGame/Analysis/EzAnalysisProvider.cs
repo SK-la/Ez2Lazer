@@ -17,9 +17,23 @@ namespace osu.Game.EzOsuGame.Analysis
         None = 0,
         XxySr = 1 << 0,
         RulesetSpecificRadarData = 1 << 1,
+
+        /// <summary>Performance points for a supplied star rating.</summary>
+        PerformancePoints = 1 << 2,
     }
 
-    public readonly record struct EzAnalysisRequest(IBeatmap Beatmap, double ClockRate, EzAnalysisScope RequestedScopes = EzAnalysisScope.None);
+    /// <summary>
+    /// One analysis request.
+    /// </summary>
+    /// <param name="StarRatingOverride">
+    /// When set, the provider rates performance as if this were the difficulty's star rating. Used to ask what a
+    /// substituted rating (such as the Sunny one) would score, without re-deriving the difficulty.
+    /// </param>
+    public readonly record struct EzAnalysisRequest(
+        IBeatmap Beatmap,
+        double ClockRate,
+        EzAnalysisScope RequestedScopes = EzAnalysisScope.None,
+        double? StarRatingOverride = null);
 
     public readonly record struct EzAnalysisField<TValue>(string Key, EzAnalysisScope Scope)
     {
@@ -59,6 +73,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public static readonly EzAnalysisField<EzRulesetSpecificRadarResult> RULESET_SPECIFIC_RADAR_RESULT
             = new EzAnalysisField<EzRulesetSpecificRadarResult>("ruleset_specific_radar_result", EzAnalysisScope.RulesetSpecificRadarData);
+
+        public static readonly EzAnalysisField<double> PERFORMANCE_POINTS
+            = new EzAnalysisField<double>("performance_points", EzAnalysisScope.PerformancePoints);
     }
 
     public sealed class EzAnalysisBag : IEzAnalysis

@@ -4,19 +4,21 @@
 using System;
 using System.Collections.Generic;
 using osu.Framework.Localisation;
-using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
-    /// LN skill (float) radar axes from chart LN structure features.
-    /// 7K subtype pattern scores (≥0.2) replace matching structure slots.
-    /// Not MinaCalc MSD — do not call this "MSD LN".
+    /// LN skill radar: six spokes built from the long-note axis declaration.
+    /// Not MinaCalc MSD - the spoke values come from the structure pass, not the rating engine.
     /// </summary>
+    /// <remarks>
+    /// Axis identities and labels come from <see cref="EzManiaLNAxis"/>. This type owns the normalisation caps
+    /// and the rule for which spoke a subtype may stand in for.
+    /// </remarks>
     public static class EzLnSkillRadar
     {
-        /// <summary>Hub pattern visibility floor reused for subtype replacement.</summary>
+        /// <summary>Subtype scores at or above this replace the spoke value instead of being ignored.</summary>
         public const double SUBTYPE_REPLACE_MIN = 0.2;
 
         public readonly record struct Axis(
@@ -24,114 +26,73 @@ namespace osu.Game.EzOsuGame.Skills.Mina
             double RawValue,
             float Normalized);
 
-        private static readonly LocalisableString label_hold =
-            new EzLocalizationManager.EzLocalisableString("Hold", "Hold");
-
-        private static readonly LocalisableString label_density =
-            new EzLocalizationManager.EzLocalisableString("Density", "Density");
-
-        private static readonly LocalisableString label_overlap =
-            new EzLocalizationManager.EzLocalisableString("Overlap", "Overlap");
-
-        private static readonly LocalisableString label_release =
-            new EzLocalizationManager.EzLocalisableString("Release", "Release");
-
-        private static readonly LocalisableString label_chord =
-            new EzLocalizationManager.EzLocalisableString("Chord", "Chord");
-
-        private static readonly LocalisableString label_hold_p90 =
-            new EzLocalizationManager.EzLocalisableString("Hold P90", "Hold P90");
-
-        private static readonly LocalisableString label_lngeneral =
-            new EzLocalizationManager.EzLocalisableString("LN General", "LN General");
-
-        private static readonly LocalisableString label_lninverse =
-            new EzLocalizationManager.EzLocalisableString("LN Inverse", "LN Inverse");
-
-        private static readonly LocalisableString label_lnrelease =
-            new EzLocalizationManager.EzLocalisableString("LN Release", "LN Release");
-
-        private static readonly LocalisableString label_lntech =
-            new EzLocalizationManager.EzLocalisableString("LN Tech", "LN Tech");
+        /// <summary>Spoke order, with the normalisation cap each raw value is divided by.</summary>
+        private static readonly (EzManiaLNAxis Axis, double Cap)[] spokes =
+        {
+            (EzManiaLNAxis.Density, 1),
+            (EzManiaLNAxis.Overlap, 5),
+            (EzManiaLNAxis.Release, 46),
+            (EzManiaLNAxis.Chord, 1),
+            (EzManiaLNAxis.HoldP90, 800),
+        };
 
         /// <summary>
-        /// Six LN structure axes; 7K subtype scores replace Hold / Overlap / Release / Chord when ≥ <see cref="SUBTYPE_REPLACE_MIN"/>.
+        /// Which subtype may replace which spoke. The hold spoke is absent because its value is the base hold
+        /// ratio rather than a structure axis, so it is passed in separately.
         /// </summary>
-        /// <param name="metrics">
-        /// null renders a zeroed LN frame (structure labels, no data) — used to pre-empt the radar
-        /// before the async LN compute lands, so the panel never paints the RC radar first and morphs.
-        /// </param>
-        public static IReadOnlyList<Axis> BuildAxes(
-            EzChartFeatureMetrics? metrics,
-            IReadOnlyDictionary<string, double>? subtypeScores,
-            int keyCount)
+        private static readonly Dictionary<EzManiaLNAxis, EzManiaLNAxis> replacements = new Dictionary<EzManiaLNAxis, EzManiaLNAxis>
         {
-            subtypeScores ??= new Dictionary<string, double>(StringComparer.Ordinal);
+            [EzManiaLNAxis.Overlap] = EzManiaLNAxis.Inverse,
+            [EzManiaLNAxis.Release] = EzManiaLNAxis.ReleaseSubtype,
+            [EzManiaLNAxis.Chord] = EzManiaLNAxis.Tech,
+        };
 
-            var hold = axisOrSubtype(
-                label_hold,
-                metrics?.HoldRatio ?? 0,
-                cap: 1,
-                subtypeScores,
-                "lngeneral",
-                label_lngeneral);
+        /// <summary>
+        /// Six ordered spokes: the hold ratio first, then the structure axes.
+        /// </summary>
+        /// <param name="holdRatio">Base hold ratio, not a structure measure.</param>
+        /// <param name="axes">Axis values by id; empty renders a zeroed frame with the right labels.</param>
+        /// <param name="keyCount">The release spoke is only replaceable on 7K.</param>
+        public static IReadOnlyList<Axis> BuildAxes(double holdRatio, IReadOnlyDictionary<string, double> axes, int keyCount)
+        {
+            var result = new List<Axis>(spokes.Length + 1)
+            {
+                // Hold: the value is the base ratio, and only a general LN subtype may stand in for it.
+                substituteOrDefault(hold_label, holdRatio, cap: 1, axes, EzManiaLNAxis.General),
+            };
 
-            var density = structureOnly(label_density, metrics?.LnDensity ?? 0, cap: 1);
+            foreach (var (axis, cap) in spokes)
+            {
+                bool replaceable = keyCount == 7 || axis != EzManiaLNAxis.Release;
 
-            var overlap = axisOrSubtype(
-                label_overlap,
-                metrics?.LnOverlapPressure ?? 0,
-                cap: 5,
-                subtypeScores,
-                "lninverse",
-                label_lninverse);
+                result.Add(replaceable && replacements.TryGetValue(axis, out var subtype)
+                    ? substituteOrDefault(axis.Meta().DisplayName, get(axes, axis), cap, axes, subtype)
+                    : structureOnly(axis.Meta().DisplayName, get(axes, axis), cap));
+            }
 
-            var release = keyCount == 7
-                ? axisOrSubtype(
-                    label_release,
-                    metrics?.LnReleasePressure ?? 0,
-                    cap: 46,
-                    subtypeScores,
-                    "lnrelease",
-                    label_lnrelease)
-                : structureOnly(label_release, metrics?.LnReleasePressure ?? 0, cap: 46);
+            return result;
+        }
 
-            var chord = axisOrSubtype(
-                label_chord,
-                metrics?.LnChordPressure ?? 0,
-                cap: 1,
-                subtypeScores,
-                "lntech",
-                label_lntech);
+        private static readonly LocalisableString hold_label = "Hold";
 
-            var holdP90 = structureOnly(label_hold_p90, metrics?.LnHoldDurationP90 ?? 0, cap: 800);
+        private static double get(IReadOnlyDictionary<string, double> axes, EzManiaLNAxis axis)
+            => axes.GetValueOrDefault(axis.ToId(), 0);
 
-            return new[] { hold, density, overlap, release, chord, holdP90 };
+        private static Axis substituteOrDefault(LocalisableString label, double raw, double cap, IReadOnlyDictionary<string, double> axes, EzManiaLNAxis subtype)
+        {
+            if (axes.TryGetValue(subtype.ToId(), out double score) && double.IsFinite(score) && score >= SUBTYPE_REPLACE_MIN)
+            {
+                double clamped = Math.Clamp(score, 0, 1);
+                return new Axis(subtype.Meta().DisplayName, clamped, (float)clamped);
+            }
+
+            return structureOnly(label, raw, cap);
         }
 
         private static Axis structureOnly(LocalisableString label, double raw, double cap)
         {
             double safe = double.IsFinite(raw) && raw > 0 ? raw : 0;
             return new Axis(label, safe, normalize(safe, cap));
-        }
-
-        private static Axis axisOrSubtype(
-            LocalisableString structureLabel,
-            double structureRaw,
-            double cap,
-            IReadOnlyDictionary<string, double> subtypeScores,
-            string subtypeId,
-            LocalisableString subtypeLabel)
-        {
-            if (subtypeScores.TryGetValue(subtypeId, out double score)
-                && double.IsFinite(score)
-                && score >= SUBTYPE_REPLACE_MIN)
-            {
-                double clamped = Math.Clamp(score, 0, 1);
-                return new Axis(subtypeLabel, clamped, (float)clamped);
-            }
-
-            return structureOnly(structureLabel, structureRaw, cap);
         }
 
         private static float normalize(double raw, double cap)

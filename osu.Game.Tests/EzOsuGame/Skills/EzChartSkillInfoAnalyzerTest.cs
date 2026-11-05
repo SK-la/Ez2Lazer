@@ -75,7 +75,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             var lnChart = new EzChartSkillInfo
             {
-                Patterns = new[] { "lntech", "lngeneral" },
+                Patterns = new[] { "ln_tech", "ln_general" },
                 LnRatio = 0.8,
                 TechScore = 0,
                 ChordjackScore = 0,
@@ -84,7 +84,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             };
 
             var lnBuckets = EzDanSkillsetFiling.BucketsForValues(7, EzDanSide.Ln, mina(), null, 1, lnChart);
-            Assert.That(lnBuckets, Does.Contain(EzDanSkillsetBuckets.LN_TECH));
+            Assert.That(lnBuckets, Does.Contain(EzDanSkillsetBuckets.LNTech));
         }
 
         [Test]

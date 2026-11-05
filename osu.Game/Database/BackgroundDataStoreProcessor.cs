@@ -739,8 +739,8 @@ namespace osu.Game.Database
                 // whole startup signal.
                 Logger.Log("Ez chart chain revisions: "
                            + $"MSD v{EzAnalysisRevision.Msd}, "
-                           + $"CSI v{EzAnalysisRevision.ChartSkillInfo} ({EzAnalysisRevision.DescribeChartSkillInfo(EzAnalysisRevision.ChartSkillInfo)}), "
-                           + $"Dan v{EzAnalysisRevision.ChartDan} ({EzAnalysisRevision.DescribeChartDan(EzAnalysisRevision.ChartDan)}).");
+                           + $"CSI v{EzAnalysisRevision.ChartSkillInfo} ({EzAnalysisRevision.DescribeChartSkillInfo()}), "
+                           + $"Dan v{EzAnalysisRevision.ChartDan} ({EzAnalysisRevision.DescribeChartDan()}).");
             }
 
             // CSI and MSD are independent inputs; Dan reads both. Run CSI first so the ChartDan pass
@@ -782,6 +782,7 @@ namespace osu.Game.Database
             {
                 Logger.Log("Clearing persisted ChartSkillInfo rows...");
                 skillStore.ClearChartSkillInfo();
+                skillProvider.InvalidateLiveMetrics();
             }
 
             if (scope.HasFlag(EzRealmMetadataScope.ChartDan))
@@ -1279,11 +1280,10 @@ namespace osu.Game.Database
                     if (keyCount <= 0)
                         keyCount = 4;
 
-                    double holdRatio = 0;
-                    if (msd.TryGetValue(EzSkillSystems.MinaHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
-                        holdRatio = Math.Clamp(cachedHold, 0, 1);
-                    else if (skillStore.TryGetChartSkillInfo(hash, out var csiHold) && csiHold?.LnRatio is double lnRatio && double.IsFinite(lnRatio))
-                        holdRatio = Math.Clamp(lnRatio, 0, 1);
+                    double holdRatio = EzHoldMetrics.HoldRatio(beatmap);
+
+                    if (double.IsNaN(holdRatio))
+                        holdRatio = 0;
 
                     // An unavailable stub is not usable input; fall back to the MSD-derived values.
                     skillStore.TryGetChartSkillInfo(hash, out var chartInfo);

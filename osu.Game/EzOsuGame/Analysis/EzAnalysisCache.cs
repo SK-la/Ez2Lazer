@@ -38,6 +38,13 @@ namespace osu.Game.EzOsuGame.Analysis
     {
         private static int computeFailCount;
 
+        private readonly EzAnalysisLiveCache liveMetrics;
+
+        public EzAnalysisCache(EzAnalysisLiveCache? liveMetrics = null)
+        {
+            this.liveMetrics = liveMetrics ?? new EzAnalysisLiveCache();
+        }
+
         private readonly ThreadedTaskScheduler updateScheduler = new ThreadedTaskScheduler(1, nameof(EzAnalysisCache));
         private readonly WeakList<BindableBeatmapEzAnalysis> trackedBindables = new WeakList<BindableBeatmapEzAnalysis>();
         private readonly List<CancellationTokenSource> linkedCancellationSources = new List<CancellationTokenSource>();
@@ -112,6 +119,7 @@ namespace osu.Game.EzOsuGame.Analysis
         public void Invalidate(IBeatmapInfo oldBeatmap, IBeatmapInfo newBeatmap)
         {
             base.Invalidate(lookup => lookup.BeatmapInfo.Equals(oldBeatmap));
+            liveMetrics.InvalidateSubject(oldBeatmap.Hash);
 
             lock (bindableUpdateLock)
             {
@@ -128,8 +136,7 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        public IBindable<EzAnalysisResult> GetBindableAnalysis(IBeatmapInfo beatmapInfo, CancellationToken cancellationToken = default, int computationDelay = 0)
-        {
+        public IBindable<EzAnalysisResult> GetBindableAnalysis(IBeatmapInfo beatmapInfo, CancellationToken cancellationToken = default, int computationDelay = 0)        {
             var bindable = new BindableBeatmapEzAnalysis(beatmapInfo, cancellationToken);
 
             // NoMod：仅预填主 SQLite 的 kps/KPC 切片；xxy/PP 占位由面板直读 Realm（对齐 StarRating）。
@@ -199,6 +206,22 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
+        /// <summary>
+        /// Live analysis that ignores <see cref="Ez2Setting.EzAnalysisRecEnabled"/> and the stored SQLite slice.
+        /// For surfaces that must always show current-mod values; the setting only gates the song-select warm-up.
+        /// </summary>
+        public Task<EzAnalysisResult?> GetLiveAnalysisAsync(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo = null, IEnumerable<Mod>? mods = null,
+                                                            CancellationToken cancellationToken = default, int computationDelay = 0)
+        {
+            rulesetInfo ??= beatmapInfo.Ruleset;
+
+            if (beatmapInfo is BeatmapInfo localBeatmapInfo
+                && ((rulesetInfo as RulesetInfo) ?? localBeatmapInfo.Ruleset) is { } localRulesetInfo)
+                return GetDynamicAnalysisAsync(localBeatmapInfo, localRulesetInfo, mods, cancellationToken, computationDelay);
+
+            return Task.FromResult<EzAnalysisResult?>(null);
+        }
+
         public bool TryGetXxySr(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double xxySr)
             => analysisDatabase.TryGetXxySr(beatmapInfo, rulesetInfo, out xxySr);
 
@@ -261,16 +284,38 @@ namespace osu.Game.EzOsuGame.Analysis
 
         protected virtual Task<EzAnalysisResult?> GetDynamicAnalysisAsync(BeatmapInfo beatmapInfo, RulesetInfo rulesetInfo, IEnumerable<Mod>? mods,
                                                                           CancellationToken cancellationToken = default, int computationDelay = 0)
-            => GetAsync(new EzAnalysisLookupCache(beatmapInfo, rulesetInfo, mods), cancellationToken, computationDelay);
+        {
+            var lookup = new EzAnalysisLookupCache(beatmapInfo, rulesetInfo, mods);
+
+            // The live cache is the single store of analysed values; this component only schedules. Reading it
+            // first is what keeps the song-select panel and the radar on one compute per chart + mods.
+            if (liveMetrics.Get(keyOf(lookup)) is { } cached)
+                return Task.FromResult<EzAnalysisResult?>(cached);
+
+            return GetAsync(lookup, cancellationToken, computationDelay);
+        }
+
+        private EzAnalysisLiveCache.AnalysisKey keyOf(in EzAnalysisLookupCache lookup)
+            => new EzAnalysisLiveCache.AnalysisKey(lookup.BeatmapInfo.Hash, lookup.Ruleset.OnlineID, lookup.ModsSignature);
 
         protected override Task<EzAnalysisResult?> ComputeValueAsync(EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
         {
             return Task.Factory.StartNew(() =>
             {
                 if (CheckExists(lookup, out var existing))
-                    return existing;
+                {
+                    if (existing is { } cached)
+                        liveMetrics.Set(keyOf(lookup), cached);
 
-                return computeAnalysis(lookup, cancellationToken);
+                    return existing;
+                }
+
+                var computed = computeAnalysis(lookup, cancellationToken);
+
+                if (computed is { } result)
+                    liveMetrics.Set(keyOf(lookup), result);
+
+                return computed;
             }, cancellationToken, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, updateScheduler);
         }
 
@@ -385,6 +430,7 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             cancelTrackedBindableUpdate();
             Invalidate(_ => true);
+            liveMetrics.Clear();
         }
 
         private sealed class BindableBeatmapEzAnalysis : Bindable<EzAnalysisResult>

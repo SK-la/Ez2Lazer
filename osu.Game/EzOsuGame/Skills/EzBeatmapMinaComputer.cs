@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
@@ -12,12 +13,16 @@ using osu.Game.EzOsuGame.Skills.Mina;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Computes NoMod 1.0x Mina axes for a beatmap and writes each axis as an independent Realm skill.
+    /// Computes NoMod 1.0x Mina axes. Persisting is a separate entry point: read paths resolve live into a
+    /// session cache only.
     /// </summary>
     public sealed class EzBeatmapMinaComputer
     {
         private readonly BeatmapManager beatmapManager;
         private readonly EzSkillStore skillStore;
+
+        private readonly ConcurrentDictionary<string, IReadOnlyDictionary<string, double>> liveCache
+            = new ConcurrentDictionary<string, IReadOnlyDictionary<string, double>>(StringComparer.Ordinal);
 
         public EzBeatmapMinaComputer(BeatmapManager beatmapManager, EzSkillStore skillStore)
         {
@@ -25,9 +30,20 @@ namespace osu.Game.EzOsuGame.Skills
             this.skillStore = skillStore;
         }
 
+        /// <summary>Drop the session-only axis set for a hash, e.g. after a backfill wrote a newer row.</summary>
+        public void InvalidateLive(string? beatmapHash = null)
+        {
+            if (string.IsNullOrEmpty(beatmapHash))
+            {
+                liveCache.Clear();
+                return;
+            }
+
+            liveCache.TryRemove(beatmapHash, out _);
+        }
+
         /// <summary>
-        /// Returns existing MSD skills when present and current; otherwise computes and persists.
-        /// Settled <c>__unrateable</c> markers return null without recomputing.
+        /// Current Realm rows when present, otherwise a session-only compute. Never persists.
         /// </summary>
         public IReadOnlyDictionary<string, double>? TryGetOrCompute(BeatmapInfo beatmapInfo)
         {
@@ -43,7 +59,25 @@ namespace osu.Game.EzOsuGame.Skills
             if (IsUnrateableMina(existing))
                 return null;
 
-            return ComputeAndStore(beatmapInfo);
+            if (liveCache.TryGetValue(beatmapInfo.Hash, out var live))
+                return live;
+
+            try
+            {
+                var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
+                var playable = EzPlayableBeatmapCache.GetShared(working, working.BeatmapInfo.Ruleset);
+                var computed = compute(playable, beatmapInfo);
+
+                if (computed != null)
+                    liveCache[beatmapInfo.Hash] = computed;
+
+                return computed;
+            }
+            catch (Exception e)
+            {
+                Logger.Log($"[EzSkills] MSD live compute failed for {beatmapInfo}: {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
+                return null;
+            }
         }
 
         public IReadOnlyDictionary<string, double>? ComputeAndStore(BeatmapInfo beatmapInfo)
@@ -57,7 +91,6 @@ namespace osu.Game.EzOsuGame.Skills
                 beatmapInfo.Ruleset.Available = true;
 
             IBeatmap playable;
-            EzCalcNote[] notes;
 
             try
             {
@@ -67,7 +100,6 @@ namespace osu.Game.EzOsuGame.Skills
                     working.BeatmapInfo.Ruleset.Available = true;
 
                 playable = EzPlayableBeatmapCache.GetShared(working, working.BeatmapInfo.Ruleset);
-                notes = EzMinaNoteConverter.Convert(playable);
             }
             catch (Exception e)
             {
@@ -79,7 +111,7 @@ namespace osu.Game.EzOsuGame.Skills
                 return null;
             }
 
-            int keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
+            int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
 
             // The engine returns a zero vector for a column count outside its range rather than throwing, so the
             // gate has to be read here: without it those charts stay row-less and every reader counts them as
@@ -91,12 +123,45 @@ namespace osu.Game.EzOsuGame.Skills
                 return null;
             }
 
+            var computed = computeVector(playable, beatmapInfo, keyCount, vector => skillStore.WriteBeatmapMsdUnrateable(beatmapInfo.Hash, beatmapInfo.ID));
+
+            if (computed == null)
+                return null;
+
+            skillStore.WriteBeatmapMsd(beatmapInfo.Hash, computed.Value, beatmapInfo.ID);
+
+            return toDictionary(computed.Value);
+        }
+
+        /// <summary>
+        /// Axis vector for a loaded chart, or null when the chart cannot be rated. <paramref name="onSettledMiss"/>
+        /// runs for verdicts that will never change for this hash; transient engine failures return null without
+        /// calling it.
+        /// </summary>
+        private IReadOnlyDictionary<string, double>? compute(IBeatmap playable, BeatmapInfo beatmapInfo)
+        {
+            int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
+
+            if (!EzMinaEngine.IsSupportedKeyCount(keyCount))
+                return null;
+
+            var vector = computeVector(playable, beatmapInfo, keyCount, _ => { });
+
+            return vector == null ? null : toDictionary(vector.Value);
+        }
+
+        private static EzMinaSkillAxisVector? computeVector(
+            IBeatmap playable,
+            BeatmapInfo beatmapInfo,
+            int keyCount,
+            Action<EzMinaSkillAxisVector> onSettledMiss)
+        {
             using var calc = new EzMinaEngine();
             EzMinaSkillAxisVector vector;
 
             try
             {
-                vector = calc.CalculateMsd(notes, keyCount, rate: 1f);
+                vector = calc.CalculateMsd(EzMinaNoteConverter.Convert(playable), keyCount, rate: 1f);
             }
             catch (Exception e)
             {
@@ -109,35 +174,29 @@ namespace osu.Game.EzOsuGame.Skills
             if (vector.Overall <= 0 && vector.Stream <= 0)
             {
                 Logger.Log($"[EzSkills] MSD zero vector for {beatmapInfo} (keys={keyCount})", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                skillStore.WriteBeatmapMsdUnrateable(beatmapInfo.Hash, beatmapInfo.ID);
+                onSettledMiss(vector);
                 return null;
             }
 
-            double holdRatio = EzHoldMetrics.ComputeHoldRatio(playable);
+            return vector;
+        }
 
-            skillStore.WriteBeatmapMsd(beatmapInfo.Hash, vector, beatmapInfo.ID, holdRatio: holdRatio);
-
-            // Return the just-written values without a second Realm round-trip.
+        private static Dictionary<string, double> toDictionary(EzMinaSkillAxisVector vector)
+        {
             var result = new Dictionary<string, double>(StringComparer.Ordinal);
 
             foreach (var (axis, value) in vector.Enumerate())
                 result[axis.ToMsdSkillId()] = value;
 
-            if (double.IsFinite(holdRatio))
-                result[EzSkillSystems.MinaHoldRatioSkillId] = Math.Clamp(holdRatio, 0, 1);
-
             return result;
         }
 
         /// <summary>
-        /// Requires every current Mina axis id plus hold ratio.
-        /// Incomplete caches fail and are recomputed via <see cref="TryGetOrCompute"/>.
+        /// Requires every current Mina axis id. Incomplete caches fail and are recomputed via
+        /// <see cref="TryGetOrCompute"/>.
         /// </summary>
         public static bool IsCurrentMinaCache(IReadOnlyDictionary<string, double> existing)
         {
-            if (!existing.ContainsKey(EzSkillSystems.MinaHoldRatioSkillId))
-                return false;
-
             foreach (var axis in EzMinaSkillAxisExtensions.All)
             {
                 if (!existing.ContainsKey(axis.ToMsdSkillId()))
