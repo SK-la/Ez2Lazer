@@ -13,6 +13,7 @@ using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Tests.Beatmaps;
@@ -179,7 +180,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 beatmap.BeatmapInfo.Hash = hash;
             }
 
-            var chartMsd = new EzSkillsetVector(
+            var chartMsd = new EzMinaSkillAxisVector(
                 Overall: 22.4,
                 Stream: 21.0,
                 Jumpstream: 23.5,
@@ -189,7 +190,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 Chordjack: 18.6,
                 Technical: 22.0);
 
-            var playerSsr = new EzSkillsetVector(
+            var playerSsr = new EzMinaSkillAxisVector(
                 Overall: 20.1,
                 Stream: 19.5,
                 Jumpstream: 21.2,
@@ -208,8 +209,8 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             Beatmap.Value = beatmap;
             SelectedMods.Value = [];
             wedge.TargetUsername.Value = test_player;
-            wedge.LeftRadarMode.Value = EzRadarDisplayMode.XxySrPattern;
-            wedge.RightRadarMode.Value = EzRadarDisplayMode.SkillDual;
+            wedge.LeftRadarMode.Value = EzRadarDisplayMode.SSRSkill;
+            wedge.RightRadarMode.Value = EzRadarDisplayMode.MSDSkillDual;
             wedge.Show();
         }
 

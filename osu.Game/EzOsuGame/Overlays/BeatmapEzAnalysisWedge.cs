@@ -25,9 +25,9 @@ namespace osu.Game.EzOsuGame.Overlays
 
         public Bindable<string?> TargetUsername { get; } = new Bindable<string?>();
 
-        public Bindable<EzRadarDisplayMode> LeftRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.XxySrPattern);
+        public Bindable<EzRadarDisplayMode> LeftRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.SSRSkill);
 
-        public Bindable<EzRadarDisplayMode> RightRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.SkillDual);
+        public Bindable<EzRadarDisplayMode> RightRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.MSDSkillDual);
 
         /// <summary>Exposed for visual tests / host configuration.</summary>
         public EzHUDDanDualPanel DanPanel { get; private set; } = null!;

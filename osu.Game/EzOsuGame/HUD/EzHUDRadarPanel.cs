@@ -22,6 +22,11 @@ using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.Pattern;
+using osu.Game.EzOsuGame.Skills.PPP;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics.Sprites;
@@ -43,20 +48,20 @@ namespace osu.Game.EzOsuGame.HUD
         [Description("Key Pattern")]
         KeyPattern,
 
-        [Description("XxySR Pattern")]
-        XxySrPattern,
+        [Description("SSR Skill")]
+        SSRSkill,
 
-        [Description("SkillDual")]
-        SkillDual,
+        [Description("Skill Dual")]
+        MSDSkillDual,
 
-        [Description("SkillChart")]
-        SkillChart,
+        [Description("Skill Chart")]
+        MSDSkillChart,
 
-        [Description("PPP Skill")]
-        PppSkillDual,
+        [Description("PP+ Dual")]
+        PPPSkillDual,
 
-        [Description("PPP Chart")]
-        PppSkillChart
+        [Description("PP+ Chart")]
+        PPPSkillChart
     }
 
     /// <summary>
@@ -174,7 +179,7 @@ namespace osu.Game.EzOsuGame.HUD
         private EzSkillProvider? skillProvider { get; set; }
 
         [Resolved(CanBeNull = true)]
-        private EzBeatmapPpPlusComputer? beatmapPpPlusComputer { get; set; }
+        private EzBeatmapPPPComputer? beatmapPPPComputer { get; set; }
 
         [Resolved]
         private EzAnalysisPlayerSelection? ezAnalysisPlayerSelection { get; set; }
@@ -436,8 +441,8 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void updateRulesetSpecificRadarPresentation()
         {
-            if (RadarDisplayMode.Value is EzRadarDisplayMode.Metadate or EzRadarDisplayMode.SkillDual or EzRadarDisplayMode.SkillChart
-                or EzRadarDisplayMode.PppSkillDual or EzRadarDisplayMode.PppSkillChart)
+            if (RadarDisplayMode.Value is EzRadarDisplayMode.Metadate or EzRadarDisplayMode.MSDSkillDual or EzRadarDisplayMode.MSDSkillChart
+                or EzRadarDisplayMode.PPPSkillDual or EzRadarDisplayMode.PPPSkillChart)
                 return;
 
             if (beatmap.Value.BeatmapInfo is BeatmapInfo beatmapInfo && isRulesetRadarCacheValid(beatmapInfo))
@@ -619,7 +624,7 @@ namespace osu.Game.EzOsuGame.HUD
 
             double holdRatio = 0;
 
-            if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
+            if (msd.TryGetValue(EzSkillSystems.MinaHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
                 holdRatio = Math.Clamp(cachedHold, 0, 1);
 
             // MSD may pre-date the hold-ratio skill id; stored CSI carries the chart LN ratio.
@@ -639,11 +644,11 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void updateOsuSkillRadarPresentation(BeatmapInfo beatmapInfo, EzSkillProfile profile)
         {
-            string chartSystemId = profile.DefaultChartSystemId ?? EzSkillSystems.BEATMAP_PPPLUS;
-            string playerSystemId = profile.DefaultPlayerSystemId ?? EzSkillSystems.PLAYER_PPPLUS;
+            string chartSystemId = profile.DefaultChartSystemId ?? EzSkillSystems.BEATMAP_PPP;
+            string playerSystemId = profile.DefaultPlayerSystemId ?? EzSkillSystems.PLAYER_PPP;
 
             IReadOnlyDictionary<string, double> chartSkills =
-                beatmapPpPlusComputer?.TryGetOrCompute(beatmapInfo)
+                beatmapPPPComputer?.TryGetOrCompute(beatmapInfo)
                 ?? skillProvider?.GetBeatmapSystemSkills(beatmapInfo.Hash, chartSystemId)
                 ?? new Dictionary<string, double>();
 
@@ -651,12 +656,12 @@ namespace osu.Game.EzOsuGame.HUD
             IReadOnlyDictionary<string, double> playerSkills = new Dictionary<string, double>();
 
             if (!string.IsNullOrWhiteSpace(username) && skillProvider != null)
-                playerSkills = skillProvider.GetPlayerSystemSkills(username, EzSkillSystems.OSU_SLICE_KEY, playerSystemId);
+                playerSkills = skillProvider.GetPlayerSystemSkills(username, EzSkillSystems.UNSLICED_KEY, playerSystemId);
 
-            bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.SkillChart;
+            bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.MSDSkillChart;
             const double display_min = 0.01;
 
-            var selected = new List<EzOsuSkillAxis>();
+            var selected = new List<EzPPPSkillAxis>();
 
             foreach (var axis in EzOsuSkillAxisExtensions.RadarAxes)
             {
@@ -769,7 +774,7 @@ namespace osu.Game.EzOsuGame.HUD
             if (!string.IsNullOrWhiteSpace(username) && keyCount > 0 && skillProvider != null)
                 ssr = skillProvider.GetPlayerSsrSnapshot(username, keyCount).Values;
 
-            bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.SkillChart;
+            bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.MSDSkillChart;
 
             var selected = new List<EzMinaSkillAxis>(skill_radar_axes.Length);
 
@@ -870,7 +875,7 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         private void applyLnSkillRadar(
-            EzDanFeatureMetrics metrics,
+            EzChartFeatureMetrics metrics,
             IReadOnlyDictionary<string, double>? subtypeScores,
             int keyCount)
             => applyLnSkillRadar(EzLnSkillRadar.BuildAxes(metrics, subtypeScores, keyCount));
@@ -899,16 +904,16 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         private bool isMinaSkillRadarMode()
-            => RadarDisplayMode.Value is EzRadarDisplayMode.SkillDual or EzRadarDisplayMode.SkillChart;
+            => RadarDisplayMode.Value is EzRadarDisplayMode.MSDSkillDual or EzRadarDisplayMode.MSDSkillChart;
 
         private bool isPppSkillRadarMode()
-            => RadarDisplayMode.Value is EzRadarDisplayMode.PppSkillDual or EzRadarDisplayMode.PppSkillChart;
+            => RadarDisplayMode.Value is EzRadarDisplayMode.PPPSkillDual or EzRadarDisplayMode.PPPSkillChart;
 
         private void updatePppSkillRadarPresentation()
         {
             var beatmapInfo = beatmap.Value.BeatmapInfo;
 
-            if (beatmapInfo == null || !EzPppSkillCatalog.SupportsRuleset(beatmapInfo.Ruleset.OnlineID))
+            if (beatmapInfo == null || !EzPPPSkillCatalog.SupportsRuleset(beatmapInfo.Ruleset.OnlineID))
             {
                 cancelLiveKick();
                 cancelRadarAnalysis();
@@ -922,20 +927,20 @@ namespace osu.Game.EzOsuGame.HUD
 
             int rulesetId = beatmapInfo.Ruleset.OnlineID;
             IReadOnlyDictionary<string, double> chartSkills =
-                beatmapPpPlusComputer?.TryGetOrCompute(beatmapInfo)
-                ?? skillProvider?.GetBeatmapSystemSkills(beatmapInfo.Hash, EzSkillSystems.BEATMAP_PPPLUS)
+                beatmapPPPComputer?.TryGetOrCompute(beatmapInfo)
+                ?? skillProvider?.GetBeatmapSystemSkills(beatmapInfo.Hash, EzSkillSystems.BEATMAP_PPP)
                 ?? new Dictionary<string, double>();
 
             int keyCount = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
-            int slice = EzPppSkillCatalog.PlayerSliceKey(rulesetId, keyCount);
+            int slice = EzPPPSkillCatalog.PlayerSliceKey(rulesetId, keyCount);
             string? username = TargetUsername.Value;
             IReadOnlyDictionary<string, double> playerSkills = new Dictionary<string, double>();
 
             if (!string.IsNullOrWhiteSpace(username) && skillProvider != null)
-                playerSkills = skillProvider.GetPlayerSystemSkills(username, slice, EzSkillSystems.PLAYER_PPPLUS);
+                playerSkills = skillProvider.GetPlayerSystemSkills(username, slice, EzSkillSystems.PLAYER_PPP);
 
-            bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.PppSkillChart;
-            var axes = EzPppSkillCatalog.RadarAxes(rulesetId);
+            bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.PPPSkillChart;
+            var axes = EzPPPSkillCatalog.RadarAxes(rulesetId);
             const double display_min = 0.01;
             var selected = new List<EzSkillSpec>();
 
@@ -1192,7 +1197,7 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 EzRadarAxisValue<string> axis = radarData[i];
 
-                activeAxisLabels[i] = EzPatternAxisExtensions.TryParse(axis.Axis, out var pattern)
+                activeAxisLabels[i] = EzKeyPatternAxisExtensions.TryParse(axis.Axis, out var pattern)
                     ? pattern.DisplayName().ToString()
                     : axis.Axis;
                 activeAxisFormats[i] = axis.Format;
@@ -1221,7 +1226,7 @@ namespace osu.Game.EzOsuGame.HUD
         private IReadOnlyList<float> getGeneralAxisMaxValues() => new[] { MaxBpm, MaxStar, MaxCs, MaxOd, MaxDr, MaxAr };
 
         private IReadOnlyList<float> getRulesetSpecificAxisMaxValues()
-            => RadarDisplayMode.Value == EzRadarDisplayMode.XxySrPattern
+            => RadarDisplayMode.Value == EzRadarDisplayMode.SSRSkill
                 ? new[] { MaxXxySr, MaxXxySr, MaxXxySr, MaxXxySr, MaxXxySr, MaxXxySr }
                 : UseAbsoluteValue.Value
                     ? new[] { MaxXxySr, MaxXxySr, long_note_ratio_max, MaxXxySr, MaxXxySr, MaxXxySr }
@@ -1231,7 +1236,7 @@ namespace osu.Game.EzOsuGame.HUD
         {
             EzRadarChartData<string> sourceRadarData = getSelectedRulesetSpecificRadarData(radarResult);
 
-            if (RadarDisplayMode.Value == EzRadarDisplayMode.XxySrPattern)
+            if (RadarDisplayMode.Value == EzRadarDisplayMode.SSRSkill)
                 return sourceRadarData;
 
             if (!UseAbsoluteValue.Value || radarResult.XxySr is not double xxySr || xxySr <= 0)
@@ -1258,7 +1263,7 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         private EzRadarChartData<string> getSelectedRulesetSpecificRadarData(EzRulesetSpecificRadarResult radarResult)
-            => RadarDisplayMode.Value == EzRadarDisplayMode.XxySrPattern ? radarResult.XxySrPatternRadarData : radarResult.KeyPatternRadarData;
+            => RadarDisplayMode.Value == EzRadarDisplayMode.SSRSkill ? radarResult.XxySrPatternRadarData : radarResult.KeyPatternRadarData;
 
         private void clearChartData()
         {

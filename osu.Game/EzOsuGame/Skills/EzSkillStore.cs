@@ -8,13 +8,18 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.Pattern;
+using osu.Game.EzOsuGame.Skills.PPP;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.Startup;
 using Realms;
 
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Single Realm persistence facade for mania skill metrics (MSD / SSR / Dan / ChartSkillInfo / ChartDan / skillset cache).
+    /// Single Realm persistence facade for skill metrics (MSD / SSR / Dan / PPP / ChartSkillInfo / ChartDan / skillset cache).
     /// Does not open the game for the caller. Evidence lists stay in local-profile SQLite.
     /// </summary>
     public sealed class EzSkillStore
@@ -49,7 +54,7 @@ namespace osu.Game.EzOsuGame.Skills
             return realmAccess.Run(r =>
             {
                 int rulesetId = resolveRulesetForBeatmapHash(r, beatmapHash);
-                int bundle = EzPppSkillVersions.ForRuleset(rulesetId);
+                int bundle = EzPPPSkillVersions.ForRuleset(rulesetId);
 
                 if (bundle <= 0)
                     return new Dictionary<string, double>(StringComparer.Ordinal);
@@ -107,7 +112,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         public bool TryGetBeatmapSkill(string beatmapHash, string skillId, out double value, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzMinaSkillAlgorithm.VERSION;
             double found = double.NaN;
 
             realmAccess.Run(r =>
@@ -231,15 +236,15 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
-        public void WriteBeatmapMsd(string beatmapHash, EzSkillsetVector vector, Guid beatmapId = default, DateTimeOffset? computedAt = null, double? holdRatio = null)
+        public void WriteBeatmapMsd(string beatmapHash, EzMinaSkillAxisVector vector, Guid beatmapId = default, DateTimeOffset? computedAt = null, double? holdRatio = null)
         {
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
-            int version = EzManiaSkillAlgorithm.VERSION;
+            int version = EzMinaSkillAlgorithm.VERSION;
 
             realmAccess.Write(r =>
             {
                 var existing = r.All<EzBeatmapSkillValue>()
-                                .Where(v => v.BeatmapHash == beatmapHash && v.SystemId == EzSkillSystems.BEATMAP_MSD)
+                                .Where(v => v.BeatmapHash == beatmapHash && v.SystemId == EzSkillSystems.BEATMAP_MINA)
                                 .ToList();
 
                 foreach (var row in existing)
@@ -251,7 +256,7 @@ namespace osu.Game.EzOsuGame.Skills
                     {
                         BeatmapHash = beatmapHash,
                         BeatmapId = beatmapId,
-                        SystemId = EzSkillSystems.BEATMAP_MSD,
+                        SystemId = EzSkillSystems.BEATMAP_MINA,
                         SkillId = axis.ToMsdSkillId(),
                         Value = value,
                         AlgorithmVersion = version,
@@ -265,8 +270,8 @@ namespace osu.Game.EzOsuGame.Skills
                     {
                         BeatmapHash = beatmapHash,
                         BeatmapId = beatmapId,
-                        SystemId = EzSkillSystems.BEATMAP_MSD,
-                        SkillId = EzSkillSystems.MsdHoldRatioSkillId,
+                        SystemId = EzSkillSystems.BEATMAP_MINA,
+                        SkillId = EzSkillSystems.MinaHoldRatioSkillId,
                         Value = Math.Clamp(ratio, 0, 1),
                         AlgorithmVersion = version,
                         ComputedAt = at,
@@ -277,19 +282,19 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Persist a settled-miss marker so BDSP does not reprocess the same zero-vector chart every launch.
-        /// Replaces any existing <see cref="EzSkillSystems.BEATMAP_MSD"/> rows for this hash.
+        /// Replaces any existing <see cref="EzSkillSystems.BEATMAP_MINA"/> rows for this hash.
         /// </summary>
         public void WriteBeatmapMsdUnrateable(string beatmapHash, Guid beatmapId = default, DateTimeOffset? computedAt = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(beatmapHash);
 
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
-            int version = EzManiaSkillAlgorithm.VERSION;
+            int version = EzMinaSkillAlgorithm.VERSION;
 
             realmAccess.Write(r =>
             {
                 var existing = r.All<EzBeatmapSkillValue>()
-                                .Where(v => v.BeatmapHash == beatmapHash && v.SystemId == EzSkillSystems.BEATMAP_MSD)
+                                .Where(v => v.BeatmapHash == beatmapHash && v.SystemId == EzSkillSystems.BEATMAP_MINA)
                                 .ToList();
 
                 foreach (var row in existing)
@@ -299,8 +304,8 @@ namespace osu.Game.EzOsuGame.Skills
                 {
                     BeatmapHash = beatmapHash,
                     BeatmapId = beatmapId,
-                    SystemId = EzSkillSystems.BEATMAP_MSD,
-                    SkillId = EzSkillSystems.MsdUnrateableSkillId,
+                    SystemId = EzSkillSystems.BEATMAP_MINA,
+                    SkillId = EzSkillSystems.MinaUnrateableSkillId,
                     Value = 1,
                     AlgorithmVersion = version,
                     ComputedAt = at,
@@ -318,7 +323,7 @@ namespace osu.Game.EzOsuGame.Skills
                 realmAccess.Write(r =>
                 {
                     var rows = r.All<EzBeatmapSkillValue>()
-                                .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MSD)
+                                .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MINA)
                                 .ToList();
 
                     foreach (var row in rows)
@@ -340,7 +345,7 @@ namespace osu.Game.EzOsuGame.Skills
                 realmAccess.Write(r =>
                 {
                     var rows = r.All<EzBeatmapSkillValue>()
-                                .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MSD)
+                                .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MINA)
                                 .AsEnumerable()
                                 .Where(v => batch.Contains(v.BeatmapHash))
                                 .ToList();
@@ -382,12 +387,12 @@ namespace osu.Game.EzOsuGame.Skills
         /// </remarks>
         public HashSet<string> GetUnrateableMsdHashes()
         {
-            int version = EzManiaSkillAlgorithm.VERSION;
+            int version = EzMinaSkillAlgorithm.VERSION;
 
             return realmAccess.Run(r => r.All<EzBeatmapSkillValue>()
-                                         .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MSD
+                                         .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MINA
                                                      && v.AlgorithmVersion == version
-                                                     && v.SkillId == EzSkillSystems.MsdUnrateableSkillId)
+                                                     && v.SkillId == EzSkillSystems.MinaUnrateableSkillId)
                                          .AsEnumerable()
                                          .Select(v => v.BeatmapHash)
                                          .ToHashSet(StringComparer.Ordinal));
@@ -425,7 +430,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                 foreach (var row in rows)
                 {
-                    if (row.AlgorithmVersion == EzPppSkillVersions.ForSkillId(row.SkillId))
+                    if (row.AlgorithmVersion == EzPPPSkillVersions.ForSkillId(row.SkillId))
                         result[row.SkillId] = row.Value;
                 }
 
@@ -441,7 +446,7 @@ namespace osu.Game.EzOsuGame.Skills
             int? algorithmVersion = null)
         {
             bool perSkill = algorithmVersion == null
-                            && systemId is EzSkillSystems.BEATMAP_PPPLUS or EzSkillSystems.PLAYER_PPPLUS;
+                            && systemId is EzSkillSystems.BEATMAP_PPP or EzSkillSystems.PLAYER_PPP;
             int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
 
             return realmAccess.Run(r =>
@@ -450,7 +455,7 @@ namespace osu.Game.EzOsuGame.Skills
                     ? r.All<EzPlayerSkillValue>()
                        .Where(v => v.Username == username && v.KeyCount == keyCount && v.SystemId == systemId)
                        .AsEnumerable()
-                       .FirstOrDefault(v => v.AlgorithmVersion == EzPppSkillVersions.ForSkillId(v.SkillId))
+                       .FirstOrDefault(v => v.AlgorithmVersion == EzPPPSkillVersions.ForSkillId(v.SkillId))
                     : r.All<EzPlayerSkillValue>()
                        .FirstOrDefault(v => v.Username == username
                                             && v.KeyCount == keyCount
@@ -463,26 +468,26 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
-        public EzPlayerSsrSnapshot GetPlayerSsrSnapshot(string username, int keyCount, int? algorithmVersion = null)
+        public EzPlayerRatingSnapshot GetPlayerSsrSnapshot(string username, int keyCount, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzMinaSkillAlgorithm.VERSION;
 
             return realmAccess.Run(r =>
             {
                 var rows = r.All<EzPlayerSkillValue>()
                             .Where(v => v.Username == username
                                         && v.KeyCount == keyCount
-                                        && v.SystemId == EzSkillSystems.PLAYER_SSR
+                                        && v.SystemId == EzSkillSystems.PLAYER_MINA
                                         && v.AlgorithmVersion == version)
                             .ToList();
 
                 if (rows.Count == 0)
-                    return new EzPlayerSsrSnapshot();
+                    return new EzPlayerRatingSnapshot();
 
                 var values = rows.ToDictionary(v => v.SkillId, v => v.Value, StringComparer.Ordinal);
                 var meta = rows.FirstOrDefault(v => v.SkillId == EzMinaSkillAxis.Overall.ToSsrSkillId()) ?? rows[0];
 
-                return new EzPlayerSsrSnapshot
+                return new EzPlayerRatingSnapshot
                 {
                     Values = values,
                     AnalyzedPlays = meta.AnalyzedPlays,
@@ -495,13 +500,13 @@ namespace osu.Game.EzOsuGame.Skills
 
         public IReadOnlyList<int> GetPlayerSsrKeyCounts(string username, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzMinaSkillAlgorithm.VERSION;
 
             return realmAccess.Run(r =>
             {
                 return r.All<EzPlayerSkillValue>()
                         .Where(v => v.Username == username
-                                    && v.SystemId == EzSkillSystems.PLAYER_SSR
+                                    && v.SystemId == EzSkillSystems.PLAYER_MINA
                                     && v.AlgorithmVersion == version)
                         .AsEnumerable()
                         .Select(v => v.KeyCount)
@@ -514,7 +519,7 @@ namespace osu.Game.EzOsuGame.Skills
         public void WritePlayerSsr(
             string username,
             int keyCount,
-            EzSkillsetVector vector,
+            EzMinaSkillAxisVector vector,
             int analyzedPlays,
             bool provisional = false,
             bool stale = false,
@@ -522,7 +527,7 @@ namespace osu.Game.EzOsuGame.Skills
             bool appendHistory = true)
         {
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
-            int version = EzManiaSkillAlgorithm.VERSION;
+            int version = EzMinaSkillAlgorithm.VERSION;
 
             realmAccess.Write(r => addPlayerSsr(r, username, keyCount, vector, analyzedPlays, provisional, stale, at, version, appendHistory));
         }
@@ -538,10 +543,10 @@ namespace osu.Game.EzOsuGame.Skills
         public void WritePlayerSkillBundle(
             string username,
             int keyCount,
-            EzSkillsetVector ssr,
+            EzMinaSkillAxisVector ssr,
             int analyzedPlays,
             bool provisional,
-            IReadOnlyList<(DateTimeOffset RecordedAt, EzSkillsetVector Vector)> historySamples,
+            IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisVector Vector)> historySamples,
             IReadOnlyList<EzPatternRating> patternRatings)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
@@ -549,7 +554,7 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentNullException.ThrowIfNull(patternRatings);
 
             DateTimeOffset at = DateTimeOffset.UtcNow;
-            int version = EzManiaSkillAlgorithm.VERSION;
+            int version = EzMinaSkillAlgorithm.VERSION;
 
             realmAccess.Write(r =>
             {
@@ -565,7 +570,7 @@ namespace osu.Game.EzOsuGame.Skills
             Realm r,
             string username,
             int keyCount,
-            EzSkillsetVector vector,
+            EzMinaSkillAxisVector vector,
             int analyzedPlays,
             bool provisional,
             bool stale,
@@ -576,7 +581,7 @@ namespace osu.Game.EzOsuGame.Skills
             var existing = r.All<EzPlayerSkillValue>()
                             .Where(v => v.Username == username
                                         && v.KeyCount == keyCount
-                                        && v.SystemId == EzSkillSystems.PLAYER_SSR)
+                                        && v.SystemId == EzSkillSystems.PLAYER_MINA)
                             .ToList();
 
             foreach (var row in existing)
@@ -590,7 +595,7 @@ namespace osu.Game.EzOsuGame.Skills
                 {
                     Username = username,
                     KeyCount = keyCount,
-                    SystemId = EzSkillSystems.PLAYER_SSR,
+                    SystemId = EzSkillSystems.PLAYER_MINA,
                     SkillId = skillId,
                     Value = value,
                     AnalyzedPlays = analyzedPlays,
@@ -617,7 +622,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         public IReadOnlyList<EzPatternRating> GetPlayerPatternRatings(string username, int keyCount, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzMinaSkillAlgorithm.VERSION;
 
             return realmAccess.Run(r =>
             {
@@ -658,7 +663,7 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentNullException.ThrowIfNull(ratings);
 
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
-            int version = EzManiaSkillAlgorithm.VERSION;
+            int version = EzMinaSkillAlgorithm.VERSION;
 
             realmAccess.Write(r => writePlayerPatternRatings(r, username, keyCount, ratings, provisional, stale, at, version));
         }
@@ -710,12 +715,12 @@ namespace osu.Game.EzOsuGame.Skills
         public void ReplacePlayerSkillHistory(
             string username,
             int keyCount,
-            IReadOnlyList<(DateTimeOffset RecordedAt, EzSkillsetVector Vector)> samples)
+            IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisVector Vector)> samples)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
             ArgumentNullException.ThrowIfNull(samples);
 
-            int version = EzManiaSkillAlgorithm.VERSION;
+            int version = EzMinaSkillAlgorithm.VERSION;
 
             realmAccess.Write(r => replacePlayerSkillHistory(r, username, keyCount, samples, version));
         }
@@ -724,7 +729,7 @@ namespace osu.Game.EzOsuGame.Skills
             Realm r,
             string username,
             int keyCount,
-            IReadOnlyList<(DateTimeOffset RecordedAt, EzSkillsetVector Vector)> samples,
+            IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisVector Vector)> samples,
             int version)
         {
             var existing = r.All<EzPlayerSkillHistoryPoint>()
@@ -761,7 +766,7 @@ namespace osu.Game.EzOsuGame.Skills
             int maxPoints = 64,
             int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzMinaSkillAlgorithm.VERSION;
 
             return realmAccess.Run(r =>
             {
@@ -892,7 +897,6 @@ namespace osu.Game.EzOsuGame.Skills
                     TechCategory = info.TechCategory,
                     ClusterTrill = info.ClusterTrill,
                     HandstreamCluster = info.HandstreamCluster,
-                    HandstreamEndurance = info.HandstreamEndurance,
                     TechScore = info.TechScore,
                     ChordjackScore = info.ChordjackScore,
                     JackScore = info.JackScore ?? -1,
@@ -1063,12 +1067,12 @@ namespace osu.Game.EzOsuGame.Skills
         public IReadOnlyList<Guid> CollectPppChartDebt()
             => scanPppCharts().OwedIds;
 
-        public void ClearBeatmapPpPlus()
+        public void ClearBeatmapPPP()
         {
             realmAccess.Write(r =>
             {
                 var rows = r.All<EzBeatmapSkillValue>()
-                            .Where(v => v.SystemId == EzSkillSystems.BEATMAP_PPPLUS)
+                            .Where(v => v.SystemId == EzSkillSystems.BEATMAP_PPP)
                             .ToList();
 
                 foreach (var row in rows)
@@ -1089,7 +1093,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                     int rulesetId = beatmap.Ruleset.OnlineID;
 
-                    if (!EzPppSkillCatalog.SupportsRuleset(rulesetId))
+                    if (!EzPPPSkillCatalog.SupportsRuleset(rulesetId))
                         continue;
 
                     candidates.Add((beatmap.ID, beatmap.Hash, rulesetId));
@@ -1097,7 +1101,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                 var byHash = new Dictionary<string, List<EzBeatmapSkillValue>>(StringComparer.Ordinal);
 
-                foreach (var row in r.All<EzBeatmapSkillValue>().Where(v => v.SystemId == EzSkillSystems.BEATMAP_PPPLUS))
+                foreach (var row in r.All<EzBeatmapSkillValue>().Where(v => v.SystemId == EzSkillSystems.BEATMAP_PPP))
                 {
                     if (!byHash.TryGetValue(row.BeatmapHash, out var list))
                     {
@@ -1122,14 +1126,14 @@ namespace osu.Game.EzOsuGame.Skills
                     if (stored == null || stored.Count == 0)
                         continue;
 
-                    rows[candidate.Hash] = new EzFacetRowState(complete ? EzPppSkillVersions.FACET_REVISION : 0, false);
+                    rows[candidate.Hash] = new EzFacetRowState(complete ? EzPPPSkillVersions.FACET_REVISION : 0, false);
                 }
 
                 var facet = new EzDataStateFacet
                 {
                     Id = "PPP",
-                    Facet = EzAnalysisFacet.PPPAlgorithm,
-                    CurrentRevision = EzPppSkillVersions.FACET_REVISION,
+                    Facet = EzAnalysisFacet.PPP,
+                    CurrentRevision = EzPPPSkillVersions.FACET_REVISION,
                     UniverseCount = candidates.Count,
                     Rows = rows,
                 };
@@ -1148,17 +1152,17 @@ namespace osu.Game.EzOsuGame.Skills
             if (skillVersions != null && skillVersions.TryGetValue(skillId, out int specific))
                 return specific;
 
-            if (systemId == EzSkillSystems.BEATMAP_PPPLUS && pppRulesetOnlineId is int chartRuleset)
+            if (systemId == EzSkillSystems.BEATMAP_PPP && pppRulesetOnlineId is int chartRuleset)
             {
-                int bundle = EzPppSkillVersions.ForRuleset(chartRuleset);
+                int bundle = EzPPPSkillVersions.ForRuleset(chartRuleset);
 
                 if (bundle > 0)
                     return bundle;
             }
 
-            if (systemId == EzSkillSystems.PLAYER_PPPLUS)
+            if (systemId == EzSkillSystems.PLAYER_PPP)
             {
-                int bundle = EzPppSkillVersions.ForSkillId(skillId);
+                int bundle = EzPPPSkillVersions.ForSkillId(skillId);
 
                 if (bundle > 0)
                     return bundle;
@@ -1172,7 +1176,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (stored == null || stored.Count == 0)
                 return false;
 
-            int bundle = EzPppSkillVersions.ForRuleset(rulesetId);
+            int bundle = EzPPPSkillVersions.ForRuleset(rulesetId);
 
             if (bundle <= 0)
                 return false;
@@ -1185,7 +1189,7 @@ namespace osu.Game.EzOsuGame.Skills
                     present.Add(row.SkillId);
             }
 
-            foreach (string required in EzPppSkillCatalog.RequiredChartSkillIds(rulesetId))
+            foreach (string required in EzPPPSkillCatalog.RequiredChartSkillIds(rulesetId))
             {
                 if (!present.Contains(required))
                     return false;
@@ -1589,7 +1593,6 @@ namespace osu.Game.EzOsuGame.Skills
                 TechCategory = row.TechCategory,
                 ClusterTrill = row.ClusterTrill,
                 HandstreamCluster = row.HandstreamCluster,
-                HandstreamEndurance = row.HandstreamEndurance,
                 TechScore = row.TechScore,
                 ChordjackScore = row.ChordjackScore,
                 JackScore = optionalDouble(row.JackScore),

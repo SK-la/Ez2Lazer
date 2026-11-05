@@ -5,8 +5,9 @@ using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Framework.IO.Stores;
-using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Resources;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
@@ -141,8 +142,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(axis, Is.EqualTo(EzMinaSkillAxis.Technical));
             Assert.That(EzMinaSkillAxis.Technical.Chip().Name.ToString(), Is.EqualTo("技").Or.EqualTo("Tech"));
             Assert.That(EzMinaSkillAxis.Technical.Chip().AccentHex, Is.EqualTo("#83cf6b"));
-            Assert.That(EzPatternAxisExtensions.TryParse("LN Hold", out var pattern), Is.True);
-            Assert.That(pattern, Is.EqualTo(EzPatternAxis.LnHold));
+            Assert.That(EzKeyPatternAxisExtensions.TryParse("LN Hold", out var pattern), Is.True);
+            Assert.That(pattern, Is.EqualTo(EzKeyPatternAxis.LnHold));
             Assert.That(pattern.DisplayName().ToString(), Is.EqualTo("长条按住").Or.EqualTo("LN Hold"));
             Assert.That(EzDanSide.Ln.ToId(), Is.EqualTo(DanSkillSystem.SIDE_LN));
         }

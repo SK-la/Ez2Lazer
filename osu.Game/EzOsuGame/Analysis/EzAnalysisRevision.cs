@@ -3,6 +3,8 @@
 
 using System;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
@@ -15,9 +17,9 @@ namespace osu.Game.EzOsuGame.Analysis
     /// Dependency edges of the Ez chart skill chain:
     /// <list type="bullet">
     /// <item><see cref="Msd"/> depends on nothing.</item>
-    /// <item><see cref="ChartSkillInfo"/> depends on <see cref="Msd"/> (HandstreamEndurance reads stored axes).</item>
+    /// <item><see cref="ChartSkillInfo"/> depends on nothing (pure chart structure; it no longer reads MSD).</item>
     /// <item><see cref="ChartDan"/> depends on <see cref="ChartSkillInfo"/> and <see cref="Msd"/>
-    /// (hold ratio falls back to CSI LnRatio; skillset stamps read CSI).</item>
+    /// (hold ratio falls back to CSI LnRatio; skillset stamps read CSI; MSD supplies the rating axes).</item>
     /// </list>
     /// Rule: bumping an upstream facet invalidates every downstream facet; bumping a downstream
     /// facet invalidates only itself.
@@ -42,12 +44,16 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <summary>Local Profile partition payloads.</summary>
         Aggregation = 1 << 5,
 
-        /// <summary>PPP chart skills (<c>beatmap_ppplus</c>). Not part of the mania MSD chain.</summary>
-        PPPAlgorithm = 1 << 6,
+        /// <summary>PPP chart skills. Not part of the mania MSD chain.</summary>
+        PPP = 1 << 6,
     }
 
     /// <summary>
-    /// Facet-scoped revision numbers for the Ez chart skill chain (MSD -> ChartSkillInfo -> ChartDan).
+    /// Facet-scoped revision numbers for the Ez chart skill chain.
+    /// <para>
+    /// CSI and MSD are independent inputs; Dan reads both. The chain is therefore
+    /// <c>MSD -> ChartDan</c> and <c>CSI -> ChartDan</c> in parallel, not a three-stage cascade.
+    /// </para>
     /// <para>
     /// Each revision encodes the facet's own version constant plus every upstream constant it reads,
     /// into base-100 slots. A persisted row stores the revision of the moment it was produced, so a
@@ -58,8 +64,8 @@ namespace osu.Game.EzOsuGame.Analysis
     /// <para>
     /// This intentionally deviates from the star / xxysr shape (one applied scalar per ruleset that
     /// is compared and then reset to -1). Those two are siblings sharing one
-    /// <c>LastAppliedDifficultyVersion</c>; the chart chain has real { MSD -> CSI -> ChartDan }
-    /// cascade, which a single scalar cannot express without also invalidating MSD on a CSI bump.
+    /// <c>LastAppliedDifficultyVersion</c>; the chart chain has real fan-in into Dan, which a single
+    /// scalar cannot express without also invalidating a sibling on an unrelated bump.
     /// </para>
     /// </summary>
     public static class EzAnalysisRevision
@@ -78,20 +84,20 @@ namespace osu.Game.EzOsuGame.Analysis
         internal const int SLOT_RADIX = 100;
 
         /// <summary>
-        /// MSD rows keep the raw <see cref="EzManiaSkillAlgorithm.VERSION"/>: <see cref="EzBeatmapSkillValue"/>
+        /// MSD rows keep the raw <see cref="EzMinaSkillAlgorithm.VERSION"/>: <see cref="EzBeatmapSkillValue"/>
         /// is shared with player SSR / pattern rows and several readers pass the algorithm version
         /// explicitly, so composing it would be a cross-facet hazard. MSD staleness is already handled
         /// by the <c>RulesetInfo.LastAppliedManiaSkillVersion</c> scalar.
         /// </summary>
-        public static int Msd => EzManiaSkillAlgorithm.VERSION;
+        public static int Msd => EzMinaSkillAlgorithm.VERSION;
 
         /// <summary>Revision stamped on <c>EzBeatmapChartSkillInfo.InfoVersion</c>.</summary>
         public static int ChartSkillInfo
-            => compose(CSI_POLICY, EzChartSkillInfo.VERSION, EzManiaSkillAlgorithm.VERSION);
+            => compose(CSI_POLICY, EzChartSkillInfo.VERSION);
 
         /// <summary>Revision stamped on <c>EzBeatmapChartDan.AlgorithmVersion</c>.</summary>
         public static int ChartDan
-            => compose(DAN_POLICY, EzDanAlgorithm.VERSION, EzChartSkillInfo.VERSION, EzManiaSkillAlgorithm.VERSION);
+            => compose(DAN_POLICY, EzDanAlgorithm.VERSION, EzChartSkillInfo.VERSION, EzMinaSkillAlgorithm.VERSION);
 
         /// <summary>Current revision for a single chart-chain facet. Returns 0 for non-chart facets.</summary>
         public static int For(EzAnalysisFacet facet)
@@ -118,7 +124,7 @@ namespace osu.Game.EzOsuGame.Analysis
             switch (facet)
             {
                 case EzAnalysisFacet.Msd:
-                    return EzAnalysisFacet.ChartSkillInfo | EzAnalysisFacet.ChartDan;
+                    return EzAnalysisFacet.ChartDan;
 
                 case EzAnalysisFacet.ChartSkillInfo:
                     return EzAnalysisFacet.ChartDan;
@@ -129,7 +135,7 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         public static string DescribeChartSkillInfo(int revision)
-            => $"policy={slotAt(revision, 3, 0)} csi={slotAt(revision, 3, 1)} msd={slotAt(revision, 3, 2)}";
+            => $"policy={slotAt(revision, 2, 0)} csi={slotAt(revision, 2, 1)}";
 
         public static string DescribeChartDan(int revision)
             => $"policy={slotAt(revision, 4, 0)} dan={slotAt(revision, 4, 1)} csi={slotAt(revision, 4, 2)} msd={slotAt(revision, 4, 3)}";

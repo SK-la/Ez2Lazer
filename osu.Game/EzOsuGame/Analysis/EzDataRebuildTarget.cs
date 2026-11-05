@@ -58,9 +58,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
         /// <summary>
         /// Scene: PPP chart skills for osu, taiko, catch, and mania.
-        /// Scope: <see cref="EzRealmMetadataScope.PPPSkills"/>.
+        /// Scope: <see cref="EzRealmMetadataScope.PPP"/>.
         /// </summary>
         [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.DATA_REBUILD_TARGET_REALM_PPP))]
-        RealmPPPSkills = 10,
+        RealmPPP = 10,
     }
 }

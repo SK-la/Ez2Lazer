@@ -59,7 +59,9 @@ using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Playback;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
-using osu.Game.EzOsuGame.Skills.Ppp;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Graphics;
@@ -473,31 +475,34 @@ namespace osu.Game
             // Mania: MSD / SSR / pattern / Dan. PPP chart / player skills cover osu, taiko, catch, and mania.
             var skillRegistry = new EzSkillRegistry();
             var skillStore = new EzSkillStore(realm);
-            var ppPlusEngine = new EzPpPlusEngine();
-            var beatmapMsdComputer = new EzBeatmapMsdComputer(BeatmapManager, skillStore);
-            var beatmapPpPlusComputer = new EzBeatmapPpPlusComputer(BeatmapManager, skillStore, ppPlusEngine);
+            var pppEngine = new EzPPPEngine();
+            var beatmapPPPComputer = new EzBeatmapPPPComputer(BeatmapManager, skillStore, pppEngine);
+
+            var beatmapMsdComputer = new EzBeatmapMinaComputer(BeatmapManager, skillStore);
             var chartDanEstimator = new EzChartDanEstimator(BeatmapManager, beatmapMsdComputer);
+
             var localProfileStore = new EzLocalProfileStore(Storage);
-            // Skill aggregators reuse localProfileStore as the per-play SSR / Dan cache (incremental backfill).
-            var playerSsrAggregator = new EzPlayerSsrAggregator(BeatmapManager, skillStore, localProfileStore);
+
+            var playerPPPAggregator = new EzPlayerPPPAggregator(BeatmapManager, skillStore, pppEngine);
+
+            var playerRatingAggregator = new EzPlayerRatingAggregator(BeatmapManager, skillStore, localProfileStore);
             var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanEstimator, skillStore, localProfileStore);
-            var playerPpPlusAggregator = new EzPlayerPpPlusAggregator(BeatmapManager, skillStore, ppPlusEngine);
             var skillProvider = new EzSkillProvider(skillStore, skillRegistry, chartDanEstimator, localProfileStore, BeatmapManager);
 
             dependencies.Cache(skillRegistry);
             dependencies.Cache(skillStore);
             dependencies.Cache(localProfileStore);
             dependencies.Cache(skillProvider);
-            dependencies.CacheAs<IEzPpPlusEngine>(ppPlusEngine);
+            dependencies.CacheAs<IEzPPPEngine>(pppEngine);
             // Write-side services still cached for LocalProfile / analysis pipelines.
             dependencies.Cache(beatmapMsdComputer);
-            dependencies.Cache(beatmapPpPlusComputer);
+            dependencies.Cache(beatmapPPPComputer);
             dependencies.Cache(chartDanEstimator);
-            dependencies.Cache(playerSsrAggregator);
+            dependencies.Cache(playerRatingAggregator);
             dependencies.Cache(playerDanAggregator);
-            dependencies.Cache(playerPpPlusAggregator);
+            dependencies.Cache(playerPPPAggregator);
 
-            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, playerSsrAggregator, playerDanAggregator, localProfileStore, skillProvider, playerPpPlusAggregator));
+            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, playerRatingAggregator, playerDanAggregator, localProfileStore, skillProvider, playerPPPAggregator));
             dependencies.Cache(new EzLocalProfileOnlinePullService(API, ScoreManager, BeatmapManager, realm, Storage));
             dependencies.Cache(new EzAnalysisPlayerSelection());
 

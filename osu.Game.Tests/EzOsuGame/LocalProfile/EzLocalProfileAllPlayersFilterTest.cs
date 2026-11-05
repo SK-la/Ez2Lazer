@@ -7,6 +7,7 @@ using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Scoring;
 
 namespace osu.Game.Tests.EzOsuGame.LocalProfile
@@ -151,7 +152,7 @@ namespace osu.Game.Tests.EzOsuGame.LocalProfile
                 Accuracy = 0.96,
                 Rate = 1,
                 ScoredAt = DateTimeOffset.UtcNow,
-                AlgorithmVersion = EzManiaSkillAlgorithm.VERSION,
+                AlgorithmVersion = EzMinaSkillAlgorithm.VERSION,
             };
     }
 }

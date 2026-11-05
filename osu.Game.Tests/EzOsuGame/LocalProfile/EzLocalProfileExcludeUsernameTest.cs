@@ -9,6 +9,7 @@ using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Scoring;
 
 namespace osu.Game.Tests.EzOsuGame.LocalProfile
@@ -245,7 +246,8 @@ namespace osu.Game.Tests.EzOsuGame.LocalProfile
         }
 
         /// <summary>Write slices the way the compute path does: partition + archive rebuild, then the drill rows.</summary>
-        private static void seed(EzLocalProfileStore store, params EzLocalProfileAggregationResult[] results)        {
+        private static void seed(EzLocalProfileStore store, params EzLocalProfileAggregationResult[] results)
+        {
             store.ApplyUsernamePartitions(
                 results.ToDictionary(r => r.IncludedUsernames.Single(), r => r, StringComparer.Ordinal),
                 replaceOtherUsernames: true,

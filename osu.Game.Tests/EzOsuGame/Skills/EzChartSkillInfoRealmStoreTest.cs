@@ -8,6 +8,9 @@ using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Rulesets;
 using osu.Game.Tests.Database;
 
@@ -33,7 +36,6 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     TechCategory = true,
                     ClusterTrill = false,
                     HandstreamCluster = null,
-                    HandstreamEndurance = true,
                     TechScore = 0.7,
                     ChordjackScore = 0.9,
                     JackScore = 0.55,
@@ -62,7 +64,6 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Assert.That(loaded.TechCategory, Is.True);
                 Assert.That(loaded.ClusterTrill, Is.False);
                 Assert.That(loaded.HandstreamCluster, Is.Null);
-                Assert.That(loaded.HandstreamEndurance, Is.True);
                 Assert.That(loaded.TechScore, Is.EqualTo(0.7).Within(1e-9));
                 Assert.That(loaded.ChordjackScore, Is.EqualTo(0.9).Within(1e-9));
                 Assert.That(loaded.JackScore, Is.EqualTo(0.55).Within(1e-9));
@@ -265,8 +266,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 const string hash_a = "batch-hash-a";
                 const string hash_b = "batch-hash-b";
 
-                store.WriteBeatmapMsd(hash_a, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
-                store.WriteBeatmapMsd(hash_b, new EzSkillsetVector(11, 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1), holdRatio: 0.3);
+                store.WriteBeatmapMsd(hash_a, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
+                store.WriteBeatmapMsd(hash_b, new EzMinaSkillAxisVector(11, 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1), holdRatio: 0.3);
 
                 store.UpsertChartSkillInfo(hash_a, new EzChartSkillInfo
                 {
@@ -278,9 +279,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     KeyCount = 4,
                 });
 
-                var msdBatch = store.GetBeatmapSkillsForHashes(new[] { hash_a, hash_b, "missing" }, EzSkillSystems.BEATMAP_MSD);
+                var msdBatch = store.GetBeatmapSkillsForHashes(new[] { hash_a, hash_b, "missing" }, EzSkillSystems.BEATMAP_MINA);
                 Assert.That(msdBatch.Keys, Is.EquivalentTo(new[] { hash_a, hash_b }));
-                Assert.That(msdBatch[hash_a][EzSkillSystems.MsdHoldRatioSkillId], Is.EqualTo(0.2).Within(1e-9));
+                Assert.That(msdBatch[hash_a][EzSkillSystems.MinaHoldRatioSkillId], Is.EqualTo(0.2).Within(1e-9));
                 Assert.That(msdBatch[hash_b][EzMinaSkillAxis.Overall.ToMsdSkillId()], Is.EqualTo(11).Within(1e-9));
 
                 var chartBatch = store.GetChartSkillInfoForHashes(new[] { hash_a, hash_b, "missing" });
@@ -357,7 +358,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 const string live_hash = "rated-msd-hash";
 
                 store.WriteBeatmapMsdUnrateable(dead_hash, Guid.NewGuid());
-                store.WriteBeatmapMsd(live_hash, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
+                store.WriteBeatmapMsd(live_hash, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
 
                 var provider = new EzSkillProvider(store);
 

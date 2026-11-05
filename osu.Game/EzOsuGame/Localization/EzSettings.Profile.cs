@@ -3,7 +3,7 @@
 
 namespace osu.Game.EzOsuGame.Localization
 {
-    public class EzSettingsProfile
+    public static class EzSettingsProfile
     {
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE =
             new EzLocalizationManager.EzLocalisableString("计算成绩分析", "Compute Score Analysis");
@@ -153,10 +153,7 @@ namespace osu.Game.EzOsuGame.Localization
                 "No Track skills yet. Recompute Score Analysis in Settings.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SKILL_RATING =
-            new EzLocalizationManager.EzLocalisableString("{0}K 技能评分", "{0}K skill rating");
-
-        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_OSU_SKILL_RATING =
-            new EzLocalizationManager.EzLocalisableString("osu 技能评分", "osu skill rating");
+            new EzLocalizationManager.EzLocalisableString("技能评分", "skill rating");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SKILL_PLAYS =
             new EzLocalizationManager.EzLocalisableString("{0} 局分析", "{0} analyzed plays");

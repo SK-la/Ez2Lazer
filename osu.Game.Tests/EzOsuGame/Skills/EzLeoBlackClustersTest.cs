@@ -4,8 +4,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
-using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.LeoBlack;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
 {

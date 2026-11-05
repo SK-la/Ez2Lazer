@@ -6,6 +6,9 @@ using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Rulesets;
 using osu.Game.Tests.Database;
 using Realms;
@@ -36,9 +39,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 var store = new EzSkillStore(realm);
 
                 // The two ends of the chain: fully rated, and rated up to MSD only.
-                store.WriteBeatmapMsd(settled_chart, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
+                store.WriteBeatmapMsd(settled_chart, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
                 store.UpsertChartSkillInfo(settled_chart, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
-                store.WriteBeatmapMsd(waiting_on_csi_chart, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
+                store.WriteBeatmapMsd(waiting_on_csi_chart, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
 
                 var debt = EzChartChainDebt.Collect(new[]
                 {
@@ -75,7 +78,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 seedCharts(realm);
                 var store = new EzSkillStore(realm);
 
-                store.WriteBeatmapMsd(waiting_on_csi_chart, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
+                store.WriteBeatmapMsd(waiting_on_csi_chart, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
 
                 var before = EzChartChainDebt.Collect(new[] { ("alpha", waiting_on_csi_chart) }, store);
                 Assert.That(before.PlaysFor("alpha"), Is.EqualTo(1));

@@ -25,6 +25,8 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Database;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
@@ -108,7 +110,7 @@ namespace osu.Game.Database
         private OsuConfigManager config { get; set; } = null!;
 
         [Resolved]
-        private EzBeatmapMsdComputer beatmapMsdComputer { get; set; } = null!;
+        private EzBeatmapMinaComputer ezBeatmapMinaComputer { get; set; } = null!;
 
         [Resolved]
         private EzSkillStore skillStore { get; set; } = null!;
@@ -671,7 +673,7 @@ namespace osu.Game.Database
         /// </summary>
         private void clearOutdatedManiaBeatmapMsd()
         {
-            const int current_version = EzManiaSkillAlgorithm.VERSION;
+            const int current_version = EzMinaSkillAlgorithm.VERSION;
 
             // Read the live Realm row — AvailableRulesets clones historically omitted
             // LastAppliedManiaSkillVersion and would wipe MSD on every startup.
@@ -692,7 +694,7 @@ namespace osu.Game.Database
             Logger.Log($"Resetting beatmap MSD for mania (mania skill version updated from {liveState.Item2} to {current_version})");
 
             // Only MSD is cleared here. ChartSkillInfo and ChartDan rows read MSD, but both are stamped
-            // with EzAnalysisRevision.ChartSkillInfo/ChartDan, which fold EzManiaSkillAlgorithm.VERSION -
+            // with EzAnalysisRevision.ChartSkillInfo/ChartDan, which fold EzMinaSkillAlgorithm.VERSION -
             // so they already read as stale and the ordinary incremental passes recompute them. Bulk
             // clearing them would erase the "stale" evidence the status UI reports.
             skillStore.ClearBeatmapMsd();
@@ -741,13 +743,8 @@ namespace osu.Game.Database
                            + $"Dan v{EzAnalysisRevision.ChartDan} ({EzAnalysisRevision.DescribeChartDan(EzAnalysisRevision.ChartDan)}).");
             }
 
-            // Defer the MSD side-upsert whenever CSI shares this job: the chain-end Dan pass owns the
-            // write then, so the row is stamped with CSI included. EzBeatmapMsdComputer independently
-            // refuses to stamp a Dan row while CSI is unsettled, so a MSD-only job cannot produce a
-            // CSI-less Dan row either.
-            bool deferChartDanSideUpsert = scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo)
-                                           || scope.HasFlag(EzRealmMetadataScope.ChartDan);
-
+            // CSI and MSD are independent inputs; Dan reads both. Run CSI first so the ChartDan pass
+            // below sees fresh tags regardless of whether MSD ran in this job.
             bool needsChartChain = scope.HasFlag(EzRealmMetadataScope.Msd)
                                    || scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo)
                                    || scope.HasFlag(EzRealmMetadataScope.ChartDan);
@@ -756,31 +753,17 @@ namespace osu.Game.Database
                 ? skillStore.CollectChartChainState("BDSP")
                 : null;
 
-            if (scope.HasFlag(EzRealmMetadataScope.Msd))
-            {
-                beatmapMsdComputer.SuppressChartDanSideUpsert = deferChartDanSideUpsert;
-
-                try
-                {
-                    if (populateMissingBeatmapMsd(chartChain!)
-                        && (scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo) || scope.HasFlag(EzRealmMetadataScope.ChartDan)))
-                        chartChain = skillStore.CollectChartChainState("BDSP");
-                }
-                finally
-                {
-                    beatmapMsdComputer.SuppressChartDanSideUpsert = false;
-                }
-            }
-
             if (scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo))
-            {
-                if (populateMissingChartSkillInfo(chartChain!)
-                    && scope.HasFlag(EzRealmMetadataScope.ChartDan))
-                    chartChain = skillStore.CollectChartChainState("BDSP");
-            }
+                populateMissingChartSkillInfo(chartChain!);
+
+            if (scope.HasFlag(EzRealmMetadataScope.Msd))
+                populateMissingBeatmapMsd(chartChain!);
 
             if (scope.HasFlag(EzRealmMetadataScope.ChartDan))
-                populateMissingChartDan(chartChain!);
+            {
+                chartChain = skillStore.CollectChartChainState("BDSP");
+                populateMissingChartDan(chartChain);
+            }
 
             EzStartupTrace.Log($"BDSP EzRealm backfill end scope={scope}");
         }
@@ -1095,11 +1078,11 @@ namespace osu.Game.Database
 
                 try
                 {
-                    if (beatmapMsdComputer.ComputeAndStore(beatmap) == null)
+                    if (ezBeatmapMinaComputer.ComputeAndStore(beatmap) == null)
                     {
                         // Zero-vector charts write __unrateable and count as settled, not failure.
-                        var skills = skillStore.GetBeatmapSkills(beatmap.Hash, EzSkillSystems.BEATMAP_MSD);
-                        if (EzBeatmapMsdComputer.IsUnrateableMsd(skills))
+                        var skills = skillStore.GetBeatmapSkills(beatmap.Hash, EzSkillSystems.BEATMAP_MINA);
+                        if (EzBeatmapMinaComputer.IsUnrateableMina(skills))
                             ++processedCount;
                         else
                             ++failedCount;
@@ -1126,18 +1109,11 @@ namespace osu.Game.Database
 
         /// <summary>
         /// Backfill typed <see cref="EzBeatmapChartSkillInfo"/> for mania beatmaps (EZ9 debt: schema without warm).
-        /// Requires the chart's MSD to be settled first: <c>HandstreamEndurance</c> is derived from the
-        /// stored axes, so a CSI row computed without MSD would silently stamp a wrong value. Candidates
-        /// whose MSD is still pending are deferred to a later run rather than analysed on partial input.
+        /// CSI is pure chart structure and no longer reads MSD, so it is not gated on the MSD stage.
         /// </summary>
         private bool populateMissingChartSkillInfo(EzChartChainState chain)
         {
             Logger.Log("Querying for mania beatmaps with missing ChartSkillInfo...");
-
-            int waitingOnMsd = chain.RateableChartCount - chain.SettledMsd.Count;
-
-            if (waitingOnMsd > 0)
-                Logger.Log($"Deferring {waitingOnMsd} ChartSkillInfo candidates until MSD is complete (run Realm MSD first).");
 
             // Settled includes a stamped unavailable stub: that stub exists precisely so a chart which
             // cannot be loaded is not re-converted on every run. A complete CSI row that an unrateable MSD
@@ -1146,7 +1122,7 @@ namespace osu.Game.Database
 
             if (missing.Count == 0)
             {
-                Logger.Log($"ChartSkillInfo backfill: nothing ready (have CSI or waiting on MSD). waitingOnMsd={waitingOnMsd}");
+                Logger.Log("ChartSkillInfo backfill: nothing ready (every rateable chart has a settled row).");
                 return false;
             }
 
@@ -1288,10 +1264,10 @@ namespace osu.Game.Database
 
                 try
                 {
-                    var msd = skillStore.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MSD);
+                    var msd = skillStore.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MINA);
 
                     // completeMsd already filtered; re-check guards races / version drift mid-run.
-                    if (!EzBeatmapMsdComputer.IsCurrentMsdCache(msd))
+                    if (!EzBeatmapMinaComputer.IsCurrentMinaCache(msd))
                     {
                         ++failedCount;
                         ++attemptedCount;
@@ -1304,7 +1280,7 @@ namespace osu.Game.Database
                         keyCount = 4;
 
                     double holdRatio = 0;
-                    if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
+                    if (msd.TryGetValue(EzSkillSystems.MinaHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
                         holdRatio = Math.Clamp(cachedHold, 0, 1);
                     else if (skillStore.TryGetChartSkillInfo(hash, out var csiHold) && csiHold?.LnRatio is double lnRatio && double.IsFinite(lnRatio))
                         holdRatio = Math.Clamp(lnRatio, 0, 1);

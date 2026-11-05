@@ -4,11 +4,15 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.Pattern;
+using osu.Game.EzOsuGame.Skills.PPP;
 
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Catalog of skill systems (mania Mina/SSR/pattern/dan + osu PP+ chart/player, …).
+    /// Catalog of skill systems
     /// Ruleset consumers should prefer <see cref="GetProfile"/> over hard-coded OnlineID checks.
     /// </summary>
     public sealed class EzSkillRegistry
@@ -41,7 +45,7 @@ namespace osu.Game.EzOsuGame.Skills
         public EzSkillProfile? GetProfile(int rulesetOnlineId)
             => EzSkillProfile.TryBuild(rulesetOnlineId, this);
 
-        /// <summary>Last segment of a skill id (<c>beatmap_ppplus.jump_aim</c> → <c>jump_aim</c>).</summary>
+        /// <summary>Last segment of a skill id (<c>beatmap_ppp.jump_aim</c> → <c>jump_aim</c>).</summary>
         public static bool TryGetMetricId(string? skillId, out string metricId)
         {
             metricId = string.Empty;
@@ -73,13 +77,14 @@ namespace osu.Game.EzOsuGame.Skills
 
         public static IEnumerable<IEzSkillSystem> CreateDefaultSystems()
         {
-            yield return new BeatmapMsdSkillSystem();
-            yield return new PlayerSsrSkillSystem();
-            yield return new PlayerPatternSkillSystem();
+            yield return new BeatmapPPPSkillSystem();
+            yield return new PlayerPPPSkillSystem();
+
+            yield return new BeatmapMinaSkillSystem();
+            yield return new PlayerMinaSkillSystem();
             yield return new DanSkillSystem();
 
-            yield return new BeatmapPpPlusSkillSystem();
-            yield return new PlayerPpPlusSkillSystem();
+            yield return new PlayerPatternSkillSystem();
         }
     }
 }

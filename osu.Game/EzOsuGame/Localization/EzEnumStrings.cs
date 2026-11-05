@@ -62,20 +62,20 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString DATA_REBUILD_TARGET_SQLITE_BRANCHES = new EzLocalizationManager.EzLocalisableString("SQLite 分支曲库 xxy/PP", "SQLite songs branches xxy/PP");
 
         public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_CHART_MSD = new EzLocalizationManager.EzLocalisableString(
-            "Realm chart MSD",
-            "Realm chart MSD");
+            "Realm MSD",
+            "Realm MSD");
 
         public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_CHART_CSI_AND_DAN = new EzLocalizationManager.EzLocalisableString(
             "Realm DualPanel谱面 (CSI+Dan)",
             "Realm DualPanel chart (CSI+Dan)");
 
         public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_CHART_SKILL_CHAIN = new EzLocalizationManager.EzLocalisableString(
-            "Realm 谱面技能链 (MSD+CSI+Dan)",
-            "Realm chart skill chain (MSD+CSI+Dan)");
+            "Realm Dan技能链 (MSD+CSI+Dan)",
+            "Realm Dan skill chain (MSD+CSI+Dan)");
 
         public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_PPP = new EzLocalizationManager.EzLocalisableString(
-            "Realm PPP 图表技能",
-            "Realm PPP chart skills");
+            "Realm PPP 技能",
+            "Realm PPP skills");
 
         public static readonly LocalisableString LOGO_VIS_BARS = new EzLocalizationManager.EzLocalisableString("柱状", "Bars");
         public static readonly LocalisableString LOGO_VIS_POLYLINE = new EzLocalizationManager.EzLocalisableString("折线", "Polyline");

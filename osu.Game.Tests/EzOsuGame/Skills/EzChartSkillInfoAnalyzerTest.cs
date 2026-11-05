@@ -5,7 +5,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
-using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
 {
@@ -99,7 +101,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var notes = Enumerable.Range(0, 40)
                                   .Select(i => new EzManiaNote(i * 50, i % 7, false, i * 50))
                                   .ToList();
-            Assert.That(EzMotionFeaturesComputer.Compute(notes, 7), Is.Null);
+            Assert.That(EzChartSkillInfoComputer.EzCSIMotionComputer.Compute(notes, 7), Is.Null);
         }
 
         [Test]
@@ -116,7 +118,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 t += 80;
             }
 
-            var motion = EzMotionFeaturesComputer.Compute(notes, 4);
+            var motion = EzChartSkillInfoComputer.EzCSIMotionComputer.Compute(notes, 4);
             Assert.That(motion, Is.Not.Null);
             Assert.That(motion!.RhythmBreak, Is.InRange(0, 1));
             Assert.That(motion.SameHand, Is.InRange(0, 1));

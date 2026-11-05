@@ -4,6 +4,8 @@
 using NUnit.Framework;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.Tests.EzOsuGame.Analysis
 {
@@ -18,14 +20,15 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         {
             // MSD rows keep the plain constant: EzBeatmapSkillValue is shared with player SSR /
             // pattern rows and readers pass the algorithm version explicitly.
-            Assert.That(EzAnalysisRevision.Msd, Is.EqualTo(EzManiaSkillAlgorithm.VERSION));
+            Assert.That(EzAnalysisRevision.Msd, Is.EqualTo(EzMinaSkillAlgorithm.VERSION));
         }
 
         [Test]
-        public void Chart_skill_info_folds_its_own_version_and_msd()
+        public void Chart_skill_info_folds_only_its_own_version()
         {
+            // CSI is pure chart structure; it reads no MSD axes, so MSD is not an input.
             Assert.That(EzAnalysisRevision.DescribeChartSkillInfo(EzAnalysisRevision.ChartSkillInfo),
-                Is.EqualTo($"policy={EzAnalysisRevision.CSI_POLICY} csi={EzChartSkillInfo.VERSION} msd={EzManiaSkillAlgorithm.VERSION}"));
+                Is.EqualTo($"policy={EzAnalysisRevision.CSI_POLICY} csi={EzChartSkillInfo.VERSION}"));
 
             // Distinct upstream values must produce distinct revisions (no slot collision).
             Assert.That(EzAnalysisRevision.ChartSkillInfo, Is.Not.EqualTo(EzAnalysisRevision.Msd));
@@ -35,7 +38,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         public void Chart_dan_folds_dan_csi_and_msd()
         {
             Assert.That(EzAnalysisRevision.DescribeChartDan(EzAnalysisRevision.ChartDan),
-                Is.EqualTo($"policy={EzAnalysisRevision.DAN_POLICY} dan={EzDanAlgorithm.VERSION} csi={EzChartSkillInfo.VERSION} msd={EzManiaSkillAlgorithm.VERSION}"));
+                Is.EqualTo($"policy={EzAnalysisRevision.DAN_POLICY} dan={EzDanAlgorithm.VERSION} csi={EzChartSkillInfo.VERSION} msd={EzMinaSkillAlgorithm.VERSION}"));
 
             Assert.That(EzAnalysisRevision.ChartDan, Is.Not.EqualTo(EzAnalysisRevision.ChartSkillInfo));
         }
@@ -43,10 +46,11 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [Test]
         public void Downstream_edges_match_the_declared_dependency_chain()
         {
-            // Msd -> ChartSkillInfo -> ChartDan. Bumping an upstream facet must invalidate every
-            // downstream facet, which is what makes the incremental backfill recompute them.
+            // Msd -> ChartDan and ChartSkillInfo -> ChartDan: the two chart facets are independent
+            // inputs and fan in at Dan. Bumping an upstream facet must invalidate every downstream
+            // facet, which is what makes the incremental backfill recompute them.
             Assert.That(EzAnalysisRevision.DownstreamOf(EzAnalysisFacet.Msd),
-                Is.EqualTo(EzAnalysisFacet.ChartSkillInfo | EzAnalysisFacet.ChartDan));
+                Is.EqualTo(EzAnalysisFacet.ChartDan));
 
             Assert.That(EzAnalysisRevision.DownstreamOf(EzAnalysisFacet.ChartSkillInfo),
                 Is.EqualTo(EzAnalysisFacet.ChartDan));
@@ -72,7 +76,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         {
             // A constant >= SLOT_RADIX would carry into the neighbouring slot and silently make two
             // different inputs share a revision.
-            Assert.That(EzManiaSkillAlgorithm.VERSION, Is.LessThan(EzAnalysisRevision.SLOT_RADIX));
+            Assert.That(EzMinaSkillAlgorithm.VERSION, Is.LessThan(EzAnalysisRevision.SLOT_RADIX));
             Assert.That(EzChartSkillInfo.VERSION, Is.LessThan(EzAnalysisRevision.SLOT_RADIX));
             Assert.That(EzDanAlgorithm.VERSION, Is.LessThan(EzAnalysisRevision.SLOT_RADIX));
             Assert.That(EzAnalysisRevision.CSI_POLICY, Is.LessThan(EzAnalysisRevision.SLOT_RADIX));

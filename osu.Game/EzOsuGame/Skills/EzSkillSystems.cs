@@ -1,81 +1,72 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.PPP;
+
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Realm <c>SystemId</c> namespaces and meta skill ids.
-    /// Mania (Mina / pattern / dan) and osu (PP+ chart / player) are peer plugins under <see cref="EzSkillRegistry"/>;
-    /// ruleset wiring is <see cref="EzSkillProfile"/>.
+    /// Storage namespaces for skill value rows, plus the ids that are not plain axes.
     /// </summary>
+    /// <remarks>
+    /// These are the strings written into the value tables. The canonical producer names live in
+    /// <c>EzMetricProducers</c>; the two are deliberately separate so storage can be renamed without
+    /// touching identity, and vice versa.
+    /// </remarks>
     public static class EzSkillSystems
     {
-        public const string BEATMAP_MSD = "beatmap_msd";
-        public const string PLAYER_SSR = "player_ssr";
+        public const string BEATMAP_MINA = "beatmap_msd";
 
-        /// <summary>
-        /// Hub pattern ratings (Overall SSR aggregated per chart pattern tag).
-        /// Persisted in existing <see cref="EzPlayerSkillValue"/> rows — see DATA-Skills-PatternRatings.
-        /// </summary>
+        public const string PLAYER_MINA = "player_ssr";
+
         public const string PLAYER_PATTERN = "player_pattern";
 
         public const string DAN = "dan";
 
-        /// <summary>osu!standard PP+-shaped chart axes (<see cref="EzOsuSkillAxis"/>).</summary>
-        public const string BEATMAP_PPPLUS = "beatmap_ppplus";
+        /// <summary>PP+ chart axes.</summary>
+        public const string BEATMAP_PPP = "beatmap_ppp";
 
-        /// <summary>osu!standard PP+-shaped player axes (aggregated plays).</summary>
-        public const string PLAYER_PPPLUS = "player_ppplus";
+        /// <summary>PP+ player axes.</summary>
+        public const string PLAYER_PPP = "player_ppp";
 
-        /// <summary>
-        /// Realm <see cref="EzPlayerSkillValue.KeyCount"/> sentinel for rulesets without keymode slices (osu).
-        /// </summary>
-        public const int OSU_SLICE_KEY = 0;
+        /// <summary>Key count sentinel for producers that are not sliced by key mode.</summary>
+        public const int UNSLICED_KEY = 0;
 
-        /// <summary>Persisted beside MSD axes when computed (not a Mina axis).</summary>
+        /// <summary>Persisted beside the Mina axes; a ratio, not an axis.</summary>
         public const string HOLD_RATIO = "__hold_ratio";
 
         /// <summary>
-        /// Settled miss for charts MinaCalc rates as a zero vector on a supported keymode.
-        /// Keyed by beatmap content hash — editing the chart changes the hash and allows recompute.
-        /// Not a valid MSD cache (<see cref="EzBeatmapMsdComputer.IsCurrentMsdCache"/> stays false).
+        /// Settled miss for a chart the engine rates as a zero vector on a supported key mode.
+        /// Keyed by content hash, so editing the chart allows a recompute.
         /// </summary>
         public const string UNRATEABLE = "__unrateable";
 
-        public static string MsdHoldRatioSkillId => $"{BEATMAP_MSD}.{HOLD_RATIO}";
+        public static string MinaHoldRatioSkillId => $"{BEATMAP_MINA}.{HOLD_RATIO}";
 
-        public static string MsdUnrateableSkillId => $"{BEATMAP_MSD}.{UNRATEABLE}";
+        public static string MinaUnrateableSkillId => $"{BEATMAP_MINA}.{UNRATEABLE}";
 
         public static string DanSkillId(int keyCount, EzDanSide side)
             => $"{DAN}.{keyCount}k.{side.ToId()}";
 
         /// <summary>
-        /// Default algorithm version for skill-value rows of <paramref name="systemId"/>.
-        /// Unknown ids return 0 (caller should pass an explicit version).
+        /// Default algorithm version for rows of <paramref name="systemId"/>. Unknown ids return 0, so
+        /// callers must pass an explicit version for anything not listed here.
         /// </summary>
         public static int ResolveAlgorithmVersion(string systemId) => systemId switch
         {
-            BEATMAP_MSD or PLAYER_SSR or PLAYER_PATTERN => EzManiaSkillAlgorithm.VERSION,
-            BEATMAP_PPPLUS or PLAYER_PPPLUS => EzOsuSkillAlgorithm.VERSION,
+            BEATMAP_MINA or PLAYER_MINA or PLAYER_PATTERN => EzMinaSkillAlgorithm.VERSION,
+            // PP+ rows are stamped per ruleset bundle, never by a single version constant.
+            BEATMAP_PPP or PLAYER_PPP => EzPPPSkillVersions.FACET_REVISION,
             _ => 0,
         };
     }
 
     /// <summary>
-    /// Bump when MinaCalc note conversion or aggregation semantics change.
-    /// 2: unified onto the 4-18K n-key MinaCalc wasm (was NuGet MinaCalc 0.4.2, 4/6/7K only).
+    /// Bump when note conversion or rating aggregation semantics change.
+    /// 2: unified onto the 4-18K n-key engine (was a 4/6/7K-only package).
     /// </summary>
-    public static class EzManiaSkillAlgorithm
-    {
-        public const int VERSION = 2;
-    }
-
-    /// <summary>
-    /// Legacy single version for PP+ rows. PPP uses
-    /// <see cref="EzPppSkillVersions"/> per ruleset bundle and do not bump this constant.
-    /// 2: PP+-shaped axes (was official Diff aim/speed/FL/reading).
-    /// </summary>
-    public static class EzOsuSkillAlgorithm
+    public static class EzMinaSkillAlgorithm
     {
         public const int VERSION = 2;
     }
