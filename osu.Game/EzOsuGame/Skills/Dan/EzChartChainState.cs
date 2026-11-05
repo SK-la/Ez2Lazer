@@ -7,6 +7,7 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 using Realms;
 
@@ -36,10 +37,10 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             public readonly double? SunnyStarRating;
             public readonly double HoldRatio;
 
-            public RateableChartMeta(int keyCount, double? SunnyStarRating, double holdRatio)
+            public RateableChartMeta(int keyCount, double? sunnyStarRating, double holdRatio)
             {
                 KeyCount = keyCount;
-                SunnyStarRating = SunnyStarRating;
+                SunnyStarRating = sunnyStarRating;
                 HoldRatio = holdRatio;
             }
         }
@@ -199,7 +200,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
                 msdRowsForReader.Add(value);
 
-                if (value.AlgorithmVersion != msdRevision)
+                if (value.AlgorithmVersion != msdRevision || value.State != (int)EzMetricState.Current)
                     continue;
 
                 if (!msdSkillsAtRevision.TryGetValue(value.BeatmapHash, out var skills))
@@ -216,7 +217,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 static v => v.BeatmapHash,
                 static v => v.AlgorithmVersion,
                 msdRevision,
-                static v => v.SkillId == EzSkillSystems.MinaUnrateableSkillId);
+                static v => v.State == (int)EzMetricState.Unrateable);
 
             var csiRows = EzRealmFacetReader.Read(
                 r.All<EzBeatmapChartSkillInfo>()

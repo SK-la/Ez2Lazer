@@ -32,11 +32,22 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         public static EzChartSkillInfo Compute(
             EzManiaChartInput chart,
             double rate = 1)
+            => Compute(chart, rate, out _, out _);
+
+        /// <summary>
+        /// Same pass, also handing out the extracted features and pattern scores so callers that need the raw
+        /// structure (the CSI axis table) do not run the analysers a second time.
+        /// </summary>
+        public static EzChartSkillInfo Compute(
+            EzManiaChartInput chart,
+            double rate,
+            out EzChartFeatureExtraction features,
+            out EzPatternAnalysis patterns)
         {
             ArgumentNullException.ThrowIfNull(chart);
 
-            var features = EzChartFeatureExtractor.Extract(chart, rate);
-            var patterns = EzPatternAnalyzer.Analyze(chart, rate, features);
+            features = EzChartFeatureExtractor.Extract(chart, rate);
+            patterns = EzPatternAnalyzer.Analyze(chart, rate, features);
             var patternScores = new Dictionary<string, double>(StringComparer.Ordinal);
 
             foreach (var hit in patterns.AllPatterns)
@@ -120,6 +131,37 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                 LengthSeconds = lengthSeconds,
                 KeyCount = keyCount,
             };
+        }
+
+        /// <summary>
+        /// Axis table of the structure pass, keyed by bare axis id, together with the typed summary the same pass
+        /// produced. Rate is not folded in: these values are rate-invariant.
+        /// </summary>
+        /// <remarks>
+        /// The single producer of the structure axis table. Both the live pass and the background write go through
+        /// it, so a persisted frame and a computed one cannot disagree on which axes exist.
+        /// </remarks>
+        public static IReadOnlyDictionary<string, double> ComputeAxes(EzManiaChartInput chart, out EzChartSkillInfo info)
+        {
+            ArgumentNullException.ThrowIfNull(chart);
+
+            info = Compute(chart, 1, out var features, out var patterns);
+
+            var axes = new Dictionary<string, double>(EzManiaLNAxisExtensions.FromFeatures(features.Metrics), StringComparer.Ordinal);
+
+            foreach (var hit in patterns.AllPatterns)
+            {
+                if (!double.IsFinite(hit.Score) || hit.Score <= 0)
+                    continue;
+
+                if (!EzManiaLNAxisExtensions.SubtypeIds.Contains(hit.Id) && !EzManiaRCAxisExtensions.AllIds.Contains(hit.Id))
+                    continue;
+
+                if (!axes.TryGetValue(hit.Id, out double existing) || hit.Score > existing)
+                    axes[hit.Id] = hit.Score;
+            }
+
+            return axes;
         }
 
         public static EzManiaChartInput FromPlayable(IBeatmap playable)

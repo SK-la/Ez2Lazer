@@ -22,11 +22,23 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly ConcurrentDictionary<AnalysisKey, EzAnalysisResult> analyses
             = new ConcurrentDictionary<AnalysisKey, EzAnalysisResult>();
 
+        /// <summary>
+        /// Upper bound on retained analyses. Each entry holds a KPS series and a mania summary, so an unbounded
+        /// store grows with everything the user browses. A full drop costs a recompute of whatever is on screen,
+        /// which is the same price the first visit paid.
+        /// </summary>
+        private const int capacity = 512;
+
         public EzAnalysisResult? Get(AnalysisKey key)
             => analyses.TryGetValue(key, out var value) ? value : null;
 
         public void Set(AnalysisKey key, EzAnalysisResult value)
-            => analyses[key] = value;
+        {
+            if (analyses.Count >= capacity && !analyses.ContainsKey(key))
+                analyses.Clear();
+
+            analyses[key] = value;
+        }
 
         /// <summary>Drops the entries a bump of <paramref name="producer"/> can invalidate.</summary>
         public void Invalidate(EzMetricProducerId producer)

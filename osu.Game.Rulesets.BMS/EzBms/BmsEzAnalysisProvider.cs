@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Runtime.CompilerServices;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Rulesets.BMS.Beatmaps;
@@ -15,7 +16,19 @@ namespace osu.Game.Rulesets.BMS.EzBms
     /// </summary>
     public sealed class BmsEzAnalysisProvider : IEzAnalysisProvider, IEzSunnyStarRatingSupport
     {
+        /// <summary>
+        /// Conversions of one source chart, keyed weakly on that chart. A single analysis pass asks this provider
+        /// several times for the same chart (rating, radar, performance), and each request would otherwise rebuild
+        /// the whole mania note list.
+        /// </summary>
+        /// <remarks>
+        /// The converted beatmap never leaves the provider: every consumer inside it only reads hit objects. It is
+        /// therefore safe to share, and it dies with the source chart it was built from.
+        /// </remarks>
+        private static readonly ConditionalWeakTable<IBeatmap, ManiaBeatmap> conversions = new ConditionalWeakTable<IBeatmap, ManiaBeatmap>();
+
         private readonly EzManiaAnalysisProvider inner = new EzManiaAnalysisProvider();
+
         public int SunnyStarRatingVersion => inner.SunnyStarRatingVersion;
 
         public bool SupportsSunnyStarRating(IBeatmap beatmap)
@@ -30,7 +43,7 @@ namespace osu.Game.Rulesets.BMS.EzBms
         {
             if (tryGetManiaBeatmap(request.Beatmap, out ManiaBeatmap? maniaBeatmap) && maniaBeatmap != null)
             {
-                var maniaRequest = new EzAnalysisRequest(maniaBeatmap, request.ClockRate, request.RequestedScopes);
+                var maniaRequest = new EzAnalysisRequest(maniaBeatmap, request.ClockRate, request.RequestedScopes, request.StarRatingOverride);
                 return inner.TryCompute(maniaRequest, cancellationToken, out analysis);
             }
 
@@ -39,8 +52,6 @@ namespace osu.Game.Rulesets.BMS.EzBms
 
         private static bool tryGetManiaBeatmap(IBeatmap beatmap, out ManiaBeatmap? maniaBeatmap)
         {
-            maniaBeatmap = null;
-
             if (beatmap is ManiaBeatmap existing)
             {
                 maniaBeatmap = existing;
@@ -49,10 +60,11 @@ namespace osu.Game.Rulesets.BMS.EzBms
 
             if (beatmap is BMSBeatmap || beatmap.HitObjects.Any(h => h is BMSHitObject))
             {
-                maniaBeatmap = ManiaConvertedWorkingBeatmap.ConvertToManiaBeatmap(beatmap);
+                maniaBeatmap = conversions.GetValue(beatmap, static source => ManiaConvertedWorkingBeatmap.ConvertToManiaBeatmap(source));
                 return true;
             }
 
+            maniaBeatmap = null;
             return false;
         }
     }

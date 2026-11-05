@@ -484,7 +484,8 @@ namespace osu.Game
             var pppEngine = new EzPPPEngine();
 
             var beatmapMsdComputer = new EzBeatmapMinaComputer(BeatmapManager, skillStore);
-            var chartDanEstimator = new EzChartDanEstimator(BeatmapManager, beatmapMsdComputer);
+            var beatmapPppComputer = new EzBeatmapPPPComputer(BeatmapManager, skillStore, pppEngine);
+            var chartDanEstimator = new EzChartDanEstimator(ezAnalysisCache);
 
             var localProfileStore = new EzLocalProfileStore(Storage);
 
@@ -499,8 +500,10 @@ namespace osu.Game
             dependencies.Cache(skillStore);
             dependencies.Cache(skillProvider);
             dependencies.Cache(beatmapMsdComputer);
+            dependencies.Cache(beatmapPppComputer);
 
-            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, playerRatingAggregator, playerDanAggregator, localProfileStore, skillProvider, playerPPPAggregator));
+            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, playerRatingAggregator, playerDanAggregator, localProfileStore,
+                skillProvider, playerPPPAggregator, ezAnalysisCache));
             dependencies.Cache(new EzLocalProfileOnlinePullService(API, ScoreManager, BeatmapManager, realm, Storage));
             dependencies.Cache(new EzAnalysisPlayerSelection());
 

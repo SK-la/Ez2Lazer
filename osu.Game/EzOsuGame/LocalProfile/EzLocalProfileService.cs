@@ -81,10 +81,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
             EzPlayerDanAggregator? danAggregator = null,
             EzLocalProfileStore? sharedStore = null,
             EzSkillProvider? skillProvider = null,
-            EzPlayerPPPAggregator? osuPPPAggregator = null)
+            EzPlayerPPPAggregator? osuPPPAggregator = null,
+            IEzChartAnalysisLookup? analysisLookup = null)
         {
             Store = sharedStore ?? new EzLocalProfileStore(storage);
-            aggregator = new EzLocalProfileAggregator(realm, analysisStore, beatmapManager);
+            aggregator = new EzLocalProfileAggregator(realm, analysisStore, beatmapManager, analysisLookup);
             this.ssrAggregator = ssrAggregator;
             this.danAggregator = danAggregator;
             this.osuPPPAggregator = osuPPPAggregator;
@@ -172,34 +173,34 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return loaded;
         }
 
+        /// <summary>
+        /// Session-cached insights for a filter, or false when this session has not built them yet.
+        /// </summary>
+        /// <remarks>
+        /// Insights are derived from drill rows and are not persisted: the overlay is a view, and a durable cache
+        /// written from it would make a read path write to disk.
+        /// </remarks>
         public bool TryGetCachedInsights(string? usernameFilter, out EzLocalProfileInsights? insights)
         {
             string key = insightsCacheKey(usernameFilter);
 
             lock (sessionCacheLock)
-            {
-                if (insightsMemoryCache.TryGetValue(key, out insights))
-                    return true;
-            }
-
-            insights = Store.TryLoadInsightsCache(usernameFilter);
-            if (insights == null)
-                return false;
-
-            lock (sessionCacheLock)
-                insightsMemoryCache[key] = insights;
-
-            return true;
+                return insightsMemoryCache.TryGetValue(key, out insights);
         }
 
+        /// <summary>
+        /// Keeps computed insights in the session cache only.
+        /// </summary>
+        /// <remarks>
+        /// The Insights overlay is a view: it may compute a missing value, but persisting it from there would mean a
+        /// read writes to disk. Durable insight caches belong to the manual local-profile compute.
+        /// </remarks>
         public void SetCachedInsights(string? usernameFilter, EzLocalProfileInsights insights)
         {
             string key = insightsCacheKey(usernameFilter);
 
             lock (sessionCacheLock)
                 insightsMemoryCache[key] = insights;
-
-            Store.SaveInsightsCache(usernameFilter, insights);
         }
 
         /// <summary>Drop session + SQLite insights caches after compute / partition writes.</summary>

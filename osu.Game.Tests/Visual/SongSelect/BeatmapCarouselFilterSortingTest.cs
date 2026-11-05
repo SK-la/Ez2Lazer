@@ -206,28 +206,28 @@ namespace osu.Game.Tests.Visual.SongSelect
         }
 
         [Test]
-        public async Task TestSortBySunnyStarRatingUsesProvidedValues()
+        public async Task TestSortByDifficultyUsesProvidedSystemValues()
         {
             var beatmapSets = new List<BeatmapSetInfo>();
 
             addBeatmapSet(applyXxy(1.0, 5.0), beatmapSets, out var lowXxyHighSr);
             addBeatmapSet(applyXxy(9.0, 1.0), beatmapSets, out var highXxyLowSr);
 
-            var results = await runSorting(SortMode.SunnyStarRating, beatmapSets, xxyValueProvider: beatmaps => beatmaps.ToDictionary(b => b, resolveXxy));
+            var results = await runSorting(SortMode.Difficulty, beatmapSets, xxyValueProvider: beatmaps => beatmaps.ToDictionary(b => b, resolveXxy));
 
             Assert.That(results.Last(), Is.EqualTo(highXxyLowSr.Beatmaps[0]));
             Assert.That(results.First(), Is.EqualTo(lowXxyHighSr.Beatmaps[0]));
         }
 
         [Test]
-        public async Task TestSortByDifficultyUsesOfficialStarRating()
+        public async Task TestSortByDifficultyUsesTheOfficialBaselineByDefault()
         {
             var beatmapSets = new List<BeatmapSetInfo>();
 
             addBeatmapSet(applyXxy(9.0, 1.0), beatmapSets, out var highXxyLowSr);
             addBeatmapSet(applyXxy(1.0, 9.0), beatmapSets, out var lowXxyHighSr);
 
-            var results = await runSorting(SortMode.Difficulty, beatmapSets, xxyValueProvider: beatmaps => beatmaps.ToDictionary(b => b, resolveXxy));
+            var results = await runSorting(SortMode.Difficulty, beatmapSets);
 
             Assert.That(results.Last(), Is.EqualTo(lowXxyHighSr.Beatmaps[0]));
             Assert.That(results.First(), Is.EqualTo(highXxyLowSr.Beatmaps[0]));
@@ -258,7 +258,7 @@ namespace osu.Game.Tests.Visual.SongSelect
         {
             var sorter = new BeatmapCarouselFilterSorting(
                 () => new FilterCriteria { Sort = sort },
-                (beatmaps, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(xxyValueProvider?.Invoke(beatmaps) ?? beatmaps.ToDictionary(b => b, resolveXxy)),
+                (beatmaps, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(xxyValueProvider?.Invoke(beatmaps) ?? new Dictionary<BeatmapInfo, double>()),
                 (beatmaps, _) => Task.FromResult(ppValueProvider?.Invoke(beatmaps) ?? new Dictionary<BeatmapInfo, double>()));
             var carouselItems = await sorter.Run(beatmapSets.SelectMany(s => s.Beatmaps.Select(b => new CarouselItem(b))), CancellationToken.None);
             return carouselItems.Select(ci => ci.Model).OfType<BeatmapInfo>();

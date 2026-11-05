@@ -496,6 +496,26 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_WRITTEN_AT =
             new EzLocalizationManager.EzLocalisableString("值写于", "values written");
 
+        public static readonly EzLocalizationManager.EzLocalisableString PANEL_VARIANT_OFFICIAL =
+            new EzLocalizationManager.EzLocalisableString("官方", "Official");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PANEL_VARIANT_MINA =
+            new EzLocalizationManager.EzLocalisableString("Mina", "Mina");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PANEL_VARIANT_SUNNY =
+            new EzLocalizationManager.EzLocalisableString("Sunny", "Sunny");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PANEL_VARIANT_PPP =
+            new EzLocalizationManager.EzLocalisableString("PP+", "PP+");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ANALYSIS_SYSTEM_SELECTION =
+            new EzLocalizationManager.EzLocalisableString("分析算法", "Analysis system");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ANALYSIS_SYSTEM_SELECTION_TOOLTIP =
+            new EzLocalizationManager.EzLocalisableString(
+                "每个规则集各自选用一套分析系统。选歌界面的排序、分组与筛选按这里的选择读取同一套基线。",
+                "Each ruleset picks its own analysis system. Sorting, grouping and filtering on song select read that baseline.");
+
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_WAITING_CHART =
             new EzLocalizationManager.EzLocalisableString("等图表链", "waiting on chart chain");
 

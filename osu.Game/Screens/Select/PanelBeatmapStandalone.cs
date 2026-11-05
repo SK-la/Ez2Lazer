@@ -75,6 +75,7 @@ namespace osu.Game.Screens.Select
         private EzDisplayKps ezDisplayKps = null!;
         private EzDisplayKpc ezDisplayKpc = null!;
         private EzDisplaySR displaySR = null!;
+        private EzDisplayPP displayPP = null!;
         private EzDisplayTag ezDisplayTag = null!;
         private EzDisplaySkillsDan ezDisplaySkillsDan = null!;
 
@@ -281,6 +282,12 @@ namespace osu.Game.Screens.Select
                                             Anchor = Anchor.CentreLeft,
                                             Scale = new Vector2(0.875f),
                                         },
+                                        displayPP = new EzDisplayPP(StarRatingDisplaySize.Small)
+                                        {
+                                            Origin = Anchor.CentreLeft,
+                                            Anchor = Anchor.CentreLeft,
+                                            Scale = new Vector2(0.875f),
+                                        },
                                         // spreadDisplay = new SpreadDisplay
                                         // {
                                         //     Origin = Anchor.CentreLeft,
@@ -329,6 +336,13 @@ namespace osu.Game.Screens.Select
 
             mods.BindValueChanged(_ => updateKeyCount(), true);
 
+            // Mania's pill follows the selection between Sunny and Mina; the other rulesets ignore it.
+            ezConfig.GetBindable<string>(Ez2Setting.AnalysisSystemSelection).BindValueChanged(_ =>
+            {
+                if (Item?.IsVisible == true)
+                    updateEzStarRating();
+            });
+
             Selected.BindValueChanged(s =>
             {
                 Expanded.Value = s.NewValue;
@@ -356,7 +370,9 @@ namespace osu.Game.Screens.Select
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
             applyPanelKps(EzSongSelectAnalysisDisplay.Empty);
-            ezDisplayKps.SetPp(EzPanelPerformancePoints.ResolveRealmBaselinePp(beatmap));
+
+            // Only the pp half is seeded here; the star comes from the difficulty cache.
+            displayPP.Current.Value = EzPanelPerformancePoints.ResolveRealmBaselinePp(beatmap);
 
             if (ruleset.Value is RulesetInfo rulesetInfo
                 && EzPanelKpsMetrics.TryResolveBaselineFromSqlite(ezAnalysisDatabase, beatmap, rulesetInfo, mods.Value, out var baselineKps))
@@ -370,10 +386,27 @@ namespace osu.Game.Screens.Select
             ezDisplaySkillsDan.Beatmap = beatmap;
             ezDisplayTag.Beatmap = beatmap;
 
-            if (supportsEzAnalysis && beatmap.SupportsSunnyStarRating())
-                displaySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay();
+            updateEzStarRating();
 
             computeEzAnalysis();
+        }
+
+        /// <summary>
+        /// Paints the Ez star pill: the ruleset's own rating next to the official one.
+        /// </summary>
+        /// <param name="summary">
+        /// Summary the current analysis pass produced for this chart; omitted to read the stored baseline.
+        /// </param>
+        private void updateEzStarRating(EzManiaSummary? summary = null)
+        {
+            EzManiaSummary display = summary ?? beatmap.ToEzManiaSummaryForDisplay();
+
+            displaySR.Current.Value = display;
+
+            if (display.XxySr is null)
+                displaySR.Hide();
+            else
+                displaySR.Show();
         }
 
         private void resetEzDisplay()
@@ -381,15 +414,7 @@ namespace osu.Game.Screens.Select
             if (Item?.IsVisible != true)
                 return;
 
-            bool showXxy = supportsEzAnalysis && beatmap.SupportsSunnyStarRating();
-
-            if (showXxy)
-                displaySR.Show();
-            else
-            {
-                displaySR.Current.Value = EzManiaSummary.EMPTY;
-                displaySR.Hide();
-            }
+            updateEzStarRating();
 
             ezDisplayKpc.ManiaSummary = null;
             ezDisplayKpc.Hide();
@@ -434,7 +459,7 @@ namespace osu.Game.Screens.Select
             ezDisplayKpc.ManiaSummary = null;
             ezDisplayKpc.Hide();
             applyPanelKps(EzSongSelectAnalysisDisplay.Empty);
-            ezDisplayKps.SetPp(null);
+            displayPP.Current.Value = null;
         }
 
         private void applyPanelKps(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
@@ -468,6 +493,9 @@ namespace osu.Game.Screens.Select
             var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, ezAnalysisResult, mods.Value);
             applyPanelKps(metrics);
 
+            // The pill exists for every ruleset; only mania's live summary carries KPC and scratch on top of it.
+            updateEzStarRating(metrics.ManiaSummary);
+
             if (!supportsEzAnalysis || !beatmap.SupportsSunnyStarRating())
                 return;
 
@@ -482,10 +510,6 @@ namespace osu.Game.Screens.Select
                 scratchText = scratch;
 
             updateKeyCount();
-
-            var summaryForDisplay = maniaSummary ?? EzManiaSummary.EMPTY;
-            if (displaySR.Current.Value.XxySr != summaryForDisplay.XxySr)
-                displaySR.Current.Value = summaryForDisplay;
         }
 
         private void computeEzAnalysis()
@@ -519,10 +543,14 @@ namespace osu.Game.Screens.Select
                 if (Item?.IsVisible != true)
                     return;
 
-                starRatingDisplay.Current.Value = starDifficulty.NewValue;
-
-                ezDisplayKps.SetPp(EzPanelPerformancePoints.ResolvePanelPp(starDifficulty.NewValue, beatmap));
+                applyPanelDifficulty(starDifficulty.NewValue);
             }, true);
+        }
+
+        private void applyPanelDifficulty(in StarDifficulty starDifficulty)
+        {
+            starRatingDisplay.Current.Value = starDifficulty;
+            displayPP.Current.Value = EzPanelPerformancePoints.ResolvePanelPp(starDifficulty, beatmap);
         }
 
         protected override void Update()
@@ -573,7 +601,7 @@ namespace osu.Game.Screens.Select
                 if (scratchText != null)
                 {
                     keyCountText.Alpha = 1;
-                    keyCountText.Text =LocalisableString.Interpolate($"[{scratchText}] ");
+                    keyCountText.Text = LocalisableString.Interpolate($"[{scratchText}] ");
                     keyCountText.Colour = Colour4.LightPink.ToLinear();
                     return;
                 }

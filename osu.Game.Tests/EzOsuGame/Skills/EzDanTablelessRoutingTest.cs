@@ -122,7 +122,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
-        public void PersistedChartDanWithoutStarRatingStaysEmpty()
+        public void PersistedChartDanWithoutStarRatingKeepsOnlyTheAxisMean()
         {
             var computed = EzPersistedChartDan.TryComputeFromStored(
                 "tableless-8k-noxxy",
@@ -133,7 +133,12 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 xxySr: null,
                 chartInfo: null);
 
-            Assert.That(computed, Is.Null);
+            // 8K has no table of its own and no star rating to read a borrowed one off, so no side resolves. The
+            // axis mean is still carried: the row is the chart's rating axis even when it has no dan label.
+            Assert.That(computed, Is.Not.Null);
+            Assert.That(computed!.OverallMsd, Is.EqualTo(20).Within(0.0001));
+            Assert.That(computed.HasSide(EzDanSide.Rc), Is.False);
+            Assert.That(computed.HasSide(EzDanSide.Ln), Is.False);
         }
     }
 }

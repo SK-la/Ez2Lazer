@@ -296,10 +296,10 @@ namespace osu.Game.Tests.Visual.SongSelect
 
         #endregion
 
-        #region xxy SR grouping
+        #region difficulty grouping by a supplied system
 
         [Test]
-        public async Task TestGroupingBySunnyStarRating()
+        public async Task TestGroupingByDifficultyUsesTheSuppliedSystemValues()
         {
             int total = 0;
 
@@ -309,7 +309,7 @@ namespace osu.Game.Tests.Visual.SongSelect
             addBeatmapSet(applyXxyStars(2.0, 9.0), beatmapSets, out var beatmap2);
             addBeatmapSet(applyXxyStars(7.0, 2.0), beatmapSets, out var beatmap7);
 
-            var results = await runGrouping(GroupMode.SunnyStarRating, beatmapSets, getXxy: resolveXxy);
+            var results = await runGrouping(GroupMode.Difficulty, beatmapSets, getXxy: resolveXxy);
             assertGroup(results, 0, BeatmapCarouselFilterGroupingStrings.BelowStars(1), beatmapBelow1.Beatmaps, ref total);
             assertGroup(results, 1, BeatmapCarouselFilterGroupingStrings.Stars(1), beatmapAbove1.Beatmaps, ref total);
             assertGroup(results, 2, BeatmapCarouselFilterGroupingStrings.Stars(2), beatmap2.Beatmaps, ref total);
@@ -485,7 +485,9 @@ namespace osu.Game.Tests.Visual.SongSelect
                 GetLocalUserTopRanks = _ => new Dictionary<Guid, ScoreRank>(),
                 GetFavouriteBeatmapSets = () => favouriteBeatmapSets,
                 GetDifficultiesForOperationsAsync = (beatmaps, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(
-                    beatmaps.ToDictionary(b => b, b => getXxy?.Invoke(b) ?? (b.SunnyStarRating >= 0 ? b.SunnyStarRating : b.StarRating))),
+                    getXxy == null
+                        ? new Dictionary<BeatmapInfo, double>()
+                        : beatmaps.ToDictionary(b => b, getXxy)),
                 GetPpForOperationsAsync = (beatmaps, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(beatmaps.Where(b => (getPp?.Invoke(b)).HasValue).ToDictionary(b => b, b => getPp!.Invoke(b)!.Value)),
             };
 

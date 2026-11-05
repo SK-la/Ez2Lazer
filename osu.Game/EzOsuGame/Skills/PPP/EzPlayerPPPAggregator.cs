@@ -6,6 +6,8 @@ using System.Collections.Generic;
 using System.Threading;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills.Mina;
@@ -40,8 +42,12 @@ namespace osu.Game.EzOsuGame.Skills.PPP
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
-            var bySlice = new Dictionary<int, Dictionary<string, List<double>>>();
-            var analyzed = new Dictionary<int, int>();
+            var bySlices = new Dictionary<(int RulesetOnlineId, int Slice), Dictionary<string, List<double>>>();
+            var analyzed = new Dictionary<(int RulesetOnlineId, int Slice), int>();
+
+            // Chart skills depend only on (chart, mods), so a second score on the same chart and mods must not
+            // re-convert the beatmap or re-run the engine. Score archives repeat charts heavily.
+            var chartSkills = new Dictionary<(string Hash, int ModsSignature), IReadOnlyDictionary<string, double>>();
 
             foreach (var play in plays)
             {
@@ -62,18 +68,26 @@ namespace osu.Game.EzOsuGame.Skills.PPP
                 {
                     var working = beatmapManager.GetWorkingBeatmap(score.BeatmapInfo);
                     var mods = score.Mods;
-                    var playable = working.GetPlayableBeatmap(score.Ruleset, mods);
-                    var chart = engine.CalculateChart(playable, mods);
+                    var playable = EzPlayableBeatmapCache.GetShared(working, score.Ruleset, mods, cancellationToken);
+
+                    var chartKey = (score.BeatmapInfo.Hash, EzAnalysisLookupCache.ComputeModsSignature(mods));
+
+                    if (!chartSkills.TryGetValue(chartKey, out var chart))
+                    {
+                        chart = engine.CalculateChart(playable, mods);
+                        chartSkills[chartKey] = chart;
+                    }
+
                     var portions = engine.CalculatePlay(chart, score);
                     int keyCount = rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID
                         ? keyCountOf(playable, score)
                         : 0;
-                    int slice = EzPPPSkillCatalog.PlayerSliceKey(rulesetId, keyCount);
+                    var key = (RulesetOnlineId: rulesetId, Slice: EzPPPSkillCatalog.PlayerSliceKey(rulesetId, keyCount));
 
-                    if (!bySlice.TryGetValue(slice, out var bySkill))
+                    if (!bySlices.TryGetValue(key, out var bySkill))
                     {
                         bySkill = new Dictionary<string, List<double>>(StringComparer.Ordinal);
-                        bySlice[slice] = bySkill;
+                        bySlices[key] = bySkill;
                     }
 
                     foreach (var (skillId, value) in portions)
@@ -90,7 +104,7 @@ namespace osu.Game.EzOsuGame.Skills.PPP
                         values.Add(value);
                     }
 
-                    analyzed[slice] = analyzed.GetValueOrDefault(slice) + 1;
+                    analyzed[key] = analyzed.GetValueOrDefault(key) + 1;
                 }
                 catch (Exception e)
                 {
@@ -98,18 +112,13 @@ namespace osu.Game.EzOsuGame.Skills.PPP
                 }
             }
 
-            if (bySlice.Count == 0)
+            if (bySlices.Count == 0)
             {
-                skillStore.WritePlayerSystemSkills(
-                    username,
-                    EzSkillSystems.UNSLICED_KEY,
-                    EzSkillSystems.PLAYER_PPP,
-                    new Dictionary<string, double>(StringComparer.Ordinal),
-                    0);
+                skillStore.ClearPlayerSystemSkills(username, EzSkillSystems.PLAYER_PPP);
                 return;
             }
 
-            foreach (var (slice, bySkill) in bySlice)
+            foreach (var ((rulesetOnlineId, slice), bySkill) in bySlices)
             {
                 var aggregated = new Dictionary<string, double>(bySkill.Count, StringComparer.Ordinal);
 
@@ -121,7 +130,8 @@ namespace osu.Game.EzOsuGame.Skills.PPP
                     slice,
                     EzSkillSystems.PLAYER_PPP,
                     aggregated,
-                    analyzed.GetValueOrDefault(slice));
+                    analyzed.GetValueOrDefault((rulesetOnlineId, slice)),
+                    rulesetOnlineId: rulesetOnlineId);
             }
         }
 

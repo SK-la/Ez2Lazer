@@ -149,7 +149,6 @@ namespace osu.Game.EzOsuGame.Metrics
                 AxisFamilyId = PPP_FAMILY,
                 AxisGroups = groups,
                 RevisionProbe = EzPPPSkillVersions.ForRuleset,
-                SupportsLive = true,
                 // Mania keeps its rating engine as the default radar.
                 IsDefaultRadarFor = notMania,
             };
@@ -198,7 +197,6 @@ namespace osu.Game.EzOsuGame.Metrics
                 AxisFamilyId = MINA_FAMILY,
                 AxisGroups = new[] { new EzMetricAxisGroup(ENGINE_GROUP, minaAxes()) },
                 RevisionProbe = static _ => EzMinaSkillAlgorithm.VERSION,
-                SupportsLive = true,
                 IsDefaultRadarFor = static _ => true,
             };
 
@@ -226,10 +224,10 @@ namespace osu.Game.EzOsuGame.Metrics
 
             return new EzMetricProducer(CSI_CHART, EzMetricTier.Tags, EzMetricUnit.Count, maniaOnly)
             {
+                SystemId = EzSkillSystems.BEATMAP_CSI,
                 // Pure chart structure: reads no stored axes, so it is not gated on the Mina stage.
                 AxisGroups = groups,
                 RevisionProbe = static _ => EzChartSkillInfo.VERSION,
-                SupportsLive = true,
             };
         }
 
@@ -281,10 +279,10 @@ namespace osu.Game.EzOsuGame.Metrics
         private static EzMetricProducer createDanBeatmap()
             => new EzMetricProducer(DAN_CHART, EzMetricTier.Dan, EzMetricUnit.DanRank, maniaOnly)
             {
-                // Rating axes come from Mina, structure tags from CSI; both are read as stored rows.
-                DependsOn = new[] { MINA_CHART, CSI_CHART },
+                // Rating axes come from Mina, structure tags from CSI; the Sunny rating selects the interval
+                // table, so it is an input too. Both are read as stored rows.
+                DependsOn = new[] { MINA_CHART, CSI_CHART, SSR_CHART },
                 RevisionProbe = static _ => EzDanAlgorithm.VERSION,
-                SupportsLive = true,
             };
 
         private static EzMetricProducer createDanPlayer()

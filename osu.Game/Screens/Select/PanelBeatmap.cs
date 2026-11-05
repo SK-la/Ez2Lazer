@@ -21,6 +21,7 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
@@ -33,7 +34,6 @@ using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Screens.Select.Filter;
 using osuTK;
 
 namespace osu.Game.Screens.Select
@@ -64,6 +64,7 @@ namespace osu.Game.Screens.Select
         private EzDisplayKps ezDisplayKps = null!;
         private EzDisplayKpc ezDisplayKpc = null!;
         private EzDisplaySR displaySR = null!;
+        private EzDisplayPP displayPP = null!;
         private EzDisplayTag ezDisplayTag = null!;
         private EzDisplaySkillsDan ezDisplaySkillsDan = null!;
 
@@ -258,6 +259,12 @@ namespace osu.Game.Screens.Select
                                                     Anchor = Anchor.CentreLeft,
                                                     Scale = new Vector2(0.875f),
                                                 },
+                                                displayPP = new EzDisplayPP(StarRatingDisplaySize.Small)
+                                                {
+                                                    Origin = Anchor.CentreLeft,
+                                                    Anchor = Anchor.CentreLeft,
+                                                    Scale = new Vector2(0.875f),
+                                                },
                                                 starCounter = new StarCounter
                                                 {
                                                     Anchor = Anchor.CentreLeft,
@@ -326,22 +333,27 @@ namespace osu.Game.Screens.Select
             mods.BindValueChanged(_ => updateKeyCount(), true);
 
             var ezAnalysisFilter = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisFilter);
-            var sortMode = config.GetBindable<SortMode>(OsuSetting.SongSelectSortingMode);
-            var groupMode = config.GetBindable<GroupMode>(OsuSetting.SongSelectGroupMode);
+            var analysisSystemSelection = ezConfig.GetBindable<string>(Ez2Setting.AnalysisSystemSelection);
 
             void updateStarFilterIcon()
             {
-                bool useXxyMetric = EzSunnyStarRatingSupport.SupportsRuleset(ruleset.Value)
-                                    && (sortMode.Value == SortMode.SunnyStarRating || groupMode.Value == GroupMode.SunnyStarRating);
+                // Mirrors the system sorting and grouping read from; the panel's own stars stay official.
+                bool useSunnyMetric = EzMetricVariantReadout.Selected(ruleset.Value?.OnlineID ?? -1)?.Id == EzMetricVariantCatalog.SUNNY;
 
-                starCounter.Icon = useXxyMetric
+                starCounter.Icon = useSunnyMetric
                     ? FontAwesome.Solid.Moon
                     : FontAwesome.Solid.Star;
             }
 
             ruleset.BindValueChanged(_ => updateStarFilterIcon(), true);
-            sortMode.BindValueChanged(_ => updateStarFilterIcon());
-            groupMode.BindValueChanged(_ => updateStarFilterIcon());
+            analysisSystemSelection.BindValueChanged(_ =>
+            {
+                updateStarFilterIcon();
+
+                // Mania's pill follows the selection between Sunny and Mina; the others ignore it.
+                if (Item?.IsVisible == true)
+                    updateEzStarRating();
+            });
             ezAnalysisFilter.BindValueChanged(_ => updateStarFilterIcon(), true);
         }
 
@@ -356,7 +368,9 @@ namespace osu.Game.Screens.Select
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
             applyPanelKps(EzSongSelectAnalysisDisplay.Empty);
-            ezDisplayKps.SetPp(EzPanelPerformancePoints.ResolveRealmBaselinePp(beatmap));
+
+            // Only the pp half is seeded here; the star comes from the difficulty cache.
+            displayPP.Current.Value = EzPanelPerformancePoints.ResolveRealmBaselinePp(beatmap);
 
             if (ruleset.Value is RulesetInfo rulesetInfo
                 && EzPanelKpsMetrics.TryResolveBaselineFromSqlite(ezAnalysisDatabase, beatmap, rulesetInfo, mods.Value, out var baselineKps))
@@ -369,10 +383,27 @@ namespace osu.Game.Screens.Select
             ezDisplaySkillsDan.Beatmap = beatmap;
             ezDisplayTag.Beatmap = beatmap;
 
-            if (supportsEzAnalysis && beatmap.SupportsSunnyStarRating())
-                displaySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay();
+            updateEzStarRating();
 
             computeEzAnalysis();
+        }
+
+        /// <summary>
+        /// Paints the Ez star pill: the ruleset's own rating next to the official one.
+        /// </summary>
+        /// <param name="summary">
+        /// Summary the current analysis pass produced for this chart; omitted to read the stored baseline.
+        /// </param>
+        private void updateEzStarRating(EzManiaSummary? summary = null)
+        {
+            EzManiaSummary display = summary ?? beatmap.ToEzManiaSummaryForDisplay();
+
+            displaySR.Current.Value = display;
+
+            if (display.XxySr is null)
+                displaySR.Hide();
+            else
+                displaySR.Show();
         }
 
         private void resetEzDisplay()
@@ -380,15 +411,7 @@ namespace osu.Game.Screens.Select
             if (Item?.IsVisible != true)
                 return;
 
-            bool showXxy = supportsEzAnalysis && beatmap.SupportsSunnyStarRating();
-
-            if (showXxy)
-                displaySR.Show();
-            else
-            {
-                displaySR.Current.Value = EzManiaSummary.EMPTY;
-                displaySR.Hide();
-            }
+            updateEzStarRating();
 
             ezDisplayKpc.ManiaSummary = null;
             ezDisplayKpc.Hide();
@@ -438,7 +461,7 @@ namespace osu.Game.Screens.Select
             ezDisplayKpc.ManiaSummary = null;
             ezDisplayKpc.Hide();
             applyPanelKps(EzSongSelectAnalysisDisplay.Empty);
-            ezDisplayKps.SetPp(null);
+            displayPP.Current.Value = null;
         }
 
         private void applyPanelKps(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
@@ -472,6 +495,9 @@ namespace osu.Game.Screens.Select
             var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, ezAnalysisResult, mods.Value);
             applyPanelKps(metrics);
 
+            // The pill exists for every ruleset; only mania's live summary carries KPC and scratch on top of it.
+            updateEzStarRating(metrics.ManiaSummary);
+
             if (!supportsEzAnalysis || !beatmap.SupportsSunnyStarRating())
                 return;
 
@@ -486,10 +512,6 @@ namespace osu.Game.Screens.Select
                 scratchText = scratch;
 
             updateKeyCount();
-
-            var summaryForDisplay = maniaSummary ?? EzManiaSummary.EMPTY;
-            if (displaySR.Current.Value.XxySr != summaryForDisplay.XxySr)
-                displaySR.Current.Value = summaryForDisplay;
         }
 
         private void computeEzAnalysis()
@@ -523,11 +545,15 @@ namespace osu.Game.Screens.Select
                 if (Item?.IsVisible != true)
                     return;
 
-                starRatingDisplay.Current.Value = starDifficulty.NewValue;
-                starCounter.Current = (float)starDifficulty.NewValue.Stars;
-
-                ezDisplayKps.SetPp(EzPanelPerformancePoints.ResolvePanelPp(starDifficulty.NewValue, beatmap));
+                applyPanelDifficulty(starDifficulty.NewValue);
             });
+        }
+
+        private void applyPanelDifficulty(in StarDifficulty starDifficulty)
+        {
+            starRatingDisplay.Current.Value = starDifficulty;
+            starCounter.Current = (float)starDifficulty.Stars;
+            displayPP.Current.Value = EzPanelPerformancePoints.ResolvePanelPp(starDifficulty, beatmap);
         }
 
         protected override void Update()

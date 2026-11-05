@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.Skills.Dan
@@ -60,6 +61,11 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         public double? XxySr { get; init; }
 
+        /// <summary>Rating-axis mean the estimate was read against, or 0 when no axis carried a value.</summary>
+        public double OverallMsd { get; init; }
+
+        public EzMinaSkillAxis DominantAxis { get; init; } = EzMinaSkillAxis.Stream;
+
         public IReadOnlyDictionary<EzDanSide, EzDanEntry> Sides { get; init; }
             = new Dictionary<EzDanSide, EzDanEntry>();
 
@@ -71,17 +77,18 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// Resolves every side this chart can be rated on.
         /// </summary>
         /// <param name="holdCount">Column hold objects; pass &lt; 0 when unknown (ratio-only LN gate).</param>
-        /// <param name="allowMsdMeans">
-        /// When false, a side with no star rating is left out rather than derived from the rating axis means.
-        /// </param>
+        /// <remarks>
+        /// This is the only place that decides whether a side resolves. A means-derived estimate is emitted and
+        /// tagged <see cref="EzDanValueSource.MsdMeans"/> rather than withheld here, so every caller persists and
+        /// displays the same thing and a reader that distrusts it can filter by source.
+        /// </remarks>
         public static EzDanSet? Create(
             IReadOnlyDictionary<string, double> axes,
             int keyCount,
             double holdRatio,
             double? xxySr,
             EzChartSkillInfo? chartInfo,
-            int holdCount = -1,
-            bool allowMsdMeans = true)
+            int holdCount = -1)
         {
             ArgumentNullException.ThrowIfNull(axes);
 
@@ -130,6 +137,8 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 KeyCount = keyCount,
                 HoldRatio = holdRatio,
                 XxySr = xxySr,
+                OverallMsd = primary.OverallMsd,
+                DominantAxis = dominantAxis,
                 Sides = sides,
             };
 
@@ -142,9 +151,6 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 {
                     return (sunny.RawDan, sunny.DisplayLabel, EzDanValueSource.SunnyTable);
                 }
-
-                if (!allowMsdMeans)
-                    return null;
 
                 if (primary.Side == side && !string.IsNullOrEmpty(primary.Label))
                     return (primary.RawDan, primary.Label, fallbackSource());

@@ -85,22 +85,6 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             };
         }
 
-        /// <summary>
-        /// Structure axis values merged with the measured subtype scores into one id-keyed table.
-        /// </summary>
-        public static IReadOnlyDictionary<string, double> FromFeatures(EzChartFeatureMetrics metrics, IReadOnlyDictionary<string, double>? subtypeScores)
-        {
-            var axes = new Dictionary<string, double>(FromFeatures(metrics), StringComparer.Ordinal);
-
-            if (subtypeScores == null)
-                return axes;
-
-            foreach (var (id, score) in subtypeScores)
-                axes[id] = score;
-
-            return axes;
-        }
-
         private static string? bareId(string? axisId)
         {
             if (string.IsNullOrEmpty(axisId))

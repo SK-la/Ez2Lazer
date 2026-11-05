@@ -176,9 +176,9 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                             }
 
                             // A rate / key-conversion mod yields a chart variant no persisted NoMod row can answer,
-                            // so the live estimate is the only correct source. It reads the playable and writes
-                            // nothing (see EzChartDanEstimator.TryComputeLiveSnapshot).
-                            chart = chartDanEstimator.TryEstimate(beatmapInfo, score.Mods);
+                            // so the live analysis is the only correct source. It goes through the shared store, so
+                            // the same chart + mods is measured once per session.
+                            chart = chartDanEstimator.TryEstimateOrCompute(beatmapInfo, score.Mods);
                         }
 
                         if (chart == null)

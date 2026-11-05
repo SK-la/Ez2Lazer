@@ -7,8 +7,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.Graphics.Carousel;
-using osu.Game.Screens.Select.Filter;
 using osu.Game.Utils;
 
 namespace osu.Game.Screens.Select
@@ -37,9 +37,7 @@ namespace osu.Game.Screens.Select
             int countMatching = 0;
             var matchedItems = new List<CarouselItem>();
 
-            bool useXxyForStarFilter = usesSunnyStarRatingOperations(criteria);
-            bool requiresXxyForFiltering = useXxyForStarFilter
-                                           && (criteria.StarDifficulty.HasFilter || criteria.UserStarDifficulty.HasFilter);
+            bool requiresDifficultyForFiltering = criteria.StarDifficulty.HasFilter || criteria.UserStarDifficulty.HasFilter;
             bool requiresPpForFiltering = criteria.Pp.HasFilter;
 
             IReadOnlyDictionary<BeatmapInfo, double>? operationDifficulties = null;
@@ -50,7 +48,7 @@ namespace osu.Game.Screens.Select
                                          .Distinct()
                                          .ToList();
 
-            if (requiresXxyForFiltering)
+            if (requiresDifficultyForFiltering)
                 operationDifficulties = await getDifficultiesForOperationsAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false);
 
             if (requiresPpForFiltering)
@@ -65,12 +63,16 @@ namespace osu.Game.Screens.Select
                 if (beatmap.Hidden)
                     continue;
 
-                double starDifficultyForFilter = useXxyForStarFilter ? beatmap.SunnyStarRating : beatmap.StarRating;
+                // The star and pp ranges filter on the analysis system this beatmap's ruleset is set to. A system
+                // whose baseline has not been written yet falls back to the official value so the range does not
+                // silently hide the whole library.
+                var values = EzMetricVariantReadout.SelectedValues(beatmap);
+                double starDifficultyForFilter = values.Star ?? beatmap.StarRating;
 
                 if (operationDifficulties != null && operationDifficulties.TryGetValue(beatmap, out double operationDifficulty))
                     starDifficultyForFilter = operationDifficulty;
 
-                if (!CheckCriteriaMatch(beatmap, criteria, starDifficultyForFilter, tryGetPpForFilter(beatmap, operationPpValues)))
+                if (!CheckCriteriaMatch(beatmap, criteria, starDifficultyForFilter, tryGetPpForFilter(beatmap, operationPpValues, values)))
                     continue;
 
                 countMatching++;
@@ -80,9 +82,6 @@ namespace osu.Game.Screens.Select
             BeatmapItemsCount = countMatching;
             return matchedItems;
         }
-
-        private static bool usesSunnyStarRatingOperations(FilterCriteria criteria)
-            => criteria.Sort == SortMode.SunnyStarRating || criteria.Group == GroupMode.SunnyStarRating;
 
         public static bool CheckCriteriaMatch(BeatmapInfo beatmap, FilterCriteria criteria, double starDifficultyForFilter, double? ppForFilter = null)
         {
@@ -198,12 +197,13 @@ namespace osu.Game.Screens.Select
             return match;
         }
 
-        private static double? tryGetPpForFilter(BeatmapInfo beatmap, IReadOnlyDictionary<BeatmapInfo, double>? operationPpValues)
+        private static double? tryGetPpForFilter(BeatmapInfo beatmap, IReadOnlyDictionary<BeatmapInfo, double>? operationPpValues,
+                                                 in EzMetricVariantValues selected)
         {
-            if (operationPpValues == null)
-                return null;
+            if (operationPpValues != null && operationPpValues.TryGetValue(beatmap, out double pp))
+                return pp;
 
-            return operationPpValues.TryGetValue(beatmap, out double pp) ? pp : null;
+            return selected.PerformancePoints;
         }
     }
 }

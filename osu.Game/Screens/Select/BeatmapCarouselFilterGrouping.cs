@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Localisation;
 using osu.Game.Rulesets;
@@ -67,13 +68,12 @@ namespace osu.Game.Screens.Select
                 IReadOnlyDictionary<BeatmapInfo, double>? operationDifficulties = null;
                 IReadOnlyDictionary<BeatmapInfo, double>? operationPpValues = null;
 
-                // xxy_SR is only required when difficulty is the active grouping key.
-                // For 0/1 item, grouping key does not affect output.
-                bool useSunnyStarRatingGrouping = itemList.Count > 1
-                                                  && criteria.Group == GroupMode.SunnyStarRating;
+                // Difficulty and PP grouping read the analysis system the beatmap's ruleset is set to.
+                bool useDifficultyGrouping = itemList.Count > 1
+                                             && criteria.Group == GroupMode.Difficulty;
                 bool usePpGrouping = criteria.Group == GroupMode.PP && itemList.Count > 0;
 
-                if (useSunnyStarRatingGrouping)
+                if (useDifficultyGrouping)
                 {
                     var uniqueBeatmaps = itemList.Select(i => (BeatmapInfo)i.Model).Distinct().ToList();
                     operationDifficulties = GetDifficultiesForOperationsAsync(uniqueBeatmaps, cancellationToken)
@@ -96,10 +96,7 @@ namespace osu.Game.Screens.Select
                     if (operationDifficulties != null && operationDifficulties.TryGetValue(beatmap, out double difficulty))
                         return difficulty;
 
-                    if (criteria.Group == GroupMode.SunnyStarRating)
-                        return beatmap.SunnyStarRating;
-
-                    return beatmap.StarRating;
+                    return EzMetricVariantReadout.SelectedValues(beatmap).Star ?? beatmap.StarRating;
                 }
 
                 double? getPp(BeatmapInfo beatmap)
@@ -202,8 +199,8 @@ namespace osu.Game.Screens.Select
         {
             // In certain cases, we intentionally split out difficulties
             // where it's more relevant or convenient to view them as individual items.
-            if (criteria.Sort is SortMode.Difficulty or SortMode.SunnyStarRating
-                || criteria.Group is GroupMode.Difficulty or GroupMode.SunnyStarRating or GroupMode.PP)
+            if (criteria.Sort is SortMode.Difficulty
+                || criteria.Group is GroupMode.Difficulty or GroupMode.PP)
                 return false;
             if (criteria.Sort == SortMode.LastPlayed && criteria.Group == GroupMode.LastPlayed)
                 return false;
@@ -254,7 +251,6 @@ namespace osu.Game.Screens.Select
                     return getGroupsBy(b => defineGroupByBPM(FormatUtils.RoundBPM(b.BPM)), items);
 
                 case GroupMode.Difficulty:
-                case GroupMode.SunnyStarRating:
                     return getGroupsBy(b => defineGroupByStars(getDifficulty(b)), items);
 
                 case GroupMode.PP:

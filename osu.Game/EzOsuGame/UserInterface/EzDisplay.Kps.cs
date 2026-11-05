@@ -16,7 +16,6 @@ namespace osu.Game.EzOsuGame.UserInterface
 {
     public partial class EzDisplayKps : CompositeDrawable
     {
-        private readonly OsuSpriteText ppValue;
         private readonly OsuSpriteText kpsText;
 
         public EzDisplayKps()
@@ -34,76 +33,41 @@ namespace osu.Game.EzOsuGame.UserInterface
                         RelativeSizeAxes = Axes.Both,
                         Colour = Color4Extensions.FromHex("303d47"),
                     },
-                    new GridContainer
+                    new FillFlowContainer
                     {
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
                         AutoSizeAxes = Axes.Both,
+                        Direction = FillDirection.Horizontal,
+                        // A horizontal fill requires every child to share one relative anchor, so the gap is the
+                        // container's spacing rather than a zero-size spacer child (which carries the default
+                        // top-left anchor and would fail the layout assertion).
+                        Spacing = new Vector2(3, 0),
                         Margin = new MarginPadding { Horizontal = 7f },
-                        ColumnDimensions = new[]
+                        Children = new Drawable[]
                         {
-                            new Dimension(GridSizeMode.AutoSize),
-                            new Dimension(GridSizeMode.AutoSize, minSize: 32f),
-                            new Dimension(GridSizeMode.Absolute, 8f),
-                            new Dimension(GridSizeMode.AutoSize),
-                            new Dimension(GridSizeMode.Absolute, 3f),
-                            new Dimension(GridSizeMode.AutoSize, minSize: 25f),
-                        },
-                        RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
-                        Content = new[]
-                        {
-                            new[]
+                            new SpriteIcon
                             {
-                                new OsuSpriteText
-                                {
-                                    Anchor = Anchor.Centre,
-                                    Origin = Anchor.Centre,
-                                    Text = "PP",
-                                    Margin = new MarginPadding { Bottom = 1.5f },
-                                    Font = OsuFont.Torus.With(size: 14.4f, weight: FontWeight.Bold, fixedWidth: true),
-                                    Shadow = false,
-                                    Colour = Color4.LightSteelBlue,
-                                },
-                                ppValue = new OsuSpriteText
-                                {
-                                    Anchor = Anchor.CentreLeft,
-                                    Origin = Anchor.CentreLeft,
-                                    Margin = new MarginPadding { Bottom = 1.5f, Left = 2f },
-                                    Font = OsuFont.Torus.With(size: 14.4f, weight: FontWeight.Bold, fixedWidth: true),
-                                    Shadow = false,
-                                    Colour = Color4.LightSteelBlue,
-                                },
-                                Empty(),
-                                new SpriteIcon
-                                {
-                                    Anchor = Anchor.Centre,
-                                    Origin = Anchor.Centre,
-                                    Icon = FontAwesome.Solid.TachometerAlt,
-                                    Size = new Vector2(14f),
-                                    Colour = Color4.CornflowerBlue,
-                                },
-                                Empty(),
-                                kpsText = new OsuSpriteText
-                                {
-                                    Anchor = Anchor.Centre,
-                                    Origin = Anchor.Centre,
-                                    Margin = new MarginPadding { Bottom = 1.5f },
-                                    Font = OsuFont.Torus.With(size: 14.4f, weight: FontWeight.Bold, fixedWidth: true),
-                                    Shadow = false,
-                                    Colour = Color4.LightSteelBlue,
-                                },
-                            }
+                                Anchor = Anchor.Centre,
+                                Origin = Anchor.Centre,
+                                Icon = FontAwesome.Solid.TachometerAlt,
+                                Size = new Vector2(14f),
+                                Colour = Color4.CornflowerBlue,
+                            },
+                            kpsText = new OsuSpriteText
+                            {
+                                Anchor = Anchor.Centre,
+                                Origin = Anchor.Centre,
+                                Margin = new MarginPadding { Bottom = 1.5f },
+                                Font = OsuFont.Torus.With(size: 14.4f, weight: FontWeight.Bold, fixedWidth: true),
+                                Shadow = false,
+                                Colour = Color4.LightSteelBlue,
+                            },
                         }
                     },
                 }
             };
         }
-
-        /// <summary>
-        /// 设置 Panel PP 数值；「PP」标签固定，数值列最小宽度占位、随文本扩展。无值传 <see langword="null"/>。
-        /// </summary>
-        public void SetPp(double? pp) =>
-            ppValue.Text = pp?.ToString("F1") ?? string.Empty;
 
         /// <summary>
         /// 设置 KPS 指标；<paramref name="averageKps"/> ≤ 0 时清空 KPS 区（如 reset 传 0）。

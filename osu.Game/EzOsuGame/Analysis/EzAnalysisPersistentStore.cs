@@ -111,6 +111,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private static readonly IReadOnlyDictionary<Guid, double> empty_pp_values = new Dictionary<Guid, double>();
 
         private bool initialised;
+        private bool initialisationFailed;
         private string dbPath = Empty;
 
         private record PendingWrite(Guid Id, string Hash, string Md5, int RulesetOnlineId, EzAnalysisResult Analysis, long Timestamp);
@@ -127,6 +128,16 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private readonly ConcurrentDictionary<Guid, MemoEntry> sharedReadMemo = new ConcurrentDictionary<Guid, MemoEntry>();
         private long sharedReadMemoGeneration;
+
+        /// <summary>
+        /// Charts whose stored row changed, with the write generation that changed it. A memo entry is dropped only
+        /// when its chart appears here; dropping the whole memo on every flush made a long write storm re-read every
+        /// panel it had already answered.
+        /// </summary>
+        private readonly ConcurrentDictionary<Guid, long> dirtyEntries = new ConcurrentDictionary<Guid, long>();
+
+        /// <summary>Upper bound on <see cref="dirtyEntries"/>; older stamps are dropped wholesale.</summary>
+        private const int dirty_entries_capacity = 16384;
         private CancellationTokenSource? writeCts;
         private Task? backgroundWriterTask;
         private bool isDisposed;
@@ -178,6 +189,15 @@ namespace osu.Game.EzOsuGame.Analysis
             this.storage = storage;
         }
 
+        /// <summary>
+        /// Creates/migrates the database and starts the background writer. Called once for the session, from the
+        /// startup maintenance path and from the first write.
+        /// </summary>
+        /// <remarks>
+        /// A failure is terminal for the session rather than retried: the previous attempt deleted the file and
+        /// recursed, which could exhaust the stack while a corrupted file kept failing. Nothing in the analysis
+        /// pipeline depends on this store, so leaving it unavailable is the safe outcome.
+        /// </remarks>
         public void Initialise()
         {
             if (!Enabled)
@@ -185,7 +205,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             lock (initLock)
             {
-                if (initialised)
+                if (initialised || initialisationFailed)
                     return;
 
                 dbPath = storage.GetFullPath(DatabaseFilename, true);
@@ -209,28 +229,32 @@ namespace osu.Game.EzOsuGame.Analysis
                 }
                 catch (Exception e)
                 {
-                    // 如果数据库损坏/无法打开：不影响游戏运行；尝试备份并重新创建。
-                    Logger.Error(e, "EzManiaAnalysisPersistentStore failed to initialise; recreating database.");
-
-                    try
-                    {
-                        if (!IsNullOrEmpty(dbPath) && File.Exists(dbPath))
-                        {
-                            string backup = dbPath + ".bak";
-                            File.Copy(dbPath, backup, overwrite: true);
-                            File.Delete(dbPath);
-                        }
-                    }
-                    catch
-                    {
-                        // ignored
-                    }
-
-                    // Second attempt.
-                    initialised = false;
-                    Initialise();
+                    initialisationFailed = true;
+                    Logger.Error(e, $"EzManiaAnalysisPersistentStore failed to initialise at {dbPath}; analysis storage is unavailable for this session.", Ez2ConfigManager.LOGGER_NAME);
                 }
             }
+        }
+
+        /// <summary>
+        /// Prepares a read without creating or migrating anything. A read that finds no database simply reports a
+        /// miss; schema creation, legacy migration and the rebuild's <c>VACUUM</c> all belong to
+        /// <see cref="Initialise"/>, which runs on the maintenance path rather than on a UI read.
+        /// </summary>
+        private bool tryPrepareRead()
+        {
+            if (!Enabled || initialisationFailed)
+                return false;
+
+            if (initialised)
+                return true;
+
+            string path = storage.GetFullPath(DatabaseFilename, true);
+
+            if (!File.Exists(path))
+                return false;
+
+            dbPath = path;
+            return true;
         }
 
         public bool TryGet(BeatmapInfo beatmap, out EzAnalysisResult result)
@@ -242,7 +266,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
             try
             {
-                Initialise();
+                if (!tryPrepareRead())
+                    return false;
 
                 pendingWrites.TryGetValue(beatmap.ID, out var pending);
 
@@ -292,10 +317,9 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </remarks>
         public ReadSession? OpenReadSession()
         {
-            if (!Enabled)
+            if (!tryPrepareRead())
                 return null;
 
-            Initialise();
             return new ReadSession(this, openConnection());
         }
 
@@ -323,7 +347,8 @@ namespace osu.Game.EzOsuGame.Analysis
                 if (tryReadMemo(sharedReadMemo, ref sharedReadMemoGeneration, beatmap, out var entry))
                     return resolveMemoEntry(beatmap, entry, out result);
 
-                Initialise();
+                if (!tryPrepareRead())
+                    return false;
 
                 using var connection = openConnection();
                 bool found = tryGetRawData(connection, beatmap, out var stored);
@@ -352,10 +377,23 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             long generation = Interlocked.Read(ref writeGeneration);
 
-            // A flushed batch can add or replace a row the memo already answered from; drop it.
+            // A flushed batch can add or replace a row the memo already answered from; drop only those charts.
             if (generation != observedGeneration)
             {
-                memo.Clear();
+                if (dirtyEntries.IsEmpty)
+                {
+                    // The change log was pruned, so we cannot tell which charts moved. Fall back to a full drop.
+                    memo.Clear();
+                }
+                else
+                {
+                    foreach (var (id, stamp) in dirtyEntries)
+                    {
+                        if (stamp <= generation)
+                            memo.Remove(id);
+                    }
+                }
+
                 observedGeneration = generation;
             }
 
@@ -370,6 +408,22 @@ namespace osu.Game.EzOsuGame.Analysis
 
             entry = default;
             return false;
+        }
+
+        /// <summary>
+        /// Records the charts a committed batch wrote, so only their memo entries are dropped.
+        /// </summary>
+        private void markDirty(IEnumerable<Guid> ids, long generation)
+        {
+            foreach (Guid id in ids)
+                dirtyEntries[id] = generation;
+
+            if (dirtyEntries.Count <= dirty_entries_capacity)
+                return;
+
+            // Rare: the change log outgrew its bound. Clearing it makes readers fall back to a full memo drop,
+            // which over-invalidates (a re-read) instead of missing an invalidation (stale rows).
+            dirtyEntries.Clear();
         }
 
         /// <summary>
@@ -716,7 +770,7 @@ LIMIT 1;
                     Initialise();
                     using var connection = openConnection();
                     writePendingEntryToConnection(connection, snapshotPendingWrite(beatmap, analysis));
-                    Interlocked.Increment(ref writeGeneration);
+                    markDirty(new[] { beatmap.ID }, Interlocked.Increment(ref writeGeneration));
                 }
                 catch (Exception ex)
                 {
@@ -2792,7 +2846,7 @@ LIMIT 1;
                         }
 
                         transaction.Commit();
-                        Interlocked.Increment(ref writeGeneration);
+                        markDirty(batch.Select(kv => kv.Key), Interlocked.Increment(ref writeGeneration));
                     }
                     catch (Exception e)
                     {
@@ -2830,15 +2884,57 @@ LIMIT 1;
             {
                 try
                 {
-                    writerTask.Wait(1000);
+                    writerTask.Wait(3000);
                 }
                 catch
                 {
                 }
             }
 
-            cancellationSource?.Dispose();
-            pendingWrites.Clear();
+            // Only dispose the source once the loop has actually stopped: disposing it under a running writer turns
+            // its next wait into an ObjectDisposedException.
+            if (writerTask == null || writerTask.IsCompleted)
+                cancellationSource?.Dispose();
+
+            flushPendingWrites();
+        }
+
+        /// <summary>
+        /// Writes whatever the background loop did not reach before it stopped. The store is the only holder of
+        /// these results, so dropping them would silently discard analysis that had already completed.
+        /// </summary>
+        private void flushPendingWrites()
+        {
+            if (pendingWrites.IsEmpty)
+                return;
+
+            try
+            {
+                if (!initialised)
+                {
+                    Initialise();
+
+                    if (!initialised)
+                        return;
+                }
+
+                using var connection = openConnection();
+                using var transaction = connection.BeginTransaction();
+                var flushed = pendingWrites.ToArray();
+
+                foreach (var kv in flushed)
+                {
+                    writePendingEntryToConnection(connection, kv.Value, transaction);
+                    pendingWrites.TryRemove(kv.Key, out _);
+                }
+
+                transaction.Commit();
+                markDirty(flushed.Select(kv => kv.Key), Interlocked.Increment(ref writeGeneration));
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore final flush failed.");
+            }
         }
 
         private static PendingWrite snapshotPendingWrite(BeatmapInfo beatmap, EzAnalysisResult analysis)

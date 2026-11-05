@@ -70,7 +70,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return profile.DefaultPlayerSystemId switch
             {
                 EzSkillSystems.PLAYER_MINA => new ManiaTrackSkillsPresenter(provider),
-                EzSkillSystems.PLAYER_PPP => new PPPSkillsPresenter(provider),
+                EzSkillSystems.PLAYER_PPP => new PPPSkillsPresenter(provider, profile.RulesetOnlineId),
                 _ => null,
             };
         }

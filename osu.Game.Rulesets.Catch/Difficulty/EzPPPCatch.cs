@@ -9,6 +9,7 @@ using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.Rulesets.Catch.Objects;
 using osu.Game.Rulesets.Catch.UI;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.Catch.Difficulty
@@ -19,7 +20,88 @@ namespace osu.Game.Rulesets.Catch.Difficulty
         [ModuleInitializer]
 #pragma warning restore CA2255
         internal static void Register()
-            => EzPPPCalculators.Register(EzLocalProfileConstants.CATCH_RULESET_ID, static (beatmap, mods, rate) => EzPPPCatch.Calculate(beatmap, rate));
+        {
+            EzPPPCalculators.Register(EzLocalProfileConstants.CATCH_RULESET_ID, static (beatmap, mods, rate) => EzPPPCatch.Calculate(beatmap, rate));
+            EzPPPPerformanceCalculators.Register(EzLocalProfileConstants.CATCH_RULESET_ID, static (skills, beatmap, mods, rate) => performance(skills, beatmap, mods, rate));
+        }
+
+        /// <summary>PP+ performance for a perfect play (documented section 3.1).</summary>
+        private static double performance(IReadOnlyDictionary<string, double> skills, IBeatmap beatmap, IReadOnlyList<Mod> mods, double clockRate)
+        {
+            var difficulty = beatmap.Difficulty.Clone();
+
+            foreach (var mod in mods)
+            {
+                if (mod is IApplicableToDifficulty applicable)
+                    applicable.ApplyToDifficulty(difficulty);
+            }
+
+            double rate = clockRate > 0 ? clockRate : 1;
+            double preempt = IBeatmapDifficultyInfo.DifficultyRange(difficulty.ApproachRate, 1800, 1200, 450) / rate;
+            double approachRate = preempt > 1200 ? -(preempt - 1800) / 120 : -(preempt - 1200) / 150 + 5;
+
+            int totalHits = 0;
+            int comboObjects = 0;
+
+            foreach (var hitObject in beatmap.HitObjects)
+            {
+                count(hitObject, ref totalHits, ref comboObjects);
+            }
+
+            bool hidden = false;
+            bool flashlight = false;
+            bool noFail = false;
+
+            foreach (var mod in mods)
+            {
+                switch (mod)
+                {
+                    case ModHidden:
+                        hidden = true;
+                        break;
+
+                    case ModFlashlight:
+                        flashlight = true;
+                        break;
+
+                    case ModNoFail:
+                        noFail = true;
+                        break;
+                }
+            }
+
+            return EzPPPPerformance.Catch(
+                EzPPPPerformanceCalculators.Rating(skills, EzPPPSkillCatalog.STAR_RATING),
+                approachRate,
+                totalHits,
+                comboObjects,
+                hidden,
+                flashlight,
+                noFail);
+        }
+
+        private static void count(HitObject hitObject, ref int totalHits, ref int comboObjects)
+        {
+            // A perfect play awards the maximum judgement to every object, so the totals are the object counts.
+            // Bananas are not judged and droplets award only a small tick, which is not a combo object.
+            if (hitObject is Banana)
+                return;
+
+            if (hitObject is TinyDroplet)
+            {
+                totalHits++;
+                return;
+            }
+
+            if (hitObject is PalpableCatchHitObject)
+            {
+                totalHits++;
+                comboObjects++;
+            }
+
+            foreach (var nested in hitObject.NestedHitObjects)
+                count(nested, ref totalHits, ref comboObjects);
+        }
     }
 
     /// <summary>osu!catch PPP movement skill and its star rating.</summary>
@@ -39,10 +121,7 @@ namespace osu.Game.Rulesets.Catch.Difficulty
 
             double rate = Math.Max(0.1, clockRate);
             float halfWidth = Catcher.CalculateCatchWidth(beatmap.Difficulty) * 0.5f;
-
-            if (beatmap.Difficulty.CircleSize > 5.5f)
-                halfWidth *= Math.Max(0.5f, 1f - 0.08f * (beatmap.Difficulty.CircleSize - 5.5f));
-
+            halfWidth *= Math.Max(0.1f, 1f - 0.0625f * Math.Max(0, beatmap.Difficulty.CircleSize - 5.5f));
             halfWidth = Math.Max(1, halfWidth);
 
             var times = new List<double>();
@@ -80,8 +159,9 @@ namespace osu.Game.Rulesets.Catch.Difficulty
 
                 if (hyperDistance <= 20)
                 {
+                    // The exponent uses the raw strain time, not the weighted time.
                     double edgeBonus = fruits[i - 1].HyperDash ? 0 : 5.7;
-                    edge = 1 + edgeBonus * ((20 - hyperDistance) / 20.0) * Math.Pow(Math.Min(timeWeight * rate, 265) / 265.0, 1.5);
+                    edge = 1 + edgeBonus * ((20 - hyperDistance) / 20.0) * Math.Pow(Math.Min(strainTime * rate, 265) / 265.0, 1.5);
                 }
 
                 double strain = (basis + stream + turn) / timeWeight * edge;
@@ -93,7 +173,7 @@ namespace osu.Game.Rulesets.Catch.Difficulty
                 previousStrain = strainTime;
             }
 
-            double value = EzPPPMath.Aggregate(times, strains, 750, 0.94);
+            double value = EzPPPMath.Aggregate(times, strains, 750, 0.94, 0.2);
             double star = 4.59 * Math.Sqrt(Math.Max(0, value));
 
             return new Dictionary<string, double>(StringComparer.Ordinal)

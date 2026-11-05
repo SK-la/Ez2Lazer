@@ -5,7 +5,9 @@ using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.Rulesets;
@@ -48,11 +50,58 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             double star = skills[EzPPPSkillAxis.StarRating.ToChartSkillId()];
             double expected = 1.6 * Math.Pow(Math.Pow(aim, 3) + Math.Pow(Math.Max(speed, stamina), 3), 1.0 / 3.0);
 
-            Assert.That(EzPPPSkillCatalog.IsCompleteChart(0, skills), Is.True);
+            Assert.That(isCompleteChart(0, skills), Is.True);
             Assert.That(jump, Is.GreaterThan(0.01));
             Assert.That(jump, Is.GreaterThan(flow));
             Assert.That(skills[EzPPPSkillAxis.Accuracy.ToChartSkillId()], Is.GreaterThanOrEqualTo(1));
             Assert.That(star, Is.EqualTo(expected).Within(1e-6));
+        }
+
+        [Test]
+        public void Osu_chart_produces_every_declared_axis_including_raw_aim()
+        {
+            var beatmap = chart(0);
+            beatmap.Difficulty.CircleSize = 4;
+            beatmap.Difficulty.OverallDifficulty = 8;
+
+            for (int i = 0; i < 16; i++)
+            {
+                beatmap.HitObjects.Add(new HitCircle
+                {
+                    StartTime = i * 180,
+                    Position = new Vector2(i % 2 == 0 ? 80 : 430, 192),
+                });
+            }
+
+            var skills = new EzPPPEngine().CalculateChart(beatmap, Array.Empty<Mod>());
+
+            Assert.That(skills.ContainsKey(EzPPPSkillAxis.RawAim.ToChartSkillId()), Is.True);
+            Assert.That(skills[EzPPPSkillAxis.RawAim.ToChartSkillId()], Is.GreaterThan(0));
+            Assert.That(skills[EzPPPSkillAxis.Precision.ToChartSkillId()], Is.GreaterThanOrEqualTo(0));
+            Assert.That(skills[EzPPPSkillAxis.Aim.ToChartSkillId()], Is.GreaterThanOrEqualTo(skills[EzPPPSkillAxis.JumpAim.ToChartSkillId()]));
+        }
+
+        [Test]
+        public void Osu_performance_is_computed_from_the_chart_vector()
+        {
+            var beatmap = chart(0);
+            beatmap.Difficulty.CircleSize = 4;
+            beatmap.Difficulty.OverallDifficulty = 8;
+
+            for (int i = 0; i < 64; i++)
+            {
+                beatmap.HitObjects.Add(new HitCircle
+                {
+                    StartTime = i * 180,
+                    Position = new Vector2(i % 2 == 0 ? 80 : 430, 192),
+                });
+            }
+
+            var skills = new EzPPPEngine().CalculateChart(beatmap, Array.Empty<Mod>());
+            double pp = EzPPPPerformanceCalculators.Calculate(0, skills, beatmap, Array.Empty<Mod>(), 1);
+
+            Assert.That(pp, Is.GreaterThan(0));
+            Assert.That(pp, Is.LessThan(2000));
         }
 
         [Test]
@@ -71,7 +120,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             var skills = new EzPPPEngine().CalculateChart(beatmap, Array.Empty<Mod>());
 
-            Assert.That(EzPPPSkillCatalog.IsCompleteChart(EzLocalProfileConstants.TAIKO_RULESET_ID, skills), Is.True);
+            Assert.That(isCompleteChart(EzLocalProfileConstants.TAIKO_RULESET_ID, skills), Is.True);
             Assert.That(skills[EzPPPSkillCatalog.ChartSkillId(EzPPPSkillCatalog.COLOUR)], Is.GreaterThan(0));
             Assert.That(skills[EzPPPSkillCatalog.ChartSkillId(EzPPPSkillCatalog.STAR_RATING)], Is.GreaterThanOrEqualTo(0));
         }
@@ -93,7 +142,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             var skills = new EzPPPEngine().CalculateChart(beatmap, Array.Empty<Mod>());
 
-            Assert.That(EzPPPSkillCatalog.IsCompleteChart(EzLocalProfileConstants.CATCH_RULESET_ID, skills), Is.True);
+            Assert.That(isCompleteChart(EzLocalProfileConstants.CATCH_RULESET_ID, skills), Is.True);
             Assert.That(skills[EzPPPSkillCatalog.ChartSkillId(EzPPPSkillCatalog.MOVEMENT)], Is.GreaterThan(0));
         }
 
@@ -113,7 +162,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             var skills = new EzPPPEngine().CalculateChart(beatmap, Array.Empty<Mod>());
 
-            Assert.That(EzPPPSkillCatalog.IsCompleteChart(3, skills), Is.True);
+            Assert.That(isCompleteChart(3, skills), Is.True);
             Assert.That(skills[EzPPPSkillCatalog.ChartSkillId(EzPPPSkillCatalog.STRAIN)], Is.GreaterThan(0));
             Assert.That(skills[EzPPPSkillCatalog.ChartSkillId(EzPPPSkillCatalog.STAR_RATING)], Is.EqualTo(skills[EzPPPSkillCatalog.ChartSkillId(EzPPPSkillCatalog.STRAIN)]));
         }
@@ -147,5 +196,12 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Ruleset = new RulesetInfo { OnlineID = rulesetId, Available = true },
             },
         };
+
+        /// <summary>
+        /// Completeness comes from the producer's declared axis set, which is the only axis list in the system.
+        /// </summary>
+        private static bool isCompleteChart(int rulesetOnlineId, IReadOnlyDictionary<string, double> skills)
+            => EzAnalysisRevision.Registry.Get(EzMetricProducers.PPP_CHART)
+                                         ?.IsCompleteFor(EzSkillSystems.UNSLICED_KEY, rulesetOnlineId, skills) == true;
     }
 }

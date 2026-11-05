@@ -104,6 +104,9 @@ namespace osu.Game.EzOsuGame.Analysis
         /// 外部规则集离线分析统一落盘：Realm NoMod 基线（Star/xxy/PP）+ 主 SQLite kps/KPC 切片。
         /// 调用方负责将规则集私有分析结果转换为 <see cref="EzAnalysisResult"/>。
         /// </summary>
+        /// <remarks>
+        /// 只能由用户显式发起的外部规则集离线分析（如 BMS 的「构建分析」）调用；不作为读路径的副作用。
+        /// </remarks>
         /// <returns><see langword="true"/> when <paramref name="beatmapId"/> exists in Realm and at least one field or slice was written.</returns>
         public bool TryCommitExternalOfflineAnalysis(RealmAccess realmAccess, Guid beatmapId, in EzExternalBeatmapAnalysisPayload payload)
         {

@@ -4,11 +4,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Beatmaps;
-using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.Rulesets.Mods;
 
@@ -19,23 +16,23 @@ namespace osu.Game.EzOsuGame.Skills.Dan
     /// Prefer xxySR → Sunny interval tables when available; else MSD Overall heuristic.
     /// Skill family / OverallMsd always come from MSD when present.
     /// </summary>
+    /// <remarks>
+    /// This reads the shared live analysis (<see cref="IEzChartAnalysisLookup"/>) rather than measuring anything:
+    /// the Mina vector and the Sunny rating are produced once per chart + mods by the analysis pass.
+    /// </remarks>
     public sealed class EzChartDanEstimator
     {
-        private readonly BeatmapManager beatmapManager;
-        private readonly EzBeatmapMinaComputer msdComputer;
+        private readonly IEzChartAnalysisLookup? analysisLookup;
 
-        public EzChartDanEstimator(BeatmapManager beatmapManager, EzBeatmapMinaComputer msdComputer)
+        public EzChartDanEstimator(IEzChartAnalysisLookup? analysisLookup = null)
         {
-            this.beatmapManager = beatmapManager;
-            this.msdComputer = msdComputer;
+            this.analysisLookup = analysisLookup;
         }
 
         /// <summary>
-        /// Estimates chart dan for player clear credit (hub exclusive RC/LN primary).
+        /// Estimates chart dan for a read path (HUD, labels): only ever uses an analysis that already exists.
+        /// Null means the pass has not produced this chart yet; the caller treats that as "not available".
         /// </summary>
-        /// <remarks>
-        /// Mods that affect the playable are rated from it directly; otherwise the stored axes are used.
-        /// </remarks>
         public EzChartDanVerdict? TryEstimate(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
         {
             ArgumentNullException.ThrowIfNull(beatmapInfo);
@@ -43,70 +40,64 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             if (beatmapInfo.Ruleset.OnlineID != 3)
                 return null;
 
-            mods ??= Array.Empty<Mod>();
-            bool live = EzModRate.AffectsChartSkills(mods);
-
-            var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-            var playable = EzPlayableBeatmapCache.GetShared(working, beatmapInfo.Ruleset, mods);
-
-            if (live)
-            {
-                var liveAxes = computeLiveAxes(playable, mods);
-
-                return liveAxes == null ? null : FromMsdAndPlayable(liveAxes, playable, resolveLiveXxy(playable, beatmapInfo, mods));
-            }
-
-            var msd = msdComputer.TryGetOrCompute(beatmapInfo);
-
-            if (msd == null || msd.Count == 0)
-                return null;
-
-            double? xxySr = beatmapInfo.SunnyStarRating >= 0 ? beatmapInfo.SunnyStarRating : null;
-            return FromMsdAndPlayable(msd, playable, xxySr);
-        }
-
-        /// <summary>
-        /// Axis values measured on a playable under the given mods, keyed by stored skill id.
-        /// </summary>
-        private static IReadOnlyDictionary<string, double>? computeLiveAxes(IBeatmap playable, IReadOnlyList<Mod> mods)
-        {
-            int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
-
-            if (keyCount <= 0)
-                return null;
-
-            using var calc = new EzMinaEngine();
-
-            if (!calc.SupportsKeyCount(keyCount))
-                return null;
-
-            try
-            {
-                var vector = calc.CalculateMsd(EzMinaNoteConverter.Convert(playable), keyCount, EzModRate.Resolve(mods));
-
-                if (vector.Overall <= 0 && vector.Stream <= 0)
-                    return null;
-
-                return VectorToMsdDict(vector);
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Sunny star rating for the current mods, or the stored baseline when it still applies.
-        /// </summary>
-        private static double? resolveLiveXxy(IBeatmap playable, BeatmapInfo beatmapInfo, IReadOnlyList<Mod> mods)
-        {
-            if (EzAnalysisComputation.TryComputeXxySrFromPlayable(playable, beatmapInfo.Ruleset, mods, CancellationToken.None, out double liveXxy)
-                && liveXxy > 0)
-                return liveXxy;
-
-            return EzModRate.CanUsePersistedXxy(mods) && beatmapInfo.SunnyStarRating >= 0
-                ? beatmapInfo.SunnyStarRating
+            return analysisLookup?.TryGet(beatmapInfo, mods) is { } analysis
+                ? fromAnalysis(analysis)
                 : null;
+        }
+
+        /// <summary>
+        /// Same estimate, but fills the shared analysis store when the inputs have not been measured yet.
+        /// </summary>
+        /// <remarks>
+        /// Batch callers only (player aggregation), which run off the update thread. The measurement is the one the
+        /// analysis pass would do, so a later HUD read of the same chart is a cache hit rather than a second pass.
+        /// </remarks>
+        public EzChartDanVerdict? TryEstimateOrCompute(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
+        {
+            ArgumentNullException.ThrowIfNull(beatmapInfo);
+
+            if (beatmapInfo.Ruleset.OnlineID != 3)
+                return null;
+
+            return analysisLookup?.GetOrCompute(beatmapInfo, beatmapInfo.Ruleset, mods) is { } analysis
+                ? fromAnalysis(analysis)
+                : null;
+        }
+
+        private static EzChartDanVerdict? fromAnalysis(EzAnalysisResult analysis)
+        {
+            // The pass already resolved every side through the single entry point. Reading it here is what keeps
+            // the HUD, the player credit and the persisted row from disagreeing about the same chart.
+            if (analysis.Dan is not { } dan || dan.Sides.Count == 0)
+                return null;
+
+            var side = dan.HoldRatio >= EzDanAlgorithm.LnPrimaryMinRatioFor(dan.KeyCount)
+                ? EzDanSide.Ln
+                : EzDanSide.Rc;
+
+            var entry = dan.For(side);
+            var resolvedSide = side;
+
+            if (entry == null)
+            {
+                resolvedSide = side == EzDanSide.Ln ? EzDanSide.Rc : EzDanSide.Ln;
+                entry = dan.For(resolvedSide);
+            }
+
+            if (entry == null)
+                return null;
+
+            return new EzChartDanVerdict
+            {
+                RawDan = entry.RawDan,
+                Label = entry.Label,
+                KeyCount = dan.KeyCount,
+                Side = resolvedSide,
+                DominantAxis = dan.DominantAxis,
+                OverallMsd = dan.OverallMsd,
+                HoldRatio = dan.HoldRatio,
+                AlgorithmVersion = EzDanAlgorithm.VERSION,
+            };
         }
 
         public static EzChartDanVerdict? FromMsdAndPlayable(
@@ -183,6 +174,31 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         public static double ComputeHoldRatio(IBeatmap playable)
             => EzHoldMetrics.ComputeHoldRatio(playable);
+
+        /// <summary>
+        /// The inputs a chart-dan derivation needs when only stored data is available.
+        /// </summary>
+        /// <remarks>
+        /// The background backfill and the read-path memory compute both come through here. Reading the same
+        /// three inputs from two hand-written blocks is how one chart could be filed from the stored hold ratio
+        /// while another was filed from the playable's.
+        /// </remarks>
+        public static bool TryResolveStoredInputs(BeatmapInfo beatmapInfo, out int keyCount, out double holdRatio, out double? xxySr, out int holdCount)
+        {
+            ArgumentNullException.ThrowIfNull(beatmapInfo);
+
+            keyCount = EzHoldMetrics.ResolveKeyCount(beatmapInfo);
+
+            holdRatio = EzHoldMetrics.HoldRatio(beatmapInfo);
+
+            if (double.IsNaN(holdRatio))
+                holdRatio = 0;
+
+            xxySr = beatmapInfo.SunnyStarRating >= 0 ? beatmapInfo.SunnyStarRating : null;
+            holdCount = TryHoldCountFromBeatmapInfo(beatmapInfo);
+
+            return keyCount > 0;
+        }
 
         /// <summary>Column hold (LN) object count on <paramref name="playable"/>.</summary>
         public static int ComputeHoldCount(IBeatmap playable)

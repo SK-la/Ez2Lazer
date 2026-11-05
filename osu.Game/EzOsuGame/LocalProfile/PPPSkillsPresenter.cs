@@ -19,10 +19,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private const double display_min = 0.01;
 
         private readonly EzSkillProvider provider;
+        private readonly int rulesetOnlineId;
 
-        public PPPSkillsPresenter(EzSkillProvider provider)
+        public PPPSkillsPresenter(EzSkillProvider provider, int rulesetOnlineId)
         {
             this.provider = provider;
+            this.rulesetOnlineId = rulesetOnlineId;
         }
 
         public string SystemId => EzSkillSystems.PLAYER_PPP;
@@ -33,7 +35,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public IReadOnlyList<int> GetSliceKeys(string username)
         {
-            var skills = provider.GetPlayerSystemSkills(username, EzSkillSystems.UNSLICED_KEY, SystemId);
+            var skills = provider.GetPlayerSystemSkills(username, EzSkillSystems.UNSLICED_KEY, SystemId, rulesetOnlineId);
             return skills.Count > 0
                 ? new[] { EzSkillSystems.UNSLICED_KEY }
                 : Array.Empty<int>();
@@ -41,11 +43,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public EzTrackSkillsSnapshot Load(string username, int sliceKey)
         {
-            var skills = provider.GetPlayerSystemSkills(username, sliceKey, SystemId);
+            // Values and row metadata come from one read; the panel only ever needs them together.
+            var slice = provider.GetPlayerSystemSkillSlice(username, sliceKey, SystemId, rulesetOnlineId);
+            var skills = slice.Values;
+
             if (skills.Count == 0)
                 return EzTrackSkillsSnapshot.Empty;
 
-            var meta = provider.GetPlayerSystemSkillMeta(username, sliceKey, SystemId);
+            var meta = slice.Meta;
 
             var radar = new List<EzTrackSkillsAxis>(EzOsuSkillAxisExtensions.RadarAxes.Length);
             var bars = new List<EzTrackSkillsAxis>(EzOsuSkillAxisExtensions.All.Length);

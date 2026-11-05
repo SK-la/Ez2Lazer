@@ -8,6 +8,7 @@ using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
@@ -209,13 +210,14 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Assert.That(store.CollectChartChainState().SettledMsd, Does.Contain(hash));
 
                 var skills = store.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MINA);
-                Assert.That(EzBeatmapMinaComputer.IsUnrateableMina(skills), Is.True);
+                Assert.That(store.GetBeatmapSystemState(hash, EzSkillSystems.BEATMAP_MINA, EzAnalysisRevision.Msd), Is.EqualTo(EzMetricState.Unrateable));
+                Assert.That(skills, Is.Empty);
                 Assert.That(EzBeatmapMinaComputer.IsCurrentMinaCache(skills), Is.False);
 
                 // Successful MSD write replaces the marker.
                 store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6));
                 Assert.That(store.CollectChartChainState().CompleteMsd, Does.Contain(hash));
-                Assert.That(EzBeatmapMinaComputer.IsUnrateableMina(store.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MINA)), Is.False);
+                Assert.That(store.GetBeatmapSystemState(hash, EzSkillSystems.BEATMAP_MINA, EzAnalysisRevision.Msd), Is.EqualTo(EzMetricState.Current));
             });
         }
 

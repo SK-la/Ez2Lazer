@@ -27,9 +27,6 @@ namespace osu.Game.EzOsuGame.Analysis
         public static bool SupportsBeatmap(IBeatmap beatmap, IRulesetInfo rulesetInfo)
             => IsRulesetAvailable(rulesetInfo) && tryGetSupport(rulesetInfo, out var support) && support.SupportsSunnyStarRating(beatmap);
 
-        public static bool SupportsBeatmapInfo(BeatmapInfo beatmapInfo)
-            => SupportsRuleset(beatmapInfo.Ruleset);
-
         /// <summary>
         /// yyyyMMdd xxy SR algorithm version for the ruleset, if it implements <see cref="IEzSunnyStarRatingSupport"/>.
         /// </summary>

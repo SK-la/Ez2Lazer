@@ -27,6 +27,7 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
@@ -61,6 +62,7 @@ namespace osu.Game.Screens.Select
 
         private IBindableList<BeatmapSetInfo> detachedBeatmaps = null!;
         private Bindable<bool> ezAnalysisFilter = null!;
+        private Bindable<string> analysisSystemSelection = null!;
         private Bindable<bool> ezAnalysisSqliteEnabled = null!; // PP 等 sqlite 消费端；不 gate xxy SR
         private Bindable<EzMaterialUiMode> materialUiMode = null!;
         private IBindable<int> activeSongsBranchVersion = null!;
@@ -175,6 +177,8 @@ namespace osu.Game.Screens.Select
             detachedBeatmaps = beatmapStore.GetBeatmapSets(cancellationToken);
             loadSamples(audio);
             ezAnalysisFilter = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisFilter);
+            analysisSystemSelection = ezConfig.GetBindable<string>(Ez2Setting.AnalysisSystemSelection);
+            analysisSystemSelection.BindValueChanged(_ => Scheduler.AddOnce(refilterForAnalysisSystemChange));
             ezAnalysisSqliteEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
             materialUiMode = ezConfig.GetBindable<EzMaterialUiMode>(Ez2Setting.MaterialUiMode);
             config.BindWith(OsuSetting.RandomSelectAlgorithm, randomAlgorithm);
@@ -184,42 +188,23 @@ namespace osu.Game.Screens.Select
 
         private bool useEzAnalysisBranchForXxyOperations => useActiveSongsBranchAsBeatmapSource && ezAnalysisFilter.Value;
 
-        private static bool usesSunnyStarRatingOperations(FilterCriteria criteria)
-            => criteria.Sort == SortMode.SunnyStarRating || criteria.Group == GroupMode.SunnyStarRating;
+        /// <summary>
+        /// Whether the active system for this ruleset is the Sunny one and a branch snapshot with mods is in play,
+        /// in which case its star has to come from the branch rather than the NoMod column.
+        /// </summary>
+        private bool usesSunnyBranchOperations
+            => useEzAnalysisBranchForXxyOperations
+               && EzMetricVariantReadout.Selected(ruleset.Value?.OnlineID ?? -1)?.Id == EzMetricVariantCatalog.SUNNY;
 
         private Task<IReadOnlyDictionary<BeatmapInfo, double>> getDifficultiesForOperationsAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
         {
             if (Criteria == null)
                 return Task.FromResult(empty_operation_difficulties);
 
-            if (!usesSunnyStarRatingOperations(Criteria))
-                return Task.FromResult(empty_operation_difficulties);
-
-            if (useEzAnalysisBranchForXxyOperations)
+            if (usesSunnyBranchOperations)
                 return getStrictActiveBranchDifficultiesAsync(beatmaps.Distinct().ToList(), Criteria.Mods, cancellationToken);
 
-            return getRealmSunnyStarRatingsAsync(beatmaps, cancellationToken);
-        }
-
-        private Task<IReadOnlyDictionary<BeatmapInfo, double>> getRealmSunnyStarRatingsAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
-        {
-            if (!EzSunnyStarRatingSupport.SupportsRuleset(ruleset.Value))
-                return Task.FromResult(empty_operation_difficulties);
-
-            var beatmapList = beatmaps.Distinct().ToList();
-
-            if (beatmapList.Count == 0)
-                return Task.FromResult(empty_operation_difficulties);
-
-            var resolvedValues = new Dictionary<BeatmapInfo, double>(beatmapList.Count);
-
-            foreach (var beatmap in beatmapList)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                resolvedValues[beatmap] = beatmap.SunnyStarRating;
-            }
-
-            return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(resolvedValues);
+            return Task.FromResult(empty_operation_difficulties);
         }
 
         private Task<IReadOnlyDictionary<BeatmapInfo, double>> getPpValuesForOperationsAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
@@ -259,8 +244,9 @@ namespace osu.Game.Screens.Select
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (beatmap.PerformancePoints >= 0)
-                    resolvedValues[beatmap] = beatmap.PerformancePoints;
+                // NoMod PP of whichever system this beatmap's ruleset reads out under.
+                if (EzMetricVariantReadout.SelectedValues(beatmap).PerformancePoints is double pp)
+                    resolvedValues[beatmap] = pp;
             }
 
             return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(resolvedValues);
@@ -315,8 +301,9 @@ namespace osu.Game.Screens.Select
                     if (Criteria == null)
                         return;
 
-                    // Avoid redundant filters when branch metadata changes but the carousel is not using that branch (or xxy sort/group).
-                    if (!useActiveSongsBranchAsBeatmapSource && !usesSunnyStarRatingOperations(Criteria))
+                    // Avoid redundant filters when branch metadata changes but the carousel is not reading the
+                    // branch, which is the case unless the active system needs it.
+                    if (!useActiveSongsBranchAsBeatmapSource && !usesSunnyBranchOperations)
                         return;
 
                     Filter(Criteria, true);
@@ -988,9 +975,26 @@ namespace osu.Game.Screens.Select
 
         public int FilterRuns => filterRuns;
 
-        public void Filter(FilterCriteria criteria, bool showLoadingImmediately = false)
+        /// <summary>
+        /// Re-runs the last filter after the per-ruleset analysis system changed, so difficulty / PP sorting,
+        /// grouping and ranges immediately reflect the newly selected baseline.
+        /// </summary>
+        private void refilterForAnalysisSystemChange()
         {
-            bool resetDisplay = grouping.BeatmapSetsGroupedTogether != BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);
+            if (Criteria is not { } criteria)
+                return;
+
+            bool usesSystem = criteria.Sort is SortMode.Difficulty or SortMode.PP
+                              || criteria.Group is GroupMode.Difficulty or GroupMode.PP
+                              || criteria.StarDifficulty.HasFilter
+                              || criteria.Pp.HasFilter;
+
+            if (usesSystem)
+                Filter(criteria);
+        }
+
+        public void Filter(FilterCriteria criteria, bool showLoadingImmediately = false)
+        {            bool resetDisplay = grouping.BeatmapSetsGroupedTogether != BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);
 
             operationDifficultyCache.Value = null;
             operationPpCache.Value = null;

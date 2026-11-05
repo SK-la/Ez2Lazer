@@ -21,6 +21,10 @@ namespace osu.Game.EzOsuGame.Skills.PPP
         [EzSkillMeta("flow_aim", "串", "Flow", "#6f87d8")]
         FlowAim,
 
+        /// <summary>Jump term at raw (unscaled) distance, without the small-circle bonus. Only Precision reads it.</summary>
+        [EzSkillMeta("raw_aim", "裸瞄", "Raw", "#6b7f9c", InRadar = false)]
+        RawAim,
+
         [EzSkillMeta("precision", "小圈", "Precision", "#b06bc0")]
         Precision,
 

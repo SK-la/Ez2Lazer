@@ -98,6 +98,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.UpdateFrameLimiter, FrameSync.Unlimited);
             SetDefault(Ez2Setting.EzAnalysisRecEnabled, true);
             SetDefault(Ez2Setting.EzAnalysisSqliteEnabled, true);
+            SetDefault(Ez2Setting.AnalysisSystemSelection, string.Empty);
             SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
             SetDefault(Ez2Setting.MenuLogoPath, @"Menu/logo");
             SetDefault(Ez2Setting.MenuLogoText, "(´・ω・｀),120");
@@ -994,6 +995,12 @@ namespace osu.Game.EzOsuGame.Configuration
         /// Ez 分析 SQLite 主库与分支曲库读写总开关；与 <see cref="EzAnalysisRecEnabled"/> 分工（存储 vs 即时计算）。
         /// </summary>
         EzAnalysisSqliteEnabled,
+
+        /// <summary>
+        /// 每个规则集选用的分析系统，格式 <c>规则集=系统;规则集=系统</c>；缺失则用该规则集的第一个系统。
+        /// 选歌界面的难度、PP、显示与雷达都按这里的选择读取同一套基线。
+        /// </summary>
+        AnalysisSystemSelection,
 
         HideMainMenuOnlineBanner,
 

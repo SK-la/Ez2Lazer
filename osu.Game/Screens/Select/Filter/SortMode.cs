@@ -29,11 +29,6 @@ namespace osu.Game.Screens.Select.Filter
         [LocalisableDescription(typeof(SongSelectStrings), nameof(SongSelectStrings.Difficulty))]
         Difficulty,
 
-        /// <summary>
-        /// Ez: sort by <see cref="Beatmaps.BeatmapInfo.SunnyStarRating"/> from Realm (baseline, no mod).
-        /// </summary>
-        SunnyStarRating,
-
         PP,
 
         [LocalisableDescription(typeof(SongSelectStrings), nameof(SongSelectStrings.LastPlayed))]

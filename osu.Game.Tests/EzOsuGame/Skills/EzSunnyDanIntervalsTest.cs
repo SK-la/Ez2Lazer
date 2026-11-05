@@ -60,7 +60,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
-        public void LiveWithoutXxyDoesNotInventMsdHeuristicDanLabels()
+        public void WithoutXxyTheStoredDanIsTaggedAsAMeansEstimate()
         {
             var msd = new Dictionary<string, double>
             {
@@ -68,7 +68,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 [EzMinaSkillAxis.Technical.ToMsdSkillId()] = 22.0,
             };
 
-            var live = EzPersistedChartDan.TryComputeFromStored(
+            var computed = EzPersistedChartDan.TryComputeFromStored(
                 "hash",
                 Guid.NewGuid(),
                 msd,
@@ -76,27 +76,13 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 holdRatio: 0.1,
                 xxySr: null,
                 chartInfo: null,
-                holdCount: 0,
-                allowMsdHeuristicLabels: false);
+                holdCount: 0);
 
-            Assert.That(live, Is.Not.Null);
-            Assert.That(live!.OverallMsd, Is.EqualTo(20.5).Within(0.001));
-            Assert.That(live.HasSide(EzDanSide.Rc), Is.False);
-            Assert.That(live.HasSide(EzDanSide.Ln), Is.False);
-
-            var persistFallback = EzPersistedChartDan.TryComputeFromStored(
-                "hash",
-                Guid.NewGuid(),
-                msd,
-                keyCount: 6,
-                holdRatio: 0.1,
-                xxySr: null,
-                chartInfo: null,
-                holdCount: 0,
-                allowMsdHeuristicLabels: true);
-
-            Assert.That(persistFallback, Is.Not.Null);
-            Assert.That(persistFallback!.HasSide(EzDanSide.Rc), Is.True);
+            // The stored row keeps the axis value and the means-derived sides; the reader decides whether to show
+            // them, instead of two callers persisting different shapes for the same chart.
+            Assert.That(computed, Is.Not.Null);
+            Assert.That(computed!.OverallMsd, Is.EqualTo(20.5).Within(0.001));
+            Assert.That(computed.HasSide(EzDanSide.Rc), Is.True);
         }
 
         [Test]
@@ -116,8 +102,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 holdRatio: 0.1,
                 xxySr: 7.03,
                 chartInfo: null,
-                holdCount: 0,
-                allowMsdHeuristicLabels: false);
+                holdCount: 0);
 
             Assert.That(live, Is.Not.Null);
             Assert.That(live!.RcLabel, Is.EqualTo("7-"));

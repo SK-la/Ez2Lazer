@@ -55,11 +55,11 @@ namespace osu.Game.EzOsuGame.Skills
                     EzSkillSystems.BEATMAP_PPP,
                     skills,
                     beatmapInfo.ID,
-                    pppRulesetOnlineId: rulesetId);
+                    rulesetOnlineId: rulesetId);
 
                 return skills;
             }
-            catch (Exception e)
+            catch (Exception e) when (e is not ObjectDisposedException)
             {
                 Logger.Log($"[EzSkills] PPP chart compute failed for {beatmapInfo}: {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                 return null;

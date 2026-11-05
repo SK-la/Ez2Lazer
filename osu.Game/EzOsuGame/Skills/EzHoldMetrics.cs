@@ -81,6 +81,22 @@ namespace osu.Game.EzOsuGame.Skills
             return maxColumn >= 0 ? maxColumn + 1 : 4;
         }
 
+        /// <summary>
+        /// Column count for a chart that is not loaded: the difficulty's circle size when it is a sane column
+        /// count, otherwise 4.
+        /// </summary>
+        /// <remarks>
+        /// The single fallback chain for callers without a playable. Deriving it per call site is how one chart
+        /// ended up filed under a different keymode slice than the one it was measured on.
+        /// </remarks>
+        public static int ResolveKeyCount(BeatmapInfo beatmapInfo)
+        {
+            ArgumentNullException.ThrowIfNull(beatmapInfo);
+
+            int fromCs = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
+            return fromCs is >= 1 and <= 18 ? fromCs : 4;
+        }
+
         private static (int Holds, int Total) countHoldAndTotal(IBeatmap playable)
         {
             ArgumentNullException.ThrowIfNull(playable);
