@@ -37,10 +37,33 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             lock (sync)
             {
-                ensureInitialised();
-                using var connection = openConnection();
+                EnsureInitialised();
+                using var connection = Open();
                 return action(connection);
             }
+        }
+
+        /// <summary>Lock shared with every other feature store over this file.</summary>
+        public Lock Sync => sync;
+
+        public void EnsureInitialised()
+        {
+            if (initialised)
+                return;
+
+            dbPath = storage.GetFullPath(DATABASE_FILENAME, true);
+
+            using var connection = Open();
+            EzLocalProfileStore.EnsureSchema(connection);
+            EzPlayerSkillSchema.Ensure(connection);
+            initialised = true;
+        }
+
+        public SqliteConnection Open()
+        {
+            var connection = new SqliteConnection($"Data Source={dbPath};Cache=Shared;Mode=ReadWriteCreate");
+            connection.Open();
+            return connection;
         }
 
         /// <summary>Runs <paramref name="action"/> under the store's lock, inside one transaction.</summary>
@@ -50,8 +73,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             lock (sync)
             {
-                ensureInitialised();
-                using var connection = openConnection();
+                EnsureInitialised();
+                using var connection = Open();
                 using var transaction = connection.BeginTransaction();
                 action(connection, transaction);
                 transaction.Commit();
@@ -67,27 +90,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
             SqliteConnection.ClearAllPools();
         }
 
-        private void ensureInitialised()
-        {
-            if (initialised)
-                return;
+        private void ensureInitialised() => EnsureInitialised();
 
-            dbPath = storage.GetFullPath(DATABASE_FILENAME, true);
-
-            using var connection = openConnection();
-
-            // Archive rows and player aggregates share this file, so both schemas are applied on the same connection.
-            EzLocalProfileStore.EnsureSchema(connection);
-            EzPlayerSkillSchema.Ensure(connection);
-            initialised = true;
-        }
-
-        private SqliteConnection openConnection()
-        {
-            var connection = new SqliteConnection($"Data Source={dbPath};Cache=Shared;Mode=ReadWriteCreate");
-            connection.Open();
-            return connection;
-        }
+        private SqliteConnection openConnection() => Open();
     }
 
     /// <summary>

@@ -286,7 +286,7 @@ namespace osu.Game.EzOsuGame.Mods
                 return;
             }
 
-            timingBeatmap = EzBeatmapSpeedTracker.ResolveTimingBeatmap(gameplayState?.Beatmap, working);
+            timingBeatmap = ResolveTimingBeatmap(gameplayState?.Beatmap, working);
 
             hasVariableTiming = hasVariableBeatLength(timingBeatmap?.ControlPointInfo);
 
@@ -331,7 +331,7 @@ namespace osu.Game.EzOsuGame.Mods
                 return;
             }
 
-            Rate.Value = EzBeatmapSpeedTracker.ResolveTrackRate(rateFrequency, rateTempo);
+            Rate.Value = ResolveTrackRate(rateFrequency, rateTempo);
         }
 
         private void onMusicControllerTrackChanged(WorkingBeatmap loadedBeatmap, TrackChangeDirection direction) => attachSongSelectTrack();

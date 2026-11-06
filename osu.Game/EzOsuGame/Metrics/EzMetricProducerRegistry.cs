@@ -28,7 +28,7 @@ namespace osu.Game.EzOsuGame.Metrics
         public void Register(EzMetricProducer producer)
         {
             ArgumentNullException.ThrowIfNull(producer);
-            this.producers[producer.Id] = producer;
+            producers[producer.Id] = producer;
         }
 
         public EzMetricProducer? Get(EzMetricProducerId id)

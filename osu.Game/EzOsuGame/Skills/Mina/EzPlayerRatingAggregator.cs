@@ -36,13 +36,15 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         private const int cache_flush_batch = 64;
 
         private readonly BeatmapManager beatmapManager;
-        private readonly EzSkillStore skillStore;
+        private readonly EzPlayerSkillStore skillStore;
+        private readonly EzChartSkillStore chartStore;
         private readonly EzLocalProfileStore? profileStore;
 
-        public EzPlayerRatingAggregator(BeatmapManager beatmapManager, EzSkillStore skillStore, EzLocalProfileStore? profileStore = null)
+        public EzPlayerRatingAggregator(BeatmapManager beatmapManager, EzPlayerSkillStore skillStore, EzChartSkillStore chartStore, EzLocalProfileStore? profileStore = null)
         {
             this.beatmapManager = beatmapManager;
             this.skillStore = skillStore;
+            this.chartStore = chartStore;
             this.profileStore = profileStore;
         }
 
@@ -256,7 +258,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 
             string[] patterns = Array.Empty<string>();
 
-            if (skillStore.TryGetChartSkillInfo(beatmapHash, out var chart))
+            if (chartStore.TryGetChartSkillInfo(beatmapHash, out var chart))
             {
                 if (chart is { IsUnavailable: false })
                     patterns = chart.Patterns;

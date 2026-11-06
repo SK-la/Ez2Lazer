@@ -36,7 +36,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             RunTestWithRealm((realm, _) =>
             {
                 seedCharts(realm);
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
 
                 // The two ends of the chain: fully rated, and rated up to MSD only.
                 store.WriteBeatmapMsd(settled_chart, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
@@ -76,7 +76,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             RunTestWithRealm((realm, _) =>
             {
                 seedCharts(realm);
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
 
                 store.WriteBeatmapMsd(waiting_on_csi_chart, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
 
@@ -98,7 +98,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             RunTestWithRealm((realm, _) =>
             {
                 seedCharts(realm);
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
 
                 // The shape a pass used to leave behind: a full CSI row derived from the stub MSD axis. The chart
                 // is settled for the whole chain, so reporting it as waiting is what kept re-queueing the chain.
@@ -124,7 +124,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             {
                 seedCharts(realm);
 
-                var debt = EzChartChainDebt.Collect(Array.Empty<(string, string)>(), new EzSkillStore(realm));
+                var debt = EzChartChainDebt.Collect(Array.Empty<(string, string)>(), new EzChartSkillStore(realm));
 
                 Assert.That(debt.HasDebt, Is.False);
                 Assert.That(debt.Usernames, Is.Empty);

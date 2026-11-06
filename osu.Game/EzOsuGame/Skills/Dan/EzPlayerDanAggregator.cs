@@ -15,7 +15,6 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 {
     /// <summary>
     /// Player dan clears: chart <see cref="EzChartDanEstimator.TryEstimate"/> → credit.
-    /// Side <see cref="EzDanEstimate"/> / GetDan is written only by
     /// <see cref="EzSkillProvider"/> <c>writeSideHeadline</c> (hub fold), not here.
     /// Hub <c>collectDanClears</c> subset: fail/EZ reject, (hash,rate) best-only.
     /// </summary>
@@ -25,14 +24,17 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         private readonly BeatmapManager beatmapManager;
         private readonly EzChartDanEstimator chartDanEstimator;
-        private readonly EzSkillStore skillStore;
+        private readonly EzPlayerSkillStore skillStore;
+        private readonly EzChartSkillStore chartStore;
         private readonly EzLocalProfileStore? profileStore;
 
-        public EzPlayerDanAggregator(BeatmapManager beatmapManager, EzChartDanEstimator chartDanEstimator, EzSkillStore skillStore, EzLocalProfileStore? profileStore = null)
+        public EzPlayerDanAggregator(BeatmapManager beatmapManager, EzChartDanEstimator chartDanEstimator, EzPlayerSkillStore skillStore, EzChartSkillStore chartStore,
+                                     EzLocalProfileStore? profileStore = null)
         {
             this.beatmapManager = beatmapManager;
             this.chartDanEstimator = chartDanEstimator;
             this.skillStore = skillStore;
+            this.chartStore = chartStore;
             this.profileStore = profileStore;
         }
 
@@ -54,7 +56,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// ever consulted after such a miss and a chart that later gains a row is answered by that row instead.
         /// </summary>
         private HashSet<string> unrateableChartsForPass
-            => unrateableMsdHashes ??= skillStore.GetUnrateableMsdHashes();
+            => unrateableMsdHashes ??= chartStore.GetUnrateableMsdHashes();
 
         /// <summary>
         /// Marks the start of a new skills pass, dropping lookups that were memoised against the previous one.
@@ -152,7 +154,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                         EzChartDanVerdict? chart = null;
 
                         if (!chartAffectingMods
-                            && skillStore.TryGetChartDan(hash, out var persisted) && persisted != null)
+                            && chartStore.TryGetChartDan(hash, out var persisted) && persisted != null)
                         {
                             var side = persisted.HoldRatio >= EzDanAlgorithm.LnPrimaryMinRatioFor(persisted.KeyCount)
                                 ? EzDanSide.Ln

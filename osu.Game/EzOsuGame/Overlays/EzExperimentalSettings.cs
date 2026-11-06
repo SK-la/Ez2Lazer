@@ -32,7 +32,8 @@ namespace osu.Game.EzOsuGame.Overlays
         private void load(Ez2ConfigManager ezConfig,
                           BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
                           EzAnalysisWarmupProcessor? analysisWarmupProcessor,
-                          EzSkillStore? skillStore,
+                          EzChartSkillStore? skillStore,
+                          EzPlayerSkillStore? playerSkillStore,
                           IDialogOverlay? dialogOverlay,
                           INotificationOverlay? notifications,
                           EzLocalProfileService? localProfileService,
@@ -40,7 +41,8 @@ namespace osu.Game.EzOsuGame.Overlays
                           RulesetStore? rulesetStore,
                           EzExternalRulesetManagerDialog? externalRulesetManager)
         {
-            EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, skillStore, dialogOverlay, notifications, localProfileService?.Store);
+            EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, skillStore, playerSkillStore, dialogOverlay, notifications,
+                localProfileService?.Store);
 
             Add(new SettingsButtonV2
             {

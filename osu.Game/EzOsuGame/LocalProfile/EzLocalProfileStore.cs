@@ -44,17 +44,25 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private const string meta_content_version = "content_version";
 
         private readonly Storage storage;
-        private readonly Lock sync = new Lock();
-        private bool initialised;
-        private string dbPath = string.Empty;
+        private readonly Lock sync;
         private bool isDisposed;
 
         /// <summary>Legacy unattributed online rows are attributed to the pulling account once per session.</summary>
         private bool onlineContributionsAdopted;
 
+        private readonly EzLocalProfileDatabase database;
+
         public EzLocalProfileStore(Storage storage)
+            : this(new EzLocalProfileDatabase(storage))
         {
-            this.storage = storage;
+        }
+
+        public EzLocalProfileStore(EzLocalProfileDatabase database)
+        {
+            ArgumentNullException.ThrowIfNull(database);
+            this.database = database;
+            this.storage = null!;
+            sync = database.Sync;
         }
 
         public EzLocalProfileSnapshot LoadSnapshot()
@@ -2021,24 +2029,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
             SqliteConnection.ClearAllPools();
         }
 
-        private void ensureInitialised()
-        {
-            if (initialised)
-                return;
+        private void ensureInitialised() => database.EnsureInitialised();
 
-            dbPath = storage.GetFullPath(DATABASE_FILENAME, true);
-
-            using var connection = openConnection();
-            EnsureSchema(connection);
-            initialised = true;
-        }
-
-        private SqliteConnection openConnection()
-        {
-            var connection = new SqliteConnection($"Data Source={dbPath};Cache=Shared;Mode=ReadWriteCreate");
-            connection.Open();
-            return connection;
-        }
+        private SqliteConnection openConnection() => database.Open();
 
         internal static void EnsureSchema(SqliteConnection connection)
         {

@@ -277,7 +277,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 this.title = title;
                 this.clearCount = clearCount;
                 this.accent = accent;
-                this.RowsFlow = rows;
+                RowsFlow = rows;
 
                 RelativeSizeAxes = Axes.X;
                 AutoSizeAxes = Axes.Y;

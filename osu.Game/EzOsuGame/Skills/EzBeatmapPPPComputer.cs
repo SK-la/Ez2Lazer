@@ -17,10 +17,10 @@ namespace osu.Game.EzOsuGame.Skills
     public sealed class EzBeatmapPPPComputer
     {
         private readonly BeatmapManager beatmapManager;
-        private readonly EzSkillStore skillStore;
+        private readonly EzChartSkillStore skillStore;
         private readonly IEzPPPEngine engine;
 
-        public EzBeatmapPPPComputer(BeatmapManager beatmapManager, EzSkillStore skillStore, IEzPPPEngine? engine = null)
+        public EzBeatmapPPPComputer(BeatmapManager beatmapManager, EzChartSkillStore skillStore, IEzPPPEngine? engine = null)
         {
             this.beatmapManager = beatmapManager;
             this.skillStore = skillStore;

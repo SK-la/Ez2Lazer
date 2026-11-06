@@ -1627,10 +1627,9 @@ namespace osu.Game.Database
 
                 case 12:
                 {
-                    // EzBeatmapSkillValue / EzPlayerSkillValue 新增 RulesetOnlineId / State：旧行没有规则集归属，而系统键值同时要改，
+                    // EzBeatmapSkillValue 新增 RulesetOnlineId / State：旧行没有规则集归属，而系统键值同时要改，
                     // 逐行猜测比直接清表更危险。开发期库没有兼容负担，交由回填重建。
                     migration.NewRealm.RemoveAll<EzBeatmapSkillValue>();
-                    migration.NewRealm.RemoveAll<EzPlayerSkillValue>();
 
                     // XxyStarRating 改名 SunnyStarRating：把旧列的值搬到新列，其余新增列保持默认 -1。
                     string beatmapClassName = getMappedOrOriginalName(typeof(BeatmapInfo));

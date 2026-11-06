@@ -51,7 +51,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         public EzDanLabeledStatList(EzDanSide side, Colour4 accent)
         {
-            this.Side = side;
+            Side = side;
             this.accent = accent;
 
             RelativeSizeAxes = Axes.X;

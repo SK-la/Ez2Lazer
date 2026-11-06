@@ -26,7 +26,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             RunTestWithRealm((realm, _) =>
             {
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
                 const string hash = "chart-dan-hash-1";
 
                 seedChart(realm, hash);
@@ -71,7 +71,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             RunTestWithRealm((realm, _) =>
             {
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
                 const string hash = "chart-dan-stale-version";
 
                 seedChart(realm, hash);
@@ -103,7 +103,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             RunTestWithRealm((realm, _) =>
             {
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
 
                 // A bare-constant stamp is what a pre-revision (or MSD-only side-upsert) row carries.
                 // Both it and a CSI-only stamp must read as a miss, because Dan folds CSI and MSD.
@@ -142,9 +142,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void FromMsd_compute_then_provider_read_only_labels()
         {
-            RunTestWithRealm((realm, _) =>
+            RunTestWithRealm((realm, storage) =>
             {
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
                 const string hash = "chart-dan-from-msd";
 
                 var msd = new Dictionary<string, double>
@@ -177,7 +177,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 store.UpsertChartDan(computed);
 
-                var provider = new EzSkillProvider(store);
+                var provider = new EzSkillProvider(store, new EzPlayerSkillStore(storage));
                 var info = new BeatmapInfo
                 {
                     Hash = hash,
@@ -199,7 +199,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             RunTestWithRealm((realm, _) =>
             {
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
                 const string hash = "msd-unrateable-hash";
 
                 seedChart(realm, hash);
@@ -231,7 +231,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             RunTestWithRealm((realm, _) =>
             {
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
                 const string hash = "chart-dan-unresolvable";
 
                 // 5K: not a 4/6/7K interval table, and no xxy star rating to borrow one from.

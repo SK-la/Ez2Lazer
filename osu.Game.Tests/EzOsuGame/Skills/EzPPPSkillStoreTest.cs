@@ -19,7 +19,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             RunTestWithRealm((realm, _) =>
             {
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
                 const string hash = "ppp-version-hash";
                 string aim = EzPPPSkillAxis.Aim.ToChartSkillId();
                 string speed = EzPPPSkillAxis.Speed.ToChartSkillId();

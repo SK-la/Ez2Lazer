@@ -64,7 +64,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                    + (waitingOnCsi.GetValueOrDefault(username, 0));
         }
 
-        public static EzChartChainDebt Collect(IEnumerable<(string Username, string BeatmapHash)> plays, EzSkillStore store)
+        public static EzChartChainDebt Collect(IEnumerable<(string Username, string BeatmapHash)> plays, EzChartSkillStore store)
         {
             ArgumentNullException.ThrowIfNull(plays);
             ArgumentNullException.ThrowIfNull(store);

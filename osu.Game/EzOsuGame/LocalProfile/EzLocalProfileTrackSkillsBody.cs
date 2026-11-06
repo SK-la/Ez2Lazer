@@ -15,7 +15,6 @@ using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills;
-using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -379,7 +378,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 new EzLocalProfileTrendChart(values, labels, displayName));
         }
 
-        private static string[] formatHistoryLabels(IReadOnlyList<EzPlayerSkillHistoryPoint> points)
+        private static string[] formatHistoryLabels(IReadOnlyList<EzPlayerSkillHistorySample> points)
         {
             var first = points[0].RecordedAt.ToLocalTime();
             var last = points[^1].RecordedAt.ToLocalTime();
