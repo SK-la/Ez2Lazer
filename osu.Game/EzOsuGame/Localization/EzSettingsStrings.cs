@@ -323,6 +323,9 @@ namespace osu.Game.EzOsuGame.Localization
             "When enabled, storyboard videos will automatically adjust their size to fill the entire storyboard area, "
             + "which may crop some of the video but will better adapt to different resolutions and screen ratios.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SECTION_HEADER =
+            new EzLocalizationManager.EzLocalisableString("Ez 分析", "Ez Analysis");
+
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_REC_ENABLED =
             new EzLocalizationManager.EzLocalisableString("启用 Ez 分析即时计算", "Enable Ez analysis on-demand computation");
 
@@ -861,10 +864,7 @@ namespace osu.Game.EzOsuGame.Localization
 
         #endregion
 
-        #region Ez 技能
-
-        public static readonly EzLocalizationManager.EzLocalisableString EZ_SKILL_SECTION_HEADER =
-            new EzLocalizationManager.EzLocalisableString("Ez 技能", "Ez Skill");
+        #region Ez 分析
 
         public static readonly LocalisableString SKILL_LN_CHART_MIN_HOLD_OBJECTS = new EzLocalizationManager.EzLocalisableString(
             "LN 谱面最小 Hold 数",
