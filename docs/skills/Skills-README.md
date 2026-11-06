@@ -24,7 +24,7 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
     `EzDataStateChecker` counts ready / settled / stale / missing, `EzDataStateReport` is the list the readout
     renders. Storage-agnostic, so a Realm table and a SQLite table report the same way.
   - `EzChartChainState` — the chart chain's Realm adapter: one read of MSD / CSI / Dan into facets, plus the
-    per-stage owed sets. `EzSkillStore.GetSkillDataStatus()` returns its report.
+    per-stage owed sets. `EzChartSkillStore.GetSkillDataStatus()` returns its report.
 - Player SSR aggregation:
   - `EzPlayerSsrAggregator`
   - `EzDanPlaySsrIndex`
@@ -105,13 +105,13 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
 
 - 启动日志：`Ez chart chain revisions: MSD v…, CSI v… (policy=… …), Dan v… (…)`。
 - 每一段补算仍各自 `showProgressNotification`；因为过期行对增量集合就是"缺失"，换版后启动会自动弹进度。
-- 设置 → Ez → 实验性 → **技能数据状态**：`EzSkillStore.GetSkillDataStatus()` 的
+- 设置 → Ez → 实验性 → **技能数据状态**：`EzChartSkillStore.GetSkillDataStatus()` 的
   ready / unrateable / stale / missing，回答"数据有没有缺、有没有过期"；同一行末尾附带玩家链的
   「玩家技能 落后账本 N」（`GetStalePlayerSkillUsernames()`）与派生的「等图表链 N」
   （`EzChartChainDebt`），所以两条链的状态在一个地方能看完。
-- 玩家侧另有一套可见性：`EzPlayerSkillValue.Stale` 在个人主页显示为「待更新」
-  （`LOCAL_PROFILE_SKILL_STALE`）；手动「计算成绩分析」弹 `EzLocalProfileComputeNotification` 进度
-  通知（一次点击只弹一轮）。
+- 玩家侧另有一套可见性：落后账本在个人主页显示为「待更新」（`LOCAL_PROFILE_SKILL_STALE`，由
+  `EzPlayerSkillStore` 按账本行数派生，不存标志位）；手动「计算成绩分析」弹
+  `EzLocalProfileComputeNotification` 进度通知（一次点击只弹一轮）。
 
 ### 加一个分析 facet（xxySR / KPS …）
 
@@ -130,18 +130,19 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
 ## 玩家链（成绩分析）：与图表链不同的第二套失效机制
 
 图表链（上面那套）失效靠**组合修订号**；玩家链（SSR / pattern / Dan 的玩家侧汇总）失效靠
-**脏位 + 派生债务**，因为它的"上游"是 Realm 里不断新增的成绩，而不是磁盘上的一批谱面行。
+**派生的落后判据**，因为它的"上游"是不断新增的成绩，而不是磁盘上的一批谱面行。
 
 两级、各有一个真源：
 
 | 阶段 | 真源 | 写点 |
 |---|---|---|
 | SQLite 切片：`drill_scores`（每局明细 + 账本）+ `username_partitions`（每玩家计数器） | `drill_scores` 就是"已分析"账本 | 一局结算入库时立即追加（`Player.ImportScore` → `EzLocalProfileService.IngestSettledScore`） |
-| Realm 技能行：`EzPlayerSkillValue`（SSR / pattern）、`EzDanEstimate` / `EzPlayerDanSkillsetValue` | 从上一步的切片聚合而来 | 只在整段 compute 里写（`writePlayerSkills`） |
+| `ez-local-profile.sqlite` 的 `player_skill_value` / `player_skill_history` / `player_dan_estimate` / `player_dan_skillset` | 从上一步的切片聚合而来 | 只在整段 compute 里写（`EzPlayerSkillStore`），与账本同库同一事务 |
 
-一局结算只做第一步，然后把该玩家（和 `All`）的 Realm 技能行置 `Stale`——**不**在结算路径上重算，
-否则每局都要做一次玩家级聚合。第二步只在用户手动「计算成绩分析」时收口：**一次点击 = 一轮**，
-跑完不留任何后台回折（启动时、图表链收工后都不再自动补算）。
+一局结算只做第一步，**不**在结算路径上重算玩家级聚合。第二步只在用户手动「计算成绩分析」时收口：
+**一次点击 = 一轮**，跑完不留任何后台回折（启动时、图表链收工后都不再自动补算）。
+“落后账本”不落持久标志：技能行记着自己折入了多少局，与 `drill_scores` 当前行数比较即可，判据不会
+活过它的成因。
 
 ### 一轮计算覆盖谁
 
@@ -150,11 +151,11 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
 
 | 来源 | 判据 | 覆盖的场景 |
 |---|---|---|
-| 脏位 | `EzPlayerSkillValue.Stale`（`EzSkillProvider.PlayerSkills.SetStale`） | 已写进切片、技能行还没跟上（只有结算入库会置位；一次覆盖该玩家的 pass 清除） |
+| 落后账本 | 技能行的 `analyzed_plays` 小于 `drill_scores` 当前行数（`EzPlayerSkillStore.GetStalePlayerSkillUsernames`） | 已写进切片、技能行还没跟上；一次覆盖该玩家的 pass 自然让它相等 |
 | 图表链债务 | `EzChartChainDebt`：`drill_scores` 的 (玩家, 谱面) 对图表链覆盖现算 | 该谱面还没被图表链评级，这一轮读不到；跑完「重算 Realm」后再点一次即可折入 |
 
-两类都在同一遍 compute 内收口：覆盖到的玩家按玩家整体清脏位；无法重算的玩家（该切片没有 mania
-成绩）直接删行，避免脏位永远清不掉。`Stale` 只表示"值落后账本"，不再兼表"等图表链"——后者由派生
+两类都在同一遍 compute 内收口：覆盖到的玩家整段重写成技能行；无法重算的玩家（该切片没有 mania
+成绩）直接删行，避免落后判据永远成立。落后只表示“值落后账本”，不兼表“等图表链”——后者由派生
 债务表达，链一写出行就自己消失。
 
 ### 为什么玩家链不复用组合修订号
@@ -163,17 +164,17 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
   删除的成绩则要让对应玩家整段重算（drill 明细删掉后计数必须一起扣）。
 - 因此账本 diff 本身就是最精确的失效判据，"过期"与"新增"是同一个判据的两个方向；
   再加一层组合号只会多一份会和账本漂移的簿记。
-- 代价：Realm 技能行的**删除**没有脏位可用（Dan 行无 `Stale` 字段），只能靠实际重算修正；
+- 代价：玩家技能行的**删除**不能靠判据发现（键已经不在账本里），只能靠实际重算修正；
   这也是对账选增量而非清库重建的原因——增量足够精确，清库会把每局缓存一起废掉。
 
 ### 玩家链只读图表侧数据，缺失的交回图表链
 
 玩家段需要图表侧三样东西：SSR 的 pattern 标签（CSI）、Dan 的 `EzPersistedChartDan`、以及
 mod 影响谱面时的现场估算。前两样**只读不写**：读不到就跳到下一局，并把该谱面记进
-`MissingChartHashes`。这一轮**不去排图表链**，也**不写脏位**——缺的局根本没进这一遍写的行，
+`MissingChartHashes`。这一轮**不去排图表链**，也**不写落后标志**——缺的局根本没进这一遍写的行，
 说清楚它们少算了是日志（`N chart(s) have no chart-side skill data yet`）和派生的「等图表链」的事：
-`Stale` 只表示"切片领先了这些行"，写上去只有再跑一遍才能清，把它兼给"等图表链"就会让状态行
-在链已补齐之后仍报落后（一次点击要跑两轮才算完）。状态行报「等图表链」时用户跑一次「重算 Realm」
+落后只表示"切片领先了这些行"，把它兼给"等图表链"就会让状态行在链已补齐之后仍报落后
+（一次点击要跑两轮才算完）。状态行报「等图表链」时用户跑一次「重算 Realm」
 （scope = MSD | CSI | ChartDan），再点一次「计算成绩分析」就折进去了。
 
 这样切开的理由：图表侧一行 MSD/CSI/Dan 是**谱面属性**，与玩家无关。玩家段顺手算一份，就会在
@@ -190,9 +191,9 @@ mod 影响谱面时的现场估算。前两样**只读不写**：读不到就跳
 | MSD 结算为 unrateable | **不会**（CSI 与 Dan 都显式跳过） | 已结算，不报缺 |
 | CSI 结算为 unavailable stub | 不会 | 已结算，不报缺 |
 
-前两类由 `EzChartChainCoverage.IsRateableChart` / `EzSkillStore.GetUnrateableMsdHashes` 区分：前者按图表链
+前两类由 `EzChartChainCoverage.IsRateableChart` / `EzChartSkillStore.GetUnrateableMsdHashes` 区分：前者按图表链
 自己的候选门槛（set 非空 + `Ruleset.OnlineID == 3` + 键数）判断，不只是看有没有行，否则会给链永不看的谱面
-反复排队、把玩家的脏位永久挂住。后两者是**落结算行**的结果，所以"缺行"一定会终止：`EzBeatmapMsdComputer.ComputeAndStore` 把零向量、
+反复排队、让玩家的落后判据永久成立。后两者是**落结算行**的结果，所以"缺行"一定会终止：`EzBeatmapMsdComputer.ComputeAndStore` 把零向量、
 超出引擎列数、内容不可加载都落成 `__unrateable`；唯一允许不落的是引擎自己抛异常的瞬态失败。
 
 同一套口径也用在 `GetSkillDataStatus()` 上：不可评的键数不计入图表总数，MSD unrateable 的谱面在
