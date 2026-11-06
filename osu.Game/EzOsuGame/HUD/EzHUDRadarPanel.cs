@@ -514,18 +514,27 @@ namespace osu.Game.EzOsuGame.HUD
                              {
                                  EzAnalysisResult? result = task.IsCanceled || task.IsFaulted ? null : task.GetResultSafely();
 
-                                 if (result != null && !cancellationToken.IsCancellationRequested)
+                                 if (result == null)
                                  {
-                                     cachedLiveAnalysisKey = key;
-                                     cachedLiveAnalysis = result;
+                                     // Do not refresh on a failed pass. The refresh would find the cache still empty,
+                                     // kick another full pass, and a chart that cannot be analysed would spin forever:
+                                     // the kick guard stays set until the chart / mods / ruleset change drops it.
+                                     if (cancellationToken.IsCancellationRequested && lastLiveAnalysisKickKey == key)
+                                         lastLiveAnalysisKickKey = null;
+
+                                     return;
                                  }
 
-                                 // A failed or superseded pass must not block a retry on the next presentation.
+                                 if (cancellationToken.IsCancellationRequested)
+                                     return;
+
+                                 cachedLiveAnalysisKey = key;
+                                 cachedLiveAnalysis = result;
+
                                  if (lastLiveAnalysisKickKey == key)
                                      lastLiveAnalysisKickKey = null;
 
-                                 if (!cancellationToken.IsCancellationRequested)
-                                     refreshRadarPresentation();
+                                 refreshRadarPresentation();
                              });
                          }, CancellationToken.None);
         }
