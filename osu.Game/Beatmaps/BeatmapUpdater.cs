@@ -75,8 +75,9 @@ namespace osu.Game.Beatmaps
                     beatmap.HasVideo = tagSummary.HasVideo;
                     beatmap.HasStoryboard = tagSummary.HasStoryboard;
 
-                    updateSunnyStarRating(beatmap);
-                    updatePerformancePoints(beatmap, working);
+                    // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+                    // updateSunnyStarRating(beatmap);
+                    // updatePerformancePoints(beatmap, working);
                 }
 
                 // And invalidate again afterwards as re-fetching the most up-to-date database metadata will be required.

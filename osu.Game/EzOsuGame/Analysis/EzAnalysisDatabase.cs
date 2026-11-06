@@ -856,6 +856,8 @@ namespace osu.Game.EzOsuGame.Analysis
                 wrote = true;
             }
 
+            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+            /*
             if (payload.SunnyStarRating is double xxy && double.IsFinite(xxy) && xxy >= 0)
             {
                 beatmap.SunnyStarRating = xxy;
@@ -867,6 +869,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 beatmap.PerformancePoints = pp;
                 wrote = true;
             }
+            */
 
             return wrote;
         }
