@@ -67,7 +67,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             if (profile == null || provider == null)
                 return null;
 
-            return profile.DefaultPlayerSystemId switch
+            return profile.DefaultSystemId switch
             {
                 EzSkillSystems.PLAYER_MINA => new ManiaTrackSkillsPresenter(provider),
                 EzSkillSystems.PLAYER_PPP => new PPPSkillsPresenter(provider, profile.RulesetOnlineId),

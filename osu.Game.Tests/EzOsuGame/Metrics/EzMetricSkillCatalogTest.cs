@@ -6,7 +6,6 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Metrics;
-using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
 
@@ -21,14 +20,17 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         private const int mania = EzLocalProfileConstants.MANIA_RULESET_ID;
         private const int osu = EzLocalProfileConstants.OSU_RULESET_ID;
 
-        private static EzMetricProducerRegistry registry =>
-            EzMetricProducers.CreateDefault(new FixedUpstream());
+        private static EzMetricProducerRegistry chartRegistry =>
+            EzChartMetricProducers.CreateRegistry(new FixedUpstream());
+
+        private static EzMetricProducerRegistry playerRegistry =>
+            EzPlayerMetricProducers.CreateRegistry();
 
         [Test]
         public void The_same_declaration_yields_the_same_order()
         {
-            var first = registry.Items(mania, EzSkillScope.Beatmap);
-            var second = EzMetricProducers.CreateDefault(new FixedUpstream()).Items(mania, EzSkillScope.Beatmap);
+            var first = chartRegistry.Items(mania);
+            var second = EzChartMetricProducers.CreateRegistry(new FixedUpstream()).Items(mania);
 
             Assert.That(first.Count, Is.GreaterThan(0));
             Assert.That(second.Count, Is.EqualTo(first.Count));
@@ -52,11 +54,11 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         [Test]
         public void Group_id_matches_the_declared_axis_group()
         {
-            var items = registry.Items(mania, EzSkillScope.Beatmap);
+            var items = chartRegistry.Items(mania);
 
             foreach (var item in items)
             {
-                var producer = registry.Get(item.Producer);
+                var producer = chartRegistry.Get(item.Producer);
 
                 Assert.That(producer, Is.Not.Null);
 
@@ -66,21 +68,24 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         }
 
         [Test]
-        public void Items_are_scoped_to_one_side()
+        public void Both_sides_declare_their_own_axes()
         {
-            var chart = registry.Items(mania, EzSkillScope.Beatmap);
-            var player = registry.Items(mania, EzSkillScope.Player);
+            var chart = chartRegistry.Items(mania);
+            var player = playerRegistry.Items(mania);
 
-            Assert.That(chart, Has.All.Matches<EzMetricSkillItem>(i => i.Scope == EzSkillScope.Beatmap));
-            Assert.That(player, Has.All.Matches<EzMetricSkillItem>(i => i.Scope == EzSkillScope.Player));
+            Assert.That(chart, Is.Not.Empty);
+            Assert.That(player, Is.Not.Empty);
+
+            // The two catalogs are separate namespaces, so no producer can appear on both sides.
+            Assert.That(chart.Select(i => i.Producer), Has.None.Matches<EzMetricProducerId>(p => player.Any(x => x.Producer == p)));
         }
 
         [Test]
         public void Mina_chart_axes_are_all_listed()
         {
-            var mina = registry.Items(mania, EzSkillScope.Beatmap)
-                               .Where(i => i.Producer == EzMetricProducers.MINA_CHART)
-                               .ToList();
+            var mina = chartRegistry.Items(mania)
+                                    .Where(i => i.Producer == EzChartMetricProducer.Mina.Id())
+                                    .ToList();
 
             Assert.That(mina.Count, Is.EqualTo(EzMinaSkillAxisExtensions.All.Length));
 
@@ -89,9 +94,9 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         }
 
         private static List<EzMetricSkillItem> pppItems(int rulesetOnlineId)
-            => registry.Items(rulesetOnlineId, EzSkillScope.Beatmap)
-                       .Where(i => i.Producer == EzMetricProducers.PPP_CHART)
-                       .ToList();
+            => chartRegistry.Items(rulesetOnlineId)
+                            .Where(i => i.Producer == EzChartMetricProducer.Ppp.Id())
+                            .ToList();
 
         private sealed class FixedUpstream : IEzMetricUpstreamRevisions
         {

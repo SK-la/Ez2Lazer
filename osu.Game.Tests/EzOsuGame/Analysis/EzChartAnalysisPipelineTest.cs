@@ -136,7 +136,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
             var table = new Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>
             {
-                [EzMetricProducers.MINA_CHART] = axes,
+                [EzChartMetricProducer.Mina.Id()] = axes,
             };
 
             // The pass resolves the sides once; the estimator is expected to read that, not derive its own.

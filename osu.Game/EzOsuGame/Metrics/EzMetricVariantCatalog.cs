@@ -21,12 +21,12 @@ namespace osu.Game.EzOsuGame.Metrics
         public const string SUNNY = "sunny";
         public const string PPP = "ppp";
 
-        private readonly EzMetricProducerRegistry registry;
+        private readonly EzMetricRevisionResolver resolver;
 
-        public EzMetricVariantCatalog(EzMetricProducerRegistry registry)
+        public EzMetricVariantCatalog(EzMetricRevisionResolver resolver)
         {
-            ArgumentNullException.ThrowIfNull(registry);
-            this.registry = registry;
+            ArgumentNullException.ThrowIfNull(resolver);
+            this.resolver = resolver;
         }
 
         /// <summary>
@@ -36,41 +36,41 @@ namespace osu.Game.EzOsuGame.Metrics
         private static readonly EzMetricVariant official = new EzMetricVariant(
             OFFICIAL,
             EzSettingsStrings.PANEL_VARIANT_OFFICIAL,
-            EzMetricProducers.PPP_FAMILY,
-            EzMetricProducers.OFFICIAL_CHART,
-            EzMetricProducers.OFFICIAL_PERFORMANCE,
-            EzMetricProducers.PPP_CHART,
-            EzMetricProducers.PPP_PLAYER);
+            EzMetricFamily.Ppp,
+            EzChartMetricProducer.Official.Id(),
+            EzChartMetricProducer.OfficialPerformance.Id(),
+            EzChartMetricProducer.Ppp.Id(),
+            EzPlayerMetricProducer.Ppp.Id());
 
         private static readonly EzMetricVariant sunny = new EzMetricVariant(
             SUNNY,
             EzSettingsStrings.PANEL_VARIANT_SUNNY,
-            EzMetricProducers.SUNNY_FAMILY,
-            EzMetricProducers.SSR_CHART,
-            EzMetricProducers.SSR_PERFORMANCE,
-            EzMetricProducers.SSR_CHART);
+            EzMetricFamily.Sunny,
+            EzChartMetricProducer.Ssr.Id(),
+            EzChartMetricProducer.SsrPerformance.Id(),
+            EzChartMetricProducer.Ssr.Id());
 
         private static readonly EzMetricVariant ppp = new EzMetricVariant(
             PPP,
             EzSettingsStrings.PANEL_VARIANT_PPP,
-            EzMetricProducers.PPP_FAMILY,
-            EzMetricProducers.PPP_CHART,
-            EzMetricProducers.PPP_PERFORMANCE,
-            EzMetricProducers.PPP_CHART,
-            EzMetricProducers.PPP_PLAYER);
+            EzMetricFamily.Ppp,
+            EzChartMetricProducer.Ppp.Id(),
+            EzChartMetricProducer.PppPerformance.Id(),
+            EzChartMetricProducer.Ppp.Id(),
+            EzPlayerMetricProducer.Ppp.Id());
 
         /// <summary>
-        /// Mania reads its skill layer from Mina, so the official variant pairs Mina's chart and player
-        /// vectors instead of PP+ (which mania also has, but not as the radar source).
+        /// Mania reads its skill layer from its own rating engine, so the official variant pairs that chart vector
+        /// with the player vector folded from it instead of PP+ (which mania also has, but not as its radar).
         /// </summary>
         private static readonly EzMetricVariant officialMania = new EzMetricVariant(
             OFFICIAL,
             EzSettingsStrings.PANEL_VARIANT_MINA,
-            EzMetricProducers.MINA_FAMILY,
-            EzMetricProducers.OFFICIAL_CHART,
-            EzMetricProducers.OFFICIAL_PERFORMANCE,
-            EzMetricProducers.MINA_CHART,
-            EzMetricProducers.MINA_PLAYER);
+            EzMetricFamily.Mina,
+            EzChartMetricProducer.Official.Id(),
+            EzChartMetricProducer.OfficialPerformance.Id(),
+            EzChartMetricProducer.Mina.Id(),
+            EzPlayerMetricProducer.Mina.Id());
 
         public IReadOnlyList<EzMetricVariant> For(int rulesetOnlineId)
         {
@@ -141,7 +141,7 @@ namespace osu.Game.EzOsuGame.Metrics
 
         private bool applies(EzMetricProducerId id, int rulesetOnlineId)
         {
-            var producer = registry.Get(id);
+            var producer = resolver.ChartRegistry.Get(id) ?? resolver.PlayerRegistry.Get(id);
             return producer != null && producer.AppliesToRuleset(rulesetOnlineId);
         }
 
@@ -154,8 +154,11 @@ namespace osu.Game.EzOsuGame.Metrics
             if (variant.ChartSkillProducer == null || variant.PlayerSkillProducer == null)
                 return false;
 
-            return registry.Get(variant.ChartSkillProducer.Value)?.AxisFamilyId == variant.AxisFamilyId
-                   && registry.Get(variant.PlayerSkillProducer.Value)?.AxisFamilyId == variant.AxisFamilyId;
+            return producer(variant.ChartSkillProducer.Value)?.Family == variant.Family
+                   && producer(variant.PlayerSkillProducer.Value)?.Family == variant.Family;
         }
+
+        private EzMetricProducer? producer(EzMetricProducerId id)
+            => resolver.ChartRegistry.Get(id) ?? resolver.PlayerRegistry.Get(id);
     }
 }

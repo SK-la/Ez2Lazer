@@ -283,13 +283,13 @@ namespace osu.Game.EzOsuGame.Analysis
             var result = new Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>();
 
             if (mina != null)
-                result[EzMetricProducers.MINA_CHART] = mina.Value.Axes;
+                result[EzChartMetricProducer.Mina.Id()] = mina.Value.Axes;
 
             if (ppp != null)
-                result[EzMetricProducers.PPP_CHART] = ppp.Value.Axes;
+                result[EzChartMetricProducer.Ppp.Id()] = ppp.Value.Axes;
 
             if (structure != null)
-                result[EzMetricProducers.CSI_CHART] = structure;
+                result[EzChartMetricProducer.Csi.Id()] = structure;
 
             addOfficial(playable, analysisBeatmap, lookup, result);
             addSsr(lookup, analysisBeatmap, xxySr, cancellationToken, result);
@@ -306,7 +306,7 @@ namespace osu.Game.EzOsuGame.Analysis
                                               Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>> result)
         {
             if (ppp is not { } values
-                || !values.Axes.TryGetValue(EzPPPSkillCatalog.STAR_RATING, out double star)
+                || !values.Axes.TryGetValue(EzMetricAxisIds.STAR_RATING, out double star)
                 || !double.IsFinite(star) || star <= 0)
             {
                 return;
@@ -320,9 +320,9 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!double.IsFinite(pp) || pp <= 0)
                 return;
 
-            result[EzMetricProducers.PPP_PERFORMANCE] = new Dictionary<string, double>(StringComparer.Ordinal)
+            result[EzChartMetricProducer.PppPerformance.Id()] = new Dictionary<string, double>(StringComparer.Ordinal)
             {
-                [EzMetricProducers.PERFORMANCE_POINTS] = pp,
+                [EzMetricAxisIds.PERFORMANCE_POINTS] = pp,
             };
         }
 
@@ -349,18 +349,18 @@ namespace osu.Game.EzOsuGame.Analysis
 
             if (double.IsFinite(official.StarRating) && official.StarRating >= 0)
             {
-                result[EzMetricProducers.OFFICIAL_CHART] = new Dictionary<string, double>(StringComparer.Ordinal)
+                result[EzChartMetricProducer.Official.Id()] = new Dictionary<string, double>(StringComparer.Ordinal)
                 {
-                    [EzMetricProducers.STAR_RATING] = official.StarRating,
+                    [EzMetricAxisIds.STAR_RATING] = official.StarRating,
                 };
             }
 
             if (official.PerformancePoints is not double pp)
                 return;
 
-            result[EzMetricProducers.OFFICIAL_PERFORMANCE] = new Dictionary<string, double>(StringComparer.Ordinal)
+            result[EzChartMetricProducer.OfficialPerformance.Id()] = new Dictionary<string, double>(StringComparer.Ordinal)
             {
-                [EzMetricProducers.PERFORMANCE_POINTS] = pp,
+                [EzMetricAxisIds.PERFORMANCE_POINTS] = pp,
             };
         }
 
@@ -423,9 +423,9 @@ namespace osu.Game.EzOsuGame.Analysis
             if (xxySr is not double value || !double.IsFinite(value))
                 return;
 
-            result[EzMetricProducers.SSR_CHART] = new Dictionary<string, double>(StringComparer.Ordinal)
+            result[EzChartMetricProducer.Ssr.Id()] = new Dictionary<string, double>(StringComparer.Ordinal)
             {
-                [EzMetricProducers.STAR_RATING] = value,
+                [EzMetricAxisIds.STAR_RATING] = value,
             };
 
             double pp = calculatePerformanceAtRating(lookup, analysisBeatmap, value, cancellationToken);
@@ -433,9 +433,9 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!double.IsFinite(pp) || pp <= 0)
                 return;
 
-            result[EzMetricProducers.SSR_PERFORMANCE] = new Dictionary<string, double>(StringComparer.Ordinal)
+            result[EzChartMetricProducer.SsrPerformance.Id()] = new Dictionary<string, double>(StringComparer.Ordinal)
             {
-                [EzMetricProducers.PERFORMANCE_POINTS] = pp,
+                [EzMetricAxisIds.PERFORMANCE_POINTS] = pp,
             };
         }
 

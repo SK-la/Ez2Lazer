@@ -3,7 +3,6 @@
 
 using System.Linq;
 using NUnit.Framework;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Metrics;
 
@@ -15,7 +14,7 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         private const int mania = EzLocalProfileConstants.MANIA_RULESET_ID;
         private const int osu = EzLocalProfileConstants.OSU_RULESET_ID;
 
-        private readonly EzMetricVariantCatalog catalog = new EzMetricVariantCatalog(EzAnalysisRevision.Registry);
+        private readonly EzMetricVariantCatalog catalog = new EzMetricVariantCatalog(EzMetricRegistries.Current);
 
         [Test]
         public void Mania_offers_the_three_systems_osu_offers_two()

@@ -23,7 +23,7 @@ namespace osu.Game.EzOsuGame.Edit
         public required bool RulesetScoped { get; init; }
 
         /// <summary>
-        /// The layout target this layer edits. Only meaningful for <see cref="EzSkinEditorLayerSource.Ez"/>.
+        /// The layout target this layer edits.
         /// </summary>
         public required GlobalSkinnableContainers Target { get; init; }
     }

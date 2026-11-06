@@ -478,9 +478,11 @@ namespace osu.Game
 
             // Skill metrics: one declaration drives both the storage keys and the ruleset profile.
             // Mania: MSD / SSR / pattern / Dan. PPP chart / player skills cover osu, taiko, catch, and mania.
-            var metricRegistry = EzMetricProducers.CreateDefault(new EzRealmUpstreamRevisions(RulesetStore));
-            EzAnalysisRevision.Configure(metricRegistry);
-            var skillStore = new EzSkillStore(realm, metricRegistry);
+            var metricResolver = new EzMetricRevisionResolver(
+                EzChartMetricProducers.CreateRegistry(new EzRealmUpstreamRevisions(RulesetStore)),
+                EzPlayerMetricProducers.CreateRegistry());
+            EzAnalysisRevision.Configure(metricResolver);
+            var skillStore = new EzSkillStore(realm, metricResolver);
             var pppEngine = new EzPPPEngine();
 
             var beatmapMsdComputer = new EzBeatmapMinaComputer(BeatmapManager, skillStore);
@@ -493,7 +495,7 @@ namespace osu.Game
 
             var playerRatingAggregator = new EzPlayerRatingAggregator(BeatmapManager, skillStore, localProfileStore);
             var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanEstimator, skillStore, localProfileStore);
-            var skillProvider = new EzSkillProvider(skillStore, metricRegistry, chartDanEstimator, localProfileStore, BeatmapManager, liveMetrics);
+            var skillProvider = new EzSkillProvider(skillStore, metricResolver, chartDanEstimator, localProfileStore, BeatmapManager, liveMetrics);
 
             // Only the types something actually resolves through DI are cached. Writers and aggregators are
             // constructed here and passed as arguments; caching them would leave entries nothing ever reads.

@@ -7,7 +7,6 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Metrics;
-using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.PPP;
 
 namespace osu.Game.Tests.EzOsuGame.Metrics
@@ -18,25 +17,40 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         private const int mania = EzLocalProfileConstants.MANIA_RULESET_ID;
         private const int osu = EzLocalProfileConstants.OSU_RULESET_ID;
 
-        private static readonly EzMetricProducerId chart_rating = new EzMetricProducerId("rating", EzSkillScope.Beatmap);
-        private const string chart_rating_id = "rating";
-        private static readonly EzMetricProducerId chart_tags = new EzMetricProducerId("tags", EzSkillScope.Beatmap);
-        private static readonly EzMetricProducerId performance = new EzMetricProducerId("pp", EzSkillScope.Beatmap);
-        private static readonly EzMetricProducerId player_rating = new EzMetricProducerId("rating", EzSkillScope.Player);
+        private static readonly EzMetricProducerId chart_rating = new EzMetricProducerId("rating");
+        private static readonly EzMetricProducerId chart_tags = new EzMetricProducerId("tags");
+        private static readonly EzMetricProducerId performance = new EzMetricProducerId("pp");
+        private static readonly EzMetricProducerId player_rating = new EzMetricProducerId("rating_player");
 
         [Test]
-        public void Same_name_on_two_scopes_is_two_producers()
+        public void The_two_catalogs_share_no_id()
         {
-            Assert.That(chart_rating, Is.Not.EqualTo(player_rating));
-            Assert.That(chart_rating.CompareTo(player_rating), Is.Not.EqualTo(0));
+            var chart = EzChartMetricProducers.CreateRegistry();
+            var player = EzPlayerMetricProducers.CreateRegistry();
+
+            var chartIds = chart.All.Select(p => p.Id).ToList();
+            var playerIds = player.All.Select(p => p.Id).ToList();
+
+            Assert.That(chartIds, Has.None.Matches<EzMetricProducerId>(id => playerIds.Contains(id)));
+        }
+
+        [Test]
+        public void Derived_ids_are_unique_and_bare()
+        {
+            foreach (var producer in EzChartMetricProducers.CreateRegistry().All.Concat(EzPlayerMetricProducers.CreateRegistry().All))
+            {
+                Assert.That(producer.Id.Id, Is.Not.Empty);
+                Assert.That(producer.Id.Id, Does.Not.Contain("."));
+                Assert.That(producer.Id.Id, Is.EqualTo(producer.Id.Id.ToLowerInvariant()));
+            }
         }
 
         [Test]
         public void Folding_the_same_graph_twice_yields_the_same_revision()
         {
-            var registry = buildRegistry();
-            int first = registry.RevisionOf(performance, mania);
-            int second = buildRegistry().RevisionOf(performance, mania);
+            var resolver = buildResolver();
+            int first = resolver.RevisionOf(performance, mania);
+            int second = buildResolver().RevisionOf(performance, mania);
 
             Assert.That(first, Is.GreaterThan(0));
             Assert.That(second, Is.EqualTo(first));
@@ -45,8 +59,8 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         [Test]
         public void Bumping_a_dependency_retires_its_consumers()
         {
-            int before = buildRegistry(ratingVersion: 1).RevisionOf(performance, mania);
-            int after = buildRegistry(ratingVersion: 2).RevisionOf(performance, mania);
+            int before = buildResolver(ratingVersion: 1).RevisionOf(performance, mania);
+            int after = buildResolver(ratingVersion: 2).RevisionOf(performance, mania);
 
             Assert.That(after, Is.Not.EqualTo(before));
         }
@@ -54,8 +68,8 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         [Test]
         public void Bumping_an_unrelated_producer_does_not_retire_a_consumer()
         {
-            int before = buildRegistry(tagVersion: 1).RevisionOf(performance, mania);
-            int after = buildRegistry(tagVersion: 2).RevisionOf(performance, mania);
+            int before = buildResolver(tagVersion: 1).RevisionOf(performance, mania);
+            int after = buildResolver(tagVersion: 2).RevisionOf(performance, mania);
 
             Assert.That(after, Is.EqualTo(before));
         }
@@ -65,30 +79,50 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         {
             // A player rating reuses the chart rating's axis names and engine but reads none of its rows,
             // so a chart-side bump must leave the player value valid.
-            int before = buildRegistry(ratingVersion: 1).RevisionOf(player_rating, mania);
-            int after = buildRegistry(ratingVersion: 99).RevisionOf(player_rating, mania);
+            int before = buildResolver(ratingVersion: 1).RevisionOf(player_rating, mania);
+            int after = buildResolver(ratingVersion: 99).RevisionOf(player_rating, mania);
 
             Assert.That(after, Is.EqualTo(before));
         }
 
         [Test]
+        public void A_player_producer_may_read_a_chart_producer_across_catalogs()
+        {
+            var resolver = buildResolver();
+
+            var playerReadsChart = new EzMetricProducer(player_rating, EzMetricTier.Skill, EzMetricUnit.SkillPoint, _ => true)
+            {
+                DependsOn = new[] { chart_rating },
+                RevisionProbe = _ => 1,
+            };
+
+            var withEdge = new EzMetricRevisionResolver(
+                new EzMetricProducerRegistry(new[] { producer(chart_rating, _ => 1) }),
+                new EzMetricProducerRegistry(new[] { playerReadsChart }));
+
+            var bumpedChart = new EzMetricRevisionResolver(
+                new EzMetricProducerRegistry(new[] { producer(chart_rating, _ => 2) }),
+                new EzMetricProducerRegistry(new[] { playerReadsChart }));
+
+            Assert.That(withEdge.RevisionOf(player_rating, mania), Is.Not.EqualTo(bumpedChart.RevisionOf(player_rating, mania)));
+
+            // The reverse edge does not exist: a chart producer never resolves a player id.
+            Assert.That(resolver.RevisionOf(player_rating, mania), Is.GreaterThan(0));
+        }
+
+        [Test]
         public void A_dependency_chain_folds_transitively()
         {
-            var registry = new EzMetricProducerRegistry(new[]
-            {
-                producer(chart_rating, "rating", _ => 1),
-                producer(chart_tags, "tags", _ => 1, dependsOn: new[] { chart_rating }),
-                producer(performance, "pp", _ => 1, dependsOn: new[] { chart_tags }),
-            });
+            var baseRevision = buildResolver().RevisionOf(performance, mania);
 
-            int baseRevision = registry.RevisionOf(performance, mania);
-
-            var bumped = new EzMetricProducerRegistry(new[]
-            {
-                producer(chart_rating, "rating", _ => 2),
-                producer(chart_tags, "tags", _ => 1, dependsOn: new[] { chart_rating }),
-                producer(performance, "pp", _ => 1, dependsOn: new[] { chart_tags }),
-            });
+            var bumped = new EzMetricRevisionResolver(
+                new EzMetricProducerRegistry(new[]
+                {
+                    producer(chart_rating, _ => 2),
+                    producer(chart_tags, _ => 1, dependsOn: new[] { chart_rating }),
+                    producer(performance, _ => 1, dependsOn: new[] { chart_tags }),
+                }),
+                new EzMetricProducerRegistry());
 
             Assert.That(bumped.RevisionOf(performance, mania), Is.Not.EqualTo(baseRevision));
         }
@@ -96,23 +130,25 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         [Test]
         public void Unknown_or_inapplicable_producers_have_no_revision()
         {
-            var registry = buildRegistry();
-            var unknown = new EzMetricProducerId("nope", EzSkillScope.Beatmap);
+            var resolver = buildResolver();
+            var unknown = new EzMetricProducerId("nope");
 
-            Assert.That(registry.RevisionOf(unknown, mania), Is.EqualTo(0));
-            Assert.That(registry.RevisionOf(performance, osu), Is.EqualTo(0));
+            Assert.That(resolver.RevisionOf(unknown, mania), Is.EqualTo(0));
+            Assert.That(resolver.RevisionOf(performance, osu), Is.EqualTo(0));
         }
 
         [Test]
         public void A_declared_cycle_fails_loudly()
         {
-            var registry = new EzMetricProducerRegistry(new[]
-            {
-                producer(chart_rating, "a", _ => 1, dependsOn: new[] { chart_tags }),
-                producer(chart_tags, "b", _ => 1, dependsOn: new[] { chart_rating }),
-            });
+            var resolver = new EzMetricRevisionResolver(
+                new EzMetricProducerRegistry(new[]
+                {
+                    producer(chart_rating, _ => 1, dependsOn: new[] { chart_tags }),
+                    producer(chart_tags, _ => 1, dependsOn: new[] { chart_rating }),
+                }),
+                new EzMetricProducerRegistry());
 
-            Assert.Throws<InvalidOperationException>(() => registry.RevisionOf(chart_rating, mania));
+            Assert.Throws<InvalidOperationException>(() => resolver.RevisionOf(chart_rating, mania));
         }
 
         [Test]
@@ -155,8 +191,8 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         [Test]
         public void A_producer_may_declare_a_different_axis_set_per_ruleset()
         {
-            var registry = EzMetricProducers.CreateDefault(new FixedUpstream());
-            var ppp = registry.Get(EzMetricProducers.PPP_CHART);
+            var registry = EzChartMetricProducers.CreateRegistry(new FixedUpstream());
+            var ppp = registry.Get(EzChartMetricProducer.Ppp.Id());
 
             Assert.That(ppp, Is.Not.Null);
 
@@ -196,35 +232,39 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
             Assert.That(EzMetricSkillId.For(chart_rating, "jump"), Is.EqualTo("rating.jump"));
 
             Assert.That(EzMetricSkillId.TrySplit("rating.jump", out string producerId, out string axisId), Is.True);
-            Assert.That(producerId, Is.EqualTo(chart_rating_id));
+            Assert.That(producerId, Is.EqualTo("rating"));
             Assert.That(axisId, Is.EqualTo("jump"));
 
             Assert.That(EzMetricSkillId.TrySplit("no-separator", out _, out _), Is.False);
             Assert.That(EzMetricSkillId.TrySplit(null, out _, out _), Is.False);
         }
 
-        private static EzMetricProducerRegistry buildRegistry(int ratingVersion = 1, int tagVersion = 1)
+        private static EzMetricRevisionResolver buildResolver(int ratingVersion = 1, int tagVersion = 1)
         {
-            return new EzMetricProducerRegistry(new[]
-            {
-                producer(chart_rating, "rating", _ => ratingVersion),
-                producer(chart_tags, "tags", _ => tagVersion),
-                producer(performance, "pp", _ => 1, dependsOn: new[] { chart_rating }),
-                // Same name, player side: shares the axis vocabulary but reads no chart rows.
-                new EzMetricProducer(player_rating, EzMetricTier.Skill, EzMetricUnit.SkillPoint, _ => true)
+            return new EzMetricRevisionResolver(
+                new EzMetricProducerRegistry(new[]
                 {
-                    AxisFamilyId = chart_rating_id,
-                    RevisionProbe = _ => 1,
-                },
-            });
+                    producer(chart_rating, _ => ratingVersion),
+                    producer(chart_tags, _ => tagVersion),
+                    producer(performance, _ => 1, dependsOn: new[] { chart_rating }),
+                }),
+                new EzMetricProducerRegistry(new[]
+                {
+                    // Same axis vocabulary as the chart side, but reads none of its rows.
+                    new EzMetricProducer(player_rating, EzMetricTier.Skill, EzMetricUnit.SkillPoint, _ => true)
+                    {
+                        Family = EzMetricFamily.Official,
+                        RevisionProbe = _ => 1,
+                    },
+                }));
         }
 
-        private static EzMetricProducer producer(EzMetricProducerId id, string family, Func<int, int> probe,
+        private static EzMetricProducer producer(EzMetricProducerId id, Func<int, int> probe,
                                                  IReadOnlyList<EzMetricProducerId>? dependsOn = null)
         {
             return new EzMetricProducer(id, EzMetricTier.Star, EzMetricUnit.Star, ruleset => ruleset == mania)
             {
-                AxisFamilyId = family,
+                Family = EzMetricFamily.Official,
                 DependsOn = dependsOn ?? Array.Empty<EzMetricProducerId>(),
                 RevisionProbe = probe,
             };

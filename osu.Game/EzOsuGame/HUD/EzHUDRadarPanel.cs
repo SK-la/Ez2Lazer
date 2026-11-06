@@ -16,7 +16,6 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.EzOsuGame.Skills;
@@ -453,7 +452,7 @@ namespace osu.Game.EzOsuGame.HUD
             if (analysis is not { } live)
                 return no_skill_values;
 
-            var axes = live.AxesOf(EzMetricProducers.PPP_CHART);
+            var axes = live.AxesOf(EzChartMetricProducer.Ppp.Id());
 
             if (axes.Count == 0)
                 return no_skill_values;
@@ -541,9 +540,11 @@ namespace osu.Game.EzOsuGame.HUD
                 return;
             }
 
-            // Skill modes name the vector the analysis system declared, not the layer it was read from. PP+ is the
-            // declared default everywhere except mania, whose own rating engine owns the MSD modes.
-            if (isPppSkillRadarMode() || beatmapInfo.Ruleset.OnlineID != EzLocalProfileConstants.MANIA_RULESET_ID)
+            // Which vector the skill modes draw is the chart catalog's declared default for the ruleset, not a
+            // ruleset test here: mania declares its own rating engine, every other ruleset declares PP+.
+            string? defaultSystem = skillProvider?.GetChartProfile(beatmapInfo.Ruleset.OnlineID)?.DefaultSystemId;
+
+            if (defaultSystem != EzSkillSystems.BEATMAP_MINA)
             {
                 updatePppSkillRadarPresentation(beatmapInfo);
                 return;
@@ -557,7 +558,7 @@ namespace osu.Game.EzOsuGame.HUD
             requestLiveAnalysis(beatmapInfo);
 
             var live = getLiveAnalysis(beatmapInfo);
-            var msd = live is { } analysed ? analysed.AxesOf(EzMetricProducers.MINA_CHART) : no_skill_values;
+            var msd = live is { } analysed ? analysed.AxesOf(EzChartMetricProducer.Mina.Id()) : no_skill_values;
             var structureAxes = live is { } structured ? structureAxesOf(structured) : no_skill_values;
 
             int keyCount = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
@@ -612,7 +613,7 @@ namespace osu.Game.EzOsuGame.HUD
             => double.IsFinite(value) && value >= EzPatternRatings.DISPLAY_MIN ? value : 0;
 
         private static IReadOnlyDictionary<string, double> structureAxesOf(in EzAnalysisResult analysis)
-            => analysis.AxesOf(EzMetricProducers.CSI_CHART);
+            => analysis.AxesOf(EzChartMetricProducer.Csi.Id());
 
         /// <summary>
         /// Synchronous LN/RC pre-judgement. Realm-persisted ChartDan with an LN half is authoritative

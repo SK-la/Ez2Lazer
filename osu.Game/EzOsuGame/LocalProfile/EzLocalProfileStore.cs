@@ -2029,7 +2029,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             dbPath = storage.GetFullPath(DATABASE_FILENAME, true);
 
             using var connection = openConnection();
-            ensureSchema(connection);
+            EnsureSchema(connection);
             initialised = true;
         }
 
@@ -2040,7 +2040,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return connection;
         }
 
-        private static void ensureSchema(SqliteConnection connection)
+        internal static void EnsureSchema(SqliteConnection connection)
         {
             using (var cmd = connection.CreateCommand())
             {

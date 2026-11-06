@@ -18,20 +18,20 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         {
             // A PP+ skill id is persisted with the catalog's own id; the shared star axis must be the same string
             // or the two tables would describe the same quantity under different keys.
-            Assert.That(EzMetricProducers.STAR_RATING, Is.EqualTo(EzPPPSkillCatalog.STAR_RATING));
+            Assert.That(EzMetricAxisIds.STAR_RATING, Is.EqualTo(EzPPPSkillCatalog.STAR_RATING));
         }
 
         [Test]
         public void Star_and_performance_axes_are_distinct()
         {
-            Assert.That(EzMetricProducers.STAR_RATING, Is.Not.EqualTo(EzMetricProducers.PERFORMANCE_POINTS));
+            Assert.That(EzMetricAxisIds.STAR_RATING, Is.Not.EqualTo(EzMetricAxisIds.PERFORMANCE_POINTS));
         }
 
         [Test]
         public void No_axis_id_is_empty_or_prefixed()
         {
             // Axis ids are bare: the producer identity carries the system, so a prefixed axis would encode it twice.
-            foreach (string id in new[] { EzMetricProducers.STAR_RATING, EzMetricProducers.PERFORMANCE_POINTS })
+            foreach (string id in new[] { EzMetricAxisIds.STAR_RATING, EzMetricAxisIds.PERFORMANCE_POINTS })
             {
                 Assert.That(id, Is.Not.Empty);
                 Assert.That(id, Does.Not.Contain("."));

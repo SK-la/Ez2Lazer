@@ -102,7 +102,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         public EzSkillProvider(
             EzSkillStore store,
-            EzMetricProducerRegistry? registry = null,
+            EzMetricRevisionResolver? resolver = null,
             EzChartDanEstimator? chartDanEstimator = null,
             EzLocalProfileStore? localProfileStore = null,
             BeatmapManager? beatmapManager = null,
@@ -113,15 +113,26 @@ namespace osu.Game.EzOsuGame.Skills
             this.localProfileStore = localProfileStore;
             this.beatmapManager = beatmapManager;
             this.liveCache = liveCache ?? new EzAnalysisLiveCache();
-            Registry = registry ?? EzAnalysisRevision.Registry;
+            Resolver = resolver ?? EzMetricRegistries.Current;
             PlayerSkills = new PlayerSkillMaintenance(this);
         }
 
-        public EzMetricProducerRegistry Registry { get; }
+        public EzMetricRevisionResolver Resolver { get; }
 
-        /// <summary>Ruleset skill wiring (systems + default radar). Null when no producer applies.</summary>
-        public EzSkillProfile? GetProfile(int rulesetOnlineId)
-            => Registry.GetProfile(rulesetOnlineId);
+        public EzMetricProducerRegistry ChartRegistry => Resolver.ChartRegistry;
+
+        public EzMetricProducerRegistry PlayerRegistry => Resolver.PlayerRegistry;
+
+        /// <summary>
+        /// Chart-side skill wiring (systems + default radar) on <paramref name="rulesetOnlineId"/>. Null when the
+        /// chart catalog declares no vector for it.
+        /// </summary>
+        public EzSkillProfile? GetChartProfile(int rulesetOnlineId)
+            => ChartRegistry.GetProfile(rulesetOnlineId);
+
+        /// <summary>Player-side skill wiring on <paramref name="rulesetOnlineId"/>.</summary>
+        public EzSkillProfile? GetPlayerProfile(int rulesetOnlineId)
+            => PlayerRegistry.GetProfile(rulesetOnlineId);
 
         /// <summary>
         /// Generic beatmap skill read for any registered <paramref name="systemId"/>.

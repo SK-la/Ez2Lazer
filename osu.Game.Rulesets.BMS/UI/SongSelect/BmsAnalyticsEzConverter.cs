@@ -43,9 +43,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             {
                 axes = new Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>
                 {
-                    [EzMetricProducers.OFFICIAL_PERFORMANCE] = new Dictionary<string, double>
+                    [EzChartMetricProducer.OfficialPerformance.Id()] = new Dictionary<string, double>
                     {
-                        [EzMetricProducers.PERFORMANCE_POINTS] = pp,
+                        [EzMetricAxisIds.PERFORMANCE_POINTS] = pp,
                     },
                 };
             }

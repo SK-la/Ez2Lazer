@@ -72,26 +72,24 @@ namespace osu.Game.EzOsuGame.Analysis
         private const int chain_ruleset = EzLocalProfileConstants.MANIA_RULESET_ID;
 
         /// <summary>
-        /// Installs the registry that supplies the revisions. Call once during startup, before any row
+        /// Installs the registries that supply the revisions. Call once during startup, before any row
         /// is stamped; the pre-install default has no upstream revisions, which keeps unit tests free of
         /// a ruleset database.
         /// </summary>
-        public static void Configure(EzMetricProducerRegistry producerRegistry)
+        public static void Configure(EzMetricRevisionResolver resolver)
         {
-            ArgumentNullException.ThrowIfNull(producerRegistry);
-            Registry = producerRegistry;
+            ArgumentNullException.ThrowIfNull(resolver);
+            EzMetricRegistries.Configure(resolver);
         }
 
-        public static EzMetricProducerRegistry Registry { get; private set; } = EzMetricProducers.CreateDefault(EzNullUpstreamRevisions.INSTANCE);
-
         /// <summary>Revision stamped on the mania Mina axis rows.</summary>
-        public static int Msd => Registry.RevisionOf(EzMetricProducers.MINA_CHART, chain_ruleset);
+        public static int Msd => EzMetricRegistries.Current.RevisionOf(EzChartMetricProducer.Mina.Id(), chain_ruleset);
 
         /// <summary>Revision stamped on <c>EzBeatmapChartSkillInfo.InfoVersion</c>.</summary>
-        public static int ChartSkillInfo => Registry.RevisionOf(EzMetricProducers.CSI_CHART, chain_ruleset);
+        public static int ChartSkillInfo => EzMetricRegistries.Current.RevisionOf(EzChartMetricProducer.Csi.Id(), chain_ruleset);
 
         /// <summary>Revision stamped on <c>EzBeatmapChartDan.AlgorithmVersion</c>.</summary>
-        public static int ChartDan => Registry.RevisionOf(EzMetricProducers.DAN_CHART, chain_ruleset);
+        public static int ChartDan => EzMetricRegistries.Current.RevisionOf(EzChartMetricProducer.Dan.Id(), chain_ruleset);
 
         /// <summary>Current revision for a single chart-chain facet. Returns 0 for non-chart facets.</summary>
         public static int For(EzAnalysisFacet facet)
@@ -129,9 +127,9 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>Human-readable breakdown of the CSI revision inputs.</summary>
-        public static string DescribeChartSkillInfo() => Registry.DescribeRevision(EzMetricProducers.CSI_CHART, chain_ruleset);
+        public static string DescribeChartSkillInfo() => EzMetricRegistries.Current.DescribeRevision(EzChartMetricProducer.Csi.Id(), chain_ruleset);
 
         /// <summary>Human-readable breakdown of the dan revision inputs.</summary>
-        public static string DescribeChartDan() => Registry.DescribeRevision(EzMetricProducers.DAN_CHART, chain_ruleset);
+        public static string DescribeChartDan() => EzMetricRegistries.Current.DescribeRevision(EzChartMetricProducer.Dan.Id(), chain_ruleset);
     }
 }

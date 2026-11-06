@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Concurrent;
-using osu.Game.EzOsuGame.Metrics;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
@@ -40,8 +39,8 @@ namespace osu.Game.EzOsuGame.Analysis
             analyses[key] = value;
         }
 
-        /// <summary>Drops the entries a bump of <paramref name="producer"/> can invalidate.</summary>
-        public void Invalidate(EzMetricProducerId producer)
+        /// <summary>Drops every entry, for a bump that can invalidate more than one.</summary>
+        public void ClearAll()
             => analyses.Clear();
 
         public void InvalidateSubject(string subject)

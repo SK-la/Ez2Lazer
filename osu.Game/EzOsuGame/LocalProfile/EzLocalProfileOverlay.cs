@@ -275,7 +275,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private void updateAnalysisSystemVisibility()
         {
             int rulesetId = ruleset.Value?.OnlineID ?? -1;
-            bool hasSkills = skillProvider.GetProfile(rulesetId)?.HasSkills == true;
+            bool hasSkills = skillProvider.GetPlayerProfile(rulesetId)?.HasSkills == true;
             analysisSystemSelector.Alpha = hasSkills ? 1 : 0;
 
             if (!hasSkills && analysisSystem.Value != EzLocalProfileAnalysisSystem.Ez)
@@ -368,7 +368,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             var rulesetStats = snapshot.RulesetStats.FirstOrDefault(s => s.RulesetId == rulesetId);
             bool mania = rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID;
-            var skillProfile = skillProvider.GetProfile(rulesetId);
+            var skillProfile = skillProvider.GetPlayerProfile(rulesetId);
             bool hasSkills = skillProfile?.HasSkills == true;
             bool trackMode = hasSkills && analysis == EzLocalProfileAnalysisSystem.Track;
             var trackPresenter = trackMode

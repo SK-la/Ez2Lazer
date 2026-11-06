@@ -27,16 +27,16 @@ namespace osu.Game.EzOsuGame.Skills
     public sealed class EzSkillStore
     {
         private readonly RealmAccess realmAccess;
-        private readonly EzMetricProducerRegistry registry;
+        private readonly EzMetricRevisionResolver resolver;
 
-        public EzSkillStore(RealmAccess realmAccess, EzMetricProducerRegistry? registry = null)
+        public EzSkillStore(RealmAccess realmAccess, EzMetricRevisionResolver? resolver = null)
         {
             this.realmAccess = realmAccess;
-            this.registry = registry ?? EzAnalysisRevision.Registry;
+            this.resolver = resolver ?? EzMetricRegistries.Current;
         }
 
         /// <summary>Revision stamped on chart-side Mina axis rows.</summary>
-        private int minaChartRevision => registry.RevisionOf(EzMetricProducers.MINA_CHART, EzLocalProfileConstants.MANIA_RULESET_ID);
+        private int minaChartRevision => resolver.RevisionOf(EzChartMetricProducer.Mina.Id(), EzLocalProfileConstants.MANIA_RULESET_ID);
 
         /// <summary>
         /// Current values for one system. Rows the producer settled without a value are excluded: a verdict is
@@ -1298,10 +1298,10 @@ namespace osu.Game.EzOsuGame.Skills
             if (stored == null || stored.Count == 0 || !EzPPPSkillCatalog.SupportsRuleset(rulesetId))
                 return false;
 
-            if (registry.Get(EzMetricProducers.PPP_CHART) is not { } producer)
+            if (resolver.ChartRegistry.Get(EzChartMetricProducer.Ppp.Id()) is not { } producer)
                 return false;
 
-            int revision = registry.RevisionOf(EzMetricProducers.PPP_CHART, rulesetId);
+            int revision = resolver.RevisionOf(EzChartMetricProducer.Ppp.Id(), rulesetId);
 
             if (revision <= 0)
                 return false;

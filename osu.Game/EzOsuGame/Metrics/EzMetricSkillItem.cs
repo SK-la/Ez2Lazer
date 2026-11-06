@@ -1,8 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Game.EzOsuGame.Skills;
-
 namespace osu.Game.EzOsuGame.Metrics
 {
     /// <summary>
@@ -23,7 +21,5 @@ namespace osu.Game.EzOsuGame.Metrics
     {
         /// <summary>Storage key of this axis.</summary>
         public string SkillId => $"{SystemId}.{Axis.Id}";
-
-        public EzSkillScope Scope => Producer.Scope;
     }
 }
