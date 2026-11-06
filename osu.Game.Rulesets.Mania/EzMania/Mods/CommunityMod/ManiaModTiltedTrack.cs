@@ -45,7 +45,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         public BindableFloat TrackAngle { get; } = new BindableFloat(30f)
         {
             MinValue = 0,
-            MaxValue = 75,
+            MaxValue = 90,
             Precision = 1,
         };
 

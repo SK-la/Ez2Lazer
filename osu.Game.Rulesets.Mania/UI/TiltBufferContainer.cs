@@ -14,7 +14,7 @@ namespace osu.Game.Rulesets.Mania.UI
     /// </summary>
     public partial class TiltBufferContainer : BufferedContainer
     {
-        private const float max_angle = 75;
+        private const float max_angle = 90;
 
         public TiltBufferContainer()
             : base(pixelSnapping: true)
