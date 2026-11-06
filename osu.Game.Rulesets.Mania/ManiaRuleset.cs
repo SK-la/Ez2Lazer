@@ -355,6 +355,7 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModLNSimplify(),
                         // new ManiaModO2Health(),
                         new ManiaModPlayfieldTransformation(),
+                        new ManiaModTiltedTrack(),
                         new ManiaModReleaseAdjust(),
                         new ManiaModRemedy(),
                         new ManiaModTrueInverse(),
