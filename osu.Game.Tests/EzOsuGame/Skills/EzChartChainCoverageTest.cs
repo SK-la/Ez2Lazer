@@ -3,7 +3,7 @@
 
 using NUnit.Framework;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Rulesets;
 
 namespace osu.Game.Tests.EzOsuGame.Skills

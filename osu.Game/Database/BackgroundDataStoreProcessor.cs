@@ -25,6 +25,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Database;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
@@ -108,7 +109,7 @@ namespace osu.Game.Database
         private OsuConfigManager config { get; set; } = null!;
 
         [Resolved]
-        private EzBeatmapMsdComputer beatmapMsdComputer { get; set; } = null!;
+        private EzBeatmapMinaComputer beatmapMsdComputer { get; set; } = null!;
 
         [Resolved]
         private EzSkillStore skillStore { get; set; } = null!;
@@ -671,7 +672,7 @@ namespace osu.Game.Database
         /// </summary>
         private void clearOutdatedManiaBeatmapMsd()
         {
-            const int current_version = EzManiaSkillAlgorithm.VERSION;
+            const int current_version = EzMinaSkillAlgorithm.VERSION;
 
             // Read the live Realm row — AvailableRulesets clones historically omitted
             // LastAppliedManiaSkillVersion and would wipe MSD on every startup.
@@ -692,7 +693,7 @@ namespace osu.Game.Database
             Logger.Log($"Resetting beatmap MSD for mania (mania skill version updated from {liveState.Item2} to {current_version})");
 
             // Only MSD is cleared here. ChartSkillInfo and ChartDan rows read MSD, but both are stamped
-            // with EzAnalysisRevision.ChartSkillInfo/ChartDan, which fold EzManiaSkillAlgorithm.VERSION -
+            // with EzAnalysisRevision.ChartSkillInfo/ChartDan, which fold EzMinaSkillAlgorithm.VERSION -
             // so they already read as stale and the ordinary incremental passes recompute them. Bulk
             // clearing them would erase the "stale" evidence the status UI reports.
             skillStore.ClearBeatmapMsd();
@@ -741,13 +742,6 @@ namespace osu.Game.Database
                            + $"Dan v{EzAnalysisRevision.ChartDan} ({EzAnalysisRevision.DescribeChartDan(EzAnalysisRevision.ChartDan)}).");
             }
 
-            // Defer the MSD side-upsert whenever CSI shares this job: the chain-end Dan pass owns the
-            // write then, so the row is stamped with CSI included. EzBeatmapMsdComputer independently
-            // refuses to stamp a Dan row while CSI is unsettled, so a MSD-only job cannot produce a
-            // CSI-less Dan row either.
-            bool deferChartDanSideUpsert = scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo)
-                                           || scope.HasFlag(EzRealmMetadataScope.ChartDan);
-
             bool needsChartChain = scope.HasFlag(EzRealmMetadataScope.Msd)
                                    || scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo)
                                    || scope.HasFlag(EzRealmMetadataScope.ChartDan);
@@ -758,18 +752,9 @@ namespace osu.Game.Database
 
             if (scope.HasFlag(EzRealmMetadataScope.Msd))
             {
-                beatmapMsdComputer.SuppressChartDanSideUpsert = deferChartDanSideUpsert;
-
-                try
-                {
-                    if (populateMissingBeatmapMsd(chartChain!)
-                        && (scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo) || scope.HasFlag(EzRealmMetadataScope.ChartDan)))
-                        chartChain = skillStore.CollectChartChainState("BDSP");
-                }
-                finally
-                {
-                    beatmapMsdComputer.SuppressChartDanSideUpsert = false;
-                }
+                if (populateMissingBeatmapMsd(chartChain!)
+                    && (scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo) || scope.HasFlag(EzRealmMetadataScope.ChartDan)))
+                    chartChain = skillStore.CollectChartChainState("BDSP");
             }
 
             if (scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo))
@@ -1098,8 +1083,8 @@ namespace osu.Game.Database
                     if (beatmapMsdComputer.ComputeAndStore(beatmap) == null)
                     {
                         // Zero-vector charts write __unrateable and count as settled, not failure.
-                        var skills = skillStore.GetBeatmapSkills(beatmap.Hash, EzSkillSystems.BEATMAP_MSD);
-                        if (EzBeatmapMsdComputer.IsUnrateableMsd(skills))
+                        var skills = skillStore.GetBeatmapSkills(beatmap.Hash, EzSkillSystems.BEATMAP_MINA);
+                        if (EzBeatmapMinaComputer.IsUnrateableMina(skills))
                             ++processedCount;
                         else
                             ++failedCount;
@@ -1288,10 +1273,10 @@ namespace osu.Game.Database
 
                 try
                 {
-                    var msd = skillStore.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MSD);
+                    var msd = skillStore.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MINA);
 
                     // completeMsd already filtered; re-check guards races / version drift mid-run.
-                    if (!EzBeatmapMsdComputer.IsCurrentMsdCache(msd))
+                    if (!EzBeatmapMinaComputer.IsCurrentMinaCache(msd))
                     {
                         ++failedCount;
                         ++attemptedCount;
@@ -1304,7 +1289,7 @@ namespace osu.Game.Database
                         keyCount = 4;
 
                     double holdRatio = 0;
-                    if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
+                    if (msd.TryGetValue(EzSkillSystems.MinaHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
                         holdRatio = Math.Clamp(cachedHold, 0, 1);
                     else if (skillStore.TryGetChartSkillInfo(hash, out var csiHold) && csiHold?.LnRatio is double lnRatio && double.IsFinite(lnRatio))
                         holdRatio = Math.Clamp(lnRatio, 0, 1);
@@ -1747,10 +1732,10 @@ namespace osu.Game.Database
             {
                 // Filter on persisted JSON strings so we never deserialize Statistics for the whole table.
                 foreach (var score in r.All<ScoreInfo>().Where(s => !s.BackgroundReprocessingFailed
-                                                                   && !s.DeletePending
-                                                                   && s.BeatmapInfo != null
-                                                                   && (s.MaximumStatisticsJson == string.Empty
-                                                                       || s.MaximumStatisticsJson == "{}")))
+                                                                    && !s.DeletePending
+                                                                    && s.BeatmapInfo != null
+                                                                    && (s.MaximumStatisticsJson == string.Empty
+                                                                        || s.MaximumStatisticsJson == "{}")))
                 {
                     if (string.IsNullOrEmpty(score.StatisticsJson) || score.StatisticsJson == "{}")
                         continue;
@@ -1865,7 +1850,7 @@ namespace osu.Game.Database
                                                       .Select(s => s.ID)
                                                       .ToList());
 
-            int leftoverPreRemap = realmAccess.Run(r => r.All<ScoreInfo>().Where(s => s.JudgeMode == 8).Count());
+            int leftoverPreRemap = realmAccess.Run(r => r.All<ScoreInfo>().Count(s => s.JudgeMode == 8));
 
             if (leftoverPreRemap > 0)
                 Logger.Log($"{leftoverPreRemap} score(s) still carry the pre-v11 judge mode 8; the v11 migration has not run on this database.");
@@ -1900,8 +1885,8 @@ namespace osu.Game.Database
                             continue;
 
                         if (EzScoreRecalculationService.RecalculateWithPinnedJudgeModeAsync(
-                                scoreManager, beatmapManager, ezReplaySession, score, EzEnumJudgeMode.StableClassic)
-                            .GetAwaiter().GetResult())
+                                                           scoreManager, beatmapManager, ezReplaySession, score, EzEnumJudgeMode.StableClassic)
+                                                       .GetAwaiter().GetResult())
                             ++processedCount;
                         else
                             ++failedCount;

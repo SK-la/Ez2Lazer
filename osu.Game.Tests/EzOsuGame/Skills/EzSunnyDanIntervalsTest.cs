@@ -7,6 +7,7 @@ using NUnit.Framework;
 using osu.Framework.IO.Stores;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.Resources;
 
 namespace osu.Game.Tests.EzOsuGame.Skills

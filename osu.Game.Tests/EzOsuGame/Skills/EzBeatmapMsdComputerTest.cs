@@ -4,35 +4,36 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Mina;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
 {
     [TestFixture]
-    public class EzBeatmapMsdComputerTest
+    public class EzBeatmapMinaComputerTest
     {
         [Test]
-        public void TestIsCurrentMsdCacheRequiresHoldRatio()
+        public void TestIsCurrentMinaCacheRequiresHoldRatio()
         {
             var skills = buildCompleteSkills();
-            skills.Remove(EzSkillSystems.MsdHoldRatioSkillId);
+            skills.Remove(EzSkillSystems.MinaHoldRatioSkillId);
 
-            Assert.That(EzBeatmapMsdComputer.IsCurrentMsdCache(skills), Is.False);
+            Assert.That(EzBeatmapMinaComputer.IsCurrentMinaCache(skills), Is.False);
         }
 
         [Test]
-        public void TestIsCurrentMsdCacheRequiresEveryAxis()
+        public void TestIsCurrentMinaCacheRequiresEveryAxis()
         {
             var skills = buildCompleteSkills();
             skills.Remove(EzMinaSkillAxis.JackSpeed.ToMsdSkillId());
 
-            Assert.That(EzBeatmapMsdComputer.IsCurrentMsdCache(skills), Is.False);
+            Assert.That(EzBeatmapMinaComputer.IsCurrentMinaCache(skills), Is.False);
         }
 
         [Test]
-        public void TestIsCurrentMsdCacheAcceptsCompleteCurrentIds()
+        public void TestIsCurrentMinaCacheAcceptsCompleteCurrentIds()
         {
-            Assert.That(EzBeatmapMsdComputer.IsCurrentMsdCache(buildCompleteSkills()), Is.True);
-            Assert.That(EzBeatmapMsdComputer.IsSettledMsdCache(buildCompleteSkills()), Is.True);
+            Assert.That(EzBeatmapMinaComputer.IsCurrentMinaCache(buildCompleteSkills()), Is.True);
+            Assert.That(EzBeatmapMinaComputer.IsSettledMinaCache(buildCompleteSkills()), Is.True);
         }
 
         [Test]
@@ -40,12 +41,12 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var skills = new Dictionary<string, double>
             {
-                [EzSkillSystems.MsdUnrateableSkillId] = 1,
+                [EzSkillSystems.MinaUnrateableSkillId] = 1,
             };
 
-            Assert.That(EzBeatmapMsdComputer.IsUnrateableMsd(skills), Is.True);
-            Assert.That(EzBeatmapMsdComputer.IsCurrentMsdCache(skills), Is.False);
-            Assert.That(EzBeatmapMsdComputer.IsSettledMsdCache(skills), Is.True);
+            Assert.That(EzBeatmapMinaComputer.IsUnrateableMina(skills), Is.True);
+            Assert.That(EzBeatmapMinaComputer.IsCurrentMinaCache(skills), Is.False);
+            Assert.That(EzBeatmapMinaComputer.IsSettledMinaCache(skills), Is.True);
         }
 
         [Test]
@@ -53,16 +54,16 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var skills = new Dictionary<string, double>();
 
-            Assert.That(EzBeatmapMsdComputer.IsCurrentMsdCache(skills), Is.False);
-            Assert.That(EzBeatmapMsdComputer.IsUnrateableMsd(skills), Is.False);
-            Assert.That(EzBeatmapMsdComputer.IsSettledMsdCache(skills), Is.False);
+            Assert.That(EzBeatmapMinaComputer.IsCurrentMinaCache(skills), Is.False);
+            Assert.That(EzBeatmapMinaComputer.IsUnrateableMina(skills), Is.False);
+            Assert.That(EzBeatmapMinaComputer.IsSettledMinaCache(skills), Is.False);
         }
 
         private static Dictionary<string, double> buildCompleteSkills()
         {
             var skills = new Dictionary<string, double>
             {
-                [EzSkillSystems.MsdHoldRatioSkillId] = 0.25,
+                [EzSkillSystems.MinaHoldRatioSkillId] = 0.25,
             };
 
             foreach (var axis in EzMinaSkillAxisExtensions.All)

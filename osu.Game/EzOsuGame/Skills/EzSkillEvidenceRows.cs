@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Game.EzOsuGame.Skills.Dan;
 
 namespace osu.Game.EzOsuGame.Skills
 {
@@ -34,6 +35,6 @@ namespace osu.Game.EzOsuGame.Skills
         public double Accuracy { get; init; }
         public double Rate { get; init; } = 1;
         public DateTimeOffset ScoredAt { get; init; }
-        public int AlgorithmVersion { get; init; } = EzManiaSkillAlgorithm.VERSION;
+        public int AlgorithmVersion { get; init; } = EzMinaSkillAlgorithm.VERSION;
     }
 }

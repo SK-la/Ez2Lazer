@@ -6,6 +6,9 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
 {
@@ -61,10 +64,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             };
 
             // Hub danTagBucketsForTest: membership of delay → speed tile.
-            var delayTags = EzDanSkillsetFiling.Buckets(7, EzDanSide.Rc)
-                                               .Where(b => EzDanSkillsetFiling.ChartBelongsToTagBucket(b, delayChart))
-                                               .Select(b => b.Id)
-                                               .ToArray();
+            string[] delayTags = EzDanSkillsetFiling.Buckets(7, EzDanSide.Rc)
+                                                    .Where(b => EzDanSkillsetFiling.ChartBelongsToTagBucket(b, delayChart))
+                                                    .Select(b => b.Id)
+                                                    .ToArray();
             Assert.That(delayTags, Does.Contain(EzDanSkillsetBuckets.SPEED));
 
             // MSD-only filing still empty for 7K; with chart, delay participates among tag tiles.

@@ -14,6 +14,7 @@ namespace osu.Game.EzOsuGame.Database
         Msd = 8,
         ChartSkillInfo = 16,
         ChartDan = 32,
-        All = Tags | Xxy | Pp | Msd | ChartSkillInfo | ChartDan,
+        PPP = 64,
+        All = Tags | Xxy | Pp | Msd | ChartSkillInfo | ChartDan | PPP,
     }
 }

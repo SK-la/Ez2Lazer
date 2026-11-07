@@ -59,6 +59,8 @@ using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Playback;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Graphics;
@@ -472,11 +474,11 @@ namespace osu.Game
             // See EzSkillSystems. Dan is a player skill for Profile, but uses its own estimate table/algorithm.
             var skillRegistry = new EzSkillRegistry();
             var skillStore = new EzSkillStore(realm);
-            var beatmapMsdComputer = new EzBeatmapMsdComputer(BeatmapManager, skillStore);
+            var beatmapMsdComputer = new EzBeatmapMinaComputer(BeatmapManager, skillStore);
             var chartDanEstimator = new EzChartDanEstimator(BeatmapManager, beatmapMsdComputer);
             var localProfileStore = new EzLocalProfileStore(Storage);
             // Skill aggregators reuse localProfileStore as the per-play SSR / Dan cache (incremental backfill).
-            var playerSsrAggregator = new EzPlayerSsrAggregator(BeatmapManager, skillStore, localProfileStore);
+            var playerSsrAggregator = new EzPlayerRatingAggregator(BeatmapManager, skillStore, localProfileStore);
             var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanEstimator, skillStore, localProfileStore);
             var skillProvider = new EzSkillProvider(skillStore, skillRegistry, chartDanEstimator, localProfileStore, BeatmapManager);
 

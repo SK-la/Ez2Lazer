@@ -14,6 +14,8 @@ using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.LocalProfile
@@ -26,7 +28,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private const int yield_every = 32;
 
         private readonly EzLocalProfileAggregator aggregator;
-        private readonly EzPlayerSsrAggregator? ssrAggregator;
+        private readonly EzPlayerRatingAggregator? ssrAggregator;
         private readonly EzPlayerDanAggregator? danAggregator;
         private readonly EzSkillProvider? skillProvider;
         private readonly Lock computeLock = new Lock();
@@ -73,7 +75,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             RealmAccess realm,
             EzAnalysisPersistentStore analysisStore,
             BeatmapManager beatmapManager,
-            EzPlayerSsrAggregator? ssrAggregator = null,
+            EzPlayerRatingAggregator? ssrAggregator = null,
             EzPlayerDanAggregator? danAggregator = null,
             EzLocalProfileStore? sharedStore = null,
             EzSkillProvider? skillProvider = null)
@@ -935,7 +937,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             List<EzSkillPlayRow> plays,
             Action tick,
             CancellationToken token,
-            IReadOnlyDictionary<Guid, EzSsrPlayCacheRow>? ssrPlayCache,
+            IReadOnlyDictionary<Guid, EzMinaPlayCacheRow>? ssrPlayCache,
             IReadOnlyDictionary<Guid, EzDanPlayCacheRow>? danPlayCache,
             HashSet<string> missingCharts)
         {

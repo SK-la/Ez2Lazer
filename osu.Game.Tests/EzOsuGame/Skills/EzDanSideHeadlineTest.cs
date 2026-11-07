@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
 {

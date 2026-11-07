@@ -1,0 +1,86 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using osu.Game.EzOsuGame.Configuration;
+
+namespace osu.Game.EzOsuGame.Skills.Dan
+{
+    /// <summary>
+    /// Bump when player-dan aggregation / side headline fold / clear credit semantics change
+    /// (not <see cref="osu.Game.Database.RealmAccess.EZ_REALM_SCHEMA_VERSION"/>).
+    /// Independent from <see cref="EzMinaSkillAlgorithm.VERSION"/>. Reads via <see cref="EzSkillStore.GetDanEstimate"/> filter on this value.
+    /// v2: side <c>GetDan</c> uses hub anchor/mean fold (<see cref="EzDanSideHeadline"/>).
+    /// v3: hub clear gates + (hash,rate) dedupe; <see cref="CLEAR_WINDOW"/>=20 + <see cref="EzDanClearWindow"/> weighting.
+    /// v4: 5K / 8K–18K chart dan comes from the 4K xxy interval table (<see cref="EzDanLabels.TryResolveFallbackDan"/>)
+    /// instead of the raw 4K MSD means table, which inflated those keymodes by several levels.
+    /// </summary>
+    public static class EzDanAlgorithm
+    {
+        public const int VERSION = 4;
+
+        // --- Player clear aggregation (hub clear window) ---
+        public const int CLEAR_QUORUM = 4;
+
+        /// <summary>Hub <c>DAN_CLEAR_AVERAGE_WINDOW</c>.</summary>
+        public const int CLEAR_WINDOW = 20;
+
+        /// <summary>Minimum rated skillset tiles before averaging / anchoring a side headline.</summary>
+        public const int SKILLSET_AVERAGE_MIN_BUCKETS = 2;
+
+        /// <summary>Hub <c>DAN_ANCHOR_CLAMP</c>: max levels another tile may pull the 7K LN headline.</summary>
+        public const double ANCHOR_CLAMP = 2;
+
+        /// <summary>Hub <c>DAN_ANCHOR_PULL</c>: fraction of mean capped distance applied to the anchor.</summary>
+        public const double ANCHOR_PULL = 0.5;
+
+        public const double ROUNDING_EPSILON = 1e-9;
+
+        // --- Chart side classification by hold ratio (hub primary identity / player filing) ---
+        public const double LN_PRIMARY_MIN_RATIO = 0.45;
+        public const double LN_PRIMARY_7K_MIN_RATIO = 0.375;
+
+        /// <summary>
+        /// Configurable absolute gate for the ChartDan LN half: hold objects above this value count as LN
+        /// without reaching the ratio line. Backed by <see cref="Ez2Setting.SkillLnChartMinHoldObjects"/>
+        /// </summary>
+        public static int LnChartMinHoldObjects => GlobalConfigStore.EzConfig.Get<int>(Ez2Setting.SkillLnChartMinHoldObjects);
+
+        public static double LnPrimaryMinRatioFor(int keyCount)
+            => keyCount == 7 ? LN_PRIMARY_7K_MIN_RATIO : LN_PRIMARY_MIN_RATIO;
+
+        /// <summary>
+        /// Hub-style exclusive primary: LN only when hold ratio reaches <see cref="LnPrimaryMinRatioFor"/>;
+        /// RC when below that line. Used for player clear filing / CSI LN tag strip — not Ez DualPanel persist.
+        /// </summary>
+        public static bool AllowsChartSideHalf(EzDanSide side, int keyCount, double holdRatio)
+        {
+            bool lnPrimary = holdRatio >= LnPrimaryMinRatioFor(keyCount);
+            return side == EzDanSide.Ln ? lnPrimary : !lnPrimary;
+        }
+
+        /// <summary>
+        /// Ez ChartDan / DualPanel LN half: write when hold count &gt; <see cref="LnChartMinHoldObjects"/>
+        /// or hold ratio reaches hub primary line. RC half is always eligible (callers skip this for RC).
+        /// Pass <paramref name="holdCount"/> &lt; 0 when unknown (ratio-only).
+        /// Prefer <see cref="EzChartDanEstimator.TryHoldCountFromBeatmapInfo"/> (same Realm ints as song-select <c>ln&gt;</c>).
+        /// </summary>
+        public static bool AllowsPersistedChartLnHalf(int keyCount, double holdRatio, int holdCount = -1)
+        {
+            if (holdCount > LnChartMinHoldObjects)
+                return true;
+
+            return holdRatio >= LnPrimaryMinRatioFor(keyCount);
+        }
+
+        public static double AccuracyBarFor(EzDanSide side, int keyCount)
+        {
+            if (side == EzDanSide.Ln)
+                return keyCount == 4 ? 0.97 : 0.95;
+
+            return 0.96;
+        }
+
+        public static double AccuracyBarFor(string sideId, int keyCount)
+            => AccuracyBarFor(EzDanSideExtensions.ParseOrRc(sideId), keyCount);
+    }
+}

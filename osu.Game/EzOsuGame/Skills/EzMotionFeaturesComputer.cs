@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.Skills
 {
@@ -12,10 +13,10 @@ namespace osu.Game.EzOsuGame.Skills
     /// </summary>
     public static class EzMotionFeaturesComputer
     {
-        private const double ROW_EPSILON_MS = 10;
-        private const double MIN_GAP_MS = 25;
-        private const double MAX_GAP_MS = 400;
-        private const int MIN_ROWS = 24;
+        private const double row_epsilon_ms = 10;
+        private const double min_gap_ms = 25;
+        private const double max_gap_ms = 400;
+        private const int min_rows = 24;
 
         /// <summary>Null when the chart is not 4K or is too short to measure.</summary>
         public static EzMotionFeatures? Compute(IReadOnlyList<EzManiaNote> notes, int keyCount)
@@ -24,7 +25,7 @@ namespace osu.Game.EzOsuGame.Skills
                 return null;
 
             var rows = buildRows(notes);
-            if (rows.Count < MIN_ROWS)
+            if (rows.Count < min_rows)
                 return null;
 
             double pairW = 0, sameHandW = 0, miniJackW = 0, chordSwingW = 0;
@@ -37,7 +38,7 @@ namespace osu.Game.EzOsuGame.Skills
                 var a = rows[i];
                 var b = rows[i + 1];
                 double gap = b.Time - a.Time;
-                if (gap <= 0 || gap > MAX_GAP_MS)
+                if (gap <= 0 || gap > max_gap_ms)
                     continue;
 
                 double w = weightFor(gap);
@@ -63,7 +64,7 @@ namespace osu.Game.EzOsuGame.Skills
                 var c = rows[i + 2];
                 double g0 = b.Time - a.Time;
                 double g1 = c.Time - b.Time;
-                if (g0 <= 0 || g1 <= 0 || g0 > MAX_GAP_MS || g1 > MAX_GAP_MS)
+                if (g0 <= 0 || g1 <= 0 || g0 > max_gap_ms || g1 > max_gap_ms)
                     continue;
 
                 double w = weightFor(Math.Max(g0, g1));
@@ -98,7 +99,7 @@ namespace osu.Game.EzOsuGame.Skills
                     window[3].Time - window[2].Time,
                 };
 
-                if (gaps.Any(gap => gap <= 0 || gap > MAX_GAP_MS))
+                if (gaps.Any(gap => gap <= 0 || gap > max_gap_ms))
                     continue;
                 if (window.Any(row => row.Columns.Count != 1))
                     continue;
@@ -127,7 +128,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         private static int hand(int column) => column < 2 ? 0 : 1;
 
-        private static double weightFor(double gap) => 1 / Math.Max(gap, MIN_GAP_MS);
+        private static double weightFor(double gap) => 1 / Math.Max(gap, min_gap_ms);
 
         private static double share(double numerator, double denominator)
             => denominator > 0 ? numerator / denominator : 0;
@@ -152,7 +153,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             foreach (var note in sorted)
             {
-                if (rows.Count > 0 && note.TimeMs - rows[^1].Time <= ROW_EPSILON_MS)
+                if (rows.Count > 0 && note.TimeMs - rows[^1].Time <= row_epsilon_ms)
                     rows[^1].Columns.Add(note.Column);
                 else
                     rows.Add(new Row(note.TimeMs, new List<int> { note.Column }));

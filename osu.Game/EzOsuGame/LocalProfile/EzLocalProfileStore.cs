@@ -13,6 +13,8 @@ using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.LocalProfile
@@ -642,7 +644,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// Axis play evidence for <paramref name="username"/>.
         /// <see cref="EzLocalProfileConstants.IsAllPlayersFilter"/> reads all real-player rows (no username filter;
         /// excludes residual <see cref="EzLocalProfileConstants.ALL_PLAYERS"/> keys).
-        /// Defaults to current <see cref="EzManiaSkillAlgorithm.VERSION"/>.
+        /// Defaults to current <see cref="EzMinaSkillAlgorithm.VERSION"/>.
         /// </summary>
         public IReadOnlyList<EzAxisPlayEvidenceRow> GetAxisPlays(string username, int? keyCount = null, string? skillId = null, int? algorithmVersion = null)
         {
@@ -650,7 +652,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             if (!allPlayers)
                 ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
-            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzMinaSkillAlgorithm.VERSION;
 
             lock (sync)
             {
@@ -1238,9 +1240,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         /// <summary>Per-play SSR cache for one algorithm version, keyed by score id (score id is globally unique).</summary>
-        public Dictionary<Guid, EzSsrPlayCacheRow> LoadSsrPlayCache(int? algorithmVersion = null)
+        public Dictionary<Guid, EzMinaPlayCacheRow> LoadSsrPlayCache(int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzMinaSkillAlgorithm.VERSION;
 
             lock (sync)
             {
@@ -1254,7 +1256,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                   """;
                 cmd.Parameters.AddWithValue("$algorithm_version", version);
 
-                var result = new Dictionary<Guid, EzSsrPlayCacheRow>();
+                var result = new Dictionary<Guid, EzMinaPlayCacheRow>();
                 using var reader = cmd.ExecuteReader();
 
                 while (reader.Read())
@@ -1262,7 +1264,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     if (!Guid.TryParse(reader.GetString(0), out var scoreId))
                         continue;
 
-                    result[scoreId] = new EzSsrPlayCacheRow(
+                    result[scoreId] = new EzMinaPlayCacheRow(
                         scoreId,
                         reader.GetString(1),
                         reader.GetString(2),
@@ -1278,7 +1280,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        public void UpsertSsrPlayCache(IReadOnlyList<EzSsrPlayCacheRow> rows)
+        public void UpsertSsrPlayCache(IReadOnlyList<EzMinaPlayCacheRow> rows)
         {
             if (rows.Count == 0)
                 return;
@@ -1526,7 +1528,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             upsert.ExecuteNonQuery();
         }
 
-        private static string serializeVector(EzSkillsetVector vector)
+        private static string serializeVector(EzMinaSkillAxisVector vector)
             => JsonSerializer.Serialize(new[]
             {
                 vector.Overall,
@@ -1539,15 +1541,15 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 vector.Technical,
             });
 
-        private static EzSkillsetVector deserializeVector(string json)
+        private static EzMinaSkillAxisVector deserializeVector(string json)
         {
             try
             {
                 double[]? values = JsonSerializer.Deserialize<double[]>(json);
 
-                if (values is { Length: >= EzSkillsetVector.RAW_LENGTH })
+                if (values is { Length: >= EzMinaSkillAxisVector.RAW_LENGTH })
                 {
-                    return new EzSkillsetVector(
+                    return new EzMinaSkillAxisVector(
                         values[0], values[1], values[2], values[3],
                         values[4], values[5], values[6], values[7]);
                 }

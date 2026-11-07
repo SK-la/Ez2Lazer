@@ -2,6 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.Skills
 {
@@ -28,8 +30,8 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>True when built from playable (selected-chart live overlay; not Realm).</summary>
         public bool IsLiveFromMods { get; init; }
 
-        /// <summary>LN structure floats for Skill radar (from <see cref="EzDanFeatureExtractor"/>).</summary>
-        public EzDanFeatureMetrics? LnMetrics { get; init; }
+        /// <summary>LN structure floats for Skill radar (from <see cref="EzChartFeatureExtractor"/>).</summary>
+        public EzChartFeatureMetrics? LnMetrics { get; init; }
 
         /// <summary>
         /// Pattern subtype scores (lngeneral / lntech / lninverse / lnrelease) for 7K LN skill axis replacement.

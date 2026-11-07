@@ -8,6 +8,9 @@ using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Rulesets;
 using osu.Game.Tests.Database;
 using Realms;
@@ -54,7 +57,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 var store = new EzSkillStore(realm);
 
                 // MSD: a complete, b settled-unrateable, c missing.
-                store.WriteBeatmapMsd(mania_a, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
+                store.WriteBeatmapMsd(mania_a, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
                 store.WriteBeatmapMsdUnrateable(mania_b, Guid.NewGuid());
 
                 // CSI: a complete, b settled stub, c missing.
@@ -123,7 +126,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 var store = new EzSkillStore(realm);
 
                 // A non-mania chart with a full set of rows must not inflate the report either way.
-                store.WriteBeatmapMsd(osu_hash, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
+                store.WriteBeatmapMsd(osu_hash, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
                 store.UpsertChartSkillInfo(osu_hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
 
                 var status = store.GetSkillDataStatus();
@@ -212,8 +215,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             {
                 var store = new EzSkillStore(realm);
 
-                store.WritePlayerSsr("alpha", 4, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
-                store.WritePlayerSsr("beta", 4, new EzSkillsetVector(11, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
+                store.WritePlayerSsr("alpha", 4, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
+                store.WritePlayerSsr("beta", 4, new EzMinaSkillAxisVector(11, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
 
                 Assert.That(store.GetStalePlayerSkillUsernames(), Is.Empty);
 
@@ -251,8 +254,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             {
                 var store = new EzSkillStore(realm);
 
-                store.WritePlayerSsr("alpha", 4, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
-                store.WritePlayerSsr("beta", 4, new EzSkillsetVector(11, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
+                store.WritePlayerSsr("alpha", 4, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
+                store.WritePlayerSsr("beta", 4, new EzMinaSkillAxisVector(11, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
 
                 Assert.That(store.GetStalePlayerSkillDetails(), Is.Empty);
 

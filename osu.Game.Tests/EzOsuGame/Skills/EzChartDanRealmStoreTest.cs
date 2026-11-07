@@ -9,6 +9,9 @@ using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Rulesets;
 using osu.Game.Tests.Database;
 
@@ -153,10 +156,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     [EzMinaSkillAxis.JackSpeed.ToMsdSkillId()] = 10,
                     [EzMinaSkillAxis.Chordjack.ToMsdSkillId()] = 8,
                     [EzMinaSkillAxis.Technical.ToMsdSkillId()] = 6,
-                    [EzSkillSystems.MsdHoldRatioSkillId] = 0.1,
+                    [EzSkillSystems.MinaHoldRatioSkillId] = 0.1,
                 };
 
-                store.WriteBeatmapMsd(hash, new EzSkillsetVector(20, 18, 16, 14, 12, 10, 8, 6), holdRatio: 0.1);
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6), holdRatio: 0.1);
 
                 var computed = EzPersistedChartDan.TryComputeFromStored(
                     hash,
@@ -206,14 +209,14 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Assert.That(store.CollectChartChainState().CompleteMsd, Does.Not.Contain(hash));
                 Assert.That(store.CollectChartChainState().SettledMsd, Does.Contain(hash));
 
-                var skills = store.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MSD);
-                Assert.That(EzBeatmapMsdComputer.IsUnrateableMsd(skills), Is.True);
-                Assert.That(EzBeatmapMsdComputer.IsCurrentMsdCache(skills), Is.False);
+                var skills = store.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MINA);
+                Assert.That(EzBeatmapMinaComputer.IsUnrateableMina(skills), Is.True);
+                Assert.That(EzBeatmapMinaComputer.IsCurrentMinaCache(skills), Is.False);
 
                 // Successful MSD write replaces the marker.
-                store.WriteBeatmapMsd(hash, new EzSkillsetVector(20, 18, 16, 14, 12, 10, 8, 6), holdRatio: 0.1);
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6), holdRatio: 0.1);
                 Assert.That(store.CollectChartChainState().CompleteMsd, Does.Contain(hash));
-                Assert.That(EzBeatmapMsdComputer.IsUnrateableMsd(store.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MSD)), Is.False);
+                Assert.That(EzBeatmapMinaComputer.IsUnrateableMina(store.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MINA)), Is.False);
             });
         }
 
@@ -232,7 +235,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 // 5K: not a 4/6/7K interval table, and no xxy star rating to borrow one from.
                 seedChart(realm, hash, circleSize: 5);
-                store.WriteBeatmapMsd(hash, new EzSkillsetVector(20, 18, 16, 14, 12, 10, 8, 6), holdRatio: 0.1);
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6), holdRatio: 0.1);
 
                 var chain = store.CollectChartChainState();
 

@@ -9,6 +9,7 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Tests.EzOsuGame.Skills

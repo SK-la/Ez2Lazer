@@ -18,6 +18,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
@@ -163,7 +164,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 players += "\n    · " + string.Join(
                     "\n    · ",
                     stalePlayers.Select(p => $"{p.Username} {EzSettingsStrings.SKILL_DATA_STATUS_WRITTEN_AT} "
-                                            + p.ComputedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)));
+                                             + p.ComputedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)));
             }
 
             string waiting = debt.HasDebt

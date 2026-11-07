@@ -22,8 +22,12 @@ using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.EzOsuGame.Skills;
-using osu.Game.EzOsuGame.UserInterface;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.Pattern;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.UI;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
@@ -591,7 +595,7 @@ namespace osu.Game.EzOsuGame.HUD
 
             double holdRatio = 0;
 
-            if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
+            if (msd.TryGetValue(EzSkillSystems.MinaHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
                 holdRatio = Math.Clamp(cachedHold, 0, 1);
 
             // MSD may pre-date the hold-ratio skill id; stored CSI carries the chart LN ratio.
@@ -731,7 +735,7 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         private void applyLnSkillRadar(
-            EzDanFeatureMetrics metrics,
+            EzChartFeatureMetrics metrics,
             IReadOnlyDictionary<string, double>? subtypeScores,
             int keyCount)
             => applyLnSkillRadar(EzLnSkillRadar.BuildAxes(metrics, subtypeScores, keyCount));

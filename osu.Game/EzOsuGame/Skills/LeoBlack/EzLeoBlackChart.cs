@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.Skills.LeoBlack
 {

@@ -5,7 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
-using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.Pattern;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
 {

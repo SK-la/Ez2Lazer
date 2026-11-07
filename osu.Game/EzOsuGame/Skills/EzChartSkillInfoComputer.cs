@@ -5,7 +5,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.LeoBlack;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 
@@ -29,8 +32,8 @@ namespace osu.Game.EzOsuGame.Skills
         {
             ArgumentNullException.ThrowIfNull(chart);
 
-            var features = EzDanFeatureExtractor.Extract(chart, rate);
-            var patterns = EzManiaPatternAnalyzer.Analyze(chart, rate, features);
+            var features = EzChartFeatureExtractor.Extract(chart, rate);
+            var patterns = EzPatternAnalyzer.Analyze(chart, rate, features);
             var patternScores = new Dictionary<string, double>(StringComparer.Ordinal);
 
             foreach (var hit in patterns.AllPatterns)

@@ -2,7 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.LocalProfile
@@ -27,7 +27,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
     /// <see cref="HasSsr"/> false records a play the engine deliberately produced no vector for,
     /// so it is not retried on every run.
     /// </summary>
-    public readonly record struct EzSsrPlayCacheRow(
+    public readonly record struct EzMinaPlayCacheRow(
         Guid ScoreId,
         string Username,
         string BeatmapHash,
@@ -35,7 +35,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         double Rate,
         DateTimeOffset ScoredAt,
         bool HasSsr,
-        EzSkillsetVector Vector,
+        EzMinaSkillAxisVector Vector,
         int AlgorithmVersion);
 
     /// <summary>

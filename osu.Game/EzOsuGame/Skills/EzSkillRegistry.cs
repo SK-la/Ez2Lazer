@@ -4,6 +4,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.Pattern;
 
 namespace osu.Game.EzOsuGame.Skills
 {
@@ -43,8 +46,8 @@ namespace osu.Game.EzOsuGame.Skills
 
         public static IEnumerable<IEzSkillSystem> CreateDefaultSystems()
         {
-            yield return new BeatmapMsdSkillSystem();
-            yield return new PlayerSsrSkillSystem();
+            yield return new BeatmapMinaSkillSystem();
+            yield return new PlayerMinaSkillSystem();
             yield return new PlayerPatternSkillSystem();
             yield return new DanSkillSystem();
         }

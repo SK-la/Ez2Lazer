@@ -3,6 +3,8 @@
 
 using System;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
@@ -75,20 +77,20 @@ namespace osu.Game.EzOsuGame.Analysis
         internal const int SLOT_RADIX = 100;
 
         /// <summary>
-        /// MSD rows keep the raw <see cref="EzManiaSkillAlgorithm.VERSION"/>: <see cref="EzBeatmapSkillValue"/>
+        /// MSD rows keep the raw <see cref="EzMinaSkillAlgorithm.VERSION"/>: <see cref="EzBeatmapSkillValue"/>
         /// is shared with player SSR / pattern rows and several readers pass the algorithm version
         /// explicitly, so composing it would be a cross-facet hazard. MSD staleness is already handled
         /// by the <c>RulesetInfo.LastAppliedManiaSkillVersion</c> scalar.
         /// </summary>
-        public static int Msd => EzManiaSkillAlgorithm.VERSION;
+        public static int Msd => EzMinaSkillAlgorithm.VERSION;
 
         /// <summary>Revision stamped on <c>EzBeatmapChartSkillInfo.InfoVersion</c>.</summary>
         public static int ChartSkillInfo
-            => compose(CSI_POLICY, EzChartSkillInfo.VERSION, EzManiaSkillAlgorithm.VERSION);
+            => compose(CSI_POLICY, EzChartSkillInfo.VERSION, EzMinaSkillAlgorithm.VERSION);
 
         /// <summary>Revision stamped on <c>EzBeatmapChartDan.AlgorithmVersion</c>.</summary>
         public static int ChartDan
-            => compose(DAN_POLICY, EzDanAlgorithm.VERSION, EzChartSkillInfo.VERSION, EzManiaSkillAlgorithm.VERSION);
+            => compose(DAN_POLICY, EzDanAlgorithm.VERSION, EzChartSkillInfo.VERSION, EzMinaSkillAlgorithm.VERSION);
 
         /// <summary>Current revision for a single chart-chain facet. Returns 0 for non-chart facets.</summary>
         public static int For(EzAnalysisFacet facet)

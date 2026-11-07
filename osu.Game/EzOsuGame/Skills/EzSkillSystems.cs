@@ -10,8 +10,8 @@ namespace osu.Game.EzOsuGame.Skills
     /// </summary>
     public static class EzSkillSystems
     {
-        public const string BEATMAP_MSD = "beatmap_msd";
-        public const string PLAYER_SSR = "player_ssr";
+        public const string BEATMAP_MINA = "beatmap_msd";
+        public const string PLAYER_MINA = "player_ssr";
 
         /// <summary>
         /// Hub pattern ratings (Overall SSR aggregated per chart pattern tag).
@@ -36,13 +36,13 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>
         /// Settled miss for charts MinaCalc rates as a zero vector on a supported keymode.
         /// Keyed by beatmap content hash — editing the chart changes the hash and allows recompute.
-        /// Not a valid MSD cache (<see cref="EzBeatmapMsdComputer.IsCurrentMsdCache"/> stays false).
+        /// Not a valid MSD cache (<see cref="EzBeatmapMinaComputer.IsCurrentMinaCache"/> stays false).
         /// </summary>
         public const string UNRATEABLE = "__unrateable";
 
-        public static string MsdHoldRatioSkillId => $"{BEATMAP_MSD}.{HOLD_RATIO}";
+        public static string MinaHoldRatioSkillId => $"{BEATMAP_MINA}.{HOLD_RATIO}";
 
-        public static string MsdUnrateableSkillId => $"{BEATMAP_MSD}.{UNRATEABLE}";
+        public static string MinaUnrateableSkillId => $"{BEATMAP_MINA}.{UNRATEABLE}";
 
         public static string DanSkillId(int keyCount, EzDanSide side)
             => $"{DAN}.{keyCount}k.{side.ToId()}";
@@ -53,7 +53,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// </summary>
         public static int ResolveAlgorithmVersion(string systemId) => systemId switch
         {
-            BEATMAP_MSD or PLAYER_SSR or PLAYER_PATTERN => EzManiaSkillAlgorithm.VERSION,
+            BEATMAP_MINA or PLAYER_MINA or PLAYER_PATTERN => EzMinaSkillAlgorithm.VERSION,
             _ => 0,
         };
     }
@@ -62,7 +62,7 @@ namespace osu.Game.EzOsuGame.Skills
     /// Bump when MinaCalc note conversion or aggregation semantics change.
     /// 2: unified onto the 4-18K n-key MinaCalc wasm (was NuGet MinaCalc 0.4.2, 4/6/7K only).
     /// </summary>
-    public static class EzManiaSkillAlgorithm
+    public static class EzMinaSkillAlgorithm
     {
         public const int VERSION = 2;
     }

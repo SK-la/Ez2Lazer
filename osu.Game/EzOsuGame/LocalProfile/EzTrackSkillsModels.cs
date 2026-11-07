@@ -6,6 +6,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Mina;
 
 namespace osu.Game.EzOsuGame.LocalProfile
 {
@@ -56,7 +57,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public IReadOnlyList<EzTrackSkillsAxis> BarAxes { get; init; } = [];
 
         public bool IsEffectivelyProvisional =>
-            Provisional || PlaysAnalyzed < EzPlayerSsrSnapshot.QUALIFYING_PLAYS;
+            Provisional || PlaysAnalyzed < EzPlayerRatingSnapshot.QUALIFYING_PLAYS;
     }
 
     public static class EzTrackSkillsPresenterFactory
@@ -68,7 +69,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             return profile.DefaultPlayerSystemId switch
             {
-                EzSkillSystems.PLAYER_SSR => new ManiaTrackSkillsPresenter(provider),
+                EzSkillSystems.PLAYER_MINA => new ManiaTrackSkillsPresenter(provider),
                 _ => null,
             };
         }

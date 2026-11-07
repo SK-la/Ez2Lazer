@@ -9,6 +9,8 @@ using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.Pattern;
 
 namespace osu.Game.EzOsuGame.LocalProfile
 {
@@ -22,7 +24,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             this.provider = provider;
         }
 
-        public string SystemId => EzSkillSystems.PLAYER_SSR;
+        public string SystemId => EzSkillSystems.PLAYER_MINA;
 
         public bool HasSliceChips => true;
 
@@ -71,7 +73,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public LocalisableString ResolveDisplayName(string skillId)
         {
-            foreach (string systemId in new[] { EzSkillSystems.PLAYER_PATTERN, EzSkillSystems.PLAYER_SSR })
+            foreach (string systemId in new[] { EzSkillSystems.PLAYER_PATTERN, EzSkillSystems.PLAYER_MINA })
             {
                 foreach (var def in provider.Registry.GetSystem(systemId)?.Skills
                                     ?? Array.Empty<EzSkillDefinition>())
