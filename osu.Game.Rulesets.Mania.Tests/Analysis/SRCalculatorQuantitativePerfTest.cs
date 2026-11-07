@@ -20,6 +20,12 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
     /// one derivation costs, so asking for a radar as well does not double the time.
     /// </para>
     /// <para>
+    /// Measured as-is: <c>SRCalculator</c> currently spreads its per-corner loop over <c>Parallel.For</c>. Those
+    /// numbers are the baseline, not evidence that the split pays. Charts are rated one after another by a single
+    /// worker, so a per-chart fan-out competes for the same cores the backfill could otherwise use; a sequential loop
+    /// is the comparison to make before deciding either way, and no new parallelism belongs in these algorithms.
+    /// </para>
+    /// <para>
     /// On hold-heavy charts the core still promotes to gen2: the corner arrays it builds for every head and tail
     /// cross the large-object threshold. That is measured and printed rather than asserted away, and is the concrete
     /// target for a span-based rewrite of the corner/curve buffers (a pooling pass would make the count zero).

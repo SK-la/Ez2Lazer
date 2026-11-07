@@ -47,12 +47,24 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         private const double mina_rows_median_ms = 30;
         private const double mina_engine_median_ms = 60;
 
+        private const double dan_alloc_kb = 96;
+        private const double dan_row_alloc_kb = 96;
+        private const double dan_labels_alloc_kb = 16;
+        private const double dan_median_ms = 20;
+        private const double dan_row_median_ms = 20;
+
+        private const double chain_alloc_kb = 40 * 1024;
+        private const double chain_median_ms = 300;
+
         /// <summary>
         /// Gen1 collections per structure pass. Today's worst case (7K, hold-heavy) sits at 0.5; a pass that starts
         /// triggering one collection per run has either grown its allocation by an order of magnitude or started
         /// keeping objects alive across runs.
         /// </summary>
         private const double gen1_per_run_ceiling = 2;
+
+        [TearDown]
+        public void TearDown() => EzMinaEnginePool.Release();
 
         [TestCase(4, 0.0)]
         [TestCase(4, 0.5)]
@@ -76,13 +88,19 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var leoblack = EzPerfMeasurer.Measure("leoblack", runs, () => EzLeoBlackPatternAnalyzer.TryAnalyze(chart));
             var minaRows = EzPerfMeasurer.Measure("mina rows", runs, () => EzMinaNoteConverter.Convert(notes));
 
+            // LeoBlack is the largest single allocator in the structure pass; splitting it shows whether the cost is
+            // the chart/row arrays or the pattern matchers, which decides where a pooled rewrite has to start.
+            var leoChart = EzLeoBlackChartBuilder.TryBuild(chart)!;
+            var leoBuild = EzPerfMeasurer.Measure("leoblack build", runs, () => EzLeoBlackChartBuilder.TryBuild(chart));
+            var leoPrimitives = EzPerfMeasurer.Measure("leoblack primitives", runs, () => EzLeoBlackPrimitives.CalculatePrimitives(leoChart));
+
             EzPerfSample minaEngine;
 
             using (var engine = new EzMinaEngine())
                 minaEngine = EzPerfMeasurer.Measure("mina engine", runs, () => engine.CalculateMsd(rows, keyCount, 1f));
 
             TestContext.Progress.WriteLine($"{keyCount}K holdRatio={holdRatio:P0} rows={notes.Count}");
-            EzPerfMeasurer.Report([features, patterns, csi, leoblack, minaRows, minaEngine]);
+            EzPerfMeasurer.Report([features, patterns, csi, leoblack, leoBuild, leoPrimitives, minaRows, minaEngine]);
 
             assertAllocation(features, features_alloc_kb);
             assertAllocation(patterns, patterns_alloc_kb);
@@ -131,13 +149,93 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         /// session memory, so it has to stay in the low megabyte range rather than track what the user scrolled past.
         /// </summary>
         [Test]
-        public void LiveCacheRetainedMemoryIsBounded()
-        {
+        public void LiveCacheRetainedMemoryIsBounded()        {
             var sample = EzPerfMeasurer.MeasureRetainedKb(() => fillCache(512));
 
             TestContext.Progress.WriteLine($"live cache (512 entries): {sample:F1} KB retained, {sample / 512:F2} KB/entry");
 
             Assert.That(sample, Is.LessThan(16 * 1024), "live cache retained more than its entry budget allows");
+        }
+
+        /// <summary>
+        /// The dan step of the chart chain: a Sunny/means table lookup plus per-side skillset filing. It is cheap in
+        /// milliseconds but allocates for both sides on every claim, which is why allocation is the guarded number
+        /// here rather than time.
+        /// </summary>
+        [TestCase(4, 0.0)]
+        [TestCase(4, 0.5)]
+        [TestCase(7, 0.0)]
+        [TestCase(7, 0.5)]
+        public void ReportAndGuardDanCost(int keyCount, double holdRatio)
+        {
+            var chart = buildChart(keyCount, holdRatio);
+            var info = EzChartSkillInfoComputer.Compute(chart);
+            var msd = computeMsd(chart, keyCount);
+            int holdCount = countHolds(chart);
+
+            Assert.That(EzDanSet.Create(msd, keyCount, holdRatio, 12.5, info, holdCount), Is.Not.Null,
+                "the dan tables could not rate this fixture; the measurement would be of the empty path");
+
+            var danSet = EzPerfMeasurer.Measure("dan set", runs, () => EzDanSet.Create(msd, keyCount, holdRatio, 12.5, info, holdCount));
+            var danRow = EzPerfMeasurer.Measure("dan persisted row", runs,
+                () => EzPersistedChartDan.TryComputeFromStored("dan-hash", Guid.Empty, msd, keyCount, holdRatio, 12.5, info, holdCount));
+            var danLabels = EzPerfMeasurer.Measure("dan skillset filing", runs,
+                () => EzDanSkillsetFiling.BucketsForValues(keyCount, EzDanSide.Rc, msd, info.LengthSeconds, 1, info));
+
+            TestContext.Progress.WriteLine($"{keyCount}K holdRatio={holdRatio:P0} holds={holdCount}");
+            EzPerfMeasurer.Report([danSet, danRow, danLabels]);
+
+            assertAllocation(danSet, dan_alloc_kb);
+            assertAllocation(danRow, dan_row_alloc_kb);
+            assertAllocation(danLabels, dan_labels_alloc_kb);
+            assertMedian(danSet, dan_median_ms);
+            assertMedian(danRow, dan_row_median_ms);
+        }
+
+        /// <summary>
+        /// One chart's whole chart chain, run on one thread: Mina rows, the engine, structure info, the dan row. This is
+        /// the unit the background backfill processes.
+        /// </summary>
+        /// <remarks>
+        /// Deliberately sequential. Per-chart work here is single-digit milliseconds, so splitting a chart across
+        /// threads (or handing charts to a thread pool) spends more on scheduling and cache traffic than it saves;
+        /// the fleet assertion below is what makes a regression to parallel-per-chart visible as gen2 pressure.
+        /// </remarks>
+        [TestCase(4, 0.0)]
+        [TestCase(4, 0.5)]
+        [TestCase(7, 0.0)]
+        [TestCase(7, 0.5)]
+        public void ReportAndGuardSequentialChartChain(int keyCount, double holdRatio)
+        {
+            var chart = buildChart(keyCount, holdRatio);
+            int holdCount = countHolds(chart);
+
+            // Resolve the module, the tables and the hot paths for this keymode before the first timed run.
+            runChain(chart, keyCount, holdRatio, holdCount);
+
+            var single = EzPerfMeasurer.Measure("chain 1 chart", runs, () => runChain(chart, keyCount, holdRatio, holdCount));
+            var fleet = EzPerfMeasurer.Measure("chain 4 charts", runs, () =>
+            {
+                for (int i = 0; i < 4; i++)
+                    runChain(chart, keyCount, holdRatio, holdCount);
+            });
+
+            TestContext.Progress.WriteLine($"{keyCount}K holdRatio={holdRatio:P0} rows={chart.Notes.Count}");
+            EzPerfMeasurer.Report([single, fleet]);
+
+            assertMedian(single, chain_median_ms);
+            assertAllocation(single, chain_alloc_kb);
+
+            Assert.That(fleet.AverageKb, Is.LessThanOrEqualTo(single.AverageKb * 4 * 1.35),
+                "chain allocation grew faster than linearly with chart count");
+
+            // Hold-heavy charts promote today: the structure pass allocates enough per chart to turn over the
+            // nursery. That is the concrete target for the zero-allocation work, so it is reported rather than
+            // asserted away; RC charts must already stay clean.
+            if (holdRatio == 0)
+                Assert.That(fleet.Gen2, Is.Zero, "a four-chart sequential RC chain promoted objects to gen2");
+            else
+                TestContext.Progress.WriteLine($"hold-heavy chain promotes {fleet.Gen2} time(s) to gen2 over 4 charts; target is 0");
         }
 
         private static void assertAllocation(in EzPerfSample sample, double ceilingKb)
@@ -150,6 +248,39 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             Assert.That(sample.MedianMs, Is.LessThanOrEqualTo(ceilingMs),
                 $"{sample.Label} median {sample.MedianMs:F2} ms, ceiling is {ceilingMs:F2} ms");
+        }
+
+        /// <summary>The Mina vector in the msd skill-id space the dan tables read.</summary>
+        private static IReadOnlyDictionary<string, double> computeMsd(EzManiaChartInput chart, int keyCount)
+        {
+            var vector = EzMinaEnginePool.Rent().CalculateMsd(EzMinaNoteConverter.Convert(chart.Notes), keyCount, 1f);
+            var msd = new Dictionary<string, double>(StringComparer.Ordinal);
+
+            foreach (var (axis, value) in vector.Enumerate())
+                msd[axis.ToMsdSkillId()] = value;
+
+            return msd;
+        }
+
+        private static int countHolds(EzManiaChartInput chart)
+        {
+            int holds = 0;
+
+            for (int i = 0; i < chart.Notes.Count; i++)
+            {
+                if (chart.Notes[i].IsHold)
+                    holds++;
+            }
+
+            return holds;
+        }
+
+        private static void runChain(EzManiaChartInput chart, int keyCount, double holdRatio, int holdCount)
+        {
+            var msd = computeMsd(chart, keyCount);
+            var info = EzChartSkillInfoComputer.Compute(chart);
+
+            EzPersistedChartDan.TryComputeFromStored("chain-hash", Guid.Empty, msd, keyCount, holdRatio, 12.5, info, holdCount);
         }
 
         private static EzAnalysisLiveCache fillCache(int entries)
