@@ -112,15 +112,42 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
 
             var sortedTimes = rowMap.Keys.OrderBy(t => t).ToList();
 
+            // Hold bodies are filled with a per-column difference array over the row indices, so the cost is one
+            // sweep per column instead of one row scan per long note.
+            int[]?[] holdCoverage = new int[]?[keys];
+
             foreach (var (column, start, end) in holdSpans)
+            {
+                int from = lowerBoundGreater(sortedTimes, start);
+                int to = lowerBoundAtOrAbove(sortedTimes, end);
+
+                if (to <= from)
+                    continue;
+
+                int[] coverage = holdCoverage[column] ??= new int[sortedTimes.Count + 1];
+                coverage[from]++;
+                coverage[to]--;
+            }
+
+            for (int column = 0; column < keys; column++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                int t = lowerBoundGreater(sortedTimes, start);
+                int[]? coverage = holdCoverage[column];
 
-                for (; t < sortedTimes.Count && sortedTimes[t] < end; t++)
+                if (coverage == null)
+                    continue;
+
+                int active = 0;
+
+                for (int i = 0; i < sortedTimes.Count; i++)
                 {
-                    int[] row = rowMap[sortedTimes[t]];
+                    active += coverage[i];
+
+                    if (active <= 0)
+                        continue;
+
+                    int[] row = rowMap[sortedTimes[i]];
 
                     if (row[column] == EzLeoBlackNoteType.NOTHING)
                         row[column] = EzLeoBlackNoteType.HOLDBODY;
@@ -200,6 +227,25 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
                 int mid = (lo + hi) >> 1;
 
                 if (sortedAsc[mid] <= target)
+                    lo = mid + 1;
+                else
+                    hi = mid;
+            }
+
+            return lo;
+        }
+
+        /// <summary>First index whose row time is at or after <paramref name="target"/>.</summary>
+        private static int lowerBoundAtOrAbove(IReadOnlyList<double> sortedAsc, double target)
+        {
+            int lo = 0;
+            int hi = sortedAsc.Count;
+
+            while (lo < hi)
+            {
+                int mid = (lo + hi) >> 1;
+
+                if (sortedAsc[mid] < target)
                     lo = mid + 1;
                 else
                     hi = mid;
