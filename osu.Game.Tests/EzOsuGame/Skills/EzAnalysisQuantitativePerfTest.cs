@@ -36,7 +36,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         private const double features_alloc_kb = 5 * 1024;
         private const double patterns_alloc_kb = 9 * 1024;
         private const double csi_alloc_kb = 34 * 1024;
-        private const double leoblack_alloc_kb = 22 * 1024;
+        private const double leoblack_alloc_kb = 12 * 1024;
         private const double mina_rows_alloc_kb = 128;
         private const double mina_engine_alloc_kb = 8;
 
@@ -53,7 +53,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         private const double dan_median_ms = 20;
         private const double dan_row_median_ms = 20;
 
-        private const double chain_alloc_kb = 34 * 1024;
+        private const double chain_alloc_kb = 20 * 1024;
         private const double chain_median_ms = 300;
 
         /// <summary>
