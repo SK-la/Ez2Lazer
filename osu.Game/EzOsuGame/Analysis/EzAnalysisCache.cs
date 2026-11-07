@@ -72,6 +72,16 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private readonly IBindable<bool> runtimeAnalysisEnabled = new Bindable<bool>();
 
+        /// <summary>
+        /// The two SSR coefficients. Session results are dropped when either changes, because an entry computed
+        /// under the old pair would otherwise answer for the new one.
+        /// </summary>
+        /// <remarks>
+        /// This is a session-only invalidation, not a version bump: stored rows keep whatever they were computed
+        /// with, exactly as the settings describe themselves.
+        /// </remarks>
+        private readonly List<IBindable<double>> ssrTuningBindables = new List<IBindable<double>>();
+
         private const int mod_settings_debounce = SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE + 10;
 
         [Resolved]
@@ -90,6 +100,11 @@ namespace osu.Game.EzOsuGame.Analysis
         private void load(Ez2ConfigManager ezConfig)
         {
             runtimeAnalysisEnabled.BindTo(ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled));
+
+            // A coefficient change makes every held result stale; dropping them costs a recompute of whatever is on
+            // screen, the same price the first visit paid.
+            ssrTuningBindables.Add(ezConfig.GetBindable<double>(Ez2Setting.SsrRescaleThreshold));
+            ssrTuningBindables.Add(ezConfig.GetBindable<double>(Ez2Setting.SsrLnMultiplier));
         }
 
         protected override void LoadComplete()
@@ -106,6 +121,16 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 Scheduler.AddOnce(updateTrackedBindables);
             }, true);
+
+            foreach (var tuning in ssrTuningBindables)
+            {
+                tuning.BindValueChanged(_ =>
+                {
+                    // Live values only: no version bump, no stored row is touched.
+                    liveMetrics.ClearAll();
+                    Scheduler.AddOnce(updateTrackedBindables);
+                });
+            }
 
             currentRuleset.BindValueChanged(_ => Scheduler.AddOnce(updateTrackedBindables));
 
@@ -247,10 +272,12 @@ namespace osu.Game.EzOsuGame.Analysis
                 : EzMetricVariantValues.Empty;
 
             if (EzMetricVariantReadout.IsOfficial(variant))
+            {
                 live = new EzMetricVariantValues(
                     officialLive.Star ?? live.Star,
                     officialLive.PerformancePoints ?? live.PerformancePoints,
                     live.SkillStar);
+            }
 
             return EzMetricVariantReadout.Read(beatmap, variant, live);
         }
@@ -421,7 +448,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 if (!inFlightPasses.TryAdd(key, created))
                 {
                     // Another caller installed a pass for this key first; the one not observed must not keep running.
-                    created.Cancellation.Cancel();
+                    await created.Cancellation.CancelAsync();
                     continue;
                 }
 
@@ -603,6 +630,9 @@ namespace osu.Game.EzOsuGame.Analysis
             base.Dispose(isDisposing);
 
             modSettingChangeTracker?.Dispose();
+
+            foreach (var tuning in ssrTuningBindables)
+                tuning.UnbindAll();
 
             cancelTrackedBindableUpdate();
             trackedUpdateCancellationSource.Dispose();

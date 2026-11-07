@@ -894,6 +894,34 @@ namespace osu.Game.EzOsuGame.Localization
             + "\nAffects: Ez ChartDan / DualPanel, song-select and HUD radar LN labels, and the persisted ChartDan LN half in Realm."
             + "\nAlready-persisted ChartDan / CSI is not retroactively updated; rebuild (Data rebuild -> Realm chart skill chain) to apply.");
 
+        public static readonly LocalisableString SSR_RESCALE_THRESHOLD = new EzLocalizationManager.EzLocalisableString(
+            "SSR 重缩放阈值",
+            "SSR rescale threshold");
+
+        public static readonly LocalisableString SSR_RESCALE_THRESHOLD_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "SSR（xxy 难度）超过这个星级后，超出部分的膨胀速度被压到 1/1.2。"
+            + "\n这是对算法的永久修订，不是一次性试验：改它不会让本地库换版本，也不会追溯重算已落盘的值，只影响此后算出的 SSR 与落库结果。"
+            + "\n调高 → 高星谱面不再被压那么多，值偏高；调低 → 高星谱面被压得更狠，值偏低。低于本阈值的中低星谱面不受影响。",
+            "Above this star rating the SSR (xxy difficulty) inflation is compressed to 1/1.2 of the excess."
+            + "\nThis is a permanent revision of the algorithm, not a one-off experiment: changing it does not change the local database version "
+            + "and does not retroactively rescore stored values; only SSR computed from then on, and its persisted result, are affected."
+            + "\nRaise it and high-star charts are compressed less (values go up); lower it and they are compressed more. Charts below the threshold are unaffected.");
+
+        public static readonly LocalisableString SSR_LN_MULTIPLIER = new EzLocalizationManager.EzLocalisableString(
+            "SSR LN 因子",
+            "SSR LN multiplier");
+
+        public static readonly LocalisableString SSR_LN_MULTIPLIER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "SSR（xxy 难度）里长条积分的权重系数，决定 LN 对难度的贡献。"
+            + "\n与重缩放阈值一样是对算法的永久修订：改动不换库版本、不追溯重算，只影响此后的 SSR 与落库结果。"
+            + "\n调高 → LN 谱面更难、值偏高；调低 → LN 谱面更易。纯 rice 谱面不受影响。"
+            + "\n建议：7K 以下用 6 左右；10K 可降到 4.5–5.5。",
+            "Weight of the long-note integral in the SSR (xxy difficulty); it decides how much holds contribute."
+            + "\nLike the rescale threshold this is a permanent revision: no database version change, no retroactive rescoring, "
+            + "only SSR computed from then on and its persisted result."
+            + "\nRaise it and LN charts rate harder (values go up); lower it and they rate easier. Pure rice charts are unaffected."
+            + "\nGuidance: around 6 below 7K; 4.5-5.5 for 10K.");
+
         #endregion
     }
 }
