@@ -24,7 +24,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [SetUp]
         public void SetUp()
         {
-            EzAnalysisRevision.Configure(EzMetricProducers.CreateDefault(EzNullUpstreamRevisions.INSTANCE));
+            EzAnalysisRevision.Configure(new EzMetricRevisionResolver(
+                EzChartMetricProducers.CreateRegistry(EzNullUpstreamRevisions.INSTANCE),
+                EzPlayerMetricProducers.CreateRegistry()));
         }
 
         [Test]
@@ -46,10 +48,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [Test]
         public void Chart_dan_folds_dan_csi_and_msd()
         {
-            int danOnly = new EzMetricProducerRegistry(new[]
-            {
-                producerWithDependencies(EzDanAlgorithm.VERSION, Array.Empty<EzMetricProducerId>()),
-            }).RevisionOf(EzMetricProducers.DAN_CHART, mania);
+            int danOnly = danRegistry(Array.Empty<EzMetricProducerId>())
+                .RevisionOf(EzChartMetricProducer.Dan.Id(), mania);
 
             // Folding the two inputs must move the number away from the dan constant alone.
             Assert.That(EzAnalysisRevision.ChartDan, Is.Not.EqualTo(danOnly));
@@ -97,29 +97,36 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             Assert.That(EzAnalysisRevision.For(EzAnalysisFacet.Aggregation), Is.EqualTo(0));
         }
 
-        private static EzMetricProducer producerWithDependencies(int probe, IReadOnlyList<EzMetricProducerId> dependsOn)
-            => new EzMetricProducer(EzMetricProducers.DAN_CHART, EzMetricTier.Dan, EzMetricUnit.DanRank, _ => true)
-            {
-                DependsOn = dependsOn,
-                RevisionProbe = _ => probe,
-            };
+        private static EzMetricRevisionResolver danRegistry(IReadOnlyList<EzMetricProducerId> dependsOn)
+            => new EzMetricRevisionResolver(
+                new EzMetricProducerRegistry(new[]
+                {
+                    new EzMetricProducer(EzChartMetricProducer.Dan.Id(), EzMetricTier.Dan, EzMetricUnit.DanRank, _ => true)
+                    {
+                        DependsOn = dependsOn,
+                        RevisionProbe = _ => EzDanAlgorithm.VERSION,
+                    },
+                }),
+                new EzMetricProducerRegistry());
 
-        private static EzMetricProducerRegistry registryWith(int? csiVersion = null, int? minaVersion = null)
-            => new EzMetricProducerRegistry(new[]
-            {
-                new EzMetricProducer(EzMetricProducers.CSI_CHART, EzMetricTier.Tags, EzMetricUnit.Count, _ => true)
+        private static EzMetricRevisionResolver registryWith(int? csiVersion = null, int? minaVersion = null)
+            => new EzMetricRevisionResolver(
+                new EzMetricProducerRegistry(new[]
                 {
-                    RevisionProbe = _ => csiVersion ?? EzChartSkillInfo.VERSION,
-                },
-                new EzMetricProducer(EzMetricProducers.MINA_CHART, EzMetricTier.Skill, EzMetricUnit.SkillPoint, _ => true)
-                {
-                    RevisionProbe = _ => minaVersion ?? EzMinaSkillAlgorithm.VERSION,
-                },
-                new EzMetricProducer(EzMetricProducers.DAN_CHART, EzMetricTier.Dan, EzMetricUnit.DanRank, _ => true)
-                {
-                    DependsOn = new[] { EzMetricProducers.MINA_CHART, EzMetricProducers.CSI_CHART },
-                    RevisionProbe = _ => EzDanAlgorithm.VERSION,
-                },
-            });
+                    new EzMetricProducer(EzChartMetricProducer.Csi.Id(), EzMetricTier.Tags, EzMetricUnit.Count, _ => true)
+                    {
+                        RevisionProbe = _ => csiVersion ?? EzChartSkillInfo.VERSION,
+                    },
+                    new EzMetricProducer(EzChartMetricProducer.Mina.Id(), EzMetricTier.Skill, EzMetricUnit.SkillPoint, _ => true)
+                    {
+                        RevisionProbe = _ => minaVersion ?? EzMinaSkillAlgorithm.VERSION,
+                    },
+                    new EzMetricProducer(EzChartMetricProducer.Dan.Id(), EzMetricTier.Dan, EzMetricUnit.DanRank, _ => true)
+                    {
+                        DependsOn = new[] { EzChartMetricProducer.Mina.Id(), EzChartMetricProducer.Csi.Id() },
+                        RevisionProbe = _ => EzDanAlgorithm.VERSION,
+                    },
+                }),
+                new EzMetricProducerRegistry());
     }
 }

@@ -2,23 +2,21 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using osu.Game.EzOsuGame.Skills;
 
 namespace osu.Game.EzOsuGame.Metrics
 {
     /// <summary>
-    /// Identity of one producer. The scope is part of the identity because the same name can carry
-    /// unrelated algorithms on the two sides — a chart rating and a player rating share an axis
-    /// vocabulary but never share a dependency edge or a stored row.
+    /// Identity of one producer within its side: the chart catalog or the player catalog.
     /// </summary>
-    public readonly record struct EzMetricProducerId(string Id, EzSkillScope Scope) : IComparable<EzMetricProducerId>
+    /// <remarks>
+    /// The two sides are separate namespaces, so an id only has to be unique within one of them. Player ids
+    /// carry a suffix because a player producer declares a dependency on a chart producer and the two must not
+    /// be confused for each other.
+    /// </remarks>
+    public readonly record struct EzMetricProducerId(string Id) : IComparable<EzMetricProducerId>
     {
-        public int CompareTo(EzMetricProducerId other)
-        {
-            int byId = string.CompareOrdinal(Id, other.Id);
-            return byId != 0 ? byId : Scope.CompareTo(other.Scope);
-        }
+        public int CompareTo(EzMetricProducerId other) => string.CompareOrdinal(Id, other.Id);
 
-        public override string ToString() => $"{Id}/{Scope}";
+        public override string ToString() => Id;
     }
 }

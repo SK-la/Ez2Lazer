@@ -418,7 +418,7 @@ namespace osu.Game.EzOsuGame.HUD
                                          ? chartDan.KeyCount
                                          : KeyCount.Value;
 
-                                     double overall = result.AxesOf(EzMetricProducers.MINA_CHART)
+                                     double overall = result.AxesOf(EzChartMetricProducer.Mina.Id())
                                                             .GetValueOrDefault(EzMinaSkillAxis.Overall.ToId(), 0);
 
                                      applyLive(result.Dan, overall, liveKeys);

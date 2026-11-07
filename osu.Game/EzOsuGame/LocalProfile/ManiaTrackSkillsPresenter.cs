@@ -73,7 +73,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public LocalisableString ResolveDisplayName(string skillId)
         {
-            foreach (var item in provider.Registry.Items(EzLocalProfileConstants.MANIA_RULESET_ID, EzSkillScope.Player))
+            foreach (var item in provider.PlayerRegistry.Items(EzLocalProfileConstants.MANIA_RULESET_ID))
             {
                 if (item.SkillId == skillId)
                     return item.Axis.DisplayName;

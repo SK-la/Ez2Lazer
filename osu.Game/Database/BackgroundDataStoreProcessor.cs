@@ -120,7 +120,7 @@ namespace osu.Game.Database
         private EzBeatmapPPPComputer ezBeatmapPPPComputer { get; set; } = null!;
 
         [Resolved]
-        private EzSkillStore skillStore { get; set; } = null!;
+        private EzChartSkillStore skillStore { get; set; } = null!;
 
         [Resolved]
         private EzSkillProvider skillProvider { get; set; } = null!;

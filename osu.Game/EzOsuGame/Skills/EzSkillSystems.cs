@@ -14,7 +14,7 @@ namespace osu.Game.EzOsuGame.Skills
     /// </summary>
     /// <remarks>
     /// These are the strings written into the value tables. The canonical producer names live in
-    /// <c>EzMetricProducers</c>; the two are deliberately separate so storage can be renamed without
+    /// <c>EzChartMetricProducers</c> / <c>EzPlayerMetricProducers</c>; the two are deliberately separate so storage can be renamed without
     /// touching identity, and vice versa.
     /// </remarks>
     public static class EzSkillSystems
@@ -60,7 +60,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// </remarks>
         public static int ResolveAlgorithmVersion(string systemId) => systemId switch
         {
-            BEATMAP_MINA => EzAnalysisRevision.Registry.RevisionOf(EzMetricProducers.MINA_CHART, EzLocalProfileConstants.MANIA_RULESET_ID),
+            BEATMAP_MINA => EzMetricRegistries.Current.RevisionOf(EzChartMetricProducer.Mina.Id(), EzLocalProfileConstants.MANIA_RULESET_ID),
             BEATMAP_CSI => EzAnalysisRevision.ChartSkillInfo,
             PLAYER_MINA or PLAYER_PATTERN => EzMinaSkillAlgorithm.VERSION,
             // PP+ rows are stamped per ruleset bundle, never by a single version constant.

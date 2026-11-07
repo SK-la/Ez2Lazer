@@ -3,7 +3,6 @@
 
 using System;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Analysis;
 
 namespace osu.Game.EzOsuGame.Metrics
 {
@@ -14,15 +13,14 @@ namespace osu.Game.EzOsuGame.Metrics
     /// The two are always read and applied as one value. A star without its pp (or the reverse) describes two
     /// different systems on the same surface, which is the mismatch this type exists to make impossible.
     /// Either half may be null on its own: the tiers degrade independently (see the read order in
-    /// <see cref="EzMetricVariantReadout.Read"/>).
     /// </remarks>
     public readonly record struct EzMetricVariantValues(double? Star, double? PerformancePoints)
     {
-        public static readonly EzMetricVariantValues Empty = new EzMetricVariantValues(null, null);
+        public static readonly EzMetricVariantValues EMPTY = new EzMetricVariantValues(null, null);
 
         public bool IsEmpty => Star == null && PerformancePoints == null;
 
-        /// <summary>A live pair, or <see cref="Empty"/> when the source has neither half.</summary>
+        /// <summary>A live pair, or <see cref="EMPTY"/> when the source has neither half.</summary>
         /// <remarks>
         /// An unresolved <see cref="StarDifficulty"/> carries <c>Stars == 0</c> and no performance attributes, which
         /// must read as "absent" so the caller falls back to the stored baseline instead of showing a zero.
@@ -47,23 +45,23 @@ namespace osu.Game.EzOsuGame.Metrics
     /// </remarks>
     public static class EzMetricVariantReadout
     {
-        private static EzMetricProducerRegistry? catalogRegistry;
+        private static EzMetricRevisionResolver? catalogResolver;
         private static EzMetricVariantCatalog? catalogInstance;
 
         /// <summary>
-        /// The catalog over the registry in force. Cached per registry instance so sorting and grouping can ask per
+        /// The catalog over the registries in force. Cached per resolver instance so sorting and grouping can ask per
         /// beatmap without allocating, and so a reconfigured registry cannot leave a stale catalog behind.
         /// </summary>
         public static EzMetricVariantCatalog Catalog
         {
             get
             {
-                var registry = EzAnalysisRevision.Registry;
+                var resolver = EzMetricRegistries.Current;
 
-                if (!ReferenceEquals(registry, catalogRegistry))
+                if (!ReferenceEquals(resolver, catalogResolver))
                 {
-                    catalogRegistry = registry;
-                    catalogInstance = new EzMetricVariantCatalog(registry);
+                    catalogResolver = resolver;
+                    catalogInstance = new EzMetricVariantCatalog(resolver);
                 }
 
                 return catalogInstance!;
@@ -82,14 +80,14 @@ namespace osu.Game.EzOsuGame.Metrics
             return Read(beatmap, Selected(beatmap.Ruleset.OnlineID));
         }
 
-        public static EzMetricVariantValues Read(BeatmapInfo beatmap, EzMetricVariant? variant) => Read(beatmap, variant, EzMetricVariantValues.Empty);
+        public static EzMetricVariantValues Read(BeatmapInfo beatmap, EzMetricVariant? variant) => Read(beatmap, variant, EzMetricVariantValues.EMPTY);
 
         public static EzMetricVariantValues Read(BeatmapInfo beatmap, EzMetricVariant? variant, in EzMetricVariantValues live)
         {
             ArgumentNullException.ThrowIfNull(beatmap);
 
             if (variant == null)
-                return EzMetricVariantValues.Empty;
+                return EzMetricVariantValues.EMPTY;
 
             double? star = live.Star ?? baseline(beatmap, variant.StarProducer);
             double? performance = variant.PerformanceProducer is { } producer
@@ -103,22 +101,23 @@ namespace osu.Game.EzOsuGame.Metrics
         public static bool IsOfficial(EzMetricVariant variant)
         {
             ArgumentNullException.ThrowIfNull(variant);
-            return variant.StarProducer == EzMetricProducers.OFFICIAL_CHART;
+            return variant.StarProducer == EzChartMetricProducer.Official.Id();
         }
 
+        /// <summary>
+        /// Reads a system's baseline from the flattened column it owns. Which producer a value belongs to is the
+        /// only thing that decides the column, so the mapping is a plain producer switch.
+        /// </summary>
         private static double? baseline(BeatmapInfo beatmap, EzMetricProducerId producer)
         {
-            double value = (producer.Id, producer.Scope) switch
-            {
-                (EzMetricProducers.OFFICIAL, Skills.EzSkillScope.Beatmap) => beatmap.StarRating,
-                (EzMetricProducers.OFFICIAL_PP, Skills.EzSkillScope.Beatmap) => beatmap.PerformancePoints,
-                (EzMetricProducers.SSR, Skills.EzSkillScope.Beatmap) => beatmap.SunnyStarRating,
-                (EzMetricProducers.SSR_PP, Skills.EzSkillScope.Beatmap) => beatmap.SunnyPerformancePoints,
-                (EzMetricProducers.PPP, Skills.EzSkillScope.Beatmap) => beatmap.PPPStarRating,
-                (EzMetricProducers.PPP_PP, Skills.EzSkillScope.Beatmap) => beatmap.PPPPerformancePoints,
-                (EzMetricProducers.MINA, Skills.EzSkillScope.Beatmap) => beatmap.MinaRating,
-                _ => -1,
-            };
+            double value = producer == EzChartMetricProducer.Official.Id() ? beatmap.StarRating
+                : producer == EzChartMetricProducer.OfficialPerformance.Id() ? beatmap.PerformancePoints
+                : producer == EzChartMetricProducer.Ssr.Id() ? beatmap.SunnyStarRating
+                : producer == EzChartMetricProducer.SsrPerformance.Id() ? beatmap.SunnyPerformancePoints
+                : producer == EzChartMetricProducer.Ppp.Id() ? beatmap.PPPStarRating
+                : producer == EzChartMetricProducer.PppPerformance.Id() ? beatmap.PPPPerformancePoints
+                : producer == EzChartMetricProducer.Mina.Id() ? beatmap.MinaRating
+                : -1;
 
             return EzMetricVariantValues.Finite(value);
         }

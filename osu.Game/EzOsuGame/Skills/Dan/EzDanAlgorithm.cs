@@ -8,7 +8,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
     /// <summary>
     /// Bump when player-dan aggregation / side headline fold / clear credit semantics change
     /// (not <see cref="osu.Game.Database.RealmAccess.EZ_REALM_SCHEMA_VERSION"/>).
-    /// Independent from <see cref="EzMinaSkillAlgorithm.VERSION"/>. Reads via <see cref="EzSkillStore.GetDanEstimate"/> filter on this value.
+    /// Independent from <see cref="EzMinaSkillAlgorithm.VERSION"/>. Reads via <see cref="EzChartSkillStore"/> filter on this value.
     /// v2: side <c>GetDan</c> uses hub anchor/mean fold (<see cref="EzDanSideHeadline"/>).
     /// v3: hub clear gates + (hash,rate) dedupe; <see cref="CLEAR_WINDOW"/>=20 + <see cref="EzDanClearWindow"/> weighting.
     /// v4: 5K / 8K–18K chart dan comes from the 4K xxy interval table (<see cref="EzDanLabels.TryResolveFallbackDan"/>)

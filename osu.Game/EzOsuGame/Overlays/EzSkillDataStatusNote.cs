@@ -33,7 +33,8 @@ namespace osu.Game.EzOsuGame.Overlays
     /// </summary>
     public partial class EzSkillDataStatusNote : CompositeDrawable
     {
-        private readonly EzSkillStore? skillStore;
+        private readonly EzChartSkillStore? skillStore;
+        private readonly EzPlayerSkillStore? playerStore;
         private readonly EzLocalProfileStore? profileStore;
         private readonly BackgroundDataStoreProcessor? backgroundDataStoreProcessor;
 
@@ -50,9 +51,11 @@ namespace osu.Game.EzOsuGame.Overlays
         /// The SQLite archive, read to name the players whose plays the chart chain has not rated yet. Without it the
         /// note still reports the player rows flagged behind the ledger, just not what they are waiting on.
         /// </param>
-        public EzSkillDataStatusNote(EzSkillStore? skillStore, BackgroundDataStoreProcessor? backgroundDataStoreProcessor, EzLocalProfileStore? profileStore = null)
+        public EzSkillDataStatusNote(EzChartSkillStore? skillStore, EzPlayerSkillStore? playerStore, BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
+                                     EzLocalProfileStore? profileStore = null)
         {
             this.skillStore = skillStore;
+            this.playerStore = playerStore;
             this.backgroundDataStoreProcessor = backgroundDataStoreProcessor;
             this.profileStore = profileStore;
 
@@ -100,7 +103,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     var chain = skillStore.CollectChartChainState("settings");
                     status = chain.ToReport(DateTimeOffset.UtcNow);
-                    stalePlayers = skillStore.GetStalePlayerSkillDetails();
+                    stalePlayers = playerStore?.GetStalePlayerSkillDetails() ?? Array.Empty<EzStalePlayerSkill>();
 
                     // Derived, not stored: the debt is the drill ledger joined against the chain's own coverage, so it
                     // disappears on its own once the chain writes the row instead of needing a flag cleared.

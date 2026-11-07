@@ -23,10 +23,10 @@ namespace osu.Game.EzOsuGame.Skills.PPP
     public sealed class EzPlayerPPPAggregator
     {
         private readonly BeatmapManager beatmapManager;
-        private readonly EzSkillStore skillStore;
+        private readonly EzPlayerSkillStore skillStore;
         private readonly IEzPPPEngine engine;
 
-        public EzPlayerPPPAggregator(BeatmapManager beatmapManager, EzSkillStore skillStore, IEzPPPEngine? engine = null)
+        public EzPlayerPPPAggregator(BeatmapManager beatmapManager, EzPlayerSkillStore skillStore, IEzPPPEngine? engine = null)
         {
             this.beatmapManager = beatmapManager;
             this.skillStore = skillStore;

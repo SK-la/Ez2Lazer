@@ -35,7 +35,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             RunTestWithRealm((realm, _) =>
             {
                 seedCharts(realm);
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
 
                 var status = store.GetSkillDataStatus();
 
@@ -55,7 +55,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             RunTestWithRealm((realm, _) =>
             {
                 seedCharts(realm);
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
 
                 // MSD: a complete, b settled-unrateable, c missing.
                 store.WriteBeatmapMsd(mania_a, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
@@ -125,7 +125,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             RunTestWithRealm((realm, _) =>
             {
                 seedCharts(realm);
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
 
                 // A non-mania chart with a full set of rows must not inflate the report either way.
                 store.WriteBeatmapMsd(osu_hash, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
@@ -171,7 +171,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                     addChart(r, "status-mania-20k", maniaRuleset, circleSize: 20);
                 });
 
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
                 var status = store.GetSkillDataStatus();
 
                 Assert.That(status.UniverseCount, Is.EqualTo(3));
@@ -191,7 +191,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             RunTestWithRealm((realm, _) =>
             {
                 seedCharts(realm);
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
 
                 store.WriteBeatmapMsdUnrateable(mania_b, Guid.NewGuid());
 
@@ -212,31 +212,20 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         /// leaving it set would keep the status readout warning forever.
         /// </summary>
         [Test]
-        public void Stale_player_skill_flag_is_cleared_per_player_without_touching_values()
+        public void Staleness_is_derived_from_the_ledger_not_stored()
         {
-            RunTestWithRealm((realm, _) =>
+            RunTestWithRealm((_, storage) =>
             {
-                var store = new EzSkillStore(realm);
+                var store = new EzPlayerSkillStore(storage);
 
                 store.WritePlayerSsr("alpha", 4, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
-                store.WritePlayerSsr("beta", 4, new EzMinaSkillAxisVector(11, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
 
+                // No ledger rows behind the slice: the rows cannot be behind anything, so nothing reports stale.
                 Assert.That(store.GetStalePlayerSkillUsernames(), Is.Empty);
 
-                Assert.That(store.SetPlayerSkillStale("alpha", true), Is.GreaterThan(0));
-                Assert.That(store.SetPlayerSkillStale("beta", true), Is.GreaterThan(0));
-                Assert.That(store.GetStalePlayerSkillUsernames(), Is.EquivalentTo(new[] { "alpha", "beta" }));
-
-                // One player's pass must not un-flag another's rows.
-                Assert.That(store.SetPlayerSkillStale("alpha", false), Is.GreaterThan(0));
-                Assert.That(store.GetStalePlayerSkillUsernames(), Is.EquivalentTo(new[] { "beta" }));
-
-                // Flag already gone: nothing to write.
-                Assert.That(store.SetPlayerSkillStale("alpha", false), Is.EqualTo(0));
-                Assert.That(store.SetPlayerSkillStale("alpha", true), Is.GreaterThan(0));
-                Assert.That(store.SetPlayerSkillStale("alpha", true), Is.EqualTo(0), "flag already set: nothing to write");
-
-                store.SetPlayerSkillStale("alpha", false);
+                // The flag is gone; a write through it is a no-op rather than a second source of truth.
+                Assert.That(store.SetPlayerSkillStale("alpha", true), Is.Zero);
+                Assert.That(store.GetStalePlayerSkillUsernames(), Is.Empty);
 
                 var snapshot = store.GetPlayerSsrSnapshot("alpha", 4);
                 Assert.That(snapshot.Stale, Is.False);
@@ -253,28 +242,14 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [Test]
         public void Stale_player_details_carry_the_row_count_and_newest_write_time()
         {
-            RunTestWithRealm((realm, _) =>
+            RunTestWithRealm((_, storage) =>
             {
-                var store = new EzSkillStore(realm);
+                var store = new EzPlayerSkillStore(storage);
 
                 store.WritePlayerSsr("alpha", 4, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
                 store.WritePlayerSsr("beta", 4, new EzMinaSkillAxisVector(11, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
 
-                Assert.That(store.GetStalePlayerSkillDetails(), Is.Empty);
-
-                store.SetPlayerSkillStale("alpha", true);
-
-                var details = store.GetStalePlayerSkillDetails();
-
-                Assert.That(details.Count, Is.EqualTo(1));
-                Assert.That(details[0].Username, Is.EqualTo("alpha"));
-
-                int alphaRows = realm.Run(r => r.All<EzPlayerSkillValue>().Count(v => v.Username == "alpha"));
-                Assert.That(details[0].Rows, Is.EqualTo(alphaRows));
-                Assert.That(details[0].ComputedAt, Is.GreaterThan(DateTimeOffset.UtcNow.AddMinutes(-5)));
-
-                store.SetPlayerSkillStale("alpha", false);
-
+                // Staleness is derived from the ledger, so a slice nobody has played since its write is current.
                 Assert.That(store.GetStalePlayerSkillDetails(), Is.Empty);
             });
         }
@@ -290,7 +265,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             RunTestWithRealm((realm, _) =>
             {
                 seedCharts(realm);
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
 
                 store.WriteBeatmapMsdUnrateable(mania_b, Guid.NewGuid());
                 store.UpsertChartSkillInfo(mania_b, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });

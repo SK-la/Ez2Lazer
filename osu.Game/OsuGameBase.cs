@@ -478,26 +478,31 @@ namespace osu.Game
 
             // Skill metrics: one declaration drives both the storage keys and the ruleset profile.
             // Mania: MSD / SSR / pattern / Dan. PPP chart / player skills cover osu, taiko, catch, and mania.
-            var metricRegistry = EzMetricProducers.CreateDefault(new EzRealmUpstreamRevisions(RulesetStore));
-            EzAnalysisRevision.Configure(metricRegistry);
-            var skillStore = new EzSkillStore(realm, metricRegistry);
+            var metricResolver = new EzMetricRevisionResolver(
+                EzChartMetricProducers.CreateRegistry(new EzRealmUpstreamRevisions(RulesetStore)),
+                EzPlayerMetricProducers.CreateRegistry());
+            EzAnalysisRevision.Configure(metricResolver);
+            var localProfileDatabase = new EzLocalProfileDatabase(Storage);
+            var localProfileStore = new EzLocalProfileStore(localProfileDatabase);
+            var chartSkillStore = new EzChartSkillStore(realm, metricResolver);
+            var playerSkillStore = new EzPlayerSkillStore(localProfileDatabase);
+            EzPlayerSkillStore.Configure(playerSkillStore);
             var pppEngine = new EzPPPEngine();
 
-            var beatmapMsdComputer = new EzBeatmapMinaComputer(BeatmapManager, skillStore);
-            var beatmapPppComputer = new EzBeatmapPPPComputer(BeatmapManager, skillStore, pppEngine);
+            var beatmapMsdComputer = new EzBeatmapMinaComputer(BeatmapManager, chartSkillStore);
+            var beatmapPppComputer = new EzBeatmapPPPComputer(BeatmapManager, chartSkillStore, pppEngine);
             var chartDanEstimator = new EzChartDanEstimator(ezAnalysisCache);
 
-            var localProfileStore = new EzLocalProfileStore(Storage);
+            var playerPPPAggregator = new EzPlayerPPPAggregator(BeatmapManager, playerSkillStore, pppEngine);
 
-            var playerPPPAggregator = new EzPlayerPPPAggregator(BeatmapManager, skillStore, pppEngine);
-
-            var playerRatingAggregator = new EzPlayerRatingAggregator(BeatmapManager, skillStore, localProfileStore);
-            var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanEstimator, skillStore, localProfileStore);
-            var skillProvider = new EzSkillProvider(skillStore, metricRegistry, chartDanEstimator, localProfileStore, BeatmapManager, liveMetrics);
+            var playerRatingAggregator = new EzPlayerRatingAggregator(BeatmapManager, playerSkillStore, chartSkillStore, localProfileStore);
+            var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanEstimator, playerSkillStore, chartSkillStore, localProfileStore);
+            var skillProvider = new EzSkillProvider(chartSkillStore, playerSkillStore, metricResolver, chartDanEstimator, localProfileStore, BeatmapManager, liveMetrics);
 
             // Only the types something actually resolves through DI are cached. Writers and aggregators are
             // constructed here and passed as arguments; caching them would leave entries nothing ever reads.
-            dependencies.Cache(skillStore);
+            dependencies.Cache(chartSkillStore);
+            dependencies.Cache(playerSkillStore);
             dependencies.Cache(skillProvider);
             dependencies.Cache(beatmapMsdComputer);
             dependencies.Cache(beatmapPppComputer);

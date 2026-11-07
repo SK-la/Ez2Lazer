@@ -17,10 +17,11 @@ namespace osu.Game.Tests.EzOsuGame.LocalProfile
         [Test]
         public void Load_fills_radar_axes_excluding_aim_total()
         {
-            RunTestWithRealm((realm, _) =>
+            RunTestWithRealm((realm, storage) =>
             {
-                var store = new EzSkillStore(realm);
-                var provider = new EzSkillProvider(store);
+                var store = new EzChartSkillStore(realm);
+                var playerStore = new EzPlayerSkillStore(storage);
+                var provider = new EzSkillProvider(store, playerStore);
                 const string username = "osu-track-tester";
 
                 var skills = new Dictionary<string, double>
@@ -34,7 +35,7 @@ namespace osu.Game.Tests.EzOsuGame.LocalProfile
                     [EzPPPSkillAxis.Accuracy.ToPlayerSkillId()] = 3.0,
                 };
 
-                store.WritePlayerSystemSkills(
+                playerStore.WritePlayerSystemSkills(
                     username,
                     EzSkillSystems.UNSLICED_KEY,
                     EzSkillSystems.PLAYER_PPP,

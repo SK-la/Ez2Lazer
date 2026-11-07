@@ -25,7 +25,8 @@ namespace osu.Game.EzOsuGame.Overlays
             SettingsSubsection subsection,
             BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
             EzAnalysisWarmupProcessor? analysisWarmupProcessor,
-            EzSkillStore? skillStore,
+            EzChartSkillStore? skillStore,
+            EzPlayerSkillStore? playerStore,
             IDialogOverlay? dialogOverlay,
             INotificationOverlay? notifications,
             EzLocalProfileStore? localProfileStore = null)
@@ -60,7 +61,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             subsection.Add(executeButton);
 
-            addSkillDataStatus(subsection, backgroundDataStoreProcessor, skillStore, localProfileStore);
+            addSkillDataStatus(subsection, backgroundDataStoreProcessor, skillStore, playerStore, localProfileStore);
         }
 
         /// <summary>
@@ -69,10 +70,11 @@ namespace osu.Game.EzOsuGame.Overlays
         private static void addSkillDataStatus(
             SettingsSubsection subsection,
             BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
-            EzSkillStore? skillStore,
+            EzChartSkillStore? skillStore,
+            EzPlayerSkillStore? playerStore,
             EzLocalProfileStore? localProfileStore)
         {
-            var statusNote = new EzSkillDataStatusNote(skillStore, backgroundDataStoreProcessor, localProfileStore);
+            var statusNote = new EzSkillDataStatusNote(skillStore, playerStore, backgroundDataStoreProcessor, localProfileStore);
 
             var refreshButton = new SettingsButtonV2
             {

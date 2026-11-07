@@ -19,18 +19,18 @@ namespace osu.Game.EzOsuGame.Skills
     public sealed class EzBeatmapMinaComputer
     {
         private readonly BeatmapManager beatmapManager;
-        private readonly EzSkillStore skillStore;
-        private readonly EzMetricProducerRegistry registry;
+        private readonly EzChartSkillStore skillStore;
+        private readonly EzMetricRevisionResolver resolver;
 
-        public EzBeatmapMinaComputer(BeatmapManager beatmapManager, EzSkillStore skillStore, EzMetricProducerRegistry? registry = null)
+        public EzBeatmapMinaComputer(BeatmapManager beatmapManager, EzChartSkillStore skillStore, EzMetricRevisionResolver? resolver = null)
         {
             this.beatmapManager = beatmapManager;
             this.skillStore = skillStore;
-            this.registry = registry ?? Analysis.EzAnalysisRevision.Registry;
+            this.resolver = resolver ?? EzMetricRegistries.Current;
         }
 
         /// <summary>Revision the stored Mina rows are stamped with.</summary>
-        public int Revision => registry.RevisionOf(EzMetricProducers.MINA_CHART, LocalProfile.EzLocalProfileConstants.MANIA_RULESET_ID);
+        public int Revision => resolver.RevisionOf(EzChartMetricProducer.Mina.Id(), LocalProfile.EzLocalProfileConstants.MANIA_RULESET_ID);
 
         public IReadOnlyDictionary<string, double>? ComputeAndStore(BeatmapInfo beatmapInfo)
         {
@@ -128,7 +128,6 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Requires every current Mina axis id. Incomplete caches fail and are recomputed via
-        /// <see cref="TryGetOrCompute"/>.
         /// </summary>
         /// <summary>
         /// Requires every axis the Mina producer declares. The declaration is the single source, so adding an
@@ -139,7 +138,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (existing.Count == 0)
                 return false;
 
-            if (Analysis.EzAnalysisRevision.Registry.Get(EzMetricProducers.MINA_CHART) is not { } producer)
+            if (EzMetricRegistries.ChartRegistry.Get(EzChartMetricProducer.Mina.Id()) is not { } producer)
                 return false;
 
             return producer.IsCompleteFor(EzSkillSystems.UNSLICED_KEY, LocalProfile.EzLocalProfileConstants.MANIA_RULESET_ID, existing);

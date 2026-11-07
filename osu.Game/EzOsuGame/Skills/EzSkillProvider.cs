@@ -31,10 +31,13 @@ namespace osu.Game.EzOsuGame.Skills
     public sealed class EzSkillProvider
     {
         /// <summary>
-        /// The store behind this provider. Exposed for callers that need a table-level read the provider's own facade
-        /// does not shape — e.g. joining chart-side coverage against the drill ledger for <see cref="EzChartChainDebt"/>.
+        /// Chart-side rows. Exposed for callers that need a table-level read the provider's facade does not shape —
+        /// e.g. joining chart coverage against the drill ledger for <see cref="Skills.Dan.EzChartChainDebt"/>.
         /// </summary>
-        public EzSkillStore Store { get; }
+        public EzChartSkillStore ChartStore { get; }
+
+        /// <summary>Player-side aggregates, stored next to the score ledger they are folded from.</summary>
+        public EzPlayerSkillStore PlayerStore { get; }
 
         private readonly EzChartDanEstimator? chartDanEstimator;
         private readonly EzLocalProfileStore? localProfileStore;
@@ -101,26 +104,39 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         public EzSkillProvider(
-            EzSkillStore store,
-            EzMetricProducerRegistry? registry = null,
+            EzChartSkillStore chartStore,
+            EzPlayerSkillStore playerStore,
+            EzMetricRevisionResolver? resolver = null,
             EzChartDanEstimator? chartDanEstimator = null,
             EzLocalProfileStore? localProfileStore = null,
             BeatmapManager? beatmapManager = null,
             EzAnalysisLiveCache? liveCache = null)
         {
-            Store = store;
+            ChartStore = chartStore;
+            PlayerStore = playerStore;
             this.chartDanEstimator = chartDanEstimator;
             this.localProfileStore = localProfileStore;
             this.beatmapManager = beatmapManager;
             this.liveCache = liveCache ?? new EzAnalysisLiveCache();
-            Registry = registry ?? EzAnalysisRevision.Registry;
+            Resolver = resolver ?? EzMetricRegistries.Current;
             PlayerSkills = new PlayerSkillMaintenance(this);
         }
 
-        public EzMetricProducerRegistry Registry { get; }
+        public EzMetricRevisionResolver Resolver { get; }
 
-        /// <summary>Ruleset skill wiring (systems + default radar). Null when no producer applies.</summary>
-        public EzSkillProfile? GetProfile(int rulesetOnlineId) => Registry.GetProfile(rulesetOnlineId);
+        public EzMetricProducerRegistry ChartRegistry => Resolver.ChartRegistry;
+
+        public EzMetricProducerRegistry PlayerRegistry => Resolver.PlayerRegistry;
+
+        /// <summary>
+        /// Chart-side skill wiring (systems + default radar) on <paramref name="rulesetOnlineId"/>. Null when the
+        /// chart catalog declares no vector for it.
+        /// </summary>
+        public EzSkillProfile? GetChartProfile(int rulesetOnlineId)
+            => ChartRegistry.GetProfile(rulesetOnlineId);
+
+        /// <summary>Player-side skill wiring on <paramref name="rulesetOnlineId"/>.</summary>
+        public EzSkillProfile? GetPlayerProfile(int rulesetOnlineId) => PlayerRegistry.GetProfile(rulesetOnlineId);
 
         /// <summary>
         /// Generic beatmap skill read for any registered <paramref name="systemId"/>.
@@ -134,9 +150,9 @@ namespace osu.Game.EzOsuGame.Skills
                 return new Dictionary<string, double>(StringComparer.Ordinal);
 
             if (systemId == EzSkillSystems.BEATMAP_PPP)
-                return Store.GetBeatmapSkillsAtCurrentVersions(beatmapInfo, systemId);
+                return ChartStore.GetBeatmapSkillsAtCurrentVersions(beatmapInfo, systemId);
 
-            return Store.GetBeatmapSkills(beatmapInfo.Hash, systemId);
+            return ChartStore.GetBeatmapSkills(beatmapInfo.Hash, systemId);
         }
 
         /// <summary>
@@ -154,9 +170,9 @@ namespace osu.Game.EzOsuGame.Skills
                 return new Dictionary<string, double>(StringComparer.Ordinal);
 
             if (systemId == EzSkillSystems.PLAYER_PPP)
-                return Store.GetPlayerSkillsAtCurrentVersions(username, sliceKey, systemId, rulesetOnlineId);
+                return PlayerStore.GetPlayerSkillsAtCurrentVersions(username, sliceKey, systemId, rulesetOnlineId);
 
-            return Store.GetPlayerSkills(username, sliceKey, systemId);
+            return PlayerStore.GetPlayerSkills(username, sliceKey, systemId);
         }
 
         public (int AnalyzedPlays, bool Provisional, bool Stale) GetPlayerSystemSkillMeta(string username, int sliceKey, string systemId, int rulesetOnlineId = -1)
@@ -164,11 +180,11 @@ namespace osu.Game.EzOsuGame.Skills
             if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(systemId))
                 return (0, false, false);
 
-            var meta = Store.GetPlayerSystemSkillMeta(username, sliceKey, systemId, rulesetOnlineId: rulesetOnlineId);
+            var meta = PlayerStore.GetPlayerSystemSkillMeta(username, sliceKey, systemId, rulesetOnlineId: rulesetOnlineId);
             if (meta.AnalyzedPlays > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
                 return meta;
 
-            return Store.GetPlayerSystemSkillMeta(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, sliceKey, systemId, rulesetOnlineId: rulesetOnlineId);
+            return PlayerStore.GetPlayerSystemSkillMeta(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, sliceKey, systemId, rulesetOnlineId: rulesetOnlineId);
         }
 
         /// <summary>
@@ -181,12 +197,12 @@ namespace osu.Game.EzOsuGame.Skills
             if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(systemId))
                 return (new Dictionary<string, double>(StringComparer.Ordinal), (0, false, false));
 
-            var slice = Store.GetPlayerSystemSkillSlice(username, sliceKey, systemId, rulesetOnlineId: rulesetOnlineId);
+            var slice = PlayerStore.GetPlayerSystemSkillSlice(username, sliceKey, systemId, rulesetOnlineId: rulesetOnlineId);
 
             if (slice.AnalyzedPlays > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
                 return (slice.Values, (slice.AnalyzedPlays, slice.Provisional, slice.Stale));
 
-            var legacy = Store.GetPlayerSystemSkillSlice(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, sliceKey, systemId, rulesetOnlineId: rulesetOnlineId);
+            var legacy = PlayerStore.GetPlayerSystemSkillSlice(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, sliceKey, systemId, rulesetOnlineId: rulesetOnlineId);
 
             return (slice.Values, legacy.AnalyzedPlays > 0
                 ? (legacy.AnalyzedPlays, legacy.Provisional, legacy.Stale)
@@ -199,7 +215,7 @@ namespace osu.Game.EzOsuGame.Skills
                 return new Dictionary<string, double>(StringComparer.Ordinal);
 
             // Settled misses are excluded by the store, so a verdict never reaches consumers as an axis set.
-            return Store.GetBeatmapSkills(beatmapHash, EzSkillSystems.BEATMAP_MINA);
+            return ChartStore.GetBeatmapSkills(beatmapHash, EzSkillSystems.BEATMAP_MINA);
         }
 
         /// <summary>
@@ -231,7 +247,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// verdict is not an axis, so a caller asking "has MSD settled it unrateable?" must not infer it from
         /// a row that is not there.
         /// </summary>
-        private bool isSettledUnrateableMina(string beatmapHash) => Store.GetBeatmapSystemState(beatmapHash, EzSkillSystems.BEATMAP_MINA, EzAnalysisRevision.Msd) == EzMetricState.Unrateable;
+        private bool isSettledUnrateableMina(string beatmapHash) => ChartStore.GetBeatmapSystemState(beatmapHash, EzSkillSystems.BEATMAP_MINA, EzAnalysisRevision.Msd) == EzMetricState.Unrateable;
 
         /// <summary>
         /// Drop session-only values so the next read reflects a row written or cleared elsewhere.
@@ -284,7 +300,7 @@ namespace osu.Game.EzOsuGame.Skills
             string skillId = EzMinaSkillAxisExtensions.TryParse(axisId, out var axis)
                 ? axis.ToMsdSkillId()
                 : axisId;
-            return Store.TryGetBeatmapSkill(beatmapHash, skillId, out value);
+            return ChartStore.TryGetBeatmapSkill(beatmapHash, skillId, out value);
         }
 
         public IReadOnlyDictionary<string, double> GetPlayerSsr(string username, int keyCount) => GetPlayerSsrSnapshot(username, keyCount).Values;
@@ -314,11 +330,11 @@ namespace osu.Game.EzOsuGame.Skills
 
         private EzPlayerRatingSnapshot loadPlayerSsrSnapshot(string username, int keyCount)
         {
-            var snapshot = Store.GetPlayerSsrSnapshot(username, keyCount);
+            var snapshot = PlayerStore.GetPlayerSsrSnapshot(username, keyCount);
             if (snapshot.Values.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
                 return snapshot;
 
-            return Store.GetPlayerSsrSnapshot(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount);
+            return PlayerStore.GetPlayerSsrSnapshot(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount);
         }
 
         /// <summary>Drop the SSR snapshot memo (after a recompute / write).</summary>
@@ -346,7 +362,7 @@ namespace osu.Game.EzOsuGame.Skills
             /// Players whose stored rows are flagged as trailing the SQLite slice. The startup reconcile reads this to
             /// decide whose skills to re-derive, and it is the manual compute's default scope.
             /// </summary>
-            public IReadOnlyList<string> StaleUsernames => provider.Store.GetStalePlayerSkillUsernames();
+            public IReadOnlyList<string> StaleUsernames => provider.PlayerStore.GetStalePlayerSkillUsernames();
 
             /// <summary>
             /// Set or clear the stale flag for one player without changing any value. Setting it happens when a
@@ -359,7 +375,7 @@ namespace osu.Game.EzOsuGame.Skills
                 if (string.IsNullOrWhiteSpace(username))
                     return 0;
 
-                int changed = provider.Store.SetPlayerSkillStale(username, stale);
+                int changed = provider.PlayerStore.SetPlayerSkillStale(username, stale);
 
                 provider.InvalidatePlayerSsrSnapshot();
 
@@ -377,7 +393,7 @@ namespace osu.Game.EzOsuGame.Skills
                 if (string.IsNullOrWhiteSpace(username))
                     return 0;
 
-                int removed = provider.Store.DeletePlayerSkillData(username);
+                int removed = provider.PlayerStore.DeletePlayerSkillData(username);
 
                 provider.InvalidatePlayerSsrSnapshot();
                 provider.InvalidateDanDisplay();
@@ -388,11 +404,11 @@ namespace osu.Game.EzOsuGame.Skills
 
         public IReadOnlyList<EzPatternRating> GetPlayerPatternRatings(string username, int keyCount)
         {
-            var ratings = Store.GetPlayerPatternRatings(username, keyCount);
+            var ratings = PlayerStore.GetPlayerPatternRatings(username, keyCount);
             if (ratings.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
                 return ratings;
 
-            return Store.GetPlayerPatternRatings(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount);
+            return PlayerStore.GetPlayerPatternRatings(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount);
         }
 
         /// <summary>Hub <c>skillModeEntries</c> for LocalProfile Track / Skills HUD.</summary>
@@ -405,30 +421,30 @@ namespace osu.Game.EzOsuGame.Skills
 
         public IReadOnlyList<int> GetPlayerSsrKeyCounts(string username)
         {
-            var keys = Store.GetPlayerSsrKeyCounts(username);
+            var keys = PlayerStore.GetPlayerSsrKeyCounts(username);
             if (keys.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
                 return keys;
 
-            return Store.GetPlayerSsrKeyCounts(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME);
+            return PlayerStore.GetPlayerSsrKeyCounts(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME);
         }
 
-        public IReadOnlyList<EzPlayerSkillHistoryPoint> GetPlayerSkillHistory(string username, int keyCount, string skillId, int maxPoints = 64)
+        public IReadOnlyList<EzPlayerSkillHistorySample> GetPlayerSkillHistory(string username, int keyCount, string skillId, int maxPoints = 64)
         {
-            var history = Store.GetPlayerSkillHistory(username, keyCount, skillId, maxPoints);
+            var history = PlayerStore.GetPlayerSkillHistory(username, keyCount, skillId, maxPoints);
             if (history.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
                 return history;
 
-            return Store.GetPlayerSkillHistory(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount, skillId, maxPoints);
+            return PlayerStore.GetPlayerSkillHistory(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount, skillId, maxPoints);
         }
 
-        public EzDanEstimate? GetDan(string username, int keyCount, string side)
+        public EzPlayerDanEstimateRow? GetDan(string username, int keyCount, string side)
         {
             string resolvedUser = resolveSkillsUsername(username);
-            var estimate = Store.GetDanEstimate(resolvedUser, keyCount, side);
+            var estimate = PlayerStore.GetDanEstimate(resolvedUser, keyCount, side);
             if (estimate != null || string.Equals(resolvedUser, username, StringComparison.Ordinal))
                 return estimate;
 
-            return Store.GetDanEstimate(username, keyCount, side);
+            return PlayerStore.GetDanEstimate(username, keyCount, side);
         }
 
         /// <summary>
@@ -449,8 +465,8 @@ namespace osu.Game.EzOsuGame.Skills
             }
 
             var estimate = GetDan(username, keyCount, side);
-            var display = estimate != null
-                ? (estimate.Label, estimate.RawDan)
+            var display = estimate is { } row
+                ? (row.Label, row.RawDan)
                 : (string.Empty, -1d);
 
             storeBounded(danDisplayMemo, key, new DanDisplayMemo(display.Item1, display.Item2, Stopwatch.GetTimestamp()));
@@ -487,12 +503,12 @@ namespace osu.Game.EzOsuGame.Skills
             if (danSkillsetSessionCache.TryGetValue(key, out var memoised))
                 return memoised;
 
-            if (Store.HasDanSkillsetCache(resolvedUser, keyCount, side))
+            if (PlayerStore.HasDanSkillsetCache(resolvedUser, keyCount, side))
                 return memoise(danSkillsetsFromCache(resolvedUser, keyCount, side));
 
             if (!EzLocalProfileConstants.IsGuestUsername(username)
                 && !string.Equals(resolvedUser, username, StringComparison.Ordinal)
-                && Store.HasDanSkillsetCache(username, keyCount, side))
+                && PlayerStore.HasDanSkillsetCache(username, keyCount, side))
             {
                 return memoise(danSkillsetsFromCache(username, keyCount, side));
             }
@@ -531,14 +547,14 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
             string resolvedUser = resolveSkillsUsername(username);
-            Store.ClearDanSkillsetValues(resolvedUser);
-            Store.ClearDanEstimates(resolvedUser);
+            PlayerStore.ClearDanSkillsetValues(resolvedUser);
+            PlayerStore.ClearDanEstimates(resolvedUser);
             InvalidateDanSkillsets();
 
             if (!string.Equals(resolvedUser, username, StringComparison.Ordinal))
             {
-                Store.ClearDanSkillsetValues(username);
-                Store.ClearDanEstimates(username);
+                PlayerStore.ClearDanSkillsetValues(username);
+                PlayerStore.ClearDanEstimates(username);
             }
 
             var allClears = GetDanClears(resolvedUser, algorithmVersion: EzDanAlgorithm.VERSION);
@@ -573,7 +589,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                     if (verdicts.Count > 0)
                     {
-                        Store.WriteDanSkillsetVerdicts(resolvedUser, keyCount, sideId, verdicts);
+                        PlayerStore.WriteDanSkillsetVerdicts(resolvedUser, keyCount, sideId, verdicts);
                         writeSideHeadline(resolvedUser, keyCount, side, clears, verdicts);
                     }
 
@@ -610,20 +626,20 @@ namespace osu.Game.EzOsuGame.Skills
 
             var (_, _, have) = EzDanClearWindow.Select(clears);
 
-            Store.WriteDanEstimate(new EzDanEstimate
-            {
-                Username = username,
-                KeyCount = keyCount,
-                Side = side.ToId(),
-                RawDan = headline.Value.RawDan,
-                Label = headline.Value.Label,
-                Clears = clears.Count,
-                BeyondTable = headline.Value.BeyondTable,
-                ClearWindowHave = (int)Math.Round(have),
-                ClearWindowNeed = EzDanAlgorithm.CLEAR_WINDOW,
-                AlgorithmVersion = EzDanAlgorithm.VERSION,
-                ComputedAt = DateTimeOffset.UtcNow,
-            });
+            PlayerStore.WriteDanEstimate(new EzPlayerDanEstimateRow(
+                username,
+                keyCount,
+                side.ToId(),
+                headline.Value.RawDan,
+                headline.Value.Label,
+                clears.Count,
+                headline.Value.BeyondTable,
+                string.Empty,
+                -1,
+                (int)Math.Round(have),
+                EzDanAlgorithm.CLEAR_WINDOW,
+                EzDanAlgorithm.VERSION,
+                DateTimeOffset.UtcNow));
         }
 
         private static readonly int[] tracked_skillset_key_counts = { 4, 5, 6, 7, 8, 9 };
@@ -651,7 +667,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         private IReadOnlyDictionary<string, EzDanSkillsetVerdict> danSkillsetsFromCache(string username, int keyCount, string side)
         {
-            var rows = Store.GetDanSkillsetValues(username, keyCount, side);
+            var rows = PlayerStore.GetDanSkillsetValues(username, keyCount, side);
             var result = new Dictionary<string, EzDanSkillsetVerdict>(StringComparer.Ordinal);
 
             foreach (var row in rows)
@@ -678,7 +694,7 @@ namespace osu.Game.EzOsuGame.Skills
             var playSsr = EzDanPlayRatingIndex.FromAxisPlays(GetAxisPlays(username, keyCount, algorithmVersion: EzMinaSkillAlgorithm.VERSION));
             IReadOnlyDictionary<string, EzChartSkillInfo> chartByHash = allowComputeChart
                 ? ensureChartSkillInfoForHashes(hashes)
-                : Store.GetChartSkillInfoForHashes(hashes);
+                : ChartStore.GetChartSkillInfoForHashes(hashes);
 
             return EzDanSkillsetBuckets.ComputeFromClears(
                 keyCount,
@@ -694,7 +710,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// </summary>
         private Dictionary<string, EzChartSkillInfo> ensureChartSkillInfoForHashes(IReadOnlyList<string> hashes)
         {
-            var chartByHash = new Dictionary<string, EzChartSkillInfo>(Store.GetChartSkillInfoForHashes(hashes), StringComparer.Ordinal);
+            var chartByHash = new Dictionary<string, EzChartSkillInfo>(ChartStore.GetChartSkillInfoForHashes(hashes), StringComparer.Ordinal);
 
             foreach (string hash in hashes)
             {
@@ -826,7 +842,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             EzPersistedChartDan? existing = null;
 
-            if (Store.TryGetChartDan(hash, out var fromRealm) && fromRealm != null)
+            if (ChartStore.TryGetChartDan(hash, out var fromRealm) && fromRealm != null)
                 existing = fromRealm;
             else if (chartDanSessionCache.TryGetValue(hash, out var fromSession))
                 existing = fromSession;
@@ -904,7 +920,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             EzChartSkillInfo? chartInfo = null;
 
-            if (Store.TryGetChartSkillInfo(beatmapInfo.Hash, out var storedCsi) && storedCsi is { IsUnavailable: false })
+            if (ChartStore.TryGetChartSkillInfo(beatmapInfo.Hash, out var storedCsi) && storedCsi is { IsUnavailable: false })
                 chartInfo = storedCsi;
 
             return EzPersistedChartDan.TryComputeFromStored(
@@ -934,7 +950,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (beatmapInfo.Ruleset.OnlineID != 3)
                 return false;
 
-            if (!Store.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) || stored == null || stored.IsUnavailable)
+            if (!ChartStore.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) || stored == null || stored.IsUnavailable)
                 return false;
 
             info = stored;
@@ -964,7 +980,7 @@ namespace osu.Game.EzOsuGame.Skills
                 return liveInfo;
             }
 
-            if (Store.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored != null)
+            if (ChartStore.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored != null)
             {
                 if (!stored.IsUnavailable)
                     return stored;
@@ -1037,11 +1053,11 @@ namespace osu.Game.EzOsuGame.Skills
             // here. A complete row in that state was derived from the stub axis by an earlier pass and is replaced.
             if (isSettledUnrateableMina(beatmapInfo.Hash))
             {
-                if (!Store.TryGetChartSkillInfo(beatmapInfo.Hash, out var settled) || settled == null || !settled.IsUnavailable)
+                if (!ChartStore.TryGetChartSkillInfo(beatmapInfo.Hash, out var settled) || settled == null || !settled.IsUnavailable)
                 {
                     Logger.Log($"[EzSkills] CSI not derived for {beatmapInfo}: MSD settled as unrateable; settling as unavailable.",
                         Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                    Store.WriteChartSkillInfoUnavailable(beatmapInfo.Hash, beatmapInfo.ID);
+                    ChartStore.WriteChartSkillInfoUnavailable(beatmapInfo.Hash, beatmapInfo.ID);
                     InvalidateLiveMetrics(beatmapInfo.Hash);
                 }
 
@@ -1049,7 +1065,7 @@ namespace osu.Game.EzOsuGame.Skills
             }
 
             // Complete row, or a stub a previous backfill already settled.
-            if (Store.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored != null)
+            if (ChartStore.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored != null)
             {
                 InvalidateLiveMetrics(beatmapInfo.Hash);
                 return true;
@@ -1071,7 +1087,7 @@ namespace osu.Game.EzOsuGame.Skills
                 // produces a new hash, and 「完全重算」 clears the stub, so this is recoverable.
                 Logger.Log($"[EzSkills] CSI backfill cannot load {beatmapInfo} ({e.Message}); settling as unavailable.",
                     Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                Store.WriteChartSkillInfoUnavailable(beatmapInfo.Hash, beatmapInfo.ID);
+                ChartStore.WriteChartSkillInfoUnavailable(beatmapInfo.Hash, beatmapInfo.ID);
                 InvalidateLiveMetrics(beatmapInfo.Hash);
                 return true;
             }
@@ -1081,10 +1097,10 @@ namespace osu.Game.EzOsuGame.Skills
                 var input = EzChartSkillInfoComputer.FromPlayable(map);
                 // Motion / pattern shares are rate-invariant; always measure at 1.0x like hub.
                 var axes = EzChartSkillInfoComputer.ComputeAxes(input, out var info);
-                Store.UpsertChartSkillInfo(beatmapInfo.Hash, info, beatmapInfo.ID);
+                ChartStore.UpsertChartSkillInfo(beatmapInfo.Hash, info, beatmapInfo.ID);
                 // The typed row carries the tags; the axis table is what a reader draws, so both are written here,
                 // by the one pass that measured them.
-                Store.WriteBeatmapSystemSkills(
+                ChartStore.WriteBeatmapSystemSkills(
                     beatmapInfo.Hash,
                     EzSkillSystems.BEATMAP_CSI,
                     axes,

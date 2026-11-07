@@ -44,17 +44,25 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private const string meta_content_version = "content_version";
 
         private readonly Storage storage;
-        private readonly Lock sync = new Lock();
-        private bool initialised;
-        private string dbPath = string.Empty;
+        private readonly Lock sync;
         private bool isDisposed;
 
         /// <summary>Legacy unattributed online rows are attributed to the pulling account once per session.</summary>
         private bool onlineContributionsAdopted;
 
+        private readonly EzLocalProfileDatabase database;
+
         public EzLocalProfileStore(Storage storage)
+            : this(new EzLocalProfileDatabase(storage))
         {
-            this.storage = storage;
+        }
+
+        public EzLocalProfileStore(EzLocalProfileDatabase database)
+        {
+            ArgumentNullException.ThrowIfNull(database);
+            this.database = database;
+            storage = null!;
+            sync = database.Sync;
         }
 
         public EzLocalProfileSnapshot LoadSnapshot()
@@ -1706,7 +1714,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                   $bpm, $key_count, $is_convert, $rate, $mod_acronyms_json);
                               """;
 
-            foreach ((string name, SqliteType type) in drillParameters)
+            foreach ((string name, SqliteType type) in drill_parameters)
                 cmd.Parameters.Add(name, type);
 
             cmd.Prepare();
@@ -1755,7 +1763,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         /// <summary>Names and SQLite types of the <c>drill_scores</c> insert; kept next to the SQL it has to match.</summary>
-        private static readonly (string Name, SqliteType Type)[] drillParameters =
+        private static readonly (string Name, SqliteType Type)[] drill_parameters =
         {
             ("$score_id", SqliteType.Text),
             ("$score_hash", SqliteType.Text),
@@ -2020,26 +2028,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
             SqliteConnection.ClearAllPools();
         }
 
-        private void ensureInitialised()
-        {
-            if (initialised)
-                return;
+        private void ensureInitialised() => database.EnsureInitialised();
 
-            dbPath = storage.GetFullPath(DATABASE_FILENAME, true);
+        private SqliteConnection openConnection() => database.Open();
 
-            using var connection = openConnection();
-            ensureSchema(connection);
-            initialised = true;
-        }
-
-        private SqliteConnection openConnection()
-        {
-            var connection = new SqliteConnection($"Data Source={dbPath};Cache=Shared;Mode=ReadWriteCreate");
-            connection.Open();
-            return connection;
-        }
-
-        private static void ensureSchema(SqliteConnection connection)
+        internal static void EnsureSchema(SqliteConnection connection)
         {
             using (var cmd = connection.CreateCommand())
             {

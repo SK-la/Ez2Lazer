@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// <summary>
         /// <see cref="Analysis.EzAnalysisRevision.ChartDan"/> at compute time - the composed dan
         /// algorithm version plus its upstream facets (CSI, MSD). Filtered as an equality test by
-        /// <see cref="EzSkillStore.TryGetChartDan"/>, so any upstream bump reads old rows as a miss.
+        /// <see cref="EzChartSkillStore.TryGetChartDan"/>, so any upstream bump reads old rows as a miss.
         /// </summary>
         public int AlgorithmVersion { get; set; }
 

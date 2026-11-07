@@ -18,8 +18,8 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         public const int VERSION = 3;
 
         /// <summary>
-        /// Unavailable stub (<c>KeyCount = -1</c>). Never written by <see cref="EzSkillStore.UpsertChartSkillInfo"/>
-        /// (which rejects it) - only by the explicit <see cref="EzSkillStore.WriteChartSkillInfoUnavailable"/>
+        /// Unavailable stub (<c>KeyCount = -1</c>). Never written by <see cref="EzChartSkillStore.UpsertChartSkillInfo"/>
+        /// (which rejects it) - only by the explicit <see cref="EzChartSkillStore.WriteChartSkillInfoUnavailable"/>
         /// settle path, and only from the BDSP backfill, so a transient hot-path miss cannot retire a chart.
         /// Legacy rows with a negative <see cref="KeyCount"/> read back as the same stub.
         /// </summary>

@@ -31,37 +31,37 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             var estimator = new EzChartDanEstimator(lookup);
 
             Assert.That(estimator.TryEstimate(maniaBeatmap(), Array.Empty<Mod>()), Is.Null);
-            Assert.That(lookup.computeCalls, Is.Zero);
+            Assert.That(lookup.ComputeCalls, Is.Zero);
         }
 
         [Test]
         public void Read_path_uses_the_shared_analysis_when_present()
         {
-            var lookup = new FakeLookup { cached = analysis() };
+            var lookup = new FakeLookup { Cached = analysis() };
             var estimator = new EzChartDanEstimator(lookup);
 
             var verdict = estimator.TryEstimate(maniaBeatmap(), Array.Empty<Mod>());
 
             Assert.That(verdict, Is.Not.Null);
-            Assert.That(lookup.computeCalls, Is.Zero);
+            Assert.That(lookup.ComputeCalls, Is.Zero);
         }
 
         [Test]
         public void Batch_path_fills_the_store_and_reads_the_result_of_that_fill()
         {
-            var lookup = new FakeLookup { computeResult = analysis() };
+            var lookup = new FakeLookup { ComputeResult = analysis() };
             var estimator = new EzChartDanEstimator(lookup);
 
             var verdict = estimator.TryEstimateOrCompute(maniaBeatmap(), Array.Empty<Mod>());
 
             Assert.That(verdict, Is.Not.Null);
-            Assert.That(lookup.computeCalls, Is.EqualTo(1));
+            Assert.That(lookup.ComputeCalls, Is.EqualTo(1));
         }
 
         [Test]
         public void Verdict_is_derived_from_the_axis_table_of_the_analysis()
         {
-            var lookup = new FakeLookup { cached = analysis() };
+            var lookup = new FakeLookup { Cached = analysis() };
             var estimator = new EzChartDanEstimator(lookup);
             var beatmap = maniaBeatmap();
 
@@ -136,7 +136,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
             var table = new Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>
             {
-                [EzMetricProducers.MINA_CHART] = axes,
+                [EzChartMetricProducer.Mina.Id()] = axes,
             };
 
             // The pass resolves the sides once; the estimator is expected to read that, not derive its own.
@@ -149,17 +149,17 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
         private sealed class FakeLookup : IEzChartAnalysisLookup
         {
-            public EzAnalysisResult? cached;
-            public EzAnalysisResult? computeResult;
-            public int computeCalls;
+            public EzAnalysisResult? Cached;
+            public EzAnalysisResult? ComputeResult;
+            public int ComputeCalls;
 
-            public EzAnalysisResult? TryGet(BeatmapInfo beatmap, IReadOnlyList<Mod>? mods) => cached;
+            public EzAnalysisResult? TryGet(BeatmapInfo beatmap, IReadOnlyList<Mod>? mods) => Cached;
 
             public EzAnalysisResult? GetOrCompute(BeatmapInfo beatmap, RulesetInfo ruleset, IReadOnlyList<Mod>? mods)
             {
-                computeCalls++;
-                cached = computeResult;
-                return computeResult;
+                ComputeCalls++;
+                Cached = ComputeResult;
+                return ComputeResult;
             }
         }
     }

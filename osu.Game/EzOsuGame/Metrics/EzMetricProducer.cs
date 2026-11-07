@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using osu.Game.EzOsuGame.Skills;
 
 namespace osu.Game.EzOsuGame.Metrics
 {
@@ -45,7 +44,6 @@ namespace osu.Game.EzOsuGame.Metrics
 
         public EzMetricUnit Unit { get; }
 
-        /// <summary>Storage namespace actually used, falling back to the producer name.</summary>
         public string EffectiveSystemId => string.IsNullOrEmpty(SystemId) ? Id.Id : SystemId;
 
         /// <summary>Which slices the producer emits. False means the producer is unsliced.</summary>
@@ -57,9 +55,9 @@ namespace osu.Game.EzOsuGame.Metrics
 
         /// <summary>
         /// Axis family this producer belongs to, when its axes are meant to be compared against another
-        /// producer's. Null for scalar-only producers.
+        /// producer's. <see cref="EzMetricFamily.None"/> for scalar-only producers.
         /// </summary>
-        public string? AxisFamilyId { get; init; }
+        public EzMetricFamily Family { get; init; } = EzMetricFamily.None;
 
         /// <summary>Axis subsets this producer emits. Empty for a scalar-only producer.</summary>
         public IReadOnlyList<EzMetricAxisGroup> AxisGroups { get; init; } = Array.Empty<EzMetricAxisGroup>();
@@ -74,18 +72,8 @@ namespace osu.Game.EzOsuGame.Metrics
         public Func<int, int> RevisionProbe { get; init; } = static _ => 1;
 
         /// <summary>
-        /// Whether a value can be computed on demand without a stored row.
-        /// </summary>
-        /// <remarks>
-        /// Derived from the scope rather than declared per producer: a chart is a fixed input, so its vector can be
-        /// measured on the spot, while a player vector is a fold over the entire score archive and exists only as a
-        /// stored row written by the score analysis.
-        /// </remarks>
-        public bool SupportsLive => Id.Scope == EzSkillScope.Beatmap;
-
-        /// <summary>
-        /// Whether this producer is the default radar source for its scope on <paramref name="rulesetOnlineId"/>.
-        /// At most one producer per scope and ruleset may answer true.
+        /// Whether this producer is the default radar source for its side on rulesetOnlineId.
+        /// At most one producer per catalog and ruleset may answer true.
         /// </summary>
         public Func<int, bool> IsDefaultRadarFor { get; init; } = static _ => false;
 

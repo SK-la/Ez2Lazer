@@ -13,7 +13,7 @@ namespace osu.Game.EzOsuGame.Metrics
     /// <remarks>
     /// A variant exists so the same consumer can render any of the systems without knowing which ones
     /// exist. Adding a system means adding a row to <see cref="EzMetricVariantCatalog"/>; no consumer
-    /// changes. <see cref="AxisFamilyId"/> is what makes the chart and player spokes comparable, so a
+    /// changes. <see cref="Family"/> is what makes the chart and player spokes comparable, so a
     /// variant that pairs two different families must not be declared.
     /// </remarks>
     public sealed class EzMetricVariant
@@ -21,18 +21,17 @@ namespace osu.Game.EzOsuGame.Metrics
         public EzMetricVariant(
             string id,
             LocalisableString name,
-            string axisFamilyId,
+            EzMetricFamily family,
             EzMetricProducerId starProducer,
             EzMetricProducerId? performanceProducer,
             EzMetricProducerId? chartSkillProducer = null,
             EzMetricProducerId? playerSkillProducer = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(id);
-            ArgumentException.ThrowIfNullOrWhiteSpace(axisFamilyId);
 
             Id = id;
             Name = name;
-            AxisFamilyId = axisFamilyId;
+            Family = family;
             StarProducer = starProducer;
             PerformanceProducer = performanceProducer;
             ChartSkillProducer = chartSkillProducer;
@@ -43,7 +42,7 @@ namespace osu.Game.EzOsuGame.Metrics
 
         public LocalisableString Name { get; }
 
-        public string AxisFamilyId { get; }
+        public EzMetricFamily Family { get; }
 
         public EzMetricProducerId StarProducer { get; }
 
