@@ -27,6 +27,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public const string ALL_PLAYERS = "All";
 
         public const int OSU_RULESET_ID = 0;
+        public const int TAIKO_RULESET_ID = 1;
+        public const int CATCH_RULESET_ID = 2;
         public const int MANIA_RULESET_ID = 3;
 
         /// <summary>

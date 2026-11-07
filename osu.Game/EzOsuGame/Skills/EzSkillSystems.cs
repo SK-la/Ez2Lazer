@@ -21,6 +21,15 @@ namespace osu.Game.EzOsuGame.Skills
 
         public const string DAN = "dan";
 
+        /// <summary>PP+ chart axes.</summary>
+        public const string BEATMAP_PPP = "beatmap_ppp";
+
+        /// <summary>PP+ player axes.</summary>
+        public const string PLAYER_PPP = "player_ppp";
+
+        /// <summary>Key count sentinel for producers that are not sliced by key mode.</summary>
+        public const int UNSLICED_KEY = 0;
+
         /// <summary>Persisted beside MSD axes when computed (not a Mina axis).</summary>
         public const string HOLD_RATIO = "__hold_ratio";
 
