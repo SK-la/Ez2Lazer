@@ -96,7 +96,7 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// Computes baseline NoMod xxy SR for persisting to <see cref="BeatmapInfo.SunnyStarRating"/>.
+        /// Computes baseline NoMod xxy SR for persisting to the Sunny star slot.
         /// Returns -1 when unsupported or failed, 0 for empty beatmaps.
         /// </summary>
         public static double ComputeBaselineSSRForRealm(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
@@ -120,7 +120,8 @@ namespace osu.Game.EzOsuGame.Analysis
         /// The baseline performance points implied by <paramref name="starRating"/>, for persisting to a per-system
         /// pp column. Returns -1 when the ruleset cannot express it or the rating is unset.
         /// </summary>
-        public static double ComputeBaselinePerformancePointsForRating(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo, double starRating, CancellationToken cancellationToken = default)
+        public static double ComputeBaselinePerformancePointsForRating(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo, double starRating,
+                                                                       CancellationToken cancellationToken = default)
         {
             if (!double.IsFinite(starRating) || starRating <= 0)
                 return -1;
@@ -137,10 +138,11 @@ namespace osu.Game.EzOsuGame.Analysis
 
         /// <summary>
         /// Computes the baseline performance points implied by the stored Sunny star rating, for persisting to
-        /// <see cref="BeatmapInfo.SunnyPerformancePoints"/>. Returns -1 when the ruleset cannot express it.
+        /// Sunny pp slot. Returns -1 when the ruleset cannot express it.
         /// </summary>
-        public static double ComputeBaselineSunnyPerformancePointsForRealm(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
-            => ComputeBaselinePerformancePointsForRating(beatmapManager, beatmapInfo, beatmapInfo.SunnyStarRating, cancellationToken);
+        public static double ComputeBaselineSunnyPerformancePointsForRealm(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo,
+                                                                           CancellationToken cancellationToken = default)
+            => ComputeBaselinePerformancePointsForRating(beatmapManager, beatmapInfo, beatmapInfo.EzRatingData.SunnySR, cancellationToken);
 
         public static bool TryComputeXxySrAndPp(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
                                                 out double? xxySr, out double? pp)
@@ -159,7 +161,8 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <summary>
         /// 主 SQLite 预热/回填专用：仅计算 kps 与 mania 列统计（NoMod），不写 xxy/PP（由 Realm 维护）。
         /// </summary>
-        public static EzAnalysisResult ComputePersistedSqliteSlice(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
+        public static EzAnalysisResult ComputePersistedSqliteSlice(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup,
+                                                                   CancellationToken cancellationToken = default)
             => ComputePersistedSqliteSlice(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo), lookup, cancellationToken);
 
         public static EzAnalysisResult ComputePersistedSqliteSlice(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
@@ -327,11 +330,12 @@ namespace osu.Game.EzOsuGame.Analysis
         /// The ruleset's perfect-play performance for an arbitrary star rating, via the ruleset analysis provider.
         /// </summary>
         private static double calculatePerformanceAtRating(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, double starRating,
-                                                           CancellationToken cancellationToken) => EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset,
-            new EzAnalysisRequest(analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), EzAnalysisScope.PerformancePoints, starRating),
-            EzAnalysisFields.PERFORMANCE_POINTS, cancellationToken, out double pp)
-            ? pp
-            : -1;
+                                                           CancellationToken cancellationToken)
+            => EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset,
+                new EzAnalysisRequest(analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), EzAnalysisScope.PerformancePoints, starRating),
+                EzAnalysisFields.PERFORMANCE_POINTS, cancellationToken, out double pp)
+                ? pp
+                : -1;
 
         /// <summary>
         /// Official difficulty and performance for the current mods. Both come from one difficulty calculation,
@@ -669,8 +673,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
             public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods) => playable ??= working.GetPlayableBeatmap(ruleset, mods);
 
-            public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken)
-                => playable ??= working.GetPlayableBeatmap(ruleset, mods, cancellationToken);
+            public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken) =>
+                playable ??= working.GetPlayableBeatmap(ruleset, mods, cancellationToken);
 
             IBeatmapInfo IWorkingBeatmap.BeatmapInfo => working.BeatmapInfo;
             bool IWorkingBeatmap.BeatmapLoaded => working.BeatmapLoaded;

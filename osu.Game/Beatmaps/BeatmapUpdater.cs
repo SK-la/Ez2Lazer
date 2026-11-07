@@ -10,6 +10,7 @@ using osu.Framework.Platform;
 using osu.Framework.Threading;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.Online.API;
 using osu.Game.Rulesets.Objects.Types;
 
@@ -68,15 +69,16 @@ namespace osu.Game.Beatmaps
                     var ruleset = working.BeatmapInfo.Ruleset.CreateInstance();
                     var calculator = ruleset.CreateDifficultyCalculator(working);
 
-                    beatmap.StarRating = calculator.Calculate().StarRating;
+                    EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Official, calculator.Calculate().StarRating);
                     beatmap.UpdateStatisticsFromBeatmap(working.Beatmap);
 
                     var tagSummary = EzBeatmapTagParser.Parse(working);
                     beatmap.HasVideo = tagSummary.HasVideo;
                     beatmap.HasStoryboard = tagSummary.HasStoryboard;
 
-                    updateSunnyStarRating(beatmap);
-                    updatePerformancePoints(beatmap, working);
+                    // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+                    // updateSunnyStarRating(beatmap);
+                    // updatePerformancePoints(beatmap, working);
                 }
 
                 // And invalidate again afterwards as re-fetching the most up-to-date database metadata will be required.
@@ -107,7 +109,7 @@ namespace osu.Game.Beatmaps
             if (beatmapManager == null)
                 return;
 
-            beatmap.SunnyStarRating = EzAnalysisComputation.ComputeBaselineSSRForRealm(beatmapManager, beatmap);
+            EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Sunny, EzAnalysisComputation.ComputeBaselineSSRForRealm(beatmapManager, beatmap));
         }
 
         private void updatePerformancePoints(BeatmapInfo beatmap, WorkingBeatmap working)
@@ -117,9 +119,11 @@ namespace osu.Game.Beatmaps
 
             var lookup = new EzAnalysisLookupCache(beatmap, beatmap.Ruleset, mods: null);
 
-            beatmap.PerformancePoints = EzAnalysisComputation.TryComputePerformancePoints(beatmapManager, lookup, CancellationToken.None, out double performancePoints)
+            double points = EzAnalysisComputation.TryComputePerformancePoints(beatmapManager, lookup, CancellationToken.None, out double performancePoints)
                 ? performancePoints
                 : -1;
+
+            EzRatingWriter.WritePP(beatmap, EzRatingSystem.Official, points);
         }
 
         #region Implementation of IDisposable

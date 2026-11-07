@@ -17,7 +17,7 @@ namespace osu.Game.Tests.EzOsuGame.UserInterface
         [Test]
         public void CardBadgeIcon_uses_moon_for_mania_with_xxy_support()
         {
-            var beatmap = createManiaBeatmap(SunnyStarRating: 5.2);
+            var beatmap = createManiaBeatmap(SunnySR: 5.2);
 
             Assert.That(EzQuickRotationCardDifficultyDisplay.ResolveBadgeIcon(beatmap), Is.EqualTo(FontAwesome.Solid.Moon));
         }
@@ -33,7 +33,7 @@ namespace osu.Game.Tests.EzOsuGame.UserInterface
         [Test]
         public void CardBadgeRating_prefers_persisted_xxy_for_mania()
         {
-            var beatmap = createManiaBeatmap(starRating: 3.1, SunnyStarRating: 5.8);
+            var beatmap = createManiaBeatmap(starRating: 3.1, SunnySR: 5.8);
 
             Assert.That(EzQuickRotationCardDifficultyDisplay.ResolveBadgeRating(beatmap), Is.EqualTo(5.8));
         }
@@ -41,7 +41,7 @@ namespace osu.Game.Tests.EzOsuGame.UserInterface
         [Test]
         public void CardBadgeRating_falls_back_to_official_star_when_xxy_missing()
         {
-            var beatmap = createManiaBeatmap(starRating: 3.1, SunnyStarRating: -1);
+            var beatmap = createManiaBeatmap(starRating: 3.1, SunnySR: -1);
 
             Assert.That(EzQuickRotationCardDifficultyDisplay.ResolveBadgeRating(beatmap), Is.EqualTo(3.1));
         }
@@ -55,21 +55,24 @@ namespace osu.Game.Tests.EzOsuGame.UserInterface
         }
 
         [Test]
-        public void ShouldShowXxyDisplay_false_for_osu()
+        public void ShouldShowXxyDisplay_true_for_osu_because_its_system_has_a_skill_vector()
         {
+            // The pill is no longer gated on an analysis provider: osu reads out under PP+, which has a chart vector.
             var beatmap = new BeatmapInfo { Ruleset = new OsuRuleset().RulesetInfo };
 
-            Assert.That(EzDualDifficultyDisplay.ShouldShowXxyDisplay(beatmap), Is.False);
+            Assert.That(EzDualDifficultyDisplay.ShouldShowXxyDisplay(beatmap), Is.True);
         }
 
-        private static BeatmapInfo createManiaBeatmap(double starRating = 0, double SunnyStarRating = 4.2)
+        private static BeatmapInfo createManiaBeatmap(double starRating = 0, double SunnySR = 4.2)
         {
-            return new BeatmapInfo
+            var beatmap = new BeatmapInfo
             {
                 Ruleset = new ManiaRuleset().RulesetInfo,
                 StarRating = starRating,
-                SunnyStarRating = SunnyStarRating,
             };
+
+            beatmap.EzRatingData.SunnySR = SunnySR;
+            return beatmap;
         }
     }
 }

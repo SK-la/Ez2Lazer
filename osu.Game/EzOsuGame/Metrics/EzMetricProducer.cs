@@ -77,6 +77,12 @@ namespace osu.Game.EzOsuGame.Metrics
         /// </summary>
         public Func<int, bool> IsDefaultRadarFor { get; init; } = static _ => false;
 
+        /// <summary>Analysis system whose flattened rating this producer writes, or <see cref="EzRatingSystem.None"/>.</summary>
+        public EzRatingSystem RatingSystem { get; init; } = EzRatingSystem.None;
+
+        /// <summary>Which half of <see cref="RatingSystem"/> this producer writes.</summary>
+        public EzRatingField RatingField { get; init; } = EzRatingField.None;
+
         /// <summary>Whether this producer contributes a scalar tier (star, performance, tags or dan) rather than a vector.</summary>
         public bool IsScalar => Tier is EzMetricTier.Star or EzMetricTier.Performance or EzMetricTier.Tags or EzMetricTier.Dan;
 

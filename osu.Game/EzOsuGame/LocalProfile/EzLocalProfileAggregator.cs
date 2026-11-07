@@ -722,7 +722,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         /// <summary>
         /// Resolve xxy SR for bucket counting. With beatmap-affecting mods, prefer playable analysis
-        /// (not Realm NoMod <see cref="BeatmapInfo.SunnyStarRating"/>).
+        /// (not the stored NoMod Sunny rating).
         /// </summary>
         private static double resolveSunnyStarRating(
             BeatmapInfo beatmap,
@@ -739,8 +739,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 return resolvedStarRating >= 0 ? resolvedStarRating : -1;
             }
 
-            if (beatmap.SunnyStarRating >= 0)
-                return beatmap.SunnyStarRating;
+            if (beatmap.EzRatingData.SunnySR >= 0)
+                return beatmap.EzRatingData.SunnySR;
 
             if (hasKps && analysis.ManiaSummary?.XxySr is double storedXxy && storedXxy >= 0)
                 return storedXxy;

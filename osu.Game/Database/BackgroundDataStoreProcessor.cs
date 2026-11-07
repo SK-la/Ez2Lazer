@@ -203,10 +203,15 @@ namespace osu.Game.Database
                 {
                     try
                     {
+                        // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+                        /*
                         if (forceAll)
                             clearEzRealmMetadata(scope);
 
                         runEzRealmMetadataBackfill(scope);
+                        */
+                        _ = forceAll;
+                        Logger.Log("Ez Realm metadata backfill skipped: Realm v12 writes are disabled for the realtime verification period.");
                     }
                     catch (Exception e)
                     {
@@ -515,11 +520,13 @@ namespace osu.Game.Database
 
                     clearOutdatedStarRatings();
 
+                    // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
                     // [Ez] 独立计算
-                    clearOutdatedManiaBeatmapSSR();
-                    clearOutdatedManiaBeatmapMSD();
+                    // clearOutdatedManiaBeatmapSSR();
+                    // clearOutdatedManiaBeatmapMSD();
 
                     // Run Ez Realm backfill before official star population so it is not blocked for long periods.
+                    /*
                     if (tryBeginEzRealmMetadataBackfill())
                     {
                         try
@@ -538,9 +545,10 @@ namespace osu.Game.Database
                         deferEzRealmMetadataRebuild(EzRealmMetadataScope.All, forceAll: false);
                         Logger.Log("Startup Ez Realm metadata backfill deferred: another backfill is running; it will run again when that one finishes.");
                     }
+                    */
 
                     populateMissingStarRatings();
-                    populateMissingMultiSystemBaselines();
+                    // populateMissingMultiSystemBaselines();
                     processOnlineBeatmapSetsWithNoUpdate();
                     // Note that the previous method will also update these on a fresh run.
                     processBeatmapsWithMissingObjectCounts();
@@ -617,7 +625,8 @@ namespace osu.Game.Database
                             if (b.Ruleset.ShortName == ruleset.ShortName)
                             {
                                 b.StarRating = -1;
-                                b.PerformancePoints = -1;
+                                // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+                                // b.PerformancePoints = -1;
                                 countReset++;
                             }
                         }
@@ -653,7 +662,8 @@ namespace osu.Game.Database
                         {
                             if (b.Ruleset.ShortName == ruleset.ShortName)
                             {
-                                b.SunnyStarRating = -1;
+                                // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+                                // b.SunnyStarRating = -1;
                                 countReset++;
                             }
                         }
@@ -669,7 +679,8 @@ namespace osu.Game.Database
                     if (ruleset.OnlineID == 3)
                     {
                         Logger.Log($"Resetting mania ChartDan for xxy version {ruleset.LastAppliedSSRVersion} -> {currentVersion}");
-                        skillStore.ClearChartDan();
+                        // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+                        // skillStore.ClearChartDan();
                     }
 
                     Logger.Log($"Finished resetting {countReset} beatmaps for xxy {ruleset.Name}");
@@ -706,7 +717,8 @@ namespace osu.Game.Database
             // with EzAnalysisRevision.ChartSkillInfo/ChartDan, which fold EzMinaSkillAlgorithm.VERSION -
             // so they already read as stale and the ordinary incremental passes recompute them. Bulk
             // clearing them would erase the "stale" evidence the status UI reports.
-            skillStore.ClearBeatmapMsd();
+            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+            // skillStore.ClearBeatmapMsd();
 
             realmAccess.Write(r =>
             {
@@ -857,11 +869,12 @@ namespace osu.Game.Database
                             continue;
                         }
 
-                        if (scope.HasFlag(EzRealmMetadataScope.Pp))
-                            beatmap.PerformancePoints = -1;
-
-                        if (scope.HasFlag(EzRealmMetadataScope.Xxy) && EzSunnyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
-                            beatmap.SunnyStarRating = -1;
+                        // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+                        // if (scope.HasFlag(EzRealmMetadataScope.Pp))
+                        //     beatmap.PerformancePoints = -1;
+                        //
+                        // if (scope.HasFlag(EzRealmMetadataScope.Xxy) && EzSunnyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
+                        //     beatmap.SunnyStarRating = -1;
 
                         totalProcessed++;
                     }
@@ -944,7 +957,7 @@ namespace osu.Game.Database
                     realmAccess.Write(r =>
                     {
                         if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
-                            liveBeatmapInfo.StarRating = starRating;
+                            EzRatingWriter.WriteSR(liveBeatmapInfo, EzRatingSystem.Official, starRating);
                     });
                     ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
                     ++processedCount;
@@ -976,7 +989,7 @@ namespace osu.Game.Database
                     if (b.BeatmapSet == null)
                         continue;
 
-                    if (b.SunnyStarRating >= 0)
+                    if (b.EzRatingData.SunnySR >= 0)
                         continue;
 
                     if (!EzSunnyStarRatingSupport.SupportsRuleset(b.Ruleset))
@@ -1017,11 +1030,14 @@ namespace osu.Game.Database
                 {
                     double ssr = EzAnalysisComputation.ComputeBaselineSSRForRealm(beatmapManager, beatmap, CancellationToken.None);
 
+                    // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+                    /*
                     realmAccess.Write(r =>
                     {
                         if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
-                            liveBeatmapInfo.SunnyStarRating = ssr;
+                            EzRatingWriter.WriteSR(liveBeatmapInfo, EzRatingSystem.Sunny, ssr);
                     });
+                    */
                     ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
                     ++processedCount;
                 }
@@ -1142,8 +1158,11 @@ namespace osu.Game.Database
                 {
                     try
                     {
-                        if (ezBeatmapMinaComputer.ComputeAndStore(beatmap) != null)
+                        if (ezBeatmapMinaComputer.ComputeAndStore(beatmap) is { } msdAxes)
+                        {
                             msdWritten = true;
+                            writeMinaRating(id, msdAxes);
+                        }
                         else if (skillStore.GetBeatmapSystemState(hash, EzSkillSystems.BEATMAP_MINA, ezBeatmapMinaComputer.Revision) != EzMetricState.Unrateable)
                             stageFailed = true;
                     }
@@ -1269,6 +1288,27 @@ namespace osu.Game.Database
         }
 
         /// <summary>
+        /// Mirrors the MSD overall onto the chart's Mina star rating.
+        /// </summary>
+        /// <remarks>
+        /// The engine's own scale is converted here, at the write, so every reader of the stored rating sees a star.
+        /// The <c>beatmap_msd</c> row keeps the engine value, which the radar and the dan chain read.
+        /// </remarks>
+        private void writeMinaRating(Guid id, IReadOnlyDictionary<string, double> axes)
+        {
+            if (!axes.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double overall) || overall <= 0)
+                return;
+
+            double star = EzMinaRatingScale.ToStarRating(overall);
+
+            realmAccess.Write(r =>
+            {
+                if (r.Find<BeatmapInfo>(id) is BeatmapInfo live)
+                    EzRatingWriter.WriteSR(live, EzRatingSystem.Mina, star);
+            });
+        }
+
+        /// <summary>
         /// Writes the PP+ star and pp columns from the vector that was just computed, so the fill does not depend on
         /// a later pass re-reading the value table.
         /// </summary>
@@ -1277,6 +1317,8 @@ namespace osu.Game.Database
             if (!skills.TryGetValue(EzPPPSkillCatalog.ChartSkillId(EzPPPSkillCatalog.STAR_RATING), out double star) || star <= 0)
                 return;
 
+            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+            /*
             double pp = computePppPerformance(beatmap, skills);
 
             realmAccess.Write(r =>
@@ -1284,11 +1326,12 @@ namespace osu.Game.Database
                 if (r.Find<BeatmapInfo>(id) is not BeatmapInfo live)
                     return;
 
-                live.PPPStarRating = star;
+                EzRatingWriter.WriteSR(live, EzRatingSystem.Ppp, star);
 
                 if (pp > 0)
-                    live.PPPPerformancePoints = pp;
+                    EzRatingWriter.WritePP(live, EzRatingSystem.Ppp, pp);
             });
+            */
 
             ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
         }
@@ -1477,6 +1520,8 @@ namespace osu.Game.Database
 
                 try
                 {
+                    // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+                    /*
                     var lookup = new EzAnalysisLookupCache(beatmap, beatmap.Ruleset, mods: null);
 
                     double performancePoints = EzAnalysisComputation.TryComputePerformancePoints(beatmapManager, lookup, CancellationToken.None, out double computedPp)
@@ -1488,6 +1533,7 @@ namespace osu.Game.Database
                         if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
                             liveBeatmapInfo.PerformancePoints = performancePoints;
                     });
+                    */
 
                     ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
                     ++processedCount;
@@ -1519,7 +1565,7 @@ namespace osu.Game.Database
             {
                 foreach (var b in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null))
                 {
-                    if (b.SunnyPerformancePoints >= 0 && b.MinaRating >= 0)
+                    if (b.EzRatingData.SunnyPP >= 0 && b.EzRatingData.MinaSR >= 0)
                         continue;
 
                     candidates.Add((b.ID, b.Hash, b.Ruleset.OnlineID));
@@ -1549,24 +1595,32 @@ namespace osu.Game.Database
 
                 try
                 {
-                    double sunnyPp = beatmap.SunnyPerformancePoints;
-                    double minaRating = beatmap.MinaRating;
+                    // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+                    /*
+                    double sunnyPp = beatmap.EzRatingData.SunnyPP;
+                    double minaSr = beatmap.EzRatingData.MinaSR;
 
                     if (sunnyPp < 0)
                         sunnyPp = EzAnalysisComputation.ComputeBaselineSunnyPerformancePointsForRealm(beatmapManager, beatmap, CancellationToken.None);
 
                     var minaRows = skillStore.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MINA);
-                    if (minaRating < 0 && minaRows.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double storedMina))
-                        minaRating = storedMina;
+                    if (minaSr < 0
+                        && minaRows.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double storedMina)
+                        && storedMina > 0)
+                        minaSr = EzMinaRatingScale.ToStarRating(storedMina);
 
                     realmAccess.Write(r =>
                     {
                         if (r.Find<BeatmapInfo>(id) is not BeatmapInfo liveBeatmapInfo)
                             return;
 
-                        liveBeatmapInfo.SunnyPerformancePoints = sunnyPp;
-                        liveBeatmapInfo.MinaRating = minaRating;
+                        if (sunnyPp >= 0)
+                            EzRatingWriter.WritePP(liveBeatmapInfo, EzRatingSystem.Sunny, sunnyPp);
+
+                        if (minaSr >= 0)
+                            EzRatingWriter.WriteSR(liveBeatmapInfo, EzRatingSystem.Mina, minaSr);
                     });
+                    */
 
                     ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
                 }

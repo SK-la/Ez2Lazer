@@ -62,6 +62,12 @@ namespace osu.Game.EzOsuGame.Metrics
 
         /// <summary>Player producers whose stored rows this producer reads.</summary>
         public EzPlayerMetricProducer[] PlayerDependsOn { get; init; } = Array.Empty<EzPlayerMetricProducer>();
+
+        /// <summary>Analysis system whose flattened rating this producer writes, or <see cref="EzRatingSystem.None"/>.</summary>
+        public EzRatingSystem RatingSystem { get; init; } = EzRatingSystem.None;
+
+        /// <summary>Which half of <see cref="RatingSystem"/> this producer writes.</summary>
+        public EzRatingField RatingField { get; init; } = EzRatingField.None;
     }
 
     /// <summary>
