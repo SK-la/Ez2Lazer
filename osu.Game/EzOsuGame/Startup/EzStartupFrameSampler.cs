@@ -52,6 +52,13 @@ namespace osu.Game.EzOsuGame.Startup
         {
             base.Update();
 
+            if (secondsReported >= max_report_seconds)
+            {
+                // Expiry is asynchronous; without this guard the sampler keeps reporting until it is removed.
+                Expire();
+                return;
+            }
+
             double now = Clock.CurrentTime;
             double elapsedMs = now - lastFrameTime;
             lastFrameTime = now;
