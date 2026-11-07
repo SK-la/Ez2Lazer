@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Difficulty;
 using osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern;
@@ -54,7 +55,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             if (wantsRadar)
             {
                 bag.Set(EzAnalysisFields.RULESET_SPECIFIC_RADAR_RESULT, new EzRulesetSpecificRadarResult(
-                    computeKeyPatternRadarData(beatmap, cancellationToken),
+                    computeKeyPatternRadarData(beatmap, request.Chart, cancellationToken),
                     xxyPatternSnapshot is { } snapshot ? EzManiaSR4PatternRadarBuilder.Create(snapshot) : createXxySrPatternRadarData(0, 0, 0, 0, 0, 0),
                     xxySr));
             }
@@ -101,8 +102,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             return double.IsFinite(pp) && pp > 0;
         }
 
-        private static EzRadarChartData<string> computeKeyPatternRadarData(ManiaBeatmap beatmap, CancellationToken cancellationToken)
+        private static EzRadarChartData<string> computeKeyPatternRadarData(ManiaBeatmap beatmap, EzManiaChartInput? chart, CancellationToken cancellationToken)
         {
+            // The pass may already hold a lossless extraction of this chart. Rebuilding the row view from it is what
+            // keeps the radar from walking the hit objects a second time; a filtered view falls back to the beatmap.
+            if (chart is { FullyRepresented: true })
+                return computeKeyPatternRadarDataFromExtraction(beatmap, chart, cancellationToken);
+
             var columnObjects = EzManiaKeyPatternHelper.GetColumnObjects(beatmap);
 
             if (columnObjects.Count == 0)
@@ -118,6 +124,64 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
                 EzManiaKeyPatternJack.Compute(beatmap, columnObjects, cancellationToken),
                 EzManiaKeyPatternDelay.Compute(rows, totalColumns, cancellationToken),
                 EzManiaKeyPatternDump.Compute(rows, totalColumns, cancellationToken));
+        }
+
+        /// <summary>
+        /// The radar from an extraction that is known to describe every hit object and timing point of
+        /// <paramref name="beatmap"/>. Rows, columns and beat lengths are rebuilt exactly as the beatmap path does.
+        /// </summary>
+        private static EzRadarChartData<string> computeKeyPatternRadarDataFromExtraction(ManiaBeatmap beatmap, EzManiaChartInput chart,
+                                                                                          CancellationToken cancellationToken)
+        {
+            var notes = chart.Notes;
+
+            if (notes.Count == 0)
+                return createKeyPatternRadarData(0, 0, 0, 0, 0, 0);
+
+            var columnObjects = EzManiaKeyPatternHelper.GetColumnObjects(chart);
+
+            var rows = EzManiaKeyPatternHelper.BuildRows(columnObjects, time => beatLengthAt(chart, time), cancellationToken);
+
+            int totalColumns = 0;
+
+            for (int i = 0; i < columnObjects.Count; i++)
+                totalColumns = Math.Max(totalColumns, columnObjects[i].Column + 1);
+
+            return createKeyPatternRadarData(
+                EzManiaKeyPatternBracket.Compute(rows, totalColumns, cancellationToken),
+                EzManiaKeyPatternChord.Compute(rows, cancellationToken),
+                EzManiaKeyPatternLongNote.Compute(chart),
+                EzManiaKeyPatternJack.Compute(beatmap, columnObjects, cancellationToken),
+                EzManiaKeyPatternDelay.Compute(rows, totalColumns, cancellationToken),
+                EzManiaKeyPatternDump.Compute(rows, totalColumns, cancellationToken));
+        }
+
+        /// <summary>
+        /// The uninherited beat length in effect at <paramref name="time"/>, matching
+        /// <c>ControlPointInfo.TimingPointAt(time).BeatLength</c>: the last point at or before the time, otherwise the
+        /// first. Zero when the extraction has no usable timing point.
+        /// </summary>
+        private static double beatLengthAt(EzManiaChartInput chart, double time)
+        {
+            var points = chart.TimingPoints;
+
+            if (points.Count == 0)
+                return chart.Bpm > 0 ? 60000 / chart.Bpm : 0;
+
+            int low = 0;
+            int high = points.Count;
+
+            while (low < high)
+            {
+                int mid = (low + high) >> 1;
+
+                if (points[mid].TimeMs <= time)
+                    low = mid + 1;
+                else
+                    high = mid;
+            }
+
+            return low > 0 ? points[low - 1].BeatLengthMs : points[0].BeatLengthMs;
         }
 
         private static EzRadarChartData<string> createKeyPatternRadarData(double bracket, double chord, double longNoteRatio, double jack, double delay, double dump)

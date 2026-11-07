@@ -23,5 +23,16 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         public IReadOnlyList<EzManiaNote> Notes { get; init; } = [];
 
         public IReadOnlyList<EzManiaTimingPoint> TimingPoints { get; init; } = [];
+
+        /// <summary>
+        /// True when <see cref="Notes"/> and <see cref="TimingPoints"/> describe every hit object and timing point of
+        /// the beatmap they were extracted from.
+        /// </summary>
+        /// <remarks>
+        /// Consumers that would otherwise re-walk the source beatmap may use this input only when it is lossless.
+        /// It defaults to false because an input built by hand (tests, synthetic charts) has no such guarantee, and
+        /// silently treating a filtered view as complete is how an analyzer ends up reading a different chart.
+        /// </remarks>
+        public bool FullyRepresented { get; init; }
     }
 }

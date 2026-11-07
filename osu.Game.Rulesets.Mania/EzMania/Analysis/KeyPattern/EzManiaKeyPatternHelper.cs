@@ -3,8 +3,8 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 
@@ -111,7 +111,33 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern
             return columnObjects;
         }
 
+        /// <summary>
+        /// Column objects from a lossless chart extraction. Equivalent to <see cref="GetColumnObjects(ManiaBeatmap)"/>
+        /// for a native mania chart: same pairs, same stable order.
+        /// </summary>
+        public static List<EzManiaKeyPatternColumnHitObject> GetColumnObjects(EzManiaChartInput chart)
+        {
+            ArgumentNullException.ThrowIfNull(chart);
+
+            var notes = chart.Notes;
+            var columnObjects = new List<EzManiaKeyPatternColumnHitObject>(notes.Count);
+
+            for (int i = 0; i < notes.Count; i++)
+                columnObjects.Add(new EzManiaKeyPatternColumnHitObject(notes[i].TimeMs, notes[i].Column));
+
+            columnObjects.Sort((left, right) => left.StartTime.CompareTo(right.StartTime));
+            return columnObjects;
+        }
+
         public static List<EzManiaKeyPatternRow> BuildRows(ManiaBeatmap beatmap, IReadOnlyList<EzManiaKeyPatternColumnHitObject> columnObjects, CancellationToken cancellationToken)
+            => BuildRows(columnObjects, time => beatmap.ControlPointInfo.TimingPointAt(time).BeatLength, cancellationToken);
+
+        /// <summary>
+        /// Rows grouped from pre-built column objects, with the beat length supplied by the caller. The beatmap
+        /// overload and the extraction path both go through here, so the grouping rule exists once.
+        /// </summary>
+        public static List<EzManiaKeyPatternRow> BuildRows(IReadOnlyList<EzManiaKeyPatternColumnHitObject> columnObjects, Func<double, double> beatLengthAt,
+                                                           CancellationToken cancellationToken)
         {
             var rows = new List<EzManiaKeyPatternRow>(columnObjects.Count);
 
@@ -143,7 +169,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern
                 var columns = new int[write];
                 currentColumns.CopyTo(0, columns, 0, write);
 
-                rows.Add(new EzManiaKeyPatternRow(currentTime, beatmap.ControlPointInfo.TimingPointAt(currentTime).BeatLength, columns));
+                rows.Add(new EzManiaKeyPatternRow(currentTime, beatLengthAt(currentTime), columns));
                 currentColumns.Clear();
                 seenColumns.Clear();
             }

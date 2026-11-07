@@ -3,13 +3,19 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using NUnit.Framework;
+using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.LeoBlack;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania.Analysis;
+using osu.Game.Rulesets.Mania.Objects;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
 {
@@ -55,6 +61,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
         private const double chain_alloc_kb = 20 * 1024;
         private const double chain_median_ms = 300;
+        private const double radar_median_ms = 200;
 
         /// <summary>
         /// Gen1 collections per structure pass. Today's worst case (7K, hold-heavy) sits at 0.5; a pass that starts
@@ -220,11 +227,24 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     runChain(chart, keyCount, holdRatio, holdCount);
             });
 
+            // Reported, not compared: on mania the ruleset radar (xxy + its SR4 breakdown) is the largest single item
+            // of a full pass, well above the structure, Mina and dan steps this chain covers. Surfacing it here keeps
+            // that ordering visible instead of letting the smaller stages look like the budget.
+            var beatmap = buildManiaBeatmap(chart, keyCount);
+            var provider = new EzManiaAnalysisProvider();
+            var radarRequest = new EzAnalysisRequest(beatmap, 1.0, EzAnalysisScope.RulesetSpecificRadarData);
+
+            var radar = EzPerfMeasurer.Measure("radar (xxy + SR4)", runs, () =>
+            {
+                provider.TryCompute(radarRequest, CancellationToken.None, out _);
+            });
+
             TestContext.Progress.WriteLine($"{keyCount}K holdRatio={holdRatio:P0} rows={chart.Notes.Count}");
-            EzPerfMeasurer.Report([single, fleet]);
+            EzPerfMeasurer.Report([single, fleet, radar]);
 
             assertMedian(single, chain_median_ms);
             assertAllocation(single, chain_alloc_kb);
+            assertMedian(radar, radar_median_ms);
 
             Assert.That(fleet.AverageKb, Is.LessThanOrEqualTo(single.AverageKb * 4 * 1.35),
                 "chain allocation grew faster than linearly with chart count");
@@ -248,6 +268,42 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             Assert.That(sample.MedianMs, Is.LessThanOrEqualTo(ceilingMs),
                 $"{sample.Label} median {sample.MedianMs:F2} ms, ceiling is {ceilingMs:F2} ms");
+        }
+
+        /// <summary>Rebuilds a playable mania chart from the synthetic fixture, so the radar can run on a real beatmap.</summary>
+        private static ManiaBeatmap buildManiaBeatmap(EzManiaChartInput chart, int keyCount)
+        {
+            var beatmap = new ManiaBeatmap(new StageDefinition(keyCount))
+            {
+                BeatmapInfo = new BeatmapInfo
+                {
+                    Metadata = new BeatmapMetadata { Title = "perf", Artist = "perf" },
+                    Ruleset = new ManiaRuleset().RulesetInfo,
+                    Difficulty = new BeatmapDifficulty { CircleSize = keyCount, OverallDifficulty = 8 },
+                },
+                Difficulty = { OverallDifficulty = 8 },
+            };
+
+            foreach (var note in chart.Notes)
+            {
+                if (note.IsHold)
+                {
+                    beatmap.HitObjects.Add(new HoldNote
+                    {
+                        StartTime = note.TimeMs,
+                        Column = note.Column,
+                        Duration = Math.Max(1, note.EndTimeMs - note.TimeMs),
+                    });
+                }
+                else
+                {
+                    beatmap.HitObjects.Add(new Note { StartTime = note.TimeMs, Column = note.Column });
+                }
+            }
+
+            beatmap.ControlPointInfo.Add(0, new osu.Game.Beatmaps.ControlPoints.TimingControlPoint { BeatLength = 500 });
+            beatmap.ControlPointInfo.Add(30_000, new osu.Game.Beatmaps.ControlPoints.TimingControlPoint { BeatLength = 400 });
+            return beatmap;
         }
 
         /// <summary>The Mina vector in the msd skill-id space the dan tables read.</summary>
