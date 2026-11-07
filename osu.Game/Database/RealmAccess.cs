@@ -138,6 +138,15 @@ namespace osu.Game.Database
         /// </remarks>
         public const int EZ_REALM_SCHEMA_VERSION = 12;
 
+        /// <summary>
+        /// Smallest file that is worth rewriting. A smaller file does not cost meaningful space, and the rewrite
+        /// blocks startup and needs free disk equal to the file.
+        /// </summary>
+        private const ulong compact_minimum_bytes = 200UL * 1024 * 1024;
+
+        /// <summary>Free space must exceed live data before the rewrite pays for itself.</summary>
+        private const double compact_max_used_ratio = 0.5;
+
         public static int EzFileSchemaVersion => schema_version * 1000 + EZ_REALM_SCHEMA_VERSION;
 
         private readonly RealmSchemaMode schemaMode;
@@ -981,9 +990,34 @@ namespace osu.Game.Database
             {
                 SchemaVersion = pinnedDiskSchemaVersion ?? (ulong)fileSchemaVersionForMode,
                 MigrationCallback = performSchemaMigration ? onMigration : null,
+                ShouldCompactOnLaunch = performSchemaMigration ? shouldCompactOnLaunch : null,
                 FallbackPipePath = tempPathLocation,
             };
         }
+
+        /// <summary>
+        /// Compacts a file whose free space has outgrown its live data.
+        /// </summary>
+        /// <remarks>
+        /// Deleting rows only returns their pages to the file's free list, so a migration that drops a whole table (or
+        /// rewrites every object into a new shape) leaves the file at its old size. This runs before the realm instance
+        /// is handed out, which is why it cannot time out the way <see cref="BlockAllOperations"/> can.
+        /// The threshold is deliberately conservative: the rewrite needs free disk space equal to the file, and it
+        /// blocks startup for its duration.
+        /// </remarks>
+        private static bool shouldCompactOnLaunch(ulong totalBytes, ulong bytesUsed)
+        {
+            bool compact = totalBytes > compact_minimum_bytes && (double)bytesUsed / totalBytes < compact_max_used_ratio;
+
+            if (compact)
+                Logger.Log($"Compacting realm: {bytesUsed / (1024 * 1024)}MB in use of {totalBytes / (1024 * 1024)}MB", LoggingTarget.Database);
+
+            return compact;
+        }
+
+        /// <summary>Exposes the launch predicate so its thresholds can be asserted without a realm file.</summary>
+        internal static bool ShouldCompactOnLaunchForTesting(ulong totalBytes, ulong bytesUsed)
+            => shouldCompactOnLaunch(totalBytes, bytesUsed);
 
         private void onMigration(Migration migration, ulong lastSchemaVersion)
         {
