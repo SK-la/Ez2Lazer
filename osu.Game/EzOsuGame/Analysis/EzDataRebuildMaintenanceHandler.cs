@@ -1,6 +1,8 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Localisation;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Localization;
@@ -42,23 +44,34 @@ namespace osu.Game.EzOsuGame.Analysis
         public bool CanExecute(EzDataRebuildAction action) => dispatcher.CanDispatch(action);
 
         /// <summary>
-        /// Runs the action's backfill. An action whose processor is missing still reports through
-        /// <see cref="NotifyDispatchResult"/> rather than being silently dropped.
+        /// Runs the backfill for every selected action. Actions sharing a queue are merged, so a selection of
+        /// MSD + CSI queues one Realm pass instead of reporting the second request as already running.
         /// </summary>
-        public EzDataRebuildDispatchResult RequestBackfill(EzDataRebuildAction action, bool forceAll)
+        public EzDataRebuildDispatchOutcome RequestBackfill(IReadOnlyList<EzDataRebuildAction> actions, bool forceAll)
         {
-            var result = dispatcher.Execute(action, forceAll);
-            NotifyDispatchResult(result);
-            return result;
+            var outcome = dispatcher.Execute(actions, forceAll);
+
+            foreach (var failure in outcome.Failures)
+                notifications?.Post(new SimpleErrorNotification { Text = GetErrorMessage(failure.Result) });
+
+            return outcome;
         }
+
+        public EzDataRebuildDispatchResult RequestBackfill(EzDataRebuildAction action, bool forceAll)
+            => RequestBackfill(new[] { action }, forceAll).FirstFailure;
 
         /// <summary>
         /// Asks before running the destructive form. Without a dialog overlay the request is reported and dropped,
         /// because a full rebuild clears existing results first.
         /// </summary>
-        public void RequestForceRebuild(EzDataRebuildAction action)
+        public void RequestForceRebuild(IReadOnlyList<EzDataRebuildAction> actions)
         {
-            if (!CanExecute(action))
+            if (actions.Count == 0)
+                return;
+
+            var snapshot = actions.ToArray();
+
+            if (!snapshot.Any(CanExecute))
             {
                 notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.DATA_REBUILD_UNAVAILABLE });
                 return;
@@ -70,18 +83,11 @@ namespace osu.Game.EzOsuGame.Analysis
                 return;
             }
 
-            LocalisableString target = EzDataRebuildCatalog.Find(action)?.Name ?? EzSettingsStrings.DATA_REBUILD_DIALOG_HEADER;
-
-            dialogOverlay.Push(new EzDataRebuildForceConfirmDialog(target, () => RequestBackfill(action, forceAll: true)));
+            LocalisableString target = EzDataRebuildCatalog.DisplayNames(snapshot);
+            dialogOverlay.Push(new EzDataRebuildForceConfirmDialog(target, () => RequestBackfill(snapshot, forceAll: true)));
         }
 
-        public void NotifyDispatchResult(EzDataRebuildDispatchResult result)
-        {
-            if (result == EzDataRebuildDispatchResult.Queued)
-                return;
-
-            notifications?.Post(new SimpleErrorNotification { Text = GetErrorMessage(result) });
-        }
+        public void RequestForceRebuild(EzDataRebuildAction action) => RequestForceRebuild(new[] { action });
 
         internal static LocalisableString GetErrorMessage(EzDataRebuildDispatchResult result)
         {

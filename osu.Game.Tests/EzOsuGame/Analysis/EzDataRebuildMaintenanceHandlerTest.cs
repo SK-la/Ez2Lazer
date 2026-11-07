@@ -5,6 +5,7 @@ using Moq;
 using NUnit.Framework;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Overlays;
+using osu.Game.Overlays.Dialog;
 
 namespace osu.Game.Tests.EzOsuGame.Analysis
 {
@@ -46,6 +47,21 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
             Assert.That(handler.RequestBackfill(EzDataRebuildAction.RealmChartMsd, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
             Assert.That(dispatched, Is.EqualTo(EzDataRebuildAction.RealmChartMsd));
+        }
+
+        [Test]
+        public void TestForceRebuildSelectionUsesOneConfirmation()
+        {
+            var dialogs = new Mock<IDialogOverlay>();
+
+            var handler = new EzDataRebuildMaintenanceHandler(
+                new EzDataRebuildDispatcher((_, _) => EzDataRebuildDispatchResult.Queued, null, null),
+                dialogs.Object,
+                notifications: null);
+
+            handler.RequestForceRebuild(new[] { EzDataRebuildAction.RealmChartMsd, EzDataRebuildAction.RealmChartCsi });
+
+            dialogs.Verify(d => d.Push(It.IsAny<PopupDialog>()), Times.Once);
         }
 
         [Test]

@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Linq;
 using NUnit.Framework;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Database;
@@ -40,6 +41,91 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             Assert.That(dispatcher.Execute(action, forceAll: true), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
             Assert.That(capturedScope, Is.EqualTo(expectedScope));
             Assert.That(capturedForceAll, Is.True);
+        }
+
+        [Test]
+        public void TestRealmSelectionIsMergedIntoOneScopeUnion()
+        {
+            int calls = 0;
+            EzRealmMetadataScope capturedScope = default;
+            bool? capturedForceAll = null;
+
+            var dispatcher = new EzDataRebuildDispatcher(
+                (scope, forceAll) =>
+                {
+                    calls++;
+                    capturedScope = scope;
+                    capturedForceAll = forceAll;
+                    return EzDataRebuildDispatchResult.Queued;
+                },
+                null,
+                null);
+
+            var actions = new[]
+            {
+                EzDataRebuildAction.RealmChartMsd,
+                EzDataRebuildAction.RealmChartCsi,
+                EzDataRebuildAction.RealmChartDan,
+            };
+
+            var outcome = dispatcher.Execute(actions, forceAll: true);
+
+            Assert.That(calls, Is.EqualTo(1), "one Realm queue accepts the whole selection");
+            Assert.That(capturedScope, Is.EqualTo(EzRealmMetadataScope.Msd | EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan));
+            Assert.That(capturedForceAll, Is.True);
+            Assert.That(outcome.Queued, Is.EquivalentTo(actions));
+            Assert.That(outcome.Failures, Is.Empty);
+        }
+
+        [Test]
+        public void TestEachQueueIsDispatchedOnceForAMixedSelection()
+        {
+            int realmCalls = 0;
+            int scoreCalls = 0;
+            int sqliteMainCalls = 0;
+
+            var dispatcher = new EzDataRebuildDispatcher(
+                (_, _) =>
+                {
+                    realmCalls++;
+                    return EzDataRebuildDispatchResult.Queued;
+                },
+                _ =>
+                {
+                    sqliteMainCalls++;
+                    return EzDataRebuildDispatchResult.Queued;
+                },
+                null,
+                _ =>
+                {
+                    scoreCalls++;
+                    return EzDataRebuildDispatchResult.Queued;
+                });
+
+            var actions = new[]
+            {
+                EzDataRebuildAction.RealmTags,
+                EzDataRebuildAction.RealmScores,
+                EzDataRebuildAction.SqliteMain,
+            };
+
+            var outcome = dispatcher.Execute(actions, forceAll: false);
+
+            Assert.That(new[] { realmCalls, scoreCalls, sqliteMainCalls }, Is.EqualTo(new[] { 1, 1, 1 }));
+            Assert.That(outcome.Queued, Is.EquivalentTo(actions));
+        }
+
+        [Test]
+        public void TestMergedGroupPropagatesTheQueueResultToEveryAction()
+        {
+            var dispatcher = new EzDataRebuildDispatcher((_, _) => EzDataRebuildDispatchResult.AlreadyRunning, null, null);
+
+            var actions = new[] { EzDataRebuildAction.RealmChartMsd, EzDataRebuildAction.RealmChartCsi };
+            var outcome = dispatcher.Execute(actions, forceAll: false);
+
+            Assert.That(outcome.Queued, Is.Empty);
+            Assert.That(outcome.Failures.Select(f => f.Action), Is.EquivalentTo(actions));
+            Assert.That(outcome.FirstFailure, Is.EqualTo(EzDataRebuildDispatchResult.AlreadyRunning));
         }
 
         [Test]

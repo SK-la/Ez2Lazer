@@ -3,6 +3,7 @@
 
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Localisation;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Overlays;
@@ -70,12 +71,43 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         [Test]
         public void TestSelectingANodeMarksIt()
         {
-            AddStep("select CSI", () => dialog.ChildrenOfType<EzDataRebuildDialog.RebuildNodeCard>()
-                                              .Single(c => c.NodeAction == EzDataRebuildAction.RealmChartCsi)
-                                              .TriggerClick());
+            AddStep("select CSI", () => card(EzDataRebuildAction.RealmChartCsi).TriggerClick());
 
             AddAssert("footer names the selection", () =>
                 dialog.ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString().Contains("CSI")));
         }
+
+        [Test]
+        public void TestClickingASelectedNodeDeselectsIt()
+        {
+            AddStep("select CSI", () => card(EzDataRebuildAction.RealmChartCsi).TriggerClick());
+            AddAssert("CSI selected", () => dialog.SelectedActions.Single() == EzDataRebuildAction.RealmChartCsi);
+
+            AddStep("select CSI again", () => card(EzDataRebuildAction.RealmChartCsi).TriggerClick());
+            AddAssert("selection cleared", () => dialog.SelectedActions.Count == 0);
+        }
+
+        [Test]
+        public void TestSelectionAcceptsMultipleNodes()
+        {
+            AddStep("select MSD", () => card(EzDataRebuildAction.RealmChartMsd).TriggerClick());
+            AddStep("select CSI", () => card(EzDataRebuildAction.RealmChartCsi).TriggerClick());
+
+            AddAssert("both selected", () => dialog.SelectedActions.OrderBy(a => a)
+                                                              .SequenceEqual(new[] { EzDataRebuildAction.RealmChartMsd, EzDataRebuildAction.RealmChartCsi }.OrderBy(a => a)));
+
+            AddStep("deselect MSD", () => card(EzDataRebuildAction.RealmChartMsd).TriggerClick());
+            AddAssert("CSI stays selected", () => dialog.SelectedActions.Single() == EzDataRebuildAction.RealmChartCsi);
+        }
+
+        [Test]
+        public void TestDependentNodeExplainsItsInput()
+        {
+            AddAssert("CSI mentions its input", () => !LocalisableString.IsNullOrEmpty(card(EzDataRebuildAction.RealmChartCsi).TooltipText));
+            AddAssert("MSD stands alone", () => LocalisableString.IsNullOrEmpty(card(EzDataRebuildAction.RealmChartMsd).TooltipText));
+        }
+
+        private EzDataRebuildDialog.RebuildNodeCard card(EzDataRebuildAction action) =>
+            dialog.ChildrenOfType<EzDataRebuildDialog.RebuildNodeCard>().Single(c => c.NodeAction == action);
     }
 }

@@ -2,6 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -21,6 +23,7 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
@@ -35,7 +38,8 @@ namespace osu.Game.EzOsuGame.Overlays
     /// </remarks>
     public partial class EzDataRebuildDialog : OsuFocusedOverlayContainer
     {
-        private readonly Bindable<EzDataRebuildAction?> selected = new Bindable<EzDataRebuildAction?>();
+        private readonly BindableList<EzDataRebuildAction> selected = new BindableList<EzDataRebuildAction>();
+        private readonly Bindable<EzDataRebuildAction?> hovered = new Bindable<EzDataRebuildAction?>();
 
         private EzDataRebuildMaintenanceHandler handler = null!;
 
@@ -43,6 +47,8 @@ namespace osu.Game.EzOsuGame.Overlays
         private OsuSpriteText statusText = null!;
         private RoundedButton backfillButton = null!;
         private RoundedButton forceButton = null!;
+
+        internal IReadOnlyList<EzDataRebuildAction> SelectedActions => selected;
 
         [Resolved(canBeNull: true)]
         private BackgroundDataStoreProcessor? backgroundDataStoreProcessor { get; set; }
@@ -111,7 +117,8 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             base.LoadComplete();
 
-            selected.BindValueChanged(e => updateFooter(e.NewValue), true);
+            selected.BindCollectionChanged((_, _) => updateFooter());
+            updateFooter();
         }
 
         protected override void PopIn()
@@ -121,6 +128,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         protected override void PopOut()
         {
+            hovered.Value = null;
             this.FadeOut(150, Easing.OutQuint);
         }
 
@@ -230,10 +238,10 @@ namespace osu.Game.EzOsuGame.Overlays
                 var node = nodes[i];
 
                 // The first node needs no leading break; every other one is spaced by its declared dependency.
-                flow.Add(new RebuildNodeCard(node, selected, handler.CanExecute(node.Action), colours)
+                flow.Add(new RebuildNodeCard(node, selected, hovered, handler.CanExecute(node.Action), colours)
                 {
                     Margin = new MarginPadding { Top = i == 0 ? 0 : EzDataRebuildCatalog.GapBefore(node) },
-                    Action = () => selected.Value = node.Action,
+                    Action = () => toggle(node.Action),
                 });
             }
 
@@ -319,54 +327,86 @@ namespace osu.Game.EzOsuGame.Overlays
             },
         };
 
+        private void toggle(EzDataRebuildAction action)
+        {
+            if (!selected.Remove(action))
+                selected.Add(action);
+        }
+
         private void run(bool force)
         {
-            if (selected.Value is not { } action)
+            var actions = selected.ToArray();
+
+            if (actions.Length == 0)
                 return;
 
             if (force)
             {
-                handler.RequestForceRebuild(action);
+                handler.RequestForceRebuild(actions);
                 return;
             }
 
-            var result = handler.RequestBackfill(action, forceAll: false);
-            LocalisableString name = EzDataRebuildCatalog.Find(action)?.Name ?? action.ToString();
+            var outcome = handler.RequestBackfill(actions, forceAll: false);
 
-            statusText.Text = result == EzDataRebuildDispatchResult.Queued
-                ? LocalisableString.Format(EzSettingsStrings.DATA_REBUILD_QUEUED, name)
-                : EzDataRebuildMaintenanceHandler.GetErrorMessage(result);
+            statusText.Text = outcome.Failures.Count == 0
+                ? LocalisableString.Format(EzSettingsStrings.DATA_REBUILD_QUEUED, EzDataRebuildCatalog.DisplayNames(outcome.Queued))
+                : EzDataRebuildMaintenanceHandler.GetErrorMessage(outcome.FirstFailure);
         }
 
-        private void updateFooter(EzDataRebuildAction? action)
+        private void updateFooter()
         {
-            bool available = action is { } chosen && handler.CanExecute(chosen);
+            var actions = selected.ToArray();
+            bool available = actions.Any(handler.CanExecute);
 
             backfillButton.Enabled.Value = available;
             forceButton.Enabled.Value = available;
 
-            selectionText.Text = action is { } selectedAction
-                ? LocalisableString.Format(EzSettingsStrings.DATA_REBUILD_SELECTED, EzDataRebuildCatalog.Find(selectedAction)?.Name ?? selectedAction.ToString())
-                : EzSettingsStrings.DATA_REBUILD_NOTHING_SELECTED;
+            if (actions.Length == 0)
+                selectionText.Text = EzSettingsStrings.DATA_REBUILD_NOTHING_SELECTED;
+            else if (actions.Length == 1)
+                selectionText.Text = LocalisableString.Format(EzSettingsStrings.DATA_REBUILD_SELECTED, nameOf(actions[0]));
+            else
+                selectionText.Text = LocalisableString.Format(EzSettingsStrings.DATA_REBUILD_SELECTED_MULTIPLE, actions.Length, EzDataRebuildCatalog.DisplayNames(actions));
         }
 
+        private static LocalisableString nameOf(EzDataRebuildAction action) =>
+            EzDataRebuildCatalog.Find(action)?.Name ?? action.ToString();
+
         /// <summary>
-        /// One selectable maintenance node: name, what it feeds, and a selected-state background.
+        /// One selectable maintenance node: name, what it feeds, and a state background. Selection is a toggle, so
+        /// the card also serves as the deselection target.
         /// </summary>
         internal partial class RebuildNodeCard : OsuClickableContainer
         {
+            private const double transition_duration = 120;
+
             private readonly EzDataRebuildNode node;
-            private readonly IBindable<EzDataRebuildAction?> selection;
+            private readonly IBindableList<EzDataRebuildAction> selection;
+            private readonly Bindable<EzDataRebuildAction?> hovered;
             private readonly OsuColour colours;
             private readonly Box background;
+            private readonly OsuSpriteText title;
+            private readonly OsuSpriteText detail;
 
             internal EzDataRebuildAction NodeAction => node.Action;
 
-            public RebuildNodeCard(EzDataRebuildNode node, IBindable<EzDataRebuildAction?> selection, bool available, OsuColour colours)
+            public RebuildNodeCard(EzDataRebuildNode node, IBindableList<EzDataRebuildAction> selection, Bindable<EzDataRebuildAction?> hovered, bool available,
+                                   OsuColour colours)
             {
                 this.node = node;
                 this.selection = selection;
+                this.hovered = hovered;
                 this.colours = colours;
+
+                var dependencies = EzDataRebuildCatalog.DependenciesOf(node.Action);
+
+                if (dependencies.Count > 0)
+                {
+                    TooltipText = LocalisableString.Format(
+                        EzSettingsStrings.DATA_REBUILD_DEPENDS_ON,
+                        node.Name,
+                        EzDataRebuildCatalog.DisplayNames(dependencies.Select(d => d.Action)));
+                }
 
                 RelativeSizeAxes = Axes.X;
                 AutoSizeAxes = Axes.Y;
@@ -389,17 +429,16 @@ namespace osu.Game.EzOsuGame.Overlays
                         Spacing = new Vector2(0, 2),
                         Children = new Drawable[]
                         {
-                            new OsuSpriteText
+                            title = new OsuSpriteText
                             {
                                 Text = node.Name,
                                 Font = OsuFont.Default.With(size: 15, weight: FontWeight.SemiBold),
                                 Alpha = available ? 1 : 0.5f,
                             },
-                            new OsuSpriteText
+                            detail = new OsuSpriteText
                             {
                                 Text = node.Detail,
                                 Font = OsuFont.Default.With(size: 12),
-                                Colour = colours.GreySeaFoamLighter,
                                 Alpha = available ? 1 : 0.5f,
                             },
                         },
@@ -411,7 +450,9 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 base.LoadComplete();
 
-                selection.BindValueChanged(e => updateBackground(e.NewValue), true);
+                selection.CollectionChanged += onSelectionChanged;
+                hovered.ValueChanged += onHoveredChanged;
+                updateAppearance();
             }
 
             protected override void Dispose(bool isDisposing)
@@ -419,24 +460,120 @@ namespace osu.Game.EzOsuGame.Overlays
                 base.Dispose(isDisposing);
 
                 if (isDisposing)
-                    selection.UnbindAll();
+                {
+                    selection.CollectionChanged -= onSelectionChanged;
+                    hovered.ValueChanged -= onHoveredChanged;
+                }
             }
 
             protected override bool OnHover(HoverEvent e)
             {
-                if (selection.Value != node.Action)
-                    background.FadeColour(colours.GreySeaFoamDark, 150, Easing.OutQuint);
-
+                hovered.Value = node.Action;
                 return base.OnHover(e);
             }
 
             protected override void OnHoverLost(HoverLostEvent e)
             {
-                updateBackground(selection.Value);
+                if (hovered.Value == node.Action)
+                    hovered.Value = null;
+
                 base.OnHoverLost(e);
             }
 
-            private void updateBackground(EzDataRebuildAction? current) => background.Colour = current == node.Action ? colours.Blue3 : colours.GreySeaFoamDarker;
+            private void onSelectionChanged(object? sender, NotifyCollectionChangedEventArgs e) => updateAppearance();
+
+            private void onHoveredChanged(ValueChangedEvent<EzDataRebuildAction?> e) => updateAppearance();
+
+            /// <summary>
+            /// All visual states flow through here: hover is no longer a separate fade that a selection refresh can
+            /// overwrite, and dependency hints survive while the dependent item stays hovered or selected. A plain
+            /// selection keeps the accent colour; a selection whose inputs are not selected too gets the warning
+            /// colour, and those inputs get a neutral grey lift instead.
+            /// </summary>
+            private void updateAppearance()
+            {
+                bool isSelected = selection.Contains(node.Action);
+                bool isHovered = hovered.Value == node.Action;
+                bool isDependency = !isSelected && !isHovered && isDependencyOfHoverOrSelection();
+
+                Color4 backgroundColour;
+                Color4 titleColour;
+                Color4 detailColour;
+
+                if (isSelected)
+                {
+                    bool warns = hasUnselectedDependency(node.Action);
+
+                    if (warns)
+                        backgroundColour = isHovered ? colours.YellowLight : colours.Yellow;
+                    else
+                        backgroundColour = isHovered ? colours.Blue2 : colours.Blue3;
+
+                    titleColour = colours.GreySeaFoamDarker;
+                    detailColour = colours.GreySeaFoamDarker;
+                }
+                else if (isHovered)
+                {
+                    backgroundColour = colours.GreySeaFoamLight;
+                    titleColour = Color4.White;
+                    detailColour = colours.GreySeaFoamLighter;
+                }
+                else if (isDependency)
+                {
+                    backgroundColour = colours.GreySeaFoam;
+                    titleColour = colours.GreySeaFoamLighter;
+                    detailColour = colours.GreySeaFoamLighter;
+                }
+                else
+                {
+                    backgroundColour = colours.GreySeaFoamDarker;
+                    titleColour = Color4.White;
+                    detailColour = colours.GreySeaFoamLighter;
+                }
+
+                background.FadeColour(backgroundColour, transition_duration, Easing.OutQuint);
+                title.FadeColour(titleColour, transition_duration, Easing.OutQuint);
+                detail.FadeColour(detailColour, transition_duration, Easing.OutQuint);
+            }
+
+            private bool hasUnselectedDependency(EzDataRebuildAction action)
+            {
+                foreach (var dependency in EzDataRebuildCatalog.DependenciesOf(action))
+                {
+                    if (!selection.Contains(dependency.Action))
+                        return true;
+                }
+
+                return false;
+            }
+
+            private bool isDependencyOfHoverOrSelection()
+            {
+                if (isDependencyOf(hovered.Value))
+                    return true;
+
+                foreach (var action in selection)
+                {
+                    if (isDependencyOf(action))
+                        return true;
+                }
+
+                return false;
+            }
+
+            private bool isDependencyOf(EzDataRebuildAction? action)
+            {
+                if (action is not { } target || target == node.Action)
+                    return false;
+
+                foreach (var dependency in EzDataRebuildCatalog.DependenciesOf(target))
+                {
+                    if (dependency.Action == node.Action)
+                        return true;
+                }
+
+                return false;
+            }
         }
     }
 }

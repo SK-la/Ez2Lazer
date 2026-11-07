@@ -89,6 +89,28 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             assertChainHeads(EzDataRebuildCatalog.Sqlite);
         }
 
+        [Test]
+        public void Dependencies_are_walked_transitively_up_the_chain()
+        {
+            Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmChartMsd), Is.Empty);
+            Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmChartCsi).Select(n => n.Action),
+                Is.EqualTo(new[] { EzDataRebuildAction.RealmChartMsd }));
+            Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmChartDan).Select(n => n.Action),
+                Is.EqualTo(new[] { EzDataRebuildAction.RealmChartCsi, EzDataRebuildAction.RealmChartMsd }));
+            Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmSunny), Is.Empty);
+            Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.SqliteSongsBranches).Select(n => n.Action),
+                Is.EqualTo(new[] { EzDataRebuildAction.SqliteMain }));
+        }
+
+        [Test]
+        public void Display_names_are_joined_for_multi_selection_text()
+        {
+            var names = EzDataRebuildCatalog.DisplayNames(new[] { EzDataRebuildAction.RealmChartMsd, EzDataRebuildAction.RealmChartCsi });
+
+            Assert.That(names, Does.Contain(EzDataRebuildCatalog.Find(EzDataRebuildAction.RealmChartMsd)!.Name.ToString()));
+            Assert.That(names, Does.Contain(EzDataRebuildCatalog.Find(EzDataRebuildAction.RealmChartCsi)!.Name.ToString()));
+        }
+
         private static void assertChainHeads(IReadOnlyList<EzDataRebuildNode> nodes)
             => Assert.That(nodes[0].ContinuesChain, Is.False, "the first node of a side has nothing above it");
 

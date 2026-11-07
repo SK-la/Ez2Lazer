@@ -1,7 +1,9 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Database;
 using osu.Game.EzOsuGame.Localization;
@@ -110,6 +112,44 @@ namespace osu.Game.EzOsuGame.Analysis
 
             return null;
         }
+
+        /// <summary>
+        /// Nodes this action reads from, nearest first. Walked transitively along the declared chain so a hint can
+        /// mention every input that may be stale, not just the immediate one.
+        /// </summary>
+        public static IReadOnlyList<EzDataRebuildNode> DependenciesOf(EzDataRebuildAction action)
+        {
+            var node = Find(action);
+
+            if (node == null)
+                return Array.Empty<EzDataRebuildNode>();
+
+            IReadOnlyList<EzDataRebuildNode> chain = node.Side == EzDataRebuildSide.Realm ? Realm : Sqlite;
+            int index = -1;
+
+            for (int i = 0; i < chain.Count; i++)
+            {
+                if (chain[i].Action == action)
+                {
+                    index = i;
+                    break;
+                }
+            }
+
+            if (index <= 0)
+                return Array.Empty<EzDataRebuildNode>();
+
+            var dependencies = new List<EzDataRebuildNode>();
+
+            for (int i = index; i > 0 && chain[i].ContinuesChain; i--)
+                dependencies.Add(chain[i - 1]);
+
+            return dependencies;
+        }
+
+        /// <summary>Current-culture names, joined for footer and confirmation text.</summary>
+        public static string DisplayNames(IEnumerable<EzDataRebuildAction> actions)
+            => string.Join(" / ", actions.Select(action => (Find(action)?.Name ?? action.ToString()).ToString()));
 
         private static EzDataRebuildNode node(EzDataRebuildAction action, EzDataRebuildSide side, bool continuesChain,
                                               LocalisableString name, LocalisableString detail)

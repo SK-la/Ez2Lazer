@@ -381,6 +381,14 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_SELECTED =
             new EzLocalizationManager.EzLocalisableString("已选择：{0}", "Selected: {0}");
 
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_SELECTED_MULTIPLE =
+            new EzLocalizationManager.EzLocalisableString("已选择 {0} 项：{1}", "Selected {0} items: {1}");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DEPENDS_ON =
+            new EzLocalizationManager.EzLocalisableString(
+                "「{0}」读取「{1}」的结果。依赖项不重算也可以；不确定时，可一并选中「{1}」。",
+                "\"{0}\" reads results from \"{1}\". Recomputing the dependency is optional; select \"{1}\" as well if unsure.");
+
         public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_QUEUED =
             new EzLocalizationManager.EzLocalisableString("已排队：{0}", "Queued: {0}");
 
