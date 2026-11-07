@@ -12,18 +12,37 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern
     {
         public static double Compute(ManiaBeatmap beatmap, IReadOnlyList<EzManiaKeyPatternColumnHitObject> columnObjects, CancellationToken cancellationToken)
         {
-            var groupedByColumn = columnObjects.GroupBy(obj => obj.Column)
-                                               .Select(group => group.OrderBy(obj => obj.StartTime).ToList())
-                                               .ToList();
+            if (columnObjects.Count == 0)
+                return 0;
+
+            // Column objects already arrive sorted by time, so appending to per-column lists keeps each column in
+            // order without the grouping and re-sorting the previous shape did. Groups stay in first-appearance order
+            // so the running sums accumulate in the same sequence as before.
+            var orderedGroups = new List<List<EzManiaKeyPatternColumnHitObject>>();
+            var groupByColumn = new Dictionary<int, List<EzManiaKeyPatternColumnHitObject>>();
+
+            for (int i = 0; i < columnObjects.Count; i++)
+            {
+                var obj = columnObjects[i];
+
+                if (!groupByColumn.TryGetValue(obj.Column, out var group))
+                {
+                    group = new List<EzManiaKeyPatternColumnHitObject>();
+                    groupByColumn[obj.Column] = group;
+                    orderedGroups.Add(group);
+                }
+
+                group.Add(obj);
+            }
 
             int totalPairs = 0;
             double weightedPairs = 0;
 
-            for (int groupIndex = 0; groupIndex < groupedByColumn.Count; groupIndex++)
+            for (int groupIndex = 0; groupIndex < orderedGroups.Count; groupIndex++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                List<EzManiaKeyPatternColumnHitObject> columnNotes = groupedByColumn[groupIndex];
+                List<EzManiaKeyPatternColumnHitObject> columnNotes = orderedGroups[groupIndex];
 
                 for (int i = 1; i < columnNotes.Count; i++)
                 {

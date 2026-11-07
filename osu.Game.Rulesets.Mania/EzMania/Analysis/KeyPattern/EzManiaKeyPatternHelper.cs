@@ -120,18 +120,32 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern
 
             double currentTime = columnObjects[0].StartTime;
             var currentColumns = new List<int> { columnObjects[0].Column };
+            var seenColumns = new HashSet<int> { columnObjects[0].Column };
 
             void flushCurrentRow()
             {
                 if (currentColumns.Count == 0)
                     return;
 
-                int[] columns = currentColumns.Distinct()
-                                              .OrderBy(column => column)
-                                              .ToArray();
+                // Columns are collected in hit-object order; sorting and de-duplicating in place gives the same
+                // ascending distinct array as a LINQ pipeline without the intermediate allocations.
+                currentColumns.Sort();
+                int write = 0;
+
+                for (int read = 0; read < currentColumns.Count; read++)
+                {
+                    if (write > 0 && currentColumns[write - 1] == currentColumns[read])
+                        continue;
+
+                    currentColumns[write++] = currentColumns[read];
+                }
+
+                var columns = new int[write];
+                currentColumns.CopyTo(0, columns, 0, write);
 
                 rows.Add(new EzManiaKeyPatternRow(currentTime, beatmap.ControlPointInfo.TimingPointAt(currentTime).BeatLength, columns));
                 currentColumns.Clear();
+                seenColumns.Clear();
             }
 
             for (int i = 1; i < columnObjects.Count; i++)
@@ -146,7 +160,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern
                     currentTime = hitObject.StartTime;
                 }
 
-                currentColumns.Add(hitObject.Column);
+                if (seenColumns.Add(hitObject.Column))
+                    currentColumns.Add(hitObject.Column);
             }
 
             flushCurrentRow();
