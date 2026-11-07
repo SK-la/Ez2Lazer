@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace osu.Game.EzOsuGame.Skills.SkillTag
 {
@@ -13,8 +14,11 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         private static readonly int[] snap_divisors = { 1, 2, 3, 4, 6, 8, 12, 16, 24, 32 };
 
         public static EzChartFeatureExtraction Extract(EzManiaChartInput map, double rate = 1)
+            => Extract(map, rate, CancellationToken.None);
+
+        public static EzChartFeatureExtraction Extract(EzManiaChartInput map, double rate, CancellationToken cancellationToken)
         {
-            var notes = getRatedNotes(map, rate);
+            var notes = getRatedNotes(map, rate, cancellationToken);
             var warnings = new List<string>();
             var noteTimes = new List<double>(notes.Count);
             var releaseTimes = new List<double>();
@@ -107,8 +111,13 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             int rowMaskBase = Math.Max(32, (1 << Math.Max(1, map.KeyCount)) + 1);
             int rowSignatureBase = rowMaskBase * 256;
 
+            int rowIndex = 0;
+
             foreach ((double time, var rowNotes) in orderedRows)
             {
+                if ((rowIndex++ & 0xFF) == 0)
+                    cancellationToken.ThrowIfCancellationRequested();
+
                 var columns = new List<int>();
                 int rowMask = 0;
                 bool rowHasHold = false;
@@ -404,7 +413,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             };
         }
 
-        private static List<EzManiaNote> getRatedNotes(EzManiaChartInput map, double rate)
+        private static List<EzManiaNote> getRatedNotes(EzManiaChartInput map, double rate, CancellationToken cancellationToken)
         {
             var notes = new List<EzManiaNote>();
 
@@ -422,6 +431,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                 notes.Add(new EzManiaNote(note.TimeMs / rate, note.Column, note.IsHold, note.EndTimeMs / rate));
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             return notes;
         }
 

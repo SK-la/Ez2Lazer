@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace osu.Game.EzOsuGame.Skills.LeoBlack
 {
@@ -86,8 +87,11 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
         }
 
         public static List<EzLeoBlackFoundPattern> Find(EzLeoBlackChart chart)
+            => Find(chart, CancellationToken.None);
+
+        public static List<EzLeoBlackFoundPattern> Find(EzLeoBlackChart chart, CancellationToken cancellationToken)
         {
-            var primitives = EzLeoBlackPrimitives.CalculatePrimitives(chart);
+            var primitives = EzLeoBlackPrimitives.CalculatePrimitives(chart, cancellationToken);
             EzLeoBlackSpecificPatterns keymodePatterns = chart.Keys switch
             {
                 4 => specific4K(),

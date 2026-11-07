@@ -273,17 +273,21 @@ namespace osu.Game.EzOsuGame.Analysis
             EzAnalysisComputation.MinaResult? mina;
 
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Mina))
-                mina = computeMinaAxes(rulesetOnlineId, measurements, rate);
+                mina = computeMinaAxes(rulesetOnlineId, measurements, rate, cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             StructureResult? structure;
 
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Structure))
-                structure = computeStructure(rulesetOnlineId, measurements);
+                structure = computeStructure(rulesetOnlineId, measurements, cancellationToken);
 
             PppResult? ppp;
 
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Ppp))
                 ppp = computePpp(rulesetOnlineId, analysisBeatmap, lookup.OrderedMods);
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (columnRuleset)
                 padColumnCounts(lookup, columnCounts, holdNoteCounts);
@@ -335,7 +339,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (structure != null)
                 result[EzChartMetricProducer.Csi.Id()] = structure;
 
-            addOfficial(playable, analysisBeatmap, lookup, result);
+            addOfficial(playable, analysisBeatmap, lookup, cancellationToken, result);
             addSsr(lookup, analysisBeatmap, xxySr, cancellationToken, result);
             addPppPerformance(lookup, analysisBeatmap, ppp, cancellationToken, result);
 
@@ -387,10 +391,11 @@ namespace osu.Game.EzOsuGame.Analysis
         /// which is why they are produced together rather than by two independent passes.
         /// </summary>
         private static void addOfficial(PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup,
-                                        Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>> result)
+                                        CancellationToken cancellationToken, Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>> result)
         {
-            if (computeOfficial(playable, analysisBeatmap, lookup, CancellationToken.None) is not { } official)
+            if (computeOfficial(playable, analysisBeatmap, lookup, cancellationToken) is not { } official)
                 return;
+
             if (double.IsFinite(official.StarRating) && official.StarRating >= 0)
             {
                 result[EzChartMetricProducer.Official.Id()] = new Dictionary<string, double>(StringComparer.Ordinal)
@@ -514,6 +519,9 @@ namespace osu.Game.EzOsuGame.Analysis
         /// goes through here, so no second implementation of the engine call can drift from this one.
         /// </summary>
         internal static MinaResult? computeMinaAxes(int rulesetOnlineId, EzChartMeasurements? measurements, double rate)
+            => computeMinaAxes(rulesetOnlineId, measurements, rate, CancellationToken.None);
+
+        internal static MinaResult? computeMinaAxes(int rulesetOnlineId, EzChartMeasurements? measurements, double rate, CancellationToken cancellationToken)
         {
             if (rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID || measurements is not { } measured)
                 return null;
@@ -521,6 +529,8 @@ namespace osu.Game.EzOsuGame.Analysis
             int keyCount = measured.KeyCount;
             if (!EzMinaEngine.IsSupportedKeyCount(keyCount))
                 return null;
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             try
             {
@@ -578,11 +588,14 @@ namespace osu.Game.EzOsuGame.Analysis
         /// the typed summary the same pass produced. Rate is not folded in; the values are rate-invariant.
         /// </summary>
         private static StructureResult? computeStructure(int rulesetOnlineId, EzChartMeasurements? measurements)
+            => computeStructure(rulesetOnlineId, measurements, CancellationToken.None);
+
+        private static StructureResult? computeStructure(int rulesetOnlineId, EzChartMeasurements? measurements, CancellationToken cancellationToken)
         {
             if (rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID || measurements is not { } measured)
                 return null;
 
-            var axes = EzChartSkillInfoComputer.ComputeAxes(measured.Chart, out var info);
+            var axes = EzChartSkillInfoComputer.ComputeAxes(measured.Chart, cancellationToken, out var info);
 
             return new StructureResult(axes, info);
         }
