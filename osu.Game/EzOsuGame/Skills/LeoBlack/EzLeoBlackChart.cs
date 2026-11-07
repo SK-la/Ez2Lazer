@@ -111,10 +111,14 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
                 return null;
 
             var sortedTimes = rowMap.Keys.OrderBy(t => t).ToList();
+            var rowData = new int[sortedTimes.Count][];
 
-            // Hold bodies are filled with a per-column difference array over the row indices, so the cost is one
-            // sweep per column instead of one row scan per long note.
-            int[]?[] holdCoverage = new int[]?[keys];
+            for (int i = 0; i < sortedTimes.Count; i++)
+                rowData[i] = rowMap[sortedTimes[i]];
+
+            // Hold bodies are filled by one index sweep over head/tail events, so the cost is a single pass over the
+            // rows instead of one row scan per long note (the latter was quadratic on hold-heavy charts).
+            var bodyEvents = new List<(int Index, int Column, int Delta)>(holdSpans.Count * 2);
 
             foreach (var (column, start, end) in holdSpans)
             {
@@ -124,46 +128,50 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
                 if (to <= from)
                     continue;
 
-                int[] coverage = holdCoverage[column] ??= new int[sortedTimes.Count + 1];
-                coverage[from]++;
-                coverage[to]--;
+                bodyEvents.Add((from, column, 1));
+                bodyEvents.Add((to, column, -1));
             }
 
-            for (int column = 0; column < keys; column++)
+            if (bodyEvents.Count > 0)
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                bodyEvents.Sort(static (left, right) => left.Index.CompareTo(right.Index));
 
-                int[]? coverage = holdCoverage[column];
+                int[] activeHolds = new int[keys];
+                int eventIndex = 0;
 
-                if (coverage == null)
-                    continue;
-
-                int active = 0;
-
-                for (int i = 0; i < sortedTimes.Count; i++)
+                for (int i = 0; i < rowData.Length; i++)
                 {
-                    active += coverage[i];
+                    if ((i & 0xFF) == 0)
+                        cancellationToken.ThrowIfCancellationRequested();
 
-                    if (active <= 0)
-                        continue;
+                    while (eventIndex < bodyEvents.Count && bodyEvents[eventIndex].Index <= i)
+                    {
+                        var evt = bodyEvents[eventIndex++];
+                        activeHolds[evt.Column] += evt.Delta;
+                    }
 
-                    int[] row = rowMap[sortedTimes[i]];
+                    int[] row = rowData[i];
 
-                    if (row[column] == EzLeoBlackNoteType.NOTHING)
+                    for (int column = 0; column < keys; column++)
+                    {
+                        if (activeHolds[column] <= 0 || row[column] != EzLeoBlackNoteType.NOTHING)
+                            continue;
+
                         row[column] = EzLeoBlackNoteType.HOLDBODY;
+                    }
                 }
             }
 
             var notes = new List<EzLeoBlackTimeItem<int[]>>(sortedTimes.Count);
 
-            foreach (double time in sortedTimes)
+            for (int i = 0; i < rowData.Length; i++)
             {
-                int[] data = rowMap[time];
+                int[] data = rowData[i];
 
                 if (isRowEmpty(data))
                     continue;
 
-                notes.Add(new EzLeoBlackTimeItem<int[]>(time, data));
+                notes.Add(new EzLeoBlackTimeItem<int[]>(sortedTimes[i], data));
             }
 
             if (notes.Count == 0)
