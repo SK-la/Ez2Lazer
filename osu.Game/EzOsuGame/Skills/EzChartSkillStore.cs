@@ -201,6 +201,8 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentException.ThrowIfNullOrWhiteSpace(systemId);
             ArgumentNullException.ThrowIfNull(skills);
 
+            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+            /*
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
 
@@ -230,10 +232,13 @@ namespace osu.Game.EzOsuGame.Skills
                     });
                 }
             });
+            */
         }
 
         public void WriteBeatmapMsd(string beatmapHash, EzMinaSkillAxisVector vector, Guid beatmapId = default, DateTimeOffset? computedAt = null)
         {
+            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+            /*
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int version = minaChartRevision;
 
@@ -261,6 +266,7 @@ namespace osu.Game.EzOsuGame.Skills
                     });
                 }
             });
+            */
         }
 
         /// <summary>
@@ -271,6 +277,8 @@ namespace osu.Game.EzOsuGame.Skills
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(beatmapHash);
 
+            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+            /*
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int version = minaChartRevision;
 
@@ -296,6 +304,7 @@ namespace osu.Game.EzOsuGame.Skills
                     ComputedAt = at,
                 });
             });
+            */
         }
 
         /// <summary>
@@ -303,8 +312,10 @@ namespace osu.Game.EzOsuGame.Skills
         /// </summary>
         public void ClearBeatmapMsd(IEnumerable<string>? hashes = null)
         {
+            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
             if (hashes == null)
             {
+                /*
                 realmAccess.Write(r =>
                 {
                     var rows = r.All<EzBeatmapSkillValue>()
@@ -314,6 +325,7 @@ namespace osu.Game.EzOsuGame.Skills
                     foreach (var row in rows)
                         r.Remove(row);
                 });
+                */
                 return;
             }
 
@@ -327,6 +339,7 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 var batch = hashList.Skip(i).Take(batch_size).ToHashSet(StringComparer.Ordinal);
 
+                /*
                 realmAccess.Write(r =>
                 {
                     var rows = r.All<EzBeatmapSkillValue>()
@@ -338,6 +351,7 @@ namespace osu.Game.EzOsuGame.Skills
                     foreach (var row in rows)
                         r.Remove(row);
                 });
+                */
             }
         }
 
@@ -423,6 +437,8 @@ namespace osu.Game.EzOsuGame.Skills
             if (info.IsUnavailable)
                 return;
 
+            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+            /*
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
 
             realmAccess.Write(r =>
@@ -461,6 +477,7 @@ namespace osu.Game.EzOsuGame.Skills
                     KeyCount = info.KeyCount ?? -1,
                 });
             });
+            */
         }
 
         /// <summary>
@@ -474,6 +491,8 @@ namespace osu.Game.EzOsuGame.Skills
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(beatmapHash);
 
+            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+            /*
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int revision = EzAnalysisRevision.ChartSkillInfo;
 
@@ -500,10 +519,13 @@ namespace osu.Game.EzOsuGame.Skills
                     KeyCount = -1,
                 });
             });
+            */
         }
 
         public void ClearChartSkillInfo()
         {
+            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+            /*
             realmAccess.Write(r =>
             {
                 var rows = r.All<EzBeatmapChartSkillInfo>().ToList();
@@ -518,6 +540,7 @@ namespace osu.Game.EzOsuGame.Skills
                 foreach (var row in axes)
                     r.Remove(row);
             });
+            */
         }
 
         private static void removeStructureAxes(Realm r, string beatmapHash)
@@ -565,10 +588,11 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentNullException.ThrowIfNull(chartDan);
             ArgumentException.ThrowIfNullOrWhiteSpace(chartDan.BeatmapHash);
 
-            DateTimeOffset at = chartDan.ComputedAt == default ? DateTimeOffset.UtcNow : chartDan.ComputedAt;
-
             // Stamped with the facet revision (not chartDan.AlgorithmVersion, which stays the pure
             // dan algorithm version on the DTO) so a later MSD/CSI bump retires this row.
+            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+            /*
+            DateTimeOffset at = chartDan.ComputedAt == default ? DateTimeOffset.UtcNow : chartDan.ComputedAt;
             int version = EzAnalysisRevision.ChartDan;
 
             realmAccess.Write(r =>
@@ -597,10 +621,13 @@ namespace osu.Game.EzOsuGame.Skills
                     ComputedAt = at,
                 });
             });
+            */
         }
 
         public void ClearChartDan()
         {
+            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+            /*
             realmAccess.Write(r =>
             {
                 var rows = r.All<EzBeatmapChartDan>().ToList();
@@ -608,6 +635,7 @@ namespace osu.Game.EzOsuGame.Skills
                 foreach (var row in rows)
                     r.Remove(row);
             });
+            */
         }
 
         /// <summary>
@@ -640,6 +668,8 @@ namespace osu.Game.EzOsuGame.Skills
 
         public void ClearBeatmapPPP()
         {
+            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+            /*
             realmAccess.Write(r =>
             {
                 var rows = r.All<EzBeatmapSkillValue>()
@@ -649,6 +679,7 @@ namespace osu.Game.EzOsuGame.Skills
                 foreach (var row in rows)
                     r.Remove(row);
             });
+            */
         }
 
         private PppChartScan scanPppCharts()
