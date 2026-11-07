@@ -29,7 +29,16 @@ namespace osu.Game.EzOsuGame.Analysis
         private const int capacity = 512;
 
         public EzAnalysisResult? Get(AnalysisKey key)
-            => analyses.TryGetValue(key, out var value) ? value : null;
+        {
+            if (analyses.TryGetValue(key, out var value))
+            {
+                EzAnalysisPassPerf.RecordCacheHit();
+                return value;
+            }
+
+            EzAnalysisPassPerf.RecordCacheMiss();
+            return null;
+        }
 
         public void Set(AnalysisKey key, EzAnalysisResult value)
         {
@@ -37,24 +46,39 @@ namespace osu.Game.EzOsuGame.Analysis
                 analyses.Clear();
 
             analyses[key] = value;
+            EzAnalysisPassPerf.UpdateCacheGauges(analyses.Count, capacity);
         }
 
         /// <summary>Drops every entry, for a bump that can invalidate more than one.</summary>
         public void ClearAll()
-            => analyses.Clear();
+        {
+            EzAnalysisPassPerf.RecordCacheClear();
+            analyses.Clear();
+            EzAnalysisPassPerf.UpdateCacheGauges(0, capacity);
+        }
 
         public void InvalidateSubject(string subject)
         {
             if (string.IsNullOrEmpty(subject))
                 return;
 
+            bool removed = false;
+
             foreach (var key in analyses.Keys)
             {
                 if (string.Equals(key.BeatmapHash, subject, System.StringComparison.Ordinal))
-                    analyses.TryRemove(key, out _);
+                    removed |= analyses.TryRemove(key, out _);
             }
+
+            if (removed)
+                EzAnalysisPassPerf.RecordCachePurge();
         }
 
-        public void Clear() => analyses.Clear();
+        public void Clear()
+        {
+            EzAnalysisPassPerf.RecordCacheClear();
+            analyses.Clear();
+            EzAnalysisPassPerf.UpdateCacheGauges(0, capacity);
+        }
     }
 }

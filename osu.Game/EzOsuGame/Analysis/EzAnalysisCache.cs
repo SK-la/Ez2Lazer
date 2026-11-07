@@ -466,6 +466,8 @@ namespace osu.Game.EzOsuGame.Analysis
             }
             catch (BeatmapInvalidForRulesetException invalidForRuleset)
             {
+                EzAnalysisPassPerf.RecordPass(succeeded: false);
+
                 if (lookup.Ruleset.Equals(lookup.BeatmapInfo.Ruleset))
                     Logger.Error(invalidForRuleset, $"[EzAnalysisCache] Failed to convert {lookup.BeatmapInfo.OnlineID} to the beatmap's default ruleset ({lookup.BeatmapInfo.Ruleset}).", Ez2ConfigManager.LOGGER_NAME);
 
@@ -473,6 +475,8 @@ namespace osu.Game.EzOsuGame.Analysis
             }
             catch (Exception ex)
             {
+                EzAnalysisPassPerf.RecordPass(succeeded: false);
+
                 if (Interlocked.Increment(ref computeFailCount) <= 10)
                 {
                     string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
