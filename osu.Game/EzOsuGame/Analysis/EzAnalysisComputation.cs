@@ -167,12 +167,13 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public static EzAnalysisResult ComputePersistedSqliteSlice(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
         {
-            bool onlyKps = !EzAnalysisProviderBridge.HasAnalysisProvider(lookup.Ruleset);
+            // Column statistics describe the layout of a column-based chart; every other ruleset has none to store.
+            bool columnRuleset = lookup.Ruleset.OnlineID == EzLocalProfileConstants.MANIA_RULESET_ID;
             IBeatmap analysisBeatmap = EzPlayableBeatmapCache.GetShared(workingBeatmap, lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(analysisBeatmap, onlyKps: onlyKps);
+            var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(analysisBeatmap, onlyKps: !columnRuleset);
 
             double rate = getRateAdjustMultiplier(lookup.OrderedMods);
 
@@ -192,7 +193,7 @@ namespace osu.Game.EzOsuGame.Analysis
             var commonSummary = new KpsSummary(averageKps, maxKps, kpsList);
             EzManiaSummary? maniaSummary = null;
 
-            if (!onlyKps)
+            if (columnRuleset)
             {
                 padColumnCounts(lookup, columnCounts, holdNoteCounts);
                 maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts, xxySr: null);
@@ -203,7 +204,11 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public static EzAnalysisResult Compute(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
         {
-            bool onlyKps = !EzAnalysisProviderBridge.HasAnalysisProvider(lookup.Ruleset);
+            // The engines that produce skill axes are independent of a ruleset exposing an analysis provider, so
+            // the pass always measures them. Products that do need the provider (official performance, the Sunny
+            // rating and the ruleset radar) are guarded where they are produced.
+            int rulesetOnlineId = lookup.Ruleset.OnlineID;
+            bool columnRuleset = rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID;
 
             // One conversion serves this whole pass: the framework's shared cache is skipped here because the
             // difficulty calculator needs an instance it may hand to sibling calculators repeatedly.
@@ -212,7 +217,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(analysisBeatmap, onlyKps: onlyKps);
+            var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(analysisBeatmap, onlyKps: !columnRuleset);
 
             // 将速率调整 mod 应用到分析结果，保持与实际游玩时长一致。
             double rate = getRateAdjustMultiplier(lookup.OrderedMods);
@@ -232,9 +237,6 @@ namespace osu.Game.EzOsuGame.Analysis
 
             var commonSummary = new KpsSummary(averageKps, maxKps, kpsList);
 
-            if (onlyKps)
-                return new EzAnalysisResult(commonSummary);
-
             // Every product below is measured once and shared by the axes table, the dan set and the mania summary.
             // Deriving them per consumer is what previously ran the Mina engine and the Sunny rating twice per pass.
             // The rating and the radar come from one provider call: the radar payload embeds the same rating, so
@@ -242,10 +244,8 @@ namespace osu.Game.EzOsuGame.Analysis
             var radarAndXxy = computeRadarAndXxy(lookup, analysisBeatmap, cancellationToken);
             double? xxySr = radarAndXxy.XxySr;
 
-            int rulesetOnlineId = lookup.Ruleset.OnlineID;
-
             // One note extraction serves the structure pass, the rating engine and the dan inputs below.
-            EzChartMeasurements? measurements = rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID
+            EzChartMeasurements? measurements = columnRuleset
                 ? EzChartMeasurements.FromPlayable(analysisBeatmap)
                 : null;
 
@@ -253,7 +253,9 @@ namespace osu.Game.EzOsuGame.Analysis
             var structure = computeStructure(rulesetOnlineId, measurements);
             var ppp = computePpp(rulesetOnlineId, analysisBeatmap, lookup.OrderedMods);
 
-            padColumnCounts(lookup, columnCounts, holdNoteCounts);
+            if (columnRuleset)
+                padColumnCounts(lookup, columnCounts, holdNoteCounts);
+
             var maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts, xxySr);
 
             return new EzAnalysisResult(commonSummary, maniaSummary,

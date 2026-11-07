@@ -3,6 +3,8 @@
 
 using System;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Skills.Mina;
 
 namespace osu.Game.EzOsuGame.Metrics
 {
@@ -14,11 +16,11 @@ namespace osu.Game.EzOsuGame.Metrics
     /// different systems on the same surface, which is the mismatch this type exists to make impossible.
     /// Either half may be null on its own: the tiers degrade independently (see the read order in
     /// </remarks>
-    public readonly record struct EzMetricVariantValues(double? Star, double? PerformancePoints)
+    public readonly record struct EzMetricVariantValues(double? Star, double? PerformancePoints, double? SkillStar = null)
     {
         public static readonly EzMetricVariantValues Empty = new EzMetricVariantValues(null, null);
 
-        public bool IsEmpty => Star == null && PerformancePoints == null;
+        public bool IsEmpty => Star == null && PerformancePoints == null && SkillStar == null;
 
         /// <summary>A live pair, or <see cref="Empty"/> when the source has neither half.</summary>
         /// <remarks>
@@ -30,6 +32,13 @@ namespace osu.Game.EzOsuGame.Metrics
 
         internal static double? Finite(double? value)
             => value is { } actual && double.IsFinite(actual) && actual >= 0 ? actual : null;
+
+        /// <summary>
+        /// A rating is only a value when it is above zero. The per-system columns are pre-populated by schema
+        /// defaults, so a zero there means "never computed", not "rated zero".
+        /// </summary>
+        internal static double? Positive(double? value)
+            => value is { } actual && double.IsFinite(actual) && actual > 0 ? actual : null;
     }
 
     /// <summary>
@@ -97,9 +106,41 @@ namespace osu.Game.EzOsuGame.Metrics
             double? performance = variant.PerformanceProducer is { } producer
                 ? live.PerformancePoints ?? baseline(beatmap, producer)
                 : null;
+            double? skillStar = variant.ChartSkillProducer is { } chartProducer
+                ? live.SkillStar ?? baseline(beatmap, chartProducer)
+                : null;
 
-            return new EzMetricVariantValues(star, performance);
+            return new EzMetricVariantValues(star, performance, skillStar);
         }
+
+        /// <summary>
+        /// The chart-skill system's star for this chart: the live axis when it was measured, else the column.
+        /// </summary>
+        /// <remarks>
+        /// This is the star the Ez pill shows beside the official one, which is not always the variant's
+        /// <see cref="EzMetricVariant.StarProducer"/> (mania's official variant reads its skill star from Mina).
+        /// </remarks>
+        public static double? SkillStar(BeatmapInfo beatmap, EzAnalysisResult? analysis)
+        {
+            ArgumentNullException.ThrowIfNull(beatmap);
+
+            if (Selected(beatmap.Ruleset.OnlineID)?.ChartSkillProducer is not { } producer)
+                return null;
+
+            if (analysis is { } live
+                && live.AxesOf(producer).TryGetValue(RatingAxisOf(producer), out double measured)
+                && double.IsFinite(measured) && measured > 0)
+                return measured;
+
+            return baseline(beatmap, producer);
+        }
+
+        /// <summary>
+        /// The axis a system's headline rating is stored under. Every system writes the shared star id except the
+        /// Mina engine, whose vector's headline is its Overall axis.
+        /// </summary>
+        public static string RatingAxisOf(EzMetricProducerId producer)
+            => producer == EzChartMetricProducer.Mina.Id() ? EzMinaSkillAxis.Overall.ToId() : EzMetricAxisIds.STAR_RATING;
 
         /// <summary>Whether the variant's star is the official rating, which the official pill already shows.</summary>
         public static bool IsOfficial(EzMetricVariant variant)
@@ -123,7 +164,7 @@ namespace osu.Game.EzOsuGame.Metrics
                 : producer == EzChartMetricProducer.Mina.Id() ? beatmap.MinaRating
                 : -1;
 
-            return EzMetricVariantValues.Finite(value);
+            return EzMetricVariantValues.Positive(value);
         }
     }
 }

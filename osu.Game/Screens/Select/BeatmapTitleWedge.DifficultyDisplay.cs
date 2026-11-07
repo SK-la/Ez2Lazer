@@ -17,6 +17,7 @@ using osu.Game.Beatmaps.Drawables;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
@@ -52,6 +53,9 @@ namespace osu.Game.Screens.Select
 
             [Resolved]
             private BeatmapDifficultyCache difficultyCache { get; set; } = null!;
+
+            [Resolved]
+            private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
 
             private StarRatingDisplay starRatingDisplay => dualDifficultyDisplay.Official;
 
@@ -334,24 +338,42 @@ namespace osu.Game.Screens.Select
                     return;
                 }
 
-                dualDifficultyDisplay.ApplyPerformance(EzPanelPerformancePoints.ResolvePanelPp(starDifficulty, beatmap.Value.BeatmapInfo));
+                applyVariantPerformance(beatmap.Value.BeatmapInfo, starDifficulty);
             }
 
             public void ApplyKpcMetrics(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
             {
-                if (beatmap.IsDefault || beatmap.Value.BeatmapInfo is not BeatmapInfo beatmapInfo
-                    || !EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value)
-                    || !beatmapInfo.SupportsSunnyStarRating())
+                if (beatmap.IsDefault || beatmap.Value.BeatmapInfo is not BeatmapInfo beatmapInfo)
                 {
                     ezDisplayKpc.ManiaSummary = null;
                     ezDisplayKpc.Hide();
                     dualDifficultyDisplay.ResetXxy();
+                    dualDifficultyDisplay.ApplyPerformance(null);
                     return;
                 }
 
-                ezDisplayKpc.ManiaSummary = metrics.ManiaSummary;
-                ezDisplayKpc.Show();
+                if (metrics.ManiaSummary?.ColumnCounts.Count > 0)
+                {
+                    ezDisplayKpc.ManiaSummary = metrics.ManiaSummary;
+                    ezDisplayKpc.Show();
+                }
+                else
+                {
+                    ezDisplayKpc.ManiaSummary = null;
+                    ezDisplayKpc.Hide();
+                }
+
                 dualDifficultyDisplay.ApplyAnalysisMetrics(beatmapInfo, metrics);
+                applyVariantPerformance(beatmapInfo, liveDifficulty.Value);
+            }
+
+            /// <summary>
+            /// The pp pill follows the selected analysis system; the official difficulty is its live official half.
+            /// </summary>
+            private void applyVariantPerformance(BeatmapInfo beatmapInfo, in StarDifficulty officialDifficulty)
+            {
+                var values = ezAnalysisCache.ReadVariantValues(beatmapInfo, mods.Value, EzMetricVariantValues.Live(officialDifficulty));
+                dualDifficultyDisplay.ApplyPerformance(values.PerformancePoints);
             }
 
             private void updateCountStatistics(CancellationToken cancellationToken)

@@ -17,12 +17,13 @@ using osu.Game.Beatmaps.Drawables;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
-using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.UI;
-using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
@@ -83,6 +84,9 @@ namespace osu.Game.Screens.Select
 
         [Resolved]
         private EzAnalysisDatabase ezAnalysisDatabase { get; set; } = null!;
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         private DifficultyDisplay difficultyDisplay = null!;
         private EzDisplayKpsGraph kpsGraph = null!;
@@ -235,6 +239,9 @@ namespace osu.Game.Screens.Select
             ruleset.BindValueChanged(_ => updateDisplay());
             onlineLookupResult.BindValueChanged(_ => updateDisplay());
 
+            // The pills read the selected analysis system; switching it re-resolves from the same cached pass.
+            ezConfig.GetBindable<string>(Ez2Setting.AnalysisSystemSelection).BindValueChanged(_ => Scheduler.AddOnce(refreshAnalysisForSystem), true);
+
             mods.BindValueChanged(m =>
             {
                 settingChangeTracker?.Dispose();
@@ -323,6 +330,14 @@ namespace osu.Game.Screens.Select
             ezAnalysisCancellationSource = null;
         }
 
+        private void refreshAnalysisForSystem()
+        {
+            if (!wedgeMetricsApplied || working.Value.BeatmapInfo is not BeatmapInfo beatmapInfo)
+                return;
+
+            applyWedgeEzAnalysis(ezAnalysisCache.TryGet(beatmapInfo, mods.Value));
+        }
+
         private void computeEzAnalysis()
         {
             if (working.Value.BeatmapInfo is not BeatmapInfo beatmapInfo)
@@ -335,12 +350,12 @@ namespace osu.Game.Screens.Select
             ezAnalysisBindable.BindValueChanged(result => applyWedgeEzAnalysis(result.NewValue), true);
         }
 
-        private void applyWedgeEzAnalysis(EzAnalysisResult result)
+        private void applyWedgeEzAnalysis(EzAnalysisResult? result)
         {
             if (working.Value.BeatmapInfo is not BeatmapInfo beatmapInfo)
                 return;
 
-            if (!EzSongSelectAnalysisDisplay.ShouldApplyPanelKpsUpdate(result, mods.Value))
+            if (result is { } analysis && !EzSongSelectAnalysisDisplay.ShouldApplyPanelKpsUpdate(analysis, mods.Value))
                 return;
 
             applyWedgeMetrics(EzSongSelectAnalysisDisplay.Resolve(beatmapInfo, result, mods.Value));

@@ -61,7 +61,11 @@ namespace osu.Game.EzOsuGame.Beatmaps
             return finite(beatmap.GetPersistedSunnyStarRating() ?? analysisSummary?.XxySr);
         }
 
+        /// <summary>
+        /// A per-system rating is only a value above zero: the columns are schema-populated and a zero means the
+        /// backfill has not reached this chart, not that it was rated zero.
+        /// </summary>
         private static double? finite(double? value)
-            => value is double actual && double.IsFinite(actual) && actual >= 0 ? actual : null;
+            => value is double actual && double.IsFinite(actual) && actual > 0 ? actual : null;
     }
 }

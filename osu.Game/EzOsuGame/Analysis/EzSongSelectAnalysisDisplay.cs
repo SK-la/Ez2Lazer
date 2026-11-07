@@ -4,8 +4,8 @@
 using System;
 using System.Collections.Generic;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Analysis
@@ -35,8 +35,6 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public static PanelMetrics Resolve(BeatmapInfo beatmap, EzAnalysisResult? dynamic, IReadOnlyList<Mod>? mods)
         {
-            bool useDynamicStarMetrics = HasActiveMods(mods) && dynamic?.ManiaSummary?.XxySr != null;
-
             double avgKps = 0;
             double maxKps = 0;
             IReadOnlyList<double> kpsList = Array.Empty<double>();
@@ -48,11 +46,21 @@ namespace osu.Game.EzOsuGame.Analysis
                 kpsList = analysis.KpsList;
             }
 
-            EzManiaSummary? maniaSummary = beatmap.ToEzManiaSummaryForDisplay(
-                dynamic?.ManiaSummary,
-                preferAnalysisValues: useDynamicStarMetrics);
+            return new PanelMetrics(avgKps, maxKps, kpsList, ResolveSummary(beatmap, dynamic));
+        }
 
-            return new PanelMetrics(avgKps, maxKps, kpsList, maniaSummary);
+        /// <summary>
+        /// The Ez pill's summary for the selected system. The rating is the chart-skill star the analysis measured,
+        /// so it follows the mods and the selected algorithm; the column answers only when the analysis has none.
+        /// </summary>
+        public static EzManiaSummary ResolveSummary(BeatmapInfo beatmap, EzAnalysisResult? analysis)
+        {
+            var columns = analysis?.ManiaSummary;
+
+            return new EzManiaSummary(
+                columns?.ColumnCounts,
+                columns is { HasHoldNoteCounts: true } supplied ? supplied.HoldNoteCounts : null,
+                EzMetricVariantReadout.SkillStar(beatmap, analysis));
         }
     }
 }

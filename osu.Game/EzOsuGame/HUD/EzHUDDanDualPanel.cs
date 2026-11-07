@@ -24,6 +24,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -106,6 +107,12 @@ namespace osu.Game.EzOsuGame.HUD
 
         [Resolved(canBeNull: true)]
         private EzAnalysisCache? analysisCache { get; set; }
+
+        /// <summary>
+        /// 非 null 表示这块面板挂在 Player 里。游玩期间只读已有分析结果，不发起计算。
+        /// </summary>
+        [Resolved(canBeNull: true)]
+        private GameplayState? gameplayState { get; set; }
 
         [Resolved(canBeNull: true)]
         private IBindable<WorkingBeatmap>? beatmap { get; set; }
@@ -371,6 +378,10 @@ namespace osu.Game.EzOsuGame.HUD
                 return;
             }
 
+            // 游玩期间只读已有结果：分析计算放到选歌、结算等非游玩路径，避免进局瞬间抢 CPU 和大量分配。
+            if (gameplayState != null)
+                return;
+
             // Same (beatmap, mods) already kicked: keep the in-flight pass alive.
             if (lastLiveKickKey == liveKey)
                 return;
@@ -393,7 +404,7 @@ namespace osu.Game.EzOsuGame.HUD
                 liveChartCancellation = new CancellationTokenSource();
                 CancellationToken token = liveChartCancellation.Token;
 
-                analysisCache.GetLiveAnalysisAsync(beatmapInfo, null, localMods, token)
+                analysisCache.GetAnalysisAsync(beatmapInfo, null, localMods, token)
                              .ContinueWith(task =>
                              {
                                  Schedule(() =>

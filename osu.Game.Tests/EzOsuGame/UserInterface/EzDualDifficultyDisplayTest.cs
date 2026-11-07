@@ -55,11 +55,12 @@ namespace osu.Game.Tests.EzOsuGame.UserInterface
         }
 
         [Test]
-        public void ShouldShowXxyDisplay_false_for_osu()
+        public void ShouldShowXxyDisplay_true_for_osu_because_its_system_has_a_skill_vector()
         {
+            // The pill is no longer gated on an analysis provider: osu reads out under PP+, which has a chart vector.
             var beatmap = new BeatmapInfo { Ruleset = new OsuRuleset().RulesetInfo };
 
-            Assert.That(EzDualDifficultyDisplay.ShouldShowXxyDisplay(beatmap), Is.False);
+            Assert.That(EzDualDifficultyDisplay.ShouldShowXxyDisplay(beatmap), Is.True);
         }
 
         private static BeatmapInfo createManiaBeatmap(double starRating = 0, double SunnyStarRating = 4.2)
