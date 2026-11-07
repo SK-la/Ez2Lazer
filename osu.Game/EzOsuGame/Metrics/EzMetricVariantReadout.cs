@@ -154,8 +154,32 @@ namespace osu.Game.EzOsuGame.Metrics
         /// only thing that decides the column, so the mapping is a plain producer switch.
         /// </summary>
         private static double? baseline(BeatmapInfo beatmap, EzMetricProducerId producer)
+            => EzMetricVariantValues.Positive(ColumnValue(beatmap, producer));
+
+        /// <summary>
+        /// Whether a producer's baseline is persisted as a flattened column on <see cref="BeatmapInfo"/>.
+        /// </summary>
+        public static bool HasColumn(EzMetricProducerId producer)
+            => producer == EzChartMetricProducer.Official.Id()
+               || producer == EzChartMetricProducer.OfficialPerformance.Id()
+               || producer == EzChartMetricProducer.Ssr.Id()
+               || producer == EzChartMetricProducer.SsrPerformance.Id()
+               || producer == EzChartMetricProducer.Ppp.Id()
+               || producer == EzChartMetricProducer.PppPerformance.Id()
+               || producer == EzChartMetricProducer.Mina.Id();
+
+        /// <summary>
+        /// The raw column a producer's baseline would be read from, or <c>-1</c> when it owns no column.
+        /// </summary>
+        /// <remarks>
+        /// Exposed so diagnostics can answer "has anything been written here" without knowing which column belongs
+        /// to which system; the read path and the coverage readout must not disagree about that mapping.
+        /// </remarks>
+        public static double ColumnValue(BeatmapInfo beatmap, EzMetricProducerId producer)
         {
-            double value = producer == EzChartMetricProducer.Official.Id() ? beatmap.StarRating
+            ArgumentNullException.ThrowIfNull(beatmap);
+
+            return producer == EzChartMetricProducer.Official.Id() ? beatmap.StarRating
                 : producer == EzChartMetricProducer.OfficialPerformance.Id() ? beatmap.PerformancePoints
                 : producer == EzChartMetricProducer.Ssr.Id() ? beatmap.SunnyStarRating
                 : producer == EzChartMetricProducer.SsrPerformance.Id() ? beatmap.SunnyPerformancePoints
@@ -163,8 +187,6 @@ namespace osu.Game.EzOsuGame.Metrics
                 : producer == EzChartMetricProducer.PppPerformance.Id() ? beatmap.PPPPerformancePoints
                 : producer == EzChartMetricProducer.Mina.Id() ? beatmap.MinaRating
                 : -1;
-
-            return EzMetricVariantValues.Positive(value);
         }
     }
 }

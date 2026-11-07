@@ -434,25 +434,27 @@ namespace osu.Game.EzOsuGame.Localization
             + "\nMay take a long time for large libraries; watch the progress notification in the top-right corner.");
 
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS =
-            new EzLocalizationManager.EzLocalisableString("技能数据状态", "Skill data status");
+            new EzLocalizationManager.EzLocalisableString("分析数据状态", "Analysis data status");
 
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_REFRESH =
-            new EzLocalizationManager.EzLocalisableString("刷新技能数据状态", "Refresh skill data status");
+            new EzLocalizationManager.EzLocalisableString("刷新分析数据状态", "Refresh analysis data status");
 
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_REFRESH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "重新统计谱面技能链（MSD → CSI → Dan）当前版本的覆盖情况并刷新状态标记。"
-            + "\n打开设置页时会自动统计一次；补算完成后可用此按钮再查。大库可能耗时数秒。"
+            "按规则集重新统计各分析系统（官方 / Sunny / PP+ / Mina / CSI / Dan）已落盘的覆盖情况并刷新状态标记。"
+            + "\n补算完成后可用此按钮再查；大库可能耗时数秒。"
             + "\n就绪 = 已是当前版本；不可评分 = 该谱面确定算不出，已结算不再重试；"
             + "过期 = 旧版本留下的行（改过算法后会出现）；缺失 = 还没算过。"
-            + "\n健康 = 过期 + 缺失；三项独立统计，上游换版会使其下游整体变为过期。"
+            + "\n待补算 = 过期 + 缺失。各系统独立统计，上游换版会使其下游整体变为过期。"
+            + "\n没有版本号列的系统（官方星级 / PP 等）只区分已填 / 未填。"
             + "\n玩家技能 = 玩家链（成绩 → SSR/Dan），没有组合版本号：一局结算后其技能行会被标为过期，"
             + "由手动「计算本地成绩」（及图表链回折）刷新；这里显示还有多少玩家待刷新。"
             + "\n蓝色 = 已对齐；橙色 = 仍有待补算；红色 = 统计失败。",
-            "Re-measures chart-skill-chain coverage (MSD -> CSI -> Dan) at the current revision and refreshes the status marker."
-            + "\nIt is also measured automatically when the settings panel opens; use this button only to re-check after a backfill. May take a few seconds on a large library."
+            "Re-measures stored coverage of every analysis system (official / Sunny / PP+ / Mina / CSI / Dan) per ruleset."
+            + "\nUse this button to re-check after a backfill. May take a few seconds on a large library."
             + "\nready = already at the current revision; unrateable = deterministically unratable and settled (no longer retried);"
             + " stale = a row left by an older revision (appears after an algorithm change); missing = never computed."
-            + "\nPending = stale + missing. The three facets are counted independently; bumping an upstream one turns its downstream facets stale."
+            + "\nPending = stale + missing. Each system is counted independently; bumping an upstream one turns its downstream facets stale."
+            + "\nSystems with no revision column (official star / pp, ...) only distinguish filled from unfilled."
             + "\nPlayer skills = the player chain (plays -> SSR/Dan), which has no composed revision: a settled play flags the player's"
             + " rows and the manual compute / chart-chain follow-up refreshes them. This shows how many players are still waiting."
             + "\nBlue = in sync; orange = work still pending; red = measurement failed.");

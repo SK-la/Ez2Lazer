@@ -18,7 +18,8 @@ namespace osu.Game.EzOsuGame.Overlays
         private static readonly string[] skill_data_keywords =
         {
             "realm", "msd", "csi", "dan", "skill", "status", "stale", "missing", "unrateable",
-            "技能", "状态", "缺失", "过期", "补算",
+            "official", "sunny", "ssr", "ppp", "mina", "analysis", "ruleset",
+            "技能", "分析", "状态", "缺失", "过期", "补算", "规则集",
         };
 
         public static void AddTo(
@@ -65,7 +66,8 @@ namespace osu.Game.EzOsuGame.Overlays
         }
 
         /// <summary>
-        /// Note readout + refresh button for the chart skill chain. Measurement runs only when the user taps refresh.
+        /// Note readout + refresh button for the persisted analysis data of every ruleset. Measurement runs only when
+        /// the user taps refresh.
         /// </summary>
         private static void addSkillDataStatus(
             SettingsSubsection subsection,

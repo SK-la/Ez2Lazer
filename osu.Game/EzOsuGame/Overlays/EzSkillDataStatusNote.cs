@@ -26,8 +26,8 @@ using osu.Game.Overlays.Settings;
 namespace osu.Game.EzOsuGame.Overlays
 {
     /// <summary>
-    /// Readout for the chart / player skill chains. The sweep walks every mania chart plus the three facet tables,
-    /// so measurement stays on a background task and runs only when the user taps refresh in settings.
+    /// Readout for the persisted analysis data of every ruleset. The sweep walks the chart chain and the value
+    /// tables, so measurement stays on a background task and runs only when the user taps refresh in settings.
     /// Reports through a <see cref="SettingsNote"/>: informational when everything is current, warning when a pass
     /// would still have work to do, critical when the measurement itself failed.
     /// </summary>
@@ -94,21 +94,20 @@ namespace osu.Game.EzOsuGame.Overlays
                 EzStartupTrace.LogDiagnostic($"SkillDataStatus.Measure begin thread={Environment.CurrentManagedThreadId}");
 
                 bool failed = false;
-                EzDataStateReport? status = null;
+                IReadOnlyList<EzRulesetAnalysisStatus> statuses = Array.Empty<EzRulesetAnalysisStatus>();
                 IReadOnlyList<EzStalePlayerSkill> stalePlayers = Array.Empty<EzStalePlayerSkill>();
                 EzChartChainDebt debt = EzChartChainDebt.EMPTY;
                 bool backfillRunning = false;
 
                 try
                 {
-                    var chain = skillStore.CollectChartChainState("settings");
-                    status = chain.ToReport(DateTimeOffset.UtcNow);
+                    statuses = skillStore.CollectAnalysisStatus("settings");
                     stalePlayers = playerStore?.GetStalePlayerSkillDetails() ?? Array.Empty<EzStalePlayerSkill>();
 
                     // Derived, not stored: the debt is the drill ledger joined against the chain's own coverage, so it
                     // disappears on its own once the chain writes the row instead of needing a flag cleared.
                     if (profileStore != null)
-                        debt = EzChartChainDebt.Collect(profileStore.LoadManiaDrillChartPlays(), chain);
+                        debt = EzChartChainDebt.Collect(profileStore.LoadManiaDrillChartPlays(), skillStore.CollectChartChainState("debt"));
 
                     backfillRunning = backgroundDataStoreProcessor?.IsEzRealmMetadataBackfillRunning == true;
                 }
@@ -128,9 +127,9 @@ namespace osu.Game.EzOsuGame.Overlays
                     Measuring.Value = false;
                     Interlocked.Exchange(ref measuring, 0);
 
-                    statusNote.Value = failed || status == null
+                    statusNote.Value = failed || statuses.Count == 0
                         ? note(EzSettingsStrings.SKILL_DATA_STATUS_FAILED, SettingsNote.Type.Critical)
-                        : describe(status, stalePlayers, debt, backfillRunning);
+                        : describe(statuses, stalePlayers, debt, backfillRunning);
                 });
             });
         }
@@ -139,7 +138,7 @@ namespace osu.Game.EzOsuGame.Overlays
             => new SettingsNote.Data($"{EzSettingsStrings.SKILL_DATA_STATUS} · {text}", type);
 
         private static SettingsNote.Data describe(
-            EzDataStateReport status,
+            IReadOnlyList<EzRulesetAnalysisStatus> statuses,
             IReadOnlyList<EzStalePlayerSkill> stalePlayers,
             EzChartChainDebt debt,
             bool backfillRunning)
@@ -150,9 +149,27 @@ namespace osu.Game.EzOsuGame.Overlays
                    + $" {EzSettingsStrings.SKILL_DATA_STATUS_STALE} {facet.Stale}"
                    + $" {EzSettingsStrings.SKILL_DATA_STATUS_MISSING} {facet.Missing}";
 
-            string pending = status.HasWorkToDo
-                ? $"    {EzSettingsStrings.SKILL_DATA_STATUS_PENDING} {status.TotalPending}"
+            bool hasWork = statuses.Any(s => s.Report.HasWorkToDo);
+            int totalPending = statuses.Sum(s => s.Report.TotalPending);
+
+            string pending = hasWork
+                ? $"{EzSettingsStrings.SKILL_DATA_STATUS_PENDING} {totalPending}"
                 : EzSettingsStrings.SKILL_DATA_STATUS_ALL_CURRENT;
+
+            // One section per ruleset: each ruleset reads out under its own systems and revisions, so a single
+            // library-wide line would mix counts that are not comparable. Only facets with work are listed; a fully
+            // current facet is the expected state and would otherwise turn the note into a table of zeroes.
+            string charts = string.Concat(statuses.Select(s =>
+            {
+                string header = $"\n · {s.RulesetName} {s.ChartCount}";
+
+                var pendingFacets = s.Report.Facets.Where(f => f.Pending > 0).ToList();
+
+                if (pendingFacets.Count == 0)
+                    return $"{header} · {EzSettingsStrings.SKILL_DATA_STATUS_ALL_CURRENT}";
+
+                return header + string.Concat(pendingFacets.Select(f => $"\n    · {describeFacet(f)}"));
+            }));
 
             // Player-side chain: it has no revision to count against, so it reports two separate things — the rows
             // flagged as trailing the SQLite slice, and (derived) the plays still waiting on the chart chain. Each
@@ -175,8 +192,8 @@ namespace osu.Game.EzOsuGame.Overlays
                   + $"({EzSettingsStrings.SKILL_DATA_STATUS_WAITING_MSD} {debt.WaitingOnMsdByUser.Values.Sum()})"
                 : $"{EzSettingsStrings.SKILL_DATA_STATUS_WAITING_CHART} {EzSettingsStrings.SKILL_DATA_STATUS_ALL_CURRENT}";
 
-            string line = $"{EzSettingsStrings.SKILL_DATA_STATUS_CHARTS} {status.UniverseCount}"
-                          + string.Concat(status.Facets.Select(f => $"\n · {describeFacet(f)}"))
+            string line = $"{EzSettingsStrings.SKILL_DATA_STATUS_CHARTS} {statuses.Sum(s => s.ChartCount)}"
+                          + charts
                           + $"\n · {pending}"
                           + $"\n · {players}"
                           + $"\n · {waiting}";
@@ -184,7 +201,7 @@ namespace osu.Game.EzOsuGame.Overlays
             if (backfillRunning)
                 line += EzSettingsStrings.SKILL_DATA_STATUS_RUNNING;
 
-            bool healthy = !status.HasWorkToDo && stalePlayers.Count == 0 && !debt.HasDebt;
+            bool healthy = !hasWork && stalePlayers.Count == 0 && !debt.HasDebt;
 
             return new SettingsNote.Data($"{EzSettingsStrings.SKILL_DATA_STATUS} · {line}",
                 healthy ? SettingsNote.Type.Informational : SettingsNote.Type.Warning);

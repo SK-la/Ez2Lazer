@@ -639,6 +639,22 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
+        /// Coverage of every analysis system, grouped by ruleset. Reads the chart chain and the skill-value table in
+        /// one run, so call it off the UI thread; it is meant for an explicit status refresh, not a hot path.
+        /// </summary>
+        public IReadOnlyList<EzRulesetAnalysisStatus> CollectAnalysisStatus(string? traceCaller = null)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var statuses = realmAccess.Run(r => EzAnalysisDataStatus.Collect(r, DateTimeOffset.UtcNow));
+            stopwatch.Stop();
+
+            if (traceCaller != null)
+                EzStartupTrace.LogDiagnostic($"AnalysisDataStatus caller={traceCaller} elapsedMs={stopwatch.ElapsedMilliseconds} rulesets={statuses.Count}");
+
+            return statuses;
+        }
+
+        /// <summary>
         /// Snapshot of the chart skill chain's completeness, counted over every rateable mania chart in Realm.
         /// <para>
         /// Reads all three facet tables in one run, so call it off the UI thread; it is meant for an explicit

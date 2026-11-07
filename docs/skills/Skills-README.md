@@ -24,7 +24,11 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
     `EzDataStateChecker` counts ready / settled / stale / missing, `EzDataStateReport` is the list the readout
     renders. Storage-agnostic, so a Realm table and a SQLite table report the same way.
   - `EzChartChainState` — the chart chain's Realm adapter: one read of MSD / CSI / Dan into facets, plus the
-    per-stage owed sets. `EzChartSkillStore.GetSkillDataStatus()` returns its report.
+    per-stage owed sets.
+  - `EzAnalysisDataStatus` — the readout entry for every ruleset: builds one facet per declared chart producer
+    (skill-value table, chart chain, or beatmap column, decided the same way the read path decides it), so a new
+    system appears in the settings status line without touching it. `EzChartSkillStore.CollectAnalysisStatus()`
+    runs it.
 - Player SSR aggregation:
   - `EzPlayerSsrAggregator`
   - `EzDanPlaySsrIndex`
@@ -105,10 +109,12 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
 
 - 启动日志：`Ez chart chain revisions: MSD v…, CSI v… (policy=… …), Dan v… (…)`。
 - 每一段补算仍各自 `showProgressNotification`；因为过期行对增量集合就是"缺失"，换版后启动会自动弹进度。
-- 设置 → Ez → 实验性 → **技能数据状态**：`EzChartSkillStore.GetSkillDataStatus()` 的
-  ready / unrateable / stale / missing，回答"数据有没有缺、有没有过期"；同一行末尾附带玩家链的
-  「玩家技能 落后账本 N」（`GetStalePlayerSkillUsernames()`）与派生的「等图表链 N」
+- 设置 → Ez → 实验性 → **分析数据状态**：`EzChartSkillStore.CollectAnalysisStatus()` 按规则集依次列出
+  各自分析系统（官方 / Sunny / PP+ / Mina / CSI / Dan）的 ready / unrateable / stale / missing，
+  回答"数据有没有缺、有没有过期"；只列出仍有待补算的系统，全部对齐时该规则集显示"无待补算"。
+  末尾附带玩家链的「玩家技能 落后账本 N」（`GetStalePlayerSkillUsernames()`）与派生的「等图表链 N」
   （`EzChartChainDebt`），所以两条链的状态在一个地方能看完。
+  没有版本号的系统（官方星级 / PP 等基线列）只区分已填 / 未填。
 - 玩家侧另有一套可见性：落后账本在个人主页显示为「待更新」（`LOCAL_PROFILE_SKILL_STALE`，由
   `EzPlayerSkillStore` 按账本行数派生，不存标志位）；手动「计算成绩分析」弹
   `EzLocalProfileComputeNotification` 进度通知（一次点击只弹一轮）。
@@ -120,8 +126,10 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
 1. `EzAnalysisFacet` 加成员（`Analysis/EzAnalysisRevision.cs`），有级联就在 `DownstreamOf` 里写下依赖边。
 2. 给一个 reader：把那张表读成 `<key, EzFacetRowState>`。Realm 表直接用
    `EzRealmFacetReader.Read(...)`；SQLite / 内存来源自己产 `EzFacetRowState` 即可，内核不认识 Realm。
-3. 把 facet 挂到状态入口产出的 `EzDataStateFacet` 列表里（图表链是 `EzChartChainState.Build`）。
-   `Id` 就是显示名，`CurrentRevision` 是这条数据要对比的版本（没有版本体系就用常量的单调值）。
+3. 把 facet 挂到状态入口产出的 `EzDataStateFacet` 列表里。图表链的 facet 是 `EzChartChainState.Build`；
+   其余分析系统由 `EzAnalysisDataStatus.Collect` 按图表生产者目录自动生成，一般不在这里加代码——
+   让解析器认得新的存储位置即可。`Id` 就是显示名，`CurrentRevision` 是这条数据要对比的版本
+   （没有版本体系就用 `0`，此时只区分已填 / 未填）。
 
 `EzDataStateChecker` 与 `EzDataStateReport` 不用动：计数口径（当前修订且非 stub = ready，stub 或上游
 已结算 = settled，旧修订 = stale，无行 = missing）只有一份，UI 遍历 `report.Facets` 渲染，新 facet 自动
