@@ -5,6 +5,8 @@ using System;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Metrics;
+using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Rulesets.Osu.Mods;
@@ -51,6 +53,34 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             var emptyAnalysis = new EzAnalysisResult(new KpsSummary(0, 0, Array.Empty<double>()));
 
             Assert.That(EzSongSelectAnalysisDisplay.ShouldApplyPanelKpsUpdate(emptyAnalysis, new Mod[] { new OsuModHardRock() }), Is.False);
+        }
+
+        [Test]
+        public void Resolve_accepts_a_default_result_before_the_pass_lands()
+        {
+            // A bindable's initial value is a default struct: no KPS summary, no axes table. The readout must
+            // report that as absent rather than throw.
+            var beatmap = new BeatmapInfo
+            {
+                ID = Guid.NewGuid(),
+                Hash = Guid.NewGuid().ToString(),
+                MD5Hash = Guid.NewGuid().ToString(),
+                Ruleset = new ManiaRuleset().RulesetInfo,
+                Difficulty = new BeatmapDifficulty { CircleSize = 4 },
+                DifficultyName = "test",
+                MinaRating = 12.5,
+            };
+
+            var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, default(EzAnalysisResult), Array.Empty<Mod>());
+
+            Assert.That(metrics.KpsList, Is.Empty);
+            Assert.That(metrics.ManiaSummary?.XxySr, Is.EqualTo(12.5), "the stored baseline answers for an unfinished pass");
+        }
+
+        [Test]
+        public void Default_result_has_no_axes()
+        {
+            Assert.That(default(EzAnalysisResult).AxesOf(EzChartMetricProducer.Mina.Id()), Is.Empty);
         }
 
         private static BeatmapInfo createOsuBeatmap(double performancePoints)

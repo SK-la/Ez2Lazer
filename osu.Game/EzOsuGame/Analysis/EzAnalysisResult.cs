@@ -124,14 +124,17 @@ namespace osu.Game.EzOsuGame.Analysis
         public readonly EzManiaSummary? ManiaSummary;
         public readonly EzBeatmapTagSummary? TagSummary;
 
+        private readonly IReadOnlyDictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>? axes;
+
         /// <summary>
         /// Axis values grouped by the producer that emitted them, keyed by bare axis id.
         /// </summary>
         /// <remarks>
         /// A producer missing from this table did not run for this chart; one present with no entries ran
-        /// and had nothing to say.
+        /// and had nothing to say. Never null: a <c>default</c> result (a bindable's pre-computation value) has no
+        /// table at all, and consumers must read "no axes" rather than crash on it.
         /// </remarks>
-        public readonly IReadOnlyDictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>> Axes;
+        public IReadOnlyDictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>> Axes => axes ?? no_axes;
 
         /// <summary>Dan estimates for the sides this chart can be rated on.</summary>
         public readonly EzDanSet? Dan;
@@ -157,7 +160,7 @@ namespace osu.Game.EzOsuGame.Analysis
             CommonSummary = commonSummary;
             ManiaSummary = maniaSummary;
             TagSummary = tagSummary;
-            Axes = axes ?? no_axes;
+            this.axes = axes;
             Dan = dan;
             Radar = radar;
             ChartSkillInfo = chartSkillInfo;
