@@ -119,7 +119,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             double resolvedXxy = SunnyStarRating
                                  ?? (hasKps && maniaSummary?.XxySr is double analysisXxy && analysisXxy >= 0
                                      ? analysisXxy
-                                     : beatmap.SunnyStarRating);
+                                     : beatmap.EzRatingData.SunnySR);
 
             int keyCount = 0;
 

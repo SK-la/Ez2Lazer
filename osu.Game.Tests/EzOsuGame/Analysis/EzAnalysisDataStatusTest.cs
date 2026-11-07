@@ -71,7 +71,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 realm.Write(r =>
                 {
                     var beatmap = r.All<BeatmapInfo>().Single(b => b.Hash == mania_hash);
-                    beatmap.SunnyStarRating = 6.5;
+                    beatmap.EzRatingData.SunnySR = 6.5;
                 });
 
                 var mania = new EzChartSkillStore(realm).CollectAnalysisStatus().Single(s => s.RulesetOnlineId == 3);

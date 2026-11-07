@@ -76,7 +76,7 @@ namespace osu.Game.Tests.Visual.SongSelect
         {
             var set = TestResources.CreateTestBeatmapSetInfo(1);
             var beatmap = set.Beatmaps[0];
-            beatmap.SunnyStarRating = xxy;
+            beatmap.EzRatingData.SunnySR = xxy;
             beatmap.StarRating = starRating;
             return beatmap;
         }

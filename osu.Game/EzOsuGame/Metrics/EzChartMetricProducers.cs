@@ -248,6 +248,8 @@ namespace osu.Game.EzOsuGame.Metrics
                 IsDefaultRadarFor = ruleset => meta.DefaultRadar
                                                && EzMetricRulesets.For(meta.Rulesets)(ruleset)
                                                && isHighestPriority(meta, ruleset, siblings),
+                RatingSystem = meta.RatingSystem,
+                RatingField = meta.RatingField,
             };
         }
 

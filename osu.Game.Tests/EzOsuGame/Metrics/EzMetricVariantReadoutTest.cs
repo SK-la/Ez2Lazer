@@ -23,7 +23,7 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         public void Unfilled_column_reads_as_absent()
         {
             var beatmap = maniaBeatmap();
-            beatmap.MinaRating = 0;
+            beatmap.EzRatingData.MinaSR = 0;
 
             Assert.That(EzMetricVariantReadout.SkillStar(beatmap, null), Is.Null);
         }
@@ -32,11 +32,11 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         public void Measured_axis_wins_over_the_column()
         {
             var beatmap = maniaBeatmap();
-            beatmap.MinaRating = 12;
+            beatmap.EzRatingData.MinaSR = 2;
 
             var analysis = analysisWith(EzChartMetricProducer.Mina.Id(), EzMinaSkillAxis.Overall.ToId(), 21.5);
 
-            Assert.That(EzMetricVariantReadout.SkillStar(beatmap, analysis), Is.EqualTo(21.5));
+            Assert.That(EzMetricVariantReadout.SkillStar(beatmap, analysis), Is.EqualTo(EzMinaRatingScale.ToStarRating(21.5)));
         }
 
         [Test]

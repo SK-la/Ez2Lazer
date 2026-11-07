@@ -11,6 +11,7 @@ using AutoMapper.Internal;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.Input.Bindings;
 using osu.Game.Models;
 using osu.Game.Rulesets;
@@ -42,12 +43,14 @@ namespace osu.Game.Database
              .ForMember(s => s.Metadata, cc => cc.Ignore())
              .ForMember(s => s.UserSettings, cc => cc.Ignore())
              .ForMember(s => s.Difficulty, cc => cc.Ignore())
+             .ForMember(s => s.EzRatingData, cc => cc.Ignore())
              .ForMember(s => s.BeatmapSet, cc => cc.Ignore())
              .AfterMap((s, d) =>
              {
                  d.Ruleset = d.Realm!.Find<RulesetInfo>(s.Ruleset.ShortName)!;
                  copyChangesToRealm(s.Difficulty, d.Difficulty);
                  copyChangesToRealm(s.Metadata, d.Metadata);
+                 copyChangesToRealm(s.EzRatingData, d.EzRatingData);
              });
             c.CreateMap<BeatmapSetInfo, BeatmapSetInfo>()
              .ConstructUsing(_ => new BeatmapSetInfo(null))
@@ -175,6 +178,7 @@ namespace osu.Game.Database
             c.CreateMap<BeatmapMetadata, BeatmapMetadata>();
             c.CreateMap<BeatmapUserSettings, BeatmapUserSettings>();
             c.CreateMap<BeatmapDifficulty, BeatmapDifficulty>();
+            c.CreateMap<EzRatingData, EzRatingData>();
             c.CreateMap<RulesetInfo, RulesetInfo>();
             c.CreateMap<ScoreInfo, ScoreInfo>();
             c.CreateMap<RealmUser, RealmUser>();
@@ -232,8 +236,14 @@ namespace osu.Game.Database
         public static void CopyChangesToRealm(this BeatmapSetInfo source, BeatmapSetInfo destination)
             => copyChangesToRealm(source, destination);
 
-        private static void copyChangesToRealm<T>(T source, T destination) where T : RealmObjectBase
-            => write_mapper.Map(source, destination);
+        private static void copyChangesToRealm<T>(T? source, T? destination) where T : RealmObjectBase
+        {
+            // An embedded object can be absent on a row written before it existed.
+            if (source == null || destination == null)
+                return;
+
+            write_mapper.Map(source, destination);
+        }
 
         public static List<Live<T>> ToLiveUnmanaged<T>(this IEnumerable<T> realmList)
             where T : RealmObject, IHasGuidPrimaryKey

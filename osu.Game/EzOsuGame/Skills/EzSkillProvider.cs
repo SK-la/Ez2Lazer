@@ -293,7 +293,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (double.IsNaN(holdRatio))
                 holdRatio = 0;
 
-            double? xxySr = beatmapInfo.SunnyStarRating >= 0 ? beatmapInfo.SunnyStarRating : null;
+            double? xxySr = beatmapInfo.EzRatingData.SunnySR >= 0 ? beatmapInfo.EzRatingData.SunnySR : null;
             return EzChartDanEstimator.FromMsd(msd, keyCount, holdRatio, xxySr);
         }
 
@@ -797,7 +797,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             // Same priority as DualPanel headline: Sunny/xxy first, then chart verdict label.
             string? aggregateLabel = null;
-            double xxy = beatmapInfo.SunnyStarRating;
+            double xxy = beatmapInfo.EzRatingData.SunnySR;
 
             // Prefer Sunny for the requested side; primary-side verdict only when sides match.
             if (xxy >= 0 && double.IsFinite(xxy)

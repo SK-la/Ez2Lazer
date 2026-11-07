@@ -29,6 +29,14 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
     (skill-value table, chart chain, or beatmap column, decided the same way the read path decides it), so a new
     system appears in the settings status line without touching it. `EzChartSkillStore.CollectAnalysisStatus()`
     runs it.
+- Per-system chart ratings:
+  - `EzRatingData` — the star rating (SR) and perfect-play pp (PP) each system gives one chart, stored flat on
+    `BeatmapInfo` (`OfficialSR` / `OfficialPP` / `SunnySR` / `SunnyPP` / `PppSR` / `PppPP` / `MinaSR` / `MinaPP`).
+    The official pair is mirrored onto `BeatmapInfo.StarRating` / `PerformancePoints`, which stay the authority for
+    upstream code.
+  - `EzRatingWriter` — the only write path; finds the field through the producer declaration.
+  - `EzMinaRatingScale` — the engine's headline to star conversion, applied once when the Mina star is written and
+    again only for the live axis. `beatmap_msd.*` keeps the engine's own scale for the radar and the dan chain.
 - Player SSR aggregation:
   - `EzPlayerSsrAggregator`
   - `EzDanPlaySsrIndex`
@@ -82,7 +90,7 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
 | `EzChartSkillInfo.VERSION` | CSI → Dan | Dan 的组合号含 CSI 版本，因此只动 CSI 也会废掉 Dan |
 | `EzDanAlgorithm.VERSION` | Dan | 只有 Dan 行受影响 |
 | `EzAnalysisRevision.CSI_POLICY` / `DAN_POLICY` | 该级 + 下游 | 生产逻辑变了但没有算法常量能表达时（新增依赖边、改动读取路径）bump 它 |
-| `EzXxyStarRatingSupport` 版本 | Dan（显式清表） | xxy 落在 `BeatmapInfo` / ruleset 标量上，不进组合号，所以由 `clearOutdatedXxyStarRatings` 显式 `ClearChartDan()` |
+| `EzXxyStarRatingSupport` 版本 | Dan（显式清表） | xxy 落在 `BeatmapInfo.EzRatingData` / ruleset 标量上，不进组合号，所以由 `clearOutdatedXxyStarRatings` 显式 `ClearChartDan()` |
 | `Ez2Setting.SsrRescaleThreshold` / `SsrLnMultiplier` | **无** | 用户对算法的永久修订，不换代：只影响此后算出的 xxy 与它落库的结果，旧行保持原值。见下节 |
 
 组合规则：`revision = compose(自身常量 + 所有上游常量)`，每槽 base-100（`SLOT_RADIX`），

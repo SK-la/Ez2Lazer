@@ -42,15 +42,17 @@ namespace osu.Game.EzOsuGame.Metrics
     }
 
     /// <summary>
-    /// Reads a variant's scalar tiers as a pair out of the <see cref="BeatmapInfo"/> baseline columns.
+    /// Reads a variant's scalar tiers as a pair out of <see cref="BeatmapInfo.EzRatingData"/> and the beatmap's own
+    /// official columns.
     /// </summary>
     /// <remarks>
-    /// The columns are the L1 authority: one star and one pp column per system, written by the background backfill.
-    /// Selecting a different variant therefore needs no new storage and no new consumer code, only a mapping here.
+    /// The stored ratings are the L1 authority: the background backfill writes one star and one pp per system.
+    /// Selecting a different variant therefore needs no new storage and no new consumer code, only the producer's
+    /// declared <see cref="EzRatingSystem"/> / <see cref="EzRatingField"/>.
     /// Values the backfill has not reached yet are <c>-1</c> and read as null.
     /// <para>
     /// A caller that already holds a higher-tier pair (the live official difficulty, or the live Sunny rating)
-    /// passes it in and the baseline is used only for the half the live pair does not have. Reading one half live
+    /// passes it in and the stored pair is used only for the half the live pair does not have. Reading one half live
     /// and the other from a different system is not expressible through this API.
     /// </para>
     /// </remarks>
@@ -107,7 +109,7 @@ namespace osu.Game.EzOsuGame.Metrics
                 ? live.PerformancePoints ?? baseline(beatmap, producer)
                 : null;
             double? skillStar = variant.ChartSkillProducer is { } chartProducer
-                ? live.SkillStar ?? baseline(beatmap, chartProducer)
+                ? live.SkillStar is double liveStar ? liveSkillStar(chartProducer, liveStar) : baseline(beatmap, chartProducer)
                 : null;
 
             return new EzMetricVariantValues(star, performance, skillStar);
@@ -130,10 +132,17 @@ namespace osu.Game.EzOsuGame.Metrics
             if (analysis is { } live
                 && live.AxesOf(producer).TryGetValue(RatingAxisOf(producer), out double measured)
                 && double.IsFinite(measured) && measured > 0)
-                return measured;
+                return liveSkillStar(producer, measured);
 
             return baseline(beatmap, producer);
         }
+
+        /// <summary>
+        /// The live chart-skill axis as the pill prints it. Stored ratings are already on this scale; only the
+        /// measured axis needs converting, because the Mina engine measures in Etterna units.
+        /// </summary>
+        private static double liveSkillStar(EzMetricProducerId producer, double value)
+            => producer == EzChartMetricProducer.Mina.Id() ? EzMinaRatingScale.ToStarRating(value) : value;
 
         /// <summary>
         /// The axis a system's headline rating is stored under. Every system writes the shared star id except the
@@ -150,43 +159,45 @@ namespace osu.Game.EzOsuGame.Metrics
         }
 
         /// <summary>
-        /// Reads a system's baseline from the flattened column it owns. Which producer a value belongs to is the
-        /// only thing that decides the column, so the mapping is a plain producer switch.
+        /// Reads a system's stored rating. The official pair lives on the beatmap's own columns, which remain the
+        /// authority for upstream code; every other system is stored in <see cref="BeatmapInfo.EzRatingData"/>.
         /// </summary>
         private static double? baseline(BeatmapInfo beatmap, EzMetricProducerId producer)
-            => EzMetricVariantValues.Positive(ColumnValue(beatmap, producer));
+            => EzMetricVariantValues.Positive(StoredRating(beatmap, producer));
+
+        /// <summary>Whether a producer's rating is persisted on the beatmap.</summary>
+        public static bool HasStoredRating(EzMetricProducerId producer)
+        {
+            if (producer == EzChartMetricProducer.Official.Id() || producer == EzChartMetricProducer.OfficialPerformance.Id())
+                return true;
+
+            return ChartProducerOf(producer)?.RatingSystem is not (null or EzRatingSystem.None);
+        }
 
         /// <summary>
-        /// Whether a producer's baseline is persisted as a flattened column on <see cref="BeatmapInfo"/>.
-        /// </summary>
-        public static bool HasColumn(EzMetricProducerId producer)
-            => producer == EzChartMetricProducer.Official.Id()
-               || producer == EzChartMetricProducer.OfficialPerformance.Id()
-               || producer == EzChartMetricProducer.Ssr.Id()
-               || producer == EzChartMetricProducer.SsrPerformance.Id()
-               || producer == EzChartMetricProducer.Ppp.Id()
-               || producer == EzChartMetricProducer.PppPerformance.Id()
-               || producer == EzChartMetricProducer.Mina.Id();
-
-        /// <summary>
-        /// The raw column a producer's baseline would be read from, or <c>-1</c> when it owns no column.
+        /// The stored value for a producer's rating, or <c>-1</c> when it owns none.
         /// </summary>
         /// <remarks>
-        /// Exposed so diagnostics can answer "has anything been written here" without knowing which column belongs
+        /// Exposed so diagnostics can answer "has anything been written here" without knowing which field belongs
         /// to which system; the read path and the coverage readout must not disagree about that mapping.
         /// </remarks>
-        public static double ColumnValue(BeatmapInfo beatmap, EzMetricProducerId producer)
+        public static double StoredRating(BeatmapInfo beatmap, EzMetricProducerId producer)
         {
             ArgumentNullException.ThrowIfNull(beatmap);
 
-            return producer == EzChartMetricProducer.Official.Id() ? beatmap.StarRating
-                : producer == EzChartMetricProducer.OfficialPerformance.Id() ? beatmap.PerformancePoints
-                : producer == EzChartMetricProducer.Ssr.Id() ? beatmap.SunnyStarRating
-                : producer == EzChartMetricProducer.SsrPerformance.Id() ? beatmap.SunnyPerformancePoints
-                : producer == EzChartMetricProducer.Ppp.Id() ? beatmap.PPPStarRating
-                : producer == EzChartMetricProducer.PppPerformance.Id() ? beatmap.PPPPerformancePoints
-                : producer == EzChartMetricProducer.Mina.Id() ? beatmap.MinaRating
-                : -1;
+            if (producer == EzChartMetricProducer.Official.Id())
+                return beatmap.StarRating;
+
+            if (producer == EzChartMetricProducer.OfficialPerformance.Id())
+                return beatmap.PerformancePoints;
+
+            EzMetricProducer? meta = ChartProducerOf(producer);
+
+            return meta == null ? -1 : beatmap.EzRatingData.Get(meta.RatingSystem, meta.RatingField);
         }
+
+        /// <summary>The chart declaration for <paramref name="producer"/>, or null when it is not a chart producer.</summary>
+        private static EzMetricProducer? ChartProducerOf(EzMetricProducerId producer)
+            => EzMetricRegistries.Current.ChartRegistry.Get(producer);
     }
 }

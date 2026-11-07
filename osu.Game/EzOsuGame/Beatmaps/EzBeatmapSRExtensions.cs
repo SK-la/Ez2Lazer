@@ -13,10 +13,10 @@ namespace osu.Game.EzOsuGame.Beatmaps
         public static bool SupportsSunnyStarRating(this BeatmapInfo beatmap)
             => EzSunnyStarRatingSupport.SupportsRuleset(beatmap.Ruleset);
 
-        public static bool HasPersistedSunnyStarRating(this BeatmapInfo beatmap) => beatmap.SunnyStarRating >= 0;
+        public static bool HasPersistedSunnyStarRating(this BeatmapInfo beatmap) => beatmap.EzRatingData.SunnySR >= 0;
 
         public static double? GetPersistedSunnyStarRating(this BeatmapInfo beatmap)
-            => beatmap.HasPersistedSunnyStarRating() ? beatmap.SunnyStarRating : null;
+            => beatmap.HasPersistedSunnyStarRating() ? beatmap.EzRatingData.SunnySR : null;
 
         /// <summary>
         /// 面板在官方星级旁展示的 Ez 星级。
@@ -50,10 +50,10 @@ namespace osu.Game.EzOsuGame.Beatmaps
             int rulesetId = beatmap.Ruleset.OnlineID;
 
             if (rulesetId != EzLocalProfileConstants.MANIA_RULESET_ID)
-                return finite(beatmap.PPPStarRating);
+                return finite(beatmap.EzRatingData.PppSR);
 
             if (EzMetricVariantReadout.Selected(rulesetId)?.Id != EzMetricVariantCatalog.SUNNY)
-                return finite(beatmap.MinaRating);
+                return finite(beatmap.EzRatingData.MinaSR);
 
             if (preferAnalysisValues && analysisSummary?.XxySr is double liveXxy)
                 return finite(liveXxy);

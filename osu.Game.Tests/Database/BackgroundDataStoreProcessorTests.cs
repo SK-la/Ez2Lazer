@@ -73,8 +73,8 @@ namespace osu.Game.Tests.Database
 
                 foreach (var beatmap in r.All<BeatmapInfo>())
                 {
-                    if (beatmap.SunnyStarRating < 0 && EzSunnyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
-                        beatmap.SunnyStarRating = beatmap.StarRating >= 0 ? beatmap.StarRating : 0;
+                    if (beatmap.EzRatingData.SunnySR < 0 && EzSunnyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
+                        beatmap.EzRatingData.SunnySR = beatmap.StarRating >= 0 ? beatmap.StarRating : 0;
 
                     if (beatmap.PerformancePoints < 0 && EzSunnyStarRatingSupport.IsRulesetAvailable(beatmap.Ruleset))
                         beatmap.PerformancePoints = 0;

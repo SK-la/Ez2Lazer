@@ -18,6 +18,7 @@ using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.Online.API;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
@@ -33,7 +34,7 @@ namespace osu.Game.EzOsuGame.Analysis
     /// - <see cref="Ez2Setting.EzAnalysisRecEnabled"/>：选歌时是否即时计算/补全 SQLite 体系内指标（经 <see cref="EzAnalysisCache"/>），关闭则只读已落盘数据。
     ///
     /// 数据层（见 <see cref="EzSongSelectAnalysisDisplay"/>）：
-    /// - L1 Realm：<see cref="BeatmapInfo.SunnyStarRating"/> / <see cref="BeatmapInfo.PerformancePoints"/>，不受上述开关影响。
+    /// - L1 Realm：<see cref="BeatmapInfo.EzRatingData"/>（各系统 SR / PP）与 <see cref="BeatmapInfo.StarRating"/> / <see cref="BeatmapInfo.PerformancePoints"/>，不受上述开关影响。
     /// - L2 主 SQLite：NoMod kps + mania 列统计（不含 xxy/PP）。
     /// - 分支库：预生成 Mod 快照 xxy/PP（及关联指标）；激活后只读，构建/刷新走维护流程。
     /// </summary>
@@ -142,9 +143,9 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             xxySr = 0;
 
-            if (beatmapInfo is BeatmapInfo beatmap && beatmap.SunnyStarRating >= 0)
+            if (beatmapInfo is BeatmapInfo beatmap && beatmap.EzRatingData.SunnySR >= 0)
             {
-                xxySr = beatmap.SunnyStarRating;
+                xxySr = beatmap.EzRatingData.SunnySR;
                 return true;
             }
 
@@ -852,7 +853,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             if (payload.StarRating is double star && double.IsFinite(star) && star >= 0)
             {
-                beatmap.StarRating = star;
+                EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Official, star);
                 wrote = true;
             }
 
@@ -860,13 +861,13 @@ namespace osu.Game.EzOsuGame.Analysis
             /*
             if (payload.SunnyStarRating is double xxy && double.IsFinite(xxy) && xxy >= 0)
             {
-                beatmap.SunnyStarRating = xxy;
+                EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Sunny, xxy);
                 wrote = true;
             }
 
             if (payload.PerformancePoints is double pp && double.IsFinite(pp) && pp >= 0)
             {
-                beatmap.PerformancePoints = pp;
+                EzRatingWriter.WritePP(beatmap, EzRatingSystem.Official, pp);
                 wrote = true;
             }
             */

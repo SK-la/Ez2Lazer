@@ -245,12 +245,12 @@ namespace osu.Game.Tests.Visual.SongSelect
         {
             return s => s.Beatmaps.ForEach(b =>
             {
-                b.SunnyStarRating = xxy;
+                b.EzRatingData.SunnySR = xxy;
                 b.StarRating = starRating;
             });
         }
 
-        private static double resolveXxy(BeatmapInfo beatmap) => beatmap.SunnyStarRating >= 0 ? beatmap.SunnyStarRating : beatmap.StarRating;
+        private static double resolveXxy(BeatmapInfo beatmap) => beatmap.EzRatingData.SunnySR >= 0 ? beatmap.EzRatingData.SunnySR : beatmap.StarRating;
 
         private static async Task<IEnumerable<BeatmapInfo>> runSorting(SortMode sort, List<BeatmapSetInfo> beatmapSets,
                                                                        Func<IEnumerable<BeatmapInfo>, IReadOnlyDictionary<BeatmapInfo, double>>? xxyValueProvider = null,

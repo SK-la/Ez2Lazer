@@ -28,7 +28,7 @@ namespace osu.Game.Rulesets
 
         /// <summary>
         /// Stores the last applied xxy SR calculation version (yyyyMMdd, from <see cref="EzOsuGame.Analysis.IEzSunnyStarRatingSupport.SunnyStarRatingVersion"/>).
-        /// Used to invalidate persisted <see cref="Beatmaps.BeatmapInfo.SunnyStarRating"/>.
+        /// Used to invalidate persisted <see cref="Beatmaps.BeatmapInfo.EzRatingData"/>.
         /// </summary>
         public int LastAppliedSSRVersion { get; set; }
 

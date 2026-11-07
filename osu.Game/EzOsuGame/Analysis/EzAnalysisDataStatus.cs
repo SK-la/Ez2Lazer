@@ -181,15 +181,15 @@ namespace osu.Game.EzOsuGame.Analysis
                 });
             }
 
-            if (!EzMetricVariantReadout.HasColumn(producer.Id))
+            if (!EzMetricVariantReadout.HasStoredRating(producer.Id))
                 return null;
 
-            // Columns carry no stamp: a filled column is the answer, an empty one is the work.
+            // Stored ratings carry no stamp: a filled field is the answer, an empty one is the work.
             var filled = new Dictionary<string, EzFacetRowState>(charts.Count, StringComparer.Ordinal);
 
             foreach (var chart in charts)
             {
-                if (EzMetricVariantReadout.ColumnValue(chart, producer.Id) >= 0)
+                if (EzMetricVariantReadout.StoredRating(chart, producer.Id) >= 0)
                     filled[chart.Hash] = new EzFacetRowState(0, false);
             }
 

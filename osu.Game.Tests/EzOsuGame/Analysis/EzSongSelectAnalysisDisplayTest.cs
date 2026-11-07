@@ -68,8 +68,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Ruleset = new ManiaRuleset().RulesetInfo,
                 Difficulty = new BeatmapDifficulty { CircleSize = 4 },
                 DifficultyName = "test",
-                MinaRating = 12.5,
             };
+
+            beatmap.EzRatingData.MinaSR = 12.5;
 
             var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, default(EzAnalysisResult), Array.Empty<Mod>());
 

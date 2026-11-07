@@ -194,7 +194,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             if (double.IsNaN(holdRatio))
                 holdRatio = 0;
 
-            xxySr = beatmapInfo.SunnyStarRating >= 0 ? beatmapInfo.SunnyStarRating : null;
+            xxySr = beatmapInfo.EzRatingData.SunnySR >= 0 ? beatmapInfo.EzRatingData.SunnySR : null;
             holdCount = TryHoldCountFromBeatmapInfo(beatmapInfo);
 
             return keyCount > 0;

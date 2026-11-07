@@ -25,6 +25,7 @@ using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Input;
 using osu.Game.Input.Bindings;
@@ -130,6 +131,11 @@ namespace osu.Game.Database
         /// Ez v11: Reorder EzEnumJudgeMode/EzEnumHealthMode (StableClassic = 1; Mania private modes at 31+);
         ///         add canonical ScoreInfo.JudgeMode/HealthMode columns and migrate the legacy ManiaHitMode/ManiaHealthMode data into them.
         /// </summary>
+        /// <remarks>
+        /// BeatmapInfo's per-system rating columns were replaced by the embedded
+        /// <see cref="EzOsuGame.Metrics.EzRatingData"/> as part of v12: the v11-to-v12 migration creates the record
+        /// for every existing row, so the version number itself does not change.
+        /// </remarks>
         public const int EZ_REALM_SCHEMA_VERSION = 12;
 
         public static int EzFileSchemaVersion => schema_version * 1000 + EZ_REALM_SCHEMA_VERSION;
@@ -1535,9 +1541,6 @@ namespace osu.Game.Database
                     break;
 
                 case 3:
-                    foreach (var beatmap in migration.NewRealm.All<BeatmapInfo>())
-                        beatmap.SunnyStarRating = -1;
-
                     break;
 
                 case 4:
@@ -1631,24 +1634,30 @@ namespace osu.Game.Database
                     // 逐行猜测比直接清表更危险。开发期库没有兼容负担，交由回填重建。
                     migration.NewRealm.RemoveAll<EzBeatmapSkillValue>();
 
-                    // XxyStarRating 改名 SunnyStarRating：把旧列的值搬到新列，其余新增列保持默认 -1。
+                    // 各系统的星级 / pp 从五列收进 EzRatingData。v11 的 XxyStarRating 在 v12 里改名成
+                    // SunnyStarRating，现在又归到 EzRatingData.SunnySR，所以这一版一并把它搬过去。
                     string beatmapClassName = getMappedOrOriginalName(typeof(BeatmapInfo));
 
-                    if (!migration.OldRealm.Schema.TryFindObjectSchema(beatmapClassName, out var beatmapSchema)
-                        || !beatmapSchema.Any(p => p.Name == "XxyStarRating"))
-                    {
-                        break;
-                    }
+                    bool hasLegacyXxy = migration.OldRealm.Schema.TryFindObjectSchema(beatmapClassName, out var beatmapSchema)
+                                        && beatmapSchema.Any(p => p.Name == "XxyStarRating");
 
-                    dynamic oldBeatmaps = migration.OldRealm.DynamicApi.All(beatmapClassName);
+                    dynamic? oldBeatmaps = hasLegacyXxy ? migration.OldRealm.DynamicApi.All(beatmapClassName) : null;
                     var newBeatmaps = migration.NewRealm.All<BeatmapInfo>().ToList();
 
                     for (int i = 0; i < newBeatmaps.Count; i++)
                     {
+                        BeatmapInfo beatmap = newBeatmaps[i];
+
+                        // 迁移期间新列是 null：显式建一条，否则读取端拿到的是空引用。
+                        beatmap.EzRatingData ??= new EzRatingData();
+
+                        if (oldBeatmaps == null)
+                            continue;
+
                         double legacy = oldBeatmaps[i].XxyStarRating;
 
                         if (double.IsFinite(legacy))
-                            newBeatmaps[i].SunnyStarRating = legacy;
+                            beatmap.EzRatingData.SunnySR = legacy;
                     }
 
                     break;

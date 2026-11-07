@@ -96,7 +96,7 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// Computes baseline NoMod xxy SR for persisting to <see cref="BeatmapInfo.SunnyStarRating"/>.
+        /// Computes baseline NoMod xxy SR for persisting to the Sunny star slot.
         /// Returns -1 when unsupported or failed, 0 for empty beatmaps.
         /// </summary>
         public static double ComputeBaselineSSRForRealm(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
@@ -137,12 +137,12 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// Computes the baseline performance points implied by the stored Sunny star rating, for persisting to
-        /// <see cref="BeatmapInfo.SunnyPerformancePoints"/>. Returns -1 when the ruleset cannot express it.
+        /// Computes the baseline performance points implied by the stored Sunny star rating, for persisting to the
+        /// Sunny pp slot. Returns -1 when the ruleset cannot express it.
         /// </summary>
         public static double ComputeBaselineSunnyPerformancePointsForRealm(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo,
                                                                            CancellationToken cancellationToken = default)
-            => ComputeBaselinePerformancePointsForRating(beatmapManager, beatmapInfo, beatmapInfo.SunnyStarRating, cancellationToken);
+            => ComputeBaselinePerformancePointsForRating(beatmapManager, beatmapInfo, beatmapInfo.EzRatingData.SunnySR, cancellationToken);
 
         public static bool TryComputeXxySrAndPp(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
                                                 out double? xxySr, out double? pp)
