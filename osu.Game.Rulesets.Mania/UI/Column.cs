@@ -106,8 +106,9 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
-        [Resolved]
-        private ManiaPlayfieldNoteDisplayTint beatLineNoteTint { get; set; } = null!;
+        // 可空：皮肤编辑器预览与进图预热会在 Player 树外单独构造 Column，那里没有 playfield 提供的 tint。
+        [Resolved(CanBeNull = true)]
+        private ManiaPlayfieldNoteDisplayTint? beatLineNoteTint { get; set; }
 
         [Resolved]
         private SkinManager skinManager { get; set; } = null!;
@@ -169,7 +170,7 @@ namespace osu.Game.Rulesets.Mania.UI
         /// <summary>
         /// Whether this column is under an editor beatmap compose context (editor or skin compose preview).
         /// </summary>
-        public bool IsEditorCompose => beatLineNoteTint.IsEditorCompose;
+        public bool IsEditorCompose => beatLineNoteTint?.IsEditorCompose == true;
 
         protected override ScrollingHitObjectContainer CreateScrollingHitObjectContainer()
             => new LaneTrackingScrollingHitObjectContainer(this);
@@ -210,7 +211,9 @@ namespace osu.Game.Rulesets.Mania.UI
             ColorSettingsEnabledBindable = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
 
             onBeatLineNoteTintChangedHandler = () => NoteColourChanged?.Invoke();
-            beatLineNoteTint.Changed += onBeatLineNoteTintChangedHandler;
+
+            if (beatLineNoteTint != null)
+                beatLineNoteTint.Changed += onBeatLineNoteTintChangedHandler;
 
             SkinnableDrawable keyArea;
 
@@ -340,7 +343,7 @@ namespace osu.Game.Rulesets.Mania.UI
             if (onNoteColourChangedHandler != null)
                 ezFactory.OnNoteColourChanged -= onNoteColourChangedHandler;
 
-            if (onBeatLineNoteTintChangedHandler != null)
+            if (onBeatLineNoteTintChangedHandler != null && beatLineNoteTint != null)
                 beatLineNoteTint.Changed -= onBeatLineNoteTintChangedHandler;
 
             if (onEzNoteColourChanged != null)
