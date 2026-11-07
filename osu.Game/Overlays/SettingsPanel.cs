@@ -79,12 +79,6 @@ namespace osu.Game.Overlays
 
         private SettingsSection indexedSection;
 
-        /// <summary>
-        /// The section whose subsections are currently navigable. Only set when the user explicitly
-        /// jumps to a category, so that normal scrolling never brings up the subsection column.
-        /// </summary>
-        private SettingsSection subsectionNavSection;
-
         private ScheduledDelegate subsectionHighlightDelegate;
 
         private double subsectionHighlightSuppressUntil;
@@ -240,10 +234,6 @@ namespace osu.Game.Overlays
 
         protected override void PopIn()
         {
-            // the subsection column is opt-in per category click, and shouldn't linger from a previous open.
-            subsectionNavSection = null;
-            resetSubsectionNav();
-
             if (!AreSectionsReadyForDisplay)
             {
                 loading.Show();
@@ -533,10 +523,7 @@ namespace osu.Game.Overlays
                         if (!SectionsContainer.IsLoaded)
                             return;
 
-                        // an explicit category jump is the only thing that enables the subsection column.
-                        subsectionNavSection = section;
                         SectionsContainer.ScrollTo(section);
-                        updateSubsectionNav();
                     },
                 };
             }
@@ -565,13 +552,8 @@ namespace osu.Game.Overlays
             var section = CurrentSection.Value;
             var subsections = section?.IndexedSubsections;
 
-            // only shown for the category the user explicitly jumped to, and only when there is
-            // enough of a subsection list to be worth navigating.
+            // the second-level column is fixed: it is always reserved, and only its entries change with the section.
             bool shouldShow = ShowSubsectionNavColumn
-                              && subsectionNavSection != null
-                              && ReferenceEquals(section, subsectionNavSection)
-                              && subsections != null
-                              && subsections.Count > 0 // 统一固定显示，交互体验更一致
                               && !subsectionNavSuppressed
                               && !searchActive;
 
@@ -595,16 +577,6 @@ namespace osu.Game.Overlays
                 startSubsectionHighlight();
             else
                 stopSubsectionHighlight();
-        }
-
-        /// <summary>
-        /// Immediately collapses the subsection column without animating, e.g. while the panel is off-screen.
-        /// </summary>
-        private void resetSubsectionNav()
-        {
-            subsectionNavVisible = false;
-            subsectionNavColumn?.SetExpanded(false, 0);
-            stopSubsectionHighlight();
         }
 
         private void startSubsectionHighlight()

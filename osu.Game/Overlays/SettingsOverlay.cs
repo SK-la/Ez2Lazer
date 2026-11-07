@@ -87,6 +87,8 @@ namespace osu.Game.Overlays
                 new EzGameSection()
             };
 
+            var rulesetSections = new List<SettingsSubsection>();
+
             foreach (Ruleset ruleset in rulesets.AvailableRulesets.Select(info => info.CreateInstance()))
             {
                 try
@@ -94,13 +96,16 @@ namespace osu.Game.Overlays
                     SettingsSubsection? section = ruleset.CreateSettings();
 
                     if (section != null)
-                        sections.Add(new RulesetSection(ruleset, section));
+                        rulesetSections.Add(section);
                 }
                 catch (Exception e)
                 {
                     RulesetStore.LogRulesetFailure(ruleset.RulesetInfo, e);
                 }
             }
+
+            if (rulesetSections.Count > 0)
+                sections.Add(new RulesetSection(rulesetSections));
 
             sections.AddRange(new SettingsSection[]
             {
