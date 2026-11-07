@@ -448,7 +448,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 if (!inFlightPasses.TryAdd(key, created))
                 {
                     // Another caller installed a pass for this key first; the one not observed must not keep running.
-                    await created.Cancellation.CancelAsync();
+                    await created.Cancellation.CancelAsync().ConfigureAwait(false);
                     continue;
                 }
 
