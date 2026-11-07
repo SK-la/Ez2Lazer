@@ -94,9 +94,9 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             var primitives = EzLeoBlackPrimitives.CalculatePrimitives(chart, cancellationToken);
             EzLeoBlackSpecificPatterns keymodePatterns = chart.Keys switch
             {
-                4 => specific4K(),
-                7 => specific7K(),
-                _ => specificOther(),
+                4 => four_key_patterns,
+                7 => seven_key_patterns,
+                _ => other_key_patterns,
             };
 
             return matches(keymodePatterns, chart.LastNote - chart.FirstNote, primitives);
@@ -891,6 +891,14 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
 
         #endregion
 
+        /// <summary>
+        /// Pattern tables are pure data (name + delegate), so they are built once instead of on every chart. The
+        /// lists are read-only by convention; nothing mutates them after construction.
+        /// </summary>
+        private static readonly EzLeoBlackSpecificPatterns four_key_patterns = specific4K();
+        private static readonly EzLeoBlackSpecificPatterns seven_key_patterns = specific7K();
+        private static readonly EzLeoBlackSpecificPatterns other_key_patterns = specificOther();
+
         private static EzLeoBlackSpecificPatterns specific4K()
         {
             var coordination = reorderSpecific(
@@ -1032,23 +1040,40 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             };
         }
 
+        /// <summary>
+        /// Reused across the windows of one <c>Find</c> call. The matchers read the window and return a
+        /// length, so neither list outlives the iteration that filled it.
+        /// </summary>
+        private sealed class MatchScratch
+        {
+            public readonly List<EzLeoBlackPrimitive> Window = new List<EzLeoBlackPrimitive>(MATCHER_WINDOW);
+            public readonly List<(int N, string SpecificType)> Matched = new List<(int N, string SpecificType)>(4);
+        }
+
         private static List<EzLeoBlackFoundPattern> matches(
             EzLeoBlackSpecificPatterns specificPatterns,
             double lastNote,
             List<EzLeoBlackPrimitive> primitives)
         {
             var results = new List<EzLeoBlackFoundPattern>();
+            var scratch = new MatchScratch();
             int start = 0;
 
             while (start < primitives.Count)
             {
-                var remaining = primitives.GetRange(start, Math.Min(MATCHER_WINDOW, primitives.Count - start));
-                appendCoreMatches(results, EzLeoBlackCorePattern.Stream, coreStream(remaining), specificPatterns.Stream, remaining, lastNote);
-                appendCoreMatches(results, EzLeoBlackCorePattern.Chordstream, coreChordstream(remaining), specificPatterns.Chordstream, remaining, lastNote);
-                appendCoreMatches(results, EzLeoBlackCorePattern.Jacks, coreJacks(remaining), specificPatterns.Jack, remaining, lastNote);
-                appendCoreMatches(results, EzLeoBlackCorePattern.Coordination, coreCoordination(remaining), specificPatterns.Coordination, remaining, lastNote);
-                appendCoreMatches(results, EzLeoBlackCorePattern.Density, coreDensity(remaining), specificPatterns.Density, remaining, lastNote);
-                appendCoreMatches(results, EzLeoBlackCorePattern.Wildcard, coreWildcard(remaining), specificPatterns.Wildcard, remaining, lastNote);
+                int windowLength = Math.Min(MATCHER_WINDOW, primitives.Count - start);
+                List<EzLeoBlackPrimitive> remaining = scratch.Window;
+                remaining.Clear();
+
+                for (int i = 0; i < windowLength; i++)
+                    remaining.Add(primitives[start + i]);
+
+                appendCoreMatches(results, EzLeoBlackCorePattern.Stream, coreStream(remaining), specificPatterns.Stream, remaining, lastNote, scratch);
+                appendCoreMatches(results, EzLeoBlackCorePattern.Chordstream, coreChordstream(remaining), specificPatterns.Chordstream, remaining, lastNote, scratch);
+                appendCoreMatches(results, EzLeoBlackCorePattern.Jacks, coreJacks(remaining), specificPatterns.Jack, remaining, lastNote, scratch);
+                appendCoreMatches(results, EzLeoBlackCorePattern.Coordination, coreCoordination(remaining), specificPatterns.Coordination, remaining, lastNote, scratch);
+                appendCoreMatches(results, EzLeoBlackCorePattern.Density, coreDensity(remaining), specificPatterns.Density, remaining, lastNote, scratch);
+                appendCoreMatches(results, EzLeoBlackCorePattern.Wildcard, coreWildcard(remaining), specificPatterns.Wildcard, remaining, lastNote, scratch);
                 start++;
             }
 
@@ -1061,29 +1086,31 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             int coreN,
             List<(string Name, EzLeoBlackPatternMatcher Match)> specificList,
             List<EzLeoBlackPrimitive> remaining,
-            double lastNote)
+            double lastNote,
+            MatchScratch scratch)
         {
             if (coreN == 0)
                 return;
 
             // hub ENABLE_MULTI_LABEL_SAME_WINDOW is true; single-label arm omitted.
-            var matched = pickSpecificAll(specificList, remaining);
+            pickSpecificAll(specificList, remaining, scratch.Matched);
 
-            if (matched.Count == 0)
+            if (scratch.Matched.Count == 0)
             {
                 appendFoundPattern(results, pattern, null, coreN, remaining, lastNote);
                 return;
             }
 
-            foreach (var (m, specificType) in matched)
+            foreach (var (m, specificType) in scratch.Matched)
                 appendFoundPattern(results, pattern, specificType, Math.Max(coreN, m), remaining, lastNote);
         }
 
-        private static List<(int N, string SpecificType)> pickSpecificAll(
+        private static void pickSpecificAll(
             List<(string Name, EzLeoBlackPatternMatcher Match)> specificList,
-            List<EzLeoBlackPrimitive> remaining)
+            List<EzLeoBlackPrimitive> remaining,
+            List<(int N, string SpecificType)> matched)
         {
-            var matched = new List<(int, string)>();
+            matched.Clear();
 
             foreach (var (name, match) in specificList)
             {
@@ -1092,8 +1119,6 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
                 if (n != 0)
                     matched.Add((n, name));
             }
-
-            return matched;
         }
 
         private static void appendFoundPattern(
@@ -1104,9 +1129,23 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             List<EzLeoBlackPrimitive> remaining,
             double lastNote)
         {
-            var d = remaining.GetRange(0, Math.Min(n2, remaining.Count));
-            double meanMspb = d.Sum(x => x.MsPerBeat) / d.Count;
-            bool mixed = !d.TrueForAll(x => Math.Abs(x.MsPerBeat - meanMspb) < EzLeoBlackConfig.PATTERN_STABILITY_THRESHOLD);
+            int count = Math.Min(n2, remaining.Count);
+            double sum = 0;
+
+            for (int i = 0; i < count; i++)
+                sum += remaining[i].MsPerBeat;
+
+            double meanMspb = sum / count;
+            bool mixed = false;
+
+            for (int i = 0; i < count; i++)
+            {
+                if (!(Math.Abs(remaining[i].MsPerBeat - meanMspb) < EzLeoBlackConfig.PATTERN_STABILITY_THRESHOLD))
+                {
+                    mixed = true;
+                    break;
+                }
+            }
 
             double start = remaining[0].Time;
             double end;
