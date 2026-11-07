@@ -250,10 +250,14 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(registry.GetSystem(EzSkillSystems.BEATMAP_MSD), Is.Not.Null);
             Assert.That(registry.GetSystem(EzSkillSystems.PLAYER_SSR), Is.Not.Null);
             Assert.That(registry.GetSystem(EzSkillSystems.DAN), Is.Not.Null);
+            Assert.That(registry.GetSystem(EzSkillSystems.BEATMAP_PPPLUS), Is.Not.Null);
+            Assert.That(registry.GetSystem(EzSkillSystems.PLAYER_PPPLUS), Is.Not.Null);
 
             Assert.That(registry.AllSkills.Any(s => s.SkillId.StartsWith($"{EzSkillSystems.BEATMAP_MSD}.", StringComparison.Ordinal)));
             Assert.That(registry.AllSkills.Any(s => s.SkillId.StartsWith($"{EzSkillSystems.PLAYER_SSR}.", StringComparison.Ordinal)));
             Assert.That(registry.AllSkills.Any(s => s.SkillId.StartsWith($"{EzSkillSystems.DAN}.", StringComparison.Ordinal)));
+            Assert.That(registry.AllSkills.Any(s => s.SkillId.StartsWith($"{EzSkillSystems.BEATMAP_PPPLUS}.", StringComparison.Ordinal)));
+            Assert.That(registry.AllSkills.Any(s => s.SkillId.StartsWith($"{EzSkillSystems.PLAYER_PPPLUS}.", StringComparison.Ordinal)));
 
             // No skill id is shared across systems.
             var ids = registry.AllSkills.Select(s => s.SkillId).ToList();
@@ -261,7 +265,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
-        public void Profiles_split_by_ruleset()
+        public void Profiles_split_mania_and_osu_plugins()
         {
             var registry = new EzSkillRegistry();
 
@@ -270,9 +274,26 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(mania!.DefaultChartSystemId, Is.EqualTo(EzSkillSystems.BEATMAP_MSD));
             Assert.That(mania.DefaultPlayerSystemId, Is.EqualTo(EzSkillSystems.PLAYER_SSR));
             Assert.That(mania.ContainsSystem(EzSkillSystems.DAN), Is.True);
+            Assert.That(mania.ContainsSystem(EzSkillSystems.BEATMAP_PPPLUS), Is.True);
+            Assert.That(mania.DefaultChartSystemId, Is.EqualTo(EzSkillSystems.BEATMAP_MSD));
 
-            Assert.That(registry.GetProfile(1), Is.Null); // taiko — no plugin yet
-            Assert.That(registry.GetProfile(2), Is.Null); // catch
+            var osu = registry.GetProfile(EzLocalProfileConstants.OSU_RULESET_ID);
+            Assert.That(osu, Is.Not.Null);
+            Assert.That(osu!.DefaultChartSystemId, Is.EqualTo(EzSkillSystems.BEATMAP_PPPLUS));
+            Assert.That(osu.DefaultPlayerSystemId, Is.EqualTo(EzSkillSystems.PLAYER_PPPLUS));
+            Assert.That(osu.ContainsSystem(EzSkillSystems.BEATMAP_MSD), Is.False);
+
+            var taiko = registry.GetProfile(1);
+            Assert.That(taiko, Is.Not.Null);
+            Assert.That(taiko!.DefaultChartSystemId, Is.EqualTo(EzSkillSystems.BEATMAP_PPPLUS));
+            Assert.That(taiko.DefaultPlayerSystemId, Is.EqualTo(EzSkillSystems.PLAYER_PPPLUS));
+
+            var @catch = registry.GetProfile(2);
+            Assert.That(@catch, Is.Not.Null);
+            Assert.That(@catch!.DefaultChartSystemId, Is.EqualTo(EzSkillSystems.BEATMAP_PPPLUS));
+
+            Assert.That(registry.EnumerateByMetric("stamina").Select(s => s.SkillId), Does.Contain(EzOsuSkillAxis.Stamina.ToChartSkillId()));
+            Assert.That(registry.EnumerateByMetric("jump_aim").Count(), Is.EqualTo(2));
         }
     }
 

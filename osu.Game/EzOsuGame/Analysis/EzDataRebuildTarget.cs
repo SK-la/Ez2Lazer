@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Database;
 using osu.Game.EzOsuGame.Localization;
 
 namespace osu.Game.EzOsuGame.Analysis
@@ -54,5 +55,12 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.DATA_REBUILD_TARGET_REALM_CHART_SKILL_CHAIN))]
         RealmChartSkillChain = 9,
+
+        /// <summary>
+        /// Scene: PPP chart skills for osu, taiko, catch, and mania.
+        /// Scope: <see cref="EzRealmMetadataScope.PPPSkills"/>.
+        /// </summary>
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.DATA_REBUILD_TARGET_REALM_PPP))]
+        RealmPPPSkills = 10,
     }
 }

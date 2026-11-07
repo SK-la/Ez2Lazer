@@ -73,6 +73,10 @@ namespace osu.Game.EzOsuGame.Localization
             "Realm 谱面技能链 (MSD+CSI+Dan)",
             "Realm chart skill chain (MSD+CSI+Dan)");
 
+        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_PPP = new EzLocalizationManager.EzLocalisableString(
+            "Realm PPP 图表技能",
+            "Realm PPP chart skills");
+
         public static readonly LocalisableString LOGO_VIS_BARS = new EzLocalizationManager.EzLocalisableString("柱状", "Bars");
         public static readonly LocalisableString LOGO_VIS_POLYLINE = new EzLocalizationManager.EzLocalisableString("折线", "Polyline");
         public static readonly LocalisableString LOGO_VIS_WAVE = new EzLocalizationManager.EzLocalisableString("波形", "Waveform");

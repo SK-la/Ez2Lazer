@@ -110,17 +110,23 @@ namespace osu.Game.EzOsuGame.Skills
             if (string.IsNullOrEmpty(beatmapHash) || string.IsNullOrEmpty(systemId))
                 return new Dictionary<string, double>(StringComparer.Ordinal);
 
+            if (systemId == EzSkillSystems.BEATMAP_PPPLUS)
+                return Store.GetBeatmapSkillsAtCurrentVersions(beatmapHash, systemId);
+
             return Store.GetBeatmapSkills(beatmapHash, systemId);
         }
 
         /// <summary>
-        /// Generic player skill read. <paramref name="sliceKey"/> is the keymode slice for keymode-scoped
-        /// rulesets; rulesets without keymode slices use a single sentinel slice.
+        /// Generic player skill read. <paramref name="sliceKey"/> is keymode for mania, or
+        /// <see cref="EzSkillSystems.OSU_SLICE_KEY"/> for osu.
         /// </summary>
         public IReadOnlyDictionary<string, double> GetPlayerSystemSkills(string username, int sliceKey, string systemId)
         {
             if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(systemId))
                 return new Dictionary<string, double>(StringComparer.Ordinal);
+
+            if (systemId == EzSkillSystems.PLAYER_PPPLUS)
+                return Store.GetPlayerSkillsAtCurrentVersions(username, sliceKey, systemId);
 
             return Store.GetPlayerSkills(username, sliceKey, systemId);
         }

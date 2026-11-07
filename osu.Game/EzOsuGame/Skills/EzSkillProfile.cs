@@ -45,7 +45,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Returns a profile for <paramref name="rulesetOnlineId"/>, or <see langword="null"/> when no
-        /// registered system applies (taiko/catch today).
+        /// registered system applies.
         /// </summary>
         public static EzSkillProfile? TryBuild(int rulesetOnlineId, EzSkillRegistry registry)
         {
@@ -61,8 +61,8 @@ namespace osu.Game.EzOsuGame.Skills
             var chart = applicable.Where(s => s.Scope == EzSkillScope.Beatmap).ToList();
             var player = applicable.Where(s => s.Scope == EzSkillScope.Player).ToList();
 
-            string? defaultChart = pickDefault(chart);
-            string? defaultPlayer = pickDefault(player);
+            string? defaultChart = pickDefault(chart, rulesetOnlineId);
+            string? defaultPlayer = pickDefault(player, rulesetOnlineId);
 
             return new EzSkillProfile(
                 rulesetOnlineId,
@@ -72,9 +72,9 @@ namespace osu.Game.EzOsuGame.Skills
                 defaultPlayer);
         }
 
-        private static string? pickDefault(IReadOnlyList<IEzSkillSystem> systems)
+        private static string? pickDefault(IReadOnlyList<IEzSkillSystem> systems, int rulesetOnlineId)
         {
-            var defaults = systems.Where(s => s.IsDefaultRadar).Select(s => s.SystemId).ToList();
+            var defaults = systems.Where(s => s.IsDefaultRadarFor(rulesetOnlineId)).Select(s => s.SystemId).ToList();
 
             if (defaults.Count > 1)
             {

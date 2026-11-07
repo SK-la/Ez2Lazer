@@ -16,6 +16,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [TestCase(EzDataRebuildTarget.RealmChartMSD, EzRealmMetadataScope.Msd)]
         [TestCase(EzDataRebuildTarget.RealmChartCSIAndDan, EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan)]
         [TestCase(EzDataRebuildTarget.RealmChartSkillChain, EzRealmMetadataScope.Msd | EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan)]
+        [TestCase(EzDataRebuildTarget.RealmPPPSkills, EzRealmMetadataScope.PPPSkills)]
         [TestCase(EzDataRebuildTarget.RealmAll, EzRealmMetadataScope.All)]
         public void TestRealmTargetsDispatchWithCorrectScope(EzDataRebuildTarget target, EzRealmMetadataScope expectedScope)
         {
