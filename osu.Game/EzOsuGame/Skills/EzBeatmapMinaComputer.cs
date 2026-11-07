@@ -91,7 +91,7 @@ namespace osu.Game.EzOsuGame.Skills
             int keyCount,
             Action<EzMinaSkillAxisVector> onSettledMiss)
         {
-            using var calc = new EzMinaEngine();
+            var calc = EzMinaEnginePool.Rent();
             EzMinaSkillAxisVector vector;
 
             try
