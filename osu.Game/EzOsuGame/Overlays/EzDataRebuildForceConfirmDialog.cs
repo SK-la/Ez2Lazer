@@ -3,33 +3,32 @@
 
 using System;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays.Dialog;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
-    public partial class EzDataRebuildConfirmDialog : PopupDialog
+    /// <summary>
+    /// Confirms the destructive form of one maintenance action. Only that form needs a prompt; the backfill runs
+    /// straight from the dialog because it writes missing rows and leaves existing ones alone.
+    /// </summary>
+    public partial class EzDataRebuildForceConfirmDialog : PopupDialog
     {
-        public EzDataRebuildConfirmDialog(Action onBackfill, Action onForceRebuild)
+        public EzDataRebuildForceConfirmDialog(LocalisableString target, Action onConfirm)
         {
-            ArgumentNullException.ThrowIfNull(onBackfill);
-            ArgumentNullException.ThrowIfNull(onForceRebuild);
+            ArgumentNullException.ThrowIfNull(onConfirm);
 
             Icon = FontAwesome.Solid.ExclamationTriangle;
             HeaderText = EzSettingsStrings.DATA_REBUILD_DIALOG_HEADER;
-            BodyText = EzSettingsStrings.DATA_REBUILD_DIALOG_BODY;
+            BodyText = LocalisableString.Format(EzSettingsStrings.DATA_REBUILD_DIALOG_BODY.ToString(), target);
 
             Buttons = new PopupDialogButton[]
             {
-                new PopupDialogOkButton
-                {
-                    Text = EzSettingsStrings.DATA_REBUILD_DIALOG_BACKFILL,
-                    Action = onBackfill,
-                },
                 new PopupDialogDangerousButton
                 {
                     Text = EzSettingsStrings.DATA_REBUILD_DIALOG_FORCE,
-                    Action = onForceRebuild,
+                    Action = onConfirm,
                 },
                 new PopupDialogCancelButton
                 {

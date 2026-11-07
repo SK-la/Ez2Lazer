@@ -356,39 +356,46 @@ namespace osu.Game.EzOsuGame.Localization
             + "\nAuto-warmup runs only when the current database is missing or needs a schema upgrade; use maintenance controls below when a matching file already exists."
             + "\nOn-demand computation is controlled separately by \"Enable Ez analysis on-demand computation\".");
 
-        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_TARGET =
-            new EzLocalizationManager.EzLocalisableString("数据维护目标", "Data maintenance target");
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_OPEN =
+            new EzLocalizationManager.EzLocalisableString("数据维护…", "Data maintenance...");
 
-        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_TARGET_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "选择要维护的数据范围。SQLite 在已有匹配的最新版文件时不会自动预热；Realm 缺失项仍会在启动时自动补算。"
-            + "\n成绩全量重算：有 replay 的 mania 成绩走 Session 原始环境重算（与选歌右键一致）；stable 旧成绩无 replay 时重走官方转换。"
-            + "\n「尝试补算」仅处理 mania 成绩；「完全重算」处理当前已加载的规则集（跳过未加载程序集的历史成绩）。"
-            + "\n技能场景：Realm MSD = 4K 雷达黄层 + DualPanel Rating + Dan 供料；"
-            + "DualPanel谱面 = CSI 分格 + ChartDan（不含 Rating）；"
-            + "谱面技能链 = MSD+CSI+Dan 一键。雷达绿层（玩家 SSR/图案）只走 Local Profile 重算。",
-            "Choose which data to maintain. SQLite is not auto-warmed when a matching current database exists; Realm missing values are still filled at startup."
-            + "\nFull score recalculation: mania scores with replays are recalculated via Session in their stored environment (same as the song select context menu); legacy scores without replays are re-converted officially."
-            + "\n\"Backfill\" processes mania scores only; \"Force rebuild\" processes currently loaded (Available) rulesets and skips scores for unloaded assemblies."
-            + "\nSkill scenes: Realm MSD = 4K radar yellow + DualPanel Rating + Dan feed; "
-            + "DualPanel chart = CSI slots + ChartDan (no Rating); "
-            + "chart skill chain = MSD+CSI+Dan. Radar green (player SSR/patterns) is Local Profile recalc only.");
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_OPEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "打开数据维护面板：Realm 侧与 SQLite 侧各自成链，链内相邻项存在依赖，链间互不影响。"
+            + "\n选中一项后执行「补算缺失」或「完全重算」；大库可能耗时较长，请留意右上角进度通知。",
+            "Opens the data maintenance panel: Realm and SQLite each form a chain, adjacent nodes in a chain depend on each other, chains do not."
+            + "\nSelect an item, then run \"Backfill missing\" or \"Force rebuild\". Large libraries may take a while; watch the progress notification in the top-right corner.");
 
-        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_EXECUTE =
-            new EzLocalizationManager.EzLocalisableString("执行", "Execute");
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_SUBTITLE = new EzLocalizationManager.EzLocalisableString(
+            "上下相邻的两项构成依赖链：紧挨着 = 后者读前者的结果；间距大 = 可独立执行。",
+            "Adjacent nodes form a dependency chain: tight spacing = the lower one reads the upper one; wide spacing = independent.");
 
-        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_EXECUTE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "确认后可选补算缺失或完全重算。大库可能耗时较长，请留意右上角进度通知。",
-            "Choose backfill missing or force full rebuild. Large libraries may take a while; watch the progress notification in the top-right corner.");
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_SIDE_REALM =
+            new EzLocalizationManager.EzLocalisableString("Realm 侧", "Realm");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_SIDE_SQLITE =
+            new EzLocalizationManager.EzLocalisableString("SQLite 侧", "SQLite");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_NOTHING_SELECTED =
+            new EzLocalizationManager.EzLocalisableString("未选择项目", "Nothing selected");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_SELECTED =
+            new EzLocalizationManager.EzLocalisableString("已选择：{0}", "Selected: {0}");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_QUEUED =
+            new EzLocalizationManager.EzLocalisableString("已排队：{0}", "Queued: {0}");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_BACKFILL =
+            new EzLocalizationManager.EzLocalisableString("补算缺失", "Backfill missing");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_CLOSE =
+            new EzLocalizationManager.EzLocalisableString("关闭", "Close");
 
         public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_HEADER =
             new EzLocalizationManager.EzLocalisableString("数据维护", "Data maintenance");
 
         public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_BODY = new EzLocalizationManager.EzLocalisableString(
-            "即将对所选目标执行后台维护。\n补算缺失仅处理未写入的数据；完全重算会先清除已有结果再全部重算。",
-            "Background maintenance will run for the selected target.\nBackfill missing only fills gaps; force rebuild clears existing results first.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_BACKFILL =
-            new EzLocalizationManager.EzLocalisableString("尝试补算", "Backfill missing");
+            "{0}\n完全重算会先清除已有结果再全部重算，确认继续？",
+            "{0}\nForce rebuild clears existing results before recomputing everything. Continue?");
 
         public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_FORCE =
             new EzLocalizationManager.EzLocalisableString("完全重算", "Force rebuild");

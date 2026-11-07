@@ -20,16 +20,51 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         }
 
         [Test]
-        public void TestCanExecuteRequiresDialogAndDispatchAvailability()
+        public void TestCanExecuteReflectsTheActionsOwnStore()
         {
             var dispatcher = new EzDataRebuildDispatcher((_, _) => EzDataRebuildDispatchResult.Queued, null, null);
-            var dialogOverlay = new Mock<IDialogOverlay>().Object;
-            var handlerWithDialog = new EzDataRebuildMaintenanceHandler(dispatcher, dialogOverlay, notifications: null);
-            var handlerWithoutDialog = new EzDataRebuildMaintenanceHandler(dispatcher, dialogOverlay: null, notifications: null);
+            var handler = new EzDataRebuildMaintenanceHandler(dispatcher, new Mock<IDialogOverlay>().Object, notifications: null);
 
-            Assert.That(handlerWithDialog.CanExecute(EzDataRebuildTarget.RealmAll), Is.True);
-            Assert.That(handlerWithoutDialog.CanExecute(EzDataRebuildTarget.RealmAll), Is.False);
-            Assert.That(handlerWithDialog.CanExecute(EzDataRebuildTarget.SqliteMain), Is.False);
+            Assert.That(handler.CanExecute(EzDataRebuildAction.RealmAll), Is.True);
+            Assert.That(handler.CanExecute(EzDataRebuildAction.RealmChartCsi), Is.True);
+            Assert.That(handler.CanExecute(EzDataRebuildAction.SqliteMain), Is.False);
+        }
+
+        [Test]
+        public void TestBackfillDispatchesWithoutADialog()
+        {
+            EzDataRebuildAction? dispatched = null;
+
+            var handler = new EzDataRebuildMaintenanceHandler(
+                new EzDataRebuildDispatcher((_, _) =>
+                {
+                    dispatched = EzDataRebuildAction.RealmChartMsd;
+                    return EzDataRebuildDispatchResult.Queued;
+                }, null, null),
+                dialogOverlay: null,
+                notifications: null);
+
+            Assert.That(handler.RequestBackfill(EzDataRebuildAction.RealmChartMsd, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
+            Assert.That(dispatched, Is.EqualTo(EzDataRebuildAction.RealmChartMsd));
+        }
+
+        [Test]
+        public void TestForceRebuildWithoutADialogDoesNotDispatch()
+        {
+            bool dispatched = false;
+
+            var handler = new EzDataRebuildMaintenanceHandler(
+                new EzDataRebuildDispatcher((_, _) =>
+                {
+                    dispatched = true;
+                    return EzDataRebuildDispatchResult.Queued;
+                }, null, null),
+                dialogOverlay: null,
+                notifications: null);
+
+            handler.RequestForceRebuild(EzDataRebuildAction.RealmChartMsd);
+
+            Assert.That(dispatched, Is.False, "a destructive rebuild must not run unconfirmed");
         }
     }
 }

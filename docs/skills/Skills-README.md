@@ -109,6 +109,10 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
 
 - 启动日志：`Ez chart chain revisions: MSD v…, CSI v… (policy=… …), Dan v… (…)`。
 - 每一段补算仍各自 `showProgressNotification`；因为过期行对增量集合就是"缺失"，换版后启动会自动弹进度。
+- 设置 → Ez → 实验性 → **数据维护…**：打开 `EzDataRebuildDialog`，Realm 与 SQLite 各一列，
+  列内按依赖链排列（MSD → CSI → Dan 紧挨；Sunny / PP+ / 官方 PP / Tag / 成绩各自独立，间距更大）。
+  选中一项后执行「补算缺失」或「完全重算」（后者先确认）。依赖关系由 `EzDataRebuildCatalog` 声明，
+  界面间距直接读它，不手工调。
 - 设置 → Ez → 实验性 → **分析数据状态**：`EzChartSkillStore.CollectAnalysisStatus()` 按规则集依次列出
   各自分析系统（官方 / Sunny / PP+ / Mina / CSI / Dan）的 ready / unrateable / stale / missing，
   回答"数据有没有缺、有没有过期"；只列出仍有待补算的系统，全部对齐时该规则集显示"无待补算"。
@@ -160,7 +164,7 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
 | 来源 | 判据 | 覆盖的场景 |
 |---|---|---|
 | 落后账本 | 技能行的 `analyzed_plays` 小于 `drill_scores` 当前行数（`EzPlayerSkillStore.GetStalePlayerSkillUsernames`） | 已写进切片、技能行还没跟上；一次覆盖该玩家的 pass 自然让它相等 |
-| 图表链债务 | `EzChartChainDebt`：`drill_scores` 的 (玩家, 谱面) 对图表链覆盖现算 | 该谱面还没被图表链评级，这一轮读不到；跑完「重算 Realm」后再点一次即可折入 |
+| 图表链债务 | `EzChartChainDebt`：`drill_scores` 的 (玩家, 谱面) 对图表链覆盖现算 | 该谱面还没被图表链评级，这一轮读不到；在「数据维护」里补算 Realm 侧图表链后再点一次即可折入 |
 
 两类都在同一遍 compute 内收口：覆盖到的玩家整段重写成技能行；无法重算的玩家（该切片没有 mania
 成绩）直接删行，避免落后判据永远成立。落后只表示“值落后账本”，不兼表“等图表链”——后者由派生
@@ -182,8 +186,8 @@ mod 影响谱面时的现场估算。前两样**只读不写**：读不到就跳
 `MissingChartHashes`。这一轮**不去排图表链**，也**不写落后标志**——缺的局根本没进这一遍写的行，
 说清楚它们少算了是日志（`N chart(s) have no chart-side skill data yet`）和派生的「等图表链」的事：
 落后只表示"切片领先了这些行"，把它兼给"等图表链"就会让状态行在链已补齐之后仍报落后
-（一次点击要跑两轮才算完）。状态行报「等图表链」时用户跑一次「重算 Realm」
-（scope = MSD | CSI | ChartDan），再点一次「计算成绩分析」就折进去了。
+（一次点击要跑两轮才算完）。状态行报「等图表链」时用户打开「数据维护」面板，
+在 Realm 侧把 MSD / CSI / Dan 这一链补算，再点一次「计算成绩分析」就折进去了。
 
 这样切开的理由：图表侧一行 MSD/CSI/Dan 是**谱面属性**，与玩家无关。玩家段顺手算一份，就会在
 每个玩家、每次 compute 上重复同一张谱面的 MinaCalc 计算，而且写的是临时值——正是这轮性能问题的来源。

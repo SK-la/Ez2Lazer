@@ -9,6 +9,10 @@ using osu.Game.EzOsuGame.Database;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
+    /// <summary>
+    /// Turns a maintenance action into the background work that performs it. Which store an action touches is
+    /// declared by the catalog, so this class only maps an action onto the queue that owns it.
+    /// </summary>
     public class EzDataRebuildDispatcher
     {
         private readonly Func<EzRealmMetadataScope, bool, EzDataRebuildDispatchResult>? queueRealm;
@@ -38,27 +42,20 @@ namespace osu.Game.EzOsuGame.Analysis
             this.queueRealmScores = queueRealmScores;
         }
 
-        public bool CanDispatch(EzDataRebuildTarget target)
+        public bool CanDispatch(EzDataRebuildAction action)
         {
-            switch (target)
-            {
-                case EzDataRebuildTarget.RealmTags:
-                case EzDataRebuildTarget.RealmXxy:
-                case EzDataRebuildTarget.RealmPp:
-                case EzDataRebuildTarget.RealmChartMSD:
-                case EzDataRebuildTarget.RealmChartCSIAndDan:
-                case EzDataRebuildTarget.RealmChartSkillChain:
-                case EzDataRebuildTarget.RealmPPP:
-                case EzDataRebuildTarget.RealmAll:
-                    return queueRealm != null;
+            if (EzDataRebuildScopes.RealmScopeOf(action) != null)
+                return queueRealm != null;
 
-                case EzDataRebuildTarget.RealmScores:
+            switch (action)
+            {
+                case EzDataRebuildAction.RealmScores:
                     return queueRealmScores != null;
 
-                case EzDataRebuildTarget.SqliteMain:
+                case EzDataRebuildAction.SqliteMain:
                     return queueSqliteMain != null;
 
-                case EzDataRebuildTarget.SqliteSongsBranches:
+                case EzDataRebuildAction.SqliteSongsBranches:
                     return queueSqliteSongsBranches != null;
 
                 default:
@@ -66,49 +63,24 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        public EzDataRebuildDispatchResult Execute(EzDataRebuildTarget target, bool forceAll)
+        public EzDataRebuildDispatchResult Execute(EzDataRebuildAction action, bool forceAll)
         {
-            switch (target)
+            if (EzDataRebuildScopes.RealmScopeOf(action) is { } scope)
+                return dispatchRealm(scope, forceAll);
+
+            switch (action)
             {
-                case EzDataRebuildTarget.RealmTags:
-                    return dispatchRealm(EzRealmMetadataScope.Tags, forceAll);
-
-                case EzDataRebuildTarget.RealmXxy:
-                    return dispatchRealm(EzRealmMetadataScope.Xxy, forceAll);
-
-                case EzDataRebuildTarget.RealmPp:
-                    return dispatchRealm(EzRealmMetadataScope.Pp, forceAll);
-
-                case EzDataRebuildTarget.RealmChartMSD:
-                    return dispatchRealm(EzRealmMetadataScope.Msd, forceAll);
-
-                case EzDataRebuildTarget.RealmChartCSIAndDan:
-                    // DualPanel chart scene: CSI + ChartDan (Rating stays on MSD).
-                    return dispatchRealm(EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan, forceAll);
-
-                case EzDataRebuildTarget.RealmChartSkillChain:
-                    // Full chart skill chain: MSD → CSI → ChartDan.
-                    return dispatchRealm(
-                        EzRealmMetadataScope.Msd | EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan,
-                        forceAll);
-
-                case EzDataRebuildTarget.RealmPPP:
-                    return dispatchRealm(EzRealmMetadataScope.PPP, forceAll);
-
-                case EzDataRebuildTarget.RealmAll:
-                    return dispatchRealm(EzRealmMetadataScope.All, forceAll);
-
-                case EzDataRebuildTarget.RealmScores:
+                case EzDataRebuildAction.RealmScores:
                     return dispatchRealmScores(forceAll);
 
-                case EzDataRebuildTarget.SqliteMain:
+                case EzDataRebuildAction.SqliteMain:
                     return dispatchSqliteMain(forceAll);
 
-                case EzDataRebuildTarget.SqliteSongsBranches:
+                case EzDataRebuildAction.SqliteSongsBranches:
                     return dispatchSqliteSongsBranches(forceAll);
 
                 default:
-                    Logger.Log($"Unknown data rebuild target: {target}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                    Logger.Log($"Unknown data rebuild action: {action}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                     return EzDataRebuildDispatchResult.UnknownTarget;
             }
         }

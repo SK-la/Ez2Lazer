@@ -10,15 +10,15 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
     [TestFixture]
     public class EzDataRebuildDispatcherTest
     {
-        [TestCase(EzDataRebuildTarget.RealmTags, EzRealmMetadataScope.Tags)]
-        [TestCase(EzDataRebuildTarget.RealmXxy, EzRealmMetadataScope.Xxy)]
-        [TestCase(EzDataRebuildTarget.RealmPp, EzRealmMetadataScope.Pp)]
-        [TestCase(EzDataRebuildTarget.RealmChartMSD, EzRealmMetadataScope.Msd)]
-        [TestCase(EzDataRebuildTarget.RealmChartCSIAndDan, EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan)]
-        [TestCase(EzDataRebuildTarget.RealmChartSkillChain, EzRealmMetadataScope.Msd | EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan)]
-        [TestCase(EzDataRebuildTarget.RealmPPP, EzRealmMetadataScope.PPP)]
-        [TestCase(EzDataRebuildTarget.RealmAll, EzRealmMetadataScope.All)]
-        public void TestRealmTargetsDispatchWithCorrectScope(EzDataRebuildTarget target, EzRealmMetadataScope expectedScope)
+        [TestCase(EzDataRebuildAction.RealmTags, EzRealmMetadataScope.Tags)]
+        [TestCase(EzDataRebuildAction.RealmSunny, EzRealmMetadataScope.Xxy)]
+        [TestCase(EzDataRebuildAction.RealmPp, EzRealmMetadataScope.Pp)]
+        [TestCase(EzDataRebuildAction.RealmChartMsd, EzRealmMetadataScope.Msd)]
+        [TestCase(EzDataRebuildAction.RealmChartCsi, EzRealmMetadataScope.ChartSkillInfo)]
+        [TestCase(EzDataRebuildAction.RealmChartDan, EzRealmMetadataScope.ChartDan)]
+        [TestCase(EzDataRebuildAction.RealmPpp, EzRealmMetadataScope.PPP)]
+        [TestCase(EzDataRebuildAction.RealmAll, EzRealmMetadataScope.All)]
+        public void TestRealmTargetsDispatchWithCorrectScope(EzDataRebuildAction action, EzRealmMetadataScope expectedScope)
         {
             EzRealmMetadataScope? capturedScope = null;
             bool? capturedForceAll = null;
@@ -33,11 +33,11 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 null,
                 null);
 
-            Assert.That(dispatcher.Execute(target, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
+            Assert.That(dispatcher.Execute(action, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
             Assert.That(capturedScope, Is.EqualTo(expectedScope));
             Assert.That(capturedForceAll, Is.False);
 
-            Assert.That(dispatcher.Execute(target, forceAll: true), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
+            Assert.That(dispatcher.Execute(action, forceAll: true), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
             Assert.That(capturedScope, Is.EqualTo(expectedScope));
             Assert.That(capturedForceAll, Is.True);
         }
@@ -57,10 +57,10 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                     return EzDataRebuildDispatchResult.Queued;
                 });
 
-            Assert.That(dispatcher.Execute(EzDataRebuildTarget.RealmScores, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
+            Assert.That(dispatcher.Execute(EzDataRebuildAction.RealmScores, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
             Assert.That(capturedForceAll, Is.False);
 
-            Assert.That(dispatcher.Execute(EzDataRebuildTarget.RealmScores, forceAll: true), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
+            Assert.That(dispatcher.Execute(EzDataRebuildAction.RealmScores, forceAll: true), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
             Assert.That(capturedForceAll, Is.True);
         }
 
@@ -69,8 +69,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         {
             var dispatcher = new EzDataRebuildDispatcher(null, null);
 
-            Assert.That(dispatcher.CanDispatch(EzDataRebuildTarget.RealmScores), Is.False);
-            Assert.That(dispatcher.Execute(EzDataRebuildTarget.RealmScores, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.UnavailableProcessor));
+            Assert.That(dispatcher.CanDispatch(EzDataRebuildAction.RealmScores), Is.False);
+            Assert.That(dispatcher.Execute(EzDataRebuildAction.RealmScores, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.UnavailableProcessor));
         }
 
         [Test]
@@ -78,7 +78,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         {
             var dispatcher = new EzDataRebuildDispatcher(null, null, null, _ => EzDataRebuildDispatchResult.Queued);
 
-            Assert.That(dispatcher.CanDispatch(EzDataRebuildTarget.RealmScores), Is.True);
+            Assert.That(dispatcher.CanDispatch(EzDataRebuildAction.RealmScores), Is.True);
         }
 
         [Test]
@@ -95,10 +95,10 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 },
                 null);
 
-            Assert.That(dispatcher.Execute(EzDataRebuildTarget.SqliteMain, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
+            Assert.That(dispatcher.Execute(EzDataRebuildAction.SqliteMain, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
             Assert.That(capturedForceAll, Is.False);
 
-            Assert.That(dispatcher.Execute(EzDataRebuildTarget.SqliteMain, forceAll: true), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
+            Assert.That(dispatcher.Execute(EzDataRebuildAction.SqliteMain, forceAll: true), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
             Assert.That(capturedForceAll, Is.True);
         }
 
@@ -116,10 +116,10 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                     return EzDataRebuildDispatchResult.Queued;
                 });
 
-            Assert.That(dispatcher.Execute(EzDataRebuildTarget.SqliteSongsBranches, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
+            Assert.That(dispatcher.Execute(EzDataRebuildAction.SqliteSongsBranches, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
             Assert.That(capturedForceAll, Is.False);
 
-            Assert.That(dispatcher.Execute(EzDataRebuildTarget.SqliteSongsBranches, forceAll: true), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
+            Assert.That(dispatcher.Execute(EzDataRebuildAction.SqliteSongsBranches, forceAll: true), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
             Assert.That(capturedForceAll, Is.True);
         }
 
@@ -132,30 +132,30 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 _ => delegateResult,
                 _ => delegateResult);
 
-            Assert.That(dispatcher.Execute(EzDataRebuildTarget.RealmAll, forceAll: false), Is.EqualTo(delegateResult));
-            Assert.That(dispatcher.Execute(EzDataRebuildTarget.SqliteMain, forceAll: false), Is.EqualTo(delegateResult));
-            Assert.That(dispatcher.Execute(EzDataRebuildTarget.SqliteSongsBranches, forceAll: false), Is.EqualTo(delegateResult));
+            Assert.That(dispatcher.Execute(EzDataRebuildAction.RealmAll, forceAll: false), Is.EqualTo(delegateResult));
+            Assert.That(dispatcher.Execute(EzDataRebuildAction.SqliteMain, forceAll: false), Is.EqualTo(delegateResult));
+            Assert.That(dispatcher.Execute(EzDataRebuildAction.SqliteSongsBranches, forceAll: false), Is.EqualTo(delegateResult));
         }
 
-        [TestCase(EzDataRebuildTarget.RealmTags)]
-        [TestCase(EzDataRebuildTarget.RealmXxy)]
-        [TestCase(EzDataRebuildTarget.RealmPp)]
-        [TestCase(EzDataRebuildTarget.RealmChartMSD)]
-        [TestCase(EzDataRebuildTarget.RealmAll)]
-        public void TestRealmTargetsUnavailableWhenProcessorMissing(EzDataRebuildTarget target)
+        [TestCase(EzDataRebuildAction.RealmTags)]
+        [TestCase(EzDataRebuildAction.RealmSunny)]
+        [TestCase(EzDataRebuildAction.RealmPp)]
+        [TestCase(EzDataRebuildAction.RealmChartMsd)]
+        [TestCase(EzDataRebuildAction.RealmAll)]
+        public void TestRealmTargetsUnavailableWhenProcessorMissing(EzDataRebuildAction action)
         {
             var dispatcher = new EzDataRebuildDispatcher(null, null);
 
-            Assert.That(dispatcher.Execute(target, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.UnavailableProcessor));
+            Assert.That(dispatcher.Execute(action, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.UnavailableProcessor));
         }
 
-        [TestCase(EzDataRebuildTarget.SqliteMain)]
-        [TestCase(EzDataRebuildTarget.SqliteSongsBranches)]
-        public void TestSqliteTargetsUnavailableWhenProcessorMissing(EzDataRebuildTarget target)
+        [TestCase(EzDataRebuildAction.SqliteMain)]
+        [TestCase(EzDataRebuildAction.SqliteSongsBranches)]
+        public void TestSqliteTargetsUnavailableWhenProcessorMissing(EzDataRebuildAction action)
         {
             var dispatcher = new EzDataRebuildDispatcher(null, null);
 
-            Assert.That(dispatcher.Execute(target, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.UnavailableProcessor));
+            Assert.That(dispatcher.Execute(action, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.UnavailableProcessor));
         }
 
         [Test]
@@ -166,41 +166,41 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 _ => EzDataRebuildDispatchResult.Queued,
                 _ => EzDataRebuildDispatchResult.Queued);
 
-            Assert.That(dispatcher.Execute((EzDataRebuildTarget)999, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.UnknownTarget));
+            Assert.That(dispatcher.Execute((EzDataRebuildAction)999, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.UnknownTarget));
         }
 
-        [TestCase(EzDataRebuildTarget.RealmTags, true, false, false)]
-        [TestCase(EzDataRebuildTarget.RealmChartMSD, true, false, false)]
-        [TestCase(EzDataRebuildTarget.RealmAll, true, false, false)]
-        [TestCase(EzDataRebuildTarget.SqliteMain, false, true, false)]
-        [TestCase(EzDataRebuildTarget.SqliteSongsBranches, false, false, true)]
-        public void TestCanDispatch(EzDataRebuildTarget target, bool hasRealm, bool hasSqliteMain, bool hasSqliteBranches)
+        [TestCase(EzDataRebuildAction.RealmTags, true, false, false)]
+        [TestCase(EzDataRebuildAction.RealmChartMsd, true, false, false)]
+        [TestCase(EzDataRebuildAction.RealmAll, true, false, false)]
+        [TestCase(EzDataRebuildAction.SqliteMain, false, true, false)]
+        [TestCase(EzDataRebuildAction.SqliteSongsBranches, false, false, true)]
+        public void TestCanDispatch(EzDataRebuildAction action, bool hasRealm, bool hasSqliteMain, bool hasSqliteBranches)
         {
             var dispatcher = new EzDataRebuildDispatcher(
                 hasRealm ? (_, _) => EzDataRebuildDispatchResult.Queued : null,
                 hasSqliteMain ? _ => EzDataRebuildDispatchResult.Queued : null,
                 hasSqliteBranches ? _ => EzDataRebuildDispatchResult.Queued : null);
 
-            Assert.That(dispatcher.CanDispatch(target), Is.True);
+            Assert.That(dispatcher.CanDispatch(action), Is.True);
         }
 
-        [TestCase(EzDataRebuildTarget.RealmTags)]
-        [TestCase(EzDataRebuildTarget.RealmChartMSD)]
-        [TestCase(EzDataRebuildTarget.RealmAll)]
-        public void TestCanDispatchFalseWhenRealmProcessorMissing(EzDataRebuildTarget target)
+        [TestCase(EzDataRebuildAction.RealmTags)]
+        [TestCase(EzDataRebuildAction.RealmChartMsd)]
+        [TestCase(EzDataRebuildAction.RealmAll)]
+        public void TestCanDispatchFalseWhenRealmProcessorMissing(EzDataRebuildAction action)
         {
             var dispatcher = new EzDataRebuildDispatcher(null, _ => EzDataRebuildDispatchResult.Queued, _ => EzDataRebuildDispatchResult.Queued);
 
-            Assert.That(dispatcher.CanDispatch(target), Is.False);
+            Assert.That(dispatcher.CanDispatch(action), Is.False);
         }
 
-        [TestCase(EzDataRebuildTarget.SqliteMain)]
-        [TestCase(EzDataRebuildTarget.SqliteSongsBranches)]
-        public void TestCanDispatchFalseWhenWarmupProcessorMissing(EzDataRebuildTarget target)
+        [TestCase(EzDataRebuildAction.SqliteMain)]
+        [TestCase(EzDataRebuildAction.SqliteSongsBranches)]
+        public void TestCanDispatchFalseWhenWarmupProcessorMissing(EzDataRebuildAction action)
         {
             var dispatcher = new EzDataRebuildDispatcher((_, _) => EzDataRebuildDispatchResult.Queued, null, null);
 
-            Assert.That(dispatcher.CanDispatch(target), Is.False);
+            Assert.That(dispatcher.CanDispatch(action), Is.False);
         }
     }
 }
