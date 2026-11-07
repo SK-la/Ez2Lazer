@@ -117,6 +117,32 @@ namespace osu.Game.EzOsuGame.Analysis
                 : -1;
         }
 
+        /// <summary>
+        /// The baseline performance points implied by <paramref name="starRating"/>, for persisting to a per-system
+        /// pp column. Returns -1 when the ruleset cannot express it or the rating is unset.
+        /// </summary>
+        public static double ComputeBaselinePerformancePointsForRating(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo, double starRating, CancellationToken cancellationToken = default)
+        {
+            if (!double.IsFinite(starRating) || starRating <= 0)
+                return -1;
+
+            var lookup = new EzAnalysisLookupCache(beatmapInfo, beatmapInfo.Ruleset, mods: null);
+            IBeatmap analysisBeatmap = EzPlayableBeatmapCache.GetShared(beatmapManager.GetWorkingBeatmap(beatmapInfo), lookup.Ruleset, lookup.OrderedMods,
+                cancellationToken);
+
+            if (analysisBeatmap.HitObjects.Count == 0)
+                return -1;
+
+            return calculatePerformanceAtRating(lookup, analysisBeatmap, starRating, cancellationToken);
+        }
+
+        /// <summary>
+        /// Computes the baseline performance points implied by the stored Sunny star rating, for persisting to
+        /// <see cref="BeatmapInfo.SunnyPerformancePoints"/>. Returns -1 when the ruleset cannot express it.
+        /// </summary>
+        public static double ComputeBaselineSunnyPerformancePointsForRealm(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
+            => ComputeBaselinePerformancePointsForRating(beatmapManager, beatmapInfo, beatmapInfo.SunnyStarRating, cancellationToken);
+
         public static bool TryComputeXxySrAndPp(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken, out double? xxySr, out double? pp)
         {
             PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
@@ -244,9 +270,46 @@ namespace osu.Game.EzOsuGame.Analysis
 
             addOfficial(playable, analysisBeatmap, lookup, result);
             addSsr(lookup, analysisBeatmap, cancellationToken, result);
+            addPppPerformance(lookup, analysisBeatmap, ppp, cancellationToken, result);
 
             return result;
         }
+
+        /// <summary>
+        /// Performance points implied by the PP+ star rating. The rating already lives in the PP+ axis table, so this
+        /// only asks the ruleset's performance calculator to score it.
+        /// </summary>
+        private static void addPppPerformance(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap,
+                                              IReadOnlyDictionary<string, double>? pppAxes, CancellationToken cancellationToken,
+                                              Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>> result)
+        {
+            if (pppAxes == null
+                || !pppAxes.TryGetValue(EzPPPSkillCatalog.STAR_RATING, out double star)
+                || !double.IsFinite(star) || star <= 0)
+            {
+                return;
+            }
+
+            double pp = calculatePerformanceAtRating(lookup, analysisBeatmap, star, cancellationToken);
+
+            if (!double.IsFinite(pp) || pp <= 0)
+                return;
+
+            result[EzMetricProducers.PPP_PERFORMANCE] = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                [EzMetricProducers.PERFORMANCE_POINTS] = pp,
+            };
+        }
+
+        /// <summary>
+        /// The ruleset's perfect-play performance for an arbitrary star rating, via the ruleset analysis provider.
+        /// </summary>
+        private static double calculatePerformanceAtRating(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, double starRating, CancellationToken cancellationToken)
+            => EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset,
+                new EzAnalysisRequest(analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), EzAnalysisScope.PerformancePoints, starRating),
+                EzAnalysisFields.PERFORMANCE_POINTS, cancellationToken, out double pp)
+                ? pp
+                : -1;
 
         /// <summary>
         /// Official difficulty and performance for the current mods. Both come from one difficulty calculation,
@@ -316,16 +379,15 @@ namespace osu.Game.EzOsuGame.Analysis
                 [EzMetricProducers.STAR_RATING] = value,
             };
 
-            // Performance from the substituted rating, when the ruleset can express it.
-            if (EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset,
-                    new EzAnalysisRequest(analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), EzAnalysisScope.PerformancePoints, value),
-                    EzAnalysisFields.PERFORMANCE_POINTS, cancellationToken, out double pp) && double.IsFinite(pp) && pp > 0)
+            double pp = calculatePerformanceAtRating(lookup, analysisBeatmap, value, cancellationToken);
+
+            if (!double.IsFinite(pp) || pp <= 0)
+                return;
+
+            result[EzMetricProducers.SSR_PERFORMANCE] = new Dictionary<string, double>(StringComparer.Ordinal)
             {
-                result[EzMetricProducers.SSR_PERFORMANCE] = new Dictionary<string, double>(StringComparer.Ordinal)
-                {
-                    [EzMetricProducers.PERFORMANCE_POINTS] = pp,
-                };
-            }
+                [EzMetricProducers.PERFORMANCE_POINTS] = pp,
+            };
         }
 
         /// <summary>
@@ -507,8 +569,7 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        private static bool tryComputeOperationValues(PlayableCachedWorkingBeatmap playableWorkingBeatmap, IBeatmap analysisBeatmap,
-                                                      in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
+        private static bool tryComputeOperationValues(PlayableCachedWorkingBeatmap playableWorkingBeatmap, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
                                                       out double? xxySr, out double? pp)
         {
             pp = tryComputePerfectPp(playableWorkingBeatmap, analysisBeatmap, lookup, cancellationToken);
@@ -537,8 +598,7 @@ namespace osu.Game.EzOsuGame.Analysis
             return xxySr != null;
         }
 
-        private static double? tryComputePerfectPp(PlayableCachedWorkingBeatmap playableWorkingBeatmap, IBeatmap analysisBeatmap,
-                                                   in EzAnalysisLookupCache lookup, CancellationToken cancellationToken)
+        private static double? tryComputePerfectPp(PlayableCachedWorkingBeatmap playableWorkingBeatmap, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken)
         {
             var ruleset = lookup.Ruleset.CreateInstance();
 

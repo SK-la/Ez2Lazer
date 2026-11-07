@@ -39,7 +39,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             public RateableChartMeta(int keyCount, double? sunnyStarRating, double holdRatio)
             {
                 KeyCount = keyCount;
-                SunnyStarRating = sunnyStarRating;
+                sunnyStarRating = sunnyStarRating;
                 HoldRatio = holdRatio;
             }
         }

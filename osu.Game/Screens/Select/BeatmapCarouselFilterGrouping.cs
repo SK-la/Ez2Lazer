@@ -69,7 +69,8 @@ namespace osu.Game.Screens.Select
 
                 // xxy_SR is only required when difficulty is the active grouping key.
                 // For 0/1 item, grouping key does not affect output.
-                bool useSunnyStarRatingGrouping = itemList.Count > 1 && criteria.Group == GroupMode.SunnyStarRating;
+                bool useSunnyStarRatingGrouping = itemList.Count > 1
+                                                  && criteria.Group == GroupMode.SunnyStarRating;
                 bool usePpGrouping = criteria.Group == GroupMode.PP && itemList.Count > 0;
 
                 if (useSunnyStarRatingGrouping)

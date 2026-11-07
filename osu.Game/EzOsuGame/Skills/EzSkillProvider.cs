@@ -102,6 +102,9 @@ namespace osu.Game.EzOsuGame.Skills
             if (string.IsNullOrEmpty(beatmapInfo.Hash) || string.IsNullOrEmpty(systemId))
                 return new Dictionary<string, double>(StringComparer.Ordinal);
 
+            if (systemId == EzSkillSystems.BEATMAP_PPP)
+                return Store.GetBeatmapSkillsAtCurrentVersions(beatmapInfo, systemId);
+
             return Store.GetBeatmapSkills(beatmapInfo.Hash, systemId);
         }
 
@@ -113,6 +116,9 @@ namespace osu.Game.EzOsuGame.Skills
         {
             if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(systemId))
                 return new Dictionary<string, double>(StringComparer.Ordinal);
+
+            if (systemId == EzSkillSystems.PLAYER_PPP)
+                return Store.GetPlayerSkillsAtCurrentVersions(username, sliceKey, systemId);
 
             return Store.GetPlayerSkills(username, sliceKey, systemId);
         }
