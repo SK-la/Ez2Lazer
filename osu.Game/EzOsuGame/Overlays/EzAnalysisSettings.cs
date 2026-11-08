@@ -58,23 +58,23 @@ namespace osu.Game.EzOsuGame.Overlays
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = EzSettingsStrings.SSR_RESCALE_THRESHOLD,
-                    HintText = EzSettingsStrings.SSR_RESCALE_THRESHOLD_TOOLTIP,
+                    Caption = EzSettingsStrings.SunnySR_RESCALE_THRESHOLD,
+                    HintText = EzSettingsStrings.SunnySR_RESCALE_THRESHOLD_TOOLTIP,
                     Current = ezConfig.GetBindable<double>(Ez2Setting.SsrRescaleThreshold),
                     KeyboardStep = 1f,
                 })
                 {
-                    Keywords = new[] { "ssr", "xxy", "star", "rating", "rescale", "threshold", "难度", "星级", "重缩放" }
+                    Keywords = new[] { "ssr", "ssr", "star", "rating", "rescale", "threshold", "难度", "星级", "重缩放" }
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = EzSettingsStrings.SSR_LN_MULTIPLIER,
-                    HintText = EzSettingsStrings.SSR_LN_MULTIPLIER_TOOLTIP,
+                    Caption = EzSettingsStrings.SunnySR_LN_MULTIPLIER,
+                    HintText = EzSettingsStrings.SunnySR_LN_MULTIPLIER_TOOLTIP,
                     Current = ezConfig.GetBindable<double>(Ez2Setting.SsrLnMultiplier),
                     KeyboardStep = 0.5f,
                 })
                 {
-                    Keywords = new[] { "ssr", "xxy", "ln", "long note", "multiplier", "长条", "因子", "难度" }
+                    Keywords = new[] { "ssr", "ssr", "ln", "long note", "multiplier", "长条", "因子", "难度" }
                 },
             });
 

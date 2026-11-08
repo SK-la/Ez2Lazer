@@ -55,10 +55,10 @@ namespace osu.Game.EzOsuGame.Beatmaps
             if (EzMetricVariantReadout.Selected(rulesetId)?.Id != EzMetricVariantCatalog.SUNNY)
                 return finite(beatmap.EzRatingData.MinaSR);
 
-            if (preferAnalysisValues && analysisSummary?.SSR is double liveXxy)
-                return finite(liveXxy);
+            if (preferAnalysisValues && analysisSummary?.SunnySR is double liveSunnySR)
+                return finite(liveSunnySR);
 
-            return finite(beatmap.GetPersistedSunnyStarRating() ?? analysisSummary?.SSR);
+            return finite(beatmap.GetPersistedSunnyStarRating() ?? analysisSummary?.SunnySR);
         }
 
         /// <summary>

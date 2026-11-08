@@ -12,7 +12,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
     public class EzDataRebuildDispatcherTest
     {
         [TestCase(EzDataRebuildAction.RealmTags, EzRealmMetadataScope.Tags)]
-        [TestCase(EzDataRebuildAction.RealmSunny, EzRealmMetadataScope.SSR)]
+        [TestCase(EzDataRebuildAction.RealmSunny, EzRealmMetadataScope.SunnySR)]
         [TestCase(EzDataRebuildAction.RealmPp, EzRealmMetadataScope.PP)]
         [TestCase(EzDataRebuildAction.RealmChartMsd, EzRealmMetadataScope.MSD)]
         [TestCase(EzDataRebuildAction.RealmChartCsi, EzRealmMetadataScope.ChartSkillInfo)]

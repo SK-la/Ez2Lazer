@@ -73,7 +73,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly IBindable<bool> runtimeAnalysisEnabled = new Bindable<bool>();
 
         /// <summary>
-        /// The two SSR coefficients. Session results are dropped when either changes, because an entry computed
+        /// The two SunnySR coefficients. Session results are dropped when either changes, because an entry computed
         /// under the old pair would otherwise answer for the new one.
         /// </summary>
         /// <remarks>
@@ -301,8 +301,8 @@ namespace osu.Game.EzOsuGame.Analysis
         private static double? positiveAxis(in EzAnalysisResult analysis, EzMetricProducerId producer, string axisId)
             => analysis.AxesOf(producer).TryGetValue(axisId, out double value) && double.IsFinite(value) && value > 0 ? value : null;
 
-        public bool TryGetSSR(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double sunnySR)
-            => analysisDatabase.TryGetSSR(beatmapInfo, rulesetInfo, out sunnySR);
+        public bool TryGetSunnySR(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double sunnySR)
+            => analysisDatabase.TryGetSunnySR(beatmapInfo, rulesetInfo, out sunnySR);
 
         /// <summary>Cached result for this chart and mods; never computes.</summary>
         public EzAnalysisResult? TryGet(BeatmapInfo beatmap, IReadOnlyList<Mod>? mods)
@@ -354,8 +354,8 @@ namespace osu.Game.EzOsuGame.Analysis
         public IReadOnlyDictionary<Guid, double> GetActiveSongsBranchPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
             => analysisDatabase.GetActiveSongsBranchPpValues(beatmaps, rulesetInfo, mods);
 
-        public IReadOnlyDictionary<Guid, double> GetBaselineSSRFromRealm(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
-            => analysisDatabase.GetBaselineSSRFromRealm(beatmaps, rulesetInfo, mods);
+        public IReadOnlyDictionary<Guid, double> GetBaselineSunnySRFromRealm(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
+            => analysisDatabase.GetBaselineSunnySRFromRealm(beatmaps, rulesetInfo, mods);
 
         public IReadOnlyDictionary<Guid, double> GetStoredPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
             => analysisDatabase.GetStoredPpValues(beatmaps, rulesetInfo, mods);

@@ -10,7 +10,7 @@ using osu.Game.Rulesets.Mods;
 namespace osu.Game.EzOsuGame.Mods
 {
     /// <summary>
-    /// Shared DT/HT rate resolution for MSD/SSR/Dan (clamp matches lazer ModRateAdjust bounds).
+    /// Shared DT/HT rate resolution for MSD/SunnySR/Dan (clamp matches lazer ModRateAdjust bounds).
     /// </summary>
     public static class EzModRate
     {
@@ -116,7 +116,7 @@ namespace osu.Game.EzOsuGame.Mods
         }
 
         /// <summary>Whether BeatmapInfo.SunnyStarRating (nomod baseline) may be reused without live recompute.</summary>
-        public static bool CanUsePersistedXxy(IEnumerable<Mod>? mods)
+        public static bool CanUsePersistedSunnySR(IEnumerable<Mod>? mods)
             => IsNoModRate(Resolve(mods)) && !ChangesPlayableKeys(mods);
     }
 }

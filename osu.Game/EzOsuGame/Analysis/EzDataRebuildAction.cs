@@ -184,7 +184,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     return EzRealmMetadataScope.PPP;
 
                 case EzDataRebuildAction.RealmSunny:
-                    return EzRealmMetadataScope.SSR;
+                    return EzRealmMetadataScope.SunnySR;
 
                 case EzDataRebuildAction.RealmPp:
                     return EzRealmMetadataScope.PP;

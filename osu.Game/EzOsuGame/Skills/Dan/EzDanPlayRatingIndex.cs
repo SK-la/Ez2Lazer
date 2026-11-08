@@ -8,7 +8,7 @@ using osu.Game.EzOsuGame.Skills.Mina;
 namespace osu.Game.EzOsuGame.Skills.Dan
 {
     /// <summary>
-    /// Hub <c>play.values</c> lookup for dan skillset filing: rebuild Mina SSR vectors from
+    /// Hub <c>play.values</c> lookup for dan skillset filing: rebuild Mina SunnySR vectors from
     /// <see cref="EzAxisPlayEvidenceRow"/> (written by <see cref="EzPlayerRatingAggregator"/>).
     /// </summary>
     public sealed class EzDanPlayRatingIndex
@@ -79,7 +79,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             return new EzDanPlayRatingIndex(list);
         }
 
-        /// <summary>Hub: the rated play's SSR vector for this clear; null when no matching axis evidence.</summary>
+        /// <summary>Hub: the rated play's SunnySR vector for this clear; null when no matching axis evidence.</summary>
         public IReadOnlyDictionary<string, double>? Resolve(EzDanClearEvidenceRow clear)
         {
             if (string.IsNullOrEmpty(clear.BeatmapHash) || plays.Count == 0)

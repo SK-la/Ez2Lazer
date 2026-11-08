@@ -52,7 +52,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
 
                 batch.Add((chart, pathKey, new BmsChartAnalyticsResult(
                     record.Pp,
-                    record.SSR,
+                    record.SunnySR,
                     record.AvgKps,
                     record.MaxKps,
                     record.StarRating,
@@ -78,7 +78,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
             {
                 PathKey = pathKey,
                 Pp = analyticsResult.PP,
-                SSR = analyticsResult.SSR,
+                SunnySR = analyticsResult.SunnySR,
                 AvgKps = analyticsResult.AvgKps,
                 MaxKps = analyticsResult.MaxKps,
                 StarRating = analyticsResult.StarRating,
@@ -86,11 +86,11 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                 KpsListJson = analyticsResult.KpsListJson,
             };
 
-            return createPayload(record, analyticsResult.StarRating, analyticsResult.SSR, analyticsResult.PP);
+            return createPayload(record, analyticsResult.StarRating, analyticsResult.SunnySR, analyticsResult.PP);
         }
 
         private static EzExternalBeatmapAnalysisPayload createPayload(BmsAnalyticsRecord record)
-            => createPayload(record, record.StarRating, record.SSR, record.Pp);
+            => createPayload(record, record.StarRating, record.SunnySR, record.Pp);
 
         private static EzExternalBeatmapAnalysisPayload createPayload(BmsAnalyticsRecord record, double? starRating, double? sunnySR, double? pp)
         {

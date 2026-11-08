@@ -33,7 +33,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         public void Msd_keeps_the_raw_algorithm_version()
         {
             // Mina declares no data dependency, so its revision stays the engine constant already on disk.
-            // EzBeatmapSkillValue is shared with player SSR / pattern rows and readers pass the version explicitly.
+            // EzBeatmapSkillValue is shared with player SunnySR / pattern rows and readers pass the version explicitly.
             Assert.That(EzAnalysisRevision.Msd, Is.EqualTo(EzMinaSkillAlgorithm.VERSION));
         }
 

@@ -65,7 +65,7 @@ namespace osu.Game.Screens.Select
 
             public Bindable<string?> EzAnalysisPlayer { get; } = new Bindable<string?>();
 
-            public Bindable<EzRadarDisplayMode> LeftRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.SSRSkill);
+            public Bindable<EzRadarDisplayMode> LeftRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.SunnySRSkill);
 
             public Bindable<EzRadarDisplayMode> RightRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.MSDSkillDual);
 
@@ -252,7 +252,7 @@ namespace osu.Game.Screens.Select
                                                             .ToList()
                                          ?? new List<string>();
 
-                // Offer All whenever any archive player has SSR (All headlines may still be empty until recompute).
+                // Offer All whenever any archive player has SunnySR (All headlines may still be empty until recompute).
                 if (playerHasSkillData(EzLocalProfileConstants.ALL_PLAYERS) || includedWithSkills.Count > 0)
                     names.Add(EzLocalProfileConstants.ALL_PLAYERS);
 

@@ -58,18 +58,18 @@ namespace osu.Game.EzOsuGame.Analysis
     }
 
     /// <summary>
-    /// 规则集通过 <see cref="Rulesets.Ruleset.CreateEzAnalysisProvider"/> 返回的实现此接口的 provider，声明支持 xxy 难度。
+    /// 规则集通过 <see cref="Rulesets.Ruleset.CreateEzAnalysisProvider"/> 返回的实现此接口的 provider，声明支持 ssr难度。
     /// 是否对某张谱面计算由 <see cref="SupportsSunnyStarRating"/> 决定；sqlite/Realm 仅为存储与消费者，不决定规则集能力。
     /// </summary>
     public interface IEzSunnyStarRatingSupport
     {
         /// <summary>
-        /// yyyyMMdd revision of this ruleset's xxy SR algorithm. Bump when calculation logic changes.
+        /// yyyyMMdd revision of this ruleset's SunnySR algorithm. Bump when calculation logic changes.
         /// </summary>
         int SunnyStarRatingVersion { get; }
 
         /// <summary>
-        /// Whether xxy SR can be calculated for this beatmap (layout, key count, etc.).
+        /// Whether SunnySR can be calculated for this beatmap (layout, key count, etc.).
         /// </summary>
         bool SupportsSunnyStarRating(IBeatmap beatmap);
     }

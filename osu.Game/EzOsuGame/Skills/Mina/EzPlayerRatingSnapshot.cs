@@ -7,7 +7,7 @@ using System.Collections.Generic;
 namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
-    /// Detached SSR snapshot for one username + keymode (values + row metadata).
+    /// Detached SunnySR snapshot for one username + keymode (values + row metadata).
     /// </summary>
     public sealed class EzPlayerRatingSnapshot
     {

@@ -93,7 +93,7 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString DATA_REBUILD_ACTION_SQLITE_MAIN_DETAIL = new EzLocalizationManager.EzLocalisableString(
             "NoMod 分析切片", "NoMod analysis slice");
 
-        public static readonly LocalisableString DATA_REBUILD_ACTION_SQLITE_BRANCHES_NAME = new EzLocalizationManager.EzLocalisableString("分支曲库 xxy / PP", "Songs branches xxy / PP");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_SQLITE_BRANCHES_NAME = new EzLocalizationManager.EzLocalisableString("分支曲库 ssr/ PP", "Songs branches ssr/ PP");
         public static readonly LocalisableString DATA_REBUILD_ACTION_SQLITE_BRANCHES_DETAIL = new EzLocalizationManager.EzLocalisableString(
             "按分支快照构建，读主库切片", "Built per branch snapshot; reads the main slice");
 

@@ -8,7 +8,7 @@ using System.Linq;
 namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
-    /// Etterna ScoreManager::AggregateSSRs port (mania-hub player-skills.ts aggregateSsrs).
+    /// Etterna ScoreManager::AggregateSunnySRs port (mania-hub player-skills.ts aggregateSsrs).
     /// </summary>
     public static class EzMinaRatingAggregator
     {

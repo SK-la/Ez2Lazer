@@ -16,7 +16,7 @@ The **mathematical formulas** used here are **distilled from** [Syriiin/osu](htt
 | mania | Strain, star rating (player rows by key count) |
 
 
-Mania default skill radar remains MSD/SSR; PPP radar display modes are optional in HUD / song select.
+Mania default skill radar remains MSD/SunnySR; PPP radar display modes are optional in HUD / song select.
 
 ## License
 

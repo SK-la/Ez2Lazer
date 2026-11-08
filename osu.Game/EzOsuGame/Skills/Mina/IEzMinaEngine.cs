@@ -6,7 +6,7 @@ using System;
 namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
-    /// Mania difficulty rating engine. MSD is the chart-side baseline; SSR is the
+    /// Mania difficulty rating engine. MSD is the chart-side baseline; SunnySR is the
     /// score-relative rating at a given Wife/accuracy goal.
     /// </summary>
     /// <remarks>
@@ -35,7 +35,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         EzMinaSkillAxisVector CalculateMsd(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate = 1f);
 
         /// <summary>
-        /// Score-relative skill rating (SSR) for the given rows at a Wife/accuracy goal.
+        /// Score-relative skill rating (SunnySR) for the given rows at a Wife/accuracy goal.
         /// <paramref name="goal"/> is clamped to the engine's usable range.
         /// Returns the zero vector when the keymode is unsupported or there are too few rows to rate.
         /// </summary>

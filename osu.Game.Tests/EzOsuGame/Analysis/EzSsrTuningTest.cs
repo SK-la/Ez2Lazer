@@ -13,7 +13,7 @@ using osu.Game.Rulesets.Mania.Objects;
 namespace osu.Game.Tests.EzOsuGame.Analysis
 {
     /// <summary>
-    /// The two SSR coefficients are user settings now, not mod state. These pin what that means: they reach the
+    /// The two SunnySR coefficients are user settings now, not mod state. These pin what that means: they reach the
     /// rating, each keeps its own effect, and a stored value outside the usable range falls back instead of
     /// producing garbage.
     /// </summary>

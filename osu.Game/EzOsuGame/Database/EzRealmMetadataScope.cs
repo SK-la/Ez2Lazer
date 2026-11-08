@@ -9,12 +9,12 @@ namespace osu.Game.EzOsuGame.Database
     public enum EzRealmMetadataScope
     {
         Tags = 1,
-        SSR = 2,
+        SunnySR = 2,
         PP = 4,
         MSD = 8,
         ChartSkillInfo = 16,
         ChartDan = 32,
         PPP = 64,
-        All = Tags | SSR | PP | MSD | ChartSkillInfo | ChartDan | PPP,
+        All = Tags | SunnySR | PP | MSD | ChartSkillInfo | ChartDan | PPP,
     }
 }

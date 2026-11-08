@@ -10,7 +10,7 @@ namespace osu.Game.EzOsuGame.Analysis
     {
         /// <summary>
         /// 官方 perfect PP 管线版本：各 ruleset 的 <see cref="Rulesets.Difficulty.DifficultyCalculator.Version"/>。
-        /// PP 为 ppy 全模式指标，与 Ez xxy SR 无关。
+        /// PP 为 ppy 全模式指标，与 Ez SunnySR 无关。
         /// </summary>
         public static bool TryGetPerformancePointsVersion(IRulesetInfo rulesetInfo, IWorkingBeatmap difficultyCalculatorBeatmap, out int version)
         {

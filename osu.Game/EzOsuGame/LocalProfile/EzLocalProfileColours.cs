@@ -18,7 +18,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// <summary>Key-press / secondary count (e.g. total keys).</summary>
         public static Color4 KeyCount(OsuColour colours) => colours.BlueLight;
 
-        /// <summary>Average rate (e.g. avg KPS, SSR axis).</summary>
+        /// <summary>Average rate (e.g. avg KPS, SunnySR axis).</summary>
         public static Color4 AvgRate(OsuColour colours) => colours.Orange1;
 
         /// <summary>Peak / max (e.g. max KPS, star peak).</summary>

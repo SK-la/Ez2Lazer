@@ -36,8 +36,8 @@ namespace osu.Game.EzOsuGame.Analysis
     ///
     /// 数据层（见 <see cref="EzSongSelectAnalysisDisplay"/>）：
     /// - L1 Realm：<see cref="BeatmapInfo.EzRatingData"/>（各系统 SR / PP）与 <see cref="BeatmapInfo.StarRating"/> / <see cref="BeatmapInfo.PerformancePoints"/>，不受上述开关影响。
-    /// - L2 主 SQLite：NoMod kps + mania 列统计（不含 xxy/PP）。
-    /// - 分支库：预生成 Mod 快照 xxy/PP（及关联指标）；激活后只读，构建/刷新走维护流程。
+    /// - L2 主 SQLite：NoMod kps + mania 列统计（不含 ssr/PP）。
+    /// - 分支库：预生成 Mod 快照 ssr/PP（及关联指标）；激活后只读，构建/刷新走维护流程。
     /// </summary>
     public class EzAnalysisDatabase
     {
@@ -59,9 +59,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public readonly record struct SongsBranchRefreshPlan(
             EzAnalysisPersistentStore.SongsBranchDescriptor Branch,
-            bool RefreshXxy,
+            bool RefreshSunnySR,
             bool RefreshPp,
-            int CurrentXxyVersion,
+            int CurrentSunnySRVersion,
             int CurrentPpVersion);
 
         public readonly record struct SongsBranchBuildResult(
@@ -87,7 +87,7 @@ namespace osu.Game.EzOsuGame.Analysis
         public bool IsSqliteAnalysisEnabled => sqliteAnalysisEnabled.Value && EzAnalysisPersistentStore.Enabled;
 
         /// <summary>
-        /// 读取主 SQLite 中的 kps/KPC 切片（NoMod）。不含 xxy/PP。
+        /// 读取主 SQLite 中的 kps/KPC 切片（NoMod）。不含 ssr/PP。
         /// </summary>
         public bool TryGetStoredSqliteSlice(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out EzAnalysisResult result)
         {
@@ -103,7 +103,7 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// 外部规则集离线分析统一落盘：Realm NoMod 基线（Star/xxy/PP）+ 主 SQLite kps/KPC 切片。
+        /// 外部规则集离线分析统一落盘：Realm NoMod 基线（Star/ssr/PP）+ 主 SQLite kps/KPC 切片。
         /// 调用方负责将规则集私有分析结果转换为 <see cref="EzAnalysisResult"/>。
         /// </summary>
         /// <remarks>
@@ -140,7 +140,7 @@ namespace osu.Game.EzOsuGame.Analysis
             return committed;
         }
 
-        public bool TryGetSSR(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double sunnySR)
+        public bool TryGetSunnySR(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double sunnySR)
         {
             sunnySR = 0;
 
@@ -194,10 +194,10 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// NoMod 基线 xxy：直读 Realm（对齐 carousel 读 <see cref="BeatmapInfo.StarRating"/>）。
+        /// NoMod 基线 ssr：直读 Realm（对齐 carousel 读 <see cref="BeatmapInfo.StarRating"/>）。
         /// 有 mod 时仅返回已激活且指纹匹配的分支库值（需 SQLite 开关）。
         /// </summary>
-        public IReadOnlyDictionary<Guid, double> GetBaselineSSRFromRealm(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
+        public IReadOnlyDictionary<Guid, double> GetBaselineSunnySRFromRealm(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
         {
             var beatmapList = beatmaps.Distinct().ToList();
 
@@ -215,7 +215,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (mods?.Any() == true)
                 return empty_sunny_sr_values;
 
-            var resolvedValues = persistentStore.GetBaselineSSRFromRealm(beatmapList);
+            var resolvedValues = persistentStore.GetBaselineSunnySRFromRealm(beatmapList);
             return resolvedValues.Count == 0 ? empty_sunny_sr_values : resolvedValues;
         }
 
@@ -350,10 +350,10 @@ namespace osu.Game.EzOsuGame.Analysis
                     {
                         var lookup = new EzAnalysisLookupCache(beatmap, localRulesetInfo, mods);
 
-                        if (EzAnalysisComputation.TryComputeSSRAndPp(beatmapManager, lookup, cancellationToken, out double? computedSSR, out double? computedPp))
+                        if (EzAnalysisComputation.TryComputeSunnySRAndPp(beatmapManager, lookup, cancellationToken, out double? computedSunnySR, out double? computedPp))
                         {
-                            if (computedSSR is double resolvedSSR)
-                                sunnySR = resolvedSSR;
+                            if (computedSunnySR is double resolvedSunnySR)
+                                sunnySR = resolvedSunnySR;
 
                             pp = computedPp;
                         }
@@ -393,8 +393,8 @@ namespace osu.Game.EzOsuGame.Analysis
                     int sunnySRAlgorithmVersion = 0;
                     int ppAlgorithmVersion = 0;
 
-                    if (EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(localRulesetInfo, out int resolvedXxyVersion))
-                        sunnySRAlgorithmVersion = resolvedXxyVersion;
+                    if (EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(localRulesetInfo, out int resolvedSunnySRVersion))
+                        sunnySRAlgorithmVersion = resolvedSunnySRVersion;
 
                     if (tryGetOfficialPerformancePointsVersion(localRulesetInfo, out int resolvedPpVersion))
                         ppAlgorithmVersion = resolvedPpVersion;
@@ -554,7 +554,7 @@ namespace osu.Game.EzOsuGame.Analysis
         public void EnsureInitialised() => persistentStore.Initialise();
 
         /// <summary>
-        /// 扫描所有分支库：v2+ legacy 库补写版本 meta；v1 迁移后标记全量 refresh；返回 xxy 或 PP 算法落后、需要重算的分支计划。
+        /// 扫描所有分支库：v2+ legacy 库补写版本 meta；v1 迁移后标记全量 refresh；返回 ssr或 PP 算法落后、需要重算的分支计划。
         /// </summary>
         public IReadOnlyList<SongsBranchRefreshPlan> GetSongsBranchesNeedingRefresh()
         {
@@ -570,10 +570,10 @@ namespace osu.Game.EzOsuGame.Analysis
                 if (rulesetInfo is not RulesetInfo localRulesetInfo)
                     continue;
 
-                bool supportsXxy = EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(localRulesetInfo, out int currentXxyVersion);
+                bool supportsSunnySR = EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(localRulesetInfo, out int currentSunnySRVersion);
                 bool supportsPp = tryGetOfficialPerformancePointsVersion(localRulesetInfo, out int currentPpVersion);
 
-                if (!supportsXxy && !supportsPp)
+                if (!supportsSunnySR&& !supportsPp)
                     continue;
 
                 if (persistentStore.TryGetSongsBranchRequiresPostMigrationRefresh(branch.DatabasePath, out bool requiresPostMigrationRefresh)
@@ -581,42 +581,42 @@ namespace osu.Game.EzOsuGame.Analysis
                 {
                     plans.Add(new SongsBranchRefreshPlan(
                         branch,
-                        RefreshXxy: supportsXxy,
+                        RefreshSunnySR: supportsSunnySR,
                         RefreshPp: supportsPp,
-                        CurrentXxyVersion: supportsXxy ? currentXxyVersion : 0,
+                        CurrentSunnySRVersion: supportsSunnySR ? currentSunnySRVersion : 0,
                         CurrentPpVersion: supportsPp ? currentPpVersion : 0));
                     continue;
                 }
 
-                int effectiveXxy = supportsXxy ? currentXxyVersion : 0;
+                int effectiveSunnySR = supportsSunnySR ? currentSunnySRVersion : 0;
                 int effectivePp = supportsPp ? currentPpVersion : 0;
 
-                if (persistentStore.SongsBranchContentHashMatches(branch.DatabasePath, branch.Metadata, effectiveXxy, effectivePp))
+                if (persistentStore.SongsBranchContentHashMatches(branch.DatabasePath, branch.Metadata, effectiveSunnySR, effectivePp))
                     continue;
 
-                persistentStore.TryGetSongsBranchStoredXxyVersion(branch.DatabasePath, out int storedXxyVersion);
+                persistentStore.TryGetSongsBranchStoredSunnySRVersion(branch.DatabasePath, out int storedSunnySRVersion);
                 persistentStore.TryGetSongsBranchStoredPpVersion(branch.DatabasePath, out int storedPpVersion);
 
-                if (supportsXxy && storedXxyVersion <= 0)
-                    persistentStore.EnsureSongsBranchXxyVersionMeta(branch.DatabasePath, currentXxyVersion);
+                if (supportsSunnySR&& storedSunnySRVersion <= 0)
+                    persistentStore.EnsureSongsBranchSunnySRVersionMeta(branch.DatabasePath, currentSunnySRVersion);
 
                 if (supportsPp && storedPpVersion <= 0)
                     persistentStore.EnsureSongsBranchPpVersionMeta(branch.DatabasePath, currentPpVersion);
 
                 // Legacy branches without content_hash get stamped during Ensure* above; re-check before planning work.
-                if (persistentStore.SongsBranchContentHashMatches(branch.DatabasePath, branch.Metadata, effectiveXxy, effectivePp))
+                if (persistentStore.SongsBranchContentHashMatches(branch.DatabasePath, branch.Metadata, effectiveSunnySR, effectivePp))
                     continue;
 
-                bool refreshXxy = supportsXxy && persistentStore.SongsBranchNeedsXxyRefresh(storedXxyVersion, currentXxyVersion);
+                bool refreshSunnySR = supportsSunnySR&& persistentStore.SongsBranchNeedsSunnySRRefresh(storedSunnySRVersion, currentSunnySRVersion);
                 bool refreshPp = supportsPp && persistentStore.SongsBranchNeedsPpRefresh(storedPpVersion, currentPpVersion);
 
-                if (refreshXxy || refreshPp)
+                if (refreshSunnySR|| refreshPp)
                 {
                     plans.Add(new SongsBranchRefreshPlan(
                         branch,
-                        refreshXxy,
+                        refreshSunnySR,
                         refreshPp,
-                        supportsXxy ? currentXxyVersion : 0,
+                        supportsSunnySR ? currentSunnySRVersion : 0,
                         supportsPp ? currentPpVersion : 0));
                 }
             }
@@ -641,17 +641,17 @@ namespace osu.Game.EzOsuGame.Analysis
                 if (rulesetInfo is not RulesetInfo localRulesetInfo)
                     continue;
 
-                bool supportsXxy = EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(localRulesetInfo, out int currentXxyVersion);
+                bool supportsSunnySR = EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(localRulesetInfo, out int currentSunnySRVersion);
                 bool supportsPp = tryGetOfficialPerformancePointsVersion(localRulesetInfo, out int currentPpVersion);
 
-                if (!supportsXxy && !supportsPp)
+                if (!supportsSunnySR&& !supportsPp)
                     continue;
 
                 plans.Add(new SongsBranchRefreshPlan(
                     branch,
-                    RefreshXxy: supportsXxy,
+                    RefreshSunnySR: supportsSunnySR,
                     RefreshPp: supportsPp,
-                    CurrentXxyVersion: supportsXxy ? currentXxyVersion : 0,
+                    CurrentSunnySRVersion: supportsSunnySR ? currentSunnySRVersion : 0,
                     CurrentPpVersion: supportsPp ? currentPpVersion : 0));
             }
 
@@ -663,7 +663,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
                 return Task.CompletedTask;
 
-            if (!plan.RefreshXxy && !plan.RefreshPp)
+            if (!plan.RefreshSunnySR&& !plan.RefreshPp)
                 return Task.CompletedTask;
 
             return Task.Run(() =>
@@ -677,7 +677,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 if (storedRows.Count == 0)
                 {
-                    persistentStore.EnsureSongsBranchVersionMeta(plan.Branch.DatabasePath, plan.CurrentXxyVersion, plan.CurrentPpVersion);
+                    persistentStore.EnsureSongsBranchVersionMeta(plan.Branch.DatabasePath, plan.CurrentSunnySRVersion, plan.CurrentPpVersion);
                     persistentStore.ClearSongsBranchPostMigrationRefresh(plan.Branch.DatabasePath);
                     return;
                 }
@@ -692,7 +692,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     cancellationToken.ThrowIfCancellationRequested();
 
                     var storedRow = storedRows[i];
-                    double sunnySR = storedRow.SSR;
+                    double sunnySR = storedRow.SunnySR;
                     double? pp = storedRow.Pp;
 
                     if (beatmapLookup.TryGetValue(storedRow.BeatmapId, out var beatmap)
@@ -702,10 +702,10 @@ namespace osu.Game.EzOsuGame.Analysis
                         {
                             var lookup = new EzAnalysisLookupCache(beatmap, localRulesetInfo, mods);
 
-                            if (plan.RefreshXxy
-                                && EzAnalysisComputation.TryComputeSSR(beatmapManager, lookup, cancellationToken, out double computedSSR))
+                            if (plan.RefreshSunnySR
+                                && EzAnalysisComputation.TryComputeSunnySR(beatmapManager, lookup, cancellationToken, out double computedSunnySR))
                             {
-                                sunnySR = computedSSR;
+                                sunnySR = computedSunnySR;
                             }
 
                             if (plan.RefreshPp
@@ -748,7 +748,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 persistentStore.UpdateSongsBranchRows(
                     plan.Branch.DatabasePath,
                     updatedRows,
-                    plan.RefreshXxy ? plan.CurrentXxyVersion : null,
+                    plan.RefreshSunnySR ? plan.CurrentSunnySRVersion : null,
                     plan.RefreshPp ? plan.CurrentPpVersion : null);
 
                 persistentStore.ClearSongsBranchPostMigrationRefresh(plan.Branch.DatabasePath);
@@ -861,9 +861,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
             // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
             /*
-            if (payload.SunnyStarRating is double xxy && double.IsFinite(xxy) && xxy >= 0)
+            if (payload.SunnyStarRating is double ssr && double.IsFinite(ssr) && ssr >= 0)
             {
-                EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Sunny, xxy);
+                EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Sunny, ssr);
                 wrote = true;
             }
 
@@ -1449,7 +1449,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private static string createModsDisplay(IReadOnlyList<Mod>? mods)
         {
-            var relevantMods = getSSRRelevantMods(mods).ToList();
+            var relevantMods = getSunnySRRelevantMods(mods).ToList();
             return relevantMods.Count == 0 ? "NoMod" : string.Join('+', relevantMods.Select(m => m.Acronym));
         }
 
@@ -1461,7 +1461,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private static string createModsProfileFingerprint(IEnumerable<Mod>? mods)
         {
-            var relevantMods = getSSRRelevantMods(mods).ToList();
+            var relevantMods = getSunnySRRelevantMods(mods).ToList();
 
             if (relevantMods.Count == 0)
                 return string.Empty;
@@ -1484,19 +1484,19 @@ namespace osu.Game.EzOsuGame.Analysis
             return builder.ToString();
         }
 
-        private static IEnumerable<Mod> getSSRRelevantMods(IEnumerable<Mod>? mods)
+        private static IEnumerable<Mod> getSunnySRRelevantMods(IEnumerable<Mod>? mods)
         {
             if (mods == null)
                 yield break;
 
             foreach (var mod in mods)
             {
-                if (modAffectsSSR(mod))
+                if (modAffectsSunnySR(mod))
                     yield return mod;
             }
         }
 
-        private static bool modAffectsSSR(Mod mod) => mod is IApplicableToRate
+        private static bool modAffectsSunnySR(Mod mod) => mod is IApplicableToRate
                                                              or IApplicableToBeatmapConverter
                                                              or IApplicableAfterBeatmapConversion
                                                              or IApplicableToDifficulty

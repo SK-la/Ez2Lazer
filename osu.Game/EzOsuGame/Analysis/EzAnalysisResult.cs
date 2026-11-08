@@ -54,12 +54,12 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public static readonly EzManiaSummary EMPTY = new EzManiaSummary(null, null, null);
 
-        public double? SSR { get; }
+        public double? SunnySR { get; }
 
         // TODO: 仅预留字段。当前阶段不参与计算、不参与持久化版本升级，也不接入 UI / 本地化。
-        public double? SSRFullLN4 { get; }
+        public double? SunnySRFullLN4 { get; }
 
-        public double? SSRFullLN8 { get; }
+        public double? SunnySRFullLN8 { get; }
 
         /// <summary>
         /// Total number of hit objects in each column (includes both regular notes and LNs).
@@ -84,9 +84,9 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             this.columnCounts = columnCounts;
             this.holdNoteCounts = holdNoteCounts;
-            SSR = sunnySR;
-            SSRFullLN4 = sunnySRFullLN4;
-            SSRFullLN8 = sunnySRFullLN8;
+            SunnySR = sunnySR;
+            SunnySRFullLN4 = sunnySRFullLN4;
+            SunnySRFullLN8 = sunnySRFullLN8;
         }
     }
 

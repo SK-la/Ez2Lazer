@@ -11,9 +11,9 @@ using osu.Game.Rulesets.Mods;
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
-    /// 选歌面板 Ez 分析显示合成（kps/KPC/xxy 等 SQLite 体系指标）。
+    /// 选歌面板 Ez 分析显示合成（KPS/KPC/SunnySR 等 SQLite 体系指标）。
     /// Panel PP 见 <see cref="EzPanelPerformancePoints"/>（L2 cache + L1 Realm），不在此合成。
-    /// L1 Realm 提供 NoMod xxy 基线；L2/L3 <see cref="EzAnalysisResult"/> 提供 kps/KPC 与 mod 动态 xxy（受 <see cref="Ez2Setting.EzAnalysisRecEnabled"/>）。
+    /// L1 Realm 提供 NoMod ssr基线；L2/L3 <see cref="EzAnalysisResult"/> 提供 kps/KPC 与 mod 动态 ssr（受 <see cref="Ez2Setting.EzAnalysisRecEnabled"/>）。
     /// </summary>
     public static class EzSongSelectAnalysisDisplay
     {

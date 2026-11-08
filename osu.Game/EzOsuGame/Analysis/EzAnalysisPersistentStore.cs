@@ -44,7 +44,7 @@ namespace osu.Game.EzOsuGame.Analysis
             Mania = 1 << 1,
         }
 
-        public readonly record struct SongsBranchRow(Guid BeatmapId, string BeatmapHash, string BeatmapMd5, double SSR, double? Pp);
+        public readonly record struct SongsBranchRow(Guid BeatmapId, string BeatmapHash, string BeatmapMd5, double SunnySR, double? Pp);
 
         public readonly record struct SongsBranchDescriptor(string DatabasePath, string RelativePath, SongsBranchMetadata Metadata);
 
@@ -85,7 +85,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <summary>
         /// 主分析库文件版本。仅 kps / KPC 表结构或列统计口径变更时递增。
         /// v7 自 v6 继承 kps 数据并移除 legacy 列；v8 只继承 kps（mania 列统计改为 dense 补列，旧 sparse 行不带过去，之后按谱面懒回填）。
-        /// 分支库 schema v1 迁移后需全量重算 xxy/PP；v2 及以后迁移时保留既有版本 meta 并复用结果。
+        /// 分支库 schema v1 迁移后需全量重算 ssr/PP；v2 及以后迁移时保留既有版本 meta 并复用结果。
         /// </summary>
         public const int ANALYSIS_VERSION = 8;
 
@@ -295,7 +295,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     return false;
                 }
 
-                // missingRequiredSSR = requireSSR && sunnySR == null;
+                // missingRequiredSunnySR = requireSunnySR && sunnySR == null;
 
                 return true;
             }
@@ -512,9 +512,9 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// NoMod 基线 xxy：从 <see cref="BeatmapInfo.EzRatingData"/> 聚合（非 SQLite）。
+        /// NoMod 基线 ssr：从 <see cref="BeatmapInfo.EzRatingData"/> 聚合（非 SQLite）。
         /// </summary>
-        public IReadOnlyDictionary<Guid, double> GetBaselineSSRFromRealm(IEnumerable<BeatmapInfo> beatmaps)
+        public IReadOnlyDictionary<Guid, double> GetBaselineSunnySRFromRealm(IEnumerable<BeatmapInfo> beatmaps)
         {
             var beatmapList = beatmaps.Distinct().ToList();
 
@@ -534,7 +534,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         /// <summary>
         /// 对比新计算结果和 SQLite 中的旧数据，如果有差异则更新。
-        /// 主要场景：KPS / mania 列统计变化（算法修复等）。基线 xxy / PP 已迁到 Realm，不在此比较。
+        /// 主要场景：KPS / mania 列统计变化（算法修复等）。基线 ssr/ PP 已迁到 Realm，不在此比较。
         /// </summary>
         public void StoreIfDifferent(BeatmapInfo beatmap, EzAnalysisResult analysis)
         {
@@ -649,7 +649,7 @@ LIMIT 1;
                     double averageKps = reader.GetDouble(4);
                     double maxKps = reader.GetDouble(5);
                     string kpsListJson = reader.GetString(6);
-                    // 主库仅持久化 kps/KPC；xxy/PP 基线由 Realm 字段提供，不在此 DTO 中注入。
+                    // 主库仅持久化 kps/KPC；ssr/PP 基线由 Realm 字段提供，不在此 DTO 中注入。
                     long maniaUpdatedAt = reader.IsDBNull(7) ? 0 : reader.GetInt64(7);
 
                     string columnCountsJson = reader.IsDBNull(8) ? "{}" : reader.GetString(8);
@@ -678,7 +678,7 @@ LIMIT 1;
         }
 
         /// <summary>
-        /// 比较两个分析结果是否有差异（仅 kps / KPC；xxy / PP 来自 Realm，不在此比较）。
+        /// 比较两个分析结果是否有差异（仅 kps / KPC；ssr/ PP 来自 Realm，不在此比较）。
         /// </summary>
         private bool hasDifference(EzAnalysisResult stored, EzAnalysisResult computed)
         {
@@ -1110,7 +1110,7 @@ ON CONFLICT({col_beatmap_id}) DO UPDATE SET
                     idParam.Value = row.BeatmapId.ToString();
                     hashParam.Value = row.BeatmapHash;
                     md5Param.Value = row.BeatmapMd5;
-                    sunnySRParam.Value = row.SSR;
+                    sunnySRParam.Value = row.SunnySR;
                     ppParam.Value = row.Pp is double pp ? pp : DBNull.Value;
                     insert.ExecuteNonQuery();
                 }
@@ -1474,9 +1474,9 @@ WHERE {col_beatmap_md5} IN ({Join(", ", parameterNames)});
         }
 
         /// <summary>
-        /// 读取分支库 meta 中的 xxy 算法版本；缺失时返回 0（表示 legacy，默认视为当前算法）。
+        /// 读取分支库 meta 中的 ssr算法版本；缺失时返回 0（表示 legacy，默认视为当前算法）。
         /// </summary>
-        public bool TryGetSongsBranchStoredXxyVersion(string databasePath, out int storedVersion)
+        public bool TryGetSongsBranchStoredSunnySRVersion(string databasePath, out int storedVersion)
         {
             storedVersion = 0;
 
@@ -1497,20 +1497,20 @@ WHERE {col_beatmap_md5} IN ({Join(", ", parameterNames)});
             }
             catch (Exception e)
             {
-                Logger.Error(e, "EzManiaAnalysisPersistentStore TryGetSongsBranchStoredXxyVersion failed.", Ez2ConfigManager.LOGGER_NAME);
+                Logger.Error(e, "EzManiaAnalysisPersistentStore TryGetSongsBranchStoredSunnySRVersion failed.", Ez2ConfigManager.LOGGER_NAME);
                 return false;
             }
         }
 
         /// <summary>
-        /// 为 legacy 分支库补写 xxy / PP 算法版本 meta（不触发重算）。已有版本且落后时不修改。
+        /// 为 legacy 分支库补写 ssr/ PP 算法版本 meta（不触发重算）。已有版本且落后时不修改。
         /// </summary>
-        public void EnsureSongsBranchVersionMeta(string databasePath, int currentXxyVersion, int currentPpVersion)
+        public void EnsureSongsBranchVersionMeta(string databasePath, int currentSunnySRVersion, int currentPpVersion)
         {
             if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return;
 
-            if (currentXxyVersion <= 0 && currentPpVersion <= 0)
+            if (currentSunnySRVersion <= 0 && currentPpVersion <= 0)
                 return;
 
             try
@@ -1520,8 +1520,8 @@ WHERE {col_beatmap_md5} IN ({Join(", ", parameterNames)});
                 if (!prepareSongsBranchConnection(connection))
                     return;
 
-                if (currentXxyVersion > 0 && IsNullOrEmpty(tryGetMeta(connection, meta_key_sunny_sr_version)))
-                    setMeta(connection, meta_key_sunny_sr_version, currentXxyVersion.ToString(CultureInfo.InvariantCulture));
+                if (currentSunnySRVersion > 0 && IsNullOrEmpty(tryGetMeta(connection, meta_key_sunny_sr_version)))
+                    setMeta(connection, meta_key_sunny_sr_version, currentSunnySRVersion.ToString(CultureInfo.InvariantCulture));
 
                 if (currentPpVersion > 0 && IsNullOrEmpty(tryGetMeta(connection, meta_key_pp_version)))
                     setMeta(connection, meta_key_pp_version, currentPpVersion.ToString(CultureInfo.InvariantCulture));
@@ -1531,9 +1531,9 @@ WHERE {col_beatmap_md5} IN ({Join(", ", parameterNames)});
                 if (IsNullOrEmpty(tryGetMeta(connection, meta_key_content_hash))
                     && tryReadSongsBranchMetadata(connection, out var metadata))
                 {
-                    int storedXxy = int.TryParse(tryGetMeta(connection, meta_key_sunny_sr_version), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedXxy)
-                        ? parsedXxy
-                        : currentXxyVersion;
+                    int storedSunnySR = int.TryParse(tryGetMeta(connection, meta_key_sunny_sr_version), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedSunnySR)
+                        ? parsedSunnySR
+                        : currentSunnySRVersion;
                     int storedPp = int.TryParse(tryGetMeta(connection, meta_key_pp_version), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedPp)
                         ? parsedPp
                         : currentPpVersion;
@@ -1553,7 +1553,7 @@ WHERE {col_beatmap_md5} IN ({Join(", ", parameterNames)});
                         metadata.SourceCollectionLastModifiedUnixMilliseconds,
                         metadata.SourceCollectionBeatmapCount,
                         md5Hashes,
-                        storedXxy,
+                        storedSunnySR,
                         storedPp));
                 }
             }
@@ -1563,26 +1563,26 @@ WHERE {col_beatmap_md5} IN ({Join(", ", parameterNames)});
             }
         }
 
-        public void EnsureSongsBranchXxyVersionMeta(string databasePath, int currentXxyVersion) => EnsureSongsBranchVersionMeta(databasePath, currentXxyVersion, 0);
+        public void EnsureSongsBranchSunnySRVersionMeta(string databasePath, int currentSunnySRVersion) => EnsureSongsBranchVersionMeta(databasePath, currentSunnySRVersion, 0);
 
         public void EnsureSongsBranchPpVersionMeta(string databasePath, int currentPpVersion) => EnsureSongsBranchVersionMeta(databasePath, 0, currentPpVersion);
 
-        public bool SongsBranchNeedsXxyRefresh(int storedXxyVersion, int currentXxyVersion)
+        public bool SongsBranchNeedsSunnySRRefresh(int storedSunnySRVersion, int currentSunnySRVersion)
         {
-            if (currentXxyVersion <= 0)
+            if (currentSunnySRVersion <= 0)
                 return false;
 
             // legacy 分支库（无 meta）默认按当前算法生成，首次打开会 stamp 而不重算（v1 迁移除外，见 requires_post_migration_refresh）
-            if (storedXxyVersion <= 0)
+            if (storedSunnySRVersion <= 0)
                 return false;
 
-            return storedXxyVersion < currentXxyVersion;
+            return storedSunnySRVersion < currentSunnySRVersion;
         }
 
         /// <summary>
         /// When the stored content hash matches the current algorithm + source-collection snapshot, the branch needs no refresh.
         /// </summary>
-        public bool SongsBranchContentHashMatches(string databasePath, SongsBranchMetadata metadata, int currentXxyVersion, int currentPpVersion)
+        public bool SongsBranchContentHashMatches(string databasePath, SongsBranchMetadata metadata, int currentSunnySRVersion, int currentPpVersion)
         {
             if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return false;
@@ -1614,7 +1614,7 @@ WHERE {col_beatmap_md5} IN ({Join(", ", parameterNames)});
                     metadata.SourceCollectionLastModifiedUnixMilliseconds,
                     metadata.SourceCollectionBeatmapCount,
                     md5Hashes,
-                    currentXxyVersion,
+                    currentSunnySRVersion,
                     currentPpVersion);
 
                 return string.Equals(storedHash, expected, StringComparison.OrdinalIgnoreCase);
@@ -1631,7 +1631,7 @@ WHERE {col_beatmap_md5} IN ({Join(", ", parameterNames)});
             long sourceCollectionLastModifiedUnixMilliseconds,
             int sourceCollectionBeatmapCount,
             IEnumerable<string> beatmapMd5Hashes,
-            int xxyVersion,
+            int ssrVersion,
             int ppVersion)
         {
             var builder = new StringBuilder(256);
@@ -1641,7 +1641,7 @@ WHERE {col_beatmap_md5} IN ({Join(", ", parameterNames)});
             builder.Append('|');
             builder.Append(sourceCollectionBeatmapCount.ToString(CultureInfo.InvariantCulture));
             builder.Append('|');
-            builder.Append(xxyVersion.ToString(CultureInfo.InvariantCulture));
+            builder.Append(ssrVersion.ToString(CultureInfo.InvariantCulture));
             builder.Append('|');
             builder.Append(ppVersion.ToString(CultureInfo.InvariantCulture));
             builder.Append('|');
@@ -1804,7 +1804,7 @@ FROM {table_songs_branch_entry};";
             }
         }
 
-        public bool UpdateSongsBranchRows(string databasePath, IEnumerable<SongsBranchRow> rows, int? newSSRAlgorithmVersion, int? newPpAlgorithmVersion)
+        public bool UpdateSongsBranchRows(string databasePath, IEnumerable<SongsBranchRow> rows, int? newSunnySRAlgorithmVersion, int? newPpAlgorithmVersion)
         {
             if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return false;
@@ -1822,7 +1822,7 @@ FROM {table_songs_branch_entry};";
                 update.Transaction = transaction;
                 update.CommandText = $@"
 UPDATE {table_songs_branch_entry}
-SET {col_sunny_sr} = $xxy,
+SET {col_sunny_sr} = $ssr,
     {col_pp} = $pp
 WHERE {col_beatmap_id} = $id;
 ";
@@ -1831,9 +1831,9 @@ WHERE {col_beatmap_id} = $id;
                 idParam.ParameterName = "$id";
                 update.Parameters.Add(idParam);
 
-                var xxyParam = update.CreateParameter();
-                xxyParam.ParameterName = "$xxy";
-                update.Parameters.Add(xxyParam);
+                var ssrParam = update.CreateParameter();
+                ssrParam.ParameterName = "$ssr";
+                update.Parameters.Add(ssrParam);
 
                 var ppParam = update.CreateParameter();
                 ppParam.ParameterName = "$pp";
@@ -1842,15 +1842,15 @@ WHERE {col_beatmap_id} = $id;
                 foreach (var row in rows)
                 {
                     idParam.Value = row.BeatmapId.ToString();
-                    xxyParam.Value = row.SSR;
+                    ssrParam.Value = row.SunnySR;
                     ppParam.Value = row.Pp.HasValue ? row.Pp.Value : DBNull.Value;
                     update.ExecuteNonQuery();
                 }
 
                 transaction.Commit();
 
-                if (newSSRAlgorithmVersion is > 0)
-                    setMeta(connection, meta_key_sunny_sr_version, newSSRAlgorithmVersion.Value.ToString(CultureInfo.InvariantCulture));
+                if (newSunnySRAlgorithmVersion is > 0)
+                    setMeta(connection, meta_key_sunny_sr_version, newSunnySRAlgorithmVersion.Value.ToString(CultureInfo.InvariantCulture));
 
                 if (newPpAlgorithmVersion is > 0)
                     setMeta(connection, meta_key_pp_version, newPpAlgorithmVersion.Value.ToString(CultureInfo.InvariantCulture));
@@ -2462,8 +2462,8 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_source_collection} (
 
             Logger.Log(
                 requiresFullRecompute
-                    ? $"[EzAnalysisPersistentStore] Migrated legacy songs branch schema v{legacySchemaVersion} to kind={songs_branch_kind}, schema v{songs_branch_schema_version}; scheduled full xxy/PP refresh."
-                    : $"[EzAnalysisPersistentStore] Migrated legacy songs branch schema v{legacySchemaVersion} to kind={songs_branch_kind}, schema v{songs_branch_schema_version}; reusing cached xxy/PP.",
+                    ? $"[EzAnalysisPersistentStore] Migrated legacy songs branch schema v{legacySchemaVersion} to kind={songs_branch_kind}, schema v{songs_branch_schema_version}; scheduled full ssr/PP refresh."
+                    : $"[EzAnalysisPersistentStore] Migrated legacy songs branch schema v{legacySchemaVersion} to kind={songs_branch_kind}, schema v{songs_branch_schema_version}; reusing cached ssr/PP.",
                 Ez2ConfigManager.LOGGER_NAME,
                 LogLevel.Important);
         }
@@ -3092,7 +3092,7 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
         /// </summary>
         private static bool isValidAnalysisResult(EzAnalysisResult result)
         {
-            if (result.ManiaSummary?.SSR is double sunnySR && (double.IsNaN(sunnySR) || double.IsInfinity(sunnySR)))
+            if (result.ManiaSummary?.SunnySR is double sunnySR && (double.IsNaN(sunnySR) || double.IsInfinity(sunnySR)))
                 return false;
 
             return true;

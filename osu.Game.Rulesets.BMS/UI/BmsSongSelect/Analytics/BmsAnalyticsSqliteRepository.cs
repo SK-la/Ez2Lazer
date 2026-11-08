@@ -9,7 +9,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
     {
         public string PathKey { get; init; } = string.Empty;
         public double? Pp { get; init; }
-        public double? SSR { get; init; }
+        public double? SunnySR { get; init; }
         public double? AvgKps { get; init; }
         public double? MaxKps { get; init; }
         public double? StarRating { get; init; }
@@ -59,7 +59,7 @@ ON CONFLICT(path_key) DO UPDATE SET
 
                 cmd.Parameters.AddWithValue("$path_key", record.PathKey);
                 cmd.Parameters.AddWithValue("$pp", (object?)record.Pp ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("$sunny_sr", (object?)record.SSR ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("$sunny_sr", (object?)record.SunnySR ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$avg_kps", (object?)record.AvgKps ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$max_kps", (object?)record.MaxKps ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$star_rating", (object?)record.StarRating ?? DBNull.Value);
@@ -141,7 +141,7 @@ FROM chart_analytics;";
             {
                 PathKey = reader.GetString(0),
                 Pp = reader.IsDBNull(1) ? null : reader.GetDouble(1),
-                SSR = reader.IsDBNull(2) ? null : reader.GetDouble(2),
+                SunnySR = reader.IsDBNull(2) ? null : reader.GetDouble(2),
                 AvgKps = reader.IsDBNull(3) ? null : reader.GetDouble(3),
                 MaxKps = reader.IsDBNull(4) ? null : reader.GetDouble(4),
                 StarRating = reader.IsDBNull(5) ? null : reader.GetDouble(5),

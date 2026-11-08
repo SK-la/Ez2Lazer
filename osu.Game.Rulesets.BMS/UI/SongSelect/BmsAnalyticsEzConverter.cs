@@ -12,7 +12,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
     {
         public static EzAnalysisResult? ToEzAnalysisResult(BmsAnalyticsRecord record)
         {
-            if (record.Pp == null && record.SSR == null && record.AvgKps == null && record.MaxKps == null && string.IsNullOrEmpty(record.ColumnCountsJson))
+            if (record.Pp == null && record.SunnySR == null && record.AvgKps == null && record.MaxKps == null && string.IsNullOrEmpty(record.ColumnCountsJson))
                 return null;
 
             double avgKps = record.AvgKps ?? 0;
@@ -34,7 +34,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 }
             }
 
-            var maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts: null, sunnySR: record.SSR);
+            var maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts: null, sunnySR: record.SunnySR);
 
             // The stored pp is a chart-level baseline, which is what the official performance producer carries.
             Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>? axes = null;

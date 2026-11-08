@@ -9,7 +9,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 {
     /// <summary>
     /// Ports mania-hub labels.ts srToRawDan / dominant axis (RcMina radar).
-    /// Label printing: <see cref="EzDanLadders"/>; xxy table path: <see cref="EzSunnyDanIntervals"/>.
+    /// Label printing: <see cref="EzDanLadders"/>; ssrtable path: <see cref="EzSunnyDanIntervals"/>.
     /// </summary>
     public static class EzDanLabels
     {
@@ -59,9 +59,9 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         private const int reform_means_levels = 20;
 
         /// <summary>
-        /// Keymodes that have their own community xxy→dan interval table (<see cref="EzSunnyDanIntervals"/>).
+        /// Keymodes that have their own community ssr→dan interval table (<see cref="EzSunnyDanIntervals"/>).
         /// </summary>
-        public static bool HasXxyDanTable(int keyCount) => EzSunnyDanIntervals.SupportsKeyCount(keyCount);
+        public static bool HasSunnySRDanTable(int keyCount) => EzSunnyDanIntervals.SupportsKeyCount(keyCount);
 
         /// <summary>Keymode whose interval table a tableless keymode reads instead: 4K, same side.</summary>
         private const int tableless_borrowed_key_count = 4;
@@ -71,7 +71,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         /// <summary>
         /// Dan used when the chart's own keymode table did not answer.
-        /// 4/6/7K have a table, so this is their no-xxy path: the calibrated MSD means table
+        /// 4/6/7K have a table, so this is their no-ssrpath: the calibrated MSD means table
         /// (and the "other side" half of an Ez dual-half row).
         /// 5K / 8K–18K have no community table at all, and the <c>means</c> tables below are
         /// calibrated on 4K MSD — the n-key engine rates those keymodes on a different curve, so
@@ -84,7 +84,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         {
             string sideId = side.ToId();
 
-            if (!HasXxyDanTable(keyCount))
+            if (!HasSunnySRDanTable(keyCount))
             {
                 if (sunnySR is double sr
                     && double.IsFinite(sr)

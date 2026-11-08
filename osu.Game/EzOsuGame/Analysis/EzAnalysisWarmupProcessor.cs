@@ -389,7 +389,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             if (refreshPlans.Count == 0)
             {
-                Logger.Log("No songs branches require xxy/PP refresh.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                Logger.Log("No songs branches require ssr/PP refresh.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return;
             }
 

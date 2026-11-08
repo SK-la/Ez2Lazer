@@ -21,8 +21,8 @@ namespace osu.Game.Tests.Visual.SongSelect
         [Test]
         public async Task TestStarFilterUsesTheOfficialBaselineByDefault()
         {
-            var inRange = createBeatmap(xxy: 1.0, starRating: 5.0);
-            var outOfRange = createBeatmap(xxy: 9.0, starRating: 1.0);
+            var inRange = createBeatmap(ssr: 1.0, starRating: 5.0);
+            var outOfRange = createBeatmap(ssr: 9.0, starRating: 1.0);
 
             var results = await runMatching(
                 criteriaFor(SortMode.Difficulty),
@@ -34,8 +34,8 @@ namespace osu.Game.Tests.Visual.SongSelect
         [Test]
         public async Task TestStarFilterUsesTheOperationsValueWhenProvided()
         {
-            var inRange = createBeatmap(xxy: 1.0, starRating: 1.0);
-            var outOfRange = createBeatmap(xxy: 9.0, starRating: 9.0);
+            var inRange = createBeatmap(ssr: 1.0, starRating: 1.0);
+            var outOfRange = createBeatmap(ssr: 9.0, starRating: 9.0);
 
             // A branch snapshot (or any other system-supplied set) overrides the stored baseline.
             var results = await runMatching(
@@ -49,8 +49,8 @@ namespace osu.Game.Tests.Visual.SongSelect
         [Test]
         public async Task TestPpFilterUsesTheOperationsValueWhenProvided()
         {
-            var inRange = createBeatmap(xxy: 1.0, starRating: 5.0);
-            var outOfRange = createBeatmap(xxy: 1.0, starRating: 5.0);
+            var inRange = createBeatmap(ssr: 1.0, starRating: 5.0);
+            var outOfRange = createBeatmap(ssr: 1.0, starRating: 5.0);
 
             var criteria = new FilterCriteria
             {
@@ -75,11 +75,11 @@ namespace osu.Game.Tests.Visual.SongSelect
             StarDifficulty = new FilterCriteria.OptionalRange<double> { Min = 4, Max = 6, IsLowerInclusive = true, IsUpperInclusive = true },
         };
 
-        private static BeatmapInfo createBeatmap(double xxy, double starRating)
+        private static BeatmapInfo createBeatmap(double ssr, double starRating)
         {
             var set = TestResources.CreateTestBeatmapSetInfo(1);
             var beatmap = set.Beatmaps[0];
-            beatmap.EzRatingData.SunnySR = xxy;
+            beatmap.EzRatingData.SunnySR = ssr;
             beatmap.StarRating = starRating;
             return beatmap;
         }

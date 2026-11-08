@@ -298,7 +298,7 @@ namespace osu.Game.Screens.Select
                     countStatisticsDisplay.FadeOut(300, Easing.OutQuint);
                     spreadDisplay.Beatmap.Value = null;
                     spreadDisplay.StarDifficulty.UnbindAll();
-                    dualDifficultyDisplay.ResetXxy();
+                    dualDifficultyDisplay.ResetSunnySR();
                     dualDifficultyDisplay.ApplyPerformance(null);
                 }
                 else
@@ -347,7 +347,7 @@ namespace osu.Game.Screens.Select
                 {
                     ezDisplayKpc.ManiaSummary = null;
                     ezDisplayKpc.Hide();
-                    dualDifficultyDisplay.ResetXxy();
+                    dualDifficultyDisplay.ResetSunnySR();
                     dualDifficultyDisplay.ApplyPerformance(null);
                     return;
                 }

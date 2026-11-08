@@ -279,7 +279,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             incrementGrade(result, rulesetId, score.Rank);
             incrementStar(result, rulesetId, starRating);
-            incrementXxy(result, rulesetId, sunnyStarRating);
+            incrementSunnySR(result, rulesetId, sunnyStarRating);
 
             if (rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID)
             {
@@ -709,19 +709,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
             result.StarPlayCounts[key] = existing + 1;
         }
 
-        private static void incrementXxy(EzLocalProfileAggregationResult result, int rulesetId, double ssr)
+        private static void incrementSunnySR(EzLocalProfileAggregationResult result, int rulesetId, double ssr)
         {
             if (ssr < 0)
                 return;
 
             int bucket = (int)Math.Floor(ssr);
             var key = (rulesetId, bucket);
-            result.XxyPlayCounts.TryGetValue(key, out int existing);
-            result.XxyPlayCounts[key] = existing + 1;
+            result.SunnySRPlayCounts.TryGetValue(key, out int existing);
+            result.SunnySRPlayCounts[key] = existing + 1;
         }
 
         /// <summary>
-        /// Resolve xxy SR for bucket counting. With beatmap-affecting mods, prefer playable analysis
+        /// Resolve SunnySR for bucket counting. With beatmap-affecting mods, prefer playable analysis
         /// (not the stored NoMod Sunny rating).
         /// </summary>
         private static double resolveSunnyStarRating(
@@ -733,8 +733,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             if (modsAffectAnalysis)
             {
-                if (hasKps && analysis.ManiaSummary?.SSR is double analysisXxy && analysisXxy >= 0)
-                    return analysisXxy;
+                if (hasKps && analysis.ManiaSummary?.SunnySR is double analysisSunnySR&& analysisSunnySR>= 0)
+                    return analysisSunnySR;
 
                 return resolvedStarRating >= 0 ? resolvedStarRating : -1;
             }
@@ -742,10 +742,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
             if (beatmap.EzRatingData.SunnySR >= 0)
                 return beatmap.EzRatingData.SunnySR;
 
-            if (hasKps && analysis.ManiaSummary?.SSR is double storedXxy && storedXxy >= 0)
-                return storedXxy;
+            if (hasKps && analysis.ManiaSummary?.SunnySR is double storedSunnySR&& storedSunnySR>= 0)
+                return storedSunnySR;
 
-            // Align play counts with official star buckets when dedicated xxy is unavailable.
+            // Align play counts with official star buckets when dedicated ssris unavailable.
             if (beatmap.StarRating >= 0)
                 return beatmap.StarRating;
 

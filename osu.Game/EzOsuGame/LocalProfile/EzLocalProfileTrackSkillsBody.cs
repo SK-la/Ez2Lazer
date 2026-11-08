@@ -810,7 +810,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 background.Configure(colours, transparentIdle: true);
                 nameText.Colour = EzLocalProfileColours.Plays(colours);
-                // Skill SSR uses Highlight1 — never PinkLight (reserved for PP).
+                // Skill SunnySR uses Highlight1 — never PinkLight (reserved for PP).
                 valueText.Colour = EzLocalProfileColours.Numeric(colours);
             }
 

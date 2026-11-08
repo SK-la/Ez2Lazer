@@ -196,7 +196,7 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Write one player × keymode's SSR values, history samples and pattern ratings in a single transaction.
+        /// Write one player × keymode's SunnySR values, history samples and pattern ratings in a single transaction.
         /// </summary>
         public void WritePlayerSkillBundle(
             string username,

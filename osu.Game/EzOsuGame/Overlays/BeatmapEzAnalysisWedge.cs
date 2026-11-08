@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         public Bindable<string?> TargetUsername { get; } = new Bindable<string?>();
 
-        public Bindable<EzRadarDisplayMode> LeftRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.SSRSkill);
+        public Bindable<EzRadarDisplayMode> LeftRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.SunnySRSkill);
 
         public Bindable<EzRadarDisplayMode> RightRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.MSDSkillDual);
 

@@ -133,11 +133,11 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             Current.BindValueChanged(c =>
             {
-                sr = c.NewValue.SSR ?? 0;
+                sr = c.NewValue.SunnySR ?? 0;
 
                 if (animated)
                 {
-                    double diff = sr - c.OldValue.SSR ?? 0;
+                    double diff = sr - c.OldValue.SunnySR ?? 0;
                     this.TransformBindableTo(displayedStars, sr, 100 + 80 * Math.Abs(diff), Easing.OutQuint);
                 }
                 else
@@ -146,7 +146,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 // updateDisplay(c.NewValue.ManiaSummary?.SunnySR);
             }, true);
 
-            displayedStars.Value = Current.Value.SSR ?? 0;
+            displayedStars.Value = Current.Value.SunnySR ?? 0;
 
             displayedStars.BindValueChanged(s =>
             {

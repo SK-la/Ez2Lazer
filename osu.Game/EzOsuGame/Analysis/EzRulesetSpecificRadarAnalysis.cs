@@ -8,7 +8,7 @@ namespace osu.Game.EzOsuGame.Analysis
 {
     public readonly record struct EzRadarAxisValue<TAxis>(TAxis Axis, double Value, string Format = "0.0");
 
-    public readonly record struct EzRulesetSpecificRadarResult(EzRadarChartData<string> KeyPatternRadarData, EzRadarChartData<string> SSRPatternRadarData, double? SSR);
+    public readonly record struct EzRulesetSpecificRadarResult(EzRadarChartData<string> KeyPatternRadarData, EzRadarChartData<string> SunnySRPatternRadarData, double? SunnySR);
 
     public readonly struct EzRadarChartData<TAxis>
     {

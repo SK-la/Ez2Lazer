@@ -68,7 +68,7 @@ namespace osu.Game.Tests.Database
                     }
 
                     if (EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(ruleset, out int ssrVersion))
-                        ruleset.LastAppliedSSRVersion = ssrVersion;
+                        ruleset.LastAppliedSunnySRVersion = ssrVersion;
                 }
 
                 foreach (var beatmap in r.All<BeatmapInfo>())

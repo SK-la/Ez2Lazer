@@ -46,7 +46,7 @@ namespace osu.Game.EzOsuGame.Analysis
             return true;
         }
 
-        public static bool TryComputeSSR(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken, out double sunnySR)
+        public static bool TryComputeSunnySR(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken, out double sunnySR)
         {
             sunnySR = 0;
 
@@ -55,19 +55,19 @@ namespace osu.Game.EzOsuGame.Analysis
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (!tryComputeSSR(analysisBeatmap, lookup, cancellationToken, out double? computedSSR)
-                || computedSSR is not double resolvedSSR)
+            if (!tryComputeSunnySR(analysisBeatmap, lookup, cancellationToken, out double? computedSunnySR)
+                || computedSunnySR is not double resolvedSunnySR)
                 return false;
 
-            sunnySR = resolvedSSR;
+            sunnySR = resolvedSunnySR;
             return true;
         }
 
         /// <summary>
-        /// Same xxy path as song-select analysis panel, but reuses an already-built playable
+        /// Same ssrpath as song-select analysis panel, but reuses an already-built playable
         /// (e.g. live ChartDan after key/rate mods). Does not write Realm.
         /// </summary>
-        public static bool TryComputeSSRFromPlayable(
+        public static bool TryComputeSunnySRFromPlayable(
             IBeatmap playable,
             IRulesetInfo ruleset,
             IReadOnlyList<Mod> mods,
@@ -96,10 +96,10 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// Computes baseline NoMod xxy SR for persisting to the Sunny star slot.
+        /// Computes baseline NoMod SunnySR for persisting to the Sunny star slot.
         /// Returns -1 when unsupported or failed, 0 for empty beatmaps.
         /// </summary>
-        public static double ComputeBaselineSSRForRealm(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
+        public static double ComputeBaselineSunnySRForRealm(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
         {
             var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
 
@@ -111,7 +111,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             var lookup = new EzAnalysisLookupCache(beatmapInfo, beatmapInfo.Ruleset, mods: null);
 
-            return TryComputeSSR(beatmapManager, lookup, cancellationToken, out double sunnySR)
+            return TryComputeSunnySR(beatmapManager, lookup, cancellationToken, out double sunnySR)
                 ? sunnySR
                 : -1;
         }
@@ -144,8 +144,8 @@ namespace osu.Game.EzOsuGame.Analysis
                                                                            CancellationToken cancellationToken = default)
             => ComputeBaselinePerformancePointsForRating(beatmapManager, beatmapInfo, beatmapInfo.EzRatingData.SunnySR, cancellationToken);
 
-        public static bool TryComputeSSRAndPp(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
-                                                out double? sunnySR, out double? pp)
+        public static bool TryComputeSunnySRAndPp(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
+                                                  out double? sunnySR, out double? pp)
         {
             PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
             IBeatmap analysisBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
@@ -159,7 +159,7 @@ namespace osu.Game.EzOsuGame.Analysis
             => Compute(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo), lookup, cancellationToken);
 
         /// <summary>
-        /// 主 SQLite 预热/回填专用：仅计算 kps 与 mania 列统计（NoMod），不写 xxy/PP（由 Realm 维护）。
+        /// 主 SQLite 预热/回填专用：仅计算 kps 与 mania 列统计（NoMod），不写 ssr/PP（由 Realm 维护）。
         /// </summary>
         public static EzAnalysisResult ComputePersistedSqliteSlice(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup,
                                                                    CancellationToken cancellationToken = default)
@@ -265,12 +265,12 @@ namespace osu.Game.EzOsuGame.Analysis
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Measurements))
                 measurements = columnRuleset ? EzChartMeasurements.FromPlayable(analysisBeatmap, cancellationToken) : null;
 
-            RadarAndXxy radarAndXxy;
+            RadarAndSunnySR radarAndSunnySR;
 
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Radar))
-                radarAndXxy = computeRadarAndXxy(lookup, analysisBeatmap, measurements?.Chart, cancellationToken);
+                radarAndSunnySR = computeRadarAndSunnySR(lookup, analysisBeatmap, measurements?.Chart, cancellationToken);
 
-            double? sunnySR = radarAndXxy.SSR;
+            double? sunnySR = radarAndSunnySR.SunnySR;
 
             MinaResult? mina;
 
@@ -305,7 +305,7 @@ namespace osu.Game.EzOsuGame.Analysis
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Dan))
                 dan = computeDan(rulesetOnlineId, measurements, mina?.Axes, structure?.Info, sunnySR);
 
-            var result = new EzAnalysisResult(commonSummary, maniaSummary, axes: axes, dan: dan, radar: radarAndXxy.Radar, chartSkillInfo: structure?.Info);
+            var result = new EzAnalysisResult(commonSummary, maniaSummary, axes: axes, dan: dan, radar: radarAndSunnySR.Radar, chartSkillInfo: structure?.Info);
 
             EzAnalysisPassPerf.RecordPass(succeeded: true);
             EzAnalysisPassPerf.MaybeLog();
@@ -602,7 +602,7 @@ namespace osu.Game.EzOsuGame.Analysis
             return new StructureResult(axes, info);
         }
 
-        private readonly record struct RadarAndXxy(double? SSR, EzRulesetSpecificRadarResult? Radar);
+        private readonly record struct RadarAndSunnySR(double? SunnySR, EzRulesetSpecificRadarResult? Radar);
 
         /// <summary>
         /// The Sunny rating and the ruleset radar from one provider call.
@@ -611,12 +611,12 @@ namespace osu.Game.EzOsuGame.Analysis
         /// The radar payload already carries the rating the provider measured, so asking for the two scopes in
         /// separate calls ran the ruleset's difficulty core twice for the same chart and mods.
         /// </remarks>
-        private static RadarAndXxy computeRadarAndXxy(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, EzManiaChartInput? chart, CancellationToken cancellationToken)
+        private static RadarAndSunnySR computeRadarAndSunnySR(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, EzManiaChartInput? chart, CancellationToken cancellationToken)
         {
-            bool supportsXxy = EzSunnyStarRatingSupport.SupportsBeatmap(analysisBeatmap, lookup.Ruleset);
+            bool supportsSunnySR = EzSunnyStarRatingSupport.SupportsBeatmap(analysisBeatmap, lookup.Ruleset);
 
             var scopes = EzAnalysisScope.RulesetSpecificRadarData
-                         | (supportsXxy ? EzAnalysisScope.SunnySR : EzAnalysisScope.None);
+                         | (supportsSunnySR ? EzAnalysisScope.SunnySR : EzAnalysisScope.None);
 
             var request = new EzAnalysisRequest(analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), scopes, Chart: chart);
 
@@ -625,7 +625,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             double? sunnySR = null;
 
-            if (supportsXxy)
+            if (supportsSunnySR)
             {
                 if (analysisBeatmap.HitObjects.Count == 0)
                     sunnySR = 0;
@@ -637,7 +637,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 ? value
                 : null;
 
-            return new RadarAndXxy(sunnySR, radar);
+            return new RadarAndSunnySR(sunnySR, radar);
         }
 
         /// <summary>
@@ -693,10 +693,10 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             pp = tryComputePerfectPp(playableWorkingBeatmap, analysisBeatmap, lookup, cancellationToken);
 
-            return tryComputeSSR(analysisBeatmap, lookup, cancellationToken, out sunnySR) || pp != null;
+            return tryComputeSunnySR(analysisBeatmap, lookup, cancellationToken, out sunnySR) || pp != null;
         }
 
-        private static bool tryComputeSSR(IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken, out double? sunnySR)
+        private static bool tryComputeSunnySR(IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken, out double? sunnySR)
         {
             sunnySR = null;
 

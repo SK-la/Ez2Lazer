@@ -104,7 +104,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                                     {
                                         PathKey = pathKey,
                                         Pp = analyticsResult.PP,
-                                        SSR = analyticsResult.SSR,
+                                        SunnySR = analyticsResult.SunnySR,
                                         AvgKps = analyticsResult.AvgKps,
                                         MaxKps = analyticsResult.MaxKps,
                                         StarRating = analyticsResult.StarRating,

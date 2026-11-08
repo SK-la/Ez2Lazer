@@ -64,7 +64,7 @@ namespace osu.Game.Screens.Select
         private IBindableList<BeatmapSetInfo> detachedBeatmaps = null!;
         private Bindable<bool> ezAnalysisFilter = null!;
         private Bindable<string> analysisSystemSelection = null!;
-        private Bindable<bool> ezAnalysisSqliteEnabled = null!; // PP 等 sqlite 消费端；不 gate xxy SR
+        private Bindable<bool> ezAnalysisSqliteEnabled = null!; // PP 等 sqlite 消费端；不 gate SunnySR
         private Bindable<EzMaterialUiMode> materialUiMode = null!;
         private IBindable<int> activeSongsBranchVersion = null!;
         private readonly AsyncLocal<Dictionary<Guid, double>?> operationDifficultyCache = new AsyncLocal<Dictionary<Guid, double>?>();
@@ -187,13 +187,13 @@ namespace osu.Game.Screens.Select
 
         private bool useActiveSongsBranchAsBeatmapSource => ezAnalysisCache.IsActiveSongsBranchFor(ruleset.Value, Criteria?.Mods);
 
-        private bool useEzAnalysisBranchForXxyOperations => useActiveSongsBranchAsBeatmapSource && ezAnalysisFilter.Value;
+        private bool useEzAnalysisBranchForSunnySROperations => useActiveSongsBranchAsBeatmapSource && ezAnalysisFilter.Value;
 
         /// <summary>
         /// Whether the active system for this ruleset is the Sunny one and a branch snapshot with mods is in play,
         /// in which case its star has to come from the branch rather than the NoMod column.
         /// </summary>
-        private bool usesSunnyBranchOperations => useEzAnalysisBranchForXxyOperations
+        private bool usesSunnyBranchOperations => useEzAnalysisBranchForSunnySROperations
                                                   && EzMetricVariantReadout.Selected(ruleset.Value?.OnlineID ?? -1)?.Id == EzMetricVariantCatalog.SUNNY;
 
         private Task<IReadOnlyDictionary<BeatmapInfo, double>> getDifficultiesForOperationsAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)

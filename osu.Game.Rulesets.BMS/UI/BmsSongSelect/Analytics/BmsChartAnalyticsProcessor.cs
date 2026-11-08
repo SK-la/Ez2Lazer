@@ -21,7 +21,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
     /// </summary>
     public readonly record struct BmsChartAnalyticsResult(
         double? PP,
-        double? SSR,
+        double? SunnySR,
         double? AvgKps,
         double? MaxKps,
         double? StarRating,

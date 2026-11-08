@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
     ///     Filing / verdicts: <see cref="EzDanSkillsetFiling"/>.
     ///     <para>
     ///         Capability matrix (always call <see cref="Slots(int, EzDanSide)"/> for layout):
-        ///         4K RC: jack/tech/speed/stamina (play SSR + chart overrides);
+        ///         4K RC: jack/tech/speed/stamina (play SunnySR + chart overrides);
         ///         6/7K RC: jack/tech/speed/stream (pattern tags; LeoBlack clusters when filled — see DATA-LeoBlack-Clusters);
         ///         4K/6K LN: DualPanel still shows LN danskill name column (layout); hub filing remains 7K-only;
         ///         7K LN: ln_general/ln_tech/ln_inverse/ln_release_pattern (LN pattern tags when chart present).
@@ -110,7 +110,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// <summary>
         ///     Skillset dans from clears via hub-aligned filing (<see cref="EzDanSkillsetFiling.ComputeVerdicts"/>).
         /// </summary>
-        /// <param name="resolvePlayValues">Hub <c>play.values</c> per clear (Mina SSR), not beatmap MSD.</param>
+        /// <param name="resolvePlayValues">Hub <c>play.values</c> per clear (Mina SunnySR), not beatmap MSD.</param>
         public static IReadOnlyDictionary<string, EzDanSkillsetVerdict> ComputeFromClears(
             int keyCount,
             EzDanSide side,

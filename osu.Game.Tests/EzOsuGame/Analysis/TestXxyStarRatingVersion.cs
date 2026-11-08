@@ -27,8 +27,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             var rulesetInfo = new ManiaRuleset().RulesetInfo;
             rulesetInfo.Available = true;
 
-            Assert.That(EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(rulesetInfo, out int xxyVersion), Is.True);
-            Assert.That(xxyVersion, Is.EqualTo(EzManiaSunnyStarRating.VERSION));
+            Assert.That(EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(rulesetInfo, out int ssrVersion), Is.True);
+            Assert.That(ssrVersion, Is.EqualTo(EzManiaSunnyStarRating.VERSION));
         }
     }
 

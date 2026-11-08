@@ -14,7 +14,7 @@ using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.LocalProfile
 {
-    /// <summary>Track Skills for mania: key chips, SSR/pattern axes, Dan DualPanel.</summary>
+    /// <summary>Track Skills for mania: key chips, SunnySR/pattern axes, Dan DualPanel.</summary>
     public sealed class ManiaTrackSkillsPresenter : IEzTrackSkillsPresenter
     {
         private readonly EzSkillProvider provider;

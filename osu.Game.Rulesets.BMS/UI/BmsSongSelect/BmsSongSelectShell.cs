@@ -331,7 +331,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 {
                     analyticsLine = BmsStrings.Raja_DetailAnalytics(
                         record.Pp ?? 0,
-                        record.SSR ?? 0,
+                        record.SunnySR ?? 0,
                         record.AvgKps ?? 0,
                         record.MaxKps ?? 0,
                         record.StarRating ?? 0);

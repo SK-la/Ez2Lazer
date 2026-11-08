@@ -37,8 +37,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                         if (result.StarRating is double star && star >= 0)
                             EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Official, star);
 
-                        if (result.SSR is double xxy && xxy >= 0)
-                            EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Sunny, xxy);
+                        if (result.SunnySR is double ssr && ssr >= 0)
+                            EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Sunny, ssr);
 
                         if (result.PP is double pp && pp >= 0)
                             EzRatingWriter.WritePP(beatmap, EzRatingSystem.Official, pp);

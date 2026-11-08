@@ -309,7 +309,7 @@ namespace osu.Game.Tests.Visual.SongSelect
             addBeatmapSet(applySunnyStarRating(2.0, 9.0), beatmapSets, out var beatmap2);
             addBeatmapSet(applySunnyStarRating(7.0, 2.0), beatmapSets, out var beatmap7);
 
-            var results = await runGrouping(GroupMode.Difficulty, beatmapSets, getXxy: resolveXxy);
+            var results = await runGrouping(GroupMode.Difficulty, beatmapSets, null, resolveSunnySR);
             assertGroup(results, 0, BeatmapCarouselFilterGroupingStrings.BelowStars(1), beatmapBelow1.Beatmaps, ref total);
             assertGroup(results, 1, BeatmapCarouselFilterGroupingStrings.Stars(1), beatmapAbove1.Beatmaps, ref total);
             assertGroup(results, 2, BeatmapCarouselFilterGroupingStrings.Stars(2), beatmap2.Beatmaps, ref total);
@@ -317,16 +317,16 @@ namespace osu.Game.Tests.Visual.SongSelect
             assertTotal(results, total);
         }
 
-        private Action<BeatmapSetInfo> applySunnyStarRating(double xxy, double starRating)
+        private Action<BeatmapSetInfo> applySunnyStarRating(double ssr, double starRating)
         {
             return s => s.Beatmaps.ForEach(b =>
             {
-                b.EzRatingData.SunnySR = xxy;
+                b.EzRatingData.SunnySR = ssr;
                 b.StarRating = starRating;
             });
         }
 
-        private static double resolveXxy(BeatmapInfo beatmap) => beatmap.EzRatingData.SunnySR >= 0 ? beatmap.EzRatingData.SunnySR : beatmap.StarRating;
+        private static double resolveSunnySR(BeatmapInfo beatmap) => beatmap.EzRatingData.SunnySR >= 0 ? beatmap.EzRatingData.SunnySR : beatmap.StarRating;
 
         #endregion
 
@@ -476,7 +476,7 @@ namespace osu.Game.Tests.Visual.SongSelect
 
         private HashSet<int> favouriteBeatmapSets = [];
 
-        private async Task<List<CarouselItem>> runGrouping(GroupMode group, List<BeatmapSetInfo> beatmapSets, Func<BeatmapInfo, double?>? getPp = null, Func<BeatmapInfo, double>? getXxy = null)
+        private async Task<List<CarouselItem>> runGrouping(GroupMode group, List<BeatmapSetInfo> beatmapSets, Func<BeatmapInfo, double?>? getPp = null, Func<BeatmapInfo, double>? getSunnySR = null)
         {
             var groupingFilter = new BeatmapCarouselFilterGrouping
             {
@@ -485,9 +485,9 @@ namespace osu.Game.Tests.Visual.SongSelect
                 GetLocalUserTopRanks = _ => new Dictionary<Guid, ScoreRank>(),
                 GetFavouriteBeatmapSets = () => favouriteBeatmapSets,
                 GetDifficultiesForOperationsAsync = (beatmaps, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(
-                    getXxy == null
+                    getSunnySR == null
                         ? new Dictionary<BeatmapInfo, double>()
-                        : beatmaps.ToDictionary(b => b, getXxy)),
+                        : beatmaps.ToDictionary(b => b, getSunnySR)),
                 GetPpForOperationsAsync = (beatmaps, _)
                     => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(beatmaps.Where(b => (getPp?.Invoke(b)).HasValue).ToDictionary(b => b, b => getPp!.Invoke(b)!.Value)),
             };

@@ -28,7 +28,7 @@ namespace osu.Game.Rulesets.BMS.Tests.Analytics
                 {
                     PathKey = path_key,
                     Pp = 123.4,
-                    SSR = 5.67,
+                    SunnySR = 5.67,
                     AvgKps = 8.1,
                     MaxKps = 12.3,
                     StarRating = 4.5,
@@ -39,7 +39,7 @@ namespace osu.Game.Rulesets.BMS.Tests.Analytics
 
                 Assert.That(repository.TryGet(path_key, out var record), Is.True);
                 Assert.That(record.Pp, Is.EqualTo(123.4).Within(0.01));
-                Assert.That(record.SSR, Is.EqualTo(5.67).Within(0.01));
+                Assert.That(record.SunnySR, Is.EqualTo(5.67).Within(0.01));
                 Assert.That(record.AvgKps, Is.EqualTo(8.1).Within(0.01));
                 Assert.That(record.FileSize, Is.EqualTo(42));
                 Assert.That(record.LastModifiedTicks, Is.EqualTo(100));

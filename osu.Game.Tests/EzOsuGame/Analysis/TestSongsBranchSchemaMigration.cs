@@ -52,7 +52,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             Assert.That(readMeta(migrated, "schema_version"), Is.EqualTo("3"));
             Assert.That(tableExists(migrated, "songs_branch_entry"), Is.True);
             Assert.That(tableExists(migrated, "sunny_sr_branch"), Is.False);
-            Assert.That(readSSR(migrated), Is.EqualTo(4.56).Within(0.001));
+            Assert.That(readSunnySR(migrated), Is.EqualTo(4.56).Within(0.001));
             Assert.That(readMeta(migrated, "sunny_sr_version"), Is.Null);
             Assert.That(readMeta(migrated, "requires_post_migration_refresh"), Is.EqualTo("1"));
         }
@@ -151,10 +151,10 @@ INSERT INTO meta(key, value) VALUES
             using var cmd = connection.CreateCommand();
             cmd.CommandText = pp.HasValue
                 ? @"INSERT INTO sunny_sr_branch(beatmap_id, beatmap_hash, beatmap_md5, sunny_sr, pp)
-VALUES('00000000-0000-0000-0000-000000000001', 'hash', 'md5', $xxy, $pp);"
+VALUES('00000000-0000-0000-0000-000000000001', 'hash', 'md5', $ssr, $pp);"
                 : @"INSERT INTO sunny_sr_branch(beatmap_id, beatmap_hash, beatmap_md5, sunny_sr)
-VALUES('00000000-0000-0000-0000-000000000001', 'hash', 'md5', $xxy);";
-            cmd.Parameters.AddWithValue("$xxy", sunnySR);
+VALUES('00000000-0000-0000-0000-000000000001', 'hash', 'md5', $ssr);";
+            cmd.Parameters.AddWithValue("$ssr", sunnySR);
 
             if (pp.HasValue)
                 cmd.Parameters.AddWithValue("$pp", pp.Value);
@@ -178,7 +178,7 @@ VALUES('00000000-0000-0000-0000-000000000001', 'hash', 'md5', $xxy);";
             return cmd.ExecuteScalar() != null;
         }
 
-        private static double readSSR(SqliteConnection connection)
+        private static double readSunnySR(SqliteConnection connection)
         {
             using var cmd = connection.CreateCommand();
             cmd.CommandText = "SELECT sunny_sr FROM songs_branch_entry LIMIT 1;";

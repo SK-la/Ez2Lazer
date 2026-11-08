@@ -22,7 +22,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         ScoreRank Rank);
 
     /// <summary>
-    /// Per-play SSR cache entry in <c>ez-local-profile.sqlite</c>. Mirrors the official star cache:
+    /// Per-play SunnySR cache entry in <c>ez-local-profile.sqlite</c>. Mirrors the official star cache:
     /// a play already rated with the current algorithm is reused so a recompute only fills in missing plays.
     /// <see cref="HasSsr"/> false records a play the engine deliberately produced no vector for,
     /// so it is not retried on every run.

@@ -24,7 +24,7 @@ namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
     /// Unified read API for skill metrics (song select, local profile Track, …).
-    /// Covers beatmap MSD, player SSR, player dan estimates, chart skill info, and chart-dan verdicts.
+    /// Covers beatmap MSD, player SunnySR, player dan estimates, chart skill info, and chart-dan verdicts.
     /// Writers (computers / aggregators) are separate DI services — see <see cref="EzSkillSystems"/>.
     /// All UI surfaces (HUD DualPanel / Radar, Analysis Wedge, LocalProfile Track, display tags) read through this type.
     /// </summary>
@@ -65,7 +65,7 @@ namespace osu.Game.EzOsuGame.Skills
             = new ConcurrentDictionary<string, EzPersistedChartDan>(StringComparer.Ordinal);
 
         /// <summary>
-        /// Short-lived player SSR memo (see <see cref="GetPlayerSsrSnapshot"/>). Keyed by (username, keyCount).
+        /// Short-lived player SunnySR memo (see <see cref="GetPlayerSsrSnapshot"/>). Keyed by (username, keyCount).
         /// </summary>
         private readonly ConcurrentDictionary<(string Username, int KeyCount), SsrSnapshotMemo> ssrSnapshotMemo
             = new ConcurrentDictionary<(string Username, int KeyCount), SsrSnapshotMemo>();
@@ -272,7 +272,7 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Chart dan from persisted MSD (+ Realm xxy when present). No MSD compute / no beatmap note load.
+        /// Chart dan from persisted MSD (+ Realm ssrwhen present). No MSD compute / no beatmap note load.
         /// Hold ratio uses MSD <c>hold_ratio</c> only (no analysis SQLite on this path).
         /// </summary>
         public EzChartDanVerdict? TryGetCachedChartDan(BeatmapInfo beatmapInfo)
@@ -306,7 +306,7 @@ namespace osu.Game.EzOsuGame.Skills
         public IReadOnlyDictionary<string, double> GetPlayerSsr(string username, int keyCount) => GetPlayerSsrSnapshot(username, keyCount).Values;
 
         /// <summary>
-        /// Player SSR snapshot with a short-lived memo. Song select re-reads this several times per switch
+        /// Player SunnySR snapshot with a short-lived memo. Song select re-reads this several times per switch
         /// (once per bindable-driven DualPanel/radar refresh); the TTL collapses those into one Realm read.
         /// Mirrors the other session caches here — a fresh compute becomes visible within the TTL at worst.
         /// </summary>
@@ -337,11 +337,11 @@ namespace osu.Game.EzOsuGame.Skills
             return PlayerStore.GetPlayerSsrSnapshot(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount);
         }
 
-        /// <summary>Drop the SSR snapshot memo (after a recompute / write).</summary>
+        /// <summary>Drop the SunnySR snapshot memo (after a recompute / write).</summary>
         public void InvalidatePlayerSsrSnapshot() => ssrSnapshotMemo.Clear();
 
         /// <summary>
-        /// Maintenance of the player-side skill rows (SSR / pattern / history / Dan) - the writes and identity reads the
+        /// Maintenance of the player-side skill rows (SunnySR / pattern / history / Dan) - the writes and identity reads the
         /// archive owns, as opposed to the metric reads the rest of this provider serves. Every write here drops the
         /// memos that would otherwise keep serving the rows it just changed, which is why callers go through this and
         /// not straight to the store.
@@ -450,7 +450,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>
         /// Dan label + rating for DualPanel display, with a short-lived snapshot memo. The Realm row itself must
         /// not outlive its transaction, so only the two plain values the caller renders are cached. Same TTL as
-        /// the SSR memo — a switch only needs to read this once instead of once per bindable-driven refresh.
+        /// the SunnySR memo — a switch only needs to read this once instead of once per bindable-driven refresh.
         /// </summary>
         public (string Label, double RawDan) GetDanDisplay(string username, int keyCount, string side)
         {
@@ -538,7 +538,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Recompute and persist skillset caches for a user after dan clears are replaced.
-        /// Prefetches play SSR (axis evidence = hub <c>play.values</c>) and ChartSkillInfo for clear hashes.
+        /// Prefetches play SunnySR (axis evidence = hub <c>play.values</c>) and ChartSkillInfo for clear hashes.
         /// Missing ChartSkillInfo is computed (hub load + heal), not left permanently null.
         /// Empty verdicts leave a miss (no empty sentinel write).
         /// </summary>
@@ -788,13 +788,13 @@ namespace osu.Game.EzOsuGame.Skills
                 return result;
             }
 
-            // Same priority as DualPanel headline: Sunny/xxy first, then chart verdict label.
+            // Same priority as DualPanel headline: Sunny/ssrfirst, then chart verdict label.
             string? aggregateLabel = null;
-            double xxy = beatmapInfo.EzRatingData.SunnySR;
+            double ssr = beatmapInfo.EzRatingData.SunnySR;
 
             // Prefer Sunny for the requested side; primary-side verdict only when sides match.
-            if (xxy >= 0 && double.IsFinite(xxy)
-                         && EzSunnyDanIntervals.TryLookup(keyCount, side.ToId(), xxy, out var sunny)
+            if (ssr >= 0 && double.IsFinite(ssr)
+                         && EzSunnyDanIntervals.TryLookup(keyCount, side.ToId(), ssr, out var sunny)
                          && !string.IsNullOrEmpty(sunny.DisplayLabel))
             {
                 aggregateLabel = sunny.DisplayLabel;
@@ -804,7 +804,7 @@ namespace osu.Game.EzOsuGame.Skills
                 aggregateLabel = chartVerdict.Label;
             }
             else if (chartVerdict != null
-                     && EzDanLabels.TryResolveFallbackDan(keyCount, side, chartVerdict.OverallMsd, chartVerdict.DominantAxis, xxy >= 0 ? xxy : null) is EzDanLabels.DanLookup fallback)
+                     && EzDanLabels.TryResolveFallbackDan(keyCount, side, chartVerdict.OverallMsd, chartVerdict.DominantAxis, ssr >= 0 ? ssr : null) is EzDanLabels.DanLookup fallback)
             {
                 aggregateLabel = fallback.Label;
             }
@@ -1142,7 +1142,7 @@ namespace osu.Game.EzOsuGame.Skills
                 algorithmVersion);
         }
 
-        /// <summary>SSR axis play evidence (sqlite). Empty when local-profile store unset.</summary>
+        /// <summary>SunnySR axis play evidence (sqlite). Empty when local-profile store unset.</summary>
         public IReadOnlyList<EzAxisPlayEvidenceRow> GetAxisPlays(string username, int? keyCount = null, string? skillId = null, int? algorithmVersion = null)
         {
             var rows = localProfileStore?.GetAxisPlays(username, keyCount, skillId, algorithmVersion) ?? [];

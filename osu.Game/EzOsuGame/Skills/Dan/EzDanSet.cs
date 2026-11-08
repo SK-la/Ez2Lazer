@@ -59,7 +59,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         public double HoldRatio { get; init; }
 
-        public double? SSR { get; init; }
+        public double? SunnySR { get; init; }
 
         /// <summary>Rating-axis mean the estimate was read against, or 0 when no axis carried a value.</summary>
         public double OverallMsd { get; init; }
@@ -135,7 +135,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             {
                 KeyCount = keyCount,
                 HoldRatio = holdRatio,
-                SSR = sunnySR,
+                SunnySR = sunnySR,
                 OverallMsd = primary.OverallMsd,
                 DominantAxis = dominantAxis,
                 Sides = sides,
@@ -161,7 +161,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             }
 
             // Reaching a fallback means the key mode's own table had nothing to say for this side.
-            EzDanValueSource fallbackSource() => EzDanLabels.HasXxyDanTable(keyCount) ? EzDanValueSource.MsdMeans : EzDanValueSource.BorrowedTable;
+            EzDanValueSource fallbackSource() => EzDanLabels.HasSunnySRDanTable(keyCount) ? EzDanValueSource.MsdMeans : EzDanValueSource.BorrowedTable;
         }
     }
 }

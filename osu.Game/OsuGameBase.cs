@@ -477,7 +477,7 @@ namespace osu.Game
             dependencies.CacheAs<IEzReplaySession>(ReplaySession);
 
             // Skill metrics: one declaration drives both the storage keys and the ruleset profile.
-            // Mania: MSD / SSR / pattern / Dan. PPP chart / player skills cover osu, taiko, catch, and mania.
+            // Mania: MSD / SunnySR / pattern / Dan. PPP chart / player skills cover osu, taiko, catch, and mania.
             var metricResolver = new EzMetricRevisionResolver(
                 EzChartMetricProducers.CreateRegistry(new EzRealmUpstreamRevisions(RulesetStore)),
                 EzPlayerMetricProducers.CreateRegistry());

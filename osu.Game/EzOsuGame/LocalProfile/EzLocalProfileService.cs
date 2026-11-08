@@ -819,7 +819,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var refreshScope = skillsUsernames?.Select(EzLocalProfileConstants.NormaliseUsername).ToHashSet(StringComparer.Ordinal);
 
             // All: always re-collect from the included set so incremental recomputes still materialise a complete
-            // archive-wide bag (AggregateSSRs is a fixed-point over the individual plays, so it cannot be merged
+            // archive-wide bag (AggregateSunnySRs is a fixed-point over the individual plays, so it cannot be merged
             // from per-player results).
             var included = Store.LoadIncludedUsernames()
                                 .Select(EzLocalProfileConstants.NormaliseUsername)
@@ -999,7 +999,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 () =>
                 {
                     ssrAggregator!.ComputeAndStore(username, plays, aggregator.CreateWindowedScoreResolver(plays, token), token, tick, ssrPlayCache);
-                    // All: keep SSR/pattern/history under the sentinel key; do not duplicate axis evidence rows.
+                    // All: keep SunnySR/pattern/history under the sentinel key; do not duplicate axis evidence rows.
                     Store.ReplaceAxisPlays(
                         username,
                         allPlayers ? Array.Empty<EzAxisPlayEvidenceRow>() : ssrAggregator.PendingEvidence);
@@ -1008,7 +1008,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         playerMissed.UnionWith(ssrAggregator.MissingChartHashes);
                 },
                 ssrAggregator != null,
-                "[EzLocalProfile] Failed to compute/persist player SSR skills after profile save.");
+                "[EzLocalProfile] Failed to compute/persist player SunnySR skills after profile save.");
 
             persisted |= tryComputeAndPersist(
                 username,

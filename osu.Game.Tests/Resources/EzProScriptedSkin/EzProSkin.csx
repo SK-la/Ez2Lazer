@@ -84,7 +84,7 @@ public class EzProSkin : Skin
                                 r1.Anchor = Anchor.BottomLeft;
                                 r1.Origin = Anchor.BottomLeft;
                                 r1.Position = new Vector2(-1, -65);
-                                r1.RadarDisplayMode.Value = EzRadarDisplayMode.SSRPattern;
+                                r1.RadarDisplayMode.Value = EzRadarDisplayMode.SunnySRPattern;
 
                                 r2.Anchor = Anchor.BottomLeft;
                                 r2.Origin = Anchor.BottomLeft;

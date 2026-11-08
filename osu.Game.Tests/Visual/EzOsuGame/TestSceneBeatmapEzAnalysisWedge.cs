@@ -213,7 +213,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             Beatmap.Value = beatmap;
             SelectedMods.Value = [];
             wedge.TargetUsername.Value = test_player;
-            wedge.LeftRadarMode.Value = EzRadarDisplayMode.SSRSkill;
+            wedge.LeftRadarMode.Value = EzRadarDisplayMode.SunnySRSkill;
             wedge.RightRadarMode.Value = EzRadarDisplayMode.MSDSkillDual;
             wedge.Show();
         }

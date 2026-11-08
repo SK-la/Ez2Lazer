@@ -48,7 +48,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         public bool UsesFixedAnchor { get; set; }
 
-        /// <summary>Chart MSD / Player SSR / Both — same idea as Skill radar layers.</summary>
+        /// <summary>Chart MSD / Player SunnySR / Both — same idea as Skill radar layers.</summary>
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.DAN_PANEL_DATA_SOURCE), nameof(EzHUDStrings.DAN_PANEL_DATA_SOURCE_TOOLTIP))]
         public Bindable<EzDanPanelDataSource> DataSource { get; } = new Bindable<EzDanPanelDataSource>(EzDanPanelDataSource.Both);
 
@@ -62,7 +62,7 @@ namespace osu.Game.EzOsuGame.HUD
         /// </summary>
         public BindableBool ShowClearCounts { get; } = new BindableBool(false);
 
-        /// <summary>Target player for SSR / dan. Externally bindable (EzAnalysis header).</summary>
+        /// <summary>Target player for SunnySR / dan. Externally bindable (EzAnalysis header).</summary>
         public Bindable<string?> TargetUsername { get; } = new Bindable<string?>();
 
         public BindableInt KeyCount { get; } = new BindableInt();
@@ -81,7 +81,7 @@ namespace osu.Game.EzOsuGame.HUD
         /// <summary>
         /// Last (beatmap, ruleset, mods) the live chart pass was kicked for. Song select fires placeholder then
         /// real star difficulty for the same chart, and several bindables fire in one switch; without this the
-        /// whole playable + Mina/xxy pass restarted each time.
+        /// whole playable + Mina/ssrpass restarted each time.
         /// </summary>
         private EzDanLiveKickKey? lastLiveKickKey;
 
@@ -313,7 +313,7 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 var info = beatmap.Value.BeatmapInfo;
 
-                // Instant: Realm / session / MSD memory (same role as xxy L1).
+                // Instant: Realm / session / MSD memory (same role as ssrL1).
                 if (skillProvider != null && skillProvider.TryGetChartDanForUi(info, out var persistedChartDan, allowMemoryCompute: true)
                                           && persistedChartDan != null)
                 {

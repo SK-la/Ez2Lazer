@@ -95,8 +95,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             using var engine = new EzMinaEngine();
 
-            var atMax = engine.CalculateRating(notes, 4, 1f, EzMinaEngine.MAX_SSR_GOAL);
-            var atMin = engine.CalculateRating(notes, 4, 1f, EzMinaEngine.MIN_SSR_GOAL);
+            var atMax = engine.CalculateRating(notes, 4, 1f, EzMinaEngine.MAX_SunnySR_GOAL);
+            var atMin = engine.CalculateRating(notes, 4, 1f, EzMinaEngine.MIN_SunnySR_GOAL);
 
             Assert.That(engine.CalculateRating(notes, 4, 1f, 4f).Overall, Is.EqualTo(atMax.Overall).Within(1e-4));
             Assert.That(engine.CalculateRating(notes, 4, 1f, 0.1f).Overall, Is.EqualTo(atMin.Overall).Within(1e-4));
@@ -219,7 +219,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             double rating = EzMinaRatingAggregator.Aggregate(new[] { 20.0 });
             Assert.That(rating, Is.GreaterThan(10));
             Assert.That(rating, Is.LessThan(25));
-            // Etterna AggregateSSRs with a single sample sits slightly below the raw SSR after scaler/rounding.
+            // Etterna AggregateSunnySRs with a single sample sits slightly below the raw SunnySR after scaler/rounding.
             Assert.That(rating, Is.EqualTo(20 * 1.04).Within(6));
         }
 

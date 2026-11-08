@@ -20,7 +20,7 @@ using Realms;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Single Realm persistence facade for skill metrics (MSD / SSR / Dan / PPP / ChartSkillInfo / ChartDan / skillset cache).
+    /// Single Realm persistence facade for skill metrics (MSD / SunnySR / Dan / PPP / ChartSkillInfo / ChartDan / skillset cache).
     /// Does not open the game for the caller. Evidence lists stay in local-profile SQLite.
     /// </summary>
     public sealed class EzChartSkillStore

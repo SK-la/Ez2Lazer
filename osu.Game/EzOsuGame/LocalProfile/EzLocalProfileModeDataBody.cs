@@ -41,7 +41,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private void load(RulesetStore rulesets)
         {
             var ruleset = rulesets.GetRuleset(rulesetId);
-            bool showXxy = rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID
+            bool showSunnySR = rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID
                            || (ruleset != null && EzSunnyStarRatingSupport.SupportsRuleset(ruleset));
 
             var lineSection = new FillFlowContainer
@@ -53,8 +53,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
             };
 
             addLineChart(lineSection, EzSettingsProfile.LOCAL_PROFILE_STAR_PLAY_LINE, createStarLineChart());
-            if (showXxy)
-                addLineChart(lineSection, EzSettingsProfile.LOCAL_PROFILE_SSR_PLAY_LINE, createXxyLineChart());
+            if (showSunnySR)
+                addLineChart(lineSection, EzSettingsProfile.LOCAL_PROFILE_SunnySR_PLAY_LINE, createSunnySRLineChart());
 
             if (rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID)
                 addLineChart(lineSection, EzSettingsProfile.LOCAL_PROFILE_MANIA_AVG_KPS_LINE, createManiaKpsLineChart());
@@ -68,11 +68,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     EzLocalProfileBucketBars.FromStarPlayCounts(snapshot.StarPlayCounts.Where(s => s.RulesetId == rulesetId)))
             };
 
-            if (showXxy)
+            if (showSunnySR)
             {
                 barColumns.Add(createBarColumn(
-                    EzSettingsProfile.LOCAL_PROFILE_SSR_PLAY_DISTRIBUTION,
-                    EzLocalProfileBucketBars.FromXxyPlayCounts(snapshot.XxyPlayCounts.Where(s => s.RulesetId == rulesetId))));
+                    EzSettingsProfile.LOCAL_PROFILE_SunnySR_PLAY_DISTRIBUTION,
+                    EzLocalProfileBucketBars.FromSunnySRPlayCounts(snapshot.SunnySRPlayCounts.Where(s => s.RulesetId == rulesetId))));
             }
 
             if (rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID)
@@ -146,16 +146,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 minValue: 0);
         }
 
-        private EzLocalProfileTrendChart? createXxyLineChart()
+        private EzLocalProfileTrendChart? createSunnySRLineChart()
         {
-            var list = snapshot.XxyPlayCounts.Where(s => s.RulesetId == rulesetId).OrderBy(s => s.StarBucket).ToList();
+            var list = snapshot.SunnySRPlayCounts.Where(s => s.RulesetId == rulesetId).OrderBy(s => s.StarBucket).ToList();
             if (list.Count < 2)
                 return null;
 
             return new EzLocalProfileTrendChart(
                 list.Select(s => (float)s.Count).ToArray(),
                 list.Select(s => s.StarBucket.ToString(CultureInfo.InvariantCulture)).ToArray(),
-                EzSettingsProfile.LOCAL_PROFILE_SSR_PLAY_LINE,
+                EzSettingsProfile.LOCAL_PROFILE_SunnySR_PLAY_LINE,
                 FontAwesome.Solid.Moon,
                 minValue: 0);
         }

@@ -27,7 +27,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
     }
 
     /// <summary>
-    /// The default 4-18K mania MSD/SSR engine: the mania-hub n-key MinaCalc build
+    /// The default 4-18K mania MSD/SunnySR engine: the mania-hub n-key MinaCalc build
     /// (<c>minaclac-74.0.wasm</c>, see <c>Resources/EzSkills/NOTICE.md</c>) hosted in-process
     /// through Wasmtime.
     /// </summary>
@@ -54,11 +54,11 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         /// <summary>Goal the engine treats as the chart-side baseline (MSD).</summary>
         public const float MSD_GOAL = 0.93f;
 
-        /// <summary>Lowest SSR goal the engine is asked for (matches the previous facade clamp).</summary>
-        public const float MIN_SSR_GOAL = 0.8f;
+        /// <summary>Lowest SunnySR goal the engine is asked for (matches the previous facade clamp).</summary>
+        public const float MIN_SunnySR_GOAL = 0.8f;
 
-        /// <summary>Highest SSR goal the engine is asked for (matches the previous facade clamp).</summary>
-        public const float MAX_SSR_GOAL = 0.9975f;
+        /// <summary>Highest SunnySR goal the engine is asked for (matches the previous facade clamp).</summary>
+        public const float MAX_SunnySR_GOAL = 0.9975f;
 
         /// <summary>
         /// MinaCalc needs an interval between rows; charts with fewer rows than this
@@ -92,7 +92,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
             => calculate(notes, keyCount, rate, MSD_GOAL);
 
         public EzMinaSkillAxisVector CalculateRating(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate, float goal)
-            => calculate(notes, keyCount, rate, Math.Clamp(goal, MIN_SSR_GOAL, MAX_SSR_GOAL));
+            => calculate(notes, keyCount, rate, Math.Clamp(goal, MIN_SunnySR_GOAL, MAX_SunnySR_GOAL));
 
         private EzMinaSkillAxisVector calculate(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate, float goal)
         {

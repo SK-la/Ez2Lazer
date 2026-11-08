@@ -12,7 +12,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
     /// <summary>
     ///     Pure port of mania-hub <c>player-skills.ts</c> dan skillset filing
     ///     (<c>bucketingSkillset</c> / <c>bucketsForClear</c> / <c>groupDanClearsBySkillset</c> primary quorum).
-    ///     4K filing uses hub <c>play.values</c> (per-clear Mina SSR); keys are Mina names
+    ///     4K filing uses hub <c>play.values</c> (per-clear Mina SunnySR); keys are Mina names
     ///     (<c>Stream</c>, <c>JackSpeed</c>, …). <see cref="NormalizeMsdValues"/> also accepts
     ///     <c>player_ssr.*</c> and legacy <c>beatmap_msd.*</c> ids.
     /// </summary>
@@ -105,7 +105,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         ///     averages over all filings into that tile (shared clears included).
         /// </summary>
         /// <param name="resolvePlayValues">
-        ///     Hub <c>play.values</c> — per-clear Mina SSR vector (not beatmap MSD).
+        ///     Hub <c>play.values</c> — per-clear Mina SunnySR vector (not beatmap MSD).
         /// </param>
         public static IReadOnlyDictionary<string, EzDanSkillsetVerdict> ComputeVerdicts(
             int keyCount,

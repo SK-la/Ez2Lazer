@@ -208,7 +208,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         /// <summary>
         /// The player-chain flag is per player, and it is what a manual compute reads to decide whose Realm rows to
         /// re-derive. A pass that covered a player must therefore be able to clear it wholesale: a row the pass could
-        /// not re-derive (SSR values for a keymode whose plays are gone, say) has no later pass to pick it up, so
+        /// not re-derive (SunnySR values for a keymode whose plays are gone, say) has no later pass to pick it up, so
         /// leaving it set would keep the status readout warning forever.
         /// </summary>
         [Test]

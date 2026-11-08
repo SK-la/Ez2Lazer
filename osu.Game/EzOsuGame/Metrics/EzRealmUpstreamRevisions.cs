@@ -26,7 +26,7 @@ namespace osu.Game.EzOsuGame.Metrics
             => rulesetStore.GetRuleset(rulesetOnlineId) is RulesetInfo ruleset ? ruleset.LastAppliedDifficultyVersion : 0;
 
         public int Ssr(int rulesetOnlineId)
-            => rulesetStore.GetRuleset(rulesetOnlineId) is RulesetInfo ruleset ? ruleset.LastAppliedSSRVersion : 0;
+            => rulesetStore.GetRuleset(rulesetOnlineId) is RulesetInfo ruleset ? ruleset.LastAppliedSunnySRVersion : 0;
     }
 
     /// <summary>

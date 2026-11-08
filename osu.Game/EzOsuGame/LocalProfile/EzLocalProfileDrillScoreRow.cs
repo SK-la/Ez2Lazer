@@ -116,9 +116,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var metadata = beatmap.Metadata;
             var maniaSummary = analysis.ManiaSummary;
 
-            double resolvedXxy = sunnyStarRating
-                                 ?? (hasKps && maniaSummary?.SSR is double analysisXxy && analysisXxy >= 0
-                                     ? analysisXxy
+            double resolvedSunnySR = sunnyStarRating
+                                 ?? (hasKps && maniaSummary?.SunnySR is double analysisSunnySR && analysisSunnySR >= 0
+                                     ? analysisSunnySR
                                      : beatmap.EzRatingData.SunnySR);
 
             int keyCount = 0;
@@ -174,7 +174,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 MapperUsername = metadata.Author.Username,
                 BeatmapStatus = beatmap.Status,
                 StarRating = starRating ?? beatmap.StarRating,
-                SunnyStarRating = resolvedXxy,
+                SunnyStarRating = resolvedSunnySR,
                 MapPerformancePoints = beatmap.PerformancePoints,
                 KpsAvg = hasKps ? analysis.AverageKps : 0,
                 KpsMax = hasKps ? analysis.MaxKps : 0,

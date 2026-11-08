@@ -331,13 +331,13 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_REC_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "控制 Ez SQLite 体系内指标在选歌时是否按需即时计算："
             + "\n· 主库：NoMod 的 kps/KPC（及 mania 列统计）缺失时 debounce 后补算；"
-            + "\n· 有 Mod：按当前 Mod 即时计算 kps/xxy 等（无匹配分支快照时）；"
+            + "\n· 有 Mod：按当前 Mod 即时计算 kps/ssr等（无匹配分支快照时）；"
             + "\n· 分支库：仍读取已激活分支的预生成快照，本开关不替代分支构建。"
             + "\n关闭时仅读已落盘 SQLite 数据，不触发选歌实时计算。"
             + "\n不影响 Realm 元数据回填；Panel PP 随官方星级缓存（BeatmapDifficultyCache），与开关无关。",
             "Controls whether Ez SQLite metrics are computed on demand during song select:"
             + "\n· Main DB: backfill missing NoMod kps/KPC (and mania column stats) after debounce;"
-            + "\n· With mods: compute kps/xxy live for the current mod set when no matching branch snapshot exists;"
+            + "\n· With mods: compute kps/ssrlive for the current mod set when no matching branch snapshot exists;"
             + "\n· Branch DB: still reads precomputed snapshots from the active branch; this switch does not replace branch builds."
             + "\nWhen disabled, only stored SQLite values are read; no live song-select computation."
             + "\nDoes not affect Realm metadata backfill; panel PP follows the official star cache (BeatmapDifficultyCache) and is not gated by this switch.");
@@ -346,11 +346,11 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("启用 Ez 分析 SQLite", "Enable Ez analysis SQLite");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SQLITE_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "启用 Ez 分析 SQLite 主库与分支曲库的读写（kps/KPC、分支 xxy/PP 快照等）。"
+            "启用 Ez 分析 SQLite 主库与分支曲库的读写（kps/KPC、分支 ssr/PP 快照等）。"
             + "\n关闭后不加载、不写入上述本地缓存。"
             + "\n自动预热仅在缺少当前版本库或需 schema 升级时触发；已有匹配库时请用下方维护控件手动补算。"
             + "\n即时计算行为由「Ez 分析即时计算」开关单独控制。",
-            "Enables read/write for the Ez analysis main SQLite database and songs branch libraries (kps/KPC, branch xxy/PP snapshots, etc.)."
+            "Enables read/write for the Ez analysis main SQLite database and songs branch libraries (kps/KPC, branch ssr/PP snapshots, etc.)."
             + "\nWhen disabled, stored local caches are neither loaded nor written."
             + "\nAuto-warmup runs only when the current database is missing or needs a schema upgrade; use maintenance controls below when a matching file already exists."
             + "\nOn-demand computation is controlled separately by \"Enable Ez analysis on-demand computation\".");
@@ -430,9 +430,9 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("立即补算", "Backfill now");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "在后台补算选歌面板所需的 Realm 字段：谱面 Tag（视频/Storyboard）、SSR 星级、PP。"
+            "在后台补算选歌面板所需的 Realm 字段：谱面 Tag（视频/Storyboard）、SunnySR 星级、PP。"
             + "\n启动时也会自动执行；若看不到进度通知，可点此手动触发。",
-            "Backfill Realm fields used by song select: beatmap tags (video/storyboard), SSR star rating, and PP."
+            "Backfill Realm fields used by song select: beatmap tags (video/storyboard), SunnySR star rating, and PP."
             + "\nAlso runs automatically at startup; use this if progress notifications did not appear.");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_FORCE =
@@ -460,7 +460,7 @@ namespace osu.Game.EzOsuGame.Localization
             + "过期 = 旧版本留下的行（改过算法后会出现）；缺失 = 还没算过。"
             + "\n待补算 = 过期 + 缺失。各系统独立统计，上游换版会使其下游整体变为过期。"
             + "\n没有版本号列的系统（官方星级 / PP 等）只区分已填 / 未填。"
-            + "\n玩家技能 = 玩家链（成绩 → SSR/Dan），没有组合版本号：一局结算后其技能行会被标为过期，"
+            + "\n玩家技能 = 玩家链（成绩 → SunnySR/Dan），没有组合版本号：一局结算后其技能行会被标为过期，"
             + "由手动「计算本地成绩」（及图表链回折）刷新；这里显示还有多少玩家待刷新。"
             + "\n蓝色 = 已对齐；橙色 = 仍有待补算；红色 = 统计失败。",
             "Re-measures stored coverage of every analysis system (official / Sunny / PP+ / Mina / CSI / Dan) per ruleset."
@@ -469,7 +469,7 @@ namespace osu.Game.EzOsuGame.Localization
             + " stale = a row left by an older revision (appears after an algorithm change); missing = never computed."
             + "\nPending = stale + missing. Each system is counted independently; bumping an upstream one turns its downstream facets stale."
             + "\nSystems with no revision column (official star / pp, ...) only distinguish filled from unfilled."
-            + "\nPlayer skills = the player chain (plays -> SSR/Dan), which has no composed revision: a settled play flags the player's"
+            + "\nPlayer skills = the player chain (plays -> SunnySR/Dan), which has no composed revision: a settled play flags the player's"
             + " rows and the manual compute / chart-chain follow-up refreshes them. This shows how many players are still waiting."
             + "\nBlue = in sync; orange = work still pending; red = measurement failed.");
 
@@ -902,31 +902,31 @@ namespace osu.Game.EzOsuGame.Localization
             + "\nAffects: Ez ChartDan / DualPanel, song-select and HUD radar LN labels, and the persisted ChartDan LN half in Realm."
             + "\nAlready-persisted ChartDan / CSI is not retroactively updated; rebuild (Data rebuild -> Realm chart skill chain) to apply.");
 
-        public static readonly LocalisableString SSR_RESCALE_THRESHOLD = new EzLocalizationManager.EzLocalisableString(
-            "SSR 重缩放阈值",
-            "SSR rescale threshold");
+        public static readonly LocalisableString SunnySR_RESCALE_THRESHOLD = new EzLocalizationManager.EzLocalisableString(
+            "SunnySR 重缩放阈值",
+            "SunnySR rescale threshold");
 
-        public static readonly LocalisableString SSR_RESCALE_THRESHOLD_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "SSR（xxy 难度）超过这个星级后，超出部分的膨胀速度被压到 1/1.2。"
-            + "\n这是对算法的永久修订，不是一次性试验：改它不会让本地库换版本，也不会追溯重算已落盘的值，只影响此后算出的 SSR 与落库结果。"
+        public static readonly LocalisableString SunnySR_RESCALE_THRESHOLD_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "SunnySR（ssr难度）超过这个星级后，超出部分的膨胀速度被压到 1/1.2。"
+            + "\n这是对算法的永久修订，不是一次性试验：改它不会让本地库换版本，也不会追溯重算已落盘的值，只影响此后算出的 SunnySR 与落库结果。"
             + "\n调高 → 高星谱面不再被压那么多，值偏高；调低 → 高星谱面被压得更狠，值偏低。低于本阈值的中低星谱面不受影响。",
-            "Above this star rating the SSR (xxy difficulty) inflation is compressed to 1/1.2 of the excess."
+            "Above this star rating the SunnySR (ssrdifficulty) inflation is compressed to 1/1.2 of the excess."
             + "\nThis is a permanent revision of the algorithm, not a one-off experiment: changing it does not change the local database version "
-            + "and does not retroactively rescore stored values; only SSR computed from then on, and its persisted result, are affected."
+            + "and does not retroactively rescore stored values; only SunnySR computed from then on, and its persisted result, are affected."
             + "\nRaise it and high-star charts are compressed less (values go up); lower it and they are compressed more. Charts below the threshold are unaffected.");
 
-        public static readonly LocalisableString SSR_LN_MULTIPLIER = new EzLocalizationManager.EzLocalisableString(
-            "SSR LN 因子",
-            "SSR LN multiplier");
+        public static readonly LocalisableString SunnySR_LN_MULTIPLIER = new EzLocalizationManager.EzLocalisableString(
+            "SunnySR LN 因子",
+            "SunnySR LN multiplier");
 
-        public static readonly LocalisableString SSR_LN_MULTIPLIER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "SSR（xxy 难度）里长条积分的权重系数，决定 LN 对难度的贡献。"
-            + "\n与重缩放阈值一样是对算法的永久修订：改动不换库版本、不追溯重算，只影响此后的 SSR 与落库结果。"
+        public static readonly LocalisableString SunnySR_LN_MULTIPLIER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "SunnySR（ssr难度）里长条积分的权重系数，决定 LN 对难度的贡献。"
+            + "\n与重缩放阈值一样是对算法的永久修订：改动不换库版本、不追溯重算，只影响此后的 SunnySR 与落库结果。"
             + "\n调高 → LN 谱面更难、值偏高；调低 → LN 谱面更易。纯 rice 谱面不受影响。"
             + "\n建议：7K 以下用 6 左右；10K 可降到 4.5–5.5。",
-            "Weight of the long-note integral in the SSR (xxy difficulty); it decides how much holds contribute."
+            "Weight of the long-note integral in the SunnySR (ssrdifficulty); it decides how much holds contribute."
             + "\nLike the rescale threshold this is a permanent revision: no database version change, no retroactive rescoring, "
-            + "only SSR computed from then on and its persisted result."
+            + "only SunnySR computed from then on and its persisted result."
             + "\nRaise it and LN charts rate harder (values go up); lower it and they rate easier. Pure rice charts are unaffected."
             + "\nGuidance: around 6 below 7K; 4.5-5.5 for 10K.");
 

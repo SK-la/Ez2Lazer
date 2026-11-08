@@ -46,9 +46,9 @@ namespace osu.Game.EzOsuGame.Localization
             "Ez analysis filter");
 
         public static readonly LocalisableString EZ_ANALYSIS_FILTER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "分支曲库激活时：开启后，所选分析系统为 Sunny 时，排序/分组/筛选改用分支库 sqlite 中的 xxy（含 mod 变体），替代 Realm 基线。"
+            "分支曲库激活时：开启后，所选分析系统为 Sunny 时，排序/分组/筛选改用分支库 sqlite 中的 ssr（含 mod 变体），替代 Realm 基线。"
             + "\n其它分析系统始终读各自基线，不受此开关影响。",
-            "When a songs branch is active: if the selected analysis system is Sunny, sort/group/star filter use branch sqlite xxy (incl. mod variants) instead of the Realm baseline."
+            "When a songs branch is active: if the selected analysis system is Sunny, sort/group/star filter use branch sqlite ssr(incl. mod variants) instead of the Realm baseline."
             + "\nOther systems always read their own baseline and ignore this switch.");
 
         public static readonly LocalisableString KEY_SOUND_PREVIEW_TOOLTIP = new EzLocalizationManager.EzLocalisableString(

@@ -15,11 +15,11 @@ Provenance for the vendored n-key MinaCalc binary used by the Ez mania skill pip
 ## Cap patch
 
 The shipped `0.74.0` binary has been byte-patched by the mania-hub fork to lift the
-per-skillset SSR clamp from 40 to 100 (`f32.const 40.0` -> `f32.const 100.0`, four
+per-skillset SunnySR clamp from 40 to 100 (`f32.const 40.0` -> `f32.const 100.0`, four
 occurrences). Upstream's n-key rebuild silently dropped the clamp lift that the older
 wasm builds (`<=0.72.3`) already carried, which pins every top-end skillset at 40.
 Do **not** replace this file with a stock upstream `0.74.0` build without re-applying
-the patch, or top-end MSD/SSR values will be clamped.
+the patch, or top-end MSD/SunnySR values will be clamped.
 
 ## Hosting
 
@@ -33,7 +33,7 @@ all of which are stubbed by the host. No WASI filesystem or environment access i
 `minacalc_compute(keycount, rate, goal, masksPtr, timesPtr, count, outPtr) -> i32`
 returns eight `f32` skillsets in the fixed order
 `Overall, Stream, Jumpstream, Handstream, Stamina, JackSpeed, Chordjack, Technical`.
-There is no separate MSD/SSR switch: `goal = 0.93` is the MSD baseline.
+There is no separate MSD/SunnySR switch: `goal = 0.93` is the MSD baseline.
 
 ## Updating
 

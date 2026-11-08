@@ -22,7 +22,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             Assert.That(set, Is.Not.Null);
             Assert.That(set!.KeyCount, Is.EqualTo(4));
-            Assert.That(set.SSR, Is.EqualTo(6));
+            Assert.That(set.SunnySR, Is.EqualTo(6));
             Assert.That(set.For(EzDanSide.Rc), Is.Not.Null);
             Assert.That(set.For(EzDanSide.Ln), Is.Not.Null);
         }

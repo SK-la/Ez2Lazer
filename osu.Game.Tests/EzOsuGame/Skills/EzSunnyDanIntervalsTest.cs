@@ -39,7 +39,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
-        public void ChartDanPrefersXxyIntervalLabelOverMsdHeuristic()
+        public void ChartDanPrefersSunnySRIntervalLabelOverMsdHeuristic()
         {
             var msd = new Dictionary<string, double>
             {
@@ -48,19 +48,19 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 [EzMinaSkillAxis.Stream.ToMsdSkillId()] = 10.0,
             };
 
-            var withXxy = EzChartDanEstimator.FromMsd(msd, keyCount: 6, holdRatio: 0.1, sunnySR: 7.03);
-            var withoutXxy = EzChartDanEstimator.FromMsd(msd, keyCount: 6, holdRatio: 0.1);
+            var withSunnySR = EzChartDanEstimator.FromMsd(msd, keyCount: 6, holdRatio: 0.1, sunnySR: 7.03);
+            var withoutSunnySR = EzChartDanEstimator.FromMsd(msd, keyCount: 6, holdRatio: 0.1);
 
-            Assert.That(withXxy, Is.Not.Null);
-            Assert.That(withoutXxy, Is.Not.Null);
-            Assert.That(withXxy!.Label, Is.EqualTo("7-"));
-            Assert.That(withXxy.OverallMsd, Is.EqualTo(20.5).Within(0.001));
-            Assert.That(withXxy.DominantAxis, Is.EqualTo(EzMinaSkillAxis.Technical));
-            Assert.That(withXxy.Label, Is.Not.EqualTo(withoutXxy!.Label));
+            Assert.That(withSunnySR, Is.Not.Null);
+            Assert.That(withoutSunnySR, Is.Not.Null);
+            Assert.That(withSunnySR!.Label, Is.EqualTo("7-"));
+            Assert.That(withSunnySR.OverallMsd, Is.EqualTo(20.5).Within(0.001));
+            Assert.That(withSunnySR.DominantAxis, Is.EqualTo(EzMinaSkillAxis.Technical));
+            Assert.That(withSunnySR.Label, Is.Not.EqualTo(withoutSunnySR!.Label));
         }
 
         [Test]
-        public void WithoutXxyTheStoredDanIsTaggedAsAMeansEstimate()
+        public void WithoutSunnySRTheStoredDanIsTaggedAsAMeansEstimate()
         {
             var msd = new Dictionary<string, double>
             {
@@ -86,7 +86,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
-        public void LiveXxyFeedsSunnyLabelsUnderConvertedKeys()
+        public void LiveSunnySRFeedsSunnyLabelsUnderConvertedKeys()
         {
             var msd = new Dictionary<string, double>
             {

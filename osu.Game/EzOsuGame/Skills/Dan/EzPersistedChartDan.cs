@@ -105,7 +105,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         }
 
         /// <summary>
-        /// Build nomod persisted chart dan from stored MSD (+ optional CSI / xxy). No playable / Mina / LeoBlack.
+        /// Build nomod persisted chart dan from stored MSD (+ optional CSI / ssr). No playable / Mina / LeoBlack.
         /// RC and LN halves may both be written (Ez DualPanel). LN when
         /// <see cref="EzDanAlgorithm.AllowsPersistedChartLnHalf"/>; RC always attempted.
         /// </summary>

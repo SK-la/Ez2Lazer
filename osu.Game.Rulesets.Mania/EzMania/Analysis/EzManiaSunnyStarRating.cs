@@ -8,12 +8,12 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 {
     /// <summary>
-    /// Mania-specific constraints for whether sunnyxxy SR can be calculated for a beatmap.
+    /// Mania-specific constraints for whether sunnySunnySR can be calculated for a beatmap.
     /// </summary>
     public static class EzManiaSunnyStarRating
     {
         /// <summary>
-        /// yyyyMMdd revision of the Mania xxy SR algorithm. Bump when calculation logic changes (independent of official <see cref="Difficulty.ManiaDifficultyCalculator.Version"/>).
+        /// yyyyMMdd revision of the Mania SunnySR algorithm. Bump when calculation logic changes (independent of official <see cref="Difficulty.ManiaDifficultyCalculator.Version"/>).
         /// </summary>
         public const int VERSION = 20250415;
 

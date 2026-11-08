@@ -27,7 +27,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public const string DATABASE_FILENAME = "ez-local-profile.sqlite";
 
         /// <summary>
-        /// v2: per-play SSR / Dan caches for incremental (backfill) compute.
+        /// v2: per-play SunnySR / Dan caches for incremental (backfill) compute.
         /// v3: <c>drill_scores</c> is the detail source of truth (a partition payload no longer carries its drills),
         /// <c>username_partitions.excluded</c> marks a player left out of the archive, and
         /// <c>online_score_contributions.username</c> attributes pulled scores to the account that pulled them.
@@ -95,7 +95,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         ManiaColumnStats = readManiaColumnStats(connection),
                         GradeCounts = readGradeCounts(connection),
                         StarPlayCounts = readStarPlayCounts(connection),
-                        XxyPlayCounts = readXxyPlayCounts(connection),
+                        SunnySRPlayCounts = readSunnySRPlayCounts(connection),
                         StdAttrAffinities = readStdAttrAffinities(connection),
                     };
                 }
@@ -547,7 +547,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         /// <summary>
-        /// Replace all SSR axis play evidence rows for <paramref name="username"/> (DATA-3 / DATA-H).
+        /// Replace all SunnySR axis play evidence rows for <paramref name="username"/> (DATA-3 / DATA-H).
         /// </summary>
         public void ReplaceAxisPlays(string username, IReadOnlyList<EzAxisPlayEvidenceRow> rows)
         {
@@ -947,11 +947,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     cmd.ExecuteNonQuery();
                 }
 
-                foreach (var ((rulesetId, starBucket), count) in result.XxyPlayCounts)
+                foreach (var ((rulesetId, starBucket), count) in result.SunnySRPlayCounts)
                 {
                     using var cmd = connection.CreateCommand();
                     cmd.CommandText = """
-                                      INSERT INTO xxy_play_counts (ruleset_id, star_bucket, count)
+                                      INSERT INTO ssr_play_counts (ruleset_id, star_bucket, count)
                                       VALUES ($ruleset_id, $star_bucket, $count);
                                       """;
                     cmd.Parameters.AddWithValue("$ruleset_id", rulesetId);
@@ -1247,7 +1247,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        /// <summary>Per-play SSR cache for one algorithm version, keyed by score id (score id is globally unique).</summary>
+        /// <summary>Per-play SunnySR cache for one algorithm version, keyed by score id (score id is globally unique).</summary>
         public Dictionary<Guid, EzMinaPlayCacheRow> LoadSsrPlayCache(int? algorithmVersion = null)
         {
             int version = algorithmVersion ?? EzMinaSkillAlgorithm.VERSION;
@@ -1563,7 +1563,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
             catch (Exception ex)
             {
-                Logger.Log($"[EzLocalProfile] Failed to parse SSR vector cache: {ex.Message}", Ez2ConfigManager.LOGGER_NAME);
+                Logger.Log($"[EzLocalProfile] Failed to parse SunnySR vector cache: {ex.Message}", Ez2ConfigManager.LOGGER_NAME);
             }
 
             return default;
@@ -1650,11 +1650,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 cmd.ExecuteNonQuery();
             }
 
-            foreach (var ((rulesetId, starBucket), count) in result.XxyPlayCounts)
+            foreach (var ((rulesetId, starBucket), count) in result.SunnySRPlayCounts)
             {
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = """
-                                  INSERT INTO xxy_play_counts (ruleset_id, star_bucket, count)
+                                  INSERT INTO ssr_play_counts (ruleset_id, star_bucket, count)
                                   VALUES ($ruleset_id, $star_bucket, $count);
                                   """;
                 cmd.Parameters.AddWithValue("$ruleset_id", rulesetId);
@@ -1700,7 +1700,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                   score_id, score_hash, username, ruleset_id, rank, pp_resolved, accuracy,
                                   max_combo, max_achievable_combo, total_score, mods_json, total_keys,
                                   beatmap_hash, beatmap_id, beatmap_set_id, title, artist, difficulty_name,
-                                  mapper_username, beatmap_status, star_rating, xxy_star_rating, map_performance_points,
+                                  mapper_username, beatmap_status, star_rating, ssr_star_rating, map_performance_points,
                                   kps_avg, kps_max, kps_list_json, column_counts_json, hold_counts_json,
                                   avg_abs_offset_ms, has_video, has_storyboard, date_ms,
                                   bpm, key_count, is_convert, rate, mod_acronyms_json)
@@ -1708,7 +1708,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                   $score_id, $score_hash, $username, $ruleset_id, $rank, $pp_resolved, $accuracy,
                                   $max_combo, $max_achievable_combo, $total_score, $mods_json, $total_keys,
                                   $beatmap_hash, $beatmap_id, $beatmap_set_id, $title, $artist, $difficulty_name,
-                                  $mapper_username, $beatmap_status, $star_rating, $xxy_star_rating, $map_performance_points,
+                                  $mapper_username, $beatmap_status, $star_rating, $ssr_star_rating, $map_performance_points,
                                   $kps_avg, $kps_max, $kps_list_json, $column_counts_json, $hold_counts_json,
                                   $avg_abs_offset_ms, $has_video, $has_storyboard, $date_ms,
                                   $bpm, $key_count, $is_convert, $rate, $mod_acronyms_json);
@@ -1742,7 +1742,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 cmd.Parameters["$mapper_username"].Value = row.MapperUsername;
                 cmd.Parameters["$beatmap_status"].Value = (int)row.BeatmapStatus;
                 cmd.Parameters["$star_rating"].Value = row.StarRating;
-                cmd.Parameters["$xxy_star_rating"].Value = row.SunnyStarRating;
+                cmd.Parameters["$ssr_star_rating"].Value = row.SunnyStarRating;
                 cmd.Parameters["$map_performance_points"].Value = row.MapPerformancePoints;
                 cmd.Parameters["$kps_avg"].Value = row.KpsAvg;
                 cmd.Parameters["$kps_max"].Value = row.KpsMax;
@@ -1786,7 +1786,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             ("$mapper_username", SqliteType.Text),
             ("$beatmap_status", SqliteType.Integer),
             ("$star_rating", SqliteType.Real),
-            ("$xxy_star_rating", SqliteType.Real),
+            ("$ssr_star_rating", SqliteType.Real),
             ("$map_performance_points", SqliteType.Real),
             ("$kps_avg", SqliteType.Real),
             ("$kps_max", SqliteType.Real),
@@ -1871,10 +1871,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                        .ThenBy(kv => kv.Key.StarBucket)
                                        .Select(kv => new EzLocalProfileStarPlayCount(kv.Key.RulesetId, kv.Key.StarBucket, kv.Value))
                                        .ToList(),
-                XxyPlayCounts = result.XxyPlayCounts
+                SunnySRPlayCounts = result.SunnySRPlayCounts
                                       .OrderBy(kv => kv.Key.RulesetId)
                                       .ThenBy(kv => kv.Key.StarBucket)
-                                      .Select(kv => new EzLocalProfileXxyPlayCount(kv.Key.RulesetId, kv.Key.StarBucket, kv.Value))
+                                      .Select(kv => new EzLocalProfileSunnySRPlayCount(kv.Key.RulesetId, kv.Key.StarBucket, kv.Value))
                                       .ToList(),
                 StdAttrAffinities = result.StdAttrAffinities
                                           .OrderBy(kv => kv.Key.Attr)
@@ -1901,7 +1901,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                   SELECT score_id, score_hash, username, ruleset_id, rank, pp_resolved, accuracy,
                          max_combo, max_achievable_combo, total_score, mods_json, total_keys,
                          beatmap_hash, beatmap_id, beatmap_set_id, title, artist, difficulty_name,
-                         mapper_username, beatmap_status, star_rating, xxy_star_rating, map_performance_points,
+                         mapper_username, beatmap_status, star_rating, ssr_star_rating, map_performance_points,
                          kps_avg, kps_max, '[]' AS kps_list_json, column_counts_json, hold_counts_json,
                          avg_abs_offset_ms, has_video, has_storyboard, date_ms,
                          bpm, key_count, is_convert, rate, mod_acronyms_json
@@ -1913,7 +1913,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                   SELECT score_id, score_hash, username, ruleset_id, rank, pp_resolved, accuracy,
                          max_combo, max_achievable_combo, total_score, mods_json, total_keys,
                          beatmap_hash, beatmap_id, beatmap_set_id, title, artist, difficulty_name,
-                         mapper_username, beatmap_status, star_rating, xxy_star_rating, map_performance_points,
+                         mapper_username, beatmap_status, star_rating, ssr_star_rating, map_performance_points,
                          kps_avg, kps_max, '[]' AS kps_list_json, column_counts_json, hold_counts_json,
                          avg_abs_offset_ms, has_video, has_storyboard, date_ms,
                          bpm, key_count, is_convert, rate, mod_acronyms_json
@@ -2083,7 +2083,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                       count INTEGER NOT NULL,
                                       PRIMARY KEY (ruleset_id, star_bucket)
                                   );
-                                  CREATE TABLE IF NOT EXISTS xxy_play_counts (
+                                  CREATE TABLE IF NOT EXISTS ssr_play_counts (
                                       ruleset_id INTEGER NOT NULL,
                                       star_bucket INTEGER NOT NULL,
                                       count INTEGER NOT NULL,
@@ -2136,7 +2136,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                       mapper_username TEXT NOT NULL,
                                       beatmap_status INTEGER NOT NULL,
                                       star_rating REAL NOT NULL,
-                                      xxy_star_rating REAL NOT NULL,
+                                      ssr_star_rating REAL NOT NULL,
                                       map_performance_points REAL NOT NULL,
                                       kps_avg REAL NOT NULL,
                                       kps_max REAL NOT NULL,
@@ -2317,7 +2317,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                          DELETE FROM mania_column_stats WHERE TRUE;
                          DELETE FROM grade_counts WHERE TRUE;
                          DELETE FROM star_play_counts WHERE TRUE;
-                         DELETE FROM xxy_play_counts WHERE TRUE;
+                         DELETE FROM ssr_play_counts WHERE TRUE;
                          DELETE FROM std_attr_affinity WHERE TRUE;
                          DELETE FROM insights_cache WHERE TRUE;
                          """;
@@ -2475,16 +2475,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return list;
         }
 
-        private static IReadOnlyList<EzLocalProfileXxyPlayCount> readXxyPlayCounts(SqliteConnection connection)
+        private static IReadOnlyList<EzLocalProfileSunnySRPlayCount> readSunnySRPlayCounts(SqliteConnection connection)
         {
-            var list = new List<EzLocalProfileXxyPlayCount>();
+            var list = new List<EzLocalProfileSunnySRPlayCount>();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT ruleset_id, star_bucket, count FROM xxy_play_counts ORDER BY ruleset_id, star_bucket;";
+            cmd.CommandText = "SELECT ruleset_id, star_bucket, count FROM ssr_play_counts ORDER BY ruleset_id, star_bucket;";
             using var reader = cmd.ExecuteReader();
 
             while (reader.Read())
             {
-                list.Add(new EzLocalProfileXxyPlayCount(
+                list.Add(new EzLocalProfileSunnySRPlayCount(
                     reader.GetInt32(0),
                     reader.GetInt32(1),
                     reader.GetInt32(2)));

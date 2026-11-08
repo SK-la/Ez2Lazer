@@ -23,10 +23,10 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString RADAR_DATA_AREA_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("数据填充区域的颜色", "Colour of data filled area.");
 
         public static readonly LocalisableString RADAR_PLAYER_DATA_LINE_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达玩家数据线色", "Radar Player Data Line Colour");
-        public static readonly LocalisableString RADAR_PLAYER_DATA_LINE_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("Skill 模式下玩家 SSR 层轮廓线与顶点颜色", "Stroke/point colour for the player SSR layer in Skill mode.");
+        public static readonly LocalisableString RADAR_PLAYER_DATA_LINE_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("Skill 模式下玩家 SunnySR 层轮廓线与顶点颜色", "Stroke/point colour for the player SunnySR layer in Skill mode.");
 
         public static readonly LocalisableString RADAR_PLAYER_DATA_AREA_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达玩家数据区色", "Radar Player Data Area Colour");
-        public static readonly LocalisableString RADAR_PLAYER_DATA_AREA_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("Skill 模式下玩家 SSR 层填充颜色", "Fill colour for the player SSR layer in Skill mode.");
+        public static readonly LocalisableString RADAR_PLAYER_DATA_AREA_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("Skill 模式下玩家 SunnySR 层填充颜色", "Fill colour for the player SunnySR layer in Skill mode.");
 
         public static readonly LocalisableString BACKGROUND_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达背景色", "Radar Background Colour");
         public static readonly LocalisableString RADAR_BOX_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("雷达图圆角背景的颜色，设置为透明可隐藏背景", "Colour of radar chart rounded background. Set to transparent to hide background.");
@@ -41,7 +41,7 @@ namespace osu.Game.EzOsuGame.Localization
             + "\n- 全局：显示常规Metadate数据。"
             + "\n- Key Pattern: 显示类PS Mod风格的并行键型数据。衡量谱面中不同键型的相对难度关系。"
             + "\n- sunnySR Pattern: 显示sunnySR星级分析的键型数据。衡量谱面中不同键型变化的难度系数，提现谱中键型变化差异程度，这里的bracket除了切指外还视为常规类型。"
-            + "\n- Skill: 黄=谱面 MSD、绿=玩家 SSR，只展示两边都有值的共性轴（同算法浮点对比）。"
+            + "\n- Skill: 黄=谱面 MSD、绿=玩家 SunnySR，只展示两边都有值的共性轴（同算法浮点对比）。"
             + "\n- Beatmap: 只展示谱面 MSD 真实有值的轴（有多少显示多少），无玩家层。"
             + "\n- PPP Skill: 黄=谱面 PPP、绿=玩家 PPP。"
             + "\n- PPP Chart: 只展示谱面 PPP。",
@@ -49,7 +49,7 @@ namespace osu.Game.EzOsuGame.Localization
             + "\n- Global: Display the standard Metadata data."
             + "\n- Key Pattern: Display the parallel key type data of the PS Mod style."
             + "\n- sunnySR Pattern: Display the key type data of the sunnySR star rating analysis."
-            + "\n- Skill: Yellow=beatmap MSD, green=player SSR; shared axes only (same-algorithm floats)."
+            + "\n- Skill: Yellow=beatmap MSD, green=player SunnySR; shared axes only (same-algorithm floats)."
             + "\n- Beatmap: Chart MSD axes with real values only (as many as exist); no player layer."
             + "\n- PPP Skill: Yellow=chart PPP, green=player PPP."
             + "\n- PPP Chart: Chart PPP only.");
@@ -295,8 +295,8 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString DAN_PANEL_DATA_SOURCE = new EzLocalizationManager.EzLocalisableString("段位数据源", "Dan Data Source");
 
         public static readonly LocalisableString DAN_PANEL_DATA_SOURCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "Chart：谱面 MSD；Player：玩家 SSR/段位；Both：双源叠加（对齐 Skill 雷达黄/绿层）。",
-            "Chart: beatmap MSD; Player: SSR/dan; Both: overlay both (Skill radar yellow/green).");
+            "Chart：谱面 MSD；Player：玩家 SunnySR/段位；Both：双源叠加（对齐 Skill 雷达黄/绿层）。",
+            "Chart: beatmap MSD; Player: SunnySR/dan; Both: overlay both (Skill radar yellow/green).");
 
         public static readonly LocalisableString DAN_PANEL_DUAL_LAYOUT = new EzLocalizationManager.EzLocalisableString("RC|LN 布局", "RC|LN Layout");
 

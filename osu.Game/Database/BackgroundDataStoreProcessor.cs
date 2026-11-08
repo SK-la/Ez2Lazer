@@ -522,7 +522,7 @@ namespace osu.Game.Database
 
                     // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
                     // [Ez] 独立计算
-                    // clearOutdatedManiaBeatmapSSR();
+                    // clearOutdatedManiaBeatmapSunnySR();
                     // clearOutdatedManiaBeatmapMSD();
 
                     // Run Ez Realm backfill before official star population so it is not blocked for long periods.
@@ -640,19 +640,19 @@ namespace osu.Game.Database
         }
 
         /// <summary>
-        /// Check whether the databased xxy calculation version matches the latest ruleset provided version.
-        /// If it doesn't, clear out existing xxy values so they can be incrementally recalculated.
+        /// Check whether the databased ssrcalculation version matches the latest ruleset provided version.
+        /// If it doesn't, clear out existing ssrvalues so they can be incrementally recalculated.
         /// </summary>
-        private void clearOutdatedManiaBeatmapSSR()
+        private void clearOutdatedManiaBeatmapSunnySR()
         {
             foreach (var ruleset in rulesetStore.AvailableRulesets)
             {
                 if (!EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(ruleset, out int currentVersion))
                     continue;
 
-                if (ruleset.LastAppliedSSRVersion < currentVersion)
+                if (ruleset.LastAppliedSunnySRVersion < currentVersion)
                 {
-                    Logger.Log($"Resetting SunnyStarRatings for {ruleset.Name} (xxy SR version updated from {ruleset.LastAppliedSSRVersion} to {currentVersion})");
+                    Logger.Log($"Resetting SunnyStarRatings for {ruleset.Name} (SunnySR version updated from {ruleset.LastAppliedSunnySRVersion} to {currentVersion})");
 
                     int countReset = 0;
 
@@ -668,22 +668,22 @@ namespace osu.Game.Database
                             }
                         }
 
-                        r.Find<RulesetInfo>(ruleset.ShortName)!.LastAppliedSSRVersion = currentVersion;
+                        r.Find<RulesetInfo>(ruleset.ShortName)!.LastAppliedSunnySRVersion = currentVersion;
                     });
 
-                    // Mania ChartDan is read off xxy SR (the 4K Sunny intervals lookup), so a new xxy
+                    // Mania ChartDan is read off SunnySR (the 4K Sunny intervals lookup), so a new ssr
                     // version retires those rows. Unlike the MSD chain, the chart-chain revisions do not
-                    // fold the xxy version in (xxy lives on BeatmapInfo and this ruleset scalar), so the
+                    // fold the ssrversion in (ssrlives on BeatmapInfo and this ruleset scalar), so the
                     // stale rows have to be dropped explicitly - otherwise the incremental ChartDan pass
                     // keeps skipping hashes that already have a row.
                     if (ruleset.OnlineID == 3)
                     {
-                        Logger.Log($"Resetting mania ChartDan for xxy version {ruleset.LastAppliedSSRVersion} -> {currentVersion}");
+                        Logger.Log($"Resetting mania ChartDan for ssrversion {ruleset.LastAppliedSunnySRVersion} -> {currentVersion}");
                         // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
                         // skillStore.ClearChartDan();
                     }
 
-                    Logger.Log($"Finished resetting {countReset} beatmaps for xxy {ruleset.Name}");
+                    Logger.Log($"Finished resetting {countReset} beatmaps for ssr{ruleset.Name}");
                 }
             }
         }
@@ -735,7 +735,7 @@ namespace osu.Game.Database
         {
             EzStartupTrace.Log($"BDSP EzRealm backfill begin scope={scope}");
 
-            if (scope.HasFlag(EzRealmMetadataScope.SSR))
+            if (scope.HasFlag(EzRealmMetadataScope.SunnySR))
                 populateMissingSunnyStarRatings();
 
             if (scope.HasFlag(EzRealmMetadataScope.PP))
@@ -813,7 +813,7 @@ namespace osu.Game.Database
             }
 
             bool clearBeatmapInfoFields = scope.HasFlag(EzRealmMetadataScope.Tags)
-                                          || scope.HasFlag(EzRealmMetadataScope.SSR)
+                                          || scope.HasFlag(EzRealmMetadataScope.SunnySR)
                                           || scope.HasFlag(EzRealmMetadataScope.PP);
 
             if (!clearBeatmapInfoFields)
@@ -862,7 +862,7 @@ namespace osu.Game.Database
                             beatmap.HasStoryboard = null;
                         }
 
-                        // Third-party / unavailable rulesets: keep persisted xxy/pp until the assembly is loadable again.
+                        // Third-party / unavailable rulesets: keep persisted ssr/pp until the assembly is loadable again.
                         if (!EzSunnyStarRatingSupport.IsRulesetAvailable(beatmap.Ruleset))
                         {
                             totalProcessed++;
@@ -873,7 +873,7 @@ namespace osu.Game.Database
                         // if (scope.HasFlag(EzRealmMetadataScope.PP))
                         //     EzRatingWriter.WritePP(beatmap, EzRatingSystem.Official, -1);
                         //
-                        // if (scope.HasFlag(EzRealmMetadataScope.SSR) && EzSunnyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
+                        // if (scope.HasFlag(EzRealmMetadataScope.SunnySR) && EzSunnyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
                         //     EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Sunny, -1);
 
                         totalProcessed++;
@@ -973,14 +973,14 @@ namespace osu.Game.Database
         }
 
         /// <summary>
-        /// Incrementally backfill missing baseline xxy star ratings on <see cref="BeatmapInfo"/>.
+        /// Incrementally backfill missing baseline SunnyStarRatings on <see cref="BeatmapInfo"/>.
         /// Behaviour intentionally mirrors <see cref="populateMissingStarRatings"/>: beatmap-level query, beatmap-level compute and write.
         /// </summary>
         private void populateMissingSunnyStarRatings()
         {
             HashSet<Guid> beatmapIds = new HashSet<Guid>();
 
-            Logger.Log("Querying for beatmaps with missing xxy star ratings...");
+            Logger.Log("Querying for beatmaps with missing SunnyStarRatings...");
 
             realmAccess.Run(r =>
             {
@@ -1002,9 +1002,9 @@ namespace osu.Game.Database
             if (beatmapIds.Count == 0)
                 return;
 
-            Logger.Log($"Found {beatmapIds.Count} beatmaps which require xxy star rating reprocessing.");
+            Logger.Log($"Found {beatmapIds.Count} beatmaps which require SunnyStarRating reprocessing.");
 
-            var notification = showProgressNotification(beatmapIds.Count, "Reprocessing xxy star rating for beatmaps", "beatmaps' xxy star ratings have been updated");
+            var notification = showProgressNotification(beatmapIds.Count, "Reprocessing SunnyStarRating for beatmaps", "beatmaps' SunnyStarRatings have been updated");
 
             int processedCount = 0;
             int failedCount = 0;
@@ -1028,7 +1028,7 @@ namespace osu.Game.Database
 
                 try
                 {
-                    double ssr = EzAnalysisComputation.ComputeBaselineSSRForRealm(beatmapManager, beatmap, CancellationToken.None);
+                    double ssr = EzAnalysisComputation.ComputeBaselineSunnySRForRealm(beatmapManager, beatmap, CancellationToken.None);
 
                     // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
                     /*
@@ -1043,7 +1043,7 @@ namespace osu.Game.Database
                 }
                 catch (Exception e)
                 {
-                    Logger.Log($"Background xxy processing failed on {beatmap}: {e}");
+                    Logger.Log($"Background ssrprocessing failed on {beatmap}: {e}");
                     ++failedCount;
                 }
             }
@@ -1360,7 +1360,7 @@ namespace osu.Game.Database
         /// <summary>
         /// Backfill Ez Realm tag columns on <see cref="BeatmapInfo"/> (baseline HasVideo/HasStoryboard).
         /// This method is intentionally separated from <see cref="BeatmapUpdater.Process"/> so we don't accidentally
-        /// recompute unrelated fields (star / xxy / pp) during PP/xxy backfills.
+        /// recompute unrelated fields (star / ssr/ pp) during PP/ssrbackfills.
         /// </summary>
         private void populateMissingBeatmapTagFlags()
         {

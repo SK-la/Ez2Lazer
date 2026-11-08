@@ -109,7 +109,7 @@ namespace osu.Game.Beatmaps
             if (beatmapManager == null)
                 return;
 
-            EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Sunny, EzAnalysisComputation.ComputeBaselineSSRForRealm(beatmapManager, beatmap));
+            EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Sunny, EzAnalysisComputation.ComputeBaselineSunnySRForRealm(beatmapManager, beatmap));
         }
 
         private void updatePerformancePoints(BeatmapInfo beatmap, WorkingBeatmap working)

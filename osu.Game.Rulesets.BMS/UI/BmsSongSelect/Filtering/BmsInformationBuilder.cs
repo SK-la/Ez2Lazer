@@ -57,8 +57,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
                 if (record.MaxKps is > 0)
                     peakDensity = record.MaxKps.Value;
 
-                if (record.SSR is > 0 && endDensity <= density * 0.85)
-                    endDensity = record.SSR.Value;
+                if (record.SunnySR is > 0 && endDensity <= density * 0.85)
+                    endDensity = record.SunnySR.Value;
             }
 
             return new BmsInformationRow(

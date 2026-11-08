@@ -14,7 +14,7 @@ namespace osu.Game.EzOsuGame.HUD
         [Description("Chart")]
         Chart,
 
-        /// <summary>Player SSR / dan only (radar secondary / green layer).</summary>
+        /// <summary>Player SunnySR / dan only (radar secondary / green layer).</summary>
         [Description("Player")]
         Player,
 

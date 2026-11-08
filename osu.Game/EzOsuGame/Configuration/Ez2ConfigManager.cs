@@ -184,7 +184,7 @@ namespace osu.Game.EzOsuGame.Configuration
             // Ez 技能：默认与 EzDanAlgorithm.LN_CHART_MIN_HOLD_OBJECTS 一致。
             SetDefault(Ez2Setting.SkillLnChartMinHoldObjects, 150, 0, 1000);
 
-            // SSR 计算的两个系数。默认值就是落库所用的值；改动属于用户对算法的永久修订，不触发版本换代。
+            // SunnySR 计算的两个系数。默认值就是落库所用的值；改动属于用户对算法的永久修订，不触发版本换代。
             SetDefault(Ez2Setting.SsrRescaleThreshold, 8.0, 6.0, 10.0, 1.0);
             SetDefault(Ez2Setting.SsrLnMultiplier, 5.5, 2.0, 8.0, 0.5);
 
@@ -988,7 +988,7 @@ namespace osu.Game.EzOsuGame.Configuration
         UpdateFrameLimiter,
 
         /// <summary>
-        /// 选歌时是否对 Ez SQLite 体系内指标（主库 kps/KPC、有 Mod 时的 kps/xxy 等）做即时计算；关闭则只读已落盘数据。
+        /// 选歌时是否对 Ez SQLite 体系内指标（主库 kps/KPC、有 Mod 时的 kps/ssr等）做即时计算；关闭则只读已落盘数据。
         /// 分支库快照仍只读；PP 显示应对齐官方 Star 缓存，不由本开关控制。
         /// </summary>
         EzAnalysisRecEnabled,
@@ -999,7 +999,7 @@ namespace osu.Game.EzOsuGame.Configuration
         EzAnalysisSqliteEnabled,
 
         /// <summary>
-        /// SSR（xxy 难度）计算里超过多少星后开始压缩膨胀。原项目默认为 9，Ez 一直用 8。
+        /// SunnySR（ssr难度）计算里超过多少星后开始压缩膨胀。原项目默认为 9，Ez 一直用 8。
         /// <para>
         /// 这是用户对算法的永久修订，不是一次性试验：改它不触发任何版本换代，只影响此后算出的值与落库结果。
         /// </para>
@@ -1007,7 +1007,7 @@ namespace osu.Game.EzOsuGame.Configuration
         SsrRescaleThreshold,
 
         /// <summary>
-        /// SSR 计算里的 LN 积分倍率，决定长条的难度权重。原项目默认为 6，Ez 一直用 5.5。
+        /// SunnySR 计算里的 LN 积分倍率，决定长条的难度权重。原项目默认为 6，Ez 一直用 5.5。
         /// <para>
         /// 与 <see cref="SsrRescaleThreshold"/> 同样是永久修订：改动不换代，只影响此后的计算与落库。
         /// </para>

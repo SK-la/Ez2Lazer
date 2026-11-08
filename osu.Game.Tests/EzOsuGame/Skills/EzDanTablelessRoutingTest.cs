@@ -9,7 +9,7 @@ using osu.Game.EzOsuGame.Skills.Mina;
 namespace osu.Game.Tests.EzOsuGame.Skills
 {
     /// <summary>
-    /// 5K / 8K–18K have no community xxy→dan table of their own, so their chart dan borrows the
+    /// 5K / 8K–18K have no community ssr→dan table of their own, so their chart dan borrows the
     /// 4K interval table on the same side (<see cref="EzDanLabels.TryResolveFallbackDan"/>) instead
     /// of running the 4K-calibrated MSD means table, which inflated those keymodes.
     /// </summary>
@@ -30,7 +30,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [TestCase(7)]
         public void KeymodesWithTheirOwnTableKeepTheMsdMeansFallback(int keyCount)
         {
-            Assert.That(EzDanLabels.HasXxyDanTable(keyCount), Is.True);
+            Assert.That(EzDanLabels.HasSunnySRDanTable(keyCount), Is.True);
 
             var resolved = EzDanLabels.TryResolveFallbackDan(keyCount, EzDanSide.Rc, overallMsd: 20, EzMinaSkillAxis.Stream, sunnySR: null);
 
@@ -46,7 +46,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [TestCase(18)]
         public void TablelessKeymodesBorrowThe4KIntervalTable(int keyCount)
         {
-            Assert.That(EzDanLabels.HasXxyDanTable(keyCount), Is.False);
+            Assert.That(EzDanLabels.HasSunnySRDanTable(keyCount), Is.False);
             Assert.That(EzSunnyDanIntervals.TryLookup(4, EzDanSide.Rc.ToId(), 6.0, out var fourK), Is.True);
 
             var resolved = EzDanLabels.TryResolveFallbackDan(keyCount, EzDanSide.Rc, overallMsd: 20, EzMinaSkillAxis.Stream, sunnySR: 6.0);
@@ -125,7 +125,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         public void PersistedChartDanWithoutStarRatingKeepsOnlyTheAxisMean()
         {
             var computed = EzPersistedChartDan.TryComputeFromStored(
-                "tableless-8k-noxxy",
+                "tableless-8k-nossr",
                 System.Guid.NewGuid(),
                 msd(20),
                 keyCount: 8,

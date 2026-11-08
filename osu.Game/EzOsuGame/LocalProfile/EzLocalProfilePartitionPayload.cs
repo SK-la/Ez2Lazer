@@ -24,7 +24,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public List<PartitionManiaColumnStats> ManiaColumnStats { get; set; } = new List<PartitionManiaColumnStats>();
         public List<PartitionGradeCount> GradeCounts { get; set; } = new List<PartitionGradeCount>();
         public List<PartitionStarPlayCount> StarPlayCounts { get; set; } = new List<PartitionStarPlayCount>();
-        public List<PartitionXxyPlayCount> XxyPlayCounts { get; set; } = new List<PartitionXxyPlayCount>();
+        public List<PartitionSunnySRPlayCount> SunnySRPlayCounts { get; set; } = new List<PartitionSunnySRPlayCount>();
         public List<PartitionStdAttrAffinity> StdAttrAffinities { get; set; } = new List<PartitionStdAttrAffinity>();
 
         /// <summary>
@@ -92,8 +92,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
             foreach (var ((rulesetId, starBucket), count) in result.StarPlayCounts)
                 payload.StarPlayCounts.Add(new PartitionStarPlayCount { RulesetId = rulesetId, StarBucket = starBucket, Count = count });
 
-            foreach (var ((rulesetId, starBucket), count) in result.XxyPlayCounts)
-                payload.XxyPlayCounts.Add(new PartitionXxyPlayCount { RulesetId = rulesetId, StarBucket = starBucket, Count = count });
+            foreach (var ((rulesetId, starBucket), count) in result.SunnySRPlayCounts)
+                payload.SunnySRPlayCounts.Add(new PartitionSunnySRPlayCount { RulesetId = rulesetId, StarBucket = starBucket, Count = count });
 
             foreach (var ((attr, value), stats) in result.StdAttrAffinities)
             {
@@ -173,11 +173,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 target.StarPlayCounts[key] = existing + row.Count;
             }
 
-            foreach (var row in XxyPlayCounts)
+            foreach (var row in SunnySRPlayCounts)
             {
                 var key = (row.RulesetId, row.StarBucket);
-                target.XxyPlayCounts.TryGetValue(key, out int existing);
-                target.XxyPlayCounts[key] = existing + row.Count;
+                target.SunnySRPlayCounts.TryGetValue(key, out int existing);
+                target.SunnySRPlayCounts[key] = existing + row.Count;
             }
 
             foreach (var row in StdAttrAffinities)
@@ -251,7 +251,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public int Count { get; set; }
     }
 
-    public sealed class PartitionXxyPlayCount
+    public sealed class PartitionSunnySRPlayCount
     {
         public int RulesetId { get; set; }
         public int StarBucket { get; set; }

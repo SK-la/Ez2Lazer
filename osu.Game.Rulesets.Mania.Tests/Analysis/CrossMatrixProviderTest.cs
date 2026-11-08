@@ -209,7 +209,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
 
         #endregion
 
-        #region xxy SR 集成
+        #region SunnySR 集成
 
         [Test]
         public void IsPatternSupported_AllSupportedKeyCounts_ReturnsTrue()

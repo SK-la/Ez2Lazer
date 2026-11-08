@@ -45,8 +45,8 @@ namespace osu.Game.EzOsuGame.HUD
         [Description("Key Pattern")]
         KeyPattern,
 
-        [Description("SSR Skill")]
-        SSRSkill,
+        [Description("SunnySR Skill")]
+        SunnySRSkill,
 
         [Description("Skill Dual")]
         MSDSkillDual,
@@ -98,7 +98,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         public float MaxKeyPatternScore { get; } = 10f;
 
-        public float MaxSSR { get; } = 10f;
+        public float MaxSunnySR { get; } = 10f;
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_DISPLAY_MODE), nameof(EzHUDStrings.RADAR_DISPLAY_MODE_TOOLTIP))]
         public Bindable<EzRadarDisplayMode> RadarDisplayMode { get; } = new Bindable<EzRadarDisplayMode>();
@@ -132,7 +132,7 @@ namespace osu.Game.EzOsuGame.HUD
             SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 PlayerDataAreaColour { get; } = new BindableColour4(new Color4(133, 196, 108, 128));
 
-        /// <summary>Target player for Skill-mode SSR overlay. Externally bindable (e.g. EzAnalysis header).</summary>
+        /// <summary>Target player for Skill-mode SunnySR overlay. Externally bindable (e.g. EzAnalysis header).</summary>
         public Bindable<string?> TargetUsername { get; } = new Bindable<string?>();
 
         public int AxisCount
@@ -860,20 +860,20 @@ namespace osu.Game.EzOsuGame.HUD
 
         private IReadOnlyList<float> getGeneralAxisMaxValues() => new[] { MaxBpm, MaxStar, MaxCs, MaxOd, MaxDr, MaxAr };
 
-        private IReadOnlyList<float> getRulesetSpecificAxisMaxValues() => RadarDisplayMode.Value == EzRadarDisplayMode.SSRSkill
-            ? new[] { MaxSSR, MaxSSR, MaxSSR, MaxSSR, MaxSSR, MaxSSR }
+        private IReadOnlyList<float> getRulesetSpecificAxisMaxValues() => RadarDisplayMode.Value == EzRadarDisplayMode.SunnySRSkill
+            ? new[] { MaxSunnySR, MaxSunnySR, MaxSunnySR, MaxSunnySR, MaxSunnySR, MaxSunnySR }
             : UseAbsoluteValue.Value
-                ? new[] { MaxSSR, MaxSSR, long_note_ratio_max, MaxSSR, MaxSSR, MaxSSR }
+                ? new[] { MaxSunnySR, MaxSunnySR, long_note_ratio_max, MaxSunnySR, MaxSunnySR, MaxSunnySR }
                 : new[] { MaxKeyPatternScore, MaxKeyPatternScore, long_note_ratio_max, MaxKeyPatternScore, MaxKeyPatternScore, MaxKeyPatternScore };
 
         private EzRadarChartData<string> createDisplayedRulesetRadarData(EzRulesetSpecificRadarResult radarResult)
         {
             EzRadarChartData<string> sourceRadarData = getSelectedRulesetSpecificRadarData(radarResult);
 
-            if (RadarDisplayMode.Value == EzRadarDisplayMode.SSRSkill)
+            if (RadarDisplayMode.Value == EzRadarDisplayMode.SunnySRSkill)
                 return sourceRadarData;
 
-            if (!UseAbsoluteValue.Value || radarResult.SSR is not double sunnySR || sunnySR <= 0)
+            if (!UseAbsoluteValue.Value || radarResult.SunnySR is not double sunnySR || sunnySR <= 0)
                 return sourceRadarData;
 
             bool preserveLongNotePercentage = RadarDisplayMode.Value == EzRadarDisplayMode.KeyPattern;
@@ -897,7 +897,7 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         private EzRadarChartData<string> getSelectedRulesetSpecificRadarData(EzRulesetSpecificRadarResult radarResult)
-            => RadarDisplayMode.Value == EzRadarDisplayMode.SSRSkill ? radarResult.SSRPatternRadarData : radarResult.KeyPatternRadarData;
+            => RadarDisplayMode.Value == EzRadarDisplayMode.SunnySRSkill ? radarResult.SunnySRPatternRadarData : radarResult.KeyPatternRadarData;
 
         private void clearChartData()
         {

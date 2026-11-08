@@ -166,9 +166,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 }
             };
 
-            bool showXxy = row.RulesetId == EzLocalProfileConstants.MANIA_RULESET_ID && row.SunnyStarRating >= 0;
+            bool showSunnySR = row.RulesetId == EzLocalProfileConstants.MANIA_RULESET_ID && row.SunnyStarRating >= 0;
 
-            if (showXxy)
+            if (showSunnySR)
             {
                 starFlow.Add(new EzDisplaySR(row.ReadManiaSummary(), StarRatingDisplaySize.Small)
                 {

@@ -122,7 +122,7 @@ namespace osu.Game.Database
         /// Ez v3: Add BeatmapInfo.SunnyStarRating.
         /// Ez v4: Add BeatmapInfo.PerformancePoints.
         /// Ez v5: Change BeatmapInfo.HasVideo/HasStoryboard to nullable (null = unknown).
-        /// Ez v6: Add RulesetInfo.LastAppliedSSRVersion.
+        /// Ez v6: Add RulesetInfo.LastAppliedSunnySRVersion.
         /// Ez v7: Normalize BeatmapSetInfo external hosting paths.
         /// Ez v8: Add mania skill RealmObjects (EzBeatmapSkillValue, EzPlayerSkillValue, EzDanEstimate,
         /// EzPlayerSkillHistoryPoint) with extended dan/provisional fields; RulesetInfo.LastAppliedManiaSkillVersion.
@@ -1594,7 +1594,7 @@ namespace osu.Game.Database
 
                 case 6:
                     foreach (var ruleset in migration.NewRealm.All<RulesetInfo>())
-                        ruleset.LastAppliedSSRVersion = 0;
+                        ruleset.LastAppliedSunnySRVersion = 0;
 
                     break;
 
@@ -1672,10 +1672,10 @@ namespace osu.Game.Database
                     // SunnyStarRating，现在又归到 EzRatingData.SunnySR，所以这一版一并把它搬过去。
                     string beatmapClassName = getMappedOrOriginalName(typeof(BeatmapInfo));
 
-                    bool hasLegacyXxy = migration.OldRealm.Schema.TryFindObjectSchema(beatmapClassName, out var beatmapSchema)
+                    bool hasLegacySunnySR = migration.OldRealm.Schema.TryFindObjectSchema(beatmapClassName, out var beatmapSchema)
                                         && beatmapSchema.Any(p => p.Name == "SunnyStarRating");
 
-                    dynamic? oldBeatmaps = hasLegacyXxy ? migration.OldRealm.DynamicApi.All(beatmapClassName) : null;
+                    dynamic? oldBeatmaps = hasLegacySunnySR ? migration.OldRealm.DynamicApi.All(beatmapClassName) : null;
                     var newBeatmaps = migration.NewRealm.All<BeatmapInfo>().ToList();
 
                     for (int i = 0; i < newBeatmaps.Count; i++)

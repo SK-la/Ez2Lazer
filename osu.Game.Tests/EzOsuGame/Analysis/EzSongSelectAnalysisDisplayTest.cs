@@ -75,7 +75,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, default(EzAnalysisResult), Array.Empty<Mod>());
 
             Assert.That(metrics.KpsList, Is.Empty);
-            Assert.That(metrics.ManiaSummary?.SSR, Is.EqualTo(12.5), "the stored baseline answers for an unfinished pass");
+            Assert.That(metrics.ManiaSummary?.SunnySR, Is.EqualTo(12.5), "the stored baseline answers for an unfinished pass");
         }
 
         [Test]

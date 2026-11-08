@@ -20,7 +20,7 @@ namespace osu.Game.EzOsuGame.UserInterface
     {
         public StarRatingDisplay Official { get; }
 
-        public EzDisplaySR Xxy { get; }
+        public EzDisplaySR SunnySR{ get; }
 
         public EzDisplayPP Performance { get; }
 
@@ -37,7 +37,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 Scale = new Vector2(scale),
             };
 
-            Xxy = new EzDisplaySR(EzManiaSummary.EMPTY, size, animated)
+            SunnySR = new EzDisplaySR(EzManiaSummary.EMPTY, size, animated)
             {
                 Anchor = Anchor.CentreLeft,
                 Origin = Anchor.CentreLeft,
@@ -54,11 +54,11 @@ namespace osu.Game.EzOsuGame.UserInterface
             Children = new Drawable[]
             {
                 Official,
-                Xxy,
+                SunnySR,
                 Performance,
             };
 
-            Xxy.Hide();
+            SunnySR.Hide();
             Performance.Hide();
         }
 
@@ -69,14 +69,14 @@ namespace osu.Game.EzOsuGame.UserInterface
         /// </summary>
         public void UpdateFromBeatmap(BeatmapInfo beatmap)
         {
-            if (!ShouldShowXxyDisplay(beatmap))
+            if (!ShouldShowSunnySRDisplay(beatmap))
             {
-                ResetXxy();
+                ResetSunnySR();
                 return;
             }
 
-            Xxy.Show();
-            Xxy.Current.Value = beatmap.ToEzManiaSummaryForDisplay();
+            SunnySR.Show();
+            SunnySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay();
         }
 
         /// <summary>
@@ -84,24 +84,24 @@ namespace osu.Game.EzOsuGame.UserInterface
         /// </summary>
         public void ApplyAnalysisMetrics(BeatmapInfo beatmap, in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
         {
-            if (!ShouldShowXxyDisplay(beatmap))
+            if (!ShouldShowSunnySRDisplay(beatmap))
             {
-                ResetXxy();
+                ResetSunnySR();
                 return;
             }
 
-            Xxy.Show();
+            SunnySR.Show();
 
             var summaryForDisplay = metrics.ManiaSummary ?? beatmap.ToEzManiaSummaryForDisplay();
 
-            if (Xxy.Current.Value.SSR != summaryForDisplay.SSR)
-                Xxy.Current.Value = summaryForDisplay;
+            if (SunnySR.Current.Value.SunnySR != summaryForDisplay.SunnySR)
+                SunnySR.Current.Value = summaryForDisplay;
         }
 
-        public void ResetXxy()
+        public void ResetSunnySR()
         {
-            Xxy.Current.Value = EzManiaSummary.EMPTY;
-            Xxy.Hide();
+            SunnySR.Current.Value = EzManiaSummary.EMPTY;
+            SunnySR.Hide();
         }
 
         /// <summary>
@@ -124,7 +124,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         /// Whether this chart has an Ez star to show beside the official one. Any ruleset whose selected system
         /// carries a skill vector does; the analysis provider only decides the Sunny rating, not the pill's presence.
         /// </summary>
-        public static bool ShouldShowXxyDisplay(BeatmapInfo beatmap)
+        public static bool ShouldShowSunnySRDisplay(BeatmapInfo beatmap)
             => EzMetricVariantReadout.Selected(beatmap.Ruleset.OnlineID)?.ChartSkillProducer != null;
     }
 }

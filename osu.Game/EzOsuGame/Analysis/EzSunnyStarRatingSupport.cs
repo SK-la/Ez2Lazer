@@ -15,18 +15,18 @@ namespace osu.Game.EzOsuGame.Analysis
         public static bool IsRulesetAvailable(IRulesetInfo? rulesetInfo) => rulesetInfo is RulesetInfo { Available: true };
 
         /// <summary>
-        /// Whether the ruleset exposes xxy SR calculation (via <see cref="IEzSunnyStarRatingSupport"/>).
+        /// Whether the ruleset exposes SunnySR calculation (via <see cref="IEzSunnyStarRatingSupport"/>).
         /// </summary>
         public static bool SupportsRuleset(IRulesetInfo? rulesetInfo) => IsRulesetAvailable(rulesetInfo) && tryGetSupport(rulesetInfo!, out _);
 
         /// <summary>
-        /// Whether baseline xxy SR can be calculated for this beatmap under the given ruleset.
+        /// Whether baseline SunnySR can be calculated for this beatmap under the given ruleset.
         /// </summary>
         public static bool SupportsBeatmap(IBeatmap beatmap, IRulesetInfo rulesetInfo)
             => IsRulesetAvailable(rulesetInfo) && tryGetSupport(rulesetInfo, out var support) && support.SupportsSunnyStarRating(beatmap);
 
         /// <summary>
-        /// yyyyMMdd xxy SR algorithm version for the ruleset, if it implements <see cref="IEzSunnyStarRatingSupport"/>.
+        /// yyyyMMdd SunnySR algorithm version for the ruleset, if it implements <see cref="IEzSunnyStarRatingSupport"/>.
         /// </summary>
         public static bool TryGetSunnyStarRatingVersion(IRulesetInfo rulesetInfo, out int version)
         {
@@ -46,10 +46,10 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!EzAnalysisProviderBridge.TryCreateProvider(rulesetInfo, out IEzAnalysisProvider provider))
                 return false;
 
-            if (provider is not IEzSunnyStarRatingSupport xxySupport)
+            if (provider is not IEzSunnyStarRatingSupport ssrSupport)
                 return false;
 
-            support = xxySupport;
+            support = ssrSupport;
             return true;
         }
     }

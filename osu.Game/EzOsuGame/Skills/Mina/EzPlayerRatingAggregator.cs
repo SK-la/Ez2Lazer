@@ -19,7 +19,7 @@ using osu.Game.Scoring;
 namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
-    /// Aggregates per-play SSR vectors into independent player skills (Etterna AggregateSSRs).
+    /// Aggregates per-play SunnySR vectors into independent player skills (Etterna AggregateSunnySRs).
     /// Goal via <see cref="EzMinaRatingGoal"/> (Wife subset when statistics exist).
     /// </summary>
     public sealed class EzPlayerRatingAggregator
@@ -28,7 +28,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         public const int HISTORY_MAX_POINTS = 64;
 
         /// <summary>
-        /// Rolling play count for history AggregateSSRs (recent window so the curve can fall).
+        /// Rolling play count for history AggregateSunnySRs (recent window so the curve can fall).
         /// Career-prefix Aggregate is structurally monotonic.
         /// </summary>
         public const int HISTORY_ROLLING_PLAYS = 50;
@@ -93,7 +93,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
             var missingCharts = new HashSet<string>(StringComparer.Ordinal);
             var patternsByHash = new Dictionary<string, string[]>(StringComparer.Ordinal);
 
-            // Per-play SSR cache: an already-rated play skips the MinaCalc engine (incremental backfill, not full recompute).
+            // Per-play SunnySR cache: an already-rated play skips the MinaCalc engine (incremental backfill, not full recompute).
             // The caller can hand one in so a multi-player pass loads the table once instead of once per player.
             var cachedPlays = loadedPlayCache ?? profileStore?.LoadSsrPlayCache() ?? new Dictionary<Guid, EzMinaPlayCacheRow>();
             var pendingCacheWrites = new List<EzMinaPlayCacheRow>();
@@ -173,8 +173,8 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                             catch (EzMinaEngineException e)
                             {
                                 // A chart the engine cannot rate (e.g. a chord wider than its column
-                                // limit) simply contributes no SSR; the engine rebuilds itself for the next play.
-                                Logger.Log($"[EzSkills] SSR compute failed for {play.BeatmapHash} (keys={keyCount}): {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                                // limit) simply contributes no SunnySR; the engine rebuilds itself for the next play.
+                                Logger.Log($"[EzSkills] SunnySR compute failed for {play.BeatmapHash} (keys={keyCount}): {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                                 cacheNegative(play, username, keyCount, rate, pendingCacheWrites);
                                 continue;
                             }
@@ -230,7 +230,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                 var patternRatings = EzPatternRatings.AggregateModePatternRatings(
                     patternPlays.Select(static p => (p.Overall, p.Patterns)));
 
-                // One transaction for the keymode: the SSR values, the replaced history curve and the pattern
+                // One transaction for the keymode: the SunnySR values, the replaced history curve and the pattern
                 // ratings. Issued separately they were three transactions per keymode per player.
                 skillStore.WritePlayerSkillBundle(
                     username,
@@ -373,7 +373,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         }
 
         /// <summary>
-        /// Running AggregateSSRs over a rolling window of recent plays, timestamped with that play's
+        /// Running AggregateSunnySRs over a rolling window of recent plays, timestamped with that play's
         /// <see cref="ScoreInfo.Date"/>. Evenly samples up to <see cref="HISTORY_MAX_POINTS"/> points
         /// across the career (always includes first and last). Unlike a career-prefix Aggregate,
         /// values can fall when strong early plays leave the window.

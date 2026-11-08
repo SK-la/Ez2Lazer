@@ -34,7 +34,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         ChartDan = 1 << 2,
 
-        /// <summary>Player SSR vectors / pattern ratings (Local Profile). Not part of the chart chain.</summary>
+        /// <summary>Player SunnySR vectors / pattern ratings (Local Profile). Not part of the chart chain.</summary>
         SsrAggregation = 1 << 3,
 
         /// <summary>Player dan clears / dan estimate rows.</summary>

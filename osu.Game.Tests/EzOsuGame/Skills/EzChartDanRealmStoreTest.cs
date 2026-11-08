@@ -234,7 +234,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 var store = new EzChartSkillStore(realm);
                 const string hash = "chart-dan-unresolvable";
 
-                // 5K: not a 4/6/7K interval table, and no xxy star rating to borrow one from.
+                // 5K: not a 4/6/7K interval table, and no SunnyStarRating to borrow one from.
                 seedChart(realm, hash, circleSize: 5);
                 store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6));
 
