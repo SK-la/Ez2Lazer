@@ -12,7 +12,7 @@ using osu.Game.EzOsuGame.Skills.SkillTag;
 namespace osu.Game.EzOsuGame.Skills.SSR
 {
     /// <summary>
-    /// Runs the SSR system for one chart: gate, shared conversion, engine, store.
+    /// Runs the SSR system for one chart: gate, one conversion, engine, store.
     /// </summary>
     /// <remarks>
     /// The rating math lives in <see cref="EzSSREngine"/>, in this assembly alongside the other systems. This type
@@ -47,6 +47,18 @@ namespace osu.Game.EzOsuGame.Skills.SSR
         public int Revision => VERSION;
 
         /// <summary>
+        /// Binding scope of the single conversion a rating pass owns.
+        /// </summary>
+        /// <remarks>
+        /// The baseline pp binds judgements onto the chart, so the shared entry cannot be used: it is read-only by
+        /// contract. A scope of its own keeps that one conversion for the star and for the pp, and keeps it away from
+        /// the JudgeMode-scoped simulation instances. Distinct from
+        /// <see cref="Scoring.EzScoreRacePlayableResolver.SESSION_READY_SCOPE"/> (1000) and the Osu simulation band
+        /// (2000+); the Mania simulation band is JudgeMode + 1.
+        /// </remarks>
+        private const int BINDING_SCOPE = 3000;
+
+        /// <summary>
         /// Rates one chart and writes its star and pp. Returns false when the chart could not be loaded, so a later
         /// pass retries it.
         /// </summary>
@@ -61,7 +73,10 @@ namespace osu.Game.EzOsuGame.Skills.SSR
 
             try
             {
-                playable = EzPlayableBeatmapCache.GetShared(beatmapManager.GetWorkingBeatmap(beatmapInfo), beatmapInfo.Ruleset);
+                // A default token stays null (no bound of its own) so the conversion keeps WorkingBeatmap's own
+                // bounded wait, exactly as the shared lookup did.
+                playable = EzPlayableBeatmapCache.GetBound(beatmapManager.GetWorkingBeatmap(beatmapInfo), beatmapInfo.Ruleset, null,
+                    BINDING_SCOPE, static _ => { }, cancellationToken == CancellationToken.None ? null : cancellationToken);
             }
             catch (Exception e) when (e is not ObjectDisposedException)
             {
@@ -80,7 +95,8 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             if (!double.IsFinite(star) || star < 0)
                 return false;
 
-            double pp = EzAnalysisComputation.ComputeBaselineSunnyPerformancePointsForRealm(beatmapManager, beatmapInfo, cancellationToken);
+            // The same conversion the star was measured on: scoring the rating used to convert the chart a second time.
+            double pp = EzAnalysisComputation.ComputeBaselineSunnyPerformancePointsForRealm(beatmapManager, beatmapInfo, playable, cancellationToken);
             skillStore.WriteRating(beatmapInfo.ID, EzAnalysisSystem.SSR, star, pp >= 0 ? pp : null);
 
             return true;

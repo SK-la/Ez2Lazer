@@ -127,11 +127,36 @@ namespace osu.Game.EzOsuGame.Analysis
             var playable = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(beatmapInfo));
             IBeatmap analysisBeatmap = playable.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
-            if (analysisBeatmap.HitObjects.Count == 0)
+            return computeBaselinePerformancePoints(playable, analysisBeatmap, lookup, starRating, cancellationToken);
+        }
+
+        /// <summary>
+        /// Same value from a chart the caller already converted, so measuring a rating and scoring it do not convert
+        /// the chart twice.
+        /// </summary>
+        /// <remarks>
+        /// The caller's instance must be one it owns (a bound cache entry, not a shared one): scoring binds
+        /// judgements in place.
+        /// </remarks>
+        internal static double ComputeBaselinePerformancePointsForRating(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo, double starRating,
+                                                                          IBeatmap analysisBeatmap, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(analysisBeatmap);
+
+            if (!double.IsFinite(starRating) || starRating <= 0)
                 return -1;
 
-            return calculatePerformanceAtRating(playable, analysisBeatmap, lookup, starRating, cancellationToken);
+            var lookup = new EzAnalysisLookupCache(beatmapInfo, beatmapInfo.Ruleset, mods: null);
+            var playable = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(beatmapInfo), analysisBeatmap);
+
+            return computeBaselinePerformancePoints(playable, analysisBeatmap, lookup, starRating, cancellationToken);
         }
+
+        private static double computeBaselinePerformancePoints(PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap,
+                                                                in EzAnalysisLookupCache lookup, double starRating, CancellationToken cancellationToken)
+            => analysisBeatmap.HitObjects.Count == 0
+                ? -1
+                : calculatePerformanceAtRating(playable, analysisBeatmap, lookup, starRating, cancellationToken);
 
         /// <summary>
         /// Computes the baseline performance points implied by the stored Sunny star rating, for persisting to the
@@ -140,6 +165,13 @@ namespace osu.Game.EzOsuGame.Analysis
         public static double ComputeBaselineSunnyPerformancePointsForRealm(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo,
                                                                            CancellationToken cancellationToken = default)
             => ComputeBaselinePerformancePointsForRating(beatmapManager, beatmapInfo, beatmapInfo.EzRatingData.SunnySR, cancellationToken);
+
+        /// <summary>
+        /// Same value from an already-converted chart; see the <see cref="IBeatmap"/> overload above.
+        /// </summary>
+        internal static double ComputeBaselineSunnyPerformancePointsForRealm(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo,
+                                                                             IBeatmap analysisBeatmap, CancellationToken cancellationToken = default)
+            => ComputeBaselinePerformancePointsForRating(beatmapManager, beatmapInfo, beatmapInfo.EzRatingData.SunnySR, analysisBeatmap, cancellationToken);
 
         public static bool TryComputeSunnySRAndPp(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
                                                   out double? sunnySR, out double? pp)
@@ -795,6 +827,15 @@ namespace osu.Game.EzOsuGame.Analysis
             public PlayableCachedWorkingBeatmap(IWorkingBeatmap working)
             {
                 this.working = working;
+            }
+
+            /// <summary>
+            /// Seeds the cache with a chart the caller already converted; the wrapper then never converts again.
+            /// </summary>
+            public PlayableCachedWorkingBeatmap(IWorkingBeatmap working, IBeatmap playable)
+                : this(working)
+            {
+                this.playable = playable;
             }
 
             public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods) => playable ??= working.GetPlayableBeatmap(ruleset, mods);
