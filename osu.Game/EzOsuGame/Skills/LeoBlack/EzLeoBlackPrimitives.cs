@@ -17,23 +17,31 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
     }
 
     /// <summary>One primitive row between consecutive chart notes (hub <c>calculatePrimitives</c>).</summary>
+    /// <remarks>
+    /// Mutable so the matcher scan can reuse a bounded set of instances instead of building one per window. Nothing
+    /// outside the scan observes a primitive after the call that produced it, and no list here is ever mutated after
+    /// construction, which is what makes reuse safe.
+    /// </remarks>
     internal sealed class EzLeoBlackPrimitive
     {
-        public int Index { get; init; }
-        public double Time { get; init; }
-        public double MsPerBeat { get; init; }
-        public double BeatLength { get; init; }
-        public int Notes { get; init; }
-        public int Jacks { get; init; }
-        public EzLeoBlackDirection Direction { get; init; }
-        public bool Roll { get; init; }
-        public int Keys { get; init; }
-        public int LeftHandKeys { get; init; }
-        public List<int> LNHeads { get; init; } = [];
-        public List<int> LNBodies { get; init; } = [];
-        public List<int> LNTails { get; init; } = [];
-        public List<int> NormalNotes { get; init; } = [];
-        public List<int> RawNotes { get; init; } = [];
+        /// <summary>Shared empty column list. Never mutated, so a pooled instance may point at it.</summary>
+        public static readonly List<int> EMPTY_COLUMNS = [];
+
+        public int Index { get; set; }
+        public double Time { get; set; }
+        public double MsPerBeat { get; set; }
+        public double BeatLength { get; set; }
+        public int Notes { get; set; }
+        public int Jacks { get; set; }
+        public EzLeoBlackDirection Direction { get; set; }
+        public bool Roll { get; set; }
+        public int Keys { get; set; }
+        public int LeftHandKeys { get; set; }
+        public List<int> LNHeads { get; set; } = EMPTY_COLUMNS;
+        public List<int> LNBodies { get; set; } = EMPTY_COLUMNS;
+        public List<int> LNTails { get; set; } = EMPTY_COLUMNS;
+        public List<int> NormalNotes { get; set; } = EMPTY_COLUMNS;
+        public List<int> RawNotes { get; set; } = EMPTY_COLUMNS;
     }
 
     /// <summary>Hub <c>patterns/primitives.js</c>.</summary>

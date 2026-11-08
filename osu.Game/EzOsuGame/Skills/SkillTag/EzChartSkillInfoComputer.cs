@@ -190,6 +190,11 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             double maxEndTime = 0;
             int scanned = 0;
 
+            // Whether a consumer may rebuild another view of this chart from what is collected here. A dropped object
+            // (not a column object, a column outside the key count, a type the row builders treat differently) makes
+            // the extraction a filtered view, not the chart.
+            bool fullyRepresented = true;
+
             foreach (HitObject obj in playable.HitObjects)
             {
                 if ((scanned++ & 0xFF) == 0)
@@ -200,11 +205,18 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                 maxEndTime = Math.Max(maxEndTime, obj.GetEndTime());
 
                 if (obj is not IHasColumn columnObj)
+                {
+                    fullyRepresented = false;
                     continue;
+                }
 
                 int column = columnObj.Column;
+
                 if (column < 0 || column >= keyCount)
+                {
+                    fullyRepresented = false;
                     continue;
+                }
 
                 bool isHold = obj is IHasDuration duration && duration.Duration > 0;
                 double endTime = isHold && obj is IHasDuration d ? d.EndTime : obj.StartTime;
@@ -222,7 +234,11 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                     firstBeatLength = point.BeatLength;
 
                 if (point.BeatLength <= 0)
+                {
+                    // A non-positive timing point still shifts the effective beat length for the timing lookup.
+                    fullyRepresented = false;
                     continue;
+                }
 
                 timingPoints.Add(new EzManiaTimingPoint(point.Time, point.BeatLength));
                 if (bpm <= 0)
@@ -243,6 +259,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                 TotalLengthMs = totalLength,
                 Notes = notes,
                 TimingPoints = timingPoints,
+                FullyRepresented = fullyRepresented,
             };
         }
 

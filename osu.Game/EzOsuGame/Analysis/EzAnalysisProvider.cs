@@ -7,6 +7,7 @@ using System.Threading;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Rulesets;
 
 namespace osu.Game.EzOsuGame.Analysis
@@ -29,11 +30,17 @@ namespace osu.Game.EzOsuGame.Analysis
     /// When set, the provider rates performance as if this were the difficulty's star rating. Used to ask what a
     /// substituted rating (such as the Sunny one) would score, without re-deriving the difficulty.
     /// </param>
+    /// <param name="Chart">
+    /// The caller's already-extracted view of the chart, when it has one. A provider may use it only if
+    /// <see cref="EzManiaChartInput.FullyRepresented"/> is set; otherwise it must read the beatmap itself, because a
+    /// filtered view is not the chart.
+    /// </param>
     public readonly record struct EzAnalysisRequest(
         IBeatmap Beatmap,
         double ClockRate,
         EzAnalysisScope RequestedScopes = EzAnalysisScope.None,
-        double? StarRatingOverride = null);
+        double? StarRatingOverride = null,
+        EzManiaChartInput? Chart = null);
 
     public readonly record struct EzAnalysisField<TValue>(string Key, EzAnalysisScope Scope)
     {

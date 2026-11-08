@@ -257,18 +257,20 @@ namespace osu.Game.EzOsuGame.Analysis
             // Deriving them per consumer is what previously ran the Mina engine and the Sunny rating twice per pass.
             // The rating and the radar come from one provider call: the radar payload embeds the same rating, so
             // asking twice made the ruleset recompute its own difficulty core.
-            RadarAndXxy radarAndXxy;
-
-            using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Radar))
-                radarAndXxy = computeRadarAndXxy(lookup, analysisBeatmap, cancellationToken);
-
-            double? xxySr = radarAndXxy.XxySr;
-
-            // One note extraction serves the structure pass, the rating engine and the dan inputs below.
+            // One note extraction serves the structure pass, the rating engine, the dan inputs below and, when it is
+            // lossless, the radar's row view. It is taken first so the radar can share it instead of walking the
+            // beatmap a second time.
             EzChartMeasurements? measurements;
 
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Measurements))
-                measurements = columnRuleset ? EzChartMeasurements.FromPlayable(analysisBeatmap) : null;
+                measurements = columnRuleset ? EzChartMeasurements.FromPlayable(analysisBeatmap, cancellationToken) : null;
+
+            RadarAndXxy radarAndXxy;
+
+            using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Radar))
+                radarAndXxy = computeRadarAndXxy(lookup, analysisBeatmap, measurements?.Chart, cancellationToken);
+
+            double? xxySr = radarAndXxy.XxySr;
 
             MinaResult? mina;
 
@@ -609,14 +611,14 @@ namespace osu.Game.EzOsuGame.Analysis
         /// The radar payload already carries the rating the provider measured, so asking for the two scopes in
         /// separate calls ran the ruleset's difficulty core twice for the same chart and mods.
         /// </remarks>
-        private static RadarAndXxy computeRadarAndXxy(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, CancellationToken cancellationToken)
+        private static RadarAndXxy computeRadarAndXxy(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, EzManiaChartInput? chart, CancellationToken cancellationToken)
         {
             bool supportsXxy = EzSunnyStarRatingSupport.SupportsBeatmap(analysisBeatmap, lookup.Ruleset);
 
             var scopes = EzAnalysisScope.RulesetSpecificRadarData
                          | (supportsXxy ? EzAnalysisScope.XxySr : EzAnalysisScope.None);
 
-            var request = new EzAnalysisRequest(analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), scopes);
+            var request = new EzAnalysisRequest(analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), scopes, Chart: chart);
 
             if (!EzAnalysisProviderBridge.TryCompute(lookup.Ruleset, request, cancellationToken, out IEzAnalysis analysis))
                 return default;
