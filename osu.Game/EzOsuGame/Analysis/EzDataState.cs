@@ -8,10 +8,9 @@ using System.Linq;
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
-    /// One key's row state for one facet: the newest revision any of its rows carries, and whether a row at the
-    /// facet's current revision is the settled-miss stub rather than a result.
+    /// One key's row state for one facet: whether its rows are the settled-miss stub rather than a result.
     /// </summary>
-    public readonly record struct EzFacetRowState(int Revision, bool CurrentStub);
+    public readonly record struct EzFacetRowState(bool CurrentStub);
 
     /// <summary>
     /// One facet of an analysis store, declared as its identity plus the rows it holds - everything the generic
@@ -24,8 +23,14 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <summary>Stable key, also the label a report renders (<c>Mina</c>, <c>CSI</c>, <c>Dan</c>, ...).</summary>
         public required string Id { get; init; }
 
-        /// <summary>Revision a row must carry to count as current.</summary>
+        /// <summary>Revision the facet's producing system currently declares, for display.</summary>
         public required int CurrentRevision { get; init; }
+
+        /// <summary>
+        /// The system has not run at <see cref="CurrentRevision"/>, so none of its rows are usable: every key counts
+        /// as owed until the next pass covers the facet.
+        /// </summary>
+        public bool IsStale { get; init; }
 
         /// <summary>How many keys the facet is counted over - the store's candidate universe.</summary>
         public required int UniverseCount { get; init; }
@@ -58,14 +63,14 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <summary>Keys settled without a result - the facet's stub row, or an upstream facet settling them.</summary>
         public required int Settled { get; init; }
 
-        /// <summary>Keys whose newest row is from an older revision - an incremental pass will recompute them.</summary>
-        public required int Stale { get; init; }
-
         /// <summary>Keys with no row for this facet at all.</summary>
         public required int Missing { get; init; }
 
+        /// <summary>Whether the facet's system is out of date, which makes every key owed.</summary>
+        public bool IsStale { get; init; }
+
         /// <summary>Work the next incremental pass would pick up.</summary>
-        public int Pending => Stale + Missing;
+        public int Pending => Missing;
     }
 
     /// <summary>
@@ -79,10 +84,24 @@ namespace osu.Game.EzOsuGame.Analysis
             ArgumentNullException.ThrowIfNull(facet);
 
             var settledWithoutRow = toSet(facet.SettledWithoutRow);
+            int settledKeyless = settledWithoutRow?.Count(key => !facet.Rows.ContainsKey(key)) ?? 0;
+
+            // A system that has not run at its current revision holds no usable row: the whole facet is owed.
+            if (facet.IsStale)
+            {
+                return new EzFacetStatus
+                {
+                    Id = facet.Id,
+                    CurrentRevision = facet.CurrentRevision,
+                    Ready = 0,
+                    Settled = settledKeyless,
+                    Missing = Math.Max(0, facet.UniverseCount - settledKeyless),
+                    IsStale = true,
+                };
+            }
 
             int ready = 0;
             int settled = 0;
-            int stale = 0;
 
             foreach (var (key, row) in facet.Rows)
             {
@@ -94,19 +113,11 @@ namespace osu.Game.EzOsuGame.Analysis
                     continue;
                 }
 
-                if (row.Revision != facet.CurrentRevision)
-                {
-                    ++stale;
-                    continue;
-                }
-
                 if (row.CurrentStub)
                     ++settled;
                 else
                     ++ready;
             }
-
-            int settledKeyless = settledWithoutRow?.Count(key => !facet.Rows.ContainsKey(key)) ?? 0;
 
             return new EzFacetStatus
             {
@@ -114,7 +125,6 @@ namespace osu.Game.EzOsuGame.Analysis
                 CurrentRevision = facet.CurrentRevision,
                 Ready = ready,
                 Settled = settled + settledKeyless,
-                Stale = stale,
                 Missing = Math.Max(0, facet.UniverseCount - facet.Rows.Count - settledKeyless),
             };
         }
@@ -153,6 +163,6 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         public string Describe()
             => string.Join('\n', Facets.Select(static f
-                   => $"{f.Id} v{f.CurrentRevision}: ready {f.Ready}, settled {f.Settled}, stale {f.Stale}, missing {f.Missing}"));
+                => $"{f.Id} v{f.CurrentRevision}{(f.IsStale ? " (out of date)" : string.Empty)}: ready {f.Ready}, settled {f.Settled}, missing {f.Missing}"));
     }
 }

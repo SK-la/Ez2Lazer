@@ -5,9 +5,11 @@ using System;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.EzMania.Analysis;
 using osu.Game.Rulesets.Mania.Objects;
 
 namespace osu.Game.Tests.EzOsuGame.Analysis
@@ -157,7 +159,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             config.SetValue(Ez2Setting.SsrRescaleThreshold, threshold);
             config.SetValue(Ez2Setting.SsrLnMultiplier, lnMultiplier);
 
-            return EzSSREngine.CalculateSR(beatmap, 1.0);
+            return EzSSREngine.CalculateSR(EzCSIEngine.FromPlayable(beatmap), EzHoldMetrics.ResolveKeyCount(beatmap), beatmap.Difficulty.OverallDifficulty, 1.0);
         }
 
         private enum HoldMode

@@ -53,14 +53,14 @@ namespace osu.Game.EzOsuGame.Skills
         public IReadOnlyDictionary<string, double> GetPlayerSkills(string username, int keyCount, EzAnalysisSystem system, int? algorithmVersion = null, int rulesetOnlineId = -1)
         {
             string systemId = system.ToStorageId();
-            int version = algorithmVersion ?? EzAnalysisRevision.OfSystem(system);
+            int version = algorithmVersion ?? system.CurrentVersion();
 
             return database.Read(c => readValues(c, new SliceQuery(username, keyCount, systemId, version, rulesetOnlineId)));
         }
 
         /// <summary>PPP player rows written at the bundle revision of <paramref name="rulesetOnlineId"/>.</summary>
         public IReadOnlyDictionary<string, double> GetPlayerSkillsAtCurrentVersions(string username, int keyCount, EzAnalysisSystem system, int rulesetOnlineId)
-            => GetPlayerSkills(username, keyCount, system, EzAnalysisRevision.OfSystem(system), rulesetOnlineId);
+            => GetPlayerSkills(username, keyCount, system, system.CurrentVersion(), rulesetOnlineId);
 
         /// <summary>Row metadata for a player system slice (analyzed plays / provisional / stale).</summary>
         public (int AnalyzedPlays, bool Provisional, bool Stale) GetPlayerSystemSkillMeta(
@@ -167,7 +167,7 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentException.ThrowIfNullOrWhiteSpace(systemId);
             ArgumentNullException.ThrowIfNull(skills);
 
-            int version = algorithmVersion ?? EzAnalysisRevision.OfSystem(system);
+            int version = algorithmVersion ?? system.CurrentVersion();
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
 
             database.Write((c, tx) => replaceValues(c, tx, username, sliceKey, systemId, rulesetOnlineId,
@@ -780,6 +780,6 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         private static int resolvePlayerVersion(EzAnalysisSystem system, int? algorithmVersion, int rulesetOnlineId)
-            => algorithmVersion ?? EzAnalysisRevision.OfSystem(system);
+            => algorithmVersion ?? system.CurrentVersion();
     }
 }

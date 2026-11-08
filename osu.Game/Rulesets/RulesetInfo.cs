@@ -26,18 +26,6 @@ namespace osu.Game.Rulesets
         /// </summary>
         public int LastAppliedDifficultyVersion { get; set; }
 
-        /// <summary>
-        /// Stores the last applied SunnySR calculation version (yyyyMMdd, from <see cref="EzOsuGame.Analysis.IEzSunnyStarRatingSupport.SunnyStarRatingVersion"/>).
-        /// Used to invalidate persisted <see cref="Beatmaps.BeatmapInfo.EzRatingData"/>.
-        /// </summary>
-        public int LastAppliedSunnySRVersion { get; set; }
-
-        /// <summary>
-        /// Ez2Lazer: last applied mania skill algorithm version (<see cref="EzOsuGame.Skills.Mina.EzMinaEngine.VERSION"/>).
-        /// Used to invalidate <see cref="EzOsuGame.Skills.EzBeatmapSkillValue"/> / player SunnySR rows.
-        /// </summary>
-        public int LastAppliedManiaSkillVersion { get; set; }
-
         public RulesetInfo(string shortName, string name, string instantiationInfo, int onlineID)
         {
             ShortName = shortName;
@@ -104,8 +92,6 @@ namespace osu.Game.Rulesets
             InstantiationInfo = InstantiationInfo,
             Available = Available,
             LastAppliedDifficultyVersion = LastAppliedDifficultyVersion,
-            LastAppliedSunnySRVersion = LastAppliedSunnySRVersion,
-            LastAppliedManiaSkillVersion = LastAppliedManiaSkillVersion,
         };
 
         public Ruleset CreateInstance()

@@ -150,8 +150,10 @@ namespace osu.Game.EzOsuGame.Analysis
 
         // 常量化的表名与 meta key，避免在代码中散落硬编码字符串。
         private const string meta_key_requires_post_migration_refresh = "requires_post_migration_refresh";
-        private const string meta_key_sunny_sr_version = "sunny_sr_version";
-        private const string meta_key_pp_version = "pp_version";
+        // The system's declared id is the key, so the branch stamp and the Realm applied-version table answer the
+        // same question with the same vocabulary.
+        private static readonly string meta_key_sunny_sr_version = EzAnalysisSystem.SSR.ToStorageId();
+        private static readonly string meta_key_pp_version = EzAnalysisSystem.Official.ToStorageId();
         private const string meta_key_analysis_version = "analysis_version";
         private const string meta_key_kind = "kind";
         private const string meta_key_schema_version = "schema_version";

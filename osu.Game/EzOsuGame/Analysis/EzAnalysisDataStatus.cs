@@ -74,6 +74,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 return Array.Empty<EzRulesetAnalysisStatus>();
 
             var skillRows = readSkillRows(realm, chartsByRuleset);
+            var expired = readExpiredSystems(realm);
 
             var result = new List<EzRulesetAnalysisStatus>(chartsByRuleset.Count);
 
@@ -87,10 +88,10 @@ namespace osu.Game.EzOsuGame.Analysis
                 if (rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID)
                     facets.AddRange(chain.Facets.Select(EzDataStateChecker.Count));
 
-                if (pppFacetOf(rulesetId, charts, skillRows) is { } ppp)
+                if (pppFacetOf(rulesetId, charts, skillRows, expired.Contains(EzAnalysisSystem.PPP)) is { } ppp)
                     facets.Add(ppp);
 
-                facets.AddRange(ratingFacetsOf(rulesetId, charts));
+                facets.AddRange(ratingFacetsOf(rulesetId, charts, expired));
 
                 result.Add(new EzRulesetAnalysisStatus
                 {
@@ -110,16 +111,14 @@ namespace osu.Game.EzOsuGame.Analysis
 
         /// <summary>PP+ rows of one ruleset, counted against the axis set that ruleset's catalog declares.</summary>
         private static EzFacetStatus? pppFacetOf(
-            int rulesetOnlineId,
-            IReadOnlyList<BeatmapInfo> charts,
-            IReadOnlyDictionary<(string SystemId, int RulesetOnlineId), Dictionary<string, List<EzBeatmapSkillValue>>> skillRows)
+            int rulesetOnlineId, IReadOnlyList<BeatmapInfo> charts, IReadOnlyDictionary<(string SystemId, int RulesetOnlineId)
+              , Dictionary<string, List<EzBeatmapSkillValue>>> skillRows, bool isStale)
         {
             var specs = EzPPPSkillCatalog.MetricsFor(rulesetOnlineId);
 
             if (specs.Count == 0)
                 return null;
 
-            int revision = EzPPPEngine.VERSION;
             var perHash = skillRows.GetValueOrDefault((EzAnalysisSystem.PPP.ToStorageId(), rulesetOnlineId));
             var states = new Dictionary<string, EzFacetRowState>(charts.Count, StringComparer.Ordinal);
 
@@ -131,21 +130,23 @@ namespace osu.Game.EzOsuGame.Analysis
 
                     foreach (var row in stored)
                     {
-                        if (row.AlgorithmVersion == revision && (EzSkillRowState)row.State == EzSkillRowState.Current)
+                        if ((EzSkillRowState)row.State == EzSkillRowState.Current)
                             values.Add(row.SkillId);
                     }
 
-                    bool complete = specs.All(spec => values.Contains(spec.ChartSkillId));
-                    states[hash] = new EzFacetRowState(complete ? revision : 0, false);
+                    // A partial axis set is not a result: leaving the key out of the table makes it work to do.
+                    if (specs.All(spec => values.Contains(spec.ChartSkillId)))
+                        states[hash] = new EzFacetRowState(false);
                 }
             }
 
             return EzDataStateChecker.Count(new EzDataStateFacet
             {
                 Id = PPP_FACET,
-                CurrentRevision = revision,
+                CurrentRevision = EzPPPEngine.VERSION,
                 UniverseCount = charts.Count,
                 Rows = states,
+                IsStale = isStale,
             });
         }
 
@@ -153,24 +154,24 @@ namespace osu.Game.EzOsuGame.Analysis
         /// The stored star / pp columns of one ruleset. These carry no revision, so a facet is either filled in or
         /// absent: that is the question the read path asks of them.
         /// </summary>
-        private static IEnumerable<EzFacetStatus> ratingFacetsOf(int rulesetOnlineId, IReadOnlyList<BeatmapInfo> charts)
+        private static IEnumerable<EzFacetStatus> ratingFacetsOf(int rulesetOnlineId, IReadOnlyList<BeatmapInfo> charts, IReadOnlySet<EzAnalysisSystem> expired)
         {
-            yield return columnFacet(OFFICIAL_FACET, charts, static b => b.StarRating);
+            yield return columnFacet(OFFICIAL_FACET, charts, static b => b.StarRating, expired.Contains(EzAnalysisSystem.Official));
 
             if (rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID)
                 yield break;
 
-            yield return columnFacet(SUNNY_FACET, charts, static b => b.EzRatingData.SunnySR);
+            yield return columnFacet(SUNNY_FACET, charts, static b => b.EzRatingData.SunnySR, expired.Contains(EzAnalysisSystem.SSR));
         }
 
-        private static EzFacetStatus columnFacet(string id, IReadOnlyList<BeatmapInfo> charts, Func<BeatmapInfo, double> valueOf)
+        private static EzFacetStatus columnFacet(string id, IReadOnlyList<BeatmapInfo> charts, Func<BeatmapInfo, double> valueOf, bool isStale)
         {
             var filled = new Dictionary<string, EzFacetRowState>(charts.Count, StringComparer.Ordinal);
 
             foreach (var chart in charts)
             {
                 if (valueOf(chart) >= 0)
-                    filled[chart.Hash] = new EzFacetRowState(0, false);
+                    filled[chart.Hash] = new EzFacetRowState(false);
             }
 
             return EzDataStateChecker.Count(new EzDataStateFacet
@@ -179,7 +180,24 @@ namespace osu.Game.EzOsuGame.Analysis
                 CurrentRevision = 0,
                 UniverseCount = charts.Count,
                 Rows = filled,
+                IsStale = isStale,
             });
+        }
+
+        /// <summary>Systems whose applied revision is behind the one their algorithm declares.</summary>
+        private static HashSet<EzAnalysisSystem> readExpiredSystems(Realm realm)
+        {
+            var expired = new HashSet<EzAnalysisSystem>();
+
+            foreach (var system in new[] { EzAnalysisSystem.Official, EzAnalysisSystem.SSR, EzAnalysisSystem.PPP, EzAnalysisSystem.Mina, EzAnalysisSystem.CSI, EzAnalysisSystem.Dan })
+            {
+                int applied = realm.Find<EzAnalysisState>(system.ToStorageId())?.AppliedVersion ?? 0;
+
+                if (applied != system.CurrentVersion())
+                    expired.Add(system);
+            }
+
+            return expired;
         }
 
         /// <summary>All skill-value rows of the scanned charts, grouped by system, ruleset and then chart.</summary>

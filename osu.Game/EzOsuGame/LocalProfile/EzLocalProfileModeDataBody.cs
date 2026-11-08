@@ -9,8 +9,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets;
@@ -42,7 +42,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             var ruleset = rulesets.GetRuleset(rulesetId);
             bool showSunnySR = rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID
-                           || (ruleset != null && EzSunnyStarRatingSupport.SupportsRuleset(ruleset));
+                           || (ruleset != null && EzSSRUnit.SupportsRuleset(ruleset.OnlineID));
 
             var lineSection = new FillFlowContainer
             {

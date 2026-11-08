@@ -5,6 +5,9 @@ using System.Text.Json;
 using osu.Framework.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -77,12 +80,16 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                 // PP is optional for analytics rows.
             }
 
-            var analysisProvider = new BMSRuleset().CreateEzAnalysisProvider();
-            var request = new EzAnalysisRequest(maniaBeatmap, 1.0, EzAnalysisScope.SSR | EzAnalysisScope.RulesetSpecificRadarData);
+            int keyCount = EzHoldMetrics.ResolveKeyCount(maniaBeatmap);
 
-            if (analysisProvider.TryCompute(request, cancellationToken, out var analysis)
-                && analysis.TryGetValue(EzAnalysisFields.SSR, out double sr))
-                sunnySR = sr;
+            if (EzSSREngine.IsPatternSupported(keyCount))
+            {
+                var chartInput = EzCSIEngine.FromPlayable(maniaBeatmap, cancellationToken);
+                double sr = EzSSREngine.CalculateSR(chartInput, keyCount, maniaBeatmap.Difficulty.OverallDifficulty);
+
+                if (double.IsFinite(sr) && sr >= 0)
+                    sunnySR = sr;
+            }
 
             var (avg, max, kpsList) = OptimizedBeatmapCalculator.GetKpsOptimized(maniaBeatmap);
             avgKps = avg;

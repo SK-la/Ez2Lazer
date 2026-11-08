@@ -1,15 +1,15 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Threading;
-using osu.Game.Rulesets.Mania.Beatmaps;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern
+namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
 {
     internal static class EzManiaKeyPatternJack
     {
-        public static double Compute(ManiaBeatmap beatmap, IReadOnlyList<EzManiaKeyPatternColumnHitObject> columnObjects, CancellationToken cancellationToken)
+        public static double Compute(IReadOnlyList<EzManiaKeyPatternColumnHitObject> columnObjects, Func<double, double> beatLengthAt, CancellationToken cancellationToken)
         {
             if (columnObjects.Count == 0)
                 return 0;
@@ -47,7 +47,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern
                 {
                     EzManiaKeyPatternColumnHitObject previous = columnNotes[i - 1];
                     EzManiaKeyPatternColumnHitObject current = columnNotes[i];
-                    double beatLength = beatmap.ControlPointInfo.TimingPointAt(previous.StartTime).BeatLength;
+                    double beatLength = beatLengthAt(previous.StartTime);
 
                     if (beatLength <= 0)
                         continue;

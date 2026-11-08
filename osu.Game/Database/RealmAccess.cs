@@ -1593,9 +1593,7 @@ namespace osu.Game.Database
                     break;
 
                 case 6:
-                    foreach (var ruleset in migration.NewRealm.All<RulesetInfo>())
-                        ruleset.LastAppliedSunnySRVersion = 0;
-
+                    // The per-ruleset SunnySR revision column was retired in favour of EzAnalysisState.
                     break;
 
                 case 7:
@@ -1611,11 +1609,8 @@ namespace osu.Game.Database
                     break;
 
                 case 8:
-                    // Skill tables are new and start empty. Mark mania skill algorithm as unset on rulesets.
-                    // Extended columns (Provisional/Stale, dan course fields, history points, BeatmapId) use defaults.
-                    foreach (var ruleset in migration.NewRealm.All<RulesetInfo>())
-                        ruleset.LastAppliedManiaSkillVersion = 0;
-
+                    // Skill tables are new and start empty. Extended columns (Provisional/Stale, dan course fields,
+                    // history points, BeatmapId) use defaults.
                     break;
 
                 case 9:

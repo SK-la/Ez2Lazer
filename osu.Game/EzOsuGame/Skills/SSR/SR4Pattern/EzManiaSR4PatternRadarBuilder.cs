@@ -3,7 +3,7 @@
 
 using osu.Game.EzOsuGame.Analysis;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Analysis.SR4Pattern
+namespace osu.Game.EzOsuGame.Skills.SSR.SR4Pattern
 {
     internal static class EzManiaSR4PatternRadarBuilder
     {

@@ -18,6 +18,7 @@ using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Online.API;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
@@ -392,8 +393,8 @@ namespace osu.Game.EzOsuGame.Analysis
                     int sunnySRAlgorithmVersion = 0;
                     int ppAlgorithmVersion = 0;
 
-                    if (EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(localRulesetInfo, out int resolvedSunnySRVersion))
-                        sunnySRAlgorithmVersion = resolvedSunnySRVersion;
+                    if (EzSSRUnit.SupportsRuleset(localRulesetInfo.OnlineID))
+                        sunnySRAlgorithmVersion = EzSSRUnit.VERSION;
 
                     if (tryGetOfficialPerformancePointsVersion(localRulesetInfo, out int resolvedPpVersion))
                         ppAlgorithmVersion = resolvedPpVersion;
@@ -569,7 +570,8 @@ namespace osu.Game.EzOsuGame.Analysis
                 if (rulesetInfo is not RulesetInfo localRulesetInfo)
                     continue;
 
-                bool supportsSunnySR = EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(localRulesetInfo, out int currentSunnySRVersion);
+                bool supportsSunnySR = EzSSRUnit.SupportsRuleset(localRulesetInfo.OnlineID);
+                int currentSunnySRVersion = supportsSunnySR ? EzSSRUnit.VERSION : 0;
                 bool supportsPp = tryGetOfficialPerformancePointsVersion(localRulesetInfo, out int currentPpVersion);
 
                 if (!supportsSunnySR&& !supportsPp)
@@ -640,7 +642,8 @@ namespace osu.Game.EzOsuGame.Analysis
                 if (rulesetInfo is not RulesetInfo localRulesetInfo)
                     continue;
 
-                bool supportsSunnySR = EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(localRulesetInfo, out int currentSunnySRVersion);
+                bool supportsSunnySR = EzSSRUnit.SupportsRuleset(localRulesetInfo.OnlineID);
+                int currentSunnySRVersion = supportsSunnySR ? EzSSRUnit.VERSION : 0;
                 bool supportsPp = tryGetOfficialPerformancePointsVersion(localRulesetInfo, out int currentPpVersion);
 
                 if (!supportsSunnySR&& !supportsPp)

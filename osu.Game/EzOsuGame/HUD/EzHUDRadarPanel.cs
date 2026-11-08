@@ -22,6 +22,7 @@ using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.Pattern;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics.Sprites;
@@ -428,9 +429,9 @@ namespace osu.Game.EzOsuGame.HUD
             if (RadarDisplayMode.Value == EzRadarDisplayMode.Metadate || isSkillRadarMode())
                 return;
 
-            if (beatmap.Value.BeatmapInfo is not BeatmapInfo beatmapInfo || !EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value))
+            if (beatmap.Value.BeatmapInfo is not BeatmapInfo beatmapInfo || !EzSSRUnit.SupportsRuleset(ruleset.Value.OnlineID))
             {
-                // No analysis provider for this ruleset: keep the general star/CS/OD radar (pre-existing fallback).
+                // This ruleset has no such view: keep the general star/CS/OD radar (pre-existing fallback).
                 cancelRadarAnalysis();
                 chart?.ClearSecondaryData();
                 applyRadarData(createGeneralRadarData(difficultyBindable?.Value ?? default), getGeneralAxisMaxValues());
@@ -439,9 +440,9 @@ namespace osu.Game.EzOsuGame.HUD
 
             requestLiveAnalysis(beatmapInfo);
 
-            if (getLiveAnalysis(beatmapInfo) is { Radar: { } radar })
+            if (getLiveAnalysis(beatmapInfo) is { } analysis && tryGetRadarData(analysis, out var radarData, out double? sunnySR))
             {
-                applyRulesetSpecificRadarResult(radar);
+                applyRulesetSpecificRadarResult(radarData, sunnySR);
                 return;
             }
 
@@ -850,10 +851,31 @@ namespace osu.Game.EzOsuGame.HUD
             updateAxisTexts();
         }
 
-        private void applyRulesetSpecificRadarResult(EzRulesetSpecificRadarResult radarResult)
+        /// <summary>
+        /// The polygon the current display mode draws: the Sunny breakdown, or the structure view.
+        /// </summary>
+        private bool tryGetRadarData(EzAnalysisResult analysis, out EzRadarChartData<string> radarData, out double? sunnySR)
+        {
+            sunnySR = analysis.RatingOf(EzAnalysisSystem.SSR).StarRating;
+
+            EzRadarChartData<string>? source = RadarDisplayMode.Value == EzRadarDisplayMode.SunnySRSkill
+                ? analysis.SsrPatternRadar
+                : analysis.KeyPatternRadar;
+
+            if (source is { } resolved)
+            {
+                radarData = resolved;
+                return true;
+            }
+
+            radarData = default;
+            return false;
+        }
+
+        private void applyRulesetSpecificRadarResult(EzRadarChartData<string> radarData, double? sunnySR)
         {
             chart?.ClearSecondaryData();
-            EzRadarChartData<string> displayedRadarData = createDisplayedRulesetRadarData(radarResult);
+            EzRadarChartData<string> displayedRadarData = createDisplayedRulesetRadarData(radarData, sunnySR);
             applyRadarData(displayedRadarData, getRulesetSpecificAxisMaxValues());
         }
 
@@ -865,14 +887,12 @@ namespace osu.Game.EzOsuGame.HUD
                 ? new[] { MaxSunnySR, MaxSunnySR, long_note_ratio_max, MaxSunnySR, MaxSunnySR, MaxSunnySR }
                 : new[] { MaxKeyPatternScore, MaxKeyPatternScore, long_note_ratio_max, MaxKeyPatternScore, MaxKeyPatternScore, MaxKeyPatternScore };
 
-        private EzRadarChartData<string> createDisplayedRulesetRadarData(EzRulesetSpecificRadarResult radarResult)
+        private EzRadarChartData<string> createDisplayedRulesetRadarData(EzRadarChartData<string> sourceRadarData, double? sunnySR)
         {
-            EzRadarChartData<string> sourceRadarData = getSelectedRulesetSpecificRadarData(radarResult);
-
             if (RadarDisplayMode.Value == EzRadarDisplayMode.SunnySRSkill)
                 return sourceRadarData;
 
-            if (!UseAbsoluteValue.Value || radarResult.SunnySR is not double sunnySR || sunnySR <= 0)
+            if (!UseAbsoluteValue.Value || sunnySR is not double sunny || sunny <= 0)
                 return sourceRadarData;
 
             bool preserveLongNotePercentage = RadarDisplayMode.Value == EzRadarDisplayMode.KeyPattern;
@@ -888,15 +908,12 @@ namespace osu.Game.EzOsuGame.HUD
                     continue;
                 }
 
-                double absoluteValue = Math.Round(axis.Value / key_pattern_full_score * sunnySR, 2, MidpointRounding.AwayFromZero);
+                double absoluteValue = Math.Round(axis.Value / key_pattern_full_score * sunny, 2, MidpointRounding.AwayFromZero);
                 axes[i] = new EzRadarAxisValue<string>(axis.Axis, absoluteValue, "0.00");
             }
 
             return EzRadarChartData<string>.Create(axes);
         }
-
-        private EzRadarChartData<string> getSelectedRulesetSpecificRadarData(EzRulesetSpecificRadarResult radarResult)
-            => RadarDisplayMode.Value == EzRadarDisplayMode.SunnySRSkill ? radarResult.SunnySRPatternRadarData : radarResult.KeyPatternRadarData;
 
         private void clearChartData()
         {

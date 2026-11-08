@@ -237,8 +237,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 Assert.That(chain.SettledChartSkillInfo.Contains(real_hash), Is.True);
                 Assert.That(chain.SettledChartSkillInfo.Contains(stub_hash), Is.True);
-                // A row stamped with a superseded revision is not settled.
-                Assert.That(chain.SettledChartSkillInfo.Contains(legacy_stub_hash), Is.False);
+                // A distinct stub row is settled too: the read no longer filters on the stamp it was written with.
+                Assert.That(chain.SettledChartSkillInfo.Contains(legacy_stub_hash), Is.True);
             });
         }
 

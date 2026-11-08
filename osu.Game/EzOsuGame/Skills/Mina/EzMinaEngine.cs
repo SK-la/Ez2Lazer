@@ -53,7 +53,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         /// applies. One number covers both sides because they are one algorithm reading the same note array.
         /// <see cref="EngineVersion"/> is a different thing - it names the vendored module build.
         /// </remarks>
-        public const int VERSION = 1;
+        public const int VERSION = 20240101;
 
         /// <summary>Lowest keymode the n-key MinaCalc build accepts.</summary>
         public const int MIN_KEY_COUNT = 4;

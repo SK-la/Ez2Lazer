@@ -11,11 +11,16 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern;
+using osu.Game.EzOsuGame.Skills.SSR;
+using osu.Game.EzOsuGame.Skills.SSR.SR4Pattern;
 using osu.Game.Rulesets;
+using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -74,20 +79,14 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             sunnySR = 0;
 
-            if (!EzSunnyStarRatingSupport.SupportsBeatmap(playable, ruleset))
+            if (!EzSSRUnit.SupportsRuleset(ruleset.OnlineID))
                 return false;
 
             if (playable.HitObjects.Count == 0)
                 return true;
 
-            double rate = getRateAdjustMultiplier(mods);
-
-            if (!EzAnalysisProviderBridge.TryGetValue(ruleset, new EzAnalysisRequest(playable, rate), EzAnalysisFields.SSR, cancellationToken, out double sr)
-                || !double.IsFinite(sr)
-                || sr < 0)
-            {
+            if (computeSunnySR(playable, getRateAdjustMultiplier(mods), cancellationToken) is not double sr)
                 return false;
-            }
 
             sunnySR = sr;
             return true;
@@ -101,7 +100,7 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
 
-            if (!EzSunnyStarRatingSupport.SupportsBeatmap(working.Beatmap, beatmapInfo.Ruleset))
+            if (!EzSSRUnit.SupportsRuleset(beatmapInfo.Ruleset.OnlineID))
                 return -1;
 
             if (working.Beatmap.HitObjects.Count == 0)
@@ -125,13 +124,13 @@ namespace osu.Game.EzOsuGame.Analysis
                 return -1;
 
             var lookup = new EzAnalysisLookupCache(beatmapInfo, beatmapInfo.Ruleset, mods: null);
-            IBeatmap analysisBeatmap = EzPlayableBeatmapCache.GetShared(beatmapManager.GetWorkingBeatmap(beatmapInfo), lookup.Ruleset, lookup.OrderedMods,
-                cancellationToken);
+            var playable = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(beatmapInfo));
+            IBeatmap analysisBeatmap = playable.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             if (analysisBeatmap.HitObjects.Count == 0)
                 return -1;
 
-            return calculatePerformanceAtRating(lookup, analysisBeatmap, starRating, cancellationToken);
+            return calculatePerformanceAtRating(playable, analysisBeatmap, lookup, starRating, cancellationToken);
         }
 
         /// <summary>
@@ -263,12 +262,12 @@ namespace osu.Game.EzOsuGame.Analysis
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Measurements))
                 measurements = columnRuleset ? EzChartMeasurements.FromPlayable(analysisBeatmap, cancellationToken) : null;
 
-            RadarAndSunnySR radarAndSunnySR;
+            SsrAndRadar ssrAndRadar;
 
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Radar))
-                radarAndSunnySR = computeRadarAndSunnySR(lookup, analysisBeatmap, measurements?.Chart, cancellationToken);
+                ssrAndRadar = computeSsrAndRadar(lookup, analysisBeatmap, measurements, cancellationToken);
 
-            double? sunnySR = radarAndSunnySR.SunnySR;
+            double? sunnySR = ssrAndRadar.SunnySR;
 
             MinaResult? mina;
 
@@ -308,8 +307,8 @@ namespace osu.Game.EzOsuGame.Analysis
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Dan))
                 dan = computeDan(rulesetOnlineId, measurements, mina?.Axes, structure?.Info, sunnySR);
 
-            var result = new EzAnalysisResult(commonSummary, maniaSummary, axes: axes, ratings: ratings, dan: dan, radar: radarAndSunnySR.Radar,
-                chartSkillInfo: structure?.Info);
+            var result = new EzAnalysisResult(commonSummary, maniaSummary, axes: axes, ratings: ratings, dan: dan,
+                keyPatternRadar: ssrAndRadar.KeyPatternRadar, ssrPatternRadar: ssrAndRadar.SsrPatternRadar, chartSkillInfo: structure?.Info);
 
             EzAnalysisPassPerf.RecordPass(succeeded: true);
             EzAnalysisPassPerf.MaybeLog();
@@ -346,8 +345,8 @@ namespace osu.Game.EzOsuGame.Analysis
             if (ppp != null)
                 addPppChart(ppp.Value, axes, ratings);
 
-            addOfficial(playable, analysisBeatmap, lookup, cancellationToken, ratings);
-            addSsr(lookup, analysisBeatmap, sunnySR, cancellationToken, ratings);
+            OfficialResult? official = addOfficial(playable, analysisBeatmap, lookup, cancellationToken, ratings);
+            addSsr(sunnySR, official, ratings);
             addPppPerformance(lookup, analysisBeatmap, ppp, cancellationToken, ratings);
 
             return new AxesResult(axes, ratings);
@@ -413,33 +412,39 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// The ruleset's perfect-play performance for an arbitrary star rating, via the ruleset analysis provider.
+        /// The ruleset's perfect-play performance for an arbitrary star rating.
         /// </summary>
-        private static double calculatePerformanceAtRating(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, double starRating,
-                                                           CancellationToken cancellationToken)
-            => EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset,
-                new EzAnalysisRequest(analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), EzAnalysisScope.PerformancePoints, starRating),
-                EzAnalysisFields.PERFORMANCE_POINTS, cancellationToken, out double pp)
-                ? pp
-                : -1;
+        private static double calculatePerformanceAtRating(PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup,
+                                                           double starRating, CancellationToken cancellationToken)
+        {
+            if (computeOfficial(playable, analysisBeatmap, lookup, cancellationToken) is not { Calculator: { } calculator, Score: { } score, Attributes: { } attributes })
+                return -1;
+
+            return performanceAtRating(calculator, score, attributes, starRating) ?? -1;
+        }
 
         /// <summary>
         /// Official difficulty and performance for the current mods. Both come from one difficulty calculation,
         /// which is why they are produced together rather than by two independent passes.
         /// </summary>
-        private static void addOfficial(PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup,
-                                        CancellationToken cancellationToken, Dictionary<EzAnalysisSystem, EzScalarRating> ratings)
+        private static OfficialResult? addOfficial(PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup,
+                                                   CancellationToken cancellationToken, Dictionary<EzAnalysisSystem, EzScalarRating> ratings)
         {
             if (computeOfficial(playable, analysisBeatmap, lookup, cancellationToken) is not { } official)
-                return;
+                return null;
 
             if (!double.IsFinite(official.StarRating) || official.StarRating < 0)
-                return;
+                return null;
 
             ratings[EzAnalysisSystem.Official] = new EzScalarRating(official.StarRating, official.PerformancePoints);
+            return official;
         }
 
-        private readonly record struct OfficialResult(double StarRating, double? PerformancePoints);
+        /// <summary>
+        /// One difficulty calculation together with the inputs a substituted rating is scored with.
+        /// </summary>
+        private readonly record struct OfficialResult(double StarRating, double? PerformancePoints, DifficultyAttributes Attributes,
+                                                      PerformanceCalculator? Calculator, ScoreInfo? Score);
 
         /// <summary>
         /// The ruleset's own difficulty and perfect-play performance for the current mods.
@@ -462,7 +467,7 @@ namespace osu.Game.EzOsuGame.Analysis
             var performanceCalculator = ruleset.CreatePerformanceCalculator();
 
             if (performanceCalculator == null)
-                return new OfficialResult(difficulty.StarRating, null);
+                return new OfficialResult(difficulty.StarRating, null, difficulty, null, null);
 
             ScoreProcessor scoreProcessor = ruleset.CreateScoreProcessor();
             scoreProcessor.Mods.Value = lookup.OrderedMods;
@@ -486,20 +491,20 @@ namespace osu.Game.EzOsuGame.Analysis
 
             double? pp = double.IsFinite(performance.Total) && performance.Total > 0 ? performance.Total : null;
 
-            return new OfficialResult(difficulty.StarRating, pp);
+            return new OfficialResult(difficulty.StarRating, pp, difficulty, performanceCalculator, perfectScore);
         }
 
         /// <summary>
         /// Sunny star rating and the pp it implies for the current mods. A star is one number, not an axis.
         /// </summary>
-        private static void addSsr(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, double? sunnySR, CancellationToken cancellationToken,
-                                   Dictionary<EzAnalysisSystem, EzScalarRating> ratings)
+        private static void addSsr(double? sunnySR, OfficialResult? official, Dictionary<EzAnalysisSystem, EzScalarRating> ratings)
         {
             if (sunnySR is not double value || !double.IsFinite(value))
                 return;
 
-            double pp = calculatePerformanceAtRating(lookup, analysisBeatmap, value, cancellationToken);
-            double? performance = double.IsFinite(pp) && pp > 0 ? pp : null;
+            double? performance = official is { Calculator: { } calculator, Score: { } score, Attributes: { } attributes }
+                ? performanceAtRating(calculator, score, attributes, value)
+                : null;
 
             ratings[EzAnalysisSystem.SSR] = new EzScalarRating(value, performance);
         }
@@ -612,43 +617,74 @@ namespace osu.Game.EzOsuGame.Analysis
             return new StructureResult(axes, info);
         }
 
-        private readonly record struct RadarAndSunnySR(double? SunnySR, EzRulesetSpecificRadarResult? Radar);
+        private readonly record struct SsrAndRadar(double? SunnySR, EzRadarChartData<string>? KeyPatternRadar, EzRadarChartData<string>? SsrPatternRadar);
 
         /// <summary>
-        /// The Sunny rating and the ruleset radar from one provider call.
+        /// The Sunny rating and the two chart views this pass can draw, from one derivation of the chart.
         /// </summary>
         /// <remarks>
-        /// The radar payload already carries the rating the provider measured, so asking for the two scopes in
-        /// separate calls ran the ruleset's difficulty core twice for the same chart and mods.
+        /// The rating and its pattern breakdown come from one engine call, so asking for both does not run the
+        /// difficulty core twice for the same chart and mods.
         /// </remarks>
-        private static RadarAndSunnySR computeRadarAndSunnySR(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, EzManiaChartInput? chart, CancellationToken cancellationToken)
+        private static SsrAndRadar computeSsrAndRadar(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, EzChartMeasurements? measurements,
+                                                      CancellationToken cancellationToken)
         {
-            bool supportsSunnySR = EzSunnyStarRatingSupport.SupportsBeatmap(analysisBeatmap, lookup.Ruleset);
-
-            var scopes = EzAnalysisScope.RulesetSpecificRadarData
-                         | (supportsSunnySR ? EzAnalysisScope.SSR : EzAnalysisScope.None);
-
-            var request = new EzAnalysisRequest(analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), scopes, Chart: chart);
-
-            if (!EzAnalysisProviderBridge.TryCompute(lookup.Ruleset, request, cancellationToken, out IEzAnalysis analysis))
+            if (!EzSSRUnit.SupportsRuleset(lookup.Ruleset.OnlineID) || measurements is not { } measured)
                 return default;
 
-            double? sunnySR = null;
+            var chart = measured.Chart;
+            int keyCount = measured.KeyCount;
 
-            if (supportsSunnySR)
-            {
-                if (analysisBeatmap.HitObjects.Count == 0)
-                    sunnySR = 0;
-                else if (analysis.TryGetValue(EzAnalysisFields.SSR, out double sr) && double.IsFinite(sr) && sr >= 0)
-                    sunnySR = sr;
-            }
+            EzRadarChartData<string>? keyPatternRadar = computeKeyPatternRadar(chart, cancellationToken);
 
-            EzRulesetSpecificRadarResult? radar = analysis.TryGetValue(EzAnalysisFields.RULESET_SPECIFIC_RADAR_RESULT, out EzRulesetSpecificRadarResult value)
-                ? value
-                : null;
+            if (!EzSSREngine.IsPatternSupported(keyCount))
+                return new SsrAndRadar(null, keyPatternRadar, null);
 
-            return new RadarAndSunnySR(sunnySR, radar);
+            if (chart.Notes.Count == 0)
+                return new SsrAndRadar(0, keyPatternRadar, null);
+
+            var combined = EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, analysisBeatmap.Difficulty.OverallDifficulty,
+                getRateAdjustMultiplier(lookup.OrderedMods));
+
+            double? sunnySR = double.IsFinite(combined.Sr) && combined.Sr >= 0 ? combined.Sr : null;
+
+            return new SsrAndRadar(sunnySR, keyPatternRadar, EzManiaSR4PatternRadarBuilder.Create(combined.PatternSnapshot));
         }
+
+        /// <summary>
+        /// The structure view of a chart, measured from the same extraction the structure pass used.
+        /// </summary>
+        private static EzRadarChartData<string> computeKeyPatternRadar(EzManiaChartInput chart, CancellationToken cancellationToken)
+        {
+            var columnObjects = EzManiaKeyPatternHelper.GetColumnObjects(chart);
+
+            if (columnObjects.Count == 0)
+                return createKeyPatternRadarData(0, 0, 0, 0, 0, 0);
+
+            int totalColumns = 0;
+
+            for (int i = 0; i < columnObjects.Count; i++)
+                totalColumns = Math.Max(totalColumns, columnObjects[i].Column + 1);
+
+            var rows = EzManiaKeyPatternHelper.BuildRows(columnObjects, time => EzManiaKeyPatternHelper.BeatLengthAt(chart, time), cancellationToken);
+
+            return createKeyPatternRadarData(
+                EzManiaKeyPatternBracket.Compute(rows, totalColumns, cancellationToken),
+                EzManiaKeyPatternChord.Compute(rows, cancellationToken),
+                EzManiaKeyPatternLongNote.Compute(chart),
+                EzManiaKeyPatternJack.Compute(columnObjects, time => EzManiaKeyPatternHelper.BeatLengthAt(chart, time), cancellationToken),
+                EzManiaKeyPatternDelay.Compute(rows, totalColumns, cancellationToken),
+                EzManiaKeyPatternDump.Compute(rows, totalColumns, cancellationToken));
+        }
+
+        private static EzRadarChartData<string> createKeyPatternRadarData(double bracket, double chord, double longNoteRatio, double jack, double delay, double dump)
+            => EzRadarChartData<string>.Create(
+                new EzRadarAxisValue<string>("Bracket", bracket, "0.00"),
+                new EzRadarAxisValue<string>("Chord", chord, "0.00"),
+                new EzRadarAxisValue<string>("LN%", longNoteRatio, "0.00"),
+                new EzRadarAxisValue<string>("Jack", jack, "0.00"),
+                new EzRadarAxisValue<string>("Delay", delay, "0.00"),
+                new EzRadarAxisValue<string>("Dump", dump, "0.00"));
 
         /// <summary>
         /// 把稀疏列统计补 0 到真实列数（仅 Mania 分析路径；0 note 谱面的空字典不补）。
@@ -659,19 +695,40 @@ namespace osu.Game.EzOsuGame.Analysis
             EzManiaColumnLayout.PadToRealColumnCount(columnCounts, holdNoteCounts, realColumnCount);
         }
 
-        public static bool TryComputeRulesetSpecificRadarData(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
-                                                              out EzRulesetSpecificRadarResult radarResult)
+        /// <summary>
+        /// The Sunny rating of an already-built playable, or null when the chart has no layout this engine rates.
+        /// </summary>
+        private static double? computeSunnySR(IBeatmap playable, double rate, CancellationToken cancellationToken)
         {
-            radarResult = default;
+            int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
 
-            IBeatmap analysisBeatmap = EzPlayableBeatmapCache.GetShared(workingBeatmap, lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+            if (!EzSSREngine.IsPatternSupported(keyCount))
+                return null;
 
-            cancellationToken.ThrowIfCancellationRequested();
+            var chart = EzCSIEngine.FromPlayable(playable, cancellationToken);
+            double sr = EzSSREngine.CalculateSR(chart, keyCount, playable.Difficulty.OverallDifficulty, rate);
 
-            double rate = getRateAdjustMultiplier(lookup.OrderedMods);
+            return double.IsFinite(sr) && sr >= 0 ? sr : null;
+        }
 
-            return EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset, new EzAnalysisRequest(analysisBeatmap, rate), EzAnalysisFields.RULESET_SPECIFIC_RADAR_RESULT,
-                cancellationToken, out radarResult);
+        /// <summary>
+        /// The ruleset's perfect-play performance at a substituted rating, reusing the attributes the official pass
+        /// already produced. The star is restored afterwards so the shared attributes still describe the chart.
+        /// </summary>
+        private static double? performanceAtRating(PerformanceCalculator calculator, ScoreInfo perfectScore, DifficultyAttributes attributes, double starRating)
+        {
+            double original = attributes.StarRating;
+            attributes.StarRating = starRating;
+
+            try
+            {
+                var performance = calculator.Calculate(perfectScore, attributes);
+                return double.IsFinite(performance.Total) && performance.Total > 0 ? performance.Total : null;
+            }
+            finally
+            {
+                attributes.StarRating = original;
+            }
         }
 
         private static double getRateAdjustMultiplier(IReadOnlyList<Mod> mods)
@@ -710,7 +767,7 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             sunnySR = null;
 
-            if (!EzSunnyStarRatingSupport.SupportsBeatmap(analysisBeatmap, lookup.Ruleset))
+            if (!EzSSRUnit.SupportsRuleset(lookup.Ruleset.OnlineID))
                 return false;
 
             if (analysisBeatmap.HitObjects.Count == 0)
@@ -719,11 +776,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 return true;
             }
 
-            double rate = getRateAdjustMultiplier(lookup.OrderedMods);
-
-            if (EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset, new EzAnalysisRequest(analysisBeatmap, rate), EzAnalysisFields.SSR, cancellationToken, out double sr))
-                sunnySR = sr;
-
+            sunnySR = computeSunnySR(analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), cancellationToken);
             return sunnySR != null;
         }
 

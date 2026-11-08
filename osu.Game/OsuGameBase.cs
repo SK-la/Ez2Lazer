@@ -62,6 +62,8 @@ using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
+using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Graphics;
@@ -484,21 +486,26 @@ namespace osu.Game
 
             var msdUnit = new EzMinaUnit(BeatmapManager, chartSkillStore);
             var pppUnit = new EzPPPUnit(BeatmapManager, chartSkillStore, pppEngine);
-            var chartDanUnit = new EzDanUnit(ezAnalysisCache);
+            var danUnit = new EzDanUnit(ezAnalysisCache, chartSkillStore);
+            var ssrUnit = new EzSSRUnit(BeatmapManager, chartSkillStore);
+            var csiUnit = new EzCSIUnit(BeatmapManager, chartSkillStore, liveMetrics);
 
             var playerPPPAggregator = new EzPlayerPPPAggregator(BeatmapManager, playerSkillStore, pppEngine);
 
             var playerRatingAggregator = new EzPlayerMinaAggregator(BeatmapManager, playerSkillStore, chartSkillStore, localProfileStore);
-            var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanUnit, playerSkillStore, chartSkillStore, localProfileStore);
-            var skillProvider = new EzSkillProvider(chartSkillStore, playerSkillStore, chartDanUnit, localProfileStore, BeatmapManager, liveMetrics);
+            var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, danUnit, playerSkillStore, chartSkillStore, localProfileStore);
+            var skillProvider = new EzSkillProvider(chartSkillStore, playerSkillStore, danUnit, localProfileStore, BeatmapManager, liveMetrics);
 
-            // Only the types something actually resolves through DI are cached. Writers and aggregators are
-            // constructed here and passed as arguments; caching them would leave entries nothing ever reads.
+            // Only the types something actually resolves through DI are cached. Aggregators are constructed here and
+            // passed as arguments; the units are cached because the background backfill resolves them.
             dependencies.Cache(chartSkillStore);
             dependencies.Cache(playerSkillStore);
             dependencies.Cache(skillProvider);
             dependencies.Cache(msdUnit);
             dependencies.Cache(pppUnit);
+            dependencies.Cache(ssrUnit);
+            dependencies.Cache(csiUnit);
+            dependencies.Cache(danUnit);
 
             dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, playerRatingAggregator, playerDanAggregator, localProfileStore,
                 skillProvider, playerPPPAggregator, ezAnalysisCache));

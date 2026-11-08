@@ -21,7 +21,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Database;
 using osu.Game.EzOsuGame.Scoring;
@@ -30,13 +29,13 @@ using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Performance;
 using osu.Game.Rulesets;
-using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Scoring.Legacy;
 using osu.Game.Screens.Play;
@@ -121,6 +120,15 @@ namespace osu.Game.Database
 
         [Resolved]
         private EzChartSkillStore skillStore { get; set; } = null!;
+
+        [Resolved]
+        private EzSSRUnit ezSSRUnit { get; set; } = null!;
+
+        [Resolved]
+        private EzCSIUnit ezCSIUnit { get; set; } = null!;
+
+        [Resolved]
+        private EzDanUnit chartDanUnit { get; set; } = null!;
 
         [Resolved]
         private EzSkillProvider skillProvider { get; set; } = null!;
@@ -520,11 +528,6 @@ namespace osu.Game.Database
 
                     clearOutdatedStarRatings();
 
-                    // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-                    // [Ez] 独立计算
-                    // clearOutdatedManiaBeatmapSunnySR();
-                    // clearOutdatedManiaBeatmapMSD();
-
                     // Run Ez Realm backfill before official star population so it is not blocked for long periods.
                     /*
                     if (tryBeginEzRealmMetadataBackfill())
@@ -639,96 +642,6 @@ namespace osu.Game.Database
             }
         }
 
-        /// <summary>
-        /// Check whether the databased ssrcalculation version matches the latest ruleset provided version.
-        /// If it doesn't, clear out existing ssrvalues so they can be incrementally recalculated.
-        /// </summary>
-        private void clearOutdatedManiaBeatmapSunnySR()
-        {
-            foreach (var ruleset in rulesetStore.AvailableRulesets)
-            {
-                if (!EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(ruleset, out int currentVersion))
-                    continue;
-
-                if (ruleset.LastAppliedSunnySRVersion < currentVersion)
-                {
-                    Logger.Log($"Resetting SunnyStarRatings for {ruleset.Name} (SunnySR version updated from {ruleset.LastAppliedSunnySRVersion} to {currentVersion})");
-
-                    int countReset = 0;
-
-                    realmAccess.Write(r =>
-                    {
-                        foreach (var b in r.All<BeatmapInfo>())
-                        {
-                            if (b.Ruleset.ShortName == ruleset.ShortName)
-                            {
-                                // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-                                // EzRatingWriter.WriteSR(b, EzAnalysisSystem.SSR, -1);
-                                countReset++;
-                            }
-                        }
-
-                        r.Find<RulesetInfo>(ruleset.ShortName)!.LastAppliedSunnySRVersion = currentVersion;
-                    });
-
-                    // Mania ChartDan is read off SunnySR (the 4K Sunny intervals lookup), so a new ssr
-                    // version retires those rows. Unlike the Mina chain, the chart-chain revisions do not
-                    // fold the ssrversion in (ssrlives on BeatmapInfo and this ruleset scalar), so the
-                    // stale rows have to be dropped explicitly - otherwise the incremental ChartDan pass
-                    // keeps skipping hashes that already have a row.
-                    if (ruleset.OnlineID == 3)
-                    {
-                        Logger.Log($"Resetting mania ChartDan for ssrversion {ruleset.LastAppliedSunnySRVersion} -> {currentVersion}");
-                        // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-                        // skillStore.ClearChartDan();
-                    }
-
-                    Logger.Log($"Finished resetting {countReset} beatmaps for ssr{ruleset.Name}");
-                }
-            }
-        }
-
-        /// <summary>
-        /// When the mania skill algorithm version advances, clear persisted beatmap Mina so startup backfill can recompute.
-        /// </summary>
-        private void clearOutdatedManiaBeatmapMSD()
-        {
-            int current_version = EzMinaEngine.VERSION;
-
-            // Read the live Realm row — AvailableRulesets clones historically omitted
-            // LastAppliedManiaSkillVersion and would wipe Mina on every startup.
-            var liveState = realmAccess.Run(r =>
-            {
-                var live = r.All<RulesetInfo>().FirstOrDefault(x => x.OnlineID == 3);
-                return live == null
-                    ? ((string?)null, 0)
-                    : (live.ShortName, live.LastAppliedManiaSkillVersion);
-            });
-
-            if (liveState.Item1 == null)
-                return;
-
-            if (liveState.Item2 >= current_version)
-                return;
-
-            Logger.Log($"Resetting beatmap Mina for mania (mania skill version updated from {liveState.Item2} to {current_version})");
-
-            // Only Mina is cleared here. ChartSkillInfo and ChartDan rows read Mina, but both are stamped
-            // stale and the ordinary incremental passes recompute them. Bulk
-            // so they already read as stale and the ordinary incremental passes recompute them. Bulk
-            // clearing them would erase the "stale" evidence the status UI reports.
-            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-            // skillStore.ClearBeatmapMsd();
-
-            realmAccess.Write(r =>
-            {
-                if (r.Find<RulesetInfo>(liveState.Item1) is RulesetInfo live)
-                    live.LastAppliedManiaSkillVersion = current_version;
-            });
-
-            Logger.Log("Finished resetting beatmap Mina for mania");
-        }
-
         private void runEzRealmMetadataBackfill() => runEzRealmMetadataBackfill(EzAnalysisSystem.All);
 
         private void runEzRealmMetadataBackfill(EzAnalysisSystem scope)
@@ -736,7 +649,10 @@ namespace osu.Game.Database
             EzStartupTrace.Log($"BDSP EzRealm backfill begin scope={scope}");
 
             if (scope.HasFlag(EzAnalysisSystem.SSR))
+            {
                 populateMissingSunnyStarRatings();
+                skillStore.SetAppliedVersion(EzAnalysisSystem.SSR, EzSSRUnit.VERSION);
+            }
 
             if (scope.HasFlag(EzAnalysisSystem.Official))
                 populateMissingPerformancePoints();
@@ -769,12 +685,29 @@ namespace osu.Game.Database
             {
                 // One pass over the library. Each chart pays only for the stages it owes, but it is loaded,
                 // converted and written by one iteration instead of one per stage.
-                populateChartChain(
+                bool completed = populateChartChain(
                     skillStore.CollectChartChainState("BDSP"),
                     csi: scope.HasFlag(EzAnalysisSystem.CSI),
                     msd: scope.HasFlag(EzAnalysisSystem.Mina),
                     ppp: scope.HasFlag(EzAnalysisSystem.PPP),
                     dan: scope.HasFlag(EzAnalysisSystem.Dan));
+
+                // Only a pass that covered its work list may claim the revision: a cancelled one leaves the systems
+                // expired, which is what makes the next launch pick them up again.
+                if (completed)
+                {
+                    if (scope.HasFlag(EzAnalysisSystem.Mina))
+                        skillStore.SetAppliedVersion(EzAnalysisSystem.Mina, EzMinaEngine.VERSION);
+
+                    if (scope.HasFlag(EzAnalysisSystem.CSI))
+                        skillStore.SetAppliedVersion(EzAnalysisSystem.CSI, EzCSIEngine.VERSION);
+
+                    if (scope.HasFlag(EzAnalysisSystem.Dan))
+                        skillStore.SetAppliedVersion(EzAnalysisSystem.Dan, EzDanEngine.VERSION);
+
+                    if (scope.HasFlag(EzAnalysisSystem.PPP))
+                        skillStore.SetAppliedVersion(EzAnalysisSystem.PPP, EzPPPEngine.VERSION);
+                }
             }
 
             EzStartupTrace.Log($"BDSP EzRealm backfill end scope={scope}");
@@ -784,30 +717,22 @@ namespace osu.Game.Database
         {
             Logger.Log($"Forcing Ez Realm metadata recalculation ({scope})...");
 
+            // Marking a system expired is the whole of "recompute everything": the next pass treats every chart as
+            // owed, and the dependency edges carry the invalidation to the systems derived from it.
             if (scope.HasFlag(EzAnalysisSystem.Mina))
-            {
-                Logger.Log("Clearing persisted beatmap Mina skill values...");
-                skillStore.ClearBeatmapMsd();
-            }
+                Logger.Log($"Marking Mina and its downstream systems out of date: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.Mina))}");
 
             if (scope.HasFlag(EzAnalysisSystem.CSI))
-            {
-                Logger.Log("Clearing persisted ChartSkillInfo rows...");
-                skillStore.ClearChartSkillInfo();
-                skillProvider.InvalidateLiveMetrics();
-            }
+                Logger.Log($"Marking CSI and its downstream systems out of date: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.CSI))}");
 
             if (scope.HasFlag(EzAnalysisSystem.Dan))
-            {
-                Logger.Log("Clearing persisted ChartDan rows...");
-                skillStore.ClearChartDan();
-            }
+                Logger.Log($"Marking Dan out of date: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.Dan))}");
 
             if (scope.HasFlag(EzAnalysisSystem.PPP))
-            {
-                Logger.Log("Clearing persisted PP+ chart skills...");
-                skillStore.ClearBeatmapPPP();
-            }
+                Logger.Log($"Marking PP+ out of date: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.PPP))}");
+
+            if (scope.HasFlag(EzAnalysisSystem.SSR))
+                skillProvider.InvalidateLiveMetrics();
 
             bool clearBeatmapInfoFields = scope.HasFlag(EzAnalysisSystem.MetadataTags)
                                           || scope.HasFlag(EzAnalysisSystem.SSR)
@@ -860,7 +785,7 @@ namespace osu.Game.Database
                         }
 
                         // Third-party / unavailable rulesets: keep persisted ssr/pp until the assembly is loadable again.
-                        if (!EzSunnyStarRatingSupport.IsRulesetAvailable(beatmap.Ruleset))
+                        if (!beatmap.Ruleset.Available)
                         {
                             totalProcessed++;
                             continue;
@@ -989,7 +914,7 @@ namespace osu.Game.Database
                     if (b.EzRatingData.SunnySR >= 0)
                         continue;
 
-                    if (!EzSunnyStarRatingSupport.SupportsRuleset(b.Ruleset))
+                    if (!EzSSRUnit.SupportsRuleset(b.Ruleset.OnlineID))
                         continue;
 
                     beatmapIds.Add(b.ID);
@@ -1025,16 +950,12 @@ namespace osu.Game.Database
 
                 try
                 {
-                    double ssr = EzAnalysisComputation.ComputeBaselineSunnySRForRealm(beatmapManager, beatmap, CancellationToken.None);
-
-                    // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-                    /*
-                    realmAccess.Write(r =>
+                    if (!ezSSRUnit.ComputeAndStore(beatmap, CancellationToken.None))
                     {
-                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
-                            EzRatingWriter.WriteSR(liveBeatmapInfo, EzAnalysisSystem.SSR, ssr);
-                    });
-                    */
+                        ++failedCount;
+                        continue;
+                    }
+
                     ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
                     ++processedCount;
                 }
@@ -1058,7 +979,7 @@ namespace osu.Game.Database
         /// within the same iteration: CSI, then Mina, then PP+, then dan - which reads what the earlier stages in
         /// this same iteration just wrote.
         /// </remarks>
-        private void populateChartChain(EzChartChainState chain, bool csi, bool msd, bool ppp, bool dan)
+        private bool populateChartChain(EzChartChainState chain, bool csi, bool msd, bool ppp, bool dan)
         {
             HashSet<Guid> pppDebt = ppp ? skillStore.CollectPppChartDebt().ToHashSet() : new HashSet<Guid>();
 
@@ -1083,7 +1004,7 @@ namespace osu.Game.Database
             if (work.Count == 0)
             {
                 Logger.Log("Chart chain backfill: nothing owed.");
-                return;
+                return true;
             }
 
             Logger.Log(
@@ -1134,7 +1055,7 @@ namespace osu.Game.Database
                     try
                     {
                         // True = settled afterwards (computed, or stamped unavailable).
-                        if (!skillProvider.TryEnsureChartSkillInfoForBackfill(beatmap))
+                        if (!ezCSIUnit.TryEnsure(beatmap))
                             stageFailed = true;
                     }
                     catch (Exception e) when (e is not ObjectDisposedException)
@@ -1155,12 +1076,9 @@ namespace osu.Game.Database
                 {
                     try
                     {
-                        if (ezBeatmapMinaComputer.ComputeAndStore(beatmap) is { } msdAxes)
-                        {
+                        if (ezBeatmapMinaComputer.ComputeAndStore(beatmap) != null)
                             msdWritten = true;
-                            writeMinaRating(id, msdAxes);
-                        }
-                        else if (skillStore.GetBeatmapSystemState(hash, EzAnalysisSystem.Mina, ezBeatmapMinaComputer.Revision) != EzSkillRowState.Unrateable)
+                        else if (skillStore.GetBeatmapSystemState(hash, EzAnalysisSystem.Mina) != EzSkillRowState.Unrateable)
                             stageFailed = true;
                     }
                     catch (Exception e) when (e is not ObjectDisposedException)
@@ -1179,12 +1097,8 @@ namespace osu.Game.Database
                 {
                     try
                     {
-                        var skills = ezBeatmapPPPComputer.ComputeAndStore(beatmap);
-
-                        if (skills == null)
+                        if (ezBeatmapPPPComputer.ComputeAndStore(beatmap) == null)
                             stageFailed = true;
-                        else
-                            writePppBaselines(id, beatmap, skills);
                     }
                     catch (Exception e) when (e is not ObjectDisposedException)
                     {
@@ -1202,7 +1116,7 @@ namespace osu.Game.Database
                 {
                     try
                     {
-                        if (!tryWriteChartDan(beatmap, hash))
+                        if (!chartDanUnit.ComputeAndStoreFromStored(beatmap))
                             stageFailed = true;
                     }
                     catch (Exception e) when (e is not ObjectDisposedException)
@@ -1234,6 +1148,8 @@ namespace osu.Game.Database
 
             completeNotification(notification, processedCount, work.Count, failedCount);
 
+            return !abortedDuringShutdown && notification?.State != ProgressNotificationState.Cancelled;
+
             IEnumerable<string> enumerateOwedHashes()
             {
                 if (csi)
@@ -1254,104 +1170,6 @@ namespace osu.Game.Database
                         yield return hash;
                 }
             }
-        }
-
-        /// <summary>
-        /// Derives and stores one chart's dan from what is currently persisted.
-        /// </summary>
-        private bool tryWriteChartDan(BeatmapInfo beatmap, string hash)
-        {
-            var msd = skillStore.GetBeatmapSkills(hash, EzAnalysisSystem.Mina);
-
-            // The chain's owed set already filtered on a complete Mina; re-check guards a version change mid-run.
-            if (!EzMinaUnit.IsCurrentMinaCache(msd))
-                return false;
-
-            if (!EzDanEngine.TryResolveStoredInputs(beatmap, out int keyCount, out double holdRatio, out double? sunnySR, out int holdCount))
-                return false;
-
-            // An unavailable stub is not usable input; fall back to the Mina-derived values.
-            skillStore.TryGetChartSkillInfo(hash, out var chartInfo);
-            if (chartInfo is { IsUnavailable: true })
-                chartInfo = null;
-
-            var persisted = EzPersistedChartDan.TryComputeFromStored(hash, beatmap.ID, msd, keyCount, holdRatio, sunnySR, chartInfo, holdCount);
-
-            if (persisted == null)
-                return false;
-
-            skillStore.UpsertChartDan(persisted);
-            return true;
-        }
-
-        /// <summary>
-        /// Mirrors the Mina overall onto the chart's Mina star rating.
-        /// </summary>
-        /// <remarks>
-        /// The engine's own scale is converted here, at the write, so every reader of the stored rating sees a star.
-        /// The <c>beatmap_msd</c> row keeps the engine value, which the radar and the dan chain read.
-        /// </remarks>
-        private void writeMinaRating(Guid id, IReadOnlyDictionary<string, double> axes)
-        {
-            if (!axes.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double overall) || overall <= 0)
-                return;
-
-            double star = EzMinaRatingScale.ToStarRating(overall);
-
-            realmAccess.Write(r =>
-            {
-                if (r.Find<BeatmapInfo>(id) is BeatmapInfo live)
-                    EzRatingWriter.WriteSR(live, EzAnalysisSystem.Mina, star);
-            });
-        }
-
-        /// <summary>
-        /// Writes the PP+ star and pp columns from the vector that was just computed, so the fill does not depend on
-        /// a later pass re-reading the value table.
-        /// </summary>
-        private void writePppBaselines(Guid id, BeatmapInfo beatmap, IReadOnlyDictionary<string, double> skills)
-        {
-            if (!skills.TryGetValue(EzPPPSkillCatalog.ChartSkillId(EzPPPSkillCatalog.STAR_RATING), out double star) || star <= 0)
-                return;
-
-            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-            /*
-            double pp = computePppPerformance(beatmap, skills);
-
-            realmAccess.Write(r =>
-            {
-                if (r.Find<BeatmapInfo>(id) is not BeatmapInfo live)
-                    return;
-
-                EzRatingWriter.WriteSR(live, EzAnalysisSystem.PPP, star);
-
-                if (pp > 0)
-                    EzRatingWriter.WritePP(live, EzAnalysisSystem.PPP, pp);
-            });
-            */
-
-            ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
-        }
-
-        /// <summary>PP+ performance for a perfect play, from the chart vector and the mode's own PP+ formula.</summary>
-        private double computePppPerformance(BeatmapInfo beatmap, IReadOnlyDictionary<string, double> skills)
-        {
-            if (beatmap.Ruleset == null || !EzPPPSkillCatalog.SupportsRuleset(beatmap.Ruleset.OnlineID))
-                return -1;
-
-            IBeatmap playable;
-
-            try
-            {
-                playable = EzPlayableBeatmapCache.GetShared(beatmapManager.GetWorkingBeatmap(beatmap), beatmap.Ruleset, Array.Empty<Mod>(), CancellationToken.None);
-            }
-            catch (Exception e)
-            {
-                Logger.Log($"PP+ performance needs a playable beatmap for {beatmap}: {e.Message}");
-                return -1;
-            }
-
-            return EzPPPPerformanceCalculators.Calculate(beatmap.Ruleset.OnlineID, skills, playable, Array.Empty<Mod>(), 1);
         }
 
         /// <summary>
@@ -1481,7 +1299,7 @@ namespace osu.Game.Database
             {
                 foreach (var b in r.All<BeatmapInfo>().Where(b => b.PerformancePoints < 0 && b.BeatmapSet != null))
                 {
-                    if (!EzSunnyStarRatingSupport.IsRulesetAvailable(b.Ruleset))
+                    if (!b.Ruleset.Available)
                         continue;
 
                     beatmapIds.Add(b.ID);

@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
@@ -11,9 +10,9 @@ using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.LeoBlack;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.EzMania.Analysis;
 using osu.Game.Rulesets.Mania.Objects;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
@@ -232,13 +231,11 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             // Reported, not compared: on mania the ruleset radar (ssr+ its SR4 breakdown) is the largest single item
             // of a full pass, well above the structure, Mina and dan steps this chain covers. Surfacing it here keeps
             // that ordering visible instead of letting the smaller stages look like the budget.
-            var beatmap = buildManiaBeatmap(chart, keyCount);
-            var provider = new EzManiaAnalysisProvider();
-            var radarRequest = new EzAnalysisRequest(beatmap, 1.0, EzAnalysisScope.RulesetSpecificRadarData);
+            double overallDifficulty = 8;
 
             var radar = EzPerfMeasurer.Measure("radar (ssr+ SR4)", runs, () =>
             {
-                provider.TryCompute(radarRequest, CancellationToken.None, out _);
+                EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, overallDifficulty);
             });
 
             TestContext.Progress.WriteLine($"{keyCount}K holdRatio={holdRatio:P0} rows={chart.Notes.Count}");
@@ -430,22 +427,21 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Sides = sides,
             };
 
-            var radar = new EzRulesetSpecificRadarResult(
-                EzRadarChartData<string>.Create(
-                    new EzRadarAxisValue<string>("Bracket", 1, "0.00"),
-                    new EzRadarAxisValue<string>("Chord", 2, "0.00"),
-                    new EzRadarAxisValue<string>("LN%", 3, "0.00"),
-                    new EzRadarAxisValue<string>("Jack", 4, "0.00"),
-                    new EzRadarAxisValue<string>("Delay", 5, "0.00"),
-                    new EzRadarAxisValue<string>("Dump", 6, "0.00")),
-                EzRadarChartData<string>.Create(
-                    new EzRadarAxisValue<string>("Bracket", 1, "0.00"),
-                    new EzRadarAxisValue<string>("Jack", 2, "0.00"),
-                    new EzRadarAxisValue<string>("Burst", 3, "0.00"),
-                    new EzRadarAxisValue<string>("LN Hold", 4, "0.00"),
-                    new EzRadarAxisValue<string>("LN Release", 5, "0.00"),
-                    new EzRadarAxisValue<string>("Anchor", 6, "0.00")),
-                12.5);
+            var keyPatternRadar = EzRadarChartData<string>.Create(
+                new EzRadarAxisValue<string>("Bracket", 1, "0.00"),
+                new EzRadarAxisValue<string>("Chord", 2, "0.00"),
+                new EzRadarAxisValue<string>("LN%", 3, "0.00"),
+                new EzRadarAxisValue<string>("Jack", 4, "0.00"),
+                new EzRadarAxisValue<string>("Delay", 5, "0.00"),
+                new EzRadarAxisValue<string>("Dump", 6, "0.00"));
+
+            var ssrPatternRadar = EzRadarChartData<string>.Create(
+                new EzRadarAxisValue<string>("Bracket", 1, "0.00"),
+                new EzRadarAxisValue<string>("Jack", 2, "0.00"),
+                new EzRadarAxisValue<string>("Burst", 3, "0.00"),
+                new EzRadarAxisValue<string>("LN Hold", 4, "0.00"),
+                new EzRadarAxisValue<string>("LN Release", 5, "0.00"),
+                new EzRadarAxisValue<string>("Anchor", 6, "0.00"));
 
             var info = new EzChartSkillInfo
             {
@@ -465,7 +461,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 new EzManiaSummary(columns, holds, 12.5),
                 axes: axes,
                 dan: dan,
-                radar: radar,
+                keyPatternRadar: keyPatternRadar,
+                ssrPatternRadar: ssrPatternRadar,
                 chartSkillInfo: info);
         }
 

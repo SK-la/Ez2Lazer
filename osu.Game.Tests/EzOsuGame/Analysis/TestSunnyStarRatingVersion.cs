@@ -7,7 +7,6 @@ using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.Difficulty;
-using osu.Game.Rulesets.Mania.EzMania.Analysis;
 
 namespace osu.Game.Tests.EzOsuGame.Analysis
 {
@@ -15,21 +14,16 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
     public class TestSunnyStarRatingVersion
     {
         [Test]
-        public void Mania_provider_reports_the_shared_ssr_revision()
+        public void Mania_is_the_ruleset_the_ssr_system_rates()
         {
-            var provider = new EzManiaAnalysisProvider();
-            Assert.That(provider.SunnyStarRatingVersion, Is.EqualTo(EzManiaSunnyStarRating.VERSION));
-            Assert.That(provider.SunnyStarRatingVersion, Is.EqualTo(EzSSRUnit.VERSION));
+            Assert.That(EzSSRUnit.SupportsRuleset(new ManiaRuleset().RulesetInfo.OnlineID), Is.True);
+            Assert.That(EzSSRUnit.VERSION, Is.EqualTo(EzSSREngine.VERSION));
         }
 
         [Test]
-        public void TryGetSunnyStarRatingVersion_reads_from_provider_not_difficulty_calculator()
+        public void A_ruleset_without_a_column_layout_does_not_declare_ssr()
         {
-            var rulesetInfo = new ManiaRuleset().RulesetInfo;
-            rulesetInfo.Available = true;
-
-            Assert.That(EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(rulesetInfo, out int ssrVersion), Is.True);
-            Assert.That(ssrVersion, Is.EqualTo(EzManiaSunnyStarRating.VERSION));
+            Assert.That(EzSSRUnit.SupportsRuleset(-1), Is.False);
         }
     }
 
@@ -45,7 +39,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
             Assert.That(EzPerformancePointsSupport.TryGetPerformancePointsVersion(rulesetInfo, workingBeatmap, out int ppVersion), Is.True);
             Assert.That(ppVersion, Is.EqualTo(new ManiaDifficultyCalculator(rulesetInfo, workingBeatmap).Version));
-            Assert.That(ppVersion, Is.Not.EqualTo(EzManiaSunnyStarRating.VERSION));
+            Assert.That(ppVersion, Is.Not.EqualTo(EzSSRUnit.VERSION));
         }
     }
 }

@@ -10,7 +10,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
     /// <summary>Port of mania-hub <c>classifyFourKeyJackDemand</c> (jack-demand.ts).</summary>
     public static class EzFourKeyJackDemand
     {
-        public const int VERSION = 1;
+        public const int VERSION = 20240102;
 
         private const double dense_chord_ratio_min = 0.70;
         private const double dense_chord_overlap_min = 0.58;

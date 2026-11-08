@@ -26,7 +26,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         /// Bump when the structure pass changes: axis definitions, pattern tags, motion features, or the LeoBlack
         /// cluster fallback.
         /// </remarks>
-        public const int VERSION = 1;
+        public const int VERSION = 20240201;
 
         private static readonly HashSet<string> ln_pattern_ids = createLnPatternIds();
 

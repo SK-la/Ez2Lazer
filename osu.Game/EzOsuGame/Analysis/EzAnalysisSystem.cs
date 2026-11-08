@@ -132,10 +132,10 @@ namespace osu.Game.EzOsuGame.Analysis
     /// cannot see the algorithm must not guess its revision.
     /// </para>
     /// </remarks>
-    public static class EzAnalysisRevision
+    public static class EzAnalysisSystemVersions
     {
-        /// <summary>Revision of <paramref name="system"/>, or 0 when it has no algorithm of its own.</summary>
-        public static int OfSystem(EzAnalysisSystem system) => system switch
+        /// <summary>Current revision of <paramref name="system"/>, or 0 when it has no algorithm of its own.</summary>
+        public static int CurrentVersion(this EzAnalysisSystem system) => system switch
         {
             EzAnalysisSystem.Mina => EzMinaEngine.VERSION,
             EzAnalysisSystem.CSI => EzCSIEngine.VERSION,

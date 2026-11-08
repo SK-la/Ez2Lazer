@@ -65,8 +65,12 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             });
         }
 
+        /// <summary>
+        /// A row carries no revision of its own: whether it counts is decided by whether the system that owns it has
+        /// run at its current revision, not by what the row was stamped with.
+        /// </summary>
         [Test]
-        public void Wrong_algorithm_version_is_miss()
+        public void A_row_reads_regardless_of_the_revision_it_was_written_with()
         {
             RunTestWithRealm((realm, _) =>
             {
@@ -85,56 +89,80 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                         HoldRatio = 0.1,
                         OverallMsd = 10,
                         RcRawDan = 5,
-                        RcLabel = "Stale",
+                        RcLabel = "Old",
                         LnRawDan = -1,
                         ComputedAt = DateTimeOffset.UtcNow,
                     });
                 });
 
-                Assert.That(store.TryGetChartDan(hash, out var missing), Is.False);
-                Assert.That(missing, Is.Null);
+                Assert.That(store.TryGetChartDan(hash, out var loaded), Is.True);
+                Assert.That(loaded, Is.Not.Null);
+
+                store.SetAppliedVersion(EzAnalysisSystem.Dan, EzDanEngine.VERSION);
+                Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Contain(hash));
+            });
+        }
+
+        /// <summary>
+        /// Retiring a downstream row is the job of the applied-version stamp: a system that has not run at its
+        /// current revision holds no results, and running it again is what brings the rows back.
+        /// </summary>
+        [Test]
+        public void A_system_that_has_not_run_retires_its_rows()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzChartSkillStore(realm);
+                const string hash = "chart-dan-retired";
+
+                seedChart(realm, hash);
+
+                realm.Write(r =>
+                {
+                    r.Add(new EzChartDan
+                    {
+                        BeatmapHash = hash,
+                        AlgorithmVersion = EzDanEngine.VERSION,
+                        KeyCount = 4,
+                        HoldRatio = 0.1,
+                        OverallMsd = 10,
+                        RcRawDan = 5,
+                        RcLabel = "Retired",
+                        LnRawDan = -1,
+                        ComputedAt = DateTimeOffset.UtcNow,
+                    });
+                });
+
+                Assert.That(store.IsExpired(EzAnalysisSystem.Dan), Is.True, "no pass has recorded a revision for Dan");
                 Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Not.Contain(hash));
+
+                store.SetAppliedVersion(EzAnalysisSystem.Dan, EzDanEngine.VERSION);
+
+                Assert.That(store.IsExpired(EzAnalysisSystem.Dan), Is.False);
+                Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Contain(hash));
             });
         }
 
         [Test]
-        public void Upstream_facets_retire_a_chart_dan_row()
+        public void Invalidating_a_system_also_marks_the_systems_derived_from_it()
         {
             RunTestWithRealm((realm, _) =>
             {
                 var store = new EzChartSkillStore(realm);
 
-                // A bare-constant stamp is what a pre-revision (or Mina-only side-upsert) row carries.
-                // Both it and a CSI-only stamp must read as a miss, because Dan folds CSI and Mina.
-                foreach ((string hash, int stamp) in new[]
-                         {
-                             ("chart-dan-bare-dan-version", EzDanEngine.VERSION),
-                             ("chart-dan-missing-csi", EzCSIEngine.VERSION),
-                             ("chart-dan-missing-msd-upstream", EzMinaEngine.VERSION),
-                         })
-                {
-                    seedChart(realm, hash);
+                store.SetAppliedVersion(EzAnalysisSystem.Mina, EzMinaEngine.VERSION);
+                store.SetAppliedVersion(EzAnalysisSystem.CSI, EzCSIEngine.VERSION);
+                store.SetAppliedVersion(EzAnalysisSystem.Dan, EzDanEngine.VERSION);
 
-                    realm.Write(r =>
-                    {
-                        r.Add(new EzChartDan
-                        {
-                            BeatmapHash = hash,
-                            AlgorithmVersion = stamp,
-                            KeyCount = 4,
-                            HoldRatio = 0.1,
-                            OverallMsd = 10,
-                            RcRawDan = 5,
-                            RcLabel = "Stale",
-                            LnRawDan = -1,
-                            ComputedAt = DateTimeOffset.UtcNow,
-                        });
-                    });
+                var invalidated = store.Invalidate(EzAnalysisSystem.CSI);
 
-                    Assert.That(store.TryGetChartDan(hash, out var stale), Is.False, $"revision {stamp} should be stale");
-                    Assert.That(stale, Is.Null);
-                    Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Not.Contain(hash));
-                }
+                Assert.That(invalidated, Does.Contain(EzAnalysisSystem.CSI));
+                Assert.That(invalidated, Does.Contain(EzAnalysisSystem.Dan), "Dan reads CSI");
+                Assert.That(invalidated, Does.Not.Contain(EzAnalysisSystem.Mina), "Mina is upstream of CSI");
+
+                Assert.That(store.IsExpired(EzAnalysisSystem.CSI), Is.True);
+                Assert.That(store.IsExpired(EzAnalysisSystem.Dan), Is.True);
+                Assert.That(store.IsExpired(EzAnalysisSystem.Mina), Is.False);
             });
         }
 
@@ -209,14 +237,14 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Assert.That(store.CollectChartChainState().SettledMsd, Does.Contain(hash));
 
                 var skills = store.GetBeatmapSkills(hash, EzAnalysisSystem.Mina);
-                Assert.That(store.GetBeatmapSystemState(hash, EzAnalysisSystem.Mina, EzMinaEngine.VERSION), Is.EqualTo(EzSkillRowState.Unrateable));
+                Assert.That(store.GetBeatmapSystemState(hash, EzAnalysisSystem.Mina), Is.EqualTo(EzSkillRowState.Unrateable));
                 Assert.That(skills, Is.Empty);
                 Assert.That(EzMinaUnit.IsCurrentMinaCache(skills), Is.False);
 
                 // Successful Mina write replaces the marker.
                 store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6));
                 Assert.That(store.CollectChartChainState().CompleteMsd, Does.Contain(hash));
-                Assert.That(store.GetBeatmapSystemState(hash, EzAnalysisSystem.Mina, EzMinaEngine.VERSION), Is.EqualTo(EzSkillRowState.Current));
+                Assert.That(store.GetBeatmapSystemState(hash, EzAnalysisSystem.Mina), Is.EqualTo(EzSkillRowState.Current));
             });
         }
 

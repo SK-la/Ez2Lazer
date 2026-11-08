@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Skills.Dan
@@ -20,10 +21,47 @@ namespace osu.Game.EzOsuGame.Skills.Dan
     public sealed class EzDanUnit
     {
         private readonly IEzChartAnalysisLookup? analysisLookup;
+        private readonly EzChartSkillStore? skillStore;
 
-        public EzDanUnit(IEzChartAnalysisLookup? analysisLookup = null)
+        public EzDanUnit(IEzChartAnalysisLookup? analysisLookup = null, EzChartSkillStore? skillStore = null)
         {
             this.analysisLookup = analysisLookup;
+            this.skillStore = skillStore;
+        }
+
+        /// <summary>
+        /// Derives and stores one chart's dan from what is currently persisted. Returns false when the stored inputs
+        /// do not resolve to a verdict, so the next pass retries it.
+        /// </summary>
+        public bool ComputeAndStoreFromStored(BeatmapInfo beatmapInfo)
+        {
+            ArgumentNullException.ThrowIfNull(beatmapInfo);
+
+            if (skillStore == null)
+                return false;
+
+            string hash = beatmapInfo.Hash;
+            var msd = skillStore.GetBeatmapSkills(hash, EzAnalysisSystem.Mina);
+
+            // The chain's owed set already filtered on a complete Mina; re-check guards a version change mid-run.
+            if (!EzMinaUnit.IsCurrentMinaCache(msd))
+                return false;
+
+            if (!EzDanEngine.TryResolveStoredInputs(beatmapInfo, out int keyCount, out double holdRatio, out double? sunnySR, out int holdCount))
+                return false;
+
+            // An unavailable stub is not usable input; fall back to the Mina-derived values.
+            skillStore.TryGetChartSkillInfo(hash, out var chartInfo);
+            if (chartInfo is { IsUnavailable: true })
+                chartInfo = null;
+
+            var persisted = EzPersistedChartDan.TryComputeFromStored(hash, beatmapInfo.ID, msd, keyCount, holdRatio, sunnySR, chartInfo, holdCount);
+
+            if (persisted == null)
+                return false;
+
+            skillStore.UpsertChartDan(persisted);
+            return true;
         }
 
         /// <summary>

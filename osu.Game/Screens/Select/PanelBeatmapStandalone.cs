@@ -19,6 +19,7 @@ using osu.Game.Beatmaps.Drawables;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
@@ -86,7 +87,7 @@ namespace osu.Game.Screens.Select
 
         private Bindable<EzMaterialUiMode> materialUiMode = null!;
 
-        private bool supportsEzAnalysis => EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value);
+        private bool supportsEzAnalysis => EzSSRUnit.SupportsRuleset(ruleset.Value.OnlineID);
 
         #endregion
 

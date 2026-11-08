@@ -162,9 +162,14 @@ namespace osu.Game.EzOsuGame.Analysis
         public readonly EzDanSet? Dan;
 
         /// <summary>
-        /// Ruleset-declared radar payload for the current mods, or null when the ruleset provides none.
+        /// Structure view of the chart for the current mods, or null when this pass measured none.
         /// </summary>
-        public readonly EzRulesetSpecificRadarResult? Radar;
+        public readonly EzRadarChartData<string>? KeyPatternRadar;
+
+        /// <summary>
+        /// Sunny pattern breakdown for the current mods, or null when the chart has no Sunny rating.
+        /// </summary>
+        public readonly EzRadarChartData<string>? SsrPatternRadar;
 
         /// <summary>
         /// Typed structure summary for the same pass that produced <see cref="Axes"/>' CSI values, or null when the
@@ -175,8 +180,8 @@ namespace osu.Game.EzOsuGame.Analysis
         public EzAnalysisResult(KpsSummary commonSummary, EzManiaSummary? maniaSummary = null, EzBeatmapTagSummary? tagSummary = null,
                                 IReadOnlyDictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>? axes = null,
                                 IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating>? ratings = null,
-                                EzDanSet? dan = null, EzRulesetSpecificRadarResult? radar = null,
-                                EzChartSkillInfo? chartSkillInfo = null)
+                                EzDanSet? dan = null, EzRadarChartData<string>? keyPatternRadar = null,
+                                EzRadarChartData<string>? ssrPatternRadar = null, EzChartSkillInfo? chartSkillInfo = null)
         {
             AverageKps = double.IsFinite(commonSummary.AverageKps) ? commonSummary.AverageKps : 0;
             MaxKps = double.IsFinite(commonSummary.MaxKps) ? commonSummary.MaxKps : 0;
@@ -186,7 +191,8 @@ namespace osu.Game.EzOsuGame.Analysis
             this.axes = axes;
             scalars = ratings;
             Dan = dan;
-            Radar = radar;
+            KeyPatternRadar = keyPatternRadar;
+            SsrPatternRadar = ssrPatternRadar;
             ChartSkillInfo = chartSkillInfo;
         }
 
@@ -199,7 +205,7 @@ namespace osu.Game.EzOsuGame.Analysis
         public EzScalarRating RatingOf(EzAnalysisSystem system) => Ratings.GetValueOrDefault(system);
 
         public EzAnalysisResult WithTagSummary(EzBeatmapTagSummary? tagSummary) => CommonSummary is KpsSummary commonSummary
-            ? new EzAnalysisResult(commonSummary, ManiaSummary, tagSummary, Axes, Ratings, Dan, Radar, ChartSkillInfo)
+            ? new EzAnalysisResult(commonSummary, ManiaSummary, tagSummary, Axes, Ratings, Dan, KeyPatternRadar, SsrPatternRadar, ChartSkillInfo)
             : this;
     }
 }

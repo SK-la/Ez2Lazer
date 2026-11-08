@@ -60,6 +60,8 @@ namespace osu.Game.EzOsuGame.Skills.PPP
                     beatmapInfo.ID,
                     rulesetOnlineId: rulesetId);
 
+                writeRating(beatmapInfo, rulesetId, playable, modList, skills);
+
                 return skills;
             }
             catch (Exception e) when (e is not ObjectDisposedException)
@@ -67,6 +69,14 @@ namespace osu.Game.EzOsuGame.Skills.PPP
                 Logger.Log($"[EzSkills] PPP chart compute failed for {beatmapInfo}: {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                 return null;
             }
+        }
+        private void writeRating(BeatmapInfo beatmapInfo, int rulesetId, IBeatmap playable, IReadOnlyList<Mod> mods, IReadOnlyDictionary<string, double> skills)
+        {
+            if (!skills.TryGetValue(EzPPPSkillCatalog.STAR_RATING, out double star) || star <= 0)
+                return;
+
+            double pp = EzPPPPerformanceCalculators.Calculate(rulesetId, skills, playable, mods, 1);
+            skillStore.WriteRating(beatmapInfo.ID, EzAnalysisSystem.PPP, star, pp > 0 ? pp : null);
         }
     }
 }

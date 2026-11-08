@@ -8,7 +8,6 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.Graphics;
@@ -83,8 +82,6 @@ namespace osu.Game.Rulesets.BMS
         public override PerformanceCalculator CreatePerformanceCalculator() => new ManiaPerformanceCalculator();
 
         public override IBeatmapVerifier CreateBeatmapVerifier() => new ManiaBeatmapVerifier();
-
-        public override IEzAnalysisProvider CreateEzAnalysisProvider() => new EzBms.BmsEzAnalysisProvider();
 
         public override ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap)
         {

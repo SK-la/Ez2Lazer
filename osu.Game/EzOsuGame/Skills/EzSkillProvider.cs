@@ -242,7 +242,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// verdict is not an axis, so a caller asking "has Mina settled it unrateable?" must not infer it from
         /// a row that is not there.
         /// </summary>
-        private bool isSettledUnrateableMina(string beatmapHash) => ChartStore.GetBeatmapSystemState(beatmapHash, EzAnalysisSystem.Mina, EzMinaEngine.VERSION) == EzSkillRowState.Unrateable;
+        private bool isSettledUnrateableMina(string beatmapHash) => ChartStore.GetBeatmapSystemState(beatmapHash, EzAnalysisSystem.Mina) == EzSkillRowState.Unrateable;
 
         /// <summary>
         /// Drop session-only values so the next read reflects a row written or cleared elsewhere.

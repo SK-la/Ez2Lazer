@@ -146,7 +146,7 @@ namespace osu.Game.EzOsuGame.Overlays
             string describeFacet(EzFacetStatus facet)
                 => $"{facet.Id} {EzSettingsStrings.SKILL_DATA_STATUS_READY} {facet.Ready}"
                    + $" {EzSettingsStrings.SKILL_DATA_STATUS_UNRATEABLE} {facet.Settled}"
-                   + $" {EzSettingsStrings.SKILL_DATA_STATUS_STALE} {facet.Stale}"
+                   + (facet.IsStale ? $" {EzSettingsStrings.SKILL_DATA_STATUS_STALE}" : string.Empty)
                    + $" {EzSettingsStrings.SKILL_DATA_STATUS_MISSING} {facet.Missing}";
 
             bool hasWork = statuses.Any(s => s.Report.HasWorkToDo);

@@ -4,12 +4,12 @@
 using System;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.EzMania.Analysis;
 using osu.Game.Rulesets.Mania.Objects;
-using osu.Game.Tests.EzOsuGame.Skills;
 
-namespace osu.Game.Rulesets.Mania.Tests.Analysis
+namespace osu.Game.Tests.EzOsuGame.Skills
 {
     /// <summary>
     /// Quantitative guard on the mania rating core, which is the heaviest single piece of an L3 pass on mania.
@@ -46,11 +46,13 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         public void CombinedRatingIsQuantified(int keyCount, bool holdHeavy)
         {
             ManiaBeatmap beatmap = createChart(keyCount, holdHeavy);
+            var chart = EzCSIEngine.FromPlayable(beatmap);
+            double overallDifficulty = beatmap.Difficulty.OverallDifficulty;
 
             // Resolve the cross matrix and JIT the hot paths before the first timed run.
-            EzSSREngine.CalculateSRWithPatternSnapshot(beatmap);
+            EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, overallDifficulty);
 
-            var sample = EzPerfMeasurer.Measure("sr + radar", runs, () => EzSSREngine.CalculateSRWithPatternSnapshot(beatmap));
+            var sample = EzPerfMeasurer.Measure("sr + radar", runs, () => EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, overallDifficulty));
 
             TestContext.Progress.WriteLine($"{keyCount}K holdHeavy={holdHeavy} notes={beatmap.HitObjects.Count}");
             EzPerfMeasurer.Report(new[] { sample });
@@ -74,10 +76,12 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         public void HoldDenseChartStaysLinear()
         {
             ManiaBeatmap beatmap = createChart(4, holdHeavy: true, rows: 1200);
+            var chart = EzCSIEngine.FromPlayable(beatmap);
+            double overallDifficulty = beatmap.Difficulty.OverallDifficulty;
 
-            EzSSREngine.CalculateSRWithPatternSnapshot(beatmap);
+            EzSSREngine.CalculateSRWithPatternSnapshot(chart, 4, overallDifficulty);
 
-            var sample = EzPerfMeasurer.Measure("sr hold-dense", runs, () => EzSSREngine.CalculateSRWithPatternSnapshot(beatmap));
+            var sample = EzPerfMeasurer.Measure("sr hold-dense", runs, () => EzSSREngine.CalculateSRWithPatternSnapshot(chart, 4, overallDifficulty));
 
             EzPerfMeasurer.Report(new[] { sample });
 

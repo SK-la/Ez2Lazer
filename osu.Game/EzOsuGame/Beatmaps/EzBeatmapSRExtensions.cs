@@ -4,13 +4,14 @@
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Skills.SSR;
 
 namespace osu.Game.EzOsuGame.Beatmaps
 {
     public static class EzBeatmapSRExtensions
     {
         public static bool SupportsSunnyStarRating(this BeatmapInfo beatmap)
-            => EzSunnyStarRatingSupport.SupportsRuleset(beatmap.Ruleset);
+            => EzSSRUnit.SupportsRuleset(beatmap.Ruleset.OnlineID);
 
         public static bool HasPersistedSunnyStarRating(this BeatmapInfo beatmap) => beatmap.EzRatingData.SunnySR >= 0;
 

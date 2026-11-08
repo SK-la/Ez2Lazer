@@ -127,7 +127,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 var osu = new EzChartSkillStore(realm).CollectAnalysisStatus().Single(s => s.RulesetOnlineId == 0);
 
                 Assert.That(osu.Report["PPP"].Ready, Is.Zero);
-                Assert.That(osu.Report["PPP"].Stale, Is.EqualTo(1));
+                Assert.That(osu.Report["PPP"].Missing, Is.EqualTo(1));
                 Assert.That(osu.Report["PPP"].Pending, Is.EqualTo(1));
             });
         }
@@ -195,6 +195,19 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 addChart(r, mania_hash, maniaRuleset, circleSize: 4);
                 addChart(r, osu_hash, osuRuleset, circleSize: 4);
             });
+
+            // The seeded library has been through a pass at the current revisions: a row or a filled column is only
+            // a result when the system that owns it is not out of date.
+            var store = new EzChartSkillStore(realm);
+
+            foreach (var system in new[]
+                     {
+                         EzAnalysisSystem.Official, EzAnalysisSystem.SSR, EzAnalysisSystem.PPP,
+                         EzAnalysisSystem.Mina, EzAnalysisSystem.CSI, EzAnalysisSystem.Dan,
+                     })
+            {
+                store.SetAppliedVersion(system, system.CurrentVersion());
+            }
         }
 
         private static void addChart(Realm r, string hash, RulesetInfo ruleset, float circleSize)

@@ -7,14 +7,11 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
-using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.EzMania.Analysis.SR4Pattern;
-using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Objects.Types;
+using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR.SR4Pattern;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Analysis
+namespace osu.Game.EzOsuGame.Skills.SSR
 {
     /// <summary>
     ///     The two coefficients the rating reads, taken from the user's Ez analysis settings.
@@ -34,6 +31,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
     /// </summary>
     public class EzSSREngine
     {
+        /// <summary>
+        /// Revision stamped on the SSR rows.
+        /// </summary>
+        /// <remarks>
+        /// The number lives here because this is the algorithm. A caller that reported a different number would be a
+        /// wiring bug, not a second revision.
+        /// </remarks>
+        public const int VERSION = 20250415;
+
         /// <summary>
         ///     Star rating above which the high-end rescale applies, from <c>Ez2Setting.SsrRescaleThreshold</c>.
         /// </summary>
@@ -78,58 +84,65 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         #region 工具方法
 
         /// <summary>
-        ///     Computes the star rating for the supplied beatmap synchronously.
+        ///     Whether this engine rates a chart with <paramref name="keyCount"/> columns.
         /// </summary>
-        /// <param name="beatmap">Beatmap instance.</param>
+        public static bool IsPatternSupported(int keyCount)
+            => keyCount >= 1 && keyCount <= CrossMatrixProvider.MAX_SUPPORTED_KEY_COUNT && CrossMatrixProvider.GetMatrix(keyCount) != null;
+
+        /// <summary>
+        ///     Computes the star rating for the supplied chart synchronously.
+        /// </summary>
+        /// <param name="chart">Chart extraction.</param>
+        /// <param name="keyCount">Column count the chart is rated as.</param>
+        /// <param name="overallDifficulty">Difficulty used for hit leniency.</param>
         /// <param name="times">Timing breakdown produced by the calculation.</param>
         /// <returns>Calculated SR value.</returns>
         [UsedImplicitly]
-        public static double CalculateSRWithTime(IBeatmap beatmap, out Dictionary<string, long>? times)
+        public static double CalculateSRWithTime(EzManiaChartInput chart, int keyCount, double overallDifficulty, out Dictionary<string, long>? times)
         {
-            (double sr, var collectedTimes) = computeInternalSunnySR(beatmap, 1.0);
+            (double sr, var collectedTimes) = computeInternalSunnySR(chart, keyCount, overallDifficulty, 1.0);
             times = collectedTimes;
             return sr;
         }
 
         [UsedImplicitly]
-        public static double CalculateSR(IBeatmap beatmap)
+        public static double CalculateSR(EzManiaChartInput chart, int keyCount, double overallDifficulty)
         {
-            (double sr, _) = computeInternalSunnySR(beatmap, 1.0);
+            (double sr, _) = computeInternalSunnySR(chart, keyCount, overallDifficulty, 1.0);
             return sr;
         }
 
         /// <summary>
         ///     Computes the star rating with clock rate adjustment (for rate-changing mods like DT/HT).
         /// </summary>
-        /// <param name="beatmap">Beatmap instance.</param>
+        /// <param name="chart">Chart extraction.</param>
+        /// <param name="keyCount">Column count the chart is rated as.</param>
+        /// <param name="overallDifficulty">Difficulty used for hit leniency.</param>
         /// <param name="clockRate">Clock rate multiplier (1.5 for DT, 0.75 for HT, etc.).</param>
         /// <returns>Calculated SR value adjusted for clock rate.</returns>
-        public static double CalculateSR(IBeatmap beatmap, double clockRate)
+        public static double CalculateSR(EzManiaChartInput chart, int keyCount, double overallDifficulty, double clockRate)
         {
-            (double sr, _) = computeInternalSunnySR(beatmap, clockRate);
+            (double sr, _) = computeInternalSunnySR(chart, keyCount, overallDifficulty, clockRate);
             return sr;
         }
 
         /// <summary>
-        ///     Computes the star rating for the supplied beatmap asynchronously.
+        ///     Computes the star rating for the supplied chart asynchronously.
         /// </summary>
-        /// <param name="beatmap">Beatmap instance.</param>
+        /// <param name="chart">Chart extraction.</param>
+        /// <param name="keyCount">Column count the chart is rated as.</param>
+        /// <param name="overallDifficulty">Difficulty used for hit leniency.</param>
         /// <returns>Tuple containing the SR value and timing breakdown.</returns>
         [UsedImplicitly]
-        public Task<(double sr, Dictionary<string, long> times)> CalculateSRAsync(IBeatmap beatmap)
-        {
-            return Task.FromResult(computeInternalSunnySR(beatmap, 1.0));
-        }
+        public Task<(double sr, Dictionary<string, long> times)> CalculateSRAsync(EzManiaChartInput chart, int keyCount, double overallDifficulty)
+            => Task.FromResult(computeInternalSunnySR(chart, keyCount, overallDifficulty, 1.0));
 
-        private static (double sr, Dictionary<string, long> times) computeInternalSunnySR(IBeatmap beatmap, double clockRate = 1.0)
+        private static (double sr, Dictionary<string, long> times) computeInternalSunnySR(EzManiaChartInput chart, int keyCount, double overallDifficulty,
+                                                                                        double clockRate = 1.0)
         {
             var stopwatch = Stopwatch.StartNew();
 
-            ManiaBeatmap maniaBeatmap = (ManiaBeatmap)beatmap;
-            // Prefer TotalColumns (reflects keymods / conversion output) over CS.
-            int keyCount = Math.Max(1, maniaBeatmap.TotalColumns > 0 ? maniaBeatmap.TotalColumns : (int)Math.Round(maniaBeatmap.Difficulty.CircleSize));
-
-            double sr = SunnySRCalculateCore(maniaBeatmap, keyCount, clockRate);
+            double sr = SunnySRCalculateCore(chart, keyCount, overallDifficulty, clockRate);
             stopwatch.Stop();
 
             var timings = new Dictionary<string, long>
@@ -193,19 +206,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 
         private static readonly Comparison<NoteStruct> note_comparer = compareNotes;
 
-        public static double SunnySRCalculateCore(ManiaBeatmap maniaBeatmap, int keyCount, double clockRate = 1.0)
+        public static double SunnySRCalculateCore(EzManiaChartInput chart, int keyCount, double overallDifficulty, double clockRate = 1.0)
         {
             var tuning = Tuning;
-            var state = buildState(maniaBeatmap, keyCount, clockRate, needPatternBars: false, tuning);
+            var state = buildState(chart, keyCount, overallDifficulty, clockRate, needPatternBars: false, tuning);
 
             if (state == null)
                 return 0.0;
 
             return finaliseDifficulty(computeLocalDifficulty(state), state.EffectiveWeights, state.Notes, state.LongNotes, tuning.RescaleThreshold);
         }
-
-        private static int resolveKeyCount(ManiaBeatmap maniaBeatmap)
-            => Math.Max(1, maniaBeatmap.TotalColumns > 0 ? maniaBeatmap.TotalColumns : (int)Math.Round(maniaBeatmap.Difficulty.CircleSize));
 
         /// <summary>
         /// Everything the per-corner terms need, derived once. Shared by the plain rating, the SR4 breakdown and
@@ -241,14 +251,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         /// Builds <paramref name="needPatternBars"/>-dependent state. The SR4 breakdown needs three burst curves where
         /// the plain rating needs one, which is why the extra curves are not always derived.
         /// </summary>
-        private static CoreState? buildState(ManiaBeatmap maniaBeatmap, int keyCount, double clockRate, bool needPatternBars, EzSSRTuning tuning)
+        private static CoreState? buildState(EzManiaChartInput chart, int keyCount, double overallDifficulty, double clockRate, bool needPatternBars, EzSSRTuning tuning)
         {
             double[]? cross = CrossMatrixProvider.GetMatrix(keyCount);
 
             if (cross == null)
                 throw new NotSupportedException($"Key mode {keyCount}k is not supported by the SR algorithm.");
 
-            int estimatedNotes = maniaBeatmap.HitObjects.Count;
+            var chartNotes = chart.Notes;
+            int estimatedNotes = chartNotes.Count;
             if (estimatedNotes == 0) return null;
 
             var notes = new List<NoteStruct>(estimatedNotes);
@@ -257,14 +268,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             for (int i = 0; i < keyCount; i++)
                 notesByColumn[i] = new List<NoteStruct>((estimatedNotes / keyCount) + 1);
 
-            foreach (var hitObject in maniaBeatmap.HitObjects)
+            foreach (var chartNote in chartNotes)
             {
-                int column = Math.Clamp(hitObject.Column, 0, keyCount - 1);
+                int column = Math.Clamp(chartNote.Column, 0, keyCount - 1);
                 // Apply clockRate to timing: faster rate = shorter intervals in calculation
-                int head = (int)Math.Round(hitObject.StartTime / clockRate);
-                int tail = (int)Math.Round(hitObject.GetEndTime() / clockRate);
-                if ((hitObject as IHasDuration)?.EndTime == null)
-                    tail = -1;
+                int head = (int)Math.Round(chartNote.TimeMs / clockRate);
+                int tail = chartNote.IsHold ? (int)Math.Round(chartNote.EndTimeMs / clockRate) : -1;
 
                 // Align with the original library behaviour: treat non-positive durations as non-LN.
                 if (tail <= head)
@@ -282,8 +291,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             var longNotes = notes.Where(n => n.IsLongNote).ToList();
             var longNotesByTails = longNotes.OrderBy(n => n.TailTime).ToList();
 
-            double od = maniaBeatmap.Difficulty.OverallDifficulty;
-            double x = computeHitLeniency(od);
+            double x = computeHitLeniency(overallDifficulty);
 
             int maxHead = notes.Max(n => n.HeadTime);
             int maxTail = longNotes.Count > 0 ? longNotes.Max(n => n.TailTime) : maxHead;
@@ -399,11 +407,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 
         #region 指标提取
 
-        internal static EzManiaSR4PatternSnapshot CalculateSR4PatternSnapshot(ManiaBeatmap maniaBeatmap, double clockRate = 1.0)
+        internal static EzManiaSR4PatternSnapshot CalculateSR4PatternSnapshot(EzManiaChartInput chart, int keyCount, double overallDifficulty, double clockRate = 1.0)
         {
-            int keyCount = resolveKeyCount(maniaBeatmap);
             var tuning = Tuning;
-            var state = buildState(maniaBeatmap, keyCount, clockRate, needPatternBars: true, tuning);
+            var state = buildState(chart, keyCount, overallDifficulty, clockRate, needPatternBars: true, tuning);
 
             if (state == null)
                 return emptyPatternSnapshot(keyCount);
@@ -415,11 +422,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         /// Total star rating and the SR4 breakdown from one derivation of the chart. The breakdown embeds the same
         /// rating, so asking for both separately ran the whole difficulty core twice for the same chart and mods.
         /// </summary>
-        internal static (double Sr, EzManiaSR4PatternSnapshot PatternSnapshot) CalculateSRWithPatternSnapshot(ManiaBeatmap maniaBeatmap, double clockRate = 1.0)
+        internal static (double Sr, EzManiaSR4PatternSnapshot PatternSnapshot) CalculateSRWithPatternSnapshot(EzManiaChartInput chart, int keyCount,
+                                                                                                                double overallDifficulty, double clockRate = 1.0)
         {
-            int keyCount = resolveKeyCount(maniaBeatmap);
             var tuning = Tuning;
-            var state = buildState(maniaBeatmap, keyCount, clockRate, needPatternBars: true, tuning);
+            var state = buildState(chart, keyCount, overallDifficulty, clockRate, needPatternBars: true, tuning);
 
             if (state == null)
                 return (0.0, emptyPatternSnapshot(keyCount));

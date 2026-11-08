@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern
+namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
 {
     internal static class EzManiaKeyPatternBracket
     {

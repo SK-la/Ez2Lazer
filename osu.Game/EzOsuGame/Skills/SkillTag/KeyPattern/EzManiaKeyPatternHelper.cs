@@ -4,11 +4,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using osu.Game.EzOsuGame.Skills.SkillTag;
-using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.Objects;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern
+namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
 {
     public readonly record struct EzManiaKeyPatternColumnHitObject(double StartTime, int Column);
 
@@ -97,23 +94,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern
     {
         public const double TIME_TOLERANCE = 3.0;
 
-        public static List<EzManiaKeyPatternColumnHitObject> GetColumnObjects(ManiaBeatmap beatmap)
-        {
-            var columnObjects = new List<EzManiaKeyPatternColumnHitObject>(beatmap.HitObjects.Count);
-
-            for (int i = 0; i < beatmap.HitObjects.Count; i++)
-            {
-                ManiaHitObject hitObject = beatmap.HitObjects[i];
-                columnObjects.Add(new EzManiaKeyPatternColumnHitObject(hitObject.StartTime, hitObject.Column));
-            }
-
-            columnObjects.Sort((left, right) => left.StartTime.CompareTo(right.StartTime));
-            return columnObjects;
-        }
-
         /// <summary>
-        /// Column objects from a lossless chart extraction. Equivalent to <see cref="GetColumnObjects(ManiaBeatmap)"/>
-        /// for a native mania chart: same pairs, same stable order.
+        /// Column objects of a chart extraction: one pair per note, in ascending time order.
         /// </summary>
         public static List<EzManiaKeyPatternColumnHitObject> GetColumnObjects(EzManiaChartInput chart)
         {
@@ -129,12 +111,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern
             return columnObjects;
         }
 
-        public static List<EzManiaKeyPatternRow> BuildRows(ManiaBeatmap beatmap, IReadOnlyList<EzManiaKeyPatternColumnHitObject> columnObjects, CancellationToken cancellationToken)
-            => BuildRows(columnObjects, time => beatmap.ControlPointInfo.TimingPointAt(time).BeatLength, cancellationToken);
-
         /// <summary>
-        /// Rows grouped from pre-built column objects, with the beat length supplied by the caller. The beatmap
-        /// overload and the extraction path both go through here, so the grouping rule exists once.
+        /// Rows grouped from pre-built column objects, with the beat length supplied by the caller, so the grouping
+        /// rule exists once.
         /// </summary>
         public static List<EzManiaKeyPatternRow> BuildRows(IReadOnlyList<EzManiaKeyPatternColumnHitObject> columnObjects, Func<double, double> beatLengthAt,
                                                            CancellationToken cancellationToken)
@@ -206,6 +185,36 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern
 
             double mod = time % interval;
             return mod <= TIME_TOLERANCE || Math.Abs(interval - mod) <= TIME_TOLERANCE;
+        }
+
+        /// <summary>
+        /// The uninherited beat length in effect at <paramref name="time"/>, matching
+        /// <c>ControlPointInfo.TimingPointAt(time).BeatLength</c>: the last point at or before the time, otherwise the
+        /// first. Falls back to the chart BPM when the extraction has no usable timing point.
+        /// </summary>
+        public static double BeatLengthAt(EzManiaChartInput chart, double time)
+        {
+            ArgumentNullException.ThrowIfNull(chart);
+
+            var points = chart.TimingPoints;
+
+            if (points.Count == 0)
+                return chart.Bpm > 0 ? 60000 / chart.Bpm : 0;
+
+            int low = 0;
+            int high = points.Count;
+
+            while (low < high)
+            {
+                int mid = (low + high) >> 1;
+
+                if (points[mid].TimeMs <= time)
+                    low = mid + 1;
+                else
+                    high = mid;
+            }
+
+            return low > 0 ? points[low - 1].BeatLengthMs : points[0].BeatLengthMs;
         }
 
         public static bool TryGetAdjacentPatternMetrics(EzManiaKeyPatternRow previous, EzManiaKeyPatternRow current, int totalColumns,

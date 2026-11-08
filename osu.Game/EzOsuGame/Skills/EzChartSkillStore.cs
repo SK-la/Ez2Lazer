@@ -38,18 +38,16 @@ namespace osu.Game.EzOsuGame.Skills
         /// not an axis, so a settled miss reads as an empty set and callers ask
         /// <see cref="GetBeatmapSystemState"/> for the reason.
         /// </summary>
-        public IReadOnlyDictionary<string, double> GetBeatmapSkills(string beatmapHash, EzAnalysisSystem system, int? algorithmVersion = null, int rulesetOnlineId = -1)
+        public IReadOnlyDictionary<string, double> GetBeatmapSkills(string beatmapHash, EzAnalysisSystem system, int rulesetOnlineId = -1)
         {
             string systemId = system.ToStorageId();
-            int version = algorithmVersion ?? EzAnalysisRevision.OfSystem(system);
 
             return realmAccess.Run(r =>
             {
                 var rows = r.All<EzBeatmapSkillValue>()
                             .Where(v => v.BeatmapHash == beatmapHash
                                         && v.SystemId == systemId
-                                        && (EzSkillRowState)v.State == EzSkillRowState.Current
-                                        && v.AlgorithmVersion == version);
+                                        && (EzSkillRowState)v.State == EzSkillRowState.Current);
 
                 if (rulesetOnlineId >= 0)
                     rows = rows.Where(v => v.RulesetOnlineId == rulesetOnlineId);
@@ -61,7 +59,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>
         /// Whether one system has a current value, a settled miss, or nothing at all for a chart.
         /// </summary>
-        public EzSkillRowState GetBeatmapSystemState(string beatmapHash, EzAnalysisSystem system, int revision)
+        public EzSkillRowState GetBeatmapSystemState(string beatmapHash, EzAnalysisSystem system)
         {
 
             string systemId = system.ToStorageId();
@@ -73,7 +71,7 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 bool any = false;
 
-                foreach (var row in r.All<EzBeatmapSkillValue>().Where(v => v.BeatmapHash == beatmapHash && v.SystemId == systemId && v.AlgorithmVersion == revision))
+                foreach (var row in r.All<EzBeatmapSkillValue>().Where(v => v.BeatmapHash == beatmapHash && v.SystemId == systemId))
                 {
                     any = true;
 
@@ -93,30 +91,8 @@ namespace osu.Game.EzOsuGame.Skills
         public IReadOnlyDictionary<string, double> GetBeatmapSkillsAtCurrentVersions(BeatmapInfo beatmapInfo, EzAnalysisSystem system)
         {
             ArgumentNullException.ThrowIfNull(beatmapInfo);
-            int rulesetId = beatmapInfo.Ruleset.OnlineID;
-            int bundle = EzAnalysisRevision.OfSystem(system);
 
-            if (bundle <= 0)
-                return new Dictionary<string, double>(StringComparer.Ordinal);
-
-            string beatmapHash = beatmapInfo.Hash;
-            string systemId = system.ToStorageId();
-
-            return realmAccess.Run(r =>
-            {
-                var rows = r.All<EzBeatmapSkillValue>()
-                            .Where(v => v.BeatmapHash == beatmapHash && v.SystemId == systemId);
-
-                var result = new Dictionary<string, double>(StringComparer.Ordinal);
-
-                foreach (var row in rows)
-                {
-                    if (row.AlgorithmVersion == bundle)
-                        result[row.SkillId] = row.Value;
-                }
-
-                return result;
-            });
+            return GetBeatmapSkills(beatmapInfo.Hash, system, beatmapInfo.Ruleset.OnlineID);
         }
 
         /// <summary>
@@ -125,8 +101,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// </summary>
         public IReadOnlyDictionary<string, IReadOnlyDictionary<string, double>> GetBeatmapSkillsForHashes(
             IEnumerable<string> beatmapHashes,
-            EzAnalysisSystem system,
-            int? algorithmVersion = null)
+            EzAnalysisSystem system)
         {
             ArgumentNullException.ThrowIfNull(beatmapHashes);
 
@@ -136,7 +111,6 @@ namespace osu.Game.EzOsuGame.Skills
 
             if (hashSet.Count == 0)
                 return new Dictionary<string, IReadOnlyDictionary<string, double>>(StringComparer.Ordinal);
-            int version = algorithmVersion ?? EzAnalysisRevision.OfSystem(system);
 
             return realmAccess.Run(r =>
             {
@@ -144,7 +118,7 @@ namespace osu.Game.EzOsuGame.Skills
                 string systemId = system.ToStorageId();
 
                 var rows = r.All<EzBeatmapSkillValue>()
-                            .Where(v => v.SystemId == systemId && v.AlgorithmVersion == version && (EzSkillRowState)v.State == EzSkillRowState.Current)
+                            .Where(v => v.SystemId == systemId && (EzSkillRowState)v.State == EzSkillRowState.Current)
                             .AsEnumerable()
                             .Where(v => hashSet.Contains(v.BeatmapHash));
 
@@ -155,17 +129,15 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
-        public bool TryGetBeatmapSkill(string beatmapHash, string skillId, out double value, int? algorithmVersion = null)
+        public bool TryGetBeatmapSkill(string beatmapHash, string skillId, out double value)
         {
-            int version = algorithmVersion ?? minaChartRevision;
             double found = double.NaN;
 
             realmAccess.Run(r =>
             {
                 var row = r.All<EzBeatmapSkillValue>()
                            .FirstOrDefault(v => v.BeatmapHash == beatmapHash
-                                                && v.SkillId == skillId
-                                                && v.AlgorithmVersion == version);
+                                                && v.SkillId == skillId);
                 if (row != null)
                     found = row.Value;
             });
@@ -203,7 +175,7 @@ namespace osu.Game.EzOsuGame.Skills
             // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
             /*
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
-            int version = algorithmVersion ?? EzAnalysisRevision.OfSystem(system);
+            int version = algorithmVersion ?? system.CurrentVersion();
             string systemId = system.ToStorageId();
 
             realmAccess.Write(r =>
@@ -231,6 +203,109 @@ namespace osu.Game.EzOsuGame.Skills
                         ComputedAt = at,
                     });
                 }
+            });
+            */
+        }
+
+        /// <summary>
+        /// The revision <paramref name="system"/> last ran at, or 0 when it has never been applied.
+        /// </summary>
+        public int GetAppliedVersion(EzAnalysisSystem system)
+        {
+            string systemId = system.ToStorageId();
+
+            if (string.IsNullOrEmpty(systemId))
+                return 0;
+
+            return realmAccess.Run(r => r.Find<EzAnalysisState>(systemId)?.AppliedVersion ?? 0);
+        }
+
+        /// <summary>Records that <paramref name="system"/> has just run at <paramref name="version"/>.</summary>
+        public void SetAppliedVersion(EzAnalysisSystem system, int version)
+        {
+            string systemId = system.ToStorageId();
+
+            if (string.IsNullOrEmpty(systemId))
+                return;
+
+            realmAccess.Write(r =>
+            {
+                if (r.Find<EzAnalysisState>(systemId) is EzAnalysisState state)
+                {
+                    state.AppliedVersion = version;
+                    return;
+                }
+
+                r.Add(new EzAnalysisState { SystemId = systemId, AppliedVersion = version });
+            });
+        }
+
+        /// <summary>
+        /// Whether <paramref name="system"/> has run at its current revision. A missing row reads as out of date, so
+        /// a fresh library and an upgraded one take the same path.
+        /// </summary>
+        public bool IsExpired(EzAnalysisSystem system) => GetAppliedVersion(system) != system.CurrentVersion();
+
+        /// <summary>
+        /// Marks <paramref name="system"/> and every system derived from it as unapplied, so the next pass recomputes
+        /// them. The dependency edges are the ones the rebuild catalog already declares.
+        /// </summary>
+        public IReadOnlyList<EzAnalysisSystem> Invalidate(EzAnalysisSystem system)
+        {
+            var invalidated = new List<EzAnalysisSystem> { system };
+            invalidated.AddRange(DownstreamOf(system));
+
+            foreach (var affected in invalidated)
+                SetAppliedVersion(affected, 0);
+
+            return invalidated;
+        }
+
+        /// <summary>
+        /// Systems that read <paramref name="system"/>, transitively. Derived from
+        /// <see cref="EzDataRebuildCatalog.DependenciesOf"/>, so an edge is declared once.
+        /// </summary>
+        public static IReadOnlyList<EzAnalysisSystem> DownstreamOf(EzAnalysisSystem system)
+        {
+            var result = new List<EzAnalysisSystem>();
+            var action = (EzDataRebuildAction)(int)system;
+
+            foreach (var node in EzDataRebuildCatalog.Realm)
+            {
+                if (node.Action == action)
+                    continue;
+
+                foreach (var dependency in EzDataRebuildCatalog.DependenciesOf(node.Action))
+                {
+                    if (dependency.Action != action)
+                        continue;
+
+                    result.Add((EzAnalysisSystem)(int)node.Action);
+                    break;
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Writes a system's star / pp onto the beatmap it belongs to. A null half is left untouched.
+        /// </summary>
+        /// <remarks>
+        /// The rating columns carry no revision of their own, so a caller only writes them after the system has been
+        /// (re)computed; the applied-version stamp is what later retires them.
+        /// </remarks>
+        public void WriteRating(Guid beatmapId, EzAnalysisSystem system, double? sr = null, double? pp = null)
+        {
+            if (beatmapId == Guid.Empty || (sr == null && pp == null))
+                return;
+
+            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+            /*
+            realmAccess.Write(r =>
+            {
+                if (r.Find<BeatmapInfo>(beatmapId) is BeatmapInfo live)
+                    EzRatingWriter.Write(live, system, sr, pp);
             });
             */
         }
@@ -410,14 +485,12 @@ namespace osu.Game.EzOsuGame.Skills
             if (string.IsNullOrEmpty(beatmapHash))
                 return false;
 
-            int revision = EzCSIEngine.VERSION;
             EzChartSkillInfo? fromRealm = null;
 
             realmAccess.Run(r =>
             {
                 var row = r.All<EzBeatmapChartSkillInfo>()
-                           .FirstOrDefault(v => v.BeatmapHash == beatmapHash
-                                                && v.InfoVersion == revision);
+                           .FirstOrDefault(v => v.BeatmapHash == beatmapHash);
                 if (row != null)
                     fromRealm = chartSkillInfoToDto(row);
             });
@@ -567,14 +640,12 @@ namespace osu.Game.EzOsuGame.Skills
             if (string.IsNullOrEmpty(beatmapHash))
                 return false;
 
-            int revision = EzDanEngine.VERSION;
             EzPersistedChartDan? fromRealm = null;
 
             realmAccess.Run(r =>
             {
                 var row = r.All<EzChartDan>()
-                           .FirstOrDefault(v => v.BeatmapHash == beatmapHash
-                                                && v.AlgorithmVersion == revision);
+                           .FirstOrDefault(v => v.BeatmapHash == beatmapHash);
                 if (row != null)
                     fromRealm = chartDanToDto(row);
             });
@@ -748,7 +819,7 @@ namespace osu.Game.EzOsuGame.Skills
                     if (stored == null || stored.Count == 0)
                         continue;
 
-                    rows[candidate.Hash] = new EzFacetRowState(complete ? EzPPPEngine.VERSION : 0, false);
+                    rows[candidate.Hash] = new EzFacetRowState(false);
                 }
 
                 var facet = new EzDataStateFacet
@@ -789,18 +860,10 @@ namespace osu.Game.EzOsuGame.Skills
             if (stored == null || stored.Count == 0 || !EzPPPSkillCatalog.SupportsRuleset(rulesetId))
                 return false;
 
-            int revision = EzPPPEngine.VERSION;
-
-            if (revision <= 0)
-                return false;
-
             var current = new Dictionary<string, double>(StringComparer.Ordinal);
 
             foreach (var row in stored)
-            {
-                if (row.AlgorithmVersion == revision)
-                    current[row.SkillId] = row.Value;
-            }
+                current[row.SkillId] = row.Value;
 
             // Completeness is the axis set the ruleset's catalog declares, not a second list kept here.
             foreach (var spec in EzPPPSkillCatalog.MetricsFor(rulesetId))
@@ -829,14 +892,11 @@ namespace osu.Game.EzOsuGame.Skills
             if (hashSet.Count == 0)
                 return new Dictionary<string, EzChartSkillInfo>(StringComparer.Ordinal);
 
-            int revision = EzCSIEngine.VERSION;
-
             return realmAccess.Run(r =>
             {
                 var result = new Dictionary<string, EzChartSkillInfo>(hashSet.Count, StringComparer.Ordinal);
 
                 var rows = r.All<EzBeatmapChartSkillInfo>()
-                            .Where(v => v.InfoVersion == revision)
                             .AsEnumerable()
                             .Where(v => hashSet.Contains(v.BeatmapHash));
 

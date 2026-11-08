@@ -161,6 +161,10 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             int csiRevision = EzCSIEngine.VERSION;
             int danRevision = EzDanEngine.VERSION;
 
+            bool minaStale = !isApplied(r, EzAnalysisSystem.Mina, minaRevision);
+            bool csiStale = !isApplied(r, EzAnalysisSystem.CSI, csiRevision);
+            bool danStale = !isApplied(r, EzAnalysisSystem.Dan, danRevision);
+
             var rateableBeatmapIds = new Dictionary<string, Guid>(StringComparer.Ordinal);
             var rateableChartMeta = new Dictionary<string, RateableChartMeta>(StringComparer.Ordinal);
 
@@ -200,7 +204,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
                 msdRowsForReader.Add(value);
 
-                if (value.AlgorithmVersion != minaRevision || (EzSkillRowState)value.State != EzSkillRowState.Current)
+                if ((EzSkillRowState)value.State != EzSkillRowState.Current)
                     continue;
 
                 if (!msdSkillsAtRevision.TryGetValue(value.BeatmapHash, out var skills))
@@ -215,8 +219,6 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             var msdRows = EzRealmFacetReader.Read(
                 msdRowsForReader,
                 static v => v.BeatmapHash,
-                static v => v.AlgorithmVersion,
-                minaRevision,
                 static v => (EzSkillRowState)v.State == EzSkillRowState.Unrateable);
 
             var csiRows = EzRealmFacetReader.Read(
@@ -224,8 +226,6 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                  .AsEnumerable()
                  .Where(v => rateableBeatmapIds.ContainsKey(v.BeatmapHash)),
                 static v => v.BeatmapHash,
-                static v => v.InfoVersion,
-                csiRevision,
                 static v => v.KeyCount < 0);
 
             // ChartDan has no settled-miss row form, so no row of it is a stub.
@@ -234,8 +234,6 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                  .AsEnumerable()
                  .Where(v => rateableBeatmapIds.ContainsKey(v.BeatmapHash)),
                 static v => v.BeatmapHash,
-                static v => v.AlgorithmVersion,
-                danRevision,
                 static _ => false);
 
             // Mina settles either with a complete axis set or as the unrateable stub. Completeness is a property of
@@ -243,11 +241,20 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             var unrateableMsd = msdRows.Where(static kv => kv.Value.CurrentStub).Select(static kv => kv.Key).ToHashSet(StringComparer.Ordinal);
             var completeMsdSkills = readCompleteMsdSkills(msdRows, msdSkillsAtRevision);
             var completeMsd = completeMsdSkills.Keys.ToHashSet(StringComparer.Ordinal);
-            var settledMsd = completeMsd.Union(unrateableMsd, StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
 
-            var settledCsi = csiRows.Where(kv => kv.Value.Revision == csiRevision).Select(static kv => kv.Key).ToHashSet(StringComparer.Ordinal);
-            var completeCsi = csiRows.Where(kv => kv.Value.Revision == csiRevision && !kv.Value.CurrentStub).Select(static kv => kv.Key).ToHashSet(StringComparer.Ordinal);
-            var completeDan = danRows.Where(kv => kv.Value.Revision == danRevision).Select(static kv => kv.Key).ToHashSet(StringComparer.Ordinal);
+            var settledMsd = minaStale
+                ? new HashSet<string>(StringComparer.Ordinal)
+                : completeMsd.Union(unrateableMsd, StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
+
+            var settledCsi = csiStale
+                ? new HashSet<string>(StringComparer.Ordinal)
+                : csiRows.Select(static kv => kv.Key).ToHashSet(StringComparer.Ordinal);
+            var completeCsi = csiStale
+                ? new HashSet<string>(StringComparer.Ordinal)
+                : csiRows.Where(static kv => !kv.Value.CurrentStub).Select(static kv => kv.Key).ToHashSet(StringComparer.Ordinal);
+            var completeDan = danStale
+                ? new HashSet<string>(StringComparer.Ordinal)
+                : danRows.Select(static kv => kv.Key).ToHashSet(StringComparer.Ordinal);
 
             var unresolvableDan = deriveUnresolvableChartDan(completeMsdSkills, rateableChartMeta);
             var settledChartDan = unrateableMsd.Union(unresolvableDan, StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
@@ -262,6 +269,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                     CurrentRevision = minaRevision,
                     UniverseCount = universe,
                     Rows = msdRows,
+                    IsStale = minaStale,
                 },
                 new EzDataStateFacet
                 {
@@ -270,6 +278,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                     UniverseCount = universe,
                     Rows = csiRows,
                     SettledWithoutRow = unrateableMsd,
+                    IsStale = csiStale,
                 },
                 new EzDataStateFacet
                 {
@@ -278,6 +287,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                     UniverseCount = universe,
                     Rows = danRows,
                     SettledWithoutRow = settledChartDan,
+                    IsStale = danStale,
                 },
             };
 
@@ -292,6 +302,10 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 completeDan,
                 unresolvableDan);
         }
+
+        /// <summary>Whether a system has run at <paramref name="revision"/>; a missing stamp reads as out of date.</summary>
+        private static bool isApplied(Realm r, EzAnalysisSystem system, int revision)
+            => (r.Find<EzAnalysisState>(system.ToStorageId())?.AppliedVersion ?? 0) == revision;
 
         /// <summary>
         /// Chart Mina axis sets that are complete at the current revision, keyed by hash, for the two verdicts that

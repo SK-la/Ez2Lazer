@@ -81,8 +81,21 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                 return null;
 
             skillStore.WriteBeatmapMsd(beatmapInfo.Hash, computed.Value, beatmapInfo.ID);
+            writeRating(beatmapInfo, computed.Value);
 
             return toDictionary(computed.Value);
+        }
+
+        /// <summary>
+        /// Mirrors the engine's overall onto the chart's Mina star. The engine scale is converted here, at the write,
+        /// so every reader of the stored rating sees a star.
+        /// </summary>
+        private void writeRating(BeatmapInfo beatmapInfo, EzMinaSkillAxisVector vector)
+        {
+            if (vector.Overall <= 0)
+                return;
+
+            skillStore.WriteRating(beatmapInfo.ID, EzAnalysisSystem.Mina, EzMinaRatingScale.ToStarRating(vector.Overall));
         }
 
         private static EzMinaSkillAxisVector? computeVector(

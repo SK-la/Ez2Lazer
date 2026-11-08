@@ -11,8 +11,8 @@ using osu.Framework.Extensions;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Scoring;
@@ -67,16 +67,14 @@ namespace osu.Game.Tests.Database
                         continue;
                     }
 
-                    if (EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(ruleset, out int ssrVersion))
-                        ruleset.LastAppliedSunnySRVersion = ssrVersion;
                 }
 
                 foreach (var beatmap in r.All<BeatmapInfo>())
                 {
-                    if (beatmap.EzRatingData.SunnySR < 0 && EzSunnyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
+                    if (beatmap.EzRatingData.SunnySR < 0 && EzSSRUnit.SupportsRuleset(beatmap.Ruleset.OnlineID))
                         beatmap.EzRatingData.SunnySR = beatmap.StarRating >= 0 ? beatmap.StarRating : 0;
 
-                    if (beatmap.PerformancePoints < 0 && EzSunnyStarRatingSupport.IsRulesetAvailable(beatmap.Ruleset))
+                    if (beatmap.PerformancePoints < 0 && beatmap.Ruleset.Available)
                         beatmap.PerformancePoints = 0;
 
                     beatmap.HasVideo ??= false;

@@ -4,7 +4,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Analysis
+namespace osu.Game.EzOsuGame.Skills.SSR
 {
     /// <summary>
     ///     交叉矩阵提供者，用于SR计算中的列间 权重矩阵
@@ -51,7 +51,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         /// <summary>
         ///     由相邻偶数键同位置系数推断奇数键交叉矩阵（长度 k+1）。
         /// </summary>
-        internal static double[] InferMatrixFromNeighbors(int k)
+        public static double[] InferMatrixFromNeighbors(int k)
         {
             double[]? lower = getDefaultMatrix(k - 1);
             double[]? upper = getDefaultMatrix(k + 1);
@@ -112,7 +112,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         /// <summary>
         ///     清除全部自定义矩阵与推断缓存（仅测试使用）。
         /// </summary>
-        internal static void ResetStateForTests()
+        public static void ResetStateForTests()
         {
             custom_matrices.Clear();
             inferred_matrices_cache.Clear();

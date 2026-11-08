@@ -65,22 +65,12 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 store.UpsertChartSkillInfo(mania_a, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
                 store.WriteChartSkillInfoUnavailable(mania_b, Guid.NewGuid());
 
-                // Dan: a and b current, c left behind by an older revision.
+                // Dan: a and b have a row, c has none.
                 store.UpsertChartDan(chartDan(mania_a));
                 store.UpsertChartDan(chartDan(mania_b));
 
-                realm.Write(r => r.Add(new EzChartDan
-                {
-                    BeatmapHash = mania_c,
-                    AlgorithmVersion = EzDanEngine.VERSION - 1,
-                    KeyCount = 4,
-                    HoldRatio = 0.1,
-                    OverallMsd = 10,
-                    RcRawDan = 5,
-                    RcLabel = "Shodan",
-                    LnRawDan = -1,
-                    ComputedAt = DateTimeOffset.UtcNow,
-                }));
+                // Rows only count once the systems have run at their current revision.
+                markApplied(store, EzAnalysisSystem.Mina, EzAnalysisSystem.CSI, EzAnalysisSystem.Dan, EzAnalysisSystem.PPP);
 
                 var status = store.GetSkillDataStatus();
 
@@ -88,7 +78,6 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
                 Assert.That(status["Mina"].Ready, Is.EqualTo(1));
                 Assert.That(status["Mina"].Settled, Is.EqualTo(1));
-                Assert.That(status["Mina"].Stale, Is.EqualTo(0));
                 Assert.That(status["Mina"].Missing, Is.EqualTo(1));
                 Assert.That(status["Mina"].CurrentRevision, Is.EqualTo(EzMinaEngine.VERSION));
 
@@ -98,11 +87,10 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(status["CSI"].CurrentRevision, Is.EqualTo(EzCSIEngine.VERSION));
 
                 // Dan: a is ready, b is settled by its unrateable Mina (the row written for it is not read as a
-                // result), c is left behind by an older revision.
+                // result), c has no row.
                 Assert.That(status["Dan"].Ready, Is.EqualTo(1));
                 Assert.That(status["Dan"].Settled, Is.EqualTo(1));
-                Assert.That(status["Dan"].Stale, Is.EqualTo(1));
-                Assert.That(status["Dan"].Missing, Is.EqualTo(0));
+                Assert.That(status["Dan"].Missing, Is.EqualTo(1));
                 Assert.That(status["Dan"].CurrentRevision, Is.EqualTo(EzDanEngine.VERSION));
 
                 // a is complete everywhere; b has Mina+CSI settled and a current Dan; c has only a stale Dan row.
@@ -139,6 +127,12 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(status["CSI"].Ready, Is.EqualTo(0));
                 Assert.That(status["CSI"].Missing, Is.EqualTo(3));
             });
+        }
+
+        private static void markApplied(EzChartSkillStore store, params EzAnalysisSystem[] systems)
+        {
+            foreach (var system in systems)
+                store.SetAppliedVersion(system, system.CurrentVersion());
         }
 
         private static EzPersistedChartDan chartDan(string hash) => new EzPersistedChartDan
@@ -293,6 +287,10 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 addChart(r, mania_c, maniaRuleset, circleSize: 7);
                 addChart(r, osu_hash, osuRuleset, circleSize: 4);
             });
+
+            // The seeded library has been through a pass at the current revisions, which is what lets a row count
+            // as a result rather than as work.
+            markApplied(new EzChartSkillStore(realm), EzAnalysisSystem.Mina, EzAnalysisSystem.CSI, EzAnalysisSystem.Dan, EzAnalysisSystem.PPP);
         }
 
         private static void addChart(Realm r, string hash, RulesetInfo ruleset, float circleSize)

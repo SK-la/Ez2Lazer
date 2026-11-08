@@ -27,7 +27,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// Bump when the mapping changes: interval tables, the fallback heuristic, side selection, or the credit
         /// semantics applied on top.
         /// </remarks>
-        public const int VERSION = 1;
+        public const int VERSION = 20240301;
 
         public static EzChartDanVerdict? FromMsdAndPlayable(
             IReadOnlyDictionary<string, double> msd,

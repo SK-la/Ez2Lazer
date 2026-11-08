@@ -19,7 +19,6 @@ using osu.Game.Beatmaps.Formats;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Extensions;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Localisation;
@@ -235,7 +234,6 @@ namespace osu.Game.Rulesets
         /// <returns>A skin with a transformer applied, or null if no transformation is provided by this ruleset.</returns>
         public virtual ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap) => null;
 
-        public virtual IEzAnalysisProvider? CreateEzAnalysisProvider() => null;
         public virtual IEzReplaySession? CreateEzReplaySession() => null;
 
         protected Ruleset()

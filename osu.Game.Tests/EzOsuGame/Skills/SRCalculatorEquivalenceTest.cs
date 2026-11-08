@@ -2,15 +2,15 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
+using osu.Game.EzOsuGame.Skills.SSR.SR4Pattern;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.EzMania.Analysis;
-using osu.Game.Rulesets.Mania.EzMania.Analysis.SR4Pattern;
 using osu.Game.Rulesets.Mania.Objects;
 
-namespace osu.Game.Rulesets.Mania.Tests.Analysis
+namespace osu.Game.Tests.EzOsuGame.Skills
 {
     /// <summary>
     /// The combined rating pass must produce the same numbers as the two single-purpose entry points it replaces:
@@ -24,11 +24,13 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         public void CombinedMatchesSeparateCalls(int keyCount)
         {
             ManiaBeatmap beatmap = createChart(keyCount);
+            var chart = EzCSIEngine.FromPlayable(beatmap);
+            double overallDifficulty = beatmap.Difficulty.OverallDifficulty;
 
-            double expectedSr = EzSSREngine.CalculateSR(beatmap);
-            EzManiaSR4PatternSnapshot expectedSnapshot = EzSSREngine.CalculateSR4PatternSnapshot(beatmap);
+            double expectedSr = EzSSREngine.CalculateSR(chart, keyCount, overallDifficulty);
+            EzManiaSR4PatternSnapshot expectedSnapshot = EzSSREngine.CalculateSR4PatternSnapshot(chart, keyCount, overallDifficulty);
 
-            var combined = EzSSREngine.CalculateSRWithPatternSnapshot(beatmap);
+            var combined = EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, overallDifficulty);
 
             assertBitIdentical(expectedSr, combined.Sr, "total SR");
             assertBitIdentical(expectedSnapshot.BracketStar, combined.PatternSnapshot.BracketStar, "bracket star");
@@ -53,9 +55,11 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         public void CombinedMatchesOnHoldHeavyChart()
         {
             ManiaBeatmap beatmap = createChart(4, holdEveryRow: true);
+            var chart = EzCSIEngine.FromPlayable(beatmap);
+            double overallDifficulty = beatmap.Difficulty.OverallDifficulty;
 
-            double expectedSr = EzSSREngine.CalculateSR(beatmap);
-            var combined = EzSSREngine.CalculateSRWithPatternSnapshot(beatmap);
+            double expectedSr = EzSSREngine.CalculateSR(chart, 4, overallDifficulty);
+            var combined = EzSSREngine.CalculateSRWithPatternSnapshot(chart, 4, overallDifficulty);
 
             assertBitIdentical(expectedSr, combined.Sr, "total SR");
         }
@@ -63,7 +67,8 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         private static void assertBitIdentical(double expected, double actual, string label)
             => Assert.That(BitConverter.DoubleToInt64Bits(actual), Is.EqualTo(BitConverter.DoubleToInt64Bits(expected)), label);
 
-        private static void assertBitIdentical(IReadOnlyList<double> expected, IReadOnlyList<double> actual, string label)
+        private static void assertBitIdentical(System.Collections.Generic.IReadOnlyList<double> expected,
+                                               System.Collections.Generic.IReadOnlyList<double> actual, string label)
         {
             Assert.That(actual.Count, Is.EqualTo(expected.Count), $"{label} length");
 

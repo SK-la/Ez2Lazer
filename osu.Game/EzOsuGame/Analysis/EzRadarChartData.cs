@@ -8,8 +8,9 @@ namespace osu.Game.EzOsuGame.Analysis
 {
     public readonly record struct EzRadarAxisValue<TAxis>(TAxis Axis, double Value, string Format = "0.0");
 
-    public readonly record struct EzRulesetSpecificRadarResult(EzRadarChartData<string> KeyPatternRadarData, EzRadarChartData<string> SunnySRPatternRadarData, double? SunnySR);
-
+    /// <summary>
+    /// A fixed-size polygon of axis values, as a reader draws it.
+    /// </summary>
     public readonly struct EzRadarChartData<TAxis>
     {
         public const int AXIS_COUNT = 6;
