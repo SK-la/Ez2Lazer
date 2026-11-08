@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -47,6 +48,13 @@ namespace osu.Game.EzOsuGame.Analysis
         private static int computeFailCount;
 
         private readonly EzAnalysisLiveCache liveMetrics;
+
+        /// <summary>
+        /// Passes currently running or queued, keyed like <see cref="EzAnalysisLiveCache"/>. A second request for the
+        /// same key joins the running pass instead of queueing a duplicate behind it.
+        /// </summary>
+        private readonly ConcurrentDictionary<EzAnalysisLiveCache.AnalysisKey, InFlightPass> inFlightPasses
+            = new ConcurrentDictionary<EzAnalysisLiveCache.AnalysisKey, InFlightPass>();
 
         public EzAnalysisCache(EzAnalysisLiveCache? liveMetrics = null)
         {
@@ -370,6 +378,11 @@ namespace osu.Game.EzOsuGame.Analysis
         /// Runs the pass for <paramref name="lookup"/> into the shared session store. There is no second cache below
         /// this one: a caller either finds the entry in <see cref="EzAnalysisLiveCache"/> or it is computed here.
         /// </summary>
+        /// <remarks>
+        /// Requests for the same key share one pass. Each waiter contributes a reference; the pass is cancelled only
+        /// when the last of them goes away, so a panel recycled while another surface still wants the same chart does
+        /// not abort the shared compute.
+        /// </remarks>
         private async Task<EzAnalysisResult?> computeIntoStoreAsync(EzAnalysisLookupCache lookup, CancellationToken cancellationToken, int computationDelay)
         {
             if (computationDelay > 0)
@@ -378,10 +391,58 @@ namespace osu.Game.EzOsuGame.Analysis
             return await ComputeValueAsync(lookup, cancellationToken).ConfigureAwait(false);
         }
 
-        protected Task<EzAnalysisResult?> ComputeValueAsync(EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
+        protected async Task<EzAnalysisResult?> ComputeValueAsync(EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
         {
             var key = keyOf(lookup);
 
+            while (true)
+            {
+                if (inFlightPasses.TryGetValue(key, out var existing))
+                {
+                    if (existing.TryJoin())
+                    {
+                        try
+                        {
+                            return await existing.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+                        }
+                        finally
+                        {
+                            existing.Leave();
+                        }
+                    }
+
+                    // The pass completed between the lookup and the join; drop it so the next iteration can start a
+                    // fresh one instead of spinning on a finished entry.
+                    removeInFlightPass(key, existing);
+                    continue;
+                }
+
+                var created = new InFlightPass();
+                created.Task = startPassTask(key, lookup, created.Cancellation.Token);
+
+                if (!inFlightPasses.TryAdd(key, created))
+                {
+                    // Another caller installed a pass for this key first; the one not observed must not keep running.
+                    await created.Cancellation.CancelAsync();
+                    continue;
+                }
+
+                created.TryJoin();
+
+                try
+                {
+                    return await created.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    created.Leave();
+                    removeInFlightPass(key, created);
+                }
+            }
+        }
+
+        private Task<EzAnalysisResult?> startPassTask(EzAnalysisLiveCache.AnalysisKey key, EzAnalysisLookupCache lookup, CancellationToken cancellationToken)
+        {
             return Task.Factory.StartNew(() =>
             {
                 // The scheduler is single-threaded, so two callers that both missed before this task ran are queued
@@ -397,6 +458,54 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 return computed;
             }, cancellationToken, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, updateScheduler);
+        }
+
+        private void removeInFlightPass(EzAnalysisLiveCache.AnalysisKey key, InFlightPass pass)
+        {
+            if (inFlightPasses.TryGetValue(key, out var current) && ReferenceEquals(current, pass))
+                inFlightPasses.TryRemove(key, out _);
+        }
+
+        /// <summary>
+        /// One pass shared by every caller waiting on a key. The cancellation source is deliberately never disposed:
+        /// a waiter that joins after the pass completed still releases its reference, and a disposed source would
+        /// turn that release into an exception.
+        /// </summary>
+        private sealed class InFlightPass
+        {
+            public readonly CancellationTokenSource Cancellation = new CancellationTokenSource();
+            public Task<EzAnalysisResult?> Task = null!;
+
+            private readonly Lock gate = new Lock();
+            private int waiters;
+            private bool finished;
+
+            public bool TryJoin()
+            {
+                lock (gate)
+                {
+                    if (finished)
+                        return false;
+
+                    waiters++;
+                    return true;
+                }
+            }
+
+            public void Leave()
+            {
+                lock (gate)
+                {
+                    if (waiters > 0)
+                        waiters--;
+
+                    if (waiters > 0 || finished)
+                        return;
+
+                    finished = true;
+                    Cancellation.Cancel();
+                }
+            }
         }
 
         private void updateTrackedBindables()
@@ -468,6 +577,8 @@ namespace osu.Game.EzOsuGame.Analysis
             }
             catch (BeatmapInvalidForRulesetException invalidForRuleset)
             {
+                EzAnalysisPassPerf.RecordPass(succeeded: false);
+
                 if (lookup.Ruleset.Equals(lookup.BeatmapInfo.Ruleset))
                     Logger.Error(invalidForRuleset, $"[EzAnalysisCache] Failed to convert {lookup.BeatmapInfo.OnlineID} to the beatmap's default ruleset ({lookup.BeatmapInfo.Ruleset}).", Ez2ConfigManager.LOGGER_NAME);
 
@@ -475,6 +586,8 @@ namespace osu.Game.EzOsuGame.Analysis
             }
             catch (Exception ex)
             {
+                EzAnalysisPassPerf.RecordPass(succeeded: false);
+
                 if (Interlocked.Increment(ref computeFailCount) <= 10)
                 {
                     string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));

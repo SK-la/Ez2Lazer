@@ -144,13 +144,59 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 
         public static double XxySRCalculateCore(ManiaBeatmap maniaBeatmap, int keyCount, double clockRate = 1.0)
         {
+            var state = buildState(maniaBeatmap, keyCount, clockRate, needPatternBars: false);
+
+            if (state == null)
+                return 0.0;
+
+            return finaliseDifficulty(computeLocalDifficulty(state), state.EffectiveWeights, state.Notes, state.LongNotes);
+        }
+
+        private static int resolveKeyCount(ManiaBeatmap maniaBeatmap)
+            => Math.Max(1, maniaBeatmap.TotalColumns > 0 ? maniaBeatmap.TotalColumns : (int)Math.Round(maniaBeatmap.Difficulty.CircleSize));
+
+        /// <summary>
+        /// Everything the per-corner terms need, derived once. Shared by the plain rating, the SR4 breakdown and
+        /// the combined call so a chart's note list, corners and curves are only built once.
+        /// </summary>
+        private sealed class CoreState
+        {
+            public int KeyCount;
+            public List<NoteStruct> Notes = null!;
+            public List<NoteStruct> LongNotes = null!;
+            public double[] AllCorners = null!;
+            public double[] BaseCorners = null!;
+            public double[] ACorners = null!;
+            public bool[][] KeyUsage = null!;
+            public int[][] ActiveColumns = null!;
+            public double[][] DeltaKs = null!;
+            public double[] JBar = null!;
+            public double[] XBar = null!;
+            public double[] PBar = null!;
+            public double[] RBar = null!;
+            public double[] ABar = null!;
+            public double[] CArr = null!;
+            public double[] KsArr = null!;
+            public double[] Gaps = null!;
+            public double[] EffectiveWeights = null!;
+            public double[]? BurstBar;
+            public double[]? LongNoteUsageBar;
+            public double[]? AnchoredBurstBar;
+        }
+
+        /// <summary>
+        /// Builds <paramref name="needPatternBars"/>-dependent state. The SR4 breakdown needs three burst curves where
+        /// the plain rating needs one, which is why the extra curves are not always derived.
+        /// </summary>
+        private static CoreState? buildState(ManiaBeatmap maniaBeatmap, int keyCount, double clockRate, bool needPatternBars)
+        {
             double[]? cross = CrossMatrixProvider.GetMatrix(keyCount);
 
             if (cross == null)
                 throw new NotSupportedException($"Key mode {keyCount}k is not supported by the SR algorithm.");
 
             int estimatedNotes = maniaBeatmap.HitObjects.Count;
-            if (estimatedNotes == 0) return 0.0;
+            if (estimatedNotes == 0) return null;
 
             var notes = new List<NoteStruct>(estimatedNotes);
             var notesByColumn = new List<NoteStruct>[keyCount];
@@ -232,172 +278,154 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             for (int i = 0; i < allCorners.Length; i++)
                 effectiveWeights[i] = cArr[i] * gaps[i];
 
-            double[] dAll = new double[allCorners.Length];
-
-            // Original sequential loop
-            // for (int i = 0; i < allCorners.Length; i++)
-            // {
-            //     ...
-            // }
-
-            // Parallel version for better performance
-            Parallel.For(0, allCorners.Length, i =>
+            var state = new CoreState
             {
-                double abarExponent = 3.0 / Math.Max(ksArr[i], 1e-6);
-                double abarPow = aBar[i] <= 0 ? 0 : Math.Pow(aBar[i], abarExponent);
-                double minCandidateContribution = 0.85 * jBar[i];
-                double minCandidate = 8 + minCandidateContribution;
-                double minJ = Math.Min(jBar[i], minCandidate);
-                double jackComponent = abarPow * minJ;
-                double term1 = 0.4 * (jackComponent <= 0 ? 0 : Math.Pow(jackComponent, 1.5));
+                KeyCount = keyCount,
+                Notes = notes,
+                LongNotes = longNotes,
+                AllCorners = allCorners,
+                BaseCorners = baseCorners,
+                ACorners = aCorners,
+                KeyUsage = keyUsage,
+                ActiveColumns = activeColumns,
+                DeltaKs = deltaKs,
+                JBar = jBar,
+                XBar = xBar,
+                PBar = pBar,
+                RBar = rBar,
+                ABar = aBar,
+                CArr = cArr,
+                KsArr = ksArr,
+                Gaps = gaps,
+                EffectiveWeights = effectiveWeights,
+            };
 
-                double scaledP = 0.8 * pBar[i];
-                double jackPenalty = rBar[i] * 35.0;
-                double ratio = jackPenalty / (cArr[i] + 8);
-                double pComponent = scaledP + ratio;
-                double powerBase = (aBar[i] <= 0 ? 0 : Math.Pow(aBar[i], 2.0 / 3.0)) * pComponent;
-                double term2 = 0.6 * (powerBase <= 0 ? 0 : Math.Pow(powerBase, 1.5));
+            if (!needPatternBars)
+                return state;
 
-                double sumTerms = term1 + term2;
-                double s = sumTerms <= 0 ? 0 : Math.Pow(sumTerms, 2.0 / 3.0);
-                double numerator = abarPow * xBar[i];
-                double denominator = xBar[i] + s + 1;
-                double tValue = denominator <= 0 ? 0 : numerator / denominator;
-                double sqrtComponent = Math.Sqrt(Math.Max(s, 0));
-                double primaryImpact = 2.7 * sqrtComponent * (tValue <= 0 ? 0 : Math.Pow(tValue, 1.5));
-                double secondaryImpact = s * 0.27;
+            // The breakdown splits the same burst term into its parts: without holds, with holds but a neutral
+            // anchor, and the full form. The full form is the plain rating's pBar, so it is reused rather than
+            // recomputed.
+            double[] neutralAnchorBase = Enumerable.Repeat(1.0, baseCorners.Length).ToArray();
 
-                dAll[i] = primaryImpact + secondaryImpact;
+            state.BurstBar = interpValues(allCorners, baseCorners,
+                computePBar(keyCount, totalTime, x, notes, null, neutralAnchorBase, baseCorners));
+            state.LongNoteUsageBar = interpValues(allCorners, baseCorners,
+                computePBar(keyCount, totalTime, x, notes, lnRep, neutralAnchorBase, baseCorners));
+            state.AnchoredBurstBar = pBar;
+
+            return state;
+        }
+
+        /// <summary>
+        /// The per-corner difficulty terms, which is what both the total rating and the SR4 breakdown start from.
+        /// </summary>
+        private static double[] computeLocalDifficulty(CoreState state)
+        {
+            int length = state.AllCorners.Length;
+            double[] dAll = new double[length];
+
+            double[] jBar = state.JBar;
+            double[] aBar = state.ABar;
+            double[] ksArr = state.KsArr;
+            double[] rBar = state.RBar;
+            double[] cArr = state.CArr;
+            double[] pBar = state.PBar;
+            double[] xBar = state.XBar;
+
+            Parallel.For(0, length, i =>
+            {
+                double term1 = computeSR4JackTerm(jBar[i], aBar[i], ksArr[i]);
+                double term2 = computeSR4BurstTerm(pBar[i], rBar[i], aBar[i], cArr[i]);
+                dAll[i] = computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], term1, term2);
             });
 
-            double sr = finaliseDifficulty(dAll, effectiveWeights, notes, longNotes);
-
-            //Logger.Log($"C# final SR: {sr}");
-
-            return sr;
+            return dAll;
         }
 
         #region 指标提取
 
         internal static EzManiaSR4PatternSnapshot CalculateSR4PatternSnapshot(ManiaBeatmap maniaBeatmap, double clockRate = 1.0)
         {
-            int keyCount = Math.Max(1, maniaBeatmap.TotalColumns > 0 ? maniaBeatmap.TotalColumns : (int)Math.Round(maniaBeatmap.Difficulty.CircleSize));
-            double[]? cross = CrossMatrixProvider.GetMatrix(keyCount);
+            int keyCount = resolveKeyCount(maniaBeatmap);
+            var state = buildState(maniaBeatmap, keyCount, clockRate, needPatternBars: true);
 
-            if (cross == null)
-                throw new NotSupportedException($"Key mode {keyCount}k is not supported by the SR algorithm.");
+            if (state == null)
+                return emptyPatternSnapshot(keyCount);
 
-            int estimatedNotes = maniaBeatmap.HitObjects.Count;
+            return buildPatternSnapshot(state, computeLocalDifficulty(state));
+        }
 
-            if (estimatedNotes == 0)
+        /// <summary>
+        /// Total star rating and the SR4 breakdown from one derivation of the chart. The breakdown embeds the same
+        /// rating, so asking for both separately ran the whole difficulty core twice for the same chart and mods.
+        /// </summary>
+        internal static (double Sr, EzManiaSR4PatternSnapshot PatternSnapshot) CalculateSRWithPatternSnapshot(ManiaBeatmap maniaBeatmap, double clockRate = 1.0)
+        {
+            int keyCount = resolveKeyCount(maniaBeatmap);
+            var state = buildState(maniaBeatmap, keyCount, clockRate, needPatternBars: true);
+
+            if (state == null)
+                return (0.0, emptyPatternSnapshot(keyCount));
+
+            double[] difficulty = computeLocalDifficulty(state);
+            double sr = finaliseDifficulty(difficulty, state.EffectiveWeights, state.Notes, state.LongNotes);
+
+            return (sr, buildPatternSnapshot(state, difficulty));
+        }
+
+        private static EzManiaSR4PatternSnapshot emptyPatternSnapshot(int keyCount)
+            => new EzManiaSR4PatternSnapshot(
+                keyCount,
+                Array.Empty<double>(),
+                Array.Empty<double>(),
+                Array.Empty<double>(),
+                Array.Empty<double>(),
+                Array.Empty<double>(),
+                Array.Empty<double>(),
+                Array.Empty<double>(),
+                Array.Empty<double>(),
+                Array.Empty<double>(),
+                0,
+                0,
+                0,
+                0,
+                0,
+                0);
+
+        /// <summary>
+        /// Splits <paramref name="totalDifficulty"/> across the measured curves. Everything it reads comes from
+        /// <paramref name="state"/>, so it is a pure function of the pass that produced it.
+        /// </summary>
+        private static EzManiaSR4PatternSnapshot buildPatternSnapshot(CoreState state, double[] totalDifficulty)
+        {
+            double[] xBar = state.XBar;
+            double[] aBar = state.ABar;
+            double[] ksArr = state.KsArr;
+            double[] cArr = state.CArr;
+            double[] jBar = state.JBar;
+            double[] rBar = state.RBar;
+            double[] burstBar = state.BurstBar ?? throw new InvalidOperationException("Pattern bars were not built for this pass.");
+            double[] longNoteUsageBar = state.LongNoteUsageBar ?? throw new InvalidOperationException("Pattern bars were not built for this pass.");
+            double[] anchoredBurstBar = state.AnchoredBurstBar ?? throw new InvalidOperationException("Pattern bars were not built for this pass.");
+
+            int length = state.AllCorners.Length;
+            double[] bracketContribution = new double[length];
+            double[] jackContribution = new double[length];
+            double[] burstContribution = new double[length];
+            double[] longNoteUsageContribution = new double[length];
+            double[] longNoteReleaseContribution = new double[length];
+            double[] anchorContribution = new double[length];
+            double[] bracketAllocated = new double[length];
+            double[] jackAllocated = new double[length];
+            double[] burstAllocated = new double[length];
+            double[] longNoteUsageAllocated = new double[length];
+            double[] longNoteReleaseAllocated = new double[length];
+            double[] anchorAllocated = new double[length];
+
+            for (int i = 0; i < length; i++)
             {
-                return new EzManiaSR4PatternSnapshot(
-                    keyCount,
-                    Array.Empty<double>(),
-                    Array.Empty<double>(),
-                    Array.Empty<double>(),
-                    Array.Empty<double>(),
-                    Array.Empty<double>(),
-                    Array.Empty<double>(),
-                    Array.Empty<double>(),
-                    Array.Empty<double>(),
-                    Array.Empty<double>(),
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0);
-            }
-
-            var notes = new List<NoteStruct>(estimatedNotes);
-            var notesByColumn = new List<NoteStruct>[keyCount];
-
-            for (int i = 0; i < keyCount; i++)
-                notesByColumn[i] = new List<NoteStruct>((estimatedNotes / keyCount) + 1);
-
-            foreach (var hitObject in maniaBeatmap.HitObjects)
-            {
-                int column = Math.Clamp(hitObject.Column, 0, keyCount - 1);
-                int head = (int)Math.Round(hitObject.StartTime / clockRate);
-                int tail = (int)Math.Round(hitObject.GetEndTime() / clockRate);
-
-                if ((hitObject as IHasDuration)?.EndTime == null)
-                    tail = -1;
-
-                if (tail <= head)
-                    tail = -1;
-
-                var note = new NoteStruct(column, head, tail);
-                notes.Add(note);
-                notesByColumn[column].Add(note);
-            }
-
-            notes.Sort(note_comparer);
-
-            foreach (var columnNotes in notesByColumn)
-                columnNotes.Sort(note_comparer);
-
-            var longNotes = notes.Where(n => n.IsLongNote).ToList();
-            var longNotesByTails = longNotes.OrderBy(n => n.TailTime).ToList();
-
-            double x = computeHitLeniency(maniaBeatmap.Difficulty.OverallDifficulty);
-            int maxHead = notes.Max(n => n.HeadTime);
-            int maxTail = longNotes.Count > 0 ? longNotes.Max(n => n.TailTime) : maxHead;
-            int totalTime = Math.Max(maxHead, maxTail) + 1;
-
-            (double[] allCorners, double[] baseCorners, double[] aCorners) = buildCorners(totalTime, notes);
-            bool[][] keyUsage = buildKeyUsage(keyCount, totalTime, notes, baseCorners);
-            int[][] activeColumns = deriveActiveColumns(keyUsage);
-            double[][] keyUsage400 = buildKeyUsage400(keyCount, totalTime, notes, baseCorners);
-            double[] anchorBase = computeAnchor(keyCount, keyUsage400, baseCorners);
-            LNRepStruct? lnRep = longNotes.Count > 0 ? buildLNRepresentation(longNotes, totalTime) : null;
-
-            double[] neutralAnchorBase = Enumerable.Repeat(1.0, baseCorners.Length).ToArray();
-
-            (double[][] deltaKs, double[] jBarBase) = computeJBar(keyCount, totalTime, x, notesByColumn, baseCorners);
-            double[] jBar = interpValues(allCorners, baseCorners, jBarBase);
-
-            double[] xBarBase = computeXBar(keyCount, totalTime, x, notesByColumn, activeColumns, baseCorners, cross);
-            double[] xBar = interpValues(allCorners, baseCorners, xBarBase);
-
-            double[] burstBase = computePBar(keyCount, totalTime, x, notes, null, neutralAnchorBase, baseCorners);
-            double[] burstBar = interpValues(allCorners, baseCorners, burstBase);
-
-            double[] longNoteUsageBase = computePBar(keyCount, totalTime, x, notes, lnRep, neutralAnchorBase, baseCorners);
-            double[] longNoteUsageBar = interpValues(allCorners, baseCorners, longNoteUsageBase);
-
-            double[] anchoredBurstBase = computePBar(keyCount, totalTime, x, notes, lnRep, anchorBase, baseCorners);
-            double[] anchoredBurstBar = interpValues(allCorners, baseCorners, anchoredBurstBase);
-
-            double[] rBarBase = computeRBar(keyCount, totalTime, x, notesByColumn, longNotesByTails, baseCorners);
-            double[] rBar = interpValues(allCorners, baseCorners, rBarBase);
-
-            double[] aBarBase = computeABar(keyCount, totalTime, deltaKs, activeColumns, aCorners, baseCorners);
-            double[] aBar = interpValues(allCorners, aCorners, aBarBase);
-
-            (double[] cStep, double[] ksStep) = computeCAndKs(keyCount, notes, keyUsage, baseCorners);
-            double[] cArr = stepInterp(allCorners, baseCorners, cStep);
-            double[] ksArr = stepInterp(allCorners, baseCorners, ksStep);
-            double[] gaps = computeGaps(allCorners);
-            double[] effectiveWeights = new double[allCorners.Length];
-            double[] totalDifficulty = new double[allCorners.Length];
-            double[] bracketContribution = new double[allCorners.Length];
-            double[] jackContribution = new double[allCorners.Length];
-            double[] burstContribution = new double[allCorners.Length];
-            double[] longNoteUsageContribution = new double[allCorners.Length];
-            double[] longNoteReleaseContribution = new double[allCorners.Length];
-            double[] anchorContribution = new double[allCorners.Length];
-            double[] bracketAllocated = new double[allCorners.Length];
-            double[] jackAllocated = new double[allCorners.Length];
-            double[] burstAllocated = new double[allCorners.Length];
-            double[] longNoteUsageAllocated = new double[allCorners.Length];
-            double[] longNoteReleaseAllocated = new double[allCorners.Length];
-            double[] anchorAllocated = new double[allCorners.Length];
-
-            for (int i = 0; i < allCorners.Length; i++)
-            {
-                effectiveWeights[i] = cArr[i] * gaps[i];
+                double actualDifficulty = totalDifficulty[i];
 
                 double actualTerm1 = computeSR4JackTerm(jBar[i], aBar[i], ksArr[i]);
                 double burstOnlyTerm2 = computeSR4BurstTerm(burstBar[i], 0, aBar[i], cArr[i]);
@@ -409,9 +437,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
                 double difficultyWithBurstOnly = computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], actualTerm1, burstOnlyTerm2);
                 double difficultyWithLongNoteUsage = computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], actualTerm1, longNoteUsageTerm2);
                 double difficultyWithAnchor = computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], actualTerm1, anchoredBurstTerm2);
-                double actualDifficulty = computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], actualTerm1, actualTerm2);
 
-                totalDifficulty[i] = actualDifficulty;
                 bracketContribution[i] = Math.Max(0, actualDifficulty - computeSR4LocalDifficulty(0, aBar[i], ksArr[i], actualTerm1, actualTerm2));
                 jackContribution[i] = Math.Max(0, actualDifficulty - computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], 0, actualTerm2));
                 burstContribution[i] = Math.Max(0, difficultyWithBurstOnly - difficultyWithoutBurstBranch);
@@ -433,13 +459,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
                 anchorAllocated[i] = anchorContribution[i] * allocationScale;
             }
 
-            double totalSr = finaliseDifficulty(totalDifficulty, effectiveWeights, notes, longNotes);
-            double bracketStar = computeSR4ContributionStar(bracketAllocated, totalDifficulty, effectiveWeights, notes, longNotes, totalSr);
-            double jackStar = computeSR4ContributionStar(jackAllocated, totalDifficulty, effectiveWeights, notes, longNotes, totalSr);
-            double burstStar = computeSR4ContributionStar(burstAllocated, totalDifficulty, effectiveWeights, notes, longNotes, totalSr);
-            double longNoteUsageStar = computeSR4ContributionStar(longNoteUsageAllocated, totalDifficulty, effectiveWeights, notes, longNotes, totalSr);
-            double longNoteReleaseStar = computeSR4ContributionStar(longNoteReleaseAllocated, totalDifficulty, effectiveWeights, notes, longNotes, totalSr);
-            double anchorStar = computeSR4ContributionStar(anchorAllocated, totalDifficulty, effectiveWeights, notes, longNotes, totalSr);
+            double[] effectiveWeights = state.EffectiveWeights;
+            double totalSr = finaliseDifficulty(totalDifficulty, effectiveWeights, state.Notes, state.LongNotes);
+            double bracketStar = computeSR4ContributionStar(bracketAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr);
+            double jackStar = computeSR4ContributionStar(jackAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr);
+            double burstStar = computeSR4ContributionStar(burstAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr);
+            double longNoteUsageStar = computeSR4ContributionStar(longNoteUsageAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr);
+            double longNoteReleaseStar = computeSR4ContributionStar(longNoteReleaseAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr);
+            double anchorStar = computeSR4ContributionStar(anchorAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr);
 
             normaliseSR4ComponentStars(totalSr,
                 ref bracketStar,
@@ -450,7 +477,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
                 ref anchorStar);
 
             return new EzManiaSR4PatternSnapshot(
-                keyCount,
+                state.KeyCount,
                 effectiveWeights,
                 cArr,
                 ksArr,
@@ -1071,11 +1098,28 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 
             double[] iList = new double[tailNotes.Count];
 
+            // The next same-column note is a fixed neighbour of each note, so its index is resolved once instead of
+            // searching the column list for every long note (which was quadratic on hold-heavy charts).
+            var columnIndex = new Dictionary<NoteStruct, int>();
+
+            foreach (var columnNotes in notesByColumn)
+            {
+                for (int i = 0; i < columnNotes.Count; i++)
+                    columnIndex.TryAdd(columnNotes[i], i);
+            }
+
             for (int idx = 0; idx < tailNotes.Count; idx++)
             {
                 var note = tailNotes[idx];
-                var next = findNextColumnNote(note, notesByColumn);
-                double nextHead = next?.HeadTime ?? 1_000_000_000;
+                double nextHead = 1_000_000_000;
+
+                if (columnIndex.TryGetValue(note, out int noteIndex))
+                {
+                    var columnNotes = notesByColumn[note.Column];
+
+                    if (noteIndex + 1 < columnNotes.Count)
+                        nextHead = columnNotes[noteIndex + 1].HeadTime;
+                }
 
                 double ih = 0.001 * Math.Abs(note.TailTime - note.HeadTime - 80) / Math.Max(x, 1e-6);
                 double it = 0.001 * Math.Abs(nextHead - note.TailTime - 80) / Math.Max(x, 1e-6);
@@ -1338,16 +1382,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         private static double finaliseDifficulty(double[] difficulties, double[] weights, List<NoteStruct> notes, List<NoteStruct> longNotes)
         {
             return finaliseDifficulty(difficulties.ToList(), weights.ToList(), notes, longNotes);
-        }
-
-        private static NoteStruct? findNextColumnNote(NoteStruct note, List<NoteStruct>[] notesByColumn)
-        {
-            var columnNotes = notesByColumn[note.Column];
-            int index = columnNotes.IndexOf(note);
-            if (index >= 0 && index + 1 < columnNotes.Count)
-                return columnNotes[index + 1];
-
-            return null;
         }
 
         private static double[] interpValues(double[] newX, double[] oldX, double[] oldVals)

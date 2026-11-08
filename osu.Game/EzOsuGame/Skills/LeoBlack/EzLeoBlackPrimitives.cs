@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace osu.Game.EzOsuGame.Skills.LeoBlack
 {
@@ -64,6 +65,9 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
         }
 
         public static List<EzLeoBlackPrimitive> CalculatePrimitives(EzLeoBlackChart chart)
+            => CalculatePrimitives(chart, CancellationToken.None);
+
+        public static List<EzLeoBlackPrimitive> CalculatePrimitives(EzLeoBlackChart chart, CancellationToken cancellationToken)
         {
             if (chart.Notes.Count == 0)
                 return [];
@@ -91,6 +95,9 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
 
             for (int i = 1; i < chart.Notes.Count; i++)
             {
+                if ((i & 0xFF) == 0)
+                    cancellationToken.ThrowIfCancellationRequested();
+
                 var item = chart.Notes[i];
                 double t = item.Time;
                 int[] row = item.Data;

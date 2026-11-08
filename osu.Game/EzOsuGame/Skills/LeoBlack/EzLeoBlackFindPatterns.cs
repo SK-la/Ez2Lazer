@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace osu.Game.EzOsuGame.Skills.LeoBlack
 {
@@ -61,21 +62,21 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
                 EzLeoBlackCorePattern.Stream, EzLeoBlackCorePattern.Chordstream, EzLeoBlackCorePattern.Jacks
             };
 
-            double defaultMultiplier = EzLeoBlackConfig.CORE_RATING_MULTIPLIER.TryGetValue(pattern, out double d) ? d : 1.0;
+            double defaultMultiplier = EzLeoBlackConfig.CORE_RATING_MULTIPLIER.GetValueOrDefault(pattern, 1.0);
 
             if (!EzLeoBlackConfig.SUBTYPE_RATING_MULTIPLIER_BY_MODE.TryGetValue(modeTag, out var subtypeMap))
                 subtypeMap = EzLeoBlackConfig.SUBTYPE_RATING_MULTIPLIER_BY_MODE["Mix"];
 
             double value = specificType == null
                 ? defaultMultiplier
-                : (subtypeMap.TryGetValue(specificType, out double s) ? s : defaultMultiplier);
+                : (subtypeMap.GetValueOrDefault(specificType, defaultMultiplier));
 
             if (modeTag == "RC" && lnCore.Contains(pattern))
             {
                 var mixMap = EzLeoBlackConfig.SUBTYPE_RATING_MULTIPLIER_BY_MODE["Mix"];
                 double bas = specificType == null
                     ? defaultMultiplier
-                    : (mixMap.TryGetValue(specificType, out double m) ? m : defaultMultiplier);
+                    : (mixMap.GetValueOrDefault(specificType, defaultMultiplier));
                 value = bas * EzLeoBlackConfig.RC_LN_CORE_SCALE;
             }
 
@@ -86,8 +87,11 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
         }
 
         public static List<EzLeoBlackFoundPattern> Find(EzLeoBlackChart chart)
+            => Find(chart, CancellationToken.None);
+
+        public static List<EzLeoBlackFoundPattern> Find(EzLeoBlackChart chart, CancellationToken cancellationToken)
         {
-            var primitives = EzLeoBlackPrimitives.CalculatePrimitives(chart);
+            var primitives = EzLeoBlackPrimitives.CalculatePrimitives(chart, cancellationToken);
             EzLeoBlackSpecificPatterns keymodePatterns = chart.Keys switch
             {
                 4 => specific4K(),
@@ -283,11 +287,11 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             var e = xs[4];
 
             if (a.Notes == 1 && a.Jacks == 0
-                && b.Notes == 1 && b.Jacks == 0
-                && c.Notes == 1 && c.Jacks == 0
-                && d.Notes == 1 && d.Jacks == 0
-                && e.Notes == 1 && e.Jacks == 0
-                && a.RawNotes[0] != e.RawNotes[0])
+                             && b.Notes == 1 && b.Jacks == 0
+                             && c.Notes == 1 && c.Jacks == 0
+                             && d.Notes == 1 && d.Jacks == 0
+                             && e.Notes == 1 && e.Jacks == 0
+                             && a.RawNotes[0] != e.RawNotes[0])
             {
                 return 5;
             }
@@ -380,7 +384,7 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
                 foreach (int x in a.RawNotes)
                 {
                     if (containsCol(b.RawNotes, x) && containsCol(c.RawNotes, x)
-                        && containsCol(d.RawNotes, x) && containsCol(e.RawNotes, x))
+                                                   && containsCol(d.RawNotes, x) && containsCol(e.RawNotes, x))
                     {
                         return 5;
                     }
@@ -523,7 +527,7 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             var d = xs[3];
 
             if (b.Jacks == 0 && c.Jacks == 0
-                && sameCols(a.RawNotes, c.RawNotes) && !sameCols(b.RawNotes, d.RawNotes))
+                             && sameCols(a.RawNotes, c.RawNotes) && !sameCols(b.RawNotes, d.RawNotes))
             {
                 return 4;
             }
@@ -874,8 +878,8 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
                 if (rows.Count >= 2)
                 {
                     bool cond = rows[0].Notes >= 2 && rows[1].Notes >= 2
-                                && rows[0].Direction == rows[1].Direction
-                                && rows[0].Direction is EzLeoBlackDirection.Left or EzLeoBlackDirection.Right;
+                                                   && rows[0].Direction == rows[1].Direction
+                                                   && rows[0].Direction is EzLeoBlackDirection.Left or EzLeoBlackDirection.Right;
 
                     if (cond || rows[0].MsPerBeat <= 170)
                         return 3;

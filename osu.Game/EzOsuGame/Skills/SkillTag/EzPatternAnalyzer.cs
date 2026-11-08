@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace osu.Game.EzOsuGame.Skills.SkillTag
 {
@@ -20,11 +21,14 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         private const double inverse_window_ratio = 0.65;
 
         public static EzPatternAnalysis Analyze(EzManiaChartInput map, double rate = 1, EzChartFeatureExtraction? precomputed = null)
+            => Analyze(map, rate, precomputed, CancellationToken.None);
+
+        public static EzPatternAnalysis Analyze(EzManiaChartInput map, double rate, EzChartFeatureExtraction? precomputed, CancellationToken cancellationToken)
         {
-            var features = precomputed ?? EzChartFeatureExtractor.Extract(map, rate);
+            var features = precomputed ?? EzChartFeatureExtractor.Extract(map, rate, cancellationToken);
             var metrics = features.Metrics;
             var orderedRows = features.OrderedRows;
-            var stats = getRowPatternStats(orderedRows, metrics.KeyCount);
+            var stats = getRowPatternStats(orderedRows, metrics.KeyCount, cancellationToken);
             int rowCount = Math.Max(1, stats.RowCount);
             double chordRatio = metrics.ChordRatio;
             double twoNoteRatio = ratio(stats.TwoNoteRows, rowCount);
@@ -52,7 +56,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             double dataConfidence = EzChartFeatureMath.Clamp01(0.35 + Math.Min(0.4, metrics.NoteCount / 2500.0) + Math.Min(0.25, stats.RowCount / 900.0));
             var candidates = new List<EzPatternHit>();
             double beatLengthMs = double.IsFinite(map.Bpm) && map.Bpm > 0 ? 60000 / (map.Bpm * rate) : 0;
-            var lnStats = getLnPatternStats(features.Notes, orderedRows, metrics.KeyCount, beatLengthMs);
+            var lnStats = getLnPatternStats(features.Notes, orderedRows, metrics.KeyCount, beatLengthMs, cancellationToken);
             double lnScore = Math.Max(
                 pressure(metrics.HoldRatio, 0.03, 0.32),
                 Math.Max(
@@ -178,7 +182,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                 double wideChordstream = Math.Max(
                     chordstreamGate,
                     EzChartFeatureMath.MinGate(pressure(chordRatio, 0.2, 0.62), pressure(metrics.ChordSizeChangeRate, 0.18, 0.52)));
-                var singleJack = getSingleJackStats(orderedRows);
+                var singleJack = getSingleJackStats(orderedRows, cancellationToken);
                 double chordRepeatGate = Math.Max(
                     pressure(ratio(stats.MultiOverlapChordPairs, Math.Max(1, stats.ChordPairs)), 0.16, 0.26),
                     Math.Max(
@@ -323,7 +327,8 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             return shared;
         }
 
-        private static RowPatternStats getRowPatternStats(IReadOnlyList<(double Time, IReadOnlyList<EzManiaNote> Notes)> orderedRows, int keyCount)
+        private static RowPatternStats getRowPatternStats(IReadOnlyList<(double Time, IReadOnlyList<EzManiaNote> Notes)> orderedRows, int keyCount,
+                                                          CancellationToken cancellationToken)
         {
             int chordRows = 0, twoNoteRows = 0, threeNoteRows = 0, fourPlusRows = 0, threePlusRows = 0, singleRows = 0;
             int repeatedChordRows = 0, bracketWindowRows = 0, totalChordSize = 0;
@@ -335,8 +340,13 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             var previousColumns = new List<int>();
             var beforePreviousColumns = new List<int>();
 
+            int rowIndex = 0;
+
             foreach ((double time, var rowNotes) in orderedRows)
             {
+                if ((rowIndex++ & 0xFF) == 0)
+                    cancellationToken.ThrowIfCancellationRequested();
+
                 var columns = rowColumns(rowNotes);
                 int size = columns.Count;
                 int mask = 0;
@@ -404,15 +414,20 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             };
         }
 
-        private static SingleJackStats getSingleJackStats(IReadOnlyList<(double Time, IReadOnlyList<EzManiaNote> Notes)> orderedRows)
+        private static SingleJackStats getSingleJackStats(IReadOnlyList<(double Time, IReadOnlyList<EzManiaNote> Notes)> orderedRows, CancellationToken cancellationToken)
         {
             var masks = new List<int>();
             var times = new List<double>();
             int noteCount = 0;
             int jack1 = 0;
 
+            int rowIndex = 0;
+
             foreach ((double time, var rowNotes) in orderedRows)
             {
+                if ((rowIndex++ & 0xFF) == 0)
+                    cancellationToken.ThrowIfCancellationRequested();
+
                 int mask = 0;
                 foreach (var note in rowNotes)
                     mask |= 1 << note.Column;
@@ -481,7 +496,8 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             IReadOnlyList<EzManiaNote> notes,
             IReadOnlyList<(double Time, IReadOnlyList<EzManiaNote> Notes)> orderedRows,
             int keyCount,
-            double beatLengthMs)
+            double beatLengthMs,
+            CancellationToken cancellationToken)
         {
             var releaseRows = new Dictionary<double, List<EzManiaNote>>();
             var headTimes = new HashSet<double>();
@@ -489,8 +505,13 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             var holdSpans = new List<EzManiaNote>();
             var notesByColumn = Enumerable.Range(0, Math.Max(1, keyCount)).Select(_ => new List<EzManiaNote>()).ToArray();
 
+            int scanIndex = 0;
+
             foreach (var note in notes)
             {
+                if ((scanIndex++ & 0xFF) == 0)
+                    cancellationToken.ThrowIfCancellationRequested();
+
                 if (note.Column >= 0 && note.Column < notesByColumn.Length)
                     notesByColumn[note.Column].Add(note);
                 if (!note.IsHold || note.EndTimeMs <= note.TimeMs)
@@ -518,9 +539,13 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             int mixedRows = 0, tapWhileHoldingRows = 0, headTailSwitchRows = 0;
             int activeHolds = 0;
             int eventIndex = 0;
+            int rowScan = 0;
 
             foreach ((double time, var rowNotes) in orderedRows)
             {
+                if ((rowScan++ & 0xFF) == 0)
+                    cancellationToken.ThrowIfCancellationRequested();
+
                 headTimes.Add(time);
 
                 while (eventIndex < holdEvents.Count && holdEvents[eventIndex].Time < time)
@@ -572,8 +597,13 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             var holdDurations = new List<double>();
             var windowPairs = new Dictionary<int, (int Pairs, int Inverse)>();
 
+            int columnScan = 0;
+
             foreach (var columnNotes in notesByColumn)
             {
+                if ((columnScan++ & 0xF) == 0)
+                    cancellationToken.ThrowIfCancellationRequested();
+
                 columnNotes.Sort((left, right) =>
                 {
                     int cmp = left.TimeMs.CompareTo(right.TimeMs);

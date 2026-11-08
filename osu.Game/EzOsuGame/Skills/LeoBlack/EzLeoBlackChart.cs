@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.Skills.LeoBlack
@@ -73,6 +74,9 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
     internal static class EzLeoBlackChartBuilder
     {
         public static EzLeoBlackChart? TryBuild(EzManiaChartInput input)
+            => TryBuild(input, CancellationToken.None);
+
+        public static EzLeoBlackChart? TryBuild(EzManiaChartInput input, CancellationToken cancellationToken)
         {
             if (input.KeyCount < 1 || input.Notes.Count == 0)
                 return null;
@@ -81,8 +85,13 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             var rowMap = new Dictionary<double, int[]>();
             var holdSpans = new List<(int Column, double Start, double End)>();
 
+            int noteIndex = 0;
+
             foreach (var note in input.Notes)
             {
+                if ((noteIndex++ & 0xFF) == 0)
+                    cancellationToken.ThrowIfCancellationRequested();
+
                 if (note.Column < 0 || note.Column >= keys || !double.IsFinite(note.TimeMs))
                     continue;
 
@@ -105,6 +114,8 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
 
             foreach (var (column, start, end) in holdSpans)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 int t = lowerBoundGreater(sortedTimes, start);
 
                 for (; t < sortedTimes.Count && sortedTimes[t] < end; t++)

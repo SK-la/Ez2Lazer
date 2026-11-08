@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Skills.LeoBlack;
 using osu.Game.EzOsuGame.Skills.Mina;
@@ -31,7 +32,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
 
         public static EzChartSkillInfo Compute(
             EzManiaChartInput chart,
-            double rate = 1) => Compute(chart, rate, out _, out _);
+            double rate = 1) => Compute(chart, rate, CancellationToken.None, out _, out _);
 
         /// <summary>
         /// Same pass, also handing out the extracted features and pattern scores so callers that need the raw
@@ -42,11 +43,21 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             double rate,
             out EzChartFeatureExtraction features,
             out EzPatternAnalysis patterns)
+            => Compute(chart, rate, CancellationToken.None, out features, out patterns);
+
+        public static EzChartSkillInfo Compute(
+            EzManiaChartInput chart,
+            double rate,
+            CancellationToken cancellationToken,
+            out EzChartFeatureExtraction features,
+            out EzPatternAnalysis patterns)
         {
             ArgumentNullException.ThrowIfNull(chart);
 
-            features = EzChartFeatureExtractor.Extract(chart, rate);
-            patterns = EzPatternAnalyzer.Analyze(chart, rate, features);
+            features = EzChartFeatureExtractor.Extract(chart, rate, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            patterns = EzPatternAnalyzer.Analyze(chart, rate, features, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             var patternScores = new Dictionary<string, double>(StringComparer.Ordinal);
 
             foreach (var hit in patterns.AllPatterns)
@@ -55,7 +66,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                     patternScores[hit.Id] = hit.Score;
             }
 
-            var leo = EzLeoBlackPatternAnalyzer.TryAnalyze(chart);
+            var leo = EzLeoBlackPatternAnalyzer.TryAnalyze(chart, cancellationToken);
             IReadOnlyList<EzLeoBlackCluster> leoClusters = leo?.Clusters ?? [];
             double? jackShare = leo != null ? EzLeoBlackClusterMetrics.JackShare(leoClusters) : null;
             double? streamShare = leo != null ? EzLeoBlackClusterMetrics.StreamShare(leoClusters) : null;
@@ -141,10 +152,13 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         /// it, so a persisted frame and a computed one cannot disagree on which axes exist.
         /// </remarks>
         public static IReadOnlyDictionary<string, double> ComputeAxes(EzManiaChartInput chart, out EzChartSkillInfo info)
+            => ComputeAxes(chart, CancellationToken.None, out info);
+
+        public static IReadOnlyDictionary<string, double> ComputeAxes(EzManiaChartInput chart, CancellationToken cancellationToken, out EzChartSkillInfo info)
         {
             ArgumentNullException.ThrowIfNull(chart);
 
-            info = Compute(chart, 1, out var features, out var patterns);
+            info = Compute(chart, 1, cancellationToken, out var features, out var patterns);
 
             var axes = new Dictionary<string, double>(EzManiaLNAxisExtensions.FromFeatures(features.Metrics), StringComparer.Ordinal);
 
@@ -164,15 +178,22 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         }
 
         public static EzManiaChartInput FromPlayable(IBeatmap playable)
+            => FromPlayable(playable, CancellationToken.None);
+
+        public static EzManiaChartInput FromPlayable(IBeatmap playable, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(playable);
 
             int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
             var notes = new List<EzManiaNote>();
             double lastTime = 0;
+            int scanned = 0;
 
             foreach (HitObject obj in playable.HitObjects)
             {
+                if ((scanned++ & 0xFF) == 0)
+                    cancellationToken.ThrowIfCancellationRequested();
+
                 if (obj is not IHasColumn columnObj)
                     continue;
 

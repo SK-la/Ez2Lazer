@@ -31,28 +31,32 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
                 return false;
 
             var bag = new EzAnalysisBag();
-            bool hasXxySr = false;
-            double xxySr = 0;
+            bool patternSupported = EzManiaSunnyStarRating.IsPatternSupported(beatmap);
+            bool wantsXxySr = request.RequestedScopes.HasFlag(EzAnalysisScope.XxySr);
+            bool wantsRadar = request.RequestedScopes.HasFlag(EzAnalysisScope.RulesetSpecificRadarData);
 
-            if (request.RequestedScopes.HasFlag(EzAnalysisScope.XxySr) && tryCalculateXxySr(beatmap, request.ClockRate, out xxySr))
+            double? xxySr = null;
+            EzManiaSR4PatternSnapshot? xxyPatternSnapshot = null;
+
+            if (patternSupported && (wantsXxySr || wantsRadar))
             {
-                bag.Set(EzAnalysisFields.XXY_SR, xxySr);
-                hasXxySr = true;
+                // The breakdown embeds the rating, so one derivation serves both scopes instead of running the
+                // difficulty core once per requested value.
+                var combined = SRCalculator.CalculateSRWithPatternSnapshot(beatmap, request.ClockRate);
+
+                xxySr = double.IsNaN(combined.Sr) || double.IsInfinity(combined.Sr) ? null : combined.Sr;
+                xxyPatternSnapshot = combined.PatternSnapshot;
             }
 
-            if (request.RequestedScopes.HasFlag(EzAnalysisScope.RulesetSpecificRadarData))
-            {
-                if (!hasXxySr && tryCalculateXxySr(beatmap, request.ClockRate, out double computedXxySr))
-                {
-                    xxySr = computedXxySr;
-                    bag.Set(EzAnalysisFields.XXY_SR, xxySr);
-                    hasXxySr = true;
-                }
+            if (xxySr is double resolvedXxySr)
+                bag.Set(EzAnalysisFields.XXY_SR, resolvedXxySr);
 
+            if (wantsRadar)
+            {
                 bag.Set(EzAnalysisFields.RULESET_SPECIFIC_RADAR_RESULT, new EzRulesetSpecificRadarResult(
                     computeKeyPatternRadarData(beatmap, cancellationToken),
-                    computeXxySrPatternRadarData(beatmap, request.ClockRate),
-                    hasXxySr ? xxySr : null));
+                    xxyPatternSnapshot is { } snapshot ? EzManiaSR4PatternRadarBuilder.Create(snapshot) : createXxySrPatternRadarData(0, 0, 0, 0, 0, 0),
+                    xxySr));
             }
 
             if (request.RequestedScopes.HasFlag(EzAnalysisScope.PerformancePoints))
@@ -97,20 +101,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             return double.IsFinite(pp) && pp > 0;
         }
 
-        private static bool tryCalculateXxySr(IBeatmap beatmap, double clockRate, out double sr)
-        {
-            sr = 0;
-
-            if (!EzManiaSunnyStarRating.IsPatternSupported(beatmap))
-                return false;
-
-            if (beatmap.HitObjects.Count == 0)
-                return true;
-
-            sr = SRCalculator.CalculateSR(beatmap, clockRate);
-            return !double.IsNaN(sr) && !double.IsInfinity(sr);
-        }
-
         private static EzRadarChartData<string> computeKeyPatternRadarData(ManiaBeatmap beatmap, CancellationToken cancellationToken)
         {
             var columnObjects = EzManiaKeyPatternHelper.GetColumnObjects(beatmap);
@@ -128,15 +118,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
                 EzManiaKeyPatternJack.Compute(beatmap, columnObjects, cancellationToken),
                 EzManiaKeyPatternDelay.Compute(rows, totalColumns, cancellationToken),
                 EzManiaKeyPatternDump.Compute(rows, totalColumns, cancellationToken));
-        }
-
-        private static EzRadarChartData<string> computeXxySrPatternRadarData(ManiaBeatmap beatmap, double clockRate)
-        {
-            if (!EzManiaSunnyStarRating.IsPatternSupported(beatmap))
-                return createXxySrPatternRadarData(0, 0, 0, 0, 0, 0);
-
-            EzManiaSR4PatternSnapshot snapshot = SRCalculator.CalculateSR4PatternSnapshot(beatmap, clockRate);
-            return EzManiaSR4PatternRadarBuilder.Create(snapshot);
         }
 
         private static EzRadarChartData<string> createKeyPatternRadarData(double bracket, double chord, double longNoteRatio, double jack, double delay, double dump)

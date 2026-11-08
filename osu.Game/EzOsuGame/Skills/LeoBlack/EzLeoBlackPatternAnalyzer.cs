@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.Skills.LeoBlack
@@ -24,18 +25,27 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
         /// (caller should fall back to tags).
         /// </summary>
         public static EzLeoBlackPatternResult? TryAnalyze(EzManiaChartInput chart)
+            => TryAnalyze(chart, CancellationToken.None);
+
+        public static EzLeoBlackPatternResult? TryAnalyze(EzManiaChartInput chart, CancellationToken cancellationToken)
         {
             try
             {
                 if (chart.Notes.Count == 0 || chart.KeyCount < 1)
                     return null;
 
-                var lbChart = EzLeoBlackChartBuilder.TryBuild(chart);
+                var lbChart = EzLeoBlackChartBuilder.TryBuild(chart, cancellationToken);
 
                 if (lbChart == null)
                     return null;
 
-                return fromChart(lbChart);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                return fromChart(lbChart, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch
             {
@@ -43,13 +53,13 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             }
         }
 
-        private static EzLeoBlackPatternResult fromChart(EzLeoBlackChart chart)
+        private static EzLeoBlackPatternResult fromChart(EzLeoBlackChart chart, CancellationToken cancellationToken)
         {
             double lnRatio = EzLeoBlackPrimitives.LnPercent(chart);
             double hbRatio = hbRowRatio(chart);
             string modeTag = resolveModeTag(lnRatio, hbRatio);
 
-            var patterns = EzLeoBlackFindPatterns.Find(chart);
+            var patterns = EzLeoBlackFindPatterns.Find(chart, cancellationToken);
 
             if (modeTag == "RC")
                 patterns = patterns.Where(p => !ln_core_patterns.Contains(p.Pattern)).ToList();

@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 
@@ -33,14 +34,21 @@ namespace osu.Game.EzOsuGame.Analysis
         public double HoldRatio => Chart.Notes.Count > 0 ? (double)HoldCount / Chart.Notes.Count : 0;
 
         public static EzChartMeasurements FromPlayable(IBeatmap playable)
+            => FromPlayable(playable, CancellationToken.None);
+
+        public static EzChartMeasurements FromPlayable(IBeatmap playable, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(playable);
 
-            var chart = EzChartSkillInfoComputer.FromPlayable(playable);
+            var chart = EzChartSkillInfoComputer.FromPlayable(playable, cancellationToken);
             int holds = 0;
+            int scanned = 0;
 
             foreach (var note in chart.Notes)
             {
+                if ((scanned++ & 0xFF) == 0)
+                    cancellationToken.ThrowIfCancellationRequested();
+
                 if (note.IsHold)
                     holds++;
             }
