@@ -185,14 +185,19 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             ArgumentNullException.ThrowIfNull(playable);
 
             int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
-            var notes = new List<EzManiaNote>();
+            var notes = new List<EzManiaNote>(playable.HitObjects.Count);
             double lastTime = 0;
+            double maxEndTime = 0;
             int scanned = 0;
 
             foreach (HitObject obj in playable.HitObjects)
             {
                 if ((scanned++ & 0xFF) == 0)
                     cancellationToken.ThrowIfCancellationRequested();
+
+                // The chart length covers every object, not only column ones, so it is tracked here rather than
+                // re-enumerating the hit objects afterwards.
+                maxEndTime = Math.Max(maxEndTime, obj.GetEndTime());
 
                 if (obj is not IHasColumn columnObj)
                     continue;
@@ -209,9 +214,13 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
 
             var timingPoints = new List<EzManiaTimingPoint>();
             double bpm = 0;
+            double firstBeatLength = 0;
 
             foreach (var point in playable.ControlPointInfo.TimingPoints)
             {
+                if (firstBeatLength <= 0 && point.BeatLength > 0)
+                    firstBeatLength = point.BeatLength;
+
                 if (point.BeatLength <= 0)
                     continue;
 
@@ -220,15 +229,11 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                     bpm = 60000 / point.BeatLength;
             }
 
-            if (bpm <= 0 && playable.ControlPointInfo.TimingPoints.Any())
-            {
-                var first = playable.ControlPointInfo.TimingPoints.First();
-                if (first.BeatLength > 0)
-                    bpm = 60000 / first.BeatLength;
-            }
+            if (bpm <= 0 && firstBeatLength > 0)
+                bpm = 60000 / firstBeatLength;
 
             double totalLength = playable.HitObjects.Count > 0
-                ? Math.Max(lastTime, playable.HitObjects.Max(h => h.GetEndTime()))
+                ? Math.Max(lastTime, maxEndTime)
                 : 0;
 
             return new EzManiaChartInput
@@ -324,24 +329,31 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
 
                 for (int i = 0; i + 3 < rows.Count; i++)
                 {
-                    var window = new[] { rows[i], rows[i + 1], rows[i + 2], rows[i + 3] };
-                    double[] gaps =
-                    {
-                        window[1].Time - window[0].Time,
-                        window[2].Time - window[1].Time,
-                        window[3].Time - window[2].Time,
-                    };
+                    var a = rows[i];
+                    var b = rows[i + 1];
+                    var c = rows[i + 2];
+                    var d = rows[i + 3];
 
-                    if (gaps.Any(gap => gap <= 0 || gap > max_gap_ms))
+                    double g0 = b.Time - a.Time;
+                    double g1 = c.Time - b.Time;
+                    double g2 = d.Time - c.Time;
+
+                    if (g0 <= 0 || g0 > max_gap_ms || g1 <= 0 || g1 > max_gap_ms || g2 <= 0 || g2 > max_gap_ms)
                         continue;
-                    if (window.Any(row => row.Columns.Count != 1))
+                    if (a.Columns.Count != 1 || b.Columns.Count != 1 || c.Columns.Count != 1 || d.Columns.Count != 1)
                         continue;
 
-                    double w = weightFor(gaps.Max());
+                    double w = weightFor(Math.Max(g0, Math.Max(g1, g2)));
                     quadW += w;
-                    int[] columns = window.Select(row => row.Columns[0]).ToArray();
-                    int[] steps = { columns[1] - columns[0], columns[2] - columns[1], columns[3] - columns[2] };
-                    if (steps.All(step => step == 1) || steps.All(step => step == -1))
+                    int ca = a.Columns[0];
+                    int cb = b.Columns[0];
+                    int cc = c.Columns[0];
+                    int cd = d.Columns[0];
+                    int step0 = cb - ca;
+                    int step1 = cc - cb;
+                    int step2 = cd - cc;
+
+                    if ((step0 == 1 && step1 == 1 && step2 == 1) || (step0 == -1 && step1 == -1 && step2 == -1))
                         roll4W += w;
                 }
 
@@ -380,10 +392,12 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
 
             private static List<Row> buildRows(IReadOnlyList<EzManiaNote> notes)
             {
-                var sorted = notes.OrderBy(n => n.TimeMs).ToList();
-                var rows = new List<Row>();
+                List<Row> rows = new List<Row>();
 
-                foreach (var note in sorted)
+                if (!isTimeSorted(notes))
+                    notes = notes.OrderBy(n => n.TimeMs).ToList();
+
+                foreach (var note in notes)
                 {
                     if (rows.Count > 0 && note.TimeMs - rows[^1].Time <= row_epsilon_ms)
                         rows[^1].Columns.Add(note.Column);
@@ -395,6 +409,17 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                     row.Columns.Sort();
 
                 return rows;
+            }
+
+            private static bool isTimeSorted(IReadOnlyList<EzManiaNote> notes)
+            {
+                for (int i = 1; i < notes.Count; i++)
+                {
+                    if (notes[i].TimeMs < notes[i - 1].TimeMs)
+                        return false;
+                }
+
+                return true;
             }
 
             private sealed class Row

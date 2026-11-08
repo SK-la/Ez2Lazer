@@ -303,7 +303,29 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
 
         private static List<int> rowColumns(IReadOnlyList<EzManiaNote> rowNotes)
         {
-            return rowNotes.Select(n => n.Column).Distinct().OrderBy(c => c).ToList();
+            // Ascending distinct columns, built in place: the previous LINQ pipeline allocated three collections per
+            // row for what is a sort plus a de-duplication.
+            var columns = new List<int>(rowNotes.Count);
+
+            for (int i = 0; i < rowNotes.Count; i++)
+                columns.Add(rowNotes[i].Column);
+
+            columns.Sort();
+
+            int write = 0;
+
+            for (int read = 0; read < columns.Count; read++)
+            {
+                if (write > 0 && columns[write - 1] == columns[read])
+                    continue;
+
+                columns[write++] = columns[read];
+            }
+
+            if (write != columns.Count)
+                columns.RemoveRange(write, columns.Count - write);
+
+            return columns;
         }
 
         private static bool isRollBetween(IReadOnlyList<int> previous, IReadOnlyList<int> current)
@@ -554,8 +576,20 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                     eventIndex++;
                 }
 
-                bool hasHold = rowNotes.Any(n => n.IsHold);
-                bool hasTap = rowNotes.Any(n => !n.IsHold);
+                bool hasHold = false;
+                bool hasTap = false;
+
+                foreach (var rowNote in rowNotes)
+                {
+                    if (rowNote.IsHold)
+                        hasHold = true;
+                    else
+                        hasTap = true;
+
+                    if (hasHold && hasTap)
+                        break;
+                }
+
                 if (hasHold && hasTap) mixedRows++;
                 if (hasTap && activeHolds > 0) tapWhileHoldingRows++;
                 if (releaseRows.ContainsKey(time)) headTailSwitchRows++;

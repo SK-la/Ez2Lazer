@@ -111,32 +111,67 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
                 return null;
 
             var sortedTimes = rowMap.Keys.OrderBy(t => t).ToList();
+            var rowData = new int[sortedTimes.Count][];
+
+            for (int i = 0; i < sortedTimes.Count; i++)
+                rowData[i] = rowMap[sortedTimes[i]];
+
+            // Hold bodies are filled by one index sweep over head/tail events, so the cost is a single pass over the
+            // rows instead of one row scan per long note (the latter was quadratic on hold-heavy charts).
+            var bodyEvents = new List<(int Index, int Column, int Delta)>(holdSpans.Count * 2);
 
             foreach (var (column, start, end) in holdSpans)
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                int from = lowerBoundGreater(sortedTimes, start);
+                int to = lowerBoundAtOrAbove(sortedTimes, end);
 
-                int t = lowerBoundGreater(sortedTimes, start);
+                if (to <= from)
+                    continue;
 
-                for (; t < sortedTimes.Count && sortedTimes[t] < end; t++)
+                bodyEvents.Add((from, column, 1));
+                bodyEvents.Add((to, column, -1));
+            }
+
+            if (bodyEvents.Count > 0)
+            {
+                bodyEvents.Sort(static (left, right) => left.Index.CompareTo(right.Index));
+
+                int[] activeHolds = new int[keys];
+                int eventIndex = 0;
+
+                for (int i = 0; i < rowData.Length; i++)
                 {
-                    int[] row = rowMap[sortedTimes[t]];
+                    if ((i & 0xFF) == 0)
+                        cancellationToken.ThrowIfCancellationRequested();
 
-                    if (row[column] == EzLeoBlackNoteType.NOTHING)
+                    while (eventIndex < bodyEvents.Count && bodyEvents[eventIndex].Index <= i)
+                    {
+                        var evt = bodyEvents[eventIndex++];
+                        activeHolds[evt.Column] += evt.Delta;
+                    }
+
+                    int[] row = rowData[i];
+
+                    for (int column = 0; column < keys; column++)
+                    {
+                        if (activeHolds[column] <= 0 || row[column] != EzLeoBlackNoteType.NOTHING)
+                            continue;
+
                         row[column] = EzLeoBlackNoteType.HOLDBODY;
+                    }
                 }
             }
 
             var notes = new List<EzLeoBlackTimeItem<int[]>>(sortedTimes.Count);
 
-            foreach (double time in sortedTimes)
+            for (int i = 0; i < rowData.Length; i++)
             {
-                int[] data = rowMap[time];
+                int[] data = rowData[i];
 
                 if (isRowEmpty(data))
                     continue;
 
-                notes.Add(new EzLeoBlackTimeItem<int[]>(time, data));
+                notes.Add(new EzLeoBlackTimeItem<int[]>(sortedTimes[i], data));
             }
 
             if (notes.Count == 0)
@@ -200,6 +235,25 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
                 int mid = (lo + hi) >> 1;
 
                 if (sortedAsc[mid] <= target)
+                    lo = mid + 1;
+                else
+                    hi = mid;
+            }
+
+            return lo;
+        }
+
+        /// <summary>First index whose row time is at or after <paramref name="target"/>.</summary>
+        private static int lowerBoundAtOrAbove(IReadOnlyList<double> sortedAsc, double target)
+        {
+            int lo = 0;
+            int hi = sortedAsc.Count;
+
+            while (lo < hi)
+            {
+                int mid = (lo + hi) >> 1;
+
+                if (sortedAsc[mid] < target)
                     lo = mid + 1;
                 else
                     hi = mid;

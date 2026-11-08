@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using NUnit.Framework;
+using osu.Game.EzOsuGame.Skills.LeoBlack;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 
@@ -39,6 +40,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             measure("CSI", iterations, () => EzChartSkillInfoComputer.Compute(chart));
             measure("patterns", iterations, () => EzPatternAnalyzer.Analyze(chart));
+            measure("features", iterations, () => EzChartFeatureExtractor.Extract(chart));
+            measure("leoblack", iterations, () => EzLeoBlackPatternAnalyzer.TryAnalyze(chart));
             measure("mina rows", iterations, () => EzMinaNoteConverter.Convert(notes));
 
             var rows = EzMinaNoteConverter.Convert(notes);

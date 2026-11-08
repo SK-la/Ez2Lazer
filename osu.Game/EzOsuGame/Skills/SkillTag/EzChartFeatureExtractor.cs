@@ -106,6 +106,8 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             int twoBackColumnRehitNotes = 0;
             double rowPatternChangeSum = 0;
             var rowMasks = new List<int>();
+            var rowMaskValues = new List<double>();
+            var rowMaskSet = new HashSet<int>();
             var rowTimes = new List<double>();
             var rowSignatures = new List<int>();
             int rowMaskBase = Math.Max(32, (1 << Math.Max(1, map.KeyCount)) + 1);
@@ -153,6 +155,8 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                 }
 
                 rowMasks.Add(rowMask);
+                rowMaskValues.Add(rowMask);
+                rowMaskSet.Add(rowMask);
                 rowTimes.Add(time);
 
                 if (previousRowMask != null)
@@ -284,10 +288,10 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             double rowBurstPressure = EzChartFeatureMath.Quantile(rowRates, 0.9);
             double fastRowRatio = rowIntervals.Count > 0 ? (double)fastRowCount / rowIntervals.Count : 0;
             double rowIntervalEntropy = EzChartFeatureMath.BucketEntropy(rowIntervals, 5);
-            double offGridShare = offGridRowShare(map);
-            double rowPatternEntropy = EzChartFeatureMath.BucketEntropy(rowMasks.Select(m => (double)m).ToList(), 1);
+            double offGridShare = offGridRowShare(map, rate == 1 ? orderedRows : null);
+            double rowPatternEntropy = EzChartFeatureMath.BucketEntropy(rowMaskValues, 1);
             double rowPatternVariety = rowMasks.Count > 0
-                ? rowMasks.Distinct().Count() / (double)Math.Min(rowMasks.Count, 1 << Math.Max(1, map.KeyCount))
+                ? rowMaskSet.Count / (double)Math.Min(rowMasks.Count, 1 << Math.Max(1, map.KeyCount))
                 : 0;
             double rowMotifRepeatRatio = numericNgramRepeatRatio(rowMasks, 4, rowMaskBase);
             double rhythmMotifRepeatRatio = numericNgramRepeatRatio(rowSignatures, 4, rowSignatureBase);
@@ -557,14 +561,14 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             return 0;
         }
 
-        private static double offGridRowShare(EzManiaChartInput map)
+        private static double offGridRowShare(EzManiaChartInput map, IReadOnlyList<(double Time, IReadOnlyList<EzManiaNote> Notes)>? orderedRows = null)
         {
             var timingPoints = map.TimingPoints
                                   .Where(point => double.IsFinite(point.TimeMs) && point.BeatLengthMs > 0)
                                   .OrderBy(point => point.TimeMs)
                                   .ToList();
             double fallbackBeatLength = map.Bpm > 0 ? 60000 / map.Bpm : double.PositiveInfinity;
-            var rows = groupNotesByTime(map.Notes.Where(note => note.Column >= 0 && note.Column < map.KeyCount).ToList());
+            var rows = orderedRows ?? groupNotesByTime(map.Notes.Where(note => note.Column >= 0 && note.Column < map.KeyCount).ToList());
             if (rows.Count < 2)
                 return 0;
 
