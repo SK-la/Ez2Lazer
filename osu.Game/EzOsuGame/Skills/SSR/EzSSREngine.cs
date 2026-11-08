@@ -157,35 +157,34 @@ namespace osu.Game.EzOsuGame.Skills.SSR
 
         #region 结构体
 
-        private readonly struct NoteStruct : IEquatable<NoteStruct>
+        private readonly struct NoteStruct
         {
             public NoteStruct(int column, int headTime, int tailTime)
             {
                 Column = column;
                 HeadTime = headTime;
                 TailTime = tailTime;
+                ColumnIndex = 0;
+            }
+
+            private NoteStruct(int column, int headTime, int tailTime, int columnIndex)
+            {
+                Column = column;
+                HeadTime = headTime;
+                TailTime = tailTime;
+                ColumnIndex = columnIndex;
             }
 
             public int Column { get; }
             public int HeadTime { get; }
             public int TailTime { get; }
 
+            /// <summary>Position within <see cref="Column"/>'s notes, so a successor is one array step away.</summary>
+            public int ColumnIndex { get; }
+
             public bool IsLongNote => TailTime >= 0 && TailTime > HeadTime;
 
-            public bool Equals(NoteStruct other)
-            {
-                return Column == other.Column && HeadTime == other.HeadTime && TailTime == other.TailTime;
-            }
-
-            public override bool Equals(object? obj)
-            {
-                return obj is NoteStruct other && Equals(other);
-            }
-
-            public override int GetHashCode()
-            {
-                return HashCode.Combine(Column, HeadTime, TailTime);
-            }
+            public NoteStruct WithColumnIndex(int columnIndex) => new NoteStruct(Column, HeadTime, TailTime, columnIndex);
         }
 
         private readonly struct LNRepStruct
@@ -279,14 +278,24 @@ namespace osu.Game.EzOsuGame.Skills.SSR
                 if (tail <= head)
                     tail = -1;
 
-                var note = new NoteStruct(column, head, tail);
-                notes.Add(note);
-                notesByColumn[column].Add(note);
+                notesByColumn[column].Add(new NoteStruct(column, head, tail));
+            }
+
+            // Each column is numbered once it is in order, so a long note can reach the note that follows it in its
+            // own column by index. The flat list is then the merge of those columns, which is the same head order a
+            // single sort of the unordered notes produced.
+            for (int column = 0; column < keyCount; column++)
+            {
+                var columnNotes = notesByColumn[column];
+                columnNotes.Sort(note_comparer);
+
+                for (int i = 0; i < columnNotes.Count; i++)
+                    columnNotes[i] = columnNotes[i].WithColumnIndex(i);
+
+                notes.AddRange(columnNotes);
             }
 
             notes.Sort(note_comparer);
-            foreach (var columnNotes in notesByColumn)
-                columnNotes.Sort(note_comparer);
 
             var longNotes = notes.Where(n => n.IsLongNote).ToList();
             var longNotesByTails = longNotes.OrderBy(n => n.TailTime).ToList();
@@ -1161,28 +1170,12 @@ namespace osu.Game.EzOsuGame.Skills.SSR
 
             double[] iList = new double[tailNotes.Count];
 
-            // The next same-column note is a fixed neighbour of each note, so its index is resolved once instead of
-            // searching the column list for every long note (which was quadratic on hold-heavy charts).
-            var columnIndex = new Dictionary<NoteStruct, int>();
-
-            foreach (var columnNotes in notesByColumn)
-            {
-                for (int i = 0; i < columnNotes.Count; i++)
-                    columnIndex.TryAdd(columnNotes[i], i);
-            }
-
             for (int idx = 0; idx < tailNotes.Count; idx++)
             {
                 var note = tailNotes[idx];
-                double nextHead = 1_000_000_000;
-
-                if (columnIndex.TryGetValue(note, out int noteIndex))
-                {
-                    var columnNotes = notesByColumn[note.Column];
-
-                    if (noteIndex + 1 < columnNotes.Count)
-                        nextHead = columnNotes[noteIndex + 1].HeadTime;
-                }
+                var columnNotes = notesByColumn[note.Column];
+                int noteIndex = note.ColumnIndex;
+                double nextHead = noteIndex + 1 < columnNotes.Count ? columnNotes[noteIndex + 1].HeadTime : 1_000_000_000;
 
                 double ih = 0.001 * Math.Abs(note.TailTime - note.HeadTime - 80) / Math.Max(x, 1e-6);
                 double it = 0.001 * Math.Abs(nextHead - note.TailTime - 80) / Math.Max(x, 1e-6);

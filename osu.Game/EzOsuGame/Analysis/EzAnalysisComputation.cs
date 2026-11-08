@@ -635,7 +635,7 @@ namespace osu.Game.EzOsuGame.Analysis
             var chart = measured.Chart;
             int keyCount = measured.KeyCount;
 
-            EzRadarChartData<string>? keyPatternRadar = computeKeyPatternRadar(chart, cancellationToken);
+            EzRadarChartData<string>? keyPatternRadar = computeKeyPatternRadar(chart, measured.HoldRatio, cancellationToken);
 
             if (!EzSSREngine.IsPatternSupported(keyCount))
                 return new SsrAndRadar(null, keyPatternRadar, null);
@@ -654,25 +654,28 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <summary>
         /// The structure view of a chart, measured from the same extraction the structure pass used.
         /// </summary>
-        private static EzRadarChartData<string> computeKeyPatternRadar(EzManiaChartInput chart, CancellationToken cancellationToken)
+        private static EzRadarChartData<string> computeKeyPatternRadar(EzManiaChartInput chart, double holdRatio, CancellationToken cancellationToken)
         {
-            var columnObjects = EzManiaKeyPatternHelper.GetColumnObjects(chart);
+            var notes = EzManiaKeyPatternHelper.NotesInTimeOrder(chart);
 
-            if (columnObjects.Count == 0)
+            if (notes.Count == 0)
                 return createKeyPatternRadarData(0, 0, 0, 0, 0, 0);
 
             int totalColumns = 0;
 
-            for (int i = 0; i < columnObjects.Count; i++)
-                totalColumns = Math.Max(totalColumns, columnObjects[i].Column + 1);
+            for (int i = 0; i < notes.Count; i++)
+                totalColumns = Math.Max(totalColumns, notes[i].Column + 1);
 
-            var rows = EzManiaKeyPatternHelper.BuildRows(columnObjects, time => EzManiaKeyPatternHelper.BeatLengthAt(chart, time), cancellationToken);
+            var rows = EzManiaKeyPatternHelper.BuildRows(notes, time => EzManiaKeyPatternHelper.BeatLengthAt(chart, time), cancellationToken);
+
+            // The hold share is already measured for this pass; counting it again here was a second walk of the chart.
+            double longNoteRatio = Math.Round(holdRatio * 100, 2, MidpointRounding.AwayFromZero);
 
             return createKeyPatternRadarData(
                 EzManiaKeyPatternBracket.Compute(rows, totalColumns, cancellationToken),
                 EzManiaKeyPatternChord.Compute(rows, cancellationToken),
-                EzManiaKeyPatternLongNote.Compute(chart),
-                EzManiaKeyPatternJack.Compute(columnObjects, time => EzManiaKeyPatternHelper.BeatLengthAt(chart, time), cancellationToken),
+                longNoteRatio,
+                EzManiaKeyPatternJack.Compute(notes, time => EzManiaKeyPatternHelper.BeatLengthAt(chart, time), cancellationToken),
                 EzManiaKeyPatternDelay.Compute(rows, totalColumns, cancellationToken),
                 EzManiaKeyPatternDump.Compute(rows, totalColumns, cancellationToken));
         }

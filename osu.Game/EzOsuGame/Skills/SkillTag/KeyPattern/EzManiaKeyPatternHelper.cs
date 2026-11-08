@@ -7,8 +7,6 @@ using System.Threading;
 
 namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
 {
-    public readonly record struct EzManiaKeyPatternColumnHitObject(double StartTime, int Column);
-
     public readonly record struct EzManiaKeyPatternRow(double Time, double BeatLength, int[] Columns)
     {
         public int NoteCount => Columns.Length;
@@ -95,37 +93,43 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
         public const double TIME_TOLERANCE = 3.0;
 
         /// <summary>
-        /// Column objects of a chart extraction: one pair per note, in ascending time order.
+        /// The chart's notes in ascending time order, which is what row grouping requires. An extraction arrives in
+        /// that order already, so a copy is only made for a hand-built input that is not.
         /// </summary>
-        public static List<EzManiaKeyPatternColumnHitObject> GetColumnObjects(EzManiaChartInput chart)
+        public static IReadOnlyList<EzManiaNote> NotesInTimeOrder(EzManiaChartInput chart)
         {
             ArgumentNullException.ThrowIfNull(chart);
 
             var notes = chart.Notes;
-            var columnObjects = new List<EzManiaKeyPatternColumnHitObject>(notes.Count);
 
-            for (int i = 0; i < notes.Count; i++)
-                columnObjects.Add(new EzManiaKeyPatternColumnHitObject(notes[i].TimeMs, notes[i].Column));
+            for (int i = 1; i < notes.Count; i++)
+            {
+                if (notes[i].TimeMs < notes[i - 1].TimeMs)
+                {
+                    var ordered = new List<EzManiaNote>(notes);
+                    ordered.Sort(static (left, right) => left.TimeMs.CompareTo(right.TimeMs));
+                    return ordered;
+                }
+            }
 
-            columnObjects.Sort((left, right) => left.StartTime.CompareTo(right.StartTime));
-            return columnObjects;
+            return notes;
         }
 
         /// <summary>
-        /// Rows grouped from pre-built column objects, with the beat length supplied by the caller, so the grouping
-        /// rule exists once.
+        /// Rows grouped from notes in time order, with the beat length supplied by the caller, so the grouping rule
+        /// exists once.
         /// </summary>
-        public static List<EzManiaKeyPatternRow> BuildRows(IReadOnlyList<EzManiaKeyPatternColumnHitObject> columnObjects, Func<double, double> beatLengthAt,
+        public static List<EzManiaKeyPatternRow> BuildRows(IReadOnlyList<EzManiaNote> orderedNotes, Func<double, double> beatLengthAt,
                                                            CancellationToken cancellationToken)
         {
-            var rows = new List<EzManiaKeyPatternRow>(columnObjects.Count);
+            var rows = new List<EzManiaKeyPatternRow>(orderedNotes.Count);
 
-            if (columnObjects.Count == 0)
+            if (orderedNotes.Count == 0)
                 return rows;
 
-            double currentTime = columnObjects[0].StartTime;
-            var currentColumns = new List<int> { columnObjects[0].Column };
-            var seenColumns = new HashSet<int> { columnObjects[0].Column };
+            double currentTime = orderedNotes[0].TimeMs;
+            var currentColumns = new List<int> { orderedNotes[0].Column };
+            var seenColumns = new HashSet<int> { orderedNotes[0].Column };
 
             void flushCurrentRow()
             {
@@ -153,20 +157,20 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
                 seenColumns.Clear();
             }
 
-            for (int i = 1; i < columnObjects.Count; i++)
+            for (int i = 1; i < orderedNotes.Count; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                EzManiaKeyPatternColumnHitObject hitObject = columnObjects[i];
+                EzManiaNote note = orderedNotes[i];
 
-                if (Math.Abs(hitObject.StartTime - currentTime) > TIME_TOLERANCE)
+                if (Math.Abs(note.TimeMs - currentTime) > TIME_TOLERANCE)
                 {
                     flushCurrentRow();
-                    currentTime = hitObject.StartTime;
+                    currentTime = note.TimeMs;
                 }
 
-                if (seenColumns.Add(hitObject.Column))
-                    currentColumns.Add(hitObject.Column);
+                if (seenColumns.Add(note.Column))
+                    currentColumns.Add(note.Column);
             }
 
             flushCurrentRow();

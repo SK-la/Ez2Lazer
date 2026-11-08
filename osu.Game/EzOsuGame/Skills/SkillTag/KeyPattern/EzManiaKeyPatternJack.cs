@@ -9,29 +9,29 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
 {
     internal static class EzManiaKeyPatternJack
     {
-        public static double Compute(IReadOnlyList<EzManiaKeyPatternColumnHitObject> columnObjects, Func<double, double> beatLengthAt, CancellationToken cancellationToken)
+        public static double Compute(IReadOnlyList<EzManiaNote> orderedNotes, Func<double, double> beatLengthAt, CancellationToken cancellationToken)
         {
-            if (columnObjects.Count == 0)
+            if (orderedNotes.Count == 0)
                 return 0;
 
-            // Column objects already arrive sorted by time, so appending to per-column lists keeps each column in
-            // order without the grouping and re-sorting the previous shape did. Groups stay in first-appearance order
-            // so the running sums accumulate in the same sequence as before.
-            var orderedGroups = new List<List<EzManiaKeyPatternColumnHitObject>>();
-            var groupByColumn = new Dictionary<int, List<EzManiaKeyPatternColumnHitObject>>();
+            // The notes arrive sorted by time, so appending to per-column lists keeps each column in order without
+            // the grouping and re-sorting the previous shape did. Groups stay in first-appearance order so the running
+            // sums accumulate in the same sequence as before.
+            var orderedGroups = new List<List<EzManiaNote>>();
+            var groupByColumn = new Dictionary<int, List<EzManiaNote>>();
 
-            for (int i = 0; i < columnObjects.Count; i++)
+            for (int i = 0; i < orderedNotes.Count; i++)
             {
-                var obj = columnObjects[i];
+                var note = orderedNotes[i];
 
-                if (!groupByColumn.TryGetValue(obj.Column, out var group))
+                if (!groupByColumn.TryGetValue(note.Column, out var group))
                 {
-                    group = new List<EzManiaKeyPatternColumnHitObject>();
-                    groupByColumn[obj.Column] = group;
+                    group = new List<EzManiaNote>();
+                    groupByColumn[note.Column] = group;
                     orderedGroups.Add(group);
                 }
 
-                group.Add(obj);
+                group.Add(note);
             }
 
             int totalPairs = 0;
@@ -41,20 +41,20 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                List<EzManiaKeyPatternColumnHitObject> columnNotes = orderedGroups[groupIndex];
+                List<EzManiaNote> columnNotes = orderedGroups[groupIndex];
 
                 for (int i = 1; i < columnNotes.Count; i++)
                 {
-                    EzManiaKeyPatternColumnHitObject previous = columnNotes[i - 1];
-                    EzManiaKeyPatternColumnHitObject current = columnNotes[i];
-                    double beatLength = beatLengthAt(previous.StartTime);
+                    EzManiaNote previous = columnNotes[i - 1];
+                    EzManiaNote current = columnNotes[i];
+                    double beatLength = beatLengthAt(previous.TimeMs);
 
                     if (beatLength <= 0)
                         continue;
 
                     totalPairs++;
 
-                    double delta = current.StartTime - previous.StartTime;
+                    double delta = current.TimeMs - previous.TimeMs;
 
                     if (delta <= beatLength / 4.0 + EzManiaKeyPatternHelper.TIME_TOLERANCE)
                         weightedPairs += 1.0;
