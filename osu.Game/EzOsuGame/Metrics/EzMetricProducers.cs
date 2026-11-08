@@ -99,34 +99,30 @@ namespace osu.Game.EzOsuGame.Metrics
             });
         }
 
-        private static EzMetricProducer createOfficialBeatmap(IEzMetricUpstreamRevisions upstream)
-            => new EzMetricProducer(OFFICIAL_CHART, EzMetricTier.Star, EzMetricUnit.Star, static _ => true)
-            {
-                AxisFamilyId = OFFICIAL_FAMILY,
-                RevisionProbe = upstream.OfficialDifficulty,
-            };
+        private static EzMetricProducer createOfficialBeatmap(IEzMetricUpstreamRevisions upstream) => new EzMetricProducer(OFFICIAL_CHART, EzMetricTier.Star, EzMetricUnit.Star, static _ => true)
+        {
+            AxisFamilyId = OFFICIAL_FAMILY,
+            RevisionProbe = upstream.OfficialDifficulty,
+        };
 
-        private static EzMetricProducer createOfficialPerformance()
-            => new EzMetricProducer(OFFICIAL_PERFORMANCE, EzMetricTier.Performance, EzMetricUnit.PerformancePoints, static _ => true)
-            {
-                AxisFamilyId = OFFICIAL_FAMILY,
-                // Computed from the same difficulty attributes, so it goes stale with them.
-                DependsOn = new[] { OFFICIAL_CHART },
-            };
+        private static EzMetricProducer createOfficialPerformance() => new EzMetricProducer(OFFICIAL_PERFORMANCE, EzMetricTier.Performance, EzMetricUnit.PerformancePoints, static _ => true)
+        {
+            AxisFamilyId = OFFICIAL_FAMILY,
+            // Computed from the same difficulty attributes, so it goes stale with them.
+            DependsOn = new[] { OFFICIAL_CHART },
+        };
 
-        private static EzMetricProducer createSsrBeatmap(IEzMetricUpstreamRevisions upstream)
-            => new EzMetricProducer(SSR_CHART, EzMetricTier.Star, EzMetricUnit.Star, maniaOnly)
-            {
-                AxisFamilyId = SUNNY_FAMILY,
-                RevisionProbe = upstream.Ssr,
-            };
+        private static EzMetricProducer createSsrBeatmap(IEzMetricUpstreamRevisions upstream) => new EzMetricProducer(SSR_CHART, EzMetricTier.Star, EzMetricUnit.Star, maniaOnly)
+        {
+            AxisFamilyId = SUNNY_FAMILY,
+            RevisionProbe = upstream.Ssr,
+        };
 
-        private static EzMetricProducer createSsrPerformance()
-            => new EzMetricProducer(SSR_PERFORMANCE, EzMetricTier.Performance, EzMetricUnit.PerformancePoints, maniaOnly)
-            {
-                AxisFamilyId = SUNNY_FAMILY,
-                DependsOn = new[] { SSR_CHART },
-            };
+        private static EzMetricProducer createSsrPerformance() => new EzMetricProducer(SSR_PERFORMANCE, EzMetricTier.Performance, EzMetricUnit.PerformancePoints, maniaOnly)
+        {
+            AxisFamilyId = SUNNY_FAMILY,
+            DependsOn = new[] { SSR_CHART },
+        };
 
         private static EzMetricProducer createPppBeatmap()
         {
@@ -149,18 +145,16 @@ namespace osu.Game.EzOsuGame.Metrics
                 AxisFamilyId = PPP_FAMILY,
                 AxisGroups = groups,
                 RevisionProbe = EzPPPSkillVersions.ForRuleset,
-                SupportsLive = true,
                 // Mania keeps its rating engine as the default radar.
                 IsDefaultRadarFor = notMania,
             };
         }
 
-        private static EzMetricProducer createPppPerformance()
-            => new EzMetricProducer(PPP_PERFORMANCE, EzMetricTier.Performance, EzMetricUnit.PerformancePoints, EzPPPSkillCatalog.SupportsRuleset)
-            {
-                AxisFamilyId = PPP_FAMILY,
-                DependsOn = new[] { PPP_CHART },
-            };
+        private static EzMetricProducer createPppPerformance() => new EzMetricProducer(PPP_PERFORMANCE, EzMetricTier.Performance, EzMetricUnit.PerformancePoints, EzPPPSkillCatalog.SupportsRuleset)
+        {
+            AxisFamilyId = PPP_FAMILY,
+            DependsOn = new[] { PPP_CHART },
+        };
 
         private static EzMetricProducer createPppPlayer()
         {
@@ -190,30 +184,27 @@ namespace osu.Game.EzOsuGame.Metrics
             };
         }
 
-        private static EzMetricProducer createMinaBeatmap()
-            => new EzMetricProducer(MINA_CHART, EzMetricTier.Skill, EzMetricUnit.SkillPoint, maniaOnly)
-            {
-                SystemId = EzSkillSystems.BEATMAP_MINA,
-                Sliced = true,
-                AxisFamilyId = MINA_FAMILY,
-                AxisGroups = new[] { new EzMetricAxisGroup(ENGINE_GROUP, minaAxes()) },
-                RevisionProbe = static _ => EzMinaSkillAlgorithm.VERSION,
-                SupportsLive = true,
-                IsDefaultRadarFor = static _ => true,
-            };
+        private static EzMetricProducer createMinaBeatmap() => new EzMetricProducer(MINA_CHART, EzMetricTier.Skill, EzMetricUnit.SkillPoint, maniaOnly)
+        {
+            SystemId = EzSkillSystems.BEATMAP_MINA,
+            Sliced = true,
+            AxisFamilyId = MINA_FAMILY,
+            AxisGroups = new[] { new EzMetricAxisGroup(ENGINE_GROUP, minaAxes()) },
+            RevisionProbe = static _ => EzMinaSkillAlgorithm.VERSION,
+            IsDefaultRadarFor = static _ => true,
+        };
 
-        private static EzMetricProducer createMinaPlayer()
-            => new EzMetricProducer(MINA_PLAYER, EzMetricTier.Skill, EzMetricUnit.SkillPoint, maniaOnly)
-            {
-                SystemId = EzSkillSystems.PLAYER_MINA,
-                Sliced = true,
-                AxisFamilyId = MINA_FAMILY,
-                AxisGroups = new[] { new EzMetricAxisGroup(ENGINE_GROUP, minaAxes()) },
-                // Re-measures every play with the same engine instead of reading stored chart rows, so it
-                // belongs to the same axis family but has no version edge to the chart side.
-                RevisionProbe = static _ => EzMinaSkillAlgorithm.VERSION,
-                IsDefaultRadarFor = static _ => true,
-            };
+        private static EzMetricProducer createMinaPlayer() => new EzMetricProducer(MINA_PLAYER, EzMetricTier.Skill, EzMetricUnit.SkillPoint, maniaOnly)
+        {
+            SystemId = EzSkillSystems.PLAYER_MINA,
+            Sliced = true,
+            AxisFamilyId = MINA_FAMILY,
+            AxisGroups = new[] { new EzMetricAxisGroup(ENGINE_GROUP, minaAxes()) },
+            // Re-measures every play with the same engine instead of reading stored chart rows, so it
+            // belongs to the same axis family but has no version edge to the chart side.
+            RevisionProbe = static _ => EzMinaSkillAlgorithm.VERSION,
+            IsDefaultRadarFor = static _ => true,
+        };
 
         private static EzMetricProducer createCsiBeatmap()
         {
@@ -226,10 +217,10 @@ namespace osu.Game.EzOsuGame.Metrics
 
             return new EzMetricProducer(CSI_CHART, EzMetricTier.Tags, EzMetricUnit.Count, maniaOnly)
             {
+                SystemId = EzSkillSystems.BEATMAP_CSI,
                 // Pure chart structure: reads no stored axes, so it is not gated on the Mina stage.
                 AxisGroups = groups,
                 RevisionProbe = static _ => EzChartSkillInfo.VERSION,
-                SupportsLive = true,
             };
         }
 
@@ -275,25 +266,22 @@ namespace osu.Game.EzOsuGame.Metrics
             return result;
         }
 
-        private static EzMetricAxis toAxis(EzSkillMetaAttribute meta, int order)
-            => new EzMetricAxis(meta.Id, meta.DisplayName, meta.AccentHex, meta.InRadar, order);
+        private static EzMetricAxis toAxis(EzSkillMetaAttribute meta, int order) => new EzMetricAxis(meta.Id, meta.DisplayName, meta.AccentHex, meta.InRadar, order);
 
-        private static EzMetricProducer createDanBeatmap()
-            => new EzMetricProducer(DAN_CHART, EzMetricTier.Dan, EzMetricUnit.DanRank, maniaOnly)
-            {
-                // Rating axes come from Mina, structure tags from CSI; both are read as stored rows.
-                DependsOn = new[] { MINA_CHART, CSI_CHART },
-                RevisionProbe = static _ => EzDanAlgorithm.VERSION,
-                SupportsLive = true,
-            };
+        private static EzMetricProducer createDanBeatmap() => new EzMetricProducer(DAN_CHART, EzMetricTier.Dan, EzMetricUnit.DanRank, maniaOnly)
+        {
+            // Rating axes come from Mina, structure tags from CSI; the Sunny rating selects the interval
+            // table, so it is an input too. Both are read as stored rows.
+            DependsOn = new[] { MINA_CHART, CSI_CHART, SSR_CHART },
+            RevisionProbe = static _ => EzDanAlgorithm.VERSION,
+        };
 
-        private static EzMetricProducer createDanPlayer()
-            => new EzMetricProducer(DAN_PLAYER, EzMetricTier.Dan, EzMetricUnit.DanRank, maniaOnly)
-            {
-                Sliced = true,
-                DependsOn = new[] { DAN_CHART },
-                RevisionProbe = static _ => EzDanAlgorithm.VERSION,
-            };
+        private static EzMetricProducer createDanPlayer() => new EzMetricProducer(DAN_PLAYER, EzMetricTier.Dan, EzMetricUnit.DanRank, maniaOnly)
+        {
+            Sliced = true,
+            DependsOn = new[] { DAN_CHART },
+            RevisionProbe = static _ => EzDanAlgorithm.VERSION,
+        };
 
         private static readonly int[] all_rulesets =
         {
@@ -303,11 +291,9 @@ namespace osu.Game.EzOsuGame.Metrics
             EzLocalProfileConstants.MANIA_RULESET_ID,
         };
 
-        private static bool maniaOnly(int rulesetOnlineId)
-            => rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID;
+        private static bool maniaOnly(int rulesetOnlineId) => rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID;
 
-        private static bool notMania(int rulesetOnlineId)
-            => rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID;
+        private static bool notMania(int rulesetOnlineId) => rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID;
 
         private static IReadOnlyList<EzMetricAxis> pppAxesFor(int rulesetOnlineId)
         {

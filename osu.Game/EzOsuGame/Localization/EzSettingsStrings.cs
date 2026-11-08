@@ -312,8 +312,7 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString SCREENSHOT_COPIED_TO_CLIPBOARD =
             new EzLocalizationManager.EzLocalisableString("截图已复制到剪贴板！", "Screenshot copied to clipboard!");
 
-        public static LocalisableString ScreenshotSaved(string filename) =>
-            new EzLocalizationManager.EzLocalisableString($"截图已保存！点此处查看：\n{filename}", $"Screenshot saved! Click to view.\n{filename}");
+        public static LocalisableString ScreenshotSaved(string filename) => new EzLocalizationManager.EzLocalisableString($"截图已保存！点此处查看：\n{filename}", $"Screenshot saved! Click to view.\n{filename}");
 
         public static readonly EzLocalizationManager.EzLocalisableString STORYBOARD_VIDEO_AUTO_SIZE =
             new EzLocalizationManager.EzLocalisableString("故事板视频自适应填满", "Storyboard video auto-size to fill");
@@ -496,6 +495,26 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_WRITTEN_AT =
             new EzLocalizationManager.EzLocalisableString("值写于", "values written");
 
+        public static readonly EzLocalizationManager.EzLocalisableString PANEL_VARIANT_OFFICIAL =
+            new EzLocalizationManager.EzLocalisableString("官方", "Official");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PANEL_VARIANT_MINA =
+            new EzLocalizationManager.EzLocalisableString("Mina", "Mina");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PANEL_VARIANT_SUNNY =
+            new EzLocalizationManager.EzLocalisableString("Sunny", "Sunny");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PANEL_VARIANT_PPP =
+            new EzLocalizationManager.EzLocalisableString("PP+", "PP+");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ANALYSIS_SYSTEM_SELECTION =
+            new EzLocalizationManager.EzLocalisableString("分析算法", "Analysis system");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ANALYSIS_SYSTEM_SELECTION_TOOLTIP =
+            new EzLocalizationManager.EzLocalisableString(
+                "每个规则集各自选用一套分析系统。选歌界面的排序、分组与筛选按这里的选择读取同一套基线。",
+                "Each ruleset picks its own analysis system. Sorting, grouping and filtering on song select read that baseline.");
+
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_WAITING_CHART =
             new EzLocalizationManager.EzLocalisableString("等图表链", "waiting on chart chain");
 
@@ -529,7 +548,8 @@ namespace osu.Game.EzOsuGame.Localization
             "Directly correct the offset value of input results without changing the timeline of audio and beatmap."
             + "\nCan be adjusted for all input delays. (Testing feature! Lock score upload)");
 
-        public static readonly EzLocalizationManager.EzLocalisableString HIT_OBJECT_LIFETIME_USES_OWN_TIME = new EzLocalizationManager.EzLocalisableString("以物件自身时间结束生命周期", "Use hit object's own time for lifetime");
+        public static readonly EzLocalizationManager.EzLocalisableString HIT_OBJECT_LIFETIME_USES_OWN_TIME =
+            new EzLocalizationManager.EzLocalisableString("以物件自身时间结束生命周期", "Use hit object's own time for lifetime");
 
         public static readonly EzLocalizationManager.EzLocalisableString HIT_OBJECT_LIFETIME_USES_OWN_TIME_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "开启后，HitObject 的命中后状态变换与生命周期结束将以物件自身时间为基准，而不是以实际交互判定时间为基准。"

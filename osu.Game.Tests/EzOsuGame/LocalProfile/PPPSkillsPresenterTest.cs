@@ -39,9 +39,10 @@ namespace osu.Game.Tests.EzOsuGame.LocalProfile
                     EzSkillSystems.UNSLICED_KEY,
                     EzSkillSystems.PLAYER_PPP,
                     skills,
-                    analyzedPlays: 12);
+                    analyzedPlays: 12,
+                    rulesetOnlineId: EzLocalProfileConstants.OSU_RULESET_ID);
 
-                var presenter = new PPPSkillsPresenter(provider);
+                var presenter = new PPPSkillsPresenter(provider, EzLocalProfileConstants.OSU_RULESET_ID);
                 var snapshot = presenter.Load(username, EzSkillSystems.UNSLICED_KEY);
 
                 Assert.That(snapshot.RadarAxes, Has.Count.EqualTo(EzOsuSkillAxisExtensions.RadarAxes.Length));

@@ -287,8 +287,7 @@ namespace osu.Game.Screens.Select
                 }
             }
 
-            private bool playerHasSkillData(string username)
-                => skillProvider == null || skillProvider.GetPlayerSsrKeyCounts(username).Count > 0;
+            private bool playerHasSkillData(string username) => skillProvider == null || skillProvider.GetPlayerSsrKeyCounts(username).Count > 0;
 
             private void applyFlowModeState(bool enabled)
             {
@@ -411,9 +410,6 @@ namespace osu.Game.Screens.Select
 
                 protected override LocalisableString GenerateItemText(EzRadarDisplayMode item)
                 {
-                    if (item == EzRadarDisplayMode.MSDSkillDual)
-                        return EzSongSelectStrings.RADAR_MODE_SKILL;
-
                     var attr = typeof(EzRadarDisplayMode).GetField(item.ToString())
                                                          ?.GetCustomAttributes(typeof(DescriptionAttribute), false)
                                                          .OfType<DescriptionAttribute>()

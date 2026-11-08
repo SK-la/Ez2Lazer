@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
@@ -140,9 +141,16 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         public readonly EzRulesetSpecificRadarResult? Radar;
 
+        /// <summary>
+        /// Typed structure summary for the same pass that produced <see cref="Axes"/>' CSI values, or null when the
+        /// ruleset has no structure analysis. Consumers read this instead of running the structure pass again.
+        /// </summary>
+        public readonly EzChartSkillInfo? ChartSkillInfo;
+
         public EzAnalysisResult(KpsSummary commonSummary, EzManiaSummary? maniaSummary = null, EzBeatmapTagSummary? tagSummary = null,
                                 IReadOnlyDictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>? axes = null,
-                                EzDanSet? dan = null, EzRulesetSpecificRadarResult? radar = null)
+                                EzDanSet? dan = null, EzRulesetSpecificRadarResult? radar = null,
+                                EzChartSkillInfo? chartSkillInfo = null)
         {
             AverageKps = double.IsFinite(commonSummary.AverageKps) ? commonSummary.AverageKps : 0;
             MaxKps = double.IsFinite(commonSummary.MaxKps) ? commonSummary.MaxKps : 0;
@@ -152,17 +160,16 @@ namespace osu.Game.EzOsuGame.Analysis
             Axes = axes ?? no_axes;
             Dan = dan;
             Radar = radar;
+            ChartSkillInfo = chartSkillInfo;
         }
 
         public IReadOnlyList<double> KpsList => CommonSummary?.KpsList ?? Array.Empty<double>();
 
         /// <summary>Axis values of one producer, empty when it did not run.</summary>
-        public IReadOnlyDictionary<string, double> AxesOf(EzMetricProducerId producer)
-            => Axes.GetValueOrDefault(producer, no_axis_values);
+        public IReadOnlyDictionary<string, double> AxesOf(EzMetricProducerId producer) => Axes.GetValueOrDefault(producer, no_axis_values);
 
-        public EzAnalysisResult WithTagSummary(EzBeatmapTagSummary? tagSummary)
-            => CommonSummary is KpsSummary commonSummary
-                ? new EzAnalysisResult(commonSummary, ManiaSummary, tagSummary, Axes, Dan, Radar)
-                : this;
+        public EzAnalysisResult WithTagSummary(EzBeatmapTagSummary? tagSummary) => CommonSummary is KpsSummary commonSummary
+            ? new EzAnalysisResult(commonSummary, ManiaSummary, tagSummary, Axes, Dan, Radar, ChartSkillInfo)
+            : this;
     }
 }

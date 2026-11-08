@@ -12,7 +12,6 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Metrics;
-using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
@@ -143,7 +142,8 @@ namespace osu.Game.EzOsuGame.Analysis
         public static double ComputeBaselineSunnyPerformancePointsForRealm(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
             => ComputeBaselinePerformancePointsForRating(beatmapManager, beatmapInfo, beatmapInfo.SunnyStarRating, cancellationToken);
 
-        public static bool TryComputeXxySrAndPp(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken, out double? xxySr, out double? pp)
+        public static bool TryComputeXxySrAndPp(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
+                                                out double? xxySr, out double? pp)
         {
             PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
             IBeatmap analysisBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
@@ -223,74 +223,96 @@ namespace osu.Game.EzOsuGame.Analysis
                     kpsList[i] *= rate;
             }
 
-            double? xxySr = null;
-
-            if (!onlyKps)
-                tryComputeXxySr(analysisBeatmap, lookup, cancellationToken, out xxySr);
-
             cancellationToken.ThrowIfCancellationRequested();
 
             kpsList = OptimizedBeatmapCalculator.DownsampleToFixedCount(kpsList, OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS);
 
             var commonSummary = new KpsSummary(averageKps, maxKps, kpsList);
-            EzManiaSummary? maniaSummary = null;
 
-            if (!onlyKps)
-            {
-                padColumnCounts(lookup, columnCounts, holdNoteCounts);
-                maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts, xxySr);
-            }
+            if (onlyKps)
+                return new EzAnalysisResult(commonSummary);
 
-            return new EzAnalysisResult(commonSummary, maniaSummary,
-                axes: computeAxes(lookup, playable, analysisBeatmap, rate, cancellationToken),
-                dan: computeDan(lookup, analysisBeatmap),
-                radar: computeRadar(lookup, analysisBeatmap, rate, cancellationToken));
-        }
+            // Every product below is measured once and shared by the axes table, the dan set and the mania summary.
+            // Deriving them per consumer is what previously ran the Mina engine and the Sunny rating twice per pass.
+            // The rating and the radar come from one provider call: the radar payload embeds the same rating, so
+            // asking twice made the ruleset recompute its own difficulty core.
+            var radarAndXxy = computeRadarAndXxy(lookup, analysisBeatmap, cancellationToken);
+            double? xxySr = radarAndXxy.XxySr;
 
-        /// <summary>
-        /// Every producer's axis values for this chart under the current mods, keyed by producer.
-        /// </summary>
-        private static IReadOnlyDictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>> computeAxes(
-            in EzAnalysisLookupCache lookup, PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap, double rate, CancellationToken cancellationToken)
-        {
-            var result = new Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>();
             int rulesetOnlineId = lookup.Ruleset.OnlineID;
 
-            var mina = computeMina(rulesetOnlineId, analysisBeatmap, rate);
-            if (mina != null)
-                result[EzMetricProducers.MINA_CHART] = mina;
+            // One note extraction serves the structure pass, the rating engine and the dan inputs below.
+            EzChartMeasurements? measurements = rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID
+                ? EzChartMeasurements.FromPlayable(analysisBeatmap)
+                : null;
 
+            var mina = ComputeMinaAxes(rulesetOnlineId, measurements, rate);
+            var structure = computeStructure(rulesetOnlineId, measurements);
             var ppp = computePpp(rulesetOnlineId, analysisBeatmap, lookup.OrderedMods);
-            if (ppp != null)
-                result[EzMetricProducers.PPP_CHART] = ppp;
 
-            var structure = computeStructure(rulesetOnlineId, analysisBeatmap);
+            padColumnCounts(lookup, columnCounts, holdNoteCounts);
+            var maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts, xxySr);
+
+            return new EzAnalysisResult(commonSummary, maniaSummary,
+                axes: computeAxes(lookup, playable, analysisBeatmap, mina, structure?.Axes, ppp, xxySr, cancellationToken),
+                dan: computeDan(rulesetOnlineId, measurements, mina?.Axes, structure?.Info, xxySr),
+                radar: radarAndXxy.Radar,
+                chartSkillInfo: structure?.Info);
+        }
+
+        private readonly record struct StructureResult(IReadOnlyDictionary<string, double> Axes, EzChartSkillInfo Info);
+
+        /// <summary>
+        /// The PP+ vector in both key spaces this pass needs: bare axis ids for the producer axis table, and the
+        /// engine's stored skill ids for the performance formula, which addresses ratings by stored id.
+        /// </summary>
+        private readonly record struct PppResult(IReadOnlyDictionary<string, double> Axes, IReadOnlyDictionary<string, double> Skills);
+
+        /// <summary>
+        /// Every producer's axis values for this chart under the current mods, keyed by producer. Takes the products
+        /// this pass already measured so no producer is computed twice.
+        /// </summary>
+        private static IReadOnlyDictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>> computeAxes(
+            in EzAnalysisLookupCache lookup, PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap,
+            MinaResult? mina, IReadOnlyDictionary<string, double>? structure, PppResult? ppp,
+            double? xxySr, CancellationToken cancellationToken)
+        {
+            var result = new Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>();
+
+            if (mina != null)
+                result[EzMetricProducers.MINA_CHART] = mina.Value.Axes;
+
+            if (ppp != null)
+                result[EzMetricProducers.PPP_CHART] = ppp.Value.Axes;
+
             if (structure != null)
                 result[EzMetricProducers.CSI_CHART] = structure;
 
             addOfficial(playable, analysisBeatmap, lookup, result);
-            addSsr(lookup, analysisBeatmap, cancellationToken, result);
+            addSsr(lookup, analysisBeatmap, xxySr, cancellationToken, result);
             addPppPerformance(lookup, analysisBeatmap, ppp, cancellationToken, result);
 
             return result;
         }
 
         /// <summary>
-        /// Performance points implied by the PP+ star rating. The rating already lives in the PP+ axis table, so this
-        /// only asks the ruleset's performance calculator to score it.
+        /// Performance points implied by the PP+ chart vector, using the mode's own PP+ formula.
         /// </summary>
         private static void addPppPerformance(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap,
-                                              IReadOnlyDictionary<string, double>? pppAxes, CancellationToken cancellationToken,
+                                              PppResult? ppp, CancellationToken cancellationToken,
                                               Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>> result)
         {
-            if (pppAxes == null
-                || !pppAxes.TryGetValue(EzPPPSkillCatalog.STAR_RATING, out double star)
+            if (ppp is not { } values
+                || !values.Axes.TryGetValue(EzPPPSkillCatalog.STAR_RATING, out double star)
                 || !double.IsFinite(star) || star <= 0)
             {
                 return;
             }
 
-            double pp = calculatePerformanceAtRating(lookup, analysisBeatmap, star, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            double pp = EzPPPPerformanceCalculators.Calculate(lookup.Ruleset.OnlineID, values.Skills, analysisBeatmap,
+                lookup.OrderedMods, getRateAdjustMultiplier(lookup.OrderedMods));
 
             if (!double.IsFinite(pp) || pp <= 0)
                 return;
@@ -304,12 +326,12 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <summary>
         /// The ruleset's perfect-play performance for an arbitrary star rating, via the ruleset analysis provider.
         /// </summary>
-        private static double calculatePerformanceAtRating(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, double starRating, CancellationToken cancellationToken)
-            => EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset,
-                new EzAnalysisRequest(analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), EzAnalysisScope.PerformancePoints, starRating),
-                EzAnalysisFields.PERFORMANCE_POINTS, cancellationToken, out double pp)
-                ? pp
-                : -1;
+        private static double calculatePerformanceAtRating(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, double starRating,
+                                                           CancellationToken cancellationToken) => EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset,
+            new EzAnalysisRequest(analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), EzAnalysisScope.PerformancePoints, starRating),
+            EzAnalysisFields.PERFORMANCE_POINTS, cancellationToken, out double pp)
+            ? pp
+            : -1;
 
         /// <summary>
         /// Official difficulty and performance for the current mods. Both come from one difficulty calculation,
@@ -318,28 +340,54 @@ namespace osu.Game.EzOsuGame.Analysis
         private static void addOfficial(PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup,
                                         Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>> result)
         {
-            var ruleset = lookup.Ruleset.CreateInstance();
-            var difficulty = ruleset.CreateDifficultyCalculator(playable).Calculate(lookup.OrderedMods, CancellationToken.None);
+            if (computeOfficial(playable, analysisBeatmap, lookup, CancellationToken.None) is not { } official)
+                return;
 
-            if (double.IsFinite(difficulty.StarRating) && difficulty.StarRating >= 0)
+            if (double.IsFinite(official.StarRating) && official.StarRating >= 0)
             {
                 result[EzMetricProducers.OFFICIAL_CHART] = new Dictionary<string, double>(StringComparer.Ordinal)
                 {
-                    [EzMetricProducers.STAR_RATING] = difficulty.StarRating,
+                    [EzMetricProducers.STAR_RATING] = official.StarRating,
                 };
             }
 
-            if (!double.IsFinite(difficulty.StarRating))
+            if (official.PerformancePoints is not double pp)
                 return;
+
+            result[EzMetricProducers.OFFICIAL_PERFORMANCE] = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                [EzMetricProducers.PERFORMANCE_POINTS] = pp,
+            };
+        }
+
+        private readonly record struct OfficialResult(double StarRating, double? PerformancePoints);
+
+        /// <summary>
+        /// The ruleset's own difficulty and perfect-play performance for the current mods.
+        /// </summary>
+        /// <remarks>
+        /// The only place that builds the calculator/score-processor pair. The live pass and the songs-branch
+        /// build both read the pair from here, so the same chart and mods cannot yield two different numbers.
+        /// </remarks>
+        private static OfficialResult? computeOfficial(PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup,
+                                                       CancellationToken cancellationToken)
+        {
+            var ruleset = lookup.Ruleset.CreateInstance();
+            var difficulty = ruleset.CreateDifficultyCalculator(playable).Calculate(lookup.OrderedMods, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!double.IsFinite(difficulty.StarRating) || difficulty.StarRating < 0)
+                return null;
 
             var performanceCalculator = ruleset.CreatePerformanceCalculator();
 
             if (performanceCalculator == null)
-                return;
+                return new OfficialResult(difficulty.StarRating, null);
 
             ScoreProcessor scoreProcessor = ruleset.CreateScoreProcessor();
             scoreProcessor.Mods.Value = lookup.OrderedMods;
             scoreProcessor.ApplyBeatmap(analysisBeatmap);
+            cancellationToken.ThrowIfCancellationRequested();
 
             ScoreInfo perfectScore = new ScoreInfo(lookup.BeatmapInfo, ruleset.RulesetInfo)
             {
@@ -354,24 +402,21 @@ namespace osu.Game.EzOsuGame.Analysis
             };
 
             var performance = performanceCalculator.Calculate(perfectScore, difficulty);
+            cancellationToken.ThrowIfCancellationRequested();
 
-            if (!double.IsFinite(performance.Total) || performance.Total <= 0)
-                return;
+            double? pp = double.IsFinite(performance.Total) && performance.Total > 0 ? performance.Total : null;
 
-            result[EzMetricProducers.OFFICIAL_PERFORMANCE] = new Dictionary<string, double>(StringComparer.Ordinal)
-            {
-                [EzMetricProducers.PERFORMANCE_POINTS] = performance.Total,
-            };
+            return new OfficialResult(difficulty.StarRating, pp);
         }
 
         /// <summary>
         /// Sunny star rating for the current mods. The rating is a single number, so it is stored under the same
         /// star axis id every other star-tier producer uses.
         /// </summary>
-        private static void addSsr(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, CancellationToken cancellationToken,
+        private static void addSsr(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, double? xxySr, CancellationToken cancellationToken,
                                    Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>> result)
         {
-            if (!tryComputeXxySr(analysisBeatmap, lookup, cancellationToken, out double? xxySr) || xxySr is not double value)
+            if (xxySr is not double value || !double.IsFinite(value))
                 return;
 
             result[EzMetricProducers.SSR_CHART] = new Dictionary<string, double>(StringComparer.Ordinal)
@@ -391,17 +436,13 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// Dan estimates for the sides this chart can be rated on. Reads the same axis tables this pass produced,
-        /// so the live value and the stored row are derived from one input.
+        /// Dan estimates for the sides this chart can be rated on, from the axis table and Sunny rating this pass
+        /// already measured.
         /// </summary>
-        private static EzDanSet? computeDan(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap)
+        private static EzDanSet? computeDan(int rulesetOnlineId, EzChartMeasurements? measurements,
+                                            IReadOnlyDictionary<string, double>? bareAxes, EzChartSkillInfo? chartInfo, double? xxySr)
         {
-            if (lookup.Ruleset.OnlineID != EzLocalProfileConstants.MANIA_RULESET_ID)
-                return null;
-
-            var bareAxes = computeMina(lookup.Ruleset.OnlineID, analysisBeatmap, EzModRate.Resolve(lookup.OrderedMods));
-
-            if (bareAxes == null)
+            if (rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID || bareAxes == null || measurements is not { } measured)
                 return null;
 
             // The estimator addresses axes by their stored skill id.
@@ -410,37 +451,32 @@ namespace osu.Game.EzOsuGame.Analysis
             foreach (var (axisId, value) in bareAxes)
                 axes[$"{EzSkillSystems.BEATMAP_MINA}.{axisId}"] = value;
 
-            int keyCount = EzHoldMetrics.ResolveKeyCount(analysisBeatmap);
-            double holdRatio = EzHoldMetrics.ComputeHoldRatio(analysisBeatmap);
-
-            if (tryComputeXxySr(analysisBeatmap, lookup, CancellationToken.None, out double? xxySr) == false)
-                xxySr = null;
-
             return EzDanSet.Create(
                 axes,
-                keyCount,
-                holdRatio,
+                measured.KeyCount,
+                measured.HoldRatio,
                 xxySr,
-                chartInfo: null,
-                holdCount: EzHoldMetrics.ComputeHoldCount(analysisBeatmap),
-                // Without a star rating the means-derived estimate is not trustworthy enough to display.
-                allowMsdMeans: xxySr != null);
+                chartInfo,
+                holdCount: measured.HoldCount);
         }
 
-        /// <summary>Mina axis values, keyed by bare axis id. Null when the key mode is outside the engine's range.</summary>
-        private static IReadOnlyDictionary<string, double>? computeMina(int rulesetOnlineId, IBeatmap analysisBeatmap, double rate)
+        /// <summary>
+        /// The one Mina measurement in the codebase. Every consumer (axes table, dan, radar, player aggregation)
+        /// goes through here, so no second implementation of the engine call can drift from this one.
+        /// </summary>
+        internal static MinaResult? ComputeMinaAxes(int rulesetOnlineId, EzChartMeasurements? measurements, double rate)
         {
-            if (rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID)
+            if (rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID || measurements is not { } measured)
                 return null;
 
-            int keyCount = EzHoldMetrics.ResolveKeyCount(analysisBeatmap);
+            int keyCount = measured.KeyCount;
             if (!EzMinaEngine.IsSupportedKeyCount(keyCount))
                 return null;
 
             try
             {
                 using var engine = new EzMinaEngine();
-                var vector = engine.CalculateMsd(EzMinaNoteConverter.Convert(analysisBeatmap), keyCount, (float)rate);
+                var vector = engine.CalculateMsd(EzMinaNoteConverter.Convert(measured.Chart.Notes), keyCount, (float)rate);
 
                 if (vector.Overall <= 0 && vector.Stream <= 0)
                     return null;
@@ -450,7 +486,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 foreach (var (axis, value) in vector.Enumerate())
                     axes[axis.ToId()] = value;
 
-                return axes;
+                return new MinaResult(axes, vector);
             }
             catch
             {
@@ -458,11 +494,14 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
+        /// <summary>Bare-axis table plus the engine vector it came from.</summary>
+        internal readonly record struct MinaResult(IReadOnlyDictionary<string, double> Axes, EzMinaSkillAxisVector Vector);
+
         /// <summary>
         /// PP+ chart vector for the current mods. Independent of the ruleset analysis provider: PP+ covers
         /// osu / taiko / catch / mania, only one of which exposes a provider.
         /// </summary>
-        private static IReadOnlyDictionary<string, double>? computePpp(int rulesetOnlineId, IBeatmap analysisBeatmap, IReadOnlyList<Mod> mods)
+        private static PppResult? computePpp(int rulesetOnlineId, IBeatmap analysisBeatmap, IReadOnlyList<Mod> mods)
         {
             if (!EzPPPSkillCatalog.SupportsRuleset(rulesetOnlineId))
                 return null;
@@ -472,7 +511,8 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!EzPPPCalculators.TryCalculate(rulesetOnlineId, analysisBeatmap, mods, clockRate, out var skills))
                 return null;
 
-            // Stored ids carry the system prefix; a producer's axis table addresses axes by bare id.
+            // Stored ids carry the system prefix; a producer's axis table addresses axes by bare id. The
+            // performance formula addresses them by stored id, so both shapes leave this method together.
             var axes = new Dictionary<string, double>(StringComparer.Ordinal);
 
             foreach (var (skillId, value) in skills)
@@ -481,46 +521,60 @@ namespace osu.Game.EzOsuGame.Analysis
                     axes[axisId] = value;
             }
 
-            return axes;
+            return new PppResult(axes, skills);
         }
 
         /// <summary>
-        /// Chart structure values: the drawn long-note measures plus the pattern and subtype scores.
-        /// Rate is not folded in; the values are rate-invariant.
+        /// Chart structure values: the drawn long-note measures plus the pattern and subtype scores, together with
+        /// the typed summary the same pass produced. Rate is not folded in; the values are rate-invariant.
         /// </summary>
-        private static IReadOnlyDictionary<string, double>? computeStructure(int rulesetOnlineId, IBeatmap analysisBeatmap)
+        private static StructureResult? computeStructure(int rulesetOnlineId, EzChartMeasurements? measurements)
         {
-            if (rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID)
+            if (rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID || measurements is not { } measured)
                 return null;
 
-            var input = EzChartSkillInfoComputer.FromPlayable(analysisBeatmap);
-            var features = EzChartFeatureExtractor.Extract(input, rate: 1);
-            var patterns = EzPatternAnalyzer.Analyze(input, rate: 1, precomputed: features);
-            var axes = new Dictionary<string, double>(StringComparer.Ordinal);
+            var axes = EzChartSkillInfoComputer.ComputeAxes(measured.Chart, out var info);
 
-            foreach (var (id, value) in EzManiaLNAxisExtensions.FromFeatures(features.Metrics))
-                axes[id] = value;
-
-            foreach (var hit in patterns.AllPatterns)
-            {
-                if (!double.IsFinite(hit.Score) || hit.Score <= 0)
-                    continue;
-
-                if (!EzManiaLNAxisExtensions.SubtypeIds.Contains(hit.Id) && !EzManiaRCAxisExtensions.AllIds.Contains(hit.Id))
-                    continue;
-
-                if (!axes.TryGetValue(hit.Id, out double existing) || hit.Score > existing)
-                    axes[hit.Id] = hit.Score;
-            }
-
-            return axes;
+            return new StructureResult(axes, info);
         }
 
-        private static EzRulesetSpecificRadarResult? computeRadar(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, double rate, CancellationToken cancellationToken)
-            => EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset, new EzAnalysisRequest(analysisBeatmap, rate), EzAnalysisFields.RULESET_SPECIFIC_RADAR_RESULT,
-                cancellationToken, out EzRulesetSpecificRadarResult radar)
-                ? radar
+        private readonly record struct RadarAndXxy(double? XxySr, EzRulesetSpecificRadarResult? Radar);
+
+        /// <summary>
+        /// The Sunny rating and the ruleset radar from one provider call.
+        /// </summary>
+        /// <remarks>
+        /// The radar payload already carries the rating the provider measured, so asking for the two scopes in
+        /// separate calls ran the ruleset's difficulty core twice for the same chart and mods.
+        /// </remarks>
+        private static RadarAndXxy computeRadarAndXxy(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, CancellationToken cancellationToken)
+        {
+            bool supportsXxy = EzSunnyStarRatingSupport.SupportsBeatmap(analysisBeatmap, lookup.Ruleset);
+
+            var scopes = EzAnalysisScope.RulesetSpecificRadarData
+                         | (supportsXxy ? EzAnalysisScope.XxySr : EzAnalysisScope.None);
+
+            var request = new EzAnalysisRequest(analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), scopes);
+
+            if (!EzAnalysisProviderBridge.TryCompute(lookup.Ruleset, request, cancellationToken, out IEzAnalysis analysis))
+                return default;
+
+            double? xxySr = null;
+
+            if (supportsXxy)
+            {
+                if (analysisBeatmap.HitObjects.Count == 0)
+                    xxySr = 0;
+                else if (analysis.TryGetValue(EzAnalysisFields.XXY_SR, out double sr) && double.IsFinite(sr) && sr >= 0)
+                    xxySr = sr;
+            }
+
+            EzRulesetSpecificRadarResult? radar = analysis.TryGetValue(EzAnalysisFields.RULESET_SPECIFIC_RADAR_RESULT, out EzRulesetSpecificRadarResult value)
+                ? value
                 : null;
+
+            return new RadarAndXxy(xxySr, radar);
+        }
 
         /// <summary>
         /// 把稀疏列统计补 0 到真实列数（仅 Mania 分析路径；0 note 谱面的空字典不补）。
@@ -569,7 +623,8 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        private static bool tryComputeOperationValues(PlayableCachedWorkingBeatmap playableWorkingBeatmap, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
+        private static bool tryComputeOperationValues(PlayableCachedWorkingBeatmap playableWorkingBeatmap, IBeatmap analysisBeatmap,
+                                                      in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
                                                       out double? xxySr, out double? pp)
         {
             pp = tryComputePerfectPp(playableWorkingBeatmap, analysisBeatmap, lookup, cancellationToken);
@@ -598,40 +653,9 @@ namespace osu.Game.EzOsuGame.Analysis
             return xxySr != null;
         }
 
-        private static double? tryComputePerfectPp(PlayableCachedWorkingBeatmap playableWorkingBeatmap, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken)
-        {
-            var ruleset = lookup.Ruleset.CreateInstance();
-
-            var performanceCalculator = ruleset.CreatePerformanceCalculator();
-
-            if (performanceCalculator == null)
-                return null;
-
-            var difficulty = ruleset.CreateDifficultyCalculator(playableWorkingBeatmap).Calculate(lookup.OrderedMods, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
-
-            ScoreProcessor scoreProcessor = ruleset.CreateScoreProcessor();
-            scoreProcessor.Mods.Value = lookup.OrderedMods;
-            scoreProcessor.ApplyBeatmap(analysisBeatmap);
-            cancellationToken.ThrowIfCancellationRequested();
-
-            ScoreInfo perfectScore = new ScoreInfo(lookup.BeatmapInfo, ruleset.RulesetInfo)
-            {
-                Passed = true,
-                Accuracy = 1,
-                Mods = lookup.OrderedMods,
-                MaxCombo = scoreProcessor.MaximumCombo,
-                Combo = scoreProcessor.MaximumCombo,
-                TotalScore = scoreProcessor.MaximumTotalScore,
-                Statistics = scoreProcessor.MaximumStatistics,
-                MaximumStatistics = scoreProcessor.MaximumStatistics
-            };
-
-            var performance = performanceCalculator.Calculate(perfectScore, difficulty);
-            cancellationToken.ThrowIfCancellationRequested();
-
-            return double.IsFinite(performance.Total) ? performance.Total : null;
-        }
+        private static double? tryComputePerfectPp(PlayableCachedWorkingBeatmap playableWorkingBeatmap, IBeatmap analysisBeatmap,
+                                                   in EzAnalysisLookupCache lookup, CancellationToken cancellationToken)
+            => computeOfficial(playableWorkingBeatmap, analysisBeatmap, lookup, cancellationToken)?.PerformancePoints;
 
         private class PlayableCachedWorkingBeatmap : IWorkingBeatmap
         {
@@ -645,8 +669,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
             public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods) => playable ??= working.GetPlayableBeatmap(ruleset, mods);
 
-            public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken) =>
-                playable ??= working.GetPlayableBeatmap(ruleset, mods, cancellationToken);
+            public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken)
+                => playable ??= working.GetPlayableBeatmap(ruleset, mods, cancellationToken);
 
             IBeatmapInfo IWorkingBeatmap.BeatmapInfo => working.BeatmapInfo;
             bool IWorkingBeatmap.BeatmapLoaded => working.BeatmapLoaded;

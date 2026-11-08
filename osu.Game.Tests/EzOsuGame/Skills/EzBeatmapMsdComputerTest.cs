@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using NUnit.Framework;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Mina;
 
@@ -34,20 +35,16 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         public void TestIsCurrentMinaCacheAcceptsCompleteCurrentIds()
         {
             Assert.That(EzBeatmapMinaComputer.IsCurrentMinaCache(buildCompleteSkills()), Is.True);
-            Assert.That(EzBeatmapMinaComputer.IsSettledMinaCache(buildCompleteSkills()), Is.True);
+            Assert.That(EzBeatmapMinaComputer.IsSettledMinaCache(EzMetricState.Current, buildCompleteSkills()), Is.True);
         }
 
         [Test]
         public void TestUnrateableMarkerIsSettledButNotCurrent()
         {
-            var skills = new Dictionary<string, double>
-            {
-                [EzSkillSystems.MinaUnrateableSkillId] = 1,
-            };
+            var skills = new Dictionary<string, double>();
 
-            Assert.That(EzBeatmapMinaComputer.IsUnrateableMina(skills), Is.True);
             Assert.That(EzBeatmapMinaComputer.IsCurrentMinaCache(skills), Is.False);
-            Assert.That(EzBeatmapMinaComputer.IsSettledMinaCache(skills), Is.True);
+            Assert.That(EzBeatmapMinaComputer.IsSettledMinaCache(EzMetricState.Unrateable, skills), Is.True);
         }
 
         [Test]
@@ -56,8 +53,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var skills = new Dictionary<string, double>();
 
             Assert.That(EzBeatmapMinaComputer.IsCurrentMinaCache(skills), Is.False);
-            Assert.That(EzBeatmapMinaComputer.IsUnrateableMina(skills), Is.False);
-            Assert.That(EzBeatmapMinaComputer.IsSettledMinaCache(skills), Is.False);
+            Assert.That(EzBeatmapMinaComputer.IsSettledMinaCache(EzMetricState.Missing, skills), Is.False);
         }
 
         private static Dictionary<string, double> buildCompleteSkills()

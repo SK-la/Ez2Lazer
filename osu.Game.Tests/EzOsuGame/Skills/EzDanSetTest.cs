@@ -3,7 +3,6 @@
 
 using System.Collections.Generic;
 using NUnit.Framework;
-using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 
@@ -68,14 +67,14 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
-        public void Means_derived_values_are_withheld_when_the_caller_refuses_them()
+        public void Means_derived_values_are_emitted_and_tagged_for_the_reader_to_filter()
         {
-            var live = EzDanSet.Create(axes(overall: 20), keyCount: 4, holdRatio: 0.1, xxySr: null, chartInfo: null, allowMsdMeans: false);
-            var persisted = EzDanSet.Create(axes(overall: 20), keyCount: 4, holdRatio: 0.1, xxySr: null, chartInfo: null, allowMsdMeans: true);
+            // One policy for every caller: the estimate is produced and tagged, and a surface that distrusts it
+            // hides it by source instead of asking the producer for a different answer.
+            var set = EzDanSet.Create(axes(overall: 20), keyCount: 4, holdRatio: 0.1, xxySr: null, chartInfo: null);
 
-            Assert.That(live, Is.Null);
-            Assert.That(persisted, Is.Not.Null);
-            Assert.That(persisted!.For(EzDanSide.Rc)!.Value, Is.EqualTo(EzDanValueSource.MsdMeans));
+            Assert.That(set, Is.Not.Null);
+            Assert.That(set!.For(EzDanSide.Rc)!.Value, Is.EqualTo(EzDanValueSource.MsdMeans));
         }
 
         [Test]

@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 
@@ -47,6 +48,35 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                 byTimeMs[timeMs] = mask | (1u << column);
             }
 
+            return toRows(byTimeMs);
+        }
+
+        /// <summary>
+        /// Builds rows from an already-extracted chart input, so a pass that measured the structure does not walk
+        /// the playable's hit objects a second time.
+        /// </summary>
+        public static EzCalcNote[] Convert(IReadOnlyList<EzManiaNote> notes)
+        {
+            ArgumentNullException.ThrowIfNull(notes);
+
+            var byTimeMs = new SortedDictionary<long, uint>();
+
+            foreach (var note in notes)
+            {
+                if (note.Column < 0 || note.Column >= 32)
+                    continue;
+
+                long timeMs = (long)Math.Round(note.TimeMs);
+
+                byTimeMs.TryGetValue(timeMs, out uint mask);
+                byTimeMs[timeMs] = mask | (1u << note.Column);
+            }
+
+            return toRows(byTimeMs);
+        }
+
+        private static EzCalcNote[] toRows(SortedDictionary<long, uint> byTimeMs)
+        {
             if (byTimeMs.Count == 0)
                 return Array.Empty<EzCalcNote>();
 

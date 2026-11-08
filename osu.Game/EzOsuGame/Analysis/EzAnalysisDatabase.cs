@@ -22,6 +22,7 @@ using osu.Game.Online.API;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
@@ -104,6 +105,9 @@ namespace osu.Game.EzOsuGame.Analysis
         /// 外部规则集离线分析统一落盘：Realm NoMod 基线（Star/xxy/PP）+ 主 SQLite kps/KPC 切片。
         /// 调用方负责将规则集私有分析结果转换为 <see cref="EzAnalysisResult"/>。
         /// </summary>
+        /// <remarks>
+        /// 只能由用户显式发起的外部规则集离线分析（如 BMS 的「构建分析」）调用；不作为读路径的副作用。
+        /// </remarks>
         /// <returns><see langword="true"/> when <paramref name="beatmapId"/> exists in Realm and at least one field or slice was written.</returns>
         public bool TryCommitExternalOfflineAnalysis(RealmAccess realmAccess, Guid beatmapId, in EzExternalBeatmapAnalysisPayload payload)
         {
@@ -427,7 +431,9 @@ namespace osu.Game.EzOsuGame.Analysis
             string currentModsFingerprint = createModsProfileFingerprint(mods);
 
             var ordered = branches
-                          .OrderByDescending(branch => currentRulesetOnlineId.HasValue && branch.Metadata.RulesetOnlineId == currentRulesetOnlineId.Value && string.Equals(branch.Metadata.ModsFingerprint, currentModsFingerprint, StringComparison.Ordinal))
+                          .OrderByDescending(branch
+                              => currentRulesetOnlineId.HasValue && branch.Metadata.RulesetOnlineId == currentRulesetOnlineId.Value
+                                                                 && string.Equals(branch.Metadata.ModsFingerprint, currentModsFingerprint, StringComparison.Ordinal))
                           .ThenByDescending(branch => currentRulesetOnlineId.HasValue && branch.Metadata.RulesetOnlineId == currentRulesetOnlineId.Value)
                           .ThenByDescending(branch => branch.Metadata.CreatedAtUnixMilliseconds)
                           .ToList();
@@ -544,8 +550,7 @@ namespace osu.Game.EzOsuGame.Analysis
             return EzAnalysisSchemaManager.ShouldRunAutomaticSqliteWarmup(databasePath);
         }
 
-        public void EnsureInitialised()
-            => persistentStore.Initialise();
+        public void EnsureInitialised() => persistentStore.Initialise();
 
         /// <summary>
         /// 扫描所有分支库：v2+ legacy 库补写版本 meta；v1 迁移后标记全量 refresh；返回 xxy 或 PP 算法落后、需要重算的分支计划。
@@ -914,10 +919,9 @@ namespace osu.Game.EzOsuGame.Analysis
             return true;
         }
 
-        private static string createBranchDisplayName(string? sourceCollectionName, IReadOnlyList<Mod>? mods)
-            => string.IsNullOrWhiteSpace(sourceCollectionName)
-                ? $"songs | {createModsDisplay(mods)}"
-                : $"{sourceCollectionName.Trim()} | {createModsDisplay(mods)}";
+        private static string createBranchDisplayName(string? sourceCollectionName, IReadOnlyList<Mod>? mods) => string.IsNullOrWhiteSpace(sourceCollectionName)
+            ? $"songs | {createModsDisplay(mods)}"
+            : $"{sourceCollectionName.Trim()} | {createModsDisplay(mods)}";
 
         private IReadOnlyDictionary<Guid, double> getResolvedActiveBranchValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo,
                                                                                 string? modsFingerprint,
@@ -1311,8 +1315,7 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        private bool isActiveSongsBranch(string databasePath)
-            => IsSongsBranchActive(databasePath);
+        private bool isActiveSongsBranch(string databasePath) => IsSongsBranchActive(databasePath);
 
         private bool removeActiveSongsBranch(string databasePath)
         {
@@ -1468,7 +1471,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 foreach (var setting in mod.SettingsBindables)
                 {
                     builder.Append('|');
-                    builder.Append(System.Text.Json.JsonSerializer.Serialize(setting.GetUnderlyingSettingValue()));
+                    builder.Append(JsonSerializer.Serialize(setting.GetUnderlyingSettingValue()));
                 }
 
                 builder.Append(';');
@@ -1489,45 +1492,61 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        private static bool modAffectsXxySr(Mod mod)
-            => mod is IApplicableToRate
-                      or IApplicableToBeatmapConverter
-                      or IApplicableAfterBeatmapConversion
-                      or IApplicableToDifficulty
-                      or IApplicableToBeatmapProcessor
-                      or IApplicableToHitObject
-                      or IApplicableToBeatmap;
+        private static bool modAffectsXxySr(Mod mod) => mod is IApplicableToRate
+                                                               or IApplicableToBeatmapConverter
+                                                               or IApplicableAfterBeatmapConversion
+                                                               or IApplicableToDifficulty
+                                                               or IApplicableToBeatmapProcessor
+                                                               or IApplicableToHitObject
+                                                               or IApplicableToBeatmap;
 
         private static class SongsBranchStrings
         {
-            internal static readonly EzLocalizationManager.EzLocalisableString SQLITE_DISABLED = new EzLocalizationManager.EzLocalisableString("Ez analysis sqlite 未启用。", "Ez analysis sqlite is disabled.");
-            internal static readonly EzLocalizationManager.EzLocalisableString MANIA_ONLY = new EzLocalizationManager.EzLocalisableString("当前仅支持在 mania 下生成分支曲库。", "Generating branch libraries is currently only supported under mania.");
-            internal static readonly EzLocalizationManager.EzLocalisableString EMPTY_FILTER_RESULT = new EzLocalizationManager.EzLocalisableString("当前筛选结果为空，未生成分支库。", "The current filtered result is empty. No branch sqlite was generated.");
-            internal static readonly EzLocalizationManager.EzLocalisableString NO_WRITABLE_RESULTS = new EzLocalizationManager.EzLocalisableString("当前收藏夹里没有可写入分支曲库的 mania 谱面。", "The selected collection does not contain any mania beatmaps that can be written into the branch library.");
-            internal static readonly EzLocalizationManager.EzLocalisableString GENERATED_AND_ACTIVATED = new EzLocalizationManager.EzLocalisableString("分支曲库已生成并启用。", "The branch library has been generated and activated.");
+            internal static readonly EzLocalizationManager.EzLocalisableString SQLITE_DISABLED =
+                new EzLocalizationManager.EzLocalisableString("Ez analysis sqlite 未启用。", "Ez analysis sqlite is disabled.");
+            internal static readonly EzLocalizationManager.EzLocalisableString MANIA_ONLY =
+                new EzLocalizationManager.EzLocalisableString("当前仅支持在 mania 下生成分支曲库。", "Generating branch libraries is currently only supported under mania.");
+            internal static readonly EzLocalizationManager.EzLocalisableString EMPTY_FILTER_RESULT =
+                new EzLocalizationManager.EzLocalisableString("当前筛选结果为空，未生成分支库。", "The current filtered result is empty. No branch sqlite was generated.");
+            internal static readonly EzLocalizationManager.EzLocalisableString NO_WRITABLE_RESULTS =
+                new EzLocalizationManager.EzLocalisableString("当前收藏夹里没有可写入分支曲库的 mania 谱面。", "The selected collection does not contain any mania beatmaps that can be written into the branch library.");
+            internal static readonly EzLocalizationManager.EzLocalisableString GENERATED_AND_ACTIVATED =
+                new EzLocalizationManager.EzLocalisableString("分支曲库已生成并启用。", "The branch library has been generated and activated.");
             internal static readonly EzLocalizationManager.EzLocalisableString GENERATED_ONLY = new EzLocalizationManager.EzLocalisableString("分支曲库已生成。", "The branch library has been generated.");
             internal static readonly EzLocalizationManager.EzLocalisableString INVALID_BRANCH = new EzLocalizationManager.EzLocalisableString("所选分支曲库无效。", "The selected branch library is invalid.");
             internal static readonly EzLocalizationManager.EzLocalisableString INVALID_COLLECTION = new EzLocalizationManager.EzLocalisableString("所选收藏夹无效。", "The selected collection is invalid.");
-            internal static readonly EzLocalizationManager.EzLocalisableString ALREADY_ACTIVE_BRANCH = new EzLocalizationManager.EzLocalisableString("分支曲库已在启用列表中：{0}", "Branch library is already active: {0}");
+            internal static readonly EzLocalizationManager.EzLocalisableString ALREADY_ACTIVE_BRANCH =
+                new EzLocalizationManager.EzLocalisableString("分支曲库已在启用列表中：{0}", "Branch library is already active: {0}");
             internal static readonly EzLocalizationManager.EzLocalisableString ACTIVATED_BRANCH = new EzLocalizationManager.EzLocalisableString("已启用分支曲库：{0}", "Activated branch library: {0}");
             internal static readonly EzLocalizationManager.EzLocalisableString DEACTIVATED_BRANCH = new EzLocalizationManager.EzLocalisableString("已停用分支曲库：{0}", "Deactivated branch library: {0}");
             internal static readonly EzLocalizationManager.EzLocalisableString DELETED_BRANCH = new EzLocalizationManager.EzLocalisableString("已删除分支曲库：{0}", "Deleted branch library: {0}");
-            internal static readonly EzLocalizationManager.EzLocalisableString DELETE_BRANCH_FAILED = new EzLocalizationManager.EzLocalisableString("删除分支曲库失败。", "Failed to delete the branch library.");
-            internal static readonly EzLocalizationManager.EzLocalisableString BRANCH_HIDE_NO_LOCAL_BEATMAPS = new EzLocalizationManager.EzLocalisableString("分支曲库“{0}”当前没有可处理的本地谱面。", "Branch library \"{0}\" currently has no local beatmaps to process.");
+            internal static readonly EzLocalizationManager.EzLocalisableString DELETE_BRANCH_FAILED =
+                new EzLocalizationManager.EzLocalisableString("删除分支曲库失败。", "Failed to delete the branch library.");
+            internal static readonly EzLocalizationManager.EzLocalisableString BRANCH_HIDE_NO_LOCAL_BEATMAPS =
+                new EzLocalizationManager.EzLocalisableString("分支曲库“{0}”当前没有可处理的本地谱面。", "Branch library \"{0}\" currently has no local beatmaps to process.");
 
             // 分支库隐藏
-            // internal static readonly EzLocalizationManager.EzLocalisableString HIDDEN_BRANCH = new EzLocalizationManager.EzLocalisableString("已对分支曲库“{0}”应用隐藏，隐藏 {1:#,0} 张。", "Applied hide for branch library \"{0}\". Hid {1:#,0} beatmaps.");
-            // internal static readonly EzLocalizationManager.EzLocalisableString HIDDEN_BRANCH_WITH_SKIPS = new EzLocalizationManager.EzLocalisableString("已对分支曲库“{0}”应用隐藏，隐藏 {1:#,0} 张，跳过 {2:#,0} 张。", "Applied hide for branch library \"{0}\". Hid {1:#,0} beatmaps and skipped {2:#,0}.");
-            // internal static readonly EzLocalizationManager.EzLocalisableString HIDE_BRANCH_FAILED = new EzLocalizationManager.EzLocalisableString("应用分支曲库隐藏失败。", "Failed to apply branch library hide.");
-            // internal static readonly EzLocalizationManager.EzLocalisableString RESTORED_BRANCH_HIDDEN = new EzLocalizationManager.EzLocalisableString("已取消分支曲库“{0}”的隐藏，恢复 {1:#,0} 张。", "Removed branch library hide for \"{0}\". Restored {1:#,0} beatmaps.");
-            // internal static readonly EzLocalizationManager.EzLocalisableString RESTORE_BRANCH_HIDE_FAILED = new EzLocalizationManager.EzLocalisableString("取消分支曲库隐藏失败。", "Failed to remove branch library hide.");
+            // internal static readonly EzLocalizationManager.EzLocalisableString HIDDEN_BRANCH = new EzLocalizationManager.EzLocalisableString("已对分支曲库“{0}”应用隐藏，隐藏 {1:#,0} 张。", "Applied hide for
+            // branch library \"{0}\". Hid {1:#,0} beatmaps.");
+            // internal static readonly EzLocalizationManager.EzLocalisableString HIDDEN_BRANCH_WITH_SKIPS = new EzLocalizationManager.EzLocalisableString("已对分支曲库“{0}”应用隐藏，隐藏 {1:#,0} 张，跳过 {2:#,0} 张。",
+            // "Applied hide for branch library \"{0}\". Hid {1:#,0} beatmaps and skipped {2:#,0}.");
+            // internal static readonly EzLocalizationManager.EzLocalisableString HIDE_BRANCH_FAILED = new EzLocalizationManager.EzLocalisableString("应用分支曲库隐藏失败。", "Failed to apply branch library
+            // hide.");
+            // internal static readonly EzLocalizationManager.EzLocalisableString RESTORED_BRANCH_HIDDEN = new EzLocalizationManager.EzLocalisableString("已取消分支曲库“{0}”的隐藏，恢复 {1:#,0} 张。", "Removed
+            // branch library hide for \"{0}\". Restored {1:#,0} beatmaps.");
+            // internal static readonly EzLocalizationManager.EzLocalisableString RESTORE_BRANCH_HIDE_FAILED = new EzLocalizationManager.EzLocalisableString("取消分支曲库隐藏失败。", "Failed to remove branch
+            // library hide.");
 
             // 收藏夹隐藏
-            internal static readonly EzLocalizationManager.EzLocalisableString HIDDEN_COLLECTION = new EzLocalizationManager.EzLocalisableString("已对收藏夹“{0}”应用隐藏，隐藏 {1:#,0} 张。", "Applied hide for collection \"{0}\". Hid {1:#,0} beatmaps.");
-            internal static readonly EzLocalizationManager.EzLocalisableString HIDDEN_COLLECTION_WITH_SKIPS = new EzLocalizationManager.EzLocalisableString("已对收藏夹“{0}”应用隐藏，隐藏 {1:#,0} 张，跳过 {2:#,0} 张。", "Applied hide for collection \"{0}\". Hid {1:#,0} beatmaps and skipped {2:#,0}.");
+            internal static readonly EzLocalizationManager.EzLocalisableString HIDDEN_COLLECTION =
+                new EzLocalizationManager.EzLocalisableString("已对收藏夹“{0}”应用隐藏，隐藏 {1:#,0} 张。", "Applied hide for collection \"{0}\". Hid {1:#,0} beatmaps.");
+            internal static readonly EzLocalizationManager.EzLocalisableString HIDDEN_COLLECTION_WITH_SKIPS =
+                new EzLocalizationManager.EzLocalisableString("已对收藏夹“{0}”应用隐藏，隐藏 {1:#,0} 张，跳过 {2:#,0} 张。", "Applied hide for collection \"{0}\". Hid {1:#,0} beatmaps and skipped {2:#,0}.");
             internal static readonly EzLocalizationManager.EzLocalisableString HIDE_COLLECTION_FAILED = new EzLocalizationManager.EzLocalisableString("应用收藏夹隐藏失败。", "Failed to apply collection hide.");
-            internal static readonly EzLocalizationManager.EzLocalisableString RESTORED_COLLECTION_HIDDEN = new EzLocalizationManager.EzLocalisableString("已取消收藏夹“{0}”的隐藏，恢复 {1:#,0} 张。", "Removed collection hide for \"{0}\". Restored {1:#,0} beatmaps.");
-            internal static readonly EzLocalizationManager.EzLocalisableString RESTORE_COLLECTION_HIDE_FAILED = new EzLocalizationManager.EzLocalisableString("取消收藏夹隐藏失败。", "Failed to remove collection hide.");
+            internal static readonly EzLocalizationManager.EzLocalisableString RESTORED_COLLECTION_HIDDEN =
+                new EzLocalizationManager.EzLocalisableString("已取消收藏夹“{0}”的隐藏，恢复 {1:#,0} 张。", "Removed collection hide for \"{0}\". Restored {1:#,0} beatmaps.");
+            internal static readonly EzLocalizationManager.EzLocalisableString RESTORE_COLLECTION_HIDE_FAILED =
+                new EzLocalizationManager.EzLocalisableString("取消收藏夹隐藏失败。", "Failed to remove collection hide.");
         }
     }
 }

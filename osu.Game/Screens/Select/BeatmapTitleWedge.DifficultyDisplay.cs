@@ -56,6 +56,7 @@ namespace osu.Game.Screens.Select
             private StarRatingDisplay starRatingDisplay => dualDifficultyDisplay.Official;
 
             private EzDualDifficultyDisplay dualDifficultyDisplay = null!;
+            private EzMetricVariantChip variantChip = null!;
             private FillFlowContainer nameLine = null!;
             private OsuSpriteText difficultyText = null!;
             private OsuSpriteText mappedByText = null!;
@@ -70,6 +71,17 @@ namespace osu.Game.Screens.Select
             private DifficultyStatisticsDisplay difficultyStatisticsDisplay = null!;
 
             private CancellationTokenSource? cancellationSource;
+
+            // Mirrors the live difficulty; re-binding the cache's shared bindable per update would stack handlers.
+            private readonly Bindable<StarDifficulty> liveDifficulty = new Bindable<StarDifficulty>();
+
+            protected override void Dispose(bool isDisposing)
+            {
+                base.Dispose(isDisposing);
+
+                if (isDisposing)
+                    liveDifficulty.UnbindAll();
+            }
 
             public DifficultyDisplay()
             {
@@ -108,6 +120,8 @@ namespace osu.Game.Screens.Select
                                     new Dimension(GridSizeMode.AutoSize),
                                     new Dimension(GridSizeMode.Absolute, 6),
                                     new Dimension(),
+                                    new Dimension(GridSizeMode.AutoSize),
+                                    new Dimension(GridSizeMode.Absolute, 6),
                                     new Dimension(GridSizeMode.AutoSize, maxSize: 160),
                                 },
                                 Content = new[]
@@ -161,6 +175,12 @@ namespace osu.Game.Screens.Select
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
                                             Margin = new MarginPadding { Left = 8f, Right = 10f },
+                                        },
+                                        Empty(),
+                                        variantChip = new EzMetricVariantChip
+                                        {
+                                            Anchor = Anchor.CentreLeft,
+                                            Origin = Anchor.CentreLeft,
                                         },
                                     }
                                 },
@@ -255,6 +275,8 @@ namespace osu.Game.Screens.Select
                     }
                 }, true);
 
+                liveDifficulty.BindValueChanged(d => applyOfficialPerformance(d.NewValue));
+
                 updateDisplay();
             }
 
@@ -273,6 +295,7 @@ namespace osu.Game.Screens.Select
                     spreadDisplay.Beatmap.Value = null;
                     spreadDisplay.StarDifficulty.UnbindAll();
                     dualDifficultyDisplay.ResetXxy();
+                    dualDifficultyDisplay.ApplyPerformance(null);
                 }
                 else
                 {
@@ -286,7 +309,13 @@ namespace osu.Game.Screens.Select
                         dualDifficultyDisplay.UpdateFromBeatmap(beatmapInfo);
                 }
 
-                dualDifficultyDisplay.Official.Current = (Bindable<StarDifficulty>)difficultyCache.GetBindableDifficulty(beatmap.Value.BeatmapInfo, cancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+                // The pp pill follows the same live calculation as the official star pill.
+                var difficultyBindable =
+                    (Bindable<StarDifficulty>)difficultyCache.GetBindableDifficulty(beatmap.Value.BeatmapInfo, cancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+                dualDifficultyDisplay.Official.Current = difficultyBindable;
+
+                liveDifficulty.UnbindAll();
+                liveDifficulty.BindTo(difficultyBindable);
 
                 if (!beatmap.IsDefault)
                 {
@@ -296,6 +325,17 @@ namespace osu.Game.Screens.Select
 
                 updateCountStatistics(cancellationSource.Token);
                 updateDifficultyStatistics();
+            }
+
+            private void applyOfficialPerformance(StarDifficulty starDifficulty)
+            {
+                if (beatmap.IsDefault)
+                {
+                    dualDifficultyDisplay.ApplyPerformance(null);
+                    return;
+                }
+
+                dualDifficultyDisplay.ApplyPerformance(EzPanelPerformancePoints.ResolvePanelPp(starDifficulty, beatmap.Value.BeatmapInfo));
             }
 
             public void ApplyKpcMetrics(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)

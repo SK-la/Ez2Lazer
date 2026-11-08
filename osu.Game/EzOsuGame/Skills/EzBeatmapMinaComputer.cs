@@ -2,83 +2,35 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills.Mina;
 
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Computes NoMod 1.0x Mina axes. Persisting is a separate entry point: read paths resolve live into a
-    /// session cache only.
+    /// Computes and persists NoMod 1.0x Mina axes for the background backfill. This is a write path only: live
+    /// values come from the shared analysis pass (<see cref="Analysis.IEzChartAnalysisLookup"/>), never from here.
     /// </summary>
     public sealed class EzBeatmapMinaComputer
     {
         private readonly BeatmapManager beatmapManager;
         private readonly EzSkillStore skillStore;
+        private readonly EzMetricProducerRegistry registry;
 
-        private readonly ConcurrentDictionary<string, IReadOnlyDictionary<string, double>> liveCache
-            = new ConcurrentDictionary<string, IReadOnlyDictionary<string, double>>(StringComparer.Ordinal);
-
-        public EzBeatmapMinaComputer(BeatmapManager beatmapManager, EzSkillStore skillStore)
+        public EzBeatmapMinaComputer(BeatmapManager beatmapManager, EzSkillStore skillStore, EzMetricProducerRegistry? registry = null)
         {
             this.beatmapManager = beatmapManager;
             this.skillStore = skillStore;
+            this.registry = registry ?? Analysis.EzAnalysisRevision.Registry;
         }
 
-        /// <summary>Drop the session-only axis set for a hash, e.g. after a backfill wrote a newer row.</summary>
-        public void InvalidateLive(string? beatmapHash = null)
-        {
-            if (string.IsNullOrEmpty(beatmapHash))
-            {
-                liveCache.Clear();
-                return;
-            }
-
-            liveCache.TryRemove(beatmapHash, out _);
-        }
-
-        /// <summary>
-        /// Current Realm rows when present, otherwise a session-only compute. Never persists.
-        /// </summary>
-        public IReadOnlyDictionary<string, double>? TryGetOrCompute(BeatmapInfo beatmapInfo)
-        {
-            ArgumentNullException.ThrowIfNull(beatmapInfo);
-
-            if (beatmapInfo.Ruleset.OnlineID != 3)
-                return null;
-
-            var existing = skillStore.GetBeatmapSkills(beatmapInfo.Hash, EzSkillSystems.BEATMAP_MINA);
-            if (IsCurrentMinaCache(existing))
-                return existing;
-
-            if (IsUnrateableMina(existing))
-                return null;
-
-            if (liveCache.TryGetValue(beatmapInfo.Hash, out var live))
-                return live;
-
-            try
-            {
-                var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-                var playable = EzPlayableBeatmapCache.GetShared(working, working.BeatmapInfo.Ruleset);
-                var computed = compute(playable, beatmapInfo);
-
-                if (computed != null)
-                    liveCache[beatmapInfo.Hash] = computed;
-
-                return computed;
-            }
-            catch (Exception e)
-            {
-                Logger.Log($"[EzSkills] MSD live compute failed for {beatmapInfo}: {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
-                return null;
-            }
-        }
+        /// <summary>Revision the stored Mina rows are stamped with.</summary>
+        public int Revision => registry.RevisionOf(EzMetricProducers.MINA_CHART, LocalProfile.EzLocalProfileConstants.MANIA_RULESET_ID);
 
         public IReadOnlyDictionary<string, double>? ComputeAndStore(BeatmapInfo beatmapInfo)
         {
@@ -101,7 +53,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                 playable = EzPlayableBeatmapCache.GetShared(working, working.BeatmapInfo.Ruleset);
             }
-            catch (Exception e)
+            catch (Exception e) when (e is not ObjectDisposedException)
             {
                 // Content-addressed: the file backing this hash will not become loadable on its own, so it is
                 // settled rather than retried on every backfill (mirrors the CSI stage). Re-importing produces a
@@ -131,23 +83,6 @@ namespace osu.Game.EzOsuGame.Skills
             skillStore.WriteBeatmapMsd(beatmapInfo.Hash, computed.Value, beatmapInfo.ID);
 
             return toDictionary(computed.Value);
-        }
-
-        /// <summary>
-        /// Axis vector for a loaded chart, or null when the chart cannot be rated. <paramref name="onSettledMiss"/>
-        /// runs for verdicts that will never change for this hash; transient engine failures return null without
-        /// calling it.
-        /// </summary>
-        private IReadOnlyDictionary<string, double>? compute(IBeatmap playable, BeatmapInfo beatmapInfo)
-        {
-            int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
-
-            if (!EzMinaEngine.IsSupportedKeyCount(keyCount))
-                return null;
-
-            var vector = computeVector(playable, beatmapInfo, keyCount, _ => { });
-
-            return vector == null ? null : toDictionary(vector.Value);
         }
 
         private static EzMinaSkillAxisVector? computeVector(
@@ -195,26 +130,25 @@ namespace osu.Game.EzOsuGame.Skills
         /// Requires every current Mina axis id. Incomplete caches fail and are recomputed via
         /// <see cref="TryGetOrCompute"/>.
         /// </summary>
+        /// <summary>
+        /// Requires every axis the Mina producer declares. The declaration is the single source, so adding an
+        /// axis cannot leave this check silently accepting a partial row set.
+        /// </summary>
         public static bool IsCurrentMinaCache(IReadOnlyDictionary<string, double> existing)
         {
-            foreach (var axis in EzMinaSkillAxisExtensions.All)
-            {
-                if (!existing.ContainsKey(axis.ToMsdSkillId()))
-                    return false;
-            }
+            if (existing.Count == 0)
+                return false;
 
-            return true;
+            if (Analysis.EzAnalysisRevision.Registry.Get(EzMetricProducers.MINA_CHART) is not { } producer)
+                return false;
+
+            return producer.IsCompleteFor(EzSkillSystems.UNSLICED_KEY, LocalProfile.EzLocalProfileConstants.MANIA_RULESET_ID, existing);
         }
 
-        /// <summary>True when BDSP has recorded a zero-vector settled miss for this hash.</summary>
-        public static bool IsUnrateableMina(IReadOnlyDictionary<string, double> existing)
-            => existing.ContainsKey(EzSkillSystems.MinaUnrateableSkillId);
-
         /// <summary>
-        /// Complete MSD or settled <c>__unrateable</c> — BDSP should not reprocess.
-        /// Unrateable is never a valid read cache (<see cref="IsCurrentMinaCache"/> stays false).
+        /// Complete MSD or a settled miss — BDSP should not reprocess. A settled miss is never a valid read
+        /// cache (<see cref="IsCurrentMinaCache"/> stays false).
         /// </summary>
-        public static bool IsSettledMinaCache(IReadOnlyDictionary<string, double> existing)
-            => IsCurrentMinaCache(existing) || IsUnrateableMina(existing);
+        public static bool IsSettledMinaCache(EzMetricState state, IReadOnlyDictionary<string, double> existing) => state == EzMetricState.Unrateable || IsCurrentMinaCache(existing);
     }
 }

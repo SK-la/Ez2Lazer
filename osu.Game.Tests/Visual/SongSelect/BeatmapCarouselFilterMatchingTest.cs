@@ -19,58 +19,61 @@ namespace osu.Game.Tests.Visual.SongSelect
     public partial class BeatmapCarouselFilterMatchingTest
     {
         [Test]
-        public async Task TestStarFilterUsesXxyWhenSortBySunnyStarRating()
-        {
-            var inRange = createBeatmap(xxy: 5.0, starRating: 1.0);
-            var outOfRange = createBeatmap(xxy: 1.0, starRating: 9.0);
-
-            var results = await runMatching(
-                new FilterCriteria
-                {
-                    Sort = SortMode.SunnyStarRating,
-                    StarDifficulty = new FilterCriteria.OptionalRange<double> { Min = 4, Max = 6, IsLowerInclusive = true, IsUpperInclusive = true },
-                },
-                [inRange, outOfRange],
-                beatmaps => beatmaps.ToDictionary(b => b, resolveXxy));
-
-            Assert.That(results, Is.EquivalentTo(new[] { inRange }));
-        }
-
-        [Test]
-        public async Task TestStarFilterUsesOfficialStarRatingWhenSortByDifficulty()
+        public async Task TestStarFilterUsesTheOfficialBaselineByDefault()
         {
             var inRange = createBeatmap(xxy: 1.0, starRating: 5.0);
             var outOfRange = createBeatmap(xxy: 9.0, starRating: 1.0);
 
             var results = await runMatching(
-                new FilterCriteria
-                {
-                    Sort = SortMode.Difficulty,
-                    StarDifficulty = new FilterCriteria.OptionalRange<double> { Min = 4, Max = 6, IsLowerInclusive = true, IsUpperInclusive = true },
-                },
-                [inRange, outOfRange],
-                beatmaps => beatmaps.ToDictionary(b => b, resolveXxy));
+                criteriaFor(SortMode.Difficulty),
+                [inRange, outOfRange]);
 
             Assert.That(results, Is.EquivalentTo(new[] { inRange }));
         }
 
         [Test]
-        public async Task TestStarFilterUsesBranchXxyWhenProvided()
+        public async Task TestStarFilterUsesTheOperationsValueWhenProvided()
         {
             var inRange = createBeatmap(xxy: 1.0, starRating: 1.0);
             var outOfRange = createBeatmap(xxy: 9.0, starRating: 9.0);
 
+            // A branch snapshot (or any other system-supplied set) overrides the stored baseline.
             var results = await runMatching(
-                new FilterCriteria
-                {
-                    Sort = SortMode.SunnyStarRating,
-                    StarDifficulty = new FilterCriteria.OptionalRange<double> { Min = 4, Max = 6, IsLowerInclusive = true, IsUpperInclusive = true },
-                },
+                criteriaFor(SortMode.Difficulty),
                 [inRange, outOfRange],
                 beatmaps => beatmaps.ToDictionary(b => b, b => b.Equals(inRange) ? 5.0 : 1.0));
 
             Assert.That(results, Is.EquivalentTo(new[] { inRange }));
         }
+
+        [Test]
+        public async Task TestPpFilterUsesTheOperationsValueWhenProvided()
+        {
+            var inRange = createBeatmap(xxy: 1.0, starRating: 5.0);
+            var outOfRange = createBeatmap(xxy: 1.0, starRating: 5.0);
+
+            var criteria = new FilterCriteria
+            {
+                Sort = SortMode.PP,
+                Pp = new FilterCriteria.OptionalRange<double> { Min = 100, Max = 200, IsLowerInclusive = true, IsUpperInclusive = true },
+            };
+
+            var matcher = new BeatmapCarouselFilterMatching(
+                () => criteria,
+                (_, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(new Dictionary<BeatmapInfo, double>()),
+                (items, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(
+                    items.ToDictionary(b => b, b => b.Equals(inRange) ? 150.0 : 50.0)));
+
+            var results = await matcher.Run(new[] { inRange, outOfRange }.Select(b => new CarouselItem(b)), CancellationToken.None);
+
+            Assert.That(results.Select(i => (BeatmapInfo)i.Model), Is.EquivalentTo(new[] { inRange }));
+        }
+
+        private static FilterCriteria criteriaFor(SortMode sort) => new FilterCriteria
+        {
+            Sort = sort,
+            StarDifficulty = new FilterCriteria.OptionalRange<double> { Min = 4, Max = 6, IsLowerInclusive = true, IsUpperInclusive = true },
+        };
 
         private static BeatmapInfo createBeatmap(double xxy, double starRating)
         {
@@ -81,16 +84,14 @@ namespace osu.Game.Tests.Visual.SongSelect
             return beatmap;
         }
 
-        private static double resolveXxy(BeatmapInfo beatmap) => beatmap.SunnyStarRating >= 0 ? beatmap.SunnyStarRating : beatmap.StarRating;
-
         private static async Task<IEnumerable<BeatmapInfo>> runMatching(
             FilterCriteria criteria,
             IReadOnlyList<BeatmapInfo> beatmaps,
-            Func<IEnumerable<BeatmapInfo>, IReadOnlyDictionary<BeatmapInfo, double>>? xxyValueProvider = null)
+            Func<IEnumerable<BeatmapInfo>, IReadOnlyDictionary<BeatmapInfo, double>>? difficultyValueProvider = null)
         {
             var matcher = new BeatmapCarouselFilterMatching(
                 () => criteria,
-                (items, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(xxyValueProvider?.Invoke(items) ?? items.ToDictionary(b => b, resolveXxy)),
+                (items, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(difficultyValueProvider?.Invoke(items) ?? new Dictionary<BeatmapInfo, double>()),
                 (_, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(new Dictionary<BeatmapInfo, double>()));
 
             var results = await matcher.Run(beatmaps.Select(b => new CarouselItem(b)), CancellationToken.None);

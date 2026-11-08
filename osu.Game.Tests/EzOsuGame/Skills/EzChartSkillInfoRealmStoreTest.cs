@@ -7,6 +7,8 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
@@ -292,6 +294,72 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         /// <summary>
+        /// The structure axis table is what a radar draws, so it has to be readable without running the pass again.
+        /// Reading resolves the revision from the system id while the write states it, so this also pins those two
+        /// in step.
+        /// </summary>
+        [Test]
+        public void Structure_axes_are_persisted_and_read_back_by_bare_axis_id()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzSkillStore(realm);
+                var provider = new EzSkillProvider(store);
+                const string hash = "structure-axis-hash";
+
+                string densityId = EzManiaLNAxis.Density.ToId();
+                string chordId = EzManiaLNAxis.Chord.ToId();
+
+                store.WriteBeatmapSystemSkills(
+                    hash,
+                    EzSkillSystems.BEATMAP_CSI,
+                    new Dictionary<string, double>(StringComparer.Ordinal)
+                    {
+                        [$"{EzSkillSystems.BEATMAP_CSI}.{densityId}"] = 0.5,
+                        [$"{EzSkillSystems.BEATMAP_CSI}.{chordId}"] = 0.25,
+                    },
+                    algorithmVersion: EzAnalysisRevision.ChartSkillInfo,
+                    rulesetOnlineId: EzLocalProfileConstants.MANIA_RULESET_ID);
+
+                var axes = provider.GetBeatmapStructureAxes(maniaBeatmap(hash, Guid.NewGuid()));
+
+                Assert.That(axes[densityId], Is.EqualTo(0.5).Within(1e-9));
+                Assert.That(axes[chordId], Is.EqualTo(0.25).Within(1e-9));
+                Assert.That(axes.ContainsKey($"{EzSkillSystems.BEATMAP_CSI}.{densityId}"), Is.False,
+                    "consumers address structure axes by the id the axis declaration uses");
+            });
+        }
+
+        /// <summary>
+        /// A settled miss means the structure pass declined to rate the chart. Leaving its frame behind would let a
+        /// reader draw axes that no longer stand behind a row.
+        /// </summary>
+        [Test]
+        public void Settling_a_structure_miss_drops_the_persisted_axes()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzSkillStore(realm);
+                var provider = new EzSkillProvider(store);
+                const string hash = "settled-structure-hash";
+                var beatmap = maniaBeatmap(hash, Guid.NewGuid());
+
+                store.WriteBeatmapSystemSkills(
+                    hash,
+                    EzSkillSystems.BEATMAP_CSI,
+                    new Dictionary<string, double>(StringComparer.Ordinal) { [$"{EzSkillSystems.BEATMAP_CSI}.{EzManiaLNAxis.Density.ToId()}"] = 0.5 },
+                    algorithmVersion: EzAnalysisRevision.ChartSkillInfo,
+                    rulesetOnlineId: EzLocalProfileConstants.MANIA_RULESET_ID);
+
+                Assert.That(provider.GetBeatmapStructureAxes(beatmap), Is.Not.Empty);
+
+                store.WriteChartSkillInfoUnavailable(hash, beatmap.ID);
+
+                Assert.That(provider.GetBeatmapStructureAxes(beatmap), Is.Empty);
+            });
+        }
+
+        /// <summary>
         /// A complete CSI row on a chart whose MSD settled as unrateable is exactly what BDSP re-queues on every
         /// run: its repair set is "unrateable MSD and still a complete CSI row". The backfill has to replace it
         /// with the stub form, which both takes it out of the complete set and leaves it in the settled set.
@@ -401,11 +469,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             });
         }
 
-        private static BeatmapInfo maniaBeatmap(string hash, Guid id)
-            => new BeatmapInfo(new RulesetInfo { OnlineID = 3 }, new BeatmapDifficulty { CircleSize = 4 })
-            {
-                ID = id,
-                Hash = hash,
-            };
+        private static BeatmapInfo maniaBeatmap(string hash, Guid id) => new BeatmapInfo(new RulesetInfo { OnlineID = 3 }, new BeatmapDifficulty { CircleSize = 4 })
+        {
+            ID = id,
+            Hash = hash,
+        };
     }
 }

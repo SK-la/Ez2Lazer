@@ -62,6 +62,7 @@ using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Graphics;
@@ -480,11 +481,15 @@ namespace osu.Game
             var metricRegistry = EzMetricProducers.CreateDefault(new EzRealmUpstreamRevisions(RulesetStore));
             EzAnalysisRevision.Configure(metricRegistry);
             var skillStore = new EzSkillStore(realm, metricRegistry);
+            var pppEngine = new EzPPPEngine();
 
             var beatmapMsdComputer = new EzBeatmapMinaComputer(BeatmapManager, skillStore);
-            var chartDanEstimator = new EzChartDanEstimator(BeatmapManager, beatmapMsdComputer);
+            var beatmapPppComputer = new EzBeatmapPPPComputer(BeatmapManager, skillStore, pppEngine);
+            var chartDanEstimator = new EzChartDanEstimator(ezAnalysisCache);
 
             var localProfileStore = new EzLocalProfileStore(Storage);
+
+            var playerPPPAggregator = new EzPlayerPPPAggregator(BeatmapManager, skillStore, pppEngine);
 
             var playerRatingAggregator = new EzPlayerRatingAggregator(BeatmapManager, skillStore, localProfileStore);
             var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanEstimator, skillStore, localProfileStore);
@@ -495,8 +500,10 @@ namespace osu.Game
             dependencies.Cache(skillStore);
             dependencies.Cache(skillProvider);
             dependencies.Cache(beatmapMsdComputer);
+            dependencies.Cache(beatmapPppComputer);
 
-            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, playerRatingAggregator, playerDanAggregator, localProfileStore, skillProvider));
+            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, playerRatingAggregator, playerDanAggregator, localProfileStore,
+                skillProvider, playerPPPAggregator, ezAnalysisCache));
             dependencies.Cache(new EzLocalProfileOnlinePullService(API, ScoreManager, BeatmapManager, realm, Storage));
             dependencies.Cache(new EzAnalysisPlayerSelection());
 
@@ -785,8 +792,7 @@ namespace osu.Game
             EzModSeed.BindUpdateScheduler(Host.UpdateThread.Scheduler);
         }
 
-        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent) =>
-            dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
+        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent) => dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
 
         public override void SetHost(GameHost host)
         {

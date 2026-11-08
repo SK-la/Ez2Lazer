@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using osu.Game.EzOsuGame.Skills;
 
 namespace osu.Game.EzOsuGame.Metrics
 {
@@ -72,8 +73,15 @@ namespace osu.Game.EzOsuGame.Metrics
         /// </summary>
         public Func<int, int> RevisionProbe { get; init; } = static _ => 1;
 
-        /// <summary>Whether a value can be computed on demand without a stored row.</summary>
-        public bool SupportsLive { get; init; }
+        /// <summary>
+        /// Whether a value can be computed on demand without a stored row.
+        /// </summary>
+        /// <remarks>
+        /// Derived from the scope rather than declared per producer: a chart is a fixed input, so its vector can be
+        /// measured on the spot, while a player vector is a fold over the entire score archive and exists only as a
+        /// stored row written by the score analysis.
+        /// </remarks>
+        public bool SupportsLive => Id.Scope == EzSkillScope.Beatmap;
 
         /// <summary>
         /// Whether this producer is the default radar source for its scope on <paramref name="rulesetOnlineId"/>.

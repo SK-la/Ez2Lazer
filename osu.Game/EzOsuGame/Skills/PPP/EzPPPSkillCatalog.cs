@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
-using osu.Game.EzOsuGame.Metrics;
 
 namespace osu.Game.EzOsuGame.Skills.PPP
 {
@@ -38,8 +37,7 @@ namespace osu.Game.EzOsuGame.Skills.PPP
         public const string STRAIN = "strain";
         public const string STAMINA = "stamina";
 
-        private static LocalisableString pppName(string zh, string en)
-            => new EzLocalizationManager.EzLocalisableString(zh, en);
+        private static LocalisableString pppName(string zh, string en) => new EzLocalizationManager.EzLocalisableString(zh, en);
 
         private static readonly EzSkillSpec[] taiko_metrics =
         {
@@ -63,14 +61,10 @@ namespace osu.Game.EzOsuGame.Skills.PPP
 
         private static readonly EzSkillSpec[] osu_metrics = buildOsuMetrics();
 
-        /// <summary>Per-ruleset chart id arrays; indexed by the dense online ids 0-3.</summary>
-        private static readonly string[]?[] required_chart_ids = new string[]?[4];
-
-        public static bool SupportsRuleset(int rulesetOnlineId)
-            => rulesetOnlineId == EzLocalProfileConstants.OSU_RULESET_ID
-               || rulesetOnlineId == EzLocalProfileConstants.TAIKO_RULESET_ID
-               || rulesetOnlineId == EzLocalProfileConstants.CATCH_RULESET_ID
-               || rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID;
+        public static bool SupportsRuleset(int rulesetOnlineId) => rulesetOnlineId == EzLocalProfileConstants.OSU_RULESET_ID
+                                                                   || rulesetOnlineId == EzLocalProfileConstants.TAIKO_RULESET_ID
+                                                                   || rulesetOnlineId == EzLocalProfileConstants.CATCH_RULESET_ID
+                                                                   || rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID;
 
         public static IReadOnlyList<EzSkillSpec> MetricsFor(int rulesetOnlineId)
         {
@@ -89,40 +83,6 @@ namespace osu.Game.EzOsuGame.Skills.PPP
             return Array.Empty<EzSkillSpec>();
         }
 
-        public static IReadOnlyList<string> RequiredChartSkillIds(int rulesetOnlineId)
-        {
-            if (rulesetOnlineId < 0 || rulesetOnlineId >= required_chart_ids.Length)
-                return Array.Empty<string>();
-
-            string[]? cached = required_chart_ids[rulesetOnlineId];
-
-            if (cached != null)
-                return cached;
-
-            var metrics = MetricsFor(rulesetOnlineId);
-            string[] ids = new string[metrics.Count];
-
-            for (int i = 0; i < metrics.Count; i++)
-                ids[i] = metrics[i].ChartSkillId;
-
-            required_chart_ids[rulesetOnlineId] = ids;
-            return ids;
-        }
-
-        public static bool IsCompleteChart(int rulesetOnlineId, IReadOnlyDictionary<string, double>? skills)
-        {
-            if (skills == null || skills.Count == 0 || !SupportsRuleset(rulesetOnlineId))
-                return false;
-
-            foreach (string id in RequiredChartSkillIds(rulesetOnlineId))
-            {
-                if (!skills.ContainsKey(id))
-                    return false;
-            }
-
-            return true;
-        }
-
         /// <summary>
         /// Realm slice key. Mania uses key count; other PPP rulesets share <see cref="EzSkillSystems.UNSLICED_KEY"/>.
         /// </summary>
@@ -134,34 +94,9 @@ namespace osu.Game.EzOsuGame.Skills.PPP
             return EzSkillSystems.UNSLICED_KEY;
         }
 
-        public static string ChartSkillId(string metricId)
-            => $"{EzSkillSystems.BEATMAP_PPP}.{metricId}";
+        public static string ChartSkillId(string metricId) => $"{EzSkillSystems.BEATMAP_PPP}.{metricId}";
 
-        public static string PlayerSkillId(string metricId)
-            => $"{EzSkillSystems.PLAYER_PPP}.{metricId}";
-
-        public static bool TrySplit(string? skillId, out bool player, out string metricId)
-        {
-            player = false;
-
-            if (!EzMetricSkillId.TrySplit(skillId, out string system, out metricId))
-            {
-                metricId = string.Empty;
-                return false;
-            }
-
-            if (system == EzSkillSystems.BEATMAP_PPP)
-                return true;
-
-            if (system == EzSkillSystems.PLAYER_PPP)
-            {
-                player = true;
-                return true;
-            }
-
-            metricId = string.Empty;
-            return false;
-        }
+        public static string PlayerSkillId(string metricId) => $"{EzSkillSystems.PLAYER_PPP}.{metricId}";
 
         public static IReadOnlyDictionary<string, double> ChartZeros(int rulesetOnlineId)
         {

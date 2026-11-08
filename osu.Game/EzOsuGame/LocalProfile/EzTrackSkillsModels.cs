@@ -56,20 +56,20 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public IReadOnlyList<EzTrackSkillsAxis> BarAxes { get; init; } = [];
 
-        public bool IsEffectivelyProvisional =>
-            Provisional || PlaysAnalyzed < EzPlayerRatingSnapshot.QUALIFYING_PLAYS;
+        public bool IsEffectivelyProvisional => Provisional || PlaysAnalyzed < EzPlayerRatingSnapshot.QUALIFYING_PLAYS;
     }
 
     public static class EzTrackSkillsPresenterFactory
     {
-        public static IEzTrackSkillsPresenter? Create(EzSkillProfile? profile, EzSkillProvider provider)
+        public static IEzTrackSkillsPresenter? Create(EzSkillProfile? profile, EzSkillProvider? provider)
         {
-            if (profile == null)
+            if (profile == null || provider == null)
                 return null;
 
             return profile.DefaultPlayerSystemId switch
             {
                 EzSkillSystems.PLAYER_MINA => new ManiaTrackSkillsPresenter(provider),
+                EzSkillSystems.PLAYER_PPP => new PPPSkillsPresenter(provider, profile.RulesetOnlineId),
                 _ => null,
             };
         }

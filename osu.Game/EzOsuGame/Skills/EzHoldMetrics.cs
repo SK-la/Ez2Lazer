@@ -51,12 +51,10 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>Column hold (LN) object count on <paramref name="playable"/>.</summary>
-        public static int ComputeHoldCount(IBeatmap playable)
-            => countHoldAndTotal(playable).Holds;
+        public static int ComputeHoldCount(IBeatmap playable) => countHoldAndTotal(playable).Holds;
 
         /// <summary>Hold count already stamped on the beatmap, or -1 when unset.</summary>
-        public static int TryHoldCountFromBeatmapInfo(BeatmapInfo beatmapInfo)
-            => beatmapInfo.EndTimeObjectCount >= 0 ? beatmapInfo.EndTimeObjectCount : -1;
+        public static int TryHoldCountFromBeatmapInfo(BeatmapInfo beatmapInfo) => beatmapInfo.EndTimeObjectCount >= 0 ? beatmapInfo.EndTimeObjectCount : -1;
 
         /// <summary>
         /// Column count of a playable chart: rounded circle size when it is a sane column count, otherwise
@@ -79,6 +77,22 @@ namespace osu.Game.EzOsuGame.Skills
             }
 
             return maxColumn >= 0 ? maxColumn + 1 : 4;
+        }
+
+        /// <summary>
+        /// Column count for a chart that is not loaded: the difficulty's circle size when it is a sane column
+        /// count, otherwise 4.
+        /// </summary>
+        /// <remarks>
+        /// The single fallback chain for callers without a playable. Deriving it per call site is how one chart
+        /// ended up filed under a different keymode slice than the one it was measured on.
+        /// </remarks>
+        public static int ResolveKeyCount(BeatmapInfo beatmapInfo)
+        {
+            ArgumentNullException.ThrowIfNull(beatmapInfo);
+
+            int fromCs = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
+            return fromCs is >= 1 and <= 18 ? fromCs : 4;
         }
 
         private static (int Holds, int Total) countHoldAndTotal(IBeatmap playable)

@@ -7,6 +7,7 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 using Realms;
 
@@ -39,7 +40,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             public RateableChartMeta(int keyCount, double? sunnyStarRating, double holdRatio)
             {
                 KeyCount = keyCount;
-                sunnyStarRating = sunnyStarRating;
+                SunnyStarRating = sunnyStarRating;
                 HoldRatio = holdRatio;
             }
         }
@@ -141,13 +142,12 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// The completeness report for this state. Counted from the same rows the stages filter on, so
         /// "Pending &gt; 0" and "the next backfill has work" cannot disagree.
         /// </summary>
-        public EzDataStateReport ToReport(DateTimeOffset measuredAt)
-            => new EzDataStateReport
-            {
-                UniverseCount = RateableChartCount,
-                Facets = Facets.Select(EzDataStateChecker.Count).ToList(),
-                MeasuredAt = measuredAt,
-            };
+        public EzDataStateReport ToReport(DateTimeOffset measuredAt) => new EzDataStateReport
+        {
+            UniverseCount = RateableChartCount,
+            Facets = Facets.Select(EzDataStateChecker.Count).ToList(),
+            MeasuredAt = measuredAt,
+        };
 
         /// <summary>
         /// Derives the whole state in one Realm read. Call inside <c>RealmAccess.Run</c>; the returned state holds
@@ -199,7 +199,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
                 msdRowsForReader.Add(value);
 
-                if (value.AlgorithmVersion != msdRevision)
+                if (value.AlgorithmVersion != msdRevision || value.State != (int)EzMetricState.Current)
                     continue;
 
                 if (!msdSkillsAtRevision.TryGetValue(value.BeatmapHash, out var skills))
@@ -216,7 +216,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 static v => v.BeatmapHash,
                 static v => v.AlgorithmVersion,
                 msdRevision,
-                static v => v.SkillId == EzSkillSystems.MinaUnrateableSkillId);
+                static v => v.State == (int)EzMetricState.Unrateable);
 
             var csiRows = EzRealmFacetReader.Read(
                 r.All<EzBeatmapChartSkillInfo>()

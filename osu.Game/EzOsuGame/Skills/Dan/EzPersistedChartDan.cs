@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.Skills.Dan
@@ -44,8 +45,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         public DateTimeOffset ComputedAt { get; init; }
 
-        public bool HasSide(EzDanSide side)
-            => side == EzDanSide.Ln ? LnRawDan >= 0 : RcRawDan >= 0;
+        public bool HasSide(EzDanSide side) => side == EzDanSide.Ln ? LnRawDan >= 0 : RcRawDan >= 0;
 
         public string? LabelFor(EzDanSide side)
         {
@@ -55,8 +55,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             return RcRawDan >= 0 && !string.IsNullOrEmpty(RcLabel) ? RcLabel : null;
         }
 
-        public IReadOnlyDictionary<string, string> SkillsetLabelsFor(EzDanSide side)
-            => side == EzDanSide.Ln ? LnSkillsetLabels : RcSkillsetLabels;
+        public IReadOnlyDictionary<string, string> SkillsetLabelsFor(EzDanSide side) => side == EzDanSide.Ln ? LnSkillsetLabels : RcSkillsetLabels;
 
         /// <summary>
         /// Nomod DualPanel overlay: keep baseline Sunny RC/LN when present; only take missing halves from <paramref name="live"/>.
@@ -111,10 +110,6 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// <see cref="EzDanAlgorithm.AllowsPersistedChartLnHalf"/>; RC always attempted.
         /// </summary>
         /// <param name="holdCount">Column hold objects; pass &lt; 0 when unknown (ratio-only LN gate).</param>
-        /// <param name="allowMsdHeuristicLabels">
-        /// When false and Sunny/xxy is unavailable, keep Overall MSD but leave RC/LN labels empty
-        /// (avoids live DualPanel stellium/finish from Mina Overall on reform means).
-        /// </param>
         public static EzPersistedChartDan? TryComputeFromStored(
             string beatmapHash,
             Guid beatmapId,
@@ -123,19 +118,21 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             double holdRatio,
             double? xxySr,
             EzChartSkillInfo? chartInfo,
-            int holdCount = -1,
-            bool allowMsdHeuristicLabels = true)
+            int holdCount = -1)
         {
             if (string.IsNullOrEmpty(beatmapHash))
                 return null;
 
-            var set = EzDanSet.Create(msd, keyCount, holdRatio, xxySr, chartInfo, holdCount, allowMsdHeuristicLabels);
-            var primary = EzChartDanEstimator.FromMsd(msd, keyCount, holdRatio, xxySr);
+            var set = EzDanSet.Create(msd, keyCount, holdRatio, xxySr, chartInfo, holdCount);
+            double overallMean = 0;
 
-            // A chart the tables cannot rate still has a rating axis; keep it so callers can display the
-            // overall value even when no side resolves.
-            if (set == null && primary == null)
-                return null;
+            if (set == null)
+            {
+                // A chart the tables cannot rate still has a rating axis; keep it so callers can display the
+                // overall value even when no side resolves. Read straight off the axes, not re-derived.
+                if (!msd.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out overallMean) || overallMean <= 0)
+                    return null;
+            }
 
             var rc = set?.For(EzDanSide.Rc);
             var ln = set?.For(EzDanSide.Ln);
@@ -147,7 +144,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 AlgorithmVersion = EzDanAlgorithm.VERSION,
                 KeyCount = keyCount,
                 HoldRatio = holdRatio,
-                OverallMsd = primary?.OverallMsd ?? 0,
+                OverallMsd = set?.OverallMsd ?? overallMean,
                 RcRawDan = rc?.RawDan ?? -1,
                 RcLabel = rc?.Label ?? string.Empty,
                 LnRawDan = ln?.RawDan ?? -1,

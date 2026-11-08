@@ -9,7 +9,7 @@ namespace osu.Game.EzOsuGame.Skills.PPP
     /// PP+ performance formulas per ruleset, for a perfect (SS, full-combo, no-miss) play.
     /// </summary>
     /// <remarks>
-    /// These are the formulas documented in <c>docs/skills/difficulty-skills-algorithms.md</c> sections
+    /// These are the formulas documented in <c>docs/skills/difficulty-skills-algorithms copy.md</c> sections
     /// 1.8 / 2.7 / 3.1 / 4.1. Only the perfect-play case is implemented because that is the only value the
     /// per-beatmap pp column carries: a missed-hit weight, a combo ratio and a guaranteed miss count would all
     /// need a score, which a chart does not have. The inputs are skill ratings already produced by the PPP
@@ -193,8 +193,7 @@ namespace osu.Game.EzOsuGame.Skills.PPP
             return Math.Min(great, ok);
         }
 
-        private static double difficultyToPerformance(double difficulty)
-            => 3.9 * difficulty * difficulty * difficulty;
+        private static double difficultyToPerformance(double difficulty) => 3.9 * difficulty * difficulty * difficulty;
 
         /// <summary>Error function, A&amp;S 7.1.26 (five-term expansion, absolute error below 1.5e-7).</summary>
         private static double erf(double x)

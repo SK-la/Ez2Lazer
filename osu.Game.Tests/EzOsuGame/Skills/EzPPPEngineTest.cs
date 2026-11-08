@@ -3,10 +3,11 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.Rulesets;
@@ -197,9 +198,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         };
 
         /// <summary>
-        /// A chart is complete when every axis the catalog declares for its ruleset has a value.
+        /// Completeness comes from the producer's declared axis set, which is the only axis list in the system.
         /// </summary>
-        private static bool isCompleteChart(int rulesetOnlineId, IReadOnlyDictionary<string, double> skills)
-            => EzPPPSkillCatalog.MetricsFor(rulesetOnlineId).All(m => skills.ContainsKey(m.ChartSkillId));
+        private static bool isCompleteChart(int rulesetOnlineId, IReadOnlyDictionary<string, double> skills) => EzAnalysisRevision.Registry.Get(EzMetricProducers.PPP_CHART)
+                                                                                                                                  ?.IsCompleteFor(EzSkillSystems.UNSLICED_KEY, rulesetOnlineId, skills)
+                                                                                                                == true;
     }
 }

@@ -12,23 +12,18 @@ namespace osu.Game.EzOsuGame.Analysis
         /// Whether the ruleset assembly is currently loadable (built-in or third-party extension).
         /// When a ruleset is removed or unavailable, persisted Realm metadata is left intact until it becomes available again.
         /// </summary>
-        public static bool IsRulesetAvailable(IRulesetInfo? rulesetInfo)
-            => rulesetInfo is RulesetInfo { Available: true };
+        public static bool IsRulesetAvailable(IRulesetInfo? rulesetInfo) => rulesetInfo is RulesetInfo { Available: true };
 
         /// <summary>
         /// Whether the ruleset exposes xxy SR calculation (via <see cref="IEzSunnyStarRatingSupport"/>).
         /// </summary>
-        public static bool SupportsRuleset(IRulesetInfo? rulesetInfo)
-            => IsRulesetAvailable(rulesetInfo) && tryGetSupport(rulesetInfo!, out _);
+        public static bool SupportsRuleset(IRulesetInfo? rulesetInfo) => IsRulesetAvailable(rulesetInfo) && tryGetSupport(rulesetInfo!, out _);
 
         /// <summary>
         /// Whether baseline xxy SR can be calculated for this beatmap under the given ruleset.
         /// </summary>
         public static bool SupportsBeatmap(IBeatmap beatmap, IRulesetInfo rulesetInfo)
             => IsRulesetAvailable(rulesetInfo) && tryGetSupport(rulesetInfo, out var support) && support.SupportsSunnyStarRating(beatmap);
-
-        public static bool SupportsBeatmapInfo(BeatmapInfo beatmapInfo)
-            => SupportsRuleset(beatmapInfo.Ruleset);
 
         /// <summary>
         /// yyyyMMdd xxy SR algorithm version for the ruleset, if it implements <see cref="IEzSunnyStarRatingSupport"/>.

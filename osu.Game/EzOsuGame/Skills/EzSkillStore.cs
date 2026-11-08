@@ -38,6 +38,11 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Revision stamped on chart-side Mina axis rows.</summary>
         private int minaChartRevision => registry.RevisionOf(EzMetricProducers.MINA_CHART, EzLocalProfileConstants.MANIA_RULESET_ID);
 
+        /// <summary>
+        /// Current values for one system. Rows the producer settled without a value are excluded: a verdict is
+        /// not an axis, so a settled miss reads as an empty set and callers ask
+        /// <see cref="GetBeatmapSystemState"/> for the reason.
+        /// </summary>
         public IReadOnlyDictionary<string, double> GetBeatmapSkills(string beatmapHash, string systemId, int? algorithmVersion = null, int rulesetOnlineId = -1)
         {
             int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
@@ -47,12 +52,37 @@ namespace osu.Game.EzOsuGame.Skills
                 var rows = r.All<EzBeatmapSkillValue>()
                             .Where(v => v.BeatmapHash == beatmapHash
                                         && v.SystemId == systemId
+                                        && v.State == (int)EzMetricState.Current
                                         && v.AlgorithmVersion == version);
 
                 if (rulesetOnlineId >= 0)
                     rows = rows.Where(v => v.RulesetOnlineId == rulesetOnlineId);
 
                 return rows.ToDictionary(v => v.SkillId, v => v.Value, StringComparer.Ordinal);
+            });
+        }
+
+        /// <summary>
+        /// Whether one system has a current value, a settled miss, or nothing at all for a chart.
+        /// </summary>
+        public EzMetricState GetBeatmapSystemState(string beatmapHash, string systemId, int revision)
+        {
+            if (string.IsNullOrEmpty(beatmapHash) || string.IsNullOrEmpty(systemId))
+                return EzMetricState.Missing;
+
+            return realmAccess.Run(r =>
+            {
+                bool any = false;
+
+                foreach (var row in r.All<EzBeatmapSkillValue>().Where(v => v.BeatmapHash == beatmapHash && v.SystemId == systemId && v.AlgorithmVersion == revision))
+                {
+                    any = true;
+
+                    if (row.State == (int)EzMetricState.Unrateable)
+                        return EzMetricState.Unrateable;
+                }
+
+                return any ? EzMetricState.Current : EzMetricState.Missing;
             });
         }
 
@@ -115,7 +145,7 @@ namespace osu.Game.EzOsuGame.Skills
                 var result = new Dictionary<string, IReadOnlyDictionary<string, double>>(hashSet.Count, StringComparer.Ordinal);
 
                 var rows = r.All<EzBeatmapSkillValue>()
-                            .Where(v => v.SystemId == systemId && v.AlgorithmVersion == version)
+                            .Where(v => v.SystemId == systemId && v.AlgorithmVersion == version && v.State == (int)EzMetricState.Current)
                             .AsEnumerable()
                             .Where(v => hashSet.Contains(v.BeatmapHash));
 
@@ -166,7 +196,6 @@ namespace osu.Game.EzOsuGame.Skills
             DateTimeOffset? computedAt = null,
             int? algorithmVersion = null,
             IReadOnlyDictionary<string, int>? skillVersions = null,
-            int? pppRulesetOnlineId = null,
             int rulesetOnlineId = -1)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(beatmapHash);
@@ -187,7 +216,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                 foreach (var (skillId, value) in skills)
                 {
-                    int rowVersion = rowVersionFor(systemId, skillId, version, skillVersions, pppRulesetOnlineId);
+                    int rowVersion = rowVersionFor(systemId, skillId, version, skillVersions, rulesetOnlineId);
 
                     r.Add(new EzBeatmapSkillValue
                     {
@@ -241,7 +270,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                 foreach (var (skillId, value) in skills)
                 {
-                    int rowVersion = rowVersionFor(systemId, skillId, version, skillVersions);
+                    int rowVersion = rowVersionFor(systemId, skillId, version, skillVersions, rulesetOnlineId);
 
                     r.Add(new EzPlayerSkillValue
                     {
@@ -318,8 +347,9 @@ namespace osu.Game.EzOsuGame.Skills
                     BeatmapId = beatmapId,
                     SystemId = EzSkillSystems.BEATMAP_MINA,
                     RulesetOnlineId = EzLocalProfileConstants.MANIA_RULESET_ID,
-                    SkillId = EzSkillSystems.MinaUnrateableSkillId,
+                    SkillId = EzSkillSystems.UNRATEABLE,
                     Value = 1,
+                    State = (int)EzMetricState.Unrateable,
                     AlgorithmVersion = version,
                     ComputedAt = at,
                 });
@@ -405,7 +435,7 @@ namespace osu.Game.EzOsuGame.Skills
             return realmAccess.Run(r => r.All<EzBeatmapSkillValue>()
                                          .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MINA
                                                      && v.AlgorithmVersion == version
-                                                     && v.SkillId == EzSkillSystems.MinaUnrateableSkillId)
+                                                     && v.State == (int)EzMetricState.Unrateable)
                                          .AsEnumerable()
                                          .Select(v => v.BeatmapHash)
                                          .ToHashSet(StringComparer.Ordinal));
@@ -431,24 +461,26 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// PPP player rows whose algorithm version matches the bundle revision for that skill's metric.
+        /// PPP player rows written at the bundle revision of <paramref name="rulesetOnlineId"/>.
         /// </summary>
-        public IReadOnlyDictionary<string, double> GetPlayerSkillsAtCurrentVersions(string username, int keyCount, string systemId)
+        public IReadOnlyDictionary<string, double> GetPlayerSkillsAtCurrentVersions(string username, int keyCount, string systemId, int rulesetOnlineId)
         {
+            int version = EzPPPSkillVersions.ForRuleset(rulesetOnlineId);
+
             return realmAccess.Run(r =>
             {
                 var rows = r.All<EzPlayerSkillValue>()
                             .Where(v => v.Username == username
                                         && v.KeyCount == keyCount
-                                        && v.SystemId == systemId);
+                                        && v.SystemId == systemId
+                                        && v.RulesetOnlineId == rulesetOnlineId
+                                        && v.AlgorithmVersion == version)
+                            .ToList();
 
-                var result = new Dictionary<string, double>(StringComparer.Ordinal);
+                var result = new Dictionary<string, double>(rows.Count, StringComparer.Ordinal);
 
                 foreach (var row in rows)
-                {
-                    if (row.AlgorithmVersion == EzPPPSkillVersions.ForSkillId(row.SkillId))
-                        result[row.SkillId] = row.Value;
-                }
+                    result[row.SkillId] = row.Value;
 
                 return result;
             });
@@ -459,29 +491,86 @@ namespace osu.Game.EzOsuGame.Skills
             string username,
             int keyCount,
             string systemId,
-            int? algorithmVersion = null)
+            int? algorithmVersion = null,
+            int rulesetOnlineId = -1)
         {
-            bool perSkill = algorithmVersion == null
-                            && systemId is EzSkillSystems.BEATMAP_PPP or EzSkillSystems.PLAYER_PPP;
-            int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
+            int version = resolvePlayerVersion(systemId, algorithmVersion, rulesetOnlineId);
 
             return realmAccess.Run(r =>
             {
-                var row = perSkill
-                    ? r.All<EzPlayerSkillValue>()
-                       .Where(v => v.Username == username && v.KeyCount == keyCount && v.SystemId == systemId)
-                       .AsEnumerable()
-                       .FirstOrDefault(v => v.AlgorithmVersion == EzPPPSkillVersions.ForSkillId(v.SkillId))
-                    : r.All<EzPlayerSkillValue>()
-                       .FirstOrDefault(v => v.Username == username
-                                            && v.KeyCount == keyCount
-                                            && v.SystemId == systemId
-                                            && v.AlgorithmVersion == version);
+                var rows = r.All<EzPlayerSkillValue>()
+                            .Where(v => v.Username == username
+                                        && v.KeyCount == keyCount
+                                        && v.SystemId == systemId
+                                        && v.AlgorithmVersion == version);
+
+                if (rulesetOnlineId >= 0)
+                    rows = rows.Where(v => v.RulesetOnlineId == rulesetOnlineId);
+
+                var row = rows.FirstOrDefault();
 
                 return row == null
                     ? (0, false, false)
                     : (row.AnalyzedPlays, row.Provisional, row.Stale);
             });
+        }
+
+        /// <summary>
+        /// One player slice's values together with its metadata, in a single Realm read.
+        /// </summary>
+        /// <remarks>
+        /// Read paths that need both used to run two transactions; the row carries the metadata, so splitting the
+        /// query only doubled the cost.
+        /// </remarks>
+        public PlayerSystemSkillSlice GetPlayerSystemSkillSlice(
+            string username,
+            int keyCount,
+            string systemId,
+            int? algorithmVersion = null,
+            int rulesetOnlineId = -1)
+        {
+            int version = resolvePlayerVersion(systemId, algorithmVersion, rulesetOnlineId);
+
+            return realmAccess.Run(r =>
+            {
+                var rows = r.All<EzPlayerSkillValue>()
+                            .Where(v => v.Username == username
+                                        && v.KeyCount == keyCount
+                                        && v.SystemId == systemId
+                                        && v.AlgorithmVersion == version);
+
+                if (rulesetOnlineId >= 0)
+                    rows = rows.Where(v => v.RulesetOnlineId == rulesetOnlineId);
+
+                var materialised = rows.ToList();
+                var values = new Dictionary<string, double>(materialised.Count, StringComparer.Ordinal);
+
+                foreach (var row in materialised)
+                    values[row.SkillId] = row.Value;
+
+                if (materialised.Count == 0)
+                    return new PlayerSystemSkillSlice(values, 0, false, false);
+
+                var first = materialised[0];
+                return new PlayerSystemSkillSlice(values, first.AnalyzedPlays, first.Provisional, first.Stale);
+            });
+        }
+
+        public readonly record struct PlayerSystemSkillSlice(IReadOnlyDictionary<string, double> Values, int AnalyzedPlays, bool Provisional, bool Stale);
+
+        /// <summary>
+        /// The revision a player slice is stored under. PP+ rows are stamped per ruleset bundle when the ruleset
+        /// is known, so there is one place that decides between the bundle and the facet revision.
+        /// </summary>
+        private static int resolvePlayerVersion(string systemId, int? algorithmVersion, int rulesetOnlineId)
+        {
+            if (algorithmVersion is int explicitVersion)
+                return explicitVersion;
+
+            if (rulesetOnlineId >= 0 && systemId is EzSkillSystems.BEATMAP_PPP or EzSkillSystems.PLAYER_PPP)
+                return EzPPPSkillVersions.ForRuleset(rulesetOnlineId);
+
+            return EzSkillSystems.ResolveAlgorithmVersion(systemId);
         }
 
         public EzPlayerRatingSnapshot GetPlayerSsrSnapshot(string username, int keyCount, int? algorithmVersion = null)
@@ -955,6 +1044,10 @@ namespace osu.Game.EzOsuGame.Skills
                 foreach (var row in existing)
                     r.Remove(row);
 
+                // A settled miss is not a frame: leaving the axis rows behind would let a reader draw a chart the
+                // structure pass declined to rate.
+                removeStructureAxes(r, beatmapHash);
+
                 r.Add(new EzBeatmapChartSkillInfo
                 {
                     BeatmapHash = beatmapHash,
@@ -975,7 +1068,24 @@ namespace osu.Game.EzOsuGame.Skills
 
                 foreach (var row in rows)
                     r.Remove(row);
+
+                var axes = r.All<EzBeatmapSkillValue>()
+                            .Where(v => v.SystemId == EzSkillSystems.BEATMAP_CSI)
+                            .ToList();
+
+                foreach (var row in axes)
+                    r.Remove(row);
             });
+        }
+
+        private static void removeStructureAxes(Realm r, string beatmapHash)
+        {
+            var axes = r.All<EzBeatmapSkillValue>()
+                        .Where(v => v.BeatmapHash == beatmapHash && v.SystemId == EzSkillSystems.BEATMAP_CSI)
+                        .ToList();
+
+            foreach (var row in axes)
+                r.Remove(row);
         }
 
         /// <summary>
@@ -1083,8 +1193,7 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>Beatmaps whose PPP chart skills are missing a current per-skill version.</summary>
-        public IReadOnlyList<Guid> CollectPppChartDebt()
-            => scanPppCharts().OwedIds;
+        public IReadOnlyList<Guid> CollectPppChartDebt() => scanPppCharts().OwedIds;
 
         public void ClearBeatmapPPP()
         {
@@ -1166,22 +1275,15 @@ namespace osu.Game.EzOsuGame.Skills
             string skillId,
             int fallback,
             IReadOnlyDictionary<string, int>? skillVersions,
-            int? pppRulesetOnlineId = null)
+            int rulesetOnlineId)
         {
             if (skillVersions != null && skillVersions.TryGetValue(skillId, out int specific))
                 return specific;
 
-            if (systemId == EzSkillSystems.BEATMAP_PPP && pppRulesetOnlineId is int chartRuleset)
+            if (rulesetOnlineId >= 0
+                && systemId is EzSkillSystems.BEATMAP_PPP or EzSkillSystems.PLAYER_PPP)
             {
-                int bundle = EzPPPSkillVersions.ForRuleset(chartRuleset);
-
-                if (bundle > 0)
-                    return bundle;
-            }
-
-            if (systemId == EzSkillSystems.PLAYER_PPP)
-            {
-                int bundle = EzPPPSkillVersions.ForSkillId(skillId);
+                int bundle = EzPPPSkillVersions.ForRuleset(rulesetOnlineId);
 
                 if (bundle > 0)
                     return bundle;
@@ -1383,6 +1485,23 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
+        /// <summary>Drop all player rows for a system across every ruleset and slice.</summary>
+        public void ClearPlayerSystemSkills(string username, string systemId)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+            ArgumentException.ThrowIfNullOrWhiteSpace(systemId);
+
+            realmAccess.Write(r =>
+            {
+                var existing = r.All<EzPlayerSkillValue>()
+                                .Where(v => v.Username == username && v.SystemId == systemId)
+                                .ToList();
+
+                foreach (var row in existing)
+                    r.Remove(row);
+            });
+        }
+
         /// <summary>Drop all skillset cache rows for a username (all keys/sides).</summary>
         public void ClearDanSkillsetValues(string username)
         {
@@ -1574,8 +1693,7 @@ namespace osu.Game.EzOsuGame.Skills
             return joined.Split(pattern_separator, StringSplitOptions.RemoveEmptyEntries);
         }
 
-        private static double? optionalDouble(double value)
-            => value < 0 ? null : value;
+        private static double? optionalDouble(double value) => value < 0 ? null : value;
 
         private static EzChartSkillInfo chartSkillInfoToDto(EzBeatmapChartSkillInfo row)
         {
@@ -1616,24 +1734,23 @@ namespace osu.Game.EzOsuGame.Skills
             };
         }
 
-        private static EzPersistedChartDan chartDanToDto(EzBeatmapChartDan row)
-            => new EzPersistedChartDan
-            {
-                BeatmapHash = row.BeatmapHash,
-                BeatmapId = row.BeatmapId,
-                // DTO keeps the pure dan algorithm version; the column holds the composed facet
-                // revision, which is a persistence detail that must not leak to consumers.
-                AlgorithmVersion = EzDanAlgorithm.VERSION,
-                KeyCount = row.KeyCount,
-                HoldRatio = row.HoldRatio,
-                OverallMsd = row.OverallMsd,
-                RcRawDan = row.RcRawDan,
-                RcLabel = row.RcLabel,
-                LnRawDan = row.LnRawDan,
-                LnLabel = row.LnLabel,
-                RcSkillsetLabels = EzPersistedChartDan.ParseSkillsetLabels(row.RcSkillsetLabelsJoined),
-                LnSkillsetLabels = EzPersistedChartDan.ParseSkillsetLabels(row.LnSkillsetLabelsJoined),
-                ComputedAt = row.ComputedAt,
-            };
+        private static EzPersistedChartDan chartDanToDto(EzBeatmapChartDan row) => new EzPersistedChartDan
+        {
+            BeatmapHash = row.BeatmapHash,
+            BeatmapId = row.BeatmapId,
+            // DTO keeps the pure dan algorithm version; the column holds the composed facet
+            // revision, which is a persistence detail that must not leak to consumers.
+            AlgorithmVersion = EzDanAlgorithm.VERSION,
+            KeyCount = row.KeyCount,
+            HoldRatio = row.HoldRatio,
+            OverallMsd = row.OverallMsd,
+            RcRawDan = row.RcRawDan,
+            RcLabel = row.RcLabel,
+            LnRawDan = row.LnRawDan,
+            LnLabel = row.LnLabel,
+            RcSkillsetLabels = EzPersistedChartDan.ParseSkillsetLabels(row.RcSkillsetLabelsJoined),
+            LnSkillsetLabels = EzPersistedChartDan.ParseSkillsetLabels(row.LnSkillsetLabelsJoined),
+            ComputedAt = row.ComputedAt,
+        };
     }
 }

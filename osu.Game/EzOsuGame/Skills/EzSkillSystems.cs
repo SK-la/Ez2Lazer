@@ -4,6 +4,7 @@
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Metrics;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.PPP;
 
 namespace osu.Game.EzOsuGame.Skills
@@ -32,19 +33,20 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>PP+ player axes.</summary>
         public const string PLAYER_PPP = "player_ppp";
 
+        /// <summary>Chart structure axes. Persisted alongside the typed structure row so a reader can draw the
+        /// long-note frame without running the structure pass again.</summary>
+        public const string BEATMAP_CSI = "csi";
+
         /// <summary>Key count sentinel for producers that are not sliced by key mode.</summary>
         public const int UNSLICED_KEY = 0;
 
         /// <summary>
-        /// Settled miss for a chart the engine rates as a zero vector on a supported key mode.
-        /// Keyed by content hash, so editing the chart allows a recompute.
+        /// Row tag for a chart the engine rates as a zero vector on a supported key mode. The row carries
+        /// <see cref="Metrics.EzMetricState.Unrateable"/>; the tag itself is not an axis.
         /// </summary>
         public const string UNRATEABLE = "__unrateable";
 
-        public static string MinaUnrateableSkillId => $"{BEATMAP_MINA}.{UNRATEABLE}";
-
-        public static string DanSkillId(int keyCount, EzDanSide side)
-            => $"{DAN}.{keyCount}k.{side.ToId()}";
+        public static string DanSkillId(int keyCount, EzDanSide side) => $"{DAN}.{keyCount}k.{side.ToId()}";
 
         /// <summary>
         /// Default algorithm version for rows of <paramref name="systemId"/>. Unknown ids return 0, so
@@ -59,6 +61,7 @@ namespace osu.Game.EzOsuGame.Skills
         public static int ResolveAlgorithmVersion(string systemId) => systemId switch
         {
             BEATMAP_MINA => EzAnalysisRevision.Registry.RevisionOf(EzMetricProducers.MINA_CHART, EzLocalProfileConstants.MANIA_RULESET_ID),
+            BEATMAP_CSI => EzAnalysisRevision.ChartSkillInfo,
             PLAYER_MINA or PLAYER_PATTERN => EzMinaSkillAlgorithm.VERSION,
             // PP+ rows are stamped per ruleset bundle, never by a single version constant.
             BEATMAP_PPP or PLAYER_PPP => EzPPPSkillVersions.FACET_REVISION,

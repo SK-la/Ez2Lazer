@@ -60,13 +60,11 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         public static IReadOnlySet<string> SubtypeIds { get; }
             = new HashSet<string>(Subtypes.Select(static a => a.ToId()), StringComparer.Ordinal);
 
-        public static EzSkillMetaAttribute Meta(this EzManiaLNAxis axis)
-            => EzEnumMetaCache<EzManiaLNAxis>.Meta(axis);
+        public static EzSkillMetaAttribute Meta(this EzManiaLNAxis axis) => EzEnumMetaCache<EzManiaLNAxis>.Meta(axis);
 
         public static string ToId(this EzManiaLNAxis axis) => axis.Meta().Id;
 
-        public static bool TryParse(string? axisId, out EzManiaLNAxis axis)
-            => EzEnumMetaCache<EzManiaLNAxis>.TryParseIgnoreCase(bareId(axisId), out axis);
+        public static bool TryParse(string? axisId, out EzManiaLNAxis axis) => EzEnumMetaCache<EzManiaLNAxis>.TryParseIgnoreCase(bareId(axisId), out axis);
 
         /// <summary>
         /// Structure axis values measured on a playable, keyed by axis id. The hold ratio is not part of this table.
@@ -83,22 +81,6 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                 [EzManiaLNAxis.Chord.ToId()] = metrics.LnChordPressure,
                 [EzManiaLNAxis.HoldP90.ToId()] = metrics.LnHoldDurationP90,
             };
-        }
-
-        /// <summary>
-        /// Structure axis values merged with the measured subtype scores into one id-keyed table.
-        /// </summary>
-        public static IReadOnlyDictionary<string, double> FromFeatures(EzChartFeatureMetrics metrics, IReadOnlyDictionary<string, double>? subtypeScores)
-        {
-            var axes = new Dictionary<string, double>(FromFeatures(metrics), StringComparer.Ordinal);
-
-            if (subtypeScores == null)
-                return axes;
-
-            foreach (var (id, score) in subtypeScores)
-                axes[id] = score;
-
-            return axes;
         }
 
         private static string? bareId(string? axisId)

@@ -53,8 +53,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// need (a ChartDan row that is otherwise missing) and reused for the rest of the pass, because it is only
         /// ever consulted after such a miss and a chart that later gains a row is answered by that row instead.
         /// </summary>
-        private HashSet<string> unrateableChartsForPass
-            => unrateableMsdHashes ??= skillStore.GetUnrateableMsdHashes();
+        private HashSet<string> unrateableChartsForPass => unrateableMsdHashes ??= skillStore.GetUnrateableMsdHashes();
 
         /// <summary>
         /// Marks the start of a new skills pass, dropping lookups that were memoised against the previous one.
@@ -65,8 +64,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// One load of the per-play cache for a whole pass, so a multi-player run does not re-read the table once per
         /// player. Pass the result to <see cref="ComputeAndStore"/>.
         /// </summary>
-        public IReadOnlyDictionary<Guid, EzDanPlayCacheRow> LoadPlayCache()
-            => profileStore?.LoadDanPlayCache() ?? new Dictionary<Guid, EzDanPlayCacheRow>();
+        public IReadOnlyDictionary<Guid, EzDanPlayCacheRow> LoadPlayCache() => profileStore?.LoadDanPlayCache() ?? new Dictionary<Guid, EzDanPlayCacheRow>();
 
         /// <param name="plays">
         /// The player's mania plays as reduced rows (the row collector filters to mania). A play the per-play cache
@@ -176,9 +174,9 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                             }
 
                             // A rate / key-conversion mod yields a chart variant no persisted NoMod row can answer,
-                            // so the live estimate is the only correct source. It reads the playable and writes
-                            // nothing (see EzChartDanEstimator.TryComputeLiveSnapshot).
-                            chart = chartDanEstimator.TryEstimate(beatmapInfo, score.Mods);
+                            // so the live analysis is the only correct source. It goes through the shared store, so
+                            // the same chart + mods is measured once per session.
+                            chart = chartDanEstimator.TryEstimateOrCompute(beatmapInfo, score.Mods);
                         }
 
                         if (chart == null)

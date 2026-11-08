@@ -28,16 +28,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private readonly RealmAccess realm;
         private readonly EzAnalysisPersistentStore analysisStore;
         private readonly BeatmapManager beatmapManager;
+        private readonly IEzChartAnalysisLookup? analysisLookup;
         private readonly EzLocalProfilePpResolver ppResolver;
 
         public EzLocalProfileAggregator(
             RealmAccess realm,
             EzAnalysisPersistentStore analysisStore,
-            BeatmapManager beatmapManager)
+            BeatmapManager beatmapManager,
+            IEzChartAnalysisLookup? analysisLookup = null)
         {
             this.realm = realm;
             this.analysisStore = analysisStore;
             this.beatmapManager = beatmapManager;
+            this.analysisLookup = analysisLookup;
             ppResolver = new EzLocalProfilePpResolver(beatmapManager);
         }
 
@@ -153,7 +156,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
 
             internal Dictionary<string, DifficultyAttributes?> AttributeCache { get; } = new Dictionary<string, DifficultyAttributes?>(StringComparer.Ordinal);
-            internal Dictionary<string, CachedAnalysis> AnalysisCache { get; } = new Dictionary<string, CachedAnalysis>(StringComparer.Ordinal);
+
+            /// <summary>
+            /// One entry per (chart, mods) measured in this run. Scores repeat charts heavily, and the analysis is
+            /// the most expensive thing the pass does, so a second score on the same chart and mods must not run it.
+            /// </summary>
+            internal Dictionary<(string Hash, int ModsSignature), CachedAnalysis> AnalysisCache { get; }
+                = new Dictionary<(string Hash, int ModsSignature), CachedAnalysis>();
+
             internal int PpFailures;
             internal int PpLoggedFailures;
 
@@ -289,8 +299,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// </summary>
         public Dictionary<string, List<EzSkillPlayRow>> CollectManiaPlayRows(
             IReadOnlyCollection<string> usernames,
-            CancellationToken cancellationToken = default)
-            => CollectPlayRows(EzLocalProfileConstants.MANIA_RULESET_ID, usernames, cancellationToken);
+            CancellationToken cancellationToken = default) => CollectPlayRows(EzLocalProfileConstants.MANIA_RULESET_ID, usernames, cancellationToken);
 
         /// <summary>
         /// Plays for one ruleset OnlineID, reduced to <see cref="EzSkillPlayRow"/> — one Realm pass.
@@ -342,8 +351,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             IReadOnlyList<Guid> scoreIds,
             int offset,
             int count,
-            CancellationToken cancellationToken = default)
-            => fetchDetachedScores(offset, count, i => scoreIds[i], (_, score) => into.Add(score), cancellationToken);
+            CancellationToken cancellationToken = default) => fetchDetachedScores(offset, count, i => scoreIds[i], (_, score) => into.Add(score), cancellationToken);
 
         /// <summary>
         /// Resolves the plays a per-play cache cannot answer, in bounded windows: one Realm transaction per window,
@@ -490,11 +498,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 return new CachedAnalysis(hasKps ? fallback : default, hasKps);
             }
 
-            var cache = state.AnalysisCache;
-            string cacheKey = $"{beatmap.ID:N}|{score.Ruleset.ShortName}|{score.ModsJson}";
+            // Same session store the live analysis pass fills, so a chart already measured for these mods (by the
+            // HUD, or by an earlier score in this run) is not measured a second time.
+            var cacheKey = (beatmap.Hash, EzAnalysisLookupCache.ComputeModsSignature(score.Mods));
 
-            if (cache.TryGetValue(cacheKey, out var cached))
-                return cached;
+            if (state.AnalysisCache.TryGetValue(cacheKey, out var memoised))
+                return memoised;
+
+            if (analysisLookup?.GetOrCompute(beatmap, score.Ruleset, score.Mods) is { } shared)
+                return state.AnalysisCache[cacheKey] = new CachedAnalysis(shared, true);
+
+            CachedAnalysis cached;
 
             try
             {
@@ -515,8 +529,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 cached = new CachedAnalysis(default, false);
             }
 
-            cache[cacheKey] = cached;
-            return cached;
+            return state.AnalysisCache[cacheKey] = cached;
         }
 
         private static int resolveManiaKeyCount(ScoreInfo score, EzAnalysisResult analysis, bool hasKps)
@@ -746,8 +759,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                 + $" && {nameof(ScoreInfo.BeatmapInfo)}.{nameof(BeatmapInfo.Hash)} == {nameof(ScoreInfo.BeatmapHash)}");
         }
 
-        private static string normaliseUsername(string? username)
-            => EzLocalProfileConstants.NormaliseUsername(username);
+        private static string normaliseUsername(string? username) => EzLocalProfileConstants.NormaliseUsername(username);
 
         private static long countKeys(ScoreInfo score)
         {

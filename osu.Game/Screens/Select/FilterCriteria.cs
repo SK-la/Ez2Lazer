@@ -198,11 +198,10 @@ namespace osu.Game.Screens.Select
             /// </summary>
             public bool InvertRange;
 
-            public bool Equals(OptionalRange<T> other)
-                => EqualityComparer<T?>.Default.Equals(Min, other.Min)
-                   && EqualityComparer<T?>.Default.Equals(Max, other.Max)
-                   && IsLowerInclusive.Equals(other.IsLowerInclusive)
-                   && IsUpperInclusive.Equals(other.IsUpperInclusive);
+            public bool Equals(OptionalRange<T> other) => EqualityComparer<T?>.Default.Equals(Min, other.Min)
+                                                          && EqualityComparer<T?>.Default.Equals(Max, other.Max)
+                                                          && IsLowerInclusive.Equals(other.IsLowerInclusive)
+                                                          && IsUpperInclusive.Equals(other.IsUpperInclusive);
         }
 
         public struct OptionalTextFilter : IEquatable<OptionalTextFilter>
@@ -313,7 +312,6 @@ namespace osu.Game.Screens.Select
                 case SortMode.BPM:
                 case SortMode.Length:
                 case SortMode.Difficulty:
-                case SortMode.SunnyStarRating:
                 case SortMode.PP:
                     return true;
 

@@ -1528,18 +1528,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
             upsert.ExecuteNonQuery();
         }
 
-        private static string serializeVector(EzMinaSkillAxisVector vector)
-            => JsonSerializer.Serialize(new[]
-            {
-                vector.Overall,
-                vector.Stream,
-                vector.Jumpstream,
-                vector.Handstream,
-                vector.Stamina,
-                vector.JackSpeed,
-                vector.Chordjack,
-                vector.Technical,
-            });
+        private static string serializeVector(EzMinaSkillAxisVector vector) => JsonSerializer.Serialize(new[]
+        {
+            vector.Overall,
+            vector.Stream,
+            vector.Jumpstream,
+            vector.Handstream,
+            vector.Stamina,
+            vector.JackSpeed,
+            vector.Chordjack,
+            vector.Technical,
+        });
 
         private static EzMinaSkillAxisVector deserializeVector(string json)
         {
@@ -1966,6 +1965,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return list;
         }
 
+        /// <summary>
+        /// Legacy durable insights cache reader. Nothing writes this table any more: insights are derived from drill
+        /// rows on demand and cached per session, so no read path persists them.
+        /// </summary>
         public EzLocalProfileInsights? TryLoadInsightsCache(string? usernameFilter)
         {
             string username = EzLocalProfileConstants.IsAllPlayersFilter(usernameFilter)
@@ -1992,33 +1995,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     Logger.Log($"[EzLocalProfile] Failed to deserialize insights cache: {ex.Message}", Ez2ConfigManager.LOGGER_NAME);
                     return null;
                 }
-            }
-        }
-
-        public void SaveInsightsCache(string? usernameFilter, EzLocalProfileInsights insights)
-        {
-            string username = EzLocalProfileConstants.IsAllPlayersFilter(usernameFilter)
-                ? EzLocalProfileConstants.ALL_PLAYERS
-                : EzLocalProfileConstants.NormaliseUsername(usernameFilter);
-
-            string json = JsonSerializer.Serialize(insights);
-
-            lock (sync)
-            {
-                ensureInitialised();
-                using var connection = openConnection();
-                using var cmd = connection.CreateCommand();
-                cmd.CommandText = """
-                                  INSERT INTO insights_cache (username, payload_json, computed_at_ms)
-                                  VALUES ($username, $payload_json, $computed_at_ms)
-                                  ON CONFLICT(username) DO UPDATE SET
-                                      payload_json = excluded.payload_json,
-                                      computed_at_ms = excluded.computed_at_ms;
-                                  """;
-                cmd.Parameters.AddWithValue("$username", username);
-                cmd.Parameters.AddWithValue("$payload_json", json);
-                cmd.Parameters.AddWithValue("$computed_at_ms", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
-                cmd.ExecuteNonQuery();
             }
         }
 
