@@ -7,7 +7,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Metrics;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -26,7 +26,7 @@ namespace osu.Game.EzOsuGame.UserInterface
     /// </remarks>
     public partial class EzMetricVariantChip : OsuClickableContainer
     {
-        public Action<EzMetricVariant?>? VariantChanged;
+        public Action<EzReadout?>? VariantChanged;
 
         private readonly OsuSpriteText label;
         private readonly Box background;
@@ -70,7 +70,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             Action = () =>
             {
                 int rulesetOnlineId = ruleset.Value?.OnlineID ?? 0;
-                EzMetricSelection.Cycle(rulesetOnlineId, EzMetricVariantReadout.Catalog);
+                EzRulesetReadout.Cycle(rulesetOnlineId);
                 refresh(rulesetOnlineId);
             };
         }
@@ -85,7 +85,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         }
 
         /// <summary>Current system for the active ruleset, or null when the ruleset has no analysis.</summary>
-        public EzMetricVariant? Current { get; private set; }
+        public EzReadout? Current { get; private set; }
 
         protected override void Dispose(bool isDisposing)
         {
@@ -96,19 +96,19 @@ namespace osu.Game.EzOsuGame.UserInterface
         private void refresh(int rulesetOnlineId)
         {
             var previous = Current;
-            Current = EzMetricVariantReadout.Selected(rulesetOnlineId);
+            Current = EzRulesetReadout.Selected(rulesetOnlineId);
 
-            if (Current == null)
+            if (Current is not { } shown)
             {
                 Hide();
                 return;
             }
 
-            label.Text = Current.Name;
+            label.Text = shown.Name;
             Show();
 
-            if (previous?.Id != Current.Id)
-                VariantChanged?.Invoke(Current);
+            if (previous?.Id != shown.Id)
+                VariantChanged?.Invoke(shown);
         }
     }
 }

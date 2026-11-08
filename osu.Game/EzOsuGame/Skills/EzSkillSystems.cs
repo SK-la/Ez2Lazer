@@ -2,10 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.LocalProfile;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills.Dan;
-using osu.Game.EzOsuGame.Skills.PPP;
 
 namespace osu.Game.EzOsuGame.Skills
 {
@@ -42,7 +39,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Row tag for a chart the engine rates as a zero vector on a supported key mode. The row carries
-        /// <see cref="Metrics.EzMetricState.Unrateable"/>; the tag itself is not an axis.
+        /// <see cref="Metrics.EzSkillRowState.Unrateable"/>; the tag itself is not an axis.
         /// </summary>
         public const string UNRATEABLE = "__unrateable";
 
@@ -60,21 +57,12 @@ namespace osu.Game.EzOsuGame.Skills
         /// </remarks>
         public static int ResolveAlgorithmVersion(string systemId) => systemId switch
         {
-            BEATMAP_MINA => EzMetricRegistries.Current.RevisionOf(EzChartMetricProducer.Mina.Id(), EzLocalProfileConstants.MANIA_RULESET_ID),
+            BEATMAP_MINA => EzAnalysisRevision.Msd,
             BEATMAP_CSI => EzAnalysisRevision.ChartSkillInfo,
-            PLAYER_MINA or PLAYER_PATTERN => EzMinaSkillAlgorithm.VERSION,
+            PLAYER_MINA or PLAYER_PATTERN => EzAnalysisRevision.VERSION,
             // PP+ rows are stamped per ruleset bundle, never by a single version constant.
-            BEATMAP_PPP or PLAYER_PPP => EzPPPSkillVersions.FACET_REVISION,
+            BEATMAP_PPP or PLAYER_PPP => EzAnalysisRevision.VERSION,
             _ => 0,
         };
-    }
-
-    /// <summary>
-    /// Bump when note conversion or rating aggregation semantics change.
-    /// 2: unified onto the 4-18K n-key engine (was a 4/6/7K-only package).
-    /// </summary>
-    public static class EzMinaSkillAlgorithm
-    {
-        public const int VERSION = 2;
     }
 }

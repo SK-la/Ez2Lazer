@@ -157,7 +157,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(leo!.Clusters.Count, Is.GreaterThan(0));
             Assert.That(leo.Category, Is.Not.Empty);
 
-            var info = EzChartSkillInfoComputer.Compute(input);
+            var info = EzCSIEngine.Compute(input);
             Assert.That(info.JackShare.HasValue || info.StreamShare.HasValue || info.TechCategory.HasValue, Is.True);
         }
     }

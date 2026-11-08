@@ -33,7 +33,7 @@ namespace osu.Game.Rulesets
         public int LastAppliedSunnySRVersion { get; set; }
 
         /// <summary>
-        /// Ez2Lazer: last applied mania skill algorithm version (<see cref="EzOsuGame.Skills.EzMinaSkillAlgorithm.VERSION"/>).
+        /// Ez2Lazer: last applied mania skill algorithm version (<see cref="EzOsuGame.Skills.EzAnalysisRevision.VERSION"/>).
         /// Used to invalidate <see cref="EzOsuGame.Skills.EzBeatmapSkillValue"/> / player SunnySR rows.
         /// </summary>
         public int LastAppliedManiaSkillVersion { get; set; }

@@ -25,10 +25,10 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         {
             ManiaBeatmap beatmap = createChart(keyCount);
 
-            double expectedSr = SRCalculator.CalculateSR(beatmap);
-            EzManiaSR4PatternSnapshot expectedSnapshot = SRCalculator.CalculateSR4PatternSnapshot(beatmap);
+            double expectedSr = EzSSREngine.CalculateSR(beatmap);
+            EzManiaSR4PatternSnapshot expectedSnapshot = EzSSREngine.CalculateSR4PatternSnapshot(beatmap);
 
-            var combined = SRCalculator.CalculateSRWithPatternSnapshot(beatmap);
+            var combined = EzSSREngine.CalculateSRWithPatternSnapshot(beatmap);
 
             assertBitIdentical(expectedSr, combined.Sr, "total SR");
             assertBitIdentical(expectedSnapshot.BracketStar, combined.PatternSnapshot.BracketStar, "bracket star");
@@ -54,8 +54,8 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         {
             ManiaBeatmap beatmap = createChart(4, holdEveryRow: true);
 
-            double expectedSr = SRCalculator.CalculateSR(beatmap);
-            var combined = SRCalculator.CalculateSRWithPatternSnapshot(beatmap);
+            double expectedSr = EzSSREngine.CalculateSR(beatmap);
+            var combined = EzSSREngine.CalculateSRWithPatternSnapshot(beatmap);
 
             assertBitIdentical(expectedSr, combined.Sr, "total SR");
         }

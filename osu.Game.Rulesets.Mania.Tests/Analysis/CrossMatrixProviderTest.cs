@@ -197,12 +197,12 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
             beatmap.HitObjects.Add(new Note { StartTime = 0, Column = 0 });
             beatmap.HitObjects.Add(new Note { StartTime = 100, Column = 1 });
 
-            double baseline = SRCalculator.CalculateSR(beatmap);
+            double baseline = EzSSREngine.CalculateSR(beatmap);
 
             double[] heavyCross = Enumerable.Repeat(0.9, key_count + 1).ToArray();
             CrossMatrixProvider.SetCustomMatrix(key_count, heavyCross);
 
-            double withCustom = SRCalculator.CalculateSR(beatmap);
+            double withCustom = EzSSREngine.CalculateSR(beatmap);
 
             Assert.That(withCustom, Is.Not.EqualTo(baseline).Within(1e-6));
         }
@@ -228,8 +228,8 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
             beatmap.HitObjects.Add(new Note { StartTime = 0, Column = 0 });
             beatmap.HitObjects.Add(new Note { StartTime = 150, Column = keyCount - 1 });
 
-            Assert.DoesNotThrow(() => SRCalculator.CalculateSR(beatmap));
-            Assert.That(SRCalculator.CalculateSR(beatmap), Is.GreaterThanOrEqualTo(0));
+            Assert.DoesNotThrow(() => EzSSREngine.CalculateSR(beatmap));
+            Assert.That(EzSSREngine.CalculateSR(beatmap), Is.GreaterThanOrEqualTo(0));
         }
 
         [Test]
@@ -237,14 +237,14 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         {
             var beatmap = createBeatmap(4);
 
-            Assert.That(SRCalculator.CalculateSR(beatmap), Is.EqualTo(0).Within(1e-6));
+            Assert.That(EzSSREngine.CalculateSR(beatmap), Is.EqualTo(0).Within(1e-6));
         }
 
         [TestCase(1)]
         [TestCase(18)]
         public void CalculateSR_EmptyBeatmap_AllKeyCounts_ReturnsZero(int keyCount)
         {
-            Assert.That(SRCalculator.CalculateSR(createBeatmap(keyCount)), Is.EqualTo(0).Within(1e-6));
+            Assert.That(EzSSREngine.CalculateSR(createBeatmap(keyCount)), Is.EqualTo(0).Within(1e-6));
         }
 
         [Test]
@@ -252,7 +252,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         {
             var beatmap = createBeatmap(19);
 
-            Assert.Throws<NotSupportedException>(() => SRCalculator.CalculateSR(beatmap));
+            Assert.Throws<NotSupportedException>(() => EzSSREngine.CalculateSR(beatmap));
         }
 
         #endregion

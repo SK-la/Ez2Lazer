@@ -4,13 +4,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.Skills.Dan
 {
     /// <summary>
-    /// In-memory DTO for <see cref="EzBeatmapChartDan"/> (nomod baseline + skillset stamps).
+    /// In-memory DTO for <see cref="EzChartDan"/> (nomod baseline + skillset stamps).
     /// </summary>
     public sealed class EzPersistedChartDan
     {
@@ -21,7 +22,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         public Guid BeatmapId { get; init; }
 
-        public int AlgorithmVersion { get; init; } = EzDanAlgorithm.VERSION;
+        public int AlgorithmVersion { get; init; } = EzAnalysisRevision.VERSION;
 
         public int KeyCount { get; init; }
 
@@ -141,7 +142,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             {
                 BeatmapHash = beatmapHash,
                 BeatmapId = beatmapId,
-                AlgorithmVersion = EzDanAlgorithm.VERSION,
+                AlgorithmVersion = EzAnalysisRevision.VERSION,
                 KeyCount = keyCount,
                 HoldRatio = holdRatio,
                 OverallMsd = set?.OverallMsd ?? overallMean,

@@ -17,7 +17,6 @@ using osu.Game.Beatmaps.Drawables;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
@@ -372,7 +371,7 @@ namespace osu.Game.Screens.Select
             /// </summary>
             private void applyVariantPerformance(BeatmapInfo beatmapInfo, in StarDifficulty officialDifficulty)
             {
-                var values = ezAnalysisCache.ReadVariantValues(beatmapInfo, mods.Value, EzMetricVariantValues.Live(officialDifficulty));
+                var values = ezAnalysisCache.ReadVariantValues(beatmapInfo, mods.Value, EzReadoutValues.Live(officialDifficulty));
                 dualDifficultyDisplay.ApplyPerformance(values.PerformancePoints);
             }
 

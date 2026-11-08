@@ -44,7 +44,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [Test]
         public void DefaultsMatchTheValuesTheStoredDataWasProducedWith()
         {
-            var tuning = SRCalculator.Tuning;
+            var tuning = EzSSREngine.Tuning;
 
             Assert.That(tuning.RescaleThreshold, Is.EqualTo(8.0));
             Assert.That(tuning.LnMultiplier, Is.EqualTo(5.5));
@@ -56,17 +56,17 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             config.SetValue(Ez2Setting.SsrRescaleThreshold, 9.0);
             config.SetValue(Ez2Setting.SsrLnMultiplier, 6.0);
 
-            var tuning = SRCalculator.Tuning;
+            var tuning = EzSSREngine.Tuning;
 
             Assert.That(tuning.RescaleThreshold, Is.EqualTo(9.0));
             Assert.That(tuning.LnMultiplier, Is.EqualTo(6.0));
-            Assert.That(SRCalculator.RescaleHighThreshold, Is.EqualTo(9.0));
-            Assert.That(SRCalculator.LnIntegralMultiplier, Is.EqualTo(6.0));
+            Assert.That(EzSSREngine.RescaleHighThreshold, Is.EqualTo(9.0));
+            Assert.That(EzSSREngine.LnIntegralMultiplier, Is.EqualTo(6.0));
         }
 
         /// <summary>
         /// The setting's own range is the first line of defence: an out-of-range write is clamped by the bindable
-        /// before the rating ever sees it. The fallback inside <see cref="SRCalculator.Tuning"/> is for a value that
+        /// before the rating ever sees it. The fallback inside <see cref="EzSSREngine.Tuning"/> is for a value that
         /// reached the file some other way, so it cannot be reached from here.
         /// </summary>
         [TestCase(0.0, 6.0)]
@@ -78,7 +78,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         {
             config.SetValue(Ez2Setting.SsrRescaleThreshold, written);
 
-            var tuning = SRCalculator.Tuning;
+            var tuning = EzSSREngine.Tuning;
 
             Assert.That(tuning.RescaleThreshold, Is.EqualTo(expected));
             Assert.That(double.IsFinite(tuning.RescaleThreshold), Is.True);
@@ -92,7 +92,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         {
             config.SetValue(Ez2Setting.SsrLnMultiplier, written);
 
-            var tuning = SRCalculator.Tuning;
+            var tuning = EzSSREngine.Tuning;
 
             Assert.That(tuning.LnMultiplier, Is.EqualTo(expected));
             Assert.That(double.IsFinite(tuning.LnMultiplier), Is.True);
@@ -157,7 +157,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             config.SetValue(Ez2Setting.SsrRescaleThreshold, threshold);
             config.SetValue(Ez2Setting.SsrLnMultiplier, lnMultiplier);
 
-            return SRCalculator.CalculateSR(beatmap, 1.0);
+            return EzSSREngine.CalculateSR(beatmap, 1.0);
         }
 
         private enum HoldMode

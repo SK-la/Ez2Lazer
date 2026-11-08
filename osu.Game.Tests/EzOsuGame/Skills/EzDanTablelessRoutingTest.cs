@@ -87,7 +87,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void TablelessChartDanUsesTheBorrowedTable()
         {
-            var verdict = EzChartDanEstimator.FromMsd(msd(20), keyCount: 5, holdRatio: 0.1, sunnySR: 6);
+            var verdict = EzDanEngine.FromMsd(msd(20), keyCount: 5, holdRatio: 0.1, sunnySR: 6);
             Assert.That(EzSunnyDanIntervals.TryLookup(4, EzDanSide.Rc.ToId(), 6.0, out var fourK), Is.True);
 
             Assert.That(verdict, Is.Not.Null);
@@ -98,8 +98,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void TablelessChartDanWithoutStarRatingIsNotInvented()
         {
-            Assert.That(EzChartDanEstimator.FromMsd(msd(20), keyCount: 5, holdRatio: 0.1), Is.Null);
-            Assert.That(EzChartDanEstimator.FromMsd(msd(20), keyCount: 8, holdRatio: 0.1, sunnySR: -1), Is.Null);
+            Assert.That(EzDanEngine.FromMsd(msd(20), keyCount: 5, holdRatio: 0.1), Is.Null);
+            Assert.That(EzDanEngine.FromMsd(msd(20), keyCount: 8, holdRatio: 0.1, sunnySR: -1), Is.Null);
         }
 
         [Test]

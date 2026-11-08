@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using NUnit.Framework;
+using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Tests.Database;
@@ -10,7 +11,7 @@ using osu.Game.Tests.Database;
 namespace osu.Game.Tests.EzOsuGame.Skills
 {
     /// <summary>
-    /// The read paths must not persist. Durable rows are owned by BDSP, <see cref="Beatmaps.BeatmapUpdater"/> and the
+    /// The read paths must not persist. Durable rows are owned by BDSP, <see cref="BeatmapUpdater"/> and the
     /// manual recompute, so a HUD read that computes a value has to keep it in memory.
     /// </summary>
     [TestFixture]

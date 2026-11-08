@@ -94,7 +94,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             if (keyCount <= 0 || axes.Count == 0)
                 return null;
 
-            var primary = EzChartDanEstimator.FromMsd(axes, keyCount, holdRatio, sunnySR);
+            var primary = EzDanEngine.FromMsd(axes, keyCount, holdRatio, sunnySR);
 
             if (primary == null)
                 return null;

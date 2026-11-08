@@ -6,8 +6,6 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.LocalProfile;
-using osu.Game.EzOsuGame.Metrics;
-using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Catch.Objects;
@@ -197,10 +195,21 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         };
 
         /// <summary>
-        /// Completeness comes from the producer's declared axis set, which is the only axis list in the system.
+        /// Completeness comes from the PP+ catalog's axis set, which is the only axis list in the system.
         /// </summary>
-        private static bool isCompleteChart(int rulesetOnlineId, IReadOnlyDictionary<string, double> skills) => EzMetricRegistries.ChartRegistry.Get(EzChartMetricProducer.Ppp.Id())
-                                                                                                                                  ?.IsCompleteFor(EzSkillSystems.UNSLICED_KEY, rulesetOnlineId, skills)
-                                                                                                                == true;
+        private static bool isCompleteChart(int rulesetOnlineId, IReadOnlyDictionary<string, double> skills)
+        {
+            bool any = false;
+
+            foreach (var spec in EzPPPSkillCatalog.MetricsFor(rulesetOnlineId))
+            {
+                any = true;
+
+                if (!skills.ContainsKey(spec.ChartSkillId))
+                    return false;
+            }
+
+            return any;
+        }
     }
 }

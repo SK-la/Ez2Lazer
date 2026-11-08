@@ -8,8 +8,6 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.LocalProfile;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
@@ -26,16 +24,14 @@ namespace osu.Game.EzOsuGame.Skills
     public sealed class EzChartSkillStore
     {
         private readonly RealmAccess realmAccess;
-        private readonly EzMetricRevisionResolver resolver;
 
-        public EzChartSkillStore(RealmAccess realmAccess, EzMetricRevisionResolver? resolver = null)
+        public EzChartSkillStore(RealmAccess realmAccess)
         {
             this.realmAccess = realmAccess;
-            this.resolver = resolver ?? EzMetricRegistries.Current;
         }
 
         /// <summary>Revision stamped on chart-side Mina axis rows.</summary>
-        private int minaChartRevision => resolver.RevisionOf(EzChartMetricProducer.Mina.Id(), EzLocalProfileConstants.MANIA_RULESET_ID);
+        private int minaChartRevision => EzAnalysisRevision.Msd;
 
         /// <summary>
         /// Current values for one system. Rows the producer settled without a value are excluded: a verdict is
@@ -51,7 +47,7 @@ namespace osu.Game.EzOsuGame.Skills
                 var rows = r.All<EzBeatmapSkillValue>()
                             .Where(v => v.BeatmapHash == beatmapHash
                                         && v.SystemId == systemId
-                                        && v.State == (int)EzMetricState.Current
+                                        && v.State == (int)EzSkillRowState.Current
                                         && v.AlgorithmVersion == version);
 
                 if (rulesetOnlineId >= 0)
@@ -64,10 +60,10 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>
         /// Whether one system has a current value, a settled miss, or nothing at all for a chart.
         /// </summary>
-        public EzMetricState GetBeatmapSystemState(string beatmapHash, string systemId, int revision)
+        public EzSkillRowState GetBeatmapSystemState(string beatmapHash, string systemId, int revision)
         {
             if (string.IsNullOrEmpty(beatmapHash) || string.IsNullOrEmpty(systemId))
-                return EzMetricState.Missing;
+                return EzSkillRowState.Missing;
 
             return realmAccess.Run(r =>
             {
@@ -77,11 +73,11 @@ namespace osu.Game.EzOsuGame.Skills
                 {
                     any = true;
 
-                    if (row.State == (int)EzMetricState.Unrateable)
-                        return EzMetricState.Unrateable;
+                    if (row.State == (int)EzSkillRowState.Unrateable)
+                        return EzSkillRowState.Unrateable;
                 }
 
-                return any ? EzMetricState.Current : EzMetricState.Missing;
+                return any ? EzSkillRowState.Current : EzSkillRowState.Missing;
             });
         }
 
@@ -95,7 +91,7 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentNullException.ThrowIfNull(beatmapInfo);
 
             int rulesetId = beatmapInfo.Ruleset.OnlineID;
-            int bundle = EzPPPSkillVersions.ForRuleset(rulesetId);
+            int bundle = EzAnalysisRevision.VERSION;
 
             if (bundle <= 0)
                 return new Dictionary<string, double>(StringComparer.Ordinal);
@@ -144,7 +140,7 @@ namespace osu.Game.EzOsuGame.Skills
                 var result = new Dictionary<string, IReadOnlyDictionary<string, double>>(hashSet.Count, StringComparer.Ordinal);
 
                 var rows = r.All<EzBeatmapSkillValue>()
-                            .Where(v => v.SystemId == systemId && v.AlgorithmVersion == version && v.State == (int)EzMetricState.Current)
+                            .Where(v => v.SystemId == systemId && v.AlgorithmVersion == version && v.State == (int)EzSkillRowState.Current)
                             .AsEnumerable()
                             .Where(v => hashSet.Contains(v.BeatmapHash));
 
@@ -299,7 +295,7 @@ namespace osu.Game.EzOsuGame.Skills
                     RulesetOnlineId = EzLocalProfileConstants.MANIA_RULESET_ID,
                     SkillId = EzSkillSystems.UNRATEABLE,
                     Value = 1,
-                    State = (int)EzMetricState.Unrateable,
+                    State = (int)EzSkillRowState.Unrateable,
                     AlgorithmVersion = version,
                     ComputedAt = at,
                 });
@@ -391,7 +387,7 @@ namespace osu.Game.EzOsuGame.Skills
             return realmAccess.Run(r => r.All<EzBeatmapSkillValue>()
                                          .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MINA
                                                      && v.AlgorithmVersion == version
-                                                     && v.State == (int)EzMetricState.Unrateable)
+                                                     && v.State == (int)EzSkillRowState.Unrateable)
                                          .AsEnumerable()
                                          .Select(v => v.BeatmapHash)
                                          .ToHashSet(StringComparer.Ordinal));
@@ -569,7 +565,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             realmAccess.Run(r =>
             {
-                var row = r.All<EzBeatmapChartDan>()
+                var row = r.All<EzChartDan>()
                            .FirstOrDefault(v => v.BeatmapHash == beatmapHash
                                                 && v.AlgorithmVersion == revision);
                 if (row != null)
@@ -597,14 +593,14 @@ namespace osu.Game.EzOsuGame.Skills
 
             realmAccess.Write(r =>
             {
-                var existing = r.All<EzBeatmapChartDan>()
+                var existing = r.All<EzChartDan>()
                                 .Where(v => v.BeatmapHash == chartDan.BeatmapHash)
                                 .ToList();
 
                 foreach (var row in existing)
                     r.Remove(row);
 
-                r.Add(new EzBeatmapChartDan
+                r.Add(new EzChartDan
                 {
                     BeatmapHash = chartDan.BeatmapHash,
                     BeatmapId = chartDan.BeatmapId,
@@ -630,7 +626,7 @@ namespace osu.Game.EzOsuGame.Skills
             /*
             realmAccess.Write(r =>
             {
-                var rows = r.All<EzBeatmapChartDan>().ToList();
+                var rows = r.All<EzChartDan>().ToList();
 
                 foreach (var row in rows)
                     r.Remove(row);
@@ -744,14 +740,13 @@ namespace osu.Game.EzOsuGame.Skills
                     if (stored == null || stored.Count == 0)
                         continue;
 
-                    rows[candidate.Hash] = new EzFacetRowState(complete ? EzPPPSkillVersions.FACET_REVISION : 0, false);
+                    rows[candidate.Hash] = new EzFacetRowState(complete ? EzAnalysisRevision.VERSION : 0, false);
                 }
 
                 var facet = new EzDataStateFacet
                 {
                     Id = "PPP",
-                    Facet = EzAnalysisFacet.PPP,
-                    CurrentRevision = EzPPPSkillVersions.FACET_REVISION,
+                    CurrentRevision = EzAnalysisRevision.VERSION,
                     UniverseCount = candidates.Count,
                     Rows = rows,
                 };
@@ -773,7 +768,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (rulesetOnlineId >= 0
                 && systemId is EzSkillSystems.BEATMAP_PPP or EzSkillSystems.PLAYER_PPP)
             {
-                int bundle = EzPPPSkillVersions.ForRuleset(rulesetOnlineId);
+                int bundle = EzAnalysisRevision.VERSION;
 
                 if (bundle > 0)
                     return bundle;
@@ -787,10 +782,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (stored == null || stored.Count == 0 || !EzPPPSkillCatalog.SupportsRuleset(rulesetId))
                 return false;
 
-            if (resolver.ChartRegistry.Get(EzChartMetricProducer.Ppp.Id()) is not { } producer)
-                return false;
-
-            int revision = resolver.RevisionOf(EzChartMetricProducer.Ppp.Id(), rulesetId);
+            int revision = EzAnalysisRevision.VERSION;
 
             if (revision <= 0)
                 return false;
@@ -803,8 +795,14 @@ namespace osu.Game.EzOsuGame.Skills
                     current[row.SkillId] = row.Value;
             }
 
-            // Completeness is the producer's declared axis set for this ruleset, not a second list kept here.
-            return producer.IsCompleteFor(EzSkillSystems.UNSLICED_KEY, rulesetId, current);
+            // Completeness is the axis set the ruleset's catalog declares, not a second list kept here.
+            foreach (var spec in EzPPPSkillCatalog.MetricsFor(rulesetId))
+            {
+                if (!current.ContainsKey(spec.ChartSkillId))
+                    return false;
+            }
+
+            return current.Count > 0;
         }
 
         private readonly record struct PppChartScan(List<Guid> OwedIds, EzFacetStatus Status);
@@ -916,14 +914,14 @@ namespace osu.Game.EzOsuGame.Skills
             };
         }
 
-        private static EzPersistedChartDan chartDanToDto(EzBeatmapChartDan row)
+        private static EzPersistedChartDan chartDanToDto(EzChartDan row)
             => new EzPersistedChartDan
             {
                 BeatmapHash = row.BeatmapHash,
                 BeatmapId = row.BeatmapId,
                 // DTO keeps the pure dan algorithm version; the column holds the composed facet
                 // revision, which is a persistence detail that must not leak to consumers.
-                AlgorithmVersion = EzDanAlgorithm.VERSION,
+                AlgorithmVersion = EzAnalysisRevision.VERSION,
                 KeyCount = row.KeyCount,
                 HoldRatio = row.HoldRatio,
                 OverallMsd = row.OverallMsd,

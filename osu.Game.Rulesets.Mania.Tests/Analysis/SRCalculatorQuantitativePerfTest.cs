@@ -20,7 +20,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
     /// one derivation costs, so asking for a radar as well does not double the time.
     /// </para>
     /// <para>
-    /// Measured as-is: <c>SRCalculator</c> currently spreads its per-corner loop over <c>Parallel.For</c>. Those
+    /// Measured as-is: <c>EzSSREngine</c> currently spreads its per-corner loop over <c>Parallel.For</c>. Those
     /// numbers are the baseline, not evidence that the split pays. Charts are rated one after another by a single
     /// worker, so a per-chart fan-out competes for the same cores the backfill could otherwise use; a sequential loop
     /// is the comparison to make before deciding either way, and no new parallelism belongs in these algorithms.
@@ -48,9 +48,9 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
             ManiaBeatmap beatmap = createChart(keyCount, holdHeavy);
 
             // Resolve the cross matrix and JIT the hot paths before the first timed run.
-            SRCalculator.CalculateSRWithPatternSnapshot(beatmap);
+            EzSSREngine.CalculateSRWithPatternSnapshot(beatmap);
 
-            var sample = EzPerfMeasurer.Measure("sr + radar", runs, () => SRCalculator.CalculateSRWithPatternSnapshot(beatmap));
+            var sample = EzPerfMeasurer.Measure("sr + radar", runs, () => EzSSREngine.CalculateSRWithPatternSnapshot(beatmap));
 
             TestContext.Progress.WriteLine($"{keyCount}K holdHeavy={holdHeavy} notes={beatmap.HitObjects.Count}");
             EzPerfMeasurer.Report(new[] { sample });
@@ -75,9 +75,9 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         {
             ManiaBeatmap beatmap = createChart(4, holdHeavy: true, rows: 1200);
 
-            SRCalculator.CalculateSRWithPatternSnapshot(beatmap);
+            EzSSREngine.CalculateSRWithPatternSnapshot(beatmap);
 
-            var sample = EzPerfMeasurer.Measure("sr hold-dense", runs, () => SRCalculator.CalculateSRWithPatternSnapshot(beatmap));
+            var sample = EzPerfMeasurer.Measure("sr hold-dense", runs, () => EzSSREngine.CalculateSRWithPatternSnapshot(beatmap));
 
             EzPerfMeasurer.Report(new[] { sample });
 

@@ -48,8 +48,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 [EzMinaSkillAxis.Stream.ToMsdSkillId()] = 10.0,
             };
 
-            var withSunnySR = EzChartDanEstimator.FromMsd(msd, keyCount: 6, holdRatio: 0.1, sunnySR: 7.03);
-            var withoutSunnySR = EzChartDanEstimator.FromMsd(msd, keyCount: 6, holdRatio: 0.1);
+            var withSunnySR = EzDanEngine.FromMsd(msd, keyCount: 6, holdRatio: 0.1, sunnySR: 7.03);
+            var withoutSunnySR = EzDanEngine.FromMsd(msd, keyCount: 6, holdRatio: 0.1);
 
             Assert.That(withSunnySR, Is.Not.Null);
             Assert.That(withoutSunnySR, Is.Not.Null);

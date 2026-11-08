@@ -7,99 +7,19 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills.Mina;
-using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Skills.Dan
 {
     /// <summary>
-    /// Chart-dan entry for song select and player credit.
-    /// Prefer sunnySR → Sunny interval tables when available; else MSD Overall heuristic.
-    /// Skill family / OverallMsd always come from MSD when present.
+    /// Chart-dan derivation from already-measured inputs. Pure: every function here takes its inputs and returns
+    /// a verdict, with no lookup, no store and no side effect.
     /// </summary>
     /// <remarks>
-    /// This reads the shared live analysis (<see cref="IEzChartAnalysisLookup"/>) rather than measuring anything:
-    /// the Mina vector and the Sunny rating are produced once per chart + mods by the analysis pass.
+    /// Prefers the SunnySR interval table when a star rating is available, else the MSD Overall heuristic. Skill
+    /// family and OverallMsd always come from MSD when present.
     /// </remarks>
-    public sealed class EzChartDanEstimator
+    public static class EzDanEngine
     {
-        private readonly IEzChartAnalysisLookup? analysisLookup;
-
-        public EzChartDanEstimator(IEzChartAnalysisLookup? analysisLookup = null)
-        {
-            this.analysisLookup = analysisLookup;
-        }
-
-        /// <summary>
-        /// Estimates chart dan for a read path (HUD, labels): only ever uses an analysis that already exists.
-        /// Null means the pass has not produced this chart yet; the caller treats that as "not available".
-        /// </summary>
-        public EzChartDanVerdict? TryEstimate(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
-        {
-            ArgumentNullException.ThrowIfNull(beatmapInfo);
-
-            if (beatmapInfo.Ruleset.OnlineID != 3)
-                return null;
-
-            return analysisLookup?.TryGet(beatmapInfo, mods) is { } analysis
-                ? fromAnalysis(analysis)
-                : null;
-        }
-
-        /// <summary>
-        /// Same estimate, but fills the shared analysis store when the inputs have not been measured yet.
-        /// </summary>
-        /// <remarks>
-        /// Batch callers only (player aggregation), which run off the update thread. The measurement is the one the
-        /// analysis pass would do, so a later HUD read of the same chart is a cache hit rather than a second pass.
-        /// </remarks>
-        public EzChartDanVerdict? TryEstimateOrCompute(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
-        {
-            ArgumentNullException.ThrowIfNull(beatmapInfo);
-
-            if (beatmapInfo.Ruleset.OnlineID != 3)
-                return null;
-
-            return analysisLookup?.GetOrCompute(beatmapInfo, beatmapInfo.Ruleset, mods) is { } analysis
-                ? fromAnalysis(analysis)
-                : null;
-        }
-
-        private static EzChartDanVerdict? fromAnalysis(EzAnalysisResult analysis)
-        {
-            // The pass already resolved every side through the single entry point. Reading it here is what keeps
-            // the HUD, the player credit and the persisted row from disagreeing about the same chart.
-            if (analysis.Dan is not { } dan || dan.Sides.Count == 0)
-                return null;
-
-            var side = dan.HoldRatio >= EzDanAlgorithm.LnPrimaryMinRatioFor(dan.KeyCount)
-                ? EzDanSide.Ln
-                : EzDanSide.Rc;
-
-            var entry = dan.For(side);
-            var resolvedSide = side;
-
-            if (entry == null)
-            {
-                resolvedSide = side == EzDanSide.Ln ? EzDanSide.Rc : EzDanSide.Ln;
-                entry = dan.For(resolvedSide);
-            }
-
-            if (entry == null)
-                return null;
-
-            return new EzChartDanVerdict
-            {
-                RawDan = entry.RawDan,
-                Label = entry.Label,
-                KeyCount = dan.KeyCount,
-                Side = resolvedSide,
-                DominantAxis = dan.DominantAxis,
-                OverallMsd = dan.OverallMsd,
-                HoldRatio = dan.HoldRatio,
-                AlgorithmVersion = EzDanAlgorithm.VERSION,
-            };
-        }
-
         public static EzChartDanVerdict? FromMsdAndPlayable(
             IReadOnlyDictionary<string, double> msd,
             IBeatmap playable,
@@ -112,6 +32,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 return null;
 
             int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
+
             if (keyCount <= 0)
                 return null;
 
@@ -168,11 +89,14 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 DominantAxis = dominantAxis,
                 OverallMsd = overall,
                 HoldRatio = holdRatio,
-                AlgorithmVersion = EzDanAlgorithm.VERSION,
+                AlgorithmVersion = EzAnalysisRevision.VERSION,
             };
         }
 
         public static double ComputeHoldRatio(IBeatmap playable) => EzHoldMetrics.ComputeHoldRatio(playable);
+
+        /// <summary>Column hold (LN) object count on <paramref name="playable"/>.</summary>
+        public static int ComputeHoldCount(IBeatmap playable) => EzHoldMetrics.ComputeHoldCount(playable);
 
         /// <summary>
         /// The inputs a chart-dan derivation needs when only stored data is available.
@@ -198,9 +122,6 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
             return keyCount > 0;
         }
-
-        /// <summary>Column hold (LN) object count on <paramref name="playable"/>.</summary>
-        public static int ComputeHoldCount(IBeatmap playable) => EzHoldMetrics.ComputeHoldCount(playable);
 
         /// <summary>Hold ratio from cached mania column/LN counts when available.</summary>
         public static double? TryHoldRatioFromManiaSummary(EzManiaSummary summary)

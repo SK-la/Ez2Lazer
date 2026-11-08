@@ -5,16 +5,17 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Metrics;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.Rulesets;
 using Realms;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
-    /// Stored-data coverage of one ruleset, as the facets its analysis systems declare.
+    /// Stored-data coverage of one ruleset.
     /// </summary>
     public sealed class EzRulesetAnalysisStatus
     {
@@ -30,27 +31,24 @@ namespace osu.Game.EzOsuGame.Analysis
     }
 
     /// <summary>
-    /// Coverage of every analysis system, grouped by the ruleset that reads it out.
+    /// Coverage of each analysis system, grouped by ruleset.
     /// </summary>
     /// <remarks>
-    /// Facets come from the chart producer catalog rather than from a hand-written list, so a system added there shows
-    /// up in the readout with no change here. Where a system's value lives is decided the same way the read path
-    /// decides it: the skill-value table when the producer owns a storage namespace, the chart chain when the chain
-    /// derives it, otherwise the flattened column on <see cref="BeatmapInfo"/>.
-    /// <para>
-    /// A column facet has no revision to compare against (nothing stamps those columns), so it reports two states
-    /// only: filled in ("ready") or not ("missing"). That is the question the read path asks of them - a column is
-    /// either a usable value or absent.
-    /// </para>
+    /// Every facet here is a direct read of one store: the chart chain's three typed tables, the PPP skill rows, or
+    /// a flattened rating column. There is no declaration layer between the store and this readout, so a system's
+    /// presence is decided by the code that counts it.
     /// </remarks>
     public static class EzAnalysisDataStatus
     {
+        private const string PPP_FACET = "PPP";
+        private const string OFFICIAL_FACET = "Official";
+        private const string SUNNY_FACET = "Sunny";
+
         public static IReadOnlyList<EzRulesetAnalysisStatus> Collect(Realm realm, DateTimeOffset measuredAt)
         {
             ArgumentNullException.ThrowIfNull(realm);
 
             var chain = EzChartChainState.Build(realm);
-            var resolver = EzMetricRegistries.Current;
 
             var rulesetNames = new Dictionary<int, string>();
 
@@ -79,19 +77,20 @@ namespace osu.Game.EzOsuGame.Analysis
 
             var result = new List<EzRulesetAnalysisStatus>(chartsByRuleset.Count);
 
-            foreach (int rulesetId in EzMetricRulesets.ALL)
+            foreach (int rulesetId in EzAnalysisChannels.ALL_RULESETS)
             {
                 if (!chartsByRuleset.TryGetValue(rulesetId, out var charts) || charts.Count == 0)
                     continue;
 
-                var hashes = charts.Select(static c => c.Hash).ToHashSet(StringComparer.Ordinal);
                 var facets = new List<EzFacetStatus>();
 
-                foreach (var producer in chartProducersFor(resolver, rulesetId))
-                {
-                    if (facetOf(producer, rulesetId, charts, hashes, chain, skillRows, resolver) is { } facet)
-                        facets.Add(facet);
-                }
+                if (rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID)
+                    facets.AddRange(chain.Facets.Select(EzDataStateChecker.Count));
+
+                if (pppFacetOf(rulesetId, charts, skillRows) is { } ppp)
+                    facets.Add(ppp);
+
+                facets.AddRange(ratingFacetsOf(rulesetId, charts));
 
                 result.Add(new EzRulesetAnalysisStatus
                 {
@@ -109,124 +108,79 @@ namespace osu.Game.EzOsuGame.Analysis
             return result;
         }
 
-        /// <summary>Producers that apply to <paramref name="rulesetOnlineId"/>, in the catalog's stable order.</summary>
-        private static IEnumerable<EzMetricProducer> chartProducersFor(EzMetricRevisionResolver resolver, int rulesetOnlineId)
-            => resolver.ChartRegistry.All
-                       .Where(p => p.AppliesToRuleset(rulesetOnlineId))
-                       .OrderBy(static p => p.Tier)
-                       .ThenBy(static p => p.Id.Id, StringComparer.Ordinal);
-
-        private static EzFacetStatus? facetOf(
-            EzMetricProducer producer,
+        /// <summary>PP+ rows of one ruleset, counted against the axis set that ruleset's catalog declares.</summary>
+        private static EzFacetStatus? pppFacetOf(
             int rulesetOnlineId,
             IReadOnlyList<BeatmapInfo> charts,
-            IReadOnlySet<string> hashes,
-            EzChartChainState chain,
-            IReadOnlyDictionary<(string SystemId, int RulesetOnlineId), Dictionary<string, List<EzBeatmapSkillValue>>> skillRows,
-            EzMetricRevisionResolver resolver)
+            IReadOnlyDictionary<(string SystemId, int RulesetOnlineId), Dictionary<string, List<EzBeatmapSkillValue>>> skillRows)
         {
-            string id = producer.Id.Id;
+            var specs = EzPPPSkillCatalog.MetricsFor(rulesetOnlineId);
 
-            // The chain derives these three from the same rows, including the verdicts that settle a chart without a
-            // row; re-counting them here would restate its rules.
-            if (chainFacetIdOf(producer.Id) is { } chainFacet)
-                return chain.Facets.FirstOrDefault(f => f.Id == chainFacet) is { } source ? withId(EzDataStateChecker.Count(source), id) : null;
-
-            int revision = resolver.RevisionOf(producer.Id, rulesetOnlineId);
-
-            if (!string.IsNullOrEmpty(producer.SystemId) && revision > 0)
-            {
-                var perHash = skillRows.GetValueOrDefault((producer.SystemId, rulesetOnlineId));
-                var states = new Dictionary<string, EzFacetRowState>(charts.Count, StringComparer.Ordinal);
-
-                if (perHash != null)
-                {
-                    foreach (var (hash, stored) in perHash)
-                    {
-                        if (!hashes.Contains(hash))
-                            continue;
-
-                        var values = new Dictionary<string, double>(StringComparer.Ordinal);
-                        bool stub = false;
-
-                        foreach (var row in stored)
-                        {
-                            if (row.AlgorithmVersion != revision)
-                                continue;
-
-                            if (row.State == (int)EzMetricState.Unrateable)
-                            {
-                                stub = true;
-                                continue;
-                            }
-
-                            values[row.SkillId] = row.Value;
-                        }
-
-                        // A partial axis set is work, not a result: the same completeness rule the write path uses
-                        // decides whether the rows describe the system. The producer declares that rule.
-                        bool complete = producer.IsCompleteFor(EzSkillSystems.UNSLICED_KEY, rulesetOnlineId, values);
-
-                        states[hash] = new EzFacetRowState(complete || stub ? revision : 0, stub);
-                    }
-                }
-
-                return EzDataStateChecker.Count(new EzDataStateFacet
-                {
-                    Id = id,
-                    Facet = declaredFacetOf(producer),
-                    CurrentRevision = revision,
-                    UniverseCount = charts.Count,
-                    Rows = states,
-                });
-            }
-
-            if (!EzMetricVariantReadout.HasStoredRating(producer.Id))
+            if (specs.Count == 0)
                 return null;
 
-            // Stored ratings carry no stamp: a filled field is the answer, an empty one is the work.
+            int revision = EzAnalysisRevision.VERSION;
+            var perHash = skillRows.GetValueOrDefault((EzSkillSystems.BEATMAP_PPP, rulesetOnlineId));
+            var states = new Dictionary<string, EzFacetRowState>(charts.Count, StringComparer.Ordinal);
+
+            if (perHash != null)
+            {
+                foreach (var (hash, stored) in perHash)
+                {
+                    var values = new HashSet<string>(StringComparer.Ordinal);
+
+                    foreach (var row in stored)
+                    {
+                        if (row.AlgorithmVersion == revision && row.State == (int)EzSkillRowState.Current)
+                            values.Add(row.SkillId);
+                    }
+
+                    bool complete = specs.All(spec => values.Contains(spec.ChartSkillId));
+                    states[hash] = new EzFacetRowState(complete ? revision : 0, false);
+                }
+            }
+
+            return EzDataStateChecker.Count(new EzDataStateFacet
+            {
+                Id = PPP_FACET,
+                CurrentRevision = revision,
+                UniverseCount = charts.Count,
+                Rows = states,
+            });
+        }
+
+        /// <summary>
+        /// The stored star / pp columns of one ruleset. These carry no revision, so a facet is either filled in or
+        /// absent: that is the question the read path asks of them.
+        /// </summary>
+        private static IEnumerable<EzFacetStatus> ratingFacetsOf(int rulesetOnlineId, IReadOnlyList<BeatmapInfo> charts)
+        {
+            yield return columnFacet(OFFICIAL_FACET, charts, static b => b.StarRating);
+
+            if (rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID)
+                yield break;
+
+            yield return columnFacet(SUNNY_FACET, charts, static b => b.EzRatingData.SunnySR);
+        }
+
+        private static EzFacetStatus columnFacet(string id, IReadOnlyList<BeatmapInfo> charts, Func<BeatmapInfo, double> valueOf)
+        {
             var filled = new Dictionary<string, EzFacetRowState>(charts.Count, StringComparer.Ordinal);
 
             foreach (var chart in charts)
             {
-                if (EzMetricVariantReadout.StoredRating(chart, producer.Id) >= 0)
+                if (valueOf(chart) >= 0)
                     filled[chart.Hash] = new EzFacetRowState(0, false);
             }
 
             return EzDataStateChecker.Count(new EzDataStateFacet
             {
                 Id = id,
-                Facet = declaredFacetOf(producer),
                 CurrentRevision = 0,
                 UniverseCount = charts.Count,
                 Rows = filled,
             });
         }
-
-        /// <summary>Chart-chain facet a producer's rows are counted as, or null when it owns its own storage.</summary>
-        private static string? chainFacetIdOf(EzMetricProducerId producer)
-            => producer == EzChartMetricProducer.Mina.Id() ? "MSD"
-                : producer == EzChartMetricProducer.Csi.Id() ? "CSI"
-                : producer == EzChartMetricProducer.Dan.Id() ? "Dan"
-                : null;
-
-        private static EzFacetStatus withId(EzFacetStatus source, string id)
-            => new EzFacetStatus
-            {
-                Id = id,
-                CurrentRevision = source.CurrentRevision,
-                Ready = source.Ready,
-                Settled = source.Settled,
-                Stale = source.Stale,
-                Missing = source.Missing,
-            };
-
-        private static EzAnalysisFacet declaredFacetOf(EzMetricProducer producer)
-            => producer.Id == EzChartMetricProducer.Csi.Id() ? EzAnalysisFacet.ChartSkillInfo
-                : producer.Id == EzChartMetricProducer.Dan.Id() ? EzAnalysisFacet.ChartDan
-                : producer.Id == EzChartMetricProducer.Mina.Id() ? EzAnalysisFacet.Msd
-                : producer.Id == EzChartMetricProducer.Ppp.Id() ? EzAnalysisFacet.PPP
-                : EzAnalysisFacet.None;
 
         /// <summary>All skill-value rows of the scanned charts, grouped by system, ruleset and then chart.</summary>
         private static Dictionary<(string SystemId, int RulesetOnlineId), Dictionary<string, List<EzBeatmapSkillValue>>> readSkillRows(

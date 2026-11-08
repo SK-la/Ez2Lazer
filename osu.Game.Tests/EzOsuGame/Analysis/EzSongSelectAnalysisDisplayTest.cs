@@ -5,7 +5,6 @@ using System;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Osu;
@@ -81,7 +80,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [Test]
         public void Default_result_has_no_axes()
         {
-            Assert.That(default(EzAnalysisResult).AxesOf(EzChartMetricProducer.Mina.Id()), Is.Empty);
+            Assert.That(default(EzAnalysisResult).AxesOf(EzAnalysisChannels.MINA), Is.Empty);
         }
 
         private static BeatmapInfo createOsuBeatmap(double performancePoints)

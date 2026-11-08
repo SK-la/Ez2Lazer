@@ -60,7 +60,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
         private static string csiDigest(EzManiaChartInput input)
         {
-            var info = EzChartSkillInfoComputer.Compute(input);
+            var info = EzCSIEngine.Compute(input);
             var builder = new StringBuilder();
 
             builder.Append("csi patterns=").Append(string.Join(',', info.Patterns))

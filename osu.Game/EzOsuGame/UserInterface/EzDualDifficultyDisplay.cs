@@ -7,7 +7,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
-using osu.Game.EzOsuGame.Metrics;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.UserInterface
@@ -125,6 +124,6 @@ namespace osu.Game.EzOsuGame.UserInterface
         /// carries a skill vector does; the analysis provider only decides the Sunny rating, not the pill's presence.
         /// </summary>
         public static bool ShouldShowSunnySRDisplay(BeatmapInfo beatmap)
-            => EzMetricVariantReadout.Selected(beatmap.Ruleset.OnlineID)?.ChartSkillProducer != null;
+            => EzRulesetReadout.Selected(beatmap.Ruleset.OnlineID)?.SkillRating != EzRatingSystem.None;
     }
 }

@@ -6,9 +6,9 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Beatmaps;
-using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -57,10 +57,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         public void StructureAndDanAreDeterministic()
         {
             ManiaBeatmap beatmap = createChart(4);
-            var input = EzChartSkillInfoComputer.FromPlayable(beatmap);
+            var input = EzCSIEngine.FromPlayable(beatmap);
 
-            var firstInfo = EzChartSkillInfoComputer.Compute(input);
-            var secondInfo = EzChartSkillInfoComputer.Compute(input);
+            var firstInfo = EzCSIEngine.Compute(input);
+            var secondInfo = EzCSIEngine.Compute(input);
 
             Assert.That(secondInfo.TechScore, Is.EqualTo(firstInfo.TechScore).Within(tolerance));
             Assert.That(secondInfo.ChordjackScore, Is.EqualTo(firstInfo.ChordjackScore).Within(tolerance));
@@ -92,10 +92,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         public void StructureInputIsStableAcrossPasses()
         {
             ManiaBeatmap beatmap = createChart(4);
-            var input = EzChartSkillInfoComputer.FromPlayable(beatmap);
+            var input = EzCSIEngine.FromPlayable(beatmap);
 
-            var first = EzChartSkillInfoComputer.Compute(input);
-            var second = EzChartSkillInfoComputer.Compute(input);
+            var first = EzCSIEngine.Compute(input);
+            var second = EzCSIEngine.Compute(input);
 
             Assert.That(second.TechScore, Is.EqualTo(first.TechScore).Within(tolerance));
             Assert.That(second.JackShare ?? 0, Is.EqualTo(first.JackShare ?? 0).Within(tolerance));

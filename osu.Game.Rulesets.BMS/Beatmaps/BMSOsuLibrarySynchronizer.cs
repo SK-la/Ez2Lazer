@@ -6,7 +6,7 @@ using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ExternalLibraries;
 using osu.Game.Database;
-using osu.Game.EzOsuGame.Metrics;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Models;
 using Realms;
 

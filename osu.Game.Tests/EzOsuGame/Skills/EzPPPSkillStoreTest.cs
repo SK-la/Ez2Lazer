@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.Rulesets;
@@ -24,7 +25,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 const string hash = "ppp-version-hash";
                 string aim = EzPPPSkillAxis.Aim.ToChartSkillId();
                 string speed = EzPPPSkillAxis.Speed.ToChartSkillId();
-                int staleBundle = EzPPPSkillVersions.ForRuleset(0) - 1;
+                int staleBundle = EzAnalysisRevision.VERSION - 1;
 
                 store.WriteBeatmapSystemSkills(
                     hash,
@@ -37,7 +38,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     skillVersions: new Dictionary<string, int>
                     {
                         [aim] = staleBundle,
-                        [speed] = EzPPPSkillVersions.ForRuleset(0),
+                        [speed] = EzAnalysisRevision.VERSION,
                     });
 
                 var beatmapInfo = new BeatmapInfo

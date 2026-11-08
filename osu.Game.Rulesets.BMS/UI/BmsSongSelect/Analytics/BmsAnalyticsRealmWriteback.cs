@@ -4,7 +4,7 @@
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
-using osu.Game.EzOsuGame.Metrics;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Rulesets.BMS.Beatmaps;
 
 namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics

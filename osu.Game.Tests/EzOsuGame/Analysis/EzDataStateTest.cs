@@ -21,7 +21,6 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             var facet = new EzDataStateFacet
             {
                 Id = "Test",
-                Facet = EzAnalysisFacet.Msd,
                 CurrentRevision = 7,
                 UniverseCount = 6,
                 Rows = new Dictionary<string, EzFacetRowState>

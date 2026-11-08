@@ -7,7 +7,6 @@ using System.Threading;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.LeoBlack;
 using osu.Game.EzOsuGame.Skills.Mina;
@@ -82,7 +81,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var chart = buildChart(keyCount, holdRatio);
             var notes = chart.Notes;
 
-            Assert.That(EzChartSkillInfoComputer.Compute(chart).KeyCount, Is.EqualTo(keyCount));
+            Assert.That(EzCSIEngine.Compute(chart).KeyCount, Is.EqualTo(keyCount));
 
             // Pin the interpreter/wasm module before the first timed run.
             var rows = EzMinaNoteConverter.Convert(notes);
@@ -91,7 +90,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             var features = EzPerfMeasurer.Measure("features", runs, () => EzChartFeatureExtractor.Extract(chart));
             var patterns = EzPerfMeasurer.Measure("patterns", runs, () => EzPatternAnalyzer.Analyze(chart));
-            var csi = EzPerfMeasurer.Measure("csi", runs, () => EzChartSkillInfoComputer.Compute(chart));
+            var csi = EzPerfMeasurer.Measure("csi", runs, () => EzCSIEngine.Compute(chart));
             var leoblack = EzPerfMeasurer.Measure("leoblack", runs, () => EzLeoBlackPatternAnalyzer.TryAnalyze(chart));
             var minaRows = EzPerfMeasurer.Measure("mina rows", runs, () => EzMinaNoteConverter.Convert(notes));
 
@@ -179,7 +178,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         public void ReportAndGuardDanCost(int keyCount, double holdRatio)
         {
             var chart = buildChart(keyCount, holdRatio);
-            var info = EzChartSkillInfoComputer.Compute(chart);
+            var info = EzCSIEngine.Compute(chart);
             var msd = computeMsd(chart, keyCount);
             int holdCount = countHolds(chart);
 
@@ -337,7 +336,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         private static void runChain(EzManiaChartInput chart, int keyCount, double holdRatio, int holdCount)
         {
             var msd = computeMsd(chart, keyCount);
-            var info = EzChartSkillInfoComputer.Compute(chart);
+            var info = EzCSIEngine.Compute(chart);
 
             EzPersistedChartDan.TryComputeFromStored("chain-hash", Guid.Empty, msd, keyCount, holdRatio, 12.5, info, holdCount);
         }
@@ -372,18 +371,18 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 holds[column] = 10 + column;
             }
 
-            var axes = new Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>();
+            var axes = new Dictionary<string, IReadOnlyDictionary<string, double>>();
 
             foreach (var producer in new[]
                      {
-                         EzChartMetricProducer.Mina,
-                         EzChartMetricProducer.Ppp,
-                         EzChartMetricProducer.Csi,
-                         EzChartMetricProducer.Ssr,
-                         EzChartMetricProducer.Official,
-                         EzChartMetricProducer.PppPerformance,
-                         EzChartMetricProducer.SsrPerformance,
-                         EzChartMetricProducer.OfficialPerformance,
+                         EzAnalysisChannels.MINA,
+                         EzAnalysisChannels.PPP,
+                         EzAnalysisChannels.CSI,
+                         EzAnalysisChannels.SUNNY,
+                         EzAnalysisChannels.OFFICIAL,
+                         EzAnalysisChannels.PPP_PERFORMANCE,
+                         EzAnalysisChannels.SUNNY_PERFORMANCE,
+                         EzAnalysisChannels.OFFICIAL_PERFORMANCE,
                      })
             {
                 var values = new Dictionary<string, double>(StringComparer.Ordinal);
@@ -391,7 +390,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 for (int axis = 0; axis < 10; axis++)
                     values[$"axis-{axis}"] = axis + (seed % 7);
 
-                axes[producer.Id()] = values;
+                axes[producer] = values;
             }
 
             var sides = new Dictionary<EzDanSide, EzDanEntry>

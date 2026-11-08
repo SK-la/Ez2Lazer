@@ -24,9 +24,6 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <summary>Stable key, also the label a report renders (<c>MSD</c>, <c>CSI</c>, <c>Dan</c>, ...).</summary>
         public required string Id { get; init; }
 
-        /// <summary>The declaration this facet belongs to, tying the readout back to the revision model.</summary>
-        public required EzAnalysisFacet Facet { get; init; }
-
         /// <summary>Revision a row must carry to count as current.</summary>
         public required int CurrentRevision { get; init; }
 

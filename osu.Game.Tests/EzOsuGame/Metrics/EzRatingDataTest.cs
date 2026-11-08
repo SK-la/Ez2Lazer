@@ -3,7 +3,7 @@
 
 using NUnit.Framework;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Metrics;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.Rulesets.Mania;
 
@@ -74,7 +74,7 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
             var beatmap = maniaBeatmap();
             beatmap.StarRating = 4.2;
 
-            Assert.That(EzMetricVariantReadout.StoredRating(beatmap, EzChartMetricProducer.Official.Id()), Is.EqualTo(4.2));
+            Assert.That(EzRulesetReadout.StoredRating(beatmap, EzRatingSystem.Official, EzRatingField.SR), Is.EqualTo(4.2));
         }
 
         [Test]

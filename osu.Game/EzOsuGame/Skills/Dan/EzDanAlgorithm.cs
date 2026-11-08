@@ -6,18 +6,13 @@ using osu.Game.EzOsuGame.Configuration;
 namespace osu.Game.EzOsuGame.Skills.Dan
 {
     /// <summary>
-    /// Bump when player-dan aggregation / side headline fold / clear credit semantics change
-    /// (not <see cref="osu.Game.Database.RealmAccess.EZ_REALM_SCHEMA_VERSION"/>).
-    /// Independent from <see cref="EzMinaSkillAlgorithm.VERSION"/>. Reads via <see cref="EzChartSkillStore"/> filter on this value.
-    /// v2: side <c>GetDan</c> uses hub anchor/mean fold (<see cref="EzDanSideHeadline"/>).
-    /// v3: hub clear gates + (hash,rate) dedupe; <see cref="CLEAR_WINDOW"/>=20 + <see cref="EzDanClearWindow"/> weighting.
-    /// v4: 5K / 8K–18K chart dan comes from the 4K ssrinterval table (<see cref="EzDanLabels.TryResolveFallbackDan"/>)
-    /// instead of the raw 4K MSD means table, which inflated those keymodes by several levels.
+    /// Chart classification policy for dan: which side a chart is filed under, and how player clears fold.
     /// </summary>
+    /// <remarks>
+    /// Content, not revision: these thresholds are gated by the single <see cref="Analysis.EzAnalysisRevision.VERSION"/>.
+    /// </remarks>
     public static class EzDanAlgorithm
     {
-        public const int VERSION = 4;
-
         // --- Player clear aggregation (hub clear window) ---
         public const int CLEAR_QUORUM = 4;
 
@@ -62,7 +57,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// Ez ChartDan / DualPanel LN half: write when hold count &gt; <see cref="LnChartMinHoldObjects"/>
         /// or hold ratio reaches hub primary line. RC half is always eligible (callers skip this for RC).
         /// Pass <paramref name="holdCount"/> &lt; 0 when unknown (ratio-only).
-        /// Prefer <see cref="EzChartDanEstimator.TryHoldCountFromBeatmapInfo"/> (same Realm ints as song-select <c>ln&gt;</c>).
+        /// Prefer <see cref="EzDanEngine.TryHoldCountFromBeatmapInfo"/> (same Realm ints as song-select <c>ln&gt;</c>).
         /// </summary>
         public static bool AllowsPersistedChartLnHalf(int keyCount, double holdRatio, int holdCount = -1)
         {

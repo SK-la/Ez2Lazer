@@ -7,7 +7,6 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 using Realms;
 
@@ -199,7 +198,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
                 msdRowsForReader.Add(value);
 
-                if (value.AlgorithmVersion != msdRevision || value.State != (int)EzMetricState.Current)
+                if (value.AlgorithmVersion != msdRevision || value.State != (int)EzSkillRowState.Current)
                     continue;
 
                 if (!msdSkillsAtRevision.TryGetValue(value.BeatmapHash, out var skills))
@@ -216,7 +215,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 static v => v.BeatmapHash,
                 static v => v.AlgorithmVersion,
                 msdRevision,
-                static v => v.State == (int)EzMetricState.Unrateable);
+                static v => v.State == (int)EzSkillRowState.Unrateable);
 
             var csiRows = EzRealmFacetReader.Read(
                 r.All<EzBeatmapChartSkillInfo>()
@@ -229,7 +228,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
             // ChartDan has no settled-miss row form, so no row of it is a stub.
             var danRows = EzRealmFacetReader.Read(
-                r.All<EzBeatmapChartDan>()
+                r.All<EzChartDan>()
                  .AsEnumerable()
                  .Where(v => rateableBeatmapIds.ContainsKey(v.BeatmapHash)),
                 static v => v.BeatmapHash,
@@ -258,7 +257,6 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 new EzDataStateFacet
                 {
                     Id = "MSD",
-                    Facet = EzAnalysisFacet.Msd,
                     CurrentRevision = msdRevision,
                     UniverseCount = universe,
                     Rows = msdRows,
@@ -266,7 +264,6 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 new EzDataStateFacet
                 {
                     Id = "CSI",
-                    Facet = EzAnalysisFacet.ChartSkillInfo,
                     CurrentRevision = csiRevision,
                     UniverseCount = universe,
                     Rows = csiRows,
@@ -275,7 +272,6 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 new EzDataStateFacet
                 {
                     Id = "Dan",
-                    Facet = EzAnalysisFacet.ChartDan,
                     CurrentRevision = danRevision,
                     UniverseCount = universe,
                     Rows = danRows,
@@ -310,7 +306,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 if (!msdRows.TryGetValue(hash, out var state) || state.CurrentStub)
                     continue;
 
-                if (EzBeatmapMinaComputer.IsCurrentMinaCache(skills))
+                if (EzMSDUnit.IsCurrentMinaCache(skills))
                     complete[hash] = skills;
             }
 
@@ -319,7 +315,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         /// <summary>
         /// Charts whose complete MSD resolves to no dan: the dan stage's own write gate
-        /// (<see cref="EzChartDanEstimator.FromMsd"/> resolving nothing) applied to the inputs that stage reads.
+        /// (<see cref="EzDanEngine.FromMsd"/> resolving nothing) applied to the inputs that stage reads.
         /// </summary>
         private static HashSet<string> deriveUnresolvableChartDan(
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, double>> completeMsdSkills,
@@ -339,7 +335,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 // The hold ratio is a hitobject ratio carried on the scan-time meta, not a stored metric.
                 double holdRatio = meta.HoldRatio;
 
-                if (EzChartDanEstimator.FromMsd(msd, keyCount, holdRatio, meta.SunnyStarRating) == null)
+                if (EzDanEngine.FromMsd(msd, keyCount, holdRatio, meta.SunnyStarRating) == null)
                     unresolvable.Add(hash);
             }
 

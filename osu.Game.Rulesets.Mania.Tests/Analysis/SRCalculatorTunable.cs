@@ -16,7 +16,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
 {
     public static class SRCalculatorTunable
     {
-        // Tunable parameters (defaults mirror original SRCalculator)
+        // Tunable parameters (defaults mirror original EzSSREngine)
         public static class Tunables
         {
             // keyUsage / anchor
@@ -46,7 +46,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
             public static double FinalScale = 0.975; // original
         }
 
-        // Public API similar to SRCalculator
+        // Public API similar to EzSSREngine
         public static double CalculateSR(IBeatmap beatmap)
         {
             return computeInternalSunnySR(beatmap, 1.0).sr;

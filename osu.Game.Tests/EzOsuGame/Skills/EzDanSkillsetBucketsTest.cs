@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.SkillTag;
@@ -251,7 +252,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Accuracy = 0.98,
                 Rate = 1,
                 ScoredAt = DateTimeOffset.UtcNow,
-                AlgorithmVersion = EzDanAlgorithm.VERSION,
+                AlgorithmVersion = EzAnalysisRevision.VERSION,
             };
     }
 }

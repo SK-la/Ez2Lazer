@@ -101,7 +101,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var notes = Enumerable.Range(0, 40)
                                   .Select(i => new EzManiaNote(i * 50, i % 7, false, i * 50))
                                   .ToList();
-            Assert.That(EzChartSkillInfoComputer.EzCSIMotionComputer.Compute(notes, 7), Is.Null);
+            Assert.That(EzCSIEngine.EzCSIMotionComputer.Compute(notes, 7), Is.Null);
         }
 
         [Test]
@@ -118,7 +118,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 t += 80;
             }
 
-            var motion = EzChartSkillInfoComputer.EzCSIMotionComputer.Compute(notes, 4);
+            var motion = EzCSIEngine.EzCSIMotionComputer.Compute(notes, 4);
             Assert.That(motion, Is.Not.Null);
             Assert.That(motion!.RhythmBreak, Is.InRange(0, 1));
             Assert.That(motion.SameHand, Is.InRange(0, 1));
@@ -179,7 +179,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 TimingPoints = new[] { new EzManiaTimingPoint(0, 400) },
             };
 
-            var info = EzChartSkillInfoComputer.Compute(chart);
+            var info = EzCSIEngine.Compute(chart);
             Assert.That(info.KeyCount, Is.EqualTo(4));
             Assert.That(info.DanEligible, Is.True);
             Assert.That(info.LnRatio, Is.EqualTo(0));

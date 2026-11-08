@@ -18,7 +18,6 @@ using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.Online.API;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;

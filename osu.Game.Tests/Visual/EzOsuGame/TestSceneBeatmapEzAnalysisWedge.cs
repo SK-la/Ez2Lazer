@@ -10,6 +10,7 @@ using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Framework.Utils;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Overlays;
@@ -235,7 +236,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 -1,
                 -1,
                 -1,
-                EzDanAlgorithm.VERSION,
+                EzAnalysisRevision.VERSION,
                 DateTimeOffset.UtcNow));
         }
     }

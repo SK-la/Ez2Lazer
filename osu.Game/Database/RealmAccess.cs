@@ -24,8 +24,8 @@ using osu.Game.Beatmaps.ExternalLibraries;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Input;
 using osu.Game.Input.Bindings;
@@ -127,13 +127,13 @@ namespace osu.Game.Database
         /// Ez v8: Add mania skill RealmObjects (EzBeatmapSkillValue, EzPlayerSkillValue, EzDanEstimate,
         /// EzPlayerSkillHistoryPoint) with extended dan/provisional fields; RulesetInfo.LastAppliedManiaSkillVersion.
         /// Ez v9: Add typed EzBeatmapChartSkillInfo + EzPlayerDanSkillsetValue (no JSON blobs).
-        /// Ez v10: Add EzBeatmapChartDan (nomod chart-dan + skillset label stamps).
+        /// Ez v10: Add EzChartDan (nomod chart-dan + skillset label stamps).
         /// Ez v11: Reorder EzEnumJudgeMode/EzEnumHealthMode (StableClassic = 1; Mania private modes at 31+);
         ///         add canonical ScoreInfo.JudgeMode/HealthMode columns and migrate the legacy ManiaHitMode/ManiaHealthMode data into them.
         /// </summary>
         /// <remarks>
         /// BeatmapInfo's per-system rating columns were replaced by the embedded
-        /// <see cref="EzOsuGame.Metrics.EzRatingData"/> as part of v12: the v11-to-v12 migration creates the record
+        /// <see cref="EzRatingData"/> as part of v12: the v11-to-v12 migration creates the record
         /// for every existing row, so the version number itself does not change.
         /// </remarks>
         public const int EZ_REALM_SCHEMA_VERSION = 12;
@@ -1624,7 +1624,7 @@ namespace osu.Game.Database
                     break;
 
                 case 10:
-                    // EzBeatmapChartDan is new and starts empty (BDSP / maintenance warm).
+                    // EzChartDan is new and starts empty (BDSP / maintenance warm).
                     break;
 
                 case 11:

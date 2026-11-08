@@ -18,7 +18,6 @@ using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
@@ -258,48 +257,47 @@ namespace osu.Game.EzOsuGame.Analysis
         /// Official difficulty the caller already holds from <see cref="BeatmapDifficultyCache"/>; used only when
         /// the selected system is the official one.
         /// </param>
-        public EzMetricVariantValues ReadVariantValues(BeatmapInfo beatmap, IReadOnlyList<Mod>? mods = null, in EzMetricVariantValues officialLive = default)
+        public EzReadoutValues ReadVariantValues(BeatmapInfo beatmap, IReadOnlyList<Mod>? mods = null, in EzReadoutValues officialLive = default)
         {
             ArgumentNullException.ThrowIfNull(beatmap);
 
-            var variant = EzMetricVariantReadout.Selected(beatmap.Ruleset.OnlineID);
+            var readout = EzRulesetReadout.Selected(beatmap.Ruleset.OnlineID);
 
-            if (variant == null)
-                return EzMetricVariantValues.Empty;
+            if (readout is not { } selected)
+                return EzReadoutValues.Empty;
 
             var live = TryGet(beatmap, mods) is { } analysis
-                ? variantValuesOf(analysis, variant)
-                : EzMetricVariantValues.Empty;
+                ? variantValuesOf(analysis, selected)
+                : EzReadoutValues.Empty;
 
-            if (EzMetricVariantReadout.IsOfficial(variant))
+            if (EzRulesetReadout.IsOfficial(selected))
             {
-                live = new EzMetricVariantValues(
+                live = new EzReadoutValues(
                     officialLive.Star ?? live.Star,
                     officialLive.PerformancePoints ?? live.PerformancePoints,
                     live.SkillStar);
             }
 
-            return EzMetricVariantReadout.Read(beatmap, variant, live);
+            return EzRulesetReadout.Read(beatmap, selected, live);
         }
 
-        private static EzMetricVariantValues variantValuesOf(in EzAnalysisResult analysis, EzMetricVariant variant)
+        private static EzReadoutValues variantValuesOf(in EzAnalysisResult analysis, EzReadout readout)
         {
-            double? star = positiveAxis(analysis, variant.StarProducer, EzMetricAxisIds.STAR_RATING);
+            string starChannel = EzRulesetReadout.ChannelOf(readout.Rating);
+            double? star = positiveAxis(analysis, starChannel, EzAnalysisChannels.STAR_RATING);
+            double? performancePoints = positiveAxis(analysis, starChannel, EzAnalysisChannels.PERFORMANCE_POINTS);
 
-            double? performancePoints = variant.PerformanceProducer is { } performanceProducer
-                ? positiveAxis(analysis, performanceProducer, EzMetricAxisIds.PERFORMANCE_POINTS)
-                : null;
+            string skillChannel = EzRulesetReadout.ChannelOf(readout.SkillRating);
+            double? skillStar = readout.SkillRating == EzRatingSystem.None
+                ? null
+                : positiveAxis(analysis, skillChannel, EzRulesetReadout.RatingAxisOf(readout.SkillRating));
 
-            double? skillStar = variant.ChartSkillProducer is { } chartProducer
-                ? positiveAxis(analysis, chartProducer, EzMetricVariantReadout.RatingAxisOf(chartProducer))
-                : null;
-
-            return new EzMetricVariantValues(star, performancePoints, skillStar);
+            return new EzReadoutValues(star, performancePoints, skillStar);
         }
 
         /// <summary>A measured scalar is only shown when it is a real value; an empty chart reads as absent.</summary>
-        private static double? positiveAxis(in EzAnalysisResult analysis, EzMetricProducerId producer, string axisId)
-            => analysis.AxesOf(producer).TryGetValue(axisId, out double value) && double.IsFinite(value) && value > 0 ? value : null;
+        private static double? positiveAxis(in EzAnalysisResult analysis, string channel, string axisId)
+            => analysis.AxesOf(channel).TryGetValue(axisId, out double value) && double.IsFinite(value) && value > 0 ? value : null;
 
         public bool TryGetSunnySR(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double sunnySR)
             => analysisDatabase.TryGetSunnySR(beatmapInfo, rulesetInfo, out sunnySR);

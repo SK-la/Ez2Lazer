@@ -7,7 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Metrics;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Utils;
 
@@ -66,7 +66,7 @@ namespace osu.Game.Screens.Select
                 // The star and pp ranges filter on the analysis system this beatmap's ruleset is set to. A system
                 // whose baseline has not been written yet falls back to the official value so the range does not
                 // silently hide the whole library.
-                var values = EzMetricVariantReadout.SelectedValues(beatmap);
+                var values = EzRulesetReadout.SelectedValues(beatmap);
                 double starDifficultyForFilter = values.Star ?? beatmap.StarRating;
 
                 if (operationDifficulties != null && operationDifficulties.TryGetValue(beatmap, out double operationDifficulty))
@@ -198,7 +198,7 @@ namespace osu.Game.Screens.Select
         }
 
         private static double? tryGetPpForFilter(BeatmapInfo beatmap, IReadOnlyDictionary<BeatmapInfo, double>? operationPpValues,
-                                                 in EzMetricVariantValues selected)
+                                                 in EzReadoutValues selected)
         {
             if (operationPpValues != null && operationPpValues.TryGetValue(beatmap, out double pp))
                 return pp;

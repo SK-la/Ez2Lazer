@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
@@ -28,9 +27,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         public void Read_path_does_not_compute_when_the_analysis_is_absent()
         {
             var lookup = new FakeLookup();
-            var estimator = new EzChartDanEstimator(lookup);
+            var unit = new EzDanUnit(lookup);
 
-            Assert.That(estimator.TryEstimate(maniaBeatmap(), Array.Empty<Mod>()), Is.Null);
+            Assert.That(unit.TryEstimate(maniaBeatmap(), Array.Empty<Mod>()), Is.Null);
             Assert.That(lookup.ComputeCalls, Is.Zero);
         }
 
@@ -38,9 +37,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         public void Read_path_uses_the_shared_analysis_when_present()
         {
             var lookup = new FakeLookup { Cached = analysis() };
-            var estimator = new EzChartDanEstimator(lookup);
+            var unit = new EzDanUnit(lookup);
 
-            var verdict = estimator.TryEstimate(maniaBeatmap(), Array.Empty<Mod>());
+            var verdict = unit.TryEstimate(maniaBeatmap(), Array.Empty<Mod>());
 
             Assert.That(verdict, Is.Not.Null);
             Assert.That(lookup.ComputeCalls, Is.Zero);
@@ -50,9 +49,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         public void Batch_path_fills_the_store_and_reads_the_result_of_that_fill()
         {
             var lookup = new FakeLookup { ComputeResult = analysis() };
-            var estimator = new EzChartDanEstimator(lookup);
+            var unit = new EzDanUnit(lookup);
 
-            var verdict = estimator.TryEstimateOrCompute(maniaBeatmap(), Array.Empty<Mod>());
+            var verdict = unit.TryEstimateOrCompute(maniaBeatmap(), Array.Empty<Mod>());
 
             Assert.That(verdict, Is.Not.Null);
             Assert.That(lookup.ComputeCalls, Is.EqualTo(1));
@@ -62,11 +61,11 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         public void Verdict_is_derived_from_the_axis_table_of_the_analysis()
         {
             var lookup = new FakeLookup { Cached = analysis() };
-            var estimator = new EzChartDanEstimator(lookup);
+            var unit = new EzDanUnit(lookup);
             var beatmap = maniaBeatmap();
 
-            var fromAnalysis = estimator.TryEstimate(beatmap, Array.Empty<Mod>());
-            var fromSameAxes = EzChartDanEstimator.FromMsd(
+            var fromAnalysis = unit.TryEstimate(beatmap, Array.Empty<Mod>());
+            var fromSameAxes = EzDanEngine.FromMsd(
                 storedAxes(),
                 (int)Math.Round(beatmap.Difficulty.CircleSize),
                 EzHoldMetrics.HoldRatio(beatmap));
@@ -78,9 +77,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [Test]
         public void Estimator_without_a_lookup_has_no_live_source()
         {
-            var estimator = new EzChartDanEstimator();
-            Assert.That(estimator.TryEstimate(maniaBeatmap(), Array.Empty<Mod>()), Is.Null);
-            Assert.That(estimator.TryEstimateOrCompute(maniaBeatmap(), Array.Empty<Mod>()), Is.Null);
+            var unit = new EzDanUnit();
+            Assert.That(unit.TryEstimate(maniaBeatmap(), Array.Empty<Mod>()), Is.Null);
+            Assert.That(unit.TryEstimateOrCompute(maniaBeatmap(), Array.Empty<Mod>()), Is.Null);
         }
 
         [Test]
@@ -134,9 +133,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 [EzMinaSkillAxis.JackSpeed.ToId()] = 16,
             };
 
-            var table = new Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>
+            var table = new Dictionary<string, IReadOnlyDictionary<string, double>>
             {
-                [EzChartMetricProducer.Mina.Id()] = axes,
+                [EzAnalysisChannels.MINA] = axes,
             };
 
             // The pass resolves the sides once; the estimator is expected to read that, not derive its own.

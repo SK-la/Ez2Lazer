@@ -54,7 +54,6 @@ using osu.Game.EzOsuGame.Fonts;
 using osu.Game.EzOsuGame.Input;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.LocalProfile;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Playback;
@@ -476,36 +475,30 @@ namespace osu.Game
             ReplaySession = new EzReplaySessionRouter(RulesetStore.AvailableRulesets, BeatmapManager);
             dependencies.CacheAs<IEzReplaySession>(ReplaySession);
 
-            // Skill metrics: one declaration drives both the storage keys and the ruleset profile.
-            // Mania: MSD / SunnySR / pattern / Dan. PPP chart / player skills cover osu, taiko, catch, and mania.
-            var metricResolver = new EzMetricRevisionResolver(
-                EzChartMetricProducers.CreateRegistry(new EzRealmUpstreamRevisions(RulesetStore)),
-                EzPlayerMetricProducers.CreateRegistry());
-            EzAnalysisRevision.Configure(metricResolver);
             var localProfileDatabase = new EzLocalProfileDatabase(Storage);
             var localProfileStore = new EzLocalProfileStore(localProfileDatabase);
-            var chartSkillStore = new EzChartSkillStore(realm, metricResolver);
+            var chartSkillStore = new EzChartSkillStore(realm);
             var playerSkillStore = new EzPlayerSkillStore(localProfileDatabase);
             EzPlayerSkillStore.Configure(playerSkillStore);
             var pppEngine = new EzPPPEngine();
 
-            var beatmapMsdComputer = new EzBeatmapMinaComputer(BeatmapManager, chartSkillStore);
-            var beatmapPppComputer = new EzBeatmapPPPComputer(BeatmapManager, chartSkillStore, pppEngine);
-            var chartDanEstimator = new EzChartDanEstimator(ezAnalysisCache);
+            var msdUnit = new EzMSDUnit(BeatmapManager, chartSkillStore);
+            var pppUnit = new EzPPPUnit(BeatmapManager, chartSkillStore, pppEngine);
+            var chartDanUnit = new EzDanUnit(ezAnalysisCache);
 
             var playerPPPAggregator = new EzPlayerPPPAggregator(BeatmapManager, playerSkillStore, pppEngine);
 
             var playerRatingAggregator = new EzPlayerRatingAggregator(BeatmapManager, playerSkillStore, chartSkillStore, localProfileStore);
-            var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanEstimator, playerSkillStore, chartSkillStore, localProfileStore);
-            var skillProvider = new EzSkillProvider(chartSkillStore, playerSkillStore, metricResolver, chartDanEstimator, localProfileStore, BeatmapManager, liveMetrics);
+            var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanUnit, playerSkillStore, chartSkillStore, localProfileStore);
+            var skillProvider = new EzSkillProvider(chartSkillStore, playerSkillStore, chartDanUnit, localProfileStore, BeatmapManager, liveMetrics);
 
             // Only the types something actually resolves through DI are cached. Writers and aggregators are
             // constructed here and passed as arguments; caching them would leave entries nothing ever reads.
             dependencies.Cache(chartSkillStore);
             dependencies.Cache(playerSkillStore);
             dependencies.Cache(skillProvider);
-            dependencies.Cache(beatmapMsdComputer);
-            dependencies.Cache(beatmapPppComputer);
+            dependencies.Cache(msdUnit);
+            dependencies.Cache(pppUnit);
 
             dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, playerRatingAggregator, playerDanAggregator, localProfileStore,
                 skillProvider, playerPPPAggregator, ezAnalysisCache));

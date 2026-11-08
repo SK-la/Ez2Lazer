@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 
@@ -112,8 +111,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
     public readonly record struct EzAnalysisResult
     {
-        private static readonly IReadOnlyDictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>> no_axes
-            = new Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>();
+        private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, double>> no_axes
+            = new Dictionary<string, IReadOnlyDictionary<string, double>>();
 
         private static readonly IReadOnlyDictionary<string, double> no_axis_values
             = new Dictionary<string, double>(StringComparer.Ordinal);
@@ -124,17 +123,17 @@ namespace osu.Game.EzOsuGame.Analysis
         public readonly EzManiaSummary? ManiaSummary;
         public readonly EzBeatmapTagSummary? TagSummary;
 
-        private readonly IReadOnlyDictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>? axes;
+        private readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, double>>? axes;
 
         /// <summary>
-        /// Axis values grouped by the producer that emitted them, keyed by bare axis id.
+        /// Axis values grouped by the channel that emitted them, keyed by bare axis id.
         /// </summary>
         /// <remarks>
-        /// A producer missing from this table did not run for this chart; one present with no entries ran
+        /// A channel missing from this table did not run for this chart; one present with no entries ran
         /// and had nothing to say. Never null: a <c>default</c> result (a bindable's pre-computation value) has no
         /// table at all, and consumers must read "no axes" rather than crash on it.
         /// </remarks>
-        public IReadOnlyDictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>> Axes => axes ?? no_axes;
+        public IReadOnlyDictionary<string, IReadOnlyDictionary<string, double>> Axes => axes ?? no_axes;
 
         /// <summary>Dan estimates for the sides this chart can be rated on.</summary>
         public readonly EzDanSet? Dan;
@@ -151,7 +150,7 @@ namespace osu.Game.EzOsuGame.Analysis
         public readonly EzChartSkillInfo? ChartSkillInfo;
 
         public EzAnalysisResult(KpsSummary commonSummary, EzManiaSummary? maniaSummary = null, EzBeatmapTagSummary? tagSummary = null,
-                                IReadOnlyDictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>? axes = null,
+                                IReadOnlyDictionary<string, IReadOnlyDictionary<string, double>>? axes = null,
                                 EzDanSet? dan = null, EzRulesetSpecificRadarResult? radar = null,
                                 EzChartSkillInfo? chartSkillInfo = null)
         {
@@ -168,8 +167,11 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public IReadOnlyList<double> KpsList => CommonSummary?.KpsList ?? Array.Empty<double>();
 
-        /// <summary>Axis values of one producer, empty when it did not run.</summary>
-        public IReadOnlyDictionary<string, double> AxesOf(EzMetricProducerId producer) => Axes.GetValueOrDefault(producer, no_axis_values);
+        /// <summary>Axis values of one channel, empty when it did not run.</summary>
+        public IReadOnlyDictionary<string, double> AxesOf(string channel) => Axes.GetValueOrDefault(channel, no_axis_values);
+
+        /// <summary>Axis values of the channel a stored skill namespace is read back under.</summary>
+        public IReadOnlyDictionary<string, double> AxesOfSystem(string systemId) => AxesOf(EzAnalysisChannels.ChannelOfSystem(systemId));
 
         public EzAnalysisResult WithTagSummary(EzBeatmapTagSummary? tagSummary) => CommonSummary is KpsSummary commonSummary
             ? new EzAnalysisResult(commonSummary, ManiaSummary, tagSummary, Axes, Dan, Radar, ChartSkillInfo)

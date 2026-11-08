@@ -32,7 +32,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
     /// <summary>
     ///     Star Rating calculator – C# port of the official Python implementation.
     /// </summary>
-    public class SRCalculator
+    public class EzSSREngine
     {
         /// <summary>
         ///     Star rating above which the high-end rescale applies, from <c>Ez2Setting.SsrRescaleThreshold</c>.

@@ -88,15 +88,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public LocalisableString ResolveDisplayName(string skillId)
         {
-            foreach (var item in provider.PlayerRegistry.Items(EzLocalProfileConstants.OSU_RULESET_ID))
-            {
-                if (item.SkillId == skillId)
-                    return item.Axis.DisplayName;
-            }
+            if (EzOsuSkillAxisExtensions.TryParse(skillId, out var axis))
+                return axis.Chip().Name;
 
-            return EzOsuSkillAxisExtensions.TryParse(skillId, out var axis)
-                ? axis.Chip().Name
-                : skillId;
+            return skillId;
         }
 
         public void ConfigureSidePanel(EzHUDDanDualPanel danPanel, BindableInt selectedSlice, string username)

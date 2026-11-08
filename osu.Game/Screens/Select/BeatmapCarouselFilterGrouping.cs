@@ -7,9 +7,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Extensions.IEnumerableExtensions;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Localisation;
 using osu.Game.Rulesets;
@@ -96,7 +96,7 @@ namespace osu.Game.Screens.Select
                     if (operationDifficulties != null && operationDifficulties.TryGetValue(beatmap, out double difficulty))
                         return difficulty;
 
-                    return EzMetricVariantReadout.SelectedValues(beatmap).Star ?? beatmap.StarRating;
+                    return EzRulesetReadout.SelectedValues(beatmap).Star ?? beatmap.StarRating;
                 }
 
                 double? getPp(BeatmapInfo beatmap)

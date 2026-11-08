@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills.Dan;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
@@ -54,7 +55,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Side = "rc",
             Rate = rate,
             CreditedDan = dan,
-            AlgorithmVersion = EzDanAlgorithm.VERSION,
+            AlgorithmVersion = EzAnalysisRevision.VERSION,
         };
     }
 }

@@ -40,7 +40,7 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             ArgumentNullException.ThrowIfNull(playable);
 
-            var chart = EzChartSkillInfoComputer.FromPlayable(playable, cancellationToken);
+            var chart = EzCSIEngine.FromPlayable(playable, cancellationToken);
             int holds = 0;
             int scanned = 0;
 

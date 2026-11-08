@@ -4,7 +4,7 @@
 using System;
 using osu.Game.Beatmaps;
 
-namespace osu.Game.EzOsuGame.Metrics
+namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
     /// The one write path for the star rating and pp each analysis system gives a chart.

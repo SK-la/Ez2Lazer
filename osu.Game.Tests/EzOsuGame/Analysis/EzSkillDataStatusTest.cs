@@ -69,7 +69,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 store.UpsertChartDan(chartDan(mania_a));
                 store.UpsertChartDan(chartDan(mania_b));
 
-                realm.Write(r => r.Add(new EzBeatmapChartDan
+                realm.Write(r => r.Add(new EzChartDan
                 {
                     BeatmapHash = mania_c,
                     AlgorithmVersion = EzAnalysisRevision.ChartDan - 1,

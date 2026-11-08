@@ -16,7 +16,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
@@ -429,7 +428,7 @@ namespace osu.Game.EzOsuGame.HUD
                                          ? chartDan.KeyCount
                                          : KeyCount.Value;
 
-                                     double overall = result.AxesOf(EzChartMetricProducer.Mina.Id())
+                                     double overall = result.AxesOf(EzAnalysisChannels.MINA)
                                                             .GetValueOrDefault(EzMinaSkillAxis.Overall.ToId(), 0);
 
                                      applyLive(result.Dan, overall, liveKeys);

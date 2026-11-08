@@ -8,11 +8,9 @@ using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
-using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Rulesets;
 using osu.Game.Tests.Database;
 
@@ -35,7 +33,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 {
                     BeatmapHash = hash,
                     BeatmapId = Guid.NewGuid(),
-                    AlgorithmVersion = EzDanAlgorithm.VERSION,
+                    AlgorithmVersion = EzAnalysisRevision.VERSION,
                     KeyCount = 4,
                     HoldRatio = 0.1,
                     OverallMsd = 18.5,
@@ -78,10 +76,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 realm.Write(r =>
                 {
-                    r.Add(new EzBeatmapChartDan
+                    r.Add(new EzChartDan
                     {
                         BeatmapHash = hash,
-                        AlgorithmVersion = EzDanAlgorithm.VERSION - 1,
+                        AlgorithmVersion = EzAnalysisRevision.VERSION - 1,
                         KeyCount = 4,
                         HoldRatio = 0.1,
                         OverallMsd = 10,
@@ -109,16 +107,16 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 // Both it and a CSI-only stamp must read as a miss, because Dan folds CSI and MSD.
                 foreach ((string hash, int stamp) in new[]
                          {
-                             ("chart-dan-bare-dan-version", EzDanAlgorithm.VERSION),
+                             ("chart-dan-bare-dan-version", EzAnalysisRevision.VERSION),
                              ("chart-dan-missing-csi", EzAnalysisRevision.ChartSkillInfo),
-                             ("chart-dan-missing-msd-upstream", EzChartSkillInfo.VERSION),
+                             ("chart-dan-missing-msd-upstream", EzAnalysisRevision.VERSION),
                          })
                 {
                     seedChart(realm, hash);
 
                     realm.Write(r =>
                     {
-                        r.Add(new EzBeatmapChartDan
+                        r.Add(new EzChartDan
                         {
                             BeatmapHash = hash,
                             AlgorithmVersion = stamp,
@@ -210,14 +208,14 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Assert.That(store.CollectChartChainState().SettledMsd, Does.Contain(hash));
 
                 var skills = store.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MINA);
-                Assert.That(store.GetBeatmapSystemState(hash, EzSkillSystems.BEATMAP_MINA, EzAnalysisRevision.Msd), Is.EqualTo(EzMetricState.Unrateable));
+                Assert.That(store.GetBeatmapSystemState(hash, EzSkillSystems.BEATMAP_MINA, EzAnalysisRevision.Msd), Is.EqualTo(EzSkillRowState.Unrateable));
                 Assert.That(skills, Is.Empty);
-                Assert.That(EzBeatmapMinaComputer.IsCurrentMinaCache(skills), Is.False);
+                Assert.That(EzMSDUnit.IsCurrentMinaCache(skills), Is.False);
 
                 // Successful MSD write replaces the marker.
                 store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6));
                 Assert.That(store.CollectChartChainState().CompleteMsd, Does.Contain(hash));
-                Assert.That(store.GetBeatmapSystemState(hash, EzSkillSystems.BEATMAP_MINA, EzAnalysisRevision.Msd), Is.EqualTo(EzMetricState.Current));
+                Assert.That(store.GetBeatmapSystemState(hash, EzSkillSystems.BEATMAP_MINA, EzAnalysisRevision.Msd), Is.EqualTo(EzSkillRowState.Current));
             });
         }
 

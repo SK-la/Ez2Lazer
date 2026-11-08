@@ -11,13 +11,6 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
     public sealed class EzChartSkillInfo
     {
         /// <summary>
-        /// Bump when CSI production changes (e.g. LeoBlack clusters). Realm rows are invalidated via
-        /// <see cref="Analysis.EzAnalysisRevision.ChartSkillInfo"/>, which folds this value into the
-        /// stored <c>InfoVersion</c> - bumping this value alone is enough.
-        /// </summary>
-        public const int VERSION = 3;
-
-        /// <summary>
         /// Unavailable stub (<c>KeyCount = -1</c>). Never written by <see cref="EzChartSkillStore.UpsertChartSkillInfo"/>
         /// (which rejects it) - only by the explicit <see cref="EzChartSkillStore.WriteChartSkillInfoUnavailable"/>
         /// settle path, and only from the BDSP backfill, so a transient hot-path miss cannot retire a chart.

@@ -4,13 +4,11 @@
 using System;
 using System.Collections.Generic;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Metrics;
-using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Utils;
 
-namespace osu.Game.EzOsuGame.Skills
+namespace osu.Game.EzOsuGame.Skills.PPP
 {
     /// <summary>
     /// PPP chart skills for osu, taiko, catch, and mania.
@@ -46,7 +44,9 @@ namespace osu.Game.EzOsuGame.Skills
 
             foreach (var (chartId, value) in chartSkills)
             {
-                if (!EzMetricSkillId.TrySplit(chartId, out string producerId, out string metric) || producerId != EzSkillSystems.BEATMAP_PPP)
+                string? metric = bareId(chartId);
+
+                if (metric == null)
                     continue;
 
                 bool accuracyAxis = metric is "accuracy" or "accuracy_difficulty";
@@ -55,6 +55,20 @@ namespace osu.Game.EzOsuGame.Skills
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// The metric id of a stored PP+ chart skill id, or null when the row belongs to another system.
+        /// </summary>
+        private static string? bareId(string chartSkillId)
+        {
+            const string prefix = EzSkillSystems.BEATMAP_PPP + ".";
+
+            if (!chartSkillId.StartsWith(prefix, StringComparison.Ordinal))
+                return null;
+
+            string metric = chartSkillId[prefix.Length..];
+            return metric.Length > 0 ? metric : null;
         }
     }
 }

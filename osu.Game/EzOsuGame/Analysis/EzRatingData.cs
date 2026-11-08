@@ -3,7 +3,7 @@
 
 using Realms;
 
-namespace osu.Game.EzOsuGame.Metrics
+namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
     /// The star rating (SR) and perfect-play performance points (PP) each analysis system gives one chart.

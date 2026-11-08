@@ -8,7 +8,7 @@ using JetBrains.Annotations;
 using Newtonsoft.Json;
 using osu.Game.Collections;
 using osu.Game.Database;
-using osu.Game.EzOsuGame.Metrics;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Models;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Overlays.BeatmapSet.Scores;

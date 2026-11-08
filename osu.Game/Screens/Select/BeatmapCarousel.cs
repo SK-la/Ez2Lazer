@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 // ReSharper disable RedundantUsingDirective
@@ -29,7 +29,6 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
@@ -194,7 +193,7 @@ namespace osu.Game.Screens.Select
         /// in which case its star has to come from the branch rather than the NoMod column.
         /// </summary>
         private bool usesSunnyBranchOperations => useEzAnalysisBranchForSunnySROperations
-                                                  && EzMetricVariantReadout.Selected(ruleset.Value?.OnlineID ?? -1)?.Id == EzMetricVariantCatalog.SUNNY;
+                                                  && EzRulesetReadout.Selected(ruleset.Value?.OnlineID ?? -1)?.Id == EzRulesetReadout.SUNNY;
 
         private Task<IReadOnlyDictionary<BeatmapInfo, double>> getDifficultiesForOperationsAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
         {
@@ -245,7 +244,7 @@ namespace osu.Game.Screens.Select
                 cancellationToken.ThrowIfCancellationRequested();
 
                 // NoMod PP of whichever system this beatmap's ruleset reads out under.
-                if (EzMetricVariantReadout.SelectedValues(beatmap).PerformancePoints is double pp)
+                if (EzRulesetReadout.SelectedValues(beatmap).PerformancePoints is double pp)
                     resolvedValues[beatmap] = pp;
             }
 

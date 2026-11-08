@@ -8,11 +8,9 @@ using Microsoft.Data.Sqlite;
 using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.Pattern;
-using osu.Game.EzOsuGame.Skills.PPP;
 
 namespace osu.Game.EzOsuGame.Skills
 {
@@ -61,7 +59,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>PPP player rows written at the bundle revision of <paramref name="rulesetOnlineId"/>.</summary>
         public IReadOnlyDictionary<string, double> GetPlayerSkillsAtCurrentVersions(string username, int keyCount, string systemId, int rulesetOnlineId)
-            => GetPlayerSkills(username, keyCount, systemId, EzPPPSkillVersions.ForRuleset(rulesetOnlineId), rulesetOnlineId);
+            => GetPlayerSkills(username, keyCount, systemId, EzAnalysisRevision.VERSION, rulesetOnlineId);
 
         /// <summary>Row metadata for a player system slice (analyzed plays / provisional / stale).</summary>
         public (int AnalyzedPlays, bool Provisional, bool Stale) GetPlayerSystemSkillMeta(
@@ -102,7 +100,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         public EzPlayerRatingSnapshot GetPlayerSsrSnapshot(string username, int keyCount, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzMinaSkillAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzAnalysisRevision.VERSION;
 
             return database.Read(c =>
             {
@@ -127,7 +125,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         public IReadOnlyList<int> GetPlayerSsrKeyCounts(string username, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzMinaSkillAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzAnalysisRevision.VERSION;
 
             return database.Read(c =>
             {
@@ -182,7 +180,7 @@ namespace osu.Game.EzOsuGame.Skills
             DateTimeOffset? computedAt = null,
             bool appendHistory = true)
         {
-            const int version = EzMinaSkillAlgorithm.VERSION;
+            const int version = EzAnalysisRevision.VERSION;
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
 
             database.Write((c, tx) =>
@@ -212,7 +210,7 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentNullException.ThrowIfNull(patternRatings);
 
             DateTimeOffset at = DateTimeOffset.UtcNow;
-            const int version = EzMinaSkillAlgorithm.VERSION;
+            const int version = EzAnalysisRevision.VERSION;
 
             database.Write((c, tx) =>
             {
@@ -228,7 +226,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         public IReadOnlyList<EzPatternRating> GetPlayerPatternRatings(string username, int keyCount, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzMinaSkillAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzAnalysisRevision.VERSION;
 
             return database.Read(c =>
             {
@@ -264,14 +262,14 @@ namespace osu.Game.EzOsuGame.Skills
 
         public void ReplacePlayerSkillHistory(string username, int keyCount, IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisVector Vector)> samples)
         {
-            const int version = EzMinaSkillAlgorithm.VERSION;
+            const int version = EzAnalysisRevision.VERSION;
 
             database.Write((c, tx) => replaceHistory(c, tx, username, keyCount, samples, version));
         }
 
         public EzPlayerDanEstimateRow? GetDanEstimate(string username, int keyCount, string side, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzDanAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzAnalysisRevision.VERSION;
 
             return database.Read(c =>
             {
@@ -318,7 +316,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         public IReadOnlyList<EzPlayerDanSkillsetRow> GetDanSkillsetValues(string username, int keyCount, string side, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzDanAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzAnalysisRevision.VERSION;
 
             return database.Read(c =>
             {
@@ -413,7 +411,7 @@ namespace osu.Game.EzOsuGame.Skills
                     verdict.RawDan,
                     verdict.Label,
                     verdict.Clears,
-                    EzDanAlgorithm.VERSION,
+                    EzAnalysisRevision.VERSION,
                     at));
             }
 
@@ -632,7 +630,7 @@ namespace osu.Game.EzOsuGame.Skills
                 ins.Parameters.AddWithValue("$ruleset", rulesetOnlineId);
                 ins.Parameters.AddWithValue("$skill_id", row.SkillId);
                 ins.Parameters.AddWithValue("$value", row.Value);
-                ins.Parameters.AddWithValue("$state", (int)EzMetricState.Current);
+                ins.Parameters.AddWithValue("$state", (int)EzSkillRowState.Current);
                 ins.Parameters.AddWithValue("$analyzed_plays", row.AnalyzedPlays);
                 ins.Parameters.AddWithValue("$provisional", row.Provisional ? 1 : 0);
                 ins.Parameters.AddWithValue("$version", version);
@@ -783,7 +781,7 @@ namespace osu.Game.EzOsuGame.Skills
                 return explicitVersion;
 
             if (rulesetOnlineId >= 0 && systemId is EzSkillSystems.BEATMAP_PPP or EzSkillSystems.PLAYER_PPP)
-                return EzPPPSkillVersions.ForRuleset(rulesetOnlineId);
+                return EzAnalysisRevision.VERSION;
 
             return EzSkillSystems.ResolveAlgorithmVersion(systemId);
         }

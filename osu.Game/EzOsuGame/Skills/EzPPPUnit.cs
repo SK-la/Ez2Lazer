@@ -13,15 +13,15 @@ using osu.Game.Rulesets.Mods;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Computes NoMod PPP chart skills and writes one Realm row per skill id, each with its own algorithm version.
+    /// Runs the PPP system for one chart: gate, convert, call the engine, hand the vector to the store.
     /// </summary>
-    public sealed class EzBeatmapPPPComputer
+    public sealed class EzPPPUnit
     {
         private readonly BeatmapManager beatmapManager;
         private readonly EzChartSkillStore skillStore;
         private readonly IEzPPPEngine engine;
 
-        public EzBeatmapPPPComputer(BeatmapManager beatmapManager, EzChartSkillStore skillStore, IEzPPPEngine? engine = null)
+        public EzPPPUnit(BeatmapManager beatmapManager, EzChartSkillStore skillStore, IEzPPPEngine? engine = null)
         {
             this.beatmapManager = beatmapManager;
             this.skillStore = skillStore;

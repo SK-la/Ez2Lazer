@@ -6,12 +6,15 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 
-namespace osu.Game.EzOsuGame.Skills
+namespace osu.Game.EzOsuGame.Skills.PPP
 {
     /// <summary>
     /// PPP skill engine for osu, taiko, catch, and mania.
-    /// Chart keys are <c>beatmap_ppp.{metric}</c>.
     /// </summary>
+    /// <remarks>
+    /// Pure: takes a playable and returns a vector. Chart keys are <c>beatmap_ppp.{metric}</c>, play keys
+    /// <c>player_ppp.{metric}</c>.
+    /// </remarks>
     public interface IEzPPPEngine
     {
         /// <summary>Chart skills for an already playable beatmap (mods and clock rate applied).</summary>

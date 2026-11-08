@@ -9,7 +9,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.EzOsuGame.Metrics;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets;
@@ -88,30 +88,27 @@ namespace osu.Game.EzOsuGame.Overlays
         private void addAnalysisSystemSettings(Ez2ConfigManager ezConfig, RulesetStore? rulesetStore)
         {
             var selection = ezConfig.GetBindable<string>(Ez2Setting.AnalysisSystemSelection);
-            var catalog = EzMetricVariantReadout.Catalog;
             var items = new List<Drawable>();
 
             foreach (var ruleset in rulesetStore?.AvailableRulesets ?? Enumerable.Empty<RulesetInfo>())
             {
-                var variants = catalog.For(ruleset.OnlineID);
+                var variants = EzRulesetReadout.All(ruleset.OnlineID);
 
                 if (variants.Count <= 1)
                     continue;
 
-                var current = new Bindable<EzMetricVariant>(EzMetricVariantReadout.Selected(ruleset.OnlineID) ?? variants[0]);
+                var current = new Bindable<EzReadout>(EzRulesetReadout.Selected(ruleset.OnlineID) ?? variants[0]);
 
                 current.BindValueChanged(c =>
                 {
                     if (c.NewValue != null && !ReferenceEquals(c.NewValue, c.OldValue))
-                        EzMetricSelection.SetPrimary(ruleset.OnlineID, c.NewValue.Id);
+                        EzReadoutSelection.Store(ruleset.OnlineID, c.NewValue.Id);
                 });
 
                 // The song select chip writes the same setting; follow it so both stay one value.
                 selection.BindValueChanged(_ =>
                 {
-                    var selected = EzMetricVariantReadout.Selected(ruleset.OnlineID);
-
-                    if (selected != null && !ReferenceEquals(selected, current.Value))
+                    if (EzRulesetReadout.Selected(ruleset.OnlineID) is { } selected && !ReferenceEquals(selected, current.Value))
                         current.Value = selected;
                 });
 
@@ -132,9 +129,9 @@ namespace osu.Game.EzOsuGame.Overlays
         }
 
         /// <summary>Shows each analysis system by its display name instead of its stored id.</summary>
-        private partial class AnalysisSystemDropdown : FormDropdown<EzMetricVariant>
+        private partial class AnalysisSystemDropdown : FormDropdown<EzReadout>
         {
-            protected override LocalisableString GenerateItemText(EzMetricVariant item) => item.Name;
+            protected override LocalisableString GenerateItemText(EzReadout item) => item.Name;
         }
     }
 }

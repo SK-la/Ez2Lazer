@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 
@@ -107,7 +108,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Accuracy = 0.98,
                 Rate = 1,
                 ScoredAt = scoredAt,
-                AlgorithmVersion = EzMinaSkillAlgorithm.VERSION,
+                AlgorithmVersion = EzAnalysisRevision.VERSION,
             };
 
         private static EzDanClearEvidenceRow clearRow(string hash, DateTimeOffset scoredAt, double accuracy = 0.98, double credited = 8)
@@ -121,7 +122,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Accuracy = accuracy,
                 Rate = 1,
                 ScoredAt = scoredAt,
-                AlgorithmVersion = EzDanAlgorithm.VERSION,
+                AlgorithmVersion = EzAnalysisRevision.VERSION,
             };
     }
 }

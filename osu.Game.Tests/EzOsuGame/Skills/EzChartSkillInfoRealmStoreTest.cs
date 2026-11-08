@@ -137,7 +137,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 store.WriteDanSkillsetValues("legacy", 7, EzDanSide.Ln.ToId(), new[]
                 {
-                    new EzPlayerDanSkillsetRow(EzDanSide.Ln.ToId(), EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL, -1, string.Empty, 0, EzDanAlgorithm.VERSION,
+                    new EzPlayerDanSkillsetRow(EzDanSide.Ln.ToId(), EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL, -1, string.Empty, 0, EzAnalysisRevision.VERSION,
                         DateTimeOffset.UtcNow),
                 });
 
@@ -216,7 +216,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     r.Add(new EzBeatmapChartSkillInfo
                     {
                         BeatmapHash = legacy_stub_hash,
-                        InfoVersion = EzChartSkillInfo.VERSION - 1,
+                        InfoVersion = EzAnalysisRevision.VERSION - 1,
                         ComputedAt = DateTimeOffset.UtcNow,
                         KeyCount = -1,
                         DanEligible = false,

@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Analysis
@@ -60,7 +59,7 @@ namespace osu.Game.EzOsuGame.Analysis
             return new EzManiaSummary(
                 columns?.ColumnCounts,
                 columns is { HasHoldNoteCounts: true } supplied ? supplied.HoldNoteCounts : null,
-                EzMetricVariantReadout.SkillStar(beatmap, analysis));
+                EzRulesetReadout.SkillStar(beatmap, analysis));
         }
     }
 }

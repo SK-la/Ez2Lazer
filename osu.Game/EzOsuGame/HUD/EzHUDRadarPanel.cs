@@ -15,7 +15,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
@@ -460,7 +459,7 @@ namespace osu.Game.EzOsuGame.HUD
             if (analysis is not { } live)
                 return no_skill_values;
 
-            var axes = live.AxesOf(EzChartMetricProducer.Ppp.Id());
+            var axes = live.AxesOf(EzAnalysisChannels.PPP);
 
             if (axes.Count == 0)
                 return no_skill_values;
@@ -579,7 +578,7 @@ namespace osu.Game.EzOsuGame.HUD
             requestLiveAnalysis(beatmapInfo);
 
             var live = getLiveAnalysis(beatmapInfo);
-            var msd = live is { } analysed ? analysed.AxesOf(EzChartMetricProducer.Mina.Id()) : no_skill_values;
+            var msd = live is { } analysed ? analysed.AxesOf(EzAnalysisChannels.MINA) : no_skill_values;
             var structureAxes = live is { } structured ? structureAxesOf(structured) : no_skill_values;
 
             int keyCount = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
@@ -596,7 +595,7 @@ namespace osu.Game.EzOsuGame.HUD
             if (double.IsNaN(holdRatio))
                 holdRatio = 0;
 
-            int holdCount = EzChartDanEstimator.TryHoldCountFromBeatmapInfo(beatmapInfo);
+            int holdCount = EzDanEngine.TryHoldCountFromBeatmapInfo(beatmapInfo);
 
             // Decided before the values land: the long-note frame has its own axis set, and painting the RC frame
             // first would visibly morph into it.
@@ -632,7 +631,7 @@ namespace osu.Game.EzOsuGame.HUD
         /// </summary>
         private static double displayValue(double value) => double.IsFinite(value) && value >= EzPatternRatings.DISPLAY_MIN ? value : 0;
 
-        private static IReadOnlyDictionary<string, double> structureAxesOf(in EzAnalysisResult analysis) => analysis.AxesOf(EzChartMetricProducer.Csi.Id());
+        private static IReadOnlyDictionary<string, double> structureAxesOf(in EzAnalysisResult analysis) => analysis.AxesOf(EzAnalysisChannels.CSI);
 
         /// <summary>
         /// Synchronous LN/RC pre-judgement. Realm-persisted ChartDan with an LN half is authoritative

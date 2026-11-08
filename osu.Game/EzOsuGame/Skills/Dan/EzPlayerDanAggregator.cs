@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.Rulesets.Mods;
@@ -14,7 +15,7 @@ using osu.Game.Scoring;
 namespace osu.Game.EzOsuGame.Skills.Dan
 {
     /// <summary>
-    /// Player dan clears: chart <see cref="EzChartDanEstimator.TryEstimate"/> → credit.
+    /// Player dan clears: chart <see cref="EzDanUnit.TryEstimate"/> → credit.
     /// <see cref="EzSkillProvider"/> <c>writeSideHeadline</c> (hub fold), not here.
     /// Hub <c>collectDanClears</c> subset: fail/EZ reject, (hash,rate) best-only.
     /// </summary>
@@ -23,16 +24,16 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         private const int cache_flush_batch = 64;
 
         private readonly BeatmapManager beatmapManager;
-        private readonly EzChartDanEstimator chartDanEstimator;
+        private readonly EzDanUnit chartDanUnit;
         private readonly EzPlayerSkillStore skillStore;
         private readonly EzChartSkillStore chartStore;
         private readonly EzLocalProfileStore? profileStore;
 
-        public EzPlayerDanAggregator(BeatmapManager beatmapManager, EzChartDanEstimator chartDanEstimator, EzPlayerSkillStore skillStore, EzChartSkillStore chartStore,
+        public EzPlayerDanAggregator(BeatmapManager beatmapManager, EzDanUnit chartDanUnit, EzPlayerSkillStore skillStore, EzChartSkillStore chartStore,
                                      EzLocalProfileStore? profileStore = null)
         {
             this.beatmapManager = beatmapManager;
-            this.chartDanEstimator = chartDanEstimator;
+            this.chartDanUnit = chartDanUnit;
             this.skillStore = skillStore;
             this.chartStore = chartStore;
             this.profileStore = profileStore;
@@ -178,7 +179,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                             // A rate / key-conversion mod yields a chart variant no persisted NoMod row can answer,
                             // so the live analysis is the only correct source. It goes through the shared store, so
                             // the same chart + mods is measured once per session.
-                            chart = chartDanEstimator.TryEstimateOrCompute(beatmapInfo, score.Mods);
+                            chart = chartDanUnit.TryEstimateOrCompute(beatmapInfo, score.Mods);
                         }
 
                         if (chart == null)
@@ -200,7 +201,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                             play.ScoreId,
                             username,
                             hash,
-                            EzDanAlgorithm.VERSION,
+                            EzAnalysisRevision.VERSION,
                             true,
                             chart.KeyCount,
                             chart.Side.ToId(),
@@ -266,7 +267,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 play.ScoreId,
                 username,
                 hash,
-                EzDanAlgorithm.VERSION,
+                EzAnalysisRevision.VERSION,
                 false,
                 0,
                 string.Empty,

@@ -10,8 +10,8 @@ namespace osu.Game.EzOsuGame.Skills.Dan
     /// Nomod chart-dan baseline + skillset label stamps (EZ≥10). One row per beatmap hash.
     /// Rate-mod (DT) chart dan is not stored here. Missing side uses <c>RawDan = -1</c>.
     /// </summary>
-    [MapTo("EzBeatmapChartDan")]
-    public class EzBeatmapChartDan : RealmObject
+    [MapTo("EzChartDan")]
+    public class EzChartDan : RealmObject
     {
         [PrimaryKey]
         public Guid ID { get; set; } = Guid.NewGuid();

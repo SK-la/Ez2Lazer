@@ -3,7 +3,6 @@
 
 using System.Text.Json;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics;
 
 namespace osu.Game.Rulesets.BMS.UI.SongSelect
@@ -36,16 +35,16 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             var maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts: null, sunnySR: record.SunnySR);
 
-            // The stored pp is a chart-level baseline, which is what the official performance producer carries.
-            Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>? axes = null;
+            // The stored pp is a chart-level baseline, which is what the official performance channel carries.
+            Dictionary<string, IReadOnlyDictionary<string, double>>? axes = null;
 
             if (record.Pp is double pp && double.IsFinite(pp) && pp > 0)
             {
-                axes = new Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>
+                axes = new Dictionary<string, IReadOnlyDictionary<string, double>>
                 {
-                    [EzChartMetricProducer.OfficialPerformance.Id()] = new Dictionary<string, double>
+                    [EzAnalysisChannels.OFFICIAL_PERFORMANCE] = new Dictionary<string, double>
                     {
-                        [EzMetricAxisIds.PERFORMANCE_POINTS] = pp,
+                        [EzAnalysisChannels.PERFORMANCE_POINTS] = pp,
                     },
                 };
             }

@@ -43,7 +43,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             {
                 // The breakdown embeds the rating, so one derivation serves both scopes instead of running the
                 // difficulty core once per requested value.
-                var combined = SRCalculator.CalculateSRWithPatternSnapshot(beatmap, request.ClockRate);
+                var combined = EzSSREngine.CalculateSRWithPatternSnapshot(beatmap, request.ClockRate);
 
                 sunnySR = double.IsNaN(combined.Sr) || double.IsInfinity(combined.Sr) ? null : combined.Sr;
                 ssrPatternSnapshot = combined.PatternSnapshot;

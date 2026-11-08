@@ -24,7 +24,6 @@ using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Database;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
@@ -114,10 +113,10 @@ namespace osu.Game.Database
         private OsuConfigManager config { get; set; } = null!;
 
         [Resolved]
-        private EzBeatmapMinaComputer ezBeatmapMinaComputer { get; set; } = null!;
+        private EzMSDUnit ezBeatmapMinaComputer { get; set; } = null!;
 
         [Resolved]
-        private EzBeatmapPPPComputer ezBeatmapPPPComputer { get; set; } = null!;
+        private EzPPPUnit ezBeatmapPPPComputer { get; set; } = null!;
 
         [Resolved]
         private EzChartSkillStore skillStore { get; set; } = null!;
@@ -693,7 +692,7 @@ namespace osu.Game.Database
         /// </summary>
         private void clearOutdatedManiaBeatmapMSD()
         {
-            const int current_version = EzMinaSkillAlgorithm.VERSION;
+            const int current_version = EzAnalysisRevision.VERSION;
 
             // Read the live Realm row — AvailableRulesets clones historically omitted
             // LastAppliedManiaSkillVersion and would wipe MSD on every startup.
@@ -714,7 +713,7 @@ namespace osu.Game.Database
             Logger.Log($"Resetting beatmap MSD for mania (mania skill version updated from {liveState.Item2} to {current_version})");
 
             // Only MSD is cleared here. ChartSkillInfo and ChartDan rows read MSD, but both are stamped
-            // with EzAnalysisRevision.ChartSkillInfo/ChartDan, which fold EzMinaSkillAlgorithm.VERSION -
+            // with EzAnalysisRevision.ChartSkillInfo/ChartDan, which fold EzAnalysisRevision.VERSION -
             // so they already read as stale and the ordinary incremental passes recompute them. Bulk
             // clearing them would erase the "stale" evidence the status UI reports.
             // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
@@ -1163,7 +1162,7 @@ namespace osu.Game.Database
                             msdWritten = true;
                             writeMinaRating(id, msdAxes);
                         }
-                        else if (skillStore.GetBeatmapSystemState(hash, EzSkillSystems.BEATMAP_MINA, ezBeatmapMinaComputer.Revision) != EzMetricState.Unrateable)
+                        else if (skillStore.GetBeatmapSystemState(hash, EzSkillSystems.BEATMAP_MINA, ezBeatmapMinaComputer.Revision) != EzSkillRowState.Unrateable)
                             stageFailed = true;
                     }
                     catch (Exception e) when (e is not ObjectDisposedException)
@@ -1267,7 +1266,7 @@ namespace osu.Game.Database
             var msd = skillStore.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MINA);
 
             // The chain's owed set already filtered on a complete MSD; re-check guards a version change mid-run.
-            if (!EzBeatmapMinaComputer.IsCurrentMinaCache(msd))
+            if (!EzMSDUnit.IsCurrentMinaCache(msd))
                 return false;
 
             if (!EzChartDanEstimator.TryResolveStoredInputs(beatmap, out int keyCount, out double holdRatio, out double? sunnySR, out int holdCount))

@@ -4,7 +4,6 @@
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
-using osu.Game.EzOsuGame.Metrics;
 
 namespace osu.Game.EzOsuGame.Beatmaps
 {
@@ -52,7 +51,7 @@ namespace osu.Game.EzOsuGame.Beatmaps
             if (rulesetId != EzLocalProfileConstants.MANIA_RULESET_ID)
                 return finite(beatmap.EzRatingData.PppSR);
 
-            if (EzMetricVariantReadout.Selected(rulesetId)?.Id != EzMetricVariantCatalog.SUNNY)
+            if (EzRulesetReadout.Selected(rulesetId)?.Id != EzRulesetReadout.SUNNY)
                 return finite(beatmap.EzRatingData.MinaSR);
 
             if (preferAnalysisValues && analysisSummary?.SunnySR is double liveSunnySR)

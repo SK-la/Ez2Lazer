@@ -13,6 +13,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
 using osu.Framework.Layout;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills;
@@ -126,8 +127,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 return;
             }
 
-            var rc = skillProvider.GetDanClears(username, keys, EzDanSide.Rc.ToId(), EzDanAlgorithm.VERSION);
-            var ln = skillProvider.GetDanClears(username, keys, EzDanSide.Ln.ToId(), EzDanAlgorithm.VERSION);
+            var rc = skillProvider.GetDanClears(username, keys, EzDanSide.Rc.ToId(), EzAnalysisRevision.VERSION);
+            var ln = skillProvider.GetDanClears(username, keys, EzDanSide.Ln.ToId(), EzAnalysisRevision.VERSION);
 
             if (rc.Count == 0 && ln.Count == 0)
             {

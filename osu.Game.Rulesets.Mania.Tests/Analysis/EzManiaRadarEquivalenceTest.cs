@@ -28,7 +28,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         public void SharedExtractionProducesTheSameRadar(int keyCount, bool holdHeavy)
         {
             ManiaBeatmap beatmap = createChart(keyCount, holdHeavy);
-            var input = EzChartSkillInfoComputer.FromPlayable(beatmap);
+            var input = EzCSIEngine.FromPlayable(beatmap);
 
             Assert.That(input.FullyRepresented, Is.True, "a native mania chart must extract losslessly, or the shared path never runs");
 
@@ -54,7 +54,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         public void FilteredExtractionFallsBackToTheBeatmap()
         {
             ManiaBeatmap beatmap = createChart(4, holdHeavy: true);
-            var lossless = EzChartSkillInfoComputer.FromPlayable(beatmap);
+            var lossless = EzCSIEngine.FromPlayable(beatmap);
 
             // Drop every long note: the extraction no longer describes the chart, so the provider must ignore it.
             var notes = new List<EzManiaNote>();

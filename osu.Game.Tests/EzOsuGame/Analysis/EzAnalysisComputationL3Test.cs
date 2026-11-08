@@ -3,7 +3,6 @@
 
 using NUnit.Framework;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Osu;
@@ -26,13 +25,13 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
             var result = EzAnalysisComputation.Compute(new TestWorkingBeatmap(beatmap), lookup);
 
-            var mina = result.AxesOf(EzChartMetricProducer.Mina.Id());
-            var ppp = result.AxesOf(EzChartMetricProducer.Ppp.Id());
+            var mina = result.AxesOf(EzAnalysisChannels.MINA);
+            var ppp = result.AxesOf(EzAnalysisChannels.PPP);
 
             Assert.That(mina, Is.Not.Empty);
             Assert.That(ppp, Is.Not.Empty);
             Assert.That(mina[EzMinaSkillAxis.Overall.ToId()], Is.GreaterThan(0));
-            Assert.That(ppp[EzMetricAxisIds.STAR_RATING], Is.GreaterThan(0));
+            Assert.That(ppp[EzAnalysisChannels.STAR_RATING], Is.GreaterThan(0));
         }
 
         [Test]
@@ -43,8 +42,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
             var result = EzAnalysisComputation.Compute(new TestWorkingBeatmap(beatmap), lookup);
 
-            Assert.That(result.AxesOf(EzChartMetricProducer.Ppp.Id()), Is.Not.Empty);
-            Assert.That(result.AxesOf(EzChartMetricProducer.Ppp.Id()).ContainsKey(EzMetricAxisIds.STAR_RATING), Is.True);
+            Assert.That(result.AxesOf(EzAnalysisChannels.PPP), Is.Not.Empty);
+            Assert.That(result.AxesOf(EzAnalysisChannels.PPP).ContainsKey(EzAnalysisChannels.STAR_RATING), Is.True);
         }
     }
 }

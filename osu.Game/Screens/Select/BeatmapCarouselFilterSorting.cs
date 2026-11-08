@@ -6,8 +6,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Screens.Select.Filter;
 using osu.Game.Utils;
@@ -59,7 +59,7 @@ namespace osu.Game.Screens.Select
 
                 // Difficulty and PP are read from the analysis system this beatmap's ruleset is set to. The pair is
                 // read once so a beatmap cannot be sorted by one system's star next to another's pp.
-                var values = EzMetricVariantReadout.SelectedValues(beatmap);
+                var values = EzRulesetReadout.SelectedValues(beatmap);
 
                 if (criteria.Sort == SortMode.PP)
                     return values.PerformancePoints ?? (beatmap.PerformancePoints >= 0 ? beatmap.PerformancePoints : -1);

@@ -21,7 +21,6 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
@@ -339,7 +338,7 @@ namespace osu.Game.Screens.Select
             void updateStarFilterIcon()
             {
                 // Mirrors the system sorting and grouping read from; the panel's own stars stay official.
-                bool useSunnyMetric = EzMetricVariantReadout.Selected(ruleset.Value?.OnlineID ?? -1)?.Id == EzMetricVariantCatalog.SUNNY;
+                bool useSunnyMetric = EzRulesetReadout.Selected(ruleset.Value?.OnlineID ?? -1)?.Id == EzRulesetReadout.SUNNY;
 
                 starCounter.Icon = useSunnyMetric
                     ? FontAwesome.Solid.Moon
@@ -396,7 +395,7 @@ namespace osu.Game.Screens.Select
         /// </remarks>
         private void updateEzDisplay()
         {
-            var values = ezAnalysisCache.ReadVariantValues(beatmap, mods.Value, EzMetricVariantValues.Live(lastStarDifficulty));
+            var values = ezAnalysisCache.ReadVariantValues(beatmap, mods.Value, EzReadoutValues.Live(lastStarDifficulty));
 
             displaySR.Current.Value = new EzManiaSummary(null, null, values.SkillStar);
 

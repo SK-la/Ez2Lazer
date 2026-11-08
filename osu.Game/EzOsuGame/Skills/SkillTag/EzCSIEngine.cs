@@ -17,7 +17,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
     /// Builds <see cref="EzChartSkillInfo"/> from note data (hub chart-analysis lean filing subset).
     /// LeoBlack patterns fill cluster columns; failure falls back to analyzer tags only.
     /// </summary>
-    public static class EzChartSkillInfoComputer
+    public static class EzCSIEngine
     {
         private static readonly HashSet<string> ln_pattern_ids = createLnPatternIds();
 

@@ -8,7 +8,6 @@ using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.PPP;
@@ -106,7 +105,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 var maniaPpp = statuses.Single(s => s.RulesetOnlineId == 3).Report["ppp"];
 
                 Assert.That(osuPpp.Ready, Is.EqualTo(1));
-                Assert.That(osuPpp.CurrentRevision, Is.EqualTo(EzPPPSkillVersions.ForRuleset(0)));
+                Assert.That(osuPpp.CurrentRevision, Is.EqualTo(EzAnalysisRevision.VERSION));
                 Assert.That(maniaPpp.Ready, Is.Zero);
                 Assert.That(maniaPpp.Missing, Is.EqualTo(1));
             });
@@ -141,7 +140,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             {
                 seedCharts(realm);
 
-                realm.Write(r => r.Add(new EzBeatmapChartDan
+                realm.Write(r => r.Add(new EzChartDan
                 {
                     BeatmapHash = mania_hash,
                     AlgorithmVersion = EzAnalysisRevision.ChartDan,
@@ -176,8 +175,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                     RulesetOnlineId = rulesetOnlineId,
                     SkillId = EzPPPSkillCatalog.ChartSkillId(metric.MetricId),
                     Value = 4.2,
-                    State = (int)EzMetricState.Current,
-                    AlgorithmVersion = EzPPPSkillVersions.ForRuleset(rulesetOnlineId),
+                    State = (int)EzSkillRowState.Current,
+                    AlgorithmVersion = EzAnalysisRevision.VERSION,
                     ComputedAt = DateTimeOffset.UtcNow,
                 });
             }
