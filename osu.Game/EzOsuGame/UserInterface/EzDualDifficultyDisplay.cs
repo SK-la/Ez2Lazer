@@ -86,6 +86,6 @@ namespace osu.Game.EzOsuGame.UserInterface
         }
 
         public static bool ShouldShowXxyDisplay(BeatmapInfo beatmap)
-            => EzAnalysisProviderBridge.HasAnalysisProvider(beatmap.Ruleset) && beatmap.SupportsXxyStarRating();
+            => EzAnalysisProviderBridge.HasAnalysisProvider(beatmap.Ruleset) && beatmap.SupportsSunnyStarRating();
     }
 }

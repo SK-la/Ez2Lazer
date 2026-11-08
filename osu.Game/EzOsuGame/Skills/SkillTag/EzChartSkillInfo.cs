@@ -6,16 +6,16 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
     /// <summary>
     ///     Chart analysis fields used by hub-aligned dan skillset filing
     ///     (mirror of mania-hub <c>ChartSkillInfo</c> filing subset).
-    ///     Persisted as typed Realm <see cref="EzBeatmapChartSkillInfo"/> (EZ鈮?).
+    ///     Persisted as typed Realm <see cref="EzBeatmapChartSkillInfo"/> (EZ≥9).
     /// </summary>
     public sealed class EzChartSkillInfo
     {
         /// <summary>
         /// Bump when CSI production changes (e.g. LeoBlack clusters). Realm rows are invalidated via
-        /// <see cref="Analysis.EzAnalysisRevision.ChartSkillInfo"/>, which folds this value together with
-        /// its upstream facet (MSD) into the stored <c>InfoVersion</c> - bumping this value alone is enough.
+        /// <see cref="Analysis.EzAnalysisRevision.ChartSkillInfo"/>, which folds this value into the
+        /// stored <c>InfoVersion</c> - bumping this value alone is enough.
         /// </summary>
-        public const int VERSION = 2;
+        public const int VERSION = 3;
 
         /// <summary>
         /// Unavailable stub (<c>KeyCount = -1</c>). Never written by <see cref="EzSkillStore.UpsertChartSkillInfo"/>
@@ -46,8 +46,6 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         public bool? ClusterTrill { get; init; }
 
         public bool? HandstreamCluster { get; init; }
-
-        public bool HandstreamEndurance { get; init; }
 
         public double TechScore { get; init; }
 

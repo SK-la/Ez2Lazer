@@ -20,9 +20,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [TestCase(4, EzDanSide.Rc, 4, new[] { "jack", "tech", "speed", "stamina" })]
         [TestCase(6, EzDanSide.Rc, 4, new[] { "jack", "tech", "speed", "stream" })]
         [TestCase(7, EzDanSide.Rc, 4, new[] { "jack", "tech", "speed", "stream" })]
-        [TestCase(4, EzDanSide.Ln, 4, new[] { "lngeneral", "lntech", "lninverse", "lnrelease" })]
-        [TestCase(6, EzDanSide.Ln, 4, new[] { "lngeneral", "lntech", "lninverse", "lnrelease" })]
-        [TestCase(7, EzDanSide.Ln, 4, new[] { "lngeneral", "lntech", "lninverse", "lnrelease" })]
+        [TestCase(4, EzDanSide.Ln, 4, new[] { "ln_general", "ln_tech", "ln_inverse", "ln_release_pattern" })]
+        [TestCase(6, EzDanSide.Ln, 4, new[] { "ln_general", "ln_tech", "ln_inverse", "ln_release_pattern" })]
+        [TestCase(7, EzDanSide.Ln, 4, new[] { "ln_general", "ln_tech", "ln_inverse", "ln_release_pattern" })]
         public void SlotsMatchDualPanelLayout(int keyCount, EzDanSide side, int expectedCount, string[] expectedIds)
         {
             var slots = EzDanSkillsetBuckets.Slots(keyCount, side);
@@ -161,8 +161,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             EzChartSkillInfo? resolveChart(string hash)
             {
                 string[] patterns = hash.StartsWith("gen-", StringComparison.Ordinal)
-                    ? new[] { "lngeneral", "ln" }
-                    : new[] { "lnrelease" };
+                    ? new[] { "ln_general", "ln" }
+                    : new[] { "ln_release_pattern" };
 
                 return new EzChartSkillInfo
                 {
@@ -181,8 +181,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 (string _) => null,
                 resolveChart);
 
-            Assert.That(verdicts.ContainsKey(EzDanSkillsetBuckets.LN_GENERAL), Is.True);
-            Assert.That(verdicts.ContainsKey(EzDanSkillsetBuckets.LN_RELEASE), Is.True);
+            Assert.That(verdicts.ContainsKey(EzDanSkillsetBuckets.LNGeneral), Is.True);
+            Assert.That(verdicts.ContainsKey(EzDanSkillsetBuckets.LNRelease), Is.True);
 
             var clearDans = clears.Select(c => c.CreditedDan).ToList();
             var headline = EzDanSideHeadline.FromSkillsets(7, EzDanSide.Ln, verdicts, clearDans);

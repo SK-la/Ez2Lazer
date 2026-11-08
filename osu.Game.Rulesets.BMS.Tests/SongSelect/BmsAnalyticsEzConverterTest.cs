@@ -26,7 +26,6 @@ namespace osu.Game.Rulesets.BMS.Tests.SongSelect
             Assert.That(BmsAnalyticsEzConverter.ToEzAnalysisResult(record), Is.Not.Null);
 
             var result = BmsAnalyticsEzConverter.ToEzAnalysisResult(record)!.Value;
-            Assert.That(result.Pp, Is.EqualTo(123.4));
             Assert.That(result.AverageKps, Is.EqualTo(7.8));
             Assert.That(result.MaxKps, Is.EqualTo(9.0));
             Assert.That(result.ManiaSummary?.XxySr, Is.EqualTo(5.6));

@@ -172,7 +172,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// <summary>
         /// Song-select baseline fields written by <see cref="UI.BmsSongSelect.Analytics.BmsAnalyticsRealmWriteback"/>.
         /// </summary>
-        public readonly record struct PersistedSongSelectBaseline(double StarRating, double XxyStarRating, double PerformancePoints);
+        public readonly record struct PersistedSongSelectBaseline(double StarRating, double SunnyStarRating, double PerformancePoints);
 
         /// <summary>
         /// Exposed for unit tests validating Realm re-import retains song-select baseline.
@@ -195,7 +195,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             foreach (var beatmap in existingSet.Beatmaps)
             {
-                result[beatmap.ID] = new PersistedSongSelectBaseline(beatmap.StarRating, beatmap.XxyStarRating, beatmap.PerformancePoints);
+                result[beatmap.ID] = new PersistedSongSelectBaseline(beatmap.StarRating, beatmap.SunnyStarRating, beatmap.PerformancePoints);
             }
 
             return result;
@@ -209,8 +209,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             if (persisted.StarRating >= 0)
                 beatmap.StarRating = persisted.StarRating;
 
-            if (persisted.XxyStarRating >= 0)
-                beatmap.XxyStarRating = persisted.XxyStarRating;
+            if (persisted.SunnyStarRating >= 0)
+                beatmap.SunnyStarRating = persisted.SunnyStarRating;
 
             if (persisted.PerformancePoints >= 0)
                 beatmap.PerformancePoints = persisted.PerformancePoints;

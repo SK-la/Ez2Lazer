@@ -21,7 +21,7 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
         public const double MIN_SPEED = 0.4;
         public const double MAX_SPEED = 3.0;
 
-        public static bool UsesXxyStarRating(RulesetInfo ruleset) => EzXxyStarRatingSupport.SupportsRuleset(ruleset);
+        public static bool UsesSunnyStarRating(RulesetInfo ruleset) => EzSunnyStarRatingSupport.SupportsRuleset(ruleset);
 
         public static double GetBaselineStarRating(BeatmapManager beatmapManager,
                                                    BeatmapInfo beatmapInfo,
@@ -43,7 +43,7 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
                                                 double speed,
                                                 CancellationToken cancellationToken)
         {
-            if (UsesXxyStarRating(ruleset))
+            if (UsesSunnyStarRating(ruleset))
             {
                 var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
                 var playable = EzPlayableBeatmapCache.GetShared(working, ruleset, mods, cancellationToken);

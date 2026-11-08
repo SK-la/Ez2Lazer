@@ -1,22 +1,27 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Metrics;
+using osu.Game.EzOsuGame.Skills.PPP;
+
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Realm <c>SystemId</c> namespaces and meta skill ids.
-    /// Mania (Mina / pattern / dan) plugins register under <see cref="EzSkillRegistry"/>;
-    /// ruleset wiring is <see cref="EzSkillProfile"/>.
+    /// Storage namespaces for skill value rows, plus the ids that are not plain axes.
     /// </summary>
+    /// <remarks>
+    /// These are the strings written into the value tables. The canonical producer names live in
+    /// <c>EzMetricProducers</c>; the two are deliberately separate so storage can be renamed without
+    /// touching identity, and vice versa.
+    /// </remarks>
     public static class EzSkillSystems
     {
         public const string BEATMAP_MINA = "beatmap_msd";
+
         public const string PLAYER_MINA = "player_ssr";
 
-        /// <summary>
-        /// Hub pattern ratings (Overall SSR aggregated per chart pattern tag).
-        /// Persisted in existing <see cref="EzPlayerSkillValue"/> rows — see DATA-Skills-PatternRatings.
-        /// </summary>
         public const string PLAYER_PATTERN = "player_pattern";
 
         public const string DAN = "dan";
@@ -30,17 +35,11 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Key count sentinel for producers that are not sliced by key mode.</summary>
         public const int UNSLICED_KEY = 0;
 
-        /// <summary>Persisted beside MSD axes when computed (not a Mina axis).</summary>
-        public const string HOLD_RATIO = "__hold_ratio";
-
         /// <summary>
-        /// Settled miss for charts MinaCalc rates as a zero vector on a supported keymode.
-        /// Keyed by beatmap content hash — editing the chart changes the hash and allows recompute.
-        /// Not a valid MSD cache (<see cref="EzBeatmapMinaComputer.IsCurrentMinaCache"/> stays false).
+        /// Settled miss for a chart the engine rates as a zero vector on a supported key mode.
+        /// Keyed by content hash, so editing the chart allows a recompute.
         /// </summary>
         public const string UNRATEABLE = "__unrateable";
-
-        public static string MinaHoldRatioSkillId => $"{BEATMAP_MINA}.{HOLD_RATIO}";
 
         public static string MinaUnrateableSkillId => $"{BEATMAP_MINA}.{UNRATEABLE}";
 
@@ -48,19 +47,28 @@ namespace osu.Game.EzOsuGame.Skills
             => $"{DAN}.{keyCount}k.{side.ToId()}";
 
         /// <summary>
-        /// Default algorithm version for skill-value rows of <paramref name="systemId"/>.
-        /// Unknown ids return 0 (caller should pass an explicit version).
+        /// Default algorithm version for rows of <paramref name="systemId"/>. Unknown ids return 0, so
+        /// callers must pass an explicit version for anything not listed here.
         /// </summary>
+        /// <remarks>
+        /// The two sides are deliberately stamped from different sources. Chart-side Mina rows carry the
+        /// producer revision, which folds every declared dependency. Player rows carry the raw engine
+        /// constant: they are aggregated per play and are not part of the chart chain, so a chart-side
+        /// admission never retires them.
+        /// </remarks>
         public static int ResolveAlgorithmVersion(string systemId) => systemId switch
         {
-            BEATMAP_MINA or PLAYER_MINA or PLAYER_PATTERN => EzMinaSkillAlgorithm.VERSION,
+            BEATMAP_MINA => EzAnalysisRevision.Registry.RevisionOf(EzMetricProducers.MINA_CHART, EzLocalProfileConstants.MANIA_RULESET_ID),
+            PLAYER_MINA or PLAYER_PATTERN => EzMinaSkillAlgorithm.VERSION,
+            // PP+ rows are stamped per ruleset bundle, never by a single version constant.
+            BEATMAP_PPP or PLAYER_PPP => EzPPPSkillVersions.FACET_REVISION,
             _ => 0,
         };
     }
 
     /// <summary>
-    /// Bump when MinaCalc note conversion or aggregation semantics change.
-    /// 2: unified onto the 4-18K n-key MinaCalc wasm (was NuGet MinaCalc 0.4.2, 4/6/7K only).
+    /// Bump when note conversion or rating aggregation semantics change.
+    /// 2: unified onto the 4-18K n-key engine (was a 4/6/7K-only package).
     /// </summary>
     public static class EzMinaSkillAlgorithm
     {

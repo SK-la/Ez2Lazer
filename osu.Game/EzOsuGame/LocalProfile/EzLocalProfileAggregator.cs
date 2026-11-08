@@ -236,7 +236,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var analysis = cached.Result;
             double avgKps = hasKps ? analysis.AverageKps : 0;
             double maxKps = hasKps ? analysis.MaxKps : 0;
-            double xxyStarRating = resolveXxyStarRating(beatmap, analysis, hasKps, modsAffect, starRating);
+            double sunnyStarRating = resolveSunnyStarRating(beatmap, analysis, hasKps, modsAffect, starRating);
             long durationMs = resolveDurationMs(score, beatmap);
 
             double? avgAbsOffsetMs = null;
@@ -251,7 +251,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 hasKps,
                 avgAbsOffsetMs,
                 starRating,
-                xxyStarRating));
+                sunnyStarRating));
 
             var rulesetStats = getOrCreate(result.RulesetStats, rulesetId, () => new EzLocalProfileAggregationResult.MutableRulesetStats());
             rulesetStats.TotalKeys += keys;
@@ -269,7 +269,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             incrementGrade(result, rulesetId, score.Rank);
             incrementStar(result, rulesetId, starRating);
-            incrementXxy(result, rulesetId, xxyStarRating);
+            incrementXxy(result, rulesetId, sunnyStarRating);
 
             if (rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID)
             {
@@ -687,12 +687,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
             result.StarPlayCounts[key] = existing + 1;
         }
 
-        private static void incrementXxy(EzLocalProfileAggregationResult result, int rulesetId, double xxyStarRating)
+        private static void incrementXxy(EzLocalProfileAggregationResult result, int rulesetId, double sunnyStarRating)
         {
-            if (xxyStarRating < 0)
+            if (sunnyStarRating < 0)
                 return;
 
-            int bucket = (int)Math.Floor(xxyStarRating);
+            int bucket = (int)Math.Floor(sunnyStarRating);
             var key = (rulesetId, bucket);
             result.XxyPlayCounts.TryGetValue(key, out int existing);
             result.XxyPlayCounts[key] = existing + 1;
@@ -700,9 +700,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         /// <summary>
         /// Resolve xxy SR for bucket counting. With beatmap-affecting mods, prefer playable analysis
-        /// (not Realm NoMod <see cref="BeatmapInfo.XxyStarRating"/>).
+        /// (not Realm NoMod <see cref="BeatmapInfo.SunnyStarRating"/>).
         /// </summary>
-        private static double resolveXxyStarRating(
+        private static double resolveSunnyStarRating(
             BeatmapInfo beatmap,
             EzAnalysisResult analysis,
             bool hasKps,
@@ -717,8 +717,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 return resolvedStarRating >= 0 ? resolvedStarRating : -1;
             }
 
-            if (beatmap.XxyStarRating >= 0)
-                return beatmap.XxyStarRating;
+            if (beatmap.SunnyStarRating >= 0)
+                return beatmap.SunnyStarRating;
 
             if (hasKps && analysis.ManiaSummary?.XxySr is double storedXxy && storedXxy >= 0)
                 return storedXxy;

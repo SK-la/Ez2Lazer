@@ -75,9 +75,8 @@ namespace osu.Game.Beatmaps
                     beatmap.HasVideo = tagSummary.HasVideo;
                     beatmap.HasStoryboard = tagSummary.HasStoryboard;
 
-                    // [EZ-REALTIME] 分析回写已临时屏蔽（实时验证期）；恢复时取消注释。
-                    // updateXxyStarRating(beatmap);
-                    // updatePerformancePoints(beatmap, working);
+                    updateSunnyStarRating(beatmap);
+                    updatePerformancePoints(beatmap, working);
                 }
 
                 // And invalidate again afterwards as re-fetching the most up-to-date database metadata will be required.
@@ -103,12 +102,12 @@ namespace osu.Game.Beatmaps
             });
         }
 
-        private void updateXxyStarRating(BeatmapInfo beatmap)
+        private void updateSunnyStarRating(BeatmapInfo beatmap)
         {
             if (beatmapManager == null)
                 return;
 
-            beatmap.XxyStarRating = EzAnalysisComputation.ComputeBaselineXxyStarRatingForRealm(beatmapManager, beatmap);
+            beatmap.SunnyStarRating = EzAnalysisComputation.ComputeBaselineSSRForRealm(beatmapManager, beatmap);
         }
 
         private void updatePerformancePoints(BeatmapInfo beatmap, WorkingBeatmap working)

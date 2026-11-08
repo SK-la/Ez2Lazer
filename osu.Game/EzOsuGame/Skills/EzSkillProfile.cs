@@ -4,13 +4,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.EzOsuGame.Metrics;
 
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
     /// Ruleset-facing skill wiring: which systems are active and which drive the default radar.
-    /// Built from <see cref="EzSkillRegistry"/> — UI/HUD should query this instead of hard-coding OnlineID gates.
     /// </summary>
+    /// <remarks>
+    /// Derived from the producer declaration, so consumers never hard-code a ruleset gate of their own.
+    /// </remarks>
     public sealed class EzSkillProfile
     {
         public EzSkillProfile(
@@ -44,45 +47,38 @@ namespace osu.Game.EzOsuGame.Skills
                || PlayerSystemIds.Contains(systemId, StringComparer.Ordinal);
 
         /// <summary>
-        /// Returns a profile for <paramref name="rulesetOnlineId"/>, or <see langword="null"/> when no
-        /// registered system applies (taiko/catch today).
+        /// Returns a profile for <paramref name="rulesetOnlineId"/>, or <see langword="null"/> when no producer
+        /// declares a skill vector for it.
         /// </summary>
-        public static EzSkillProfile? TryBuild(int rulesetOnlineId, EzSkillRegistry registry)
+        public static EzSkillProfile? TryBuild(int rulesetOnlineId, EzMetricProducerRegistry registry)
         {
             ArgumentNullException.ThrowIfNull(registry);
 
-            var applicable = registry.Systems
-                                     .Where(s => s.AppliesToRuleset(rulesetOnlineId))
-                                     .ToList();
+            var chart = registry.VectorProducers(rulesetOnlineId, EzSkillScope.Beatmap).ToList();
+            var player = registry.VectorProducers(rulesetOnlineId, EzSkillScope.Player).ToList();
 
-            if (applicable.Count == 0)
+            if (chart.Count == 0 && player.Count == 0)
                 return null;
-
-            var chart = applicable.Where(s => s.Scope == EzSkillScope.Beatmap).ToList();
-            var player = applicable.Where(s => s.Scope == EzSkillScope.Player).ToList();
-
-            string? defaultChart = pickDefault(chart);
-            string? defaultPlayer = pickDefault(player);
 
             return new EzSkillProfile(
                 rulesetOnlineId,
-                chart.Select(s => s.SystemId).ToList(),
-                player.Select(s => s.SystemId).ToList(),
-                defaultChart,
-                defaultPlayer);
+                chart.Select(s => s.EffectiveSystemId).ToList(),
+                player.Select(s => s.EffectiveSystemId).ToList(),
+                pickDefault(chart, rulesetOnlineId),
+                pickDefault(player, rulesetOnlineId));
         }
 
-        private static string? pickDefault(IReadOnlyList<IEzSkillSystem> systems)
+        private static string? pickDefault(IReadOnlyList<EzMetricProducer> producers, int rulesetOnlineId)
         {
-            var defaults = systems.Where(s => s.IsDefaultRadar).Select(s => s.SystemId).ToList();
+            var defaults = producers.Where(s => s.IsDefaultRadarFor(rulesetOnlineId)).Select(s => s.EffectiveSystemId).ToList();
 
             if (defaults.Count > 1)
             {
                 throw new InvalidOperationException(
-                    $"Multiple default-radar systems for scope: {string.Join(", ", defaults)}");
+                    $"Multiple default-radar producers for scope: {string.Join(", ", defaults)}");
             }
 
-            return defaults.Count == 1 ? defaults[0] : systems.FirstOrDefault()?.SystemId;
+            return defaults.Count == 1 ? defaults[0] : producers.FirstOrDefault()?.EffectiveSystemId;
         }
     }
 }

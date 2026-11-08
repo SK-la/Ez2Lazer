@@ -28,7 +28,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 var beatmap = createBeatmap();
 
                 var kpsList = new List<double> { 1, 2, 3 };
-                var slice = new EzAnalysisResult(new KpsSummary(1.5, 3, kpsList), pp: null, new EzManiaSummary(new Dictionary<int, int> { [4] = 10 }, null, xxySr: null));
+                var slice = new EzAnalysisResult(new KpsSummary(1.5, 3, kpsList), new EzManiaSummary(new Dictionary<int, int> { [4] = 10 }, null, xxySr: null));
 
                 persistentStore.Store(beatmap, slice);
 

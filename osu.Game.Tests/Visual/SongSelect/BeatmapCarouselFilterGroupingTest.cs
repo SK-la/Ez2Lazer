@@ -299,7 +299,7 @@ namespace osu.Game.Tests.Visual.SongSelect
         #region xxy SR grouping
 
         [Test]
-        public async Task TestGroupingByXxyStarRating()
+        public async Task TestGroupingBySunnyStarRating()
         {
             int total = 0;
 
@@ -309,7 +309,7 @@ namespace osu.Game.Tests.Visual.SongSelect
             addBeatmapSet(applyXxyStars(2.0, 9.0), beatmapSets, out var beatmap2);
             addBeatmapSet(applyXxyStars(7.0, 2.0), beatmapSets, out var beatmap7);
 
-            var results = await runGrouping(GroupMode.XxyStarRating, beatmapSets, getXxy: resolveXxy);
+            var results = await runGrouping(GroupMode.SunnyStarRating, beatmapSets, getXxy: resolveXxy);
             assertGroup(results, 0, BeatmapCarouselFilterGroupingStrings.BelowStars(1), beatmapBelow1.Beatmaps, ref total);
             assertGroup(results, 1, BeatmapCarouselFilterGroupingStrings.Stars(1), beatmapAbove1.Beatmaps, ref total);
             assertGroup(results, 2, BeatmapCarouselFilterGroupingStrings.Stars(2), beatmap2.Beatmaps, ref total);
@@ -321,12 +321,12 @@ namespace osu.Game.Tests.Visual.SongSelect
         {
             return s => s.Beatmaps.ForEach(b =>
             {
-                b.XxyStarRating = xxy;
+                b.SunnyStarRating = xxy;
                 b.StarRating = starRating;
             });
         }
 
-        private static double resolveXxy(BeatmapInfo beatmap) => beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : beatmap.StarRating;
+        private static double resolveXxy(BeatmapInfo beatmap) => beatmap.SunnyStarRating >= 0 ? beatmap.SunnyStarRating : beatmap.StarRating;
 
         #endregion
 
@@ -485,7 +485,7 @@ namespace osu.Game.Tests.Visual.SongSelect
                 GetLocalUserTopRanks = _ => new Dictionary<Guid, ScoreRank>(),
                 GetFavouriteBeatmapSets = () => favouriteBeatmapSets,
                 GetDifficultiesForOperationsAsync = (beatmaps, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(
-                    beatmaps.ToDictionary(b => b, b => getXxy?.Invoke(b) ?? (b.XxyStarRating >= 0 ? b.XxyStarRating : b.StarRating))),
+                    beatmaps.ToDictionary(b => b, b => getXxy?.Invoke(b) ?? (b.SunnyStarRating >= 0 ? b.SunnyStarRating : b.StarRating))),
                 GetPpForOperationsAsync = (beatmaps, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(beatmaps.Where(b => (getPp?.Invoke(b)).HasValue).ToDictionary(b => b, b => getPp!.Invoke(b)!.Value)),
             };
 

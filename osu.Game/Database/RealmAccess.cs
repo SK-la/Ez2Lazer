@@ -117,7 +117,7 @@ namespace osu.Game.Database
         /// The on-disk Realm schema version is <see cref="EzFileSchemaVersion"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 52010).
         /// Ez v1: Add ScoreInfo hit/health mode (later renamed: Judgement=>JudgeMode, health kept).
         /// Ez v2: Add BeatmapInfo.HasVideo and HasStoryboard.
-        /// Ez v3: Add BeatmapInfo.XxyStarRating.
+        /// Ez v3: Add BeatmapInfo.SunnyStarRating.
         /// Ez v4: Add BeatmapInfo.PerformancePoints.
         /// Ez v5: Change BeatmapInfo.HasVideo/HasStoryboard to nullable (null = unknown).
         /// Ez v6: Add RulesetInfo.LastAppliedXxySrVersion.
@@ -1535,7 +1535,7 @@ namespace osu.Game.Database
 
                 case 3:
                     foreach (var beatmap in migration.NewRealm.All<BeatmapInfo>())
-                        beatmap.XxyStarRating = -1;
+                        beatmap.SunnyStarRating = -1;
 
                     break;
 

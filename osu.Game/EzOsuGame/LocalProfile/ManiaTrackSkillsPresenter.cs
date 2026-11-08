@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Bindables;
@@ -11,6 +10,7 @@ using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.Pattern;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.LocalProfile
 {
@@ -73,18 +73,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public LocalisableString ResolveDisplayName(string skillId)
         {
-            foreach (string systemId in new[] { EzSkillSystems.PLAYER_PATTERN, EzSkillSystems.PLAYER_MINA })
+            foreach (var item in provider.Registry.Items(EzLocalProfileConstants.MANIA_RULESET_ID, EzSkillScope.Player))
             {
-                foreach (var def in provider.Registry.GetSystem(systemId)?.Skills
-                                    ?? Array.Empty<EzSkillDefinition>())
-                {
-                    if (def.SkillId == skillId)
-                        return def.DisplayName;
-                }
+                if (item.SkillId == skillId)
+                    return item.Axis.DisplayName;
             }
 
             if (EzPatternRatings.TryParseSkillId(skillId, out string patternId)
-                && EzPlayerPatternAxisExtensions.TryParse(patternId, out var patternAxis))
+                && EzManiaRCAxisExtensions.TryParse(patternId, out var patternAxis))
             {
                 return patternAxis.Meta().DisplayName;
             }

@@ -151,7 +151,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 MapperUsername = "Mapper",
                 BeatmapStatus = BeatmapOnlineStatus.Ranked,
                 StarRating = 5.42,
-                XxyStarRating = -1,
+                SunnyStarRating = -1,
                 MapPerformancePoints = 120,
                 KpsAvg = 8.75,
                 KpsMax = 12.3,

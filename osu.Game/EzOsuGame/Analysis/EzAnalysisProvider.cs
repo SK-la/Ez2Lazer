@@ -17,9 +17,23 @@ namespace osu.Game.EzOsuGame.Analysis
         None = 0,
         XxySr = 1 << 0,
         RulesetSpecificRadarData = 1 << 1,
+
+        /// <summary>Performance points for a supplied star rating.</summary>
+        PerformancePoints = 1 << 2,
     }
 
-    public readonly record struct EzAnalysisRequest(IBeatmap Beatmap, double ClockRate, EzAnalysisScope RequestedScopes = EzAnalysisScope.None);
+    /// <summary>
+    /// One analysis request.
+    /// </summary>
+    /// <param name="StarRatingOverride">
+    /// When set, the provider rates performance as if this were the difficulty's star rating. Used to ask what a
+    /// substituted rating (such as the Sunny one) would score, without re-deriving the difficulty.
+    /// </param>
+    public readonly record struct EzAnalysisRequest(
+        IBeatmap Beatmap,
+        double ClockRate,
+        EzAnalysisScope RequestedScopes = EzAnalysisScope.None,
+        double? StarRatingOverride = null);
 
     public readonly record struct EzAnalysisField<TValue>(string Key, EzAnalysisScope Scope)
     {
@@ -38,19 +52,19 @@ namespace osu.Game.EzOsuGame.Analysis
 
     /// <summary>
     /// 规则集通过 <see cref="Rulesets.Ruleset.CreateEzAnalysisProvider"/> 返回的实现此接口的 provider，声明支持 xxy 难度。
-    /// 是否对某张谱面计算由 <see cref="SupportsXxyStarRating"/> 决定；sqlite/Realm 仅为存储与消费者，不决定规则集能力。
+    /// 是否对某张谱面计算由 <see cref="SupportsSunnyStarRating"/> 决定；sqlite/Realm 仅为存储与消费者，不决定规则集能力。
     /// </summary>
-    public interface IEzXxyStarRatingSupport
+    public interface IEzSunnyStarRatingSupport
     {
         /// <summary>
         /// yyyyMMdd revision of this ruleset's xxy SR algorithm. Bump when calculation logic changes.
         /// </summary>
-        int XxyStarRatingVersion { get; }
+        int SunnyStarRatingVersion { get; }
 
         /// <summary>
         /// Whether xxy SR can be calculated for this beatmap (layout, key count, etc.).
         /// </summary>
-        bool SupportsXxyStarRating(IBeatmap beatmap);
+        bool SupportsSunnyStarRating(IBeatmap beatmap);
     }
 
     public static class EzAnalysisFields
@@ -59,6 +73,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public static readonly EzAnalysisField<EzRulesetSpecificRadarResult> RULESET_SPECIFIC_RADAR_RESULT
             = new EzAnalysisField<EzRulesetSpecificRadarResult>("ruleset_specific_radar_result", EzAnalysisScope.RulesetSpecificRadarData);
+
+        public static readonly EzAnalysisField<double> PERFORMANCE_POINTS
+            = new EzAnalysisField<double>("performance_points", EzAnalysisScope.PerformancePoints);
     }
 
     public sealed class EzAnalysisBag : IEzAnalysis
@@ -95,7 +112,7 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             provider = null!;
 
-            if (!EzXxyStarRatingSupport.IsRulesetAvailable(rulesetInfo))
+            if (!EzSunnyStarRatingSupport.IsRulesetAvailable(rulesetInfo))
                 return false;
 
             try

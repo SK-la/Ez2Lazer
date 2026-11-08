@@ -206,14 +206,14 @@ namespace osu.Game.Tests.Visual.SongSelect
         }
 
         [Test]
-        public async Task TestSortByXxyStarRatingUsesProvidedValues()
+        public async Task TestSortBySunnyStarRatingUsesProvidedValues()
         {
             var beatmapSets = new List<BeatmapSetInfo>();
 
             addBeatmapSet(applyXxy(1.0, 5.0), beatmapSets, out var lowXxyHighSr);
             addBeatmapSet(applyXxy(9.0, 1.0), beatmapSets, out var highXxyLowSr);
 
-            var results = await runSorting(SortMode.XxyStarRating, beatmapSets, xxyValueProvider: beatmaps => beatmaps.ToDictionary(b => b, resolveXxy));
+            var results = await runSorting(SortMode.SunnyStarRating, beatmapSets, xxyValueProvider: beatmaps => beatmaps.ToDictionary(b => b, resolveXxy));
 
             Assert.That(results.Last(), Is.EqualTo(highXxyLowSr.Beatmaps[0]));
             Assert.That(results.First(), Is.EqualTo(lowXxyHighSr.Beatmaps[0]));
@@ -245,12 +245,12 @@ namespace osu.Game.Tests.Visual.SongSelect
         {
             return s => s.Beatmaps.ForEach(b =>
             {
-                b.XxyStarRating = xxy;
+                b.SunnyStarRating = xxy;
                 b.StarRating = starRating;
             });
         }
 
-        private static double resolveXxy(BeatmapInfo beatmap) => beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : beatmap.StarRating;
+        private static double resolveXxy(BeatmapInfo beatmap) => beatmap.SunnyStarRating >= 0 ? beatmap.SunnyStarRating : beatmap.StarRating;
 
         private static async Task<IEnumerable<BeatmapInfo>> runSorting(SortMode sort, List<BeatmapSetInfo> beatmapSets,
                                                                        Func<IEnumerable<BeatmapInfo>, IReadOnlyDictionary<BeatmapInfo, double>>? xxyValueProvider = null,

@@ -301,8 +301,8 @@ namespace osu.Game.Screens.Select
             public void ApplyKpcMetrics(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
             {
                 if (beatmap.IsDefault || beatmap.Value.BeatmapInfo is not BeatmapInfo beatmapInfo
-                    || !EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value)
-                    || !beatmapInfo.SupportsXxyStarRating())
+                                      || !EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value)
+                                      || !beatmapInfo.SupportsSunnyStarRating())
                 {
                     ezDisplayKpc.ManiaSummary = null;
                     ezDisplayKpc.Hide();

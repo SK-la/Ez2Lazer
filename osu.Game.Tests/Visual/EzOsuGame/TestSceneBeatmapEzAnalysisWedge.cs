@@ -169,7 +169,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             wedge.DanPanel.DualLayout.Value = EzDanPanelDualLayout.Horizontal;
             var beatmap = CreateWorkingBeatmap(new TestBeatmap(new ManiaRuleset().RulesetInfo));
             beatmap.BeatmapInfo.Difficulty.CircleSize = test_keys;
-            beatmap.BeatmapInfo.XxyStarRating = 18.5;
+            beatmap.BeatmapInfo.SunnyStarRating = 18.5;
 
             string hash = beatmap.BeatmapInfo.Hash;
 
@@ -200,7 +200,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 Chordjack: 16.5,
                 Technical: 20.0);
 
-            skillStore.WriteBeatmapMsd(hash, chartMsd, beatmap.BeatmapInfo.ID, holdRatio: 0.22);
+            skillStore.WriteBeatmapMsd(hash, chartMsd, beatmap.BeatmapInfo.ID);
             skillStore.WritePlayerSsr(test_player, test_keys, playerSsr, analyzedPlays: 40, provisional: false);
 
             writeDan(test_player, EzDanSide.Rc, chartMsd.Overall, clears: 12);
@@ -209,8 +209,8 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             Beatmap.Value = beatmap;
             SelectedMods.Value = [];
             wedge.TargetUsername.Value = test_player;
-            wedge.LeftRadarMode.Value = EzRadarDisplayMode.XxySrPattern;
-            wedge.RightRadarMode.Value = EzRadarDisplayMode.SkillDual;
+            wedge.LeftRadarMode.Value = EzRadarDisplayMode.SSRSkill;
+            wedge.RightRadarMode.Value = EzRadarDisplayMode.MSDSkillDual;
             wedge.Show();
         }
 

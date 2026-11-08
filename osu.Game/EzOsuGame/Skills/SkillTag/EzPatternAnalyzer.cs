@@ -12,37 +12,12 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
     /// </summary>
     public static class EzPatternAnalyzer
     {
-        private static readonly HashSet<string> ln_subtype_ids = new HashSet<string>(StringComparer.Ordinal)
-        {
-            "lngeneral", "lnrelease", "lninverse", "lntech"
-        };
+        private static readonly HashSet<string> ln_subtype_ids = new HashSet<string>(EzManiaLNAxisExtensions.SubtypeIds, StringComparer.Ordinal);
 
         private const double inverse_window_ms = 8000;
         private const int inverse_window_min_pairs = 20;
         private const int inverse_window_min_windows = 3;
         private const double inverse_window_ratio = 0.65;
-
-        private static readonly Dictionary<string, string> labels = new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["jack"] = "Jack",
-            ["chordjack"] = "Chordjack",
-            ["speedjack"] = "Speedjack",
-            ["handjack"] = "Handjack",
-            ["tech"] = "Tech",
-            ["stream"] = "Stream",
-            ["dumpstream"] = "Dumpstream",
-            ["jumpstream"] = "Jumpstream",
-            ["handstream"] = "Handstream",
-            ["quadstream"] = "Quadstream",
-            ["delay"] = "Delay",
-            ["bracket"] = "Bracket",
-            ["chordstream"] = "Chordstream",
-            ["ln"] = "LN",
-            ["lngeneral"] = "LN General",
-            ["lnrelease"] = "LN Release",
-            ["lninverse"] = "LN Inverse",
-            ["lntech"] = "LN Tech"
-        };
 
         public static EzPatternAnalysis Analyze(EzManiaChartInput map, double rate = 1, EzChartFeatureExtraction? precomputed = null)
         {
@@ -148,15 +123,15 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             double lnSpecialtyScore = Math.Max(lnInverseScore, Math.Max(lnReleaseScore, lnTechScore));
             double lnGeneralScore = lnSubtypeGate * lnGeneralCoverage * EzChartFeatureMath.Clamp01((0.7 - lnSpecialtyScore) / 0.4);
 
-            candidates.Add(hit("ln", metrics.KeyCount == 7 ? lnScore * 0.62 : lnScore, dataConfidence));
+            candidates.Add(hit(EzManiaRCAxis.Ln, metrics.KeyCount == 7 ? lnScore * 0.62 : lnScore, dataConfidence));
 
             if (lnSubtypeKeys)
             {
-                candidates.Add(hit("lngeneral", lnGeneralScore, dataConfidence));
-                candidates.Add(hit("lninverse", lnInverseScore, dataConfidence));
-                candidates.Add(hit("lntech", lnTechScore, dataConfidence));
+                candidates.Add(hit(EzManiaLNAxis.General, lnGeneralScore, dataConfidence));
+                candidates.Add(hit(EzManiaLNAxis.Inverse, lnInverseScore, dataConfidence));
+                candidates.Add(hit(EzManiaLNAxis.Tech, lnTechScore, dataConfidence));
                 if (metrics.KeyCount == 7)
-                    candidates.Add(hit("lnrelease", lnReleaseScore, dataConfidence));
+                    candidates.Add(hit(EzManiaLNAxis.ReleaseSubtype, lnReleaseScore, dataConfidence));
             }
 
             if (metrics.KeyCount == 4)
@@ -164,32 +139,32 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                 double jackScore = Math.Max(
                     pressure(metrics.JackPressure, 75, 185) * (0.55 + lowChordGate * 0.35),
                     EzChartFeatureMath.MinGate(pressure(metrics.JackPressure, 110, 200), pressure(metrics.FastRowRatio, 0.05, 0.28)));
-                candidates.Add(hit("jack", jackScore, dataConfidence));
-                candidates.Add(hit("chordjack", chordjackBase, dataConfidence));
-                candidates.Add(hit("speedjack", chordjackBase * EzChartFeatureMath.MinGate(
+                candidates.Add(hit(EzManiaRCAxis.Jack, jackScore, dataConfidence));
+                candidates.Add(hit(EzManiaRCAxis.Chordjack, chordjackBase, dataConfidence));
+                candidates.Add(hit(EzManiaRCAxis.Speedjack, chordjackBase * EzChartFeatureMath.MinGate(
                     pressure(twoNoteRatio, 0.18, 0.42),
                     pressure(metrics.JackPressure, 115, 205),
                     EzChartFeatureMath.Clamp01((0.68 - threePlusRatio) / 0.35)), dataConfidence));
-                candidates.Add(hit("handjack", chordjackBase * EzChartFeatureMath.MinGate(
+                candidates.Add(hit(EzManiaRCAxis.Handjack, chordjackBase * EzChartFeatureMath.MinGate(
                     pressure(threePlusRatio, 0.08, 0.28),
                     pressure(stats.AverageChordSize, 2.15, 3.1),
                     pressure(metrics.JackPressure, 95, 180)), dataConfidence));
-                candidates.Add(hit("tech", techScore, dataConfidence));
-                candidates.Add(hit("stream", lowChordGate * streamActivity * EzChartFeatureMath.Clamp01((150 - metrics.JackPressure) / 120), dataConfidence));
-                candidates.Add(hit("dumpstream", lowChordGate * streamActivity * EzChartFeatureMath.MinGate(
+                candidates.Add(hit(EzManiaRCAxis.Tech, techScore, dataConfidence));
+                candidates.Add(hit(EzManiaRCAxis.Stream, lowChordGate * streamActivity * EzChartFeatureMath.Clamp01((150 - metrics.JackPressure) / 120), dataConfidence));
+                candidates.Add(hit(EzManiaRCAxis.Dumpstream, lowChordGate * streamActivity * EzChartFeatureMath.MinGate(
                     pressure(metrics.RowPatternEntropy, 1.8, 3.5),
                     pressure(metrics.RowIntervalEntropy, 1.2, 2.7),
                     EzChartFeatureMath.Clamp01((0.75 - metrics.RhythmMotifRepeatRatio) / 0.45)), dataConfidence));
-                candidates.Add(hit("jumpstream", EzChartFeatureMath.MinGate(
+                candidates.Add(hit(EzManiaRCAxis.Jumpstream, EzChartFeatureMath.MinGate(
                     pressure(twoNoteRatio, 0.14, 0.36),
                     pressure(chordRatio, 0.24, 0.56),
                     pressure(metrics.JumpstreamPressure, 8, 22)), dataConfidence));
-                candidates.Add(hit("handstream", EzChartFeatureMath.MinGate(
+                candidates.Add(hit(EzManiaRCAxis.Handstream, EzChartFeatureMath.MinGate(
                     pressure(threeNoteRatio, 0.06, 0.22),
                     pressure(chordRatio, 0.32, 0.62),
                     pressure(metrics.SustainedNps10s, 13, 27),
                     EzChartFeatureMath.Clamp01((175 - metrics.JackPressure) / 120)), dataConfidence));
-                candidates.Add(hit("quadstream", EzChartFeatureMath.MinGate(
+                candidates.Add(hit(EzManiaRCAxis.Quadstream, EzChartFeatureMath.MinGate(
                     pressure(fourPlusRatio, 0.015, 0.08),
                     pressure(chordRatio, 0.36, 0.72),
                     pressure(metrics.SustainedNps10s, 12, 25)), dataConfidence));
@@ -217,23 +192,23 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                 double jackScore = nonLnPatternGate * Math.Max(
                     pressure(singleJack.Jack1Share, 0.08, 0.28),
                     pressure(singleJack.TrillRunShare, 0.03, 0.12));
-                candidates.Add(hit("delay", delayScore, dataConfidence));
-                candidates.Add(hit("jack", jackScore, dataConfidence));
-                candidates.Add(hit("chordjack", chordjackScore, dataConfidence));
-                candidates.Add(hit("tech", nonLnPatternGate * Math.Max(
+                candidates.Add(hit(EzManiaRCAxis.Delay, delayScore, dataConfidence));
+                candidates.Add(hit(EzManiaRCAxis.Jack, jackScore, dataConfidence));
+                candidates.Add(hit(EzManiaRCAxis.Chordjack, chordjackScore, dataConfidence));
+                candidates.Add(hit(EzManiaRCAxis.Tech, nonLnPatternGate * Math.Max(
                     techScore,
                     wideChordstream * EzChartFeatureMath.MinGate(pressure(metrics.RowPatternChangeRate, 0.38, 0.72), pressure(metrics.FastRowRatio, 0.08, 0.36))), dataConfidence));
-                candidates.Add(hit("bracket", nonLnPatternGate * bracketOverlapGate * EzChartFeatureMath.MinGate(
+                candidates.Add(hit(EzManiaRCAxis.Bracket, nonLnPatternGate * bracketOverlapGate * EzChartFeatureMath.MinGate(
                     pressure(chordRatio, 0.28, 0.62),
                     pressure(bracketWindowRatio, 0.18, 0.38)), dataConfidence));
-                candidates.Add(hit("chordstream", nonLnPatternGate * wideChordstream * EzChartFeatureMath.Clamp01((165 - metrics.JackPressure) / 130), dataConfidence));
+                candidates.Add(hit(EzManiaRCAxis.Chordstream, nonLnPatternGate * wideChordstream * EzChartFeatureMath.Clamp01((165 - metrics.JackPressure) / 130), dataConfidence));
             }
             else
             {
-                candidates.Add(hit("stream", lowChordGate * streamActivity, dataConfidence));
-                candidates.Add(hit("chordstream", chordstreamGate, dataConfidence));
-                candidates.Add(hit("chordjack", chordjackBase, dataConfidence));
-                candidates.Add(hit("tech", techScore, dataConfidence));
+                candidates.Add(hit(EzManiaRCAxis.Stream, lowChordGate * streamActivity, dataConfidence));
+                candidates.Add(hit(EzManiaRCAxis.Chordstream, chordstreamGate, dataConfidence));
+                candidates.Add(hit(EzManiaRCAxis.Chordjack, chordjackBase, dataConfidence));
+                candidates.Add(hit(EzManiaRCAxis.Tech, techScore, dataConfidence));
             }
 
             var allPatterns = candidates
@@ -250,9 +225,10 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                               .ToList();
 
             var visiblePatterns = allPatterns.Where(p => p.Score >= 0.2).Take(5).ToList();
-            var lnPattern = allPatterns.FirstOrDefault(p => p.Id == "ln");
+            string lnId = EzManiaRCAxis.Ln.ToId();
+            var lnPattern = allPatterns.FirstOrDefault(p => p.Id == lnId);
             bool hasLnSignal = lnPattern != null && (lnPattern.Score > 0 || metrics.HoldRatio > 0);
-            var lnAxisPatterns = lnPattern != null && hasLnSignal && visiblePatterns.All(p => p.Id != "ln")
+            var lnAxisPatterns = lnPattern != null && hasLnSignal && visiblePatterns.All(p => p.Id != lnId)
                 ? visiblePatterns.Append(lnPattern).ToList()
                 : visiblePatterns;
             var subtypeOverflow = allPatterns.Where(p => ln_subtype_ids.Contains(p.Id)
@@ -271,12 +247,23 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             };
         }
 
-        private static EzPatternHit hit(string id, double score, double dataConfidence)
+        private static EzPatternHit hit(EzManiaRCAxis tag, double score, double dataConfidence)
         {
             return new EzPatternHit
             {
-                Id = id,
-                Label = labels.GetValueOrDefault(id, id),
+                Id = tag.ToId(),
+                Label = tag.Meta().NameEn,
+                Score = roundedScore(score),
+                Confidence = roundedScore(score * dataConfidence)
+            };
+        }
+
+        private static EzPatternHit hit(EzManiaLNAxis axis, double score, double dataConfidence)
+        {
+            return new EzPatternHit
+            {
+                Id = axis.ToId(),
+                Label = axis.Meta().NameEn,
                 Score = roundedScore(score),
                 Confidence = roundedScore(score * dataConfidence)
             };

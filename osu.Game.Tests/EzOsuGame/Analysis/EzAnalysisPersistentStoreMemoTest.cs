@@ -75,7 +75,6 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         private static EzAnalysisResult createSlice(double averageKps, double maxKps)
             => new EzAnalysisResult(
                 new KpsSummary(averageKps, maxKps, new List<double> { averageKps, maxKps }),
-                pp: null,
                 new EzManiaSummary(new Dictionary<int, int> { [4] = 10 }, null, xxySr: null));
 
         private static BeatmapInfo createBeatmap() => new BeatmapInfo

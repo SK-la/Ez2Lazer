@@ -370,7 +370,7 @@ namespace osu.Game.Screens.Select
             ezDisplaySkillsDan.Beatmap = beatmap;
             ezDisplayTag.Beatmap = beatmap;
 
-            if (supportsEzAnalysis && beatmap.SupportsXxyStarRating())
+            if (supportsEzAnalysis && beatmap.SupportsSunnyStarRating())
                 displaySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay();
 
             computeEzAnalysis();
@@ -381,7 +381,7 @@ namespace osu.Game.Screens.Select
             if (Item?.IsVisible != true)
                 return;
 
-            bool showXxy = supportsEzAnalysis && beatmap.SupportsXxyStarRating();
+            bool showXxy = supportsEzAnalysis && beatmap.SupportsSunnyStarRating();
 
             if (showXxy)
                 displaySR.Show();
@@ -468,7 +468,7 @@ namespace osu.Game.Screens.Select
             var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, ezAnalysisResult, mods.Value);
             applyPanelKps(metrics);
 
-            if (!supportsEzAnalysis || !beatmap.SupportsXxyStarRating())
+            if (!supportsEzAnalysis || !beatmap.SupportsSunnyStarRating())
                 return;
 
             var maniaSummary = metrics.ManiaSummary;

@@ -156,10 +156,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     [EzMinaSkillAxis.JackSpeed.ToMsdSkillId()] = 10,
                     [EzMinaSkillAxis.Chordjack.ToMsdSkillId()] = 8,
                     [EzMinaSkillAxis.Technical.ToMsdSkillId()] = 6,
-                    [EzSkillSystems.MinaHoldRatioSkillId] = 0.1,
                 };
 
-                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6), holdRatio: 0.1);
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6));
 
                 var computed = EzPersistedChartDan.TryComputeFromStored(
                     hash,
@@ -214,7 +213,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Assert.That(EzBeatmapMinaComputer.IsCurrentMinaCache(skills), Is.False);
 
                 // Successful MSD write replaces the marker.
-                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6), holdRatio: 0.1);
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6));
                 Assert.That(store.CollectChartChainState().CompleteMsd, Does.Contain(hash));
                 Assert.That(EzBeatmapMinaComputer.IsUnrateableMina(store.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MINA)), Is.False);
             });
@@ -235,7 +234,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 // 5K: not a 4/6/7K interval table, and no xxy star rating to borrow one from.
                 seedChart(realm, hash, circleSize: 5);
-                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6), holdRatio: 0.1);
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6));
 
                 var chain = store.CollectChartChainState();
 
@@ -293,7 +292,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void File_schema_version_is_ez11()
         {
-            Assert.That(RealmAccess.EZ_REALM_SCHEMA_VERSION, Is.EqualTo(11));
+            Assert.That(RealmAccess.EZ_REALM_SCHEMA_VERSION, Is.EqualTo(12));
             Assert.That(RealmAccess.EzFileSchemaVersion, Is.EqualTo(RealmAccess.UpstreamSchemaVersion * 1000 + 11));
         }
     }

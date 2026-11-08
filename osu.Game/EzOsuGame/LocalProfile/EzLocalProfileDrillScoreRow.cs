@@ -39,7 +39,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public string MapperUsername { get; init; } = string.Empty;
         public BeatmapOnlineStatus BeatmapStatus { get; init; }
         public double StarRating { get; init; }
-        public double XxyStarRating { get; init; }
+        public double SunnyStarRating { get; init; }
         public double MapPerformancePoints { get; init; }
         public double KpsAvg { get; init; }
         public double KpsMax { get; init; }
@@ -94,7 +94,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 var columns = JsonSerializer.Deserialize<Dictionary<int, int>>(ColumnCountsJson) ?? new Dictionary<int, int>();
                 var holds = JsonSerializer.Deserialize<Dictionary<int, int>>(HoldCountsJson) ?? new Dictionary<int, int>();
-                return new EzManiaSummary(columns, holds, XxyStarRating >= 0 ? XxyStarRating : null);
+                return new EzManiaSummary(columns, holds, SunnyStarRating >= 0 ? SunnyStarRating : null);
             }
             catch
             {
@@ -110,16 +110,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
             bool hasKps,
             double? avgAbsOffsetMs = null,
             double? starRating = null,
-            double? xxyStarRating = null)
+            double? sunnyStarRating = null)
         {
             var beatmap = score.BeatmapInfo!;
             var metadata = beatmap.Metadata;
             var maniaSummary = analysis.ManiaSummary;
 
-            double resolvedXxy = xxyStarRating
+            double resolvedXxy = sunnyStarRating
                                  ?? (hasKps && maniaSummary?.XxySr is double analysisXxy && analysisXxy >= 0
                                      ? analysisXxy
-                                     : beatmap.XxyStarRating);
+                                     : beatmap.SunnyStarRating);
 
             int keyCount = 0;
 
@@ -174,7 +174,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 MapperUsername = metadata.Author.Username,
                 BeatmapStatus = beatmap.Status,
                 StarRating = starRating ?? beatmap.StarRating,
-                XxyStarRating = resolvedXxy,
+                SunnyStarRating = resolvedXxy,
                 MapPerformancePoints = beatmap.PerformancePoints,
                 KpsAvg = hasKps ? analysis.AverageKps : 0,
                 KpsMax = hasKps ? analysis.MaxKps : 0,

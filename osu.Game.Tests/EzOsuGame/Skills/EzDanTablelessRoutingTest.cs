@@ -48,7 +48,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         public void TablelessKeymodesBorrowThe4KIntervalTable(int keyCount)
         {
             Assert.That(EzDanLabels.HasXxyDanTable(keyCount), Is.False);
-            Assert.That(EzSunnyDanIntervals.TryLookup(4, DanSkillSystem.SIDE_RC, 6.0, out var fourK), Is.True);
+            Assert.That(EzSunnyDanIntervals.TryLookup(4, EzDanSide.Rc.ToId(), 6.0, out var fourK), Is.True);
 
             var resolved = EzDanLabels.TryResolveFallbackDan(keyCount, EzDanSide.Rc, overallMsd: 20, EzMinaSkillAxis.Stream, xxySr: 6.0);
 
@@ -60,7 +60,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void TablelessLnSideBorrowsThe4KLnTable()
         {
-            Assert.That(EzSunnyDanIntervals.TryLookup(4, DanSkillSystem.SIDE_LN, 7.0, out var fourKLn), Is.True);
+            Assert.That(EzSunnyDanIntervals.TryLookup(4, EzDanSide.Ln.ToId(), 7.0, out var fourKLn), Is.True);
 
             var resolved = EzDanLabels.TryResolveFallbackDan(8, EzDanSide.Ln, overallMsd: 20, EzMinaSkillAxis.Stream, xxySr: 7.0);
 
@@ -89,7 +89,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         public void TablelessChartDanUsesTheBorrowedTable()
         {
             var verdict = EzChartDanEstimator.FromMsd(msd(20), keyCount: 5, holdRatio: 0.1, xxySr: 6);
-            Assert.That(EzSunnyDanIntervals.TryLookup(4, DanSkillSystem.SIDE_RC, 6.0, out var fourK), Is.True);
+            Assert.That(EzSunnyDanIntervals.TryLookup(4, EzDanSide.Rc.ToId(), 6.0, out var fourK), Is.True);
 
             Assert.That(verdict, Is.Not.Null);
             Assert.That(verdict!.Label, Is.EqualTo(fourK.DisplayLabel));
@@ -114,7 +114,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 holdRatio: 0.1,
                 xxySr: 6,
                 chartInfo: null);
-            Assert.That(EzSunnyDanIntervals.TryLookup(4, DanSkillSystem.SIDE_RC, 6.0, out var fourK), Is.True);
+            Assert.That(EzSunnyDanIntervals.TryLookup(4, EzDanSide.Rc.ToId(), 6.0, out var fourK), Is.True);
 
             Assert.That(computed, Is.Not.Null);
             Assert.That(computed!.HasSide(EzDanSide.Rc), Is.True);

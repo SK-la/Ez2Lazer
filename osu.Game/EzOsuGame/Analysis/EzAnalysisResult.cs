@@ -3,6 +3,8 @@
 
 using System;
 using System.Collections.Generic;
+using osu.Game.EzOsuGame.Metrics;
+using osu.Game.EzOsuGame.Skills.Dan;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
@@ -109,28 +111,58 @@ namespace osu.Game.EzOsuGame.Analysis
 
     public readonly record struct EzAnalysisResult
     {
+        private static readonly IReadOnlyDictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>> no_axes
+            = new Dictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>();
+
+        private static readonly IReadOnlyDictionary<string, double> no_axis_values
+            = new Dictionary<string, double>(StringComparer.Ordinal);
+
         public readonly double AverageKps;
         public readonly double MaxKps;
-        public readonly double? Pp;
         public readonly KpsSummary? CommonSummary;
         public readonly EzManiaSummary? ManiaSummary;
         public readonly EzBeatmapTagSummary? TagSummary;
 
-        public EzAnalysisResult(KpsSummary commonSummary, double? pp = null, EzManiaSummary? maniaSummary = null, EzBeatmapTagSummary? tagSummary = null)
+        /// <summary>
+        /// Axis values grouped by the producer that emitted them, keyed by bare axis id.
+        /// </summary>
+        /// <remarks>
+        /// A producer missing from this table did not run for this chart; one present with no entries ran
+        /// and had nothing to say.
+        /// </remarks>
+        public readonly IReadOnlyDictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>> Axes;
+
+        /// <summary>Dan estimates for the sides this chart can be rated on.</summary>
+        public readonly EzDanSet? Dan;
+
+        /// <summary>
+        /// Ruleset-declared radar payload for the current mods, or null when the ruleset provides none.
+        /// </summary>
+        public readonly EzRulesetSpecificRadarResult? Radar;
+
+        public EzAnalysisResult(KpsSummary commonSummary, EzManiaSummary? maniaSummary = null, EzBeatmapTagSummary? tagSummary = null,
+                                IReadOnlyDictionary<EzMetricProducerId, IReadOnlyDictionary<string, double>>? axes = null,
+                                EzDanSet? dan = null, EzRulesetSpecificRadarResult? radar = null)
         {
             AverageKps = double.IsFinite(commonSummary.AverageKps) ? commonSummary.AverageKps : 0;
             MaxKps = double.IsFinite(commonSummary.MaxKps) ? commonSummary.MaxKps : 0;
-            Pp = pp is double value && double.IsFinite(value) ? value : null;
             CommonSummary = commonSummary;
             ManiaSummary = maniaSummary;
             TagSummary = tagSummary;
+            Axes = axes ?? no_axes;
+            Dan = dan;
+            Radar = radar;
         }
 
         public IReadOnlyList<double> KpsList => CommonSummary?.KpsList ?? Array.Empty<double>();
 
+        /// <summary>Axis values of one producer, empty when it did not run.</summary>
+        public IReadOnlyDictionary<string, double> AxesOf(EzMetricProducerId producer)
+            => Axes.GetValueOrDefault(producer, no_axis_values);
+
         public EzAnalysisResult WithTagSummary(EzBeatmapTagSummary? tagSummary)
             => CommonSummary is KpsSummary commonSummary
-                ? new EzAnalysisResult(commonSummary, Pp, ManiaSummary, tagSummary)
+                ? new EzAnalysisResult(commonSummary, ManiaSummary, tagSummary, Axes, Dan, Radar)
                 : this;
     }
 }

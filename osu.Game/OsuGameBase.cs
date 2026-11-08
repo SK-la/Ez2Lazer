@@ -54,6 +54,7 @@ using osu.Game.EzOsuGame.Fonts;
 using osu.Game.EzOsuGame.Input;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Playback;
@@ -466,33 +467,36 @@ namespace osu.Game
             var ezAnalysisDatabase = new EzAnalysisDatabase(ezAnalysisPersistentStore, BeatmapManager, RulesetStore, Ez2ConfigManager);
             dependencies.Cache(ezAnalysisPersistentStore);
             dependencies.Cache(ezAnalysisDatabase);
-            dependencies.Cache(ezAnalysisCache = new EzAnalysisCache());
+
+            // One live layer for every read path: the analysis component schedules, this holds the values.
+            var liveMetrics = new EzAnalysisLiveCache();
+            dependencies.Cache(liveMetrics);
+            dependencies.Cache(ezAnalysisCache = new EzAnalysisCache(liveMetrics));
             ReplaySession = new EzReplaySessionRouter(RulesetStore.AvailableRulesets, BeatmapManager);
             dependencies.CacheAs<IEzReplaySession>(ReplaySession);
 
-            // Skill metrics: MSD (beatmap), SSR + Dan (player). Read via EzSkillProvider; writers stay separate.
-            // See EzSkillSystems. Dan is a player skill for Profile, but uses its own estimate table/algorithm.
-            var skillRegistry = new EzSkillRegistry();
-            var skillStore = new EzSkillStore(realm);
+            // Skill metrics: one declaration drives both the storage keys and the ruleset profile.
+            // Mania: MSD / SSR / pattern / Dan. PPP chart / player skills cover osu, taiko, catch, and mania.
+            var metricRegistry = EzMetricProducers.CreateDefault(new EzRealmUpstreamRevisions(RulesetStore));
+            EzAnalysisRevision.Configure(metricRegistry);
+            var skillStore = new EzSkillStore(realm, metricRegistry);
+
             var beatmapMsdComputer = new EzBeatmapMinaComputer(BeatmapManager, skillStore);
             var chartDanEstimator = new EzChartDanEstimator(BeatmapManager, beatmapMsdComputer);
+
             var localProfileStore = new EzLocalProfileStore(Storage);
-            // Skill aggregators reuse localProfileStore as the per-play SSR / Dan cache (incremental backfill).
-            var playerSsrAggregator = new EzPlayerRatingAggregator(BeatmapManager, skillStore, localProfileStore);
+
+            var playerRatingAggregator = new EzPlayerRatingAggregator(BeatmapManager, skillStore, localProfileStore);
             var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanEstimator, skillStore, localProfileStore);
-            var skillProvider = new EzSkillProvider(skillStore, skillRegistry, chartDanEstimator, localProfileStore, BeatmapManager);
+            var skillProvider = new EzSkillProvider(skillStore, metricRegistry, chartDanEstimator, localProfileStore, BeatmapManager, liveMetrics);
 
-            dependencies.Cache(skillRegistry);
+            // Only the types something actually resolves through DI are cached. Writers and aggregators are
+            // constructed here and passed as arguments; caching them would leave entries nothing ever reads.
             dependencies.Cache(skillStore);
-            dependencies.Cache(localProfileStore);
             dependencies.Cache(skillProvider);
-            // Write-side services still cached for LocalProfile / analysis pipelines.
             dependencies.Cache(beatmapMsdComputer);
-            dependencies.Cache(chartDanEstimator);
-            dependencies.Cache(playerSsrAggregator);
-            dependencies.Cache(playerDanAggregator);
 
-            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, playerSsrAggregator, playerDanAggregator, localProfileStore, skillProvider));
+            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, playerRatingAggregator, playerDanAggregator, localProfileStore, skillProvider));
             dependencies.Cache(new EzLocalProfileOnlinePullService(API, ScoreManager, BeatmapManager, realm, Storage));
             dependencies.Cache(new EzAnalysisPlayerSelection());
 

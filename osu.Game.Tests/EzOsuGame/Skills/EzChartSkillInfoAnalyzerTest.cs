@@ -76,7 +76,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             var lnChart = new EzChartSkillInfo
             {
-                Patterns = new[] { "lntech", "lngeneral" },
+                Patterns = new[] { "ln_tech", "ln_general" },
                 LnRatio = 0.8,
                 TechScore = 0,
                 ChordjackScore = 0,
@@ -85,7 +85,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             };
 
             var lnBuckets = EzDanSkillsetFiling.BucketsForValues(7, EzDanSide.Ln, mina(), null, 1, lnChart);
-            Assert.That(lnBuckets, Does.Contain(EzDanSkillsetBuckets.LN_TECH));
+            Assert.That(lnBuckets, Does.Contain(EzDanSkillsetBuckets.LNTech));
         }
 
         [Test]
@@ -102,7 +102,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var notes = Enumerable.Range(0, 40)
                                   .Select(i => new EzManiaNote(i * 50, i % 7, false, i * 50))
                                   .ToList();
-            Assert.That(EzMotionFeaturesComputer.Compute(notes, 7), Is.Null);
+            Assert.That(EzChartSkillInfoComputer.EzCSIMotionComputer.Compute(notes, 7), Is.Null);
         }
 
         [Test]
@@ -119,7 +119,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 t += 80;
             }
 
-            var motion = EzMotionFeaturesComputer.Compute(notes, 4);
+            var motion = EzChartSkillInfoComputer.EzCSIMotionComputer.Compute(notes, 4);
             Assert.That(motion, Is.Not.Null);
             Assert.That(motion!.RhythmBreak, Is.InRange(0, 1));
             Assert.That(motion.SameHand, Is.InRange(0, 1));

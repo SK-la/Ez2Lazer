@@ -42,7 +42,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             var ruleset = rulesets.GetRuleset(rulesetId);
             bool showXxy = rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID
-                           || (ruleset != null && EzXxyStarRatingSupport.SupportsRuleset(ruleset));
+                           || (ruleset != null && EzSunnyStarRatingSupport.SupportsRuleset(ruleset));
 
             var lineSection = new FillFlowContainer
             {

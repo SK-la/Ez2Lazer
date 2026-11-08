@@ -11,24 +11,24 @@ using osu.Game.Rulesets.Mania.EzMania.Analysis;
 namespace osu.Game.Tests.EzOsuGame.Analysis
 {
     [TestFixture]
-    public class TestXxyStarRatingVersion
+    public class TestSunnyStarRatingVersion
     {
         [Test]
         public void Mania_provider_exposes_date_version()
         {
             var provider = new EzManiaAnalysisProvider();
-            Assert.That(provider.XxyStarRatingVersion, Is.EqualTo(EzManiaXxyStarRating.VERSION));
-            Assert.That(provider.XxyStarRatingVersion, Is.GreaterThanOrEqualTo(20200101));
+            Assert.That(provider.SunnyStarRatingVersion, Is.EqualTo(EzManiaSunnyStarRating.VERSION));
+            Assert.That(provider.SunnyStarRatingVersion, Is.GreaterThanOrEqualTo(20200101));
         }
 
         [Test]
-        public void TryGetXxyStarRatingVersion_reads_from_provider_not_difficulty_calculator()
+        public void TryGetSunnyStarRatingVersion_reads_from_provider_not_difficulty_calculator()
         {
             var rulesetInfo = new ManiaRuleset().RulesetInfo;
             rulesetInfo.Available = true;
 
-            Assert.That(EzXxyStarRatingSupport.TryGetXxyStarRatingVersion(rulesetInfo, out int xxyVersion), Is.True);
-            Assert.That(xxyVersion, Is.EqualTo(EzManiaXxyStarRating.VERSION));
+            Assert.That(EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(rulesetInfo, out int xxyVersion), Is.True);
+            Assert.That(xxyVersion, Is.EqualTo(EzManiaSunnyStarRating.VERSION));
         }
     }
 
@@ -44,7 +44,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
             Assert.That(EzPerformancePointsSupport.TryGetPerformancePointsVersion(rulesetInfo, workingBeatmap, out int ppVersion), Is.True);
             Assert.That(ppVersion, Is.EqualTo(new ManiaDifficultyCalculator(rulesetInfo, workingBeatmap).Version));
-            Assert.That(ppVersion, Is.Not.EqualTo(EzManiaXxyStarRating.VERSION));
+            Assert.That(ppVersion, Is.Not.EqualTo(EzManiaSunnyStarRating.VERSION));
         }
     }
 }

@@ -17,8 +17,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             // Hub corpus example: General 13 + Release 9 → headline 12 (not plain mean 11).
             var skillsets = new Dictionary<string, EzDanSkillsetVerdict>
             {
-                ["lngeneral"] = new EzDanSkillsetVerdict("lngeneral", 13, "x", 10),
-                ["lnrelease"] = new EzDanSkillsetVerdict("lnrelease", 9, "y", 6),
+                [EzDanSkillsetBuckets.LNGeneral] = new EzDanSkillsetVerdict(EzDanSkillsetBuckets.LNGeneral, 13, "x", 10),
+                [EzDanSkillsetBuckets.LNRelease] = new EzDanSkillsetVerdict(EzDanSkillsetBuckets.LNRelease, 9, "y", 6),
             };
 
             var result = EzDanSideHeadline.FromSkillsets(7, EzDanSide.Ln, skillsets, new[] { 13.0, 9.0 });
@@ -32,8 +32,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             // General 13 + Tech 12.5 → 13 + 0.5 * (-0.5) = 12.75
             var skillsets = new Dictionary<string, EzDanSkillsetVerdict>
             {
-                ["lngeneral"] = new EzDanSkillsetVerdict("lngeneral", 13, "x", 10),
-                ["lntech"] = new EzDanSkillsetVerdict("lntech", 12.5, "y", 8),
+                [EzDanSkillsetBuckets.LNGeneral] = new EzDanSkillsetVerdict(EzDanSkillsetBuckets.LNGeneral, 13, "x", 10),
+                [EzDanSkillsetBuckets.LNTech] = new EzDanSkillsetVerdict(EzDanSkillsetBuckets.LNTech, 12.5, "y", 8),
             };
 
             var result = EzDanSideHeadline.FromSkillsets(7, EzDanSide.Ln, skillsets, new[] { 13.0, 12.5 });

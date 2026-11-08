@@ -115,7 +115,7 @@ namespace osu.Game.EzOsuGame.Mods
             return mods.Any(static m => m is IApplicableToBeatmapConverter or IApplicableAfterBeatmapConversion);
         }
 
-        /// <summary>Whether BeatmapInfo.XxyStarRating (nomod baseline) may be reused without live recompute.</summary>
+        /// <summary>Whether BeatmapInfo.SunnyStarRating (nomod baseline) may be reused without live recompute.</summary>
         public static bool CanUsePersistedXxy(IEnumerable<Mod>? mods)
             => IsNoModRate(Resolve(mods)) && !ChangesPlayableKeys(mods);
     }

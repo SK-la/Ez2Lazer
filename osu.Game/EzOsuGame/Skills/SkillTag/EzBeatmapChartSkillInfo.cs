@@ -7,7 +7,7 @@ using Realms;
 namespace osu.Game.EzOsuGame.Skills.SkillTag
 {
     /// <summary>
-    /// Typed Realm row for hub-aligned chart skill filing (EZ鈮?).
+    /// Typed Realm row for hub-aligned chart skill filing (EZ≥9).
     /// Mirrors the <see cref="EzChartSkillInfo"/> DTO; large blobs stay out of Realm.
     /// Nullable doubles use -1; unset key count uses -1; missing motion uses -1 on all motion columns.
     /// </summary>
@@ -28,7 +28,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         public DateTimeOffset ComputedAt { get; set; }
 
         /// <summary>
-        /// Pattern tags joined with ASCII unit separator (U+001F). Closed filing vocabulary 鈥?not a JSON blob.
+        /// Pattern tags joined with ASCII unit separator (U+001F). Closed filing vocabulary — not a JSON blob.
         /// </summary>
         public string PatternTagsJoined { get; set; } = string.Empty;
 
@@ -45,8 +45,6 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         public bool? ClusterTrill { get; set; }
 
         public bool? HandstreamCluster { get; set; }
-
-        public bool HandstreamEndurance { get; set; }
 
         public double TechScore { get; set; }
 

@@ -34,7 +34,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             }
 
             var maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts: null, xxySr: record.XxySr);
-            return new EzAnalysisResult(kpsSummary, record.Pp, maniaSummary);
+            return new EzAnalysisResult(kpsSummary, maniaSummary);
         }
 
         private static IReadOnlyList<double> tryDeserializeKpsList(string? json)

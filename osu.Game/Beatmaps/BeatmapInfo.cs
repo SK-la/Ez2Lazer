@@ -97,7 +97,7 @@ namespace osu.Game.Beatmaps
         /// <summary>
         /// Ez2Lazer: Baseline mania xxy star rating (no mods). Defaults to -1 (not yet calculated). Populated by <see cref="BeatmapUpdater"/>.
         /// </summary>
-        public double XxyStarRating { get; set; } = -1;
+        public double SunnyStarRating { get; set; } = -1;
 
         /// <summary>
         /// Ez2Lazer: Baseline perfect-play performance points (no mods). Defaults to -1 (not yet calculated).

@@ -83,11 +83,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public LocalisableString ResolveDisplayName(string skillId)
         {
-            foreach (var def in provider.Registry.GetSystem(SystemId)?.Skills
-                                ?? Array.Empty<EzSkillDefinition>())
+            foreach (var item in provider.Registry.Items(EzLocalProfileConstants.OSU_RULESET_ID, EzSkillScope.Player))
             {
-                if (def.SkillId == skillId)
-                    return def.DisplayName;
+                if (item.SkillId == skillId)
+                    return item.Axis.DisplayName;
             }
 
             return EzOsuSkillAxisExtensions.TryParse(skillId, out var axis)

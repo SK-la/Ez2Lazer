@@ -184,26 +184,26 @@ namespace osu.Game.Screens.Select
 
         private bool useEzAnalysisBranchForXxyOperations => useActiveSongsBranchAsBeatmapSource && ezAnalysisFilter.Value;
 
-        private static bool usesXxyStarRatingOperations(FilterCriteria criteria)
-            => criteria.Sort == SortMode.XxyStarRating || criteria.Group == GroupMode.XxyStarRating;
+        private static bool usesSunnyStarRatingOperations(FilterCriteria criteria)
+            => criteria.Sort == SortMode.SunnyStarRating || criteria.Group == GroupMode.SunnyStarRating;
 
         private Task<IReadOnlyDictionary<BeatmapInfo, double>> getDifficultiesForOperationsAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
         {
             if (Criteria == null)
                 return Task.FromResult(empty_operation_difficulties);
 
-            if (!usesXxyStarRatingOperations(Criteria))
+            if (!usesSunnyStarRatingOperations(Criteria))
                 return Task.FromResult(empty_operation_difficulties);
 
             if (useEzAnalysisBranchForXxyOperations)
                 return getStrictActiveBranchDifficultiesAsync(beatmaps.Distinct().ToList(), Criteria.Mods, cancellationToken);
 
-            return getRealmXxyStarRatingsAsync(beatmaps, cancellationToken);
+            return getRealmSunnyStarRatingsAsync(beatmaps, cancellationToken);
         }
 
-        private Task<IReadOnlyDictionary<BeatmapInfo, double>> getRealmXxyStarRatingsAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
+        private Task<IReadOnlyDictionary<BeatmapInfo, double>> getRealmSunnyStarRatingsAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
         {
-            if (!EzXxyStarRatingSupport.SupportsRuleset(ruleset.Value))
+            if (!EzSunnyStarRatingSupport.SupportsRuleset(ruleset.Value))
                 return Task.FromResult(empty_operation_difficulties);
 
             var beatmapList = beatmaps.Distinct().ToList();
@@ -216,7 +216,7 @@ namespace osu.Game.Screens.Select
             foreach (var beatmap in beatmapList)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                resolvedValues[beatmap] = beatmap.XxyStarRating;
+                resolvedValues[beatmap] = beatmap.SunnyStarRating;
             }
 
             return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(resolvedValues);
@@ -316,7 +316,7 @@ namespace osu.Game.Screens.Select
                         return;
 
                     // Avoid redundant filters when branch metadata changes but the carousel is not using that branch (or xxy sort/group).
-                    if (!useActiveSongsBranchAsBeatmapSource && !usesXxyStarRatingOperations(Criteria))
+                    if (!useActiveSongsBranchAsBeatmapSource && !usesSunnyStarRatingOperations(Criteria))
                         return;
 
                     Filter(Criteria, true);

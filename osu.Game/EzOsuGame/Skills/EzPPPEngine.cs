@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -45,7 +46,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             foreach (var (chartId, value) in chartSkills)
             {
-                if (!trySplitChartId(chartId, out string metric))
+                if (!EzMetricSkillId.TrySplit(chartId, out string producerId, out string metric) || producerId != EzSkillSystems.BEATMAP_PPP)
                     continue;
 
                 bool accuracyAxis = metric is "accuracy" or "accuracy_difficulty";
@@ -54,17 +55,6 @@ namespace osu.Game.EzOsuGame.Skills
             }
 
             return result;
-        }
-
-        private static bool trySplitChartId(string chartId, out string metric)
-        {
-            metric = string.Empty;
-
-            if (!chartId.StartsWith(EzSkillSystems.BEATMAP_PPP + ".", StringComparison.Ordinal))
-                return false;
-
-            metric = chartId[(EzSkillSystems.BEATMAP_PPP.Length + 1)..];
-            return metric.Length > 0;
         }
     }
 }

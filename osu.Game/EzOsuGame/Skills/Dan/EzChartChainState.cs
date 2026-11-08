@@ -33,12 +33,14 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         private readonly struct RateableChartMeta
         {
             public readonly int KeyCount;
-            public readonly double? XxyStarRating;
+            public readonly double? SunnyStarRating;
+            public readonly double HoldRatio;
 
-            public RateableChartMeta(int keyCount, double? xxyStarRating)
+            public RateableChartMeta(int keyCount, double? sunnyStarRating, double holdRatio)
             {
                 KeyCount = keyCount;
-                XxyStarRating = xxyStarRating;
+                SunnyStarRating = sunnyStarRating;
+                HoldRatio = holdRatio;
             }
         }
 
@@ -176,8 +178,13 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 rateableBeatmapIds[beatmap.Hash] = beatmap.ID;
 
                 int keyCount = (int)Math.Round(beatmap.Difficulty.CircleSize);
-                double? xxySr = beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : null;
-                rateableChartMeta[beatmap.Hash] = new RateableChartMeta(keyCount, xxySr);
+                double? xxySr = beatmap.SunnyStarRating >= 0 ? beatmap.SunnyStarRating : null;
+                double holdRatio = EzHoldMetrics.HoldRatio(beatmap);
+
+                if (double.IsNaN(holdRatio))
+                    holdRatio = 0;
+
+                rateableChartMeta[beatmap.Hash] = new RateableChartMeta(keyCount, xxySr, holdRatio);
             }
 
             var msdRowsForReader = new List<EzBeatmapSkillValue>();
@@ -329,13 +336,10 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 if (keyCount <= 0)
                     keyCount = 4;
 
-                // A complete MSD always carries the hold ratio column, so the dan stage's CSI LnRatio fallback is
-                // dead here and deliberately not repeated.
-                double holdRatio = msd.TryGetValue(EzSkillSystems.MinaHoldRatioSkillId, out double hold) && double.IsFinite(hold)
-                    ? Math.Clamp(hold, 0, 1)
-                    : 0;
+                // The hold ratio is a hitobject ratio carried on the scan-time meta, not a stored metric.
+                double holdRatio = meta.HoldRatio;
 
-                if (EzChartDanEstimator.FromMsd(msd, keyCount, holdRatio, meta.XxyStarRating) == null)
+                if (EzChartDanEstimator.FromMsd(msd, keyCount, holdRatio, meta.SunnyStarRating) == null)
                     unresolvable.Add(hash);
             }
 

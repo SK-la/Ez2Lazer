@@ -44,8 +44,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
                 if (beatmap == null)
                     return;
 
-                if (beatmap.XxyStarRating >= 0)
-                    endDensity = beatmap.XxyStarRating;
+                if (beatmap.SunnyStarRating >= 0)
+                    endDensity = beatmap.SunnyStarRating;
             });
 
             // KPS detail remains in analytics.sqlite until a dedicated Realm field exists.

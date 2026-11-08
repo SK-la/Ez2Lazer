@@ -36,12 +36,11 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                         if (result.StarRating is double star && star >= 0)
                             beatmap.StarRating = star;
 
-                        // [EZ-REALTIME] 分析回写已临时屏蔽（实时验证期）；恢复时取消注释。
-                        // if (result.XxySr is double xxy && xxy >= 0)
-                        //     beatmap.XxyStarRating = xxy;
-                        //
-                        // if (result.Pp is double pp && pp >= 0)
-                        //     beatmap.PerformancePoints = pp;
+                        if (result.XxySr is double xxy && xxy >= 0)
+                            beatmap.SunnyStarRating = xxy;
+
+                        if (result.Pp is double pp && pp >= 0)
+                            beatmap.PerformancePoints = pp;
                     }
                 });
             }

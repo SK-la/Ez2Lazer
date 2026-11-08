@@ -303,7 +303,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             starRatingDisplay.Current.Value = new StarDifficulty(row.StarRating, 0);
             accentStrip.Colour = starRatingDisplay.DisplayedDifficultyColour;
 
-            bool showXxy = row.RulesetId == EzLocalProfileConstants.MANIA_RULESET_ID && row.XxyStarRating >= 0;
+            bool showXxy = row.RulesetId == EzLocalProfileConstants.MANIA_RULESET_ID && row.SunnyStarRating >= 0;
             var maniaSummary = row.ReadManiaSummary();
 
             if (showXxy)

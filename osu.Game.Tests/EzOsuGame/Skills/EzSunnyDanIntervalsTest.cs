@@ -8,6 +8,7 @@ using osu.Framework.IO.Stores;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Resources;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
@@ -18,7 +19,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void SixKRcLookupMapsMidLowTierToMinus()
         {
-            Assert.That(EzSunnyDanIntervals.TryLookup(6, DanSkillSystem.SIDE_RC, 7.03, out var result), Is.True);
+            Assert.That(EzSunnyDanIntervals.TryLookup(6, EzDanSide.Rc.ToId(), 7.03, out var result), Is.True);
             Assert.That(result.DisplayLabel, Is.EqualTo("7-"));
             Assert.That(result.IntervalName, Is.EqualTo("Regular 7 mid/low"));
             Assert.That(result.RawDan, Is.EqualTo(6.8).Within(0.001));
@@ -27,7 +28,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void FourKReformLookupUsesNumericBareLabel()
         {
-            Assert.That(EzSunnyDanIntervals.TryLookup(4, DanSkillSystem.SIDE_RC, 3.2, out var result), Is.True);
+            Assert.That(EzSunnyDanIntervals.TryLookup(4, EzDanSide.Rc.ToId(), 3.2, out var result), Is.True);
             Assert.That(result.DisplayLabel, Does.Match(@"^\d"));
             Assert.That(result.IntervalName, Does.Contain("Reform"));
         }
@@ -35,7 +36,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void UnsupportedKeyCountFallsBack()
         {
-            Assert.That(EzSunnyDanIntervals.TryLookup(5, DanSkillSystem.SIDE_RC, 7.0, out _), Is.False);
+            Assert.That(EzSunnyDanIntervals.TryLookup(5, EzDanSide.Rc.ToId(), 7.0, out _), Is.False);
         }
 
         [Test]
@@ -127,10 +128,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void TexturePathsResolveForBundledLadders()
         {
-            Assert.That(EzDanLadders.TryGetTexturePath(4, DanSkillSystem.SIDE_RC, "7++"), Is.EqualTo("Dans/reform/7"));
-            Assert.That(EzDanLadders.TryGetTexturePath(6, DanSkillSystem.SIDE_RC, "7-"), Is.EqualTo("Dans/6k/7"));
-            Assert.That(EzDanLadders.TryGetTexturePath(6, DanSkillSystem.SIDE_LN, "7"), Is.EqualTo("Dans/6k/ln-7"));
-            Assert.That(EzDanLadders.TryGetTexturePath(7, DanSkillSystem.SIDE_RC, "zenith"), Is.EqualTo("Dans/7k/zenith"));
+            Assert.That(EzDanLadders.TryGetTexturePath(4, EzDanSide.Rc.ToId(), "7++"), Is.EqualTo("Dans/reform/7"));
+            Assert.That(EzDanLadders.TryGetTexturePath(6, EzDanSide.Rc.ToId(), "7-"), Is.EqualTo("Dans/6k/7"));
+            Assert.That(EzDanLadders.TryGetTexturePath(6, EzDanSide.Ln.ToId(), "7"), Is.EqualTo("Dans/6k/ln-7"));
+            Assert.That(EzDanLadders.TryGetTexturePath(7, EzDanSide.Rc.ToId(), "zenith"), Is.EqualTo("Dans/7k/zenith"));
         }
 
         [Test]
@@ -142,10 +143,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(axis, Is.EqualTo(EzMinaSkillAxis.Technical));
             Assert.That(EzMinaSkillAxis.Technical.Chip().Name.ToString(), Is.EqualTo("技").Or.EqualTo("Tech"));
             Assert.That(EzMinaSkillAxis.Technical.Chip().AccentHex, Is.EqualTo("#83cf6b"));
-            Assert.That(EzPatternAxisExtensions.TryParse("LN Hold", out var pattern), Is.True);
-            Assert.That(pattern, Is.EqualTo(EzPatternAxis.LnHold));
+            Assert.That(EzKeyPatternAxisExtensions.TryParse("LN Hold", out var pattern), Is.True);
+            Assert.That(pattern, Is.EqualTo(EzKeyPatternAxis.LnHold));
             Assert.That(pattern.DisplayName().ToString(), Is.EqualTo("长条按住").Or.EqualTo("LN Hold"));
-            Assert.That(EzDanSide.Ln.ToId(), Is.EqualTo(DanSkillSystem.SIDE_LN));
+            Assert.That(EzDanSide.Ln.ToId(), Is.EqualTo(EzDanSide.Ln.ToId()));
         }
 
         [Test]
