@@ -12,8 +12,8 @@ using osu.Game.Tests.Beatmaps;
 namespace osu.Game.Tests.EzOsuGame.Analysis
 {
     /// <summary>
-    /// The live (not persisted) pass must produce every selectable system's scalar, because no baseline column
-    /// is written while Realm v12 writes are disabled.
+    /// The live (not persisted) pass must produce every selectable system's scalar, because baseline columns are
+    /// only filled in by the backfill passes.
     /// </summary>
     [TestFixture]
     public class EzAnalysisComputationL3Test

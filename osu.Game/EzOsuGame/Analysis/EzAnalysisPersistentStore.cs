@@ -121,12 +121,25 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly ConcurrentDictionary<Guid, PendingWrite> pendingWrites = new ConcurrentDictionary<Guid, PendingWrite>();
 
         /// <summary>
-        /// Upper bound on <see cref="sharedReadMemo"/> entries. Counted, not tracked: a full memo is dropped wholesale,
-        /// which costs a re-read of whatever is on screen rather than an eviction policy no caller depends on.
+        /// Upper bound on <see cref="sharedReadMemo"/> entries. At the bound the oldest inserts are dropped in a
+        /// batch, so a long scroll keeps answering for the charts it re-binds rather than emptying the memo and
+        /// re-reading every panel.
         /// </summary>
         private const int shared_read_memo_capacity = 2048;
 
+        /// <summary>
+        /// Entries dropped at once when the bound is reached. Batching amortises the eviction over many inserts.
+        /// </summary>
+        private readonly int sharedReadMemoEvictionBatch;
+
         private readonly ConcurrentDictionary<Guid, MemoEntry> sharedReadMemo = new ConcurrentDictionary<Guid, MemoEntry>();
+
+        /// <summary>
+        /// Insertion order for <see cref="sharedReadMemo"/>. A chart that is bound again is naturally the newest
+        /// insert for its slot, so first-in-first-out already keeps whatever is on screen.
+        /// </summary>
+        private readonly ConcurrentQueue<Guid> sharedReadMemoOrder = new ConcurrentQueue<Guid>();
+
         private long sharedReadMemoGeneration;
 
         /// <summary>
@@ -187,9 +200,22 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         public EzAnalysisPersistentStore(Storage storage)
+            : this(storage, shared_read_memo_capacity)
+        {
+        }
+
+        /// <summary>
+        /// Builds a store whose read memo is bounded by <paramref name="sharedReadMemoCapacity"/>. The smaller bound
+        /// exists so the eviction policy can be exercised without filling two thousand entries.
+        /// </summary>
+        internal EzAnalysisPersistentStore(Storage storage, int sharedReadMemoCapacity)
         {
             this.storage = storage;
+            this.sharedReadMemoCapacity = sharedReadMemoCapacity;
+            sharedReadMemoEvictionBatch = Math.Max(1, sharedReadMemoCapacity / 4);
         }
+
+        private readonly int sharedReadMemoCapacity;
 
         /// <summary>
         /// Creates/migrates the database and starts the background writer. Called once for the session, from the
@@ -357,10 +383,11 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 entry = new MemoEntry(found, beatmap.Hash, beatmap.MD5Hash, beatmap.Ruleset.OnlineID, stored);
 
-                if (sharedReadMemo.Count >= shared_read_memo_capacity)
-                    sharedReadMemo.Clear();
+                if (!sharedReadMemo.ContainsKey(beatmap.ID) && sharedReadMemo.Count >= sharedReadMemoCapacity)
+                    evictOldestSharedReadMemoEntries();
 
                 sharedReadMemo[beatmap.ID] = entry;
+                sharedReadMemoOrder.Enqueue(beatmap.ID);
 
                 return resolveMemoEntry(beatmap, entry, out result);
             }
@@ -370,6 +397,32 @@ namespace osu.Game.EzOsuGame.Analysis
                 return false;
             }
         }
+
+        /// <summary>
+        /// Drops the oldest inserts until the memo is back under its target. Ids already dropped by the dirty-entry
+        /// path are skipped rather than counted, so a batch always makes progress.
+        /// </summary>
+        private void evictOldestSharedReadMemoEntries()
+        {
+            int target = Math.Max(1, sharedReadMemoCapacity - sharedReadMemoEvictionBatch);
+            while (sharedReadMemo.Count > target && sharedReadMemoOrder.TryDequeue(out Guid id))
+                sharedReadMemo.TryRemove(id, out _);
+
+            // The order queue can also outlive its entries (a full memo drop, a chart replaced under a new hash).
+            // Leaving the leftovers would only cost memory, so they are trimmed once the memo is clear.
+            if (sharedReadMemo.IsEmpty)
+            {
+                while (sharedReadMemoOrder.TryDequeue(out _))
+                {
+                }
+            }
+        }
+
+        /// <summary>
+        /// Entries currently held by the shared read memo. Exposed for tests only: the bound and its eviction
+        /// policy are what is being pinned, and both are otherwise invisible from outside.
+        /// </summary>
+        internal int SharedReadMemoCount => sharedReadMemo.Count;
 
         /// <summary>
         /// Looks up a memo entry whose fingerprint still matches the chart, dropping the whole memo first if a pending
@@ -2814,6 +2867,7 @@ LIMIT 1;
 
                         using var connection = openConnection();
                         using var transaction = connection.BeginTransaction();
+                        using var writer = new PendingWriteWriter(connection, transaction);
 
                         int errorsLogged = 0;
 
@@ -2826,7 +2880,7 @@ LIMIT 1;
 
                             try
                             {
-                                writePendingEntryToConnection(connection, pw, transaction);
+                                writer.Write(pw);
 
                                 // Only remove if the pending entry we wrote is still the latest.
                                 if (pendingWrites.TryGetValue(id, out var latest) && latest.Timestamp == pw.Timestamp)
@@ -2919,11 +2973,12 @@ LIMIT 1;
 
                 using var connection = openConnection();
                 using var transaction = connection.BeginTransaction();
+                using var writer = new PendingWriteWriter(connection, transaction);
                 var flushed = pendingWrites.ToArray();
 
                 foreach (var kv in flushed)
                 {
-                    writePendingEntryToConnection(connection, kv.Value, transaction);
+                    writer.Write(kv.Value);
                     pendingWrites.TryRemove(kv.Key, out _);
                 }
 
@@ -2944,21 +2999,11 @@ LIMIT 1;
             analysis,
             DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
-        private void writePendingEntryToConnection(SqliteConnection connection, PendingWrite pending, SqliteTransaction? transaction = null)
-        {
-            var commonSummary = pending.Analysis.CommonSummary;
-            var maniaSummary = pending.Analysis.ManiaSummary;
-
-            if (commonSummary == null)
-                return;
-
-            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            string kpsListJson = JsonSerializer.Serialize(commonSummary.Value.KpsList);
-
-            using (var entry = connection.CreateCommand())
-            {
-                entry.Transaction = transaction;
-                entry.CommandText = $@"
+        /// <summary>
+        /// Statements a <see cref="PendingWriteWriter"/> prepares once per batch. Built from the schema constants at
+        /// type load, so the SQL text is assembled once rather than per row.
+        /// </summary>
+        private static readonly string entry_upsert_sql = $@"
 INSERT INTO {EzAnalysisSchemaManager.TABLE_ENTRY}(
     {EzAnalysisSchemaManager.COL_BEATMAP_ID},
     {EzAnalysisSchemaManager.COL_BEATMAP_HASH},
@@ -2988,38 +3033,8 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
     {EzAnalysisSchemaManager.COL_MAX_KPS} = excluded.{EzAnalysisSchemaManager.COL_MAX_KPS},
     {EzAnalysisSchemaManager.COL_KPS_LIST_JSON} = excluded.{EzAnalysisSchemaManager.COL_KPS_LIST_JSON};
 ";
-                entry.Parameters.AddWithValue("$id", pending.Id.ToString());
-                entry.Parameters.AddWithValue("$hash", pending.Hash);
-                entry.Parameters.AddWithValue("$md5", pending.Md5);
-                entry.Parameters.AddWithValue("$ruleset", pending.RulesetOnlineId);
-                entry.Parameters.AddWithValue("$common_updated_at", now);
-                entry.Parameters.AddWithValue("$avg", pending.Analysis.AverageKps);
-                entry.Parameters.AddWithValue("$max", pending.Analysis.MaxKps);
-                entry.Parameters.AddWithValue("$kps", kpsListJson);
-                entry.ExecuteNonQuery();
-            }
 
-            using (var mania = connection.CreateCommand())
-            {
-                mania.Transaction = transaction;
-
-                if (maniaSummary == null)
-                {
-                    mania.CommandText = $@"
-DELETE FROM {EzAnalysisSchemaManager.TABLE_MANIA}
-WHERE {EzAnalysisSchemaManager.COL_BEATMAP_ID} = $id;
-";
-                    mania.Parameters.AddWithValue("$id", pending.Id.ToString());
-                    mania.ExecuteNonQuery();
-                    return;
-                }
-
-                string columnCountsJson = JsonSerializer.Serialize(maniaSummary.Value.ColumnCounts);
-                string holdNoteCountsJson = maniaSummary.Value.HasHoldNoteCounts
-                    ? JsonSerializer.Serialize(maniaSummary.Value.HoldNoteCounts)
-                    : "{}";
-
-                mania.CommandText = $@"
+        private static readonly string mania_upsert_sql = $@"
 INSERT INTO {EzAnalysisSchemaManager.TABLE_MANIA}(
     {EzAnalysisSchemaManager.COL_BEATMAP_ID},
     {EzAnalysisSchemaManager.COL_UPDATED_AT},
@@ -3037,11 +3052,113 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
     {EzAnalysisSchemaManager.COL_COLUMN_COUNTS_JSON} = excluded.{EzAnalysisSchemaManager.COL_COLUMN_COUNTS_JSON},
     {EzAnalysisSchemaManager.COL_HOLD_NOTE_COUNTS_JSON} = excluded.{EzAnalysisSchemaManager.COL_HOLD_NOTE_COUNTS_JSON};
 ";
-                mania.Parameters.AddWithValue("$id", pending.Id.ToString());
-                mania.Parameters.AddWithValue("$updated_at", now);
-                mania.Parameters.AddWithValue("$column_counts_json", columnCountsJson);
-                mania.Parameters.AddWithValue("$hold_note_counts_json", holdNoteCountsJson);
-                mania.ExecuteNonQuery();
+
+        private static readonly string mania_delete_sql = $@"
+DELETE FROM {EzAnalysisSchemaManager.TABLE_MANIA}
+WHERE {EzAnalysisSchemaManager.COL_BEATMAP_ID} = $id;
+";
+
+        private void writePendingEntryToConnection(SqliteConnection connection, PendingWrite pending, SqliteTransaction? transaction = null)
+        {
+            using var writer = new PendingWriteWriter(connection, transaction);
+            writer.Write(pending);
+        }
+
+        /// <summary>
+        /// One connection's prepared statements for a pending-write batch.
+        /// </summary>
+        /// <remarks>
+        /// A backfill writes thousands of rows through one connection and transaction. Building the three statements
+        /// per row put the SQL text through the parser and re-bound every parameter each time; preparing them once
+        /// per batch leaves only the parameter values to set.
+        /// </remarks>
+        private sealed class PendingWriteWriter : IDisposable
+        {
+            private readonly SqliteCommand entryUpsert;
+            private readonly SqliteCommand maniaUpsert;
+            private readonly SqliteCommand maniaDelete;
+            private readonly SqliteParameter entryId;
+            private readonly SqliteParameter entryHash;
+            private readonly SqliteParameter entryMd5;
+            private readonly SqliteParameter entryRuleset;
+            private readonly SqliteParameter entryUpdatedAt;
+            private readonly SqliteParameter entryAverage;
+            private readonly SqliteParameter entryMax;
+            private readonly SqliteParameter entryKps;
+            private readonly SqliteParameter maniaId;
+            private readonly SqliteParameter maniaUpdatedAt;
+            private readonly SqliteParameter maniaColumnCounts;
+            private readonly SqliteParameter maniaHoldCounts;
+
+            public PendingWriteWriter(SqliteConnection connection, SqliteTransaction? transaction)
+            {
+                entryUpsert = connection.CreateCommand();
+                entryUpsert.Transaction = transaction;
+                entryUpsert.CommandText = entry_upsert_sql;
+                entryId = entryUpsert.Parameters.Add("$id", SqliteType.Text);
+                entryHash = entryUpsert.Parameters.Add("$hash", SqliteType.Text);
+                entryMd5 = entryUpsert.Parameters.Add("$md5", SqliteType.Text);
+                entryRuleset = entryUpsert.Parameters.Add("$ruleset", SqliteType.Integer);
+                entryUpdatedAt = entryUpsert.Parameters.Add("$common_updated_at", SqliteType.Integer);
+                entryAverage = entryUpsert.Parameters.Add("$avg", SqliteType.Real);
+                entryMax = entryUpsert.Parameters.Add("$max", SqliteType.Real);
+                entryKps = entryUpsert.Parameters.Add("$kps", SqliteType.Text);
+
+                maniaUpsert = connection.CreateCommand();
+                maniaUpsert.Transaction = transaction;
+                maniaUpsert.CommandText = mania_upsert_sql;
+                maniaId = maniaUpsert.Parameters.Add("$id", SqliteType.Text);
+                maniaUpdatedAt = maniaUpsert.Parameters.Add("$updated_at", SqliteType.Integer);
+                maniaColumnCounts = maniaUpsert.Parameters.Add("$column_counts_json", SqliteType.Text);
+                maniaHoldCounts = maniaUpsert.Parameters.Add("$hold_note_counts_json", SqliteType.Text);
+
+                maniaDelete = connection.CreateCommand();
+                maniaDelete.Transaction = transaction;
+                maniaDelete.CommandText = mania_delete_sql;
+                maniaDelete.Parameters.Add("$id", SqliteType.Text);
+            }
+
+            public void Write(PendingWrite pending)
+            {
+                var commonSummary = pending.Analysis.CommonSummary;
+                var maniaSummary = pending.Analysis.ManiaSummary;
+
+                if (commonSummary == null)
+                    return;
+
+                long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+                entryId.Value = pending.Id.ToString();
+                entryHash.Value = pending.Hash;
+                entryMd5.Value = pending.Md5;
+                entryRuleset.Value = pending.RulesetOnlineId;
+                entryUpdatedAt.Value = now;
+                entryAverage.Value = pending.Analysis.AverageKps;
+                entryMax.Value = pending.Analysis.MaxKps;
+                entryKps.Value = JsonSerializer.Serialize(commonSummary.Value.KpsList);
+                entryUpsert.ExecuteNonQuery();
+
+                if (maniaSummary == null)
+                {
+                    maniaDelete.Parameters["$id"].Value = pending.Id.ToString();
+                    maniaDelete.ExecuteNonQuery();
+                    return;
+                }
+
+                maniaId.Value = pending.Id.ToString();
+                maniaUpdatedAt.Value = now;
+                maniaColumnCounts.Value = JsonSerializer.Serialize(maniaSummary.Value.ColumnCounts);
+                maniaHoldCounts.Value = maniaSummary.Value.HasHoldNoteCounts
+                    ? JsonSerializer.Serialize(maniaSummary.Value.HoldNoteCounts)
+                    : "{}";
+                maniaUpsert.ExecuteNonQuery();
+            }
+
+            public void Dispose()
+            {
+                entryUpsert.Dispose();
+                maniaUpsert.Dispose();
+                maniaDelete.Dispose();
             }
         }
 
