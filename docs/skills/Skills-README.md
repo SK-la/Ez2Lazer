@@ -83,10 +83,25 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
 | `EzDanAlgorithm.VERSION` | Dan | 只有 Dan 行受影响 |
 | `EzAnalysisRevision.CSI_POLICY` / `DAN_POLICY` | 该级 + 下游 | 生产逻辑变了但没有算法常量能表达时（新增依赖边、改动读取路径）bump 它 |
 | `EzXxyStarRatingSupport` 版本 | Dan（显式清表） | xxy 落在 `BeatmapInfo` / ruleset 标量上，不进组合号，所以由 `clearOutdatedXxyStarRatings` 显式 `ClearChartDan()` |
+| `Ez2Setting.SsrRescaleThreshold` / `SsrLnMultiplier` | **无** | 用户对算法的永久修订，不换代：只影响此后算出的 xxy 与它落库的结果，旧行保持原值。见下节 |
 
 组合规则：`revision = compose(自身常量 + 所有上游常量)`，每槽 base-100（`SLOT_RADIX`），
 所以每个参与常量必须小于 100。`EzAnalysisRevision.DownstreamOf(facet)` 是依赖边的可执行声明；
 新增一条依赖边时，同时改它和上面这张表（`EzAnalysisRevisionTest` 覆盖了 `SLOT_RADIX` 约束和下游集合）。
+
+### SSR 的两个系数是用户设置，不是版本
+
+`Ez2Setting.SsrRescaleThreshold`（默认 8，范围 6–10）与 `SsrLnMultiplier`（默认 5.5，范围 2–8）
+是 SSR 计算的两个修正系数，位于「设置 → Ez → 分析」。
+
+- **不换代**：改动不 bump 任何存储版本，也不追溯重算已落盘的行。旧行保持用旧系数算出的值，
+  新行用新系数；两者并存是预期状态，不是不一致。
+- **不是 mod**：早先它们挂在 `ManiaModSRAdjust`（SRA）上，由 mod 构造函数写静态字段，移除 mod 后
+  残留值会继续影响此后所有评级（包括后台回填），而缓存 key 说的是"无 mod"。现在只有这一处来源。
+- **每 pass 读一次**：`SRCalculator.Tuning` 一次解析成 `EzSsrTuning` 并作为参数贯穿到各阶段，
+  中途改设置不会让同一次评级前后半段用不同系数。会话内结果缓存在系数变化时整体丢弃（纯内存）。
+- 越界写入由设置自身的范围钳制；`Tuning` 里另有一层"非法值回落默认"的兜底，只可能在配置文件被
+  手工改坏时触发。
 
 ### 为什么不用官方 star / xxySR 的单标量
 

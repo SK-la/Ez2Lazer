@@ -184,6 +184,10 @@ namespace osu.Game.EzOsuGame.Configuration
             // Ez 技能：默认与 EzDanAlgorithm.LN_CHART_MIN_HOLD_OBJECTS 一致。
             SetDefault(Ez2Setting.SkillLnChartMinHoldObjects, 150, 0, 1000);
 
+            // SSR 计算的两个系数。默认值就是落库所用的值；改动属于用户对算法的永久修订，不触发版本换代。
+            SetDefault(Ez2Setting.SsrRescaleThreshold, 8.0, 6.0, 10.0, 1.0);
+            SetDefault(Ez2Setting.SsrLnMultiplier, 5.5, 2.0, 8.0, 0.5);
+
             #endregion
 
             #region 音频与输入
@@ -993,6 +997,22 @@ namespace osu.Game.EzOsuGame.Configuration
         /// Ez 分析 SQLite 主库与分支曲库读写总开关；与 <see cref="EzAnalysisRecEnabled"/> 分工（存储 vs 即时计算）。
         /// </summary>
         EzAnalysisSqliteEnabled,
+
+        /// <summary>
+        /// SSR（xxy 难度）计算里超过多少星后开始压缩膨胀。原项目默认为 9，Ez 一直用 8。
+        /// <para>
+        /// 这是用户对算法的永久修订，不是一次性试验：改它不触发任何版本换代，只影响此后算出的值与落库结果。
+        /// </para>
+        /// </summary>
+        SsrRescaleThreshold,
+
+        /// <summary>
+        /// SSR 计算里的 LN 积分倍率，决定长条的难度权重。原项目默认为 6，Ez 一直用 5.5。
+        /// <para>
+        /// 与 <see cref="SsrRescaleThreshold"/> 同样是永久修订：改动不换代，只影响此后的计算与落库。
+        /// </para>
+        /// </summary>
+        SsrLnMultiplier,
 
         /// <summary>
         /// 每个规则集选用的分析系统，格式 <c>规则集=系统;规则集=系统</c>；缺失则用该规则集的第一个系统。

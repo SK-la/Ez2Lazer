@@ -330,7 +330,6 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModKrrDPRefiner(),
                         new ManiaModReconcile(),
                         new ManiaUniversalLoopPlayClip(),
-                        new ManiaModSRAdjust(),
                     };
 
                 case ModType.CommunityMod:

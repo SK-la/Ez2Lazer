@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania.Analysis.SR4Pattern;
 using osu.Game.Rulesets.Objects;
@@ -16,13 +17,63 @@ using osu.Game.Rulesets.Objects.Types;
 namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 {
     /// <summary>
+    ///     The two coefficients the rating reads, taken from the user's Ez analysis settings.
+    /// </summary>
+    /// <remarks>
+    /// A plain struct so one pass reads the settings once and every stage uses the same pair. Resolving them per
+    /// stage would let a settings edit that lands mid-pass change the halves of one rating.
+    /// </remarks>
+    public readonly record struct EzSsrTuning(double RescaleThreshold, double LnMultiplier)
+    {
+        /// <summary>Values used when the config store is unavailable (unit tests, early startup).</summary>
+        public static readonly EzSsrTuning FALLBACK = new EzSsrTuning(8.0, 5.5);
+    }
+
+    /// <summary>
     ///     Star Rating calculator – C# port of the official Python implementation.
     /// </summary>
     public class SRCalculator
     {
-        // 可通过 Mod 进行调整的参数（保持与原始实现一致的默认值）
-        public static double RescaleHighThreshold { get; set; } = 8.0; // 默认9
-        public static double LnIntegralMultiplier { get; set; } = 5.5; // 默认6
+        /// <summary>
+        ///     Star rating above which the high-end rescale applies, from <c>Ez2Setting.SsrRescaleThreshold</c>.
+        /// </summary>
+        /// <remarks>
+        /// A setting rather than a mod. Changing it is a deliberate, permanent revision of the user's algorithm: it
+        /// never bumps a stored-data version, and it only affects ratings produced from then on.
+        /// </remarks>
+        public static double RescaleHighThreshold => Tuning.RescaleThreshold;
+
+        /// <summary>
+        ///     Long-note integral multiplier, from <c>Ez2Setting.SsrLnMultiplier</c>. Same permanence rules as
+        ///     <see cref="RescaleHighThreshold"/>.
+        /// </summary>
+        public static double LnIntegralMultiplier => Tuning.LnMultiplier;
+
+        /// <summary>The current coefficients, read once per pass.</summary>
+        public static EzSsrTuning Tuning
+        {
+            get
+            {
+                try
+                {
+                    Ez2ConfigManager config = GlobalConfigStore.EzConfig;
+                    double threshold = config.Get<double>(Ez2Setting.SsrRescaleThreshold);
+                    double ln = config.Get<double>(Ez2Setting.SsrLnMultiplier);
+
+                    // Guard the stored file: a zero or non-finite value would make every rating degenerate.
+                    if (!double.IsFinite(threshold) || threshold <= 0)
+                        threshold = EzSsrTuning.FALLBACK.RescaleThreshold;
+                    if (!double.IsFinite(ln) || ln <= 0)
+                        ln = EzSsrTuning.FALLBACK.LnMultiplier;
+
+                    return new EzSsrTuning(threshold, ln);
+                }
+                catch
+                {
+                    return EzSsrTuning.FALLBACK;
+                }
+            }
+        }
 
         #region 工具方法
 
@@ -144,12 +195,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 
         public static double XxySRCalculateCore(ManiaBeatmap maniaBeatmap, int keyCount, double clockRate = 1.0)
         {
-            var state = buildState(maniaBeatmap, keyCount, clockRate, needPatternBars: false);
+            var tuning = Tuning;
+            var state = buildState(maniaBeatmap, keyCount, clockRate, needPatternBars: false, tuning);
 
             if (state == null)
                 return 0.0;
 
-            return finaliseDifficulty(computeLocalDifficulty(state), state.EffectiveWeights, state.Notes, state.LongNotes);
+            return finaliseDifficulty(computeLocalDifficulty(state), state.EffectiveWeights, state.Notes, state.LongNotes, tuning.RescaleThreshold);
         }
 
         private static int resolveKeyCount(ManiaBeatmap maniaBeatmap)
@@ -182,13 +234,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             public double[]? BurstBar;
             public double[]? LongNoteUsageBar;
             public double[]? AnchoredBurstBar;
+            public EzSsrTuning Tuning;
         }
 
         /// <summary>
         /// Builds <paramref name="needPatternBars"/>-dependent state. The SR4 breakdown needs three burst curves where
         /// the plain rating needs one, which is why the extra curves are not always derived.
         /// </summary>
-        private static CoreState? buildState(ManiaBeatmap maniaBeatmap, int keyCount, double clockRate, bool needPatternBars)
+        private static CoreState? buildState(ManiaBeatmap maniaBeatmap, int keyCount, double clockRate, bool needPatternBars, EzSsrTuning tuning)
         {
             double[]? cross = CrossMatrixProvider.GetMatrix(keyCount);
 
@@ -258,7 +311,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 
             //Logger.Log($"C# xBarBase sample: {string.Join(", ", xBarBase.Take(10))}");
 
-            double[] pBarBase = computePBar(keyCount, totalTime, x, notes, lnRep, anchorBase, baseCorners);
+            double[] pBarBase = computePBar(keyCount, totalTime, x, notes, lnRep, anchorBase, baseCorners, tuning.LnMultiplier);
             double[] pBar = interpValues(allCorners, baseCorners, pBarBase);
 
             //Logger.Log($"C# pBarBase sample: {string.Join(", ", pBarBase.Take(10))}");
@@ -298,6 +351,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
                 KsArr = ksArr,
                 Gaps = gaps,
                 EffectiveWeights = effectiveWeights,
+                Tuning = tuning,
             };
 
             if (!needPatternBars)
@@ -309,9 +363,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             double[] neutralAnchorBase = Enumerable.Repeat(1.0, baseCorners.Length).ToArray();
 
             state.BurstBar = interpValues(allCorners, baseCorners,
-                computePBar(keyCount, totalTime, x, notes, null, neutralAnchorBase, baseCorners));
+                computePBar(keyCount, totalTime, x, notes, null, neutralAnchorBase, baseCorners, tuning.LnMultiplier));
             state.LongNoteUsageBar = interpValues(allCorners, baseCorners,
-                computePBar(keyCount, totalTime, x, notes, lnRep, neutralAnchorBase, baseCorners));
+                computePBar(keyCount, totalTime, x, notes, lnRep, neutralAnchorBase, baseCorners, tuning.LnMultiplier));
             state.AnchoredBurstBar = pBar;
 
             return state;
@@ -348,12 +402,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         internal static EzManiaSR4PatternSnapshot CalculateSR4PatternSnapshot(ManiaBeatmap maniaBeatmap, double clockRate = 1.0)
         {
             int keyCount = resolveKeyCount(maniaBeatmap);
-            var state = buildState(maniaBeatmap, keyCount, clockRate, needPatternBars: true);
+            var tuning = Tuning;
+            var state = buildState(maniaBeatmap, keyCount, clockRate, needPatternBars: true, tuning);
 
             if (state == null)
                 return emptyPatternSnapshot(keyCount);
 
-            return buildPatternSnapshot(state, computeLocalDifficulty(state));
+            return buildPatternSnapshot(state, computeLocalDifficulty(state), tuning.RescaleThreshold);
         }
 
         /// <summary>
@@ -363,15 +418,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         internal static (double Sr, EzManiaSR4PatternSnapshot PatternSnapshot) CalculateSRWithPatternSnapshot(ManiaBeatmap maniaBeatmap, double clockRate = 1.0)
         {
             int keyCount = resolveKeyCount(maniaBeatmap);
-            var state = buildState(maniaBeatmap, keyCount, clockRate, needPatternBars: true);
+            var tuning = Tuning;
+            var state = buildState(maniaBeatmap, keyCount, clockRate, needPatternBars: true, tuning);
 
             if (state == null)
                 return (0.0, emptyPatternSnapshot(keyCount));
 
             double[] difficulty = computeLocalDifficulty(state);
-            double sr = finaliseDifficulty(difficulty, state.EffectiveWeights, state.Notes, state.LongNotes);
+            double sr = finaliseDifficulty(difficulty, state.EffectiveWeights, state.Notes, state.LongNotes, tuning.RescaleThreshold);
 
-            return (sr, buildPatternSnapshot(state, difficulty));
+            return (sr, buildPatternSnapshot(state, difficulty, tuning.RescaleThreshold));
         }
 
         private static EzManiaSR4PatternSnapshot emptyPatternSnapshot(int keyCount)
@@ -397,7 +453,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         /// Splits <paramref name="totalDifficulty"/> across the measured curves. Everything it reads comes from
         /// <paramref name="state"/>, so it is a pure function of the pass that produced it.
         /// </summary>
-        private static EzManiaSR4PatternSnapshot buildPatternSnapshot(CoreState state, double[] totalDifficulty)
+        private static EzManiaSR4PatternSnapshot buildPatternSnapshot(CoreState state, double[] totalDifficulty, double rescaleThreshold)
         {
             double[] xBar = state.XBar;
             double[] aBar = state.ABar;
@@ -460,13 +516,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             }
 
             double[] effectiveWeights = state.EffectiveWeights;
-            double totalSr = finaliseDifficulty(totalDifficulty, effectiveWeights, state.Notes, state.LongNotes);
-            double bracketStar = computeSR4ContributionStar(bracketAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr);
-            double jackStar = computeSR4ContributionStar(jackAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr);
-            double burstStar = computeSR4ContributionStar(burstAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr);
-            double longNoteUsageStar = computeSR4ContributionStar(longNoteUsageAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr);
-            double longNoteReleaseStar = computeSR4ContributionStar(longNoteReleaseAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr);
-            double anchorStar = computeSR4ContributionStar(anchorAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr);
+            double totalSr = finaliseDifficulty(totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, rescaleThreshold);
+            double bracketStar = computeSR4ContributionStar(bracketAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr, rescaleThreshold);
+            double jackStar = computeSR4ContributionStar(jackAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr, rescaleThreshold);
+            double burstStar = computeSR4ContributionStar(burstAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr, rescaleThreshold);
+            double longNoteUsageStar = computeSR4ContributionStar(longNoteUsageAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr, rescaleThreshold);
+            double longNoteReleaseStar = computeSR4ContributionStar(longNoteReleaseAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr, rescaleThreshold);
+            double anchorStar = computeSR4ContributionStar(anchorAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr, rescaleThreshold);
 
             normaliseSR4ComponentStars(totalSr,
                 ref bracketStar,
@@ -969,7 +1025,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             return SmoothOnCorners(baseCorners, xBase, 500, 0.001, SmoothMode.Sum);
         }
 
-        private static double[] computePBar(int keyCount, int totalTime, double x, List<NoteStruct> notes, LNRepStruct? lnRep, double[] anchor, double[] baseCorners)
+        private static double[] computePBar(int keyCount, int totalTime, double x, List<NoteStruct> notes, LNRepStruct? lnRep, double[] anchor, double[] baseCorners, double lnMultiplier)
         {
             double[] pStep = new double[baseCorners.Length];
 
@@ -1006,7 +1062,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
                 double delta = 0.001 * deltaTime;
                 double v = 1;
                 if (lnRep.HasValue)
-                    v += LnIntegralMultiplier * 0.001 * lnIntegral(lnRep.Value, leftNote.HeadTime, rightNote.HeadTime);
+                    v += lnMultiplier * 0.001 * lnIntegral(lnRep.Value, leftNote.HeadTime, rightNote.HeadTime);
 
                 double booster = streamBooster(delta);
                 double effective = Math.Max(booster, v);
@@ -1245,7 +1301,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             return primaryImpact + secondaryImpact;
         }
 
-        private static double computeSR4ContributionStar(double[] localContribution, double[] totalDifficulty, double[] weights, List<NoteStruct> notes, List<NoteStruct> longNotes, double totalSr)
+        private static double computeSR4ContributionStar(double[] localContribution, double[] totalDifficulty, double[] weights, List<NoteStruct> notes, List<NoteStruct> longNotes, double totalSr, double rescaleThreshold)
         {
             if (localContribution.Length == 0 || totalDifficulty.Length == 0 || weights.Length == 0 || totalSr <= 0)
                 return 0;
@@ -1263,7 +1319,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             if (clampedContribution.All(v => v <= 0))
                 return 0;
 
-            double componentSr = finaliseDifficulty(clampedContribution, localWeights, notes, longNotes);
+            double componentSr = finaliseDifficulty(clampedContribution, localWeights, notes, longNotes, rescaleThreshold);
             return Math.Round(Math.Clamp(componentSr, 0, totalSr), 2, MidpointRounding.AwayFromZero);
         }
 
@@ -1304,7 +1360,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 
         #endregion
 
-        private static double finaliseDifficulty(List<double> difficulties, List<double> weights, List<NoteStruct> notes, List<NoteStruct> longNotes)
+        private static double finaliseDifficulty(List<double> difficulties, List<double> weights, List<NoteStruct> notes, List<NoteStruct> longNotes, double rescaleThreshold)
         {
             var combined = difficulties.Zip(weights, (d, w) => (d, w)).OrderBy(pair => pair.d).ToList();
             if (combined.Count == 0)
@@ -1371,7 +1427,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             //Logger.Log($"C# totalNotes: {totalNotes}");
 
             sr *= totalNotes / (totalNotes + 60);
-            sr = rescaleHigh(sr);
+            sr = rescaleHigh(sr, rescaleThreshold);
             sr *= 0.975;
 
             //Logger.Log($"C# final SR: {sr}");
@@ -1379,9 +1435,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             return sr;
         }
 
-        private static double finaliseDifficulty(double[] difficulties, double[] weights, List<NoteStruct> notes, List<NoteStruct> longNotes)
+        private static double finaliseDifficulty(double[] difficulties, double[] weights, List<NoteStruct> notes, List<NoteStruct> longNotes, double rescaleThreshold)
         {
-            return finaliseDifficulty(difficulties.ToList(), weights.ToList(), notes, longNotes);
+            return finaliseDifficulty(difficulties.ToList(), weights.ToList(), notes, longNotes, rescaleThreshold);
         }
 
         private static double[] interpValues(double[] newX, double[] oldX, double[] oldVals)
@@ -1619,9 +1675,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             return result;
         }
 
-        private static double rescaleHigh(double sr)
+        private static double rescaleHigh(double sr, double threshold)
         {
-            double threshold = RescaleHighThreshold;
             double excess = sr - threshold;
             double normalized = excess / 1.2;
             double softened = threshold + normalized;

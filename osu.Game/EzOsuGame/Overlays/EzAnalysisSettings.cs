@@ -56,6 +56,26 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "ez", "skill", "ln", "hold", "chartdan", "dan", "ratio", "技能", "占比", "门槛" }
                 },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzSettingsStrings.SSR_RESCALE_THRESHOLD,
+                    HintText = EzSettingsStrings.SSR_RESCALE_THRESHOLD_TOOLTIP,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.SsrRescaleThreshold),
+                    KeyboardStep = 1f,
+                })
+                {
+                    Keywords = new[] { "ssr", "xxy", "star", "rating", "rescale", "threshold", "难度", "星级", "重缩放" }
+                },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzSettingsStrings.SSR_LN_MULTIPLIER,
+                    HintText = EzSettingsStrings.SSR_LN_MULTIPLIER_TOOLTIP,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.SsrLnMultiplier),
+                    KeyboardStep = 0.5f,
+                })
+                {
+                    Keywords = new[] { "ssr", "xxy", "ln", "long note", "multiplier", "长条", "因子", "难度" }
+                },
             });
 
             addAnalysisSystemSettings(ezConfig, rulesetStore);
