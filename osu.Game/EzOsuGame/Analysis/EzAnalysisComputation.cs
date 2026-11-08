@@ -166,13 +166,6 @@ namespace osu.Game.EzOsuGame.Analysis
                                                                            CancellationToken cancellationToken = default)
             => ComputeBaselinePerformancePointsForRating(beatmapManager, beatmapInfo, beatmapInfo.EzRatingData.SunnySR, cancellationToken);
 
-        /// <summary>
-        /// Same value from an already-converted chart; see the <see cref="IBeatmap"/> overload above.
-        /// </summary>
-        internal static double ComputeBaselineSunnyPerformancePointsForRealm(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo,
-                                                                             IBeatmap analysisBeatmap, CancellationToken cancellationToken = default)
-            => ComputeBaselinePerformancePointsForRating(beatmapManager, beatmapInfo, beatmapInfo.EzRatingData.SunnySR, analysisBeatmap, cancellationToken);
-
         public static bool TryComputeSunnySRAndPp(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
                                                   out double? sunnySR, out double? pp)
         {

@@ -95,8 +95,10 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             if (!double.IsFinite(star) || star < 0)
                 return false;
 
-            // The same conversion the star was measured on: scoring the rating used to convert the chart a second time.
-            double pp = EzAnalysisComputation.ComputeBaselineSunnyPerformancePointsForRealm(beatmapManager, beatmapInfo, playable, cancellationToken);
+            // Scored at the rating this call just measured, on the conversion it just used. Reading the stored SunnySR
+            // instead scored the previous pass's value - absent on a first rating - which is how the Sunny pp column
+            // ended up needing a second full-library pass that converted every chart again.
+            double pp = EzAnalysisComputation.ComputeBaselinePerformancePointsForRating(beatmapManager, beatmapInfo, star, playable, cancellationToken);
             skillStore.WriteRating(beatmapInfo.ID, EzAnalysisSystem.SSR, star, pp >= 0 ? pp : null);
 
             return true;
