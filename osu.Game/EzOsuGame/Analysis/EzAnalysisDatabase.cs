@@ -861,8 +861,6 @@ namespace osu.Game.EzOsuGame.Analysis
                 wrote = true;
             }
 
-            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-            /*
             if (payload.SunnyStarRating is double ssr && double.IsFinite(ssr) && ssr >= 0)
             {
                 EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.SSR, ssr);
@@ -874,7 +872,6 @@ namespace osu.Game.EzOsuGame.Analysis
                 EzRatingWriter.WritePP(beatmap, EzAnalysisSystem.Official, pp);
                 wrote = true;
             }
-            */
 
             return wrote;
         }

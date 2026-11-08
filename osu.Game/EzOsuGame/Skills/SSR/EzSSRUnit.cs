@@ -4,6 +4,7 @@
 using System;
 using System.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills.SkillTag;
@@ -79,11 +80,8 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             if (!double.IsFinite(star) || star < 0)
                 return false;
 
-            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-            /*
             double pp = EzAnalysisComputation.ComputeBaselineSunnyPerformancePointsForRealm(beatmapManager, beatmapInfo, cancellationToken);
             skillStore.WriteRating(beatmapInfo.ID, EzAnalysisSystem.SSR, star, pp >= 0 ? pp : null);
-            */
 
             return true;
         }

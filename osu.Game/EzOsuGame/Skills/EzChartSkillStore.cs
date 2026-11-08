@@ -8,6 +8,7 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
@@ -172,8 +173,6 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentException.ThrowIfNullOrWhiteSpace(beatmapHash);
             ArgumentNullException.ThrowIfNull(skills);
 
-            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-            /*
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int version = algorithmVersion ?? system.CurrentVersion();
             string systemId = system.ToStorageId();
@@ -189,7 +188,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                 foreach (var (skillId, value) in skills)
                 {
-                    int rowVersion = rowVersionFor(systemId, skillId, version, skillVersions, rulesetOnlineId);
+                    int rowVersion = rowVersionFor(system, skillId, version, skillVersions, rulesetOnlineId);
 
                     r.Add(new EzBeatmapSkillValue
                     {
@@ -204,7 +203,6 @@ namespace osu.Game.EzOsuGame.Skills
                     });
                 }
             });
-            */
         }
 
         /// <summary>
@@ -300,22 +298,18 @@ namespace osu.Game.EzOsuGame.Skills
             if (beatmapId == Guid.Empty || (sr == null && pp == null))
                 return;
 
-            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-            /*
             realmAccess.Write(r =>
             {
                 if (r.Find<BeatmapInfo>(beatmapId) is BeatmapInfo live)
                     EzRatingWriter.Write(live, system, sr, pp);
             });
-            */
         }
 
         public void WriteBeatmapMsd(string beatmapHash, EzMinaSkillAxisVector vector, Guid beatmapId = default, DateTimeOffset? computedAt = null)
         {
-            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-            /*
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int version = minaChartRevision;
+            string msdSystemId = EzAnalysisSystem.Mina.ToStorageId();
 
             realmAccess.Write(r =>
             {
@@ -341,7 +335,6 @@ namespace osu.Game.EzOsuGame.Skills
                     });
                 }
             });
-            */
         }
 
         /// <summary>
@@ -352,10 +345,9 @@ namespace osu.Game.EzOsuGame.Skills
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(beatmapHash);
 
-            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-            /*
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int version = minaChartRevision;
+            string msdSystemId = EzAnalysisSystem.Mina.ToStorageId();
 
             realmAccess.Write(r =>
             {
@@ -379,7 +371,6 @@ namespace osu.Game.EzOsuGame.Skills
                     ComputedAt = at,
                 });
             });
-            */
         }
 
         /// <summary>
@@ -387,10 +378,10 @@ namespace osu.Game.EzOsuGame.Skills
         /// </summary>
         public void ClearBeatmapMsd(IEnumerable<string>? hashes = null)
         {
-            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
+            string msdSystemId = EzAnalysisSystem.Mina.ToStorageId();
+
             if (hashes == null)
             {
-                /*
                 realmAccess.Write(r =>
                 {
                     var rows = r.All<EzBeatmapSkillValue>()
@@ -400,7 +391,7 @@ namespace osu.Game.EzOsuGame.Skills
                     foreach (var row in rows)
                         r.Remove(row);
                 });
-                */
+
                 return;
             }
 
@@ -414,7 +405,6 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 var batch = hashList.Skip(i).Take(batch_size).ToHashSet(StringComparer.Ordinal);
 
-                /*
                 realmAccess.Write(r =>
                 {
                     var rows = r.All<EzBeatmapSkillValue>()
@@ -426,7 +416,6 @@ namespace osu.Game.EzOsuGame.Skills
                     foreach (var row in rows)
                         r.Remove(row);
                 });
-                */
             }
         }
 
@@ -511,8 +500,6 @@ namespace osu.Game.EzOsuGame.Skills
             if (info.IsUnavailable)
                 return;
 
-            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-            /*
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
 
             realmAccess.Write(r =>
@@ -551,7 +538,6 @@ namespace osu.Game.EzOsuGame.Skills
                     KeyCount = info.KeyCount ?? -1,
                 });
             });
-            */
         }
 
         /// <summary>
@@ -565,8 +551,6 @@ namespace osu.Game.EzOsuGame.Skills
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(beatmapHash);
 
-            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-            /*
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int revision = EzCSIEngine.VERSION;
 
@@ -593,13 +577,12 @@ namespace osu.Game.EzOsuGame.Skills
                     KeyCount = -1,
                 });
             });
-            */
         }
 
         public void ClearChartSkillInfo()
         {
-            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-            /*
+            string csiSystemId = EzAnalysisSystem.CSI.ToStorageId();
+
             realmAccess.Write(r =>
             {
                 var rows = r.All<EzBeatmapChartSkillInfo>().ToList();
@@ -614,7 +597,6 @@ namespace osu.Game.EzOsuGame.Skills
                 foreach (var row in axes)
                     r.Remove(row);
             });
-            */
         }
 
         private static void removeStructureAxes(Realm r, string beatmapHash)
@@ -664,8 +646,6 @@ namespace osu.Game.EzOsuGame.Skills
 
             // Stamped with the facet revision (not chartDan.AlgorithmVersion, which stays the pure
             // dan algorithm version on the DTO) so a later Mina/CSI bump retires this row.
-            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-            /*
             DateTimeOffset at = chartDan.ComputedAt == default ? DateTimeOffset.UtcNow : chartDan.ComputedAt;
             int version = EzDanEngine.VERSION;
 
@@ -695,13 +675,10 @@ namespace osu.Game.EzOsuGame.Skills
                     ComputedAt = at,
                 });
             });
-            */
         }
 
         public void ClearChartDan()
         {
-            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-            /*
             realmAccess.Write(r =>
             {
                 var rows = r.All<EzChartDan>().ToList();
@@ -709,7 +686,6 @@ namespace osu.Game.EzOsuGame.Skills
                 foreach (var row in rows)
                     r.Remove(row);
             });
-            */
         }
 
         /// <summary>
@@ -758,8 +734,8 @@ namespace osu.Game.EzOsuGame.Skills
 
         public void ClearBeatmapPPP()
         {
-            // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-            /*
+            string pppSystemId = EzAnalysisSystem.PPP.ToStorageId();
+
             realmAccess.Write(r =>
             {
                 var rows = r.All<EzBeatmapSkillValue>()
@@ -769,7 +745,6 @@ namespace osu.Game.EzOsuGame.Skills
                 foreach (var row in rows)
                     r.Remove(row);
             });
-            */
         }
 
         private PppChartScan scanPppCharts()

@@ -13,7 +13,6 @@ using osu.Game.Tests.Database;
 namespace osu.Game.Tests.EzOsuGame.Skills
 {
     [TestFixture]
-    [Ignore("[EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。")]
     public class EzPPPSkillStoreTest : RealmTest
     {
         [Test]

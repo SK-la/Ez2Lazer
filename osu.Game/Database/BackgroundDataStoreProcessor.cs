@@ -211,15 +211,10 @@ namespace osu.Game.Database
                 {
                     try
                     {
-                        // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-                        /*
                         if (forceAll)
                             clearEzRealmMetadata(scope);
 
                         runEzRealmMetadataBackfill(scope);
-                        */
-                        _ = forceAll;
-                        Logger.Log("Ez Realm metadata backfill skipped: Realm v12 writes are disabled for the realtime verification period.");
                     }
                     catch (Exception e)
                     {
@@ -529,7 +524,6 @@ namespace osu.Game.Database
                     clearOutdatedStarRatings();
 
                     // Run Ez Realm backfill before official star population so it is not blocked for long periods.
-                    /*
                     if (tryBeginEzRealmMetadataBackfill())
                     {
                         try
@@ -548,10 +542,9 @@ namespace osu.Game.Database
                         deferEzRealmMetadataRebuild(EzAnalysisSystem.All, forceAll: false);
                         Logger.Log("Startup Ez Realm metadata backfill deferred: another backfill is running; it will run again when that one finishes.");
                     }
-                    */
 
                     populateMissingStarRatings();
-                    // populateMissingMultiSystemBaselines();
+                    populateMissingMultiSystemBaselines();
                     processOnlineBeatmapSetsWithNoUpdate();
                     // Note that the previous method will also update these on a fresh run.
                     processBeatmapsWithMissingObjectCounts();
@@ -628,8 +621,7 @@ namespace osu.Game.Database
                             if (b.Ruleset.ShortName == ruleset.ShortName)
                             {
                                 b.StarRating = -1;
-                                // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-                                // b.PerformancePoints = -1;
+                                b.PerformancePoints = -1;
                                 countReset++;
                             }
                         }
@@ -791,12 +783,11 @@ namespace osu.Game.Database
                             continue;
                         }
 
-                        // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-                        // if (scope.HasFlag(EzAnalysisSystem.Official))
-                        //     EzRatingWriter.WritePP(beatmap, EzAnalysisSystem.Official, -1);
-                        //
-                        // if (scope.HasFlag(EzAnalysisSystem.SSR) && EzSunnyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
-                        //     EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.SSR, -1);
+                        if (scope.HasFlag(EzAnalysisSystem.Official))
+                            EzRatingWriter.WritePP(beatmap, EzAnalysisSystem.Official, -1);
+
+                        if (scope.HasFlag(EzAnalysisSystem.SSR) && EzSSRUnit.SupportsRuleset(beatmap.Ruleset.OnlineID))
+                            EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.SSR, -1);
 
                         totalProcessed++;
                     }
@@ -976,8 +967,9 @@ namespace osu.Game.Database
         /// The stages used to be four separate full-library loops, so a chart needing all four was loaded and
         /// converted four times. They are still four independent stages with their own revision gates (a chart
         /// only pays for the stages it owes), but they now share one beatmap load and run in dependency order
-        /// within the same iteration: CSI, then Mina, then PP+, then dan - which reads what the earlier stages in
-        /// this same iteration just wrote.
+        /// within the same iteration: Mina, then CSI, then dan, then PP+ - each stage reading what the earlier
+        /// stages in this same iteration just wrote. Mina leads because CSI settles against its unrateable verdict;
+        /// dan reads both rows; PP+ is independent and goes last.
         /// </remarks>
         private bool populateChartChain(EzChartChainState chain, bool csi, bool msd, bool ppp, bool dan)
         {
@@ -1010,7 +1002,9 @@ namespace osu.Game.Database
             Logger.Log(
                 $"Found {work.Count} beatmaps which require chart chain reprocessing (Mina v{EzMinaEngine.VERSION}, CSI v{EzCSIEngine.VERSION}, Dan v{EzDanEngine.VERSION}).");
 
-            var notification = showProgressNotification(work.Count, "Reprocessing chart analysis chain", "beatmaps' analysis chain has been updated");
+            var notification = showProgressNotification(work.Count,
+                $"Reprocessing chart analysis chain ({describeChartStages(csi, msd, ppp, dan)})",
+                "beatmaps' analysis chain has been updated");
 
             int processedCount = 0;
             int failedCount = 0;
@@ -1050,26 +1044,6 @@ namespace osu.Game.Database
 
                 bool stageFailed = false;
 
-                if (csi && hash != null && chain.ChartSkillInfoOwed.Contains(hash))
-                {
-                    try
-                    {
-                        // True = settled afterwards (computed, or stamped unavailable).
-                        if (!ezCSIUnit.TryEnsure(beatmap))
-                            stageFailed = true;
-                    }
-                    catch (Exception e) when (e is not ObjectDisposedException)
-                    {
-                        Logger.Log($"Background ChartSkillInfo processing failed on {beatmap}: {e}");
-                        stageFailed = true;
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        abortedDuringShutdown = true;
-                        break;
-                    }
-                }
-
                 bool msdWritten = false;
 
                 if (msd && hash != null && chain.MsdOwed.Contains(hash))
@@ -1093,16 +1067,17 @@ namespace osu.Game.Database
                     }
                 }
 
-                if (ppp && pppDebt.Contains(id))
+                if (csi && hash != null && chain.ChartSkillInfoOwed.Contains(hash))
                 {
                     try
                     {
-                        if (ezBeatmapPPPComputer.ComputeAndStore(beatmap) == null)
+                        // True = settled afterwards (computed, or stamped unavailable).
+                        if (!ezCSIUnit.TryEnsure(beatmap))
                             stageFailed = true;
                     }
                     catch (Exception e) when (e is not ObjectDisposedException)
                     {
-                        Logger.Log($"Background PP+ processing failed on {beatmap}: {e}");
+                        Logger.Log($"Background ChartSkillInfo processing failed on {beatmap}: {e}");
                         stageFailed = true;
                     }
                     catch (ObjectDisposedException)
@@ -1122,6 +1097,25 @@ namespace osu.Game.Database
                     catch (Exception e) when (e is not ObjectDisposedException)
                     {
                         Logger.Log($"Background ChartDan processing failed on {beatmap}: {e}");
+                        stageFailed = true;
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        abortedDuringShutdown = true;
+                        break;
+                    }
+                }
+
+                if (ppp && pppDebt.Contains(id))
+                {
+                    try
+                    {
+                        if (ezBeatmapPPPComputer.ComputeAndStore(beatmap) == null)
+                            stageFailed = true;
+                    }
+                    catch (Exception e) when (e is not ObjectDisposedException)
+                    {
+                        Logger.Log($"Background PP+ processing failed on {beatmap}: {e}");
                         stageFailed = true;
                     }
                     catch (ObjectDisposedException)
@@ -1170,6 +1164,27 @@ namespace osu.Game.Database
                         yield return hash;
                 }
             }
+        }
+
+        // Names the stages a chart chain pass runs, in order, so the progress notification says which systems are
+        // being computed rather than "chain".
+        private static string describeChartStages(bool csi, bool msd, bool ppp, bool dan)
+        {
+            var labels = new List<string>(4);
+
+            if (msd)
+                labels.Add(EzEnumMetaCache<EzAnalysisSystem>.Meta(EzAnalysisSystem.Mina).NameEn);
+
+            if (csi)
+                labels.Add(EzEnumMetaCache<EzAnalysisSystem>.Meta(EzAnalysisSystem.CSI).NameEn);
+
+            if (dan)
+                labels.Add(EzEnumMetaCache<EzAnalysisSystem>.Meta(EzAnalysisSystem.Dan).NameEn);
+
+            if (ppp)
+                labels.Add(EzEnumMetaCache<EzAnalysisSystem>.Meta(EzAnalysisSystem.PPP).NameEn);
+
+            return string.Join(", ", labels);
         }
 
         /// <summary>
@@ -1335,8 +1350,6 @@ namespace osu.Game.Database
 
                 try
                 {
-                    // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-                    /*
                     var lookup = new EzAnalysisLookupCache(beatmap, beatmap.Ruleset, mods: null);
 
                     double performancePoints = EzAnalysisComputation.TryComputePerformancePoints(beatmapManager, lookup, CancellationToken.None, out double computedPp)
@@ -1348,7 +1361,6 @@ namespace osu.Game.Database
                         if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
                             liveBeatmapInfo.PerformancePoints = performancePoints;
                     });
-                    */
 
                     ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
                     ++processedCount;
@@ -1410,8 +1422,6 @@ namespace osu.Game.Database
 
                 try
                 {
-                    // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-                    /*
                     double sunnyPp = beatmap.EzRatingData.SunnyPP;
                     double minaSr = beatmap.EzRatingData.MinaSR;
 
@@ -1435,7 +1445,6 @@ namespace osu.Game.Database
                         if (minaSr >= 0)
                             EzRatingWriter.WriteSR(liveBeatmapInfo, EzAnalysisSystem.Mina, minaSr);
                     });
-                    */
 
                     ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
                 }
