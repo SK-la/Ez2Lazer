@@ -19,10 +19,10 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [Test]
         public void Empty_has_non_null_empty_kps_list()
         {
-            Assert.That(EzSongSelectAnalysisDisplay.Empty.KpsList, Is.Not.Null);
-            Assert.That(EzSongSelectAnalysisDisplay.Empty.KpsList, Is.Empty);
-            Assert.That(EzSongSelectAnalysisDisplay.Empty.AverageKps, Is.Zero);
-            Assert.That(EzSongSelectAnalysisDisplay.Empty.MaxKps, Is.Zero);
+            Assert.That(EzSongSelectAnalysisDisplay.EMPTY.KpsList, Is.Not.Null);
+            Assert.That(EzSongSelectAnalysisDisplay.EMPTY.KpsList, Is.Empty);
+            Assert.That(EzSongSelectAnalysisDisplay.EMPTY.AverageKps, Is.Zero);
+            Assert.That(EzSongSelectAnalysisDisplay.EMPTY.MaxKps, Is.Zero);
         }
 
         [Test]

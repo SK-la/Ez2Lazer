@@ -1,71 +1,51 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Framework.Bindables;
 using osu.Game.Database;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
-using osu.Game.Graphics.UserInterfaceV2;
-using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
     public static partial class EzDataRebuildSettingsSection
     {
+        private static readonly string[] rebuild_keywords =
+        {
+            "realm", "sqlite", "msd", "csi", "dan", "skill", "sunny", "ppp", "pp", "tags", "rebuild", "maintenance", "backfill",
+            "技能", "数据", "维护", "补算", "重算",
+        };
+
         private static readonly string[] skill_data_keywords =
         {
             "realm", "msd", "csi", "dan", "skill", "status", "stale", "missing", "unrateable",
-            "技能", "状态", "缺失", "过期", "补算",
+            "official", "sunny", "ssr", "ppp", "mina", "analysis", "ruleset",
+            "技能", "分析", "状态", "缺失", "过期", "补算", "规则集",
         };
 
         public static void AddTo(
             SettingsSubsection subsection,
             BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
-            EzAnalysisWarmupProcessor? analysisWarmupProcessor,
             EzChartSkillStore? skillStore,
             EzPlayerSkillStore? playerStore,
-            IDialogOverlay? dialogOverlay,
-            INotificationOverlay? notifications,
-            EzLocalProfileStore? localProfileStore = null)
+            EzLocalProfileStore? localProfileStore = null,
+            EzDataRebuildDialog? rebuildDialog = null)
         {
-            var rebuildTarget = new Bindable<EzDataRebuildTarget>(EzDataRebuildTarget.RealmChartSkillChain);
-            var maintenanceHandler = new EzDataRebuildMaintenanceHandler(backgroundDataStoreProcessor, analysisWarmupProcessor, dialogOverlay, notifications);
-
-            var executeButton = new DangerousSettingsButtonV2
+            subsection.Add(new SettingsButtonV2
             {
-                Text = EzSettingsStrings.DATA_REBUILD_EXECUTE,
-                TooltipText = EzSettingsStrings.DATA_REBUILD_EXECUTE_TOOLTIP,
-                Keywords = new[] { "realm", "tag", "xxy", "pp", "msd", "skill", "metadata", "backfill", "force", "recalculate", "sqlite", "rebuild", "maintenance", "execute", "score", "成绩" },
-            };
-
-            void updateExecuteButtonState()
-            {
-                executeButton.Enabled.Value = maintenanceHandler.CanExecute(rebuildTarget.Value);
-            }
-
-            executeButton.Action = () => maintenanceHandler.RequestExecute(rebuildTarget.Value);
-            rebuildTarget.BindValueChanged(_ => updateExecuteButtonState(), true);
-
-            subsection.Add(new SettingsItemV2(new FormEnumDropdown<EzDataRebuildTarget>
-            {
-                Caption = EzSettingsStrings.DATA_REBUILD_TARGET,
-                HintText = EzSettingsStrings.DATA_REBUILD_TARGET_TOOLTIP,
-                Current = rebuildTarget,
-            })
-            {
-                Keywords = new[] { "realm", "tag", "xxy", "pp", "msd", "skill", "metadata", "backfill", "force", "recalculate", "sqlite", "rebuild", "maintenance", "score", "成绩" }
+                Text = EzSettingsStrings.DATA_REBUILD_OPEN,
+                TooltipText = EzSettingsStrings.DATA_REBUILD_OPEN_TOOLTIP,
+                Keywords = rebuild_keywords,
+                Action = () => rebuildDialog?.ShowMaintenance(),
             });
-
-            subsection.Add(executeButton);
 
             addSkillDataStatus(subsection, backgroundDataStoreProcessor, skillStore, playerStore, localProfileStore);
         }
 
         /// <summary>
-        /// Note readout + refresh button for the chart skill chain. Measurement runs only when the user taps refresh.
+        /// Note readout + refresh button for the persisted analysis data of every ruleset. Measurement runs only when
+        /// the user taps refresh.
         /// </summary>
         private static void addSkillDataStatus(
             SettingsSubsection subsection,

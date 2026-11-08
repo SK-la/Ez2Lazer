@@ -7,6 +7,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
+using osu.Game.EzOsuGame.Metrics;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.UserInterface
@@ -119,6 +120,11 @@ namespace osu.Game.EzOsuGame.UserInterface
             Performance.Show();
         }
 
-        public static bool ShouldShowXxyDisplay(BeatmapInfo beatmap) => EzAnalysisProviderBridge.HasAnalysisProvider(beatmap.Ruleset) && beatmap.SupportsSunnyStarRating();
+        /// <summary>
+        /// Whether this chart has an Ez star to show beside the official one. Any ruleset whose selected system
+        /// carries a skill vector does; the analysis provider only decides the Sunny rating, not the pill's presence.
+        /// </summary>
+        public static bool ShouldShowXxyDisplay(BeatmapInfo beatmap)
+            => EzMetricVariantReadout.Selected(beatmap.Ruleset.OnlineID)?.ChartSkillProducer != null;
     }
 }

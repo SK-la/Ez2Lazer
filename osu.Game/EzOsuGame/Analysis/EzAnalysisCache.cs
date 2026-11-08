@@ -17,6 +17,7 @@ using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Metrics;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
@@ -25,13 +26,12 @@ using osu.Game.Screens.Select;
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
-    /// 选歌 Ez 分析前台缓存；<see cref="Ez2Setting.EzAnalysisRecEnabled"/> 控制本 cache 是否对 SQLite 体系指标做即时计算。
+    /// 选歌 Ez 分析前台缓存与派发点。调用方只描述要分析的谱面 / 规则集 / mods，不指定读哪一层。
     ///
-    /// - L1 Realm 基线 xxy/PP：UI 直读 <see cref="BeatmapInfo"/>，不经本 cache；Panel PP 应对齐官方 <see cref="BeatmapDifficultyCache"/>。
-    /// - L2 主 SQLite（<see cref="Ez2Setting.EzAnalysisSqliteEnabled"/>）：NoMod kps/KPC 切片；只读，不含 xxy/PP。
-    /// - L3 本 cache（受 Rec 开关）：当前 ruleset/mods 下即时计算 <see cref="EzAnalysisResult"/>（kps、mod xxy 等）；Rec 关则仅 L2 预填/回退。
-    /// 分支库 xxy/PP 为预生成快照，由 <see cref="EzAnalysisDatabase"/> 读取；Rec 关时不为分支场景做选歌补算。
-    /// NoMod 语义对齐 <see cref="BeatmapDifficultyCache"/>：优先读 L2 已存切片，缺失时在内存补算而不落盘。
+    /// 派发顺序：本会话 store → 即时计算（受 <see cref="Ez2Setting.EzAnalysisRecEnabled"/>）→ 主 SQLite NoMod 切片
+    /// （受 <see cref="Ez2Setting.EzAnalysisSqliteEnabled"/>）→ 无结果。
+    /// 已存切片只描述本规则集 NoMod 请求，因此有 mod 或换规则集的请求没有已存答案，由即时计算回答。
+    /// 标量（星 / PP / 技能星）经 <see cref="ReadVariantValues"/> 按当前选中系统读取，缺失的半侧才回落到基线列。
     /// <para>
     /// 本 cache 是纯读组件：任何落盘（主 SQLite 切片、Realm 值行与基线列）都由 BDSP、<see cref="BeatmapUpdater"/> 或设置里的手动重算发起。
     /// 不承担启动预热、Realm 回填或分支库构建。
@@ -145,7 +145,7 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             var bindable = new BindableBeatmapEzAnalysis(beatmapInfo, cancellationToken);
 
-            // NoMod：仅预填主 SQLite 的 kps/KPC 切片；xxy/PP 占位由面板直读 Realm（对齐 StarRating）。
+            // NoMod：仅预填主 SQLite 的 kps/KPC 切片，让首帧就有 KPS；其余数值由 getAnalysisAsync 按同一套派发补齐。
             if (currentMods.Value.Count == 0
                 && beatmapInfo is BeatmapInfo seedBeatmapInfo
                 && analysisDatabase.TryGetStoredSqliteSlice(seedBeatmapInfo, currentRuleset.Value, out var storedSlice))
@@ -173,62 +173,103 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
+        /// <summary>
+        /// The single read entry every consumer goes through. Callers state what they want analysed; which source
+        /// answers is decided here from the request and the current database state.
+        /// </summary>
+        /// <remarks>
+        /// Dispatch order: this session's store, then a live pass when on-demand computation is enabled, then the
+        /// stored SQLite slice. A stored slice only describes a NoMod request for the beatmap's own ruleset, so a
+        /// modded or foreign-ruleset request is answered by the live pass.
+        /// </remarks>
         public virtual Task<EzAnalysisResult?> GetAnalysisAsync(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo = null, IEnumerable<Mod>? mods = null,
                                                                 CancellationToken cancellationToken = default, int computationDelay = 0)
         {
             rulesetInfo ??= beatmapInfo.Ruleset;
 
-            var localBeatmapInfo = beatmapInfo as BeatmapInfo;
-            var localRulesetInfo = (rulesetInfo as RulesetInfo) ?? localBeatmapInfo?.Ruleset;
+            if (beatmapInfo is not BeatmapInfo localBeatmapInfo
+                || ((rulesetInfo as RulesetInfo) ?? localBeatmapInfo.Ruleset) is not { } localRulesetInfo)
+                return Task.FromResult<EzAnalysisResult?>(null);
 
-            if (runtimeAnalysisEnabled.Value && localBeatmapInfo != null && localRulesetInfo != null)
+            return resolveAsync(new EzAnalysisLookupCache(localBeatmapInfo, localRulesetInfo, mods), cancellationToken, computationDelay);
+        }
+
+        private async Task<EzAnalysisResult?> resolveAsync(EzAnalysisLookupCache lookup, CancellationToken cancellationToken, int computationDelay)
+        {
+            var key = keyOf(lookup);
+
+            if (liveMetrics.Get(key) is { } cached)
+                return cached;
+
+            if (runtimeAnalysisEnabled.Value)
             {
-                if (!analysisDatabase.IsSqliteAnalysisEnabled)
-                    return GetDynamicAnalysisAsync(localBeatmapInfo, localRulesetInfo, mods, cancellationToken, computationDelay);
-
-                return getDynamicWithStoredFallbackAsync(localBeatmapInfo, localRulesetInfo);
-            }
-
-            if (localBeatmapInfo != null
-                && EzAnalysisDatabase.CanUseStoredAnalysis(localBeatmapInfo, rulesetInfo, mods)
-                && analysisDatabase.TryGetStoredSqliteSlice(beatmapInfo, rulesetInfo, out var storedSlice))
-                return Task.FromResult<EzAnalysisResult?>(storedSlice);
-
-            return Task.FromResult<EzAnalysisResult?>(null);
-
-            async Task<EzAnalysisResult?> getDynamicWithStoredFallbackAsync(BeatmapInfo dynamicBeatmapInfo, RulesetInfo dynamicRulesetInfo)
-            {
-                var dynamicAnalysis = await GetDynamicAnalysisAsync(dynamicBeatmapInfo, dynamicRulesetInfo, mods, cancellationToken, computationDelay).ConfigureAwait(false);
+                var dynamicAnalysis = await computeIntoStoreAsync(lookup, cancellationToken, computationDelay).ConfigureAwait(false);
 
                 if (dynamicAnalysis != null)
                     return dynamicAnalysis;
-
-                if (analysisDatabase.IsSqliteAnalysisEnabled
-                    && EzAnalysisDatabase.CanUseStoredAnalysis(dynamicBeatmapInfo, dynamicRulesetInfo, mods)
-                    && analysisDatabase.TryGetStoredSqliteSlice(dynamicBeatmapInfo, dynamicRulesetInfo, out var fallbackStoredSlice))
-                    return fallbackStoredSlice;
-
-                return null;
             }
+
+            if (analysisDatabase.IsSqliteAnalysisEnabled
+                && EzAnalysisDatabase.CanUseStoredAnalysis(lookup.BeatmapInfo, lookup.Ruleset, lookup.OrderedMods)
+                && analysisDatabase.TryGetStoredSqliteSlice(lookup.BeatmapInfo, lookup.Ruleset, out var storedSlice))
+                return storedSlice;
+
+            return null;
         }
 
         /// <summary>
-        /// Live analysis that ignores <see cref="Ez2Setting.EzAnalysisRecEnabled"/> and the stored SQLite slice.
-        /// For surfaces that must always show current-mod values; the setting only gates the song-select warm-up.
+        /// The selected system's star, pp and skill star for this chart. The cache decides whether the session
+        /// result or the stored baseline answers each half.
         /// </summary>
-        public Task<EzAnalysisResult?> GetLiveAnalysisAsync(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo = null, IEnumerable<Mod>? mods = null,
-                                                            CancellationToken cancellationToken = default, int computationDelay = 0)
+        /// <param name="officialLive">
+        /// Official difficulty the caller already holds from <see cref="BeatmapDifficultyCache"/>; used only when
+        /// the selected system is the official one.
+        /// </param>
+        public EzMetricVariantValues ReadVariantValues(BeatmapInfo beatmap, IReadOnlyList<Mod>? mods = null, in EzMetricVariantValues officialLive = default)
         {
-            rulesetInfo ??= beatmapInfo.Ruleset;
+            ArgumentNullException.ThrowIfNull(beatmap);
 
-            if (beatmapInfo is BeatmapInfo localBeatmapInfo
-                && ((rulesetInfo as RulesetInfo) ?? localBeatmapInfo.Ruleset) is { } localRulesetInfo)
-                return GetDynamicAnalysisAsync(localBeatmapInfo, localRulesetInfo, mods, cancellationToken, computationDelay);
+            var variant = EzMetricVariantReadout.Selected(beatmap.Ruleset.OnlineID);
 
-            return Task.FromResult<EzAnalysisResult?>(null);
+            if (variant == null)
+                return EzMetricVariantValues.Empty;
+
+            var live = TryGet(beatmap, mods) is { } analysis
+                ? variantValuesOf(analysis, variant)
+                : EzMetricVariantValues.Empty;
+
+            if (EzMetricVariantReadout.IsOfficial(variant))
+            {
+                live = new EzMetricVariantValues(
+                    officialLive.Star ?? live.Star,
+                    officialLive.PerformancePoints ?? live.PerformancePoints,
+                    live.SkillStar);
+            }
+
+            return EzMetricVariantReadout.Read(beatmap, variant, live);
         }
 
-        public bool TryGetXxySr(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double xxySr) => analysisDatabase.TryGetXxySr(beatmapInfo, rulesetInfo, out xxySr);
+        private static EzMetricVariantValues variantValuesOf(in EzAnalysisResult analysis, EzMetricVariant variant)
+        {
+            double? star = positiveAxis(analysis, variant.StarProducer, EzMetricAxisIds.STAR_RATING);
+
+            double? performancePoints = variant.PerformanceProducer is { } performanceProducer
+                ? positiveAxis(analysis, performanceProducer, EzMetricAxisIds.PERFORMANCE_POINTS)
+                : null;
+
+            double? skillStar = variant.ChartSkillProducer is { } chartProducer
+                ? positiveAxis(analysis, chartProducer, EzMetricVariantReadout.RatingAxisOf(chartProducer))
+                : null;
+
+            return new EzMetricVariantValues(star, performancePoints, skillStar);
+        }
+
+        /// <summary>A measured scalar is only shown when it is a real value; an empty chart reads as absent.</summary>
+        private static double? positiveAxis(in EzAnalysisResult analysis, EzMetricProducerId producer, string axisId)
+            => analysis.AxesOf(producer).TryGetValue(axisId, out double value) && double.IsFinite(value) && value > 0 ? value : null;
+
+        public bool TryGetXxySr(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double xxySr)
+            => analysisDatabase.TryGetXxySr(beatmapInfo, rulesetInfo, out xxySr);
 
         /// <summary>Cached result for this chart and mods; never computes.</summary>
         public EzAnalysisResult? TryGet(BeatmapInfo beatmap, IReadOnlyList<Mod>? mods)
@@ -271,7 +312,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public bool HasActiveSongsBranch => analysisDatabase.HasActiveSongsBranch;
 
-        public bool HasActiveSongsBranchFor(IRulesetInfo? rulesetInfo) => analysisDatabase.HasActiveSongsBranchFor(rulesetInfo);
+        public bool HasActiveSongsBranchFor(IRulesetInfo? rulesetInfo)
+            => analysisDatabase.HasActiveSongsBranchFor(rulesetInfo);
 
         public IReadOnlyDictionary<Guid, double> GetActiveSongsBranchValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
             => analysisDatabase.GetActiveSongsBranchValues(beatmaps, rulesetInfo, mods);
@@ -285,17 +327,23 @@ namespace osu.Game.EzOsuGame.Analysis
         public IReadOnlyDictionary<Guid, double> GetStoredPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
             => analysisDatabase.GetStoredPpValues(beatmaps, rulesetInfo, mods);
 
-        public bool IsActiveSongsBranchFor(IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods) => analysisDatabase.IsActiveSongsBranchFor(rulesetInfo, mods);
+        public bool IsActiveSongsBranchFor(IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods)
+            => analysisDatabase.IsActiveSongsBranchFor(rulesetInfo, mods);
 
-        public bool IsSongsBranchActive(string databasePath) => analysisDatabase.IsSongsBranchActive(databasePath);
+        public bool IsSongsBranchActive(string databasePath)
+            => analysisDatabase.IsSongsBranchActive(databasePath);
 
-        public void DeactivateSongsBranch() => analysisDatabase.DeactivateSongsBranch();
+        public void DeactivateSongsBranch()
+            => analysisDatabase.DeactivateSongsBranch();
 
-        public bool TryActivateSongsBranch(string databasePath, out LocalisableString message) => analysisDatabase.TryActivateSongsBranch(databasePath, out message);
+        public bool TryActivateSongsBranch(string databasePath, out LocalisableString message)
+            => analysisDatabase.TryActivateSongsBranch(databasePath, out message);
 
-        public bool TryToggleSongsBranchActivation(string databasePath, out LocalisableString message) => analysisDatabase.TryToggleSongsBranchActivation(databasePath, out message);
+        public bool TryToggleSongsBranchActivation(string databasePath, out LocalisableString message)
+            => analysisDatabase.TryToggleSongsBranchActivation(databasePath, out message);
 
-        public bool TryDeleteSongsBranch(string databasePath, out LocalisableString message) => analysisDatabase.TryDeleteSongsBranch(databasePath, out message);
+        public bool TryDeleteSongsBranch(string databasePath, out LocalisableString message)
+            => analysisDatabase.TryDeleteSongsBranch(databasePath, out message);
 
         // public bool TryToggleSongsBranchHidden(string databasePath, out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
         //     => analysisDatabase.TryToggleSongsBranchHidden(databasePath, out message, out nonHideableBeatmapSets);
@@ -304,31 +352,19 @@ namespace osu.Game.EzOsuGame.Analysis
                                               out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets, long lastModifiedUnixMilliseconds = 0)
             => analysisDatabase.TryToggleCollectionHidden(collectionId, collectionName, beatmapMd5Hashes, out message, out nonHideableBeatmapSets, lastModifiedUnixMilliseconds);
 
-        public IReadOnlySet<Guid> GetHiddenCollectionIds() => analysisDatabase.GetHiddenCollectionIds();
+        public IReadOnlySet<Guid> GetHiddenCollectionIds()
+            => analysisDatabase.GetHiddenCollectionIds();
 
         public IReadOnlyList<EzAnalysisPersistentStore.SongsBranchDescriptor> GetAvailableSongsBranches(IRulesetInfo? rulesetInfo = null, IReadOnlyList<Mod>? mods = null, int maxCount = 0)
             => analysisDatabase.GetAvailableSongsBranches(rulesetInfo, mods, maxCount);
 
-        public Task<EzAnalysisDatabase.SongsBranchBuildResult> CreateAndActivateSongsBranchAsync(IEnumerable<BeatmapInfo> beatmaps,
-                                                                                                 EzAnalysisPersistentStore.SourceCollectionSnapshot? sourceCollection,
+        public Task<EzAnalysisDatabase.SongsBranchBuildResult> CreateAndActivateSongsBranchAsync(IEnumerable<BeatmapInfo> beatmaps, EzAnalysisPersistentStore.SourceCollectionSnapshot? sourceCollection,
                                                                                                  IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods, bool activateAfterCreate = true,
                                                                                                  Action<int, int>? progress = null, CancellationToken cancellationToken = default)
             => analysisDatabase.CreateAndActivateSongsBranchAsync(beatmaps, sourceCollection, rulesetInfo, mods, activateAfterCreate, progress, cancellationToken);
 
-        protected virtual Task<EzAnalysisResult?> GetDynamicAnalysisAsync(BeatmapInfo beatmapInfo, RulesetInfo rulesetInfo, IEnumerable<Mod>? mods,
-                                                                          CancellationToken cancellationToken = default, int computationDelay = 0)
-        {
-            var lookup = new EzAnalysisLookupCache(beatmapInfo, rulesetInfo, mods);
-
-            // The live cache is the single store of analysed values; this component only schedules. Reading it
-            // first is what keeps the song-select panel and the radar on one compute per chart + mods.
-            if (liveMetrics.Get(keyOf(lookup)) is { } cached)
-                return Task.FromResult<EzAnalysisResult?>(cached);
-
-            return computeIntoStoreAsync(lookup, cancellationToken, computationDelay);
-        }
-
-        private EzAnalysisLiveCache.AnalysisKey keyOf(in EzAnalysisLookupCache lookup) => new EzAnalysisLiveCache.AnalysisKey(lookup.BeatmapInfo.Hash, lookup.Ruleset.OnlineID, lookup.ModsSignature);
+        private EzAnalysisLiveCache.AnalysisKey keyOf(in EzAnalysisLookupCache lookup)
+            => new EzAnalysisLiveCache.AnalysisKey(lookup.BeatmapInfo.Hash, lookup.Ruleset.OnlineID, lookup.ModsSignature);
 
         /// <summary>
         /// Runs the pass for <paramref name="lookup"/> into the shared session store. There is no second cache below
@@ -433,8 +469,7 @@ namespace osu.Game.EzOsuGame.Analysis
             catch (BeatmapInvalidForRulesetException invalidForRuleset)
             {
                 if (lookup.Ruleset.Equals(lookup.BeatmapInfo.Ruleset))
-                    Logger.Error(invalidForRuleset, $"[EzAnalysisCache] Failed to convert {lookup.BeatmapInfo.OnlineID} to the beatmap's default ruleset ({lookup.BeatmapInfo.Ruleset}).",
-                        Ez2ConfigManager.LOGGER_NAME);
+                    Logger.Error(invalidForRuleset, $"[EzAnalysisCache] Failed to convert {lookup.BeatmapInfo.OnlineID} to the beatmap's default ruleset ({lookup.BeatmapInfo.Ruleset}).", Ez2ConfigManager.LOGGER_NAME);
 
                 return null;
             }

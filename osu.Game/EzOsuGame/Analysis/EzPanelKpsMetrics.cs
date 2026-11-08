@@ -29,7 +29,7 @@ namespace osu.Game.EzOsuGame.Analysis
             IReadOnlyList<Mod>? mods,
             out EzSongSelectAnalysisDisplay.PanelMetrics metrics)
         {
-            metrics = EzSongSelectAnalysisDisplay.Empty;
+            metrics = EzSongSelectAnalysisDisplay.EMPTY;
 
             if (!EzAnalysisDatabase.CanUseStoredAnalysis(beatmap, ruleset, mods))
                 return false;

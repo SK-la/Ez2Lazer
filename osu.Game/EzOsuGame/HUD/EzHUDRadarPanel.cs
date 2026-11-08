@@ -14,7 +14,6 @@ using osu.Framework.Graphics.Shapes;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Screens;
@@ -30,6 +29,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -182,6 +182,12 @@ namespace osu.Game.EzOsuGame.HUD
 
         [Resolved(CanBeNull = true)]
         private EzAnalysisCache? analysisCache { get; set; }
+
+        /// <summary>
+        /// 非 null 表示这块面板挂在 Player 里。游玩期间只读已有分析结果，不发起计算。
+        /// </summary>
+        [Resolved(CanBeNull = true)]
+        private GameplayState? gameplayState { get; set; }
 
         private IBindable<StarDifficulty>? difficultyBindable;
         private CancellationTokenSource? difficultyCancellationSource;
@@ -483,12 +489,16 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         /// <summary>
-        /// Asks the analysis system for the current chart + mods and repaints when the result lands. Independent of
-        /// <see cref="Ez2Setting.EzAnalysisRecEnabled"/>: the radar must reflect the selected mods.
+        /// Asks the analysis cache for the current chart + mods and repaints when the result lands. The cache decides
+        /// which source answers; the radar does not pick a layer.
         /// </summary>
         private void requestLiveAnalysis(BeatmapInfo beatmapInfo)
         {
             if (analysisCache == null)
+                return;
+
+            // 游玩期间只读已有结果：分析计算放到选歌、结算等非游玩路径，避免进局瞬间抢 CPU 和大量分配。
+            if (gameplayState != null)
                 return;
 
             if (getLiveAnalysis(beatmapInfo) != null)
@@ -509,25 +519,34 @@ namespace osu.Game.EzOsuGame.HUD
 
             // The continuation is not registered against the pass' own token: a superseded pass that still completes
             // has warmed the shared store, and dropping its callback is what left the radar permanently empty.
-            analysisCache.GetLiveAnalysisAsync(beatmapInfo, localRuleset, localMods, cancellationToken)
+            analysisCache.GetAnalysisAsync(beatmapInfo, localRuleset, localMods, cancellationToken)
                          .ContinueWith(task =>
                          {
                              Schedule(() =>
                              {
                                  EzAnalysisResult? result = task.IsCanceled || task.IsFaulted ? null : task.GetResultSafely();
 
-                                 if (result != null && !cancellationToken.IsCancellationRequested)
+                                 if (result == null)
                                  {
-                                     cachedLiveAnalysisKey = key;
-                                     cachedLiveAnalysis = result;
+                                     // Do not refresh on a failed pass. The refresh would find the cache still empty,
+                                     // kick another full pass, and a chart that cannot be analysed would spin forever:
+                                     // the kick guard stays set until the chart / mods / ruleset change drops it.
+                                     if (cancellationToken.IsCancellationRequested && lastLiveAnalysisKickKey == key)
+                                         lastLiveAnalysisKickKey = null;
+
+                                     return;
                                  }
 
-                                 // A failed or superseded pass must not block a retry on the next presentation.
+                                 if (cancellationToken.IsCancellationRequested)
+                                     return;
+
+                                 cachedLiveAnalysisKey = key;
+                                 cachedLiveAnalysis = result;
+
                                  if (lastLiveAnalysisKickKey == key)
                                      lastLiveAnalysisKickKey = null;
 
-                                 if (!cancellationToken.IsCancellationRequested)
-                                     refreshRadarPresentation();
+                                 refreshRadarPresentation();
                              });
                          }, CancellationToken.None);
         }

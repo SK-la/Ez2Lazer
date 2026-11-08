@@ -2,18 +2,14 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Database;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
-using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Graphics.UserInterfaceV2;
@@ -31,7 +27,6 @@ namespace osu.Game.EzOsuGame.Overlays
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig,
                           BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
-                          EzAnalysisWarmupProcessor? analysisWarmupProcessor,
                           EzChartSkillStore? skillStore,
                           EzPlayerSkillStore? playerSkillStore,
                           IDialogOverlay? dialogOverlay,
@@ -39,10 +34,10 @@ namespace osu.Game.EzOsuGame.Overlays
                           EzLocalProfileService? localProfileService,
                           EzLocalProfileOnlinePullService? onlinePullService,
                           RulesetStore? rulesetStore,
-                          EzExternalRulesetManagerDialog? externalRulesetManager)
+                          EzExternalRulesetManagerDialog? externalRulesetManager,
+                          EzDataRebuildDialog? rebuildDialog)
         {
-            EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, skillStore, playerSkillStore, dialogOverlay, notifications,
-                localProfileService?.Store);
+            EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, skillStore, playerSkillStore, localProfileService?.Store, rebuildDialog);
 
             Add(new SettingsButtonV2
             {
@@ -70,24 +65,6 @@ namespace osu.Game.EzOsuGame.Overlays
 
             AddRange(new Drawable[]
             {
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = EzSettingsStrings.EZ_ANALYSIS_REC_ENABLED,
-                    HintText = EzSettingsStrings.EZ_ANALYSIS_REC_ENABLED_TOOLTIP,
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled),
-                })
-                {
-                    Keywords = new[] { "analysis", "ez", "song select", "kps", "kpc" }
-                },
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = EzSettingsStrings.EZ_ANALYSIS_SQLITE_ENABLED,
-                    HintText = EzSettingsStrings.EZ_ANALYSIS_SQLITE_ENABLED_TOOLTIP,
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled),
-                })
-                {
-                    Keywords = new[] { "analysis", "sqlite", "cache", "warmup", "persistent" }
-                },
                 new SettingsItemV2(new FormCheckBox
                 {
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.EzSubFrameCorrectionEnabled),
@@ -158,64 +135,6 @@ namespace osu.Game.EzOsuGame.Overlays
                     Keywords = new[] { "gc", "garbage", "collection", "server", "workstation", "stutter", "frame", "内存", "卡顿", "帧" }
                 },
             });
-
-            addAnalysisSystemSettings(ezConfig, rulesetStore);
-        }
-
-        /// <summary>
-        /// One analysis-system dropdown per ruleset. Each ruleset owns its choice; song select sorting, grouping and
-        /// filtering read out under it.
-        /// </summary>
-        private void addAnalysisSystemSettings(Ez2ConfigManager ezConfig, RulesetStore? rulesetStore)
-        {
-            var selection = ezConfig.GetBindable<string>(Ez2Setting.AnalysisSystemSelection);
-            var catalog = EzMetricVariantReadout.Catalog;
-            var items = new List<Drawable>();
-
-            foreach (var ruleset in rulesetStore?.AvailableRulesets ?? Enumerable.Empty<RulesetInfo>())
-            {
-                var variants = catalog.For(ruleset.OnlineID);
-
-                if (variants.Count <= 1)
-                    continue;
-
-                var current = new Bindable<EzMetricVariant>(EzMetricVariantReadout.Selected(ruleset.OnlineID) ?? variants[0]);
-
-                current.BindValueChanged(c =>
-                {
-                    if (c.NewValue != null && !ReferenceEquals(c.NewValue, c.OldValue))
-                        EzMetricSelection.SetPrimary(ruleset.OnlineID, c.NewValue.Id);
-                });
-
-                // The song select chip writes the same setting; follow it so both stay one value.
-                selection.BindValueChanged(_ =>
-                {
-                    var selected = EzMetricVariantReadout.Selected(ruleset.OnlineID);
-
-                    if (selected != null && !ReferenceEquals(selected, current.Value))
-                        current.Value = selected;
-                });
-
-                items.Add(new SettingsItemV2(new AnalysisSystemDropdown
-                {
-                    Caption = LocalisableString.Interpolate($"{ruleset.Name} · {EzSettingsStrings.ANALYSIS_SYSTEM_SELECTION}"),
-                    HintText = EzSettingsStrings.ANALYSIS_SYSTEM_SELECTION_TOOLTIP,
-                    Items = variants,
-                    Current = current,
-                })
-                {
-                    Keywords = new[] { "analysis", "system", "algorithm", "baseline", "算法", "基线", "分析", ruleset.ShortName }
-                });
-            }
-
-            if (items.Count > 0)
-                AddRange(items);
-        }
-
-        /// <summary>Shows each analysis system by its display name instead of its stored id.</summary>
-        private partial class AnalysisSystemDropdown : FormDropdown<EzMetricVariant>
-        {
-            protected override LocalisableString GenerateItemText(EzMetricVariant item) => item.Name;
         }
 
         private void requestComputeLocalProfile(
