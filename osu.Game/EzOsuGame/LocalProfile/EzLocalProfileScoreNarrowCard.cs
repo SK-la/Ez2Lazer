@@ -23,7 +23,7 @@ using osuTK;
 namespace osu.Game.EzOsuGame.LocalProfile
 {
     /// <summary>
-    /// Shared Local Profile narrow score card: artist, title, player, mods, date, pp, star, xxySR.
+    /// Shared Local Profile narrow score card: artist, title, player, mods, date, pp, star, sunnySR.
     /// </summary>
     public partial class EzLocalProfileScoreNarrowCard : OsuClickableContainer
     {

@@ -61,7 +61,7 @@ namespace osu.Game.EzOsuGame.Analysis
     /// (it is just "row revision != current revision").
     /// </para>
     /// <para>
-    /// This intentionally deviates from the star / xxysr shape (one applied scalar per ruleset that is
+    /// This intentionally deviates from the star / sunnySR shape (one applied scalar per ruleset that is
     /// compared and then reset to -1). Those two are siblings sharing one
     /// <c>LastAppliedDifficultyVersion</c>; the chart chain has real fan-in into Dan, which a single
     /// scalar cannot express without also invalidating a sibling on an unrelated bump.

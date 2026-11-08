@@ -59,7 +59,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         public double HoldRatio { get; init; }
 
-        public double? XxySr { get; init; }
+        public double? SSR { get; init; }
 
         /// <summary>Rating-axis mean the estimate was read against, or 0 when no axis carried a value.</summary>
         public double OverallMsd { get; init; }
@@ -85,7 +85,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             IReadOnlyDictionary<string, double> axes,
             int keyCount,
             double holdRatio,
-            double? xxySr,
+            double? sunnySR,
             EzChartSkillInfo? chartInfo,
             int holdCount = -1)
         {
@@ -94,7 +94,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             if (keyCount <= 0 || axes.Count == 0)
                 return null;
 
-            var primary = EzChartDanEstimator.FromMsd(axes, keyCount, holdRatio, xxySr);
+            var primary = EzChartDanEstimator.FromMsd(axes, keyCount, holdRatio, sunnySR);
 
             if (primary == null)
                 return null;
@@ -135,7 +135,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             {
                 KeyCount = keyCount,
                 HoldRatio = holdRatio,
-                XxySr = xxySr,
+                SSR = sunnySR,
                 OverallMsd = primary.OverallMsd,
                 DominantAxis = dominantAxis,
                 Sides = sides,
@@ -143,7 +143,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
             (double RawDan, string Label, EzDanValueSource Source)? resolve(EzDanSide side)
             {
-                if (xxySr is double sr
+                if (sunnySR is double sr
                     && sr >= 0 && double.IsFinite(sr)
                     && EzSunnyDanIntervals.TryLookup(keyCount, side.ToId(), sr, out var sunny)
                     && !string.IsNullOrEmpty(sunny.DisplayLabel))
@@ -154,7 +154,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 if (primary.Side == side && !string.IsNullOrEmpty(primary.Label))
                     return (primary.RawDan, primary.Label, fallbackSource());
 
-                if (EzDanLabels.TryResolveFallbackDan(keyCount, side, primary.OverallMsd, dominantAxis, xxySr) is not { } fallback)
+                if (EzDanLabels.TryResolveFallbackDan(keyCount, side, primary.OverallMsd, dominantAxis, sunnySR) is not { } fallback)
                     return null;
 
                 return (fallback.RawDan, fallback.Label, fallbackSource());

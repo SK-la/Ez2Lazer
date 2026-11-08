@@ -116,14 +116,14 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             IReadOnlyDictionary<string, double> msd,
             int keyCount,
             double holdRatio,
-            double? xxySr,
+            double? sunnySR,
             EzChartSkillInfo? chartInfo,
             int holdCount = -1)
         {
             if (string.IsNullOrEmpty(beatmapHash))
                 return null;
 
-            var set = EzDanSet.Create(msd, keyCount, holdRatio, xxySr, chartInfo, holdCount);
+            var set = EzDanSet.Create(msd, keyCount, holdRatio, sunnySR, chartInfo, holdCount);
             double overallMean = 0;
 
             if (set == null)

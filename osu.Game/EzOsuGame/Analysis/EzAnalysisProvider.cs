@@ -16,7 +16,7 @@ namespace osu.Game.EzOsuGame.Analysis
     public enum EzAnalysisScope
     {
         None = 0,
-        XxySr = 1 << 0,
+        SunnySR = 1 << 0,
         RulesetSpecificRadarData = 1 << 1,
 
         /// <summary>Performance points for a supplied star rating.</summary>
@@ -76,7 +76,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
     public static class EzAnalysisFields
     {
-        public static readonly EzAnalysisField<double> XXY_SR = new EzAnalysisField<double>("xxy_sr", EzAnalysisScope.XxySr);
+        public static readonly EzAnalysisField<double> SUNNY_SR = new EzAnalysisField<double>("sunny_sr", EzAnalysisScope.SunnySR);
 
         public static readonly EzAnalysisField<EzRulesetSpecificRadarResult> RULESET_SPECIFIC_RADAR_RESULT
             = new EzAnalysisField<EzRulesetSpecificRadarResult>("ruleset_specific_radar_result", EzAnalysisScope.RulesetSpecificRadarData);

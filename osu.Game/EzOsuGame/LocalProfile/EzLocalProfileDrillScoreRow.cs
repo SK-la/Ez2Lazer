@@ -117,7 +117,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var maniaSummary = analysis.ManiaSummary;
 
             double resolvedXxy = sunnyStarRating
-                                 ?? (hasKps && maniaSummary?.XxySr is double analysisXxy && analysisXxy >= 0
+                                 ?? (hasKps && maniaSummary?.SSR is double analysisXxy && analysisXxy >= 0
                                      ? analysisXxy
                                      : beatmap.EzRatingData.SunnySR);
 

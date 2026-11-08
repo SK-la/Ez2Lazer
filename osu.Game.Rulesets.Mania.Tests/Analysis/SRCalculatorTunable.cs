@@ -49,21 +49,21 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         // Public API similar to SRCalculator
         public static double CalculateSR(IBeatmap beatmap)
         {
-            return computeInternalXxySR(beatmap, 1.0).sr;
+            return computeInternalSunnySR(beatmap, 1.0).sr;
         }
 
         public static double CalculateSR(IBeatmap beatmap, double clockRate)
         {
-            return computeInternalXxySR(beatmap, clockRate).sr;
+            return computeInternalSunnySR(beatmap, clockRate).sr;
         }
 
-        private static (double sr, Dictionary<string, long> times) computeInternalXxySR(IBeatmap beatmap, double clockRate = 1.0)
+        private static (double sr, Dictionary<string, long> times) computeInternalSunnySR(IBeatmap beatmap, double clockRate = 1.0)
         {
             var stopwatch = Stopwatch.StartNew();
             ManiaBeatmap maniaBeatmap = (ManiaBeatmap)beatmap;
             int keyCount = Math.Max(1, maniaBeatmap.TotalColumns > 0 ? maniaBeatmap.TotalColumns : (int)Math.Round(maniaBeatmap.BeatmapInfo.Difficulty.CircleSize));
 
-            double sr = XxySRCalculateCoreTunable(maniaBeatmap, keyCount, clockRate);
+            double sr = SunnySRCalculateCoreTunable(maniaBeatmap, keyCount, clockRate);
             stopwatch.Stop();
 
             var timings = new Dictionary<string, long> { ["Total"] = stopwatch.ElapsedMilliseconds };
@@ -105,8 +105,8 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
 
         private static readonly Comparison<NoteStruct> note_comparer = compareNotes;
 
-        // Core: copy of XxySRCalculateCore but using Tunables
-        public static double XxySRCalculateCoreTunable(ManiaBeatmap maniaBeatmap, int keyCount, double clockRate = 1.0)
+        // Core: copy of SunnySRCalculateCore but using Tunables
+        public static double SunnySRCalculateCoreTunable(ManiaBeatmap maniaBeatmap, int keyCount, double clockRate = 1.0)
         {
             double[]? cross = CrossMatrixProvider.GetMatrix(keyCount);
             if (cross == null) throw new NotSupportedException($"Key mode {keyCount}k is not supported by the SR algorithm.");

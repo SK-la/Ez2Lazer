@@ -65,7 +65,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             Assert.That(report["KPS"].CurrentRevision, Is.EqualTo(3));
             Assert.That(report.Describe(), Does.Contain("KPS v3: ready 1, settled 1, stale 1, missing 1"));
             Assert.That(report.Describe(), Does.Contain("MSD v1: ready 4, settled 0, stale 0, missing 0"));
-            Assert.That(() => report["xxySR"], Throws.TypeOf<KeyNotFoundException>());
+            Assert.That(() => report["sunnySR"], Throws.TypeOf<KeyNotFoundException>());
         }
     }
 }

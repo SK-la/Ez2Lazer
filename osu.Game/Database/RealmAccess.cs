@@ -1668,12 +1668,12 @@ namespace osu.Game.Database
                     // 逐行猜测比直接清表更危险。开发期库没有兼容负担，交由回填重建。
                     migration.NewRealm.RemoveAll<EzBeatmapSkillValue>();
 
-                    // 各系统的星级 / pp 从五列收进 EzRatingData。v11 的 XxyStarRating 在 v12 里改名成
+                    // 各系统的星级 / pp 从五列收进 EzRatingData。v11 的 SunnyStarRating 在 v12 里改名成
                     // SunnyStarRating，现在又归到 EzRatingData.SunnySR，所以这一版一并把它搬过去。
                     string beatmapClassName = getMappedOrOriginalName(typeof(BeatmapInfo));
 
                     bool hasLegacyXxy = migration.OldRealm.Schema.TryFindObjectSchema(beatmapClassName, out var beatmapSchema)
-                                        && beatmapSchema.Any(p => p.Name == "XxyStarRating");
+                                        && beatmapSchema.Any(p => p.Name == "SunnyStarRating");
 
                     dynamic? oldBeatmaps = hasLegacyXxy ? migration.OldRealm.DynamicApi.All(beatmapClassName) : null;
                     var newBeatmaps = migration.NewRealm.All<BeatmapInfo>().ToList();
@@ -1688,7 +1688,7 @@ namespace osu.Game.Database
                         if (oldBeatmaps == null)
                             continue;
 
-                        double legacy = oldBeatmaps[i].XxyStarRating;
+                        double legacy = oldBeatmaps[i].SunnyStarRating;
 
                         if (double.IsFinite(legacy))
                             beatmap.EzRatingData.SunnySR = legacy;

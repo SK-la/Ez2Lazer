@@ -9,7 +9,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
     {
         public string PathKey { get; init; } = string.Empty;
         public double? Pp { get; init; }
-        public double? XxySr { get; init; }
+        public double? SSR { get; init; }
         public double? AvgKps { get; init; }
         public double? MaxKps { get; init; }
         public double? StarRating { get; init; }
@@ -41,13 +41,13 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
 INSERT INTO chart_analytics (
-    path_key, pp, xxy_sr, avg_kps, max_kps, star_rating, column_counts_json, kps_list_json, file_size, last_modified_ticks, scanned_at
+    path_key, pp, sunny_sr, avg_kps, max_kps, star_rating, column_counts_json, kps_list_json, file_size, last_modified_ticks, scanned_at
 ) VALUES (
-    $path_key, $pp, $xxy_sr, $avg_kps, $max_kps, $star_rating, $column_counts_json, $kps_list_json, $file_size, $last_modified_ticks, $scanned_at
+    $path_key, $pp, $sunny_sr, $avg_kps, $max_kps, $star_rating, $column_counts_json, $kps_list_json, $file_size, $last_modified_ticks, $scanned_at
 )
 ON CONFLICT(path_key) DO UPDATE SET
     pp = excluded.pp,
-    xxy_sr = excluded.xxy_sr,
+    sunny_sr = excluded.sunny_sr,
     avg_kps = excluded.avg_kps,
     max_kps = excluded.max_kps,
     star_rating = excluded.star_rating,
@@ -59,7 +59,7 @@ ON CONFLICT(path_key) DO UPDATE SET
 
                 cmd.Parameters.AddWithValue("$path_key", record.PathKey);
                 cmd.Parameters.AddWithValue("$pp", (object?)record.Pp ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("$xxy_sr", (object?)record.XxySr ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("$sunny_sr", (object?)record.SSR ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$avg_kps", (object?)record.AvgKps ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$max_kps", (object?)record.MaxKps ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$star_rating", (object?)record.StarRating ?? DBNull.Value);
@@ -80,7 +80,7 @@ ON CONFLICT(path_key) DO UPDATE SET
             using var connection = openConnection();
             using var cmd = connection.CreateCommand();
             cmd.CommandText = @"
-SELECT path_key, pp, xxy_sr, avg_kps, max_kps, star_rating, column_counts_json, kps_list_json, file_size, last_modified_ticks
+SELECT path_key, pp, sunny_sr, avg_kps, max_kps, star_rating, column_counts_json, kps_list_json, file_size, last_modified_ticks
 FROM chart_analytics
 WHERE path_key = $path_key
 LIMIT 1;";
@@ -121,7 +121,7 @@ LIMIT 1;";
             using var connection = openConnection();
             using var cmd = connection.CreateCommand();
             cmd.CommandText = @"
-SELECT path_key, pp, xxy_sr, avg_kps, max_kps, star_rating, column_counts_json, kps_list_json, file_size, last_modified_ticks
+SELECT path_key, pp, sunny_sr, avg_kps, max_kps, star_rating, column_counts_json, kps_list_json, file_size, last_modified_ticks
 FROM chart_analytics;";
 
             using var reader = cmd.ExecuteReader();
@@ -141,7 +141,7 @@ FROM chart_analytics;";
             {
                 PathKey = reader.GetString(0),
                 Pp = reader.IsDBNull(1) ? null : reader.GetDouble(1),
-                XxySr = reader.IsDBNull(2) ? null : reader.GetDouble(2),
+                SSR = reader.IsDBNull(2) ? null : reader.GetDouble(2),
                 AvgKps = reader.IsDBNull(3) ? null : reader.GetDouble(3),
                 MaxKps = reader.IsDBNull(4) ? null : reader.GetDouble(4),
                 StarRating = reader.IsDBNull(5) ? null : reader.GetDouble(5),
@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS chart_analytics (
     path_key TEXT PRIMARY KEY,
     pp REAL,
-    xxy_sr REAL,
+    sunny_sr REAL,
     avg_kps REAL,
     max_kps REAL,
     star_rating REAL,

@@ -54,12 +54,12 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public static readonly EzManiaSummary EMPTY = new EzManiaSummary(null, null, null);
 
-        public double? XxySr { get; }
+        public double? SSR { get; }
 
         // TODO: 仅预留字段。当前阶段不参与计算、不参与持久化版本升级，也不接入 UI / 本地化。
-        public double? XxySrFullLN4 { get; }
+        public double? SSRFullLN4 { get; }
 
-        public double? XxySrFullLN8 { get; }
+        public double? SSRFullLN8 { get; }
 
         /// <summary>
         /// Total number of hit objects in each column (includes both regular notes and LNs).
@@ -79,14 +79,14 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         public bool HasHoldNoteCounts => holdNoteCounts != null;
 
-        public EzManiaSummary(Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts, double? xxySr,
-                              double? xxySrFullLN4 = null, double? xxySrFullLN8 = null)
+        public EzManiaSummary(Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts, double? sunnySR,
+                              double? sunnySRFullLN4 = null, double? sunnySRFullLN8 = null)
         {
             this.columnCounts = columnCounts;
             this.holdNoteCounts = holdNoteCounts;
-            XxySr = xxySr;
-            XxySrFullLN4 = xxySrFullLN4;
-            XxySrFullLN8 = xxySrFullLN8;
+            SSR = sunnySR;
+            SSRFullLN4 = sunnySRFullLN4;
+            SSRFullLN8 = sunnySRFullLN8;
         }
     }
 

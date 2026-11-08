@@ -167,7 +167,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     msd,
                     keyCount: 4,
                     holdRatio: 0.1,
-                    xxySr: null,
+                    sunnySR: null,
                     chartInfo: null);
 
                 Assert.That(computed, Is.Not.Null);

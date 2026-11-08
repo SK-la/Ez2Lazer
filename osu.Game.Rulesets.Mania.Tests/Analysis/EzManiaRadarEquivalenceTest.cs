@@ -94,7 +94,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
             Assert.That(actual.TryGetValue(EzAnalysisFields.RULESET_SPECIFIC_RADAR_RESULT, out EzRulesetSpecificRadarResult actualRadar), Is.True);
 
             assertAxes(expectedRadar.KeyPatternRadarData, actualRadar.KeyPatternRadarData, $"{label} key pattern");
-            assertAxes(expectedRadar.XxySrPatternRadarData, actualRadar.XxySrPatternRadarData, $"{label} xxy pattern");
+            assertAxes(expectedRadar.SSRPatternRadarData, actualRadar.SSRPatternRadarData, $"{label} xxy pattern");
         }
 
         private static void assertAxes(EzRadarChartData<string> expected, EzRadarChartData<string> actual, string label)

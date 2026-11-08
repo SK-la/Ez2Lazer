@@ -15,7 +15,7 @@ namespace osu.Game.EzOsuGame.Analysis
     /// </summary>
     internal static class EzAnalysisSchemaManager
     {
-        // Note: main sqlite v8 stores kps/KPC only (slim schema). Legacy pp/tag/xxy_sr columns removed at schema v3.
+        // Note: main sqlite v8 stores kps/KPC only (slim schema). Legacy pp/tag/sunny_sr columns removed at schema v3.
         // v8: mania column stats became dense (trailing empty columns padded to the real N); migration inherits kps but not mania.
         // Schema v4 briefly added chart_skill_info JSON; abandoned without migration — ChartSkillInfo lives in Realm (EZ≥9).
         // Schema v5: stop creating chart_skill_info; orphaned tables in old DBs are ignored.
@@ -45,7 +45,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public const string COL_TAG_UPDATED_AT = "tag_updated_at";
         public const string COL_TAG_PAYLOAD_JSON = "tag_payload_json";
-        public const string COL_XXY_SR = "xxy_sr";
+        public const string COL_SUNNY_SR = "sunny_sr";
         public const string COL_PP = "pp";
 
         public const string META_KEY_FORCE_RECOMPUTE = "force_recompute";
@@ -669,7 +669,7 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;
                     || key == "kps_kpc_version"
                     || key == "computation_version"
                     || key == "pp_version"
-                    || key == "xxy_sr_version"
+                    || key == "sunny_sr_version"
                     || key == META_KEY_FORCE_RECOMPUTE
                     || key == META_KEY_KIND)
                     continue;

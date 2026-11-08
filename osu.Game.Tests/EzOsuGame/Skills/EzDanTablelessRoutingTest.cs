@@ -32,7 +32,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             Assert.That(EzDanLabels.HasXxyDanTable(keyCount), Is.True);
 
-            var resolved = EzDanLabels.TryResolveFallbackDan(keyCount, EzDanSide.Rc, overallMsd: 20, EzMinaSkillAxis.Stream, xxySr: null);
+            var resolved = EzDanLabels.TryResolveFallbackDan(keyCount, EzDanSide.Rc, overallMsd: 20, EzMinaSkillAxis.Stream, sunnySR: null);
 
             Assert.That(resolved, Is.Not.Null);
             Assert.That(resolved!.Value.RawDan, Is.EqualTo(EzDanLabels.SrToRawDan(20, EzMinaSkillAxis.Stream)).Within(0.0001));
@@ -49,7 +49,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(EzDanLabels.HasXxyDanTable(keyCount), Is.False);
             Assert.That(EzSunnyDanIntervals.TryLookup(4, EzDanSide.Rc.ToId(), 6.0, out var fourK), Is.True);
 
-            var resolved = EzDanLabels.TryResolveFallbackDan(keyCount, EzDanSide.Rc, overallMsd: 20, EzMinaSkillAxis.Stream, xxySr: 6.0);
+            var resolved = EzDanLabels.TryResolveFallbackDan(keyCount, EzDanSide.Rc, overallMsd: 20, EzMinaSkillAxis.Stream, sunnySR: 6.0);
 
             Assert.That(resolved, Is.Not.Null);
             Assert.That(resolved!.Value.RawDan, Is.EqualTo(fourK.RawDan).Within(0.0001));
@@ -61,7 +61,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             Assert.That(EzSunnyDanIntervals.TryLookup(4, EzDanSide.Ln.ToId(), 7.0, out var fourKLn), Is.True);
 
-            var resolved = EzDanLabels.TryResolveFallbackDan(8, EzDanSide.Ln, overallMsd: 20, EzMinaSkillAxis.Stream, xxySr: 7.0);
+            var resolved = EzDanLabels.TryResolveFallbackDan(8, EzDanSide.Ln, overallMsd: 20, EzMinaSkillAxis.Stream, sunnySR: 7.0);
 
             Assert.That(resolved, Is.Not.Null);
             Assert.That(resolved!.Value.Label, Is.EqualTo(fourKLn.DisplayLabel));
@@ -70,7 +70,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void BorrowedDanIsFarBelowTheRawMsdHeuristic()
         {
-            var resolved = EzDanLabels.TryResolveFallbackDan(5, EzDanSide.Rc, overallMsd: 20, EzMinaSkillAxis.Stream, xxySr: 6.0);
+            var resolved = EzDanLabels.TryResolveFallbackDan(5, EzDanSide.Rc, overallMsd: 20, EzMinaSkillAxis.Stream, sunnySR: 6.0);
 
             Assert.That(resolved, Is.Not.Null);
             // The old 5K path ran Overall MSD through the 4K means table and clamped to the ladder top.
@@ -80,14 +80,14 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void TablelessDanWithoutAStarRatingIsNotInvented()
         {
-            Assert.That(EzDanLabels.TryResolveFallbackDan(5, EzDanSide.Rc, 20, EzMinaSkillAxis.Stream, xxySr: null), Is.Null);
-            Assert.That(EzDanLabels.TryResolveFallbackDan(8, EzDanSide.Rc, 20, EzMinaSkillAxis.Stream, xxySr: -1), Is.Null);
+            Assert.That(EzDanLabels.TryResolveFallbackDan(5, EzDanSide.Rc, 20, EzMinaSkillAxis.Stream, sunnySR: null), Is.Null);
+            Assert.That(EzDanLabels.TryResolveFallbackDan(8, EzDanSide.Rc, 20, EzMinaSkillAxis.Stream, sunnySR: -1), Is.Null);
         }
 
         [Test]
         public void TablelessChartDanUsesTheBorrowedTable()
         {
-            var verdict = EzChartDanEstimator.FromMsd(msd(20), keyCount: 5, holdRatio: 0.1, xxySr: 6);
+            var verdict = EzChartDanEstimator.FromMsd(msd(20), keyCount: 5, holdRatio: 0.1, sunnySR: 6);
             Assert.That(EzSunnyDanIntervals.TryLookup(4, EzDanSide.Rc.ToId(), 6.0, out var fourK), Is.True);
 
             Assert.That(verdict, Is.Not.Null);
@@ -99,7 +99,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         public void TablelessChartDanWithoutStarRatingIsNotInvented()
         {
             Assert.That(EzChartDanEstimator.FromMsd(msd(20), keyCount: 5, holdRatio: 0.1), Is.Null);
-            Assert.That(EzChartDanEstimator.FromMsd(msd(20), keyCount: 8, holdRatio: 0.1, xxySr: -1), Is.Null);
+            Assert.That(EzChartDanEstimator.FromMsd(msd(20), keyCount: 8, holdRatio: 0.1, sunnySR: -1), Is.Null);
         }
 
         [Test]
@@ -111,7 +111,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 msd(20),
                 keyCount: 8,
                 holdRatio: 0.1,
-                xxySr: 6,
+                sunnySR: 6,
                 chartInfo: null);
             Assert.That(EzSunnyDanIntervals.TryLookup(4, EzDanSide.Rc.ToId(), 6.0, out var fourK), Is.True);
 
@@ -130,7 +130,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 msd(20),
                 keyCount: 8,
                 holdRatio: 0.1,
-                xxySr: null,
+                sunnySR: null,
                 chartInfo: null);
 
             // 8K has no table of its own and no star rating to read a borrowed one off, so no side resolves. The

@@ -33,31 +33,31 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 
             var bag = new EzAnalysisBag();
             bool patternSupported = EzManiaSunnyStarRating.IsPatternSupported(beatmap);
-            bool wantsXxySr = request.RequestedScopes.HasFlag(EzAnalysisScope.XxySr);
+            bool wantsSSR = request.RequestedScopes.HasFlag(EzAnalysisScope.SunnySR);
             bool wantsRadar = request.RequestedScopes.HasFlag(EzAnalysisScope.RulesetSpecificRadarData);
 
-            double? xxySr = null;
+            double? sunnySR = null;
             EzManiaSR4PatternSnapshot? xxyPatternSnapshot = null;
 
-            if (patternSupported && (wantsXxySr || wantsRadar))
+            if (patternSupported && (wantsSSR || wantsRadar))
             {
                 // The breakdown embeds the rating, so one derivation serves both scopes instead of running the
                 // difficulty core once per requested value.
                 var combined = SRCalculator.CalculateSRWithPatternSnapshot(beatmap, request.ClockRate);
 
-                xxySr = double.IsNaN(combined.Sr) || double.IsInfinity(combined.Sr) ? null : combined.Sr;
+                sunnySR = double.IsNaN(combined.Sr) || double.IsInfinity(combined.Sr) ? null : combined.Sr;
                 xxyPatternSnapshot = combined.PatternSnapshot;
             }
 
-            if (xxySr is double resolvedXxySr)
-                bag.Set(EzAnalysisFields.XXY_SR, resolvedXxySr);
+            if (sunnySR is double resolvedSSR)
+                bag.Set(EzAnalysisFields.SUNNY_SR, resolvedSSR);
 
             if (wantsRadar)
             {
                 bag.Set(EzAnalysisFields.RULESET_SPECIFIC_RADAR_RESULT, new EzRulesetSpecificRadarResult(
                     computeKeyPatternRadarData(beatmap, request.Chart, cancellationToken),
-                    xxyPatternSnapshot is { } snapshot ? EzManiaSR4PatternRadarBuilder.Create(snapshot) : createXxySrPatternRadarData(0, 0, 0, 0, 0, 0),
-                    xxySr));
+                    xxyPatternSnapshot is { } snapshot ? EzManiaSR4PatternRadarBuilder.Create(snapshot) : createSSRPatternRadarData(0, 0, 0, 0, 0, 0),
+                    sunnySR));
             }
 
             if (request.RequestedScopes.HasFlag(EzAnalysisScope.PerformancePoints))
@@ -192,7 +192,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
                 new EzRadarAxisValue<string>("Delay", delay, "0.00"),
                 new EzRadarAxisValue<string>("Dump", dump, "0.00"));
 
-        private static EzRadarChartData<string> createXxySrPatternRadarData(double bracketValue, double jackValue, double burst, double longNoteUsage, double longNoteRelease, double anchor)
+        private static EzRadarChartData<string> createSSRPatternRadarData(double bracketValue, double jackValue, double burst, double longNoteUsage, double longNoteRelease, double anchor)
             => EzRadarChartData<string>.Create(
                 new EzRadarAxisValue<string>("Bracket", bracketValue, "0.00"),
                 new EzRadarAxisValue<string>("Jack", jackValue, "0.00"),

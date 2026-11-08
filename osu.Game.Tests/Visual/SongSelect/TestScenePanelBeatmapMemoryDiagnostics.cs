@@ -132,7 +132,7 @@ namespace osu.Game.Tests.Visual.SongSelect
             AddUntilStep("no leaked graphs", () => ManiaModStressSteps.collectAndCount(graphWeakReferences) == 0);
             AddUntilStep("no leaked kps displays", () => ManiaModStressSteps.collectAndCount(kpsWeakReferences) == 0);
             AddUntilStep("no leaked kpc displays", () => ManiaModStressSteps.collectAndCount(kpcWeakReferences) == 0);
-            AddUntilStep("no leaked xxySR displays", () => ManiaModStressSteps.collectAndCount(xxyWeakReferences) == 0);
+            AddUntilStep("no leaked sunnySR displays", () => ManiaModStressSteps.collectAndCount(xxyWeakReferences) == 0);
             AddUntilStep("no leaked tag displays", () => ManiaModStressSteps.collectAndCount(tagWeakReferences) == 0);
             assertCacheBindablesReturnToBaseline();
         }
@@ -410,7 +410,7 @@ namespace osu.Game.Tests.Visual.SongSelect
         {
             long managed = ManiaModStressSteps.forceCollectionAndGetManagedMemory();
 
-            return $"Ez component diagnostics | hosts: {ManiaModStressSteps.countAlive(componentHostWeakReferences)} | graphs: {ManiaModStressSteps.countAlive(graphWeakReferences)} | kps displays: {ManiaModStressSteps.countAlive(kpsWeakReferences)} | kpc displays: {ManiaModStressSteps.countAlive(kpcWeakReferences)} | xxySR displays: {ManiaModStressSteps.countAlive(xxyWeakReferences)} | tag displays: {ManiaModStressSteps.countAlive(tagWeakReferences)} | ez tracked: {ezAnalysisCache.GetTrackedBindableCount()} | star tracked: {difficultyCache.GetTrackedBindableCount()} | managed delta: {ManiaModStressSteps.formatMemoryDelta(managed - baselineManagedMemory)}";
+            return $"Ez component diagnostics | hosts: {ManiaModStressSteps.countAlive(componentHostWeakReferences)} | graphs: {ManiaModStressSteps.countAlive(graphWeakReferences)} | kps displays: {ManiaModStressSteps.countAlive(kpsWeakReferences)} | kpc displays: {ManiaModStressSteps.countAlive(kpcWeakReferences)} | sunnySR displays: {ManiaModStressSteps.countAlive(xxyWeakReferences)} | tag displays: {ManiaModStressSteps.countAlive(tagWeakReferences)} | ez tracked: {ezAnalysisCache.GetTrackedBindableCount()} | star tracked: {difficultyCache.GetTrackedBindableCount()} | managed delta: {ManiaModStressSteps.formatMemoryDelta(managed - baselineManagedMemory)}";
         }
 
         private void updateSummary(string summary)

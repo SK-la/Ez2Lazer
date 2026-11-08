@@ -40,7 +40,7 @@ namespace osu.Game.EzOsuGame.Localization
             "切换不同数据源的显示模式："
             + "\n- 全局：显示常规Metadate数据。"
             + "\n- Key Pattern: 显示类PS Mod风格的并行键型数据。衡量谱面中不同键型的相对难度关系。"
-            + "\n- xxySR Pattern: 显示xxySR星级分析的键型数据。衡量谱面中不同键型变化的难度系数，提现谱中键型变化差异程度，这里的bracket除了切指外还视为常规类型。"
+            + "\n- sunnySR Pattern: 显示sunnySR星级分析的键型数据。衡量谱面中不同键型变化的难度系数，提现谱中键型变化差异程度，这里的bracket除了切指外还视为常规类型。"
             + "\n- Skill: 黄=谱面 MSD、绿=玩家 SSR，只展示两边都有值的共性轴（同算法浮点对比）。"
             + "\n- Beatmap: 只展示谱面 MSD 真实有值的轴（有多少显示多少），无玩家层。"
             + "\n- PPP Skill: 黄=谱面 PPP、绿=玩家 PPP。"
@@ -48,7 +48,7 @@ namespace osu.Game.EzOsuGame.Localization
             "Switch between different data sources to display:"
             + "\n- Global: Display the standard Metadata data."
             + "\n- Key Pattern: Display the parallel key type data of the PS Mod style."
-            + "\n- xxySR Pattern: Display the key type data of the xxySR star rating analysis."
+            + "\n- sunnySR Pattern: Display the key type data of the sunnySR star rating analysis."
             + "\n- Skill: Yellow=beatmap MSD, green=player SSR; shared axes only (same-algorithm floats)."
             + "\n- Beatmap: Chart MSD axes with real values only (as many as exist); no player layer."
             + "\n- PPP Skill: Yellow=chart PPP, green=player PPP."
@@ -57,9 +57,9 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString RADAR_USE_ABSOLUTE_VALUE = new EzLocalizationManager.EzLocalisableString("使用星数绝对值", "Use Star Absolute Value");
 
         public static readonly LocalisableString RADAR_USE_ABSOLUTE_VALUE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "开启后，会把指标结果视为比例，乘上xxySR，变成星级难度指标。"
+            "开启后，会把指标结果视为比例，乘上sunnySR，变成星级难度指标。"
             + "\n注意这样并不可靠，只是提供一种视觉策略。",
-            "When enabled, the result of each metric will be treated as a ratio and multiplied by xxySR to become a star rating metric."
+            "When enabled, the result of each metric will be treated as a ratio and multiplied by sunnySR to become a star rating metric."
             + "\nNote that this is not reliable and just provides a visual strategy.");
 
         // 通用设置（所有模式共享）

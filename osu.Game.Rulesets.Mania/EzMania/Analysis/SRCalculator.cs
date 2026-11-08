@@ -86,7 +86,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         [UsedImplicitly]
         public static double CalculateSRWithTime(IBeatmap beatmap, out Dictionary<string, long>? times)
         {
-            (double sr, var collectedTimes) = computeInternalXxySR(beatmap, 1.0);
+            (double sr, var collectedTimes) = computeInternalSunnySR(beatmap, 1.0);
             times = collectedTimes;
             return sr;
         }
@@ -94,7 +94,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         [UsedImplicitly]
         public static double CalculateSR(IBeatmap beatmap)
         {
-            (double sr, _) = computeInternalXxySR(beatmap, 1.0);
+            (double sr, _) = computeInternalSunnySR(beatmap, 1.0);
             return sr;
         }
 
@@ -106,7 +106,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         /// <returns>Calculated SR value adjusted for clock rate.</returns>
         public static double CalculateSR(IBeatmap beatmap, double clockRate)
         {
-            (double sr, _) = computeInternalXxySR(beatmap, clockRate);
+            (double sr, _) = computeInternalSunnySR(beatmap, clockRate);
             return sr;
         }
 
@@ -118,10 +118,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         [UsedImplicitly]
         public Task<(double sr, Dictionary<string, long> times)> CalculateSRAsync(IBeatmap beatmap)
         {
-            return Task.FromResult(computeInternalXxySR(beatmap, 1.0));
+            return Task.FromResult(computeInternalSunnySR(beatmap, 1.0));
         }
 
-        private static (double sr, Dictionary<string, long> times) computeInternalXxySR(IBeatmap beatmap, double clockRate = 1.0)
+        private static (double sr, Dictionary<string, long> times) computeInternalSunnySR(IBeatmap beatmap, double clockRate = 1.0)
         {
             var stopwatch = Stopwatch.StartNew();
 
@@ -129,7 +129,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             // Prefer TotalColumns (reflects keymods / conversion output) over CS.
             int keyCount = Math.Max(1, maniaBeatmap.TotalColumns > 0 ? maniaBeatmap.TotalColumns : (int)Math.Round(maniaBeatmap.Difficulty.CircleSize));
 
-            double sr = XxySRCalculateCore(maniaBeatmap, keyCount, clockRate);
+            double sr = SunnySRCalculateCore(maniaBeatmap, keyCount, clockRate);
             stopwatch.Stop();
 
             var timings = new Dictionary<string, long>
@@ -193,7 +193,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 
         private static readonly Comparison<NoteStruct> note_comparer = compareNotes;
 
-        public static double XxySRCalculateCore(ManiaBeatmap maniaBeatmap, int keyCount, double clockRate = 1.0)
+        public static double SunnySRCalculateCore(ManiaBeatmap maniaBeatmap, int keyCount, double clockRate = 1.0)
         {
             var tuning = Tuning;
             var state = buildState(maniaBeatmap, keyCount, clockRate, needPatternBars: false, tuning);

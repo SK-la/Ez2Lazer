@@ -18,11 +18,11 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         public void A_rated_chart_produces_one_entry_per_side_it_can_be_rated_on()
         {
             // Hold ratio above the LN line, so both sides resolve.
-            var set = EzDanSet.Create(axes(overall: 20), keyCount: 4, holdRatio: 0.6, xxySr: 6, chartInfo: null, holdCount: 101);
+            var set = EzDanSet.Create(axes(overall: 20), keyCount: 4, holdRatio: 0.6, sunnySR: 6, chartInfo: null, holdCount: 101);
 
             Assert.That(set, Is.Not.Null);
             Assert.That(set!.KeyCount, Is.EqualTo(4));
-            Assert.That(set.XxySr, Is.EqualTo(6));
+            Assert.That(set.SSR, Is.EqualTo(6));
             Assert.That(set.For(EzDanSide.Rc), Is.Not.Null);
             Assert.That(set.For(EzDanSide.Ln), Is.Not.Null);
         }
@@ -31,7 +31,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         public void The_ln_side_is_omitted_when_the_hold_gate_rejects_it()
         {
             // Below both the ratio line and the absolute hold count.
-            var set = EzDanSet.Create(axes(overall: 20), keyCount: 4, holdRatio: 0.1, xxySr: 6, chartInfo: null, holdCount: 10);
+            var set = EzDanSet.Create(axes(overall: 20), keyCount: 4, holdRatio: 0.1, sunnySR: 6, chartInfo: null, holdCount: 10);
 
             Assert.That(set, Is.Not.Null);
             Assert.That(set!.For(EzDanSide.Ln), Is.Null);
@@ -41,7 +41,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void Each_side_reports_the_ladder_it_was_read_off()
         {
-            var set = EzDanSet.Create(axes(overall: 20), keyCount: 4, holdRatio: 0.6, xxySr: 6, chartInfo: null, holdCount: 101);
+            var set = EzDanSet.Create(axes(overall: 20), keyCount: 4, holdRatio: 0.6, sunnySR: 6, chartInfo: null, holdCount: 101);
 
             Assert.That(set, Is.Not.Null);
             Assert.That(set!.For(EzDanSide.Rc)!.Ladder, Is.EqualTo(EzDanLadderKind.Reform4K));
@@ -51,7 +51,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void A_star_rating_from_the_key_modes_own_table_is_reported_as_such()
         {
-            var set = EzDanSet.Create(axes(overall: 20), keyCount: 4, holdRatio: 0.1, xxySr: 6, chartInfo: null, holdCount: 101);
+            var set = EzDanSet.Create(axes(overall: 20), keyCount: 4, holdRatio: 0.1, sunnySR: 6, chartInfo: null, holdCount: 101);
 
             Assert.That(set!.For(EzDanSide.Rc)!.Value, Is.EqualTo(EzDanValueSource.SunnyTable));
         }
@@ -60,7 +60,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         public void A_key_mode_without_a_table_reports_a_borrowed_value()
         {
             // 5K has no Sunny table of its own and borrows the 4K curve.
-            var set = EzDanSet.Create(axes(overall: 20), keyCount: 5, holdRatio: 0.1, xxySr: 6, chartInfo: null, holdCount: 101);
+            var set = EzDanSet.Create(axes(overall: 20), keyCount: 5, holdRatio: 0.1, sunnySR: 6, chartInfo: null, holdCount: 101);
 
             Assert.That(set, Is.Not.Null);
             Assert.That(set!.For(EzDanSide.Rc)!.Value, Is.EqualTo(EzDanValueSource.BorrowedTable));
@@ -71,7 +71,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             // One policy for every caller: the estimate is produced and tagged, and a surface that distrusts it
             // hides it by source instead of asking the producer for a different answer.
-            var set = EzDanSet.Create(axes(overall: 20), keyCount: 4, holdRatio: 0.1, xxySr: null, chartInfo: null);
+            var set = EzDanSet.Create(axes(overall: 20), keyCount: 4, holdRatio: 0.1, sunnySR: null, chartInfo: null);
 
             Assert.That(set, Is.Not.Null);
             Assert.That(set!.For(EzDanSide.Rc)!.Value, Is.EqualTo(EzDanValueSource.MsdMeans));
@@ -80,8 +80,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void A_chart_without_any_rating_axis_yields_nothing()
         {
-            Assert.That(EzDanSet.Create(new Dictionary<string, double>(), keyCount: 4, holdRatio: 0.1, xxySr: 6, chartInfo: null), Is.Null);
-            Assert.That(EzDanSet.Create(axes(overall: 0), keyCount: 4, holdRatio: 0.1, xxySr: 6, chartInfo: null), Is.Null);
+            Assert.That(EzDanSet.Create(new Dictionary<string, double>(), keyCount: 4, holdRatio: 0.1, sunnySR: 6, chartInfo: null), Is.Null);
+            Assert.That(EzDanSet.Create(axes(overall: 0), keyCount: 4, holdRatio: 0.1, sunnySR: 6, chartInfo: null), Is.Null);
         }
 
         private static Dictionary<string, double> axes(double overall)

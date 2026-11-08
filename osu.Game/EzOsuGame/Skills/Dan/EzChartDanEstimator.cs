@@ -13,7 +13,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 {
     /// <summary>
     /// Chart-dan entry for song select and player credit.
-    /// Prefer xxySR → Sunny interval tables when available; else MSD Overall heuristic.
+    /// Prefer sunnySR → Sunny interval tables when available; else MSD Overall heuristic.
     /// Skill family / OverallMsd always come from MSD when present.
     /// </summary>
     /// <remarks>
@@ -103,7 +103,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         public static EzChartDanVerdict? FromMsdAndPlayable(
             IReadOnlyDictionary<string, double> msd,
             IBeatmap playable,
-            double? xxySr = null)
+            double? sunnySR = null)
         {
             ArgumentNullException.ThrowIfNull(msd);
             ArgumentNullException.ThrowIfNull(playable);
@@ -116,14 +116,14 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 return null;
 
             double holdRatio = ComputeHoldRatio(playable);
-            return FromMsd(msd, keyCount, holdRatio, xxySr);
+            return FromMsd(msd, keyCount, holdRatio, sunnySR);
         }
 
         public static EzChartDanVerdict? FromMsd(
             IReadOnlyDictionary<string, double> msd,
             int keyCount,
             double holdRatio,
-            double? xxySr = null)
+            double? sunnySR = null)
         {
             ArgumentNullException.ThrowIfNull(msd);
 
@@ -141,13 +141,13 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             double rawDan;
             string label;
 
-            if (xxySr is double sr
+            if (sunnySR is double sr
                 && EzSunnyDanIntervals.TryLookup(keyCount, side.ToId(), sr, out var sunny))
             {
                 rawDan = sunny.RawDan;
                 label = sunny.DisplayLabel;
             }
-            else if (EzDanLabels.TryResolveFallbackDan(keyCount, side, overall, dominantAxis, xxySr) is EzDanLabels.DanLookup fallback)
+            else if (EzDanLabels.TryResolveFallbackDan(keyCount, side, overall, dominantAxis, sunnySR) is EzDanLabels.DanLookup fallback)
             {
                 rawDan = fallback.RawDan;
                 label = fallback.Label;
@@ -182,7 +182,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// three inputs from two hand-written blocks is how one chart could be filed from the stored hold ratio
         /// while another was filed from the playable's.
         /// </remarks>
-        public static bool TryResolveStoredInputs(BeatmapInfo beatmapInfo, out int keyCount, out double holdRatio, out double? xxySr, out int holdCount)
+        public static bool TryResolveStoredInputs(BeatmapInfo beatmapInfo, out int keyCount, out double holdRatio, out double? sunnySR, out int holdCount)
         {
             ArgumentNullException.ThrowIfNull(beatmapInfo);
 
@@ -193,7 +193,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             if (double.IsNaN(holdRatio))
                 holdRatio = 0;
 
-            xxySr = beatmapInfo.EzRatingData.SunnySR >= 0 ? beatmapInfo.EzRatingData.SunnySR : null;
+            sunnySR = beatmapInfo.EzRatingData.SunnySR >= 0 ? beatmapInfo.EzRatingData.SunnySR : null;
             holdCount = TryHoldCountFromBeatmapInfo(beatmapInfo);
 
             return keyCount > 0;

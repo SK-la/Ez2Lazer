@@ -28,7 +28,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 var beatmap = createBeatmap();
 
                 var kpsList = new List<double> { 1, 2, 3 };
-                var slice = new EzAnalysisResult(new KpsSummary(1.5, 3, kpsList), new EzManiaSummary(new Dictionary<int, int> { [4] = 10 }, null, xxySr: null));
+                var slice = new EzAnalysisResult(new KpsSummary(1.5, 3, kpsList), new EzManiaSummary(new Dictionary<int, int> { [4] = 10 }, null, sunnySR: null));
 
                 persistentStore.Store(beatmap, slice);
 
@@ -55,7 +55,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
             var maniaOnly = new EzAnalysisResult(
                 new KpsSummary(0, 0, Array.Empty<double>()),
-                maniaSummary: new EzManiaSummary(new Dictionary<int, int> { [4] = 10 }, null, xxySr: null));
+                maniaSummary: new EzManiaSummary(new Dictionary<int, int> { [4] = 10 }, null, sunnySR: null));
             Assert.That(maniaOnly.KpsList.Count > 0 || maniaOnly.ManiaSummary?.ColumnCounts.Count > 0, Is.True);
         }
 

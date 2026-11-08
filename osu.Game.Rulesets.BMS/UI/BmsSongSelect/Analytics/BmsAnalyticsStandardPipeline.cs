@@ -52,7 +52,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
 
                 batch.Add((chart, pathKey, new BmsChartAnalyticsResult(
                     record.Pp,
-                    record.XxySr,
+                    record.SSR,
                     record.AvgKps,
                     record.MaxKps,
                     record.StarRating,
@@ -77,8 +77,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
             var record = new BmsAnalyticsRecord
             {
                 PathKey = pathKey,
-                Pp = analyticsResult.Pp,
-                XxySr = analyticsResult.XxySr,
+                Pp = analyticsResult.PP,
+                SSR = analyticsResult.SSR,
                 AvgKps = analyticsResult.AvgKps,
                 MaxKps = analyticsResult.MaxKps,
                 StarRating = analyticsResult.StarRating,
@@ -86,16 +86,16 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                 KpsListJson = analyticsResult.KpsListJson,
             };
 
-            return createPayload(record, analyticsResult.StarRating, analyticsResult.XxySr, analyticsResult.Pp);
+            return createPayload(record, analyticsResult.StarRating, analyticsResult.SSR, analyticsResult.PP);
         }
 
         private static EzExternalBeatmapAnalysisPayload createPayload(BmsAnalyticsRecord record)
-            => createPayload(record, record.StarRating, record.XxySr, record.Pp);
+            => createPayload(record, record.StarRating, record.SSR, record.Pp);
 
-        private static EzExternalBeatmapAnalysisPayload createPayload(BmsAnalyticsRecord record, double? starRating, double? xxySr, double? pp)
+        private static EzExternalBeatmapAnalysisPayload createPayload(BmsAnalyticsRecord record, double? starRating, double? sunnySR, double? pp)
         {
             EzAnalysisResult? slice = BmsAnalyticsEzConverter.ToEzAnalysisResult(record);
-            return new EzExternalBeatmapAnalysisPayload(starRating, xxySr, pp, slice);
+            return new EzExternalBeatmapAnalysisPayload(starRating, sunnySR, pp, slice);
         }
     }
 }

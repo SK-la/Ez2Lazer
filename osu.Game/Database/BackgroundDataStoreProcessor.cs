@@ -169,7 +169,7 @@ namespace osu.Game.Database
         }
 
         /// <summary>
-        /// Queue Ez Realm metadata backfill (Tag / XxySR / PP / MSD) on a background thread.
+        /// Queue Ez Realm metadata backfill (Tag / SunnySR / PP / MSD) on a background thread.
         /// </summary>
         /// <param name="forceAll">When true, clears persisted values first so all supported beatmaps are recomputed.</param>
         public EzDataRebuildDispatchResult QueueEzRealmMetadataBackfill(bool forceAll = false) => QueueEzRealmMetadataRebuild(EzRealmMetadataScope.All, forceAll);
@@ -735,10 +735,10 @@ namespace osu.Game.Database
         {
             EzStartupTrace.Log($"BDSP EzRealm backfill begin scope={scope}");
 
-            if (scope.HasFlag(EzRealmMetadataScope.Xxy))
+            if (scope.HasFlag(EzRealmMetadataScope.SSR))
                 populateMissingSunnyStarRatings();
 
-            if (scope.HasFlag(EzRealmMetadataScope.Pp))
+            if (scope.HasFlag(EzRealmMetadataScope.PP))
                 populateMissingPerformancePoints();
 
             if (scope.HasFlag(EzRealmMetadataScope.Tags))
@@ -748,7 +748,7 @@ namespace osu.Game.Database
             // incremental pass keyed on its facet revision (EzAnalysisRevision), so bumping a stage
             // version (or an upstream one) retires exactly the affected rows and this job recomputes
             // them - no bulk clearing, and "stale" stays observable.
-            if (scope.HasFlag(EzRealmMetadataScope.Msd)
+            if (scope.HasFlag(EzRealmMetadataScope.MSD)
                 || scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo)
                 || scope.HasFlag(EzRealmMetadataScope.ChartDan))
             {
@@ -763,7 +763,7 @@ namespace osu.Game.Database
                            + $"Dan v{EzAnalysisRevision.ChartDan} ({EzAnalysisRevision.DescribeChartDan()}).");
             }
 
-            bool needsChartChain = scope.HasFlag(EzRealmMetadataScope.Msd)
+            bool needsChartChain = scope.HasFlag(EzRealmMetadataScope.MSD)
                                    || scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo)
                                    || scope.HasFlag(EzRealmMetadataScope.ChartDan)
                                    || scope.HasFlag(EzRealmMetadataScope.PPP);
@@ -775,7 +775,7 @@ namespace osu.Game.Database
                 populateChartChain(
                     skillStore.CollectChartChainState("BDSP"),
                     csi: scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo),
-                    msd: scope.HasFlag(EzRealmMetadataScope.Msd),
+                    msd: scope.HasFlag(EzRealmMetadataScope.MSD),
                     ppp: scope.HasFlag(EzRealmMetadataScope.PPP),
                     dan: scope.HasFlag(EzRealmMetadataScope.ChartDan));
             }
@@ -787,7 +787,7 @@ namespace osu.Game.Database
         {
             Logger.Log($"Forcing Ez Realm metadata recalculation ({scope})...");
 
-            if (scope.HasFlag(EzRealmMetadataScope.Msd))
+            if (scope.HasFlag(EzRealmMetadataScope.MSD))
             {
                 Logger.Log("Clearing persisted beatmap MSD skill values...");
                 skillStore.ClearBeatmapMsd();
@@ -813,8 +813,8 @@ namespace osu.Game.Database
             }
 
             bool clearBeatmapInfoFields = scope.HasFlag(EzRealmMetadataScope.Tags)
-                                          || scope.HasFlag(EzRealmMetadataScope.Xxy)
-                                          || scope.HasFlag(EzRealmMetadataScope.Pp);
+                                          || scope.HasFlag(EzRealmMetadataScope.SSR)
+                                          || scope.HasFlag(EzRealmMetadataScope.PP);
 
             if (!clearBeatmapInfoFields)
             {
@@ -870,10 +870,10 @@ namespace osu.Game.Database
                         }
 
                         // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-                        // if (scope.HasFlag(EzRealmMetadataScope.Pp))
+                        // if (scope.HasFlag(EzRealmMetadataScope.PP))
                         //     EzRatingWriter.WritePP(beatmap, EzRatingSystem.Official, -1);
                         //
-                        // if (scope.HasFlag(EzRealmMetadataScope.Xxy) && EzSunnyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
+                        // if (scope.HasFlag(EzRealmMetadataScope.SSR) && EzSunnyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
                         //     EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Sunny, -1);
 
                         totalProcessed++;
@@ -1270,7 +1270,7 @@ namespace osu.Game.Database
             if (!EzBeatmapMinaComputer.IsCurrentMinaCache(msd))
                 return false;
 
-            if (!EzChartDanEstimator.TryResolveStoredInputs(beatmap, out int keyCount, out double holdRatio, out double? xxySr, out int holdCount))
+            if (!EzChartDanEstimator.TryResolveStoredInputs(beatmap, out int keyCount, out double holdRatio, out double? sunnySR, out int holdCount))
                 return false;
 
             // An unavailable stub is not usable input; fall back to the MSD-derived values.
@@ -1278,7 +1278,7 @@ namespace osu.Game.Database
             if (chartInfo is { IsUnavailable: true })
                 chartInfo = null;
 
-            var persisted = EzPersistedChartDan.TryComputeFromStored(hash, beatmap.ID, msd, keyCount, holdRatio, xxySr, chartInfo, holdCount);
+            var persisted = EzPersistedChartDan.TryComputeFromStored(hash, beatmap.ID, msd, keyCount, holdRatio, sunnySR, chartInfo, holdCount);
 
             if (persisted == null)
                 return false;

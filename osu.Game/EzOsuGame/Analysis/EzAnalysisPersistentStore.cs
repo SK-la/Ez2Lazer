@@ -44,7 +44,7 @@ namespace osu.Game.EzOsuGame.Analysis
             Mania = 1 << 1,
         }
 
-        public readonly record struct SongsBranchRow(Guid BeatmapId, string BeatmapHash, string BeatmapMd5, double XxySr, double? Pp);
+        public readonly record struct SongsBranchRow(Guid BeatmapId, string BeatmapHash, string BeatmapMd5, double SSR, double? Pp);
 
         public readonly record struct SongsBranchDescriptor(string DatabasePath, string RelativePath, SongsBranchMetadata Metadata);
 
@@ -79,7 +79,7 @@ namespace osu.Game.EzOsuGame.Analysis
         public const string SONGS_BRANCH_DATABASE_DIRECTORY = "EzData";
 
         private const string songs_branch_kind = "songs_branch";
-        private const string legacy_xxy_sr_branch_kind = "xxy_sr_branch";
+        private const string legacy_sunny_sr_branch_kind = "sunny_sr_branch";
         private const int songs_branch_schema_version = 3;
 
         /// <summary>
@@ -102,12 +102,12 @@ namespace osu.Game.EzOsuGame.Analysis
         private const string col_beatmap_id = "beatmap_id";
         private const string col_beatmap_hash = "beatmap_hash";
         private const string col_beatmap_md5 = "beatmap_md5";
-        private const string col_xxy_sr = "xxy_sr";
+        private const string col_sunny_sr = "sunny_sr";
         private const string col_pp = "pp";
 
         private readonly Storage storage;
         private readonly Lock initLock = new Lock();
-        private static readonly IReadOnlyDictionary<Guid, double> empty_xxy_sr_values = new Dictionary<Guid, double>();
+        private static readonly IReadOnlyDictionary<Guid, double> empty_sunny_sr_values = new Dictionary<Guid, double>();
         private static readonly IReadOnlyDictionary<Guid, double> empty_pp_values = new Dictionary<Guid, double>();
 
         private bool initialised;
@@ -150,7 +150,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         // 常量化的表名与 meta key，避免在代码中散落硬编码字符串。
         private const string meta_key_requires_post_migration_refresh = "requires_post_migration_refresh";
-        private const string meta_key_xxy_sr_version = "xxy_sr_version";
+        private const string meta_key_sunny_sr_version = "sunny_sr_version";
         private const string meta_key_pp_version = "pp_version";
         private const string meta_key_analysis_version = "analysis_version";
         private const string meta_key_kind = "kind";
@@ -172,7 +172,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         // songs branch tables
         private const string table_songs_branch_entry = "songs_branch_entry";
-        private const string legacy_table_xxy_sr_branch = "xxy_sr_branch";
+        private const string legacy_table_sunny_sr_branch = "sunny_sr_branch";
         private const string table_songs_branch_hidden_preexisting = "hidden_preexisting_beatmap";
         private const string table_songs_branch_source_collection = "source_collection_beatmap";
 
@@ -295,7 +295,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     return false;
                 }
 
-                // missingRequiredXxySr = requireXxySr && xxySr == null;
+                // missingRequiredSSR = requireSSR && sunnySR == null;
 
                 return true;
             }
@@ -514,12 +514,12 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <summary>
         /// NoMod 基线 xxy：从 <see cref="BeatmapInfo.EzRatingData"/> 聚合（非 SQLite）。
         /// </summary>
-        public IReadOnlyDictionary<Guid, double> GetBaselineXxySrFromRealm(IEnumerable<BeatmapInfo> beatmaps)
+        public IReadOnlyDictionary<Guid, double> GetBaselineSSRFromRealm(IEnumerable<BeatmapInfo> beatmaps)
         {
             var beatmapList = beatmaps.Distinct().ToList();
 
             if (beatmapList.Count == 0)
-                return empty_xxy_sr_values;
+                return empty_sunny_sr_values;
 
             var resolvedValues = new Dictionary<Guid, double>(beatmapList.Count);
 
@@ -660,7 +660,7 @@ LIMIT 1;
                     var kpsList = JsonSerializer.Deserialize<List<double>>(kpsListJson) ?? new List<double>();
 
                     EzManiaSummary? maniaSummary = storedRulesetOnlineId == 3 && maniaUpdatedAt > 0
-                        ? new EzManiaSummary(columnCounts, holdNoteCounts, xxySr: null)
+                        ? new EzManiaSummary(columnCounts, holdNoteCounts, sunnySR: null)
                         : null;
 
                     result = new EzAnalysisResult(new KpsSummary(averageKps, maxKps, kpsList), maniaSummary);
@@ -941,7 +941,7 @@ WHERE {EzAnalysisSchemaManager.COL_UPDATED_AT} > 0;
         }
 
         public void StoreSongsBranch(string databasePath, SongsBranchMetadata metadata, IEnumerable<SongsBranchRow> rows, SourceCollectionSnapshot? sourceCollection = null,
-                                     int xxySrAlgorithmVersion = 0, int ppAlgorithmVersion = 0, CancellationToken cancellationToken = default)
+                                     int sunnySRAlgorithmVersion = 0, int ppAlgorithmVersion = 0, CancellationToken cancellationToken = default)
         {
             if (!Enabled)
                 return;
@@ -980,7 +980,7 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_entry} (
     {col_beatmap_id} TEXT PRIMARY KEY,
     {col_beatmap_hash} TEXT NOT NULL,
     {col_beatmap_md5} TEXT NOT NULL,
-    {col_xxy_sr} REAL NOT NULL,
+    {col_sunny_sr} REAL NOT NULL,
     {col_pp} REAL NULL
 );
 
@@ -1002,8 +1002,8 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_source_collection} (
                 setMeta(connection, meta_key_schema_version, songs_branch_schema_version.ToString(CultureInfo.InvariantCulture));
                 setMeta(connection, meta_key_analysis_version, ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
 
-                if (xxySrAlgorithmVersion > 0)
-                    setMeta(connection, meta_key_xxy_sr_version, xxySrAlgorithmVersion.ToString(CultureInfo.InvariantCulture));
+                if (sunnySRAlgorithmVersion > 0)
+                    setMeta(connection, meta_key_sunny_sr_version, sunnySRAlgorithmVersion.ToString(CultureInfo.InvariantCulture));
 
                 if (ppAlgorithmVersion > 0)
                     setMeta(connection, meta_key_pp_version, ppAlgorithmVersion.ToString(CultureInfo.InvariantCulture));
@@ -1033,7 +1033,7 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_source_collection} (
                     sourceCollectionLastModified,
                     sourceCollectionBeatmapCount,
                     contentHashMd5s,
-                    xxySrAlgorithmVersion > 0 ? xxySrAlgorithmVersion : 0,
+                    sunnySRAlgorithmVersion > 0 ? sunnySRAlgorithmVersion : 0,
                     ppAlgorithmVersion > 0 ? ppAlgorithmVersion : 0));
 
                 using var transaction = connection.BeginTransaction();
@@ -1067,20 +1067,20 @@ INSERT INTO {table_songs_branch_entry}(
     {col_beatmap_id},
     {col_beatmap_hash},
     {col_beatmap_md5},
-    {col_xxy_sr},
+    {col_sunny_sr},
     {col_pp}
 )
 VALUES(
     $id,
     $hash,
     $md5,
-    $xxy_sr,
+    $sunny_sr,
     $pp
 )
 ON CONFLICT({col_beatmap_id}) DO UPDATE SET
     {col_beatmap_hash} = excluded.{col_beatmap_hash},
     {col_beatmap_md5} = excluded.{col_beatmap_md5},
-    {col_xxy_sr} = excluded.{col_xxy_sr},
+    {col_sunny_sr} = excluded.{col_sunny_sr},
     {col_pp} = excluded.{col_pp};
 ";
 
@@ -1096,9 +1096,9 @@ ON CONFLICT({col_beatmap_id}) DO UPDATE SET
                 md5Param.ParameterName = "$md5";
                 insert.Parameters.Add(md5Param);
 
-                var xxySrParam = insert.CreateParameter();
-                xxySrParam.ParameterName = "$xxy_sr";
-                insert.Parameters.Add(xxySrParam);
+                var sunnySRParam = insert.CreateParameter();
+                sunnySRParam.ParameterName = "$sunny_sr";
+                insert.Parameters.Add(sunnySRParam);
 
                 var ppParam = insert.CreateParameter();
                 ppParam.ParameterName = "$pp";
@@ -1110,7 +1110,7 @@ ON CONFLICT({col_beatmap_id}) DO UPDATE SET
                     idParam.Value = row.BeatmapId.ToString();
                     hashParam.Value = row.BeatmapHash;
                     md5Param.Value = row.BeatmapMd5;
-                    xxySrParam.Value = row.XxySr;
+                    sunnySRParam.Value = row.SSR;
                     ppParam.Value = row.Pp is double pp ? pp : DBNull.Value;
                     insert.ExecuteNonQuery();
                 }
@@ -1140,19 +1140,19 @@ ON CONFLICT({col_beatmap_id}) DO UPDATE SET
         public IReadOnlyDictionary<Guid, double> GetSongsBranchValues(string databasePath, IEnumerable<BeatmapInfo> beatmaps)
         {
             if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
-                return empty_xxy_sr_values;
+                return empty_sunny_sr_values;
 
             try
             {
                 var beatmapList = beatmaps.Distinct().ToList();
 
                 if (beatmapList.Count == 0)
-                    return empty_xxy_sr_values;
+                    return empty_sunny_sr_values;
 
                 using var connection = openConnection(databasePath);
 
                 if (!prepareSongsBranchConnection(connection))
-                    return empty_xxy_sr_values;
+                    return empty_sunny_sr_values;
 
                 var beatmapsById = beatmapList.ToDictionary(b => b.ID);
                 var resolvedValues = new Dictionary<Guid, double>(beatmapList.Count);
@@ -1173,7 +1173,7 @@ ON CONFLICT({col_beatmap_id}) DO UPDATE SET
                     }
 
                     cmd.CommandText = $@"
-SELECT beatmap_id, beatmap_hash, beatmap_md5, xxy_sr
+SELECT beatmap_id, beatmap_hash, beatmap_md5, sunny_sr
 FROM {table_songs_branch_entry}
 WHERE beatmap_id IN ({Join(", ", parameterNames)});
 ";
@@ -1206,7 +1206,7 @@ WHERE beatmap_id IN ({Join(", ", parameterNames)});
             catch (Exception e)
             {
                 Logger.Error(e, "EzManiaAnalysisPersistentStore GetSongsBranchValues failed.", Ez2ConfigManager.LOGGER_NAME);
-                return empty_xxy_sr_values;
+                return empty_sunny_sr_values;
             }
         }
 
@@ -1490,7 +1490,7 @@ WHERE {col_beatmap_md5} IN ({Join(", ", parameterNames)});
                 if (!prepareSongsBranchConnection(connection))
                     return false;
 
-                if (!int.TryParse(tryGetMeta(connection, meta_key_xxy_sr_version), NumberStyles.Integer, CultureInfo.InvariantCulture, out storedVersion))
+                if (!int.TryParse(tryGetMeta(connection, meta_key_sunny_sr_version), NumberStyles.Integer, CultureInfo.InvariantCulture, out storedVersion))
                     storedVersion = 0;
 
                 return true;
@@ -1520,8 +1520,8 @@ WHERE {col_beatmap_md5} IN ({Join(", ", parameterNames)});
                 if (!prepareSongsBranchConnection(connection))
                     return;
 
-                if (currentXxyVersion > 0 && IsNullOrEmpty(tryGetMeta(connection, meta_key_xxy_sr_version)))
-                    setMeta(connection, meta_key_xxy_sr_version, currentXxyVersion.ToString(CultureInfo.InvariantCulture));
+                if (currentXxyVersion > 0 && IsNullOrEmpty(tryGetMeta(connection, meta_key_sunny_sr_version)))
+                    setMeta(connection, meta_key_sunny_sr_version, currentXxyVersion.ToString(CultureInfo.InvariantCulture));
 
                 if (currentPpVersion > 0 && IsNullOrEmpty(tryGetMeta(connection, meta_key_pp_version)))
                     setMeta(connection, meta_key_pp_version, currentPpVersion.ToString(CultureInfo.InvariantCulture));
@@ -1531,7 +1531,7 @@ WHERE {col_beatmap_md5} IN ({Join(", ", parameterNames)});
                 if (IsNullOrEmpty(tryGetMeta(connection, meta_key_content_hash))
                     && tryReadSongsBranchMetadata(connection, out var metadata))
                 {
-                    int storedXxy = int.TryParse(tryGetMeta(connection, meta_key_xxy_sr_version), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedXxy)
+                    int storedXxy = int.TryParse(tryGetMeta(connection, meta_key_sunny_sr_version), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedXxy)
                         ? parsedXxy
                         : currentXxyVersion;
                     int storedPp = int.TryParse(tryGetMeta(connection, meta_key_pp_version), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedPp)
@@ -1738,7 +1738,7 @@ WHERE {col_beatmap_md5} IN ({Join(", ", parameterNames)});
 
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = $@"
-SELECT {col_beatmap_id}, {col_beatmap_hash}, {col_beatmap_md5}, {col_xxy_sr}, {col_pp}
+SELECT {col_beatmap_id}, {col_beatmap_hash}, {col_beatmap_md5}, {col_sunny_sr}, {col_pp}
 FROM {table_songs_branch_entry};";
 
                 var rows = new List<SongsBranchRow>();
@@ -1804,7 +1804,7 @@ FROM {table_songs_branch_entry};";
             }
         }
 
-        public bool UpdateSongsBranchRows(string databasePath, IEnumerable<SongsBranchRow> rows, int? newXxySrAlgorithmVersion, int? newPpAlgorithmVersion)
+        public bool UpdateSongsBranchRows(string databasePath, IEnumerable<SongsBranchRow> rows, int? newSSRAlgorithmVersion, int? newPpAlgorithmVersion)
         {
             if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return false;
@@ -1822,7 +1822,7 @@ FROM {table_songs_branch_entry};";
                 update.Transaction = transaction;
                 update.CommandText = $@"
 UPDATE {table_songs_branch_entry}
-SET {col_xxy_sr} = $xxy,
+SET {col_sunny_sr} = $xxy,
     {col_pp} = $pp
 WHERE {col_beatmap_id} = $id;
 ";
@@ -1842,15 +1842,15 @@ WHERE {col_beatmap_id} = $id;
                 foreach (var row in rows)
                 {
                     idParam.Value = row.BeatmapId.ToString();
-                    xxyParam.Value = row.XxySr;
+                    xxyParam.Value = row.SSR;
                     ppParam.Value = row.Pp.HasValue ? row.Pp.Value : DBNull.Value;
                     update.ExecuteNonQuery();
                 }
 
                 transaction.Commit();
 
-                if (newXxySrAlgorithmVersion is > 0)
-                    setMeta(connection, meta_key_xxy_sr_version, newXxySrAlgorithmVersion.Value.ToString(CultureInfo.InvariantCulture));
+                if (newSSRAlgorithmVersion is > 0)
+                    setMeta(connection, meta_key_sunny_sr_version, newSSRAlgorithmVersion.Value.ToString(CultureInfo.InvariantCulture));
 
                 if (newPpAlgorithmVersion is > 0)
                     setMeta(connection, meta_key_pp_version, newPpAlgorithmVersion.Value.ToString(CultureInfo.InvariantCulture));
@@ -2355,10 +2355,10 @@ LIMIT 1;
             string? kind = tryGetMeta(connection, meta_key_kind);
 
             if (string.Equals(kind, songs_branch_kind, StringComparison.Ordinal)
-                || string.Equals(kind, legacy_xxy_sr_branch_kind, StringComparison.Ordinal))
+                || string.Equals(kind, legacy_sunny_sr_branch_kind, StringComparison.Ordinal))
                 return true;
 
-            return songsBranchEntryTableExists(connection, legacy_table_xxy_sr_branch)
+            return songsBranchEntryTableExists(connection, legacy_table_sunny_sr_branch)
                    || songsBranchEntryTableExists(connection, table_songs_branch_entry);
         }
 
@@ -2375,11 +2375,11 @@ LIMIT 1;
 
             using var transaction = connection.BeginTransaction();
 
-            if (songsBranchEntryTableExists(connection, legacy_table_xxy_sr_branch))
+            if (songsBranchEntryTableExists(connection, legacy_table_sunny_sr_branch))
             {
                 if (songsBranchEntryTableExists(connection, table_songs_branch_entry))
                 {
-                    bool legacyHasPp = songsBranchEntryColumnExists(connection, legacy_table_xxy_sr_branch, col_pp);
+                    bool legacyHasPp = songsBranchEntryColumnExists(connection, legacy_table_sunny_sr_branch, col_pp);
                     string legacyPpSelect = legacyHasPp ? col_pp : "NULL";
 
                     using (var copy = connection.CreateCommand())
@@ -2390,16 +2390,16 @@ INSERT OR REPLACE INTO {table_songs_branch_entry}(
     {col_beatmap_id},
     {col_beatmap_hash},
     {col_beatmap_md5},
-    {col_xxy_sr},
+    {col_sunny_sr},
     {col_pp}
 )
 SELECT
     {col_beatmap_id},
     {col_beatmap_hash},
     {col_beatmap_md5},
-    {col_xxy_sr},
+    {col_sunny_sr},
     {legacyPpSelect}
-FROM {legacy_table_xxy_sr_branch};
+FROM {legacy_table_sunny_sr_branch};
 ";
                         copy.ExecuteNonQuery();
                     }
@@ -2407,7 +2407,7 @@ FROM {legacy_table_xxy_sr_branch};
                     using (var drop = connection.CreateCommand())
                     {
                         drop.Transaction = transaction;
-                        drop.CommandText = $"DROP TABLE {legacy_table_xxy_sr_branch};";
+                        drop.CommandText = $"DROP TABLE {legacy_table_sunny_sr_branch};";
                         drop.ExecuteNonQuery();
                     }
                 }
@@ -2415,7 +2415,7 @@ FROM {legacy_table_xxy_sr_branch};
                 {
                     using var rename = connection.CreateCommand();
                     rename.Transaction = transaction;
-                    rename.CommandText = $"ALTER TABLE {legacy_table_xxy_sr_branch} RENAME TO {table_songs_branch_entry};";
+                    rename.CommandText = $"ALTER TABLE {legacy_table_sunny_sr_branch} RENAME TO {table_songs_branch_entry};";
                     rename.ExecuteNonQuery();
                 }
             }
@@ -2449,7 +2449,7 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_source_collection} (
 
             if (requiresFullRecompute)
             {
-                deleteMeta(connection, meta_key_xxy_sr_version);
+                deleteMeta(connection, meta_key_sunny_sr_version);
                 deleteMeta(connection, meta_key_pp_version);
                 setMeta(connection, meta_key_requires_post_migration_refresh, "1");
             }
@@ -2487,8 +2487,8 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_source_collection} (
             if (legacySchemaVersion == 1)
                 return true;
 
-            if (songsBranchEntryTableExists(connection, legacy_table_xxy_sr_branch))
-                return !songsBranchEntryColumnExists(connection, legacy_table_xxy_sr_branch, col_pp);
+            if (songsBranchEntryTableExists(connection, legacy_table_sunny_sr_branch))
+                return !songsBranchEntryColumnExists(connection, legacy_table_sunny_sr_branch, col_pp);
 
             if (songsBranchEntryTableExists(connection, table_songs_branch_entry))
                 return !songsBranchEntryColumnExists(connection, table_songs_branch_entry, col_pp);
@@ -2508,7 +2508,7 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_source_collection} (
                 return false;
 
             return songsBranchEntryTableExists(connection, table_songs_branch_entry)
-                   && !songsBranchEntryTableExists(connection, legacy_table_xxy_sr_branch);
+                   && !songsBranchEntryTableExists(connection, legacy_table_sunny_sr_branch);
         }
 
         private static bool isValidSongsBranchConnection(SqliteConnection connection) => isCurrentSongsBranchSchema(connection);
@@ -3092,7 +3092,7 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
         /// </summary>
         private static bool isValidAnalysisResult(EzAnalysisResult result)
         {
-            if (result.ManiaSummary?.XxySr is double xxySr && (double.IsNaN(xxySr) || double.IsInfinity(xxySr)))
+            if (result.ManiaSummary?.SSR is double sunnySR && (double.IsNaN(sunnySR) || double.IsInfinity(sunnySR)))
                 return false;
 
             return true;

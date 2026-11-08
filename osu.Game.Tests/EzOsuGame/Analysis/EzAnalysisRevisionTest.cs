@@ -72,7 +72,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [Test]
         public void Downstream_edges_match_the_declared_dependency_chain()
         {
-            // Msd -> ChartDan and ChartSkillInfo -> ChartDan: the two chart facets are independent
+            // MSD -> ChartDan and ChartSkillInfo -> ChartDan: the two chart facets are independent
             // inputs and fan in at Dan. Bumping an upstream facet must invalidate every downstream
             // facet, which is what makes the incremental backfill recompute them.
             Assert.That(EzAnalysisRevision.DownstreamOf(EzAnalysisFacet.Msd),

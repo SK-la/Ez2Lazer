@@ -94,7 +94,7 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             var summaryForDisplay = metrics.ManiaSummary ?? beatmap.ToEzManiaSummaryForDisplay();
 
-            if (Xxy.Current.Value.XxySr != summaryForDisplay.XxySr)
+            if (Xxy.Current.Value.SSR != summaryForDisplay.SSR)
                 Xxy.Current.Value = summaryForDisplay;
         }
 

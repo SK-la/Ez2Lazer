@@ -33,7 +33,7 @@ namespace osu.Game.EzOsuGame.HUD
     /// <summary>
     /// HUD RC|LN skills-dan dual panel (Skill-radar style Chart / Player / Both sources).
     /// Borrowed by EzAnalysis wedge and Local Profile Track with bindable settings.
-    /// Chart side: Realm first, then always async live MSD/ChartDan for the selected map (xxySR rhythm; not written).
+    /// Chart side: Realm first, then always async live MSD/ChartDan for the selected map (sunnySR rhythm; not written).
     /// </summary>
     public partial class EzHUDDanDualPanel : CompositeDrawable, ISerialisableDrawable
     {

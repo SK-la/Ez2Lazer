@@ -291,8 +291,8 @@ namespace osu.Game.EzOsuGame.Skills
             if (double.IsNaN(holdRatio))
                 holdRatio = 0;
 
-            double? xxySr = beatmapInfo.EzRatingData.SunnySR >= 0 ? beatmapInfo.EzRatingData.SunnySR : null;
-            return EzChartDanEstimator.FromMsd(msd, keyCount, holdRatio, xxySr);
+            double? sunnySR = beatmapInfo.EzRatingData.SunnySR >= 0 ? beatmapInfo.EzRatingData.SunnySR : null;
+            return EzChartDanEstimator.FromMsd(msd, keyCount, holdRatio, sunnySR);
         }
 
         public bool TryGetBeatmapMsdSkill(string beatmapHash, string axisId, out double value)
@@ -915,7 +915,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (!EzBeatmapMinaComputer.IsCurrentMinaCache(msd))
                 return null;
 
-            if (!EzChartDanEstimator.TryResolveStoredInputs(beatmapInfo, out int keyCount, out double holdRatio, out double? xxySr, out int holdCount))
+            if (!EzChartDanEstimator.TryResolveStoredInputs(beatmapInfo, out int keyCount, out double holdRatio, out double? sunnySR, out int holdCount))
                 return null;
 
             EzChartSkillInfo? chartInfo = null;
@@ -929,7 +929,7 @@ namespace osu.Game.EzOsuGame.Skills
                 msd,
                 keyCount,
                 holdRatio,
-                xxySr,
+                sunnySR,
                 chartInfo,
                 holdCount);
         }

@@ -12,9 +12,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
     public class EzDataRebuildDispatcherTest
     {
         [TestCase(EzDataRebuildAction.RealmTags, EzRealmMetadataScope.Tags)]
-        [TestCase(EzDataRebuildAction.RealmSunny, EzRealmMetadataScope.Xxy)]
-        [TestCase(EzDataRebuildAction.RealmPp, EzRealmMetadataScope.Pp)]
-        [TestCase(EzDataRebuildAction.RealmChartMsd, EzRealmMetadataScope.Msd)]
+        [TestCase(EzDataRebuildAction.RealmSunny, EzRealmMetadataScope.SSR)]
+        [TestCase(EzDataRebuildAction.RealmPp, EzRealmMetadataScope.PP)]
+        [TestCase(EzDataRebuildAction.RealmChartMsd, EzRealmMetadataScope.MSD)]
         [TestCase(EzDataRebuildAction.RealmChartCsi, EzRealmMetadataScope.ChartSkillInfo)]
         [TestCase(EzDataRebuildAction.RealmChartDan, EzRealmMetadataScope.ChartDan)]
         [TestCase(EzDataRebuildAction.RealmPpp, EzRealmMetadataScope.PPP)]
@@ -71,7 +71,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             var outcome = dispatcher.Execute(actions, forceAll: true);
 
             Assert.That(calls, Is.EqualTo(1), "one Realm queue accepts the whole selection");
-            Assert.That(capturedScope, Is.EqualTo(EzRealmMetadataScope.Msd | EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan));
+            Assert.That(capturedScope, Is.EqualTo(EzRealmMetadataScope.MSD | EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan));
             Assert.That(capturedForceAll, Is.True);
             Assert.That(outcome.Queued, Is.EquivalentTo(actions));
             Assert.That(outcome.Failures, Is.Empty);

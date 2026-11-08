@@ -80,13 +80,13 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// side) instead of inventing a new MSD→dan constant.
         /// Null = no trustworthy dan; callers must leave the label empty rather than invent one.
         /// </summary>
-        public static DanLookup? TryResolveFallbackDan(int keyCount, EzDanSide side, double overallMsd, EzMinaSkillAxis axis, double? xxySr)
+        public static DanLookup? TryResolveFallbackDan(int keyCount, EzDanSide side, double overallMsd, EzMinaSkillAxis axis, double? sunnySR)
         {
             string sideId = side.ToId();
 
             if (!HasXxyDanTable(keyCount))
             {
-                if (xxySr is double sr
+                if (sunnySR is double sr
                     && double.IsFinite(sr)
                     && EzSunnyDanIntervals.TryLookup(tableless_borrowed_key_count, sideId, sr, out var borrowed)
                     && !string.IsNullOrEmpty(borrowed.DisplayLabel))

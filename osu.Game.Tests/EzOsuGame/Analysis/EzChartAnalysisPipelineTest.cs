@@ -140,7 +140,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             };
 
             // The pass resolves the sides once; the estimator is expected to read that, not derive its own.
-            var dan = EzDanSet.Create(storedAxes(), keyCount: 4, holdRatio: 0.1, xxySr: null, chartInfo: null);
+            var dan = EzDanSet.Create(storedAxes(), keyCount: 4, holdRatio: 0.1, sunnySR: null, chartInfo: null);
 
             return new EzAnalysisResult(new KpsSummary(1, 2, new[] { 1.0 }), axes: table,
                 dan: dan,

@@ -54,7 +54,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             addLineChart(lineSection, EzSettingsProfile.LOCAL_PROFILE_STAR_PLAY_LINE, createStarLineChart());
             if (showXxy)
-                addLineChart(lineSection, EzSettingsProfile.LOCAL_PROFILE_XXY_PLAY_LINE, createXxyLineChart());
+                addLineChart(lineSection, EzSettingsProfile.LOCAL_PROFILE_SSR_PLAY_LINE, createXxyLineChart());
 
             if (rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID)
                 addLineChart(lineSection, EzSettingsProfile.LOCAL_PROFILE_MANIA_AVG_KPS_LINE, createManiaKpsLineChart());
@@ -71,7 +71,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             if (showXxy)
             {
                 barColumns.Add(createBarColumn(
-                    EzSettingsProfile.LOCAL_PROFILE_XXY_PLAY_DISTRIBUTION,
+                    EzSettingsProfile.LOCAL_PROFILE_SSR_PLAY_DISTRIBUTION,
                     EzLocalProfileBucketBars.FromXxyPlayCounts(snapshot.XxyPlayCounts.Where(s => s.RulesetId == rulesetId))));
             }
 
@@ -155,7 +155,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return new EzLocalProfileTrendChart(
                 list.Select(s => (float)s.Count).ToArray(),
                 list.Select(s => s.StarBucket.ToString(CultureInfo.InvariantCulture)).ToArray(),
-                EzSettingsProfile.LOCAL_PROFILE_XXY_PLAY_LINE,
+                EzSettingsProfile.LOCAL_PROFILE_SSR_PLAY_LINE,
                 FontAwesome.Solid.Moon,
                 minValue: 0);
         }

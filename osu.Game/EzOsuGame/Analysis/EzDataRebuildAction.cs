@@ -172,7 +172,7 @@ namespace osu.Game.EzOsuGame.Analysis
             switch (action)
             {
                 case EzDataRebuildAction.RealmChartMsd:
-                    return EzRealmMetadataScope.Msd;
+                    return EzRealmMetadataScope.MSD;
 
                 case EzDataRebuildAction.RealmChartCsi:
                     return EzRealmMetadataScope.ChartSkillInfo;
@@ -184,10 +184,10 @@ namespace osu.Game.EzOsuGame.Analysis
                     return EzRealmMetadataScope.PPP;
 
                 case EzDataRebuildAction.RealmSunny:
-                    return EzRealmMetadataScope.Xxy;
+                    return EzRealmMetadataScope.SSR;
 
                 case EzDataRebuildAction.RealmPp:
-                    return EzRealmMetadataScope.Pp;
+                    return EzRealmMetadataScope.PP;
 
                 case EzDataRebuildAction.RealmTags:
                     return EzRealmMetadataScope.Tags;

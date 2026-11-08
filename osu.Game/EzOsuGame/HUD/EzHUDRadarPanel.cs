@@ -98,7 +98,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         public float MaxKeyPatternScore { get; } = 10f;
 
-        public float MaxXxySr { get; } = 10f;
+        public float MaxSSR { get; } = 10f;
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_DISPLAY_MODE), nameof(EzHUDStrings.RADAR_DISPLAY_MODE_TOOLTIP))]
         public Bindable<EzRadarDisplayMode> RadarDisplayMode { get; } = new Bindable<EzRadarDisplayMode>();
@@ -861,9 +861,9 @@ namespace osu.Game.EzOsuGame.HUD
         private IReadOnlyList<float> getGeneralAxisMaxValues() => new[] { MaxBpm, MaxStar, MaxCs, MaxOd, MaxDr, MaxAr };
 
         private IReadOnlyList<float> getRulesetSpecificAxisMaxValues() => RadarDisplayMode.Value == EzRadarDisplayMode.SSRSkill
-            ? new[] { MaxXxySr, MaxXxySr, MaxXxySr, MaxXxySr, MaxXxySr, MaxXxySr }
+            ? new[] { MaxSSR, MaxSSR, MaxSSR, MaxSSR, MaxSSR, MaxSSR }
             : UseAbsoluteValue.Value
-                ? new[] { MaxXxySr, MaxXxySr, long_note_ratio_max, MaxXxySr, MaxXxySr, MaxXxySr }
+                ? new[] { MaxSSR, MaxSSR, long_note_ratio_max, MaxSSR, MaxSSR, MaxSSR }
                 : new[] { MaxKeyPatternScore, MaxKeyPatternScore, long_note_ratio_max, MaxKeyPatternScore, MaxKeyPatternScore, MaxKeyPatternScore };
 
         private EzRadarChartData<string> createDisplayedRulesetRadarData(EzRulesetSpecificRadarResult radarResult)
@@ -873,7 +873,7 @@ namespace osu.Game.EzOsuGame.HUD
             if (RadarDisplayMode.Value == EzRadarDisplayMode.SSRSkill)
                 return sourceRadarData;
 
-            if (!UseAbsoluteValue.Value || radarResult.XxySr is not double xxySr || xxySr <= 0)
+            if (!UseAbsoluteValue.Value || radarResult.SSR is not double sunnySR || sunnySR <= 0)
                 return sourceRadarData;
 
             bool preserveLongNotePercentage = RadarDisplayMode.Value == EzRadarDisplayMode.KeyPattern;
@@ -889,7 +889,7 @@ namespace osu.Game.EzOsuGame.HUD
                     continue;
                 }
 
-                double absoluteValue = Math.Round(axis.Value / key_pattern_full_score * xxySr, 2, MidpointRounding.AwayFromZero);
+                double absoluteValue = Math.Round(axis.Value / key_pattern_full_score * sunnySR, 2, MidpointRounding.AwayFromZero);
                 axes[i] = new EzRadarAxisValue<string>(axis.Axis, absoluteValue, "0.00");
             }
 
@@ -897,7 +897,7 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         private EzRadarChartData<string> getSelectedRulesetSpecificRadarData(EzRulesetSpecificRadarResult radarResult)
-            => RadarDisplayMode.Value == EzRadarDisplayMode.SSRSkill ? radarResult.XxySrPatternRadarData : radarResult.KeyPatternRadarData;
+            => RadarDisplayMode.Value == EzRadarDisplayMode.SSRSkill ? radarResult.SSRPatternRadarData : radarResult.KeyPatternRadarData;
 
         private void clearChartData()
         {

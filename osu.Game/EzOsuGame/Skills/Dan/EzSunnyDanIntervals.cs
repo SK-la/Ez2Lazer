@@ -9,7 +9,7 @@ using System.Threading;
 namespace osu.Game.EzOsuGame.Skills.Dan
 {
     /// <summary>
-    ///     Maps xxySR (Sunny star) onto community dan labels via mania-hub interval tables.
+    ///     Maps sunnySR (Sunny star) onto community dan labels via mania-hub interval tables.
     ///     Does not run LeoBlack / sunnyAlgorithm — only table lookup.
     /// </summary>
     public static class EzSunnyDanIntervals
@@ -54,18 +54,18 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             return keyCount is 4 or 6 or 7;
         }
 
-        public static bool TryLookup(int keyCount, string side, double xxySr, out LookupResult result)
+        public static bool TryLookup(int keyCount, string side, double sunnySR, out LookupResult result)
         {
             result = default;
 
-            if (!SupportsKeyCount(keyCount) || !double.IsFinite(xxySr) || xxySr <= 0)
+            if (!SupportsKeyCount(keyCount) || !double.IsFinite(sunnySR) || sunnySR <= 0)
                 return false;
 
             var table = getTable(keyCount, side);
             if (table == null || table.Length == 0)
                 return false;
 
-            string intervalName = lookupIntervalName(xxySr, table);
+            string intervalName = lookupIntervalName(sunnySR, table);
             if (!tryParseInterval(intervalName, keyCount, side, table, out string displayLabel, out double rawDan))
                 return false;
 

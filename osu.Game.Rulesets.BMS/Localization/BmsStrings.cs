@@ -175,7 +175,7 @@ namespace osu.Game.Rulesets.BMS.Localization
             new BmsLocalizationManager.BmsLocalisableString("重新扫描 BMS 曲库并同步元数据（含内容 hash）", "Rescan the BMS library and sync metadata, including content hashes");
 
         public static readonly LocalisableString SONG_SELECT_BUILD_ANALYTICS_TOOLTIP =
-            new BmsLocalizationManager.BmsLocalisableString("为曲库生成 / 更新分析数据：星级、xxySR、KPS 等", "Build or update analytics data for the library: stars, xxySR, KPS, and more");
+            new BmsLocalizationManager.BmsLocalisableString("为曲库生成 / 更新分析数据：星级、sunnySR、KPS 等", "Build or update analytics data for the library: stars, sunnySR, KPS, and more");
 
         public static readonly LocalisableString SONG_SELECT_SYNC_BUILTIN_TABLES_TOOLTIP =
             new BmsLocalizationManager.BmsLocalisableString("下载并同步内置难度表目录", "Download and sync the built-in difficulty table catalog");
@@ -251,9 +251,9 @@ namespace osu.Game.Rulesets.BMS.Localization
 
         public static string Raja_DetailPath(string path) => raja_detail_path_template.Format(path);
 
-        public static string Raja_DetailAnalytics(double pp, double xxySr, double avgKps, double maxKps, double star) => raja_detail_analytics_template.Format(pp, xxySr, avgKps, maxKps, star);
+        public static string Raja_DetailAnalytics(double pp, double sunnySR, double avgKps, double maxKps, double star) => raja_detail_analytics_template.Format(pp, sunnySR, avgKps, maxKps, star);
 
-        public static string Raja_RowAnalyticsSuffix(double pp, double xxySr, double avgKps) => raja_row_analytics_suffix_template.Format(pp, xxySr, avgKps);
+        public static string Raja_RowAnalyticsSuffix(double pp, double sunnySR, double avgKps) => raja_row_analytics_suffix_template.Format(pp, sunnySR, avgKps);
 
         private static readonly BmsLocalizationManager.BmsLocalisableString raja_detail_artist_template = new BmsLocalizationManager.BmsLocalisableString("艺术家: {0}", "Artist: {0}");
 
@@ -266,7 +266,7 @@ namespace osu.Game.Rulesets.BMS.Localization
         private static readonly BmsLocalizationManager.BmsLocalisableString raja_detail_path_template = new BmsLocalizationManager.BmsLocalisableString("路径: {0}", "Path: {0}");
 
         private static readonly BmsLocalizationManager.BmsLocalisableString raja_detail_analytics_template =
-            new BmsLocalizationManager.BmsLocalisableString("PP {0:0.#} | xxySR {1:0.##} | KPS {2:0.#}/{3:0.#} | ★ {4:0.##}", "PP {0:0.#} | xxySR {1:0.##} | KPS {2:0.#}/{3:0.#} | ★ {4:0.##}");
+            new BmsLocalizationManager.BmsLocalisableString("PP {0:0.#} | sunnySR {1:0.##} | KPS {2:0.#}/{3:0.#} | ★ {4:0.##}", "PP {0:0.#} | sunnySR {1:0.##} | KPS {2:0.#}/{3:0.#} | ★ {4:0.##}");
 
         private static readonly BmsLocalizationManager.BmsLocalisableString raja_row_analytics_suffix_template =
             new BmsLocalizationManager.BmsLocalisableString("PP{0:0.#} SR{1:0.##} KPS{2:0.#}", "PP{0:0.#} SR{1:0.##} KPS{2:0.#}");

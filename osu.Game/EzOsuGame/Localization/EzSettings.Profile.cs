@@ -271,14 +271,14 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_INSIGHTS_OLDEST_TOP =
             new EzLocalizationManager.EzLocalisableString("最早 Top Play", "Oldest Top Play");
 
-        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_XXY_PLAY_DISTRIBUTION =
-            new EzLocalizationManager.EzLocalisableString("xxySR 分布", "Plays by xxySR");
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SSR_PLAY_DISTRIBUTION =
+            new EzLocalizationManager.EzLocalisableString("sunnySR 分布", "Plays by sunnySR");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_STAR_PLAY_LINE =
             new EzLocalizationManager.EzLocalisableString("星级游玩分布", "Plays by star rating");
 
-        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_XXY_PLAY_LINE =
-            new EzLocalizationManager.EzLocalisableString("xxySR 游玩分布", "xxySR distribution");
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SSR_PLAY_LINE =
+            new EzLocalizationManager.EzLocalisableString("sunnySR 游玩分布", "sunnySR distribution");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_SCORE_DRILL =
             new EzLocalizationManager.EzLocalisableString("成绩记录", "Score history");

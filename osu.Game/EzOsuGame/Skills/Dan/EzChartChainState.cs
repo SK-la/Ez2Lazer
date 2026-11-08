@@ -178,13 +178,13 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 rateableBeatmapIds[beatmap.Hash] = beatmap.ID;
 
                 int keyCount = (int)Math.Round(beatmap.Difficulty.CircleSize);
-                double? xxySr = beatmap.EzRatingData.SunnySR >= 0 ? beatmap.EzRatingData.SunnySR : null;
+                double? sunnySR = beatmap.EzRatingData.SunnySR >= 0 ? beatmap.EzRatingData.SunnySR : null;
                 double holdRatio = EzHoldMetrics.HoldRatio(beatmap);
 
                 if (double.IsNaN(holdRatio))
                     holdRatio = 0;
 
-                rateableChartMeta[beatmap.Hash] = new RateableChartMeta(keyCount, xxySr, holdRatio);
+                rateableChartMeta[beatmap.Hash] = new RateableChartMeta(keyCount, sunnySR, holdRatio);
             }
 
             var msdRowsForReader = new List<EzBeatmapSkillValue>();

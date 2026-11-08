@@ -43,7 +43,7 @@ namespace osu.Game.EzOsuGame.Analysis
     {
         private static int computeFailCount;
         private static int songsBranchComputeFailCount;
-        private static readonly IReadOnlyDictionary<Guid, double> empty_xxy_sr_values = new Dictionary<Guid, double>();
+        private static readonly IReadOnlyDictionary<Guid, double> empty_sunny_sr_values = new Dictionary<Guid, double>();
         private static readonly IReadOnlyDictionary<Guid, double> empty_pp_values = new Dictionary<Guid, double>();
 
         private readonly EzAnalysisPersistentStore persistentStore;
@@ -140,13 +140,13 @@ namespace osu.Game.EzOsuGame.Analysis
             return committed;
         }
 
-        public bool TryGetXxySr(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double xxySr)
+        public bool TryGetSSR(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double sunnySR)
         {
-            xxySr = 0;
+            sunnySR = 0;
 
             if (beatmapInfo is BeatmapInfo beatmap && beatmap.EzRatingData.SunnySR >= 0)
             {
-                xxySr = beatmap.EzRatingData.SunnySR;
+                sunnySR = beatmap.EzRatingData.SunnySR;
                 return true;
             }
 
@@ -180,9 +180,9 @@ namespace osu.Game.EzOsuGame.Analysis
         public IReadOnlyDictionary<Guid, double> GetActiveSongsBranchValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
         {
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled || !IsActiveSongsBranchFor(rulesetInfo, mods))
-                return empty_xxy_sr_values;
+                return empty_sunny_sr_values;
 
-            return getResolvedActiveBranchValues(beatmaps, rulesetInfo, createModsProfileFingerprint(mods), persistentStore.GetSongsBranchValues, empty_xxy_sr_values);
+            return getResolvedActiveBranchValues(beatmaps, rulesetInfo, createModsProfileFingerprint(mods), persistentStore.GetSongsBranchValues, empty_sunny_sr_values);
         }
 
         public IReadOnlyDictionary<Guid, double> GetActiveSongsBranchPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
@@ -197,26 +197,26 @@ namespace osu.Game.EzOsuGame.Analysis
         /// NoMod 基线 xxy：直读 Realm（对齐 carousel 读 <see cref="BeatmapInfo.StarRating"/>）。
         /// 有 mod 时仅返回已激活且指纹匹配的分支库值（需 SQLite 开关）。
         /// </summary>
-        public IReadOnlyDictionary<Guid, double> GetBaselineXxySrFromRealm(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
+        public IReadOnlyDictionary<Guid, double> GetBaselineSSRFromRealm(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
         {
             var beatmapList = beatmaps.Distinct().ToList();
 
             if (beatmapList.Count == 0)
-                return empty_xxy_sr_values;
+                return empty_sunny_sr_values;
 
             if (IsActiveSongsBranchFor(rulesetInfo, mods))
             {
                 if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
-                    return empty_xxy_sr_values;
+                    return empty_sunny_sr_values;
 
-                return getResolvedActiveBranchValues(beatmapList, rulesetInfo, createModsProfileFingerprint(mods), persistentStore.GetSongsBranchValues, empty_xxy_sr_values);
+                return getResolvedActiveBranchValues(beatmapList, rulesetInfo, createModsProfileFingerprint(mods), persistentStore.GetSongsBranchValues, empty_sunny_sr_values);
             }
 
             if (mods?.Any() == true)
-                return empty_xxy_sr_values;
+                return empty_sunny_sr_values;
 
-            var resolvedValues = persistentStore.GetBaselineXxySrFromRealm(beatmapList);
-            return resolvedValues.Count == 0 ? empty_xxy_sr_values : resolvedValues;
+            var resolvedValues = persistentStore.GetBaselineSSRFromRealm(beatmapList);
+            return resolvedValues.Count == 0 ? empty_sunny_sr_values : resolvedValues;
         }
 
         public IReadOnlyDictionary<Guid, double> GetStoredPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
@@ -343,17 +343,17 @@ namespace osu.Game.EzOsuGame.Analysis
                     cancellationToken.ThrowIfCancellationRequested();
 
                     var beatmap = beatmapList[i];
-                    double xxySr = 0;
+                    double sunnySR = 0;
                     double? pp = null;
 
                     try
                     {
                         var lookup = new EzAnalysisLookupCache(beatmap, localRulesetInfo, mods);
 
-                        if (EzAnalysisComputation.TryComputeXxySrAndPp(beatmapManager, lookup, cancellationToken, out double? computedXxySr, out double? computedPp))
+                        if (EzAnalysisComputation.TryComputeSSRAndPp(beatmapManager, lookup, cancellationToken, out double? computedSSR, out double? computedPp))
                         {
-                            if (computedXxySr is double resolvedXxySr)
-                                xxySr = resolvedXxySr;
+                            if (computedSSR is double resolvedSSR)
+                                sunnySR = resolvedSSR;
 
                             pp = computedPp;
                         }
@@ -375,7 +375,7 @@ namespace osu.Game.EzOsuGame.Analysis
                         }
                     }
 
-                    rows.Add(new EzAnalysisPersistentStore.SongsBranchRow(beatmap.ID, beatmap.Hash, beatmap.MD5Hash, xxySr, pp));
+                    rows.Add(new EzAnalysisPersistentStore.SongsBranchRow(beatmap.ID, beatmap.Hash, beatmap.MD5Hash, sunnySR, pp));
 
                     long now = Environment.TickCount64;
 
@@ -390,16 +390,16 @@ namespace osu.Game.EzOsuGame.Analysis
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    int xxySrAlgorithmVersion = 0;
+                    int sunnySRAlgorithmVersion = 0;
                     int ppAlgorithmVersion = 0;
 
                     if (EzSunnyStarRatingSupport.TryGetSunnyStarRatingVersion(localRulesetInfo, out int resolvedXxyVersion))
-                        xxySrAlgorithmVersion = resolvedXxyVersion;
+                        sunnySRAlgorithmVersion = resolvedXxyVersion;
 
                     if (tryGetOfficialPerformancePointsVersion(localRulesetInfo, out int resolvedPpVersion))
                         ppAlgorithmVersion = resolvedPpVersion;
 
-                    persistentStore.StoreSongsBranch(databasePath, metadata, rows, sourceCollection, xxySrAlgorithmVersion, ppAlgorithmVersion, cancellationToken);
+                    persistentStore.StoreSongsBranch(databasePath, metadata, rows, sourceCollection, sunnySRAlgorithmVersion, ppAlgorithmVersion, cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
 
                     deleteBranchesForSourceCollection(resolvedSourceCollectionId, databasePath);
@@ -692,7 +692,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     cancellationToken.ThrowIfCancellationRequested();
 
                     var storedRow = storedRows[i];
-                    double xxySr = storedRow.XxySr;
+                    double sunnySR = storedRow.SSR;
                     double? pp = storedRow.Pp;
 
                     if (beatmapLookup.TryGetValue(storedRow.BeatmapId, out var beatmap)
@@ -703,9 +703,9 @@ namespace osu.Game.EzOsuGame.Analysis
                             var lookup = new EzAnalysisLookupCache(beatmap, localRulesetInfo, mods);
 
                             if (plan.RefreshXxy
-                                && EzAnalysisComputation.TryComputeXxySr(beatmapManager, lookup, cancellationToken, out double computedXxySr))
+                                && EzAnalysisComputation.TryComputeSSR(beatmapManager, lookup, cancellationToken, out double computedSSR))
                             {
-                                xxySr = computedXxySr;
+                                sunnySR = computedSSR;
                             }
 
                             if (plan.RefreshPp
@@ -732,7 +732,7 @@ namespace osu.Game.EzOsuGame.Analysis
                         }
                     }
 
-                    updatedRows.Add(new EzAnalysisPersistentStore.SongsBranchRow(storedRow.BeatmapId, storedRow.BeatmapHash, storedRow.BeatmapMd5, xxySr, pp));
+                    updatedRows.Add(new EzAnalysisPersistentStore.SongsBranchRow(storedRow.BeatmapId, storedRow.BeatmapHash, storedRow.BeatmapMd5, sunnySR, pp));
 
                     long now = Environment.TickCount64;
 
@@ -1449,7 +1449,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private static string createModsDisplay(IReadOnlyList<Mod>? mods)
         {
-            var relevantMods = getXxySrRelevantMods(mods).ToList();
+            var relevantMods = getSSRRelevantMods(mods).ToList();
             return relevantMods.Count == 0 ? "NoMod" : string.Join('+', relevantMods.Select(m => m.Acronym));
         }
 
@@ -1461,7 +1461,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private static string createModsProfileFingerprint(IEnumerable<Mod>? mods)
         {
-            var relevantMods = getXxySrRelevantMods(mods).ToList();
+            var relevantMods = getSSRRelevantMods(mods).ToList();
 
             if (relevantMods.Count == 0)
                 return string.Empty;
@@ -1484,25 +1484,25 @@ namespace osu.Game.EzOsuGame.Analysis
             return builder.ToString();
         }
 
-        private static IEnumerable<Mod> getXxySrRelevantMods(IEnumerable<Mod>? mods)
+        private static IEnumerable<Mod> getSSRRelevantMods(IEnumerable<Mod>? mods)
         {
             if (mods == null)
                 yield break;
 
             foreach (var mod in mods)
             {
-                if (modAffectsXxySr(mod))
+                if (modAffectsSSR(mod))
                     yield return mod;
             }
         }
 
-        private static bool modAffectsXxySr(Mod mod) => mod is IApplicableToRate
-                                                               or IApplicableToBeatmapConverter
-                                                               or IApplicableAfterBeatmapConversion
-                                                               or IApplicableToDifficulty
-                                                               or IApplicableToBeatmapProcessor
-                                                               or IApplicableToHitObject
-                                                               or IApplicableToBeatmap;
+        private static bool modAffectsSSR(Mod mod) => mod is IApplicableToRate
+                                                             or IApplicableToBeatmapConverter
+                                                             or IApplicableAfterBeatmapConversion
+                                                             or IApplicableToDifficulty
+                                                             or IApplicableToBeatmapProcessor
+                                                             or IApplicableToHitObject
+                                                             or IApplicableToBeatmap;
 
         private static class SongsBranchStrings
         {

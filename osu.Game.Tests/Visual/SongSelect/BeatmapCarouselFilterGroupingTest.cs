@@ -304,10 +304,10 @@ namespace osu.Game.Tests.Visual.SongSelect
             int total = 0;
 
             var beatmapSets = new List<BeatmapSetInfo>();
-            addBeatmapSet(applyXxyStars(0.5, 5.0), beatmapSets, out var beatmapBelow1);
-            addBeatmapSet(applyXxyStars(1.9, 1.0), beatmapSets, out var beatmapAbove1);
-            addBeatmapSet(applyXxyStars(2.0, 9.0), beatmapSets, out var beatmap2);
-            addBeatmapSet(applyXxyStars(7.0, 2.0), beatmapSets, out var beatmap7);
+            addBeatmapSet(applySunnyStarRating(0.5, 5.0), beatmapSets, out var beatmapBelow1);
+            addBeatmapSet(applySunnyStarRating(1.9, 1.0), beatmapSets, out var beatmapAbove1);
+            addBeatmapSet(applySunnyStarRating(2.0, 9.0), beatmapSets, out var beatmap2);
+            addBeatmapSet(applySunnyStarRating(7.0, 2.0), beatmapSets, out var beatmap7);
 
             var results = await runGrouping(GroupMode.Difficulty, beatmapSets, getXxy: resolveXxy);
             assertGroup(results, 0, BeatmapCarouselFilterGroupingStrings.BelowStars(1), beatmapBelow1.Beatmaps, ref total);
@@ -317,7 +317,7 @@ namespace osu.Game.Tests.Visual.SongSelect
             assertTotal(results, total);
         }
 
-        private Action<BeatmapSetInfo> applyXxyStars(double xxy, double starRating)
+        private Action<BeatmapSetInfo> applySunnyStarRating(double xxy, double starRating)
         {
             return s => s.Beatmaps.ForEach(b =>
             {

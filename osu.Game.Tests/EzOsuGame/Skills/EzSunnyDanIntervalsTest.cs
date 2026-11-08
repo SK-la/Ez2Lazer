@@ -48,7 +48,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 [EzMinaSkillAxis.Stream.ToMsdSkillId()] = 10.0,
             };
 
-            var withXxy = EzChartDanEstimator.FromMsd(msd, keyCount: 6, holdRatio: 0.1, xxySr: 7.03);
+            var withXxy = EzChartDanEstimator.FromMsd(msd, keyCount: 6, holdRatio: 0.1, sunnySR: 7.03);
             var withoutXxy = EzChartDanEstimator.FromMsd(msd, keyCount: 6, holdRatio: 0.1);
 
             Assert.That(withXxy, Is.Not.Null);
@@ -74,7 +74,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 msd,
                 keyCount: 6,
                 holdRatio: 0.1,
-                xxySr: null,
+                sunnySR: null,
                 chartInfo: null,
                 holdCount: 0);
 
@@ -100,7 +100,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 msd,
                 keyCount: 6,
                 holdRatio: 0.1,
-                xxySr: 7.03,
+                sunnySR: 7.03,
                 chartInfo: null,
                 holdCount: 0);
 

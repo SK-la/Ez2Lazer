@@ -266,8 +266,8 @@ namespace osu.Game.Screens.Select
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (activeSongsBranchValues.TryGetValue(beatmap.ID, out double xxySr))
-                        cachedDifficulties[beatmap.ID] = xxySr;
+                    if (activeSongsBranchValues.TryGetValue(beatmap.ID, out double sunnySR))
+                        cachedDifficulties[beatmap.ID] = sunnySR;
                 }
             }
 
@@ -277,8 +277,8 @@ namespace osu.Game.Screens.Select
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (cachedDifficulties.TryGetValue(beatmap.ID, out double xxySr))
-                    resolvedValues[beatmap] = xxySr;
+                if (cachedDifficulties.TryGetValue(beatmap.ID, out double sunnySR))
+                    resolvedValues[beatmap] = sunnySR;
             }
 
             return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(resolvedValues);

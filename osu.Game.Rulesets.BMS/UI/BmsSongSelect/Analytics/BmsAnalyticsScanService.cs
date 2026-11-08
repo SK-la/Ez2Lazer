@@ -103,8 +103,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                                     repository.Upsert(new BmsAnalyticsRecord
                                     {
                                         PathKey = pathKey,
-                                        Pp = analyticsResult.Pp,
-                                        XxySr = analyticsResult.XxySr,
+                                        Pp = analyticsResult.PP,
+                                        SSR = analyticsResult.SSR,
                                         AvgKps = analyticsResult.AvgKps,
                                         MaxKps = analyticsResult.MaxKps,
                                         StarRating = analyticsResult.StarRating,

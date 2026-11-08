@@ -301,8 +301,8 @@ namespace osu.Game.EzOsuGame.Analysis
         private static double? positiveAxis(in EzAnalysisResult analysis, EzMetricProducerId producer, string axisId)
             => analysis.AxesOf(producer).TryGetValue(axisId, out double value) && double.IsFinite(value) && value > 0 ? value : null;
 
-        public bool TryGetXxySr(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double xxySr)
-            => analysisDatabase.TryGetXxySr(beatmapInfo, rulesetInfo, out xxySr);
+        public bool TryGetSSR(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double sunnySR)
+            => analysisDatabase.TryGetSSR(beatmapInfo, rulesetInfo, out sunnySR);
 
         /// <summary>Cached result for this chart and mods; never computes.</summary>
         public EzAnalysisResult? TryGet(BeatmapInfo beatmap, IReadOnlyList<Mod>? mods)
@@ -354,8 +354,8 @@ namespace osu.Game.EzOsuGame.Analysis
         public IReadOnlyDictionary<Guid, double> GetActiveSongsBranchPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
             => analysisDatabase.GetActiveSongsBranchPpValues(beatmaps, rulesetInfo, mods);
 
-        public IReadOnlyDictionary<Guid, double> GetBaselineXxySrFromRealm(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
-            => analysisDatabase.GetBaselineXxySrFromRealm(beatmaps, rulesetInfo, mods);
+        public IReadOnlyDictionary<Guid, double> GetBaselineSSRFromRealm(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
+            => analysisDatabase.GetBaselineSSRFromRealm(beatmaps, rulesetInfo, mods);
 
         public IReadOnlyDictionary<Guid, double> GetStoredPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
             => analysisDatabase.GetStoredPpValues(beatmaps, rulesetInfo, mods);

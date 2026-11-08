@@ -425,7 +425,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             {
                 KeyCount = 4,
                 HoldRatio = 0.2,
-                XxySr = 12.5,
+                SSR = 12.5,
                 OverallMsd = 10.5,
                 DominantAxis = EzMinaSkillAxis.Stream,
                 Sides = sides,
