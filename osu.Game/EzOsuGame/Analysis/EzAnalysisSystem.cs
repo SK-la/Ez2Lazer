@@ -6,6 +6,11 @@ using System.Collections.Generic;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.Pattern;
+using osu.Game.EzOsuGame.Skills.PPP;
+using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
@@ -18,8 +23,8 @@ namespace osu.Game.EzOsuGame.Analysis
     /// system and the scope that covers it are the same vocabulary.
     /// <para>
     /// A system may have any subset of a chart vector, a player vector and a scalar rating; which subset it has
-    /// follows from what it computes, not from a declaration. SSR covers the Sunny rating family on both sides
-    /// (the chart star and the player aggregate), Mina the Mina chart vector.
+    /// follows from what it computes, not from a declaration. Mina owns both of its vectors; SSR owns one chart
+    /// star and nothing else.
     /// </para>
     /// </remarks>
     [Flags]
@@ -33,7 +38,7 @@ namespace osu.Game.EzOsuGame.Analysis
         [EzSkillMeta("official", "官方", "Official")]
         Official = 1 << 0,
 
-        /// <summary>Sunny rating family: the chart star and the player aggregate.</summary>
+        /// <summary>Sunny chart star. The algorithm lives in a ruleset assembly; the rating is one number per chart.</summary>
         [EzSkillMeta("ssr", "Sunny", "Sunny")]
         SSR = 1 << 1,
 
@@ -41,7 +46,7 @@ namespace osu.Game.EzOsuGame.Analysis
         [EzSkillMeta("ppp", "PP+", "PP+")]
         PPP = 1 << 2,
 
-        /// <summary>Mina chart vector, and the star rating derived from it.</summary>
+        /// <summary>Mina vectors: the chart difficulty vector and the player rating vector.</summary>
         [EzSkillMeta("mina", "Mina", "Mina")]
         Mina = 1 << 3,
 
@@ -113,19 +118,33 @@ namespace osu.Game.EzOsuGame.Analysis
     }
 
     /// <summary>
-    /// The analysis layer's own revision.
+    /// Resolves the revision a system stamps on its rows.
     /// </summary>
     /// <remarks>
-    /// One number for every row of every system: a stored row is current only when its stamp equals
-    /// <see cref="VERSION"/>. Bumping it retires everything and the ordinary incremental backfill recomputes on
-    /// the next pass, with no per-system cascade to reason about.
+    /// The number is defined by the code that computes it - an engine, a math class - and this only knows which
+    /// one owns which system. A bump is therefore made where the algorithm is changed, not here.
+    /// <para>
+    /// There is deliberately no per-ruleset and no per-submodule revision. A change that only affects one ruleset
+    /// or one internal stage is still that system changing, so one system has one number.
+    /// </para>
+    /// <para>
+    /// Official is not answerable here: its algorithm is upstream difficulty, not an Ez system, and a process that
+    /// cannot see the algorithm must not guess its revision.
+    /// </para>
     /// </remarks>
-    public static class EzAnalysis
+    public static class EzAnalysisRevision
     {
-        /// <summary>
-        /// Bump when any analysis algorithm, note conversion or rating scale changes.
-        /// </summary>
-        public const int VERSION = 4;
+        /// <summary>Revision of <paramref name="system"/>, or 0 when it has no algorithm of its own.</summary>
+        public static int OfSystem(EzAnalysisSystem system) => system switch
+        {
+            EzAnalysisSystem.Mina => EzMinaEngine.VERSION,
+            EzAnalysisSystem.CSI => EzCSIEngine.VERSION,
+            EzAnalysisSystem.Dan => EzDanEngine.VERSION,
+            EzAnalysisSystem.PPP => EzPPPEngine.VERSION,
+            EzAnalysisSystem.Pattern => EzPatternRatings.VERSION,
+            EzAnalysisSystem.SSR => EzSSRUnit.VERSION,
+            _ => 0,
+        };
     }
 
     /// <summary>

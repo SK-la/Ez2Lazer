@@ -119,7 +119,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (specs.Count == 0)
                 return null;
 
-            int revision = EzAnalysis.VERSION;
+            int revision = EzPPPEngine.VERSION;
             var perHash = skillRows.GetValueOrDefault((EzAnalysisSystem.PPP.ToStorageId(), rulesetOnlineId));
             var states = new Dictionary<string, EzFacetRowState>(charts.Count, StringComparer.Ordinal);
 

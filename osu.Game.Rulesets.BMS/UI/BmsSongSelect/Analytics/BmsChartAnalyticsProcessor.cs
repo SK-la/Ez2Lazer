@@ -78,10 +78,10 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
             }
 
             var analysisProvider = new BMSRuleset().CreateEzAnalysisProvider();
-            var request = new EzAnalysisRequest(maniaBeatmap, 1.0, EzAnalysisScope.SunnySR | EzAnalysisScope.RulesetSpecificRadarData);
+            var request = new EzAnalysisRequest(maniaBeatmap, 1.0, EzAnalysisScope.SSR | EzAnalysisScope.RulesetSpecificRadarData);
 
             if (analysisProvider.TryCompute(request, cancellationToken, out var analysis)
-                && analysis.TryGetValue(EzAnalysisFields.SUNNY_SR, out double sr))
+                && analysis.TryGetValue(EzAnalysisFields.SSR, out double sr))
                 sunnySR = sr;
 
             var (avg, max, kpsList) = OptimizedBeatmapCalculator.GetKpsOptimized(maniaBeatmap);

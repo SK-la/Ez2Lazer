@@ -22,7 +22,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         bool HasSidePanel { get; }
 
-        int AlgorithmVersion => EzAnalysis.VERSION;
+        int AlgorithmVersion => EzAnalysisRevision.OfSystem(System);
 
         IReadOnlyList<int> GetSliceKeys(string username);
 

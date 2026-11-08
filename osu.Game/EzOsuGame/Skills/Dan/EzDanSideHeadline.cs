@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using osu.Game.EzOsuGame.Analysis;
 
 namespace osu.Game.EzOsuGame.Skills.Dan
 {
@@ -56,7 +55,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 KeyCount = keyCount,
                 Side = side.ToId(),
                 CreditedDan = v,
-                AlgorithmVersion = EzAnalysis.VERSION,
+                AlgorithmVersion = EzDanEngine.VERSION,
             }).ToList();
 
             return FromSideClears(keyCount, side, rows);

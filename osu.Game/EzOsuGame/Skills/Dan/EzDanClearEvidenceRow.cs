@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using osu.Game.EzOsuGame.Analysis;
 
 namespace osu.Game.EzOsuGame.Skills.Dan
 {
@@ -19,6 +18,6 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         public double CreditedDan { get; init; }
         public double Accuracy { get; init; }
         public DateTimeOffset ScoredAt { get; init; }
-        public int AlgorithmVersion { get; init; } = EzAnalysis.VERSION;
+        public int AlgorithmVersion { get; init; } = EzDanEngine.VERSION;
     }
 }

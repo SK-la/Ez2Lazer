@@ -25,7 +25,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 const string hash = "ppp-version-hash";
                 string aim = EzPPPSkillAxis.Aim.ToChartSkillId();
                 string speed = EzPPPSkillAxis.Speed.ToChartSkillId();
-                int staleBundle = EzAnalysis.VERSION - 1;
+                int staleBundle = EzPPPEngine.VERSION - 1;
 
                 store.WriteBeatmapSystemSkills(
                     hash,
@@ -38,7 +38,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     skillVersions: new Dictionary<string, int>
                     {
                         [aim] = staleBundle,
-                        [speed] = EzAnalysis.VERSION,
+                        [speed] = EzPPPEngine.VERSION,
                     });
 
                 var beatmapInfo = new BeatmapInfo

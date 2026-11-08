@@ -27,7 +27,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             var handler = new EzDataRebuildMaintenanceHandler(dispatcher, new Mock<IDialogOverlay>().Object, notifications: null);
 
             Assert.That(handler.CanExecute(EzDataRebuildAction.RealmAll), Is.True);
-            Assert.That(handler.CanExecute(EzDataRebuildAction.RealmChartCsi), Is.True);
+            Assert.That(handler.CanExecute(EzDataRebuildAction.RealmCSI), Is.True);
             Assert.That(handler.CanExecute(EzDataRebuildAction.SqliteMain), Is.False);
         }
 
@@ -39,14 +39,14 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             var handler = new EzDataRebuildMaintenanceHandler(
                 new EzDataRebuildDispatcher((_, _) =>
                 {
-                    dispatched = EzDataRebuildAction.RealmChartMsd;
+                    dispatched = EzDataRebuildAction.RealmMina;
                     return EzDataRebuildDispatchResult.Queued;
                 }, null, null),
                 dialogOverlay: null,
                 notifications: null);
 
-            Assert.That(handler.RequestBackfill(EzDataRebuildAction.RealmChartMsd, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
-            Assert.That(dispatched, Is.EqualTo(EzDataRebuildAction.RealmChartMsd));
+            Assert.That(handler.RequestBackfill(EzDataRebuildAction.RealmMina, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
+            Assert.That(dispatched, Is.EqualTo(EzDataRebuildAction.RealmMina));
         }
 
         [Test]
@@ -59,7 +59,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 dialogs.Object,
                 notifications: null);
 
-            handler.RequestForceRebuild(new[] { EzDataRebuildAction.RealmChartMsd, EzDataRebuildAction.RealmChartCsi });
+            handler.RequestForceRebuild(new[] { EzDataRebuildAction.RealmMina, EzDataRebuildAction.RealmCSI });
 
             dialogs.Verify(d => d.Push(It.IsAny<PopupDialog>()), Times.Once);
         }
@@ -78,7 +78,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 dialogOverlay: null,
                 notifications: null);
 
-            handler.RequestForceRebuild(EzDataRebuildAction.RealmChartMsd);
+            handler.RequestForceRebuild(EzDataRebuildAction.RealmMina);
 
             Assert.That(dispatched, Is.False, "a destructive rebuild must not run unconfirmed");
         }

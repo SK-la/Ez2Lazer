@@ -16,7 +16,10 @@ namespace osu.Game.EzOsuGame.Analysis
     public enum EzAnalysisScope
     {
         None = 0,
-        SunnySR = 1 << 0,
+
+        /// <summary>Sunny star rating.</summary>
+        SSR = 1 << 0,
+
         RulesetSpecificRadarData = 1 << 1,
 
         /// <summary>Performance points for a supplied star rating.</summary>
@@ -42,10 +45,7 @@ namespace osu.Game.EzOsuGame.Analysis
         double? StarRatingOverride = null,
         EzManiaChartInput? Chart = null);
 
-    public readonly record struct EzAnalysisField<TValue>(string Key, EzAnalysisScope Scope)
-    {
-        public Type ValueType => typeof(TValue);
-    }
+    public readonly record struct EzAnalysisField<TValue>(string Key, EzAnalysisScope Scope);
 
     public interface IEzAnalysis
     {
@@ -58,13 +58,13 @@ namespace osu.Game.EzOsuGame.Analysis
     }
 
     /// <summary>
-    /// 规则集通过 <see cref="Rulesets.Ruleset.CreateEzAnalysisProvider"/> 返回的实现此接口的 provider，声明支持 ssr难度。
+    /// 规则集通过 <see cref="Rulesets.Ruleset.CreateEzAnalysisProvider"/> 返回的实现此接口的 provider，声明支持 SSR 难度。
     /// 是否对某张谱面计算由 <see cref="SupportsSunnyStarRating"/> 决定；sqlite/Realm 仅为存储与消费者，不决定规则集能力。
     /// </summary>
     public interface IEzSunnyStarRatingSupport
     {
         /// <summary>
-        /// yyyyMMdd revision of this ruleset's SunnySR algorithm. Bump when calculation logic changes.
+        /// yyyyMMdd revision of this ruleset's SSR algorithm. Bump when calculation logic changes.
         /// </summary>
         int SunnyStarRatingVersion { get; }
 
@@ -76,7 +76,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
     public static class EzAnalysisFields
     {
-        public static readonly EzAnalysisField<double> SUNNY_SR = new EzAnalysisField<double>("sunny_sr", EzAnalysisScope.SunnySR);
+        public static readonly EzAnalysisField<double> SSR = new EzAnalysisField<double>("ssr", EzAnalysisScope.SSR);
 
         public static readonly EzAnalysisField<EzRulesetSpecificRadarResult> RULESET_SPECIFIC_RADAR_RESULT
             = new EzAnalysisField<EzRulesetSpecificRadarResult>("ruleset_specific_radar_result", EzAnalysisScope.RulesetSpecificRadarData);

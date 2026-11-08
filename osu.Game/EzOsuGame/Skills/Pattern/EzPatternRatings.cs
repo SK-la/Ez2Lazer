@@ -35,6 +35,14 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
     /// </summary>
     public static class EzPatternRatings
     {
+        /// <summary>
+        /// Revision stamped on the player pattern rows this aggregation produces.
+        /// </summary>
+        /// <remarks>
+        /// Bump when the play-to-pattern fold changes: the minimum-play gate, the aggregation, or the tag filter.
+        /// </remarks>
+        public const int VERSION = 1;
+
         /// <summary>Hub <c>PATTERN_RATING_MIN_PLAYS</c>.</summary>
         public const int MIN_PLAYS = 3;
 

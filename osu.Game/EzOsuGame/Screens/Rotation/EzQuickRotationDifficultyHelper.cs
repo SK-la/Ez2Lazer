@@ -48,7 +48,7 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
                 var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
                 var playable = EzPlayableBeatmapCache.GetShared(working, ruleset, mods, cancellationToken);
 
-                if (EzAnalysisProviderBridge.TryGetValue(ruleset, new EzAnalysisRequest(playable, speed), EzAnalysisFields.SUNNY_SR, cancellationToken, out double sunnySR))
+                if (EzAnalysisProviderBridge.TryGetValue(ruleset, new EzAnalysisRequest(playable, speed), EzAnalysisFields.SSR, cancellationToken, out double sunnySR))
                     return sunnySR;
             }
 

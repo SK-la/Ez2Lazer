@@ -8,10 +8,9 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.EzOsuGame.Skills
+namespace osu.Game.EzOsuGame.Skills.PPP
 {
     /// <summary>
     /// Runs the PPP system for one chart: gate, convert, call the engine, hand the vector to the store.

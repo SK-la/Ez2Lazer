@@ -20,6 +20,15 @@ namespace osu.Game.EzOsuGame.Skills.Dan
     /// </remarks>
     public static class EzDanEngine
     {
+        /// <summary>
+        /// Revision stamped on every dan row and verdict this engine derives.
+        /// </summary>
+        /// <remarks>
+        /// Bump when the mapping changes: interval tables, the fallback heuristic, side selection, or the credit
+        /// semantics applied on top.
+        /// </remarks>
+        public const int VERSION = 1;
+
         public static EzChartDanVerdict? FromMsdAndPlayable(
             IReadOnlyDictionary<string, double> msd,
             IBeatmap playable,
@@ -88,8 +97,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 Side = side,
                 DominantAxis = dominantAxis,
                 OverallMsd = overall,
-                HoldRatio = holdRatio,
-                AlgorithmVersion = EzAnalysis.VERSION,
+                AlgorithmVersion = VERSION,
             };
         }
 

@@ -21,9 +21,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         {
             var realm = EzDataRebuildCatalog.Realm;
 
-            int msd = indexOf(realm, EzDataRebuildAction.RealmChartMsd);
-            int csi = indexOf(realm, EzDataRebuildAction.RealmChartCsi);
-            int dan = indexOf(realm, EzDataRebuildAction.RealmChartDan);
+            int msd = indexOf(realm, EzDataRebuildAction.RealmMina);
+            int csi = indexOf(realm, EzDataRebuildAction.RealmCSI);
+            int dan = indexOf(realm, EzDataRebuildAction.RealmDan);
 
             Assert.That(msd, Is.LessThan(csi));
             Assert.That(csi, Is.LessThan(dan));
@@ -37,7 +37,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         public void Sunny_stands_alone_so_it_gets_the_wide_gap()
         {
             var realm = EzDataRebuildCatalog.Realm;
-            var sunny = realm.Single(n => n.Action == EzDataRebuildAction.RealmSunny);
+            var sunny = realm.Single(n => n.Action == EzDataRebuildAction.RealmSSR);
 
             Assert.That(sunny.ContinuesChain, Is.False);
             Assert.That(EzDataRebuildCatalog.GapBefore(sunny), Is.EqualTo(EzDataRebuildCatalog.INDEPENDENT_GAP));
@@ -63,7 +63,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [Test]
         public void Every_action_has_exactly_one_node()
         {
-            var actions = Enum.GetValues<EzDataRebuildAction>();
+            var actions = Enum.GetValues<EzDataRebuildAction>().Where(a => a != EzDataRebuildAction.None).ToArray();
 
             Assert.That(EzDataRebuildCatalog.All.Count, Is.EqualTo(actions.Length));
 
@@ -72,13 +72,19 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         }
 
         [Test]
-        public void Realm_nodes_declare_the_realm_side_and_sqlite_nodes_the_other()
+        public void Every_realm_action_is_declared_in_the_realm_chain_and_sqlite_actions_in_the_other()
         {
             foreach (var node in EzDataRebuildCatalog.Realm)
-                Assert.That(node.Side, Is.EqualTo(EzDataRebuildSide.Realm));
+            {
+                // Scores has its own queue, so it carries the bit without joining the metadata scope.
+                if (node.Action == EzDataRebuildAction.RealmScores)
+                    continue;
+
+                Assert.That(EzDataRebuildScopes.RealmScopeOf(node.Action), Is.Not.Null, node.Action.ToString());
+            }
 
             foreach (var node in EzDataRebuildCatalog.Sqlite)
-                Assert.That(node.Side, Is.EqualTo(EzDataRebuildSide.Sqlite));
+                Assert.That(EzDataRebuildScopes.RealmScopeOf(node.Action), Is.Null, node.Action.ToString());
         }
 
         [Test]
@@ -92,12 +98,12 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [Test]
         public void Dependencies_are_walked_transitively_up_the_chain()
         {
-            Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmChartMsd), Is.Empty);
-            Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmChartCsi).Select(n => n.Action),
-                Is.EqualTo(new[] { EzDataRebuildAction.RealmChartMsd }));
-            Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmChartDan).Select(n => n.Action),
-                Is.EqualTo(new[] { EzDataRebuildAction.RealmChartCsi, EzDataRebuildAction.RealmChartMsd }));
-            Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmSunny), Is.Empty);
+            Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmMina), Is.Empty);
+            Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmCSI).Select(n => n.Action),
+                Is.EqualTo(new[] { EzDataRebuildAction.RealmMina }));
+            Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmDan).Select(n => n.Action),
+                Is.EqualTo(new[] { EzDataRebuildAction.RealmCSI, EzDataRebuildAction.RealmMina }));
+            Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmSSR), Is.Empty);
             Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.SqliteSongsBranches).Select(n => n.Action),
                 Is.EqualTo(new[] { EzDataRebuildAction.SqliteMain }));
         }
@@ -105,10 +111,10 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [Test]
         public void Display_names_are_joined_for_multi_selection_text()
         {
-            string names = EzDataRebuildCatalog.DisplayNames(new[] { EzDataRebuildAction.RealmChartMsd, EzDataRebuildAction.RealmChartCsi });
+            string names = EzDataRebuildCatalog.DisplayNames(new[] { EzDataRebuildAction.RealmMina, EzDataRebuildAction.RealmCSI });
 
-            Assert.That(names, Does.Contain(EzDataRebuildCatalog.Find(EzDataRebuildAction.RealmChartMsd)!.Name.ToString()));
-            Assert.That(names, Does.Contain(EzDataRebuildCatalog.Find(EzDataRebuildAction.RealmChartCsi)!.Name.ToString()));
+            Assert.That(names, Does.Contain(EzDataRebuildCatalog.Find(EzDataRebuildAction.RealmMina)!.Name.ToString()));
+            Assert.That(names, Does.Contain(EzDataRebuildCatalog.Find(EzDataRebuildAction.RealmCSI)!.Name.ToString()));
         }
 
         private static void assertChainHeads(IReadOnlyList<EzDataRebuildNode> nodes)

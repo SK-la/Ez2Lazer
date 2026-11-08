@@ -82,7 +82,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             double rate = getRateAdjustMultiplier(mods);
 
-            if (!EzAnalysisProviderBridge.TryGetValue(ruleset, new EzAnalysisRequest(playable, rate), EzAnalysisFields.SUNNY_SR, cancellationToken, out double sr)
+            if (!EzAnalysisProviderBridge.TryGetValue(ruleset, new EzAnalysisRequest(playable, rate), EzAnalysisFields.SSR, cancellationToken, out double sr)
                 || !double.IsFinite(sr)
                 || sr < 0)
             {
@@ -626,7 +626,7 @@ namespace osu.Game.EzOsuGame.Analysis
             bool supportsSunnySR = EzSunnyStarRatingSupport.SupportsBeatmap(analysisBeatmap, lookup.Ruleset);
 
             var scopes = EzAnalysisScope.RulesetSpecificRadarData
-                         | (supportsSunnySR ? EzAnalysisScope.SunnySR : EzAnalysisScope.None);
+                         | (supportsSunnySR ? EzAnalysisScope.SSR : EzAnalysisScope.None);
 
             var request = new EzAnalysisRequest(analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), scopes, Chart: chart);
 
@@ -639,7 +639,7 @@ namespace osu.Game.EzOsuGame.Analysis
             {
                 if (analysisBeatmap.HitObjects.Count == 0)
                     sunnySR = 0;
-                else if (analysis.TryGetValue(EzAnalysisFields.SUNNY_SR, out double sr) && double.IsFinite(sr) && sr >= 0)
+                else if (analysis.TryGetValue(EzAnalysisFields.SSR, out double sr) && double.IsFinite(sr) && sr >= 0)
                     sunnySR = sr;
             }
 
@@ -721,7 +721,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             double rate = getRateAdjustMultiplier(lookup.OrderedMods);
 
-            if (EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset, new EzAnalysisRequest(analysisBeatmap, rate), EzAnalysisFields.SUNNY_SR, cancellationToken, out double sr))
+            if (EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset, new EzAnalysisRequest(analysisBeatmap, rate), EzAnalysisFields.SSR, cancellationToken, out double sr))
                 sunnySR = sr;
 
             return sunnySR != null;

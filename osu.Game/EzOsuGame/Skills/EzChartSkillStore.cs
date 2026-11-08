@@ -31,7 +31,7 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>Revision stamped on chart-side Mina axis rows.</summary>
-        private int minaChartRevision => EzAnalysis.VERSION;
+        private int minaChartRevision => EzMinaEngine.VERSION;
 
         /// <summary>
         /// Current values for one system. Rows the producer settled without a value are excluded: a verdict is
@@ -41,7 +41,7 @@ namespace osu.Game.EzOsuGame.Skills
         public IReadOnlyDictionary<string, double> GetBeatmapSkills(string beatmapHash, EzAnalysisSystem system, int? algorithmVersion = null, int rulesetOnlineId = -1)
         {
             string systemId = system.ToStorageId();
-            int version = algorithmVersion ?? EzAnalysis.VERSION;
+            int version = algorithmVersion ?? EzAnalysisRevision.OfSystem(system);
 
             return realmAccess.Run(r =>
             {
@@ -94,7 +94,7 @@ namespace osu.Game.EzOsuGame.Skills
         {
             ArgumentNullException.ThrowIfNull(beatmapInfo);
             int rulesetId = beatmapInfo.Ruleset.OnlineID;
-            int bundle = EzAnalysis.VERSION;
+            int bundle = EzAnalysisRevision.OfSystem(system);
 
             if (bundle <= 0)
                 return new Dictionary<string, double>(StringComparer.Ordinal);
@@ -136,7 +136,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             if (hashSet.Count == 0)
                 return new Dictionary<string, IReadOnlyDictionary<string, double>>(StringComparer.Ordinal);
-            int version = algorithmVersion ?? EzAnalysis.VERSION;
+            int version = algorithmVersion ?? EzAnalysisRevision.OfSystem(system);
 
             return realmAccess.Run(r =>
             {
@@ -203,7 +203,8 @@ namespace osu.Game.EzOsuGame.Skills
             // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
             /*
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
-            int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
+            int version = algorithmVersion ?? EzAnalysisRevision.OfSystem(system);
+            string systemId = system.ToStorageId();
 
             realmAccess.Write(r =>
             {
@@ -399,7 +400,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Typed Realm ChartSkillInfo (EZ≥9). Miss → callers recompute; no SQLite JSON fallback.
-        /// Filtered on <see cref="EzAnalysis.VERSION"/>, so a bump of the CSI version
+        /// Filtered on the current CSI revision, so a bump of it
         /// or of an upstream facet (Mina) reads as a miss.
         /// </summary>
         public bool TryGetChartSkillInfo(string beatmapHash, out EzChartSkillInfo? info)
@@ -409,7 +410,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (string.IsNullOrEmpty(beatmapHash))
                 return false;
 
-            int revision = EzAnalysis.VERSION;
+            int revision = EzCSIEngine.VERSION;
             EzChartSkillInfo? fromRealm = null;
 
             realmAccess.Run(r =>
@@ -454,7 +455,7 @@ namespace osu.Game.EzOsuGame.Skills
                 {
                     BeatmapHash = beatmapHash,
                     BeatmapId = beatmapId,
-                    InfoVersion = EzAnalysis.VERSION,
+                    InfoVersion = EzCSIEngine.VERSION,
                     ComputedAt = at,
                     PatternTagsJoined = joinPatterns(info.Patterns),
                     JackDemand = info.JackDemand,
@@ -494,7 +495,7 @@ namespace osu.Game.EzOsuGame.Skills
             // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
             /*
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
-            int revision = EzAnalysis.VERSION;
+            int revision = EzCSIEngine.VERSION;
 
             realmAccess.Write(r =>
             {
@@ -556,7 +557,7 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Typed Realm ChartDan (EZ≥10). Filtered on <see cref="EzAnalysis.VERSION"/>, so a bump
+        /// Typed Realm ChartDan (EZ>=10). Filtered on the current dan revision, so a bump
         /// of the dan algorithm, CSI, or Mina reads as a miss and BDSP recomputes it.
         /// </summary>
         public bool TryGetChartDan(string beatmapHash, out EzPersistedChartDan? chartDan)
@@ -566,7 +567,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (string.IsNullOrEmpty(beatmapHash))
                 return false;
 
-            int revision = EzAnalysis.VERSION;
+            int revision = EzDanEngine.VERSION;
             EzPersistedChartDan? fromRealm = null;
 
             realmAccess.Run(r =>
@@ -595,7 +596,7 @@ namespace osu.Game.EzOsuGame.Skills
             // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
             /*
             DateTimeOffset at = chartDan.ComputedAt == default ? DateTimeOffset.UtcNow : chartDan.ComputedAt;
-            int version = EzAnalysis.VERSION;
+            int version = EzDanEngine.VERSION;
 
             realmAccess.Write(r =>
             {
@@ -747,13 +748,13 @@ namespace osu.Game.EzOsuGame.Skills
                     if (stored == null || stored.Count == 0)
                         continue;
 
-                    rows[candidate.Hash] = new EzFacetRowState(complete ? EzAnalysis.VERSION : 0, false);
+                    rows[candidate.Hash] = new EzFacetRowState(complete ? EzPPPEngine.VERSION : 0, false);
                 }
 
                 var facet = new EzDataStateFacet
                 {
                     Id = "PPP",
-                    CurrentRevision = EzAnalysis.VERSION,
+                    CurrentRevision = EzPPPEngine.VERSION,
                     UniverseCount = candidates.Count,
                     Rows = rows,
                 };
@@ -774,7 +775,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             if (rulesetOnlineId >= 0 && system == EzAnalysisSystem.PPP)
             {
-                int bundle = EzAnalysis.VERSION;
+                int bundle = EzPPPEngine.VERSION;
 
                 if (bundle > 0)
                     return bundle;
@@ -788,7 +789,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (stored == null || stored.Count == 0 || !EzPPPSkillCatalog.SupportsRuleset(rulesetId))
                 return false;
 
-            int revision = EzAnalysis.VERSION;
+            int revision = EzPPPEngine.VERSION;
 
             if (revision <= 0)
                 return false;
@@ -828,7 +829,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (hashSet.Count == 0)
                 return new Dictionary<string, EzChartSkillInfo>(StringComparer.Ordinal);
 
-            int revision = EzAnalysis.VERSION;
+            int revision = EzCSIEngine.VERSION;
 
             return realmAccess.Run(r =>
             {
@@ -927,7 +928,7 @@ namespace osu.Game.EzOsuGame.Skills
                 BeatmapId = row.BeatmapId,
                 // DTO keeps the pure dan algorithm version; the column holds the composed facet
                 // revision, which is a persistence detail that must not leak to consumers.
-                AlgorithmVersion = EzAnalysis.VERSION,
+                AlgorithmVersion = EzDanEngine.VERSION,
                 KeyCount = row.KeyCount,
                 HoldRatio = row.HoldRatio,
                 OverallMsd = row.OverallMsd,

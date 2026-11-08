@@ -24,7 +24,7 @@ namespace osu.Game.EzOsuGame.Skills
     /// <summary>
     /// Unified read API for skill metrics (song select, local profile Track, …).
     /// Covers beatmap Mina, player SunnySR, player dan estimates, chart skill info, and chart-dan verdicts.
-    /// Writers (computers / aggregators) are separate DI services — see <see cref="EzSkillSystems"/>.
+    /// Writers (computers / aggregators) are separate DI services and are not read here.
     /// All UI surfaces (HUD DualPanel / Radar, Analysis Wedge, LocalProfile Track, display tags) read through this type.
     /// </summary>
     public sealed class EzSkillProvider
@@ -242,7 +242,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// verdict is not an axis, so a caller asking "has Mina settled it unrateable?" must not infer it from
         /// a row that is not there.
         /// </summary>
-        private bool isSettledUnrateableMina(string beatmapHash) => ChartStore.GetBeatmapSystemState(beatmapHash, EzAnalysisSystem.Mina, EzAnalysis.VERSION) == EzSkillRowState.Unrateable;
+        private bool isSettledUnrateableMina(string beatmapHash) => ChartStore.GetBeatmapSystemState(beatmapHash, EzAnalysisSystem.Mina, EzMinaEngine.VERSION) == EzSkillRowState.Unrateable;
 
         /// <summary>
         /// Drop session-only values so the next read reflects a row written or cleared elsewhere.
@@ -508,9 +508,9 @@ namespace osu.Game.EzOsuGame.Skills
                 return memoise(danSkillsetsFromCache(username, keyCount, side));
             }
 
-            var clears = GetDanClears(resolvedUser, keyCount, side, EzAnalysis.VERSION);
+            var clears = GetDanClears(resolvedUser, keyCount, side, EzDanEngine.VERSION);
 
-            // No clears for current EzAnalysis.VERSION → miss. Memoised as a miss so a HUD redraw does not repeat
+            // No clears at the current dan revision -> miss. Memoised as a miss so a HUD redraw does not repeat
             // the query; the manual compute invalidates the memo when it writes clears.
             if (clears.Count == 0)
                 return memoise(new Dictionary<string, EzDanSkillsetVerdict>(StringComparer.Ordinal));
@@ -552,14 +552,14 @@ namespace osu.Game.EzOsuGame.Skills
                 PlayerStore.ClearDanEstimates(username);
             }
 
-            var allClears = GetDanClears(resolvedUser, algorithmVersion: EzAnalysis.VERSION);
+            var allClears = GetDanClears(resolvedUser, algorithmVersion: EzDanEngine.VERSION);
             var hashes = allClears
                          .Select(c => c.BeatmapHash)
                          .Where(static h => !string.IsNullOrEmpty(h))
                          .Distinct(StringComparer.Ordinal)
                          .ToList();
 
-            var playSsr = EzDanPlayRatingIndex.FromAxisPlays(GetAxisPlays(resolvedUser, algorithmVersion: EzAnalysis.VERSION));
+            var playSsr = EzDanPlayRatingIndex.FromAxisPlays(GetAxisPlays(resolvedUser, algorithmVersion: EzMinaEngine.VERSION));
             var chartByHash = ensureChartSkillInfoForHashes(hashes);
 
             foreach (int keyCount in tracked_skillset_key_counts)
@@ -633,7 +633,7 @@ namespace osu.Game.EzOsuGame.Skills
                 -1,
                 (int)Math.Round(have),
                 EzDanAlgorithm.CLEAR_WINDOW,
-                EzAnalysis.VERSION,
+                EzDanEngine.VERSION,
                 DateTimeOffset.UtcNow));
         }
 
@@ -678,7 +678,7 @@ namespace osu.Game.EzOsuGame.Skills
             bool allowComputeChart)
         {
             var sideEnum = EzDanSideExtensions.ParseOrRc(side);
-            var clears = GetDanClears(username, keyCount, side, EzAnalysis.VERSION);
+            var clears = GetDanClears(username, keyCount, side, EzDanEngine.VERSION);
 
             var hashes = clears
                          .Select(c => c.BeatmapHash)
@@ -686,7 +686,7 @@ namespace osu.Game.EzOsuGame.Skills
                          .Distinct(StringComparer.Ordinal)
                          .ToList();
 
-            var playSsr = EzDanPlayRatingIndex.FromAxisPlays(GetAxisPlays(username, keyCount, algorithmVersion: EzAnalysis.VERSION));
+            var playSsr = EzDanPlayRatingIndex.FromAxisPlays(GetAxisPlays(username, keyCount, algorithmVersion: EzMinaEngine.VERSION));
             IReadOnlyDictionary<string, EzChartSkillInfo> chartByHash = allowComputeChart
                 ? ensureChartSkillInfoForHashes(hashes)
                 : ChartStore.GetChartSkillInfoForHashes(hashes);
@@ -735,7 +735,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (!EzLocalProfileConstants.IsGuestUsername(username))
                 return username;
 
-            var clears = localProfileStore?.GetDanClears(username, algorithmVersion: EzAnalysis.VERSION);
+            var clears = localProfileStore?.GetDanClears(username, algorithmVersion: EzDanEngine.VERSION);
             if (clears is { Count: > 0 })
                 return username;
 
@@ -1100,7 +1100,7 @@ namespace osu.Game.EzOsuGame.Skills
                     EzAnalysisSystem.CSI,
                     axes,
                     beatmapInfo.ID,
-                    algorithmVersion: EzAnalysis.VERSION,
+                    algorithmVersion: EzCSIEngine.VERSION,
                     rulesetOnlineId: EzLocalProfileConstants.MANIA_RULESET_ID);
 
                 chartSkillInfoSessionMisses.Remove(beatmapInfo.Hash);

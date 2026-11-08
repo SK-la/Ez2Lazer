@@ -11,7 +11,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
     /// Ports mania-hub <c>ssrGoalForScore</c> / <c>estimateWifeAccuracy</c> (subset).
-    /// Pre-release corrective: does not bump <see cref="EzAnalysis.VERSION"/>.
+    /// Pre-release corrective: does not bump <see cref="EzMinaEngine.VERSION"/>.
     /// </summary>
     public static class EzMinaRatingGoal
     {

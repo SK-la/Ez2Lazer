@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 
@@ -22,7 +21,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         public Guid BeatmapId { get; init; }
 
-        public int AlgorithmVersion { get; init; } = EzAnalysis.VERSION;
+        public int AlgorithmVersion { get; init; } = EzDanEngine.VERSION;
 
         public int KeyCount { get; init; }
 
@@ -142,7 +141,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             {
                 BeatmapHash = beatmapHash,
                 BeatmapId = beatmapId,
-                AlgorithmVersion = EzAnalysis.VERSION,
+                AlgorithmVersion = EzDanEngine.VERSION,
                 KeyCount = keyCount,
                 HoldRatio = holdRatio,
                 OverallMsd = set?.OverallMsd ?? overallMean,

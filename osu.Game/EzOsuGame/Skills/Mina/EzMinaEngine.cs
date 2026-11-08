@@ -45,6 +45,16 @@ namespace osu.Game.EzOsuGame.Skills.Mina
     /// </remarks>
     public sealed class EzMinaEngine : IEzMinaEngine
     {
+        /// <summary>
+        /// Revision stamped on every Mina row, chart side and player side alike.
+        /// </summary>
+        /// <remarks>
+        /// Bump when the chain this engine owns changes: note conversion, the goal it is asked for, or the clamp it
+        /// applies. One number covers both sides because they are one algorithm reading the same note array.
+        /// <see cref="EngineVersion"/> is a different thing - it names the vendored module build.
+        /// </remarks>
+        public const int VERSION = 1;
+
         /// <summary>Lowest keymode the n-key MinaCalc build accepts.</summary>
         public const int MIN_KEY_COUNT = 4;
 

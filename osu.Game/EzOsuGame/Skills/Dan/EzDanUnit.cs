@@ -91,7 +91,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 DominantAxis = dan.DominantAxis,
                 OverallMsd = dan.OverallMsd,
                 HoldRatio = dan.HoldRatio,
-                AlgorithmVersion = EzAnalysis.VERSION,
+                AlgorithmVersion = EzDanEngine.VERSION,
             };
         }
     }

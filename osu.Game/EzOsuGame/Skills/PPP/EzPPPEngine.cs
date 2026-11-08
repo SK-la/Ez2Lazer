@@ -16,6 +16,15 @@ namespace osu.Game.EzOsuGame.Skills.PPP
     /// </summary>
     public sealed class EzPPPEngine : IEzPPPEngine
     {
+        /// <summary>
+        /// Revision stamped on every PPP row, chart side and player side, for every ruleset.
+        /// </summary>
+        /// <remarks>
+        /// Bump when any mode's PPP math changes. One number covers every ruleset: a per-ruleset bundle would give
+        /// one system several revisions, which is exactly what this replaces.
+        /// </remarks>
+        public const int VERSION = 1;
+
         public IReadOnlyDictionary<string, double> CalculateChart(IBeatmap beatmap, IReadOnlyList<Mod>? mods)
         {
             ArgumentNullException.ThrowIfNull(beatmap);

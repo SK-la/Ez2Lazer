@@ -8,9 +8,8 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Skills.Mina;
 
-namespace osu.Game.EzOsuGame.Skills
+namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
     /// Runs the Mina system for one chart: gate, convert, call the Mina engine, hand the vector to the store.
@@ -31,7 +30,7 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>Revision the stored Mina rows are stamped with.</summary>
-        public int Revision => EzAnalysis.VERSION;
+        public int Revision => EzMinaEngine.VERSION;
 
         public IReadOnlyDictionary<string, double>? ComputeAndStore(BeatmapInfo beatmapInfo)
         {

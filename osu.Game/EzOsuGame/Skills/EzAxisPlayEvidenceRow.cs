@@ -2,7 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Skills.Mina;
 
 namespace osu.Game.EzOsuGame.Skills
 {
@@ -19,6 +19,6 @@ namespace osu.Game.EzOsuGame.Skills
         public double Accuracy { get; init; }
         public double Rate { get; init; } = 1;
         public DateTimeOffset ScoredAt { get; init; }
-        public int AlgorithmVersion { get; init; } = EzAnalysis.VERSION;
+        public int AlgorithmVersion { get; init; } = EzMinaEngine.VERSION;
     }
 }

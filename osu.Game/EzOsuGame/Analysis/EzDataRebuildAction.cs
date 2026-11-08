@@ -10,29 +10,72 @@ using osu.Game.EzOsuGame.Localization;
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
-    /// One dispatchable maintenance action. Identity only: which storage it lives in and what it reads is
-    /// declared by <see cref="EzDataRebuildCatalog"/>.
+    /// One dispatchable maintenance action, or a set of them.
     /// </summary>
+    /// <remarks>
+    /// Every Realm member is bit-identical to the <see cref="EzAnalysisSystem"/> it rebuilds, so the action's scope
+    /// is a mask rather than a table kept beside the systems. The two SQLite members sit above the system bits
+    /// because they address a database, not an analysis system.
+    /// <para>
+    /// <see cref="RealmAll"/> covers every system, including ones that have no card of their own.
+    /// </para>
+    /// </remarks>
+    [Flags]
     public enum EzDataRebuildAction
     {
-        RealmChartMsd = 0,
-        RealmChartCsi = 1,
-        RealmChartDan = 2,
-        RealmPpp = 3,
-        RealmSunny = 4,
-        RealmPp = 5,
-        RealmTags = 6,
-        RealmScores = 7,
-        RealmAll = 8,
-        SqliteMain = 9,
-        SqliteSongsBranches = 10,
+        None = 0,
+
+        RealmOfficial = (int)EzAnalysisSystem.Official,
+
+        RealmSSR = (int)EzAnalysisSystem.SSR,
+
+        RealmPPP = (int)EzAnalysisSystem.PPP,
+
+        RealmMina = (int)EzAnalysisSystem.Mina,
+
+        RealmCSI = (int)EzAnalysisSystem.CSI,
+
+        RealmDan = (int)EzAnalysisSystem.Dan,
+
+        RealmMetadataTags = (int)EzAnalysisSystem.MetadataTags,
+
+        /// <summary>
+        /// Full score recalculation. It carries the Scores bit but is dispatched to its own queue, so it is
+        /// deliberately outside the Realm metadata set.
+        /// </summary>
+        RealmScores = (int)EzAnalysisSystem.Scores,
+
+        RealmAll = (int)EzAnalysisSystem.All,
+
+        SqliteMain = 1 << 16,
+
+        SqliteSongsBranches = 1 << 17,
     }
 
-    /// <summary>Which store an action writes to. The dialog renders one chain per side.</summary>
-    public enum EzDataRebuildSide
+    /// <summary>
+    /// The systems an action rebuilds, or null when it addresses a store instead.
+    /// </summary>
+    public static class EzDataRebuildScopes
     {
-        Realm,
-        Sqlite,
+        /// <summary>Actions that go to the Realm metadata queue, one bit per system.</summary>
+        private const EzDataRebuildAction realm_actions = EzDataRebuildAction.RealmOfficial
+                                                          | EzDataRebuildAction.RealmSSR
+                                                          | EzDataRebuildAction.RealmPPP
+                                                          | EzDataRebuildAction.RealmMina
+                                                          | EzDataRebuildAction.RealmCSI
+                                                          | EzDataRebuildAction.RealmDan
+                                                          | EzDataRebuildAction.RealmMetadataTags;
+
+        public static EzAnalysisSystem? RealmScopeOf(EzDataRebuildAction action)
+        {
+            if (action == EzDataRebuildAction.RealmAll)
+                return EzAnalysisSystem.All;
+
+            if (action == EzDataRebuildAction.None || (action & ~realm_actions) != 0)
+                return null;
+
+            return (EzAnalysisSystem)action;
+        }
     }
 
     /// <summary>
@@ -44,7 +87,6 @@ namespace osu.Game.EzOsuGame.Analysis
     /// </param>
     public sealed record EzDataRebuildNode(
         EzDataRebuildAction Action,
-        EzDataRebuildSide Side,
         bool ContinuesChain,
         LocalisableString Name,
         LocalisableString Detail);
@@ -56,6 +98,10 @@ namespace osu.Game.EzOsuGame.Analysis
     /// The graph is declared once here so the dialog (layout), the dispatcher (scope) and the tests read the same
     /// edges. Adding an action means adding an enum member here and a dispatch arm; nothing in the UI enumerates
     /// actions by hand.
+    /// <para>
+    /// Which store a node belongs to is its chain, not a field: a node appears in exactly one of <see cref="Realm"/>
+    /// and <see cref="Sqlite"/>, so carrying a side on the node would only repeat where it was declared.
+    /// </para>
     /// </remarks>
     public static class EzDataRebuildCatalog
     {
@@ -67,32 +113,32 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public static IReadOnlyList<EzDataRebuildNode> Realm { get; } = new[]
         {
-            node(EzDataRebuildAction.RealmChartMsd, EzDataRebuildSide.Realm, false,
-                EzEnumStrings.DATA_REBUILD_ACTION_MSD_NAME, EzEnumStrings.DATA_REBUILD_ACTION_MSD_DETAIL),
-            node(EzDataRebuildAction.RealmChartCsi, EzDataRebuildSide.Realm, true,
+            node(EzDataRebuildAction.RealmMina, false,
+                EzEnumStrings.DATA_REBUILD_ACTION_MINA_NAME, EzEnumStrings.DATA_REBUILD_ACTION_MINA_DETAIL),
+            node(EzDataRebuildAction.RealmCSI, true,
                 EzEnumStrings.DATA_REBUILD_ACTION_CSI_NAME, EzEnumStrings.DATA_REBUILD_ACTION_CSI_DETAIL),
-            node(EzDataRebuildAction.RealmChartDan, EzDataRebuildSide.Realm, true,
+            node(EzDataRebuildAction.RealmDan, true,
                 EzEnumStrings.DATA_REBUILD_ACTION_DAN_NAME, EzEnumStrings.DATA_REBUILD_ACTION_DAN_DETAIL),
 
-            node(EzDataRebuildAction.RealmPpp, EzDataRebuildSide.Realm, false,
+            node(EzDataRebuildAction.RealmPPP, false,
                 EzEnumStrings.DATA_REBUILD_ACTION_PPP_NAME, EzEnumStrings.DATA_REBUILD_ACTION_PPP_DETAIL),
-            node(EzDataRebuildAction.RealmSunny, EzDataRebuildSide.Realm, false,
-                EzEnumStrings.DATA_REBUILD_ACTION_SUNNY_NAME, EzEnumStrings.DATA_REBUILD_ACTION_SUNNY_DETAIL),
-            node(EzDataRebuildAction.RealmPp, EzDataRebuildSide.Realm, false,
-                EzEnumStrings.DATA_REBUILD_ACTION_PP_NAME, EzEnumStrings.DATA_REBUILD_ACTION_PP_DETAIL),
-            node(EzDataRebuildAction.RealmTags, EzDataRebuildSide.Realm, false,
+            node(EzDataRebuildAction.RealmSSR, false,
+                EzEnumStrings.DATA_REBUILD_ACTION_SSR_NAME, EzEnumStrings.DATA_REBUILD_ACTION_SSR_DETAIL),
+            node(EzDataRebuildAction.RealmOfficial, false,
+                EzEnumStrings.DATA_REBUILD_ACTION_OFFICIAL_NAME, EzEnumStrings.DATA_REBUILD_ACTION_OFFICIAL_DETAIL),
+            node(EzDataRebuildAction.RealmMetadataTags, false,
                 EzEnumStrings.DATA_REBUILD_ACTION_TAGS_NAME, EzEnumStrings.DATA_REBUILD_ACTION_TAGS_DETAIL),
-            node(EzDataRebuildAction.RealmScores, EzDataRebuildSide.Realm, false,
+            node(EzDataRebuildAction.RealmScores, false,
                 EzEnumStrings.DATA_REBUILD_ACTION_SCORES_NAME, EzEnumStrings.DATA_REBUILD_ACTION_SCORES_DETAIL),
-            node(EzDataRebuildAction.RealmAll, EzDataRebuildSide.Realm, false,
+            node(EzDataRebuildAction.RealmAll, false,
                 EzEnumStrings.DATA_REBUILD_ACTION_ALL_NAME, EzEnumStrings.DATA_REBUILD_ACTION_ALL_DETAIL),
         };
 
         public static IReadOnlyList<EzDataRebuildNode> Sqlite { get; } = new[]
         {
-            node(EzDataRebuildAction.SqliteMain, EzDataRebuildSide.Sqlite, false,
+            node(EzDataRebuildAction.SqliteMain, false,
                 EzEnumStrings.DATA_REBUILD_ACTION_SQLITE_MAIN_NAME, EzEnumStrings.DATA_REBUILD_ACTION_SQLITE_MAIN_DETAIL),
-            node(EzDataRebuildAction.SqliteSongsBranches, EzDataRebuildSide.Sqlite, true,
+            node(EzDataRebuildAction.SqliteSongsBranches, true,
                 EzEnumStrings.DATA_REBUILD_ACTION_SQLITE_BRANCHES_NAME, EzEnumStrings.DATA_REBUILD_ACTION_SQLITE_BRANCHES_DETAIL),
         };
 
@@ -118,12 +164,10 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         public static IReadOnlyList<EzDataRebuildNode> DependenciesOf(EzDataRebuildAction action)
         {
-            var node = Find(action);
-
-            if (node == null)
+            if (Find(action) == null)
                 return Array.Empty<EzDataRebuildNode>();
 
-            IReadOnlyList<EzDataRebuildNode> chain = node.Side == EzDataRebuildSide.Realm ? Realm : Sqlite;
+            IReadOnlyList<EzDataRebuildNode> chain = chainOf(action);
             int index = -1;
 
             for (int i = 0; i < chain.Count; i++)
@@ -150,9 +194,21 @@ namespace osu.Game.EzOsuGame.Analysis
         public static string DisplayNames(IEnumerable<EzDataRebuildAction> actions)
             => string.Join(" / ", actions.Select(action => (Find(action)?.Name ?? action.ToString()).ToString()));
 
-        private static EzDataRebuildNode node(EzDataRebuildAction action, EzDataRebuildSide side, bool continuesChain,
+        /// <summary>The chain an action was declared in: that is where its side comes from.</summary>
+        private static IReadOnlyList<EzDataRebuildNode> chainOf(EzDataRebuildAction action)
+        {
+            foreach (var node in Realm)
+            {
+                if (node.Action == action)
+                    return Realm;
+            }
+
+            return Sqlite;
+        }
+
+        private static EzDataRebuildNode node(EzDataRebuildAction action, bool continuesChain,
                                               LocalisableString name, LocalisableString detail)
-            => new EzDataRebuildNode(action, side, continuesChain, name, detail);
+            => new EzDataRebuildNode(action, continuesChain, name, detail);
 
         private static IReadOnlyList<EzDataRebuildNode> concat(IReadOnlyList<EzDataRebuildNode> first, IReadOnlyList<EzDataRebuildNode> second)
         {
@@ -160,43 +216,6 @@ namespace osu.Game.EzOsuGame.Analysis
             result.AddRange(first);
             result.AddRange(second);
             return result;
-        }
-    }
-
-    /// <summary>Storage scope an action clears / backfills, for the Realm side.</summary>
-    public static class EzDataRebuildScopes
-    {
-        public static EzAnalysisSystem? RealmScopeOf(EzDataRebuildAction action)
-        {
-            switch (action)
-            {
-                case EzDataRebuildAction.RealmChartMsd:
-                    return EzAnalysisSystem.Mina;
-
-                case EzDataRebuildAction.RealmChartCsi:
-                    return EzAnalysisSystem.CSI;
-
-                case EzDataRebuildAction.RealmChartDan:
-                    return EzAnalysisSystem.Dan;
-
-                case EzDataRebuildAction.RealmPpp:
-                    return EzAnalysisSystem.PPP;
-
-                case EzDataRebuildAction.RealmSunny:
-                    return EzAnalysisSystem.SSR;
-
-                case EzDataRebuildAction.RealmPp:
-                    return EzAnalysisSystem.Official;
-
-                case EzDataRebuildAction.RealmTags:
-                    return EzAnalysisSystem.MetadataTags;
-
-                case EzDataRebuildAction.RealmAll:
-                    return EzAnalysisSystem.All;
-
-                default:
-                    return null;
-            }
         }
     }
 }

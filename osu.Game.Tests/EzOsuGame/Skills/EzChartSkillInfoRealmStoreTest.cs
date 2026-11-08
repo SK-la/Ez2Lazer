@@ -137,7 +137,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 store.WriteDanSkillsetValues("legacy", 7, EzDanSide.Ln.ToId(), new[]
                 {
-                    new EzPlayerDanSkillsetRow(EzDanSide.Ln.ToId(), EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL, -1, string.Empty, 0, EzAnalysis.VERSION,
+                    new EzPlayerDanSkillsetRow(EzDanSide.Ln.ToId(), EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL, -1, string.Empty, 0, EzDanEngine.VERSION,
                         DateTimeOffset.UtcNow),
                 });
 
@@ -216,7 +216,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     r.Add(new EzBeatmapChartSkillInfo
                     {
                         BeatmapHash = legacy_stub_hash,
-                        InfoVersion = EzAnalysis.VERSION - 1,
+                        InfoVersion = EzCSIEngine.VERSION - 1,
                         ComputedAt = DateTimeOffset.UtcNow,
                         KeyCount = -1,
                         DanEligible = false,
@@ -301,7 +301,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                         [$"{EzAnalysisSystem.CSI}.{densityId}"] = 0.5,
                         [$"{EzAnalysisSystem.CSI}.{chordId}"] = 0.25,
                     },
-                    algorithmVersion: EzAnalysis.VERSION,
+                    algorithmVersion: EzCSIEngine.VERSION,
                     rulesetOnlineId: EzLocalProfileConstants.MANIA_RULESET_ID);
 
                 var axes = provider.GetBeatmapStructureAxes(maniaBeatmap(hash, Guid.NewGuid()));
@@ -331,7 +331,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     hash,
                     EzAnalysisSystem.CSI,
                     new Dictionary<string, double>(StringComparer.Ordinal) { [$"{EzAnalysisSystem.CSI}.{EzManiaLNAxis.Density.ToId()}"] = 0.5 },
-                    algorithmVersion: EzAnalysis.VERSION,
+                    algorithmVersion: EzCSIEngine.VERSION,
                     rulesetOnlineId: EzLocalProfileConstants.MANIA_RULESET_ID);
 
                 Assert.That(provider.GetBeatmapStructureAxes(beatmap), Is.Not.Empty);

@@ -19,6 +19,15 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
     /// </summary>
     public static class EzCSIEngine
     {
+        /// <summary>
+        /// Revision stamped on every structure row this engine produces.
+        /// </summary>
+        /// <remarks>
+        /// Bump when the structure pass changes: axis definitions, pattern tags, motion features, or the LeoBlack
+        /// cluster fallback.
+        /// </remarks>
+        public const int VERSION = 1;
+
         private static readonly HashSet<string> ln_pattern_ids = createLnPatternIds();
 
         private static HashSet<string> createLnPatternIds()

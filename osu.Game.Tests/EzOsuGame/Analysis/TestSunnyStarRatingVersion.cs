@@ -4,6 +4,7 @@
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.Difficulty;
 using osu.Game.Rulesets.Mania.EzMania.Analysis;
@@ -14,11 +15,11 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
     public class TestSunnyStarRatingVersion
     {
         [Test]
-        public void Mania_provider_exposes_date_version()
+        public void Mania_provider_reports_the_shared_ssr_revision()
         {
             var provider = new EzManiaAnalysisProvider();
             Assert.That(provider.SunnyStarRatingVersion, Is.EqualTo(EzManiaSunnyStarRating.VERSION));
-            Assert.That(provider.SunnyStarRatingVersion, Is.GreaterThanOrEqualTo(20200101));
+            Assert.That(provider.SunnyStarRatingVersion, Is.EqualTo(EzSSRUnit.VERSION));
         }
 
         [Test]

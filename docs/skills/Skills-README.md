@@ -106,7 +106,7 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
   新行用新系数；两者并存是预期状态，不是不一致。
 - **不是 mod**：早先它们挂在 `ManiaModSRAdjust`（SRA）上，由 mod 构造函数写静态字段，移除 mod 后
   残留值会继续影响此后所有评级（包括后台回填），而缓存 key 说的是"无 mod"。现在只有这一处来源。
-- **每 pass 读一次**：`SRCalculator.Tuning` 一次解析成 `EzSsrTuning` 并作为参数贯穿到各阶段，
+- **每 pass 读一次**：`SRCalculator.Tuning` 一次解析成 `EzSSRTuning` 并作为参数贯穿到各阶段，
   中途改设置不会让同一次评级前后半段用不同系数。会话内结果缓存在系数变化时整体丢弃（纯内存）。
 - 越界写入由设置自身的范围钳制；`Tuning` 里另有一层"非法值回落默认"的兜底，只可能在配置文件被
   手工改坏时触发。

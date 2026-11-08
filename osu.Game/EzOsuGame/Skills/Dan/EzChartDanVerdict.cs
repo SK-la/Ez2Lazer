@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills.Mina;
 
 namespace osu.Game.EzOsuGame.Skills.Dan
@@ -28,6 +27,6 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         public double HoldRatio { get; init; }
 
-        public int AlgorithmVersion { get; init; } = EzAnalysis.VERSION;
+        public int AlgorithmVersion { get; init; } = EzDanEngine.VERSION;
     }
 }

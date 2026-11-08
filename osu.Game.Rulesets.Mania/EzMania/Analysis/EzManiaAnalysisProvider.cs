@@ -33,7 +33,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 
             var bag = new EzAnalysisBag();
             bool patternSupported = EzManiaSunnyStarRating.IsPatternSupported(beatmap);
-            bool wantsSunnySR = request.RequestedScopes.HasFlag(EzAnalysisScope.SunnySR);
+            bool wantsSunnySR = request.RequestedScopes.HasFlag(EzAnalysisScope.SSR);
             bool wantsRadar = request.RequestedScopes.HasFlag(EzAnalysisScope.RulesetSpecificRadarData);
 
             double? sunnySR = null;
@@ -50,7 +50,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             }
 
             if (sunnySR is double resolvedSunnySR)
-                bag.Set(EzAnalysisFields.SUNNY_SR, resolvedSunnySR);
+                bag.Set(EzAnalysisFields.SSR, resolvedSunnySR);
 
             if (wantsRadar)
             {

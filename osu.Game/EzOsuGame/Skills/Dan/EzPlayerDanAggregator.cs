@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.Rulesets.Mods;
@@ -201,7 +200,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                             play.ScoreId,
                             username,
                             hash,
-                            EzAnalysis.VERSION,
+                            EzDanEngine.VERSION,
                             true,
                             chart.KeyCount,
                             chart.Side.ToId(),
@@ -267,7 +266,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 play.ScoreId,
                 username,
                 hash,
-                EzAnalysis.VERSION,
+                EzDanEngine.VERSION,
                 false,
                 0,
                 string.Empty,

@@ -22,7 +22,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
     /// only contract is that a rating computed after a change reflects it.
     /// </remarks>
     [TestFixture]
-    public class EzSsrTuningTest
+    public class EzSSRTuningTest
     {
         private Ez2ConfigManager config = null!;
 
@@ -37,8 +37,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [TearDown]
         public void TearDown()
         {
-            config.SetValue(Ez2Setting.SsrRescaleThreshold, EzSsrTuning.FALLBACK.RescaleThreshold);
-            config.SetValue(Ez2Setting.SsrLnMultiplier, EzSsrTuning.FALLBACK.LnMultiplier);
+            config.SetValue(Ez2Setting.SsrRescaleThreshold, EzSSRTuning.FALLBACK.RescaleThreshold);
+            config.SetValue(Ez2Setting.SsrLnMultiplier, EzSSRTuning.FALLBACK.LnMultiplier);
         }
 
         [Test]

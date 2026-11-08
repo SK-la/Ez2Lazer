@@ -52,11 +52,10 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 string[] osuFacets = statuses.Single(s => s.RulesetOnlineId == 0).Report.Facets.Select(f => f.Id).ToArray();
                 string[] maniaFacets = statuses.Single(s => s.RulesetOnlineId == 3).Report.Facets.Select(f => f.Id).ToArray();
 
-                Assert.That(osuFacets, Is.EquivalentTo(new[] { "official", "official_performance", "ppp", "ppp_performance" }));
-                Assert.That(maniaFacets, Is.EquivalentTo(new[]
-                {
-                    "official", "official_performance", "ssr", "ssr_performance", "ppp", "ppp_performance", "mina", "csi", "dan",
-                }));
+                // One facet per system: a system holds its star and its pp in one slot, so there is no separate
+                // performance facet here.
+                Assert.That(osuFacets, Is.EquivalentTo(new[] { "Official", "PPP" }));
+                Assert.That(maniaFacets, Is.EquivalentTo(new[] { "Mina", "CSI", "Dan", "PPP", "Official", "Sunny" }));
             });
         }
 
@@ -74,15 +73,15 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 });
 
                 var mania = new EzChartSkillStore(realm).CollectAnalysisStatus().Single(s => s.RulesetOnlineId == 3);
-                var ssr = mania.Report["ssr"];
+                var sunny = mania.Report["Sunny"];
 
-                Assert.That(ssr.Ready, Is.EqualTo(1));
-                Assert.That(ssr.Missing, Is.Zero);
-                Assert.That(ssr.CurrentRevision, Is.Zero);
-                Assert.That(ssr.Pending, Is.Zero);
+                Assert.That(sunny.Ready, Is.EqualTo(1));
+                Assert.That(sunny.Missing, Is.Zero);
+                Assert.That(sunny.CurrentRevision, Is.Zero);
+                Assert.That(sunny.Pending, Is.Zero);
 
-                Assert.That(mania.Report["ssr_performance"].Missing, Is.EqualTo(1));
-                Assert.That(mania.Report["official"].Missing, Is.EqualTo(1));
+                Assert.That(mania.Report["Official"].Missing, Is.EqualTo(1));
+                Assert.That(mania.Report["PPP"].Missing, Is.EqualTo(1));
             });
         }
 
@@ -101,11 +100,11 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
                 var statuses = new EzChartSkillStore(realm).CollectAnalysisStatus();
 
-                var osuPpp = statuses.Single(s => s.RulesetOnlineId == 0).Report["ppp"];
-                var maniaPpp = statuses.Single(s => s.RulesetOnlineId == 3).Report["ppp"];
+                var osuPpp = statuses.Single(s => s.RulesetOnlineId == 0).Report["PPP"];
+                var maniaPpp = statuses.Single(s => s.RulesetOnlineId == 3).Report["PPP"];
 
                 Assert.That(osuPpp.Ready, Is.EqualTo(1));
-                Assert.That(osuPpp.CurrentRevision, Is.EqualTo(EzAnalysis.VERSION));
+                Assert.That(osuPpp.CurrentRevision, Is.EqualTo(EzPPPEngine.VERSION));
                 Assert.That(maniaPpp.Ready, Is.Zero);
                 Assert.That(maniaPpp.Missing, Is.EqualTo(1));
             });
@@ -127,9 +126,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
                 var osu = new EzChartSkillStore(realm).CollectAnalysisStatus().Single(s => s.RulesetOnlineId == 0);
 
-                Assert.That(osu.Report["ppp"].Ready, Is.Zero);
-                Assert.That(osu.Report["ppp"].Stale, Is.EqualTo(1));
-                Assert.That(osu.Report["ppp"].Pending, Is.EqualTo(1));
+                Assert.That(osu.Report["PPP"].Ready, Is.Zero);
+                Assert.That(osu.Report["PPP"].Stale, Is.EqualTo(1));
+                Assert.That(osu.Report["PPP"].Pending, Is.EqualTo(1));
             });
         }
 
@@ -143,7 +142,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 realm.Write(r => r.Add(new EzChartDan
                 {
                     BeatmapHash = mania_hash,
-                    AlgorithmVersion = EzAnalysis.VERSION,
+                    AlgorithmVersion = EzDanEngine.VERSION,
                     KeyCount = 4,
                     HoldRatio = 0.1,
                     OverallMsd = 10,
@@ -155,9 +154,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
                 var mania = new EzChartSkillStore(realm).CollectAnalysisStatus().Single(s => s.RulesetOnlineId == 3);
 
-                Assert.That(mania.Report["dan"].Ready, Is.EqualTo(1));
-                Assert.That(mania.Report["dan"].CurrentRevision, Is.EqualTo(EzAnalysis.VERSION));
-                Assert.That(mania.Report["mina"].Missing, Is.EqualTo(1));
+                Assert.That(mania.Report["Dan"].Ready, Is.EqualTo(1));
+                Assert.That(mania.Report["Dan"].CurrentRevision, Is.EqualTo(EzDanEngine.VERSION));
+                Assert.That(mania.Report["Mina"].Missing, Is.EqualTo(1));
             });
         }
 
@@ -176,7 +175,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                     SkillId = EzPPPSkillCatalog.ChartSkillId(metric.MetricId),
                     Value = 4.2,
                     State = (int)EzSkillRowState.Current,
-                    AlgorithmVersion = EzAnalysis.VERSION,
+                    AlgorithmVersion = EzPPPEngine.VERSION,
                     ComputedAt = DateTimeOffset.UtcNow,
                 });
             }

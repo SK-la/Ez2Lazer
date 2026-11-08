@@ -7,6 +7,7 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 using Realms;
 
@@ -156,9 +157,9 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         {
             ArgumentNullException.ThrowIfNull(r);
 
-            int msdRevision = EzAnalysis.VERSION;
-            int csiRevision = EzAnalysis.VERSION;
-            int danRevision = EzAnalysis.VERSION;
+            int minaRevision = EzMinaEngine.VERSION;
+            int csiRevision = EzCSIEngine.VERSION;
+            int danRevision = EzDanEngine.VERSION;
 
             var rateableBeatmapIds = new Dictionary<string, Guid>(StringComparer.Ordinal);
             var rateableChartMeta = new Dictionary<string, RateableChartMeta>(StringComparer.Ordinal);
@@ -199,7 +200,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
                 msdRowsForReader.Add(value);
 
-                if (value.AlgorithmVersion != msdRevision || (EzSkillRowState)value.State != EzSkillRowState.Current)
+                if (value.AlgorithmVersion != minaRevision || (EzSkillRowState)value.State != EzSkillRowState.Current)
                     continue;
 
                 if (!msdSkillsAtRevision.TryGetValue(value.BeatmapHash, out var skills))
@@ -215,7 +216,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 msdRowsForReader,
                 static v => v.BeatmapHash,
                 static v => v.AlgorithmVersion,
-                msdRevision,
+                minaRevision,
                 static v => (EzSkillRowState)v.State == EzSkillRowState.Unrateable);
 
             var csiRows = EzRealmFacetReader.Read(
@@ -258,7 +259,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 new EzDataStateFacet
                 {
                     Id = "Mina",
-                    CurrentRevision = msdRevision,
+                    CurrentRevision = minaRevision,
                     UniverseCount = universe,
                     Rows = msdRows,
                 },

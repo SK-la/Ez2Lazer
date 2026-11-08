@@ -29,6 +29,7 @@ using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
@@ -692,7 +693,7 @@ namespace osu.Game.Database
         /// </summary>
         private void clearOutdatedManiaBeatmapMSD()
         {
-            const int current_version = EzAnalysis.VERSION;
+            int current_version = EzMinaEngine.VERSION;
 
             // Read the live Realm row — AvailableRulesets clones historically omitted
             // LastAppliedManiaSkillVersion and would wipe Mina on every startup.
@@ -713,7 +714,7 @@ namespace osu.Game.Database
             Logger.Log($"Resetting beatmap Mina for mania (mania skill version updated from {liveState.Item2} to {current_version})");
 
             // Only Mina is cleared here. ChartSkillInfo and ChartDan rows read Mina, but both are stamped
-            // with EzAnalysis.VERSION/ChartDan, which fold EzAnalysis.VERSION -
+            // stale and the ordinary incremental passes recompute them. Bulk
             // so they already read as stale and the ordinary incremental passes recompute them. Bulk
             // clearing them would erase the "stale" evidence the status UI reports.
             // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
@@ -756,7 +757,7 @@ namespace osu.Game.Database
                 // older revision are simply "missing" to the incremental passes below (nothing is
                 // bulk-cleared), so this line plus the per-stage progress notifications are the
                 // whole startup signal.
-                Logger.Log($"Ez analysis revision: v{EzAnalysis.VERSION} (every system shares it).");
+                Logger.Log($"Ez analysis revisions: Mina v{EzMinaEngine.VERSION}, CSI v{EzCSIEngine.VERSION}, Dan v{EzDanEngine.VERSION}.");
             }
 
             bool needsChartChain = scope.HasFlag(EzAnalysisSystem.Mina)
@@ -1086,7 +1087,7 @@ namespace osu.Game.Database
             }
 
             Logger.Log(
-                $"Found {work.Count} beatmaps which require chart chain reprocessing (Mina v{EzAnalysis.VERSION}, CSI v{EzAnalysis.VERSION}, Dan v{EzAnalysis.VERSION}).");
+                $"Found {work.Count} beatmaps which require chart chain reprocessing (Mina v{EzMinaEngine.VERSION}, CSI v{EzCSIEngine.VERSION}, Dan v{EzDanEngine.VERSION}).");
 
             var notification = showProgressNotification(work.Count, "Reprocessing chart analysis chain", "beatmaps' analysis chain has been updated");
 

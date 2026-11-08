@@ -23,10 +23,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
     /// A plain struct so one pass reads the settings once and every stage uses the same pair. Resolving them per
     /// stage would let a settings edit that lands mid-pass change the halves of one rating.
     /// </remarks>
-    public readonly record struct EzSsrTuning(double RescaleThreshold, double LnMultiplier)
+    public readonly record struct EzSSRTuning(double RescaleThreshold, double LnMultiplier)
     {
         /// <summary>Values used when the config store is unavailable (unit tests, early startup).</summary>
-        public static readonly EzSsrTuning FALLBACK = new EzSsrTuning(8.0, 5.5);
+        public static readonly EzSSRTuning FALLBACK = new EzSSRTuning(8.0, 5.5);
     }
 
     /// <summary>
@@ -50,7 +50,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         public static double LnIntegralMultiplier => Tuning.LnMultiplier;
 
         /// <summary>The current coefficients, read once per pass.</summary>
-        public static EzSsrTuning Tuning
+        public static EzSSRTuning Tuning
         {
             get
             {
@@ -62,15 +62,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 
                     // Guard the stored file: a zero or non-finite value would make every rating degenerate.
                     if (!double.IsFinite(threshold) || threshold <= 0)
-                        threshold = EzSsrTuning.FALLBACK.RescaleThreshold;
+                        threshold = EzSSRTuning.FALLBACK.RescaleThreshold;
                     if (!double.IsFinite(ln) || ln <= 0)
-                        ln = EzSsrTuning.FALLBACK.LnMultiplier;
+                        ln = EzSSRTuning.FALLBACK.LnMultiplier;
 
-                    return new EzSsrTuning(threshold, ln);
+                    return new EzSSRTuning(threshold, ln);
                 }
                 catch
                 {
-                    return EzSsrTuning.FALLBACK;
+                    return EzSSRTuning.FALLBACK;
                 }
             }
         }
@@ -234,14 +234,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             public double[]? BurstBar;
             public double[]? LongNoteUsageBar;
             public double[]? AnchoredBurstBar;
-            public EzSsrTuning Tuning;
+            public EzSSRTuning Tuning;
         }
 
         /// <summary>
         /// Builds <paramref name="needPatternBars"/>-dependent state. The SR4 breakdown needs three burst curves where
         /// the plain rating needs one, which is why the extra curves are not always derived.
         /// </summary>
-        private static CoreState? buildState(ManiaBeatmap maniaBeatmap, int keyCount, double clockRate, bool needPatternBars, EzSsrTuning tuning)
+        private static CoreState? buildState(ManiaBeatmap maniaBeatmap, int keyCount, double clockRate, bool needPatternBars, EzSSRTuning tuning)
         {
             double[]? cross = CrossMatrixProvider.GetMatrix(keyCount);
 

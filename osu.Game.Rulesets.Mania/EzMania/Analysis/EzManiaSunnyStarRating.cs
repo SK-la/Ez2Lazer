@@ -3,6 +3,7 @@
 
 using System;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Rulesets.Mania.Beatmaps;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Analysis
@@ -13,9 +14,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
     public static class EzManiaSunnyStarRating
     {
         /// <summary>
-        /// yyyyMMdd revision of the Mania SunnySR algorithm. Bump when calculation logic changes (independent of official <see cref="Difficulty.ManiaDifficultyCalculator.Version"/>).
+        /// Revision of the SunnySR algorithm, owned by <see cref="EzSSRUnit"/>.
         /// </summary>
-        public const int VERSION = 20250415;
+        /// <remarks>
+        /// The number is not defined here: the ruleset only reports it. Bumping it is done at the owner, so the
+        /// stored rows and this provider can never disagree.
+        /// </remarks>
+        public static int VERSION => EzSSRUnit.VERSION;
 
         public static bool IsPatternSupported(IBeatmap beatmap)
         {

@@ -72,7 +72,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 realm.Write(r => r.Add(new EzChartDan
                 {
                     BeatmapHash = mania_c,
-                    AlgorithmVersion = EzAnalysis.VERSION - 1,
+                    AlgorithmVersion = EzDanEngine.VERSION - 1,
                     KeyCount = 4,
                     HoldRatio = 0.1,
                     OverallMsd = 10,
@@ -90,12 +90,12 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(status["Mina"].Settled, Is.EqualTo(1));
                 Assert.That(status["Mina"].Stale, Is.EqualTo(0));
                 Assert.That(status["Mina"].Missing, Is.EqualTo(1));
-                Assert.That(status["Mina"].CurrentRevision, Is.EqualTo(EzAnalysis.VERSION));
+                Assert.That(status["Mina"].CurrentRevision, Is.EqualTo(EzMinaEngine.VERSION));
 
                 Assert.That(status["CSI"].Ready, Is.EqualTo(1));
                 Assert.That(status["CSI"].Settled, Is.EqualTo(1));
                 Assert.That(status["CSI"].Missing, Is.EqualTo(1));
-                Assert.That(status["CSI"].CurrentRevision, Is.EqualTo(EzAnalysis.VERSION));
+                Assert.That(status["CSI"].CurrentRevision, Is.EqualTo(EzCSIEngine.VERSION));
 
                 // Dan: a is ready, b is settled by its unrateable Mina (the row written for it is not read as a
                 // result), c is left behind by an older revision.
@@ -103,7 +103,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(status["Dan"].Settled, Is.EqualTo(1));
                 Assert.That(status["Dan"].Stale, Is.EqualTo(1));
                 Assert.That(status["Dan"].Missing, Is.EqualTo(0));
-                Assert.That(status["Dan"].CurrentRevision, Is.EqualTo(EzAnalysis.VERSION));
+                Assert.That(status["Dan"].CurrentRevision, Is.EqualTo(EzDanEngine.VERSION));
 
                 // a is complete everywhere; b has Mina+CSI settled and a current Dan; c has only a stale Dan row.
                 Assert.That(status["Mina"].Pending, Is.EqualTo(1));

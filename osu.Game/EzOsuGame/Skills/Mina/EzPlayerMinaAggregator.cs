@@ -7,7 +7,6 @@ using System.Linq;
 using System.Threading;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.LocalProfile;
@@ -195,7 +194,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                                 play.ScoredAt,
                                 true,
                                 vector,
-                                EzAnalysis.VERSION));
+                                EzMinaEngine.VERSION));
                         }
 
                         string[] patterns = resolvePatterns(play.BeatmapHash, patternsByHash, missingCharts);
@@ -298,7 +297,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                 play.ScoredAt,
                 false,
                 default,
-                EzAnalysis.VERSION));
+                EzMinaEngine.VERSION));
         }
 
         private void flushCache(List<EzMinaPlayCacheRow> pending)
@@ -348,7 +347,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                         Accuracy = play.Accuracy,
                         Rate = rate,
                         ScoredAt = play.ScoredAt,
-                        AlgorithmVersion = EzAnalysis.VERSION,
+                        AlgorithmVersion = EzMinaEngine.VERSION,
                     });
                 }
             }
@@ -368,7 +367,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                     Accuracy = play.Accuracy,
                     Rate = rate,
                     ScoredAt = play.ScoredAt,
-                    AlgorithmVersion = EzAnalysis.VERSION,
+                    AlgorithmVersion = EzMinaEngine.VERSION,
                 });
             }
         }
