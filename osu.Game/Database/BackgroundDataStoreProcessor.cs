@@ -28,6 +28,7 @@ using osu.Game.EzOsuGame.Metrics;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.Online.API;
@@ -956,7 +957,7 @@ namespace osu.Game.Database
                     realmAccess.Write(r =>
                     {
                         if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
-                            liveBeatmapInfo.StarRating = starRating;
+                            EzRatingWriter.WriteSR(liveBeatmapInfo, EzRatingSystem.Official, starRating);
                     });
                     ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
                     ++processedCount;
@@ -1157,8 +1158,11 @@ namespace osu.Game.Database
                 {
                     try
                     {
-                        if (ezBeatmapMinaComputer.ComputeAndStore(beatmap) != null)
+                        if (ezBeatmapMinaComputer.ComputeAndStore(beatmap) is { } msdAxes)
+                        {
                             msdWritten = true;
+                            writeMinaRating(id, msdAxes);
+                        }
                         else if (skillStore.GetBeatmapSystemState(hash, EzSkillSystems.BEATMAP_MINA, ezBeatmapMinaComputer.Revision) != EzMetricState.Unrateable)
                             stageFailed = true;
                     }
@@ -1281,6 +1285,27 @@ namespace osu.Game.Database
 
             skillStore.UpsertChartDan(persisted);
             return true;
+        }
+
+        /// <summary>
+        /// Mirrors the MSD overall onto the chart's Mina star rating.
+        /// </summary>
+        /// <remarks>
+        /// The engine's own scale is converted here, at the write, so every reader of the stored rating sees a star.
+        /// The <c>beatmap_msd</c> row keeps the engine value, which the radar and the dan chain read.
+        /// </remarks>
+        private void writeMinaRating(Guid id, IReadOnlyDictionary<string, double> axes)
+        {
+            if (!axes.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double overall) || overall <= 0)
+                return;
+
+            double star = EzMinaRatingScale.ToStarRating(overall);
+
+            realmAccess.Write(r =>
+            {
+                if (r.Find<BeatmapInfo>(id) is BeatmapInfo live)
+                    EzRatingWriter.WriteSR(live, EzRatingSystem.Mina, star);
+            });
         }
 
         /// <summary>
@@ -1573,22 +1598,27 @@ namespace osu.Game.Database
                     // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
                     /*
                     double sunnyPp = beatmap.EzRatingData.SunnyPP;
-                    double minaRating = beatmap.EzRatingData.MinaSR;
+                    double minaSr = beatmap.EzRatingData.MinaSR;
 
                     if (sunnyPp < 0)
                         sunnyPp = EzAnalysisComputation.ComputeBaselineSunnyPerformancePointsForRealm(beatmapManager, beatmap, CancellationToken.None);
 
                     var minaRows = skillStore.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MINA);
-                    if (minaRating < 0 && minaRows.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double storedMina))
-                        minaRating = storedMina;
+                    if (minaSr < 0
+                        && minaRows.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double storedMina)
+                        && storedMina > 0)
+                        minaSr = EzMinaRatingScale.ToStarRating(storedMina);
 
                     realmAccess.Write(r =>
                     {
                         if (r.Find<BeatmapInfo>(id) is not BeatmapInfo liveBeatmapInfo)
                             return;
 
-                        liveBeatmapInfo.EzRatingData.SunnyPP = sunnyPp;
-                        EzRatingWriter.WriteSR(liveBeatmapInfo, EzRatingSystem.Mina, minaRating);
+                        if (sunnyPp >= 0)
+                            EzRatingWriter.WritePP(liveBeatmapInfo, EzRatingSystem.Sunny, sunnyPp);
+
+                        if (minaSr >= 0)
+                            EzRatingWriter.WriteSR(liveBeatmapInfo, EzRatingSystem.Mina, minaSr);
                     });
                     */
 

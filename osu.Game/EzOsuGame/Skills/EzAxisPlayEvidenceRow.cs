@@ -6,7 +6,7 @@ using System;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// One per-play SSR axis contribution stored in <c>ez-local-profile.sqlite</c> (DATA-3 / DATA-H).
+    /// One per-play rating-axis contribution, kept as thin evidence behind an aggregate.
     /// </summary>
     public sealed class EzAxisPlayEvidenceRow
     {
