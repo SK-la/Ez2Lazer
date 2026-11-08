@@ -280,8 +280,10 @@ namespace osu.Game.Screens.Menu
             NotifyMainMenuEnteredForStartup();
             startupWorkCoordinator?.OnMainMenuEntered(this);
 
-            // Diagnostic: sample the post-startup frame-rate dip from main-menu entry. Debug-only.
-            if (DebugUtils.IsDebugBuild)
+            // Diagnostic: sample the post-startup frame-rate dip from main-menu entry. Debug-only, and one sampler
+            // only: every return from a subscreen enters the menu again, so adding unconditionally stacked samplers
+            // that each reported their own window.
+            if (DebugUtils.IsDebugBuild && !InternalChildren.OfType<EzStartupFrameSampler>().Any())
                 AddInternal(new EzStartupFrameSampler { Depth = float.MinValue });
             Buttons.FadeInFromZero(500);
 

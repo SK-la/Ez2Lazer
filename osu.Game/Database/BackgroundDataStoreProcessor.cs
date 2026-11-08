@@ -662,7 +662,7 @@ namespace osu.Game.Database
                             if (b.Ruleset.ShortName == ruleset.ShortName)
                             {
                                 // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
-                                // b.SunnyStarRating = -1;
+                                // EzRatingWriter.WriteSR(b, EzRatingSystem.Sunny, -1);
                                 countReset++;
                             }
                         }
@@ -870,10 +870,10 @@ namespace osu.Game.Database
 
                         // [EZ-REALTIME] Realm v12 写入已屏蔽（实时验证期）；恢复时取消注释。
                         // if (scope.HasFlag(EzRealmMetadataScope.Pp))
-                        //     beatmap.PerformancePoints = -1;
+                        //     EzRatingWriter.WritePP(beatmap, EzRatingSystem.Official, -1);
                         //
                         // if (scope.HasFlag(EzRealmMetadataScope.Xxy) && EzSunnyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
-                        //     beatmap.EzRatingData.SunnySR = -1;
+                        //     EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Sunny, -1);
 
                         totalProcessed++;
                     }
@@ -1034,7 +1034,7 @@ namespace osu.Game.Database
                     realmAccess.Write(r =>
                     {
                         if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
-                            liveBeatmapInfo.SunnyStarRating = ssr;
+                            EzRatingWriter.WriteSR(liveBeatmapInfo, EzRatingSystem.Sunny, ssr);
                     });
                     */
                     ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
@@ -1301,10 +1301,10 @@ namespace osu.Game.Database
                 if (r.Find<BeatmapInfo>(id) is not BeatmapInfo live)
                     return;
 
-                live.PPPStarRating = star;
+                EzRatingWriter.WriteSR(live, EzRatingSystem.Ppp, star);
 
                 if (pp > 0)
-                    live.PPPPerformancePoints = pp;
+                    EzRatingWriter.WritePP(live, EzRatingSystem.Ppp, pp);
             });
             */
 
@@ -1576,7 +1576,7 @@ namespace osu.Game.Database
                     double minaRating = beatmap.EzRatingData.MinaSR;
 
                     if (sunnyPp < 0)
-                        sunnyPp = EzAnalysisComputation.ComputeBaselineEzRatingData.SunnyPPForRealm(beatmapManager, beatmap, CancellationToken.None);
+                        sunnyPp = EzAnalysisComputation.ComputeBaselineSunnyPerformancePointsForRealm(beatmapManager, beatmap, CancellationToken.None);
 
                     var minaRows = skillStore.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MINA);
                     if (minaRating < 0 && minaRows.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double storedMina))
@@ -1588,7 +1588,7 @@ namespace osu.Game.Database
                             return;
 
                         liveBeatmapInfo.EzRatingData.SunnyPP = sunnyPp;
-                        liveBeatmapInfo.MinaRating = minaRating;
+                        EzRatingWriter.WriteSR(liveBeatmapInfo, EzRatingSystem.Mina, minaRating);
                     });
                     */
 

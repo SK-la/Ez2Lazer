@@ -52,6 +52,13 @@ namespace osu.Game.EzOsuGame.Startup
         {
             base.Update();
 
+            if (secondsReported >= max_report_seconds)
+            {
+                // Expiry is asynchronous; without this guard the sampler keeps reporting until it is removed.
+                Expire();
+                return;
+            }
+
             double now = Clock.CurrentTime;
             double elapsedMs = now - lastFrameTime;
             lastFrameTime = now;
@@ -75,7 +82,7 @@ namespace osu.Game.EzOsuGame.Startup
             double allocMb = (allocated - lastAllocatedBytes) / 1024.0 / 1024.0;
 
             EzStartupTrace.LogDiagnostic($"FrameSample {secondsReported}s frames={frames} avg={fmt(avgMs)}ms worst={fmt(worstFrameMs)}ms "
-                               + $"alloc={fmt(allocMb)}MB gc0={gc0 - lastGc0} gc1={gc1 - lastGc1} gc2={gc2 - lastGc2}");
+                                         + $"alloc={fmt(allocMb)}MB gc0={gc0 - lastGc0} gc1={gc1 - lastGc1} gc2={gc2 - lastGc2}");
 
             windowStart = now;
             frames = 0;
