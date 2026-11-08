@@ -86,7 +86,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         public static string ToId(this EzManiaRCAxis tag) => tag.Meta().Id;
 
         /// <summary>Player rating row id: the pattern system prefix plus the tag id.</summary>
-        public static string ToSkillId(this EzManiaRCAxis tag) => $"{EzSkillSystems.PLAYER_PATTERN}.{tag.ToId()}";
+        public static string ToSkillId(this EzManiaRCAxis tag) => tag.ToId();
 
         public static EzSkillChip Chip(this EzManiaRCAxis tag) => tag.Meta().Chip;
 

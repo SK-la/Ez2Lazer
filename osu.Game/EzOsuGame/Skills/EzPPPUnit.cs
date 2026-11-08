@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Skills.PPP;
@@ -49,13 +50,13 @@ namespace osu.Game.EzOsuGame.Skills
 
                 IReadOnlyList<Mod> modList = mods ?? Array.Empty<Mod>();
                 // One conversion per chart: the shared cache is the same conversion this would have run, and CSi /
-                // MSD already converted the same inputs, so re-converting here doubled the load cost per chart.
+                // Mina already converted the same inputs, so re-converting here doubled the load cost per chart.
                 var playable = EzPlayableBeatmapCache.GetShared(working, beatmapInfo.Ruleset, modList);
                 var skills = engine.CalculateChart(playable, modList);
 
                 skillStore.WriteBeatmapSystemSkills(
                     beatmapInfo.Hash,
-                    EzSkillSystems.BEATMAP_PPP,
+                    EzAnalysisSystem.PPP,
                     skills,
                     beatmapInfo.ID,
                     rulesetOnlineId: rulesetId);

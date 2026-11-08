@@ -55,7 +55,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Side = "rc",
             Rate = rate,
             CreditedDan = dan,
-            AlgorithmVersion = EzAnalysisRevision.VERSION,
+            AlgorithmVersion = EzAnalysis.VERSION,
         };
     }
 }

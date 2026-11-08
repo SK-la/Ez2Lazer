@@ -10,7 +10,7 @@ using osu.Game.Rulesets.Mods;
 namespace osu.Game.EzOsuGame.Mods
 {
     /// <summary>
-    /// Shared DT/HT rate resolution for MSD/SunnySR/Dan (clamp matches lazer ModRateAdjust bounds).
+    /// Shared DT/HT rate resolution for Mina/SunnySR/Dan (clamp matches lazer ModRateAdjust bounds).
     /// </summary>
     public static class EzModRate
     {
@@ -87,7 +87,7 @@ namespace osu.Game.EzOsuGame.Mods
 
         /// <summary>
         /// Mods that change playable layout, rate, or difficulty — song-select Skill radar / DualPanel
-        /// should live-recompute chart MSD/ChartDan (same idea as sunnySR analysis).
+        /// should live-recompute chart Mina/ChartDan (same idea as sunnySR analysis).
         /// </summary>
         public static bool AffectsChartSkills(IEnumerable<Mod>? mods)
         {

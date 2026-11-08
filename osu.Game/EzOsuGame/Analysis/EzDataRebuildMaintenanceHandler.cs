@@ -45,7 +45,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         /// <summary>
         /// Runs the backfill for every selected action. Actions sharing a queue are merged, so a selection of
-        /// MSD + CSI queues one Realm pass instead of reporting the second request as already running.
+        /// Mina + CSI queues one Realm pass instead of reporting the second request as already running.
         /// </summary>
         public EzDataRebuildDispatchOutcome RequestBackfill(IReadOnlyList<EzDataRebuildAction> actions, bool forceAll)
         {

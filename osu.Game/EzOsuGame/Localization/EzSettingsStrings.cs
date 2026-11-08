@@ -539,7 +539,7 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("等图表链", "waiting on chart chain");
 
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_WAITING_MSD =
-            new EzLocalizationManager.EzLocalisableString("其中卡在 MSD", "of which stuck on MSD");
+            new EzLocalizationManager.EzLocalisableString("其中卡在 Mina", "of which stuck on Mina");
 
         #region 机制类
 

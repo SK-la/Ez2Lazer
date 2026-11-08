@@ -482,13 +482,13 @@ namespace osu.Game
             EzPlayerSkillStore.Configure(playerSkillStore);
             var pppEngine = new EzPPPEngine();
 
-            var msdUnit = new EzMSDUnit(BeatmapManager, chartSkillStore);
+            var msdUnit = new EzMinaUnit(BeatmapManager, chartSkillStore);
             var pppUnit = new EzPPPUnit(BeatmapManager, chartSkillStore, pppEngine);
             var chartDanUnit = new EzDanUnit(ezAnalysisCache);
 
             var playerPPPAggregator = new EzPlayerPPPAggregator(BeatmapManager, playerSkillStore, pppEngine);
 
-            var playerRatingAggregator = new EzPlayerRatingAggregator(BeatmapManager, playerSkillStore, chartSkillStore, localProfileStore);
+            var playerRatingAggregator = new EzPlayerMinaAggregator(BeatmapManager, playerSkillStore, chartSkillStore, localProfileStore);
             var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanUnit, playerSkillStore, chartSkillStore, localProfileStore);
             var skillProvider = new EzSkillProvider(chartSkillStore, playerSkillStore, chartDanUnit, localProfileStore, BeatmapManager, liveMetrics);
 

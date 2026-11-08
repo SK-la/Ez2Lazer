@@ -51,11 +51,9 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 
         public static string ToId(this EzMinaSkillAxis axis) => axis.Meta().Id;
 
-        public static string ToMsdSkillId(this EzMinaSkillAxis axis)
-            => $"{EzSkillSystems.BEATMAP_MINA}.{axis.ToId()}";
+        public static string ToMsdSkillId(this EzMinaSkillAxis axis) => axis.ToId();
 
-        public static string ToSsrSkillId(this EzMinaSkillAxis axis)
-            => $"{EzSkillSystems.PLAYER_MINA}.{axis.ToId()}";
+        public static string ToSsrSkillId(this EzMinaSkillAxis axis) => axis.ToId();
 
         public static EzSkillChip Chip(this EzMinaSkillAxis axis) => axis.Meta().Chip;
 

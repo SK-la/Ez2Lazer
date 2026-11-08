@@ -33,7 +33,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 {
                     BeatmapHash = hash,
                     BeatmapId = Guid.NewGuid(),
-                    AlgorithmVersion = EzAnalysisRevision.VERSION,
+                    AlgorithmVersion = EzAnalysis.VERSION,
                     KeyCount = 4,
                     HoldRatio = 0.1,
                     OverallMsd = 18.5,
@@ -79,7 +79,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     r.Add(new EzChartDan
                     {
                         BeatmapHash = hash,
-                        AlgorithmVersion = EzAnalysisRevision.VERSION - 1,
+                        AlgorithmVersion = EzAnalysis.VERSION - 1,
                         KeyCount = 4,
                         HoldRatio = 0.1,
                         OverallMsd = 10,
@@ -103,13 +103,13 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             {
                 var store = new EzChartSkillStore(realm);
 
-                // A bare-constant stamp is what a pre-revision (or MSD-only side-upsert) row carries.
-                // Both it and a CSI-only stamp must read as a miss, because Dan folds CSI and MSD.
+                // A bare-constant stamp is what a pre-revision (or Mina-only side-upsert) row carries.
+                // Both it and a CSI-only stamp must read as a miss, because Dan folds CSI and Mina.
                 foreach ((string hash, int stamp) in new[]
                          {
-                             ("chart-dan-bare-dan-version", EzAnalysisRevision.VERSION),
-                             ("chart-dan-missing-csi", EzAnalysisRevision.ChartSkillInfo),
-                             ("chart-dan-missing-msd-upstream", EzAnalysisRevision.VERSION),
+                             ("chart-dan-bare-dan-version", EzAnalysis.VERSION),
+                             ("chart-dan-missing-csi", EzAnalysis.VERSION),
+                             ("chart-dan-missing-msd-upstream", EzAnalysis.VERSION),
                          })
                 {
                     seedChart(realm, hash);
@@ -207,20 +207,20 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Assert.That(store.CollectChartChainState().CompleteMsd, Does.Not.Contain(hash));
                 Assert.That(store.CollectChartChainState().SettledMsd, Does.Contain(hash));
 
-                var skills = store.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MINA);
-                Assert.That(store.GetBeatmapSystemState(hash, EzSkillSystems.BEATMAP_MINA, EzAnalysisRevision.Msd), Is.EqualTo(EzSkillRowState.Unrateable));
+                var skills = store.GetBeatmapSkills(hash, EzAnalysisSystem.Mina);
+                Assert.That(store.GetBeatmapSystemState(hash, EzAnalysisSystem.Mina, EzAnalysis.VERSION), Is.EqualTo(EzSkillRowState.Unrateable));
                 Assert.That(skills, Is.Empty);
-                Assert.That(EzMSDUnit.IsCurrentMinaCache(skills), Is.False);
+                Assert.That(EzMinaUnit.IsCurrentMinaCache(skills), Is.False);
 
-                // Successful MSD write replaces the marker.
+                // Successful Mina write replaces the marker.
                 store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6));
                 Assert.That(store.CollectChartChainState().CompleteMsd, Does.Contain(hash));
-                Assert.That(store.GetBeatmapSystemState(hash, EzSkillSystems.BEATMAP_MINA, EzAnalysisRevision.Msd), Is.EqualTo(EzSkillRowState.Current));
+                Assert.That(store.GetBeatmapSystemState(hash, EzAnalysisSystem.Mina, EzAnalysis.VERSION), Is.EqualTo(EzSkillRowState.Current));
             });
         }
 
         /// <summary>
-        /// A chart that is rateable and has a complete MSD, yet whose stored inputs resolve to no dan (a keymode with
+        /// A chart that is rateable and has a complete Mina, yet whose stored inputs resolve to no dan (a keymode with
         /// no table of its own and no star rating to borrow one from), is settled for the dan facet rather than
         /// missing: counting it as missing is what made the backfill re-attempt and re-report it on every launch.
         /// </summary>

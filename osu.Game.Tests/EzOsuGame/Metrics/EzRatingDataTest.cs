@@ -22,14 +22,15 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
             var data = new EzRatingData();
             int value = 1;
 
-            foreach (var system in new[] { EzRatingSystem.Official, EzRatingSystem.Sunny, EzRatingSystem.Ppp, EzRatingSystem.Mina })
+            foreach (var system in new[] { EzAnalysisSystem.Official, EzAnalysisSystem.SSR, EzAnalysisSystem.PPP, EzAnalysisSystem.Mina })
             {
-                foreach (var field in new[] { EzRatingField.SR, EzRatingField.PP })
-                {
-                    data.Set(system, field, value);
-                    Assert.That(data.Get(system, field), Is.EqualTo(value));
-                    ++value;
-                }
+                data.SetStar(system, value);
+                Assert.That(data.GetStar(system), Is.EqualTo(value));
+                ++value;
+
+                data.SetPerformance(system, value);
+                Assert.That(data.GetPerformance(system), Is.EqualTo(value));
+                ++value;
             }
         }
 
@@ -38,8 +39,8 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         {
             var data = new EzRatingData();
 
-            Assert.That(data.Get(EzRatingSystem.Mina, EzRatingField.SR), Is.EqualTo(-1));
-            Assert.That(data.Get(EzRatingSystem.None, EzRatingField.SR), Is.EqualTo(-1));
+            Assert.That(data.GetStar(EzAnalysisSystem.Mina), Is.EqualTo(-1));
+            Assert.That(data.GetStar(EzAnalysisSystem.None), Is.EqualTo(-1));
         }
 
         [Test]
@@ -47,8 +48,8 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         {
             var beatmap = maniaBeatmap();
 
-            EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Official, 4.5);
-            EzRatingWriter.WritePP(beatmap, EzRatingSystem.Official, 120);
+            EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.Official, 4.5);
+            EzRatingWriter.WritePP(beatmap, EzAnalysisSystem.Official, 120);
 
             Assert.That(beatmap.StarRating, Is.EqualTo(4.5));
             Assert.That(beatmap.PerformancePoints, Is.EqualTo(120));
@@ -62,7 +63,7 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
             var beatmap = maniaBeatmap();
             beatmap.StarRating = 3;
 
-            EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Sunny, 6);
+            EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.SSR, 6);
 
             Assert.That(beatmap.StarRating, Is.EqualTo(3));
             Assert.That(beatmap.EzRatingData.SunnySR, Is.EqualTo(6));
@@ -74,7 +75,7 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
             var beatmap = maniaBeatmap();
             beatmap.StarRating = 4.2;
 
-            Assert.That(EzRulesetReadout.StoredRating(beatmap, EzRatingSystem.Official, EzRatingField.SR), Is.EqualTo(4.2));
+            Assert.That(EzRulesetReadout.StoredStar(beatmap, EzAnalysisSystem.Official), Is.EqualTo(4.2));
         }
 
         [Test]
@@ -92,10 +93,10 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         {
             var beatmap = maniaBeatmap();
 
-            foreach (var system in new[] { EzRatingSystem.Official, EzRatingSystem.Sunny, EzRatingSystem.Ppp, EzRatingSystem.Mina })
+            foreach (var system in new[] { EzAnalysisSystem.Official, EzAnalysisSystem.SSR, EzAnalysisSystem.PPP, EzAnalysisSystem.Mina })
             {
-                Assert.That(beatmap.EzRatingData.Get(system, EzRatingField.SR), Is.EqualTo(-1));
-                Assert.That(beatmap.EzRatingData.Get(system, EzRatingField.PP), Is.EqualTo(-1));
+                Assert.That(beatmap.EzRatingData.GetStar(system), Is.EqualTo(-1));
+                Assert.That(beatmap.EzRatingData.GetPerformance(system), Is.EqualTo(-1));
             }
         }
 

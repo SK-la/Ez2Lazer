@@ -40,7 +40,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 var status = store.GetSkillDataStatus();
 
                 Assert.That(status.UniverseCount, Is.EqualTo(3));
-                Assert.That(status["MSD"].Missing, Is.EqualTo(3));
+                Assert.That(status["Mina"].Missing, Is.EqualTo(3));
                 Assert.That(status["CSI"].Missing, Is.EqualTo(3));
                 Assert.That(status["Dan"].Missing, Is.EqualTo(3));
                 Assert.That(status.HasWorkToDo, Is.True);
@@ -57,7 +57,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 seedCharts(realm);
                 var store = new EzChartSkillStore(realm);
 
-                // MSD: a complete, b settled-unrateable, c missing.
+                // Mina: a complete, b settled-unrateable, c missing.
                 store.WriteBeatmapMsd(mania_a, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
                 store.WriteBeatmapMsdUnrateable(mania_b, Guid.NewGuid());
 
@@ -72,7 +72,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 realm.Write(r => r.Add(new EzChartDan
                 {
                     BeatmapHash = mania_c,
-                    AlgorithmVersion = EzAnalysisRevision.ChartDan - 1,
+                    AlgorithmVersion = EzAnalysis.VERSION - 1,
                     KeyCount = 4,
                     HoldRatio = 0.1,
                     OverallMsd = 10,
@@ -86,34 +86,34 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
                 Assert.That(status.UniverseCount, Is.EqualTo(3));
 
-                Assert.That(status["MSD"].Ready, Is.EqualTo(1));
-                Assert.That(status["MSD"].Settled, Is.EqualTo(1));
-                Assert.That(status["MSD"].Stale, Is.EqualTo(0));
-                Assert.That(status["MSD"].Missing, Is.EqualTo(1));
-                Assert.That(status["MSD"].CurrentRevision, Is.EqualTo(EzAnalysisRevision.Msd));
+                Assert.That(status["Mina"].Ready, Is.EqualTo(1));
+                Assert.That(status["Mina"].Settled, Is.EqualTo(1));
+                Assert.That(status["Mina"].Stale, Is.EqualTo(0));
+                Assert.That(status["Mina"].Missing, Is.EqualTo(1));
+                Assert.That(status["Mina"].CurrentRevision, Is.EqualTo(EzAnalysis.VERSION));
 
                 Assert.That(status["CSI"].Ready, Is.EqualTo(1));
                 Assert.That(status["CSI"].Settled, Is.EqualTo(1));
                 Assert.That(status["CSI"].Missing, Is.EqualTo(1));
-                Assert.That(status["CSI"].CurrentRevision, Is.EqualTo(EzAnalysisRevision.ChartSkillInfo));
+                Assert.That(status["CSI"].CurrentRevision, Is.EqualTo(EzAnalysis.VERSION));
 
-                // Dan: a is ready, b is settled by its unrateable MSD (the row written for it is not read as a
+                // Dan: a is ready, b is settled by its unrateable Mina (the row written for it is not read as a
                 // result), c is left behind by an older revision.
                 Assert.That(status["Dan"].Ready, Is.EqualTo(1));
                 Assert.That(status["Dan"].Settled, Is.EqualTo(1));
                 Assert.That(status["Dan"].Stale, Is.EqualTo(1));
                 Assert.That(status["Dan"].Missing, Is.EqualTo(0));
-                Assert.That(status["Dan"].CurrentRevision, Is.EqualTo(EzAnalysisRevision.ChartDan));
+                Assert.That(status["Dan"].CurrentRevision, Is.EqualTo(EzAnalysis.VERSION));
 
-                // a is complete everywhere; b has MSD+CSI settled and a current Dan; c has only a stale Dan row.
-                Assert.That(status["MSD"].Pending, Is.EqualTo(1));
+                // a is complete everywhere; b has Mina+CSI settled and a current Dan; c has only a stale Dan row.
+                Assert.That(status["Mina"].Pending, Is.EqualTo(1));
                 Assert.That(status["CSI"].Pending, Is.EqualTo(1));
                 Assert.That(status["Dan"].Pending, Is.EqualTo(1));
                 Assert.That(status["PPP"].Missing, Is.EqualTo(4));
                 Assert.That(status.TotalPending, Is.EqualTo(7));
 
                 string described = status.Describe();
-                Assert.That(described, Does.Contain("MSD v"));
+                Assert.That(described, Does.Contain("Mina v"));
                 Assert.That(described, Does.Contain("CSI v"));
                 Assert.That(described, Does.Contain("Dan v"));
             });
@@ -134,8 +134,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 var status = store.GetSkillDataStatus();
 
                 Assert.That(status.UniverseCount, Is.EqualTo(3));
-                Assert.That(status["MSD"].Ready, Is.EqualTo(0));
-                Assert.That(status["MSD"].Missing, Is.EqualTo(3));
+                Assert.That(status["Mina"].Ready, Is.EqualTo(0));
+                Assert.That(status["Mina"].Missing, Is.EqualTo(3));
                 Assert.That(status["CSI"].Ready, Is.EqualTo(0));
                 Assert.That(status["CSI"].Missing, Is.EqualTo(3));
             });
@@ -154,7 +154,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         };
 
         /// <summary>
-        /// The chain drops keymodes its engine cannot rate before MSD, so those charts are never work for it and
+        /// The chain drops keymodes its engine cannot rate before Mina, so those charts are never work for it and
         /// must not be counted as missing - otherwise "all current" can never be reached.
         /// </summary>
         [Test]
@@ -175,14 +175,14 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 var status = store.GetSkillDataStatus();
 
                 Assert.That(status.UniverseCount, Is.EqualTo(3));
-                Assert.That(status["MSD"].Missing, Is.EqualTo(3));
+                Assert.That(status["Mina"].Missing, Is.EqualTo(3));
                 Assert.That(status["PPP"].Missing, Is.EqualTo(6));
                 Assert.That(status.TotalPending, Is.EqualTo(15));
             });
         }
 
         /// <summary>
-        /// A chart whose MSD settled as unrateable can never produce a ChartDan, so it is settled for that facet
+        /// A chart whose Mina settled as unrateable can never produce a ChartDan, so it is settled for that facet
         /// too rather than permanently pending.
         /// </summary>
         [Test]
@@ -197,7 +197,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
                 var status = store.GetSkillDataStatus();
 
-                Assert.That(status["MSD"].Settled, Is.EqualTo(1));
+                Assert.That(status["Mina"].Settled, Is.EqualTo(1));
                 Assert.That(status["Dan"].Ready, Is.EqualTo(0));
                 Assert.That(status["Dan"].Settled, Is.EqualTo(1));
                 Assert.That(status["Dan"].Missing, Is.EqualTo(2));
@@ -255,9 +255,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// A CSI row written for a chart whose MSD later settled as unrateable came from the stub axis rather than
-        /// from real MSD, so it must stop reading as a result the moment the verdict lands: otherwise the facet
-        /// reports "ready" while MSD reports the same chart as unrateable, and the chain never revisits it.
+        /// A CSI row written for a chart whose Mina later settled as unrateable came from the stub axis rather than
+        /// from real Mina, so it must stop reading as a result the moment the verdict lands: otherwise the facet
+        /// reports "ready" while Mina reports the same chart as unrateable, and the chain never revisits it.
         /// </summary>
         [Test]
         public void Csi_row_that_an_unrateable_msd_invalidates_is_settled_not_ready()

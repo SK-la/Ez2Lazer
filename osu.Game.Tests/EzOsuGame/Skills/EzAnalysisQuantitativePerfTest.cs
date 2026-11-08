@@ -371,18 +371,18 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 holds[column] = 10 + column;
             }
 
-            var axes = new Dictionary<string, IReadOnlyDictionary<string, double>>();
+            var axes = new Dictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>();
 
             foreach (var producer in new[]
                      {
-                         EzAnalysisChannels.MINA,
-                         EzAnalysisChannels.PPP,
-                         EzAnalysisChannels.CSI,
-                         EzAnalysisChannels.SUNNY,
-                         EzAnalysisChannels.OFFICIAL,
-                         EzAnalysisChannels.PPP_PERFORMANCE,
-                         EzAnalysisChannels.SUNNY_PERFORMANCE,
-                         EzAnalysisChannels.OFFICIAL_PERFORMANCE,
+                         EzAnalysisSystem.Mina,
+                         EzAnalysisSystem.PPP,
+                         EzAnalysisSystem.CSI,
+                         EzAnalysisSystem.SSR,
+                         EzAnalysisSystem.Official,
+                         EzAnalysisSystem.PPP,
+                         EzAnalysisSystem.SSR,
+                         EzAnalysisSystem.Official,
                      })
             {
                 var values = new Dictionary<string, double>(StringComparer.Ordinal);

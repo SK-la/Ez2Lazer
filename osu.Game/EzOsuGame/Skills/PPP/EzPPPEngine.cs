@@ -42,11 +42,9 @@ namespace osu.Game.EzOsuGame.Skills.PPP
             double scale = Math.Pow(accuracy, 1.5) * comboScale;
             var result = new Dictionary<string, double>(chartSkills.Count, StringComparer.Ordinal);
 
-            foreach (var (chartId, value) in chartSkills)
+            foreach (var (metric, value) in chartSkills)
             {
-                string? metric = bareId(chartId);
-
-                if (metric == null)
+                if (string.IsNullOrEmpty(metric))
                     continue;
 
                 bool accuracyAxis = metric is "accuracy" or "accuracy_difficulty";
@@ -55,20 +53,6 @@ namespace osu.Game.EzOsuGame.Skills.PPP
             }
 
             return result;
-        }
-
-        /// <summary>
-        /// The metric id of a stored PP+ chart skill id, or null when the row belongs to another system.
-        /// </summary>
-        private static string? bareId(string chartSkillId)
-        {
-            const string prefix = EzSkillSystems.BEATMAP_PPP + ".";
-
-            if (!chartSkillId.StartsWith(prefix, StringComparison.Ordinal))
-                return null;
-
-            string metric = chartSkillId[prefix.Length..];
-            return metric.Length > 0 ? metric : null;
         }
     }
 }

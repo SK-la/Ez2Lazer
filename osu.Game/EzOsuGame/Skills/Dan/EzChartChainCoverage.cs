@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// <summary>
         /// Whether the chain can rate a chart at all. Every stage starts from the same mania candidate list, so a
         /// chart outside it - keymode the engine cannot rate, no beatmap set left, or a convert play - is skipped by
-        /// MSD first and by CSI / ChartDan after it.
+        /// Mina first and by CSI / ChartDan after it.
         /// </summary>
         public static bool IsRateableChart(BeatmapInfo beatmapInfo)
             => beatmapInfo.BeatmapSet != null

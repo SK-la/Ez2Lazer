@@ -180,7 +180,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
 
             if (string.IsNullOrEmpty(hash))
             {
-                // Test beatmaps sometimes ship empty hash; DualPanel keys off Hash for MSD lookup.
+                // Test beatmaps sometimes ship empty hash; DualPanel keys off Hash for Mina lookup.
                 hash = "ez-analysis-wedge-test-hash";
                 beatmap.BeatmapInfo.Hash = hash;
             }
@@ -236,7 +236,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 -1,
                 -1,
                 -1,
-                EzAnalysisRevision.VERSION,
+                EzAnalysis.VERSION,
                 DateTimeOffset.UtcNow));
         }
     }

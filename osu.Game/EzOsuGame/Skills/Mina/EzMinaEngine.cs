@@ -27,7 +27,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
     }
 
     /// <summary>
-    /// The default 4-18K mania MSD/SunnySR engine: the mania-hub n-key MinaCalc build
+    /// The default 4-18K mania Mina/SunnySR engine: the mania-hub n-key MinaCalc build
     /// (<c>minaclac-74.0.wasm</c>, see <c>Resources/EzSkills/NOTICE.md</c>) hosted in-process
     /// through Wasmtime.
     /// </summary>
@@ -51,7 +51,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         /// <summary>Highest keymode the n-key MinaCalc build accepts.</summary>
         public const int MAX_KEY_COUNT = 18;
 
-        /// <summary>Goal the engine treats as the chart-side baseline (MSD).</summary>
+        /// <summary>Goal the engine treats as the chart-side baseline (Mina).</summary>
         public const float MSD_GOAL = 0.93f;
 
         /// <summary>Lowest SunnySR goal the engine is asked for (matches the previous facade clamp).</summary>

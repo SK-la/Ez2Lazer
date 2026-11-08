@@ -56,7 +56,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 KeyCount = keyCount,
                 Side = side.ToId(),
                 CreditedDan = v,
-                AlgorithmVersion = EzAnalysisRevision.VERSION,
+                AlgorithmVersion = EzAnalysis.VERSION,
             }).ToList();
 
             return FromSideClears(keyCount, side, rows);

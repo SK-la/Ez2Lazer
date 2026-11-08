@@ -52,7 +52,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 UniverseCount = 4,
                 Facets = new[]
                 {
-                    new EzFacetStatus { Id = "MSD", CurrentRevision = 1, Ready = 4, Settled = 0, Stale = 0, Missing = 0 },
+                    new EzFacetStatus { Id = "Mina", CurrentRevision = 1, Ready = 4, Settled = 0, Stale = 0, Missing = 0 },
                     // Any facet a store declares shows up here, named by itself.
                     new EzFacetStatus { Id = "KPS", CurrentRevision = 3, Ready = 1, Settled = 1, Stale = 1, Missing = 1 },
                 },
@@ -63,7 +63,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             Assert.That(report.TotalPending, Is.EqualTo(2));
             Assert.That(report["KPS"].CurrentRevision, Is.EqualTo(3));
             Assert.That(report.Describe(), Does.Contain("KPS v3: ready 1, settled 1, stale 1, missing 1"));
-            Assert.That(report.Describe(), Does.Contain("MSD v1: ready 4, settled 0, stale 0, missing 0"));
+            Assert.That(report.Describe(), Does.Contain("Mina v1: ready 4, settled 0, stale 0, missing 0"));
             Assert.That(() => report["sunnySR"], Throws.TypeOf<KeyNotFoundException>());
         }
     }

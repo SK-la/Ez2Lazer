@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using osu.Framework.Logging;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Database;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
@@ -16,7 +15,7 @@ namespace osu.Game.EzOsuGame.Analysis
     /// </summary>
     public class EzDataRebuildDispatcher
     {
-        private readonly Func<EzRealmMetadataScope, bool, EzDataRebuildDispatchResult>? queueRealm;
+        private readonly Func<EzAnalysisSystem, bool, EzDataRebuildDispatchResult>? queueRealm;
         private readonly Func<bool, EzDataRebuildDispatchResult>? queueSqliteMain;
         private readonly Func<bool, EzDataRebuildDispatchResult>? queueSqliteSongsBranches;
         private readonly Func<bool, EzDataRebuildDispatchResult>? queueRealmScores;
@@ -32,7 +31,7 @@ namespace osu.Game.EzOsuGame.Analysis
         { }
 
         internal EzDataRebuildDispatcher(
-            Func<EzRealmMetadataScope, bool, EzDataRebuildDispatchResult>? queueRealm,
+            Func<EzAnalysisSystem, bool, EzDataRebuildDispatchResult>? queueRealm,
             Func<bool, EzDataRebuildDispatchResult>? queueSqliteMain,
             Func<bool, EzDataRebuildDispatchResult>? queueSqliteSongsBranches,
             Func<bool, EzDataRebuildDispatchResult>? queueRealmScores = null)
@@ -83,7 +82,7 @@ namespace osu.Game.EzOsuGame.Analysis
             var songsBranchesGroup = new List<EzDataRebuildAction>();
             var unknownGroup = new List<EzDataRebuildAction>();
 
-            EzRealmMetadataScope realmScope = default;
+            EzAnalysisSystem realmScope = default;
 
             foreach (var action in actions)
             {
@@ -146,7 +145,7 @@ namespace osu.Game.EzOsuGame.Analysis
             return new EzDataRebuildDispatchOutcome(queued, failures);
         }
 
-        private EzDataRebuildDispatchResult dispatchRealm(EzRealmMetadataScope scope, bool forceAll)
+        private EzDataRebuildDispatchResult dispatchRealm(EzAnalysisSystem scope, bool forceAll)
         {
             if (queueRealm == null)
             {

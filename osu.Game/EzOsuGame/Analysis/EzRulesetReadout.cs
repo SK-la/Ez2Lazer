@@ -38,15 +38,15 @@ namespace osu.Game.EzOsuGame.Analysis
     }
 
     /// <summary>
-    /// One selectable readout for a ruleset: which stored rating slot it renders, and which slot holds the skill
+    /// One selectable readout for a ruleset: which system's rating it renders, and which system holds the skill
     /// star shown beside the official one.
     /// </summary>
     /// <remarks>
     /// A readout carries no axis vocabulary, no applicability predicate and no revision. It only names two
-    /// <see cref="EzRatingSystem"/> slots; which of them exist for a ruleset is decided by ruleset identity in
+    /// <see cref="EzAnalysisSystem"/> values; which of them exist for a ruleset is decided by ruleset identity in
     /// <see cref="EzRulesetReadout.All"/>.
     /// </remarks>
-    public readonly record struct EzReadout(string Id, LocalisableString Name, EzRatingSystem Rating, EzRatingSystem SkillRating);
+    public readonly record struct EzReadout(string Id, LocalisableString Name, EzAnalysisSystem Rating, EzAnalysisSystem SkillRating);
 
     /// <summary>
     /// The readouts a ruleset offers, and the stored-value reads behind them.
@@ -58,18 +58,18 @@ namespace osu.Game.EzOsuGame.Analysis
         public const string PPP = "ppp";
 
         private static readonly EzReadout sunny = new EzReadout(
-            SUNNY, EzSettingsStrings.PANEL_VARIANT_SUNNY, EzRatingSystem.Sunny, EzRatingSystem.Sunny);
+            SUNNY, EzSettingsStrings.PANEL_VARIANT_SUNNY, EzAnalysisSystem.SSR, EzAnalysisSystem.SSR);
 
         private static readonly EzReadout ppp = new EzReadout(
-            PPP, EzSettingsStrings.PANEL_VARIANT_PPP, EzRatingSystem.Ppp, EzRatingSystem.Ppp);
+            PPP, EzSettingsStrings.PANEL_VARIANT_PPP, EzAnalysisSystem.PPP, EzAnalysisSystem.PPP);
 
-        private static readonly EzReadout official_mina = new EzReadout(
-            OFFICIAL, EzSettingsStrings.PANEL_VARIANT_MINA, EzRatingSystem.Official, EzRatingSystem.Mina);
+        private static readonly EzReadout official_msd = new EzReadout(
+            OFFICIAL, EzSettingsStrings.PANEL_VARIANT_MINA, EzAnalysisSystem.Official, EzAnalysisSystem.Mina);
 
         private static readonly EzReadout official_ppp = new EzReadout(
-            OFFICIAL, EzSettingsStrings.PANEL_VARIANT_OFFICIAL, EzRatingSystem.Official, EzRatingSystem.Ppp);
+            OFFICIAL, EzSettingsStrings.PANEL_VARIANT_OFFICIAL, EzAnalysisSystem.Official, EzAnalysisSystem.PPP);
 
-        private static readonly EzReadout[] mania_readouts = [official_mina, sunny, ppp];
+        private static readonly EzReadout[] mania_readouts = [official_msd, sunny, ppp];
 
         private static readonly EzReadout[] other_readouts = [official_ppp, ppp];
 
@@ -94,7 +94,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <summary>The readout this ruleset currently shows, falling back to its first one.</summary>
         public static EzReadout? Selected(int rulesetOnlineId)
         {
-            var stored = EzReadoutSelection.StoredId(rulesetOnlineId);
+            string? stored = EzReadoutSelection.StoredId(rulesetOnlineId);
 
             return Find(rulesetOnlineId, stored) ?? (All(rulesetOnlineId).Count > 0 ? All(rulesetOnlineId)[0] : null);
         }
@@ -145,11 +145,11 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             ArgumentNullException.ThrowIfNull(beatmap);
 
-            double? star = live.Star ?? EzReadoutValues.Positive(StoredRating(beatmap, readout.Rating, EzRatingField.SR));
-            double? performance = live.PerformancePoints ?? EzReadoutValues.Positive(StoredRating(beatmap, readout.Rating, EzRatingField.PP));
+            double? star = live.Star ?? EzReadoutValues.Positive(StoredStar(beatmap, readout.Rating));
+            double? performance = live.PerformancePoints ?? EzReadoutValues.Positive(StoredPerformance(beatmap, readout.Rating));
             double? skillStar = live.SkillStar is double liveStar
                 ? liveSkillStar(readout.SkillRating, liveStar)
-                : EzReadoutValues.Positive(StoredRating(beatmap, readout.SkillRating, EzRatingField.SR));
+                : EzReadoutValues.Positive(StoredStar(beatmap, readout.SkillRating));
 
             return new EzReadoutValues(star, performance, skillStar);
         }
@@ -161,60 +161,59 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             ArgumentNullException.ThrowIfNull(beatmap);
 
-            if (Selected(beatmap.Ruleset.OnlineID) is not { } readout || readout.SkillRating == EzRatingSystem.None)
+            if (Selected(beatmap.Ruleset.OnlineID) is not { } readout || readout.SkillRating == EzAnalysisSystem.None)
                 return null;
 
-            if (analysis is { } live
-                && live.AxesOf(ChannelOf(readout.SkillRating)).TryGetValue(RatingAxisOf(readout.SkillRating), out double measured)
-                && double.IsFinite(measured) && measured > 0)
+            if (analysis is { } live && live.RatingOf(readout.SkillRating).StarRating is double measured
+                                     && double.IsFinite(measured) && measured > 0)
                 return liveSkillStar(readout.SkillRating, measured);
 
-            return EzReadoutValues.Positive(StoredRating(beatmap, readout.SkillRating, EzRatingField.SR));
+            return EzReadoutValues.Positive(StoredStar(beatmap, readout.SkillRating));
         }
 
-        /// <summary>Channel an analysis pass files a system's axes under.</summary>
-        public static string ChannelOf(EzRatingSystem system) => system switch
-        {
-            EzRatingSystem.Mina => EzAnalysisChannels.MINA,
-            EzRatingSystem.Ppp => EzAnalysisChannels.PPP,
-            EzRatingSystem.Sunny => EzAnalysisChannels.SUNNY,
-            _ => EzAnalysisChannels.OFFICIAL,
-        };
-
         /// <summary>
-        /// The axis a system's headline rating is stored under. Every system writes the shared star id except the
-        /// Mina engine, whose vector's headline is its Overall axis.
+        /// The axis the Mina engine's headline sits on. Only Mina has one: every other system's star is a scalar
+        /// read through <see cref="EzAnalysisResult.RatingOf"/>.
         /// </summary>
-        public static string RatingAxisOf(EzRatingSystem system)
-            => system == EzRatingSystem.Mina ? EzMinaSkillAxis.Overall.ToId() : EzAnalysisChannels.STAR_RATING;
+        public static string RatingAxisOf(EzAnalysisSystem system) => EzMinaSkillAxis.Overall.ToId();
 
         /// <summary>Whether the readout's star is the official rating, which the official pill already shows.</summary>
-        public static bool IsOfficial(EzReadout readout) => readout.Rating == EzRatingSystem.Official;
+        public static bool IsOfficial(EzReadout readout) => readout.Rating == EzAnalysisSystem.Official;
 
         /// <summary>
-        /// Reads a system's stored rating. The official pair lives on the beatmap's own columns, which remain the
-        /// authority for upstream code; every other system is stored in <see cref="BeatmapInfo.EzRatingData"/>.
+        /// Reads a system's stored star rating. The official pair lives on the beatmap's own columns, which remain
+        /// the authority for upstream code; every other system is stored in <see cref="BeatmapInfo.EzRatingData"/>.
         /// </summary>
-        public static double StoredRating(BeatmapInfo beatmap, EzRatingSystem system, EzRatingField field)
+        public static double StoredStar(BeatmapInfo beatmap, EzAnalysisSystem system)
         {
             ArgumentNullException.ThrowIfNull(beatmap);
 
-            if (system == EzRatingSystem.None)
+            if (system == EzAnalysisSystem.None)
                 return -1;
 
-            if (system == EzRatingSystem.Official)
-            {
-                return field == EzRatingField.PP
-                    ? beatmap.PerformancePoints
-                    : beatmap.StarRating;
-            }
+            if (system == EzAnalysisSystem.Official)
+                return beatmap.StarRating;
 
-            return beatmap.EzRatingData.Get(system, field);
+            return beatmap.EzRatingData.GetStar(system);
+        }
+
+        /// <summary>Reads a system's stored perfect-play pp, from the same two places as <see cref="StoredStar"/>.</summary>
+        public static double StoredPerformance(BeatmapInfo beatmap, EzAnalysisSystem system)
+        {
+            ArgumentNullException.ThrowIfNull(beatmap);
+
+            if (system == EzAnalysisSystem.None)
+                return -1;
+
+            if (system == EzAnalysisSystem.Official)
+                return beatmap.PerformancePoints;
+
+            return beatmap.EzRatingData.GetPerformance(system);
         }
 
         /// <summary>The live chart-skill axis as the pill prints it: Mina measures in Etterna units.</summary>
-        private static double liveSkillStar(EzRatingSystem system, double value)
-            => system == EzRatingSystem.Mina ? EzMinaRatingScale.ToStarRating(value) : value;
+        private static double liveSkillStar(EzAnalysisSystem system, double value)
+            => system == EzAnalysisSystem.Mina ? EzMinaRatingScale.ToStarRating(value) : value;
     }
 
     /// <summary>

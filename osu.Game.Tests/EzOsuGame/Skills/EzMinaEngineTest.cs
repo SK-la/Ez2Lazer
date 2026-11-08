@@ -43,7 +43,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             var msd = engine.CalculateMsd(createStreamNotes(keyCount), keyCount);
 
-            Assert.That(msd.Overall, Is.GreaterThan(0), $"{keyCount}K produced a zero MSD vector.");
+            Assert.That(msd.Overall, Is.GreaterThan(0), $"{keyCount}K produced a zero Mina vector.");
             Assert.That(msd.Stream, Is.GreaterThan(0), $"{keyCount}K produced a zero Stream axis.");
         }
 

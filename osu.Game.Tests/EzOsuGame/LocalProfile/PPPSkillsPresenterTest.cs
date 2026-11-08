@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.PPP;
@@ -37,14 +38,14 @@ namespace osu.Game.Tests.EzOsuGame.LocalProfile
 
                 playerStore.WritePlayerSystemSkills(
                     username,
-                    EzSkillSystems.UNSLICED_KEY,
-                    EzSkillSystems.PLAYER_PPP,
+                    EzAxisIds.UNSLICED_KEY,
+                    EzAnalysisSystem.PPP,
                     skills,
                     analyzedPlays: 12,
                     rulesetOnlineId: EzLocalProfileConstants.OSU_RULESET_ID);
 
                 var presenter = new PPPSkillsPresenter(provider, EzLocalProfileConstants.OSU_RULESET_ID);
-                var snapshot = presenter.Load(username, EzSkillSystems.UNSLICED_KEY);
+                var snapshot = presenter.Load(username, EzAxisIds.UNSLICED_KEY);
 
                 Assert.That(snapshot.RadarAxes, Has.Count.EqualTo(EzOsuSkillAxisExtensions.RadarAxes.Length));
                 Assert.That(snapshot.RadarAxes.Select(a => a.SkillId), Does.Not.Contain(EzPPPSkillAxis.Aim.ToPlayerSkillId()));

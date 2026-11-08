@@ -32,7 +32,7 @@ namespace osu.Game.EzOsuGame.HUD
     /// <summary>
     /// HUD RC|LN skills-dan dual panel (Skill-radar style Chart / Player / Both sources).
     /// Borrowed by EzAnalysis wedge and Local Profile Track with bindable settings.
-    /// Chart side: Realm first, then always async live MSD/ChartDan for the selected map (sunnySR rhythm; not written).
+    /// Chart side: Realm first, then always async live Mina/ChartDan for the selected map (sunnySR rhythm; not written).
     /// </summary>
     public partial class EzHUDDanDualPanel : CompositeDrawable, ISerialisableDrawable
     {
@@ -47,7 +47,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         public bool UsesFixedAnchor { get; set; }
 
-        /// <summary>Chart MSD / Player SunnySR / Both — same idea as Skill radar layers.</summary>
+        /// <summary>Chart Mina / Player SunnySR / Both — same idea as Skill radar layers.</summary>
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.DAN_PANEL_DATA_SOURCE), nameof(EzHUDStrings.DAN_PANEL_DATA_SOURCE_TOOLTIP))]
         public Bindable<EzDanPanelDataSource> DataSource { get; } = new Bindable<EzDanPanelDataSource>(EzDanPanelDataSource.Both);
 
@@ -312,7 +312,7 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 var info = beatmap.Value.BeatmapInfo;
 
-                // Instant: Realm / session / MSD memory (same role as ssrL1).
+                // Instant: Realm / session / Mina memory (same role as ssrL1).
                 if (skillProvider != null && skillProvider.TryGetChartDanForUi(info, out var persistedChartDan, allowMemoryCompute: true)
                                           && persistedChartDan != null)
                 {
@@ -428,7 +428,7 @@ namespace osu.Game.EzOsuGame.HUD
                                          ? chartDan.KeyCount
                                          : KeyCount.Value;
 
-                                     double overall = result.AxesOf(EzAnalysisChannels.MINA)
+                                     double overall = result.AxesOf(EzAnalysisSystem.Mina)
                                                             .GetValueOrDefault(EzMinaSkillAxis.Overall.ToId(), 0);
 
                                      applyLive(result.Dan, overall, liveKeys);

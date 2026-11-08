@@ -854,7 +854,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             if (payload.StarRating is double star && double.IsFinite(star) && star >= 0)
             {
-                EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Official, star);
+                EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.Official, star);
                 wrote = true;
             }
 
@@ -862,13 +862,13 @@ namespace osu.Game.EzOsuGame.Analysis
             /*
             if (payload.SunnyStarRating is double ssr && double.IsFinite(ssr) && ssr >= 0)
             {
-                EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Sunny, ssr);
+                EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.SSR, ssr);
                 wrote = true;
             }
 
             if (payload.PerformancePoints is double pp && double.IsFinite(pp) && pp >= 0)
             {
-                EzRatingWriter.WritePP(beatmap, EzRatingSystem.Official, pp);
+                EzRatingWriter.WritePP(beatmap, EzAnalysisSystem.Official, pp);
                 wrote = true;
             }
             */

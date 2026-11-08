@@ -69,7 +69,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                                                     .ToArray();
             Assert.That(delayTags, Does.Contain(EzDanSkillsetBuckets.SPEED));
 
-            // MSD-only filing still empty for 7K; with chart, delay participates among tag tiles.
+            // Mina-only filing still empty for 7K; with chart, delay participates among tag tiles.
             Assert.That(EzDanSkillsetFiling.BucketsForValues(7, EzDanSide.Rc, mina(jackSpeed: 20), null, 1, delayChart),
                 Does.Contain(EzDanSkillsetBuckets.SPEED));
 

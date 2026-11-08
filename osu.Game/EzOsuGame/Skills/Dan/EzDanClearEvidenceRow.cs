@@ -19,6 +19,6 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         public double CreditedDan { get; init; }
         public double Accuracy { get; init; }
         public DateTimeOffset ScoredAt { get; init; }
-        public int AlgorithmVersion { get; init; } = EzAnalysisRevision.VERSION;
+        public int AlgorithmVersion { get; init; } = EzAnalysis.VERSION;
     }
 }

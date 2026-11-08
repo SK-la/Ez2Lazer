@@ -3,13 +3,14 @@
 
 using System;
 using System.Collections.Generic;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills.Mina;
 
 namespace osu.Game.EzOsuGame.Skills.Dan
 {
     /// <summary>
     /// Hub <c>play.values</c> lookup for dan skillset filing: rebuild Mina SunnySR vectors from
-    /// <see cref="EzAxisPlayEvidenceRow"/> (written by <see cref="EzPlayerRatingAggregator"/>).
+    /// <see cref="EzAxisPlayEvidenceRow"/> (written by <see cref="EzPlayerMinaAggregator"/>).
     /// </summary>
     public sealed class EzDanPlayRatingIndex
     {
@@ -32,10 +33,10 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                     continue;
 
                 // Pattern ratings are not Mina play.values.
-                if (row.SkillId.StartsWith(EzSkillSystems.PLAYER_PATTERN + ".", StringComparison.Ordinal))
+                if (row.SkillId.StartsWith(EzAnalysisSystem.Pattern + ".", StringComparison.Ordinal))
                     continue;
 
-                if (!row.SkillId.StartsWith(EzSkillSystems.PLAYER_MINA + ".", StringComparison.Ordinal)
+                if (!row.SkillId.StartsWith(EzAnalysisSystem.SSR + ".", StringComparison.Ordinal)
                     && !EzMinaSkillAxisExtensions.TryParse(row.SkillId, out _))
                     continue;
 

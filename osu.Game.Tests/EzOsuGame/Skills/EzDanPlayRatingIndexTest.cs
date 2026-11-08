@@ -108,7 +108,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Accuracy = 0.98,
                 Rate = 1,
                 ScoredAt = scoredAt,
-                AlgorithmVersion = EzAnalysisRevision.VERSION,
+                AlgorithmVersion = EzAnalysis.VERSION,
             };
 
         private static EzDanClearEvidenceRow clearRow(string hash, DateTimeOffset scoredAt, double accuracy = 0.98, double credited = 8)
@@ -122,7 +122,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Accuracy = accuracy,
                 Rate = 1,
                 ScoredAt = scoredAt,
-                AlgorithmVersion = EzAnalysisRevision.VERSION,
+                AlgorithmVersion = EzAnalysis.VERSION,
             };
     }
 }

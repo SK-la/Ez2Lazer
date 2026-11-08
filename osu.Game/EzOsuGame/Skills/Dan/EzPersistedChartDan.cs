@@ -22,7 +22,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         public Guid BeatmapId { get; init; }
 
-        public int AlgorithmVersion { get; init; } = EzAnalysisRevision.VERSION;
+        public int AlgorithmVersion { get; init; } = EzAnalysis.VERSION;
 
         public int KeyCount { get; init; }
 
@@ -60,7 +60,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         /// <summary>
         /// Nomod DualPanel overlay: keep baseline Sunny RC/LN when present; only take missing halves from <paramref name="live"/>.
-        /// Avoids MSD <c>SrToRawDan</c> clamping to stellium (star badge) overwriting good Realm labels.
+        /// Avoids Mina <c>SrToRawDan</c> clamping to stellium (star badge) overwriting good Realm labels.
         /// </summary>
         public static EzPersistedChartDan MergeNomodBaselineWithLive(EzPersistedChartDan baseline, EzPersistedChartDan live)
         {
@@ -106,7 +106,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         }
 
         /// <summary>
-        /// Build nomod persisted chart dan from stored MSD (+ optional CSI / ssr). No playable / Mina / LeoBlack.
+        /// Build nomod persisted chart dan from stored Mina (+ optional CSI / ssr). No playable / Mina / LeoBlack.
         /// RC and LN halves may both be written (Ez DualPanel). LN when
         /// <see cref="EzDanAlgorithm.AllowsPersistedChartLnHalf"/>; RC always attempted.
         /// </summary>
@@ -142,7 +142,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             {
                 BeatmapHash = beatmapHash,
                 BeatmapId = beatmapId,
-                AlgorithmVersion = EzAnalysisRevision.VERSION,
+                AlgorithmVersion = EzAnalysis.VERSION,
                 KeyCount = keyCount,
                 HoldRatio = holdRatio,
                 OverallMsd = set?.OverallMsd ?? overallMean,

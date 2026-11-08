@@ -252,7 +252,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Accuracy = 0.98,
                 Rate = 1,
                 ScoredAt = DateTimeOffset.UtcNow,
-                AlgorithmVersion = EzAnalysisRevision.VERSION,
+                AlgorithmVersion = EzAnalysis.VERSION,
             };
     }
 }

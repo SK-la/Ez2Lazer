@@ -9,7 +9,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
     /// Chart classification policy for dan: which side a chart is filed under, and how player clears fold.
     /// </summary>
     /// <remarks>
-    /// Content, not revision: these thresholds are gated by the single <see cref="Analysis.EzAnalysisRevision.VERSION"/>.
+    /// Content, not revision: these thresholds are gated by the single <see cref="Analysis.EzAnalysis.VERSION"/>.
     /// </remarks>
     public static class EzDanAlgorithm
     {

@@ -21,7 +21,7 @@ namespace osu.Game.EzOsuGame.Analysis
     /// </summary>
     public sealed class EzDataStateFacet
     {
-        /// <summary>Stable key, also the label a report renders (<c>MSD</c>, <c>CSI</c>, <c>Dan</c>, ...).</summary>
+        /// <summary>Stable key, also the label a report renders (<c>Mina</c>, <c>CSI</c>, <c>Dan</c>, ...).</summary>
         public required string Id { get; init; }
 
         /// <summary>Revision a row must carry to count as current.</summary>
@@ -34,7 +34,7 @@ namespace osu.Game.EzOsuGame.Analysis
         public required IReadOnlyDictionary<string, EzFacetRowState> Rows { get; init; }
 
         /// <summary>
-        /// Keys this facet can never hold a row for because an upstream one settled them (an unrateable MSD, stored
+        /// Keys this facet can never hold a row for because an upstream one settled them (an unrateable Mina, stored
         /// inputs that resolve to no result). They count as settled - no result, but not work either.
         /// </summary>
         public IReadOnlyCollection<string>? SettledWithoutRow { get; init; }
@@ -149,7 +149,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         /// <summary>
         /// One line per facet for notifications / logs, e.g.
-        /// <c>MSD v2: ready 812, settled 40, stale 0, missing 12</c>.
+        /// <c>Mina v2: ready 812, settled 40, stale 0, missing 12</c>.
         /// </summary>
         public string Describe()
             => string.Join('\n', Facets.Select(static f

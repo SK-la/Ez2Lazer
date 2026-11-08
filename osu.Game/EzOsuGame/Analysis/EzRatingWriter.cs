@@ -18,29 +18,35 @@ namespace osu.Game.EzOsuGame.Analysis
     public static class EzRatingWriter
     {
         /// <summary>Writes a system's star rating. A non-finite value is ignored.</summary>
-        public static void WriteSR(BeatmapInfo beatmap, EzRatingSystem system, double sr)
+        public static void WriteSR(BeatmapInfo beatmap, EzAnalysisSystem system, double sr)
         {
             ArgumentNullException.ThrowIfNull(beatmap);
 
             if (!double.IsFinite(sr))
                 return;
 
-            write(beatmap, system, EzRatingField.SR, sr);
+            beatmap.EzRatingData.SetStar(system, sr);
+
+            if (system == EzAnalysisSystem.Official)
+                beatmap.StarRating = sr;
         }
 
         /// <summary>Writes a system's perfect-play pp. A non-finite value is ignored.</summary>
-        public static void WritePP(BeatmapInfo beatmap, EzRatingSystem system, double pp)
+        public static void WritePP(BeatmapInfo beatmap, EzAnalysisSystem system, double pp)
         {
             ArgumentNullException.ThrowIfNull(beatmap);
 
             if (!double.IsFinite(pp))
                 return;
 
-            write(beatmap, system, EzRatingField.PP, pp);
+            beatmap.EzRatingData.SetPerformance(system, pp);
+
+            if (system == EzAnalysisSystem.Official)
+                beatmap.PerformancePoints = pp;
         }
 
         /// <summary>Writes whichever halves are supplied. Null leaves the other half untouched.</summary>
-        public static void Write(BeatmapInfo beatmap, EzRatingSystem system, double? sr = null, double? pp = null)
+        public static void Write(BeatmapInfo beatmap, EzAnalysisSystem system, double? sr = null, double? pp = null)
         {
             ArgumentNullException.ThrowIfNull(beatmap);
 
@@ -49,24 +55,6 @@ namespace osu.Game.EzOsuGame.Analysis
 
             if (pp is double points)
                 WritePP(beatmap, system, points);
-        }
-
-        private static void write(BeatmapInfo beatmap, EzRatingSystem system, EzRatingField field, double value)
-        {
-            if (system == EzRatingSystem.None || field == EzRatingField.None)
-                return;
-
-            // The row always carries a record (the v12 migration creates it), so the write is a plain set.
-            beatmap.EzRatingData.Set(system, field, value);
-
-            if (system != EzRatingSystem.Official)
-                return;
-
-            // The beatmap's own columns stay the authority for upstream code, so they are written beside the copy.
-            if (field == EzRatingField.SR)
-                beatmap.StarRating = value;
-            else
-                beatmap.PerformancePoints = value;
         }
     }
 }

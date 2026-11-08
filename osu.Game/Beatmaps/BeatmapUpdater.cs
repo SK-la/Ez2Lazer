@@ -68,7 +68,7 @@ namespace osu.Game.Beatmaps
                     var ruleset = working.BeatmapInfo.Ruleset.CreateInstance();
                     var calculator = ruleset.CreateDifficultyCalculator(working);
 
-                    EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Official, calculator.Calculate().StarRating);
+                    EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.Official, calculator.Calculate().StarRating);
                     beatmap.UpdateStatisticsFromBeatmap(working.Beatmap);
 
                     var tagSummary = EzBeatmapTagParser.Parse(working);
@@ -108,7 +108,7 @@ namespace osu.Game.Beatmaps
             if (beatmapManager == null)
                 return;
 
-            EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Sunny, EzAnalysisComputation.ComputeBaselineSunnySRForRealm(beatmapManager, beatmap));
+            EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.SSR, EzAnalysisComputation.ComputeBaselineSunnySRForRealm(beatmapManager, beatmap));
         }
 
         private void updatePerformancePoints(BeatmapInfo beatmap, WorkingBeatmap working)
@@ -122,7 +122,7 @@ namespace osu.Game.Beatmaps
                 ? performancePoints
                 : -1;
 
-            EzRatingWriter.WritePP(beatmap, EzRatingSystem.Official, points);
+            EzRatingWriter.WritePP(beatmap, EzAnalysisSystem.Official, points);
         }
 
         #region Implementation of IDisposable

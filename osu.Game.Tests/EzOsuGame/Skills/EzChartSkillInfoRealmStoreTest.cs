@@ -137,7 +137,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 store.WriteDanSkillsetValues("legacy", 7, EzDanSide.Ln.ToId(), new[]
                 {
-                    new EzPlayerDanSkillsetRow(EzDanSide.Ln.ToId(), EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL, -1, string.Empty, 0, EzAnalysisRevision.VERSION,
+                    new EzPlayerDanSkillsetRow(EzDanSide.Ln.ToId(), EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL, -1, string.Empty, 0, EzAnalysis.VERSION,
                         DateTimeOffset.UtcNow),
                 });
 
@@ -216,7 +216,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     r.Add(new EzBeatmapChartSkillInfo
                     {
                         BeatmapHash = legacy_stub_hash,
-                        InfoVersion = EzAnalysisRevision.VERSION - 1,
+                        InfoVersion = EzAnalysis.VERSION - 1,
                         ComputedAt = DateTimeOffset.UtcNow,
                         KeyCount = -1,
                         DanEligible = false,
@@ -264,7 +264,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     KeyCount = 4,
                 });
 
-                var msdBatch = store.GetBeatmapSkillsForHashes(new[] { hash_a, hash_b, "missing" }, EzSkillSystems.BEATMAP_MINA);
+                var msdBatch = store.GetBeatmapSkillsForHashes(new[] { hash_a, hash_b, "missing" }, EzAnalysisSystem.Mina);
                 Assert.That(msdBatch.Keys, Is.EquivalentTo(new[] { hash_a, hash_b }));
                 Assert.That(msdBatch[hash_a][EzMinaSkillAxis.Overall.ToMsdSkillId()], Is.EqualTo(10).Within(1e-9));
                 Assert.That(msdBatch[hash_b][EzMinaSkillAxis.Overall.ToMsdSkillId()], Is.EqualTo(11).Within(1e-9));
@@ -295,20 +295,20 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 store.WriteBeatmapSystemSkills(
                     hash,
-                    EzSkillSystems.BEATMAP_CSI,
+                    EzAnalysisSystem.CSI,
                     new Dictionary<string, double>(StringComparer.Ordinal)
                     {
-                        [$"{EzSkillSystems.BEATMAP_CSI}.{densityId}"] = 0.5,
-                        [$"{EzSkillSystems.BEATMAP_CSI}.{chordId}"] = 0.25,
+                        [$"{EzAnalysisSystem.CSI}.{densityId}"] = 0.5,
+                        [$"{EzAnalysisSystem.CSI}.{chordId}"] = 0.25,
                     },
-                    algorithmVersion: EzAnalysisRevision.ChartSkillInfo,
+                    algorithmVersion: EzAnalysis.VERSION,
                     rulesetOnlineId: EzLocalProfileConstants.MANIA_RULESET_ID);
 
                 var axes = provider.GetBeatmapStructureAxes(maniaBeatmap(hash, Guid.NewGuid()));
 
                 Assert.That(axes[densityId], Is.EqualTo(0.5).Within(1e-9));
                 Assert.That(axes[chordId], Is.EqualTo(0.25).Within(1e-9));
-                Assert.That(axes.ContainsKey($"{EzSkillSystems.BEATMAP_CSI}.{densityId}"), Is.False,
+                Assert.That(axes.ContainsKey($"{EzAnalysisSystem.CSI}.{densityId}"), Is.False,
                     "consumers address structure axes by the id the axis declaration uses");
             });
         }
@@ -329,9 +329,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 store.WriteBeatmapSystemSkills(
                     hash,
-                    EzSkillSystems.BEATMAP_CSI,
-                    new Dictionary<string, double>(StringComparer.Ordinal) { [$"{EzSkillSystems.BEATMAP_CSI}.{EzManiaLNAxis.Density.ToId()}"] = 0.5 },
-                    algorithmVersion: EzAnalysisRevision.ChartSkillInfo,
+                    EzAnalysisSystem.CSI,
+                    new Dictionary<string, double>(StringComparer.Ordinal) { [$"{EzAnalysisSystem.CSI}.{EzManiaLNAxis.Density.ToId()}"] = 0.5 },
+                    algorithmVersion: EzAnalysis.VERSION,
                     rulesetOnlineId: EzLocalProfileConstants.MANIA_RULESET_ID);
 
                 Assert.That(provider.GetBeatmapStructureAxes(beatmap), Is.Not.Empty);
@@ -343,8 +343,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// A complete CSI row on a chart whose MSD settled as unrateable is exactly what BDSP re-queues on every
-        /// run: its repair set is "unrateable MSD and still a complete CSI row". The backfill has to replace it
+        /// A complete CSI row on a chart whose Mina settled as unrateable is exactly what BDSP re-queues on every
+        /// run: its repair set is "unrateable Mina and still a complete CSI row". The backfill has to replace it
         /// with the stub form, which both takes it out of the complete set and leaves it in the settled set.
         /// </summary>
         [Test]
@@ -378,7 +378,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// The live read path must not rebuild the row the backfill just retired: with a settled unrateable MSD there
+        /// The live read path must not rebuild the row the backfill just retired: with a settled unrateable Mina there
         /// are no axes to compute from, so it declines instead of stamping a full row off the stub marker.
         /// </summary>
         [Test]

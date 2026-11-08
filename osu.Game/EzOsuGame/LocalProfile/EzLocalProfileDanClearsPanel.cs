@@ -127,8 +127,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 return;
             }
 
-            var rc = skillProvider.GetDanClears(username, keys, EzDanSide.Rc.ToId(), EzAnalysisRevision.VERSION);
-            var ln = skillProvider.GetDanClears(username, keys, EzDanSide.Ln.ToId(), EzAnalysisRevision.VERSION);
+            var rc = skillProvider.GetDanClears(username, keys, EzDanSide.Rc.ToId(), EzAnalysis.VERSION);
+            var ln = skillProvider.GetDanClears(username, keys, EzDanSide.Ln.ToId(), EzAnalysis.VERSION);
 
             if (rc.Count == 0 && ln.Count == 0)
             {

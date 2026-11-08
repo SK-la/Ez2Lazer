@@ -4,24 +4,23 @@
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Database;
 
 namespace osu.Game.Tests.EzOsuGame.Analysis
 {
     [TestFixture]
     public class EzDataRebuildDispatcherTest
     {
-        [TestCase(EzDataRebuildAction.RealmTags, EzRealmMetadataScope.Tags)]
-        [TestCase(EzDataRebuildAction.RealmSunny, EzRealmMetadataScope.SunnySR)]
-        [TestCase(EzDataRebuildAction.RealmPp, EzRealmMetadataScope.PP)]
-        [TestCase(EzDataRebuildAction.RealmChartMsd, EzRealmMetadataScope.MSD)]
-        [TestCase(EzDataRebuildAction.RealmChartCsi, EzRealmMetadataScope.ChartSkillInfo)]
-        [TestCase(EzDataRebuildAction.RealmChartDan, EzRealmMetadataScope.ChartDan)]
-        [TestCase(EzDataRebuildAction.RealmPpp, EzRealmMetadataScope.PPP)]
-        [TestCase(EzDataRebuildAction.RealmAll, EzRealmMetadataScope.All)]
-        public void TestRealmTargetsDispatchWithCorrectScope(EzDataRebuildAction action, EzRealmMetadataScope expectedScope)
+        [TestCase(EzDataRebuildAction.RealmTags, EzAnalysisSystem.MetadataTags)]
+        [TestCase(EzDataRebuildAction.RealmSunny, EzAnalysisSystem.SSR)]
+        [TestCase(EzDataRebuildAction.RealmPp, EzAnalysisSystem.Official)]
+        [TestCase(EzDataRebuildAction.RealmChartMsd, EzAnalysisSystem.Mina)]
+        [TestCase(EzDataRebuildAction.RealmChartCsi, EzAnalysisSystem.CSI)]
+        [TestCase(EzDataRebuildAction.RealmChartDan, EzAnalysisSystem.Dan)]
+        [TestCase(EzDataRebuildAction.RealmPpp, EzAnalysisSystem.PPP)]
+        [TestCase(EzDataRebuildAction.RealmAll, EzAnalysisSystem.All)]
+        public void TestRealmTargetsDispatchWithCorrectScope(EzDataRebuildAction action, EzAnalysisSystem expectedScope)
         {
-            EzRealmMetadataScope? capturedScope = null;
+            EzAnalysisSystem? capturedScope = null;
             bool? capturedForceAll = null;
 
             var dispatcher = new EzDataRebuildDispatcher(
@@ -47,7 +46,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         public void TestRealmSelectionIsMergedIntoOneScopeUnion()
         {
             int calls = 0;
-            EzRealmMetadataScope capturedScope = default;
+            EzAnalysisSystem capturedScope = default;
             bool? capturedForceAll = null;
 
             var dispatcher = new EzDataRebuildDispatcher(
@@ -71,7 +70,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             var outcome = dispatcher.Execute(actions, forceAll: true);
 
             Assert.That(calls, Is.EqualTo(1), "one Realm queue accepts the whole selection");
-            Assert.That(capturedScope, Is.EqualTo(EzRealmMetadataScope.MSD | EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan));
+            Assert.That(capturedScope, Is.EqualTo(EzAnalysisSystem.Mina | EzAnalysisSystem.CSI | EzAnalysisSystem.Dan));
             Assert.That(capturedForceAll, Is.True);
             Assert.That(outcome.Queued, Is.EquivalentTo(actions));
             Assert.That(outcome.Failures, Is.Empty);

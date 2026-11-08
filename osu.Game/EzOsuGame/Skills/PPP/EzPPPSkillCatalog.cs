@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
 
@@ -25,7 +26,7 @@ namespace osu.Game.EzOsuGame.Skills.PPP
 
     /// <summary>
     /// PPP skill ids for osu, taiko, catch, and mania. System ids stay
-    /// <see cref="EzSkillSystems.BEATMAP_PPP"/> / <see cref="EzSkillSystems.PLAYER_PPP"/>.
+    /// <see cref="EzAnalysisSystem.PPP"/> / <see cref="EzAnalysisSystem.PPP"/>.
     /// </summary>
     public static class EzPPPSkillCatalog
     {
@@ -84,19 +85,19 @@ namespace osu.Game.EzOsuGame.Skills.PPP
         }
 
         /// <summary>
-        /// Realm slice key. Mania uses key count; other PPP rulesets share <see cref="EzSkillSystems.UNSLICED_KEY"/>.
+        /// Realm slice key. Mania uses key count; other PPP rulesets share <see cref="EzAxisIds.UNSLICED_KEY"/>.
         /// </summary>
         public static int PlayerSliceKey(int rulesetOnlineId, int keyCount)
         {
             if (rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID)
                 return Math.Max(1, keyCount);
 
-            return EzSkillSystems.UNSLICED_KEY;
+            return EzAxisIds.UNSLICED_KEY;
         }
 
-        public static string ChartSkillId(string metricId) => $"{EzSkillSystems.BEATMAP_PPP}.{metricId}";
+        public static string ChartSkillId(string metricId) => metricId;
 
-        public static string PlayerSkillId(string metricId) => $"{EzSkillSystems.PLAYER_PPP}.{metricId}";
+        public static string PlayerSkillId(string metricId) => metricId;
 
         public static IReadOnlyDictionary<string, double> ChartZeros(int rulesetOnlineId)
         {

@@ -459,7 +459,7 @@ namespace osu.Game.EzOsuGame.HUD
             if (analysis is not { } live)
                 return no_skill_values;
 
-            var axes = live.AxesOf(EzAnalysisChannels.PPP);
+            var axes = live.AxesOf(EzAnalysisSystem.PPP);
 
             if (axes.Count == 0)
                 return no_skill_values;
@@ -562,9 +562,9 @@ namespace osu.Game.EzOsuGame.HUD
 
             // Which vector the skill modes draw is the chart catalog's declared default for the ruleset, not a
             // ruleset test here: mania declares its own rating engine, every other ruleset declares PP+.
-            string? defaultSystem = skillProvider?.GetChartProfile(beatmapInfo.Ruleset.OnlineID)?.DefaultSystemId;
+            EzAnalysisSystem? defaultSystem = skillProvider?.GetChartProfile(beatmapInfo.Ruleset.OnlineID)?.DefaultSystem;
 
-            if (defaultSystem != EzSkillSystems.BEATMAP_MINA)
+            if (defaultSystem != EzAnalysisSystem.Mina)
             {
                 updatePppSkillRadarPresentation(beatmapInfo);
                 return;
@@ -578,7 +578,7 @@ namespace osu.Game.EzOsuGame.HUD
             requestLiveAnalysis(beatmapInfo);
 
             var live = getLiveAnalysis(beatmapInfo);
-            var msd = live is { } analysed ? analysed.AxesOf(EzAnalysisChannels.MINA) : no_skill_values;
+            var msd = live is { } analysed ? analysed.AxesOf(EzAnalysisSystem.Mina) : no_skill_values;
             var structureAxes = live is { } structured ? structureAxesOf(structured) : no_skill_values;
 
             int keyCount = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
@@ -631,11 +631,11 @@ namespace osu.Game.EzOsuGame.HUD
         /// </summary>
         private static double displayValue(double value) => double.IsFinite(value) && value >= EzPatternRatings.DISPLAY_MIN ? value : 0;
 
-        private static IReadOnlyDictionary<string, double> structureAxesOf(in EzAnalysisResult analysis) => analysis.AxesOf(EzAnalysisChannels.CSI);
+        private static IReadOnlyDictionary<string, double> structureAxesOf(in EzAnalysisResult analysis) => analysis.AxesOf(EzAnalysisSystem.CSI);
 
         /// <summary>
         /// Synchronous LN/RC pre-judgement. Realm-persisted ChartDan with an LN half is authoritative
-        /// (written through the same hold gate); otherwise fall back to that gate using the MSD hold ratio
+        /// (written through the same hold gate); otherwise fall back to that gate using the Mina hold ratio
         /// and the stored hold-object count.
         /// </summary>
         private static bool expectsLnSkillRadar(int keyCount, EzPersistedChartDan? persistedChartDan, double holdRatio, int holdCount)
@@ -760,7 +760,7 @@ namespace osu.Game.EzOsuGame.HUD
             IReadOnlyDictionary<string, double> playerSkills = no_skill_values;
 
             if (!string.IsNullOrWhiteSpace(username) && skillProvider != null)
-                playerSkills = skillProvider.GetPlayerSystemSkills(username, slice, EzSkillSystems.PLAYER_PPP, rulesetId);
+                playerSkills = skillProvider.GetPlayerSystemSkills(username, slice, EzAnalysisSystem.PPP, rulesetId);
 
             bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.PPPSkillChart;
             var axes = EzPPPSkillCatalog.RadarAxes(rulesetId);

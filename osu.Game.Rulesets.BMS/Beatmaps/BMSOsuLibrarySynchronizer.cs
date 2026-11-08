@@ -211,7 +211,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 beatmap.StarRating = persisted.StarRating;
 
             if (persisted.SunnySR >= 0)
-                EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Sunny, persisted.SunnySR);
+                EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.SSR, persisted.SunnySR);
 
             if (persisted.PerformancePoints >= 0)
                 beatmap.PerformancePoints = persisted.PerformancePoints;

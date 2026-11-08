@@ -6,7 +6,7 @@ using System;
 namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
-    /// Mania difficulty rating engine. MSD is the chart-side baseline; SunnySR is the
+    /// Mania difficulty rating engine. Mina is the chart-side baseline; SunnySR is the
     /// score-relative rating at a given Wife/accuracy goal.
     /// </summary>
     /// <remarks>
@@ -29,7 +29,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         bool SupportsKeyCount(int keyCount);
 
         /// <summary>
-        /// Chart difficulty (MSD) for the given rows. <paramref name="rate"/> applies a music-rate mod.
+        /// Chart difficulty (Mina) for the given rows. <paramref name="rate"/> applies a music-rate mod.
         /// Returns the zero vector when the keymode is unsupported or there are too few rows to rate.
         /// </summary>
         EzMinaSkillAxisVector CalculateMsd(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate = 1f);

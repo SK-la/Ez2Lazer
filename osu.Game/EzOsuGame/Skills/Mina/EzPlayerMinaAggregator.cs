@@ -23,7 +23,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
     /// Aggregates per-play SunnySR vectors into independent player skills (Etterna AggregateSunnySRs).
     /// Goal via <see cref="EzMinaRatingGoal"/> (Wife subset when statistics exist).
     /// </summary>
-    public sealed class EzPlayerRatingAggregator
+    public sealed class EzPlayerMinaAggregator
     {
         /// <summary>Max skill-history samples stored per keymode (trend chart cap).</summary>
         public const int HISTORY_MAX_POINTS = 64;
@@ -41,7 +41,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         private readonly EzChartSkillStore chartStore;
         private readonly EzLocalProfileStore? profileStore;
 
-        public EzPlayerRatingAggregator(BeatmapManager beatmapManager, EzPlayerSkillStore skillStore, EzChartSkillStore chartStore, EzLocalProfileStore? profileStore = null)
+        public EzPlayerMinaAggregator(BeatmapManager beatmapManager, EzPlayerSkillStore skillStore, EzChartSkillStore chartStore, EzLocalProfileStore? profileStore = null)
         {
             this.beatmapManager = beatmapManager;
             this.skillStore = skillStore;
@@ -195,7 +195,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                                 play.ScoredAt,
                                 true,
                                 vector,
-                                EzAnalysisRevision.VERSION));
+                                EzAnalysis.VERSION));
                         }
 
                         string[] patterns = resolvePatterns(play.BeatmapHash, patternsByHash, missingCharts);
@@ -298,7 +298,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                 play.ScoredAt,
                 false,
                 default,
-                EzAnalysisRevision.VERSION));
+                EzAnalysis.VERSION));
         }
 
         private void flushCache(List<EzMinaPlayCacheRow> pending)
@@ -348,7 +348,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                         Accuracy = play.Accuracy,
                         Rate = rate,
                         ScoredAt = play.ScoredAt,
-                        AlgorithmVersion = EzAnalysisRevision.VERSION,
+                        AlgorithmVersion = EzAnalysis.VERSION,
                     });
                 }
             }
@@ -368,7 +368,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                     Accuracy = play.Accuracy,
                     Rate = rate,
                     ScoredAt = play.ScoredAt,
-                    AlgorithmVersion = EzAnalysisRevision.VERSION,
+                    AlgorithmVersion = EzAnalysis.VERSION,
                 });
             }
         }

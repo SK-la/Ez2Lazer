@@ -25,7 +25,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
     [TestFixture]
     public class EzAnalysisDriftGuardTest
     {
-        /// <summary>Largest accepted drift for a continuous value (star, MSD axis, dan).</summary>
+        /// <summary>Largest accepted drift for a continuous value (star, Mina axis, dan).</summary>
         private const double tolerance = 0.002;
 
         [TearDown]

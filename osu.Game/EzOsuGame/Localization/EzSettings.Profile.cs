@@ -216,8 +216,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DAN_HEURISTIC_HINT =
             new EzLocalizationManager.EzLocalisableString(
-                "MSD→Dan 近似，非 LeoBlack",
-                "MSD→Dan approx, not LeoBlack");
+                "Mina→Dan 近似，非 LeoBlack",
+                "Mina→Dan approx, not LeoBlack");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_TRACK_INSIGHTS =
             new EzLocalizationManager.EzLocalisableString("成绩洞察", "Profile Insights");

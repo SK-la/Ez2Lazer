@@ -49,12 +49,11 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
 
         /// <summary>
         /// Skill radar axes for 6/7/8K: the player axes minus <see cref="EzManiaRCAxis.Ln"/> (LN has its own layer).
-        /// Dual source (4+2): pattern Overall buckets + Mina SunnySR↔MSD — each axis compares same algorithm.
+        /// Dual source (4+2): pattern Overall buckets + Mina SunnySR↔Mina — each axis compares same algorithm.
         /// </summary>
         public static IReadOnlyList<EzManiaRCAxis> RadarAxes { get; } = EzManiaRCAxisExtensions.PlayerRadarAxes;
 
-        public static string ToSkillId(string patternId)
-            => $"{EzSkillSystems.PLAYER_PATTERN}.{patternId}";
+        public static string ToSkillId(string patternId) => patternId;
 
         public static string ToSkillId(EzManiaRCAxis axis) => axis.ToSkillId();
 
@@ -65,18 +64,14 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
             if (string.IsNullOrEmpty(skillId))
                 return false;
 
-            const string prefix = EzSkillSystems.PLAYER_PATTERN + ".";
-            if (!skillId.StartsWith(prefix, StringComparison.Ordinal))
-                return false;
-
-            patternId = skillId[prefix.Length..];
+            patternId = skillId;
             return patternId.Length > 0;
         }
 
         /// <summary>
-        /// Pattern-Overall axes (player_pattern ↔ chart Overall MSD when tagged):
+        /// Pattern-Overall axes (player_pattern ↔ chart Overall Mina when tagged):
         /// chordstream / bracket / delay / stream.
-        /// Mina axes (SunnySR ↔ MSD): jack / tech.
+        /// Mina axes (SunnySR ↔ Mina): jack / tech.
         /// </summary>
         public static bool UsesMinaRadarSource(EzManiaRCAxis axis)
             => axis is EzManiaRCAxis.Jack or EzManiaRCAxis.Tech;
@@ -152,8 +147,8 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
 
         /// <summary>
         /// Same-algorithm green/yellow for one radar axis.
-        /// Pattern axes: player pattern rating ↔ Overall MSD if chart tagged.
-        /// Mina axes: player SunnySR ↔ chart MSD.
+        /// Pattern axes: player pattern rating ↔ Overall Mina if chart tagged.
+        /// Mina axes: player SunnySR ↔ chart Mina.
         /// </summary>
         public static EzRadarAxisPair ResolveRadarAxisPair(
             EzManiaRCAxis axis,

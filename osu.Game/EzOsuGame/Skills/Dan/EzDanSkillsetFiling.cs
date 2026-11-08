@@ -105,7 +105,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         ///     averages over all filings into that tile (shared clears included).
         /// </summary>
         /// <param name="resolvePlayValues">
-        ///     Hub <c>play.values</c> — per-clear Mina SunnySR vector (not beatmap MSD).
+        ///     Hub <c>play.values</c> — per-clear Mina SunnySR vector (not beatmap Mina).
         /// </param>
         public static IReadOnlyDictionary<string, EzDanSkillsetVerdict> ComputeVerdicts(
             int keyCount,
@@ -285,7 +285,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         }
 
         /// <summary>
-        ///     Normalize MSD dict keys to Mina skillset names used by filing.
+        ///     Normalize Mina dict keys to Mina skillset names used by filing.
         ///     Accepts <c>beatmap_msd.stream</c>, bare <c>stream</c>/<c>jack</c>/<c>tech</c>, and Mina <c>Stream</c>/<c>JackSpeed</c>.
         /// </summary>
         public static IReadOnlyDictionary<string, double> NormalizeMsdValues(IReadOnlyDictionary<string, double>? source)
@@ -709,7 +709,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                && DominantSkillset(pickSkillsets(values, base_msd_skillsets)) == "Handstream";
 
         /// <summary>
-        /// 4K non-LN charts whose MSD distribution leads with Handstream under a Stamina dominance.
+        /// 4K non-LN charts whose Mina distribution leads with Handstream under a Stamina dominance.
         /// </summary>
         private static bool isHandstreamEndurance(EzChartSkillInfo chart, IReadOnlyDictionary<string, double>? values)
         {

@@ -53,17 +53,17 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString IGNORE_BETTER = new EzLocalizationManager.EzLocalisableString("忽略更好", "Ignore Better");
         public static readonly LocalisableString IGNORE_WORSE = new EzLocalizationManager.EzLocalisableString("忽略更差", "Ignore Worse");
 
-        public static readonly LocalisableString DATA_REBUILD_ACTION_MSD_NAME = new EzLocalizationManager.EzLocalisableString("MSD 技能评分", "MSD skill rating");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_MSD_NAME = new EzLocalizationManager.EzLocalisableString("Mina 技能评分", "Mina skill rating");
         public static readonly LocalisableString DATA_REBUILD_ACTION_MSD_DETAIL = new EzLocalizationManager.EzLocalisableString(
             "引擎评级，喂养雷达与段位", "Engine rating; feeds the radar and dan");
 
         public static readonly LocalisableString DATA_REBUILD_ACTION_CSI_NAME = new EzLocalizationManager.EzLocalisableString("CSI 谱面结构", "CSI chart structure");
         public static readonly LocalisableString DATA_REBUILD_ACTION_CSI_DETAIL = new EzLocalizationManager.EzLocalisableString(
-            "结构轴与谱面标签，读 MSD", "Structure axes and chart tags; reads MSD");
+            "结构轴与谱面标签，读 Mina", "Structure axes and chart tags; reads Mina");
 
         public static readonly LocalisableString DATA_REBUILD_ACTION_DAN_NAME = new EzLocalizationManager.EzLocalisableString("段位（Dan）", "Dan rank");
         public static readonly LocalisableString DATA_REBUILD_ACTION_DAN_DETAIL = new EzLocalizationManager.EzLocalisableString(
-            "由 MSD 与 CSI 推导", "Derived from MSD and CSI");
+            "由 Mina 与 CSI 推导", "Derived from Mina and CSI");
 
         public static readonly LocalisableString DATA_REBUILD_ACTION_PPP_NAME = new EzLocalizationManager.EzLocalisableString("PP+ 技能", "PP+ skills");
         public static readonly LocalisableString DATA_REBUILD_ACTION_PPP_DETAIL = new EzLocalizationManager.EzLocalisableString(

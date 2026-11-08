@@ -80,7 +80,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [Test]
         public void Default_result_has_no_axes()
         {
-            Assert.That(default(EzAnalysisResult).AxesOf(EzAnalysisChannels.MINA), Is.Empty);
+            Assert.That(default(EzAnalysisResult).AxesOf(EzAnalysisSystem.Mina), Is.Empty);
         }
 
         private static BeatmapInfo createOsuBeatmap(double performancePoints)

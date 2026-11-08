@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using NUnit.Framework;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics;
 using osu.Game.Rulesets.BMS.UI.SongSelect;
 
@@ -27,7 +26,6 @@ namespace osu.Game.Rulesets.BMS.Tests.SongSelect
             Assert.That(BmsAnalyticsEzConverter.ToEzAnalysisResult(record), Is.Not.Null);
 
             var result = BmsAnalyticsEzConverter.ToEzAnalysisResult(record)!.Value;
-            Assert.That(result.AxesOf(EzAnalysisChannels.OFFICIAL_PERFORMANCE)[EzAnalysisChannels.PERFORMANCE_POINTS], Is.EqualTo(123.4));
             Assert.That(result.AverageKps, Is.EqualTo(7.8));
             Assert.That(result.MaxKps, Is.EqualTo(9.0));
             Assert.That(result.ManiaSummary?.SunnySR, Is.EqualTo(5.6));

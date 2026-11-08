@@ -124,6 +124,6 @@ namespace osu.Game.EzOsuGame.UserInterface
         /// carries a skill vector does; the analysis provider only decides the Sunny rating, not the pill's presence.
         /// </summary>
         public static bool ShouldShowSunnySRDisplay(BeatmapInfo beatmap)
-            => EzRulesetReadout.Selected(beatmap.Ruleset.OnlineID)?.SkillRating != EzRatingSystem.None;
+            => EzRulesetReadout.Selected(beatmap.Ruleset.OnlineID)?.SkillRating != EzAnalysisSystem.None;
     }
 }

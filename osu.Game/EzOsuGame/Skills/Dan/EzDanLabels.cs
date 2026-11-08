@@ -71,13 +71,13 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         /// <summary>
         /// Dan used when the chart's own keymode table did not answer.
-        /// 4/6/7K have a table, so this is their no-ssrpath: the calibrated MSD means table
+        /// 4/6/7K have a table, so this is their no-ssrpath: the calibrated Mina means table
         /// (and the "other side" half of an Ez dual-half row).
         /// 5K / 8K–18K have no community table at all, and the <c>means</c> tables below are
-        /// calibrated on 4K MSD — the n-key engine rates those keymodes on a different curve, so
-        /// feeding it their Overall MSD inflated the label by several levels. Their star rating is
+        /// calibrated on 4K Mina — the n-key engine rates those keymodes on a different curve, so
+        /// feeding it their Overall Mina inflated the label by several levels. Their star rating is
         /// the only community-calibrated number they have, so it is read off the 4K curve (same
-        /// side) instead of inventing a new MSD→dan constant.
+        /// side) instead of inventing a new Mina→dan constant.
         /// Null = no trustworthy dan; callers must leave the label empty rather than invent one.
         /// </summary>
         public static DanLookup? TryResolveFallbackDan(int keyCount, EzDanSide side, double overallMsd, EzMinaSkillAxis axis, double? sunnySR)
@@ -165,7 +165,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             return sr + (targetSr - sr) * gate;
         }
 
-        /// <summary>Highest RcMina radar axis in MSD (for chart skill chip / means when not Sunny).</summary>
+        /// <summary>Highest RcMina radar axis in Mina (for chart skill chip / means when not Sunny).</summary>
         public static EzMinaSkillAxis DominantAxis(IReadOnlyDictionary<string, double> msdSkills)
         {
             var best = EzMinaSkillAxis.Stream;
@@ -183,7 +183,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             return best;
         }
 
-        /// <summary>Look up one axis via its current MSD skill id.</summary>
+        /// <summary>Look up one axis via its current Mina skill id.</summary>
         private static bool tryGetAxisMsd(IReadOnlyDictionary<string, double> msdSkills, EzMinaSkillAxis axis, out double value)
         {
             if (msdSkills.TryGetValue(axis.ToMsdSkillId(), out value))

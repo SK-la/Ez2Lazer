@@ -29,7 +29,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private const int yield_every = 32;
 
         private readonly EzLocalProfileAggregator aggregator;
-        private readonly EzPlayerRatingAggregator? ssrAggregator;
+        private readonly EzPlayerMinaAggregator? ssrAggregator;
         private readonly EzPlayerDanAggregator? danAggregator;
         private readonly EzPlayerPPPAggregator? osuPPPAggregator;
         private readonly EzSkillProvider? skillProvider;
@@ -77,7 +77,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             RealmAccess realm,
             EzAnalysisPersistentStore analysisStore,
             BeatmapManager beatmapManager,
-            EzPlayerRatingAggregator? ssrAggregator = null,
+            EzPlayerMinaAggregator? ssrAggregator = null,
             EzPlayerDanAggregator? danAggregator = null,
             EzLocalProfileStore? sharedStore = null,
             EzSkillProvider? skillProvider = null,
@@ -957,7 +957,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             if (skillsProcessed < skillsTotal)
                 progress?.Report(new EzLocalProfileComputeProgress(skillsTotal, skillsTotal, EzLocalProfileComputePhase.Skills));
 
-            // The chart-side chain owns MSD / CSI / ChartDan, and this pass never rates a chart. A play on a chart the
+            // The chart-side chain owns Mina / CSI / ChartDan, and this pass never rates a chart. A play on a chart the
             // chain has not rated yet is simply left out of the rows written above; it is reported here and picked up
             // by the next pass that runs after the chain does. It is deliberately NOT written as a stale flag: that
             // flag means "the slice moved ahead of these rows" and only another pass can clear it, so flagging a chain

@@ -62,7 +62,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 float csiToDan = gapAfter(EzDataRebuildAction.RealmChartCsi);
                 float danToPpp = gapAfter(EzDataRebuildAction.RealmChartDan);
 
-                Assert.That(msdToCsi, Is.EqualTo(EzDataRebuildCatalog.CHAIN_GAP), "MSD feeds CSI");
+                Assert.That(msdToCsi, Is.EqualTo(EzDataRebuildCatalog.CHAIN_GAP), "Mina feeds CSI");
                 Assert.That(csiToDan, Is.EqualTo(EzDataRebuildCatalog.CHAIN_GAP), "CSI feeds Dan");
                 Assert.That(danToPpp, Is.EqualTo(EzDataRebuildCatalog.INDEPENDENT_GAP), "PP+ does not read Dan");
             });
@@ -90,13 +90,13 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         [Test]
         public void TestSelectionAcceptsMultipleNodes()
         {
-            AddStep("select MSD", () => card(EzDataRebuildAction.RealmChartMsd).TriggerClick());
+            AddStep("select Mina", () => card(EzDataRebuildAction.RealmChartMsd).TriggerClick());
             AddStep("select CSI", () => card(EzDataRebuildAction.RealmChartCsi).TriggerClick());
 
             AddAssert("both selected", () => dialog.SelectedActions.OrderBy(a => a)
                                                    .SequenceEqual(new[] { EzDataRebuildAction.RealmChartMsd, EzDataRebuildAction.RealmChartCsi }.OrderBy(a => a)));
 
-            AddStep("deselect MSD", () => card(EzDataRebuildAction.RealmChartMsd).TriggerClick());
+            AddStep("deselect Mina", () => card(EzDataRebuildAction.RealmChartMsd).TriggerClick());
             AddAssert("CSI stays selected", () => dialog.SelectedActions.Single() == EzDataRebuildAction.RealmChartCsi);
         }
 
@@ -104,7 +104,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         public void TestDependentNodeExplainsItsInput()
         {
             AddAssert("CSI mentions its input", () => !LocalisableString.IsNullOrEmpty(card(EzDataRebuildAction.RealmChartCsi).TooltipText));
-            AddAssert("MSD stands alone", () => LocalisableString.IsNullOrEmpty(card(EzDataRebuildAction.RealmChartMsd).TooltipText));
+            AddAssert("Mina stands alone", () => LocalisableString.IsNullOrEmpty(card(EzDataRebuildAction.RealmChartMsd).TooltipText));
         }
 
         private EzDataRebuildDialog.RebuildNodeCard card(EzDataRebuildAction action) =>

@@ -28,6 +28,6 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         public double HoldRatio { get; init; }
 
-        public int AlgorithmVersion { get; init; } = EzAnalysisRevision.VERSION;
+        public int AlgorithmVersion { get; init; } = EzAnalysis.VERSION;
     }
 }

@@ -19,6 +19,6 @@ namespace osu.Game.EzOsuGame.Skills
         public double Accuracy { get; init; }
         public double Rate { get; init; } = 1;
         public DateTimeOffset ScoredAt { get; init; }
-        public int AlgorithmVersion { get; init; } = EzAnalysisRevision.VERSION;
+        public int AlgorithmVersion { get; init; } = EzAnalysis.VERSION;
     }
 }

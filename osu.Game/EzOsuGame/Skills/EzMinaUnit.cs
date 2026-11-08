@@ -13,25 +13,25 @@ using osu.Game.EzOsuGame.Skills.Mina;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Runs the MSD system for one chart: gate, convert, call the Mina engine, hand the vector to the store.
+    /// Runs the Mina system for one chart: gate, convert, call the Mina engine, hand the vector to the store.
     /// </summary>
     /// <remarks>
     /// Write path only: live values come from the shared analysis pass
     /// (<see cref="IEzChartAnalysisLookup"/>), never from here.
     /// </remarks>
-    public sealed class EzMSDUnit
+    public sealed class EzMinaUnit
     {
         private readonly BeatmapManager beatmapManager;
         private readonly EzChartSkillStore skillStore;
 
-        public EzMSDUnit(BeatmapManager beatmapManager, EzChartSkillStore skillStore)
+        public EzMinaUnit(BeatmapManager beatmapManager, EzChartSkillStore skillStore)
         {
             this.beatmapManager = beatmapManager;
             this.skillStore = skillStore;
         }
 
-        /// <summary>Revision the stored MSD rows are stamped with.</summary>
-        public int Revision => EzAnalysisRevision.Msd;
+        /// <summary>Revision the stored Mina rows are stamped with.</summary>
+        public int Revision => EzAnalysis.VERSION;
 
         public IReadOnlyDictionary<string, double>? ComputeAndStore(BeatmapInfo beatmapInfo)
         {
@@ -59,7 +59,7 @@ namespace osu.Game.EzOsuGame.Skills
                 // Content-addressed: the file backing this hash will not become loadable on its own, so it is
                 // settled rather than retried on every backfill (mirrors the CSI stage). Re-importing produces a
                 // new hash and 「完全重算」 clears the marker.
-                Logger.Log($"[EzSkills] MSD cannot load {beatmapInfo} ({e.Message}); settling as unrateable.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                Logger.Log($"[EzSkills] Mina cannot load {beatmapInfo} ({e.Message}); settling as unrateable.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 skillStore.WriteBeatmapMsdUnrateable(beatmapInfo.Hash, beatmapInfo.ID);
                 return null;
             }
@@ -71,7 +71,7 @@ namespace osu.Game.EzOsuGame.Skills
             // "still missing" forever.
             if (!EzMinaEngine.IsSupportedKeyCount(keyCount))
             {
-                Logger.Log($"[EzSkills] MSD unsupported keymode {keyCount} for {beatmapInfo}; settling as unrateable.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                Logger.Log($"[EzSkills] Mina unsupported keymode {keyCount} for {beatmapInfo}; settling as unrateable.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 skillStore.WriteBeatmapMsdUnrateable(beatmapInfo.Hash, beatmapInfo.ID);
                 return null;
             }
@@ -103,13 +103,13 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 // Transient: the engine rebuilds itself and the next pass retries. Settling here would retire a
                 // chart the engine can very likely still rate.
-                Logger.Log($"[EzSkills] MSD compute failed for {beatmapInfo} (keys={keyCount}): {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
+                Logger.Log($"[EzSkills] Mina compute failed for {beatmapInfo} (keys={keyCount}): {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                 return null;
             }
 
             if (vector.Overall <= 0 && vector.Stream <= 0)
             {
-                Logger.Log($"[EzSkills] MSD zero vector for {beatmapInfo} (keys={keyCount})", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                Logger.Log($"[EzSkills] Mina zero vector for {beatmapInfo} (keys={keyCount})", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 onSettledMiss(vector);
                 return null;
             }
@@ -146,7 +146,7 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Complete MSD or a settled miss — BDSP should not reprocess. A settled miss is never a valid read
+        /// Complete Mina or a settled miss — BDSP should not reprocess. A settled miss is never a valid read
         /// cache (<see cref="IsCurrentMinaCache"/> stays false).
         /// </summary>
         public static bool IsSettledMinaCache(EzSkillRowState state, IReadOnlyDictionary<string, double> existing) => state == EzSkillRowState.Unrateable || IsCurrentMinaCache(existing);

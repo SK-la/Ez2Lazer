@@ -11,7 +11,6 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.LocalProfile;
-using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
@@ -295,16 +294,22 @@ namespace osu.Game.EzOsuGame.Analysis
 
             var maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts, sunnySR);
 
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, double>> axes;
+            IReadOnlyDictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>> axes;
+            IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating> ratings;
             EzDanSet? dan;
 
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Axes))
-                axes = computeAxes(lookup, playable, analysisBeatmap, mina, structure?.Axes, ppp, sunnySR, cancellationToken);
+            {
+                var computed = computeAxes(lookup, playable, analysisBeatmap, mina, structure?.Axes, ppp, sunnySR, cancellationToken);
+                axes = computed.Axes;
+                ratings = computed.Ratings;
+            }
 
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Dan))
                 dan = computeDan(rulesetOnlineId, measurements, mina?.Axes, structure?.Info, sunnySR);
 
-            var result = new EzAnalysisResult(commonSummary, maniaSummary, axes: axes, dan: dan, radar: radarAndSunnySR.Radar, chartSkillInfo: structure?.Info);
+            var result = new EzAnalysisResult(commonSummary, maniaSummary, axes: axes, ratings: ratings, dan: dan, radar: radarAndSunnySR.Radar,
+                chartSkillInfo: structure?.Info);
 
             EzAnalysisPassPerf.RecordPass(succeeded: true);
             EzAnalysisPassPerf.MaybeLog();
@@ -321,30 +326,62 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly record struct PppResult(IReadOnlyDictionary<string, double> Axes, IReadOnlyDictionary<string, double> Skills);
 
         /// <summary>
-        /// Every producer's axis values for this chart under the current mods, keyed by producer. Takes the products
-        /// this pass already measured so no producer is computed twice.
+        /// Every producer's vector axes and scalar ratings for this chart under the current mods, keyed by system.
+        /// Takes the products this pass already measured so no producer is computed twice.
         /// </summary>
-        private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, double>> computeAxes(
+        private static AxesResult computeAxes(
             in EzAnalysisLookupCache lookup, PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap,
             MinaResult? mina, IReadOnlyDictionary<string, double>? structure, PppResult? ppp,
             double? sunnySR, CancellationToken cancellationToken)
         {
-            var result = new Dictionary<string, IReadOnlyDictionary<string, double>>();
+            var axes = new Dictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>();
+            var ratings = new Dictionary<EzAnalysisSystem, EzScalarRating>();
 
             if (mina != null)
-                result[EzAnalysisChannels.MINA] = mina.Value.Axes;
-
-            if (ppp != null)
-                result[EzAnalysisChannels.PPP] = ppp.Value.Axes;
+                axes[EzAnalysisSystem.Mina] = mina.Value.Axes;
 
             if (structure != null)
-                result[EzAnalysisChannels.CSI] = structure;
+                axes[EzAnalysisSystem.CSI] = structure;
 
-            addOfficial(playable, analysisBeatmap, lookup, cancellationToken, result);
-            addSsr(lookup, analysisBeatmap, sunnySR, cancellationToken, result);
-            addPppPerformance(lookup, analysisBeatmap, ppp, cancellationToken, result);
+            if (ppp != null)
+                addPppChart(ppp.Value, axes, ratings);
 
-            return result;
+            addOfficial(playable, analysisBeatmap, lookup, cancellationToken, ratings);
+            addSsr(lookup, analysisBeatmap, sunnySR, cancellationToken, ratings);
+            addPppPerformance(lookup, analysisBeatmap, ppp, cancellationToken, ratings);
+
+            return new AxesResult(axes, ratings);
+        }
+
+        private readonly record struct AxesResult(
+            IReadOnlyDictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>> Axes,
+            IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating> Ratings);
+
+        /// <summary>
+        /// The PP+ chart vector, with its star separated out: the engine reports the star beside the vector axes,
+        /// but a star is one number and belongs in the rating slot rather than in the axis table.
+        /// </summary>
+        private static void addPppChart(
+            in PppResult ppp,
+            Dictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>> axes,
+            Dictionary<EzAnalysisSystem, EzScalarRating> ratings)
+        {
+            if (!ppp.Axes.TryGetValue(EzPPPSkillCatalog.STAR_RATING, out double star))
+            {
+                axes[EzAnalysisSystem.PPP] = ppp.Axes;
+                return;
+            }
+
+            var vector = new Dictionary<string, double>(ppp.Axes.Count - 1, StringComparer.Ordinal);
+
+            foreach (var (axisId, value) in ppp.Axes)
+            {
+                if (axisId != EzPPPSkillCatalog.STAR_RATING)
+                    vector[axisId] = value;
+            }
+
+            axes[EzAnalysisSystem.PPP] = vector;
+            ratings[EzAnalysisSystem.PPP] = new EzScalarRating(star, null);
         }
 
         /// <summary>
@@ -352,10 +389,10 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         private static void addPppPerformance(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap,
                                               PppResult? ppp, CancellationToken cancellationToken,
-                                              Dictionary<string, IReadOnlyDictionary<string, double>> result)
+                                              Dictionary<EzAnalysisSystem, EzScalarRating> ratings)
         {
             if (ppp is not { } values
-                || !values.Axes.TryGetValue(EzAnalysisChannels.STAR_RATING, out double star)
+                || !values.Axes.TryGetValue(EzPPPSkillCatalog.STAR_RATING, out double star)
                 || !double.IsFinite(star) || star <= 0)
             {
                 return;
@@ -370,10 +407,9 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!double.IsFinite(pp) || pp <= 0)
                 return;
 
-            result[EzAnalysisChannels.PPP_PERFORMANCE] = new Dictionary<string, double>(StringComparer.Ordinal)
-            {
-                [EzAnalysisChannels.PERFORMANCE_POINTS] = pp,
-            };
+            ratings[EzAnalysisSystem.PPP] = ratings.TryGetValue(EzAnalysisSystem.PPP, out var existing)
+                ? existing with { PerformancePoints = pp }
+                : new EzScalarRating(null, pp);
         }
 
         /// <summary>
@@ -392,26 +428,15 @@ namespace osu.Game.EzOsuGame.Analysis
         /// which is why they are produced together rather than by two independent passes.
         /// </summary>
         private static void addOfficial(PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup,
-                                        CancellationToken cancellationToken, Dictionary<string, IReadOnlyDictionary<string, double>> result)
+                                        CancellationToken cancellationToken, Dictionary<EzAnalysisSystem, EzScalarRating> ratings)
         {
             if (computeOfficial(playable, analysisBeatmap, lookup, cancellationToken) is not { } official)
                 return;
 
-            if (double.IsFinite(official.StarRating) && official.StarRating >= 0)
-            {
-                result[EzAnalysisChannels.OFFICIAL] = new Dictionary<string, double>(StringComparer.Ordinal)
-                {
-                    [EzAnalysisChannels.STAR_RATING] = official.StarRating,
-                };
-            }
-
-            if (official.PerformancePoints is not double pp)
+            if (!double.IsFinite(official.StarRating) || official.StarRating < 0)
                 return;
 
-            result[EzAnalysisChannels.OFFICIAL_PERFORMANCE] = new Dictionary<string, double>(StringComparer.Ordinal)
-            {
-                [EzAnalysisChannels.PERFORMANCE_POINTS] = pp,
-            };
+            ratings[EzAnalysisSystem.Official] = new EzScalarRating(official.StarRating, official.PerformancePoints);
         }
 
         private readonly record struct OfficialResult(double StarRating, double? PerformancePoints);
@@ -465,29 +490,18 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// Sunny star rating for the current mods. The rating is a single number, so it is stored under the same
-        /// star axis id every other star-tier producer uses.
+        /// Sunny star rating and the pp it implies for the current mods. A star is one number, not an axis.
         /// </summary>
         private static void addSsr(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, double? sunnySR, CancellationToken cancellationToken,
-                                   Dictionary<string, IReadOnlyDictionary<string, double>> result)
+                                   Dictionary<EzAnalysisSystem, EzScalarRating> ratings)
         {
             if (sunnySR is not double value || !double.IsFinite(value))
                 return;
 
-            result[EzAnalysisChannels.SUNNY] = new Dictionary<string, double>(StringComparer.Ordinal)
-            {
-                [EzAnalysisChannels.STAR_RATING] = value,
-            };
-
             double pp = calculatePerformanceAtRating(lookup, analysisBeatmap, value, cancellationToken);
+            double? performance = double.IsFinite(pp) && pp > 0 ? pp : null;
 
-            if (!double.IsFinite(pp) || pp <= 0)
-                return;
-
-            result[EzAnalysisChannels.SUNNY_PERFORMANCE] = new Dictionary<string, double>(StringComparer.Ordinal)
-            {
-                [EzAnalysisChannels.PERFORMANCE_POINTS] = pp,
-            };
+            ratings[EzAnalysisSystem.SSR] = new EzScalarRating(value, performance);
         }
 
         /// <summary>
@@ -500,11 +514,11 @@ namespace osu.Game.EzOsuGame.Analysis
             if (rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID || bareAxes == null || measurements is not { } measured)
                 return null;
 
-            // The estimator addresses axes by their stored skill id.
+            // The estimator addresses axes by bare axis id; the prefix is now the system column.
             var axes = new Dictionary<string, double>(bareAxes.Count, StringComparer.Ordinal);
 
             foreach (var (axisId, value) in bareAxes)
-                axes[$"{EzSkillSystems.BEATMAP_MINA}.{axisId}"] = value;
+                axes[axisId] = value;
 
             return EzDanSet.Create(
                 axes,
@@ -571,17 +585,12 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!EzPPPCalculators.TryCalculate(rulesetOnlineId, analysisBeatmap, mods, clockRate, out var skills))
                 return null;
 
-            // Stored ids carry the system prefix; a producer's axis table addresses axes by bare id. The
-            // performance formula addresses them by stored id, so both shapes leave this method together.
+            // Axis ids are bare now: the system is a column, not a prefix, so the table and the stored rows
+            // address an axis by the same string.
             var axes = new Dictionary<string, double>(StringComparer.Ordinal);
 
-            foreach (var (skillId, value) in skills)
-            {
-                int dot = skillId.LastIndexOf('.');
-
-                if (dot > 0 && dot < skillId.Length - 1)
-                    axes[skillId[(dot + 1)..]] = value;
-            }
+            foreach (var (metricId, value) in skills)
+                axes[metricId] = value;
 
             return new PppResult(axes, skills);
         }

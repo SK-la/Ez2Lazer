@@ -77,7 +77,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             var result = new List<EzRulesetAnalysisStatus>(chartsByRuleset.Count);
 
-            foreach (int rulesetId in EzAnalysisChannels.ALL_RULESETS)
+            foreach (int rulesetId in EzAxisIds.ALL_RULESETS)
             {
                 if (!chartsByRuleset.TryGetValue(rulesetId, out var charts) || charts.Count == 0)
                     continue;
@@ -119,8 +119,8 @@ namespace osu.Game.EzOsuGame.Analysis
             if (specs.Count == 0)
                 return null;
 
-            int revision = EzAnalysisRevision.VERSION;
-            var perHash = skillRows.GetValueOrDefault((EzSkillSystems.BEATMAP_PPP, rulesetOnlineId));
+            int revision = EzAnalysis.VERSION;
+            var perHash = skillRows.GetValueOrDefault((EzAnalysisSystem.PPP.ToStorageId(), rulesetOnlineId));
             var states = new Dictionary<string, EzFacetRowState>(charts.Count, StringComparer.Ordinal);
 
             if (perHash != null)
@@ -131,7 +131,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
                     foreach (var row in stored)
                     {
-                        if (row.AlgorithmVersion == revision && row.State == (int)EzSkillRowState.Current)
+                        if (row.AlgorithmVersion == revision && (EzSkillRowState)row.State == EzSkillRowState.Current)
                             values.Add(row.SkillId);
                     }
 

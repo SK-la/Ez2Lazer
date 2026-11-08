@@ -52,7 +52,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         private HashSet<string>? unrateableMsdHashes;
 
         /// <summary>
-        /// Charts whose MSD settled as unrateable, so no ChartDan row can ever arrive for them. Loaded on first
+        /// Charts whose Mina settled as unrateable, so no ChartDan row can ever arrive for them. Loaded on first
         /// need (a ChartDan row that is otherwise missing) and reused for the rest of the pass, because it is only
         /// ever consulted after such a miss and a chart that later gains a row is answered by that row instead.
         /// </summary>
@@ -201,7 +201,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                             play.ScoreId,
                             username,
                             hash,
-                            EzAnalysisRevision.VERSION,
+                            EzAnalysis.VERSION,
                             true,
                             chart.KeyCount,
                             chart.Side.ToId(),
@@ -267,7 +267,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 play.ScoreId,
                 username,
                 hash,
-                EzAnalysisRevision.VERSION,
+                EzAnalysis.VERSION,
                 false,
                 0,
                 string.Empty,

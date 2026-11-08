@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills;
@@ -27,7 +28,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             this.rulesetOnlineId = rulesetOnlineId;
         }
 
-        public string SystemId => EzSkillSystems.PLAYER_PPP;
+        public EzAnalysisSystem System => EzAnalysisSystem.PPP;
 
         public bool HasSliceChips => false;
 
@@ -35,16 +36,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public IReadOnlyList<int> GetSliceKeys(string username)
         {
-            var skills = provider.GetPlayerSystemSkills(username, EzSkillSystems.UNSLICED_KEY, SystemId, rulesetOnlineId);
+            var skills = provider.GetPlayerSystemSkills(username, EzAxisIds.UNSLICED_KEY, System, rulesetOnlineId);
             return skills.Count > 0
-                ? new[] { EzSkillSystems.UNSLICED_KEY }
+                ? new[] { EzAxisIds.UNSLICED_KEY }
                 : Array.Empty<int>();
         }
 
         public EzTrackSkillsSnapshot Load(string username, int sliceKey)
         {
             // Values and row metadata come from one read; the panel only ever needs them together.
-            var slice = provider.GetPlayerSystemSkillSlice(username, sliceKey, SystemId, rulesetOnlineId);
+            var slice = provider.GetPlayerSystemSkillSlice(username, sliceKey, System, rulesetOnlineId);
             var skills = slice.Values;
 
             if (skills.Count == 0)

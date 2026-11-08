@@ -50,26 +50,27 @@ namespace osu.Game.EzOsuGame.Skills
 
         public readonly record struct PlayerSystemSkillSlice(IReadOnlyDictionary<string, double> Values, int AnalyzedPlays, bool Provisional, bool Stale);
 
-        public IReadOnlyDictionary<string, double> GetPlayerSkills(string username, int keyCount, string systemId, int? algorithmVersion = null, int rulesetOnlineId = -1)
+        public IReadOnlyDictionary<string, double> GetPlayerSkills(string username, int keyCount, EzAnalysisSystem system, int? algorithmVersion = null, int rulesetOnlineId = -1)
         {
-            int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
+            string systemId = system.ToStorageId();
+            int version = algorithmVersion ?? EzAnalysis.VERSION;
 
             return database.Read(c => readValues(c, new SliceQuery(username, keyCount, systemId, version, rulesetOnlineId)));
         }
 
         /// <summary>PPP player rows written at the bundle revision of <paramref name="rulesetOnlineId"/>.</summary>
-        public IReadOnlyDictionary<string, double> GetPlayerSkillsAtCurrentVersions(string username, int keyCount, string systemId, int rulesetOnlineId)
-            => GetPlayerSkills(username, keyCount, systemId, EzAnalysisRevision.VERSION, rulesetOnlineId);
+        public IReadOnlyDictionary<string, double> GetPlayerSkillsAtCurrentVersions(string username, int keyCount, EzAnalysisSystem system, int rulesetOnlineId)
+            => GetPlayerSkills(username, keyCount, system, EzAnalysis.VERSION, rulesetOnlineId);
 
         /// <summary>Row metadata for a player system slice (analyzed plays / provisional / stale).</summary>
         public (int AnalyzedPlays, bool Provisional, bool Stale) GetPlayerSystemSkillMeta(
             string username,
             int keyCount,
-            string systemId,
+            EzAnalysisSystem system,
             int? algorithmVersion = null,
             int rulesetOnlineId = -1)
         {
-            PlayerSystemSkillSlice slice = GetPlayerSystemSkillSlice(username, keyCount, systemId, algorithmVersion, rulesetOnlineId);
+            PlayerSystemSkillSlice slice = GetPlayerSystemSkillSlice(username, keyCount, system, algorithmVersion, rulesetOnlineId);
             return (slice.AnalyzedPlays, slice.Provisional, slice.Stale);
         }
 
@@ -79,10 +80,11 @@ namespace osu.Game.EzOsuGame.Skills
         public PlayerSystemSkillSlice GetPlayerSystemSkillSlice(
             string username,
             int keyCount,
-            string systemId,
+            EzAnalysisSystem system,
             int? algorithmVersion = null,
             int rulesetOnlineId = -1)
         {
+            string systemId = system.ToStorageId();
             int version = resolvePlayerVersion(systemId, algorithmVersion, rulesetOnlineId);
 
             return database.Read(c =>
@@ -100,11 +102,11 @@ namespace osu.Game.EzOsuGame.Skills
 
         public EzPlayerRatingSnapshot GetPlayerSsrSnapshot(string username, int keyCount, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzAnalysisRevision.VERSION;
+            int version = algorithmVersion ?? EzAnalysis.VERSION;
 
             return database.Read(c =>
             {
-                var query = new SliceQuery(username, keyCount, EzSkillSystems.PLAYER_MINA, version, EzLocalProfileConstants.MANIA_RULESET_ID);
+                var query = new SliceQuery(username, keyCount, EzAnalysisSystem.SSR.ToStorageId(), version, EzLocalProfileConstants.MANIA_RULESET_ID);
                 var values = readValues(c, query);
 
                 if (values.Count == 0)
@@ -125,7 +127,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         public IReadOnlyList<int> GetPlayerSsrKeyCounts(string username, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzAnalysisRevision.VERSION;
+            int version = algorithmVersion ?? EzAnalysis.VERSION;
 
             return database.Read(c =>
             {
@@ -136,7 +138,7 @@ namespace osu.Game.EzOsuGame.Skills
                                   ORDER BY key_count;
                                   """;
                 cmd.Parameters.AddWithValue("$username", username);
-                cmd.Parameters.AddWithValue("$system", EzSkillSystems.PLAYER_MINA);
+                cmd.Parameters.AddWithValue("$system", EzAnalysisSystem.SSR.ToStorageId());
                 cmd.Parameters.AddWithValue("$version", version);
 
                 var keys = new List<int>();
@@ -152,7 +154,7 @@ namespace osu.Game.EzOsuGame.Skills
         public void WritePlayerSystemSkills(
             string username,
             int sliceKey,
-            string systemId,
+            EzAnalysisSystem system,
             IReadOnlyDictionary<string, double> skills,
             int analyzedPlays,
             bool provisional = false,
@@ -161,10 +163,11 @@ namespace osu.Game.EzOsuGame.Skills
             int rulesetOnlineId = -1)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
+            string systemId = system.ToStorageId();
             ArgumentException.ThrowIfNullOrWhiteSpace(systemId);
             ArgumentNullException.ThrowIfNull(skills);
 
-            int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
+            int version = algorithmVersion ?? EzAnalysis.VERSION;
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
 
             database.Write((c, tx) => replaceValues(c, tx, username, sliceKey, systemId, rulesetOnlineId,
@@ -180,12 +183,12 @@ namespace osu.Game.EzOsuGame.Skills
             DateTimeOffset? computedAt = null,
             bool appendHistory = true)
         {
-            const int version = EzAnalysisRevision.VERSION;
+            const int version = EzAnalysis.VERSION;
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
 
             database.Write((c, tx) =>
             {
-                replaceValues(c, tx, username, keyCount, EzSkillSystems.PLAYER_MINA, EzLocalProfileConstants.MANIA_RULESET_ID,
+                replaceValues(c, tx, username, keyCount, EzAnalysisSystem.SSR.ToStorageId(), EzLocalProfileConstants.MANIA_RULESET_ID,
                     toRows(ssrValues(vector), analyzedPlays, provisional, version, at), version);
 
                 if (appendHistory)
@@ -210,23 +213,23 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentNullException.ThrowIfNull(patternRatings);
 
             DateTimeOffset at = DateTimeOffset.UtcNow;
-            const int version = EzAnalysisRevision.VERSION;
+            const int version = EzAnalysis.VERSION;
 
             database.Write((c, tx) =>
             {
-                replaceValues(c, tx, username, keyCount, EzSkillSystems.PLAYER_MINA, EzLocalProfileConstants.MANIA_RULESET_ID,
+                replaceValues(c, tx, username, keyCount, EzAnalysisSystem.SSR.ToStorageId(), EzLocalProfileConstants.MANIA_RULESET_ID,
                     toRows(ssrValues(ssr), analyzedPlays, provisional, version, at), version);
 
                 replaceHistory(c, tx, username, keyCount, historySamples, version);
 
-                replaceValues(c, tx, username, keyCount, EzSkillSystems.PLAYER_PATTERN, -1,
+                replaceValues(c, tx, username, keyCount, EzAnalysisSystem.Pattern.ToStorageId(), -1,
                     toRows(patternValues(patternRatings), analyzedPlays, provisional, version, at), version);
             });
         }
 
         public IReadOnlyList<EzPatternRating> GetPlayerPatternRatings(string username, int keyCount, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzAnalysisRevision.VERSION;
+            int version = algorithmVersion ?? EzAnalysis.VERSION;
 
             return database.Read(c =>
             {
@@ -239,7 +242,7 @@ namespace osu.Game.EzOsuGame.Skills
                                   """;
                 cmd.Parameters.AddWithValue("$username", username);
                 cmd.Parameters.AddWithValue("$key_count", keyCount);
-                cmd.Parameters.AddWithValue("$system", EzSkillSystems.PLAYER_PATTERN);
+                cmd.Parameters.AddWithValue("$system", EzAnalysisSystem.Pattern.ToStorageId());
                 cmd.Parameters.AddWithValue("$version", version);
 
                 var list = new List<EzPatternRating>();
@@ -262,14 +265,14 @@ namespace osu.Game.EzOsuGame.Skills
 
         public void ReplacePlayerSkillHistory(string username, int keyCount, IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisVector Vector)> samples)
         {
-            const int version = EzAnalysisRevision.VERSION;
+            const int version = EzAnalysis.VERSION;
 
             database.Write((c, tx) => replaceHistory(c, tx, username, keyCount, samples, version));
         }
 
         public EzPlayerDanEstimateRow? GetDanEstimate(string username, int keyCount, string side, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzAnalysisRevision.VERSION;
+            int version = algorithmVersion ?? EzAnalysis.VERSION;
 
             return database.Read(c =>
             {
@@ -316,7 +319,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         public IReadOnlyList<EzPlayerDanSkillsetRow> GetDanSkillsetValues(string username, int keyCount, string side, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzAnalysisRevision.VERSION;
+            int version = algorithmVersion ?? EzAnalysis.VERSION;
 
             return database.Read(c =>
             {
@@ -411,19 +414,20 @@ namespace osu.Game.EzOsuGame.Skills
                     verdict.RawDan,
                     verdict.Label,
                     verdict.Clears,
-                    EzAnalysisRevision.VERSION,
+                    EzAnalysis.VERSION,
                     at));
             }
 
             WriteDanSkillsetValues(username, keyCount, side, values);
         }
 
-        public void ClearPlayerSystemSkills(string username, string systemId) => database.Write((c, tx) => deleteRows(c, tx, "player_skill_value",
+        public void ClearPlayerSystemSkills(string username, EzAnalysisSystem system)
+            => database.Write((c, tx) => deleteRows(c, tx, "player_skill_value",
             "username = $username AND system_id = $system",
             cmd =>
             {
                 cmd.Parameters.AddWithValue("$username", username);
-                cmd.Parameters.AddWithValue("$system", systemId);
+                cmd.Parameters.AddWithValue("$system", system.ToStorageId());
             }));
 
         public void ClearDanSkillsetValues(string username)
@@ -630,7 +634,7 @@ namespace osu.Game.EzOsuGame.Skills
                 ins.Parameters.AddWithValue("$ruleset", rulesetOnlineId);
                 ins.Parameters.AddWithValue("$skill_id", row.SkillId);
                 ins.Parameters.AddWithValue("$value", row.Value);
-                ins.Parameters.AddWithValue("$state", (int)EzSkillRowState.Current);
+                ins.Parameters.AddWithValue("$state", EzSkillRowState.Current);
                 ins.Parameters.AddWithValue("$analyzed_plays", row.AnalyzedPlays);
                 ins.Parameters.AddWithValue("$provisional", row.Provisional ? 1 : 0);
                 ins.Parameters.AddWithValue("$version", version);
@@ -776,14 +780,6 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         private static int resolvePlayerVersion(string systemId, int? algorithmVersion, int rulesetOnlineId)
-        {
-            if (algorithmVersion is int explicitVersion)
-                return explicitVersion;
-
-            if (rulesetOnlineId >= 0 && systemId is EzSkillSystems.BEATMAP_PPP or EzSkillSystems.PLAYER_PPP)
-                return EzAnalysisRevision.VERSION;
-
-            return EzSkillSystems.ResolveAlgorithmVersion(systemId);
-        }
+            => algorithmVersion ?? EzAnalysis.VERSION;
     }
 }

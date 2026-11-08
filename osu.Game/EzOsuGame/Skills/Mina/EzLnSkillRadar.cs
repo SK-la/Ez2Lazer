@@ -10,7 +10,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
     /// LN skill radar: six spokes built from the long-note axis declaration.
-    /// Not MinaCalc MSD - the spoke values come from the structure pass, not the rating engine.
+    /// Not MinaCalc Mina - the spoke values come from the structure pass, not the rating engine.
     /// </summary>
     /// <remarks>
     /// Axis identities and labels come from <see cref="EzManiaLNAxis"/>. This type owns the normalisation caps

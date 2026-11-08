@@ -139,7 +139,7 @@ namespace osu.Game.Tests.EzOsuGame.LocalProfile
                 CreditedDan = dan,
                 Accuracy = 0.96,
                 ScoredAt = DateTimeOffset.UtcNow,
-                AlgorithmVersion = EzAnalysisRevision.VERSION,
+                AlgorithmVersion = EzAnalysis.VERSION,
             };
 
         private static EzAxisPlayEvidenceRow createAxisPlay(string username, string skillId, double value)
@@ -153,7 +153,7 @@ namespace osu.Game.Tests.EzOsuGame.LocalProfile
                 Accuracy = 0.96,
                 Rate = 1,
                 ScoredAt = DateTimeOffset.UtcNow,
-                AlgorithmVersion = EzAnalysisRevision.VERSION,
+                AlgorithmVersion = EzAnalysis.VERSION,
             };
     }
 }

@@ -12,9 +12,9 @@ namespace osu.Game.EzOsuGame.Skills.Dan
     /// chain's own coverage instead of being flagged on the player's rows.
     /// <para>
     /// A play waits when its chart is one the chain will rate - the beatmap still exists, its keymode is inside the
-    /// engine's range, and MSD has not settled it as unrateable - but carries no current chart-skill row. The two
-    /// shapes are not equally fixable: <see cref="WaitingOnCsiByUser"/> charts have a settled, rateable MSD and only
-    /// need the CSI stage to run, while <see cref="WaitingOnMsdByUser"/> charts have no settled MSD at all, so that
+    /// engine's range, and Mina has not settled it as unrateable - but carries no current chart-skill row. The two
+    /// shapes are not equally fixable: <see cref="WaitingOnCsiByUser"/> charts have a settled, rateable Mina and only
+    /// need the CSI stage to run, while <see cref="WaitingOnMsdByUser"/> charts have no settled Mina at all, so that
     /// stage never yields the row they need and they stay in debt until it succeeds.
     /// </para>
     /// <para>
@@ -39,11 +39,11 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             TotalPlays = waitingOnMsd.Values.Sum() + waitingOnCsi.Values.Sum();
         }
 
-        /// <summary>Waits that cannot end until MSD produces a row for the chart, per player: the keymode is rateable
-        /// but MSD has settled nothing for the chart at all.</summary>
+        /// <summary>Waits that cannot end until Mina produces a row for the chart, per player: the keymode is rateable
+        /// but Mina has settled nothing for the chart at all.</summary>
         public IReadOnlyDictionary<string, int> WaitingOnMsdByUser => waitingOnMsd;
 
-        /// <summary>Waits the CSI stage can still answer, per player: MSD settled the chart as rateable, so only the
+        /// <summary>Waits the CSI stage can still answer, per player: Mina settled the chart as rateable, so only the
         /// CSI row is outstanding.</summary>
         public IReadOnlyDictionary<string, int> WaitingOnCsiByUser => waitingOnCsi;
 
@@ -95,7 +95,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                     continue;
 
                 // A chart the chain settled as unrateable is not waiting on anything, whatever CSI row an earlier
-                // pass may have stamped for it from the stub MSD axis.
+                // pass may have stamped for it from the stub Mina axis.
                 if (unrateableMsd.Contains(play.BeatmapHash))
                     continue;
 

@@ -15,7 +15,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void SampleIndicesIncludeEndpointsAndCap()
         {
-            var indices = EzPlayerRatingAggregator.SampleIndices(100, 5);
+            var indices = EzPlayerMinaAggregator.SampleIndices(100, 5);
             Assert.That(indices.First(), Is.EqualTo(0));
             Assert.That(indices.Last(), Is.EqualTo(99));
             Assert.That(indices.Count, Is.LessThanOrEqualTo(5));
@@ -35,7 +35,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     new EzMinaSkillAxisVector(10 + i, 1, 1, 1, 1, 1, 1, 1)));
             }
 
-            var samples = EzPlayerRatingAggregator.BuildChronologicalHistorySamples(plays, maxPoints: 4);
+            var samples = EzPlayerMinaAggregator.BuildChronologicalHistorySamples(plays, maxPoints: 4);
 
             Assert.That(samples.Count, Is.EqualTo(4));
             Assert.That(samples[0].RecordedAt.Year, Is.EqualTo(2019));
@@ -57,7 +57,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             for (int i = 5; i < 60; i++)
                 plays.Add((t0.AddMinutes(i), vec(5)));
 
-            var samples = EzPlayerRatingAggregator.BuildChronologicalHistorySamples(
+            var samples = EzPlayerMinaAggregator.BuildChronologicalHistorySamples(
                 plays,
                 maxPoints: plays.Count,
                 rollingPlays: 10);

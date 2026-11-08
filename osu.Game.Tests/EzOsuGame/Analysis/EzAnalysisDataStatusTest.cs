@@ -105,7 +105,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 var maniaPpp = statuses.Single(s => s.RulesetOnlineId == 3).Report["ppp"];
 
                 Assert.That(osuPpp.Ready, Is.EqualTo(1));
-                Assert.That(osuPpp.CurrentRevision, Is.EqualTo(EzAnalysisRevision.VERSION));
+                Assert.That(osuPpp.CurrentRevision, Is.EqualTo(EzAnalysis.VERSION));
                 Assert.That(maniaPpp.Ready, Is.Zero);
                 Assert.That(maniaPpp.Missing, Is.EqualTo(1));
             });
@@ -143,7 +143,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 realm.Write(r => r.Add(new EzChartDan
                 {
                     BeatmapHash = mania_hash,
-                    AlgorithmVersion = EzAnalysisRevision.ChartDan,
+                    AlgorithmVersion = EzAnalysis.VERSION,
                     KeyCount = 4,
                     HoldRatio = 0.1,
                     OverallMsd = 10,
@@ -156,7 +156,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 var mania = new EzChartSkillStore(realm).CollectAnalysisStatus().Single(s => s.RulesetOnlineId == 3);
 
                 Assert.That(mania.Report["dan"].Ready, Is.EqualTo(1));
-                Assert.That(mania.Report["dan"].CurrentRevision, Is.EqualTo(EzAnalysisRevision.ChartDan));
+                Assert.That(mania.Report["dan"].CurrentRevision, Is.EqualTo(EzAnalysis.VERSION));
                 Assert.That(mania.Report["mina"].Missing, Is.EqualTo(1));
             });
         }
@@ -171,12 +171,12 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 rows.Add(new EzBeatmapSkillValue
                 {
                     BeatmapHash = hash,
-                    SystemId = EzSkillSystems.BEATMAP_PPP,
+                    SystemId = EzAnalysisSystem.PPP.ToStorageId(),
                     RulesetOnlineId = rulesetOnlineId,
                     SkillId = EzPPPSkillCatalog.ChartSkillId(metric.MetricId),
                     Value = 4.2,
                     State = (int)EzSkillRowState.Current,
-                    AlgorithmVersion = EzAnalysisRevision.VERSION,
+                    AlgorithmVersion = EzAnalysis.VERSION,
                     ComputedAt = DateTimeOffset.UtcNow,
                 });
             }

@@ -23,7 +23,7 @@ namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
     /// Unified read API for skill metrics (song select, local profile Track, …).
-    /// Covers beatmap MSD, player SunnySR, player dan estimates, chart skill info, and chart-dan verdicts.
+    /// Covers beatmap Mina, player SunnySR, player dan estimates, chart skill info, and chart-dan verdicts.
     /// Writers (computers / aggregators) are separate DI services — see <see cref="EzSkillSystems"/>.
     /// All UI surfaces (HUD DualPanel / Radar, Analysis Wedge, LocalProfile Track, display tags) read through this type.
     /// </summary>
@@ -131,49 +131,49 @@ namespace osu.Game.EzOsuGame.Skills
         /// Generic beatmap skill read for any registered <paramref name="systemId"/>.
         /// Prefer this over mania-specific helpers when the caller already knows the system.
         /// </summary>
-        public IReadOnlyDictionary<string, double> GetBeatmapSystemSkills(BeatmapInfo beatmapInfo, string systemId)
+        public IReadOnlyDictionary<string, double> GetBeatmapSystemSkills(BeatmapInfo beatmapInfo, EzAnalysisSystem system)
         {
             ArgumentNullException.ThrowIfNull(beatmapInfo);
 
-            if (string.IsNullOrEmpty(beatmapInfo.Hash) || string.IsNullOrEmpty(systemId))
+            if (string.IsNullOrEmpty(beatmapInfo.Hash) || system == EzAnalysisSystem.None)
                 return new Dictionary<string, double>(StringComparer.Ordinal);
 
-            if (systemId == EzSkillSystems.BEATMAP_PPP)
-                return ChartStore.GetBeatmapSkillsAtCurrentVersions(beatmapInfo, systemId);
+            if (system == EzAnalysisSystem.PPP)
+                return ChartStore.GetBeatmapSkillsAtCurrentVersions(beatmapInfo, system);
 
-            return ChartStore.GetBeatmapSkills(beatmapInfo.Hash, systemId);
+            return ChartStore.GetBeatmapSkills(beatmapInfo.Hash, system);
         }
 
         /// <summary>
         /// Generic player skill read. <paramref name="sliceKey"/> is keymode for mania, or
-        /// <see cref="EzSkillSystems.UNSLICED_KEY"/> for osu. <paramref name="rulesetOnlineId"/> selects the
+        /// <see cref="EzAxisIds.UNSLICED_KEY"/> for osu. <paramref name="rulesetOnlineId"/> selects the
         /// ruleset slice; pass a negative value for systems whose rows are not ruleset-attributed.
         /// </summary>
         /// <remarks>
         /// Reads stored rows only: a player vector folds the whole score archive, so it is written by the score
         /// analysis and never measured on demand. Do not add a compute fallback here.
         /// </remarks>
-        public IReadOnlyDictionary<string, double> GetPlayerSystemSkills(string username, int sliceKey, string systemId, int rulesetOnlineId = -1)
+        public IReadOnlyDictionary<string, double> GetPlayerSystemSkills(string username, int sliceKey, EzAnalysisSystem system, int rulesetOnlineId = -1)
         {
-            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(systemId))
+            if (string.IsNullOrEmpty(username) || system == EzAnalysisSystem.None)
                 return new Dictionary<string, double>(StringComparer.Ordinal);
 
-            if (systemId == EzSkillSystems.PLAYER_PPP)
-                return PlayerStore.GetPlayerSkillsAtCurrentVersions(username, sliceKey, systemId, rulesetOnlineId);
+            if (system == EzAnalysisSystem.PPP)
+                return PlayerStore.GetPlayerSkillsAtCurrentVersions(username, sliceKey, system, rulesetOnlineId);
 
-            return PlayerStore.GetPlayerSkills(username, sliceKey, systemId);
+            return PlayerStore.GetPlayerSkills(username, sliceKey, system);
         }
 
-        public (int AnalyzedPlays, bool Provisional, bool Stale) GetPlayerSystemSkillMeta(string username, int sliceKey, string systemId, int rulesetOnlineId = -1)
+        public (int AnalyzedPlays, bool Provisional, bool Stale) GetPlayerSystemSkillMeta(string username, int sliceKey, EzAnalysisSystem system, int rulesetOnlineId = -1)
         {
-            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(systemId))
+            if (string.IsNullOrEmpty(username) || system == EzAnalysisSystem.None)
                 return (0, false, false);
 
-            var meta = PlayerStore.GetPlayerSystemSkillMeta(username, sliceKey, systemId, rulesetOnlineId: rulesetOnlineId);
+            var meta = PlayerStore.GetPlayerSystemSkillMeta(username, sliceKey, system, rulesetOnlineId: rulesetOnlineId);
             if (meta.AnalyzedPlays > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
                 return meta;
 
-            return PlayerStore.GetPlayerSystemSkillMeta(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, sliceKey, systemId, rulesetOnlineId: rulesetOnlineId);
+            return PlayerStore.GetPlayerSystemSkillMeta(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, sliceKey, system, rulesetOnlineId: rulesetOnlineId);
         }
 
         /// <summary>
@@ -181,17 +181,17 @@ namespace osu.Game.EzOsuGame.Skills
         /// when both are needed; they each open their own transaction on the same row set.
         /// </summary>
         public (IReadOnlyDictionary<string, double> Values, (int AnalyzedPlays, bool Provisional, bool Stale) Meta) GetPlayerSystemSkillSlice(
-            string username, int sliceKey, string systemId, int rulesetOnlineId = -1)
+            string username, int sliceKey, EzAnalysisSystem system, int rulesetOnlineId = -1)
         {
-            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(systemId))
+            if (string.IsNullOrEmpty(username) || system == EzAnalysisSystem.None)
                 return (new Dictionary<string, double>(StringComparer.Ordinal), (0, false, false));
 
-            var slice = PlayerStore.GetPlayerSystemSkillSlice(username, sliceKey, systemId, rulesetOnlineId: rulesetOnlineId);
+            var slice = PlayerStore.GetPlayerSystemSkillSlice(username, sliceKey, system, rulesetOnlineId: rulesetOnlineId);
 
             if (slice.AnalyzedPlays > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
                 return (slice.Values, (slice.AnalyzedPlays, slice.Provisional, slice.Stale));
 
-            var legacy = PlayerStore.GetPlayerSystemSkillSlice(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, sliceKey, systemId, rulesetOnlineId: rulesetOnlineId);
+            var legacy = PlayerStore.GetPlayerSystemSkillSlice(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, sliceKey, system, rulesetOnlineId: rulesetOnlineId);
 
             return (slice.Values, legacy.AnalyzedPlays > 0
                 ? (legacy.AnalyzedPlays, legacy.Provisional, legacy.Stale)
@@ -204,7 +204,7 @@ namespace osu.Game.EzOsuGame.Skills
                 return new Dictionary<string, double>(StringComparer.Ordinal);
 
             // Settled misses are excluded by the store, so a verdict never reaches consumers as an axis set.
-            return ChartStore.GetBeatmapSkills(beatmapHash, EzSkillSystems.BEATMAP_MINA);
+            return ChartStore.GetBeatmapSkills(beatmapHash, EzAnalysisSystem.Mina);
         }
 
         /// <summary>
@@ -218,7 +218,7 @@ namespace osu.Game.EzOsuGame.Skills
         {
             ArgumentNullException.ThrowIfNull(beatmapInfo);
 
-            var stored = GetBeatmapSystemSkills(beatmapInfo, EzSkillSystems.BEATMAP_CSI);
+            var stored = GetBeatmapSystemSkills(beatmapInfo, EzAnalysisSystem.CSI);
 
             if (stored.Count == 0)
                 return stored;
@@ -238,11 +238,11 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Whether MSD settled this chart as unrateable. Asks the stored state rather than the axis set: a
-        /// verdict is not an axis, so a caller asking "has MSD settled it unrateable?" must not infer it from
+        /// Whether Mina settled this chart as unrateable. Asks the stored state rather than the axis set: a
+        /// verdict is not an axis, so a caller asking "has Mina settled it unrateable?" must not infer it from
         /// a row that is not there.
         /// </summary>
-        private bool isSettledUnrateableMina(string beatmapHash) => ChartStore.GetBeatmapSystemState(beatmapHash, EzSkillSystems.BEATMAP_MINA, EzAnalysisRevision.Msd) == EzSkillRowState.Unrateable;
+        private bool isSettledUnrateableMina(string beatmapHash) => ChartStore.GetBeatmapSystemState(beatmapHash, EzAnalysisSystem.Mina, EzAnalysis.VERSION) == EzSkillRowState.Unrateable;
 
         /// <summary>
         /// Drop session-only values so the next read reflects a row written or cleared elsewhere.
@@ -267,8 +267,8 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Chart dan from persisted MSD (+ Realm ssrwhen present). No MSD compute / no beatmap note load.
-        /// Hold ratio uses MSD <c>hold_ratio</c> only (no analysis SQLite on this path).
+        /// Chart dan from persisted Mina (+ Realm ssrwhen present). No Mina compute / no beatmap note load.
+        /// Hold ratio uses Mina <c>hold_ratio</c> only (no analysis SQLite on this path).
         /// </summary>
         public EzChartDanVerdict? TryGetCachedChartDan(BeatmapInfo beatmapInfo)
         {
@@ -508,9 +508,9 @@ namespace osu.Game.EzOsuGame.Skills
                 return memoise(danSkillsetsFromCache(username, keyCount, side));
             }
 
-            var clears = GetDanClears(resolvedUser, keyCount, side, EzAnalysisRevision.VERSION);
+            var clears = GetDanClears(resolvedUser, keyCount, side, EzAnalysis.VERSION);
 
-            // No clears for current EzAnalysisRevision.VERSION → miss. Memoised as a miss so a HUD redraw does not repeat
+            // No clears for current EzAnalysis.VERSION → miss. Memoised as a miss so a HUD redraw does not repeat
             // the query; the manual compute invalidates the memo when it writes clears.
             if (clears.Count == 0)
                 return memoise(new Dictionary<string, EzDanSkillsetVerdict>(StringComparer.Ordinal));
@@ -552,14 +552,14 @@ namespace osu.Game.EzOsuGame.Skills
                 PlayerStore.ClearDanEstimates(username);
             }
 
-            var allClears = GetDanClears(resolvedUser, algorithmVersion: EzAnalysisRevision.VERSION);
+            var allClears = GetDanClears(resolvedUser, algorithmVersion: EzAnalysis.VERSION);
             var hashes = allClears
                          .Select(c => c.BeatmapHash)
                          .Where(static h => !string.IsNullOrEmpty(h))
                          .Distinct(StringComparer.Ordinal)
                          .ToList();
 
-            var playSsr = EzDanPlayRatingIndex.FromAxisPlays(GetAxisPlays(resolvedUser, algorithmVersion: EzAnalysisRevision.VERSION));
+            var playSsr = EzDanPlayRatingIndex.FromAxisPlays(GetAxisPlays(resolvedUser, algorithmVersion: EzAnalysis.VERSION));
             var chartByHash = ensureChartSkillInfoForHashes(hashes);
 
             foreach (int keyCount in tracked_skillset_key_counts)
@@ -633,7 +633,7 @@ namespace osu.Game.EzOsuGame.Skills
                 -1,
                 (int)Math.Round(have),
                 EzDanAlgorithm.CLEAR_WINDOW,
-                EzAnalysisRevision.VERSION,
+                EzAnalysis.VERSION,
                 DateTimeOffset.UtcNow));
         }
 
@@ -678,7 +678,7 @@ namespace osu.Game.EzOsuGame.Skills
             bool allowComputeChart)
         {
             var sideEnum = EzDanSideExtensions.ParseOrRc(side);
-            var clears = GetDanClears(username, keyCount, side, EzAnalysisRevision.VERSION);
+            var clears = GetDanClears(username, keyCount, side, EzAnalysis.VERSION);
 
             var hashes = clears
                          .Select(c => c.BeatmapHash)
@@ -686,7 +686,7 @@ namespace osu.Game.EzOsuGame.Skills
                          .Distinct(StringComparer.Ordinal)
                          .ToList();
 
-            var playSsr = EzDanPlayRatingIndex.FromAxisPlays(GetAxisPlays(username, keyCount, algorithmVersion: EzAnalysisRevision.VERSION));
+            var playSsr = EzDanPlayRatingIndex.FromAxisPlays(GetAxisPlays(username, keyCount, algorithmVersion: EzAnalysis.VERSION));
             IReadOnlyDictionary<string, EzChartSkillInfo> chartByHash = allowComputeChart
                 ? ensureChartSkillInfoForHashes(hashes)
                 : ChartStore.GetChartSkillInfoForHashes(hashes);
@@ -735,7 +735,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (!EzLocalProfileConstants.IsGuestUsername(username))
                 return username;
 
-            var clears = localProfileStore?.GetDanClears(username, algorithmVersion: EzAnalysisRevision.VERSION);
+            var clears = localProfileStore?.GetDanClears(username, algorithmVersion: EzAnalysis.VERSION);
             if (clears is { Count: > 0 })
                 return username;
 
@@ -746,7 +746,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// Chart-side skillset labels for one DualPanel side via hub filing
         /// (<see cref="EzDanSkillsetFiling.BucketsForValues"/>). Same aggregate label on every hit bucket
         /// (hub DualPanel-style chart half; not primary-only).
-        /// TODO(data): DATA-DualPanel-ChartSkillsetDans — idea: independent chart skillset dans (MSD→SrToRawDan / LeoBlack).
+        /// TODO(data): DATA-DualPanel-ChartSkillsetDans — idea: independent chart skillset dans (Mina→SrToRawDan / LeoBlack).
         /// Prefer <see cref="GetChartDanSkillsetLabelsReadOnly"/> on song-select hot paths.
         /// </summary>
         public IReadOnlyDictionary<string, string> GetChartDanSkillsetLabels(
@@ -819,7 +819,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Song-select / DualPanel chart dan for UI.
-        /// Order: Realm → session → optional in-memory recompute from MSD+CSI (no disk write).
+        /// Order: Realm → session → optional in-memory recompute from Mina+CSI (no disk write).
         /// With <paramref name="allowMemoryCompute"/>, a Realm/session row that is missing an LN/RC half
         /// the current gate would allow is replaced by a fresh memory compute (stale ChartDan after gate changes).
         /// </summary>
@@ -907,7 +907,7 @@ namespace osu.Game.EzOsuGame.Skills
         private EzPersistedChartDan? tryComputeChartDanMemoryOnly(BeatmapInfo beatmapInfo)
         {
             var msd = GetBeatmapMsd(beatmapInfo.Hash);
-            if (!EzMSDUnit.IsCurrentMinaCache(msd))
+            if (!EzMinaUnit.IsCurrentMinaCache(msd))
                 return null;
 
             if (!EzDanEngine.TryResolveStoredInputs(beatmapInfo, out int keyCount, out double holdRatio, out double? sunnySR, out int holdCount))
@@ -992,7 +992,7 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 mods ??= Array.Empty<Mod>();
 
-                // A chart whose MSD settled as unrateable is settled for the whole chain, so no CSI is derived from
+                // A chart whose Mina settled as unrateable is settled for the whole chain, so no CSI is derived from
                 // it here. BDSP owns replacing a row an earlier pass stamped from the stub axis with the stub form,
                 // which is why this path only declines to compute.
                 if (isSettledUnrateableMina(beatmapInfo.Hash))
@@ -1033,7 +1033,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>
         /// BDSP-facing CSI ensure for one chart. Returns true when the hash is settled afterwards
         /// (a current-revision row, a fresh compute, or a stub because the chart cannot be loaded or its
-        /// MSD settled as unrateable), false when the failure is transient and should be retried on a later run.
+        /// Mina settled as unrateable), false when the failure is transient and should be retried on a later run.
         /// <para>
         /// This is deliberately the only path that stamps a stub: a hot-path read never persists a
         /// failure, so a transient miss from song select cannot permanently retire a chart.
@@ -1044,13 +1044,13 @@ namespace osu.Game.EzOsuGame.Skills
             if (beatmapInfo.Ruleset.OnlineID != 3)
                 return true;
 
-            // MSD settled as unrateable: the chart is settled for the whole chain, so the stub form is what belongs
+            // Mina settled as unrateable: the chart is settled for the whole chain, so the stub form is what belongs
             // here. A complete row in that state was derived from the stub axis by an earlier pass and is replaced.
             if (isSettledUnrateableMina(beatmapInfo.Hash))
             {
                 if (!ChartStore.TryGetChartSkillInfo(beatmapInfo.Hash, out var settled) || settled == null || !settled.IsUnavailable)
                 {
-                    Logger.Log($"[EzSkills] CSI not derived for {beatmapInfo}: MSD settled as unrateable; settling as unavailable.",
+                    Logger.Log($"[EzSkills] CSI not derived for {beatmapInfo}: Mina settled as unrateable; settling as unavailable.",
                         Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                     ChartStore.WriteChartSkillInfoUnavailable(beatmapInfo.Hash, beatmapInfo.ID);
                     InvalidateLiveMetrics(beatmapInfo.Hash);
@@ -1097,10 +1097,10 @@ namespace osu.Game.EzOsuGame.Skills
                 // by the one pass that measured them.
                 ChartStore.WriteBeatmapSystemSkills(
                     beatmapInfo.Hash,
-                    EzSkillSystems.BEATMAP_CSI,
+                    EzAnalysisSystem.CSI,
                     axes,
                     beatmapInfo.ID,
-                    algorithmVersion: EzAnalysisRevision.ChartSkillInfo,
+                    algorithmVersion: EzAnalysis.VERSION,
                     rulesetOnlineId: EzLocalProfileConstants.MANIA_RULESET_ID);
 
                 chartSkillInfoSessionMisses.Remove(beatmapInfo.Hash);

@@ -25,11 +25,11 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 const string hash = "ppp-version-hash";
                 string aim = EzPPPSkillAxis.Aim.ToChartSkillId();
                 string speed = EzPPPSkillAxis.Speed.ToChartSkillId();
-                int staleBundle = EzAnalysisRevision.VERSION - 1;
+                int staleBundle = EzAnalysis.VERSION - 1;
 
                 store.WriteBeatmapSystemSkills(
                     hash,
-                    EzSkillSystems.BEATMAP_PPP,
+                    EzAnalysisSystem.PPP,
                     new Dictionary<string, double>
                     {
                         [aim] = 1.5,
@@ -38,7 +38,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     skillVersions: new Dictionary<string, int>
                     {
                         [aim] = staleBundle,
-                        [speed] = EzAnalysisRevision.VERSION,
+                        [speed] = EzAnalysis.VERSION,
                     });
 
                 var beatmapInfo = new BeatmapInfo
@@ -47,7 +47,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     Ruleset = new RulesetInfo("osu", "osu!", "osu.Game.Rulesets.Osu.OsuRuleset, osu.Game.Rulesets.Osu", 0),
                 };
 
-                var current = store.GetBeatmapSkillsAtCurrentVersions(beatmapInfo, EzSkillSystems.BEATMAP_PPP);
+                var current = store.GetBeatmapSkillsAtCurrentVersions(beatmapInfo, EzAnalysisSystem.PPP);
 
                 Assert.That(current.ContainsKey(aim), Is.False);
                 Assert.That(current[speed], Is.EqualTo(2.5));

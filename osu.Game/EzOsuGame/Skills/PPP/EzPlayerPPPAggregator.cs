@@ -18,7 +18,7 @@ namespace osu.Game.EzOsuGame.Skills.PPP
 {
     /// <summary>
     /// Aggregates per-play PPP vectors into player skills (one weighted value per axis).
-    /// Mania plays are stored on their key-count slice; other rulesets use <see cref="EzSkillSystems.UNSLICED_KEY"/>.
+    /// Mania plays are stored on their key-count slice; other rulesets use <see cref="EzAxisIds.UNSLICED_KEY"/>.
     /// </summary>
     public sealed class EzPlayerPPPAggregator
     {
@@ -114,7 +114,7 @@ namespace osu.Game.EzOsuGame.Skills.PPP
 
             if (bySlices.Count == 0)
             {
-                skillStore.ClearPlayerSystemSkills(username, EzSkillSystems.PLAYER_PPP);
+                skillStore.ClearPlayerSystemSkills(username, EzAnalysisSystem.PPP);
                 return;
             }
 
@@ -128,7 +128,7 @@ namespace osu.Game.EzOsuGame.Skills.PPP
                 skillStore.WritePlayerSystemSkills(
                     username,
                     slice,
-                    EzSkillSystems.PLAYER_PPP,
+                    EzAnalysisSystem.PPP,
                     aggregated,
                     analyzed.GetValueOrDefault((rulesetOnlineId, slice)),
                     rulesetOnlineId: rulesetOnlineId);

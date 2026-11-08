@@ -15,8 +15,8 @@ namespace osu.Game.EzOsuGame.Skills.Dan
     /// a verdict, with no lookup, no store and no side effect.
     /// </summary>
     /// <remarks>
-    /// Prefers the SunnySR interval table when a star rating is available, else the MSD Overall heuristic. Skill
-    /// family and OverallMsd always come from MSD when present.
+    /// Prefers the SunnySR interval table when a star rating is available, else the Mina Overall heuristic. Skill
+    /// family and OverallMsd always come from Mina when present.
     /// </remarks>
     public static class EzDanEngine
     {
@@ -89,7 +89,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 DominantAxis = dominantAxis,
                 OverallMsd = overall,
                 HoldRatio = holdRatio,
-                AlgorithmVersion = EzAnalysisRevision.VERSION,
+                AlgorithmVersion = EzAnalysis.VERSION,
             };
         }
 

@@ -133,9 +133,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 [EzMinaSkillAxis.JackSpeed.ToId()] = 16,
             };
 
-            var table = new Dictionary<string, IReadOnlyDictionary<string, double>>
+            var table = new Dictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>
             {
-                [EzAnalysisChannels.MINA] = axes,
+                [EzAnalysisSystem.Mina] = axes,
             };
 
             // The pass resolves the sides once; the estimator is expected to read that, not derive its own.

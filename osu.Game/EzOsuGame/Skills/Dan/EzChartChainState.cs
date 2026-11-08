@@ -69,8 +69,8 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
             MsdOwed = RateableCharts.Where(h => !settledMsd.Contains(h)).ToHashSet(StringComparer.Ordinal);
 
-            // CSI is chart structure only, so it is owed for every rateable chart without a settled row - MSD
-            // settlement is no longer a precondition. The second term is a CSI row an unrateable MSD invalidated:
+            // CSI is chart structure only, so it is owed for every rateable chart without a settled row - Mina
+            // settlement is no longer a precondition. The second term is a CSI row an unrateable Mina invalidated:
             // it came from the stub axis rather than from real axes, so it is re-queued to be replaced by the stub
             // form the chain settles with - it counts as settled, so nothing else would ever revisit it.
             ChartSkillInfoOwed = RateableCharts.Where(h => !settledCsi.Contains(h))
@@ -95,13 +95,13 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         public int RateableChartCount => RateableBeatmapIds.Count;
 
-        /// <summary>Charts MSD settled - with a complete axis set or as a settled unrateable.</summary>
+        /// <summary>Charts Mina settled - with a complete axis set or as a settled unrateable.</summary>
         public IReadOnlySet<string> SettledMsd { get; }
 
-        /// <summary>Charts with a complete current MSD axis set.</summary>
+        /// <summary>Charts with a complete current Mina axis set.</summary>
         public IReadOnlySet<string> CompleteMsd { get; }
 
-        /// <summary>Charts MSD settled as unrateable; no later facet can produce a row for them.</summary>
+        /// <summary>Charts Mina settled as unrateable; no later facet can produce a row for them.</summary>
         public IReadOnlySet<string> UnrateableMsd { get; }
 
         /// <summary>Charts with a current CSI row (a result or the unavailable stub).</summary>
@@ -114,7 +114,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         public IReadOnlySet<string> CompleteChartDan { get; }
 
         /// <summary>
-        /// Charts that have a complete MSD but whose stored inputs resolve to no dan at all, so the dan stage can
+        /// Charts that have a complete Mina but whose stored inputs resolve to no dan at all, so the dan stage can
         /// never write a row for them.
         /// </summary>
         public IReadOnlySet<string> UnresolvableChartDan { get; }
@@ -122,7 +122,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// <summary>Charts the dan stage is settled for without holding a row.</summary>
         public IReadOnlySet<string> SettledChartDan { get; }
 
-        /// <summary>Charts MSD still owes a result for - the MSD stage's missing set.</summary>
+        /// <summary>Charts Mina still owes a result for - the Mina stage's missing set.</summary>
         public IReadOnlySet<string> MsdOwed { get; }
 
         /// <summary>Charts the CSI stage still owes a result for, heal set included.</summary>
@@ -156,9 +156,9 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         {
             ArgumentNullException.ThrowIfNull(r);
 
-            int msdRevision = EzAnalysisRevision.Msd;
-            int csiRevision = EzAnalysisRevision.ChartSkillInfo;
-            int danRevision = EzAnalysisRevision.ChartDan;
+            int msdRevision = EzAnalysis.VERSION;
+            int csiRevision = EzAnalysis.VERSION;
+            int danRevision = EzAnalysis.VERSION;
 
             var rateableBeatmapIds = new Dictionary<string, Guid>(StringComparer.Ordinal);
             var rateableChartMeta = new Dictionary<string, RateableChartMeta>(StringComparer.Ordinal);
@@ -188,9 +188,10 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
             var msdRowsForReader = new List<EzBeatmapSkillValue>();
             var msdSkillsAtRevision = new Dictionary<string, Dictionary<string, double>>(StringComparer.Ordinal);
+            string msdSystemId = EzAnalysisSystem.Mina.ToStorageId();
 
             foreach (var value in r.All<EzBeatmapSkillValue>()
-                                   .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MINA)
+                                   .Where(v => v.SystemId == msdSystemId)
                                    .AsEnumerable())
             {
                 if (!rateableBeatmapIds.ContainsKey(value.BeatmapHash))
@@ -198,7 +199,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
                 msdRowsForReader.Add(value);
 
-                if (value.AlgorithmVersion != msdRevision || value.State != (int)EzSkillRowState.Current)
+                if (value.AlgorithmVersion != msdRevision || (EzSkillRowState)value.State != EzSkillRowState.Current)
                     continue;
 
                 if (!msdSkillsAtRevision.TryGetValue(value.BeatmapHash, out var skills))
@@ -215,7 +216,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 static v => v.BeatmapHash,
                 static v => v.AlgorithmVersion,
                 msdRevision,
-                static v => v.State == (int)EzSkillRowState.Unrateable);
+                static v => (EzSkillRowState)v.State == EzSkillRowState.Unrateable);
 
             var csiRows = EzRealmFacetReader.Read(
                 r.All<EzBeatmapChartSkillInfo>()
@@ -236,7 +237,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 danRevision,
                 static _ => false);
 
-            // MSD settles either with a complete axis set or as the unrateable stub. Completeness is a property of
+            // Mina settles either with a complete axis set or as the unrateable stub. Completeness is a property of
             // the whole axis set, so it is read separately from the per-row revision state above.
             var unrateableMsd = msdRows.Where(static kv => kv.Value.CurrentStub).Select(static kv => kv.Key).ToHashSet(StringComparer.Ordinal);
             var completeMsdSkills = readCompleteMsdSkills(msdRows, msdSkillsAtRevision);
@@ -256,7 +257,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             {
                 new EzDataStateFacet
                 {
-                    Id = "MSD",
+                    Id = "Mina",
                     CurrentRevision = msdRevision,
                     UniverseCount = universe,
                     Rows = msdRows,
@@ -292,8 +293,8 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         }
 
         /// <summary>
-        /// Chart MSD axis sets that are complete at the current revision, keyed by hash, for the two verdicts that
-        /// need the axes rather than a row's revision: whether MSD settled, and whether a dan resolves from them.
+        /// Chart Mina axis sets that are complete at the current revision, keyed by hash, for the two verdicts that
+        /// need the axes rather than a row's revision: whether Mina settled, and whether a dan resolves from them.
         /// </summary>
         private static Dictionary<string, IReadOnlyDictionary<string, double>> readCompleteMsdSkills(
             IReadOnlyDictionary<string, EzFacetRowState> msdRows,
@@ -306,7 +307,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 if (!msdRows.TryGetValue(hash, out var state) || state.CurrentStub)
                     continue;
 
-                if (EzMSDUnit.IsCurrentMinaCache(skills))
+                if (EzMinaUnit.IsCurrentMinaCache(skills))
                     complete[hash] = skills;
             }
 
@@ -314,7 +315,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         }
 
         /// <summary>
-        /// Charts whose complete MSD resolves to no dan: the dan stage's own write gate
+        /// Charts whose complete Mina resolves to no dan: the dan stage's own write gate
         /// (<see cref="EzDanEngine.FromMsd"/> resolving nothing) applied to the inputs that stage reads.
         /// </summary>
         private static HashSet<string> deriveUnresolvableChartDan(

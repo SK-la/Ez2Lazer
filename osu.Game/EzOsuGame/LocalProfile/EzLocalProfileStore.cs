@@ -584,7 +584,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// Dan clear evidence for <paramref name="username"/>.
         /// <see cref="EzLocalProfileConstants.IsAllPlayersFilter"/> reads all real-player rows (no username filter;
         /// excludes residual <see cref="EzLocalProfileConstants.ALL_PLAYERS"/> keys).
-        /// Defaults to current <see cref="EzAnalysisRevision.VERSION"/>.
+        /// Defaults to current <see cref="EzAnalysis.VERSION"/>.
         /// </summary>
         public IReadOnlyList<EzDanClearEvidenceRow> GetDanClears(string username, int? keyCount = null, string? side = null, int? algorithmVersion = null)
         {
@@ -592,7 +592,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             if (!allPlayers)
                 ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
-            int version = algorithmVersion ?? EzAnalysisRevision.VERSION;
+            int version = algorithmVersion ?? EzAnalysis.VERSION;
 
             lock (sync)
             {
@@ -653,7 +653,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// Axis play evidence for <paramref name="username"/>.
         /// <see cref="EzLocalProfileConstants.IsAllPlayersFilter"/> reads all real-player rows (no username filter;
         /// excludes residual <see cref="EzLocalProfileConstants.ALL_PLAYERS"/> keys).
-        /// Defaults to current <see cref="EzAnalysisRevision.VERSION"/>.
+        /// Defaults to current <see cref="EzAnalysis.VERSION"/>.
         /// </summary>
         public IReadOnlyList<EzAxisPlayEvidenceRow> GetAxisPlays(string username, int? keyCount = null, string? skillId = null, int? algorithmVersion = null)
         {
@@ -661,7 +661,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             if (!allPlayers)
                 ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
-            int version = algorithmVersion ?? EzAnalysisRevision.VERSION;
+            int version = algorithmVersion ?? EzAnalysis.VERSION;
 
             lock (sync)
             {
@@ -1251,7 +1251,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// <summary>Per-play SunnySR cache for one algorithm version, keyed by score id (score id is globally unique).</summary>
         public Dictionary<Guid, EzMinaPlayCacheRow> LoadSsrPlayCache(int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzAnalysisRevision.VERSION;
+            int version = algorithmVersion ?? EzAnalysis.VERSION;
 
             lock (sync)
             {
@@ -1337,7 +1337,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// <summary>Per-play Dan cache for one algorithm version, keyed by score id.</summary>
         public Dictionary<Guid, EzDanPlayCacheRow> LoadDanPlayCache(int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzAnalysisRevision.VERSION;
+            int version = algorithmVersion ?? EzAnalysis.VERSION;
 
             lock (sync)
             {

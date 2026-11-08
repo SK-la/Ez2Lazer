@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Localisation;
-using osu.Game.EzOsuGame.Database;
 using osu.Game.EzOsuGame.Localization;
 
 namespace osu.Game.EzOsuGame.Analysis
@@ -167,33 +166,33 @@ namespace osu.Game.EzOsuGame.Analysis
     /// <summary>Storage scope an action clears / backfills, for the Realm side.</summary>
     public static class EzDataRebuildScopes
     {
-        public static EzRealmMetadataScope? RealmScopeOf(EzDataRebuildAction action)
+        public static EzAnalysisSystem? RealmScopeOf(EzDataRebuildAction action)
         {
             switch (action)
             {
                 case EzDataRebuildAction.RealmChartMsd:
-                    return EzRealmMetadataScope.MSD;
+                    return EzAnalysisSystem.Mina;
 
                 case EzDataRebuildAction.RealmChartCsi:
-                    return EzRealmMetadataScope.ChartSkillInfo;
+                    return EzAnalysisSystem.CSI;
 
                 case EzDataRebuildAction.RealmChartDan:
-                    return EzRealmMetadataScope.ChartDan;
+                    return EzAnalysisSystem.Dan;
 
                 case EzDataRebuildAction.RealmPpp:
-                    return EzRealmMetadataScope.PPP;
+                    return EzAnalysisSystem.PPP;
 
                 case EzDataRebuildAction.RealmSunny:
-                    return EzRealmMetadataScope.SunnySR;
+                    return EzAnalysisSystem.SSR;
 
                 case EzDataRebuildAction.RealmPp:
-                    return EzRealmMetadataScope.PP;
+                    return EzAnalysisSystem.Official;
 
                 case EzDataRebuildAction.RealmTags:
-                    return EzRealmMetadataScope.Tags;
+                    return EzAnalysisSystem.MetadataTags;
 
                 case EzDataRebuildAction.RealmAll:
-                    return EzRealmMetadataScope.All;
+                    return EzAnalysisSystem.All;
 
                 default:
                     return null;

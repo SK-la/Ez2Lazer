@@ -35,21 +35,18 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             var maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts: null, sunnySR: record.SunnySR);
 
-            // The stored pp is a chart-level baseline, which is what the official performance channel carries.
-            Dictionary<string, IReadOnlyDictionary<string, double>>? axes = null;
+            // The stored pp is a chart-level baseline, so it fills the official rating slot.
+            Dictionary<EzAnalysisSystem, EzScalarRating>? ratings = null;
 
             if (record.Pp is double pp && double.IsFinite(pp) && pp > 0)
             {
-                axes = new Dictionary<string, IReadOnlyDictionary<string, double>>
+                ratings = new Dictionary<EzAnalysisSystem, EzScalarRating>
                 {
-                    [EzAnalysisChannels.OFFICIAL_PERFORMANCE] = new Dictionary<string, double>
-                    {
-                        [EzAnalysisChannels.PERFORMANCE_POINTS] = pp,
-                    },
+                    [EzAnalysisSystem.Official] = new EzScalarRating(null, pp),
                 };
             }
 
-            return new EzAnalysisResult(kpsSummary, maniaSummary, axes: axes);
+            return new EzAnalysisResult(kpsSummary, maniaSummary, ratings: ratings);
         }
 
         private static IReadOnlyList<double> tryDeserializeKpsList(string? json)

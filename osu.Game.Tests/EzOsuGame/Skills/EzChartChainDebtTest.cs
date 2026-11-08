@@ -38,7 +38,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 seedCharts(realm);
                 var store = new EzChartSkillStore(realm);
 
-                // The two ends of the chain: fully rated, and rated up to MSD only.
+                // The two ends of the chain: fully rated, and rated up to Mina only.
                 store.WriteBeatmapMsd(settled_chart, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
                 store.UpsertChartSkillInfo(settled_chart, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
                 store.WriteBeatmapMsd(waiting_on_csi_chart, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
@@ -100,7 +100,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 seedCharts(realm);
                 var store = new EzChartSkillStore(realm);
 
-                // The shape a pass used to leave behind: a full CSI row derived from the stub MSD axis. The chart
+                // The shape a pass used to leave behind: a full CSI row derived from the stub Mina axis. The chart
                 // is settled for the whole chain, so reporting it as waiting is what kept re-queueing the chain.
                 store.WriteBeatmapMsdUnrateable(unrateable_with_csi_chart, Guid.NewGuid());
                 store.UpsertChartSkillInfo(unrateable_with_csi_chart, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = false });

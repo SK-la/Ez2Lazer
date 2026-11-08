@@ -11,7 +11,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
     /// <summary>
     /// 5K / 8K–18K have no community ssr→dan table of their own, so their chart dan borrows the
     /// 4K interval table on the same side (<see cref="EzDanLabels.TryResolveFallbackDan"/>) instead
-    /// of running the 4K-calibrated MSD means table, which inflated those keymodes.
+    /// of running the 4K-calibrated Mina means table, which inflated those keymodes.
     /// </summary>
     [TestFixture]
     public class EzDanTablelessRoutingTest
@@ -73,7 +73,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var resolved = EzDanLabels.TryResolveFallbackDan(5, EzDanSide.Rc, overallMsd: 20, EzMinaSkillAxis.Stream, sunnySR: 6.0);
 
             Assert.That(resolved, Is.Not.Null);
-            // The old 5K path ran Overall MSD through the 4K means table and clamped to the ladder top.
+            // The old 5K path ran Overall Mina through the 4K means table and clamped to the ladder top.
             Assert.That(resolved!.Value.RawDan, Is.LessThan(0.5 * EzDanLabels.SrToRawDan(20, EzMinaSkillAxis.Stream)));
         }
 

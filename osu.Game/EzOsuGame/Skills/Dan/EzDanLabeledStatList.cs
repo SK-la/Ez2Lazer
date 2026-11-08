@@ -18,7 +18,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 {
     /// <summary>
     /// One RC/LN side as a fixed 3-column grid: label | player | chart.
-    /// Row 0: Rating (Overall SunnySR / Overall MSD); row 1: side dan aggregates; then skillset rows.
+    /// Row 0: Rating (Overall SunnySR / Overall Mina); row 1: side dan aggregates; then skillset rows.
     /// Chart skillset labels stay hub filing stamps (not per-axis chart dan).
     /// Clear score lists live on Local Profile, not here.
     /// </summary>

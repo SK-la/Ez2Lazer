@@ -283,21 +283,21 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private static EzReadoutValues variantValuesOf(in EzAnalysisResult analysis, EzReadout readout)
         {
-            string starChannel = EzRulesetReadout.ChannelOf(readout.Rating);
-            double? star = positiveAxis(analysis, starChannel, EzAnalysisChannels.STAR_RATING);
-            double? performancePoints = positiveAxis(analysis, starChannel, EzAnalysisChannels.PERFORMANCE_POINTS);
+            var rating = analysis.RatingOf(readout.Rating);
 
-            string skillChannel = EzRulesetReadout.ChannelOf(readout.SkillRating);
-            double? skillStar = readout.SkillRating == EzRatingSystem.None
+            double? skillStar = readout.SkillRating == EzAnalysisSystem.None
                 ? null
-                : positiveAxis(analysis, skillChannel, EzRulesetReadout.RatingAxisOf(readout.SkillRating));
+                : positiveAxis(analysis, readout.SkillRating, EzRulesetReadout.RatingAxisOf(readout.SkillRating));
 
-            return new EzReadoutValues(star, performancePoints, skillStar);
+            return new EzReadoutValues(positive(rating.StarRating), positive(rating.PerformancePoints), skillStar);
         }
 
+        private static double? positive(double? value)
+            => value is { } actual && double.IsFinite(actual) && actual > 0 ? actual : null;
+
         /// <summary>A measured scalar is only shown when it is a real value; an empty chart reads as absent.</summary>
-        private static double? positiveAxis(in EzAnalysisResult analysis, string channel, string axisId)
-            => analysis.AxesOf(channel).TryGetValue(axisId, out double value) && double.IsFinite(value) && value > 0 ? value : null;
+        private static double? positiveAxis(in EzAnalysisResult analysis, EzAnalysisSystem system, string axisId)
+            => analysis.AxesOf(system).TryGetValue(axisId, out double value) && double.IsFinite(value) && value > 0 ? value : null;
 
         public bool TryGetSunnySR(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double sunnySR)
             => analysisDatabase.TryGetSunnySR(beatmapInfo, rulesetInfo, out sunnySR);

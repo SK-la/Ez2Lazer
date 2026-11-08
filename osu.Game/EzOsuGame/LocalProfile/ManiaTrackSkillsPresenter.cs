@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills;
@@ -24,7 +25,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             this.provider = provider;
         }
 
-        public string SystemId => EzSkillSystems.PLAYER_MINA;
+        public EzAnalysisSystem System => EzAnalysisSystem.SSR;
 
         public bool HasSliceChips => true;
 

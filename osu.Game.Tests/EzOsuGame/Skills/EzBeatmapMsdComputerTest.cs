@@ -18,7 +18,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var skills = buildCompleteSkills();
 
             Assert.That(skills.ContainsKey("beatmap_msd.__hold_ratio"), Is.False);
-            Assert.That(EzMSDUnit.IsCurrentMinaCache(skills), Is.True);
+            Assert.That(EzMinaUnit.IsCurrentMinaCache(skills), Is.True);
         }
 
         [Test]
@@ -27,14 +27,14 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var skills = buildCompleteSkills();
             skills.Remove(EzMinaSkillAxis.JackSpeed.ToMsdSkillId());
 
-            Assert.That(EzMSDUnit.IsCurrentMinaCache(skills), Is.False);
+            Assert.That(EzMinaUnit.IsCurrentMinaCache(skills), Is.False);
         }
 
         [Test]
         public void TestIsCurrentMinaCacheAcceptsCompleteCurrentIds()
         {
-            Assert.That(EzMSDUnit.IsCurrentMinaCache(buildCompleteSkills()), Is.True);
-            Assert.That(EzMSDUnit.IsSettledMinaCache(EzSkillRowState.Current, buildCompleteSkills()), Is.True);
+            Assert.That(EzMinaUnit.IsCurrentMinaCache(buildCompleteSkills()), Is.True);
+            Assert.That(EzMinaUnit.IsSettledMinaCache(EzSkillRowState.Current, buildCompleteSkills()), Is.True);
         }
 
         [Test]
@@ -42,8 +42,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var skills = new Dictionary<string, double>();
 
-            Assert.That(EzMSDUnit.IsCurrentMinaCache(skills), Is.False);
-            Assert.That(EzMSDUnit.IsSettledMinaCache(EzSkillRowState.Unrateable, skills), Is.True);
+            Assert.That(EzMinaUnit.IsCurrentMinaCache(skills), Is.False);
+            Assert.That(EzMinaUnit.IsSettledMinaCache(EzSkillRowState.Unrateable, skills), Is.True);
         }
 
         [Test]
@@ -51,8 +51,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var skills = new Dictionary<string, double>();
 
-            Assert.That(EzMSDUnit.IsCurrentMinaCache(skills), Is.False);
-            Assert.That(EzMSDUnit.IsSettledMinaCache(EzSkillRowState.Missing, skills), Is.False);
+            Assert.That(EzMinaUnit.IsCurrentMinaCache(skills), Is.False);
+            Assert.That(EzMinaUnit.IsSettledMinaCache(EzSkillRowState.Missing, skills), Is.False);
         }
 
         private static Dictionary<string, double> buildCompleteSkills()

@@ -110,7 +110,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// <summary>
         ///     Skillset dans from clears via hub-aligned filing (<see cref="EzDanSkillsetFiling.ComputeVerdicts"/>).
         /// </summary>
-        /// <param name="resolvePlayValues">Hub <c>play.values</c> per clear (Mina SunnySR), not beatmap MSD.</param>
+        /// <param name="resolvePlayValues">Hub <c>play.values</c> per clear (Mina SunnySR), not beatmap Mina.</param>
         public static IReadOnlyDictionary<string, EzDanSkillsetVerdict> ComputeFromClears(
             int keyCount,
             EzDanSide side,

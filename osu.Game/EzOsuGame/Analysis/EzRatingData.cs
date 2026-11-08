@@ -6,13 +6,17 @@ using Realms;
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
-    /// The star rating (SR) and perfect-play performance points (PP) each analysis system gives one chart.
+    /// The star rating and perfect-play performance points each analysis system gives one chart.
     /// </summary>
     /// <remarks>
-    /// One flat field per system and value, so a reader locates a rating through
-    /// <see cref="Get"/> instead of naming a column. Stored on the beatmap row.
+    /// One flat field per system and value, so a reader locates a rating through <see cref="GetStar"/> /
+    /// <see cref="GetPerformance"/> instead of naming a column. Stored on the beatmap row.
     /// The official pair is mirrored onto the beatmap's own star and pp columns, which stay the authority for
     /// upstream code; every other system lives only here.
+    /// <para>
+    /// The property names are persisted column names and stay as they are; only the reader-facing API speaks
+    /// <see cref="EzAnalysisSystem"/>.
+    /// </para>
     /// </remarks>
     [MapTo("EzRatingData")]
     public class EzRatingData : EmbeddedObject
@@ -46,83 +50,70 @@ namespace osu.Game.EzOsuGame.Analysis
             MinaPP = MinaPP,
         };
 
-        /// <summary>Reads one rating, or <c>-1</c> when this system has no such value.</summary>
-        public double Get(EzRatingSystem system, EzRatingField field) => (system, field) switch
+        /// <summary>Reads one system's star rating, or <c>-1</c> when it has none.</summary>
+        public double GetStar(EzAnalysisSystem system) => system switch
         {
-            (EzRatingSystem.Official, EzRatingField.SR) => OfficialSR,
-            (EzRatingSystem.Official, EzRatingField.PP) => OfficialPP,
-            (EzRatingSystem.Sunny, EzRatingField.SR) => SunnySR,
-            (EzRatingSystem.Sunny, EzRatingField.PP) => SunnyPP,
-            (EzRatingSystem.Ppp, EzRatingField.SR) => PppSR,
-            (EzRatingSystem.Ppp, EzRatingField.PP) => PppPP,
-            (EzRatingSystem.Mina, EzRatingField.SR) => MinaSR,
-            (EzRatingSystem.Mina, EzRatingField.PP) => MinaPP,
+            EzAnalysisSystem.Official => OfficialSR,
+            EzAnalysisSystem.SSR => SunnySR,
+            EzAnalysisSystem.PPP => PppSR,
+            EzAnalysisSystem.Mina => MinaSR,
             _ => -1,
         };
 
-        /// <summary>Writes one rating. A system/field pair this type does not carry is ignored.</summary>
-        public void Set(EzRatingSystem system, EzRatingField field, double value)
+        /// <summary>Reads one system's perfect-play performance points, or <c>-1</c> when it has none.</summary>
+        public double GetPerformance(EzAnalysisSystem system) => system switch
         {
-            switch (system, field)
+            EzAnalysisSystem.Official => OfficialPP,
+            EzAnalysisSystem.SSR => SunnyPP,
+            EzAnalysisSystem.PPP => PppPP,
+            EzAnalysisSystem.Mina => MinaPP,
+            _ => -1,
+        };
+
+        /// <summary>Writes one system's star rating. A system with no slot here is ignored.</summary>
+        public void SetStar(EzAnalysisSystem system, double value)
+        {
+            switch (system)
             {
-                case (EzRatingSystem.Official, EzRatingField.SR):
+                case EzAnalysisSystem.Official:
                     OfficialSR = value;
                     break;
 
-                case (EzRatingSystem.Official, EzRatingField.PP):
-                    OfficialPP = value;
-                    break;
-
-                case (EzRatingSystem.Sunny, EzRatingField.SR):
+                case EzAnalysisSystem.SSR:
                     SunnySR = value;
                     break;
 
-                case (EzRatingSystem.Sunny, EzRatingField.PP):
-                    SunnyPP = value;
-                    break;
-
-                case (EzRatingSystem.Ppp, EzRatingField.SR):
+                case EzAnalysisSystem.PPP:
                     PppSR = value;
                     break;
 
-                case (EzRatingSystem.Ppp, EzRatingField.PP):
+                case EzAnalysisSystem.Mina:
+                    MinaSR = value;
+                    break;
+            }
+        }
+
+        /// <summary>Writes one system's perfect-play performance points. A system with no slot here is ignored.</summary>
+        public void SetPerformance(EzAnalysisSystem system, double value)
+        {
+            switch (system)
+            {
+                case EzAnalysisSystem.Official:
+                    OfficialPP = value;
+                    break;
+
+                case EzAnalysisSystem.SSR:
+                    SunnyPP = value;
+                    break;
+
+                case EzAnalysisSystem.PPP:
                     PppPP = value;
                     break;
 
-                case (EzRatingSystem.Mina, EzRatingField.SR):
-                    MinaSR = value;
-                    break;
-
-                case (EzRatingSystem.Mina, EzRatingField.PP):
+                case EzAnalysisSystem.Mina:
                     MinaPP = value;
                     break;
             }
         }
-    }
-
-    /// <summary>Analysis systems a chart rating is stored for.</summary>
-    public enum EzRatingSystem
-    {
-        None,
-
-        Official,
-
-        Sunny,
-
-        Ppp,
-
-        Mina,
-    }
-
-    /// <summary>Which half of a system's rating is addressed.</summary>
-    public enum EzRatingField
-    {
-        None,
-
-        /// <summary>Star rating, on the same scale the panel prints beside the official star.</summary>
-        SR,
-
-        /// <summary>Perfect-play performance points.</summary>
-        PP,
     }
 }

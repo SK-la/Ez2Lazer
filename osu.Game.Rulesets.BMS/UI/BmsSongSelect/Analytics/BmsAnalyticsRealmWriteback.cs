@@ -35,13 +35,13 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                             continue;
 
                         if (result.StarRating is double star && star >= 0)
-                            EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Official, star);
+                            EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.Official, star);
 
                         if (result.SunnySR is double ssr && ssr >= 0)
-                            EzRatingWriter.WriteSR(beatmap, EzRatingSystem.Sunny, ssr);
+                            EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.SSR, ssr);
 
                         if (result.PP is double pp && pp >= 0)
-                            EzRatingWriter.WritePP(beatmap, EzRatingSystem.Official, pp);
+                            EzRatingWriter.WritePP(beatmap, EzAnalysisSystem.Official, pp);
                     }
                 });
             }

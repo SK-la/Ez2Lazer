@@ -54,11 +54,9 @@ namespace osu.Game.EzOsuGame.Skills.PPP
 
         public static string ToId(this EzPPPSkillAxis axis) => axis.Meta().Id;
 
-        public static string ToChartSkillId(this EzPPPSkillAxis axis)
-            => $"{EzSkillSystems.BEATMAP_PPP}.{axis.ToId()}";
+        public static string ToChartSkillId(this EzPPPSkillAxis axis) => axis.ToId();
 
-        public static string ToPlayerSkillId(this EzPPPSkillAxis axis)
-            => $"{EzSkillSystems.PLAYER_PPP}.{axis.ToId()}";
+        public static string ToPlayerSkillId(this EzPPPSkillAxis axis) => axis.ToId();
 
         public static EzSkillChip Chip(this EzPPPSkillAxis axis) => axis.Meta().Chip;
 
