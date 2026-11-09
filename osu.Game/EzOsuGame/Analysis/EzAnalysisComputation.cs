@@ -159,6 +159,34 @@ namespace osu.Game.EzOsuGame.Analysis
                 : calculatePerformanceAtRating(playable, analysisBeatmap, lookup, starRating, cancellationToken);
 
         /// <summary>
+        /// The official perfect-play pp and the pp implied by <paramref name="starRating"/>, from one difficulty
+        /// calculation on a chart the caller already converted.
+        /// </summary>
+        /// <remarks>
+        /// The official value is what the rating-substituted one is derived from: scoring the official attributes
+        /// twice would repeat the whole performance calculation for a number the caller is already holding. Each half
+        /// is <c>-1</c> when the ruleset cannot express it.
+        /// </remarks>
+        internal static (double OfficialPp, double SubstitutedPp) ComputeBaselinePerformancePoints(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo,
+                                                                                                    double starRating, IBeatmap analysisBeatmap,
+                                                                                                    CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(analysisBeatmap);
+
+            if (!double.IsFinite(starRating) || starRating <= 0 || analysisBeatmap.HitObjects.Count == 0)
+                return (-1, -1);
+
+            var lookup = new EzAnalysisLookupCache(beatmapInfo, beatmapInfo.Ruleset, mods: null);
+            var playable = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(beatmapInfo), analysisBeatmap);
+
+            if (computeOfficial(playable, analysisBeatmap, lookup, cancellationToken) is not { Calculator: { } calculator, Score: { } score, Attributes: { } attributes } official)
+                return (-1, -1);
+
+            double substituted = performanceAtRating(calculator, score, attributes, starRating) ?? -1;
+            return (official.PerformancePoints ?? -1, substituted);
+        }
+
+        /// <summary>
         /// Computes the baseline performance points implied by the stored Sunny star rating, for persisting to the
         /// Sunny pp slot. Returns -1 when the ruleset cannot express it.
         /// </summary>

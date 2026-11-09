@@ -98,8 +98,14 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             // Scored at the rating this call just measured, on the conversion it just used. Reading the stored SunnySR
             // instead scored the previous pass's value - absent on a first rating - which is how the Sunny pp column
             // ended up needing a second full-library pass that converted every chart again.
-            double pp = EzAnalysisComputation.ComputeBaselinePerformancePointsForRating(beatmapManager, beatmapInfo, star, playable, cancellationToken);
-            skillStore.WriteRating(beatmapInfo.ID, EzAnalysisSystem.SSR, star, pp >= 0 ? pp : null);
+            var pp = EzAnalysisComputation.ComputeBaselinePerformancePoints(beatmapManager, beatmapInfo, star, playable, cancellationToken);
+            skillStore.WriteRating(beatmapInfo.ID, EzAnalysisSystem.SSR, star, pp.SubstitutedPp >= 0 ? pp.SubstitutedPp : null);
+
+            // The same call already produced the official perfect-play pp - it is what the substituted one is scored
+            // from. Writing it here is what lets the official pp pass skip this chart entirely, instead of loading
+            // and converting it a second time for a number this pass just computed and discarded.
+            if (beatmapInfo.PerformancePoints < 0 && pp.OfficialPp >= 0)
+                skillStore.WriteRating(beatmapInfo.ID, EzAnalysisSystem.Official, pp: pp.OfficialPp);
 
             return true;
         }

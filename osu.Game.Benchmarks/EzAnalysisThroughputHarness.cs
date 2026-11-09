@@ -13,6 +13,7 @@ using osu.Framework.IO.Stores;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.IO;
@@ -110,21 +111,71 @@ namespace osu.Game.Benchmarks
             Console.WriteLine($"{"stage",-22}{"op",-10}{"charts/s",10}{"ms/chart",12}{"alloc KB",12}");
             Console.WriteLine(new string('-', 68));
 
-            Measurement decodeRow = measure("decode", iterations, () => decode(rawBeatmap));
-            Measurement loadRow = measure("load+convert", iterations, () => loadPlayable(rawBeatmap, rulesetInfo, mods));
-            Measurement extractRow = measure("extract", iterations, () => EzCSIEngine.FromPlayable(starPlayable));
-            Measurement starRow = measure("ssr_star", iterations, () => computeStar(starPlayable, keyCount, overallDifficulty));
-            Measurement starOnlyRow = measure("ssr_star_only", iterations, () => EzSSREngine.CalculateSR(chartOnce, keyCount, overallDifficulty));
-            Measurement extractOnlyRow = measure("extract_only", iterations, () => EzCSIEngine.FromPlayable(starPlayable));
-            Measurement difficultyRow = measure("official_difficulty", iterations, () => computeOfficial(officialPlayable, ruleset, mods));
-            Measurement officialPpRow = measure("official_pp", iterations, () => computePp(officialPlayable, ruleset, mods, computeOfficial(officialPlayable, ruleset, mods)));
+            Action decodeAction = () => decode(rawBeatmap);
+            Action loadAction = () => loadPlayable(rawBeatmap, rulesetInfo, mods);
+            Action extractAction = () => EzCSIEngine.FromPlayable(starPlayable);
+            Action starAction = () => computeStar(starPlayable, keyCount, overallDifficulty);
+            Action starOnlyAction = () => EzSSREngine.CalculateSR(chartOnce, keyCount, overallDifficulty);
+            Action difficultyAction = () => computeOfficial(officialPlayable, ruleset, mods);
+            Action officialPpAction = () => computePp(officialPlayable, ruleset, mods, computeOfficial(officialPlayable, ruleset, mods));
+
+            // The three full-library passes a first backfill runs, each measured as the whole pass does it: one
+            // conversion of its own, then its own compute. `ssr_pass` also produces the official pp, which is why the
+            // official pp pass no longer has to touch the same chart.
+            Action ssrPassAction = () =>
+            {
+                IBeatmap playable = loadPlayable(rawBeatmap, rulesetInfo, mods);
+                double sr = EzSSREngine.CalculateSR(EzCSIEngine.FromPlayable(playable), EzHoldMetrics.ResolveKeyCount(playable), playable.Difficulty.OverallDifficulty);
+                DifficultyAttributes attributes = computeOfficial(playable, ruleset, mods);
+                GC.KeepAlive(computePp(playable, ruleset, mods, attributes, sr));
+            };
+
+            Action officialPpPassAction = () =>
+            {
+                IBeatmap playable = loadPlayable(rawBeatmap, rulesetInfo, mods);
+                GC.KeepAlive(computePp(playable, ruleset, mods, computeOfficial(playable, ruleset, mods)));
+            };
+
+            Action chainPassAction = () =>
+            {
+                IBeatmap playable = loadPlayable(rawBeatmap, rulesetInfo, mods);
+                runChainStages(playable);
+            };
 
             // Current shape: star and official difficulty/pp run on two different conversions. Single pass: both run
             // on the conversion the star already used. Conversion itself is not repeated inside these rows.
-            Measurement currentRow = measure("ssr_current", iterations, () =>
-                computePp(officialPlayable, ruleset, mods, computeOfficial(officialPlayable, ruleset, mods), star));
-            Measurement singleRow = measure("ssr_single_pass", iterations, () =>
-                computePp(starPlayable, ruleset, mods, computeOfficial(starPlayable, ruleset, mods), star));
+            Action currentAction = () =>
+                computePp(officialPlayable, ruleset, mods, computeOfficial(officialPlayable, ruleset, mods), star);
+            Action singleAction = () =>
+                computePp(starPlayable, ruleset, mods, computeOfficial(starPlayable, ruleset, mods), star);
+
+            // Every action is warmed before anything is measured: tiered compilation promotes a method after enough
+            // calls, and a row measured before its callees are promoted reads as a regression that is not there.
+            Action[] allActions =
+            {
+                decodeAction, loadAction, extractAction, starAction, starOnlyAction, difficultyAction, officialPpAction,
+                ssrPassAction, officialPpPassAction, chainPassAction, currentAction, singleAction,
+            };
+
+            for (int warmup = 0; warmup < 40; warmup++)
+            {
+                foreach (var action in allActions)
+                    action();
+            }
+
+            Measurement decodeRow = measure("decode", iterations, decodeAction);
+            Measurement loadRow = measure("load+convert", iterations, loadAction);
+            Measurement extractRow = measure("extract", iterations, extractAction);
+            Measurement starRow = measure("ssr_star", iterations, starAction);
+            Measurement starOnlyRow = measure("ssr_star_only", iterations, starOnlyAction);
+            Measurement extractOnlyRow = measure("extract_only", iterations, extractAction);
+            Measurement difficultyRow = measure("official_difficulty", iterations, difficultyAction);
+            Measurement officialPpRow = measure("official_pp", iterations, officialPpAction);
+            Measurement ssrPassRow = measure("ssr_pass", iterations, ssrPassAction);
+            Measurement officialPpPassRow = measure("official_pp_pass", iterations, officialPpPassAction);
+            Measurement chainPassRow = measure("chain_pass", iterations, chainPassAction);
+            Measurement currentRow = measure("ssr_current", iterations, currentAction);
+            Measurement singleRow = measure("ssr_single_pass", iterations, singleAction);
 
             print(decodeRow);
             print(loadRow);
@@ -136,9 +187,51 @@ namespace osu.Game.Benchmarks
             print(officialPpRow);
             print(currentRow);
             print(singleRow);
+            print(ssrPassRow);
+            print(officialPpPassRow);
+            print(chainPassRow);
 
             printTotal("total_current", loadRow, starRow, currentRow, conversions: 2);
             printTotal("total_single_pass", loadRow, starRow, singleRow, conversions: 1);
+
+            // A first backfill: what the three passes cost on one chart before and after the SSR pass started
+            // producing the official pp from the same conversion.
+            Measurement before = add("backfill_before", ssrPassRow, officialPpPassRow, chainPassRow);
+            Measurement after = add("backfill_after", ssrPassRow, chainPassRow);
+
+            print(before);
+            print(after);
+        }
+
+        private static Measurement add(string name, params Measurement[] parts)
+        {
+            double nanoseconds = 0;
+            long allocated = 0;
+            long iterations = 0;
+
+            foreach (var part in parts)
+            {
+                nanoseconds += part.Nanoseconds;
+                allocated += part.AllocatedBytes;
+                iterations = part.Iterations;
+            }
+
+            return new Measurement(name, iterations, nanoseconds, allocated);
+        }
+
+        /// <summary>
+        /// The chart-chain stages that read a converted chart: Mina's wasm rating, and the structure pass CSI shares
+        /// with the Sunny rating.
+        /// </summary>
+        private static void runChainStages(IBeatmap playable)
+        {
+            int keys = EzHoldMetrics.ResolveKeyCount(playable);
+            var chart = EzCSIEngine.FromPlayable(playable);
+
+            if (EzMinaEngine.IsSupportedKeyCount(keys))
+                GC.KeepAlive(EzMinaEnginePool.Rent().CalculateMsd(EzMinaNoteConverter.Convert(chart.Notes), keys, 1f));
+
+            GC.KeepAlive(EzCSIEngine.ComputeAxes(chart, out _));
         }
 
         private static void profile(byte[] raw, Ruleset ruleset, IRulesetInfo rulesetInfo)
