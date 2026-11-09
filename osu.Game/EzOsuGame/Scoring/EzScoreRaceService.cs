@@ -561,8 +561,11 @@ namespace osu.Game.EzOsuGame.Scoring
                     scoreInfos,
                     i => results[i] == null);
 
-                bool maniaUsesProvider = EzScoreRaceRulesetSupport.GetGhostTimelineMode(rulesetInfo)
-                                         == EzScoreRaceGhostTimelineMode.ManiaSession;
+                // Modes whose builder attaches its own beatmap provider: it derives a per-JudgeMode copy from the
+                // score's beatmap and ignores whatever playable it is handed, so producing a session-ready instance
+                // here would only be converted and thrown away.
+                bool builderUsesProvider = EzScoreRaceRulesetSupport.GetGhostTimelineMode(rulesetInfo)
+                                           is EzScoreRaceGhostTimelineMode.ManiaSession or EzScoreRaceGhostTimelineMode.OsuSession;
 
                 await Task.Run(() =>
                 {
@@ -575,9 +578,9 @@ namespace osu.Game.EzOsuGame.Scoring
 
                         int representative = group[0];
 
-                        // Mania：AttachBeatmaps 后由 SimulationBeatmapProvider.GetBound(JudgeMode) 取谱；不传 shared。
-                        // 其余模式：GetBound(session-ready) 同 Mod 复用。
-                        IBeatmap? sharedPlayable = maniaUsesProvider
+                        // Provider modes: the builder binds its own copy, so nothing is handed in.
+                        // Other modes: GetBound(session-ready) so one conversion serves the whole group.
+                        IBeatmap? sharedPlayable = builderUsesProvider
                             ? null
                             : EzScoreRacePlayableResolver.GetSessionReady(
                                 workingBeatmap,

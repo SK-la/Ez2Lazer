@@ -11,7 +11,6 @@ using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using osu.Framework.Allocation;
 using osu.Game.Beatmaps;
-using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
@@ -20,32 +19,35 @@ using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Replays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Catch;
-using osu.Game.Rulesets.Catch.Objects;
 using osu.Game.Rulesets.Catch.Replays;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Replays;
-using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Osu.Replays;
 using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Taiko;
-using osu.Game.Rulesets.Taiko.Objects;
 using osu.Game.Rulesets.Taiko.Replays;
 using osu.Game.Scoring;
 using osu.Game.Scoring.Legacy;
-using osu.Game.Tests.Beatmaps;
-using osu.Game.Tests.Resources;
 using osu.Game.Tests.Scores.IO;
-using osuTK;
 
 namespace osu.Game.Tests.EzOsuGame.Scoring
 {
     /// <summary>
-    /// P6：四模式 <see cref="EzScoreTimelineBuilder.TryBuild"/> ≡ Session <c>RunTimelineDirect(ForLive)</c>。
-    /// 使用显式 shared playable（与 Race 同 Mod 复用路径一致）；Mania Race 生产传 null 另走 provider。
+    /// P6: for every mode, <see cref="EzScoreTimelineBuilder.TryBuild"/> and a session driven exactly the way the
+    /// builder drives one produce the same timeline for the same score.
     /// </summary>
+    /// <remarks>
+    /// The fixture has to be a chart the score itself is filed under. Two modes (mania, osu) let the builder attach a
+    /// beatmap provider, which re-derives the chart from the score's beatmap and ignores whatever playable it is
+    /// handed; a fixture that paired a synthetic chart with an unrelated databased beatmap would therefore compare two
+    /// different charts and read as a builder defect. So the replay is generated from the databased chart's own
+    /// playable, and the reference session is set up the way production sets it up for that mode.
+    /// </remarks>
     [TestFixture]
     public class EzScoreTimelineTryBuildFourModeIntegrationTest : ImportTest
     {
@@ -59,7 +61,9 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
 
             try
             {
-                var osu = LoadOsuIntoHost(host, withBeatmap: false);
+                // The standard test archive carries one difficulty per ruleset, imported before the host finishes
+                // loading so the score can be filed under it.
+                var osu = LoadOsuIntoHost(host, withBeatmap: true);
                 EzScoreTimeline? builderTimeline = null;
                 long sessionTotal = 0;
                 bool done = false;
@@ -74,30 +78,35 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
                         var scoreManager = osu.Dependencies.Get<ScoreManager>();
                         var beatmapManager = osu.Dependencies.Get<BeatmapManager>();
                         var ruleset = (Ruleset)Activator.CreateInstance(rulesetType)!;
-                        var (score, playableBeatmap) = createTinyScore(ruleset);
+                        var beatmapInfo = findBeatmap(beatmapManager, ruleset.RulesetInfo);
+                        var workingBeatmap = beatmapManager.GetWorkingBeatmap(beatmapInfo);
+                        var playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset.RulesetInfo, Array.Empty<Mod>());
 
-                        var importedSet = beatmapManager.Import(TestResources.CreateTestBeatmapSetInfo(1, rulesets: new[] { ruleset.RulesetInfo }));
-                        Assert.That(importedSet, Is.Not.Null);
+                        Assert.That(playableBeatmap.HitObjects.Count, Is.GreaterThan(0), "the fixture chart has no objects");
 
-                        var beatmapInfo = importedSet!.PerformRead(set => set.Beatmaps.First(b => b.Ruleset.ShortName == ruleset.RulesetInfo.ShortName).Detach());
-
-                        score.ScoreInfo.BeatmapInfo = beatmapInfo;
-                        score.ScoreInfo.Ruleset = ruleset.RulesetInfo;
+                        var score = createScore(ruleset, beatmapInfo, playableBeatmap);
                         score.ScoreInfo.User = new APIUser { Id = 2100 + ruleset.RulesetInfo.OnlineID, Username = $"trybuild_{ruleset.ShortName}" };
 
                         using var replayStream = new MemoryStream();
                         new LegacyScoreEncoder(score, playableBeatmap).Encode(replayStream);
                         var imported = ImportScoreTest.LoadScoreIntoOsu(osu, score.ScoreInfo, new ByteArrayArchiveReader(replayStream.ToArray(), "replay.osr"));
 
-                        builderTimeline = EzScoreTimelineBuilder.TryBuild(
-                            scoreManager,
-                            beatmapManager,
-                            imported,
-                            sharedPlayableBeatmap: playableBeatmap);
+                        // Modes with a beatmap provider take the chart from the provider, so production hands them no
+                        // playable at all; the others reuse one session-ready conversion.
+                        bool usesProvider = usesBeatmapProvider(ruleset);
+                        var sharedPlayable = usesProvider
+                            ? null
+                            : EzScoreRacePlayableResolver.GetSessionReady(workingBeatmap, ruleset.RulesetInfo, Array.Empty<Mod>());
+
+                        builderTimeline = EzScoreTimelineBuilder.TryBuild(scoreManager, beatmapManager, imported, sharedPlayableBeatmap: sharedPlayable);
 
                         var databasedScore = scoreManager.GetScore(imported)!;
                         var session = ruleset.CreateEzReplaySession()!;
-                        sessionTotal = session.RunTimelineDirect(databasedScore, playableBeatmap, ReplayRunPurpose.ForLive).FinalTotalScore;
+
+                        if (usesProvider)
+                            session.AttachBeatmaps(beatmapManager);
+
+                        sessionTotal = session.RunTimelineDirect(databasedScore, sharedPlayable ?? playableBeatmap, ReplayRunPurpose.ForLive).FinalTotalScore;
                     }
                     catch (Exception ex)
                     {
@@ -124,143 +133,105 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             }
         }
 
-        private static (Score score, IBeatmap beatmap) createTinyScore(Ruleset ruleset) => ruleset switch
-        {
-            OsuRuleset => createOsu(),
-            ManiaRuleset => createMania(),
-            TaikoRuleset => createTaiko(),
-            CatchRuleset => createCatch(),
-            _ => throw new ArgumentOutOfRangeException(nameof(ruleset)),
-        };
+        private static bool usesBeatmapProvider(Ruleset ruleset)
+            => EzScoreRaceRulesetSupport.GetGhostTimelineMode(ruleset.RulesetInfo)
+               is EzScoreRaceGhostTimelineMode.ManiaSession or EzScoreRaceGhostTimelineMode.OsuSession;
 
-        private static (Score score, IBeatmap beatmap) createOsu()
+        private static BeatmapInfo findBeatmap(BeatmapManager beatmapManager, RulesetInfo rulesetInfo)
         {
-            var ruleset = new OsuRuleset();
-            var test = new TestBeatmap(ruleset.RulesetInfo)
+            foreach (var set in beatmapManager.GetAllUsableBeatmapSets())
             {
-                HitObjects = new List<HitObject>
-                {
-                    new HitCircle { StartTime = 1000, Position = new Vector2(256, 192) },
-                    new HitCircle { StartTime = 2000, Position = new Vector2(300, 200) },
-                },
-            };
-            var beatmap = prepareConverted(ruleset, test);
-            var c1 = (HitCircle)beatmap.HitObjects[0];
-            var c2 = (HitCircle)beatmap.HitObjects[1];
-            var replay = new Replay
-            {
-                Frames = new List<ReplayFrame>
-                {
-                    new OsuReplayFrame(1000, c1.StackedPosition, OsuAction.LeftButton),
-                    new OsuReplayFrame(1100, c1.StackedPosition),
-                    new OsuReplayFrame(2000, c2.StackedPosition, OsuAction.LeftButton),
-                },
-            };
-            return (score(ruleset, beatmap, replay), beatmap);
+                var detached = set.Detach();
+                var match = detached.Beatmaps.FirstOrDefault(b => b.Ruleset.ShortName == rulesetInfo.ShortName);
+
+                if (match != null)
+                    return match;
+            }
+
+            throw new AssertionException($"no imported beatmap for {rulesetInfo.ShortName}");
         }
 
-        private static (Score score, IBeatmap beatmap) createMania()
-        {
-            var ruleset = new ManiaRuleset();
-            var beatmap = new TestBeatmap(ruleset.RulesetInfo)
-            {
-                HitObjects = new List<HitObject>
-                {
-                    new Note { StartTime = 1000, Column = 0 },
-                    new Note { StartTime = 2000, Column = 0 },
-                },
-                ControlPointInfo = new ControlPointInfo(),
-            };
-            foreach (var obj in beatmap.HitObjects)
-                obj.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
-
-            var replay = new Replay
-            {
-                Frames = new List<ReplayFrame>
-                {
-                    new ManiaReplayFrame(1000, ManiaAction.Key1),
-                    new ManiaReplayFrame(1100),
-                    new ManiaReplayFrame(2000, ManiaAction.Key1),
-                    new ManiaReplayFrame(2100),
-                },
-            };
-            return (score(ruleset, beatmap, replay), beatmap);
-        }
-
-        private static (Score score, IBeatmap beatmap) createTaiko()
-        {
-            var ruleset = new TaikoRuleset();
-            var test = new TestBeatmap(ruleset.RulesetInfo)
-            {
-                HitObjects = new List<HitObject>
-                {
-                    new Hit { StartTime = 1000, Type = HitType.Centre },
-                    new Hit { StartTime = 2000, Type = HitType.Centre },
-                },
-            };
-            var beatmap = prepareConverted(ruleset, test);
-            var replay = new Replay
-            {
-                Frames = new List<ReplayFrame>
-                {
-                    new TaikoReplayFrame(1000, TaikoAction.LeftCentre),
-                    new TaikoReplayFrame(1100),
-                    new TaikoReplayFrame(2000, TaikoAction.LeftCentre),
-                    new TaikoReplayFrame(2100),
-                },
-            };
-            return (score(ruleset, beatmap, replay), beatmap);
-        }
-
-        private static (Score score, IBeatmap beatmap) createCatch()
-        {
-            var ruleset = new CatchRuleset();
-            var test = new TestBeatmap(ruleset.RulesetInfo)
-            {
-                HitObjects = new List<HitObject>
-                {
-                    new Fruit { StartTime = 1000, X = 200 },
-                    new Fruit { StartTime = 2000, X = 200 },
-                },
-            };
-            var beatmap = prepareConverted(ruleset, test);
-            var replay = new Replay
-            {
-                Frames = new List<ReplayFrame>
-                {
-                    new CatchReplayFrame(999, 200),
-                    new CatchReplayFrame(1000, 200),
-                    new CatchReplayFrame(1999, 200),
-                    new CatchReplayFrame(2000, 200),
-                },
-            };
-            return (score(ruleset, beatmap, replay), beatmap);
-        }
-
-        private static IBeatmap prepareConverted(Ruleset ruleset, TestBeatmap testBeatmap)
-        {
-            var beatmap = ruleset.CreateBeatmapConverter(testBeatmap).Convert();
-            var processor = ruleset.CreateBeatmapProcessor(beatmap);
-            processor?.PreProcess();
-
-            foreach (var obj in beatmap.HitObjects)
-                obj.ApplyDefaults(beatmap.ControlPointInfo, beatmap.BeatmapInfo.Difficulty);
-
-            processor?.PostProcess();
-            return beatmap;
-        }
-
-        private static Score score(Ruleset ruleset, IBeatmap beatmap, Replay replay) => new Score
+        private static Score createScore(Ruleset ruleset, BeatmapInfo beatmapInfo, IBeatmap beatmap) => new Score
         {
             ScoreInfo = new ScoreInfo
             {
                 Ruleset = ruleset.RulesetInfo,
-                BeatmapInfo = beatmap.BeatmapInfo,
+                BeatmapInfo = beatmapInfo,
                 ID = Guid.NewGuid(),
                 Hash = Guid.NewGuid().ToString("N"),
             },
-            Replay = replay,
+            Replay = new Replay { Frames = buildFrames(ruleset, beatmap) },
         };
+
+        /// <summary>
+        /// A deterministic replay against the chart it is paired with.
+        /// </summary>
+        /// <remarks>
+        /// It does not have to be a good play: both sides are handed the same frames and the same chart, so any
+        /// difference in the resulting timeline is the thing under test rather than the quality of the input.
+        /// </remarks>
+        private static List<ReplayFrame> buildFrames(Ruleset ruleset, IBeatmap beatmap)
+        {
+            switch (ruleset)
+            {
+                case OsuRuleset:
+                {
+                    var frames = new List<ReplayFrame>();
+
+                    foreach (var obj in beatmap.HitObjects.OfType<OsuHitObject>())
+                    {
+                        frames.Add(new OsuReplayFrame(obj.StartTime, obj.StackedPosition, OsuAction.LeftButton));
+                        frames.Add(new OsuReplayFrame(obj.StartTime + 10, obj.StackedPosition));
+                    }
+
+                    return frames;
+                }
+
+                case TaikoRuleset:
+                {
+                    var frames = new List<ReplayFrame>();
+
+                    foreach (var obj in beatmap.HitObjects)
+                    {
+                        frames.Add(new TaikoReplayFrame(obj.StartTime, TaikoAction.LeftCentre));
+                        frames.Add(new TaikoReplayFrame(obj.StartTime + 10));
+                    }
+
+                    return frames;
+                }
+
+                case CatchRuleset:
+                {
+                    var frames = new List<ReplayFrame>();
+
+                    foreach (var obj in beatmap.HitObjects)
+                    {
+                        float x = obj is IHasXPosition hasX ? hasX.X : 256;
+                        frames.Add(new CatchReplayFrame(obj.StartTime, x));
+                    }
+
+                    return frames;
+                }
+
+                case ManiaRuleset:
+                {
+                    var frames = new List<ReplayFrame>();
+
+                    foreach (var obj in beatmap.HitObjects.OfType<ManiaHitObject>())
+                    {
+                        var action = (ManiaAction)((int)ManiaAction.Key1 + obj.Column);
+
+                        frames.Add(new ManiaReplayFrame(obj.StartTime, action));
+                        frames.Add(new ManiaReplayFrame(obj.StartTime + 10));
+                    }
+
+                    return frames;
+                }
+
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(ruleset));
+            }
+        }
 
         private static void waitForOrAssert(Func<bool> result, string failureMessage, int timeout = 60000)
         {
