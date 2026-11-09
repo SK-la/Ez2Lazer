@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Framework.Threading;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
@@ -47,6 +48,8 @@ namespace osu.Game.EzOsuGame.Overlays
         private OsuSpriteText statusText = null!;
         private RoundedButton backfillButton = null!;
         private RoundedButton forceButton = null!;
+
+        private ScheduledDelegate? maintenanceStatusRefresh;
 
         internal IReadOnlyList<EzDataRebuildAction> SelectedActions => selected;
 
@@ -119,17 +122,60 @@ namespace osu.Game.EzOsuGame.Overlays
 
             selected.BindCollectionChanged((_, _) => updateFooter());
             updateFooter();
+
+            if (backgroundDataStoreProcessor != null)
+                backgroundDataStoreProcessor.EzRealmMetadataBackfillFinished += onMaintenanceFinished;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing && backgroundDataStoreProcessor != null)
+                backgroundDataStoreProcessor.EzRealmMetadataBackfillFinished -= onMaintenanceFinished;
+
+            maintenanceStatusRefresh?.Cancel();
+            base.Dispose(isDisposing);
         }
 
         protected override void PopIn()
         {
             this.FadeIn(200, Easing.OutQuint);
+            startMaintenanceStatusRefresh();
+            refreshMaintenanceStatus();
         }
 
         protected override void PopOut()
         {
             hovered.Value = null;
+            maintenanceStatusRefresh?.Cancel();
+            maintenanceStatusRefresh = null;
             this.FadeOut(150, Easing.OutQuint);
+        }
+
+        private void onMaintenanceFinished() => Schedule(refreshMaintenanceStatus);
+
+        private void startMaintenanceStatusRefresh()
+        {
+            maintenanceStatusRefresh?.Cancel();
+            maintenanceStatusRefresh = Schedule(_ =>
+            {
+                refreshMaintenanceStatus();
+
+                if (isMaintenanceRunning())
+                    startMaintenanceStatusRefresh();
+            }, 500);
+        }
+
+        private bool isMaintenanceRunning()
+        {
+            return backgroundDataStoreProcessor?.IsEzRealmMetadataBackfillRunning == true
+                   || backgroundDataStoreProcessor?.IsEzScoreRecalculationRunning == true
+                   || analysisWarmupProcessor?.IsManualSqliteRebuildRunning == true;
+        }
+
+        private void refreshMaintenanceStatus()
+        {
+            if (isMaintenanceRunning())
+                statusText.Text = EzSettingsStrings.DATA_REBUILD_IN_PROGRESS;
         }
 
         private Drawable createHeader(OsuColour colours)
@@ -348,9 +394,19 @@ namespace osu.Game.EzOsuGame.Overlays
 
             var outcome = handler.RequestBackfill(actions, forceAll: false);
 
-            statusText.Text = outcome.Failures.Count == 0
-                ? LocalisableString.Format(EzSettingsStrings.DATA_REBUILD_QUEUED, EzDataRebuildCatalog.DisplayNames(outcome.Queued))
-                : EzDataRebuildMaintenanceHandler.GetErrorMessage(outcome.FirstFailure);
+            if (outcome.Queued.Count > 0)
+                statusText.Text = LocalisableString.Format(EzSettingsStrings.DATA_REBUILD_QUEUED, EzDataRebuildCatalog.DisplayNames(outcome.Queued));
+            else if (outcome.Failures.Count > 0)
+            {
+                var failure = outcome.FirstFailure;
+
+                statusText.Text = failure == EzDataRebuildDispatchResult.AlreadyRunning
+                    ? EzSettingsStrings.DATA_REBUILD_IN_PROGRESS
+                    : EzDataRebuildMaintenanceHandler.GetErrorMessage(failure);
+            }
+
+            refreshMaintenanceStatus();
+            startMaintenanceStatusRefresh();
         }
 
         private void updateFooter()

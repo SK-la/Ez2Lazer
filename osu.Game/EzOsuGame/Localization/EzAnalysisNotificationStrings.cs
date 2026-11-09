@@ -31,6 +31,15 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString SCORES_RUNNING = new EzLocalizationManager.EzLocalisableString("重算本地成绩", "Recalculating local scores");
         public static readonly LocalisableString SCORES_COMPLETED = new EzLocalizationManager.EzLocalisableString("本地成绩已重算", "local scores recalculated");
 
+        public static readonly LocalisableString MAINTENANCE_PREP_RUNNING = new EzLocalizationManager.EzLocalisableString(
+            "数据维护：扫描谱面库…", "Data maintenance: scanning beatmaps…");
+
+        public static readonly LocalisableString MAINTENANCE_PREP_COMPLETED = new EzLocalizationManager.EzLocalisableString(
+            "数据维护完成", "Data maintenance finished");
+
+        public static readonly LocalisableString MAINTENANCE_NOTHING_PENDING = new EzLocalizationManager.EzLocalisableString(
+            "所选项目无待补算", "Nothing pending for the selected maintenance item(s)");
+
         /// <summary>Chart chain, naming the stages that are actually running.</summary>
         public static LocalisableString ChartChainRunning(bool msd, bool csi, bool dan, bool ppp)
             => new EzLocalizationManager.EzLocalisableString(
