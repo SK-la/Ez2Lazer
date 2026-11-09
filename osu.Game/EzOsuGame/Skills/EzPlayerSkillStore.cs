@@ -125,6 +125,36 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
+        /// <summary>Keymodes a player has a slice for under one system, so a keymode-sliced system can be read.</summary>
+        public IReadOnlyList<int> GetPlayerKeyCounts(string username, EzAnalysisSystem system, int rulesetOnlineId, int? algorithmVersion = null)
+        {
+            string systemId = system.ToStorageId();
+            int version = algorithmVersion ?? system.CurrentVersion();
+
+            return database.Read(c =>
+            {
+                using var cmd = c.CreateCommand();
+                cmd.CommandText = """
+                                  SELECT DISTINCT key_count FROM player_skill_value
+                                  WHERE username = $username AND system_id = $system
+                                    AND ruleset_online_id = $ruleset AND algorithm_version = $version
+                                  ORDER BY key_count;
+                                  """;
+                cmd.Parameters.AddWithValue("$username", username);
+                cmd.Parameters.AddWithValue("$system", systemId);
+                cmd.Parameters.AddWithValue("$ruleset", rulesetOnlineId);
+                cmd.Parameters.AddWithValue("$version", version);
+
+                var list = new List<int>();
+                using var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                    list.Add(reader.GetInt32(0));
+
+                return (IReadOnlyList<int>)list;
+            });
+        }
+
         public IReadOnlyList<int> GetPlayerSsrKeyCounts(string username, int? algorithmVersion = null)
         {
             int version = algorithmVersion ?? EzMinaEngine.VERSION;
@@ -422,12 +452,27 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         public void ClearPlayerSystemSkills(string username, EzAnalysisSystem system)
+            => ClearPlayerSystemSkills(username, system, null);
+
+        /// <summary>
+        /// Drops a player's rows for one system, optionally only those of one ruleset.
+        /// </summary>
+        /// <remarks>
+        /// The ruleset filter is what lets a pass that covers one ruleset clear its own rows without touching another
+        /// ruleset's rows for the same system - the two are written by separate calls but share a system id.
+        /// </remarks>
+        public void ClearPlayerSystemSkills(string username, EzAnalysisSystem system, int? rulesetOnlineId)
             => database.Write((c, tx) => deleteRows(c, tx, "player_skill_value",
-            "username = $username AND system_id = $system",
+            rulesetOnlineId == null
+                ? "username = $username AND system_id = $system"
+                : "username = $username AND system_id = $system AND ruleset_online_id = $ruleset",
             cmd =>
             {
                 cmd.Parameters.AddWithValue("$username", username);
                 cmd.Parameters.AddWithValue("$system", system.ToStorageId());
+
+                if (rulesetOnlineId is int ruleset)
+                    cmd.Parameters.AddWithValue("$ruleset", ruleset);
             }));
 
         public void ClearDanSkillsetValues(string username)

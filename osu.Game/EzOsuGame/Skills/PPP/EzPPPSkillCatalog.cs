@@ -67,6 +67,30 @@ namespace osu.Game.EzOsuGame.Skills.PPP
                                                                    || rulesetOnlineId == EzLocalProfileConstants.CATCH_RULESET_ID
                                                                    || rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID;
 
+        /// <summary>
+        /// Every ruleset this system covers. Declared here so the compute pass and the readout cannot disagree about
+        /// which rulesets have PP+ data.
+        /// </summary>
+        public static IReadOnlyList<int> SupportedRulesets { get; } = new[]
+        {
+            EzLocalProfileConstants.OSU_RULESET_ID,
+            EzLocalProfileConstants.TAIKO_RULESET_ID,
+            EzLocalProfileConstants.CATCH_RULESET_ID,
+            EzLocalProfileConstants.MANIA_RULESET_ID,
+        };
+
+        /// <summary>
+        /// The player metric a ruleset shows as its headline bar.
+        /// </summary>
+        /// <remarks>
+        /// Aim is the osu summary; the other rulesets have a single difficulty-shaped family, so the star rating is
+        /// the number that stands for the slice.
+        /// </remarks>
+        public static string SummarySkillId(int rulesetOnlineId)
+            => rulesetOnlineId == EzLocalProfileConstants.OSU_RULESET_ID
+                ? EzPPPSkillAxis.Aim.ToPlayerSkillId()
+                : STAR_RATING;
+
         public static IReadOnlyList<EzSkillSpec> MetricsFor(int rulesetOnlineId)
         {
             if (rulesetOnlineId == EzLocalProfileConstants.OSU_RULESET_ID)

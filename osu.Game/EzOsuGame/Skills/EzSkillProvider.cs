@@ -423,6 +423,19 @@ namespace osu.Game.EzOsuGame.Skills
             return PlayerStore.GetPlayerSsrKeyCounts(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME);
         }
 
+        /// <summary>
+        /// Keymode slices a player has under one system and ruleset. Only systems sliced by keymode have more than one.
+        /// </summary>
+        public IReadOnlyList<int> GetPlayerKeyCounts(string username, EzAnalysisSystem system, int rulesetOnlineId)
+        {
+            var keys = PlayerStore.GetPlayerKeyCounts(username, system, rulesetOnlineId);
+
+            if (keys.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
+                return keys;
+
+            return PlayerStore.GetPlayerKeyCounts(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, system, rulesetOnlineId);
+        }
+
         public IReadOnlyList<EzPlayerSkillHistorySample> GetPlayerSkillHistory(string username, int keyCount, string skillId, int maxPoints = 64)
         {
             var history = PlayerStore.GetPlayerSkillHistory(username, keyCount, skillId, maxPoints);

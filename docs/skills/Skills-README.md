@@ -193,6 +193,21 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
 成绩）直接删行，避免落后判据永远成立。落后只表示“值落后账本”，不兼表“等图表链”——后者由派生
 债务表达，链一写出行就自己消失。
 
+### 玩家侧覆盖哪些系统与规则集
+
+按 `EzAnalysisSystem` 分，玩家侧存的是**三类**结果，覆盖范围由系统自身的目录声明：
+
+| 系统 | 规则集 | 切片 | 轴来源 |
+|---|---|---|---|
+| Sunny / pattern / dan | 仅 mania | 每个 keymode 一个 | `EzManiaSkillAxis` / `EzPatternRatings` / `EzDanEngine` |
+| PP+ | osu / taiko / catch / mania（`EzPPPSkillCatalog.SupportedRulesets`） | mania 按 keymode，其他一个 | `EzPPPSkillCatalog.MetricsFor(ruleset)` |
+
+PP+ 是唯一横跨四个规则集的玩家系统，所以 `ComputeAsync` 会为每个受支持规则集各收集一次成绩、
+各跑一次聚合。行按 `(username, key_count, system_id, ruleset_online_id, skill_id)` 定位，**规则集在
+键里**：一个规则集的一轮 pass 若没有任何成绩，只清自己那一份（`ClearPlayerSystemSkills(..., ruleset)`），
+不会带走别的规则集的行。读侧同样按规则集取轴——`PPPSkillsPresenter` 的轴表来自该规则集的目录，
+不写死为 osu 的那一套。
+
 ### 为什么玩家链不复用组合修订号
 
 - 上游不是"一批会被整体换版的谱面行"，而是**可增可删的成绩**：新成绩天然是"账本里没有"，

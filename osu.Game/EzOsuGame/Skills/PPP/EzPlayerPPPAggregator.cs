@@ -33,12 +33,21 @@ namespace osu.Game.EzOsuGame.Skills.PPP
             this.engine = engine ?? new EzPPPEngine();
         }
 
+        /// <summary>
+        /// Folds one player's plays into PP+ player rows.
+        /// </summary>
+        /// <param name="rulesetScope">
+        /// The ruleset whose plays this call covers, or null for every ruleset the catalog supports. PP+ rows are
+        /// written per ruleset, so a pass that covers one ruleset must not clear another's rows: the scope is what
+        /// keeps an empty result from wiping rows another call owns.
+        /// </param>
         public void ComputeAndStore(
             string username,
             IEnumerable<EzSkillPlayRow> plays,
             Func<Guid, ScoreInfo?>? resolveScore,
             CancellationToken cancellationToken = default,
-            Action? afterEachScore = null)
+            Action? afterEachScore = null,
+            int? rulesetScope = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
@@ -62,6 +71,9 @@ namespace osu.Game.EzOsuGame.Skills.PPP
                 int rulesetId = score.Ruleset.OnlineID;
 
                 if (!EzPPPSkillCatalog.SupportsRuleset(rulesetId))
+                    continue;
+
+                if (rulesetScope is int scope && rulesetId != scope)
                     continue;
 
                 try
@@ -114,7 +126,7 @@ namespace osu.Game.EzOsuGame.Skills.PPP
 
             if (bySlices.Count == 0)
             {
-                skillStore.ClearPlayerSystemSkills(username, EzAnalysisSystem.PPP);
+                skillStore.ClearPlayerSystemSkills(username, EzAnalysisSystem.PPP, rulesetScope);
                 return;
             }
 

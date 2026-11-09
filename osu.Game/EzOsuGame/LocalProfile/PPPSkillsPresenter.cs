@@ -30,12 +30,24 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public EzAnalysisSystem System => EzAnalysisSystem.PPP;
 
-        public bool HasSliceChips => false;
+        public bool HasSliceChips => slicedByKeyMode;
 
         public bool HasSidePanel => false;
 
+        /// <summary>
+        /// Whether this ruleset's PP+ rows are stored per keymode.
+        /// </summary>
+        /// <remarks>
+        /// Mania's PP+ axes are keyed by the column count a play was rated at, exactly like its Sunny rows; the other
+        /// rulesets have one slice per player. The read has to ask for the same slice the write used.
+        /// </remarks>
+        private bool slicedByKeyMode => rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID;
+
         public IReadOnlyList<int> GetSliceKeys(string username)
         {
+            if (slicedByKeyMode)
+                return provider.GetPlayerKeyCounts(username, System, rulesetOnlineId);
+
             var skills = provider.GetPlayerSystemSkills(username, EzAxisIds.UNSLICED_KEY, System, rulesetOnlineId);
             return skills.Count > 0
                 ? new[] { EzAxisIds.UNSLICED_KEY }
@@ -53,25 +65,32 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             var meta = slice.Meta;
 
-            var radar = new List<EzTrackSkillsAxis>(EzOsuSkillAxisExtensions.RadarAxes.Length);
-            var bars = new List<EzTrackSkillsAxis>(EzOsuSkillAxisExtensions.All.Length);
+            // Axes come from the ruleset's own catalog, not from a hard-coded set: PP+ declares a different metric
+            // list per ruleset (osu aim/tapping, taiko rhythm/colour, catch movement, mania strain).
+            var specs = EzPPPSkillCatalog.MetricsFor(rulesetOnlineId);
 
-            foreach (var axis in EzOsuSkillAxisExtensions.All)
+            var radar = new List<EzTrackSkillsAxis>(specs.Count);
+            var bars = new List<EzTrackSkillsAxis>(specs.Count);
+
+            foreach (var spec in specs)
             {
-                string skillId = axis.ToPlayerSkillId();
+                string skillId = spec.PlayerSkillId;
                 double value = skills.GetValueOrDefault(skillId, 0);
+
                 if (!double.IsFinite(value) || value < display_min)
                     continue;
 
-                var chip = axis.Chip();
-                var entry = new EzTrackSkillsAxis(skillId, chip.Name, value, chip.AccentHex);
+                var entry = new EzTrackSkillsAxis(skillId, spec.DisplayName, value, spec.AccentHex);
                 bars.Add(entry);
 
-                if (axis.Meta().InRadar)
+                if (spec.InRadar)
                     radar.Add(entry);
             }
 
-            double overall = skills.GetValueOrDefault(EzPPPSkillAxis.Aim.ToPlayerSkillId(), 0);
+            // The headline is the metric the catalog declares as the summary for this ruleset: osu's aim, and the
+            // star rating for the others. Falling back to the largest bar keeps a partial row from showing zero.
+            string overallId = EzPPPSkillCatalog.SummarySkillId(rulesetOnlineId);
+            double overall = skills.GetValueOrDefault(overallId, 0);
             if (!double.IsFinite(overall) || overall < display_min)
                 overall = bars.Select(static a => a.Value).DefaultIfEmpty(0).Max();
 
@@ -89,6 +108,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public LocalisableString ResolveDisplayName(string skillId)
         {
+            foreach (var spec in EzPPPSkillCatalog.MetricsFor(rulesetOnlineId))
+            {
+                if (string.Equals(spec.PlayerSkillId, skillId, StringComparison.Ordinal))
+                    return spec.DisplayName;
+            }
+
             if (EzOsuSkillAxisExtensions.TryParse(skillId, out var axis))
                 return axis.Chip().Name;
 
