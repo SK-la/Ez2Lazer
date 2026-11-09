@@ -44,8 +44,7 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         }
 
         [Test]
-        public void Official_write_mirrors_onto_the_beatmap_columns()
-        {
+        public void Official_write_mirrors_onto_the_beatmap_columns()        {
             var beatmap = maniaBeatmap();
 
             EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.Official, 4.5);
@@ -100,11 +99,39 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
             }
         }
 
+        [Test]
+        public void Clear_retires_both_halves_of_the_official_pair()
+        {
+            var beatmap = maniaBeatmap();
+            EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.Official, 4.5);
+            EzRatingWriter.WritePP(beatmap, EzAnalysisSystem.Official, 120);
+
+            EzRatingWriter.Clear(beatmap, EzAnalysisSystem.Official);
+
+            Assert.That(beatmap.StarRating, Is.EqualTo(-1));
+            Assert.That(beatmap.PerformancePoints, Is.EqualTo(-1));
+            Assert.That(beatmap.EzRatingData.OfficialSR, Is.EqualTo(-1));
+            Assert.That(beatmap.EzRatingData.OfficialPP, Is.EqualTo(-1));
+        }
+
+        [Test]
+        public void Clear_leaves_other_systems_alone()
+        {
+            var beatmap = maniaBeatmap();
+            EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.SSR, 6);
+            EzRatingWriter.WritePP(beatmap, EzAnalysisSystem.SSR, 300);
+            EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.Official, 4.5);
+
+            EzRatingWriter.Clear(beatmap, EzAnalysisSystem.Official);
+
+            Assert.That(beatmap.EzRatingData.SunnySR, Is.EqualTo(6));
+            Assert.That(beatmap.EzRatingData.SunnyPP, Is.EqualTo(300));
+        }
+
         private static BeatmapInfo maniaBeatmap() => new BeatmapInfo
         {
             Ruleset = new ManiaRuleset().RulesetInfo,
             Difficulty = new BeatmapDifficulty { CircleSize = 4 },
             DifficultyName = "test",
-        };
-    }
+        };    }
 }

@@ -620,8 +620,7 @@ namespace osu.Game.Database
                         {
                             if (b.Ruleset.ShortName == ruleset.ShortName)
                             {
-                                b.StarRating = -1;
-                                b.PerformancePoints = -1;
+                                EzRatingWriter.Clear(b, EzAnalysisSystem.Official);
                                 countReset++;
                             }
                         }
@@ -784,7 +783,7 @@ namespace osu.Game.Database
                         }
 
                         if (scope.HasFlag(EzAnalysisSystem.Official))
-                            EzRatingWriter.WritePP(beatmap, EzAnalysisSystem.Official, -1);
+                            EzRatingWriter.Clear(beatmap, EzAnalysisSystem.Official);
 
                         if (scope.HasFlag(EzAnalysisSystem.SSR) && EzSSRUnit.SupportsRuleset(beatmap.Ruleset.OnlineID))
                             EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.SSR, -1);

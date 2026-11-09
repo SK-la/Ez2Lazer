@@ -56,5 +56,21 @@ namespace osu.Game.EzOsuGame.Analysis
             if (pp is double points)
                 WritePP(beatmap, system, points);
         }
+
+        /// <summary>
+        /// Retires both halves of one system's rating.
+        /// </summary>
+        /// <remarks>
+        /// One writer so the halves cannot expire apart: a stale star with a fresh pp (or the reverse) is what a
+        /// reader cannot tell from a valid pair, and the official pair is derived from one calculation, so it is only
+        /// ever both or neither.
+        /// </remarks>
+        public static void Clear(BeatmapInfo beatmap, EzAnalysisSystem system)
+        {
+            ArgumentNullException.ThrowIfNull(beatmap);
+
+            WriteSR(beatmap, system, -1);
+            WritePP(beatmap, system, -1);
+        }
     }
 }

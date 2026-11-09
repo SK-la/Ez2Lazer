@@ -142,19 +142,18 @@ namespace osu.Game.Benchmarks
                 runChainStages(playable);
             };
 
-            // Current shape: star and official difficulty/pp run on two different conversions. Single pass: both run
-            // on the conversion the star already used. Conversion itself is not repeated inside these rows.
-            Action currentAction = () =>
-                computePp(officialPlayable, ruleset, mods, computeOfficial(officialPlayable, ruleset, mods), star);
-            Action singleAction = () =>
-                computePp(starPlayable, ruleset, mods, computeOfficial(starPlayable, ruleset, mods), star);
+            Action officialStarPassAction = () =>
+            {
+                IBeatmap playable = loadPlayable(rawBeatmap, rulesetInfo, mods);
+                GC.KeepAlive(computeOfficial(playable, ruleset, mods));
+            };
 
             // Every action is warmed before anything is measured: tiered compilation promotes a method after enough
             // calls, and a row measured before its callees are promoted reads as a regression that is not there.
             Action[] allActions =
             {
                 decodeAction, loadAction, extractAction, starAction, starOnlyAction, difficultyAction, officialPpAction,
-                ssrPassAction, officialPpPassAction, chainPassAction, currentAction, singleAction,
+                ssrPassAction, officialPpPassAction, officialStarPassAction, chainPassAction,
             };
 
             for (int warmup = 0; warmup < 40; warmup++)
@@ -168,39 +167,38 @@ namespace osu.Game.Benchmarks
             Measurement extractRow = measure("extract", iterations, extractAction);
             Measurement starRow = measure("ssr_star", iterations, starAction);
             Measurement starOnlyRow = measure("ssr_star_only", iterations, starOnlyAction);
-            Measurement extractOnlyRow = measure("extract_only", iterations, extractAction);
             Measurement difficultyRow = measure("official_difficulty", iterations, difficultyAction);
             Measurement officialPpRow = measure("official_pp", iterations, officialPpAction);
             Measurement ssrPassRow = measure("ssr_pass", iterations, ssrPassAction);
             Measurement officialPpPassRow = measure("official_pp_pass", iterations, officialPpPassAction);
+            Measurement officialStarPassRow = measure("official_star_pass", iterations, officialStarPassAction);
             Measurement chainPassRow = measure("chain_pass", iterations, chainPassAction);
-            Measurement currentRow = measure("ssr_current", iterations, currentAction);
-            Measurement singleRow = measure("ssr_single_pass", iterations, singleAction);
 
             print(decodeRow);
             print(loadRow);
             print(extractRow);
             print(starRow);
             print(starOnlyRow);
-            print(extractOnlyRow);
             print(difficultyRow);
             print(officialPpRow);
-            print(currentRow);
-            print(singleRow);
             print(ssrPassRow);
             print(officialPpPassRow);
+            print(officialStarPassRow);
             print(chainPassRow);
 
-            printTotal("total_current", loadRow, starRow, currentRow, conversions: 2);
-            printTotal("total_single_pass", loadRow, starRow, singleRow, conversions: 1);
-
-            // A first backfill: what the three passes cost on one chart before and after the SSR pass started
-            // producing the official pp from the same conversion.
-            Measurement before = add("backfill_before", ssrPassRow, officialPpPassRow, chainPassRow);
+            // Per chart, across every pass a first backfill runs. `ssr_pass` now also produces the official star and
+            // pp, which is why the official passes no longer have to touch the same chart.
+            Measurement before = add("backfill_before", officialStarPassRow, officialPpPassRow, ssrPassRow, chainPassRow);
             Measurement after = add("backfill_after", ssrPassRow, chainPassRow);
 
             print(before);
             print(after);
+
+            Console.WriteLine();
+
+            // Always reported: a change inside one computation can look like a win on a single thread and still make
+            // the pass slower by allocating more, so the parallel number is part of every result.
+            pipeline(rawBeatmap, ruleset, rulesetInfo, mods);
         }
 
         private static Measurement add(string name, params Measurement[] parts)
@@ -377,15 +375,17 @@ namespace osu.Game.Benchmarks
         {
             const int chart_count = 48;
 
-            Console.WriteLine($"charts={chart_count} (real chart) threads={Environment.ProcessorCount}");
+            Console.WriteLine($"{"workers",-10}{"charts/s",10}{"ms/chart",12}{"alloc KB",12}   (whole per-chart pass)");
 
             foreach (int workers in new[] { 1, 2, 4, 8 })
             {
                 double totalMs = 0;
+                long totalAllocated = 0;
 
                 // Two passes: the first pays JIT and engine warm-up for every stage.
                 for (int pass = 0; pass < 2; pass++)
                 {
+                    long allocated = GC.GetTotalAllocatedBytes();
                     var stopwatch = Stopwatch.StartNew();
                     int next = -1;
 
@@ -411,13 +411,19 @@ namespace osu.Game.Benchmarks
                         thread.Join();
 
                     if (pass == 1)
+                    {
                         totalMs = stopwatch.Elapsed.TotalMilliseconds;
+                        totalAllocated = GC.GetTotalAllocatedBytes() - allocated;
+                    }
                 }
 
-                Console.WriteLine($"workers={workers,-3}{chart_count / (totalMs / 1000.0),8:F1} charts/s{totalMs / chart_count,10:F1} ms/chart");
+                Console.WriteLine($"{workers,-10}{chart_count / (totalMs / 1000.0),10:F1}{totalMs / chart_count,12:F1}{totalAllocated / 1024.0 / chart_count,12:F0}");
             }
         }
 
+        /// <summary>
+        /// One chart, start to finish: load, convert, and every system that reads the converted chart.
+        /// </summary>
         private static void runPipeline(byte[] raw, Ruleset ruleset, IRulesetInfo rulesetInfo, Mod[] mods)
         {
             // Own working beatmap per chart: the shared cache would otherwise reuse the conversion for later charts.
@@ -428,6 +434,8 @@ namespace osu.Game.Benchmarks
             double sr = EzSSREngine.CalculateSR(EzCSIEngine.FromPlayable(playable), keys, overallDifficulty);
             DifficultyAttributes attributes = computeOfficial(playable, ruleset, mods);
             double pp = computePp(playable, ruleset, mods, attributes, sr);
+
+            runChainStages(playable);
 
             GC.KeepAlive(pp);
         }
