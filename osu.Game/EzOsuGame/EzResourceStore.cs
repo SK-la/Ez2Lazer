@@ -135,7 +135,8 @@ namespace osu.Game.EzOsuGame
             animationSafeStore.AddTextureSource(baseTextureLoader);
 
             // 单帧大图：引用计数，禁止用于循环动画帧。
-            refCountedTextureStore = new LargeTextureStore(renderer, textureLoaderStore1);
+            // 此通道保留源图尺寸；需要限制超大用户资源的通道仍使用 textureLoaderStore1。
+            refCountedTextureStore = new LargeTextureStore(renderer, new TextureLoaderStore(combinedStore));
             refCountedTextureStore.AddTextureSource(baseTextureLoader);
 
             // HUD combo / score 与舞台数字共用。超过 100 的图先缩小再进一页。
@@ -176,8 +177,12 @@ namespace osu.Game.EzOsuGame
         /// </summary>
         /// <param name="path">完整路径（不含后缀）</param>
         /// <param name="usage">纹理用途，决定底层 store</param>
-        public Texture? Get(string path, EzTextureUsage usage = EzTextureUsage.Atlas)
+        /// <param name="originalSize">是否跳过该用途的尺寸限制并按源图尺寸加载。</param>
+        public Texture? Get(string path, EzTextureUsage usage = EzTextureUsage.Atlas, bool originalSize = false)
         {
+            if (originalSize)
+                return refCountedTextureStore.Get(path);
+
             return usage switch
             {
                 EzTextureUsage.AnimationSafe => animationSafeStore.Get(path),

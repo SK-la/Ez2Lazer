@@ -183,6 +183,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
             // Ez 技能：默认与 EzDanAlgorithm.LN_CHART_MIN_HOLD_OBJECTS 一致。
             SetDefault(Ez2Setting.SkillLnChartMinHoldObjects, 150, 0, 1000);
+            SetDefault(Ez2Setting.SkillDanFanatic, false);
 
             // SunnySR 计算的两个系数。默认值就是落库所用的值；改动属于用户对算法的永久修订，不触发版本换代。
             SetDefault(Ez2Setting.SsrRescaleThreshold, 8.0, 6.0, 10.0, 1.0);
@@ -1468,6 +1469,9 @@ namespace osu.Game.EzOsuGame.Configuration
         /// 与 <c>EzDanAlgorithm.LnPrimaryMinRatioFor</c> 为「或」关系。
         /// </summary>
         SkillLnChartMinHoldObjects,
+
+        /// <summary>选歌界面背景叠 chart-dan 段位图（「段位痴」）。</summary>
+        SkillDanFanatic,
     }
 
     public enum EzColumnType : byte

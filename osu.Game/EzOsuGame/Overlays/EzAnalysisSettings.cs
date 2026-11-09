@@ -7,9 +7,9 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets;
@@ -55,6 +55,15 @@ namespace osu.Game.EzOsuGame.Overlays
                 })
                 {
                     Keywords = new[] { "ez", "skill", "ln", "hold", "chartdan", "dan", "ratio", "技能", "占比", "门槛" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.SKILL_SONG_SELECT_DAN_FANATIC,
+                    HintText = EzSettingsStrings.SKILL_SONG_SELECT_DAN_FANATIC_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.SkillDanFanatic),
+                })
+                {
+                    Keywords = new[] { "ez", "skill", "dan", "chartdan", "song select", "background", "段位", "选歌", "痴" }
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {

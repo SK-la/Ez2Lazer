@@ -28,7 +28,7 @@ namespace osu.Game.EzOsuGame
         /// <remarks>
         /// 调用方只交 <see cref="EzAnimationRequest"/>。<see cref="EzAnimationRequest.FrameTemplate"/> 为空时走层 1 到层 4；
         /// 非空时只查该模板，失败后按名字取单图，不回到层 1 和层 2。
-        /// 解码原语是 <see cref="Get(string, EzTextureUsage)"/>，字形用 <see cref="GetGlyph"/>。判定以外的 HUD 不传帧模板。
+        /// 解码原语是 <see cref="Get(string, EzTextureUsage, bool)"/>，字形用 <see cref="GetGlyph"/>。判定以外的 HUD 不传帧模板。
         /// </remarks>
         /// <param name="request">帧加载请求；见 <see cref="EzAnimationRequest"/>。</param>
         /// <param name="looping">多帧时是否循环。</param>

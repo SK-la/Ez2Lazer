@@ -952,6 +952,16 @@ namespace osu.Game.EzOsuGame.Localization
             "返回设置",
             "Back to settings");
 
+        public static readonly LocalisableString SKILL_SONG_SELECT_DAN_FANATIC = new EzLocalizationManager.EzLocalisableString(
+            "段位痴",
+            "Dan fanatic");
+
+        public static readonly LocalisableString SKILL_SONG_SELECT_DAN_FANATIC_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后，在选歌界面谱面/菜单背景上叠一层当前谱 ChartDan 的 RC/LN 段位图（半透明水印）。"
+            + "\n段位图按最长边 500 像素加载（更小则保持原图），与 HUD 小段位标分页独立。",
+            "When enabled, overlays semi-transparent RC/LN chart-dan badge art on the song-select background."
+            + "\nTextures load with max edge 500 px (smaller sources stay native), separate from HUD badge atlasing.");
+
         #endregion
     }
 }
