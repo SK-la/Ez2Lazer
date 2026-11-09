@@ -463,17 +463,17 @@ namespace osu.Game.EzOsuGame.Skills
         /// </remarks>
         public void ClearPlayerSystemSkills(string username, EzAnalysisSystem system, int? rulesetOnlineId)
             => database.Write((c, tx) => deleteRows(c, tx, "player_skill_value",
-            rulesetOnlineId == null
-                ? "username = $username AND system_id = $system"
-                : "username = $username AND system_id = $system AND ruleset_online_id = $ruleset",
-            cmd =>
-            {
-                cmd.Parameters.AddWithValue("$username", username);
-                cmd.Parameters.AddWithValue("$system", system.ToStorageId());
+                rulesetOnlineId == null
+                    ? "username = $username AND system_id = $system"
+                    : "username = $username AND system_id = $system AND ruleset_online_id = $ruleset",
+                cmd =>
+                {
+                    cmd.Parameters.AddWithValue("$username", username);
+                    cmd.Parameters.AddWithValue("$system", system.ToStorageId());
 
-                if (rulesetOnlineId is int ruleset)
-                    cmd.Parameters.AddWithValue("$ruleset", ruleset);
-            }));
+                    if (rulesetOnlineId is int ruleset)
+                        cmd.Parameters.AddWithValue("$ruleset", ruleset);
+                }));
 
         public void ClearDanSkillsetValues(string username)
             => database.Write((c, tx) => deleteRows(c, tx, "player_dan_skillset", "username = $username",
@@ -659,8 +659,9 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Whether the ledger has moved past what these rows folded. A slice with no rows is not stale: there is
-        /// nothing on screen to be behind.
+        /// Whether the ledger has moved past what these rows folded (per keymode). Algorithm superseded is reported only
+        /// via <see cref="GetStalePlayerSkillDetails"/> — HUD slices read the current revision and do not duplicate that.
+        /// A slice with no rows is not stale.
         /// </summary>
         private static bool isStale(SqliteConnection connection, string username, int keyCount, int rulesetOnlineId, int analyzedPlays)
         {
