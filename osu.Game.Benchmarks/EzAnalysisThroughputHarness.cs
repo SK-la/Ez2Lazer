@@ -77,6 +77,7 @@ namespace osu.Game.Benchmarks
             int keyCount = EzHoldMetrics.ResolveKeyCount(starPlayable);
             double overallDifficulty = starPlayable.Difficulty.OverallDifficulty;
             double star = computeStar(starPlayable, keyCount, overallDifficulty);
+            var chartOnce = EzCSIEngine.FromPlayable(starPlayable);
 
             Console.WriteLine($"chart: {mania_beatmap_name}");
             Console.WriteLine($"objects: {starPlayable.HitObjects.Count}, keys: {keyCount}, od: {overallDifficulty:0.##}, iterations: {iterations}");
@@ -88,6 +89,18 @@ namespace osu.Game.Benchmarks
                 return;
             }
 
+            if (Array.IndexOf(args, "--srprobe") >= 0)
+            {
+                srProbe(starPlayable, keyCount, overallDifficulty);
+                return;
+            }
+
+            if (Array.IndexOf(args, "--srpretty") >= 0)
+            {
+                srPretty(starPlayable, keyCount, overallDifficulty);
+                return;
+            }
+
             Console.WriteLine($"{"stage",-22}{"op",-10}{"charts/s",10}{"ms/chart",12}{"alloc KB",12}");
             Console.WriteLine(new string('-', 68));
 
@@ -95,6 +108,8 @@ namespace osu.Game.Benchmarks
             Measurement loadRow = measure("load+convert", iterations, () => loadPlayable(rawBeatmap, rulesetInfo, mods));
             Measurement extractRow = measure("extract", iterations, () => EzCSIEngine.FromPlayable(starPlayable));
             Measurement starRow = measure("ssr_star", iterations, () => computeStar(starPlayable, keyCount, overallDifficulty));
+            Measurement starOnlyRow = measure("ssr_star_only", iterations, () => EzSSREngine.CalculateSR(chartOnce, keyCount, overallDifficulty));
+            Measurement extractOnlyRow = measure("extract_only", iterations, () => EzCSIEngine.FromPlayable(starPlayable));
             Measurement difficultyRow = measure("official_difficulty", iterations, () => computeOfficial(officialPlayable, ruleset, mods));
             Measurement officialPpRow = measure("official_pp", iterations, () => computePp(officialPlayable, ruleset, mods, computeOfficial(officialPlayable, ruleset, mods)));
 
@@ -109,6 +124,8 @@ namespace osu.Game.Benchmarks
             print(loadRow);
             print(extractRow);
             print(starRow);
+            print(starOnlyRow);
+            print(extractOnlyRow);
             print(difficultyRow);
             print(officialPpRow);
             print(currentRow);
@@ -182,6 +199,69 @@ namespace osu.Game.Benchmarks
 
                 long allocatedKb = (GC.GetAllocatedBytesForCurrentThread() - allocated) / 1024;
                 Console.WriteLine($"run{run} objects={converted.HitObjects.Count} decode={decodeMs}ms convert={convertMs}ms defaults={defaultsMs}ms processor={processorMs}ms alloc={allocatedKb}KB");
+            }
+        }
+
+        /// <summary>
+        /// Prints the full-precision Sunny rating for a fixed set of charts, so a change to the engine can be shown
+        /// to leave the numbers alone (or to move them, when that is intended).
+        /// </summary>
+        private static void srPretty(IBeatmap realChart, int realKeyCount, double realOverallDifficulty)
+        {
+            Console.WriteLine($"real keys={realKeyCount} sr={EzSSREngine.CalculateSR(EzCSIEngine.FromPlayable(realChart), realKeyCount, realOverallDifficulty):R}");
+
+            foreach (int keyCount in new[] { 4, 6, 7, 10 })
+            {
+                foreach (int notesPerSecond in new[] { 6, 12 })
+                {
+                    foreach (bool holds in new[] { false, true })
+                    {
+                        var chart = syntheticChart(keyCount, notesPerSecond, seconds: 90, holds);
+                        Console.WriteLine($"synth keys={keyCount} nps={notesPerSecond} holds={holds} sr={EzSSREngine.CalculateSR(chart, keyCount, 8):R}");
+                    }
+                }
+            }
+        }
+
+        private static EzManiaChartInput syntheticChart(int keyCount, int notesPerSecond, int seconds, bool holds)
+        {
+            int noteCount = notesPerSecond * seconds;
+            var notes = new List<EzManiaNote>(noteCount);
+            double interval = 1000.0 / notesPerSecond;
+
+            for (int i = 0; i < noteCount; i++)
+            {
+                double time = i * interval;
+                bool isHold = holds && i % 3 == 0;
+                notes.Add(new EzManiaNote(time, i % keyCount, isHold, isHold ? time + 220 : time));
+            }
+
+            return new EzManiaChartInput
+            {
+                KeyCount = keyCount,
+                Bpm = 180,
+                TotalLengthMs = seconds * 1000.0,
+                Notes = notes,
+                TimingPoints = new[] { new EzManiaTimingPoint(0, 1000.0 / 3) },
+                FullyRepresented = true,
+            };
+        }
+
+        private static void srProbe(IBeatmap playable, int keyCount, double overallDifficulty)
+        {
+            var chart = EzCSIEngine.FromPlayable(playable);
+
+            for (int i = 0; i < 12; i++)
+            {
+                long allocated = GC.GetAllocatedBytesForCurrentThread();
+                int gc0 = GC.CollectionCount(0);
+                int gc1 = GC.CollectionCount(1);
+                int gc2 = GC.CollectionCount(2);
+                var stopwatch = Stopwatch.StartNew();
+                double sr = EzSSREngine.CalculateSR(chart, keyCount, overallDifficulty);
+
+                Console.WriteLine($"call={i} sr={sr:F4} ms={stopwatch.Elapsed.TotalMilliseconds:F2} allocKB={(GC.GetAllocatedBytesForCurrentThread() - allocated) / 1024.0:F0} "
+                                  + $"gc={GC.CollectionCount(0) - gc0}/{GC.CollectionCount(1) - gc1}/{GC.CollectionCount(2) - gc2}");
             }
         }
 

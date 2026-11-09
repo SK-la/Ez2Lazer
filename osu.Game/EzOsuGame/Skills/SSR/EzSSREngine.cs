@@ -27,7 +27,7 @@ namespace osu.Game.EzOsuGame.Skills.SSR
     }
 
     /// <summary>
-    ///     Star Rating calculator – C# port of the official Python implementation.
+    ///     Star Rating calculator â€“ C# port of the official Python implementation.
     /// </summary>
     public class EzSSREngine
     {
@@ -81,7 +81,7 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             }
         }
 
-        #region 工具方法
+        #region å·¥å…·æ–¹æ³•
 
         /// <summary>
         ///     Whether this engine rates a chart with <paramref name="keyCount"/> columns.
@@ -155,7 +155,7 @@ namespace osu.Game.EzOsuGame.Skills.SSR
 
         #endregion
 
-        #region 结构体
+        #region ç»“æž„ä½“
 
         private readonly struct NoteStruct
         {
@@ -213,7 +213,9 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             if (state == null)
                 return 0.0;
 
-            return finaliseDifficulty(computeLocalDifficulty(state), state.EffectiveWeights, state.Notes, state.LongNotes, tuning.RescaleThreshold);
+            double sr = finaliseDifficulty(computeLocalDifficulty(state), state.EffectiveWeights, state.Notes, state.LongNotes, tuning.RescaleThreshold);
+
+            return sr;
         }
 
         /// <summary>
@@ -296,53 +298,33 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             }
 
             notes.Sort(note_comparer);
-
             var longNotes = notes.Where(n => n.IsLongNote).ToList();
             var longNotesByTails = longNotes.OrderBy(n => n.TailTime).ToList();
-
             double x = computeHitLeniency(overallDifficulty);
 
             int maxHead = notes.Max(n => n.HeadTime);
             int maxTail = longNotes.Count > 0 ? longNotes.Max(n => n.TailTime) : maxHead;
             int totalTime = Math.Max(maxHead, maxTail) + 1;
 
-            //Logger.Log($"C# maxHead: {maxHead}, maxTail: {maxTail}, totalTime: {totalTime}");
-
             (double[] allCorners, double[] baseCorners, double[] aCorners) = buildCorners(totalTime, notes);
-
-            //Logger.Log($"C# allCorners length: {allCorners.Length}, baseCorners length: {baseCorners.Length}");
-
             bool[][] keyUsage = buildKeyUsage(keyCount, totalTime, notes, baseCorners);
             int[][] activeColumns = deriveActiveColumns(keyUsage);
-
             double[][] keyUsage400 = buildKeyUsage400(keyCount, totalTime, notes, baseCorners);
             double[] anchorBase = computeAnchor(keyCount, keyUsage400, baseCorners);
-
             LNRepStruct? lnRep = longNotes.Count > 0 ? buildLNRepresentation(longNotes, totalTime) : null;
-
             (double[][] deltaKs, double[] jBarBase) = computeJBar(keyCount, totalTime, x, notesByColumn, baseCorners);
             double[] jBar = interpValues(allCorners, baseCorners, jBarBase);
-
             double[] xBarBase = computeXBar(keyCount, totalTime, x, notesByColumn, activeColumns, baseCorners, cross);
             double[] xBar = interpValues(allCorners, baseCorners, xBarBase);
-
-            //Logger.Log($"C# xBarBase sample: {string.Join(", ", xBarBase.Take(10))}");
-
             double[] pBarBase = computePBar(keyCount, totalTime, x, notes, lnRep, anchorBase, baseCorners, tuning.LnMultiplier);
             double[] pBar = interpValues(allCorners, baseCorners, pBarBase);
-
-            //Logger.Log($"C# pBarBase sample: {string.Join(", ", pBarBase.Take(10))}");
-
             double[] aBarBase = computeABar(keyCount, totalTime, deltaKs, activeColumns, aCorners, baseCorners);
             double[] aBar = interpValues(allCorners, aCorners, aBarBase);
-
             double[] rBarBase = computeRBar(keyCount, totalTime, x, notesByColumn, longNotesByTails, baseCorners);
             double[] rBar = interpValues(allCorners, baseCorners, rBarBase);
-
             (double[] cStep, double[] ksStep) = computeCAndKs(keyCount, notes, keyUsage, baseCorners);
             double[] cArr = stepInterp(allCorners, baseCorners, cStep);
             double[] ksArr = stepInterp(allCorners, baseCorners, ksStep);
-
             double[] gaps = computeGaps(allCorners);
             double[] effectiveWeights = new double[allCorners.Length];
             for (int i = 0; i < allCorners.Length; i++)
@@ -414,7 +396,7 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             return dAll;
         }
 
-        #region 指标提取
+        #region æŒ‡æ ‡æ��å�–
 
         internal static EzManiaSR4PatternSnapshot CalculateSR4PatternSnapshot(EzManiaChartInput chart, int keyCount, double overallDifficulty, double clockRate = 1.0)
         {
@@ -579,51 +561,124 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             return Math.Min(leniency, adjustedWindow);
         }
 
+        /// <summary>
+        /// Corner positions the per-corner curves are sampled at: every note edge, plus a fixed set of offsets around
+        /// them so a curve's knee lands on a sample.
+        /// </summary>
+        /// <remarks>
+        /// The corners are a set of integers, so they are collected into plain arrays, sorted and deduplicated instead
+        /// of being built through hash sets and LINQ. Equal values mean the same corner, so the sampled positions -
+        /// and therefore every derived value - are the ones the set produced.
+        /// </remarks>
         private static (double[] allCorners, double[] baseCorners, double[] aCorners) buildCorners(int totalTime, List<NoteStruct> notes)
         {
-            var baseSet = new HashSet<int>();
+            // Head and tail each contribute themselves plus three offsets for base, and themselves plus two for a.
+            var baseRaw = new int[(notes.Count * 8) + 2];
+            var aRaw = new int[(notes.Count * 6) + 2];
+            int baseCount = 0;
+            int aCount = 0;
 
             foreach (var note in notes)
             {
-                baseSet.Add(note.HeadTime);
-                if (note.IsLongNote)
-                    baseSet.Add(note.TailTime);
+                baseCount = appendBaseCorners(baseRaw, baseCount, note.HeadTime);
+                aCount = appendACorners(aRaw, aCount, note.HeadTime);
+
+                if (!note.IsLongNote)
+                    continue;
+
+                baseCount = appendBaseCorners(baseRaw, baseCount, note.TailTime);
+                aCount = appendACorners(aRaw, aCount, note.TailTime);
             }
 
-            foreach (int value in baseSet.ToArray())
-            {
-                baseSet.Add(value + 501);
-                baseSet.Add(value - 499);
-                baseSet.Add(value + 1);
-            }
+            baseRaw[baseCount++] = 0;
+            baseRaw[baseCount++] = totalTime;
+            aRaw[aCount++] = 0;
+            aRaw[aCount++] = totalTime;
 
-            baseSet.Add(0);
-            baseSet.Add(totalTime);
+            double[] baseCorners = sortFilterDedupe(baseRaw, baseCount, totalTime);
+            double[] aCorners = sortFilterDedupe(aRaw, aCount, totalTime);
+            double[] allCorners = mergeSorted(baseCorners, aCorners);
 
-            double[] baseCorners = baseSet.Where(v => v >= 0 && v <= totalTime).Select(v => (double)v).Distinct().OrderBy(v => v).ToArray();
-
-            var aSet = new HashSet<int>();
-
-            foreach (var note in notes)
-            {
-                aSet.Add(note.HeadTime);
-                if (note.IsLongNote)
-                    aSet.Add(note.TailTime);
-            }
-
-            foreach (int value in aSet.ToArray())
-            {
-                aSet.Add(value + 1000);
-                aSet.Add(value - 1000);
-            }
-
-            aSet.Add(0);
-            aSet.Add(totalTime);
-
-            double[] aCorners = aSet.Where(v => v >= 0 && v <= totalTime).Select(v => (double)v).Distinct().OrderBy(v => v).ToArray();
-
-            double[] allCorners = baseCorners.Concat(aCorners).Distinct().OrderBy(v => v).ToArray();
             return (allCorners, baseCorners, aCorners);
+
+            static int appendBaseCorners(int[] target, int index, int value)
+            {
+                target[index++] = value;
+                target[index++] = value + 501;
+                target[index++] = value - 499;
+                target[index++] = value + 1;
+                return index;
+            }
+
+            static int appendACorners(int[] target, int index, int value)
+            {
+                target[index++] = value;
+                target[index++] = value + 1000;
+                target[index++] = value - 1000;
+                return index;
+            }
+        }
+
+        private static double[] sortFilterDedupe(int[] raw, int count, int totalTime)
+        {
+            int kept = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                int value = raw[i];
+
+                if (value >= 0 && value <= totalTime)
+                    raw[kept++] = value;
+            }
+
+            Array.Sort(raw, 0, kept);
+
+            if (kept == 0)
+                return Array.Empty<double>();
+
+            int unique = 1;
+
+            for (int i = 1; i < kept; i++)
+            {
+                if (raw[i] != raw[unique - 1])
+                    raw[unique++] = raw[i];
+            }
+
+            var corners = new double[unique];
+
+            for (int i = 0; i < unique; i++)
+                corners[i] = raw[i];
+
+            return corners;
+        }
+
+        /// <summary>Union of two ascending, deduplicated arrays.</summary>
+        private static double[] mergeSorted(double[] first, double[] second)
+        {
+            var merged = new double[first.Length + second.Length];
+            int a = 0;
+            int b = 0;
+            int count = 0;
+
+            while (a < first.Length || b < second.Length)
+            {
+                double value;
+
+                if (b >= second.Length || (a < first.Length && first[a] <= second[b]))
+                    value = first[a++];
+                else
+                    value = second[b++];
+
+                if (count > 0 && merged[count - 1] == value)
+                    continue;
+
+                merged[count++] = value;
+            }
+
+            if (count != merged.Length)
+                Array.Resize(ref merged, count);
+
+            return merged;
         }
 
         private static bool[][] buildKeyUsage(int keyCount, int totalTime, List<NoteStruct> notes, double[] baseCorners)
@@ -649,19 +704,29 @@ namespace osu.Game.EzOsuGame.Skills.SSR
         private static int[][] deriveActiveColumns(bool[][] keyUsage)
         {
             int length = keyUsage[0].Length;
+            int keyCount = keyUsage.Length;
             int[][] active = new int[length][];
+            var scratch = new int[keyCount];
 
             for (int i = 0; i < length; i++)
             {
-                var list = new List<int>();
+                int count = 0;
 
-                for (int col = 0; col < keyUsage.Length; col++)
+                for (int col = 0; col < keyCount; col++)
                 {
                     if (keyUsage[col][i])
-                        list.Add(col);
+                        scratch[count++] = col;
                 }
 
-                active[i] = list.ToArray();
+                if (count == 0)
+                {
+                    active[i] = Array.Empty<int>();
+                    continue;
+                }
+
+                var columns = new int[count];
+                Array.Copy(scratch, columns, count);
+                active[i] = columns;
             }
 
             return active;
@@ -696,7 +761,7 @@ namespace osu.Game.EzOsuGame.Skills.SSR
                 for (int idx = left400; idx < left; idx++)
                 {
                     double offset = baseCorners[idx] - startTime;
-                    double falloffContribution = falloff * Math.Pow(offset, 2);
+                    double falloffContribution = falloff * offset * offset;
                     double value = base_contribution - falloffContribution;
                     double clamped = Math.Max(value, 0);
                     usage[note.Column][idx] += clamped;
@@ -705,7 +770,7 @@ namespace osu.Game.EzOsuGame.Skills.SSR
                 for (int idx = right; idx < right400; idx++)
                 {
                     double offset = baseCorners[idx] - endTime;
-                    double falloffContribution = falloff * Math.Pow(offset, 2);
+                    double falloffContribution = falloff * offset * offset;
                     double value = base_contribution - falloffContribution;
                     double clamped = Math.Max(value, 0);
                     usage[note.Column][idx] += clamped;
@@ -715,7 +780,7 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             return usage;
         }
 
-        #region LN计算
+        #region LNè®¡ç®—
 
         private static LNRepStruct buildLNRepresentation(List<NoteStruct> longNotes, int totalTime)
         {
@@ -845,24 +910,31 @@ namespace osu.Game.EzOsuGame.Skills.SSR
 
         #endregion
 
-        #region 计算核心
+        #region è®¡ç®—æ ¸å¿ƒ
 
         private static double[] computeAnchor(int keyCount, double[][] keyUsage400, double[] baseCorners)
         {
             double[] anchor = new double[baseCorners.Length];
 
+            // One buffer for the whole pass: this runs once per corner, so a per-corner array is the dominant
+            // allocation of the anchor term.
+            var counts = new double[keyCount];
+
             for (int i = 0; i < baseCorners.Length; i++)
             {
-                double[] counts = new double[keyCount];
                 for (int k = 0; k < keyCount; k++)
                     counts[k] = keyUsage400[k][i];
 
+                // Ascending order; the walk reads it from the largest value down, which is the order the previous
+                // sort-then-reverse produced without reversing.
                 Array.Sort(counts);
-                Array.Reverse(counts);
 
-                double[] nonZero = counts.Where(c => c > 0).ToArray();
+                int firstPositive = 0;
 
-                if (nonZero.Length <= 1)
+                while (firstPositive < keyCount && counts[firstPositive] <= 0)
+                    firstPositive++;
+
+                if (keyCount - firstPositive <= 1)
                 {
                     anchor[i] = 0;
                     continue;
@@ -871,10 +943,10 @@ namespace osu.Game.EzOsuGame.Skills.SSR
                 double walk = 0;
                 double maxWalk = 0;
 
-                for (int idx = 0; idx < nonZero.Length - 1; idx++)
+                for (int idx = keyCount - 1; idx > firstPositive; idx--)
                 {
-                    double current = nonZero[idx];
-                    double next = nonZero[idx + 1];
+                    double current = counts[idx];
+                    double next = counts[idx - 1];
                     double ratio = next / current;
                     double offset = 0.5 - ratio;
                     double offsetPenalty = 4 * Math.Pow(offset, 2);
@@ -965,32 +1037,27 @@ namespace osu.Game.EzOsuGame.Skills.SSR
 
         private static double[] computeXBar(int keyCount, int totalTime, double x, List<NoteStruct>[] notesByColumn, int[][] activeColumns, double[] baseCorners, double[] cross)
         {
-            double[][] xKs = new double[keyCount + 1][];
             double[][] fastCross = new double[keyCount + 1][];
 
-            for (int i = 0; i < xKs.Length; i++)
-            {
-                xKs[i] = new double[baseCorners.Length];
+            for (int i = 0; i < fastCross.Length; i++)
                 fastCross[i] = new double[baseCorners.Length];
-            }
 
-            // Parallel.For(0, keyCount + 1, k =>
-            Parallel.For(0, keyCount + 1, k =>
+            // Sum of the plain term folded in as the pair walk writes it: the term is a single weighted value per
+            // corner, so keeping a full slice per adjacency pair only to sum it afterwards costs an array per pair.
+            double[] weightedX = new double[baseCorners.Length];
+
+            // Per-adjacency-pair work, run serially: it writes one slice each, and the slices below are read only
+            // after every pair is done, so there is nothing to gain from the thread pool and its per-partition state.
+            var pair = new List<NoteStruct>();
+
+            for (int k = 0; k <= keyCount; k++)
             {
-                var pair = new List<NoteStruct>();
+                mergePair(notesByColumn, keyCount, k, pair);
 
-                if (k == 0)
-                    pair.AddRange(notesByColumn[0]);
-                else if (k == keyCount)
-                    pair.AddRange(notesByColumn[keyCount - 1]);
-                else
-                {
-                    pair.AddRange(notesByColumn[k - 1]);
-                    pair.AddRange(notesByColumn[k]);
-                }
+                if (pair.Count < 2)
+                    continue;
 
-                pair.Sort(note_comparer);
-                if (pair.Count < 2) return;
+                double crossWeight = cross[Math.Min(k, cross.Length - 1)];
 
                 for (int i = 1; i < pair.Count; i++)
                 {
@@ -1009,24 +1076,25 @@ namespace osu.Game.EzOsuGame.Skills.SSR
                     bool condition1 = !contains(activeColumns[idxStart], k - 1) && !contains(activeColumns[idxEnd], k - 1);
                     bool condition2 = !contains(activeColumns[idxStart], k) && !contains(activeColumns[idxEnd], k);
                     if (condition1 || condition2)
-                        val *= 1 - cross[Math.Min(k, cross.Length - 1)];
+                        val *= 1 - crossWeight;
+
+                    // The fast-cross value is a property of this pair, not of the corner, so it is computed once.
+                    double fast = Math.Max(0, (0.4 * Math.Pow(Math.Max(Math.Max(delta, 0.06), 0.75 * x), -2)) - 80);
+                    double weighted = crossWeight * val;
 
                     for (int idx = left; idx < right; idx++)
                     {
-                        xKs[k][idx] = val;
-                        fastCross[k][idx] = Math.Max(0, (0.4 * Math.Pow(Math.Max(Math.Max(delta, 0.06), 0.75 * x), -2)) - 80);
+                        weightedX[idx] += weighted;
+                        fastCross[k][idx] = fast;
                     }
                 }
-            });
-            // for (int k = 0; k <= keyCount; k++)
+            }
 
             double[] xBase = new double[baseCorners.Length];
 
             for (int idx = 0; idx < baseCorners.Length; idx++)
             {
-                double sum = 0;
-                for (int k = 0; k <= keyCount; k++)
-                    sum += cross[Math.Min(k, cross.Length - 1)] * xKs[k][idx];
+                double sum = weightedX[idx];
 
                 for (int k = 0; k < keyCount; k++)
                 {
@@ -1090,7 +1158,7 @@ namespace osu.Game.EzOsuGame.Skills.SSR
                     double invX = 1.0 / Math.Max(x, 1e-6);
                     double halfX = x / 2.0;
                     double deltaCentre = delta - halfX;
-                    double deltaTerm = 24 * invX * Math.Pow(deltaCentre, 2);
+                    double deltaTerm = 24 * invX * deltaCentre * deltaCentre;
                     double inner = 0.08 * invX * (1 - deltaTerm);
                     double innerClamp = Math.Max(inner, 0);
                     double magnitude = Math.Pow(innerClamp, 0.25);
@@ -1099,7 +1167,8 @@ namespace osu.Game.EzOsuGame.Skills.SSR
                 else
                 {
                     double invX = 1.0 / Math.Max(x, 1e-6);
-                    double centreTerm = Math.Pow(x / 6.0, 2);
+                    double centre = x / 6.0;
+                    double centreTerm = centre * centre;
                     double deltaTerm = 24 * invX * centreTerm;
                     double inner = 0.08 * invX * (1 - deltaTerm);
                     double innerClamp = Math.Max(inner, 0);
@@ -1119,6 +1188,40 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             }
 
             return SmoothOnCorners(baseCorners, pStep, 500, 0.001, SmoothMode.Sum);
+        }
+
+        /// <summary>
+        /// Merges the two columns an adjacency pair spans into <paramref name="target"/>, in the same
+        /// (time, column) order a sort of their concatenation produced.
+        /// </summary>
+        private static void mergePair(List<NoteStruct>[] notesByColumn, int keyCount, int k, List<NoteStruct> target)
+        {
+            target.Clear();
+
+            List<NoteStruct>? left = k == 0 ? null : notesByColumn[k - 1];
+            List<NoteStruct>? right = k == keyCount ? null : notesByColumn[k];
+
+            if (left != null && right != null)
+            {
+                int l = 0;
+                int r = 0;
+
+                while (l < left.Count && r < right.Count)
+                {
+                    // Columns are ordered, so an equal-head note from the left column sorts first.
+                    target.Add(left[l].HeadTime <= right[r].HeadTime ? left[l++] : right[r++]);
+                }
+
+                while (l < left.Count)
+                    target.Add(left[l++]);
+
+                while (r < right.Count)
+                    target.Add(right[r++]);
+
+                return;
+            }
+
+            target.AddRange(left ?? right!);
         }
 
         private static double[] computeABar(int keyCount, int totalTime, double[][] deltaKs, int[][] activeColumns, double[] aCorners, double[] baseCorners)
@@ -1266,7 +1369,7 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             return gaps;
         }
 
-        #region 指标映射
+        #region æŒ‡æ ‡æ˜ å°„
 
         private static double computeSR4JackTerm(double jackValue, double aBar, double activeColumns)
         {
@@ -1362,20 +1465,45 @@ namespace osu.Game.EzOsuGame.Skills.SSR
 
         private static double finaliseDifficulty(List<double> difficulties, List<double> weights, List<NoteStruct> notes, List<NoteStruct> longNotes, double rescaleThreshold)
         {
-            var combined = difficulties.Zip(weights, (d, w) => (d, w)).OrderBy(pair => pair.d).ToList();
-            if (combined.Count == 0)
+            int count = Math.Min(difficulties.Count, weights.Count);
+
+            if (count == 0)
                 return 0;
 
-            double[] sortedD = combined.Select(p => p.d).ToArray();
-            double[] sortedWeights = combined.Select(p => Math.Max(p.w, 0)).ToArray();
+            var sortedD = new double[count];
+            var sortedWeights = new double[count];
 
-            double[] cumulative = new double[sortedWeights.Length];
+            for (int i = 0; i < count; i++)
+            {
+                sortedD[i] = difficulties[i];
+                sortedWeights[i] = Math.Max(weights[i], 0);
+            }
+
+            return finaliseFromSorted(sortedD, sortedWeights, count, notes, longNotes, rescaleThreshold);
+        }
+
+        /// <summary>
+        /// Final pass over the per-corner difficulties and their weights.
+        /// </summary>
+        /// <remarks>
+        /// Both inputs are permuted into ascending difficulty order in place. The percentile lookup below reads the
+        /// two arrays positionally, so they must be sorted together; sorting one scratch copy of the pair instead of
+        /// materialising a list of tuples keeps this pass allocation-free apart from the sort itself.
+        /// </remarks>
+        private static double finaliseFromSorted(double[] sortedD, double[] sortedWeights, int count, List<NoteStruct> notes, List<NoteStruct> longNotes,
+                                                double rescaleThreshold)
+        {
+            Array.Sort(sortedD, sortedWeights, 0, count);
+
+            double[] cumulative = new double[count];
             cumulative[0] = sortedWeights[0];
-            for (int i = 1; i < sortedWeights.Length; i++)
+            for (int i = 1; i < count; i++)
                 cumulative[i] = cumulative[i - 1] + sortedWeights[i];
 
             double totalWeight = Math.Max(cumulative[^1], 1e-9);
-            double[] norm = cumulative.Select(v => v / totalWeight).ToArray();
+
+            for (int i = 0; i < count; i++)
+                cumulative[i] /= totalWeight;
 
             double[] targets = { 0.945, 0.935, 0.925, 0.915, 0.845, 0.835, 0.825, 0.815 };
             double percentile93 = 0;
@@ -1383,7 +1511,7 @@ namespace osu.Game.EzOsuGame.Skills.SSR
 
             for (int i = 0; i < 4; i++)
             {
-                int index = Math.Min(bisectLeft(norm, targets[i]), sortedD.Length - 1);
+                int index = Math.Min(bisectLeft(cumulative, targets[i]), count - 1);
                 percentile93 += sortedD[index];
             }
 
@@ -1391,29 +1519,23 @@ namespace osu.Game.EzOsuGame.Skills.SSR
 
             for (int i = 4; i < 8; i++)
             {
-                int index = Math.Min(bisectLeft(norm, targets[i]), sortedD.Length - 1);
+                int index = Math.Min(bisectLeft(cumulative, targets[i]), count - 1);
                 percentile83 += sortedD[index];
             }
 
             percentile83 /= 4.0;
 
-            //Logger.Log($"C# percentile93: {percentile93}, percentile83: {percentile83}");
-
             double weightedMeanNumerator = 0;
-            for (int i = 0; i < sortedD.Length; i++)
+            for (int i = 0; i < count; i++)
                 weightedMeanNumerator += Math.Pow(sortedD[i], 5) * sortedWeights[i];
 
             double weightedMean = Math.Pow(Math.Max(weightedMeanNumerator / totalWeight, 0), 0.2);
-
-            //Logger.Log($"C# weightedMean: {weightedMean}");
 
             double topComponent = 0.25 * 0.88 * percentile93;
             double middleComponent = 0.2 * 0.94 * percentile83;
             double meanComponent = 0.55 * weightedMean;
             double sr = topComponent + middleComponent + meanComponent;
             sr = Math.Pow(sr, 1.0) / Math.Pow(8, 1.0) * 8;
-
-            //Logger.Log($"C# sr before notes adjustment: {sr}");
 
             double totalNotes = notes.Count;
 
@@ -1424,20 +1546,31 @@ namespace osu.Game.EzOsuGame.Skills.SSR
                 totalNotes += 0.5 * (len / 200.0);
             }
 
-            //Logger.Log($"C# totalNotes: {totalNotes}");
-
             sr *= totalNotes / (totalNotes + 60);
             sr = rescaleHigh(sr, rescaleThreshold);
             sr *= 0.975;
-
-            //Logger.Log($"C# final SR: {sr}");
 
             return sr;
         }
 
         private static double finaliseDifficulty(double[] difficulties, double[] weights, List<NoteStruct> notes, List<NoteStruct> longNotes, double rescaleThreshold)
         {
-            return finaliseDifficulty(difficulties.ToList(), weights.ToList(), notes, longNotes, rescaleThreshold);
+            int count = Math.Min(difficulties.Length, weights.Length);
+
+            if (count == 0)
+                return 0;
+
+            // Copies: the callers keep using their arrays (the breakdown re-reads the same difficulty curve).
+            var sortedD = new double[count];
+            var sortedWeights = new double[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                sortedD[i] = difficulties[i];
+                sortedWeights[i] = Math.Max(weights[i], 0);
+            }
+
+            return finaliseFromSorted(sortedD, sortedWeights, count, notes, longNotes, rescaleThreshold);
         }
 
         private static double[] interpValues(double[] newX, double[] oldX, double[] oldVals)
