@@ -14,6 +14,7 @@ using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Performance;
@@ -61,6 +62,15 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly Lock sqliteManualRebuildLock = new Lock();
         private bool sqliteMainRebuildQueued;
         private bool sqliteSongsBranchesRebuildQueued;
+
+        public bool IsManualSqliteRebuildRunning
+        {
+            get
+            {
+                lock (sqliteManualRebuildLock)
+                    return sqliteMainRebuildQueued || sqliteSongsBranchesRebuildQueued;
+            }
+        }
 
         protected virtual int TimeToSleepDuringGameplay => 30000;
         private readonly Lock pendingBeatmapLock = new Lock();
@@ -283,6 +293,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (needingRecompute.Count == 0)
             {
                 Logger.Log("No beatmaps require analysis recompute.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                postMaintenanceNothingPendingNotification();
                 return;
             }
 
@@ -356,6 +367,20 @@ namespace osu.Game.EzOsuGame.Analysis
             return beatmapIds;
         }
 
+        private void postMaintenanceNothingPendingNotification()
+        {
+            if (notificationOverlay == null)
+                return;
+
+            Schedule(() =>
+            {
+                notificationOverlay.Post(new SimpleNotification
+                {
+                    Text = EzAnalysisNotificationStrings.MAINTENANCE_NOTHING_PENDING,
+                });
+            });
+        }
+
         private void queueBeatmapsForMainSqliteBackfill(IReadOnlyList<Guid> beatmapIds)
         {
             bool shouldSignalStartupWarmup = false;
@@ -390,6 +415,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (refreshPlans.Count == 0)
             {
                 Logger.Log("No songs branches require ssr/PP refresh.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                postMaintenanceNothingPendingNotification();
                 return;
             }
 

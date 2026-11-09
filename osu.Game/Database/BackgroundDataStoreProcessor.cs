@@ -140,6 +140,9 @@ namespace osu.Game.Database
         private readonly Lock ezRealmMetadataBackfillLock = new Lock();
         private bool ezRealmMetadataBackfillQueued;
 
+        private ProgressNotification? ezRealmMaintenancePrepNotification;
+        private bool ezRealmMaintenanceStageNotificationPosted;
+
         /// <summary>
         /// Request that arrived while a backfill was already running. Kept (rather than dropped) so
         /// "a version bump is recomputed on the next launch" holds even when the startup pass loses the
@@ -178,6 +181,15 @@ namespace osu.Game.Database
             }
         }
 
+        public bool IsEzScoreRecalculationRunning
+        {
+            get
+            {
+                lock (ezScoreRecalculationLock)
+                    return ezScoreRecalculationQueued;
+            }
+        }
+
         /// <summary>
         /// Queue Ez Realm metadata backfill (Tag / SunnySR / PP / Mina) on a background thread.
         /// </summary>
@@ -207,6 +219,8 @@ namespace osu.Game.Database
         /// </summary>
         private void runEzRealmMetadataBackfillTask(EzAnalysisSystem scope, bool forceAll)
         {
+            beginEzRealmMaintenancePrepNotification();
+
             try
             {
                 while (true)
@@ -230,8 +244,56 @@ namespace osu.Game.Database
             }
             finally
             {
+                finishEzRealmMaintenancePrepNotification();
                 endEzRealmMetadataBackfill();
             }
+        }
+
+        private void beginEzRealmMaintenancePrepNotification()
+        {
+            ezRealmMaintenanceStageNotificationPosted = false;
+
+            if (notificationOverlay == null)
+                return;
+
+            ezRealmMaintenancePrepNotification = showProgressNotification(
+                1,
+                EzAnalysisNotificationStrings.MAINTENANCE_PREP_RUNNING,
+                EzAnalysisNotificationStrings.MAINTENANCE_PREP_COMPLETED,
+                dismissOverlappingPrep: false);
+        }
+
+        private void dismissEzRealmMaintenancePrepNotification()
+        {
+            var notification = ezRealmMaintenancePrepNotification;
+            ezRealmMaintenancePrepNotification = null;
+
+            if (notification == null)
+                return;
+
+            Schedule(notification.CompleteSilently);
+        }
+
+        private void finishEzRealmMaintenancePrepNotification()
+        {
+            if (ezRealmMaintenanceStageNotificationPosted)
+            {
+                dismissEzRealmMaintenancePrepNotification();
+                return;
+            }
+
+            if (ezRealmMaintenancePrepNotification == null)
+                return;
+
+            dismissEzRealmMaintenancePrepNotification();
+
+            Schedule(() =>
+            {
+                notificationOverlay?.Post(new SimpleNotification
+                {
+                    Text = EzAnalysisNotificationStrings.MAINTENANCE_NOTHING_PENDING,
+                });
+            });
         }
 
         /// <summary>
@@ -2436,12 +2498,18 @@ namespace osu.Game.Database
             });
         }
 
-        private ProgressNotification? showProgressNotification(int totalCount, LocalisableString running, LocalisableString completed)
+        private ProgressNotification? showProgressNotification(int totalCount, LocalisableString running, LocalisableString completed, bool dismissOverlappingPrep = true)
         {
             if (notificationOverlay == null)
             {
                 Logger.Log("Background progress notification skipped because INotificationOverlay is unavailable.");
                 return null;
+            }
+
+            if (dismissOverlappingPrep)
+            {
+                dismissEzRealmMaintenancePrepNotification();
+                ezRealmMaintenanceStageNotificationPosted = true;
             }
 
             ProgressNotification notification = new ProgressNotification
