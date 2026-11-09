@@ -52,7 +52,12 @@ namespace osu.Game.EzOsuGame.Analysis
             var outcome = dispatcher.Execute(actions, forceAll);
 
             foreach (var failure in outcome.Failures)
+            {
+                if (failure.Result == EzDataRebuildDispatchResult.AlreadyRunning)
+                    continue;
+
                 notifications?.Post(new SimpleErrorNotification { Text = GetErrorMessage(failure.Result) });
+            }
 
             return outcome;
         }

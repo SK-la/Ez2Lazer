@@ -415,6 +415,10 @@ namespace osu.Game.EzOsuGame.Localization
             "数据维护已在后台运行，请等待当前任务完成。",
             "Data maintenance is already running in the background. Wait for the current task to finish.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_IN_PROGRESS = new EzLocalizationManager.EzLocalisableString(
+            "后台补算进行中，进度见右上角通知。",
+            "Backfill is running in the background; see the notification tray for progress.");
+
         public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_SQLITE_DISABLED = new EzLocalizationManager.EzLocalisableString(
             "SQLite 分析缓存已关闭，请在上方启用后再执行。",
             "SQLite analysis cache is disabled. Enable it above before running this action.");
