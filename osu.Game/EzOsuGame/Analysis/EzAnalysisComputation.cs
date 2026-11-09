@@ -138,8 +138,8 @@ namespace osu.Game.EzOsuGame.Analysis
         /// The caller's instance must be one it owns (a bound cache entry, not a shared one): scoring binds
         /// judgements in place.
         /// </remarks>
-        internal static double ComputeBaselinePerformancePointsForRating(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo, double starRating,
-                                                                          IBeatmap analysisBeatmap, CancellationToken cancellationToken = default)
+        internal static double ComputeBaselinePerformancePointsForRating(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo, double starRating, IBeatmap analysisBeatmap,
+                                                                         CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(analysisBeatmap);
 
@@ -152,8 +152,8 @@ namespace osu.Game.EzOsuGame.Analysis
             return computeBaselinePerformancePoints(playable, analysisBeatmap, lookup, starRating, cancellationToken);
         }
 
-        private static double computeBaselinePerformancePoints(PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap,
-                                                                in EzAnalysisLookupCache lookup, double starRating, CancellationToken cancellationToken)
+        private static double computeBaselinePerformancePoints(PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup, double starRating,
+                                                               CancellationToken cancellationToken)
             => analysisBeatmap.HitObjects.Count == 0
                 ? -1
                 : calculatePerformanceAtRating(playable, analysisBeatmap, lookup, starRating, cancellationToken);
@@ -168,8 +168,8 @@ namespace osu.Game.EzOsuGame.Analysis
         /// ruleset cannot express it.
         /// </remarks>
         internal static (double Star, double Pp, double SubstitutedPp) ComputeOfficialBaseline(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo,
-                                                                                              double starRating, IBeatmap analysisBeatmap,
-                                                                                              CancellationToken cancellationToken = default)
+                                                                                               double starRating, IBeatmap analysisBeatmap,
+                                                                                               CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(analysisBeatmap);
 
@@ -231,6 +231,90 @@ namespace osu.Game.EzOsuGame.Analysis
             cancellationToken.ThrowIfCancellationRequested();
 
             return tryComputeOperationValues(workingBeatmap, analysisBeatmap, lookup, cancellationToken, out sunnySR, out pp);
+        }
+
+        /// <summary>
+        /// Mod-sensitive mirrored scalars and axis rows for a songs branch snapshot. CSI / dan stay on the NoMod Realm projection.
+        /// </summary>
+        internal readonly record struct ModSensitiveBranchMirror(
+            double? OfficialSr,
+            double? MinaSr,
+            double? MinaPp,
+            double? PppSr,
+            double? PppPp,
+            IReadOnlyDictionary<string, double>? MinaAxes,
+            IReadOnlyDictionary<string, double>? PppAxes);
+
+        internal static bool TryComputeModSensitiveBranchMirror(
+            BeatmapManager beatmapManager,
+            in EzAnalysisLookupCache lookup,
+            CancellationToken cancellationToken,
+            out ModSensitiveBranchMirror mirror)
+        {
+            mirror = default;
+
+            try
+            {
+                var playable = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
+                IBeatmap analysisBeatmap = playable.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                double? officialSr = null;
+
+                if (computeOfficial(playable, analysisBeatmap, lookup, cancellationToken) is { StarRating: var osr }
+                    && double.IsFinite(osr) && osr >= 0)
+                {
+                    officialSr = osr;
+                }
+
+                double? pppSr = null;
+                double? pppPp = null;
+                IReadOnlyDictionary<string, double>? pppAxes = null;
+
+                if (computePpp(lookup.Ruleset.OnlineID, analysisBeatmap, lookup.OrderedMods) is { } ppp)
+                {
+                    pppAxes = ppp.Axes;
+
+                    if (ppp.Axes.TryGetValue(EzPPPSkillCatalog.STAR_RATING, out double star) && double.IsFinite(star) && star > 0)
+                    {
+                        pppSr = star;
+
+                        double pp = EzPPPPerformanceCalculators.Calculate(lookup.Ruleset.OnlineID, ppp.Skills, analysisBeatmap,
+                            lookup.OrderedMods, getRateAdjustMultiplier(lookup.OrderedMods));
+
+                        if (double.IsFinite(pp) && pp > 0)
+                            pppPp = pp;
+                    }
+                }
+
+                double? minaSr = null;
+                IReadOnlyDictionary<string, double>? minaAxes = null;
+
+                if (lookup.Ruleset.OnlineID == EzLocalProfileConstants.MANIA_RULESET_ID)
+                {
+                    var measurements = EzChartMeasurements.FromPlayable(analysisBeatmap, cancellationToken);
+
+                    if (ComputeMinaAxes(lookup.Ruleset.OnlineID, measurements, getRateAdjustMultiplier(lookup.OrderedMods), cancellationToken) is { } mina)
+                    {
+                        minaAxes = mina.Axes;
+
+                        if (mina.Vector.Overall > 0)
+                            minaSr = EzMinaRatingScale.ToStarRating(mina.Vector.Overall);
+                    }
+                }
+
+                mirror = new ModSensitiveBranchMirror(officialSr, minaSr, null, pppSr, pppPp, minaAxes, pppAxes);
+                return officialSr != null || minaSr != null || pppSr != null || pppAxes != null || minaAxes != null;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public static EzAnalysisResult Compute(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
@@ -524,8 +608,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <summary>
         /// One difficulty calculation together with the inputs a substituted rating is scored with.
         /// </summary>
-        private readonly record struct OfficialResult(double StarRating, double? PerformancePoints, DifficultyAttributes Attributes,
-                                                      PerformanceCalculator? Calculator, ScoreInfo? Score);
+        private readonly record struct OfficialResult(double StarRating, double? PerformancePoints, DifficultyAttributes Attributes, PerformanceCalculator? Calculator, ScoreInfo? Score);
 
         /// <summary>
         /// The ruleset's own difficulty and perfect-play performance for the current mods.
