@@ -41,6 +41,54 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         {
             config.SetValue(Ez2Setting.SsrRescaleThreshold, EzSSRTuning.FALLBACK.RescaleThreshold);
             config.SetValue(Ez2Setting.SsrLnMultiplier, EzSSRTuning.FALLBACK.LnMultiplier);
+            config.SetValue(Ez2Setting.SsrAppliedRescaleThreshold, EzSSRTuning.FALLBACK.RescaleThreshold);
+            config.SetValue(Ez2Setting.SsrAppliedLnMultiplier, EzSSRTuning.FALLBACK.LnMultiplier);
+        }
+
+        [Test]
+        public void A_fresh_install_has_nothing_pending()
+        {
+            EzSSRTuningSnapshot.Record();
+
+            Assert.That(EzSSRTuningSnapshot.IsPending, Is.False);
+        }
+
+        [Test]
+        public void Changing_a_coefficient_marks_the_stored_ratings_pending()
+        {
+            EzSSRTuningSnapshot.Record();
+
+            config.SetValue(Ez2Setting.SsrRescaleThreshold, 9.0);
+
+            Assert.That(EzSSRTuningSnapshot.IsPending, Is.True);
+        }
+
+        [Test]
+        public void Restoring_the_previous_value_clears_the_pending_state()
+        {
+            EzSSRTuningSnapshot.Record();
+            config.SetValue(Ez2Setting.SsrLnMultiplier, 7.0);
+            Assert.That(EzSSRTuningSnapshot.IsPending, Is.True, "precondition");
+
+            // An abandoned experiment must not queue a rebuild, which is why the record is a value pair, not a flag.
+            config.SetValue(Ez2Setting.SsrLnMultiplier, EzSSRTuning.FALLBACK.LnMultiplier);
+
+            Assert.That(EzSSRTuningSnapshot.IsPending, Is.False);
+        }
+
+        [Test]
+        public void Afinished_pass_absorbs_the_current_settings()
+        {
+            // Values inside the settings' own ranges and steps, so nothing is clamped before it is recorded.
+            config.SetValue(Ez2Setting.SsrRescaleThreshold, 9.0);
+            config.SetValue(Ez2Setting.SsrLnMultiplier, 6.5);
+            Assert.That(EzSSRTuningSnapshot.IsPending, Is.True, "precondition");
+
+            EzSSRTuningSnapshot.Record();
+
+            Assert.That(EzSSRTuningSnapshot.IsPending, Is.False);
+            Assert.That(EzSSRTuningSnapshot.Applied.RescaleThreshold, Is.EqualTo(9.0));
+            Assert.That(EzSSRTuningSnapshot.Applied.LnMultiplier, Is.EqualTo(6.5));
         }
 
         [Test]
