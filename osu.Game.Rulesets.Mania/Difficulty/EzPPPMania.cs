@@ -20,7 +20,7 @@ namespace osu.Game.Rulesets.Mania.Difficulty
 #pragma warning restore CA2255
         internal static void Register()
         {
-            EzPPPCalculators.Register(EzLocalProfileConstants.MANIA_RULESET_ID, static (beatmap, mods, _) => EzPPPMania.Calculate(beatmap));
+            EzPPPCalculators.Register(EzLocalProfileConstants.MANIA_RULESET_ID, static (beatmap, mods, rate) => EzPPPMania.Calculate(beatmap, mods, rate));
             EzPPPPerformanceCalculators.Register(EzLocalProfileConstants.MANIA_RULESET_ID, static (skills, beatmap, mods, _) => performance(skills, beatmap, mods));
         }
 
@@ -67,8 +67,12 @@ namespace osu.Game.Rulesets.Mania.Difficulty
         /// <summary>Millisecond tolerance for "these two objects are a chord" and for the interval comparisons.</summary>
         private const double tolerance_ms = 1;
 
-        public static Dictionary<string, double> Calculate(IBeatmap beatmap)
+        public static Dictionary<string, double> Calculate(IBeatmap beatmap, IReadOnlyList<Mod> mods, double clockRate)
         {
+            _ = mods;
+
+            double rate = clockRate > 0 ? clockRate : 1;
+
             var notes = new List<(int Column, double Start, double End)>();
 
             foreach (var hitObject in beatmap.HitObjects)
@@ -110,7 +114,7 @@ namespace osu.Game.Rulesets.Mania.Difficulty
             {
                 var note = notes[i];
                 int column = Math.Clamp(note.Column, 0, columns - 1);
-                double delta = i == 0 ? 0 : note.Start - previousStart;
+                double delta = i == 0 ? 0 : (note.Start - previousStart) / rate;
                 double noteEnd = Math.Max(note.End, note.Start);
 
                 bool overlap = false;
@@ -137,11 +141,11 @@ namespace osu.Game.Rulesets.Mania.Difficulty
                 double holdFactor = holdAcross ? 1.25 : 1;
                 double holdBonus = overlap ? 1.0 / (1 + Math.Exp(0.27 * (30 - nearestRelease))) : 0;
 
-                double columnDelta = occupied[column] ? Math.Max(0, note.Start - columnStart[column]) : 0;
+                double columnDelta = occupied[column] ? Math.Max(0, (note.Start - columnStart[column]) / rate) : 0;
                 columnStrain[column] = EzPPPMath.Decay(columnDelta, individual_decay) * columnStrain[column] + 2 * holdFactor;
 
                 // A chord shares the peak of its columns; a lone note takes its own column's strain.
-                individual = i > 0 && note.Start - previousStart <= tolerance_ms
+                individual = i > 0 && (note.Start - previousStart) / rate <= tolerance_ms
                     ? Math.Max(individual, columnStrain[column])
                     : columnStrain[column];
 
@@ -151,7 +155,7 @@ namespace osu.Game.Rulesets.Mania.Difficulty
                 double level = individual + overall;
                 strains.Add(i == 0 ? level : Math.Max(0, level - (individualLevels[i - 1] + overallLevels[i - 1])));
 
-                times.Add(note.Start);
+                times.Add(note.Start / rate);
                 individualLevels.Add(individual);
                 overallLevels.Add(overall);
 

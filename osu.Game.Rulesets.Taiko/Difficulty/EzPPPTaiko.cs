@@ -21,7 +21,7 @@ namespace osu.Game.Rulesets.Taiko.Difficulty
 #pragma warning restore CA2255
         internal static void Register()
         {
-            EzPPPCalculators.Register(EzLocalProfileConstants.TAIKO_RULESET_ID, static (beatmap, mods, _) => EzPPPTaiko.Calculate(beatmap));
+            EzPPPCalculators.Register(EzLocalProfileConstants.TAIKO_RULESET_ID, static (beatmap, mods, rate) => EzPPPTaiko.Calculate(beatmap, mods, rate));
             EzPPPPerformanceCalculators.Register(EzLocalProfileConstants.TAIKO_RULESET_ID, static (skills, beatmap, mods, rate) => performance(skills, beatmap, mods, rate));
         }
 
@@ -76,6 +76,8 @@ namespace osu.Game.Rulesets.Taiko.Difficulty
                 }
             }
 
+            bool isConvert = beatmap.BeatmapInfo.Ruleset.OnlineID != EzLocalProfileConstants.TAIKO_RULESET_ID;
+
             return EzPPPPerformance.Taiko(
                 EzPPPPerformanceCalculators.Rating(skills, EzPPPSkillCatalog.STAR_RATING),
                 totalHits,
@@ -84,7 +86,8 @@ namespace osu.Game.Rulesets.Taiko.Difficulty
                 hidden,
                 easy,
                 hardRock,
-                flashlight);
+                flashlight,
+                isConvert);
         }
     }
 
@@ -119,8 +122,10 @@ namespace osu.Game.Rulesets.Taiko.Difficulty
             (4.0 / 5, 0.7),
         };
 
-        public static Dictionary<string, double> Calculate(IBeatmap beatmap)
+        public static Dictionary<string, double> Calculate(IBeatmap beatmap, IReadOnlyList<Mod> mods, double clockRate)
         {
+            _ = mods;
+
             var objects = new List<TaikoHitObject>();
 
             foreach (var hitObject in beatmap.HitObjects)
@@ -132,15 +137,17 @@ namespace osu.Game.Rulesets.Taiko.Difficulty
             if (objects.Count < 3)
                 return new Dictionary<string, double>(EzPPPSkillCatalog.ChartZeros(EzLocalProfileConstants.TAIKO_RULESET_ID), StringComparer.Ordinal);
 
+            double rate = positiveRate(clockRate);
+
             int count = objects.Count;
             var times = new List<double>(count);
             var rhythmStrain = new List<double>(count);
             var colourStrain = new List<double>(count);
             var staminaStrain = new List<double>(count);
 
-            double[] rhythmValues = rhythms(objects);
+            double[] rhythmValues = rhythms(objects, rate);
             double[] colourValues = colours(objects);
-            double[] staminaValues = stamina(objects);
+            double[] staminaValues = stamina(objects, rate);
 
             double rhythmState = 0;
             double colourState = 0;
@@ -149,13 +156,13 @@ namespace osu.Game.Rulesets.Taiko.Difficulty
 
             for (int i = 2; i < count; i++)
             {
-                double delta = Math.Max(0, objects[i].StartTime - previousTime);
+                double delta = scaledDelta(objects[i].StartTime, previousTime, rate);
 
                 rhythmState = rhythm_decay * rhythmState + rhythm_multiplier * rhythmValues[i];
                 colourState = EzPPPMath.Decay(delta, colour_decay) * colourState + colour_multiplier * colourValues[i];
                 staminaState = EzPPPMath.Decay(delta, stamina_decay) * staminaState + stamina_multiplier * staminaValues[i];
 
-                times.Add(objects[i].StartTime);
+                times.Add(scaledTime(objects[i].StartTime, rate));
                 rhythmStrain.Add(rhythmState);
                 colourStrain.Add(colourState);
                 staminaStrain.Add(staminaState);
@@ -181,7 +188,14 @@ namespace osu.Game.Rulesets.Taiko.Difficulty
         /// Rhythm skill contribution per object. Only a Hit that repeats a table ratio inside the speed window
         /// contributes; everything else contributes zero and may also reset the rolling state.
         /// </summary>
-        private static double[] rhythms(List<TaikoHitObject> objects)
+        private static double positiveRate(double clockRate) => clockRate > 0 ? clockRate : 1;
+
+        private static double scaledTime(double milliseconds, double rate) => milliseconds / rate;
+
+        private static double scaledDelta(double currentMs, double previousMs, double rate)
+            => Math.Max(0, (currentMs - previousMs) / rate);
+
+        private static double[] rhythms(List<TaikoHitObject> objects, double rate)
         {
             double[] result = new double[objects.Count];
             var history = new List<RhythmEntry>(rhythm_history_capacity + 1);
@@ -199,8 +213,8 @@ namespace osu.Game.Rulesets.Taiko.Difficulty
 
                 notesSinceAccumulated++;
 
-                double delta = objects[i].StartTime - objects[i - 1].StartTime;
-                double previousDelta = objects[i - 1].StartTime - objects[i - 2].StartTime;
+                double delta = scaledDelta(objects[i].StartTime, objects[i - 1].StartTime, rate);
+                double previousDelta = scaledDelta(objects[i - 1].StartTime, objects[i - 2].StartTime, rate);
                 double ratio = previousDelta > 0 ? delta / previousDelta : 1;
                 var (rho, weight) = matchRhythm(ratio);
 
@@ -446,7 +460,7 @@ namespace osu.Game.Rulesets.Taiko.Difficulty
         }
 
         /// <summary>Stamina contribution: same-colour press cadence with a two- or four-finger assumption.</summary>
-        private static double[] stamina(List<TaikoHitObject> objects)
+        private static double[] stamina(List<TaikoHitObject> objects, double rate)
         {
             double[] result = new double[objects.Count];
             var history = new Dictionary<HitType, List<double>>();
@@ -456,7 +470,7 @@ namespace osu.Game.Rulesets.Taiko.Difficulty
                 if (objects[i] is not Hit hit)
                     continue;
 
-                int fingers = colourChangedNear(objects, i) ? 2 : 4;
+                int fingers = colourChangedNear(objects, i, rate) ? 2 : 4;
 
                 if (!history.TryGetValue(hit.Type, out var times))
                 {
@@ -467,7 +481,7 @@ namespace osu.Game.Rulesets.Taiko.Difficulty
                 int back = fingers - 1;
 
                 if (times.Count >= back && back > 0)
-                    result[i] = 0.5 + 30.0 / Math.Max(1, hit.StartTime - times[^back]);
+                    result[i] = 0.5 + 30.0 / Math.Max(1, scaledDelta(hit.StartTime, times[^back], rate));
 
                 times.Add(hit.StartTime);
             }
@@ -476,7 +490,7 @@ namespace osu.Game.Rulesets.Taiko.Difficulty
         }
 
         /// <summary>Whether a colour change sits within 300 ms before or after this object.</summary>
-        private static bool colourChangedNear(List<TaikoHitObject> objects, int index)
+        private static bool colourChangedNear(List<TaikoHitObject> objects, int index, double rate)
         {
             var hit = (Hit)objects[index];
 
@@ -485,7 +499,7 @@ namespace osu.Game.Rulesets.Taiko.Difficulty
                 if (i == index || objects[i] is not Hit other)
                     continue;
 
-                if (other.Type != hit.Type && Math.Abs(other.StartTime - hit.StartTime) < 300)
+                if (other.Type != hit.Type && scaledDelta(other.StartTime, hit.StartTime, rate) < 300)
                     return true;
             }
 
