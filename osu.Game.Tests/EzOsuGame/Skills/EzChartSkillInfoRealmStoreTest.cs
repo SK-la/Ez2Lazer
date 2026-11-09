@@ -198,6 +198,11 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 seedChart(realm, real_hash);
                 seedChart(realm, legacy_stub_hash);
 
+                // The chain only counts a row when the systems that produced it are current: CSI reads Mina, so both
+                // stamps are part of what this fixture presupposes.
+                store.SetAppliedVersion(EzAnalysisSystem.Mina, EzMinaEngine.VERSION);
+                store.SetAppliedVersion(EzAnalysisSystem.CSI, EzCSIEngine.VERSION);
+
                 // Implicit stub upsert is a no-op: an Unavailable DTO must never fake "already processed".
                 store.UpsertChartSkillInfo(stub_hash, EzChartSkillInfo.Unavailable);
                 Assert.That(store.TryGetChartSkillInfo(stub_hash, out var missing), Is.False);
@@ -358,6 +363,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 var id = Guid.NewGuid();
 
                 seedChart(realm, hash);
+
+                store.SetAppliedVersion(EzAnalysisSystem.Mina, EzMinaEngine.VERSION);
+                store.SetAppliedVersion(EzAnalysisSystem.CSI, EzCSIEngine.VERSION);
 
                 // What an earlier pass stamped from the stub axis.
                 store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });

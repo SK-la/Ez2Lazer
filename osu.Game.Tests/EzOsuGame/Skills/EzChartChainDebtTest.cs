@@ -5,10 +5,12 @@ using System;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Rulesets;
 using osu.Game.Tests.Database;
 using Realms;
@@ -147,6 +149,15 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 addChart(r, unrateable_with_csi_chart, maniaRuleset, circleSize: 4);
                 addChart(r, osu_chart, osuRuleset, circleSize: 4);
             });
+
+            // The chain only counts a stored row when the systems that produced it are current, so the revision each
+            // one would have recorded after a real pass has to be part of the fixture.
+            var store = new EzChartSkillStore(realm);
+            store.SetAppliedVersion(EzAnalysisSystem.Mina, EzMinaEngine.VERSION);
+            store.SetAppliedVersion(EzAnalysisSystem.CSI, EzCSIEngine.VERSION);
+            store.SetAppliedVersion(EzAnalysisSystem.Dan, EzDanEngine.VERSION);
+            store.SetAppliedVersion(EzAnalysisSystem.SSR, EzSSRUnit.VERSION);
+            EzSSRTuningSnapshot.Record();
         }
 
         private static void addChart(Realm r, string hash, RulesetInfo ruleset, float circleSize)

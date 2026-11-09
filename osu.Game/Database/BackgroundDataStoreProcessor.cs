@@ -643,8 +643,19 @@ namespace osu.Game.Database
 
             if (scope.HasFlag(EzAnalysisSystem.SSR))
             {
-                populateMissingSunnyStarRatings();
-                skillStore.SetAppliedVersion(EzAnalysisSystem.SSR, EzSSRUnit.VERSION);
+                // The chain reads SunnySR for dan, so whether SSR is stale is answered before the pass runs: the
+                // staleness covers both the absorbed algorithm revision and the rating the stored rows carry.
+                bool expired = skillStore.IsExpired(EzAnalysisSystem.SSR) || EzSSRTuningSnapshot.IsPending;
+
+                if (populateMissingSunnyStarRatings(expired))
+                {
+                    skillStore.SetAppliedVersion(EzAnalysisSystem.SSR, EzSSRUnit.VERSION);
+                    EzSSRTuningSnapshot.Record();
+                }
+                else
+                {
+                    Logger.Log("Sunny rating pass did not finish; leaving its revision unapplied so the next launch retries.");
+                }
             }
 
             if (scope.HasFlag(EzAnalysisSystem.Official))
@@ -805,14 +816,18 @@ namespace osu.Game.Database
         private void forceEzRealmMetadataRecalculation() => clearEzRealmMetadata(EzAnalysisSystem.All);
 
         /// <summary>
-        /// Incrementally backfill missing baseline SunnyStarRatings on <see cref="BeatmapInfo"/>.
-        /// Behaviour intentionally mirrors <see cref="populateOfficialBaselines"/>: beatmap-level query, beatmap-level compute and write.
+        /// Brings the stored SunnyStarRatings up to date, rewriting every rated chart when the system's revision moved.
         /// </summary>
-        private void populateMissingSunnyStarRatings()
+        /// <remarks>
+        /// A revision bump has to retire the stored values, not just the missing ones: the rating is a number stamped
+        /// with the algorithm that produced it, and a bump says those stamps no longer answer the question. Only a
+        /// pass that covered its whole work list may claim the revision, which is what makes a cancelled pass retry.
+        /// </remarks>
+        private bool populateMissingSunnyStarRatings(bool expired)
         {
             HashSet<Guid> beatmapIds = new HashSet<Guid>();
 
-            Logger.Log("Querying for beatmaps with missing SunnyStarRatings...");
+            Logger.Log($"Querying for beatmaps with stale SunnyStarRatings (expired={expired})...");
 
             realmAccess.Run(r =>
             {
@@ -821,7 +836,7 @@ namespace osu.Game.Database
                     if (b.BeatmapSet == null)
                         continue;
 
-                    if (b.EzRatingData.SunnySR >= 0)
+                    if (!expired && b.EzRatingData.SunnySR >= 0)
                         continue;
 
                     if (!EzSSRUnit.SupportsRuleset(b.Ruleset.OnlineID))
@@ -832,51 +847,31 @@ namespace osu.Game.Database
             });
 
             if (beatmapIds.Count == 0)
-                return;
+                return true;
 
             Logger.Log($"Found {beatmapIds.Count} beatmaps which require SunnyStarRating reprocessing.");
 
             var notification = showProgressNotification(beatmapIds.Count, "Reprocessing SunnyStarRating for beatmaps", "beatmaps' SunnyStarRatings have been updated");
 
-            int processedCount = 0;
-            int failedCount = 0;
+            ChartBatchResult batch = runChartBatch(beatmapIds.ToList(), processSunnyRating, notification);
 
-            foreach (Guid id in beatmapIds)
+            completeNotification(notification, batch.Processed, beatmapIds.Count, batch.Failed);
+
+            return !batch.Aborted && notification?.State != ProgressNotificationState.Cancelled;
+
+            bool processSunnyRating(Guid id)
             {
-                if (notification?.State == ProgressNotificationState.Cancelled)
-                    break;
-
-                updateNotificationProgress(notification, processedCount, beatmapIds.Count);
-
-                sleepIfRequired();
-
                 var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
 
                 if (beatmap == null)
-                {
-                    ++failedCount;
-                    continue;
-                }
+                    return false;
 
-                try
-                {
-                    if (!ezSSRUnit.ComputeAndStore(beatmap, CancellationToken.None))
-                    {
-                        ++failedCount;
-                        continue;
-                    }
+                if (!ezSSRUnit.ComputeAndStore(beatmap, CancellationToken.None))
+                    return false;
 
-                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
-                    ++processedCount;
-                }
-                catch (Exception e)
-                {
-                    Logger.Log($"Background ssrprocessing failed on {beatmap}: {e}");
-                    ++failedCount;
-                }
+                ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+                return true;
             }
-
-            completeNotification(notification, processedCount, beatmapIds.Count, failedCount);
         }
 
         /// <summary>

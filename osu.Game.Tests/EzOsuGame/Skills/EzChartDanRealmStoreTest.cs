@@ -12,6 +12,7 @@ using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Rulesets;
 using osu.Game.Tests.Database;
 
@@ -61,6 +62,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Assert.That(loaded.LnRawDan, Is.EqualTo(-1));
                 Assert.That(loaded.RcSkillsetLabels["jack"], Is.EqualTo("Shodan"));
                 Assert.That(loaded.RcSkillsetLabels["tech"], Is.EqualTo("Shodan"));
+
+                stampWholeChain(store);
+
                 Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Contain(hash));
             });
         }
@@ -98,7 +102,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Assert.That(store.TryGetChartDan(hash, out var loaded), Is.True);
                 Assert.That(loaded, Is.Not.Null);
 
-                store.SetAppliedVersion(EzAnalysisSystem.Dan, EzDanEngine.VERSION);
+                stampWholeChain(store);
+
                 Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Contain(hash));
             });
         }
@@ -137,6 +142,12 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Not.Contain(hash));
 
                 store.SetAppliedVersion(EzAnalysisSystem.Dan, EzDanEngine.VERSION);
+
+                // Dan's own stamp is not the whole answer: it reads the Sunny rating, so that system has to have run
+                // at its current revision too before a stored row counts as a result.
+                Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Not.Contain(hash), "the upstreams have not run here");
+
+                stampWholeChain(store);
 
                 Assert.That(store.IsExpired(EzAnalysisSystem.Dan), Is.False);
                 Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Contain(hash));
@@ -231,6 +242,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 seedChart(realm, hash);
 
+                stampWholeChain(store);
+
                 store.WriteBeatmapMsdUnrateable(hash, Guid.NewGuid());
 
                 Assert.That(store.CollectChartChainState().CompleteMsd, Does.Not.Contain(hash));
@@ -275,6 +288,65 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Assert.That(status["Dan"].Missing, Is.EqualTo(0));
                 Assert.That(status["Dan"].Settled, Is.EqualTo(1));
             });
+        }
+
+        /// <summary>
+        /// A revision bump has to reach the systems that read the bumped one, even when their own revision did not
+        /// move: their stored rows were derived from the old values.
+        /// </summary>
+        [Test]
+        public void A_stale_upstream_makes_the_systems_reading_it_stale()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzChartSkillStore(realm);
+                const string hash = "chart-dan-upstream";
+
+                seedChart(realm, hash);
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6));
+                store.UpsertChartDan(new EzPersistedChartDan
+                {
+                    BeatmapHash = hash,
+                    KeyCount = 4,
+                    HoldRatio = 0.1,
+                    OverallMsd = 20,
+                    RcRawDan = 9,
+                    RcLabel = "Shodan",
+                    LnRawDan = -1,
+                    ComputedAt = DateTimeOffset.UtcNow,
+                });
+
+                // The chart chain's own three systems are all current, and so is the Sunny coefficient record.
+                store.SetAppliedVersion(EzAnalysisSystem.Mina, EzMinaEngine.VERSION);
+                store.SetAppliedVersion(EzAnalysisSystem.CSI, EzCSIEngine.VERSION);
+                store.SetAppliedVersion(EzAnalysisSystem.Dan, EzDanEngine.VERSION);
+                EzSSRTuningSnapshot.Record();
+
+                // Dan reads the Sunny rating, which has never run here, so the stored row is not a result yet.
+                var withoutSunny = store.CollectChartChainState();
+
+                Assert.That(withoutSunny.CompleteChartDan, Is.Empty, "a dan derived from an absent Sunny rating is not a result");
+                Assert.That(withoutSunny.ChartDanOwed, Does.Contain(hash));
+
+                store.SetAppliedVersion(EzAnalysisSystem.SSR, EzSSRUnit.VERSION);
+
+                // Once the upstream is current the same row counts again: nothing had to be re-stamped for Dan.
+                Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Contain(hash));
+                Assert.That(store.CollectChartChainState().ChartDanOwed, Does.Not.Contain(hash));
+            });
+        }
+
+        /// <summary>
+        /// Records the whole chart chain as current. Dan's rows are derived from Mina, the chart structure and the
+        /// Sunny rating, so a test about what a Dan row means has to have all of them settled first.
+        /// </summary>
+        private static void stampWholeChain(EzChartSkillStore store)
+        {
+            store.SetAppliedVersion(EzAnalysisSystem.Mina, EzMinaEngine.VERSION);
+            store.SetAppliedVersion(EzAnalysisSystem.CSI, EzCSIEngine.VERSION);
+            store.SetAppliedVersion(EzAnalysisSystem.Dan, EzDanEngine.VERSION);
+            store.SetAppliedVersion(EzAnalysisSystem.SSR, EzSSRUnit.VERSION);
+            EzSSRTuningSnapshot.Record();
         }
 
         private static void seedChart(RealmAccess realm, string hash, float circleSize = 4)

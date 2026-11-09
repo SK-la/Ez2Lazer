@@ -837,8 +837,17 @@ namespace osu.Game.EzOsuGame.Skills
 
             var current = new Dictionary<string, double>(StringComparer.Ordinal);
 
+            // The row's revision is part of the answer: a complete axis set produced by an older bundle is a result of
+            // that bundle, not of the one in force. Reading only the axis set made a PP+ revision bump a no-op.
+            int revision = EzPPPEngine.VERSION;
+
             foreach (var row in stored)
+            {
+                if (revision > 0 && row.AlgorithmVersion != revision)
+                    continue;
+
                 current[row.SkillId] = row.Value;
+            }
 
             // Completeness is the axis set the ruleset's catalog declares, not a second list kept here.
             foreach (var spec in EzPPPSkillCatalog.MetricsFor(rulesetId))

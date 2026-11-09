@@ -11,6 +11,7 @@ using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Rulesets;
 using osu.Game.Tests.Database;
 using Realms;
@@ -69,8 +70,10 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 store.UpsertChartDan(chartDan(mania_a));
                 store.UpsertChartDan(chartDan(mania_b));
 
-                // Rows only count once the systems have run at their current revision.
-                markApplied(store, EzAnalysisSystem.Mina, EzAnalysisSystem.CSI, EzAnalysisSystem.Dan, EzAnalysisSystem.PPP);
+                // Rows only count once the systems have run at their current revision. SSR is part of that set: dan is
+                // derived from the Sunny rating, so without it the dan rows are not results yet.
+                markApplied(store, EzAnalysisSystem.Mina, EzAnalysisSystem.CSI, EzAnalysisSystem.Dan, EzAnalysisSystem.PPP, EzAnalysisSystem.SSR);
+                EzSSRTuningSnapshot.Record();
 
                 var status = store.GetSkillDataStatus();
 

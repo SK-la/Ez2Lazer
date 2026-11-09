@@ -9,6 +9,7 @@ using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 using Realms;
 
 namespace osu.Game.EzOsuGame.Skills.Dan
@@ -161,9 +162,17 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             int csiRevision = EzCSIEngine.VERSION;
             int danRevision = EzDanEngine.VERSION;
 
+            // A system is current only when the systems it reads are current too. Its stored rows were derived from
+            // their values, so a bump upstream makes the rows stale even though this system's own revision did not
+            // move. What is recorded per system stays its own algorithm revision: recomputing downstream re-stamps
+            // the same number, and the chain settles because the upstream really is current by then.
+            //
+            // The edges are the ones the maintenance catalog declares, restated here as the chain's own reading:
+            // CSI reads Mina, and dan reads CSI, Mina and the Sunny rating.
             bool minaStale = !isApplied(r, EzAnalysisSystem.Mina, minaRevision);
-            bool csiStale = !isApplied(r, EzAnalysisSystem.CSI, csiRevision);
-            bool danStale = !isApplied(r, EzAnalysisSystem.Dan, danRevision);
+            bool ssrStale = isSsrStale(r);
+            bool csiStale = !isApplied(r, EzAnalysisSystem.CSI, csiRevision) || minaStale;
+            bool danStale = !isApplied(r, EzAnalysisSystem.Dan, danRevision) || csiStale || minaStale || ssrStale;
 
             var rateableBeatmapIds = new Dictionary<string, Guid>(StringComparer.Ordinal);
             var rateableChartMeta = new Dictionary<string, RateableChartMeta>(StringComparer.Ordinal);
@@ -306,6 +315,16 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// <summary>Whether a system has run at <paramref name="revision"/>; a missing stamp reads as out of date.</summary>
         private static bool isApplied(Realm r, EzAnalysisSystem system, int revision)
             => (r.Find<EzAnalysisState>(system.ToStorageId())?.AppliedVersion ?? 0) == revision;
+
+        /// <summary>
+        /// Whether the Sunny ratings the chain reads are behind.
+        /// </summary>
+        /// <remarks>
+        /// The tuning coefficients are part of the algorithm even though editing them never bumps its revision, so a
+        /// library rated with another pair is stale for the same reason a version bump makes it stale.
+        /// </remarks>
+        private static bool isSsrStale(Realm r)
+            => !isApplied(r, EzAnalysisSystem.SSR, EzSSRUnit.VERSION) || EzSSRTuningSnapshot.IsPending;
 
         /// <summary>
         /// Chart Mina axis sets that are complete at the current revision, keyed by hash, for the two verdicts that

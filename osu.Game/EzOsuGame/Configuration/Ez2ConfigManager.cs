@@ -188,6 +188,10 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.SsrRescaleThreshold, 8.0, 6.0, 10.0, 1.0);
             SetDefault(Ez2Setting.SsrLnMultiplier, 5.5, 2.0, 8.0, 0.5);
 
+            // 落库所用的那组系数。默认等于上一行的默认值，所以已有库不会被判成待重算。
+            SetDefault(Ez2Setting.SsrAppliedRescaleThreshold, 8.0, 6.0, 10.0, 1.0);
+            SetDefault(Ez2Setting.SsrAppliedLnMultiplier, 5.5, 2.0, 8.0, 0.5);
+
             #endregion
 
             #region 音频与输入
@@ -1013,6 +1017,18 @@ namespace osu.Game.EzOsuGame.Configuration
         /// </para>
         /// </summary>
         SsrLnMultiplier,
+
+        /// <summary>
+        /// 落库的 SunnySR 所用的 <see cref="SsrRescaleThreshold"/>。由完成的一轮 Sunny 评级写入，
+        /// 与当前设置不一致即视为该系统的算法已变，下次启动全库重算。
+        /// </summary>
+        /// <remarks>
+        /// 记录「已应用的参数」而不是一个脏标记：用户把参数改回原值后两者重新相等，一次放弃的试验不会排队重算。
+        /// </remarks>
+        SsrAppliedRescaleThreshold,
+
+        /// <summary>落库的 SunnySR 所用的 <see cref="SsrLnMultiplier"/>，规则同 <see cref="SsrAppliedRescaleThreshold"/>。</summary>
+        SsrAppliedLnMultiplier,
 
         /// <summary>
         /// 每个规则集选用的分析系统，格式 <c>规则集=系统;规则集=系统</c>；缺失则用该规则集的第一个系统。

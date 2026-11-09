@@ -9,6 +9,7 @@ using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.PPP;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Rulesets;
 using Realms;
 
@@ -196,6 +197,12 @@ namespace osu.Game.EzOsuGame.Analysis
                 if (applied != system.CurrentVersion())
                     expired.Add(system);
             }
+
+            // The Sunny coefficients are part of its algorithm even though editing one never bumps the revision, so
+            // the readout has to ask the same question the pass does. The mania chart-chain facets answer this for
+            // themselves (the chain settles its own staleness), which is why only the rating column needs it here.
+            if (EzSSRTuningSnapshot.IsPending)
+                expired.Add(EzAnalysisSystem.SSR);
 
             return expired;
         }
