@@ -643,19 +643,20 @@ namespace osu.Game.Database
 
             if (scope.HasFlag(EzAnalysisSystem.SSR))
             {
-                // The chain reads SunnySR for dan, so whether SSR is stale is answered before the pass runs: the
-                // staleness covers both the absorbed algorithm revision and the rating the stored rows carry.
-                bool expired = skillStore.IsExpired(EzAnalysisSystem.SSR) || EzSSRTuningSnapshot.IsPending;
+                // A tuning edit never bumps the revision, so the stored rows look current while having been produced
+                // by another pair. Retiring them once, and recording the tuning in the same step, is what keeps that
+                // from turning into a full pass on every launch after an interrupted one: the pass below only fills
+                // what is still missing.
+                if (skillStore.IsExpired(EzAnalysisSystem.SSR) || EzSSRTuningSnapshot.IsPending)
+                {
+                    Logger.Log($"Retiring Sunny ratings for recomputation: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.SSR))}.");
 
-                if (populateMissingSunnyStarRatings(expired))
-                {
-                    skillStore.SetAppliedVersion(EzAnalysisSystem.SSR, EzSSRUnit.VERSION);
-                    EzSSRTuningSnapshot.Record();
+                    if (EzSSRTuningSnapshot.IsPending)
+                        EzSSRTuningSnapshot.Record();
                 }
-                else
-                {
-                    Logger.Log("Sunny rating pass did not finish; leaving its revision unapplied so the next launch retries.");
-                }
+
+                if (!populateMissingSunnyStarRatings())
+                    Logger.Log("Sunny rating pass did not finish; the remaining charts stay missing and are picked up next launch.");
             }
 
             if (scope.HasFlag(EzAnalysisSystem.Official))
@@ -687,59 +688,61 @@ namespace osu.Game.Database
 
             if (needsChartChain)
             {
+                // Same contract as the Sunny pass: a revision that is behind is retired once instead of being read as
+                // stale by every later pass, so a cancelled pass resumes on the rows still missing.
+                retireExpiredChainSystems(scope);
+
                 // One pass over the library. Each chart pays only for the stages it owes, but it is loaded,
                 // converted and written by one iteration instead of one per stage.
-                bool completed = populateChartChain(
+                populateChartChain(
                     skillStore.CollectChartChainState("BDSP"),
                     csi: scope.HasFlag(EzAnalysisSystem.CSI),
                     msd: scope.HasFlag(EzAnalysisSystem.Mina),
                     ppp: scope.HasFlag(EzAnalysisSystem.PPP),
                     dan: scope.HasFlag(EzAnalysisSystem.Dan));
-
-                // Only a pass that covered its work list may claim the revision: a cancelled one leaves the systems
-                // expired, which is what makes the next launch pick them up again.
-                if (completed)
-                {
-                    if (scope.HasFlag(EzAnalysisSystem.Mina))
-                        skillStore.SetAppliedVersion(EzAnalysisSystem.Mina, EzMinaEngine.VERSION);
-
-                    if (scope.HasFlag(EzAnalysisSystem.CSI))
-                        skillStore.SetAppliedVersion(EzAnalysisSystem.CSI, EzCSIEngine.VERSION);
-
-                    if (scope.HasFlag(EzAnalysisSystem.Dan))
-                        skillStore.SetAppliedVersion(EzAnalysisSystem.Dan, EzDanEngine.VERSION);
-
-                    if (scope.HasFlag(EzAnalysisSystem.PPP))
-                        skillStore.SetAppliedVersion(EzAnalysisSystem.PPP, EzPPPEngine.VERSION);
-                }
             }
 
             EzStartupTrace.Log($"BDSP EzRealm backfill end scope={scope}");
+        }
+
+        private void retireExpiredChainSystems(EzAnalysisSystem scope)
+        {
+            foreach (var system in new[] { EzAnalysisSystem.Mina, EzAnalysisSystem.CSI, EzAnalysisSystem.Dan, EzAnalysisSystem.PPP })
+            {
+                if (!scope.HasFlag(system) || !skillStore.IsExpired(system))
+                    continue;
+
+                Logger.Log($"Retiring {system} rows for recomputation: {string.Join(", ", skillStore.Invalidate(system))}.");
+            }
         }
 
         private void clearEzRealmMetadata(EzAnalysisSystem scope)
         {
             Logger.Log($"Forcing Ez Realm metadata recalculation ({scope})...");
 
-            // Marking a system expired is the whole of "recompute everything": the next pass treats every chart as
-            // owed, and the dependency edges carry the invalidation to the systems derived from it.
+            // Retiring a system is the whole of "recompute everything": its rows are gone, and the dependency edges
+            // carry that to the systems derived from it. The revision is recorded at the same time, so an interrupted
+            // pass resumes on whatever is still missing instead of retiring the library again.
             if (scope.HasFlag(EzAnalysisSystem.Mina))
-                Logger.Log($"Marking Mina and its downstream systems out of date: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.Mina))}");
+                Logger.Log($"Retiring Mina and its downstream systems: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.Mina))}");
 
             if (scope.HasFlag(EzAnalysisSystem.CSI))
-                Logger.Log($"Marking CSI and its downstream systems out of date: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.CSI))}");
+                Logger.Log($"Retiring CSI and its downstream systems: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.CSI))}");
 
             if (scope.HasFlag(EzAnalysisSystem.Dan))
-                Logger.Log($"Marking Dan out of date: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.Dan))}");
+                Logger.Log($"Retiring Dan: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.Dan))}");
 
             if (scope.HasFlag(EzAnalysisSystem.PPP))
-                Logger.Log($"Marking PP+ out of date: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.PPP))}");
+                Logger.Log($"Retiring PP+: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.PPP))}");
 
             if (scope.HasFlag(EzAnalysisSystem.SSR))
+            {
+                // Dan reads the Sunny rating, so the dependency edge retires it along with the ratings.
+                Logger.Log($"Retiring Sunny ratings: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.SSR))}");
                 skillProvider.InvalidateLiveMetrics();
+            }
 
             bool clearBeatmapInfoFields = scope.HasFlag(EzAnalysisSystem.MetadataTags)
-                                          || scope.HasFlag(EzAnalysisSystem.SSR)
                                           || scope.HasFlag(EzAnalysisSystem.Official);
 
             if (!clearBeatmapInfoFields)
@@ -798,9 +801,6 @@ namespace osu.Game.Database
                         if (scope.HasFlag(EzAnalysisSystem.Official))
                             EzRatingWriter.Clear(beatmap, EzAnalysisSystem.Official);
 
-                        if (scope.HasFlag(EzAnalysisSystem.SSR) && EzSSRUnit.SupportsRuleset(beatmap.Ruleset.OnlineID))
-                            EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.SSR, -1);
-
                         totalProcessed++;
                     }
                 });
@@ -816,18 +816,18 @@ namespace osu.Game.Database
         private void forceEzRealmMetadataRecalculation() => clearEzRealmMetadata(EzAnalysisSystem.All);
 
         /// <summary>
-        /// Brings the stored SunnyStarRatings up to date, rewriting every rated chart when the system's revision moved.
+        /// Fills the SunnyStarRatings that are not stored yet.
         /// </summary>
         /// <remarks>
-        /// A revision bump has to retire the stored values, not just the missing ones: the rating is a number stamped
-        /// with the algorithm that produced it, and a bump says those stamps no longer answer the question. Only a
-        /// pass that covered its whole work list may claim the revision, which is what makes a cancelled pass retry.
+        /// Retirement happens before this runs (<see cref="EzChartSkillStore.Invalidate"/>), so the only question here
+        /// is whether a chart has a rating: a pass that is cancelled leaves the rest missing, and the next launch
+        /// continues from there instead of retiring everything again.
         /// </remarks>
-        private bool populateMissingSunnyStarRatings(bool expired)
+        private bool populateMissingSunnyStarRatings()
         {
             HashSet<Guid> beatmapIds = new HashSet<Guid>();
 
-            Logger.Log($"Querying for beatmaps with stale SunnyStarRatings (expired={expired})...");
+            Logger.Log("Querying for beatmaps with missing SunnyStarRatings...");
 
             realmAccess.Run(r =>
             {
@@ -836,7 +836,7 @@ namespace osu.Game.Database
                     if (b.BeatmapSet == null)
                         continue;
 
-                    if (!expired && b.EzRatingData.SunnySR >= 0)
+                    if (b.EzRatingData.SunnySR >= 0)
                         continue;
 
                     if (!EzSSRUnit.SupportsRuleset(b.Ruleset.OnlineID))

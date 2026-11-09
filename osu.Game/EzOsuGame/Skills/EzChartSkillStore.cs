@@ -245,18 +245,79 @@ namespace osu.Game.EzOsuGame.Skills
         public bool IsExpired(EzAnalysisSystem system) => GetAppliedVersion(system) != system.CurrentVersion();
 
         /// <summary>
-        /// Marks <paramref name="system"/> and every system derived from it as unapplied, so the next pass recomputes
-        /// them. The dependency edges are the ones the rebuild catalog already declares.
+        /// Retires <paramref name="system"/> and every system derived from it, so the next pass recomputes them.
+        /// The dependency edges are the ones the rebuild catalog already declares.
         /// </summary>
+        /// <remarks>
+        /// The rows are deleted and the current revision is recorded in the same step. Pairing "nothing stored" with
+        /// "at this revision" is what makes a pass resumable: the next launch fills whatever is still missing instead
+        /// of retiring the whole library again. Rows carry a revision, but the passes select on row presence, so a
+        /// bump that only moved a stamp would leave the old rows looking settled.
+        /// </remarks>
         public IReadOnlyList<EzAnalysisSystem> Invalidate(EzAnalysisSystem system)
         {
             var invalidated = new List<EzAnalysisSystem> { system };
             invalidated.AddRange(DownstreamOf(system));
 
             foreach (var affected in invalidated)
-                SetAppliedVersion(affected, 0);
+                clearRows(affected);
+
+            foreach (var affected in invalidated)
+            {
+                int version = affected.CurrentVersion();
+
+                if (version > 0)
+                    SetAppliedVersion(affected, version);
+            }
 
             return invalidated;
+        }
+
+        private void clearRows(EzAnalysisSystem system)
+        {
+            switch (system)
+            {
+                case EzAnalysisSystem.Mina:
+                    ClearBeatmapMsd();
+                    break;
+
+                case EzAnalysisSystem.CSI:
+                    ClearChartSkillInfo();
+                    break;
+
+                case EzAnalysisSystem.Dan:
+                    ClearChartDan();
+                    break;
+
+                case EzAnalysisSystem.PPP:
+                    ClearBeatmapPPP();
+                    break;
+
+                case EzAnalysisSystem.SSR:
+                    ClearRatings(EzAnalysisSystem.SSR);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Drops one system's stored star and pp from every beatmap.
+        /// </summary>
+        /// <remarks>
+        /// The rating columns carry no revision of their own, so deleting them is the only way to make a changed
+        /// tuning coefficient observable to the pass that fills them.
+        /// </remarks>
+        public void ClearRatings(EzAnalysisSystem system)
+        {
+            realmAccess.Write(r =>
+            {
+                foreach (var beatmap in r.All<BeatmapInfo>())
+                {
+                    if (beatmap.EzRatingData.GetStar(system) < 0 && beatmap.EzRatingData.GetPerformance(system) < 0)
+                        continue;
+
+                    EzRatingWriter.Clear(beatmap, system);
+                }
+            });
         }
 
         /// <summary>
