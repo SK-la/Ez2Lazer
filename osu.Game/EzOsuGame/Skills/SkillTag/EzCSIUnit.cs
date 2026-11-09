@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
@@ -26,7 +25,8 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         private readonly EzAnalysisLiveCache liveCache;
 
         /// <summary>Session-only compute failures - keep the miss out of Realm so the next backfill retries.</summary>
-        private readonly HashSet<string> sessionMisses = new HashSet<string>(StringComparer.Ordinal);
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> sessionMisses =
+            new System.Collections.Concurrent.ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
 
         public EzCSIUnit(BeatmapManager beatmapManager, EzChartSkillStore skillStore, EzAnalysisLiveCache? liveCache = null)
         {
@@ -100,7 +100,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                     beatmapInfo.ID,
                     rulesetOnlineId: EzLocalProfileConstants.MANIA_RULESET_ID);
 
-                sessionMisses.Remove(beatmapInfo.Hash);
+                sessionMisses.TryRemove(beatmapInfo.Hash, out _);
                 liveCache.InvalidateSubject(beatmapInfo.Hash);
                 return true;
             }
@@ -119,10 +119,11 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
 
         private void recordSessionMiss(string beatmapHash)
         {
+            // Several analysis workers settle charts at once, so this is written concurrently.
             if (sessionMisses.Count >= 1024)
                 sessionMisses.Clear();
 
-            sessionMisses.Add(beatmapHash);
+            sessionMisses.TryAdd(beatmapHash, 0);
         }
     }
 }

@@ -1009,140 +1009,61 @@ namespace osu.Game.Database
             int processedCount = 0;
             int failedCount = 0;
             int attemptedCount = 0;
-            const int log_every = 25;
 
-            // The store is disposed before this background task is torn down. Surfacing that as one failure per
-            // remaining chart would spend the whole pass on exceptions, so a disposed store abandons the pass.
-            bool abortedDuringShutdown = false;
+            ChartBatchResult result = runChartBatch(work, processChart, notification);
 
-            foreach (var (id, hash) in work)
-            {
-                if (notification?.State == ProgressNotificationState.Cancelled)
-                    break;
+            attemptedCount = result.Attempted;
+            processedCount = result.Processed;
+            failedCount = result.Failed;
 
-                sleepIfRequired();
-
-                BeatmapInfo? beatmap;
-
-                try
-                {
-                    beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
-                }
-                catch (ObjectDisposedException)
-                {
-                    abortedDuringShutdown = true;
-                    break;
-                }
-
-                if (beatmap == null)
-                {
-                    ++failedCount;
-                    ++attemptedCount;
-                    updateNotificationProgress(notification, attemptedCount, work.Count);
-                    continue;
-                }
-
-                bool stageFailed = false;
-
-                bool msdWritten = false;
-
-                if (msd && hash != null && chain.MsdOwed.Contains(hash))
-                {
-                    try
-                    {
-                        if (ezBeatmapMinaComputer.ComputeAndStore(beatmap) != null)
-                            msdWritten = true;
-                        else if (skillStore.GetBeatmapSystemState(hash, EzAnalysisSystem.Mina) != EzSkillRowState.Unrateable)
-                            stageFailed = true;
-                    }
-                    catch (Exception e) when (e is not ObjectDisposedException)
-                    {
-                        Logger.Log($"Background Mina processing failed on {beatmap}: {e}");
-                        stageFailed = true;
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        abortedDuringShutdown = true;
-                        break;
-                    }
-                }
-
-                if (csi && hash != null && chain.ChartSkillInfoOwed.Contains(hash))
-                {
-                    try
-                    {
-                        // True = settled afterwards (computed, or stamped unavailable).
-                        if (!ezCSIUnit.TryEnsure(beatmap))
-                            stageFailed = true;
-                    }
-                    catch (Exception e) when (e is not ObjectDisposedException)
-                    {
-                        Logger.Log($"Background ChartSkillInfo processing failed on {beatmap}: {e}");
-                        stageFailed = true;
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        abortedDuringShutdown = true;
-                        break;
-                    }
-                }
-
-                if (dan && hash != null && (msdWritten || chain.ChartDanOwed.Contains(hash)))
-                {
-                    try
-                    {
-                        if (!chartDanUnit.ComputeAndStoreFromStored(beatmap))
-                            stageFailed = true;
-                    }
-                    catch (Exception e) when (e is not ObjectDisposedException)
-                    {
-                        Logger.Log($"Background ChartDan processing failed on {beatmap}: {e}");
-                        stageFailed = true;
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        abortedDuringShutdown = true;
-                        break;
-                    }
-                }
-
-                if (ppp && pppDebt.Contains(id))
-                {
-                    try
-                    {
-                        if (ezBeatmapPPPComputer.ComputeAndStore(beatmap) == null)
-                            stageFailed = true;
-                    }
-                    catch (Exception e) when (e is not ObjectDisposedException)
-                    {
-                        Logger.Log($"Background PP+ processing failed on {beatmap}: {e}");
-                        stageFailed = true;
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        abortedDuringShutdown = true;
-                        break;
-                    }
-                }
-
-                if (stageFailed)
-                    ++failedCount;
-                else
-                    ++processedCount;
-
-                ++attemptedCount;
-                updateNotificationProgress(notification, attemptedCount, work.Count);
-
-                if (attemptedCount % log_every == 0 || attemptedCount >= work.Count)
-                    Logger.Log($"Chart chain backfill progress: {attemptedCount} of {work.Count} (ok={processedCount}, fail={failedCount})");
-            }
-
-            if (abortedDuringShutdown)
+            if (result.Aborted)
                 Logger.Log($"Chart chain backfill aborted during shutdown after {attemptedCount} of {work.Count}.");
+            else
+                Logger.Log($"Chart chain backfill progress: {attemptedCount} of {work.Count} (ok={processedCount}, fail={failedCount})");
 
             completeNotification(notification, processedCount, work.Count, failedCount);
 
-            return !abortedDuringShutdown && notification?.State != ProgressNotificationState.Cancelled;
+            return !result.Aborted && notification?.State != ProgressNotificationState.Cancelled;
+
+            bool processChart((Guid Id, string? Hash) item)
+            {
+                BeatmapInfo? beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(item.Id)?.Detach());
+
+                if (beatmap == null)
+                    return false;
+
+                bool stageFailed = false;
+                bool msdWritten = false;
+
+                if (msd && item.Hash != null && chain.MsdOwed.Contains(item.Hash))
+                {
+                    if (ezBeatmapMinaComputer.ComputeAndStore(beatmap) != null)
+                        msdWritten = true;
+                    else if (skillStore.GetBeatmapSystemState(item.Hash, EzAnalysisSystem.Mina) != EzSkillRowState.Unrateable)
+                        stageFailed = true;
+                }
+
+                if (csi && item.Hash != null && chain.ChartSkillInfoOwed.Contains(item.Hash))
+                {
+                    // True = settled afterwards (computed, or stamped unavailable).
+                    if (!ezCSIUnit.TryEnsure(beatmap))
+                        stageFailed = true;
+                }
+
+                if (dan && item.Hash != null && (msdWritten || chain.ChartDanOwed.Contains(item.Hash)))
+                {
+                    if (!chartDanUnit.ComputeAndStoreFromStored(beatmap))
+                        stageFailed = true;
+                }
+
+                if (ppp && pppDebt.Contains(item.Id))
+                {
+                    if (ezBeatmapPPPComputer.ComputeAndStore(beatmap) == null)
+                        stageFailed = true;
+                }
+
+                return !stageFailed;
+            }
 
             IEnumerable<string> enumerateOwedHashes()
             {
@@ -1328,51 +1249,32 @@ namespace osu.Game.Database
 
             var notification = showProgressNotification(beatmapIds.Count, "Reprocessing baseline PP for beatmaps", "beatmaps' baseline PP has been updated");
 
-            int processedCount = 0;
-            int failedCount = 0;
+            ChartBatchResult batch = runChartBatch(beatmapIds.ToList(), processPerformancePoints, notification);
 
-            foreach (Guid id in beatmapIds)
+            completeNotification(notification, batch.Processed, beatmapIds.Count, batch.Failed);
+
+            bool processPerformancePoints(Guid id)
             {
-                if (notification?.State == ProgressNotificationState.Cancelled)
-                    break;
-
-                updateNotificationProgress(notification, processedCount, beatmapIds.Count);
-
-                sleepIfRequired();
-
                 var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
 
                 if (beatmap == null)
+                    return false;
+
+                var lookup = new EzAnalysisLookupCache(beatmap, beatmap.Ruleset, mods: null);
+
+                double performancePoints = EzAnalysisComputation.TryComputePerformancePoints(beatmapManager, lookup, CancellationToken.None, out double computedPp)
+                    ? computedPp
+                    : -1;
+
+                realmAccess.Write(r =>
                 {
-                    ++failedCount;
-                    continue;
-                }
+                    if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
+                        liveBeatmapInfo.PerformancePoints = performancePoints;
+                });
 
-                try
-                {
-                    var lookup = new EzAnalysisLookupCache(beatmap, beatmap.Ruleset, mods: null);
-
-                    double performancePoints = EzAnalysisComputation.TryComputePerformancePoints(beatmapManager, lookup, CancellationToken.None, out double computedPp)
-                        ? computedPp
-                        : -1;
-
-                    realmAccess.Write(r =>
-                    {
-                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
-                            liveBeatmapInfo.PerformancePoints = performancePoints;
-                    });
-
-                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
-                    ++processedCount;
-                }
-                catch (Exception e)
-                {
-                    Logger.Log($"Background PP processing failed on {beatmap}: {e}");
-                    ++failedCount;
-                }
+                ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+                return true;
             }
-
-            completeNotification(notification, processedCount, beatmapIds.Count, failedCount);
         }
 
         /// <summary>
@@ -1402,61 +1304,49 @@ namespace osu.Game.Database
             if (candidates.Count == 0)
                 return;
 
-            Logger.Log($"Found {candidates.Count} beatmaps which require per-system baseline columns.");
+            Logger.Log($"Found {candidates.Count} beatmaps which require Sunny pp, PP+ star and pp, Mina rating.");
 
-            var notification = showProgressNotification(candidates.Count, "Filling per-system baselines", "beatmaps' per-system baselines have been updated");
+            // TODO: 这里的计算剔除了 SSR? 很奇怪
+            var notification = showProgressNotification(candidates.Count, "Filling Sunny pp, PP+ star and pp, Mina rating", "beatmaps' per-system baselines have been updated");
 
-            int processedCount = 0;
+            ChartBatchResult batch = runChartBatch(candidates, processBaseline, notification);
 
-            foreach (var (id, hash, rulesetId) in candidates)
+            completeNotification(notification, batch.Processed, candidates.Count);
+
+            bool processBaseline((Guid Id, string Hash, int RulesetId) candidate)
             {
-                if (notification?.State == ProgressNotificationState.Cancelled)
-                    break;
-
-                updateNotificationProgress(notification, processedCount, candidates.Count);
-
-                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(candidate.Id)?.Detach());
 
                 if (beatmap == null)
-                    continue;
+                    return false;
 
-                try
+                double sunnyPp = beatmap.EzRatingData.SunnyPP;
+                double minaSr = beatmap.EzRatingData.MinaSR;
+
+                if (sunnyPp < 0)
+                    sunnyPp = EzAnalysisComputation.ComputeBaselineSunnyPerformancePointsForRealm(beatmapManager, beatmap, CancellationToken.None);
+
+                var minaRows = skillStore.GetBeatmapSkills(candidate.Hash, EzAnalysisSystem.Mina);
+                if (minaSr < 0
+                    && minaRows.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double storedMina)
+                    && storedMina > 0)
+                    minaSr = EzMinaRatingScale.ToStarRating(storedMina);
+
+                realmAccess.Write(r =>
                 {
-                    double sunnyPp = beatmap.EzRatingData.SunnyPP;
-                    double minaSr = beatmap.EzRatingData.MinaSR;
+                    if (r.Find<BeatmapInfo>(candidate.Id) is not BeatmapInfo liveBeatmapInfo)
+                        return;
 
-                    if (sunnyPp < 0)
-                        sunnyPp = EzAnalysisComputation.ComputeBaselineSunnyPerformancePointsForRealm(beatmapManager, beatmap, CancellationToken.None);
+                    if (sunnyPp >= 0)
+                        EzRatingWriter.WritePP(liveBeatmapInfo, EzAnalysisSystem.SSR, sunnyPp);
 
-                    var minaRows = skillStore.GetBeatmapSkills(hash, EzAnalysisSystem.Mina);
-                    if (minaSr < 0
-                        && minaRows.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double storedMina)
-                        && storedMina > 0)
-                        minaSr = EzMinaRatingScale.ToStarRating(storedMina);
+                    if (minaSr >= 0)
+                        EzRatingWriter.WriteSR(liveBeatmapInfo, EzAnalysisSystem.Mina, minaSr);
+                });
 
-                    realmAccess.Write(r =>
-                    {
-                        if (r.Find<BeatmapInfo>(id) is not BeatmapInfo liveBeatmapInfo)
-                            return;
-
-                        if (sunnyPp >= 0)
-                            EzRatingWriter.WritePP(liveBeatmapInfo, EzAnalysisSystem.SSR, sunnyPp);
-
-                        if (minaSr >= 0)
-                            EzRatingWriter.WriteSR(liveBeatmapInfo, EzAnalysisSystem.Mina, minaSr);
-                    });
-
-                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
-                }
-                catch (Exception e)
-                {
-                    Logger.Log($"Per-system baseline fill failed on {beatmap}: {e}");
-                }
-
-                ++processedCount;
+                ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+                return true;
             }
-
-            completeNotification(notification, processedCount, candidates.Count);
         }
 
         private void processOnlineBeatmapSetsWithNoUpdate()
@@ -2354,6 +2244,98 @@ namespace osu.Game.Database
             config.SetValue(OsuSetting.LastOnlineTagsPopulation, metadataSourceFetchDate);
         }
 
+        /// <summary>
+        /// How many charts the analysis passes compute at once.
+        /// </summary>
+        /// <remarks>
+        /// The per-chart work is CPU bound and independent, so a single thread leaves most of the machine idle: one
+        /// chart is a beatmap load, a conversion, and then the systems that read it. Workers are real threads rather
+        /// than pool tasks because the engines behind them are per-thread state, and one core is left for the UI.
+        /// </remarks>
+        private static int analysisWorkerCount => Math.Clamp(Environment.ProcessorCount - 1, 1, 8);
+
+        /// <summary>
+        /// Runs <paramref name="work"/> through <paramref name="process"/> on <see cref="analysisWorkerCount"/> threads.
+        /// </summary>
+        /// <param name="process">Per-item work. Returning false counts the item as failed instead of processed.</param>
+        /// <remarks>
+        /// A disposed store (shutdown) abandons the pass rather than being reported once per remaining chart, which is
+        /// what a per-item exception would do. Cancellation is read from the notification's state, so a cancel takes
+        /// effect between charts on every worker.
+        /// </remarks>
+        private ChartBatchResult runChartBatch<T>(IReadOnlyList<T> work, Func<T, bool> process, ProgressNotification? notification)
+        {
+            int total = work.Count;
+            int next = -1;
+            int attempted = 0;
+            int processed = 0;
+            int failed = 0;
+            int aborted = 0;
+
+            int workers = Math.Min(analysisWorkerCount, total);
+            var threads = new Thread[workers];
+
+            for (int i = 0; i < workers; i++)
+            {
+                threads[i] = new Thread(runWorker, 4 * 1024 * 1024)
+                {
+                    IsBackground = true,
+                    Name = $"ez-analysis-{i}",
+                };
+
+                threads[i].Start();
+            }
+
+            foreach (var thread in threads)
+                thread.Join();
+
+            return new ChartBatchResult(Volatile.Read(ref attempted), processed, failed, Volatile.Read(ref aborted) != 0);
+
+            void runWorker()
+            {
+                while (Volatile.Read(ref aborted) == 0)
+                {
+                    if (notification?.State == ProgressNotificationState.Cancelled)
+                        return;
+
+                    int index = Interlocked.Increment(ref next);
+
+                    if (index >= total)
+                        return;
+
+                    sleepIfRequired();
+
+                    bool ok;
+
+                    try
+                    {
+                        ok = process(work[index]);
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        Interlocked.Exchange(ref aborted, 1);
+                        return;
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Log($"Background analysis work failed on {work[index]}: {e}");
+                        ok = false;
+                    }
+
+                    if (ok)
+                        Interlocked.Increment(ref processed);
+                    else
+                        Interlocked.Increment(ref failed);
+
+                    int current = Interlocked.Increment(ref attempted);
+                    updateNotificationProgress(notification, current, total);
+                }
+            }
+        }
+
+        /// <summary>Outcome of one <see cref="runChartBatch{T}"/>.</summary>
+        private readonly record struct ChartBatchResult(int Attempted, int Processed, int Failed, bool Aborted);
+
         private int lastNotificationProgressReported = -1;
 
         private const int notification_progress_update_interval = 25;
@@ -2374,7 +2356,8 @@ namespace osu.Game.Database
             if (!shouldUpdate)
                 return;
 
-            lastNotificationProgressReported = processedCount;
+            // Several analysis workers report at once; a stale value here only means a redundant UI update.
+            Volatile.Write(ref lastNotificationProgressReported, processedCount);
 
             Schedule(() =>
             {

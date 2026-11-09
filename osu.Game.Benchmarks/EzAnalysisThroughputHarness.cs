@@ -101,6 +101,12 @@ namespace osu.Game.Benchmarks
                 return;
             }
 
+            if (Array.IndexOf(args, "--pipeline") >= 0)
+            {
+                pipeline(rawBeatmap, ruleset, rulesetInfo, mods);
+                return;
+            }
+
             Console.WriteLine($"{"stage",-22}{"op",-10}{"charts/s",10}{"ms/chart",12}{"alloc KB",12}");
             Console.WriteLine(new string('-', 68));
 
@@ -265,16 +271,87 @@ namespace osu.Game.Benchmarks
             }
         }
 
+        /// <summary>
+        /// Runs what a backfill pass does to one chart — load, convert, extract, rate, and score — on a given number
+        /// of workers, over the real chart.
+        /// </summary>
+        /// <remarks>
+        /// This is the shape the pipeline has, not the pass itself: the Realm read and write are absent, and every
+        /// iteration loads its own working beatmap so no conversion is reused. It answers how much throughput the
+        /// per-chart work has, and how it scales with workers.
+        /// </remarks>
+        private static void pipeline(byte[] raw, Ruleset ruleset, IRulesetInfo rulesetInfo, Mod[] mods)
+        {
+            const int chart_count = 48;
+
+            Console.WriteLine($"charts={chart_count} (real chart) threads={Environment.ProcessorCount}");
+
+            foreach (int workers in new[] { 1, 2, 4, 8 })
+            {
+                double totalMs = 0;
+
+                // Two passes: the first pays JIT and engine warm-up for every stage.
+                for (int pass = 0; pass < 2; pass++)
+                {
+                    var stopwatch = Stopwatch.StartNew();
+                    int next = -1;
+
+                    var threads = new Thread[workers];
+
+                    for (int w = 0; w < workers; w++)
+                    {
+                        threads[w] = new Thread(() =>
+                        {
+                            while (true)
+                            {
+                                if (Interlocked.Increment(ref next) >= chart_count)
+                                    return;
+
+                                runPipeline(raw, ruleset, rulesetInfo, mods);
+                            }
+                        }, 4 * 1024 * 1024) { IsBackground = true };
+
+                        threads[w].Start();
+                    }
+
+                    foreach (var thread in threads)
+                        thread.Join();
+
+                    if (pass == 1)
+                        totalMs = stopwatch.Elapsed.TotalMilliseconds;
+                }
+
+                Console.WriteLine($"workers={workers,-3}{chart_count / (totalMs / 1000.0),8:F1} charts/s{totalMs / chart_count,10:F1} ms/chart");
+            }
+        }
+
+        private static void runPipeline(byte[] raw, Ruleset ruleset, IRulesetInfo rulesetInfo, Mod[] mods)
+        {
+            // Own working beatmap per chart: the shared cache would otherwise reuse the conversion for later charts.
+            IBeatmap playable = loadPlayable(raw, rulesetInfo, mods);
+            int keys = EzHoldMetrics.ResolveKeyCount(playable);
+            double overallDifficulty = playable.Difficulty.OverallDifficulty;
+
+            double sr = EzSSREngine.CalculateSR(EzCSIEngine.FromPlayable(playable), keys, overallDifficulty);
+            DifficultyAttributes attributes = computeOfficial(playable, ruleset, mods);
+            double pp = computePp(playable, ruleset, mods, attributes, sr);
+
+            GC.KeepAlive(pp);
+        }
+
         private static void print(Measurement row)
         {
-            Console.WriteLine($"{row.Name,-22}{row.Iterations,-10}{1_000_000_000.0 / row.Nanoseconds,10:F1}{row.Nanoseconds / 1_000_000.0,12:F2}{row.AllocatedBytes / 1024.0 / row.Iterations,12:F1}");
+            // The columns are per chart, so both the rate and the time are derived from the per-iteration share.
+            double perChartNanoseconds = row.Nanoseconds / row.Iterations;
+            Console.WriteLine($"{row.Name,-22}{row.Iterations,-10}{1_000_000_000.0 / perChartNanoseconds,10:F1}{perChartNanoseconds / 1_000_000.0,12:F2}{row.AllocatedBytes / 1024.0 / row.Iterations,12:F1}");
         }
 
         private static void printTotal(string name, Measurement load, Measurement star, Measurement compute, int conversions)
         {
             double nanoseconds = load.Nanoseconds * conversions + star.Nanoseconds + compute.Nanoseconds;
             double allocated = load.AllocatedBytes * conversions + star.AllocatedBytes + compute.AllocatedBytes;
-            Console.WriteLine($"{name,-22}{load.Iterations,-10}{1_000_000_000.0 / nanoseconds,10:F1}{nanoseconds / 1_000_000.0,12:F2}{allocated / 1024.0 / load.Iterations,12:F1}");
+            double perChartNanoseconds = nanoseconds / load.Iterations;
+            Console.WriteLine($"{name,-22}{load.Iterations,-10}{1_000_000_000.0 / perChartNanoseconds,10:F1}{perChartNanoseconds / 1_000_000.0,12:F2}{allocated / 1024.0 / load.Iterations,12:F1}");
         }
 
         private static double computeStar(IBeatmap playable, int keyCount, double overallDifficulty)
