@@ -96,16 +96,38 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         }
 
         [Test]
-        public void Dependencies_are_walked_transitively_up_the_chain()
+        public void Dependencies_are_walked_transitively_along_the_declared_edges()
         {
             Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmMina), Is.Empty);
             Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmCSI).Select(n => n.Action),
                 Is.EqualTo(new[] { EzDataRebuildAction.RealmMina }));
+
+            // Dan is derived from the chart structure (which is itself from Mina) and from the Sunny rating.
             Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmDan).Select(n => n.Action),
-                Is.EqualTo(new[] { EzDataRebuildAction.RealmCSI, EzDataRebuildAction.RealmMina }));
+                Is.EqualTo(new[] { EzDataRebuildAction.RealmCSI, EzDataRebuildAction.RealmMina, EzDataRebuildAction.RealmSSR }));
+
             Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmSSR), Is.Empty);
+            Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmPPP), Is.Empty);
             Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.SqliteSongsBranches).Select(n => n.Action),
                 Is.EqualTo(new[] { EzDataRebuildAction.SqliteMain }));
+        }
+
+        [Test]
+        public void Every_declared_dependency_names_a_node()
+        {
+            // A dangling edge would silently drop a step from the invalidation chain, or throw out of the hint text.
+            foreach (var node in EzDataRebuildCatalog.All)
+            {
+                foreach (var dependency in node.Dependencies)
+                    Assert.That(EzDataRebuildCatalog.Find(dependency), Is.Not.Null, $"{node.Action} -> {dependency}");
+            }
+        }
+
+        [Test]
+        public void A_dependent_node_never_depends_on_itself()
+        {
+            foreach (var node in EzDataRebuildCatalog.All)
+                Assert.That(node.Dependencies, Does.Not.Contain(node.Action), node.Action.ToString());
         }
 
         [Test]

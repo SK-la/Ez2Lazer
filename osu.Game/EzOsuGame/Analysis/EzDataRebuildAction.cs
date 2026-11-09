@@ -82,14 +82,21 @@ namespace osu.Game.EzOsuGame.Analysis
     /// One node of a maintenance chain.
     /// </summary>
     /// <param name="ContinuesChain">
-    /// Whether this node reads the node directly above it. That is the only thing the dialog's spacing encodes:
-    /// a dependent step sits tight under its input, an independent one gets a visible break.
+    /// Whether this node is drawn tight under the node directly above it. That is the only thing the dialog's
+    /// spacing encodes: a dependent step sits tight under its input, an independent one gets a visible break.
+    /// It says nothing about what the node reads - that is <paramref name="Dependencies"/>.
+    /// </param>
+    /// <param name="Dependencies">
+    /// Nodes this one reads. Declared explicitly rather than inferred from position, because the graph is not a
+    /// single line: dan reads the chart structure and the Sunny rating, which are declared in different parts of
+    /// the list. Display order and dependency order are therefore separate questions.
     /// </param>
     public sealed record EzDataRebuildNode(
         EzDataRebuildAction Action,
         bool ContinuesChain,
         LocalisableString Name,
-        LocalisableString Detail);
+        LocalisableString Detail,
+        IReadOnlyList<EzDataRebuildAction> Dependencies);
 
     /// <summary>
     /// The maintenance surface's content: two chains, one per store, each listing its actions in dependency order.
@@ -101,6 +108,10 @@ namespace osu.Game.EzOsuGame.Analysis
     /// <para>
     /// Which store a node belongs to is its chain, not a field: a node appears in exactly one of <see cref="Realm"/>
     /// and <see cref="Sqlite"/>, so carrying a side on the node would only repeat where it was declared.
+    /// </para>
+    /// <para>
+    /// An edge declared here is what makes a revision bump reach the systems that read the bumped one: the chart chain
+    /// settles its own staleness against these edges, and a manual rebuild invalidates downstream along them.
     /// </para>
     /// </remarks>
     public static class EzDataRebuildCatalog
@@ -116,9 +127,11 @@ namespace osu.Game.EzOsuGame.Analysis
             node(EzDataRebuildAction.RealmMina, false,
                 EzEnumStrings.DATA_REBUILD_ACTION_MINA_NAME, EzEnumStrings.DATA_REBUILD_ACTION_MINA_DETAIL),
             node(EzDataRebuildAction.RealmCSI, true,
-                EzEnumStrings.DATA_REBUILD_ACTION_CSI_NAME, EzEnumStrings.DATA_REBUILD_ACTION_CSI_DETAIL),
+                EzEnumStrings.DATA_REBUILD_ACTION_CSI_NAME, EzEnumStrings.DATA_REBUILD_ACTION_CSI_DETAIL,
+                EzDataRebuildAction.RealmMina),
             node(EzDataRebuildAction.RealmDan, true,
-                EzEnumStrings.DATA_REBUILD_ACTION_DAN_NAME, EzEnumStrings.DATA_REBUILD_ACTION_DAN_DETAIL),
+                EzEnumStrings.DATA_REBUILD_ACTION_DAN_NAME, EzEnumStrings.DATA_REBUILD_ACTION_DAN_DETAIL,
+                EzDataRebuildAction.RealmCSI, EzDataRebuildAction.RealmMina, EzDataRebuildAction.RealmSSR),
 
             node(EzDataRebuildAction.RealmPPP, false,
                 EzEnumStrings.DATA_REBUILD_ACTION_PPP_NAME, EzEnumStrings.DATA_REBUILD_ACTION_PPP_DETAIL),
@@ -139,7 +152,8 @@ namespace osu.Game.EzOsuGame.Analysis
             node(EzDataRebuildAction.SqliteMain, false,
                 EzEnumStrings.DATA_REBUILD_ACTION_SQLITE_MAIN_NAME, EzEnumStrings.DATA_REBUILD_ACTION_SQLITE_MAIN_DETAIL),
             node(EzDataRebuildAction.SqliteSongsBranches, true,
-                EzEnumStrings.DATA_REBUILD_ACTION_SQLITE_BRANCHES_NAME, EzEnumStrings.DATA_REBUILD_ACTION_SQLITE_BRANCHES_DETAIL),
+                EzEnumStrings.DATA_REBUILD_ACTION_SQLITE_BRANCHES_NAME, EzEnumStrings.DATA_REBUILD_ACTION_SQLITE_BRANCHES_DETAIL,
+                EzDataRebuildAction.SqliteMain),
         };
 
         public static IReadOnlyList<EzDataRebuildNode> All { get; } = concat(Realm, Sqlite);
@@ -159,56 +173,51 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// Nodes this action reads from, nearest first. Walked transitively along the declared chain so a hint can
-        /// mention every input that may be stale, not just the immediate one.
+        /// Nodes this action reads from, nearest first: a dependency appears before its own dependencies, so a hint
+        /// can mention every input that may be stale, not just the immediate one.
         /// </summary>
+        /// <remarks>
+        /// The walk follows the declared edges rather than the display order, because a node's inputs are not
+        /// necessarily the nodes listed above it: dan reads the Sunny rating, which is declared further down.
+        /// </remarks>
         public static IReadOnlyList<EzDataRebuildNode> DependenciesOf(EzDataRebuildAction action)
         {
             if (Find(action) == null)
                 return Array.Empty<EzDataRebuildNode>();
 
-            IReadOnlyList<EzDataRebuildNode> chain = chainOf(action);
-            int index = -1;
-
-            for (int i = 0; i < chain.Count; i++)
-            {
-                if (chain[i].Action == action)
-                {
-                    index = i;
-                    break;
-                }
-            }
-
-            if (index <= 0)
-                return Array.Empty<EzDataRebuildNode>();
-
             var dependencies = new List<EzDataRebuildNode>();
+            var seen = new HashSet<EzDataRebuildAction> { action };
 
-            for (int i = index; i > 0 && chain[i].ContinuesChain; i--)
-                dependencies.Add(chain[i - 1]);
+            collect(action, dependencies, seen);
 
             return dependencies;
+
+            static void collect(EzDataRebuildAction current, List<EzDataRebuildNode> result, HashSet<EzDataRebuildAction> seen)
+            {
+                if (Find(current) is not { } node)
+                    return;
+
+                foreach (var dependency in node.Dependencies)
+                {
+                    if (!seen.Add(dependency))
+                        continue;
+
+                    if (Find(dependency) is { } dependencyNode)
+                        result.Add(dependencyNode);
+
+                    collect(dependency, result, seen);
+                }
+            }
         }
 
         /// <summary>Current-culture names, joined for footer and confirmation text.</summary>
         public static string DisplayNames(IEnumerable<EzDataRebuildAction> actions)
             => string.Join(" / ", actions.Select(action => (Find(action)?.Name ?? action.ToString()).ToString()));
 
-        /// <summary>The chain an action was declared in: that is where its side comes from.</summary>
-        private static IReadOnlyList<EzDataRebuildNode> chainOf(EzDataRebuildAction action)
-        {
-            foreach (var node in Realm)
-            {
-                if (node.Action == action)
-                    return Realm;
-            }
-
-            return Sqlite;
-        }
-
         private static EzDataRebuildNode node(EzDataRebuildAction action, bool continuesChain,
-                                              LocalisableString name, LocalisableString detail)
-            => new EzDataRebuildNode(action, continuesChain, name, detail);
+                                              LocalisableString name, LocalisableString detail,
+                                              params EzDataRebuildAction[] dependencies)
+            => new EzDataRebuildNode(action, continuesChain, name, detail, dependencies);
 
         private static IReadOnlyList<EzDataRebuildNode> concat(IReadOnlyList<EzDataRebuildNode> first, IReadOnlyList<EzDataRebuildNode> second)
         {
