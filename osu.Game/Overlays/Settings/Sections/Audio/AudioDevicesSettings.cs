@@ -41,6 +41,9 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         private FormDropdown<int>? bufferSizeDropdown;
         private SettingsItemV2? bufferSizeSettingsItem;
 
+        private FormDropdown<int>? exclusiveBufferDropdown;
+        private SettingsItemV2? exclusiveBufferSettingsItem;
+
         private AudioDeviceDropdown dropdown = null!;
         private SettingsItemV2? outputDeviceSettingsItem;
 
@@ -54,6 +57,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         private Bindable<int> configBitDepth = null!;
         private Bindable<int> configBufferSize = null!;
         private Bindable<bool> configAsioUseExternalPCM = null!;
+        private Bindable<int> configExclusiveBufferMs = null!;
 
         private bool suppressAsioFormatChanges;
 
@@ -64,6 +68,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             configBitDepth = ezConfig.GetBindable<int>(Ez2Setting.AsioBitDepth);
             configBufferSize = ezConfig.GetBindable<int>(Ez2Setting.AsioBufferSize);
             configAsioUseExternalPCM = ezConfig.GetBindable<bool>(Ez2Setting.AsioUseExternalPCM);
+            configExclusiveBufferMs = ezConfig.GetBindable<int>(Ez2Setting.WasapiExclusiveBufferMs);
 
             Children = new Drawable[]
             {
@@ -85,6 +90,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 });
             });
 
+            audio.OnWindowsOutputRuntimeChanged += onWindowsOutputRuntimeChanged;
             audio.OnNewDevice += onDeviceChanged;
             audio.OnLostDevice += onDeviceChanged;
             dropdown.Current = audio.AudioDevice;
@@ -110,6 +116,14 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     Items = new[] { initialBuffer },
                 };
 
+                exclusiveBufferDropdown = new ExclusiveBufferDropdown
+                {
+                    Caption = EzSettingsAudioString.WASAPI_EXCLUSIVE_BUFFER_LABEL,
+                    HintText = EzSettingsAudioString.WASAPI_EXCLUSIVE_BUFFER_HINT,
+                    Current = configExclusiveBufferMs,
+                    Items = new[] { 0, 10, 20, 30 },
+                };
+
                 Add(asioPassThroughSettingsItem = new SettingsItemV2(asioPassThrough = new FormCheckBox
                 {
                     Caption = EzSettingsAudioString.ASIO_PASSTHROUGH_LABEL,
@@ -133,6 +147,10 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     TooltipText = EzSettingsAudioString.ASIO_RELOAD_DRIVER_HINT,
                     Keywords = new[] { "asio", "reload", "driver", "refresh", "restart" },
                     Action = reloadAsioDriver,
+                });
+                Add(exclusiveBufferSettingsItem = new SettingsItemV2(exclusiveBufferDropdown)
+                {
+                    Keywords = new[] { "wasapi", "exclusive", "buffer", "latency" },
                 });
                 Add(new SettingsItemV2(legacyAudio = new LegacyAudioCheckbox())
                 {
@@ -222,7 +240,15 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     updateAudioDeviceStatusNote(getCurrentDeviceSelection());
                 }, true);
 
+                exclusiveBufferDropdown.Current.BindValueChanged(e =>
+                {
+                    Logger.Log($"User set WASAPI Exclusive buffer to {(e.NewValue <= 0 ? "auto" : $"{e.NewValue}ms")}", LoggingTarget.Runtime, LogLevel.Debug);
+                    audio.SetWasapiExclusiveBufferMs(e.NewValue);
+                    updateAudioDeviceStatusNote(getCurrentDeviceSelection());
+                });
+
                 setAsioSettingsVisible(false);
+                setExclusiveSettingsVisible(false);
             }
         }
 
@@ -249,7 +275,10 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             {
                 string deviceSelection = getCurrentDeviceSelection();
                 setAsioSettingsVisible(isAsioSelection(deviceSelection));
+                setExclusiveSettingsVisible(isExclusiveSelection(deviceSelection));
                 updateAudioDeviceStatusNote(deviceSelection);
+
+                audio.SetWasapiExclusiveBufferMs(configExclusiveBufferMs.Value);
 
                 if (!isAsioSelection(deviceSelection))
                     return;
@@ -281,6 +310,8 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
         private static bool isAsioSelection(string? selection) => selection?.Contains("ASIO", StringComparison.Ordinal) == true;
 
+        private static bool isExclusiveSelection(string? selection) => selection?.Contains("WASAPI Exclusive", StringComparison.Ordinal) == true;
+
         private void onDeviceChanged(string? _)
         {
             Scheduler.AddOnce(() =>
@@ -289,6 +320,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
                 string deviceSelection = getCurrentDeviceSelection();
                 setAsioSettingsVisible(isAsioSelection(deviceSelection));
+                setExclusiveSettingsVisible(isExclusiveSelection(deviceSelection));
 
                 // Do not query/touch the ASIO driver from the UI thread here — that raced audio-thread init and caused silent output.
                 // Lists refresh after audio-thread initialisation via SetupAsioConfigurationSync, or from cache if already running.
@@ -325,6 +357,14 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 asioPassThroughSettingsItem?.Hide();
                 reloadAsioDriverButton?.Hide();
             }
+        }
+
+        private void setExclusiveSettingsVisible(bool visible)
+        {
+            if (visible)
+                exclusiveBufferSettingsItem?.Show();
+            else
+                exclusiveBufferSettingsItem?.Hide();
         }
 
         private void reloadAsioDriver()
@@ -512,13 +552,13 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
         private void updateAudioDeviceStatusNote(string? deviceSelection)
         {
-            if (outputDeviceSettingsItem == null)
-                return;
-
-            outputDeviceSettingsItem.Note.Value = new SettingsNote.Data(
+            outputDeviceSettingsItem?.Note.Value = new SettingsNote.Data(
                 audio.GetOutputDeviceStatusNote(deviceSelection),
                 SettingsNote.Type.Informational);
         }
+
+        private void onWindowsOutputRuntimeChanged() =>
+            Schedule(() => updateAudioDeviceStatusNote(getCurrentDeviceSelection()));
 
         protected override void Dispose(bool isDisposing)
         {
@@ -526,6 +566,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
             if (audio.IsNotNull())
             {
+                audio.OnWindowsOutputRuntimeChanged -= onWindowsOutputRuntimeChanged;
                 audio.OnNewDevice -= onDeviceChanged;
                 audio.OnLostDevice -= onDeviceChanged;
             }
@@ -539,6 +580,11 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         private partial class AsioFormatDropdown : FormDropdown<EzAsioFormatOption>
         {
             protected override LocalisableString GenerateItemText(EzAsioFormatOption item) => item.DisplayName;
+        }
+
+        private partial class ExclusiveBufferDropdown : FormDropdown<int>
+        {
+            protected override LocalisableString GenerateItemText(int item) => item <= 0 ? "Auto" : $"{item} ms";
         }
     }
 
