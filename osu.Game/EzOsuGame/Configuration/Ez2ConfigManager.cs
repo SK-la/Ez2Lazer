@@ -8,6 +8,7 @@ using System.Drawing;
 using System.Text;
 using System.Threading;
 using JetBrains.Annotations;
+using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration;
 using osu.Framework.Development;
@@ -199,10 +200,11 @@ namespace osu.Game.EzOsuGame.Configuration
 
             #region 音频与输入
 
-            SetDefault(Ez2Setting.AsioSampleRate, 48000);
+            SetDefault(Ez2Setting.AsioSampleRate, AudioOutputDefaults.DEFAULT_SAMPLE_RATE);
             SetDefault(Ez2Setting.AsioBitDepth, 24);
-            SetDefault(Ez2Setting.AsioBufferSize, 128);
+            SetDefault(Ez2Setting.AsioBufferSize, AudioOutputDefaults.DEFAULT_ASIO_BUFFER_SIZE);
             SetDefault(Ez2Setting.AsioUseExternalPCM, true);
+            SetDefault(Ez2Setting.WasapiExclusiveBufferMs, AudioOutputDefaults.WASAPI_EXCLUSIVE_AUTO);
 
             SetDefault(Ez2Setting.OffsetPlusMania, 0.0, -200.0, 200.0, 1.0);
             SetDefault(Ez2Setting.OffsetPlusNonMania, 0.0, -200.0, 200.0, 1.0);
@@ -1313,6 +1315,7 @@ namespace osu.Game.EzOsuGame.Configuration
         AsioBitDepth,
         AsioBufferSize,
         AsioUseExternalPCM,
+        WasapiExclusiveBufferMs,
         OffsetPlusMania,
         OffsetPlusNonMania,
         StdJudgeMode,
@@ -1384,11 +1387,13 @@ namespace osu.Game.EzOsuGame.Configuration
         ManiaPseudo3DRotation,
 
         ManiaHoldTailAlpha,
+
         /// <summary>
         /// LN 投皮距离档位。UI 0-8，除 32 得到节拍；0 关闭投皮额外负担，默认 4 = 4/32 = 2/16。进局 Get 一次快照。
         /// </summary>
         ManiaHoldTailMaskGradientHeight,
         ManiaLNGradientEnable,
+
         /// <summary>
         /// 动态投皮。进局时 Get 一次快照，局内不跟随设置变更；开启后按 tracker 当前拍长调整投皮距离。
         /// </summary>
