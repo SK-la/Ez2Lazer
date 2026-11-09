@@ -1342,6 +1342,7 @@ namespace osu.Game
 
             // 缓存供 realm重算 使用，必须在 BackgroundDataStoreProcessor 之前注册。
             loadComponentSingleFile(new BackgroundDataStoreProcessor(), Add, true);
+            cacheDetachedBeatmapStoreSyncPolicy();
             loadComponentSingleFile<BeatmapStore>(detachedBeatmapStore = new RealmDetachedBeatmapStore(), Add, true);
             loadComponentSingleFile(new QueueController(), Add, true);
 
@@ -1981,10 +1982,15 @@ namespace osu.Game
             }
         }
 
-        private void screenPushed(IScreen lastScreen, IScreen newScreen) => ScreenChanged((OsuScreen)lastScreen, (OsuScreen)newScreen);
+        private void screenPushed(IScreen lastScreen, IScreen newScreen)
+        {
+            onEzDetachedBeatmapStoreScreenPushed(lastScreen, newScreen);
+            ScreenChanged((OsuScreen)lastScreen, (OsuScreen)newScreen);
+        }
 
         private void screenExited(IScreen lastScreen, IScreen newScreen)
         {
+            onEzDetachedBeatmapStoreScreenExited(lastScreen, newScreen);
             ScreenChanged((OsuScreen)lastScreen, (OsuScreen)newScreen);
             startupSongSelectPreload((OsuScreen)lastScreen, (OsuScreen)newScreen);
 

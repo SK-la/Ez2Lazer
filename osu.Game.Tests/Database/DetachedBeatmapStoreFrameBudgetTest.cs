@@ -53,5 +53,21 @@ namespace osu.Game.Tests.Database
             Assert.Throws<ArgumentOutOfRangeException>(() =>
                 DetachedBeatmapStoreFrameBudget.Drain(queue, -1, _ => { }));
         }
+
+        [Test]
+        public void Time_budget_stops_after_first_item_when_subsequent_would_exceed_budget()
+        {
+            var queue = new Queue<int>(new[] { 1, 2, 3 });
+
+            int processed = DetachedBeatmapStoreFrameBudget.DrainForTimeBudget(queue, 8, 0.001, i =>
+            {
+                if (i >= 2)
+                    System.Threading.Thread.Sleep(2);
+            });
+
+            Assert.That(processed, Is.EqualTo(1));
+            Assert.That(queue.Count, Is.EqualTo(2));
+            Assert.That(queue.Peek(), Is.EqualTo(2));
+        }
     }
 }

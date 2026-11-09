@@ -10,6 +10,8 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
 using osu.Game.Online.Multiplayer;
+using osu.Game.Performance;
+using osu.Game.Screens.Play;
 using Realms;
 
 namespace osu.Game.Database
@@ -26,6 +28,15 @@ namespace osu.Game.Database
 
         [Resolved]
         private RealmAccess realm { get; set; } = null!;
+
+        [Resolved(CanBeNull = true)]
+        private DetachedBeatmapStoreSyncPolicy? syncPolicy { get; set; }
+
+        [Resolved(CanBeNull = true)]
+        private ILocalUserPlayInfo? localUserPlayInfo { get; set; }
+
+        [Resolved(CanBeNull = true)]
+        private IHighPerformanceSessionManager? highPerformanceSessionManager { get; set; }
 
         public override IBindableList<BeatmapSetInfo> GetBeatmapSets(CancellationToken? cancellationToken)
         {
@@ -168,11 +179,17 @@ namespace osu.Game.Database
             if (pendingOperations.Count == 0)
                 return;
 
+            if (syncPolicy != null && !syncPolicy.AllowDrain(Clock.CurrentTime, localUserPlayInfo, highPerformanceSessionManager))
+                return;
+
+            int maxOps = syncPolicy?.DrainMaxOpsPerFrame ?? DetachedBeatmapStoreFrameBudget.MAX_OPS_PER_FRAME;
+            double timeBudgetMs = syncPolicy?.DrainTimeBudgetMilliseconds ?? 0;
+
             lock (detachedBeatmapSets)
             {
                 // BackgroundDataStoreProcessor Ez/SR backfill can enqueue thousands of Replace ops.
                 // Unbounded drain stalls SongSelect Update for frames; cap per frame and catch up over time.
-                DetachedBeatmapStoreFrameBudget.Drain(pendingOperations, DetachedBeatmapStoreFrameBudget.MAX_OPS_PER_FRAME, op =>
+                DetachedBeatmapStoreFrameBudget.DrainForTimeBudget(pendingOperations, maxOps, timeBudgetMs, op =>
                 {
                     switch (op.Type)
                     {
