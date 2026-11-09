@@ -1,0 +1,103 @@
+# PR：仅当标签为 size/XL 或 size/XXL 时自动跑测试；可用 workflow_dispatch 手动触发。
+# master 直 push 不触发。同一 PR 上新 push / force push 会取消未完成的 run。
+name: Continuous Integration
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-pr-${{ github.event.pull_request.number || format('manual-{0}', github.run_id) }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  gate:
+    name: Gate
+    runs-on: ubuntu-latest
+    outputs:
+      run_ci: ${{ steps.evaluate.outputs.run_ci }}
+    steps:
+      - name: Evaluate
+        id: evaluate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.eventName === 'workflow_dispatch') {
+              core.setOutput('run_ci', 'true');
+              return;
+            }
+
+            const xlLabels = new Set(['size/XL', 'size/XXL']);
+            const names = context.payload.pull_request.labels.map(label => label.name);
+            const run = names.some(name => xlLabels.has(name));
+            core.setOutput('run_ci', run ? 'true' : 'false');
+
+  test:
+    name: Test
+    needs: gate
+    if: needs.gate.outputs.run_ci == 'true'
+    runs-on: ${{ matrix.os.fullname }}
+    env:
+      OSU_EXECUTION_MODE: ${{ matrix.threadingMode }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - { prettyname: Windows, fullname: windows-latest }
+          - { prettyname: Linux, fullname: ubuntu-latest }
+        threadingMode: [SingleThread, MultiThreaded]
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install .NET 10.0.x
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Compile
+        run: dotnet build -c Debug -warnaserror osu.Desktop.slnf
+
+      - name: Test
+        run: dotnet test osu.Desktop.slnf --logger "trx;LogFileName=TestResults-${{ matrix.os.prettyname }}-${{ matrix.threadingMode }}.trx" -- NUnit.ConsoleOut=0
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: osu-test-results-${{ matrix.os.prettyname }}-${{ matrix.threadingMode }}
+          path: ${{ github.workspace }}/**/TestResults/TestResults-${{ matrix.os.prettyname }}-${{ matrix.threadingMode }}.trx
+
+  test-results:
+    name: Test results
+    needs: [gate, test]
+    if: ${{ needs.gate.outputs.run_ci == 'true' && !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download results
+        uses: actions/download-artifact@v8
+        with:
+          pattern: osu-test-results-*
+          merge-multiple: true
+
+      - name: Add test results summary to workflow run
+        uses: dorny/test-reporter@v3.0.0
+        with:
+          name: Results
+          path: "**/*.trx"
+          reporter: dotnet-trx
+          list-suites: failed
+          list-tests: failed
+          use-actions-summary: true
