@@ -455,63 +455,106 @@ namespace osu.Game.EzOsuGame.Skills
             });
 
         /// <summary>
-        /// Players whose stored rows were written before their ledger moved on.
+        /// Players whose stored rows no longer answer the question the read path asks.
         /// </summary>
         /// <remarks>
-        /// Derived from the ledger instead of a stored flag: a row records how many plays it folded, so comparing that
-        /// with the ledger's current count is the whole test, and it cannot outlive its cause.
+        /// <para>
+        /// Two criteria, for the two ways a row goes out of date, both derived instead of stored:
+        /// </para>
+        /// <list type="bullet">
+        /// <item>
+        /// The ledger moved on. A row records how many plays it folded, so comparing that with the ledger's current
+        /// count is the whole test.
+        /// </item>
+        /// <item>
+        /// The algorithm moved on. Rows are read filtered to the current revision, so a row left at an older
+        /// revision answers nothing - it is not a cache miss the read path can repair, because these rows are only
+        /// written by the manual pass.
+        /// </item>
+        /// </list>
         /// </remarks>
         public IReadOnlyList<string> GetStalePlayerSkillUsernames()
-            => database.Read(c =>
-            {
-                using var cmd = c.CreateCommand();
-                cmd.CommandText = """
-                                  SELECT DISTINCT v.username
-                                  FROM player_skill_value v
-                                  WHERE v.analyzed_plays < (
-                                      SELECT COUNT(*) FROM drill_scores d
-                                      WHERE d.username = v.username
-                                        AND d.ruleset_id = v.ruleset_online_id)
-                                  ORDER BY v.username;
-                                  """;
-
-                var names = new List<string>();
-                using var reader = cmd.ExecuteReader();
-
-                while (reader.Read())
-                    names.Add(reader.GetString(0));
-
-                return (IReadOnlyList<string>)names;
-            });
+            => database.Read(c => new List<string>(collectStaleUsernameRows(c).Keys));
 
         public IReadOnlyList<EzStalePlayerSkill> GetStalePlayerSkillDetails()
             => database.Read(c =>
             {
+                var stale = collectStaleUsernameRows(c);
+
                 using var cmd = c.CreateCommand();
                 cmd.CommandText = """
-                                  SELECT username, COUNT(*), MAX(computed_at_ms)
+                                  SELECT username, MAX(computed_at_ms)
                                   FROM player_skill_value
-                                  WHERE analyzed_plays < (
-                                      SELECT COUNT(*) FROM drill_scores d
-                                      WHERE d.username = player_skill_value.username
-                                        AND d.ruleset_id = player_skill_value.ruleset_online_id)
-                                  GROUP BY username
-                                  ORDER BY username;
+                                  GROUP BY username;
                                   """;
 
-                var list = new List<EzStalePlayerSkill>();
+                var computedAt = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
+                using var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                    computedAt[reader.GetString(0)] = DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(1));
+
+                var list = new List<EzStalePlayerSkill>(stale.Count);
+
+                foreach (var (username, rows) in stale)
+                    list.Add(new EzStalePlayerSkill(username, rows, computedAt.GetValueOrDefault(username)));
+
+                return (IReadOnlyList<EzStalePlayerSkill>)list;
+            });
+
+        /// <summary>
+        /// Usernames with at least one out-of-date row, with how many of their rows are out of date.
+        /// </summary>
+        /// <remarks>
+        /// Evaluated per row here rather than in SQL because the revision each row is compared against belongs to the
+        /// system named in the same row; that mapping lives in <see cref="EzAnalysisSystemStorage"/> and has no SQL
+        /// equivalent.
+        /// </remarks>
+        private static SortedDictionary<string, int> collectStaleUsernameRows(SqliteConnection connection)
+        {
+            var ledger = new Dictionary<(string Username, int Ruleset), int>();
+
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SELECT username, ruleset_id, COUNT(*) FROM drill_scores GROUP BY username, ruleset_id;";
+
+                using var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                    ledger[(reader.GetString(0), reader.GetInt32(1))] = reader.GetInt32(2);
+            }
+
+            var stale = new SortedDictionary<string, int>(StringComparer.Ordinal);
+
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = """
+                                  SELECT username, ruleset_online_id, system_id, algorithm_version, analyzed_plays
+                                  FROM player_skill_value;
+                                  """;
+
                 using var reader = cmd.ExecuteReader();
 
                 while (reader.Read())
                 {
-                    list.Add(new EzStalePlayerSkill(
-                        reader.GetString(0),
-                        reader.GetInt32(1),
-                        DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(2))));
-                }
+                    string username = reader.GetString(0);
+                    int ruleset = reader.GetInt32(1);
+                    int current = EzAnalysisSystemStorage.FromStorageId(reader.GetString(2)).CurrentVersion();
+                    int version = reader.GetInt32(3);
+                    int analyzed = reader.GetInt32(4);
 
-                return (IReadOnlyList<EzStalePlayerSkill>)list;
-            });
+                    bool ledgerMoved = analyzed < ledger.GetValueOrDefault((username, ruleset), 0);
+                    bool superseded = current > 0 && version != current;
+
+                    if (!ledgerMoved && !superseded)
+                        continue;
+
+                    stale[username] = stale.GetValueOrDefault(username) + 1;
+                }
+            }
+
+            return stale;
+        }
 
         /// <summary>No stored flag remains; staleness is derived from the ledger.</summary>
         public int SetPlayerSkillStale(string username, bool stale) => 0;

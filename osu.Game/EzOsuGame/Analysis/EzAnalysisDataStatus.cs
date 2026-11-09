@@ -42,6 +42,7 @@ namespace osu.Game.EzOsuGame.Analysis
     public static class EzAnalysisDataStatus
     {
         private const string PPP_FACET = "PPP";
+        private const string TAGS_FACET = "Tags";
         private const string OFFICIAL_FACET = "Official";
         private const string SUNNY_FACET = "Sunny";
 
@@ -92,6 +93,9 @@ namespace osu.Game.EzOsuGame.Analysis
                 if (pppFacetOf(rulesetId, charts, skillRows, expired.Contains(EzAnalysisSystem.PPP)) is { } ppp)
                     facets.Add(ppp);
 
+                if (tagsFacetOf(charts) is { } tags)
+                    facets.Add(tags);
+
                 facets.AddRange(ratingFacetsOf(rulesetId, charts, expired));
 
                 result.Add(new EzRulesetAnalysisStatus
@@ -111,6 +115,29 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>PP+ rows of one ruleset, counted against the axis set that ruleset's catalog declares.</summary>
+        /// <summary>
+        /// The metadata tag columns of one ruleset. They carry no revision, so the only question the read path asks of
+        /// them is whether they have been computed, and null is that question's answer.
+        /// </summary>
+        private static EzFacetStatus? tagsFacetOf(IReadOnlyList<BeatmapInfo> charts)
+        {
+            var filled = new Dictionary<string, EzFacetRowState>(charts.Count, StringComparer.Ordinal);
+
+            foreach (var chart in charts)
+            {
+                if (chart.HasVideo.HasValue && chart.HasStoryboard.HasValue)
+                    filled[chart.Hash] = new EzFacetRowState(false);
+            }
+
+            return EzDataStateChecker.Count(new EzDataStateFacet
+            {
+                Id = TAGS_FACET,
+                CurrentRevision = 0,
+                UniverseCount = charts.Count,
+                Rows = filled,
+            });
+        }
+
         private static EzFacetStatus? pppFacetOf(
             int rulesetOnlineId, IReadOnlyList<BeatmapInfo> charts, IReadOnlyDictionary<(string SystemId, int RulesetOnlineId)
               , Dictionary<string, List<EzBeatmapSkillValue>>> skillRows, bool isStale)

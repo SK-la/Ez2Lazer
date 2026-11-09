@@ -53,9 +53,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 string[] maniaFacets = statuses.Single(s => s.RulesetOnlineId == 3).Report.Facets.Select(f => f.Id).ToArray();
 
                 // One facet per system: a system holds its star and its pp in one slot, so there is no separate
-                // performance facet here.
-                Assert.That(osuFacets, Is.EquivalentTo(new[] { "Official", "PPP" }));
-                Assert.That(maniaFacets, Is.EquivalentTo(new[] { "Mina", "CSI", "Dan", "PPP", "Official", "Sunny" }));
+                // performance facet here. Tags is the one facet that is not a rating or a chain stage.
+                Assert.That(osuFacets, Is.EquivalentTo(new[] { "Official", "PPP", "Tags" }));
+                Assert.That(maniaFacets, Is.EquivalentTo(new[] { "Mina", "CSI", "Dan", "PPP", "Official", "Sunny", "Tags" }));
             });
         }
 
