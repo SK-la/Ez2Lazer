@@ -259,7 +259,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
             entries.Clear();
             entries.AddRange(items);
 
-            rebuildList();
+            if (IsLoaded)
+                rebuildList();
+            else
+                Schedule(rebuildList);
 
             if (entries.Count == 0)
             {
@@ -300,14 +303,39 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         protected override void Dispose(bool isDisposing)
         {
-            cancelRebuild();
+            rebuildGeneration++;
+            endRebuildCts(rebuildCts);
+            rebuildCts = null;
+            batchDelegate?.Cancel();
+            batchDelegate = null;
             base.Dispose(isDisposing);
+        }
+
+        private static void endRebuildCts(CancellationTokenSource? cts)
+        {
+            if (cts == null)
+                return;
+
+            try
+            {
+                cts.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            try
+            {
+                cts.Dispose();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
         }
 
         private void cancelRebuild()
         {
-            rebuildCts?.Cancel();
-            rebuildCts?.Dispose();
+            endRebuildCts(rebuildCts);
             rebuildCts = null;
             batchDelegate?.Cancel();
             batchDelegate = null;
@@ -315,6 +343,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private void rebuildList()
         {
+            if (!IsLoaded)
+                return;
+
             cancelRebuild();
             listFlow.Clear();
 
@@ -324,6 +355,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             int generation = ++rebuildGeneration;
             var rows = entries.ToList();
             var localCts = rebuildCts = new CancellationTokenSource();
+            CancellationToken token = localCts.Token;
             var localRulesets = rulesets;
 
             Task.Run(() =>
@@ -332,26 +364,39 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 foreach (var row in rows)
                 {
-                    localCts.Token.ThrowIfCancellationRequested();
+                    token.ThrowIfCancellationRequested();
                     prepared.Add((row, EzLocalProfileDrillMods.Resolve(row, localRulesets)));
                 }
 
                 return prepared;
-            }, localCts.Token).ContinueWith(task => Schedule(() =>
+            }, token).ContinueWith(task =>
             {
-                if (generation != rebuildGeneration || localCts.IsCancellationRequested || task.IsCanceled)
-                    return;
-
-                if (task.IsFaulted)
+                try
                 {
-                    foreach (var row in rows)
-                        listFlow.Add(new EzLocalProfileScoreNarrowCard(row, Array.Empty<Mod>(), () => Current.Value = row));
-                    updateSelectionHighlight();
-                    return;
-                }
+                    Schedule(() =>
+                    {
+                        if (generation != rebuildGeneration || task.IsCanceled)
+                            return;
 
-                startBatchedAdd(task.GetResultSafely(), generation);
-            }), localCts.Token);
+                        if (task.IsFaulted)
+                        {
+                            foreach (var row in rows)
+                                listFlow.Add(new EzLocalProfileScoreNarrowCard(row, Array.Empty<Mod>(), () => Current.Value = row));
+                            updateSelectionHighlight();
+                            return;
+                        }
+
+                        startBatchedAdd(task.GetResultSafely(), generation);
+                    });
+                }
+                finally
+                {
+                    if (ReferenceEquals(rebuildCts, localCts))
+                        rebuildCts = null;
+
+                    localCts.Dispose();
+                }
+            }, TaskScheduler.Default);
         }
 
         private void startBatchedAdd(IReadOnlyList<(EzLocalProfileDrillScoreRow Row, Mod[] Mods)> prepared, int generation)
