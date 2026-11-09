@@ -25,7 +25,9 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Game.EzOsuGame.Screens.Visualizer;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -452,22 +454,45 @@ namespace osu.Game.Screens.Menu
 
         public override bool OnExiting(ScreenExitEvent e)
         {
+            // A pending Sunny recompute outranks the generic prompts: it is the only one whose cost is paid on the
+            // next launch rather than here, so it is also the only one the user can still avoid.
+            bool sunnyRecomputePending = EzSSRTuningSnapshot.IsPending;
+
             bool requiresConfirmation =
                 // we need to have a dialog overlay to confirm in the first place.
                 dialogOverlay != null
                 // if the dialog has already displayed and been accepted by the user, we are good.
                 && !exitConfirmedViaDialog
                 // Only require confirmation if there is either an ongoing operation or the user exited via a non-hold escape press.
-                && (notifications.HasOngoingOperations || !exitConfirmedViaHoldOrClick);
+                && (sunnyRecomputePending || notifications.HasOngoingOperations || !exitConfirmedViaHoldOrClick);
 
             if (requiresConfirmation)
             {
-                if (dialogOverlay.CurrentDialog is ConfirmExitDialog exitDialog)
+                if (dialogOverlay.CurrentDialog is EzSunnyRecomputeExitDialog recomputeDialog)
+                {
+                    if (recomputeDialog.Buttons.OfType<PopupDialogOkButton>().FirstOrDefault() != null)
+                        recomputeDialog.PerformOkAction();
+                    else
+                        recomputeDialog.Flash();
+                }
+                else if (dialogOverlay.CurrentDialog is ConfirmExitDialog exitDialog)
                 {
                     if (exitDialog.Buttons.OfType<PopupDialogOkButton>().FirstOrDefault() != null)
                         exitDialog.PerformOkAction();
                     else
                         exitDialog.Flash();
+                }
+                else if (sunnyRecomputePending)
+                {
+                    dialogOverlay.Push(new EzSunnyRecomputeExitDialog(() =>
+                    {
+                        exitConfirmedViaDialog = true;
+                        this.Exit();
+                    }, () =>
+                    {
+                        holdToExitGameOverlay.Abort();
+                        Game.CancelRestartOnExit();
+                    }));
                 }
                 else
                 {

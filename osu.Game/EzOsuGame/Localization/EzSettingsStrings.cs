@@ -908,11 +908,13 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SunnySR_RESCALE_THRESHOLD_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "SunnySR（ssr难度）超过这个星级后，超出部分的膨胀速度被压到 1/1.2。"
-            + "\n这是对算法的永久修订，不是一次性试验：改它不会让本地库换版本，也不会追溯重算已落盘的值，只影响此后算出的 SunnySR 与落库结果。"
+            + "\n这是对算法的永久修订，不是一次性试验：改它不会让本地库换版本，但会标记为待重算——"
+            + "下次启动自动对全库重算 SunnySR，以及依赖它的段位数据。改动本身不会立刻重算；退出游戏时会提示。"
             + "\n调高 → 高星谱面不再被压那么多，值偏高；调低 → 高星谱面被压得更狠，值偏低。低于本阈值的中低星谱面不受影响。",
             "Above this star rating the SunnySR (ssrdifficulty) inflation is compressed to 1/1.2 of the excess."
-            + "\nThis is a permanent revision of the algorithm, not a one-off experiment: changing it does not change the local database version "
-            + "and does not retroactively rescore stored values; only SunnySR computed from then on, and its persisted result, are affected."
+            + "\nThis is a permanent revision of the algorithm, not a one-off experiment: it does not change the local database version, "
+            + "but it does mark the stored ratings as out of date - the next launch recomputes SunnySR for the whole library, "
+            + "along with the dan data derived from it. Nothing is recomputed while you keep playing; quitting shows a prompt."
             + "\nRaise it and high-star charts are compressed less (values go up); lower it and they are compressed more. Charts below the threshold are unaffected.");
 
         public static readonly LocalisableString SunnySR_LN_MULTIPLIER = new EzLocalizationManager.EzLocalisableString(
@@ -921,14 +923,34 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SunnySR_LN_MULTIPLIER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "SunnySR（ssr难度）里长条积分的权重系数，决定 LN 对难度的贡献。"
-            + "\n与重缩放阈值一样是对算法的永久修订：改动不换库版本、不追溯重算，只影响此后的 SunnySR 与落库结果。"
+            + "\n与重缩放阈值一样是对算法的永久修订：不换库版本，但标记为待重算，下次启动自动全库重算 SunnySR 与依赖它的段位数据；"
+            + "改动本身不会立刻重算，退出游戏时会提示。"
             + "\n调高 → LN 谱面更难、值偏高；调低 → LN 谱面更易。纯 rice 谱面不受影响。"
             + "\n建议：7K 以下用 6 左右；10K 可降到 4.5–5.5。",
             "Weight of the long-note integral in the SunnySR (ssrdifficulty); it decides how much holds contribute."
-            + "\nLike the rescale threshold this is a permanent revision: no database version change, no retroactive rescoring, "
-            + "only SunnySR computed from then on and its persisted result."
+            + "\nLike the rescale threshold this is a permanent revision: no database version change, but the stored ratings are marked out of date, "
+            + "and the next launch recomputes SunnySR for the whole library along with the dan data derived from it. "
+            + "Nothing is recomputed while you keep playing; quitting shows a prompt."
             + "\nRaise it and LN charts rate harder (values go up); lower it and they rate easier. Pure rice charts are unaffected."
             + "\nGuidance: around 6 below 7K; 4.5-5.5 for 10K.");
+
+        public static readonly LocalisableString SSR_TUNING_CHANGED_EXIT_HEADER = new EzLocalizationManager.EzLocalisableString(
+            "SSR 算法参数已修改",
+            "SunnySR settings changed");
+
+        public static readonly LocalisableString SSR_TUNING_CHANGED_EXIT_BODY = new EzLocalizationManager.EzLocalisableString(
+            "退出后，下次启动会自动对全库重算 SunnySR，以及所有依赖它的段位数据。"
+            + "\n取消退出可以回到设置把参数改回原值；改回后不会再排入重算。",
+            "After quitting, the next launch recomputes SunnySR for the whole library, along with every dan value derived from it."
+            + "\nCancel the exit to go back and restore the previous values; doing so removes the pending recompute.");
+
+        public static readonly LocalisableString SSR_TUNING_CHANGED_EXIT_CONFIRM = new EzLocalizationManager.EzLocalisableString(
+            "仍然退出",
+            "Quit anyway");
+
+        public static readonly LocalisableString SSR_TUNING_CHANGED_EXIT_CANCEL = new EzLocalizationManager.EzLocalisableString(
+            "返回设置",
+            "Back to settings");
 
         #endregion
     }
