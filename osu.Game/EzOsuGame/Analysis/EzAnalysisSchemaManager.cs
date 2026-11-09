@@ -76,6 +76,16 @@ PRAGMA temp_store=MEMORY;
             createMainTablesIfMissing(connection);
             EnsureMainSchemaCurrent(connection);
             EnsureCollectionHideTables(connection);
+
+            // The stored revision is read before it is overwritten: a file written by another analysis revision is
+            // retired here (timestamps back to 0, which is the pass's work list), and the new revision is stamped in
+            // the same step. That is what lets an interrupted warmup resume instead of recomputing the whole file.
+            bool versionMoved = int.TryParse(TryGetMeta(connection, META_KEY_ANALYSIS_VERSION), NumberStyles.Integer, CultureInfo.InvariantCulture, out int storedAnalysisVersion)
+                                && storedAnalysisVersion != ANALYSIS_VERSION;
+
+            if (versionMoved)
+                InvalidateAllCachedAnalysisTimestamps(connection);
+
             SetMeta(connection, META_KEY_KIND, MAIN_DATABASE_KIND);
             SetMeta(connection, META_KEY_SCHEMA_VERSION, MAIN_SCHEMA_VERSION.ToString(CultureInfo.InvariantCulture));
             SetMeta(connection, META_KEY_ANALYSIS_VERSION, ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
@@ -198,18 +208,7 @@ WHERE {COL_UPDATED_AT} <> 0;
             {
                 using var connection = OpenConnection(databasePath);
 
-                if (!tableExists(connection, TABLE_ENTRY))
-                    return false;
-
-                if (!int.TryParse(TryGetMeta(connection, META_KEY_SCHEMA_VERSION), NumberStyles.Integer, CultureInfo.InvariantCulture, out int storedSchemaVersion)
-                    || storedSchemaVersion != MAIN_SCHEMA_VERSION)
-                    return false;
-
-                if (!int.TryParse(TryGetMeta(connection, META_KEY_ANALYSIS_VERSION), NumberStyles.Integer, CultureInfo.InvariantCulture, out int storedAnalysisVersion)
-                    || storedAnalysisVersion != ANALYSIS_VERSION)
-                    return false;
-
-                return true;
+                return isMetaMatching(connection);
             }
             catch
             {
@@ -217,22 +216,61 @@ WHERE {COL_UPDATED_AT} <> 0;
             }
         }
 
-        /// <summary>
-        /// 存在可迁移的旧版主库，或当前主库需要 schema / 版本升级。
-        /// 已匹配的最新版文件不应触发启动预热。
-        /// </summary>
-        public static bool ShouldRunAutomaticSqliteWarmup(string databasePath)
+        /// <summary>Schema / analysis 版本与代码一致。</summary>
+        private static bool isMetaMatching(SqliteConnection connection)
         {
-            if (IsMainDatabaseMatching(databasePath))
+            if (!tableExists(connection, TABLE_ENTRY))
                 return false;
 
+            if (!int.TryParse(TryGetMeta(connection, META_KEY_SCHEMA_VERSION), NumberStyles.Integer, CultureInfo.InvariantCulture, out int storedSchemaVersion)
+                || storedSchemaVersion != MAIN_SCHEMA_VERSION)
+                return false;
+
+            if (!int.TryParse(TryGetMeta(connection, META_KEY_ANALYSIS_VERSION), NumberStyles.Integer, CultureInfo.InvariantCulture, out int storedAnalysisVersion)
+                || storedAnalysisVersion != ANALYSIS_VERSION)
+                return false;
+
+            return true;
+        }
+
+        /// <summary>
+        /// 当前主库文件需要启动预热：schema / analysis 版本与代码不一致，或行里仍有未补齐的切片。
+        /// </summary>
+        /// <remarks>
+        /// 版本换代是把行时间戳清零（见 <see cref="InitializeMainDatabase"/>），所以“还有 0 时间戳”就是预热没跑完；
+        /// 只看版本号的话，中断过一次的预热在下次启动会被当作已完成。
+        /// </remarks>
+        public static bool ShouldRunAutomaticSqliteWarmup(string databasePath)
+        {
             if (!File.Exists(databasePath))
             {
                 string? directory = Path.GetDirectoryName(databasePath);
                 return !string.IsNullOrEmpty(directory) && findLatestPreviousMainDatabase(directory, databasePath) != null;
             }
 
-            return true;
+            try
+            {
+                using var connection = OpenConnection(databasePath);
+
+                if (!tableExists(connection, TABLE_ENTRY))
+                    return true;
+
+                return !isMetaMatching(connection) || hasPendingRows(connection);
+            }
+            catch
+            {
+                return true;
+            }
+        }
+
+        private static bool hasPendingRows(SqliteConnection connection)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"
+SELECT EXISTS(SELECT 1 FROM {TABLE_ENTRY} WHERE {COL_COMMON_UPDATED_AT} = 0)
+    OR EXISTS(SELECT 1 FROM {TABLE_MANIA} WHERE {COL_UPDATED_AT} = 0);";
+
+            return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) != 0;
         }
 
         public static void EnsureMetaTableExists(SqliteConnection connection)

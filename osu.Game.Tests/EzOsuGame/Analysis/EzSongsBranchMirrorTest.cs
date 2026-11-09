@@ -5,6 +5,7 @@ using System;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Testing;
+using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
 
@@ -133,6 +134,75 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(updated.SunnySR, Is.EqualTo(7.5).Within(1e-9));
                 Assert.That(updated.OfficialSr, Is.EqualTo(4.75).Within(1e-9));
                 Assert.That(updated.MinaSr, Is.EqualTo(7.25).Within(1e-9));
+            });
+        }
+
+        [Test]
+        public void Retiring_computed_values_clears_them_and_stamps_the_revision()
+        {
+            withBranch((store, path) =>
+            {
+                store.StoreSongsBranch(path, metadata(), new[] { row(beatmap_a, "hash-a", 6.5, 120) }, sunnySRAlgorithmVersion: 111, ppAlgorithmVersion: 222);
+
+                Assert.That(store.SongsBranchHasPendingComputedValues(path, out _, out _), Is.False, "a fresh branch owes nothing");
+
+                Assert.That(store.RetireSongsBranchComputedValues(path, sunnySR: true, sunnySRVersion: 333, pp: true, ppVersion: 444), Is.True);
+
+                var retired = store.ReadAllSongsBranchRows(path).Single();
+                Assert.That(retired.SunnySR, Is.EqualTo(-1), "the retired value is the empty sentinel, not a rating");
+                Assert.That(retired.Pp, Is.EqualTo(-1));
+
+                Assert.That(store.SongsBranchHasPendingComputedValues(path, out bool pendingSunnySR, out bool pendingPp), Is.True);
+                Assert.That(pendingSunnySR, Is.True);
+                Assert.That(pendingPp, Is.True);
+
+                // The revision moves in the same step, which is what stops the next launch from retiring again.
+                Assert.That(store.TryGetSongsBranchStoredSunnySRVersion(path, out int sunnySRVersion), Is.True);
+                Assert.That(sunnySRVersion, Is.EqualTo(333));
+                Assert.That(store.TryGetSongsBranchStoredPpVersion(path, out int ppVersion), Is.True);
+                Assert.That(ppVersion, Is.EqualTo(444));
+            });
+        }
+
+        [Test]
+        public void A_retired_branch_offers_work_until_every_value_is_filled()
+        {
+            withBranch((store, path) =>
+            {
+                store.StoreSongsBranch(path, metadata(), new[]
+                {
+                    row(beatmap_a, "hash-a", 6.5, 120),
+                    row(beatmap_b, "hash-b", 3.25, 80),
+                }, sunnySRAlgorithmVersion: 111, ppAlgorithmVersion: 222);
+
+                store.RetireSongsBranchComputedValues(path, sunnySR: true, sunnySRVersion: 333, pp: true, ppVersion: 444);
+
+                // One row filled, the other still retired: the branch still reports work, which is how an interrupted
+                // pass resumes rather than being read as complete.
+                store.UpdateSongsBranchRows(path, new[] { row(beatmap_a, "hash-a", 7.5, 130) }, null, null);
+
+                Assert.That(store.SongsBranchHasPendingComputedValues(path, out bool pendingSunnySR, out bool pendingPp), Is.True);
+                Assert.That(pendingSunnySR, Is.True);
+                Assert.That(pendingPp, Is.True);
+
+                store.UpdateSongsBranchRows(path, new[] { row(beatmap_b, "hash-b", 4.25, 90) }, null, null);
+
+                Assert.That(store.SongsBranchHasPendingComputedValues(path, out _, out _), Is.False);
+            });
+        }
+
+        [Test]
+        public void Retired_values_are_not_read_as_ratings()
+        {
+            withBranch((store, path) =>
+            {
+                store.StoreSongsBranch(path, metadata(), new[] { row(beatmap_a, "hash-a", 6.5, 120) }, sunnySRAlgorithmVersion: 111, ppAlgorithmVersion: 222);
+                store.RetireSongsBranchComputedValues(path, sunnySR: true, sunnySRVersion: 333, pp: true, ppVersion: 444);
+
+                var beatmap = new BeatmapInfo { ID = beatmap_a, Hash = "hash-a", MD5Hash = "md5-hash-a" };
+
+                Assert.That(store.GetSongsBranchValues(path, new[] { beatmap }), Is.Empty);
+                Assert.That(store.GetSongsBranchPpValues(path, new[] { beatmap }), Is.Empty);
             });
         }
 
