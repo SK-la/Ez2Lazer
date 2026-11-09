@@ -47,7 +47,7 @@ namespace osu.Game.Tests.Visual.SongSelect
         private WeakList<EzDisplayKpsGraph> graphWeakReferences = new WeakList<EzDisplayKpsGraph>();
         private WeakList<EzDisplayKps> kpsWeakReferences = new WeakList<EzDisplayKps>();
         private WeakList<EzDisplayKpc> kpcWeakReferences = new WeakList<EzDisplayKpc>();
-        private WeakList<EzDisplaySR> xxyWeakReferences = new WeakList<EzDisplaySR>();
+        private WeakList<EzDisplaySR> ssrWeakReferences = new WeakList<EzDisplaySR>();
         private WeakList<EzDisplayTag> tagWeakReferences = new WeakList<EzDisplayTag>();
         private WeakList<CompositeDrawable> componentHostWeakReferences = new WeakList<CompositeDrawable>();
 
@@ -132,7 +132,7 @@ namespace osu.Game.Tests.Visual.SongSelect
             AddUntilStep("no leaked graphs", () => ManiaModStressSteps.collectAndCount(graphWeakReferences) == 0);
             AddUntilStep("no leaked kps displays", () => ManiaModStressSteps.collectAndCount(kpsWeakReferences) == 0);
             AddUntilStep("no leaked kpc displays", () => ManiaModStressSteps.collectAndCount(kpcWeakReferences) == 0);
-            AddUntilStep("no leaked xxySR displays", () => ManiaModStressSteps.collectAndCount(xxyWeakReferences) == 0);
+            AddUntilStep("no leaked sunnySR displays", () => ManiaModStressSteps.collectAndCount(ssrWeakReferences) == 0);
             AddUntilStep("no leaked tag displays", () => ManiaModStressSteps.collectAndCount(tagWeakReferences) == 0);
             assertCacheBindablesReturnToBaseline();
         }
@@ -269,7 +269,7 @@ namespace osu.Game.Tests.Visual.SongSelect
             graphWeakReferences = new WeakList<EzDisplayKpsGraph>();
             kpsWeakReferences = new WeakList<EzDisplayKps>();
             kpcWeakReferences = new WeakList<EzDisplayKpc>();
-            xxyWeakReferences = new WeakList<EzDisplaySR>();
+            ssrWeakReferences = new WeakList<EzDisplaySR>();
             tagWeakReferences = new WeakList<EzDisplayTag>();
             componentHostWeakReferences = new WeakList<CompositeDrawable>();
             reusablePanel = null;
@@ -363,8 +363,8 @@ namespace osu.Game.Tests.Visual.SongSelect
             foreach (var kpc in panel.ChildrenOfType<EzDisplayKpc>())
                 kpcWeakReferences.Add(kpc);
 
-            foreach (var xxy in panel.ChildrenOfType<EzDisplaySR>())
-                xxyWeakReferences.Add(xxy);
+            foreach (var ssr in panel.ChildrenOfType<EzDisplaySR>())
+                ssrWeakReferences.Add(ssr);
 
             foreach (var tag in panel.ChildrenOfType<EzDisplayTag>())
                 tagWeakReferences.Add(tag);
@@ -410,7 +410,7 @@ namespace osu.Game.Tests.Visual.SongSelect
         {
             long managed = ManiaModStressSteps.forceCollectionAndGetManagedMemory();
 
-            return $"Ez component diagnostics | hosts: {ManiaModStressSteps.countAlive(componentHostWeakReferences)} | graphs: {ManiaModStressSteps.countAlive(graphWeakReferences)} | kps displays: {ManiaModStressSteps.countAlive(kpsWeakReferences)} | kpc displays: {ManiaModStressSteps.countAlive(kpcWeakReferences)} | xxySR displays: {ManiaModStressSteps.countAlive(xxyWeakReferences)} | tag displays: {ManiaModStressSteps.countAlive(tagWeakReferences)} | ez tracked: {ezAnalysisCache.GetTrackedBindableCount()} | star tracked: {difficultyCache.GetTrackedBindableCount()} | managed delta: {ManiaModStressSteps.formatMemoryDelta(managed - baselineManagedMemory)}";
+            return $"Ez component diagnostics | hosts: {ManiaModStressSteps.countAlive(componentHostWeakReferences)} | graphs: {ManiaModStressSteps.countAlive(graphWeakReferences)} | kps displays: {ManiaModStressSteps.countAlive(kpsWeakReferences)} | kpc displays: {ManiaModStressSteps.countAlive(kpcWeakReferences)} | sunnySR displays: {ManiaModStressSteps.countAlive(ssrWeakReferences)} | tag displays: {ManiaModStressSteps.countAlive(tagWeakReferences)} | ez tracked: {ezAnalysisCache.GetTrackedBindableCount()} | star tracked: {difficultyCache.GetTrackedBindableCount()} | managed delta: {ManiaModStressSteps.formatMemoryDelta(managed - baselineManagedMemory)}";
         }
 
         private void updateSummary(string summary)

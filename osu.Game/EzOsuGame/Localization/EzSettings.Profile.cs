@@ -3,7 +3,7 @@
 
 namespace osu.Game.EzOsuGame.Localization
 {
-    public class EzSettingsProfile
+    public static class EzSettingsProfile
     {
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE =
             new EzLocalizationManager.EzLocalisableString("计算成绩分析", "Compute Score Analysis");
@@ -153,7 +153,7 @@ namespace osu.Game.EzOsuGame.Localization
                 "No Track skills yet. Recompute Score Analysis in Settings.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SKILL_RATING =
-            new EzLocalizationManager.EzLocalisableString("{0}K 技能评分", "{0}K skill rating");
+            new EzLocalizationManager.EzLocalisableString("技能评分", "skill rating");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SKILL_PLAYS =
             new EzLocalizationManager.EzLocalisableString("{0} 局分析", "{0} analyzed plays");
@@ -216,8 +216,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DAN_HEURISTIC_HINT =
             new EzLocalizationManager.EzLocalisableString(
-                "MSD→Dan 近似，非 LeoBlack",
-                "MSD→Dan approx, not LeoBlack");
+                "Mina→Dan 近似，非 LeoBlack",
+                "Mina→Dan approx, not LeoBlack");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_TRACK_INSIGHTS =
             new EzLocalizationManager.EzLocalisableString("成绩洞察", "Profile Insights");
@@ -271,14 +271,14 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_INSIGHTS_OLDEST_TOP =
             new EzLocalizationManager.EzLocalisableString("最早 Top Play", "Oldest Top Play");
 
-        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_XXY_PLAY_DISTRIBUTION =
-            new EzLocalizationManager.EzLocalisableString("xxySR 分布", "Plays by xxySR");
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SunnySR_PLAY_DISTRIBUTION =
+            new EzLocalizationManager.EzLocalisableString("sunnySR 分布", "Plays by sunnySR");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_STAR_PLAY_LINE =
             new EzLocalizationManager.EzLocalisableString("星级游玩分布", "Plays by star rating");
 
-        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_XXY_PLAY_LINE =
-            new EzLocalizationManager.EzLocalisableString("xxySR 游玩分布", "xxySR distribution");
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SunnySR_PLAY_LINE =
+            new EzLocalizationManager.EzLocalisableString("sunnySR 游玩分布", "sunnySR distribution");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_SCORE_DRILL =
             new EzLocalizationManager.EzLocalisableString("成绩记录", "Score history");

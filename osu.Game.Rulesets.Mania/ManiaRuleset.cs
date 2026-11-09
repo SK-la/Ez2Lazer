@@ -12,7 +12,6 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Extensions;
@@ -31,7 +30,6 @@ using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Difficulty;
 using osu.Game.Rulesets.Mania.Edit;
 using osu.Game.Rulesets.Mania.Edit.Setup;
-using osu.Game.Rulesets.Mania.EzMania.Analysis;
 using osu.Game.Rulesets.Mania.EzMania.Editor;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
@@ -100,8 +98,6 @@ namespace osu.Game.Rulesets.Mania
         }
 
         public override IBeatmapVerifier CreateBeatmapVerifier() => new ManiaBeatmapVerifier();
-
-        public override IEzAnalysisProvider CreateEzAnalysisProvider() => new EzManiaAnalysisProvider();
 
         public override IEzReplaySession CreateEzReplaySession() => new ManiaReplaySessionService();
 
@@ -330,7 +326,6 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModKrrDPRefiner(),
                         new ManiaModReconcile(),
                         new ManiaUniversalLoopPlayClip(),
-                        new ManiaModSRAdjust(),
                     };
 
                 case ModType.CommunityMod:

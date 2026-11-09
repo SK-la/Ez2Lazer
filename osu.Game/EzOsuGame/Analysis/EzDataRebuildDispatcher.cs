@@ -2,16 +2,20 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using osu.Framework.Logging;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Database;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
+    /// <summary>
+    /// Turns a maintenance action into the background work that performs it. Which store an action touches is
+    /// declared by the catalog, so this class only maps an action onto the queue that owns it.
+    /// </summary>
     public class EzDataRebuildDispatcher
     {
-        private readonly Func<EzRealmMetadataScope, bool, EzDataRebuildDispatchResult>? queueRealm;
+        private readonly Func<EzAnalysisSystem, bool, EzDataRebuildDispatchResult>? queueRealm;
         private readonly Func<bool, EzDataRebuildDispatchResult>? queueSqliteMain;
         private readonly Func<bool, EzDataRebuildDispatchResult>? queueSqliteSongsBranches;
         private readonly Func<bool, EzDataRebuildDispatchResult>? queueRealmScores;
@@ -27,7 +31,7 @@ namespace osu.Game.EzOsuGame.Analysis
         { }
 
         internal EzDataRebuildDispatcher(
-            Func<EzRealmMetadataScope, bool, EzDataRebuildDispatchResult>? queueRealm,
+            Func<EzAnalysisSystem, bool, EzDataRebuildDispatchResult>? queueRealm,
             Func<bool, EzDataRebuildDispatchResult>? queueSqliteMain,
             Func<bool, EzDataRebuildDispatchResult>? queueSqliteSongsBranches,
             Func<bool, EzDataRebuildDispatchResult>? queueRealmScores = null)
@@ -38,26 +42,20 @@ namespace osu.Game.EzOsuGame.Analysis
             this.queueRealmScores = queueRealmScores;
         }
 
-        public bool CanDispatch(EzDataRebuildTarget target)
+        public bool CanDispatch(EzDataRebuildAction action)
         {
-            switch (target)
-            {
-                case EzDataRebuildTarget.RealmTags:
-                case EzDataRebuildTarget.RealmXxy:
-                case EzDataRebuildTarget.RealmPp:
-                case EzDataRebuildTarget.RealmChartMSD:
-                case EzDataRebuildTarget.RealmChartCSIAndDan:
-                case EzDataRebuildTarget.RealmChartSkillChain:
-                case EzDataRebuildTarget.RealmAll:
-                    return queueRealm != null;
+            if (EzDataRebuildScopes.RealmScopeOf(action) != null)
+                return queueRealm != null;
 
-                case EzDataRebuildTarget.RealmScores:
+            switch (action)
+            {
+                case EzDataRebuildAction.RealmScores:
                     return queueRealmScores != null;
 
-                case EzDataRebuildTarget.SqliteMain:
+                case EzDataRebuildAction.SqliteMain:
                     return queueSqliteMain != null;
 
-                case EzDataRebuildTarget.SqliteSongsBranches:
+                case EzDataRebuildAction.SqliteSongsBranches:
                     return queueSqliteSongsBranches != null;
 
                 default:
@@ -65,51 +63,89 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        public EzDataRebuildDispatchResult Execute(EzDataRebuildTarget target, bool forceAll)
+        public EzDataRebuildDispatchResult Execute(EzDataRebuildAction action, bool forceAll)
+            => Execute(new[] { action }, forceAll).FirstFailure;
+
+        /// <summary>
+        /// Dispatches a whole selection. Actions owned by the same queue are merged into one request: the Realm
+        /// metadata queue accepts a scope union, and asking it twice would report the second call as already
+        /// running even though it actually deferred the work.
+        /// </summary>
+        public EzDataRebuildDispatchOutcome Execute(IReadOnlyList<EzDataRebuildAction> actions, bool forceAll)
         {
-            switch (target)
+            var queued = new List<EzDataRebuildAction>(actions.Count);
+            var failures = new List<EzDataRebuildDispatchFailure>();
+
+            var realmGroup = new List<EzDataRebuildAction>();
+            var scoreGroup = new List<EzDataRebuildAction>();
+            var sqliteMainGroup = new List<EzDataRebuildAction>();
+            var songsBranchesGroup = new List<EzDataRebuildAction>();
+            var unknownGroup = new List<EzDataRebuildAction>();
+
+            EzAnalysisSystem realmScope = default;
+
+            foreach (var action in actions)
             {
-                case EzDataRebuildTarget.RealmTags:
-                    return dispatchRealm(EzRealmMetadataScope.Tags, forceAll);
+                if (EzDataRebuildScopes.RealmScopeOf(action) is { } scope)
+                {
+                    realmGroup.Add(action);
+                    realmScope |= scope;
+                    continue;
+                }
 
-                case EzDataRebuildTarget.RealmXxy:
-                    return dispatchRealm(EzRealmMetadataScope.Xxy, forceAll);
+                switch (action)
+                {
+                    case EzDataRebuildAction.RealmScores:
+                        scoreGroup.Add(action);
+                        break;
 
-                case EzDataRebuildTarget.RealmPp:
-                    return dispatchRealm(EzRealmMetadataScope.Pp, forceAll);
+                    case EzDataRebuildAction.SqliteMain:
+                        sqliteMainGroup.Add(action);
+                        break;
 
-                case EzDataRebuildTarget.RealmChartMSD:
-                    return dispatchRealm(EzRealmMetadataScope.Msd, forceAll);
+                    case EzDataRebuildAction.SqliteSongsBranches:
+                        songsBranchesGroup.Add(action);
+                        break;
 
-                case EzDataRebuildTarget.RealmChartCSIAndDan:
-                    // DualPanel chart scene: CSI + ChartDan (Rating stays on MSD).
-                    return dispatchRealm(EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan, forceAll);
-
-                case EzDataRebuildTarget.RealmChartSkillChain:
-                    // Full chart skill chain: MSD → CSI → ChartDan.
-                    return dispatchRealm(
-                        EzRealmMetadataScope.Msd | EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan,
-                        forceAll);
-
-                case EzDataRebuildTarget.RealmAll:
-                    return dispatchRealm(EzRealmMetadataScope.All, forceAll);
-
-                case EzDataRebuildTarget.RealmScores:
-                    return dispatchRealmScores(forceAll);
-
-                case EzDataRebuildTarget.SqliteMain:
-                    return dispatchSqliteMain(forceAll);
-
-                case EzDataRebuildTarget.SqliteSongsBranches:
-                    return dispatchSqliteSongsBranches(forceAll);
-
-                default:
-                    Logger.Log($"Unknown data rebuild target: {target}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                    return EzDataRebuildDispatchResult.UnknownTarget;
+                    default:
+                        unknownGroup.Add(action);
+                        break;
+                }
             }
+
+            void resolve(List<EzDataRebuildAction> group, EzDataRebuildDispatchResult result)
+            {
+                foreach (var action in group)
+                {
+                    if (result == EzDataRebuildDispatchResult.Queued)
+                        queued.Add(action);
+                    else
+                        failures.Add(new EzDataRebuildDispatchFailure(action, result));
+                }
+            }
+
+            if (realmGroup.Count > 0)
+                resolve(realmGroup, dispatchRealm(realmScope, forceAll));
+
+            if (scoreGroup.Count > 0)
+                resolve(scoreGroup, dispatchRealmScores(forceAll));
+
+            if (sqliteMainGroup.Count > 0)
+                resolve(sqliteMainGroup, dispatchSqliteMain(forceAll));
+
+            if (songsBranchesGroup.Count > 0)
+                resolve(songsBranchesGroup, dispatchSqliteSongsBranches(forceAll));
+
+            foreach (var action in unknownGroup)
+            {
+                Logger.Log($"Unknown data rebuild action: {action}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                failures.Add(new EzDataRebuildDispatchFailure(action, EzDataRebuildDispatchResult.UnknownTarget));
+            }
+
+            return new EzDataRebuildDispatchOutcome(queued, failures);
         }
 
-        private EzDataRebuildDispatchResult dispatchRealm(EzRealmMetadataScope scope, bool forceAll)
+        private EzDataRebuildDispatchResult dispatchRealm(EzAnalysisSystem scope, bool forceAll)
         {
             if (queueRealm == null)
             {

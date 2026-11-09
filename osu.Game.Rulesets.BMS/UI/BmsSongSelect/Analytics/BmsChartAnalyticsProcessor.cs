@@ -5,6 +5,9 @@ using System.Text.Json;
 using osu.Framework.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -20,8 +23,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
     /// BMS 的分析 playable 不是 <c>ManiaBeatmap</c>，N 的取法待日后单独处理（不随 EzAnalysisComputation 的 dense 补列一起改）。
     /// </summary>
     public readonly record struct BmsChartAnalyticsResult(
-        double? Pp,
-        double? XxySr,
+        double? PP,
+        double? SunnySR,
         double? AvgKps,
         double? MaxKps,
         double? StarRating,
@@ -54,7 +57,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                                       .Calculate(Array.Empty<Mod>()).StarRating;
 
             double? pp = null;
-            double? xxySr = null;
+            double? sunnySR = null;
             double? avgKps = null;
             double? maxKps = null;
             string? columnJson = null;
@@ -77,12 +80,16 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                 // PP is optional for analytics rows.
             }
 
-            var analysisProvider = new BMSRuleset().CreateEzAnalysisProvider();
-            var request = new EzAnalysisRequest(maniaBeatmap, 1.0, EzAnalysisScope.XxySr | EzAnalysisScope.RulesetSpecificRadarData);
+            int keyCount = EzHoldMetrics.ResolveKeyCount(maniaBeatmap);
 
-            if (analysisProvider.TryCompute(request, cancellationToken, out var analysis)
-                && analysis.TryGetValue(EzAnalysisFields.XXY_SR, out double sr))
-                xxySr = sr;
+            if (EzSSREngine.IsPatternSupported(keyCount))
+            {
+                var chartInput = EzCSIEngine.FromPlayable(maniaBeatmap, cancellationToken);
+                double sr = EzSSREngine.CalculateSR(chartInput, keyCount, maniaBeatmap.Difficulty.OverallDifficulty);
+
+                if (double.IsFinite(sr) && sr >= 0)
+                    sunnySR = sr;
+            }
 
             var (avg, max, kpsList) = OptimizedBeatmapCalculator.GetKpsOptimized(maniaBeatmap);
             avgKps = avg;
@@ -95,7 +102,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
             var columnCounts = OptimizedBeatmapCalculator.GetColumnNoteCountsOptimized(maniaBeatmap);
             columnJson = JsonSerializer.Serialize(columnCounts);
 
-            return new BmsChartAnalyticsResult(pp, xxySr, avgKps, maxKps, star, columnJson, kpsListJson);
+            return new BmsChartAnalyticsResult(pp, sunnySR, avgKps, maxKps, star, columnJson, kpsListJson);
         }
 
         private static void applyChartMetadata(BMSBeatmap bmsBeatmap, BMSChartCache chart)

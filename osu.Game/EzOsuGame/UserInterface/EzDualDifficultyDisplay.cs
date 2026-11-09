@@ -12,13 +12,16 @@ using osuTK;
 namespace osu.Game.EzOsuGame.UserInterface
 {
     /// <summary>
-    /// Horizontal official <see cref="StarRatingDisplay"/> + conditional <see cref="EzDisplaySR"/>.
+    /// Horizontal official <see cref="StarRatingDisplay"/> + conditional <see cref="EzDisplaySR"/> + the official
+    /// <see cref="EzDisplayPP"/>.
     /// </summary>
     public partial class EzDualDifficultyDisplay : FillFlowContainer
     {
         public StarRatingDisplay Official { get; }
 
-        public EzDisplaySR Xxy { get; }
+        public EzDisplaySR SunnySR{ get; }
+
+        public EzDisplayPP Performance { get; }
 
         public EzDualDifficultyDisplay(StarRatingDisplaySize size = StarRatingDisplaySize.Regular, bool animated = false, float scale = 1f)
         {
@@ -33,7 +36,14 @@ namespace osu.Game.EzOsuGame.UserInterface
                 Scale = new Vector2(scale),
             };
 
-            Xxy = new EzDisplaySR(EzManiaSummary.EMPTY, size, animated)
+            SunnySR = new EzDisplaySR(EzManiaSummary.EMPTY, size, animated)
+            {
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
+                Scale = new Vector2(scale),
+            };
+
+            Performance = new EzDisplayPP(size)
             {
                 Anchor = Anchor.CentreLeft,
                 Origin = Anchor.CentreLeft,
@@ -43,49 +53,77 @@ namespace osu.Game.EzOsuGame.UserInterface
             Children = new Drawable[]
             {
                 Official,
-                Xxy,
+                SunnySR,
+                Performance,
             };
 
-            Xxy.Hide();
+            SunnySR.Hide();
+            Performance.Hide();
         }
 
         public void UpdateOfficial(StarDifficulty starDifficulty) => Official.Current.Value = starDifficulty;
 
+        /// <summary>
+        /// Star-only surface (gameplay metadata): the stored Sunny rating.
+        /// </summary>
         public void UpdateFromBeatmap(BeatmapInfo beatmap)
         {
-            if (!ShouldShowXxyDisplay(beatmap))
+            if (!ShouldShowSunnySRDisplay(beatmap))
             {
-                ResetXxy();
+                ResetSunnySR();
                 return;
             }
 
-            Xxy.Show();
-            Xxy.Current.Value = beatmap.ToEzManiaSummaryForDisplay();
+            SunnySR.Show();
+            SunnySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay();
         }
 
+        /// <summary>
+        /// The Sunny star for surfaces without a live analysis pass (gameplay metadata).
+        /// </summary>
         public void ApplyAnalysisMetrics(BeatmapInfo beatmap, in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
         {
-            if (!ShouldShowXxyDisplay(beatmap))
+            if (!ShouldShowSunnySRDisplay(beatmap))
             {
-                ResetXxy();
+                ResetSunnySR();
                 return;
             }
 
-            Xxy.Show();
+            SunnySR.Show();
 
             var summaryForDisplay = metrics.ManiaSummary ?? beatmap.ToEzManiaSummaryForDisplay();
 
-            if (Xxy.Current.Value.XxySr != summaryForDisplay.XxySr)
-                Xxy.Current.Value = summaryForDisplay;
+            if (SunnySR.Current.Value.SunnySR != summaryForDisplay.SunnySR)
+                SunnySR.Current.Value = summaryForDisplay;
         }
 
-        public void ResetXxy()
+        public void ResetSunnySR()
         {
-            Xxy.Current.Value = EzManiaSummary.EMPTY;
-            Xxy.Hide();
+            SunnySR.Current.Value = EzManiaSummary.EMPTY;
+            SunnySR.Hide();
         }
 
-        public static bool ShouldShowXxyDisplay(BeatmapInfo beatmap)
-            => EzAnalysisProviderBridge.HasAnalysisProvider(beatmap.Ruleset) && beatmap.SupportsXxyStarRating();
+        /// <summary>
+        /// Shows the official performance points beside the stars. Null or a negative value hides the pill.
+        /// </summary>
+        public void ApplyPerformance(double? points)
+        {
+            if (points == null || !double.IsFinite(points.Value) || points.Value < 0)
+            {
+                Performance.Current.Value = null;
+                Performance.Hide();
+                return;
+            }
+
+            Performance.Current.Value = points.Value;
+            Performance.Show();
+        }
+
+        /// <summary>
+        /// Whether this chart has an Ez star to show beside the official one. Any ruleset whose selected system
+        /// carries a skill vector does; the analysis provider only decides the Sunny rating, not the pill's presence.
+        /// </summary>
+        public static bool ShouldShowSunnySRDisplay(BeatmapInfo beatmap)
+            => EzRulesetReadout.Selected(beatmap.Ruleset.OnlineID)?.SkillRating != EzAnalysisSystem.None;
     }
 }

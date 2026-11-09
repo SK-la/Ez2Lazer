@@ -16,7 +16,7 @@ using osuTK;
 namespace osu.Game.EzOsuGame.LocalProfile
 {
     /// <summary>
-    /// Horizontal rounded bar list for bucketed play counts (official star, xxy SR, etc.).
+    /// Horizontal rounded bar list for bucketed play counts (official star, SunnySR, etc.).
     /// </summary>
     public partial class EzLocalProfileBucketBars : FillFlowContainer
     {
@@ -50,7 +50,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 stars.Select(s => (s.StarBucket, s.Count)),
                 bucket => $"{bucket}★–{bucket + 1}★");
 
-        public static EzLocalProfileBucketBars FromXxyPlayCounts(IEnumerable<EzLocalProfileXxyPlayCount> plays) =>
+        public static EzLocalProfileBucketBars FromSunnySRPlayCounts(IEnumerable<EzLocalProfileSunnySRPlayCount> plays) =>
             new EzLocalProfileBucketBars(
                 plays.Select(s => (s.StarBucket, s.Count)),
                 bucket => $"{bucket}–{bucket + 1} SR");

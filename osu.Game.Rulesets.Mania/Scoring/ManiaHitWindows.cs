@@ -182,7 +182,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             ActiveJudgeMode = judgeModeOverride ?? GlobalConfigStore.EzConfig.Get<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
             helper.JudgeMode = ActiveJudgeMode;
-            updateWindows();
         }
 
         /// <summary>
@@ -260,13 +259,48 @@ namespace osu.Game.Rulesets.Mania.Scoring
         }
 
         /// <summary>不对称 miss 早窗（ms）；AutoMissGate / ShouldDefer 热路径用，勿每帧调 helper。</summary>
-        public double MissEarlyWindow { get; private set; }
+        public double MissEarlyWindow
+        {
+            get
+            {
+                ensureWindows();
+                return missEarlyWindow;
+            }
+        }
 
         /// <summary>不对称 miss 晚窗（ms）。</summary>
-        public double MissLateWindow { get; private set; }
+        public double MissLateWindow
+        {
+            get
+            {
+                ensureWindows();
+                return missLateWindow;
+            }
+        }
+
+        private double missEarlyWindow;
+        private double missLateWindow;
+
+        /// <summary>
+        /// Whether the windows still have to be derived from the settings they currently read.
+        /// </summary>
+        /// <remarks>
+        /// Conversion creates one of these per hit object and applies the difficulty immediately afterwards, so
+        /// deriving on construction made every hit object derive its windows twice. Deriving on first read keeps that
+        /// to once without any caller having to know.
+        /// </remarks>
+        private bool windowsPending = true;
+
+        private void ensureWindows()
+        {
+            if (windowsPending)
+                updateWindows();
+        }
 
         private void updateWindows()
         {
+            windowsPending = false;
+
             if (setJudgeMode() && !HasReset)
             {
                 perfect = perfectRange;
@@ -318,12 +352,14 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private void refreshMissDirectionWindows()
         {
             // 与 WindowFor(Miss, isEarly) 语义一致，但在 update 时烘焙，避免每帧进 helper。
-            MissEarlyWindow = helper.WindowFor(HitResult.Miss, true);
-            MissLateWindow = helper.WindowFor(HitResult.Miss, false);
+            missEarlyWindow = helper.WindowFor(HitResult.Miss, true);
+            missLateWindow = helper.WindowFor(HitResult.Miss, false);
         }
 
         public override double WindowFor(HitResult result)
         {
+            ensureWindows();
+
             if (modOverride is { } mo)
             {
                 return result switch

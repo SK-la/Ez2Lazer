@@ -16,6 +16,7 @@ using osu.Framework.Layout;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -125,8 +126,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 return;
             }
 
-            var rc = skillProvider.GetDanClears(username, keys, EzDanSide.Rc.ToId(), EzDanAlgorithm.VERSION);
-            var ln = skillProvider.GetDanClears(username, keys, EzDanSide.Ln.ToId(), EzDanAlgorithm.VERSION);
+            var rc = skillProvider.GetDanClears(username, keys, EzDanSide.Rc.ToId(), EzDanEngine.VERSION);
+            var ln = skillProvider.GetDanClears(username, keys, EzDanSide.Ln.ToId(), EzDanEngine.VERSION);
 
             if (rc.Count == 0 && ln.Count == 0)
             {
@@ -276,7 +277,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 this.title = title;
                 this.clearCount = clearCount;
                 this.accent = accent;
-                this.RowsFlow = rows;
+                RowsFlow = rows;
 
                 RelativeSizeAxes = Axes.X;
                 AutoSizeAxes = Axes.Y;

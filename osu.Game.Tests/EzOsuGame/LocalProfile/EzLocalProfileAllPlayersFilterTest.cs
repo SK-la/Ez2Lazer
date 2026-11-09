@@ -2,11 +2,13 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Game.EzOsuGame.Skills.Mina;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Scoring;
 
 namespace osu.Game.Tests.EzOsuGame.LocalProfile
@@ -137,7 +139,7 @@ namespace osu.Game.Tests.EzOsuGame.LocalProfile
                 CreditedDan = dan,
                 Accuracy = 0.96,
                 ScoredAt = DateTimeOffset.UtcNow,
-                AlgorithmVersion = EzDanAlgorithm.VERSION,
+                    AlgorithmVersion = EzDanEngine.VERSION,
             };
 
         private static EzAxisPlayEvidenceRow createAxisPlay(string username, string skillId, double value)
@@ -151,7 +153,7 @@ namespace osu.Game.Tests.EzOsuGame.LocalProfile
                 Accuracy = 0.96,
                 Rate = 1,
                 ScoredAt = DateTimeOffset.UtcNow,
-                AlgorithmVersion = EzManiaSkillAlgorithm.VERSION,
+                AlgorithmVersion = EzMinaEngine.VERSION,
             };
     }
 }

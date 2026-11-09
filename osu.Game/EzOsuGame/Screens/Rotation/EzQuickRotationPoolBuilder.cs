@@ -40,7 +40,7 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
                                  .Where(b => b.AllowGameplayWithRuleset(constraints.Ruleset, allowConversion: false))
                                  .Where(b => matchesCollection(b, constraints.CollectionMd5Hashes))
                                  .Where(b => matchesStarMin(b, constraints))
-                                 .Where(b => matchesKeyCount(b, constraints))
+                                 .Where(b => MatchesKeyCount(b, constraints))
                                  .Distinct()
                                  .ToList();
         }
@@ -67,14 +67,14 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
             if (constraints.StarRatingMin is not double min)
                 return true;
 
-            double star = EzQuickRotationDifficultyHelper.UsesXxyStarRating(constraints.Ruleset)
-                ? beatmap.GetPersistedXxyStarRating() ?? beatmap.StarRating
+            double star = EzQuickRotationDifficultyHelper.UsesSunnyStarRating(constraints.Ruleset)
+                ? beatmap.GetPersistedSunnyStarRating() ?? beatmap.StarRating
                 : beatmap.StarRating;
 
             return star >= min;
         }
 
-        internal static bool matchesKeyCount(BeatmapInfo beatmap, EzQuickRotationPoolConstraints constraints)
+        internal static bool MatchesKeyCount(BeatmapInfo beatmap, EzQuickRotationPoolConstraints constraints)
         {
             if (constraints.Ruleset.ShortName != "mania")
                 return true;

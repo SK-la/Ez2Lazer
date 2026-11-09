@@ -312,8 +312,7 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString SCREENSHOT_COPIED_TO_CLIPBOARD =
             new EzLocalizationManager.EzLocalisableString("截图已复制到剪贴板！", "Screenshot copied to clipboard!");
 
-        public static LocalisableString ScreenshotSaved(string filename) =>
-            new EzLocalizationManager.EzLocalisableString($"截图已保存！点此处查看：\n{filename}", $"Screenshot saved! Click to view.\n{filename}");
+        public static LocalisableString ScreenshotSaved(string filename) => new EzLocalizationManager.EzLocalisableString($"截图已保存！点此处查看：\n{filename}", $"Screenshot saved! Click to view.\n{filename}");
 
         public static readonly EzLocalizationManager.EzLocalisableString STORYBOARD_VIDEO_AUTO_SIZE =
             new EzLocalizationManager.EzLocalisableString("故事板视频自适应填满", "Storyboard video auto-size to fill");
@@ -323,19 +322,22 @@ namespace osu.Game.EzOsuGame.Localization
             "When enabled, storyboard videos will automatically adjust their size to fill the entire storyboard area, "
             + "which may crop some of the video but will better adapt to different resolutions and screen ratios.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SECTION_HEADER =
+            new EzLocalizationManager.EzLocalisableString("Ez 分析", "Ez Analysis");
+
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_REC_ENABLED =
             new EzLocalizationManager.EzLocalisableString("启用 Ez 分析即时计算", "Enable Ez analysis on-demand computation");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_REC_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "控制 Ez SQLite 体系内指标在选歌时是否按需即时计算："
             + "\n· 主库：NoMod 的 kps/KPC（及 mania 列统计）缺失时 debounce 后补算；"
-            + "\n· 有 Mod：按当前 Mod 即时计算 kps/xxy 等（无匹配分支快照时）；"
+            + "\n· 有 Mod：按当前 Mod 即时计算 kps/ssr等（无匹配分支快照时）；"
             + "\n· 分支库：仍读取已激活分支的预生成快照，本开关不替代分支构建。"
             + "\n关闭时仅读已落盘 SQLite 数据，不触发选歌实时计算。"
             + "\n不影响 Realm 元数据回填；Panel PP 随官方星级缓存（BeatmapDifficultyCache），与开关无关。",
             "Controls whether Ez SQLite metrics are computed on demand during song select:"
             + "\n· Main DB: backfill missing NoMod kps/KPC (and mania column stats) after debounce;"
-            + "\n· With mods: compute kps/xxy live for the current mod set when no matching branch snapshot exists;"
+            + "\n· With mods: compute kps/ssrlive for the current mod set when no matching branch snapshot exists;"
             + "\n· Branch DB: still reads precomputed snapshots from the active branch; this switch does not replace branch builds."
             + "\nWhen disabled, only stored SQLite values are read; no live song-select computation."
             + "\nDoes not affect Realm metadata backfill; panel PP follows the official star cache (BeatmapDifficultyCache) and is not gated by this switch.");
@@ -344,48 +346,63 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("启用 Ez 分析 SQLite", "Enable Ez analysis SQLite");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SQLITE_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "启用 Ez 分析 SQLite 主库与分支曲库的读写（kps/KPC、分支 xxy/PP 快照等）。"
+            "启用 Ez 分析 SQLite 主库与分支曲库的读写（kps/KPC、分支 ssr/PP 快照等）。"
             + "\n关闭后不加载、不写入上述本地缓存。"
             + "\n自动预热仅在缺少当前版本库或需 schema 升级时触发；已有匹配库时请用下方维护控件手动补算。"
             + "\n即时计算行为由「Ez 分析即时计算」开关单独控制。",
-            "Enables read/write for the Ez analysis main SQLite database and songs branch libraries (kps/KPC, branch xxy/PP snapshots, etc.)."
+            "Enables read/write for the Ez analysis main SQLite database and songs branch libraries (kps/KPC, branch ssr/PP snapshots, etc.)."
             + "\nWhen disabled, stored local caches are neither loaded nor written."
             + "\nAuto-warmup runs only when the current database is missing or needs a schema upgrade; use maintenance controls below when a matching file already exists."
             + "\nOn-demand computation is controlled separately by \"Enable Ez analysis on-demand computation\".");
 
-        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_TARGET =
-            new EzLocalizationManager.EzLocalisableString("数据维护目标", "Data maintenance target");
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_OPEN =
+            new EzLocalizationManager.EzLocalisableString("数据维护…", "Data maintenance...");
 
-        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_TARGET_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "选择要维护的数据范围。SQLite 在已有匹配的最新版文件时不会自动预热；Realm 缺失项仍会在启动时自动补算。"
-            + "\n成绩全量重算：有 replay 的 mania 成绩走 Session 原始环境重算（与选歌右键一致）；stable 旧成绩无 replay 时重走官方转换。"
-            + "\n「尝试补算」仅处理 mania 成绩；「完全重算」处理当前已加载的规则集（跳过未加载程序集的历史成绩）。"
-            + "\n技能场景：Realm MSD = 4K 雷达黄层 + DualPanel Rating + Dan 供料；"
-            + "DualPanel谱面 = CSI 分格 + ChartDan（不含 Rating）；"
-            + "谱面技能链 = MSD+CSI+Dan 一键。雷达绿层（玩家 SSR/图案）只走 Local Profile 重算。",
-            "Choose which data to maintain. SQLite is not auto-warmed when a matching current database exists; Realm missing values are still filled at startup."
-            + "\nFull score recalculation: mania scores with replays are recalculated via Session in their stored environment (same as the song select context menu); legacy scores without replays are re-converted officially."
-            + "\n\"Backfill\" processes mania scores only; \"Force rebuild\" processes currently loaded (Available) rulesets and skips scores for unloaded assemblies."
-            + "\nSkill scenes: Realm MSD = 4K radar yellow + DualPanel Rating + Dan feed; "
-            + "DualPanel chart = CSI slots + ChartDan (no Rating); "
-            + "chart skill chain = MSD+CSI+Dan. Radar green (player SSR/patterns) is Local Profile recalc only.");
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_OPEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "打开数据维护面板：Realm 侧与 SQLite 侧各自成链，链内相邻项存在依赖，链间互不影响。"
+            + "\n选中一项后执行「补算缺失」或「完全重算」；大库可能耗时较长，请留意右上角进度通知。",
+            "Opens the data maintenance panel: Realm and SQLite each form a chain, adjacent nodes in a chain depend on each other, chains do not."
+            + "\nSelect an item, then run \"Backfill missing\" or \"Force rebuild\". Large libraries may take a while; watch the progress notification in the top-right corner.");
 
-        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_EXECUTE =
-            new EzLocalizationManager.EzLocalisableString("执行", "Execute");
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_SUBTITLE = new EzLocalizationManager.EzLocalisableString(
+            "上下相邻的两项构成依赖链：紧挨着 = 后者读前者的结果；间距大 = 可独立执行。",
+            "Adjacent nodes form a dependency chain: tight spacing = the lower one reads the upper one; wide spacing = independent.");
 
-        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_EXECUTE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "确认后可选补算缺失或完全重算。大库可能耗时较长，请留意右上角进度通知。",
-            "Choose backfill missing or force full rebuild. Large libraries may take a while; watch the progress notification in the top-right corner.");
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_SIDE_REALM =
+            new EzLocalizationManager.EzLocalisableString("Realm 侧", "Realm");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_SIDE_SQLITE =
+            new EzLocalizationManager.EzLocalisableString("SQLite 侧", "SQLite");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_NOTHING_SELECTED =
+            new EzLocalizationManager.EzLocalisableString("未选择项目", "Nothing selected");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_SELECTED =
+            new EzLocalizationManager.EzLocalisableString("已选择：{0}", "Selected: {0}");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_SELECTED_MULTIPLE =
+            new EzLocalizationManager.EzLocalisableString("已选择 {0} 项：{1}", "Selected {0} items: {1}");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DEPENDS_ON =
+            new EzLocalizationManager.EzLocalisableString(
+                "「{0}」读取「{1}」的结果。依赖项不重算也可以；不确定时，可一并选中「{1}」。",
+                "\"{0}\" reads results from \"{1}\". Recomputing the dependency is optional; select \"{1}\" as well if unsure.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_QUEUED =
+            new EzLocalizationManager.EzLocalisableString("已排队：{0}", "Queued: {0}");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_BACKFILL =
+            new EzLocalizationManager.EzLocalisableString("补算缺失", "Backfill missing");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_CLOSE =
+            new EzLocalizationManager.EzLocalisableString("关闭", "Close");
 
         public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_HEADER =
             new EzLocalizationManager.EzLocalisableString("数据维护", "Data maintenance");
 
         public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_BODY = new EzLocalizationManager.EzLocalisableString(
-            "即将对所选目标执行后台维护。\n补算缺失仅处理未写入的数据；完全重算会先清除已有结果再全部重算。",
-            "Background maintenance will run for the selected target.\nBackfill missing only fills gaps; force rebuild clears existing results first.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_BACKFILL =
-            new EzLocalizationManager.EzLocalisableString("尝试补算", "Backfill missing");
+            "{0}\n完全重算会先清除已有结果再全部重算，确认继续？",
+            "{0}\nForce rebuild clears existing results before recomputing everything. Continue?");
 
         public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_FORCE =
             new EzLocalizationManager.EzLocalisableString("完全重算", "Force rebuild");
@@ -407,15 +424,15 @@ namespace osu.Game.EzOsuGame.Localization
             "Cannot open the confirmation dialog. Try again later.");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL =
-            new EzLocalizationManager.EzLocalisableString("补算 Realm 元数据（Tag / XxySR / PP）", "Backfill Realm metadata (Tag / XxySR / PP)");
+            new EzLocalizationManager.EzLocalisableString("补算 Realm 元数据（Tag / SunnySR / PP）", "Backfill Realm metadata (Tag / SunnySR / PP)");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_BUTTON =
             new EzLocalizationManager.EzLocalisableString("立即补算", "Backfill now");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "在后台补算选歌面板所需的 Realm 字段：谱面 Tag（视频/Storyboard）、Xxy 星级、PP。"
+            "在后台补算选歌面板所需的 Realm 字段：谱面 Tag（视频/Storyboard）、SunnySR 星级、PP。"
             + "\n启动时也会自动执行；若看不到进度通知，可点此手动触发。",
-            "Backfill Realm fields used by song select: beatmap tags (video/storyboard), Xxy star rating, and PP."
+            "Backfill Realm fields used by song select: beatmap tags (video/storyboard), SunnySR star rating, and PP."
             + "\nAlso runs automatically at startup; use this if progress notifications did not appear.");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_FORCE =
@@ -425,32 +442,34 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("强制重算", "Force recalculate");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_FORCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "先将所有谱面的 Tag / XxySR / PP 标记为未计算，再执行完整补算。"
+            "先将所有谱面的 Tag / SunnySR / PP 标记为未计算，再执行完整补算。"
             + "\n谱面较多时耗时较长，请留意右上角进度通知。",
-            "Marks all beatmaps' Tag / XxySR / PP as uncomputed, then runs a full backfill."
+            "Marks all beatmaps' Tag / SunnySR / PP as uncomputed, then runs a full backfill."
             + "\nMay take a long time for large libraries; watch the progress notification in the top-right corner.");
 
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS =
-            new EzLocalizationManager.EzLocalisableString("技能数据状态", "Skill data status");
+            new EzLocalizationManager.EzLocalisableString("分析数据状态", "Analysis data status");
 
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_REFRESH =
-            new EzLocalizationManager.EzLocalisableString("刷新技能数据状态", "Refresh skill data status");
+            new EzLocalizationManager.EzLocalisableString("刷新分析数据状态", "Refresh analysis data status");
 
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_REFRESH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "重新统计谱面技能链（MSD → CSI → Dan）当前版本的覆盖情况并刷新状态标记。"
-            + "\n打开设置页时会自动统计一次；补算完成后可用此按钮再查。大库可能耗时数秒。"
+            "按规则集重新统计各分析系统（官方 / Sunny / PP+ / Mina / CSI / Dan）已落盘的覆盖情况并刷新状态标记。"
+            + "\n补算完成后可用此按钮再查；大库可能耗时数秒。"
             + "\n就绪 = 已是当前版本；不可评分 = 该谱面确定算不出，已结算不再重试；"
             + "过期 = 旧版本留下的行（改过算法后会出现）；缺失 = 还没算过。"
-            + "\n健康 = 过期 + 缺失；三项独立统计，上游换版会使其下游整体变为过期。"
-            + "\n玩家技能 = 玩家链（成绩 → SSR/Dan），没有组合版本号：一局结算后其技能行会被标为过期，"
+            + "\n待补算 = 过期 + 缺失。各系统独立统计，上游换版会使其下游整体变为过期。"
+            + "\n没有版本号列的系统（官方星级 / PP 等）只区分已填 / 未填。"
+            + "\n玩家技能 = 玩家链（成绩 → SunnySR/Dan），没有组合版本号：一局结算后其技能行会被标为过期，"
             + "由手动「计算本地成绩」（及图表链回折）刷新；这里显示还有多少玩家待刷新。"
             + "\n蓝色 = 已对齐；橙色 = 仍有待补算；红色 = 统计失败。",
-            "Re-measures chart-skill-chain coverage (MSD -> CSI -> Dan) at the current revision and refreshes the status marker."
-            + "\nIt is also measured automatically when the settings panel opens; use this button only to re-check after a backfill. May take a few seconds on a large library."
+            "Re-measures stored coverage of every analysis system (official / Sunny / PP+ / Mina / CSI / Dan) per ruleset."
+            + "\nUse this button to re-check after a backfill. May take a few seconds on a large library."
             + "\nready = already at the current revision; unrateable = deterministically unratable and settled (no longer retried);"
             + " stale = a row left by an older revision (appears after an algorithm change); missing = never computed."
-            + "\nPending = stale + missing. The three facets are counted independently; bumping an upstream one turns its downstream facets stale."
-            + "\nPlayer skills = the player chain (plays -> SSR/Dan), which has no composed revision: a settled play flags the player's"
+            + "\nPending = stale + missing. Each system is counted independently; bumping an upstream one turns its downstream facets stale."
+            + "\nSystems with no revision column (official star / pp, ...) only distinguish filled from unfilled."
+            + "\nPlayer skills = the player chain (plays -> SunnySR/Dan), which has no composed revision: a settled play flags the player's"
             + " rows and the manual compute / chart-chain follow-up refreshes them. This shows how many players are still waiting."
             + "\nBlue = in sync; orange = work still pending; red = measurement failed.");
 
@@ -496,11 +515,31 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_WRITTEN_AT =
             new EzLocalizationManager.EzLocalisableString("值写于", "values written");
 
+        public static readonly EzLocalizationManager.EzLocalisableString PANEL_VARIANT_OFFICIAL =
+            new EzLocalizationManager.EzLocalisableString("官方", "Official");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PANEL_VARIANT_MINA =
+            new EzLocalizationManager.EzLocalisableString("Mina", "Mina");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PANEL_VARIANT_SUNNY =
+            new EzLocalizationManager.EzLocalisableString("Sunny", "Sunny");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PANEL_VARIANT_PPP =
+            new EzLocalizationManager.EzLocalisableString("PP+", "PP+");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ANALYSIS_SYSTEM_SELECTION =
+            new EzLocalizationManager.EzLocalisableString("分析算法", "Analysis system");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ANALYSIS_SYSTEM_SELECTION_TOOLTIP =
+            new EzLocalizationManager.EzLocalisableString(
+                "每个规则集各自选用一套分析系统。选歌界面的排序、分组与筛选按这里的选择读取同一套基线。",
+                "Each ruleset picks its own analysis system. Sorting, grouping and filtering on song select read that baseline.");
+
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_WAITING_CHART =
             new EzLocalizationManager.EzLocalisableString("等图表链", "waiting on chart chain");
 
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_WAITING_MSD =
-            new EzLocalizationManager.EzLocalisableString("其中卡在 MSD", "of which stuck on MSD");
+            new EzLocalizationManager.EzLocalisableString("其中卡在 Mina", "of which stuck on Mina");
 
         #region 机制类
 
@@ -529,7 +568,8 @@ namespace osu.Game.EzOsuGame.Localization
             "Directly correct the offset value of input results without changing the timeline of audio and beatmap."
             + "\nCan be adjusted for all input delays. (Testing feature! Lock score upload)");
 
-        public static readonly EzLocalizationManager.EzLocalisableString HIT_OBJECT_LIFETIME_USES_OWN_TIME = new EzLocalizationManager.EzLocalisableString("以物件自身时间结束生命周期", "Use hit object's own time for lifetime");
+        public static readonly EzLocalizationManager.EzLocalisableString HIT_OBJECT_LIFETIME_USES_OWN_TIME =
+            new EzLocalizationManager.EzLocalisableString("以物件自身时间结束生命周期", "Use hit object's own time for lifetime");
 
         public static readonly EzLocalizationManager.EzLocalisableString HIT_OBJECT_LIFETIME_USES_OWN_TIME_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "开启后，HitObject 的命中后状态变换与生命周期结束将以物件自身时间为基准，而不是以实际交互判定时间为基准。"
@@ -841,10 +881,7 @@ namespace osu.Game.EzOsuGame.Localization
 
         #endregion
 
-        #region Ez 技能
-
-        public static readonly EzLocalizationManager.EzLocalisableString EZ_SKILL_SECTION_HEADER =
-            new EzLocalizationManager.EzLocalisableString("Ez 技能", "Ez Skill");
+        #region Ez 分析
 
         public static readonly LocalisableString SKILL_LN_CHART_MIN_HOLD_OBJECTS = new EzLocalizationManager.EzLocalisableString(
             "LN 谱面最小 Hold 数",
@@ -864,6 +901,56 @@ namespace osu.Game.EzOsuGame.Localization
             + "\nLower = more hold-heavy but low-ratio charts get an LN half; higher = the ratio line dominates and low-ratio charts fall back to RC."
             + "\nAffects: Ez ChartDan / DualPanel, song-select and HUD radar LN labels, and the persisted ChartDan LN half in Realm."
             + "\nAlready-persisted ChartDan / CSI is not retroactively updated; rebuild (Data rebuild -> Realm chart skill chain) to apply.");
+
+        public static readonly LocalisableString SunnySR_RESCALE_THRESHOLD = new EzLocalizationManager.EzLocalisableString(
+            "SunnySR 重缩放阈值",
+            "SunnySR rescale threshold");
+
+        public static readonly LocalisableString SunnySR_RESCALE_THRESHOLD_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "SunnySR（ssr难度）超过这个星级后，超出部分的膨胀速度被压到 1/1.2。"
+            + "\n这是对算法的永久修订，不是一次性试验：改它不会让本地库换版本，但会标记为待重算——"
+            + "下次启动自动对全库重算 SunnySR，以及依赖它的段位数据。改动本身不会立刻重算；退出游戏时会提示。"
+            + "\n调高 → 高星谱面不再被压那么多，值偏高；调低 → 高星谱面被压得更狠，值偏低。低于本阈值的中低星谱面不受影响。",
+            "Above this star rating the SunnySR (ssrdifficulty) inflation is compressed to 1/1.2 of the excess."
+            + "\nThis is a permanent revision of the algorithm, not a one-off experiment: it does not change the local database version, "
+            + "but it does mark the stored ratings as out of date - the next launch recomputes SunnySR for the whole library, "
+            + "along with the dan data derived from it. Nothing is recomputed while you keep playing; quitting shows a prompt."
+            + "\nRaise it and high-star charts are compressed less (values go up); lower it and they are compressed more. Charts below the threshold are unaffected.");
+
+        public static readonly LocalisableString SunnySR_LN_MULTIPLIER = new EzLocalizationManager.EzLocalisableString(
+            "SunnySR LN 因子",
+            "SunnySR LN multiplier");
+
+        public static readonly LocalisableString SunnySR_LN_MULTIPLIER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "SunnySR（ssr难度）里长条积分的权重系数，决定 LN 对难度的贡献。"
+            + "\n与重缩放阈值一样是对算法的永久修订：不换库版本，但标记为待重算，下次启动自动全库重算 SunnySR 与依赖它的段位数据；"
+            + "改动本身不会立刻重算，退出游戏时会提示。"
+            + "\n调高 → LN 谱面更难、值偏高；调低 → LN 谱面更易。纯 rice 谱面不受影响。"
+            + "\n建议：7K 以下用 6 左右；10K 可降到 4.5–5.5。",
+            "Weight of the long-note integral in the SunnySR (ssrdifficulty); it decides how much holds contribute."
+            + "\nLike the rescale threshold this is a permanent revision: no database version change, but the stored ratings are marked out of date, "
+            + "and the next launch recomputes SunnySR for the whole library along with the dan data derived from it. "
+            + "Nothing is recomputed while you keep playing; quitting shows a prompt."
+            + "\nRaise it and LN charts rate harder (values go up); lower it and they rate easier. Pure rice charts are unaffected."
+            + "\nGuidance: around 6 below 7K; 4.5-5.5 for 10K.");
+
+        public static readonly LocalisableString SSR_TUNING_CHANGED_EXIT_HEADER = new EzLocalizationManager.EzLocalisableString(
+            "SSR 算法参数已修改",
+            "SunnySR settings changed");
+
+        public static readonly LocalisableString SSR_TUNING_CHANGED_EXIT_BODY = new EzLocalizationManager.EzLocalisableString(
+            "退出后，下次启动会自动对全库重算 SunnySR，以及所有依赖它的段位数据。"
+            + "\n取消退出可以回到设置把参数改回原值；改回后不会再排入重算。",
+            "After quitting, the next launch recomputes SunnySR for the whole library, along with every dan value derived from it."
+            + "\nCancel the exit to go back and restore the previous values; doing so removes the pending recompute.");
+
+        public static readonly LocalisableString SSR_TUNING_CHANGED_EXIT_CONFIRM = new EzLocalizationManager.EzLocalisableString(
+            "仍然退出",
+            "Quit anyway");
+
+        public static readonly LocalisableString SSR_TUNING_CHANGED_EXIT_CANCEL = new EzLocalizationManager.EzLocalisableString(
+            "返回设置",
+            "Back to settings");
 
         #endregion
     }

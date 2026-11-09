@@ -3,9 +3,23 @@
 
 using System;
 using System.Collections.Generic;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
+    /// <summary>
+    /// One system's star rating and perfect-play pp for a chart, as a single pass produced them.
+    /// </summary>
+    /// <remarks>
+    /// A rating is one number per field, not a vector: it is carried here rather than as an axis so a consumer
+    /// never has to know a storage key to read a star.
+    /// </remarks>
+    public readonly record struct EzScalarRating(double? StarRating, double? PerformancePoints)
+    {
+        public bool IsEmpty => StarRating == null && PerformancePoints == null;
+    }
+
     /// <summary>
     /// 通用分析概要。
     /// 当前仅包含所有规则集都可消费的 KPS 相关数据。
@@ -51,12 +65,12 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public static readonly EzManiaSummary EMPTY = new EzManiaSummary(null, null, null);
 
-        public double? XxySr { get; }
+        public double? SunnySR { get; }
 
         // TODO: 仅预留字段。当前阶段不参与计算、不参与持久化版本升级，也不接入 UI / 本地化。
-        public double? XxySrFullLN4 { get; }
+        public double? SunnySRFullLN4 { get; }
 
-        public double? XxySrFullLN8 { get; }
+        public double? SunnySRFullLN8 { get; }
 
         /// <summary>
         /// Total number of hit objects in each column (includes both regular notes and LNs).
@@ -76,14 +90,14 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         public bool HasHoldNoteCounts => holdNoteCounts != null;
 
-        public EzManiaSummary(Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts, double? xxySr,
-                              double? xxySrFullLN4 = null, double? xxySrFullLN8 = null)
+        public EzManiaSummary(Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts, double? sunnySR,
+                              double? sunnySRFullLN4 = null, double? sunnySRFullLN8 = null)
         {
             this.columnCounts = columnCounts;
             this.holdNoteCounts = holdNoteCounts;
-            XxySr = xxySr;
-            XxySrFullLN4 = xxySrFullLN4;
-            XxySrFullLN8 = xxySrFullLN8;
+            SunnySR = sunnySR;
+            SunnySRFullLN4 = sunnySRFullLN4;
+            SunnySRFullLN8 = sunnySRFullLN8;
         }
     }
 
@@ -109,28 +123,89 @@ namespace osu.Game.EzOsuGame.Analysis
 
     public readonly record struct EzAnalysisResult
     {
+        private static readonly IReadOnlyDictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>> no_axes
+            = new Dictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>();
+
+        private static readonly IReadOnlyDictionary<string, double> no_axis_values
+            = new Dictionary<string, double>(StringComparer.Ordinal);
+
+        private static readonly IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating> no_scalars
+            = new Dictionary<EzAnalysisSystem, EzScalarRating>();
+
         public readonly double AverageKps;
         public readonly double MaxKps;
-        public readonly double? Pp;
         public readonly KpsSummary? CommonSummary;
         public readonly EzManiaSummary? ManiaSummary;
         public readonly EzBeatmapTagSummary? TagSummary;
 
-        public EzAnalysisResult(KpsSummary commonSummary, double? pp = null, EzManiaSummary? maniaSummary = null, EzBeatmapTagSummary? tagSummary = null)
+        private readonly IReadOnlyDictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>? axes;
+        private readonly IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating>? scalars;
+
+        /// <summary>
+        /// Axis values grouped by the system that emitted them, keyed by bare axis id.
+        /// </summary>
+        /// <remarks>
+        /// A system missing from this table did not run for this chart; one present with no entries ran
+        /// and had nothing to say. Never null: a <c>default</c> result (a bindable's pre-computation value) has no
+        /// table at all, and consumers must read "no axes" rather than crash on it.
+        /// <para>
+        /// Only vectors live here. A star rating and a pp number are single numbers, not axes, and are read through
+        /// <see cref="RatingOf"/>.
+        /// </para>
+        /// </remarks>
+        public IReadOnlyDictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>> Axes => axes ?? no_axes;
+
+        /// <summary>Star rating and pp per system, for the systems this pass produced them for.</summary>
+        public IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating> Ratings => scalars ?? no_scalars;
+
+        /// <summary>Dan estimates for the sides this chart can be rated on.</summary>
+        public readonly EzDanSet? Dan;
+
+        /// <summary>
+        /// Structure view of the chart for the current mods, or null when this pass measured none.
+        /// </summary>
+        public readonly EzRadarChartData<string>? KeyPatternRadar;
+
+        /// <summary>
+        /// Sunny pattern breakdown for the current mods, or null when the chart has no Sunny rating.
+        /// </summary>
+        public readonly EzRadarChartData<string>? SsrPatternRadar;
+
+        /// <summary>
+        /// Typed structure summary for the same pass that produced <see cref="Axes"/>' CSI values, or null when the
+        /// ruleset has no structure analysis. Consumers read this instead of running the structure pass again.
+        /// </summary>
+        public readonly EzChartSkillInfo? ChartSkillInfo;
+
+        public EzAnalysisResult(KpsSummary commonSummary, EzManiaSummary? maniaSummary = null, EzBeatmapTagSummary? tagSummary = null,
+                                IReadOnlyDictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>? axes = null,
+                                IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating>? ratings = null,
+                                EzDanSet? dan = null, EzRadarChartData<string>? keyPatternRadar = null,
+                                EzRadarChartData<string>? ssrPatternRadar = null, EzChartSkillInfo? chartSkillInfo = null)
         {
             AverageKps = double.IsFinite(commonSummary.AverageKps) ? commonSummary.AverageKps : 0;
             MaxKps = double.IsFinite(commonSummary.MaxKps) ? commonSummary.MaxKps : 0;
-            Pp = pp is double value && double.IsFinite(value) ? value : null;
             CommonSummary = commonSummary;
             ManiaSummary = maniaSummary;
             TagSummary = tagSummary;
+            this.axes = axes;
+            scalars = ratings;
+            Dan = dan;
+            KeyPatternRadar = keyPatternRadar;
+            SsrPatternRadar = ssrPatternRadar;
+            ChartSkillInfo = chartSkillInfo;
         }
 
         public IReadOnlyList<double> KpsList => CommonSummary?.KpsList ?? Array.Empty<double>();
 
-        public EzAnalysisResult WithTagSummary(EzBeatmapTagSummary? tagSummary)
-            => CommonSummary is KpsSummary commonSummary
-                ? new EzAnalysisResult(commonSummary, Pp, ManiaSummary, tagSummary)
-                : this;
+        /// <summary>Axis values of one system, empty when it did not run.</summary>
+        public IReadOnlyDictionary<string, double> AxesOf(EzAnalysisSystem system) => Axes.GetValueOrDefault(system, no_axis_values);
+
+        /// <summary>Star rating and pp of one system, absent when this pass produced neither.</summary>
+        public EzScalarRating RatingOf(EzAnalysisSystem system) => Ratings.GetValueOrDefault(system);
+
+        public EzAnalysisResult WithTagSummary(EzBeatmapTagSummary? tagSummary) => CommonSummary is KpsSummary commonSummary
+            ? new EzAnalysisResult(commonSummary, ManiaSummary, tagSummary, Axes, Ratings, Dan, KeyPatternRadar, SsrPatternRadar, ChartSkillInfo)
+            : this;
     }
 }

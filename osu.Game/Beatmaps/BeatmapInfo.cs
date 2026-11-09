@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -8,6 +8,7 @@ using JetBrains.Annotations;
 using Newtonsoft.Json;
 using osu.Game.Collections;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Models;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Overlays.BeatmapSet.Scores;
@@ -95,16 +96,21 @@ namespace osu.Game.Beatmaps
         public double StarRating { get; set; } = -1;
 
         /// <summary>
-        /// Ez2Lazer: Baseline mania xxy star rating (no mods). Defaults to -1 (not yet calculated). Populated by <see cref="BeatmapUpdater"/>.
-        /// </summary>
-        public double XxyStarRating { get; set; } = -1;
-
-        /// <summary>
         /// Ez2Lazer: Baseline perfect-play performance points (no mods). Defaults to -1 (not yet calculated).
         /// L1 Panel/sort placeholder; invalidated with <see cref="StarRating"/> on <see cref="Rulesets.RulesetInfo.LastAppliedDifficultyVersion"/> bump.
         /// L2 display uses <see cref="StarDifficulty.PerformanceAttributes"/> from <see cref="BeatmapDifficultyCache"/>.
         /// </summary>
         public double PerformancePoints { get; set; } = -1;
+
+        /// <summary>
+        /// Ez2Lazer: the star rating and perfect-play pp each analysis system gives this chart (no mods).
+        /// </summary>
+        /// <remarks>
+        /// The official pair duplicates <see cref="StarRating"/> and <see cref="PerformancePoints"/>, which stay the
+        /// authority for upstream code; both are written through the same path so they cannot disagree.
+        /// Every row carries a record: the v11-to-v12 migration creates it and <see cref="EzRatingWriter"/> keeps it.
+        /// </remarks>
+        public EzRatingData EzRatingData { get; set; } = new EzRatingData();
 
         /// <summary>
         /// Ez2Lazer: Whether the beatmap set's storyboard file contains a video event.
@@ -262,7 +268,15 @@ namespace osu.Game.Beatmaps
         [Obsolete("Use ScoreManager.GetMaximumAchievableComboAsync instead.")]
         public int? MaxCombo { get; set; }
 
-        public BeatmapInfo Clone() => (BeatmapInfo)this.Detach().MemberwiseClone();
+        public BeatmapInfo Clone()
+        {
+            var clone = (BeatmapInfo)this.Detach().MemberwiseClone();
+
+            // The embedded record is detached with the beatmap, but a shallow clone would still share it: a write
+            // through either copy would then be visible on the other.
+            clone.EzRatingData = EzRatingData.Copy();
+            return clone;
+        }
 
         public override string ToString() => this.GetDisplayTitle();
 

@@ -98,6 +98,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.UpdateFrameLimiter, FrameSync.Unlimited);
             SetDefault(Ez2Setting.EzAnalysisRecEnabled, true);
             SetDefault(Ez2Setting.EzAnalysisSqliteEnabled, true);
+            SetDefault(Ez2Setting.AnalysisSystemSelection, string.Empty);
             SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
             SetDefault(Ez2Setting.MenuLogoPath, @"Menu/logo");
             SetDefault(Ez2Setting.MenuLogoText, "(´・ω・｀),120");
@@ -182,6 +183,14 @@ namespace osu.Game.EzOsuGame.Configuration
 
             // Ez 技能：默认与 EzDanAlgorithm.LN_CHART_MIN_HOLD_OBJECTS 一致。
             SetDefault(Ez2Setting.SkillLnChartMinHoldObjects, 150, 0, 1000);
+
+            // SunnySR 计算的两个系数。默认值就是落库所用的值；改动属于用户对算法的永久修订，不触发版本换代。
+            SetDefault(Ez2Setting.SsrRescaleThreshold, 8.0, 6.0, 10.0, 1.0);
+            SetDefault(Ez2Setting.SsrLnMultiplier, 5.5, 2.0, 8.0, 0.5);
+
+            // 落库所用的那组系数。默认等于上一行的默认值，所以已有库不会被判成待重算。
+            SetDefault(Ez2Setting.SsrAppliedRescaleThreshold, 8.0, 6.0, 10.0, 1.0);
+            SetDefault(Ez2Setting.SsrAppliedLnMultiplier, 5.5, 2.0, 8.0, 0.5);
 
             #endregion
 
@@ -366,8 +375,7 @@ namespace osu.Game.EzOsuGame.Configuration
         /// <summary>
         /// 从当前配置读取实时游玩环境快照（等同 <see cref="ResolveEnvironment"/> + <see cref="ReplayRunPurpose.ForLive"/>）。
         /// </summary>
-        public GameplayEnvironment GetGameplayEnvironment(RulesetInfo? ruleset = null)
-            => ResolveEnvironment(ReplayRunPurpose.ForLive, ruleset: ruleset);
+        public GameplayEnvironment GetGameplayEnvironment(RulesetInfo? ruleset = null) => ResolveEnvironment(ReplayRunPurpose.ForLive, ruleset: ruleset);
 
         /// <summary>
         /// 统一环境解析：Purpose 决定 JudgeMode/HealthMode 来源；score 可选。
@@ -427,8 +435,7 @@ namespace osu.Game.EzOsuGame.Configuration
         /// 已保存配置里可能残留已淘汰的枚举值（例如 Mania Classic 的 38）。未定义值回退 StableClassic：
         /// 留到下游会让窗口表落空、全判 Miss。只做内存回退，不改写已保存配置。
         /// </summary>
-        private static EzEnumJudgeMode normalizeJudgeMode(EzEnumJudgeMode mode)
-            => Enum.IsDefined(mode) ? mode : EzEnumJudgeMode.StableClassic;
+        private static EzEnumJudgeMode normalizeJudgeMode(EzEnumJudgeMode mode) => Enum.IsDefined(mode) ? mode : EzEnumJudgeMode.StableClassic;
 
         private static GameplayEnvironment resolveStoredModes(GameplayEnvironment live, ScoreInfo? score, int rulesetId)
         {
@@ -985,7 +992,7 @@ namespace osu.Game.EzOsuGame.Configuration
         UpdateFrameLimiter,
 
         /// <summary>
-        /// 选歌时是否对 Ez SQLite 体系内指标（主库 kps/KPC、有 Mod 时的 kps/xxy 等）做即时计算；关闭则只读已落盘数据。
+        /// 选歌时是否对 Ez SQLite 体系内指标（主库 kps/KPC、有 Mod 时的 kps/ssr等）做即时计算；关闭则只读已落盘数据。
         /// 分支库快照仍只读；PP 显示应对齐官方 Star 缓存，不由本开关控制。
         /// </summary>
         EzAnalysisRecEnabled,
@@ -994,6 +1001,40 @@ namespace osu.Game.EzOsuGame.Configuration
         /// Ez 分析 SQLite 主库与分支曲库读写总开关；与 <see cref="EzAnalysisRecEnabled"/> 分工（存储 vs 即时计算）。
         /// </summary>
         EzAnalysisSqliteEnabled,
+
+        /// <summary>
+        /// SunnySR（ssr难度）计算里超过多少星后开始压缩膨胀。原项目默认为 9，Ez 一直用 8。
+        /// <para>
+        /// 这是用户对算法的永久修订，不是一次性试验：改它不触发任何版本换代，只影响此后算出的值与落库结果。
+        /// </para>
+        /// </summary>
+        SsrRescaleThreshold,
+
+        /// <summary>
+        /// SunnySR 计算里的 LN 积分倍率，决定长条的难度权重。原项目默认为 6，Ez 一直用 5.5。
+        /// <para>
+        /// 与 <see cref="SsrRescaleThreshold"/> 同样是永久修订：改动不换代，只影响此后的计算与落库。
+        /// </para>
+        /// </summary>
+        SsrLnMultiplier,
+
+        /// <summary>
+        /// 落库的 SunnySR 所用的 <see cref="SsrRescaleThreshold"/>。由完成的一轮 Sunny 评级写入，
+        /// 与当前设置不一致即视为该系统的算法已变，下次启动全库重算。
+        /// </summary>
+        /// <remarks>
+        /// 记录「已应用的参数」而不是一个脏标记：用户把参数改回原值后两者重新相等，一次放弃的试验不会排队重算。
+        /// </remarks>
+        SsrAppliedRescaleThreshold,
+
+        /// <summary>落库的 SunnySR 所用的 <see cref="SsrLnMultiplier"/>，规则同 <see cref="SsrAppliedRescaleThreshold"/>。</summary>
+        SsrAppliedLnMultiplier,
+
+        /// <summary>
+        /// 每个规则集选用的分析系统，格式 <c>规则集=系统;规则集=系统</c>；缺失则用该规则集的第一个系统。
+        /// 选歌界面的难度、PP、显示与雷达都按这里的选择读取同一套基线。
+        /// </summary>
+        AnalysisSystemSelection,
 
         HideMainMenuOnlineBanner,
 

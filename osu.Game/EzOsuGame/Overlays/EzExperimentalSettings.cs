@@ -7,7 +7,6 @@ using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Database;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
@@ -28,16 +27,17 @@ namespace osu.Game.EzOsuGame.Overlays
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig,
                           BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
-                          EzAnalysisWarmupProcessor? analysisWarmupProcessor,
-                          EzSkillStore? skillStore,
+                          EzChartSkillStore? skillStore,
+                          EzPlayerSkillStore? playerSkillStore,
                           IDialogOverlay? dialogOverlay,
                           INotificationOverlay? notifications,
                           EzLocalProfileService? localProfileService,
                           EzLocalProfileOnlinePullService? onlinePullService,
                           RulesetStore? rulesetStore,
-                          EzExternalRulesetManagerDialog? externalRulesetManager)
+                          EzExternalRulesetManagerDialog? externalRulesetManager,
+                          EzDataRebuildDialog? rebuildDialog)
         {
-            EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, skillStore, dialogOverlay, notifications, localProfileService?.Store);
+            EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, skillStore, playerSkillStore, localProfileService?.Store, rebuildDialog);
 
             Add(new SettingsButtonV2
             {
@@ -65,24 +65,6 @@ namespace osu.Game.EzOsuGame.Overlays
 
             AddRange(new Drawable[]
             {
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = EzSettingsStrings.EZ_ANALYSIS_REC_ENABLED,
-                    HintText = EzSettingsStrings.EZ_ANALYSIS_REC_ENABLED_TOOLTIP,
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled),
-                })
-                {
-                    Keywords = new[] { "analysis", "ez", "song select", "kps", "kpc" }
-                },
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = EzSettingsStrings.EZ_ANALYSIS_SQLITE_ENABLED,
-                    HintText = EzSettingsStrings.EZ_ANALYSIS_SQLITE_ENABLED_TOOLTIP,
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled),
-                })
-                {
-                    Keywords = new[] { "analysis", "sqlite", "cache", "warmup", "persistent" }
-                },
                 new SettingsItemV2(new FormCheckBox
                 {
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.EzSubFrameCorrectionEnabled),

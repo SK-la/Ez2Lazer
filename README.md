@@ -90,3 +90,4 @@ Self-built copies hide in-game update settings and do not check SK-la/Ez2Lazer R
 - [g0v0](https://github.com/GooGuTeam/g0v0-server): Private server support.
 - [mania-hub](https://github.com/aleju03/mania-hub): Data display inspiration.
 - [MinaCalc](https://github.com/etternagame/etterna): Skill algorithm.
+- [Syriiin/osu](https://github.com/Syriiin/osu): PP Plus (PPP) difficulty formulas.

@@ -26,11 +26,11 @@ namespace osu.Game.Tests.EzOsuGame.Rotation
         {
             var constraints = new EzQuickRotationPoolConstraints(null, null, maniaRuleset, null, CrossKeyMode: true);
 
-            Assert.That(EzQuickRotationPoolBuilder.matchesKeyCount(createManiaBeatmap(4), constraints), Is.True);
-            Assert.That(EzQuickRotationPoolBuilder.matchesKeyCount(createManiaBeatmap(7), constraints), Is.True);
-            Assert.That(EzQuickRotationPoolBuilder.matchesKeyCount(createManiaBeatmap(10), constraints), Is.True);
-            Assert.That(EzQuickRotationPoolBuilder.matchesKeyCount(createManiaBeatmap(12), constraints), Is.False);
-            Assert.That(EzQuickRotationPoolBuilder.matchesKeyCount(createManiaBeatmap(3), constraints), Is.False);
+            Assert.That(EzQuickRotationPoolBuilder.MatchesKeyCount(createManiaBeatmap(4), constraints), Is.True);
+            Assert.That(EzQuickRotationPoolBuilder.MatchesKeyCount(createManiaBeatmap(7), constraints), Is.True);
+            Assert.That(EzQuickRotationPoolBuilder.MatchesKeyCount(createManiaBeatmap(10), constraints), Is.True);
+            Assert.That(EzQuickRotationPoolBuilder.MatchesKeyCount(createManiaBeatmap(12), constraints), Is.False);
+            Assert.That(EzQuickRotationPoolBuilder.MatchesKeyCount(createManiaBeatmap(3), constraints), Is.False);
         }
 
         [Test]
@@ -38,9 +38,9 @@ namespace osu.Game.Tests.EzOsuGame.Rotation
         {
             var constraints = new EzQuickRotationPoolConstraints(null, null, maniaRuleset, LockedKeyCount: 7, CrossKeyMode: false);
 
-            Assert.That(EzQuickRotationPoolBuilder.matchesKeyCount(createManiaBeatmap(7), constraints), Is.True);
-            Assert.That(EzQuickRotationPoolBuilder.matchesKeyCount(createManiaBeatmap(4), constraints), Is.False);
-            Assert.That(EzQuickRotationPoolBuilder.matchesKeyCount(createManiaBeatmap(12), constraints), Is.False);
+            Assert.That(EzQuickRotationPoolBuilder.MatchesKeyCount(createManiaBeatmap(7), constraints), Is.True);
+            Assert.That(EzQuickRotationPoolBuilder.MatchesKeyCount(createManiaBeatmap(4), constraints), Is.False);
+            Assert.That(EzQuickRotationPoolBuilder.MatchesKeyCount(createManiaBeatmap(12), constraints), Is.False);
         }
 
         [Test]
@@ -49,7 +49,7 @@ namespace osu.Game.Tests.EzOsuGame.Rotation
             var osuRuleset = new OsuRuleset().RulesetInfo;
             var constraints = new EzQuickRotationPoolConstraints(null, null, osuRuleset, LockedKeyCount: 4, CrossKeyMode: true);
 
-            Assert.That(EzQuickRotationPoolBuilder.matchesKeyCount(createManiaBeatmap(12), constraints), Is.True);
+            Assert.That(EzQuickRotationPoolBuilder.MatchesKeyCount(createManiaBeatmap(12), constraints), Is.True);
         }
 
         private static BeatmapInfo createManiaBeatmap(int keyCount) => new BeatmapInfo

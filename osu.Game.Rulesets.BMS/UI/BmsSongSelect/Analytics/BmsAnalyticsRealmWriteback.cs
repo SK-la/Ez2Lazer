@@ -4,6 +4,7 @@
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Rulesets.BMS.Beatmaps;
 
 namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
@@ -34,13 +35,13 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                             continue;
 
                         if (result.StarRating is double star && star >= 0)
-                            beatmap.StarRating = star;
+                            EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.Official, star);
 
-                        if (result.XxySr is double xxy && xxy >= 0)
-                            beatmap.XxyStarRating = xxy;
+                        if (result.SunnySR is double ssr && ssr >= 0)
+                            EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.SSR, ssr);
 
-                        if (result.Pp is double pp && pp >= 0)
-                            beatmap.PerformancePoints = pp;
+                        if (result.PP is double pp && pp >= 0)
+                            EzRatingWriter.WritePP(beatmap, EzAnalysisSystem.Official, pp);
                     }
                 });
             }

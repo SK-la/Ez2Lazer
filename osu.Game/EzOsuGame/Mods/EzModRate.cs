@@ -10,7 +10,7 @@ using osu.Game.Rulesets.Mods;
 namespace osu.Game.EzOsuGame.Mods
 {
     /// <summary>
-    /// Shared DT/HT rate resolution for MSD/SSR/Dan (clamp matches lazer ModRateAdjust bounds).
+    /// Shared DT/HT rate resolution for Mina/SunnySR/Dan (clamp matches lazer ModRateAdjust bounds).
     /// </summary>
     public static class EzModRate
     {
@@ -87,7 +87,7 @@ namespace osu.Game.EzOsuGame.Mods
 
         /// <summary>
         /// Mods that change playable layout, rate, or difficulty — song-select Skill radar / DualPanel
-        /// should live-recompute chart MSD/ChartDan (same idea as xxySR analysis).
+        /// should live-recompute chart Mina/ChartDan (same idea as sunnySR analysis).
         /// </summary>
         public static bool AffectsChartSkills(IEnumerable<Mod>? mods)
         {
@@ -106,7 +106,7 @@ namespace osu.Game.EzOsuGame.Mods
                       or IApplicableToHitObject
                       or IApplicableToBeatmap;
 
-        /// <summary>Key-conversion / post-convert mods — persisted xxySR must not be reused.</summary>
+        /// <summary>Key-conversion / post-convert mods — persisted sunnySR must not be reused.</summary>
         public static bool ChangesPlayableKeys(IEnumerable<Mod>? mods)
         {
             if (mods == null)
@@ -115,8 +115,8 @@ namespace osu.Game.EzOsuGame.Mods
             return mods.Any(static m => m is IApplicableToBeatmapConverter or IApplicableAfterBeatmapConversion);
         }
 
-        /// <summary>Whether BeatmapInfo.XxyStarRating (nomod baseline) may be reused without live recompute.</summary>
-        public static bool CanUsePersistedXxy(IEnumerable<Mod>? mods)
+        /// <summary>Whether BeatmapInfo.SunnyStarRating (nomod baseline) may be reused without live recompute.</summary>
+        public static bool CanUsePersistedSunnySR(IEnumerable<Mod>? mods)
             => IsNoModRate(Resolve(mods)) && !ChangesPlayableKeys(mods);
     }
 }

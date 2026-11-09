@@ -67,7 +67,7 @@ namespace osu.Game.Tests.Visual.Ranking
         }
 
         [Test]
-        public void TestAlmostSSRank()
+        public void TestAlmostSunnySRank()
         {
             var score = TestResources.CreateTestScoreInfo();
             score.Accuracy = 0.9999;
@@ -77,7 +77,7 @@ namespace osu.Game.Tests.Visual.Ranking
         }
 
         [Test]
-        public void TestSSRank()
+        public void TestSunnySRank()
         {
             var score = TestResources.CreateTestScoreInfo();
             score.Accuracy = 1;

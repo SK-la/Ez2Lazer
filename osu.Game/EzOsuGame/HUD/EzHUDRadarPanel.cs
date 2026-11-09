@@ -5,29 +5,31 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Logging;
-using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.EzOsuGame.Skills;
-using osu.Game.EzOsuGame.UserInterface;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.Pattern;
+using osu.Game.EzOsuGame.Skills.PPP;
+using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.EzOsuGame.UI;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -43,14 +45,20 @@ namespace osu.Game.EzOsuGame.HUD
         [Description("Key Pattern")]
         KeyPattern,
 
-        [Description("XxySR Pattern")]
-        XxySrPattern,
+        [Description("SunnySR Skill")]
+        SunnySRSkill,
 
-        [Description("SkillDual")]
-        SkillDual,
+        [Description("Skill Dual")]
+        MSDSkillDual,
 
-        [Description("SkillChart")]
-        SkillChart
+        [Description("Skill Chart")]
+        MSDSkillChart,
+
+        [Description("PP+ Dual")]
+        PPPSkillDual,
+
+        [Description("PP+ Chart")]
+        PPPSkillChart
     }
 
     /// <summary>
@@ -90,7 +98,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         public float MaxKeyPatternScore { get; } = 10f;
 
-        public float MaxXxySr { get; } = 10f;
+        public float MaxSunnySR { get; } = 10f;
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_DISPLAY_MODE), nameof(EzHUDStrings.RADAR_DISPLAY_MODE_TOOLTIP))]
         public Bindable<EzRadarDisplayMode> RadarDisplayMode { get; } = new Bindable<EzRadarDisplayMode>();
@@ -116,13 +124,15 @@ namespace osu.Game.EzOsuGame.HUD
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_DATA_AREA_COLOUR), nameof(EzHUDStrings.RADAR_DATA_AREA_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 DataAreaColour { get; } = new BindableColour4(new Color4(255, 217, 102, 128));
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_PLAYER_DATA_LINE_COLOUR), nameof(EzHUDStrings.RADAR_PLAYER_DATA_LINE_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_PLAYER_DATA_LINE_COLOUR), nameof(EzHUDStrings.RADAR_PLAYER_DATA_LINE_COLOUR_TOOLTIP),
+            SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 PlayerDataLineColour { get; } = new BindableColour4(new Color4(133, 196, 108, 230));
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_PLAYER_DATA_AREA_COLOUR), nameof(EzHUDStrings.RADAR_PLAYER_DATA_AREA_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_PLAYER_DATA_AREA_COLOUR), nameof(EzHUDStrings.RADAR_PLAYER_DATA_AREA_COLOUR_TOOLTIP),
+            SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 PlayerDataAreaColour { get; } = new BindableColour4(new Color4(133, 196, 108, 128));
 
-        /// <summary>Target player for Skill-mode SSR overlay. Externally bindable (e.g. EzAnalysis header).</summary>
+        /// <summary>Target player for Skill-mode SunnySR overlay. Externally bindable (e.g. EzAnalysis header).</summary>
         public Bindable<string?> TargetUsername { get; } = new Bindable<string?>();
 
         public int AxisCount
@@ -170,6 +180,15 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved]
         private EzAnalysisPlayerSelection? ezAnalysisPlayerSelection { get; set; }
 
+        [Resolved(CanBeNull = true)]
+        private EzAnalysisCache? analysisCache { get; set; }
+
+        /// <summary>
+        /// 非 null 表示这块面板挂在 Player 里。游玩期间只读已有分析结果，不发起计算。
+        /// </summary>
+        [Resolved(CanBeNull = true)]
+        private GameplayState? gameplayState { get; set; }
+
         private IBindable<StarDifficulty>? difficultyBindable;
         private CancellationTokenSource? difficultyCancellationSource;
         private CancellationTokenSource? radarAnalysisCancellationSource;
@@ -181,35 +200,26 @@ namespace osu.Game.EzOsuGame.HUD
         private FillFlowContainer[] axisLabelContainers = Array.Empty<FillFlowContainer>();
         private string[] activeAxisLabels = default_axis_labels;
         private string[] activeAxisFormats = default_axis_formats;
-        private EzRulesetSpecificRadarResult? cachedRulesetSpecificRadarResult;
 
-        /// <summary>Cheap identity of the inputs the ruleset-specific radar was computed for (no mod deep-clone).</summary>
-        private EzRadarComputeKey? cachedRulesetSpecificRadarKey;
+        /// <summary>Last live result the analysis cache handed this panel, keyed by chart + ruleset + mods.</summary>
+        private EzAnalysisResult? cachedLiveAnalysis;
 
-        /// <summary>Last (beatmap, mods, mode) the ruleset-specific radar was kicked for; blocks duplicate kicks.</summary>
-        private EzRadarComputeKey? lastRulesetRadarKickKey;
+        private EzRadarComputeKey? cachedLiveAnalysisKey;
 
-        /// <summary>Last successful live (beatmap, mods) chart snapshot, so a re-present keeps LN/RC without a flash.</summary>
-        private EzLiveChartSkillSnapshot? cachedLiveSkillSnapshot;
+        /// <summary>Last chart + mods a live pass was kicked for; blocks duplicate kicks.</summary>
+        private EzRadarComputeKey? lastLiveAnalysisKickKey;
 
-        private EzRadarComputeKey? cachedLiveSkillSnapshotKey;
-
-        /// <summary>Last (beatmap, mods) the live skill pass was kicked for; blocks duplicate kicks.</summary>
-        private EzRadarComputeKey? lastLiveKickKey;
-
-        private ScheduledDelegate? liveKickDebounce;
+        private static readonly IReadOnlyDictionary<string, double> no_skill_values
+            = new Dictionary<string, double>(StringComparer.Ordinal);
 
         /// <summary>
-        /// Song select fires placeholder then real star difficulty for the same chart; without a coalescing delay a
-        /// fast scroll runs the full playable + Mina/xxy pass for every chart passed over. Only the settled chart computes.
+        /// Identity of one analysis request. The display mode is deliberately absent: every mode reads the same
+        /// result, and switching modes must not invalidate or cancel a pass that is already running.
         /// </summary>
-        private const double live_kick_debounce_ms = 100;
+        private readonly record struct EzRadarComputeKey(string Hash, int RulesetId, int ModsSignature);
 
-        /// <summary>
-        /// Cheap cache/kick identity for both radar paths. <see cref="EzAnalysisLookupCache.ComputeModsSignature"/>
-        /// reads live mods directly (no <c>DeepClone</c>), which is what made the old key construction allocate.
-        /// </summary>
-        private readonly record struct EzRadarComputeKey(string Hash, int RulesetId, int ModsSignature, EzRadarDisplayMode Mode);
+        /// <summary>One declared radar spoke. <see cref="Chart"/> / <see cref="Player"/> are radii, not axis identity.</summary>
+        private readonly record struct SkillSpoke(string Label, double Chart, double Player);
 
         public EzHUDRadarPanel()
         {
@@ -298,7 +308,7 @@ namespace osu.Game.EzOsuGame.HUD
             UseAbsoluteValue.BindValueChanged(_ => refreshRadarPresentation(), true);
             TargetUsername.BindValueChanged(_ =>
             {
-                if (isMinaSkillRadarMode())
+                if (isSkillRadarMode())
                     updateSkillRadarPresentation();
             });
 
@@ -307,9 +317,10 @@ namespace osu.Game.EzOsuGame.HUD
 
             beatmap.BindValueChanged(b =>
             {
-                cachedRulesetSpecificRadarResult = null;
-                cachedRulesetSpecificRadarKey = null;
+                cachedLiveAnalysis = null;
+                cachedLiveAnalysisKey = null;
                 resetRadarKickGuards();
+                cancelRadarAnalysis();
                 difficultyCancellationSource?.Cancel();
                 difficultyCancellationSource = new CancellationTokenSource();
 
@@ -323,9 +334,10 @@ namespace osu.Game.EzOsuGame.HUD
 
             mods.BindValueChanged(m =>
             {
-                cachedRulesetSpecificRadarResult = null;
-                cachedRulesetSpecificRadarKey = null;
+                cachedLiveAnalysis = null;
+                cachedLiveAnalysisKey = null;
                 resetRadarKickGuards();
+                cancelRadarAnalysis();
                 modSettingTracker?.Dispose();
                 modSettingTracker = new ModSettingChangeTracker(m.NewValue)
                 {
@@ -336,9 +348,10 @@ namespace osu.Game.EzOsuGame.HUD
 
             ruleset.BindValueChanged(_ =>
             {
-                cachedRulesetSpecificRadarResult = null;
-                cachedRulesetSpecificRadarKey = null;
+                cachedLiveAnalysis = null;
+                cachedLiveAnalysisKey = null;
                 resetRadarKickGuards();
+                cancelRadarAnalysis();
                 updateParameterRatios(difficultyBindable?.Value ?? default);
             }, true);
         }
@@ -359,16 +372,12 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void refreshRadarPresentation()
         {
-            // Leaving skill radar mode: drop any pending live kick rather than letting it land on the new mode.
-            if (!isMinaSkillRadarMode())
-                cancelLiveKick();
-
             if (RadarDisplayMode.Value == EzRadarDisplayMode.Metadate)
             {
                 chart?.ClearSecondaryData();
                 updateParameterRatios(difficultyBindable?.Value ?? default);
             }
-            else if (isMinaSkillRadarMode())
+            else if (isSkillRadarMode())
                 updateSkillRadarPresentation();
             else
             {
@@ -398,7 +407,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void updateParameterRatios(StarDifficulty difficulty)
         {
-            if (isMinaSkillRadarMode())
+            if (isSkillRadarMode())
             {
                 updateSkillRadarPresentation();
                 return;
@@ -417,24 +426,129 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void updateRulesetSpecificRadarPresentation()
         {
-            if (RadarDisplayMode.Value is EzRadarDisplayMode.Metadate or EzRadarDisplayMode.SkillDual or EzRadarDisplayMode.SkillChart)
+            if (RadarDisplayMode.Value == EzRadarDisplayMode.Metadate || isSkillRadarMode())
                 return;
 
-            if (beatmap.Value.BeatmapInfo is BeatmapInfo beatmapInfo && isRulesetRadarCacheValid(beatmapInfo))
+            if (beatmap.Value.BeatmapInfo is not BeatmapInfo beatmapInfo || !EzSSRUnit.SupportsRuleset(ruleset.Value.OnlineID))
             {
-                // Reuse the applied result instead of restarting the (expensive) ruleset compute on every
-                // star-difficulty rebind for the same chart + mods.
-                applyRulesetSpecificRadarResult(cachedRulesetSpecificRadarResult!.Value);
-                return;
-            }
-
-            if (!beginRulesetSpecificRadarUpdate())
-            {
-                // No analysis provider for this ruleset: keep the general star/CS/OD radar (pre-existing fallback).
+                // This ruleset has no such view: keep the general star/CS/OD radar (pre-existing fallback).
                 cancelRadarAnalysis();
                 chart?.ClearSecondaryData();
                 applyRadarData(createGeneralRadarData(difficultyBindable?.Value ?? default), getGeneralAxisMaxValues());
+                return;
             }
+
+            requestLiveAnalysis(beatmapInfo);
+
+            if (getLiveAnalysis(beatmapInfo) is { } analysis && tryGetRadarData(analysis, out var radarData, out double? sunnySR))
+            {
+                applyRulesetSpecificRadarResult(radarData, sunnySR);
+                return;
+            }
+
+            // Nothing for this chart + mods yet: paint nothing rather than the general star radar, so a
+            // placeholder -> real star rebind does not visibly swap axis sets twice.
+            clearChartData();
+            chart?.ClearSecondaryData();
+        }
+
+        /// <summary>
+        /// Chart-side PP+ vector from the analysis result, re-keyed to the stored skill ids this panel draws with.
+        /// </summary>
+        private static IReadOnlyDictionary<string, double> pppChartSkillsOf(EzAnalysisResult? analysis)
+        {
+            if (analysis is not { } live)
+                return no_skill_values;
+
+            var axes = live.AxesOf(EzAnalysisSystem.PPP);
+
+            if (axes.Count == 0)
+                return no_skill_values;
+
+            var bySkillId = new Dictionary<string, double>(axes.Count, StringComparer.Ordinal);
+
+            foreach (var (axisId, value) in axes)
+                bySkillId[EzPPPSkillCatalog.ChartSkillId(axisId)] = value;
+
+            return bySkillId;
+        }
+
+        /// <summary>
+        /// The analysis result for this chart + mods, from the analysis cache only. A miss is "not computed yet",
+        /// never "read the stored rows instead".
+        /// </summary>
+        private EzAnalysisResult? getLiveAnalysis(BeatmapInfo beatmapInfo)
+        {
+            if (analysisCache?.TryGet(beatmapInfo, mods.Value) is { } shared)
+                return shared;
+
+            if (cachedLiveAnalysis is not { } local || cachedLiveAnalysisKey is not { } key)
+                return null;
+
+            return key == createAnalysisKey(beatmapInfo, ruleset.Value, mods.Value) ? local : null;
+        }
+
+        /// <summary>
+        /// Asks the analysis cache for the current chart + mods and repaints when the result lands. The cache decides
+        /// which source answers; the radar does not pick a layer.
+        /// </summary>
+        private void requestLiveAnalysis(BeatmapInfo beatmapInfo)
+        {
+            if (analysisCache == null)
+                return;
+
+            // 游玩期间只读已有结果：分析计算放到选歌、结算等非游玩路径，避免进局瞬间抢 CPU 和大量分配。
+            if (gameplayState != null)
+                return;
+
+            if (getLiveAnalysis(beatmapInfo) != null)
+                return;
+
+            var key = createAnalysisKey(beatmapInfo, ruleset.Value, mods.Value);
+
+            if (lastLiveAnalysisKickKey == key)
+                return;
+
+            radarAnalysisCancellationSource ??= new CancellationTokenSource();
+            CancellationToken cancellationToken = radarAnalysisCancellationSource.Token;
+
+            lastLiveAnalysisKickKey = key;
+
+            RulesetInfo localRuleset = ruleset.Value;
+            IReadOnlyList<Mod> localMods = mods.Value;
+
+            // The continuation is not registered against the pass' own token: a superseded pass that still completes
+            // has warmed the shared store, and dropping its callback is what left the radar permanently empty.
+            analysisCache.GetAnalysisAsync(beatmapInfo, localRuleset, localMods, cancellationToken)
+                         .ContinueWith(task =>
+                         {
+                             Schedule(() =>
+                             {
+                                 EzAnalysisResult? result = task.IsCanceled || task.IsFaulted ? null : task.GetResultSafely();
+
+                                 if (result == null)
+                                 {
+                                     // Do not refresh on a failed pass. The refresh would find the cache still empty,
+                                     // kick another full pass, and a chart that cannot be analysed would spin forever:
+                                     // the kick guard stays set until the chart / mods / ruleset change drops it.
+                                     if (cancellationToken.IsCancellationRequested && lastLiveAnalysisKickKey == key)
+                                         lastLiveAnalysisKickKey = null;
+
+                                     return;
+                                 }
+
+                                 if (cancellationToken.IsCancellationRequested)
+                                     return;
+
+                                 cachedLiveAnalysisKey = key;
+                                 cachedLiveAnalysis = result;
+
+                                 if (lastLiveAnalysisKickKey == key)
+                                     lastLiveAnalysisKickKey = null;
+
+                                 refreshRadarPresentation();
+                             });
+                         }, CancellationToken.None);
         }
 
         private void updateSkillRadarPresentation()
@@ -443,38 +557,33 @@ namespace osu.Game.EzOsuGame.HUD
 
             if (beatmapInfo == null)
             {
-                cancelLiveKick();
-                cancelRadarAnalysis();
-                clearChartData();
-                chart?.ClearSecondaryData();
+                clearSkillRadar();
                 return;
             }
 
-            var profile = skillProvider?.GetProfile(beatmapInfo.Ruleset.OnlineID);
+            // Which vector the skill modes draw is the chart catalog's declared default for the ruleset, not a
+            // ruleset test here: mania declares its own rating engine, every other ruleset declares PP+.
+            EzAnalysisSystem? defaultSystem = skillProvider?.GetChartProfile(beatmapInfo.Ruleset.OnlineID)?.DefaultSystem;
 
-            if (profile == null)
+            if (defaultSystem != EzAnalysisSystem.Mina)
             {
-                cancelLiveKick();
-                cancelRadarAnalysis();
-                clearChartData();
-                chart?.ClearSecondaryData();
+                updatePppSkillRadarPresentation(beatmapInfo);
                 return;
             }
 
-            if (beatmapInfo.Ruleset.OnlineID != EzLocalProfileConstants.MANIA_RULESET_ID)
-            {
-                cancelLiveKick();
-                cancelRadarAnalysis();
-                clearChartData();
-                chart?.ClearSecondaryData();
-                return;
-            }
+            updateMinaSkillRadarPresentation(beatmapInfo);
+        }
 
-            // Key locked to current beatmap CS (same-beatmap ChartDan only if CS missing).
-            // Live mods may override after async compute.
+        private void updateMinaSkillRadarPresentation(BeatmapInfo beatmapInfo)
+        {
+            requestLiveAnalysis(beatmapInfo);
+
+            var live = getLiveAnalysis(beatmapInfo);
+            var msd = live is { } analysed ? analysed.AxesOf(EzAnalysisSystem.Mina) : no_skill_values;
+            var structureAxes = live is { } structured ? structureAxesOf(structured) : no_skill_values;
+
             int keyCount = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
 
-            // One Realm read serves both the CS-missing key fallback and the LN pre-judgement below.
             EzPersistedChartDan? persistedChartDan = null;
 
             skillProvider?.TryGetPersistedChartDan(beatmapInfo, out persistedChartDan);
@@ -482,106 +591,55 @@ namespace osu.Game.EzOsuGame.HUD
             if (keyCount <= 0 && persistedChartDan is { KeyCount: > 0 })
                 keyCount = persistedChartDan.KeyCount;
 
-            string? username = TargetUsername.Value;
-            IReadOnlyList<Mod> localMods = mods.Value;
+            double holdRatio = EzHoldMetrics.HoldRatio(beatmapInfo);
 
-            // Instant: Realm MSD (xxy L1).
-            IReadOnlyDictionary<string, double> msd = skillProvider?.GetBeatmapMsd(beatmapInfo.Hash)
-                                                      ?? new Dictionary<string, double>();
+            if (double.IsNaN(holdRatio))
+                holdRatio = 0;
 
-            // Cheap (no mod deep-clone) identity of what the live pass would compute.
-            var liveCacheKey = createRadarKey(beatmapInfo, ruleset.Value, localMods, RadarDisplayMode.Value);
-            bool hasCachedLive = cachedLiveSkillSnapshotKey == liveCacheKey && cachedLiveSkillSnapshot != null;
+            int holdCount = EzDanEngine.TryHoldCountFromBeatmapInfo(beatmapInfo);
 
-            // Decide LN vs RC *before* painting: the live LN compute lands a few frames later, and painting the RC
-            // radar first visibly morphs into the LN radar (different axis count + labels).
-            bool lnExpected = expectsLnSkillRadar(beatmapInfo, keyCount, msd, persistedChartDan);
-
-            if (hasCachedLive)
+            // Decided before the values land: the long-note frame has its own axis set, and painting the RC frame
+            // first would visibly morph into it.
+            if (expectsLnSkillRadar(keyCount, persistedChartDan, holdRatio, holdCount))
             {
-                // Known result for this exact (beatmap, mods): paint it directly, no LN/RC frame to correct.
-                var cachedSnap = cachedLiveSkillSnapshot!;
-                applySkillRadarLayers(cachedSnap.KeyCount > 0 ? cachedSnap.KeyCount : keyCount, username, cachedSnap.Msd, cachedSnap);
+                applyLnSkillRadar(EzLnSkillRadar.BuildAxes(holdRatio, structureAxes, keyCount));
+                return;
             }
-            else if (lnExpected)
-                applyLnSkillRadar(EzLnSkillRadar.BuildAxes(null, null, keyCount));
-            else
-                applySkillRadarLayers(keyCount, username, msd, live: null);
 
-            // Always live-recompute selected chart MSD (xxySR analysis rhythm), including nomod.
-            if (skillProvider == null)
-                return;
+            string? username = TargetUsername.Value;
+            IReadOnlyDictionary<string, double> ssr = no_skill_values;
 
-            // Superseded: stop the previous chart's in-flight compute now; it no longer has a holder.
-            if (lastLiveKickKey != null && lastLiveKickKey != liveCacheKey)
-                cancelRadarAnalysis();
+            if (!string.IsNullOrWhiteSpace(username) && keyCount > 0 && skillProvider != null)
+                ssr = skillProvider.GetPlayerSsrSnapshot(username, keyCount).Values;
 
-            // Same (beatmap, mods) already painted or already in flight: the placeholder → real star-difficulty
-            // rebind must not restart the whole playable + Mina/xxy pass.
-            if (hasCachedLive || lastLiveKickKey == liveCacheKey)
-                return;
+            bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.MSDSkillChart;
+            var spokes = new List<SkillSpoke>(skill_radar_axes.Length);
 
-            var provider = skillProvider;
-            lastLiveKickKey = liveCacheKey;
-
-            // Coalesce placeholder/repeat presentments and fast scrolling into one compute for the settled chart.
-            liveKickDebounce?.Cancel();
-            liveKickDebounce = Scheduler.AddDelayed(() =>
+            foreach (var axis in skill_radar_axes)
             {
-                liveKickDebounce = null;
+                spokes.Add(new SkillSpoke(
+                    skillAxisDisplayName(axis),
+                    displayValue(msd.GetValueOrDefault(axis.ToId(), 0)),
+                    displayValue(ssr.GetValueOrDefault(axis.ToSsrSkillId(), 0))));
+            }
 
-                if (lastLiveKickKey != liveCacheKey)
-                    return;
-
-                cancelRadarAnalysis();
-                radarAnalysisCancellationSource = new CancellationTokenSource();
-                CancellationToken token = radarAnalysisCancellationSource.Token;
-
-                provider.GetOrComputeLiveChartSkillsAsync(beatmapInfo, localMods, token)
-                        .ContinueWith(task =>
-                        {
-                            Schedule(() =>
-                            {
-                                if (token.IsCancellationRequested)
-                                    return;
-
-                                if (task.IsCanceled || task.IsFaulted)
-                                    return;
-
-                                var snap = task.GetResultSafely();
-
-                                if (snap == null || snap.Msd.Count == 0)
-                                {
-                                    // Live compute unavailable: never leave the pre-judged LN frame empty — fall back to RC.
-                                    if (lnExpected)
-                                        applySkillRadarLayers(keyCount, TargetUsername.Value, msd, live: null);
-
-                                    // Allow a later re-presentation to retry rather than blocking on a failed kick.
-                                    if (lastLiveKickKey == liveCacheKey)
-                                        lastLiveKickKey = null;
-
-                                    return;
-                                }
-
-                                cachedLiveSkillSnapshotKey = liveCacheKey;
-                                cachedLiveSkillSnapshot = snap;
-
-                                applySkillRadarLayers(
-                                    snap.KeyCount > 0 ? snap.KeyCount : keyCount,
-                                    TargetUsername.Value,
-                                    snap.Msd,
-                                    snap);
-                            });
-                        }, token);
-            }, live_kick_debounce_ms);
+            applySkillSpokes(spokes, beatmapOnly);
         }
 
         /// <summary>
+        /// The generic n-key engine returns a ~0.18 sliver for skillsets it does not rate, which is noise next to a
+        /// real bar. The spoke stays; only its value reads as absent.
+        /// </summary>
+        private static double displayValue(double value) => double.IsFinite(value) && value >= EzPatternRatings.DISPLAY_MIN ? value : 0;
+
+        private static IReadOnlyDictionary<string, double> structureAxesOf(in EzAnalysisResult analysis) => analysis.AxesOf(EzAnalysisSystem.CSI);
+
+        /// <summary>
         /// Synchronous LN/RC pre-judgement. Realm-persisted ChartDan with an LN half is authoritative
-        /// (written through the same hold gate); otherwise fall back to that gate using Realm MSD hold ratio
+        /// (written through the same hold gate); otherwise fall back to that gate using the Mina hold ratio
         /// and the stored hold-object count.
         /// </summary>
-        private bool expectsLnSkillRadar(BeatmapInfo beatmapInfo, int keyCount, IReadOnlyDictionary<string, double> msd, EzPersistedChartDan? persistedChartDan)
+        private static bool expectsLnSkillRadar(int keyCount, EzPersistedChartDan? persistedChartDan, double holdRatio, int holdCount)
         {
             if (keyCount <= 0)
                 return false;
@@ -589,134 +647,48 @@ namespace osu.Game.EzOsuGame.HUD
             if (persistedChartDan != null && persistedChartDan.HasSide(EzDanSide.Ln))
                 return true;
 
-            double holdRatio = 0;
-
-            if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
-                holdRatio = Math.Clamp(cachedHold, 0, 1);
-
-            // MSD may pre-date the hold-ratio skill id; stored CSI carries the chart LN ratio.
-            if (holdRatio <= 0
-                && skillProvider != null
-                && skillProvider.TryGetStoredChartSkillInfo(beatmapInfo, out var chartInfo)
-                && chartInfo?.LnRatio is double lnRatio
-                && double.IsFinite(lnRatio))
-            {
-                holdRatio = Math.Clamp(lnRatio, 0, 1);
-            }
-
-            int holdCount = EzChartDanEstimator.TryHoldCountFromBeatmapInfo(beatmapInfo);
-
             return EzDanAlgorithm.AllowsPersistedChartLnHalf(keyCount, holdRatio, holdCount);
         }
 
-        private void applySkillRadarLayers(
-            int keyCount,
-            string? username,
-            IReadOnlyDictionary<string, double> msd,
-            EzLiveChartSkillSnapshot? live)
+        /// <summary>
+        /// Paints one skill frame. The spokes are fixed by the analysis system's declaration, so an absent value
+        /// draws at the centre instead of removing its spoke and rotating every other one.
+        /// </summary>
+        private void applySkillSpokes(IReadOnlyList<SkillSpoke> spokes, bool beatmapOnly)
         {
-            // LN skill: same gate as DualPanel / ChartDan LN half (hold count > 100 OR hub ratio).
-            if (live?.LnMetrics != null
-                && keyCount > 0
-                && EzDanAlgorithm.AllowsPersistedChartLnHalf(keyCount, live.HoldRatio, live.HoldCount))
-            {
-                applyLnSkillRadar(live.LnMetrics, live.LnSubtypeScores, keyCount);
-                return;
-            }
+            AxisCount = Math.Max(3, spokes.Count);
 
-            // All keys: Mina SSR ↔ MSD (same algorithm). No fabricated pattern yellow.
-            IReadOnlyDictionary<string, double> ssr = new Dictionary<string, double>();
-
-            if (!string.IsNullOrWhiteSpace(username) && keyCount > 0 && skillProvider != null)
-                ssr = skillProvider.GetPlayerSsrSnapshot(username, keyCount).Values;
-
-            bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.SkillChart;
-
-            var selected = new List<EzMinaSkillAxis>(skill_radar_axes.Length);
-
-            foreach (var axis in skill_radar_axes)
-            {
-                double chartValue = msd.GetValueOrDefault(axis.ToMsdSkillId(), 0);
-                // Same floor as the player SSR side / hub skillModeEntries: the generic n-key
-                // engine returns a ~0.18 sliver for skillsets it does not rate (Technical on
-                // 5K and 8K+), which is noise next to a real 10+ bar — not a spoke.
-                if (!double.IsFinite(chartValue) || chartValue < EzPatternRatings.DISPLAY_MIN)
-                    continue;
-
-                if (beatmapOnly)
-                {
-                    selected.Add(axis);
-                    continue;
-                }
-
-                double playerValue = ssr.GetValueOrDefault(axis.ToSsrSkillId(), 0);
-                if (!double.IsFinite(playerValue) || playerValue < EzPatternRatings.DISPLAY_MIN)
-                    continue;
-
-                // Dual: commonality only — both chart MSD and player SSR present.
-                selected.Add(axis);
-            }
-
-            // Beatmap: show every real MSD axis above the hub display floor (pad to 3 for EzRadarChart).
-            // Dual with no overlap: fall back to chart axes.
-            if (selected.Count == 0 && !beatmapOnly)
-            {
-                foreach (var axis in skill_radar_axes)
-                {
-                    double chartValue = msd.GetValueOrDefault(axis.ToMsdSkillId(), 0);
-                    if (double.IsFinite(chartValue) && chartValue >= EzPatternRatings.DISPLAY_MIN)
-                        selected.Add(axis);
-                }
-            }
-
-            if (selected.Count == 0)
-            {
-                clearChartData();
-                chart?.ClearSecondaryData();
-                return;
-            }
-
-            AxisCount = Math.Max(3, selected.Count);
-            activeAxisLabels = new string[AxisCount];
+            activeAxisLabels = Enumerable.Repeat(string.Empty, AxisCount).ToArray();
             activeAxisFormats = Enumerable.Repeat("0.00", AxisCount).ToArray();
 
-            double maxMina = 0;
+            double maxValue = 0;
             double[] chartValues = new double[AxisCount];
             double[] playerValues = new double[AxisCount];
 
-            for (int i = 0; i < selected.Count; i++)
+            for (int i = 0; i < spokes.Count; i++)
             {
-                var axis = selected[i];
-                activeAxisLabels[i] = skillAxisDisplayName(axis);
-                double beatmapValue = msd.GetValueOrDefault(axis.ToMsdSkillId(), 0);
-                double playerValue = beatmapOnly ? 0 : ssr.GetValueOrDefault(axis.ToSsrSkillId(), 0);
-                if (playerValue < EzPatternRatings.DISPLAY_MIN)
-                    playerValue = 0;
+                SkillSpoke spoke = spokes[i];
 
-                chartValues[i] = beatmapValue;
+                double chartValue = nonNegative(spoke.Chart);
+                double playerValue = beatmapOnly ? 0 : nonNegative(spoke.Player);
+
+                activeAxisLabels[i] = spoke.Label;
+                chartValues[i] = chartValue;
                 playerValues[i] = playerValue;
-                parameterValues[i] = (float)beatmapValue;
-                maxMina = Math.Max(maxMina, Math.Max(beatmapValue, playerValue));
+                parameterValues[i] = (float)chartValue;
+                maxValue = Math.Max(maxValue, Math.Max(chartValue, playerValue));
             }
 
-            for (int i = selected.Count; i < AxisCount; i++)
-            {
-                activeAxisLabels[i] = string.Empty;
-                chartValues[i] = 0;
-                playerValues[i] = 0;
-                parameterValues[i] = 0;
-            }
-
-            if (maxMina <= 0)
-                maxMina = 1;
+            if (maxValue <= 0)
+                maxValue = 1;
 
             float[] beatmapRatios = new float[AxisCount];
             float[] playerRatios = new float[AxisCount];
 
             for (int i = 0; i < AxisCount; i++)
             {
-                beatmapRatios[i] = (float)(chartValues[i] / maxMina);
-                playerRatios[i] = (float)(playerValues[i] / maxMina);
+                beatmapRatios[i] = (float)(chartValues[i] / maxValue);
+                playerRatios[i] = (float)(playerValues[i] / maxValue);
             }
 
             chart?.SetData(beatmapRatios);
@@ -730,11 +702,17 @@ namespace osu.Game.EzOsuGame.HUD
             applyChartColours();
         }
 
-        private void applyLnSkillRadar(
-            EzDanFeatureMetrics metrics,
-            IReadOnlyDictionary<string, double>? subtypeScores,
-            int keyCount)
-            => applyLnSkillRadar(EzLnSkillRadar.BuildAxes(metrics, subtypeScores, keyCount));
+        private static double nonNegative(double value) => double.IsFinite(value) && value > 0 ? value : 0;
+
+        /// <summary>No axis set at all: draws nothing and leaves no stale labels behind.</summary>
+        private void clearSkillRadar()
+        {
+            int slots = Math.Max(3, AxisCount);
+
+            activeAxisLabels = Enumerable.Repeat(string.Empty, slots).ToArray();
+            activeAxisFormats = Enumerable.Repeat("0.00", slots).ToArray();
+            clearChartData();
+        }
 
         private void applyLnSkillRadar(IReadOnlyList<EzLnSkillRadar.Axis> lnAxes)
         {
@@ -759,16 +737,60 @@ namespace osu.Game.EzOsuGame.HUD
             applyChartColours();
         }
 
-        private bool isMinaSkillRadarMode()
-            => RadarDisplayMode.Value is EzRadarDisplayMode.SkillDual or EzRadarDisplayMode.SkillChart;
+        private bool isSkillRadarMode() => RadarDisplayMode.Value is EzRadarDisplayMode.MSDSkillDual or EzRadarDisplayMode.MSDSkillChart
+                                                                                                     or EzRadarDisplayMode.PPPSkillDual or EzRadarDisplayMode.PPPSkillChart;
+
+        private bool isPppSkillRadarMode() => RadarDisplayMode.Value is EzRadarDisplayMode.PPPSkillDual or EzRadarDisplayMode.PPPSkillChart;
+
+        private void updatePppSkillRadarPresentation(BeatmapInfo beatmapInfo)
+        {
+            if (!EzPPPSkillCatalog.SupportsRuleset(beatmapInfo.Ruleset.OnlineID))
+            {
+                clearSkillRadar();
+                return;
+            }
+
+            requestLiveAnalysis(beatmapInfo);
+
+            int rulesetId = beatmapInfo.Ruleset.OnlineID;
+            var chartSkills = pppChartSkillsOf(getLiveAnalysis(beatmapInfo));
+
+            int keyCount = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
+            int slice = EzPPPSkillCatalog.PlayerSliceKey(rulesetId, keyCount);
+            string? username = TargetUsername.Value;
+            IReadOnlyDictionary<string, double> playerSkills = no_skill_values;
+
+            if (!string.IsNullOrWhiteSpace(username) && skillProvider != null)
+                playerSkills = skillProvider.GetPlayerSystemSkills(username, slice, EzAnalysisSystem.PPP, rulesetId);
+
+            bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.PPPSkillChart;
+            var axes = EzPPPSkillCatalog.RadarAxes(rulesetId);
+            var spokes = new List<SkillSpoke>(axes.Count);
+
+            foreach (var axis in axes)
+            {
+                // A blank slot is part of the ruleset's declared shape, not a value that failed to load.
+                if (axis.MetricId.StartsWith("_pad", StringComparison.Ordinal))
+                {
+                    spokes.Add(new SkillSpoke(string.Empty, 0, 0));
+                    continue;
+                }
+
+                spokes.Add(new SkillSpoke(
+                    axis.DisplayName.ToString(),
+                    nonNegative(chartSkills.GetValueOrDefault(axis.ChartSkillId, 0)),
+                    nonNegative(playerSkills.GetValueOrDefault(axis.PlayerSkillId, 0))));
+            }
+
+            applySkillSpokes(spokes, beatmapOnly);
+        }
 
         private static readonly EzMinaSkillAxis[] skill_radar_axes = EzMinaSkillAxisExtensions.RadarAxes;
 
-        private static string skillAxisDisplayName(EzMinaSkillAxis axis)
-            => axis.Chip().Name.ToString();
+        private static string skillAxisDisplayName(EzMinaSkillAxis axis) => axis.Chip().Name.ToString();
 
-        private static EzRadarComputeKey createRadarKey(BeatmapInfo beatmapInfo, RulesetInfo ruleset, IReadOnlyList<Mod>? mods, EzRadarDisplayMode mode)
-            => new EzRadarComputeKey(beatmapInfo.Hash, ruleset.OnlineID, EzAnalysisLookupCache.ComputeModsSignature(mods), mode);
+        private static EzRadarComputeKey createAnalysisKey(BeatmapInfo beatmapInfo, RulesetInfo ruleset, IReadOnlyList<Mod>? mods)
+            => new EzRadarComputeKey(beatmapInfo.Hash, ruleset.OnlineID, EzAnalysisLookupCache.ComputeModsSignature(mods));
 
         private void cancelRadarAnalysis()
         {
@@ -778,110 +800,12 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         /// <summary>
-        /// Drop pending debounce + kick guards. Called when the chart / mods / ruleset changed, so the next
-        /// presentation is allowed to kick again (a chart switched away from and back must not be blocked by a
-        /// cancelled in-flight kick).
+        /// Drop pending kick guards. Called when the chart / mods / ruleset changed, so the next presentation is
+        /// allowed to kick again (a chart switched away from and back must not be blocked by a cancelled kick).
         /// </summary>
         private void resetRadarKickGuards()
         {
-            liveKickDebounce?.Cancel();
-            liveKickDebounce = null;
-            lastLiveKickKey = null;
-            lastRulesetRadarKickKey = null;
-        }
-
-        /// <summary>Cancel a pending (not yet started) live skill kick when leaving skill radar mode.</summary>
-        private void cancelLiveKick()
-        {
-            liveKickDebounce?.Cancel();
-            liveKickDebounce = null;
-            lastLiveKickKey = null;
-        }
-
-        private bool isRulesetRadarCacheValid(BeatmapInfo beatmapInfo)
-            => cachedRulesetSpecificRadarResult != null
-               && cachedRulesetSpecificRadarKey is { } key
-               && key == createRadarKey(beatmapInfo, ruleset.Value, mods.Value, RadarDisplayMode.Value);
-
-        private bool beginRulesetSpecificRadarUpdate()
-        {
-            if (!EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value))
-                return false;
-
-            if (beatmap.Value.BeatmapInfo is not BeatmapInfo beatmapInfo)
-            {
-                cancelRadarAnalysis();
-                lastRulesetRadarKickKey = null;
-                clearChartData();
-                return true;
-            }
-
-            var key = createRadarKey(beatmapInfo, ruleset.Value, mods.Value, RadarDisplayMode.Value);
-
-            // Same chart + mods + mode already kicked: the first pass is still in flight (or has already been
-            // applied / is cached). Restarting here is what ran the full ruleset compute twice per song switch.
-            if (lastRulesetRadarKickKey == key)
-                return true;
-
-            cancelRadarAnalysis();
-            clearChartData();
-
-            lastRulesetRadarKickKey = key;
-            radarAnalysisCancellationSource = new CancellationTokenSource();
-
-            CancellationToken cancellationToken = radarAnalysisCancellationSource.Token;
-            WorkingBeatmap workingBeatmap = beatmap.Value;
-            RulesetInfo localRuleset = ruleset.Value;
-            IReadOnlyList<Mod> localMods = mods.Value;
-
-            Task.Factory.StartNew(() => computeRulesetSpecificRadarData(workingBeatmap, beatmapInfo, localRuleset, localMods, cancellationToken), cancellationToken,
-                    TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, TaskScheduler.Default)
-                .ContinueWith(task =>
-                {
-                    Schedule(() =>
-                    {
-                        if (cancellationToken.IsCancellationRequested)
-                            return;
-
-                        EzRulesetSpecificRadarResult? radarResult = task.GetResultSafely();
-
-                        if (radarResult != null)
-                        {
-                            cachedRulesetSpecificRadarResult = radarResult.Value;
-                            cachedRulesetSpecificRadarKey = key;
-                            applyRulesetSpecificRadarResult(radarResult.Value);
-                        }
-                        else if (lastRulesetRadarKickKey == key)
-                        {
-                            // A failed / unavailable compute must not block a retry on the next presentation.
-                            lastRulesetRadarKickKey = null;
-                        }
-                    });
-                }, cancellationToken);
-
-            return true;
-        }
-
-        private EzRulesetSpecificRadarResult? computeRulesetSpecificRadarData(WorkingBeatmap workingBeatmap, BeatmapInfo beatmapInfo, RulesetInfo localRuleset,
-                                                                              IReadOnlyList<Mod> localMods, CancellationToken cancellationToken)
-        {
-            try
-            {
-                var lookup = new EzAnalysisLookupCache(beatmapInfo, localRuleset, localMods);
-
-                return EzAnalysisComputation.TryComputeRulesetSpecificRadarData(workingBeatmap, lookup, cancellationToken, out EzRulesetSpecificRadarResult radarResult)
-                    ? radarResult
-                    : null;
-            }
-            catch (OperationCanceledException)
-            {
-                return null;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, $"[EzComRadarPanel] Failed to compute ruleset radar for beatmapId={beatmapInfo.ID}.", Ez2ConfigManager.LOGGER_NAME);
-                return null;
-            }
+            lastLiveAnalysisKickKey = null;
         }
 
         private EzRadarChartData<string> createGeneralRadarData(StarDifficulty difficulty)
@@ -908,7 +832,7 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 EzRadarAxisValue<string> axis = radarData[i];
 
-                activeAxisLabels[i] = EzPatternAxisExtensions.TryParse(axis.Axis, out var pattern)
+                activeAxisLabels[i] = EzKeyPatternAxisExtensions.TryParse(axis.Axis, out var pattern)
                     ? pattern.DisplayName().ToString()
                     : axis.Axis;
                 activeAxisFormats[i] = axis.Format;
@@ -927,30 +851,48 @@ namespace osu.Game.EzOsuGame.HUD
             updateAxisTexts();
         }
 
-        private void applyRulesetSpecificRadarResult(EzRulesetSpecificRadarResult radarResult)
+        /// <summary>
+        /// The polygon the current display mode draws: the Sunny breakdown, or the structure view.
+        /// </summary>
+        private bool tryGetRadarData(EzAnalysisResult analysis, out EzRadarChartData<string> radarData, out double? sunnySR)
+        {
+            sunnySR = analysis.RatingOf(EzAnalysisSystem.SSR).StarRating;
+
+            EzRadarChartData<string>? source = RadarDisplayMode.Value == EzRadarDisplayMode.SunnySRSkill
+                ? analysis.SsrPatternRadar
+                : analysis.KeyPatternRadar;
+
+            if (source is { } resolved)
+            {
+                radarData = resolved;
+                return true;
+            }
+
+            radarData = default;
+            return false;
+        }
+
+        private void applyRulesetSpecificRadarResult(EzRadarChartData<string> radarData, double? sunnySR)
         {
             chart?.ClearSecondaryData();
-            EzRadarChartData<string> displayedRadarData = createDisplayedRulesetRadarData(radarResult);
+            EzRadarChartData<string> displayedRadarData = createDisplayedRulesetRadarData(radarData, sunnySR);
             applyRadarData(displayedRadarData, getRulesetSpecificAxisMaxValues());
         }
 
         private IReadOnlyList<float> getGeneralAxisMaxValues() => new[] { MaxBpm, MaxStar, MaxCs, MaxOd, MaxDr, MaxAr };
 
-        private IReadOnlyList<float> getRulesetSpecificAxisMaxValues()
-            => RadarDisplayMode.Value == EzRadarDisplayMode.XxySrPattern
-                ? new[] { MaxXxySr, MaxXxySr, MaxXxySr, MaxXxySr, MaxXxySr, MaxXxySr }
-                : UseAbsoluteValue.Value
-                    ? new[] { MaxXxySr, MaxXxySr, long_note_ratio_max, MaxXxySr, MaxXxySr, MaxXxySr }
-                    : new[] { MaxKeyPatternScore, MaxKeyPatternScore, long_note_ratio_max, MaxKeyPatternScore, MaxKeyPatternScore, MaxKeyPatternScore };
+        private IReadOnlyList<float> getRulesetSpecificAxisMaxValues() => RadarDisplayMode.Value == EzRadarDisplayMode.SunnySRSkill
+            ? new[] { MaxSunnySR, MaxSunnySR, MaxSunnySR, MaxSunnySR, MaxSunnySR, MaxSunnySR }
+            : UseAbsoluteValue.Value
+                ? new[] { MaxSunnySR, MaxSunnySR, long_note_ratio_max, MaxSunnySR, MaxSunnySR, MaxSunnySR }
+                : new[] { MaxKeyPatternScore, MaxKeyPatternScore, long_note_ratio_max, MaxKeyPatternScore, MaxKeyPatternScore, MaxKeyPatternScore };
 
-        private EzRadarChartData<string> createDisplayedRulesetRadarData(EzRulesetSpecificRadarResult radarResult)
+        private EzRadarChartData<string> createDisplayedRulesetRadarData(EzRadarChartData<string> sourceRadarData, double? sunnySR)
         {
-            EzRadarChartData<string> sourceRadarData = getSelectedRulesetSpecificRadarData(radarResult);
-
-            if (RadarDisplayMode.Value == EzRadarDisplayMode.XxySrPattern)
+            if (RadarDisplayMode.Value == EzRadarDisplayMode.SunnySRSkill)
                 return sourceRadarData;
 
-            if (!UseAbsoluteValue.Value || radarResult.XxySr is not double xxySr || xxySr <= 0)
+            if (!UseAbsoluteValue.Value || sunnySR is not double sunny || sunny <= 0)
                 return sourceRadarData;
 
             bool preserveLongNotePercentage = RadarDisplayMode.Value == EzRadarDisplayMode.KeyPattern;
@@ -966,15 +908,12 @@ namespace osu.Game.EzOsuGame.HUD
                     continue;
                 }
 
-                double absoluteValue = Math.Round(axis.Value / key_pattern_full_score * xxySr, 2, MidpointRounding.AwayFromZero);
+                double absoluteValue = Math.Round(axis.Value / key_pattern_full_score * sunny, 2, MidpointRounding.AwayFromZero);
                 axes[i] = new EzRadarAxisValue<string>(axis.Axis, absoluteValue, "0.00");
             }
 
             return EzRadarChartData<string>.Create(axes);
         }
-
-        private EzRadarChartData<string> getSelectedRulesetSpecificRadarData(EzRulesetSpecificRadarResult radarResult)
-            => RadarDisplayMode.Value == EzRadarDisplayMode.XxySrPattern ? radarResult.XxySrPatternRadarData : radarResult.KeyPatternRadarData;
 
         private void clearChartData()
         {

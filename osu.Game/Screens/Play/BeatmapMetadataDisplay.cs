@@ -287,9 +287,9 @@ namespace osu.Game.Screens.Play
             ezAnalysisCancellationSource?.Dispose();
             ezAnalysisCancellationSource = new CancellationTokenSource();
 
-            if (!EzDualDifficultyDisplay.ShouldShowXxyDisplay(beatmapInfo))
+            if (!EzDualDifficultyDisplay.ShouldShowSunnySRDisplay(beatmapInfo))
             {
-                dualDifficultyDisplay.ResetXxy();
+                dualDifficultyDisplay.ResetSunnySR();
                 return;
             }
 

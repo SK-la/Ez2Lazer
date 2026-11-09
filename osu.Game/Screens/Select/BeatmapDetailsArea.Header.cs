@@ -65,9 +65,9 @@ namespace osu.Game.Screens.Select
 
             public Bindable<string?> EzAnalysisPlayer { get; } = new Bindable<string?>();
 
-            public Bindable<EzRadarDisplayMode> LeftRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.XxySrPattern);
+            public Bindable<EzRadarDisplayMode> LeftRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.SunnySRSkill);
 
-            public Bindable<EzRadarDisplayMode> RightRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.SkillDual);
+            public Bindable<EzRadarDisplayMode> RightRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.MSDSkillDual);
 
             [Resolved]
             private EzLocalProfileService? localProfileService { get; set; }
@@ -252,7 +252,7 @@ namespace osu.Game.Screens.Select
                                                             .ToList()
                                          ?? new List<string>();
 
-                // Offer All whenever any archive player has SSR (All headlines may still be empty until recompute).
+                // Offer All whenever any archive player has SunnySR (All headlines may still be empty until recompute).
                 if (playerHasSkillData(EzLocalProfileConstants.ALL_PLAYERS) || includedWithSkills.Count > 0)
                     names.Add(EzLocalProfileConstants.ALL_PLAYERS);
 
@@ -287,8 +287,7 @@ namespace osu.Game.Screens.Select
                 }
             }
 
-            private bool playerHasSkillData(string username)
-                => skillProvider == null || skillProvider.GetPlayerSsrKeyCounts(username).Count > 0;
+            private bool playerHasSkillData(string username) => skillProvider == null || skillProvider.GetPlayerSsrKeyCounts(username).Count > 0;
 
             private void applyFlowModeState(bool enabled)
             {
@@ -411,9 +410,6 @@ namespace osu.Game.Screens.Select
 
                 protected override LocalisableString GenerateItemText(EzRadarDisplayMode item)
                 {
-                    if (item == EzRadarDisplayMode.SkillDual)
-                        return EzSongSelectStrings.RADAR_MODE_SKILL;
-
                     var attr = typeof(EzRadarDisplayMode).GetField(item.ToString())
                                                          ?.GetCustomAttributes(typeof(DescriptionAttribute), false)
                                                          .OfType<DescriptionAttribute>()

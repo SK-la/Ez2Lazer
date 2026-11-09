@@ -54,6 +54,78 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             });
         }
 
+        /// <summary>
+        /// The memo is bounded, but reaching the bound must not throw away the charts a scroll is currently
+        /// re-binding. Only the oldest quarter is dropped, so whatever was inserted last still answers.
+        /// </summary>
+        [Test]
+        public void MemoEvictsOldestInsteadOfClearing()
+        {
+            using var storage = new TemporaryNativeStorage($"ez-analysis-memo-evict-{Guid.NewGuid()}");
+
+            bool previousEnabled = EzAnalysisPersistentStore.Enabled;
+            EzAnalysisPersistentStore.Enabled = true;
+
+            try
+            {
+                const int capacity = 8;
+
+                using var store = new EzAnalysisPersistentStore(storage, capacity);
+                store.Initialise();
+
+                var beatmaps = new List<BeatmapInfo>();
+
+                for (int i = 0; i < capacity; i++)
+                {
+                    var beatmap = createBeatmap();
+                    beatmaps.Add(beatmap);
+
+                    Assert.That(store.TryGetMemoised(beatmap, out _), Is.False);
+                }
+
+                // The newest insert pushes the memo past the bound, which evicts the oldest quarter (two entries)
+                // and then inserts, leaving the store at bound - batch + 1 rather than empty.
+                var latest = createBeatmap();
+                Assert.That(store.TryGetMemoised(latest, out _), Is.False);
+
+                Assert.That(store.SharedReadMemoCount, Is.EqualTo(capacity - capacity / 4 + 1),
+                    "the memo should drop the oldest quarter, not the whole table");
+            }
+            finally
+            {
+                EzAnalysisPersistentStore.Enabled = previousEnabled;
+            }
+        }
+
+        /// <summary>
+        /// Re-binding the same chart must not enqueue a duplicate eviction slot: the memo would otherwise grow its
+        /// order queue without bound while its entry count stayed flat.
+        /// </summary>
+        [Test]
+        public void RepeatedReadsDoNotGrowTheMemo()
+        {
+            using var storage = new TemporaryNativeStorage($"ez-analysis-memo-repeat-{Guid.NewGuid()}");
+
+            bool previousEnabled = EzAnalysisPersistentStore.Enabled;
+            EzAnalysisPersistentStore.Enabled = true;
+
+            try
+            {
+                using var store = new EzAnalysisPersistentStore(storage, 16);
+                store.Initialise();
+                var beatmap = createBeatmap();
+
+                for (int i = 0; i < 100; i++)
+                    store.TryGetMemoised(beatmap, out _);
+
+                Assert.That(store.SharedReadMemoCount, Is.EqualTo(1));
+            }
+            finally
+            {
+                EzAnalysisPersistentStore.Enabled = previousEnabled;
+            }
+        }
+
         private static void withEnabledStore(Action<EzAnalysisPersistentStore, BeatmapInfo> test)
         {
             using var storage = new TemporaryNativeStorage($"ez-analysis-memo-test-{Guid.NewGuid()}");
@@ -75,8 +147,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         private static EzAnalysisResult createSlice(double averageKps, double maxKps)
             => new EzAnalysisResult(
                 new KpsSummary(averageKps, maxKps, new List<double> { averageKps, maxKps }),
-                pp: null,
-                new EzManiaSummary(new Dictionary<int, int> { [4] = 10 }, null, xxySr: null));
+                new EzManiaSummary(new Dictionary<int, int> { [4] = 10 }, null, sunnySR: null));
 
         private static BeatmapInfo createBeatmap() => new BeatmapInfo
         {

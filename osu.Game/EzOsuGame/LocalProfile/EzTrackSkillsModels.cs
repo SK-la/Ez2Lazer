@@ -4,8 +4,10 @@
 using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Mina;
 
 namespace osu.Game.EzOsuGame.LocalProfile
 {
@@ -14,13 +16,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
     /// </summary>
     public interface IEzTrackSkillsPresenter
     {
-        string SystemId { get; }
+        EzAnalysisSystem System { get; }
 
         bool HasSliceChips { get; }
 
         bool HasSidePanel { get; }
 
-        int AlgorithmVersion => EzSkillSystems.ResolveAlgorithmVersion(SystemId);
+        int AlgorithmVersion => System.CurrentVersion();
 
         IReadOnlyList<int> GetSliceKeys(string username);
 
@@ -55,20 +57,20 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public IReadOnlyList<EzTrackSkillsAxis> BarAxes { get; init; } = [];
 
-        public bool IsEffectivelyProvisional =>
-            Provisional || PlaysAnalyzed < EzPlayerSsrSnapshot.QUALIFYING_PLAYS;
+        public bool IsEffectivelyProvisional => Provisional || PlaysAnalyzed < EzPlayerRatingSnapshot.QUALIFYING_PLAYS;
     }
 
     public static class EzTrackSkillsPresenterFactory
     {
-        public static IEzTrackSkillsPresenter? Create(EzSkillProfile? profile, EzSkillProvider provider)
+        public static IEzTrackSkillsPresenter? Create(EzSkillProfile? profile, EzSkillProvider? provider)
         {
-            if (profile == null)
+            if (profile == null || provider == null)
                 return null;
 
-            return profile.DefaultPlayerSystemId switch
+            return profile.DefaultSystem switch
             {
-                EzSkillSystems.PLAYER_SSR => new ManiaTrackSkillsPresenter(provider),
+                EzAnalysisSystem.SSR => new ManiaTrackSkillsPresenter(provider),
+                EzAnalysisSystem.PPP => new PPPSkillsPresenter(provider, profile.RulesetOnlineId),
                 _ => null,
             };
         }

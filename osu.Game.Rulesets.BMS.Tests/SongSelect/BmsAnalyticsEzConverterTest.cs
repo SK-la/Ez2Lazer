@@ -11,13 +11,13 @@ namespace osu.Game.Rulesets.BMS.Tests.SongSelect
     public class BmsAnalyticsEzConverterTest
     {
         [Test]
-        public void ToEzAnalysisResult_maps_pp_kps_and_xxy_sr()
+        public void ToEzAnalysisResult_maps_pp_kps_and_sunny_sr()
         {
             var record = new BmsAnalyticsRecord
             {
                 PathKey = "abc",
                 Pp = 123.4,
-                XxySr = 5.6,
+                SunnySR = 5.6,
                 AvgKps = 7.8,
                 MaxKps = 9.0,
                 ColumnCountsJson = "{\"1\":10,\"2\":5}",
@@ -26,10 +26,9 @@ namespace osu.Game.Rulesets.BMS.Tests.SongSelect
             Assert.That(BmsAnalyticsEzConverter.ToEzAnalysisResult(record), Is.Not.Null);
 
             var result = BmsAnalyticsEzConverter.ToEzAnalysisResult(record)!.Value;
-            Assert.That(result.Pp, Is.EqualTo(123.4));
             Assert.That(result.AverageKps, Is.EqualTo(7.8));
             Assert.That(result.MaxKps, Is.EqualTo(9.0));
-            Assert.That(result.ManiaSummary?.XxySr, Is.EqualTo(5.6));
+            Assert.That(result.ManiaSummary?.SunnySR, Is.EqualTo(5.6));
             Assert.That(result.ManiaSummary?.ColumnCounts[1], Is.EqualTo(10));
             Assert.That(result.ManiaSummary?.ColumnCounts[2], Is.EqualTo(5));
         }

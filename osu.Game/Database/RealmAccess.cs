@@ -24,7 +24,9 @@ using osu.Game.Beatmaps.ExternalLibraries;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.Input;
 using osu.Game.Input.Bindings;
 using osu.Game.Models;
@@ -117,19 +119,33 @@ namespace osu.Game.Database
         /// The on-disk Realm schema version is <see cref="EzFileSchemaVersion"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 52010).
         /// Ez v1: Add ScoreInfo hit/health mode (later renamed: Judgement=>JudgeMode, health kept).
         /// Ez v2: Add BeatmapInfo.HasVideo and HasStoryboard.
-        /// Ez v3: Add BeatmapInfo.XxyStarRating.
+        /// Ez v3: Add BeatmapInfo.SunnyStarRating.
         /// Ez v4: Add BeatmapInfo.PerformancePoints.
         /// Ez v5: Change BeatmapInfo.HasVideo/HasStoryboard to nullable (null = unknown).
-        /// Ez v6: Add RulesetInfo.LastAppliedXxySrVersion.
+        /// Ez v6: Add RulesetInfo.LastAppliedSunnySRVersion.
         /// Ez v7: Normalize BeatmapSetInfo external hosting paths.
         /// Ez v8: Add mania skill RealmObjects (EzBeatmapSkillValue, EzPlayerSkillValue, EzDanEstimate,
         /// EzPlayerSkillHistoryPoint) with extended dan/provisional fields; RulesetInfo.LastAppliedManiaSkillVersion.
         /// Ez v9: Add typed EzBeatmapChartSkillInfo + EzPlayerDanSkillsetValue (no JSON blobs).
-        /// Ez v10: Add EzBeatmapChartDan (nomod chart-dan + skillset label stamps).
+        /// Ez v10: Add EzChartDan (nomod chart-dan + skillset label stamps).
         /// Ez v11: Reorder EzEnumJudgeMode/EzEnumHealthMode (StableClassic = 1; Mania private modes at 31+);
         ///         add canonical ScoreInfo.JudgeMode/HealthMode columns and migrate the legacy ManiaHitMode/ManiaHealthMode data into them.
         /// </summary>
-        public const int EZ_REALM_SCHEMA_VERSION = 11;
+        /// <remarks>
+        /// BeatmapInfo's per-system rating columns were replaced by the embedded
+        /// <see cref="EzRatingData"/> as part of v12: the v11-to-v12 migration creates the record
+        /// for every existing row, so the version number itself does not change.
+        /// </remarks>
+        public const int EZ_REALM_SCHEMA_VERSION = 12;
+
+        /// <summary>
+        /// Smallest file that is worth rewriting. A smaller file does not cost meaningful space, and the rewrite
+        /// blocks startup and needs free disk equal to the file.
+        /// </summary>
+        private const ulong compact_minimum_bytes = 200UL * 1024 * 1024;
+
+        /// <summary>Free space must exceed live data before the rewrite pays for itself.</summary>
+        private const double compact_max_used_ratio = 0.5;
 
         public static int EzFileSchemaVersion => schema_version * 1000 + EZ_REALM_SCHEMA_VERSION;
 
@@ -974,9 +990,34 @@ namespace osu.Game.Database
             {
                 SchemaVersion = pinnedDiskSchemaVersion ?? (ulong)fileSchemaVersionForMode,
                 MigrationCallback = performSchemaMigration ? onMigration : null,
+                ShouldCompactOnLaunch = performSchemaMigration ? shouldCompactOnLaunch : null,
                 FallbackPipePath = tempPathLocation,
             };
         }
+
+        /// <summary>
+        /// Compacts a file whose free space has outgrown its live data.
+        /// </summary>
+        /// <remarks>
+        /// Deleting rows only returns their pages to the file's free list, so a migration that drops a whole table (or
+        /// rewrites every object into a new shape) leaves the file at its old size. This runs before the realm instance
+        /// is handed out, which is why it cannot time out the way <see cref="BlockAllOperations"/> can.
+        /// The threshold is deliberately conservative: the rewrite needs free disk space equal to the file, and it
+        /// blocks startup for its duration.
+        /// </remarks>
+        private static bool shouldCompactOnLaunch(ulong totalBytes, ulong bytesUsed)
+        {
+            bool compact = totalBytes > compact_minimum_bytes && (double)bytesUsed / totalBytes < compact_max_used_ratio;
+
+            if (compact)
+                Logger.Log($"Compacting realm: {bytesUsed / (1024 * 1024)}MB in use of {totalBytes / (1024 * 1024)}MB", LoggingTarget.Database);
+
+            return compact;
+        }
+
+        /// <summary>Exposes the launch predicate so its thresholds can be asserted without a realm file.</summary>
+        internal static bool ShouldCompactOnLaunchForTesting(ulong totalBytes, ulong bytesUsed)
+            => shouldCompactOnLaunch(totalBytes, bytesUsed);
 
         private void onMigration(Migration migration, ulong lastSchemaVersion)
         {
@@ -1534,9 +1575,6 @@ namespace osu.Game.Database
                     break;
 
                 case 3:
-                    foreach (var beatmap in migration.NewRealm.All<BeatmapInfo>())
-                        beatmap.XxyStarRating = -1;
-
                     break;
 
                 case 4:
@@ -1555,9 +1593,7 @@ namespace osu.Game.Database
                     break;
 
                 case 6:
-                    foreach (var ruleset in migration.NewRealm.All<RulesetInfo>())
-                        ruleset.LastAppliedXxySrVersion = 0;
-
+                    // The per-ruleset SunnySR revision column was retired in favour of EzAnalysisState.
                     break;
 
                 case 7:
@@ -1573,11 +1609,8 @@ namespace osu.Game.Database
                     break;
 
                 case 8:
-                    // Skill tables are new and start empty. Mark mania skill algorithm as unset on rulesets.
-                    // Extended columns (Provisional/Stale, dan course fields, history points, BeatmapId) use defaults.
-                    foreach (var ruleset in migration.NewRealm.All<RulesetInfo>())
-                        ruleset.LastAppliedManiaSkillVersion = 0;
-
+                    // Skill tables are new and start empty. Extended columns (Provisional/Stale, dan course fields,
+                    // history points, BeatmapId) use defaults.
                     break;
 
                 case 9:
@@ -1586,7 +1619,7 @@ namespace osu.Game.Database
                     break;
 
                 case 10:
-                    // EzBeatmapChartDan is new and starts empty (BDSP / maintenance warm).
+                    // EzChartDan is new and starts empty (BDSP / maintenance warm).
                     break;
 
                 case 11:
@@ -1619,6 +1652,41 @@ namespace osu.Game.Database
                             newScores[i].JudgeMode = RemapEzJudgeMode(oldJudge);
                             newScores[i].HealthMode = RemapEzHealthMode(oldHealth);
                         }
+                    }
+
+                    break;
+                }
+
+                case 12:
+                {
+                    // EzBeatmapSkillValue 新增 RulesetOnlineId / State：旧行没有规则集归属，而系统键值同时要改，
+                    // 逐行猜测比直接清表更危险。开发期库没有兼容负担，交由回填重建。
+                    migration.NewRealm.RemoveAll<EzBeatmapSkillValue>();
+
+                    // 各系统的星级 / pp 从五列收进 EzRatingData。v11 的 SunnyStarRating 在 v12 里改名成
+                    // SunnyStarRating，现在又归到 EzRatingData.SunnySR，所以这一版一并把它搬过去。
+                    string beatmapClassName = getMappedOrOriginalName(typeof(BeatmapInfo));
+
+                    bool hasLegacySunnySR = migration.OldRealm.Schema.TryFindObjectSchema(beatmapClassName, out var beatmapSchema)
+                                        && beatmapSchema.Any(p => p.Name == "SunnyStarRating");
+
+                    dynamic? oldBeatmaps = hasLegacySunnySR ? migration.OldRealm.DynamicApi.All(beatmapClassName) : null;
+                    var newBeatmaps = migration.NewRealm.All<BeatmapInfo>().ToList();
+
+                    for (int i = 0; i < newBeatmaps.Count; i++)
+                    {
+                        BeatmapInfo beatmap = newBeatmaps[i];
+
+                        // v12 之前没有这一列，迁移出来的新行不会自带，由这一版创建。
+                        beatmap.EzRatingData = new EzRatingData();
+
+                        if (oldBeatmaps == null)
+                            continue;
+
+                        double legacy = oldBeatmaps[i].SunnyStarRating;
+
+                        if (double.IsFinite(legacy))
+                            beatmap.EzRatingData.SunnySR = legacy;
                     }
 
                     break;

@@ -15,13 +15,13 @@ using osu.Framework.Graphics.Shapes;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
 using osu.Game.Configuration;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Containers;
-using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.Chat;
@@ -53,9 +53,13 @@ namespace osu.Game.Screens.Select
             [Resolved]
             private BeatmapDifficultyCache difficultyCache { get; set; } = null!;
 
+            [Resolved]
+            private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
+
             private StarRatingDisplay starRatingDisplay => dualDifficultyDisplay.Official;
 
             private EzDualDifficultyDisplay dualDifficultyDisplay = null!;
+            private EzMetricVariantChip variantChip = null!;
             private FillFlowContainer nameLine = null!;
             private OsuSpriteText difficultyText = null!;
             private OsuSpriteText mappedByText = null!;
@@ -70,6 +74,17 @@ namespace osu.Game.Screens.Select
             private DifficultyStatisticsDisplay difficultyStatisticsDisplay = null!;
 
             private CancellationTokenSource? cancellationSource;
+
+            // Mirrors the live difficulty; re-binding the cache's shared bindable per update would stack handlers.
+            private readonly Bindable<StarDifficulty> liveDifficulty = new Bindable<StarDifficulty>();
+
+            protected override void Dispose(bool isDisposing)
+            {
+                base.Dispose(isDisposing);
+
+                if (isDisposing)
+                    liveDifficulty.UnbindAll();
+            }
 
             public DifficultyDisplay()
             {
@@ -108,6 +123,8 @@ namespace osu.Game.Screens.Select
                                     new Dimension(GridSizeMode.AutoSize),
                                     new Dimension(GridSizeMode.Absolute, 6),
                                     new Dimension(),
+                                    new Dimension(GridSizeMode.AutoSize),
+                                    new Dimension(GridSizeMode.Absolute, 6),
                                     new Dimension(GridSizeMode.AutoSize, maxSize: 160),
                                 },
                                 Content = new[]
@@ -161,6 +178,12 @@ namespace osu.Game.Screens.Select
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
                                             Margin = new MarginPadding { Left = 8f, Right = 10f },
+                                        },
+                                        Empty(),
+                                        variantChip = new EzMetricVariantChip
+                                        {
+                                            Anchor = Anchor.CentreLeft,
+                                            Origin = Anchor.CentreLeft,
                                         },
                                     }
                                 },
@@ -255,6 +278,8 @@ namespace osu.Game.Screens.Select
                     }
                 }, true);
 
+                liveDifficulty.BindValueChanged(d => applyOfficialPerformance(d.NewValue));
+
                 updateDisplay();
             }
 
@@ -272,7 +297,8 @@ namespace osu.Game.Screens.Select
                     countStatisticsDisplay.FadeOut(300, Easing.OutQuint);
                     spreadDisplay.Beatmap.Value = null;
                     spreadDisplay.StarDifficulty.UnbindAll();
-                    dualDifficultyDisplay.ResetXxy();
+                    dualDifficultyDisplay.ResetSunnySR();
+                    dualDifficultyDisplay.ApplyPerformance(null);
                 }
                 else
                 {
@@ -286,7 +312,12 @@ namespace osu.Game.Screens.Select
                         dualDifficultyDisplay.UpdateFromBeatmap(beatmapInfo);
                 }
 
-                dualDifficultyDisplay.Official.Current = (Bindable<StarDifficulty>)difficultyCache.GetBindableDifficulty(beatmap.Value.BeatmapInfo, cancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+                // The pp pill follows the same live calculation as the official star pill.
+                var difficultyBindable = (Bindable<StarDifficulty>)difficultyCache.GetBindableDifficulty(beatmap.Value.BeatmapInfo, cancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+                dualDifficultyDisplay.Official.Current = difficultyBindable;
+
+                liveDifficulty.UnbindAll();
+                liveDifficulty.BindTo(difficultyBindable);
 
                 if (!beatmap.IsDefault)
                 {
@@ -298,21 +329,50 @@ namespace osu.Game.Screens.Select
                 updateDifficultyStatistics();
             }
 
-            public void ApplyKpcMetrics(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
+            private void applyOfficialPerformance(StarDifficulty starDifficulty)
             {
-                if (beatmap.IsDefault || beatmap.Value.BeatmapInfo is not BeatmapInfo beatmapInfo
-                    || !EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value)
-                    || !beatmapInfo.SupportsXxyStarRating())
+                if (beatmap.IsDefault)
                 {
-                    ezDisplayKpc.ManiaSummary = null;
-                    ezDisplayKpc.Hide();
-                    dualDifficultyDisplay.ResetXxy();
+                    dualDifficultyDisplay.ApplyPerformance(null);
                     return;
                 }
 
-                ezDisplayKpc.ManiaSummary = metrics.ManiaSummary;
-                ezDisplayKpc.Show();
+                applyVariantPerformance(beatmap.Value.BeatmapInfo, starDifficulty);
+            }
+
+            public void ApplyKpcMetrics(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
+            {
+                if (beatmap.IsDefault || beatmap.Value.BeatmapInfo is not BeatmapInfo beatmapInfo)
+                {
+                    ezDisplayKpc.ManiaSummary = null;
+                    ezDisplayKpc.Hide();
+                    dualDifficultyDisplay.ResetSunnySR();
+                    dualDifficultyDisplay.ApplyPerformance(null);
+                    return;
+                }
+
+                if (metrics.ManiaSummary?.ColumnCounts.Count > 0)
+                {
+                    ezDisplayKpc.ManiaSummary = metrics.ManiaSummary;
+                    ezDisplayKpc.Show();
+                }
+                else
+                {
+                    ezDisplayKpc.ManiaSummary = null;
+                    ezDisplayKpc.Hide();
+                }
+
                 dualDifficultyDisplay.ApplyAnalysisMetrics(beatmapInfo, metrics);
+                applyVariantPerformance(beatmapInfo, liveDifficulty.Value);
+            }
+
+            /// <summary>
+            /// The pp pill follows the selected analysis system; the official difficulty is its live official half.
+            /// </summary>
+            private void applyVariantPerformance(BeatmapInfo beatmapInfo, in StarDifficulty officialDifficulty)
+            {
+                var values = ezAnalysisCache.ReadVariantValues(beatmapInfo, mods.Value, EzReadoutValues.Live(officialDifficulty));
+                dualDifficultyDisplay.ApplyPerformance(values.PerformancePoints);
             }
 
             private void updateCountStatistics(CancellationToken cancellationToken)

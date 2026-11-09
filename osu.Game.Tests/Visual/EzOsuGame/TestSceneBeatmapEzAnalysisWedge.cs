@@ -6,13 +6,16 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Framework.Utils;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.HUD;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Tests.Beatmaps;
@@ -27,7 +30,8 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         private const int test_keys = 4;
 
         private BeatmapEzAnalysisWedge wedge = null!;
-        private EzSkillStore skillStore = null!;
+        private EzChartSkillStore skillStore = null!;
+        private EzPlayerSkillStore playerStore = null!;
 
         /// <summary>Match MetadataWedge host; DualPanel uses Horizontal RC|LN (not Auto on a pinned narrow box).</summary>
         protected override float InitialRelativeWidth => 0.5f;
@@ -35,8 +39,9 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
         {
             var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
-            skillStore = new EzSkillStore(dependencies.Get<RealmAccess>());
-            dependencies.CacheAs(new EzSkillProvider(skillStore));
+            skillStore = new EzChartSkillStore(dependencies.Get<RealmAccess>());
+            playerStore = new EzPlayerSkillStore(new EzLocalProfileDatabase(dependencies.Get<Storage>()));
+            dependencies.CacheAs(new EzSkillProvider(skillStore, playerStore));
             return dependencies;
         }
 
@@ -151,11 +156,11 @@ namespace osu.Game.Tests.Visual.EzOsuGame
 
             AddAssert("rc and ln player aggregates seeded", () =>
             {
-                var rc = skillStore.GetDanEstimate(test_player, test_keys, EzDanSide.Rc.ToId());
-                var ln = skillStore.GetDanEstimate(test_player, test_keys, EzDanSide.Ln.ToId());
-                return rc != null && ln != null
-                       && !string.IsNullOrEmpty(rc.Label) && !string.IsNullOrEmpty(ln.Label)
-                       && rc.Label != ln.Label;
+                var rc = playerStore.GetDanEstimate(test_player, test_keys, EzDanSide.Rc.ToId());
+                var ln = playerStore.GetDanEstimate(test_player, test_keys, EzDanSide.Ln.ToId());
+                return rc is { } rcRow && ln is { } lnRow
+                                       && !string.IsNullOrEmpty(rcRow.Label) && !string.IsNullOrEmpty(lnRow.Label)
+                                       && rcRow.Label != lnRow.Label;
             });
 
             AddUntilStep("header aggregate dans visible", () =>
@@ -168,18 +173,18 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             wedge.DanPanel.DualLayout.Value = EzDanPanelDualLayout.Horizontal;
             var beatmap = CreateWorkingBeatmap(new TestBeatmap(new ManiaRuleset().RulesetInfo));
             beatmap.BeatmapInfo.Difficulty.CircleSize = test_keys;
-            beatmap.BeatmapInfo.XxyStarRating = 18.5;
+            beatmap.BeatmapInfo.EzRatingData.SunnySR = 18.5;
 
             string hash = beatmap.BeatmapInfo.Hash;
 
             if (string.IsNullOrEmpty(hash))
             {
-                // Test beatmaps sometimes ship empty hash; DualPanel keys off Hash for MSD lookup.
+                // Test beatmaps sometimes ship empty hash; DualPanel keys off Hash for Mina lookup.
                 hash = "ez-analysis-wedge-test-hash";
                 beatmap.BeatmapInfo.Hash = hash;
             }
 
-            var chartMsd = new EzSkillsetVector(
+            var chartMsd = new EzMinaSkillAxisVector(
                 Overall: 22.4,
                 Stream: 21.0,
                 Jumpstream: 23.5,
@@ -189,7 +194,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 Chordjack: 18.6,
                 Technical: 22.0);
 
-            var playerSsr = new EzSkillsetVector(
+            var playerSsr = new EzMinaSkillAxisVector(
                 Overall: 20.1,
                 Stream: 19.5,
                 Jumpstream: 21.2,
@@ -199,8 +204,8 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 Chordjack: 16.5,
                 Technical: 20.0);
 
-            skillStore.WriteBeatmapMsd(hash, chartMsd, beatmap.BeatmapInfo.ID, holdRatio: 0.22);
-            skillStore.WritePlayerSsr(test_player, test_keys, playerSsr, analyzedPlays: 40, provisional: false);
+            skillStore.WriteBeatmapMsd(hash, chartMsd, beatmap.BeatmapInfo.ID);
+            playerStore.WritePlayerSsr(test_player, test_keys, playerSsr, analyzedPlays: 40, provisional: false);
 
             writeDan(test_player, EzDanSide.Rc, chartMsd.Overall, clears: 12);
             writeDan(test_player, EzDanSide.Ln, chartMsd.Overall * 0.92, clears: 5);
@@ -208,8 +213,8 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             Beatmap.Value = beatmap;
             SelectedMods.Value = [];
             wedge.TargetUsername.Value = test_player;
-            wedge.LeftRadarMode.Value = EzRadarDisplayMode.XxySrPattern;
-            wedge.RightRadarMode.Value = EzRadarDisplayMode.SkillDual;
+            wedge.LeftRadarMode.Value = EzRadarDisplayMode.SunnySRSkill;
+            wedge.RightRadarMode.Value = EzRadarDisplayMode.MSDSkillDual;
             wedge.Show();
         }
 
@@ -218,17 +223,20 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             double raw = EzDanLabels.SrToRawDan(overallSr, EzMinaSkillAxis.Stream);
             string label = EzDanLadders.For(test_keys, side).ParseLabel(raw);
 
-            skillStore.WriteDanEstimate(new EzDanEstimate
-            {
-                Username = username,
-                KeyCount = test_keys,
-                Side = side.ToId(),
-                RawDan = raw,
-                Label = label,
-                Clears = clears,
-                AlgorithmVersion = EzDanAlgorithm.VERSION,
-                ComputedAt = DateTimeOffset.UtcNow,
-            });
+            playerStore.WriteDanEstimate(new EzPlayerDanEstimateRow(
+                username,
+                test_keys,
+                side.ToId(),
+                raw,
+                label,
+                clears,
+                false,
+                string.Empty,
+                -1,
+                -1,
+                -1,
+                EzDanEngine.VERSION,
+                DateTimeOffset.UtcNow));
         }
     }
 }

@@ -1,18 +1,21 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.Pattern;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.LocalProfile
 {
-    /// <summary>Track Skills for mania: key chips, SSR/pattern axes, Dan DualPanel.</summary>
+    /// <summary>Track Skills for mania: key chips, SunnySR/pattern axes, Dan DualPanel.</summary>
     public sealed class ManiaTrackSkillsPresenter : IEzTrackSkillsPresenter
     {
         private readonly EzSkillProvider provider;
@@ -22,7 +25,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             this.provider = provider;
         }
 
-        public string SystemId => EzSkillSystems.PLAYER_SSR;
+        public EzAnalysisSystem System => EzAnalysisSystem.SSR;
 
         public bool HasSliceChips => true;
 
@@ -71,18 +74,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public LocalisableString ResolveDisplayName(string skillId)
         {
-            foreach (string systemId in new[] { EzSkillSystems.PLAYER_PATTERN, EzSkillSystems.PLAYER_SSR })
-            {
-                foreach (var def in provider.Registry.GetSystem(systemId)?.Skills
-                                    ?? Array.Empty<EzSkillDefinition>())
-                {
-                    if (def.SkillId == skillId)
-                        return def.DisplayName;
-                }
-            }
-
             if (EzPatternRatings.TryParseSkillId(skillId, out string patternId)
-                && EzPlayerPatternAxisExtensions.TryParse(patternId, out var patternAxis))
+                && EzManiaRCAxisExtensions.TryParse(patternId, out var patternAxis))
             {
                 return patternAxis.Meta().DisplayName;
             }

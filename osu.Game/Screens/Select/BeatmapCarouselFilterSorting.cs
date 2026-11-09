@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Screens.Select.Filter;
@@ -36,10 +37,10 @@ namespace osu.Game.Screens.Select
             var itemList = items.ToList();
 
             bool groupedSets = BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);
-            bool useXxySort = criteria.Sort == SortMode.XxyStarRating;
+            bool usesDifficultyValues = criteria.Sort == SortMode.Difficulty;
             bool usePpValues = criteria.Sort == SortMode.PP;
             bool useSortOperationValues = itemList.Count > 1
-                                          && (useXxySort || usePpValues);
+                                          && (usesDifficultyValues || usePpValues);
 
             IReadOnlyDictionary<BeatmapInfo, double>? operationSortValues = null;
 
@@ -56,13 +57,14 @@ namespace osu.Game.Screens.Select
                 if (operationSortValues != null && operationSortValues.TryGetValue(beatmap, out double sortValue))
                     return sortValue;
 
+                // Difficulty and PP are read from the analysis system this beatmap's ruleset is set to. The pair is
+                // read once so a beatmap cannot be sorted by one system's star next to another's pp.
+                var values = EzRulesetReadout.SelectedValues(beatmap);
+
                 if (criteria.Sort == SortMode.PP)
-                    return beatmap.PerformancePoints >= 0 ? beatmap.PerformancePoints : -1;
+                    return values.PerformancePoints ?? (beatmap.PerformancePoints >= 0 ? beatmap.PerformancePoints : -1);
 
-                if (criteria.Sort == SortMode.XxyStarRating)
-                    return beatmap.XxyStarRating;
-
-                return beatmap.StarRating;
+                return values.Star ?? beatmap.StarRating;
             }
 
             BeatmapItemsCount = itemList.Count;
@@ -110,7 +112,6 @@ namespace osu.Game.Screens.Select
                     break;
 
                 case SortMode.Difficulty:
-                case SortMode.XxyStarRating:
                     comparison = getSortValue(a).CompareTo(getSortValue(b));
                     break;
 

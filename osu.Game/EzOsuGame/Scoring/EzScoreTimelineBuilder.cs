@@ -42,12 +42,21 @@ namespace osu.Game.EzOsuGame.Scoring
             if (timelineMode == EzScoreRaceGhostTimelineMode.None)
                 return null;
 
-            var playableBeatmap = resolvePlayableBeatmap(beatmaps, scoreInfo, sharedPlayableBeatmap, cancellationToken);
+            // Modes that attach a beatmap provider take their chart from the provider, which derives a per-JudgeMode
+            // copy from the score's own beatmap. Converting one here as well would produce a second, discarded copy of
+            // the same chart, so only the availability of the source is checked.
+            bool usesBeatmapProvider = timelineMode is EzScoreRaceGhostTimelineMode.ManiaSession or EzScoreRaceGhostTimelineMode.OsuSession;
+
+            var workingBeatmap = beatmaps.GetWorkingBeatmap(scoreInfo.BeatmapInfo);
+
+            if (workingBeatmap is DummyWorkingBeatmap)
+                return null;
+
+            var playableBeatmap = usesBeatmapProvider ? null : resolvePlayableBeatmap(beatmaps, scoreInfo, sharedPlayableBeatmap, cancellationToken);
             var resolvedEnvironment = GlobalConfigStore.EzConfig.ResolveEnvironment(ReplayRunPurpose.ForLive, scoreInfo, ignoreOffset: true);
 
-            string? cacheKey = playableBeatmap != null
-                ? getCacheKey(scoreInfo, timelineMode, resolvedEnvironment, playableBeatmap)
-                : null;
+            // The key names the chart, not the conversion: a converted instance is not needed to identify one.
+            string? cacheKey = getCacheKey(scoreInfo, timelineMode, resolvedEnvironment, workingBeatmap.BeatmapInfo);
 
             if (!string.IsNullOrEmpty(cacheKey) && cache.TryGet(cacheKey, out var cached))
                 return cached == EzScoreTimeline.EMPTY ? null : cached;
@@ -63,10 +72,10 @@ namespace osu.Game.EzOsuGame.Scoring
                 return null;
             }
 
-            if (playableBeatmap == null)
+            if (!usesBeatmapProvider && playableBeatmap == null)
                 return null;
 
-            if (playableBeatmap.HitObjects.Count == 0)
+            if (playableBeatmap is { HitObjects.Count: 0 })
             {
                 if (!string.IsNullOrEmpty(cacheKey))
                     cache.Store(cacheKey, EzScoreTimeline.EMPTY);
@@ -142,7 +151,7 @@ namespace osu.Game.EzOsuGame.Scoring
             return EzScoreRacePlayableResolver.GetSessionReady(workingBeatmap, scoreInfo.Ruleset, scoreInfo.Mods, cancellationToken);
         }
 
-        private static string? getCacheKey(ScoreInfo? scoreInfo, EzScoreRaceGhostTimelineMode timelineMode, IGameplayEnvironment environment, IBeatmap? beatmap)
+        private static string? getCacheKey(ScoreInfo? scoreInfo, EzScoreRaceGhostTimelineMode timelineMode, IGameplayEnvironment environment, IBeatmapInfo? beatmap)
         {
             string? identity = getScoreIdentity(scoreInfo);
 
@@ -150,8 +159,8 @@ namespace osu.Game.EzOsuGame.Scoring
                 return null;
 
             string modFp = getModFingerprint(scoreInfo.Mods);
-            string beatmapFp = beatmap != null
-                ? $"b:{beatmap.BeatmapInfo.ID}:od{beatmap.BeatmapInfo.Difficulty.OverallDifficulty:F2}:hp{beatmap.BeatmapInfo.Difficulty.DrainRate:F2}"
+            string beatmapFp = beatmap is BeatmapInfo local
+                ? $"b:{local.ID}:od{local.Difficulty.OverallDifficulty:F2}:hp{local.Difficulty.DrainRate:F2}"
                 : "b:?";
 
             switch (timelineMode)

@@ -81,7 +81,7 @@ namespace osu.Game.Rulesets.BMS.Tests
             var existingSet = buildSyncedSet(ruleset, beatmapId, chartPath, relativeFilename: "chart.bms");
             var beatmap = existingSet.Beatmaps[0];
             beatmap.StarRating = 4.56;
-            beatmap.XxyStarRating = 6.21;
+            beatmap.EzRatingData.SunnySR = 6.21;
             beatmap.PerformancePoints = 123.45;
 
             var preserved = BMSOsuLibrarySynchronizer.CapturePersistedSongSelectBaselineForTesting(existingSet);
@@ -95,7 +95,7 @@ namespace osu.Game.Rulesets.BMS.Tests
             BMSOsuLibrarySynchronizer.ApplyPersistedSongSelectBaselineForTesting(reimported, preserved);
 
             Assert.That(reimported.StarRating, Is.EqualTo(4.56).Within(0.001));
-            Assert.That(reimported.XxyStarRating, Is.EqualTo(6.21).Within(0.001));
+            Assert.That(reimported.EzRatingData.SunnySR, Is.EqualTo(6.21).Within(0.001));
             Assert.That(reimported.PerformancePoints, Is.EqualTo(123.45).Within(0.001));
         }
 
@@ -106,10 +106,11 @@ namespace osu.Game.Rulesets.BMS.Tests
             var existing = new BeatmapInfo(ruleset, new BeatmapDifficulty(), new BeatmapMetadata())
             {
                 StarRating = 4.56,
-                XxyStarRating = 6.21,
                 PerformancePoints = 123.45,
                 BPM = 120,
             };
+
+            existing.EzRatingData.SunnySR = 6.21;
             BeatmapMetadata metadata = existing.Metadata;
             BeatmapDifficulty difficulty = existing.Difficulty;
             var target = new BeatmapInfo(ruleset, new BeatmapDifficulty(), new BeatmapMetadata())
@@ -140,7 +141,7 @@ namespace osu.Game.Rulesets.BMS.Tests
                 Assert.That(existing.BPM, Is.EqualTo(180));
                 Assert.That(existing.Difficulty.CircleSize, Is.EqualTo(7));
                 Assert.That(existing.StarRating, Is.EqualTo(4.56));
-                Assert.That(existing.XxyStarRating, Is.EqualTo(6.21));
+                Assert.That(existing.EzRatingData.SunnySR, Is.EqualTo(6.21));
                 Assert.That(existing.PerformancePoints, Is.EqualTo(123.45));
             });
         }

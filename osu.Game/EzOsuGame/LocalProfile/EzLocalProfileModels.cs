@@ -21,12 +21,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         /// <summary>
         /// Sentinel for the player filter: archive-wide totals (no per-player username filter).
-        /// Career / Drill / evidence reads treat this as unfiltered; SSR / Dan headlines are
+        /// Career / Drill / evidence reads treat this as unfiltered; SunnySR / Dan headlines are
         /// materialised under this key as a hypothetical player (small rows only — evidence is not duplicated).
         /// </summary>
         public const string ALL_PLAYERS = "All";
 
         public const int OSU_RULESET_ID = 0;
+        public const int TAIKO_RULESET_ID = 1;
+        public const int CATCH_RULESET_ID = 2;
         public const int MANIA_RULESET_ID = 3;
 
         /// <summary>
@@ -148,7 +150,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public IReadOnlyList<EzLocalProfileManiaColumnStats> ManiaColumnStats { get; init; } = Array.Empty<EzLocalProfileManiaColumnStats>();
         public IReadOnlyList<EzLocalProfileGradeCount> GradeCounts { get; init; } = Array.Empty<EzLocalProfileGradeCount>();
         public IReadOnlyList<EzLocalProfileStarPlayCount> StarPlayCounts { get; init; } = Array.Empty<EzLocalProfileStarPlayCount>();
-        public IReadOnlyList<EzLocalProfileXxyPlayCount> XxyPlayCounts { get; init; } = Array.Empty<EzLocalProfileXxyPlayCount>();
+        public IReadOnlyList<EzLocalProfileSunnySRPlayCount> SunnySRPlayCounts { get; init; } = Array.Empty<EzLocalProfileSunnySRPlayCount>();
         public IReadOnlyList<EzLocalProfileStdAttrAffinity> StdAttrAffinities { get; init; } = Array.Empty<EzLocalProfileStdAttrAffinity>();
         public IReadOnlyList<EzLocalProfileDrillScoreRow> DrillScores { get; init; } = Array.Empty<EzLocalProfileDrillScoreRow>();
     }
@@ -187,9 +189,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
     public readonly record struct EzLocalProfileStarPlayCount(int RulesetId, int StarBucket, int Count);
 
     /// <summary>
-    /// xxy SR play distribution; bucket semantics mirror <see cref="EzLocalProfileStarPlayCount"/>.
+    /// SunnySR play distribution; bucket semantics mirror <see cref="EzLocalProfileStarPlayCount"/>.
     /// </summary>
-    public readonly record struct EzLocalProfileXxyPlayCount(int RulesetId, int StarBucket, int Count);
+    public readonly record struct EzLocalProfileSunnySRPlayCount(int RulesetId, int StarBucket, int Count);
 
     public enum EzLocalProfileStdAttr
     {
@@ -232,7 +234,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public Dictionary<(int KeyCount, int Column), MutableManiaColumnStats> ManiaColumnStats { get; } = new Dictionary<(int KeyCount, int Column), MutableManiaColumnStats>();
         public Dictionary<(int RulesetId, ScoreRank Rank), int> GradeCounts { get; } = new Dictionary<(int RulesetId, ScoreRank Rank), int>();
         public Dictionary<(int RulesetId, int StarBucket), int> StarPlayCounts { get; } = new Dictionary<(int RulesetId, int StarBucket), int>();
-        public Dictionary<(int RulesetId, int StarBucket), int> XxyPlayCounts { get; } = new Dictionary<(int RulesetId, int StarBucket), int>();
+        public Dictionary<(int RulesetId, int StarBucket), int> SunnySRPlayCounts { get; } = new Dictionary<(int RulesetId, int StarBucket), int>();
         public Dictionary<(EzLocalProfileStdAttr Attr, double Value), MutableStdAttr> StdAttrAffinities { get; } = new Dictionary<(EzLocalProfileStdAttr Attr, double Value), MutableStdAttr>();
         public List<EzLocalProfileDrillScoreRow> DrillScores { get; } = new List<EzLocalProfileDrillScoreRow>();
 

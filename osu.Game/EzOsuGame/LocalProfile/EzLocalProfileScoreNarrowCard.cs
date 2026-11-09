@@ -23,7 +23,7 @@ using osuTK;
 namespace osu.Game.EzOsuGame.LocalProfile
 {
     /// <summary>
-    /// Shared Local Profile narrow score card: artist, title, player, mods, date, pp, star, xxySR.
+    /// Shared Local Profile narrow score card: artist, title, player, mods, date, pp, star, sunnySR.
     /// </summary>
     public partial class EzLocalProfileScoreNarrowCard : OsuClickableContainer
     {
@@ -166,9 +166,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 }
             };
 
-            bool showXxy = row.RulesetId == EzLocalProfileConstants.MANIA_RULESET_ID && row.XxyStarRating >= 0;
+            bool showSunnySR = row.RulesetId == EzLocalProfileConstants.MANIA_RULESET_ID && row.SunnyStarRating >= 0;
 
-            if (showXxy)
+            if (showSunnySR)
             {
                 starFlow.Add(new EzDisplaySR(row.ReadManiaSummary(), StarRatingDisplaySize.Small)
                 {

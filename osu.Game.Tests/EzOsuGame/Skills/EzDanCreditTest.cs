@@ -3,7 +3,8 @@
 
 using System.Collections.Generic;
 using NUnit.Framework;
-using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
 {
@@ -49,14 +50,14 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 [EzMinaSkillAxis.Jumpstream.ToMsdSkillId()] = 5.0,
             };
 
-            var rc = EzChartDanEstimator.FromMsd(msd, keyCount: 4, holdRatio: 0.1);
+            var rc = EzDanEngine.FromMsd(msd, keyCount: 4, holdRatio: 0.1);
             Assert.That(rc, Is.Not.Null);
             Assert.That(rc!.Side, Is.EqualTo(EzDanSide.Rc));
             Assert.That(rc.DominantAxis, Is.EqualTo(EzMinaSkillAxis.Stream));
             Assert.That(rc.RawDan, Is.GreaterThan(0));
             Assert.That(rc.Label, Is.Not.Empty);
 
-            var ln = EzChartDanEstimator.FromMsd(msd, keyCount: 4, holdRatio: 0.5);
+            var ln = EzDanEngine.FromMsd(msd, keyCount: 4, holdRatio: 0.5);
             Assert.That(ln, Is.Not.Null);
             Assert.That(ln!.Side, Is.EqualTo(EzDanSide.Ln));
             Assert.That(ln.RawDan, Is.EqualTo(rc.RawDan).Within(0.001));

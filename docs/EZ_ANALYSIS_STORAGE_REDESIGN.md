@@ -202,8 +202,16 @@
 2. 该扫描应复用现有 warmup/backfill 主链，不额外分叉另一套临时补算逻辑。
 3. 行为目标是“开启即可开始补库”，避免为了触发预热强制重启游戏。
 
-### 运行时选中谱面补算
+### SSR 系数与落库的关系
 
+`Ez2Setting.SsrRescaleThreshold` / `SsrLnMultiplier` 是用户对算法的永久修订，处理方式与版本号相反：
+
+1. 改它**不 bump** `ANALYSIS_VERSION`，也不清任何行。
+2. 已经落盘的 `xxy_sr` 保持用旧系数算出的值；新算的行用新系数。两套值并存是设计如此。
+3. 想让整库按新系数重算，走“数据维护 → 完全重算”，这是用户的显式动作，不是改设置的自副作用。
+4. 因此这两个值**不进** `meta_key_*_version`，也不参与任何缓存 key 的相等判定。
+
+### 运行时选中谱面补算
 运行时 selected beatmap worker 负责：
 
 1. 检查当前谱面缺失的 `common`、`mania`、`tag group`。

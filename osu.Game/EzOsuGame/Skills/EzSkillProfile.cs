@@ -1,88 +1,61 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Skills.PPP;
 
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Ruleset-facing skill wiring: which systems are active and which drive the default radar.
-    /// Built from <see cref="EzSkillRegistry"/> — UI/HUD should query this instead of hard-coding OnlineID gates.
+    /// Which analysis systems a ruleset has a vector for, and which one it reads by default.
     /// </summary>
+    /// <remarks>
+    /// Two rulesets actually have a choice (mania reads Mina, every PP+ ruleset reads PPP), so this is a table of
+    /// two cases rather than a declaration per system.
+    /// </remarks>
     public sealed class EzSkillProfile
     {
-        public EzSkillProfile(
-            int rulesetOnlineId,
-            IReadOnlyList<string> chartSystemIds,
-            IReadOnlyList<string> playerSystemIds,
-            string? defaultChartSystemId,
-            string? defaultPlayerSystemId)
+        private EzSkillProfile(int rulesetOnlineId, IReadOnlyList<EzAnalysisSystem> systems, EzAnalysisSystem defaultSystem)
         {
             RulesetOnlineId = rulesetOnlineId;
-            ChartSystemIds = chartSystemIds;
-            PlayerSystemIds = playerSystemIds;
-            DefaultChartSystemId = defaultChartSystemId;
-            DefaultPlayerSystemId = defaultPlayerSystemId;
+            Systems = systems;
+            DefaultSystem = defaultSystem;
         }
 
         public int RulesetOnlineId { get; }
 
-        public IReadOnlyList<string> ChartSystemIds { get; }
+        public IReadOnlyList<EzAnalysisSystem> Systems { get; }
 
-        public IReadOnlyList<string> PlayerSystemIds { get; }
+        public EzAnalysisSystem DefaultSystem { get; }
 
-        public string? DefaultChartSystemId { get; }
+        public bool HasSkills => Systems.Count > 0;
 
-        public string? DefaultPlayerSystemId { get; }
-
-        public bool HasSkills => ChartSystemIds.Count > 0 || PlayerSystemIds.Count > 0;
-
-        public bool ContainsSystem(string systemId)
-            => ChartSystemIds.Contains(systemId, StringComparer.Ordinal)
-               || PlayerSystemIds.Contains(systemId, StringComparer.Ordinal);
-
-        /// <summary>
-        /// Returns a profile for <paramref name="rulesetOnlineId"/>, or <see langword="null"/> when no
-        /// registered system applies (taiko/catch today).
-        /// </summary>
-        public static EzSkillProfile? TryBuild(int rulesetOnlineId, EzSkillRegistry registry)
+        public bool Contains(EzAnalysisSystem system) => Systems.Contains(system);
+        /// <summary>Chart-side systems, or null when the ruleset has none.</summary>
+        public static EzSkillProfile? ForChart(int rulesetOnlineId)
         {
-            ArgumentNullException.ThrowIfNull(registry);
+            if (rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID)
+                return new EzSkillProfile(rulesetOnlineId, [EzAnalysisSystem.Mina, EzAnalysisSystem.PPP], EzAnalysisSystem.Mina);
 
-            var applicable = registry.Systems
-                                     .Where(s => s.AppliesToRuleset(rulesetOnlineId))
-                                     .ToList();
+            if (EzPPPSkillCatalog.SupportsRuleset(rulesetOnlineId))
+                return new EzSkillProfile(rulesetOnlineId, [EzAnalysisSystem.PPP], EzAnalysisSystem.PPP);
 
-            if (applicable.Count == 0)
-                return null;
-
-            var chart = applicable.Where(s => s.Scope == EzSkillScope.Beatmap).ToList();
-            var player = applicable.Where(s => s.Scope == EzSkillScope.Player).ToList();
-
-            string? defaultChart = pickDefault(chart);
-            string? defaultPlayer = pickDefault(player);
-
-            return new EzSkillProfile(
-                rulesetOnlineId,
-                chart.Select(s => s.SystemId).ToList(),
-                player.Select(s => s.SystemId).ToList(),
-                defaultChart,
-                defaultPlayer);
+            return null;
         }
 
-        private static string? pickDefault(IReadOnlyList<IEzSkillSystem> systems)
+        /// <summary>Player-side systems, or null when the ruleset has none.</summary>
+        public static EzSkillProfile? ForPlayer(int rulesetOnlineId)
         {
-            var defaults = systems.Where(s => s.IsDefaultRadar).Select(s => s.SystemId).ToList();
+            if (rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID)
+                return new EzSkillProfile(rulesetOnlineId, [EzAnalysisSystem.SSR, EzAnalysisSystem.PPP], EzAnalysisSystem.SSR);
 
-            if (defaults.Count > 1)
-            {
-                throw new InvalidOperationException(
-                    $"Multiple default-radar systems for scope: {string.Join(", ", defaults)}");
-            }
+            if (EzPPPSkillCatalog.SupportsRuleset(rulesetOnlineId))
+                return new EzSkillProfile(rulesetOnlineId, [EzAnalysisSystem.PPP], EzAnalysisSystem.PPP);
 
-            return defaults.Count == 1 ? defaults[0] : systems.FirstOrDefault()?.SystemId;
+            return null;
         }
     }
 }

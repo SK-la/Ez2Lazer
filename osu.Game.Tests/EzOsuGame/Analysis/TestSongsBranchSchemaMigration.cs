@@ -38,40 +38,52 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         }
 
         [Test]
-        public void Legacy_xxy_sr_branch_v1_migrates_to_songs_branch_without_data_loss()
+        public void Legacy_sunny_sr_branch_v1_migrates_to_songs_branch_without_data_loss()
         {
             using (var connection = openConnection())
             {
                 createLegacyV1Branch(connection);
-                insertLegacyRow(connection, xxySr: 4.56, pp: null);
+                insertLegacyRow(connection, sunnySR: 4.56, pp: null);
             }
 
             using var migrated = openConnection();
             Assert.That(prepareBranch(migrated), Is.True);
             Assert.That(readMeta(migrated, "kind"), Is.EqualTo("songs_branch"));
-            Assert.That(readMeta(migrated, "schema_version"), Is.EqualTo("3"));
+            Assert.That(readMeta(migrated, "schema_version"), Is.EqualTo("4"));
             Assert.That(tableExists(migrated, "songs_branch_entry"), Is.True);
-            Assert.That(tableExists(migrated, "xxy_sr_branch"), Is.False);
-            Assert.That(readXxySr(migrated), Is.EqualTo(4.56).Within(0.001));
-            Assert.That(readMeta(migrated, "xxy_sr_version"), Is.Null);
+            Assert.That(tableExists(migrated, "sunny_sr_branch"), Is.False);
+            Assert.That(readSunnySR(migrated), Is.EqualTo(4.56).Within(0.001));
+
+            // v1 has no pp column, so its Sunny stars cannot be reused either (they came from a build that predates the
+            // current one): both stamps are dropped and the branch is scheduled for a full refresh.
+            Assert.That(readMeta(migrated, legacy_meta_key), Is.Null, "the legacy key must not survive migration");
+            Assert.That(readMeta(migrated, "ssr"), Is.Null, "a full recompute drops the stamp it is recomputing");
+            Assert.That(readMeta(migrated, "official"), Is.Null);
             Assert.That(readMeta(migrated, "requires_post_migration_refresh"), Is.EqualTo("1"));
         }
 
         [Test]
-        public void Legacy_xxy_sr_branch_v2_with_pp_migrates_in_place()
+        public void Legacy_sunny_sr_branch_v2_with_pp_migrates_in_place()
         {
             using (var connection = openConnection())
             {
                 createLegacyV2Branch(connection);
-                insertLegacyRow(connection, xxySr: 7.89, pp: 123.4);
+                insertLegacyRow(connection, sunnySR: 7.89, pp: 123.4);
             }
 
             using var migrated = openConnection();
             Assert.That(prepareBranch(migrated), Is.True);
             Assert.That(readPp(migrated), Is.EqualTo(123.4).Within(0.001));
-            Assert.That(readMeta(migrated, "pp_version"), Is.EqualTo("20241007"));
             Assert.That(readMeta(migrated, "requires_post_migration_refresh"), Is.Null);
+
+            // v2 can be reused, but only if its stamps survive under the names the reader asks for. Left under the
+            // legacy names they read as absent, and the planner would stamp the branch current instead of refreshing it.
+            Assert.That(readMeta(migrated, legacy_meta_key), Is.Null, "the legacy key must not survive migration");
+            Assert.That(readMeta(migrated, "ssr"), Is.EqualTo("20250415"));
+            Assert.That(readMeta(migrated, "official"), Is.EqualTo("20241007"));
         }
+
+        private const string legacy_meta_key = "sunny_sr_version";
 
         private SqliteConnection openConnection()
         {
@@ -92,15 +104,15 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             cmd.CommandText = @"
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
-CREATE TABLE xxy_sr_branch (
+CREATE TABLE sunny_sr_branch (
     beatmap_id TEXT PRIMARY KEY,
     beatmap_hash TEXT NOT NULL,
     beatmap_md5 TEXT NOT NULL,
-    xxy_sr REAL NOT NULL
+    sunny_sr REAL NOT NULL
 );
 
 INSERT INTO meta(key, value) VALUES
-    ('kind', 'xxy_sr_branch'),
+    ('kind', 'sunny_sr_branch'),
     ('schema_version', '1'),
     ('analysis_version', '6'),
     ('ruleset_online_id', '3'),
@@ -110,7 +122,7 @@ INSERT INTO meta(key, value) VALUES
     ('beatmap_count', '1'),
     ('created_at', '1'),
     ('display_name', 'legacy branch'),
-    ('xxy_sr_version', '20250415');
+    ('sunny_sr_version', '20250415');
 ";
             cmd.ExecuteNonQuery();
         }
@@ -121,16 +133,16 @@ INSERT INTO meta(key, value) VALUES
             cmd.CommandText = @"
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
-CREATE TABLE xxy_sr_branch (
+CREATE TABLE sunny_sr_branch (
     beatmap_id TEXT PRIMARY KEY,
     beatmap_hash TEXT NOT NULL,
     beatmap_md5 TEXT NOT NULL,
-    xxy_sr REAL NOT NULL,
+    sunny_sr REAL NOT NULL,
     pp REAL NULL
 );
 
 INSERT INTO meta(key, value) VALUES
-    ('kind', 'xxy_sr_branch'),
+    ('kind', 'sunny_sr_branch'),
     ('schema_version', '2'),
     ('analysis_version', '6'),
     ('ruleset_online_id', '3'),
@@ -140,21 +152,21 @@ INSERT INTO meta(key, value) VALUES
     ('beatmap_count', '1'),
     ('created_at', '1'),
     ('display_name', 'legacy branch'),
-    ('xxy_sr_version', '20250415'),
+    ('sunny_sr_version', '20250415'),
     ('pp_version', '20241007');
 ";
             cmd.ExecuteNonQuery();
         }
 
-        private static void insertLegacyRow(SqliteConnection connection, double xxySr, double? pp)
+        private static void insertLegacyRow(SqliteConnection connection, double sunnySR, double? pp)
         {
             using var cmd = connection.CreateCommand();
             cmd.CommandText = pp.HasValue
-                ? @"INSERT INTO xxy_sr_branch(beatmap_id, beatmap_hash, beatmap_md5, xxy_sr, pp)
-VALUES('00000000-0000-0000-0000-000000000001', 'hash', 'md5', $xxy, $pp);"
-                : @"INSERT INTO xxy_sr_branch(beatmap_id, beatmap_hash, beatmap_md5, xxy_sr)
-VALUES('00000000-0000-0000-0000-000000000001', 'hash', 'md5', $xxy);";
-            cmd.Parameters.AddWithValue("$xxy", xxySr);
+                ? @"INSERT INTO sunny_sr_branch(beatmap_id, beatmap_hash, beatmap_md5, sunny_sr, pp)
+VALUES('00000000-0000-0000-0000-000000000001', 'hash', 'md5', $ssr, $pp);"
+                : @"INSERT INTO sunny_sr_branch(beatmap_id, beatmap_hash, beatmap_md5, sunny_sr)
+VALUES('00000000-0000-0000-0000-000000000001', 'hash', 'md5', $ssr);";
+            cmd.Parameters.AddWithValue("$ssr", sunnySR);
 
             if (pp.HasValue)
                 cmd.Parameters.AddWithValue("$pp", pp.Value);
@@ -178,10 +190,10 @@ VALUES('00000000-0000-0000-0000-000000000001', 'hash', 'md5', $xxy);";
             return cmd.ExecuteScalar() != null;
         }
 
-        private static double readXxySr(SqliteConnection connection)
+        private static double readSunnySR(SqliteConnection connection)
         {
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT xxy_sr FROM songs_branch_entry LIMIT 1;";
+            cmd.CommandText = "SELECT sunny_sr FROM songs_branch_entry LIMIT 1;";
             return Convert.ToDouble(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
         }
 

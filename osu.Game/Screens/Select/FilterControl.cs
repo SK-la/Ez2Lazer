@@ -7,8 +7,8 @@ using System.Collections.Immutable;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Extensions;
+using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -21,7 +21,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.UI;
@@ -310,7 +309,7 @@ namespace osu.Game.Screens.Select
                     return;
 
                 var rulesetCriteria = currentCriteria.RulesetCriteria;
-                if (sortDropdown.Current.Value is SortMode.PP or SortMode.XxyStarRating || rulesetCriteria?.FilterMayChangeFromMods(currentCriteria, m) == true)
+                if (sortDropdown.Current.Value is SortMode.PP || rulesetCriteria?.FilterMayChangeFromMods(currentCriteria, m) == true)
                     updateCriteria();
             });
 
@@ -439,8 +438,7 @@ namespace osu.Game.Screens.Select
             return criteria;
         }
 
-        private void applyCircleSizeFilter(FilterCriteria criteria) =>
-            csSelector.ApplyToFilterCriteria(criteria);
+        private void applyCircleSizeFilter(FilterCriteria criteria) => csSelector.ApplyToFilterCriteria(criteria);
 
         private void updateCriteria(bool clearScopedSet = true)
         {
@@ -645,17 +643,7 @@ namespace osu.Game.Screens.Select
 
             private void updateAvailableItems()
             {
-                var items = new List<SortMode>();
-
-                foreach (var item in Enum.GetValues<SortMode>())
-                {
-                    if (item == SortMode.XxyStarRating && !EzXxyStarRatingSupport.SupportsRuleset(ruleset.Value))
-                        continue;
-
-                    items.Add(item);
-                }
-
-                Items = items.ToArray();
+                Items = Enum.GetValues<SortMode>();
             }
 
             private bool synchronisingBindables;
@@ -675,19 +663,10 @@ namespace osu.Game.Screens.Select
                 if (synchronisingBindables)
                     return;
 
-                if (current.NewValue == SortMode.XxyStarRating && !Items.Contains(SortMode.XxyStarRating))
-                    return;
-
                 configSortMode.Value = current.NewValue;
             }
 
-            protected override LocalisableString GenerateItemText(SortMode item)
-            {
-                if (item == SortMode.XxyStarRating)
-                    return EzSongSelectStrings.XXY_STAR_RATING;
-
-                return item.GetLocalisableDescription();
-            }
+            protected override LocalisableString GenerateItemText(SortMode item) => item.GetLocalisableDescription();
         }
 
         private partial class GroupModeDropdown : ShearedDropdown<GroupModeDropdownItem>
@@ -736,13 +715,6 @@ namespace osu.Game.Screens.Select
                     {
                         case GroupMode.PP:
                             items.Add(new GroupModeDropdownItem(GroupMode.PP, "PP"));
-                            break;
-
-                        case GroupMode.XxyStarRating:
-                            if (!EzXxyStarRatingSupport.SupportsRuleset(ruleset.Value))
-                                break;
-
-                            items.Add(new GroupModeDropdownItem(GroupMode.XxyStarRating, EzSongSelectStrings.XXY_STAR_RATING));
                             break;
 
                         default:

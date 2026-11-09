@@ -36,6 +36,12 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
     /// <summary>Hub <c>patterns/clustering.js</c>.</summary>
     internal static class EzLeoBlackClustering
     {
+        /// <summary>
+        /// Grouping key for one (pattern, mixed, clustered BPM) bucket. A value type instead of the interpolated
+        /// string the port used, which built one string per detected pattern - tens of thousands per chart.
+        /// </summary>
+        private readonly record struct GroupKey(string Pattern, bool Mixed, double Bpm);
+
         public static List<EzLeoBlackInternalCluster> CalculateClusteredPatterns(
             IReadOnlyList<EzLeoBlackFoundPattern> patterns,
             string modeTag = "Mix")
@@ -160,11 +166,11 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             List<(EzLeoBlackFoundPattern Pattern, ClusterBuilder Cluster)> patternsWithClusters,
             string modeTag)
         {
-            var groups = new Dictionary<string, (string Pattern, bool Mixed, double Bpm, List<(EzLeoBlackFoundPattern, ClusterBuilder)> Data)>(StringComparer.Ordinal);
+            var groups = new Dictionary<GroupKey, (string Pattern, bool Mixed, double Bpm, List<(EzLeoBlackFoundPattern, ClusterBuilder)> Data)>();
 
             foreach (var (p, c) in patternsWithClusters)
             {
-                string key = $"{p.Pattern}@@{(p.Mixed ? 1 : 0)}@@{c.Value}";
+                var key = new GroupKey(p.Pattern, p.Mixed, c.Value);
 
                 if (!groups.TryGetValue(key, out var group))
                 {

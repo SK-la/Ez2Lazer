@@ -59,6 +59,11 @@ using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Playback;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.PPP;
+using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Graphics;
@@ -461,36 +466,49 @@ namespace osu.Game
             // EzAnalysisPersistentStore.Enabled = ezAnalysisSqliteEnabled.Value;
 
             ezAnalysisPersistentStore = new EzAnalysisPersistentStore(Storage);
-            var ezAnalysisDatabase = new EzAnalysisDatabase(ezAnalysisPersistentStore, BeatmapManager, RulesetStore, Ez2ConfigManager);
+            var ezAnalysisDatabase = new EzAnalysisDatabase(ezAnalysisPersistentStore, BeatmapManager, RulesetStore, Ez2ConfigManager, realm);
             dependencies.Cache(ezAnalysisPersistentStore);
             dependencies.Cache(ezAnalysisDatabase);
-            dependencies.Cache(ezAnalysisCache = new EzAnalysisCache());
+
+            // One live layer for every read path: the analysis component schedules, this holds the values.
+            var liveMetrics = new EzAnalysisLiveCache();
+            dependencies.Cache(liveMetrics);
+            dependencies.Cache(ezAnalysisCache = new EzAnalysisCache(liveMetrics));
             ReplaySession = new EzReplaySessionRouter(RulesetStore.AvailableRulesets, BeatmapManager);
             dependencies.CacheAs<IEzReplaySession>(ReplaySession);
 
-            // Skill metrics: MSD (beatmap), SSR + Dan (player). Read via EzSkillProvider; writers stay separate.
-            // See EzSkillSystems. Dan is a player skill for Profile, but uses its own estimate table/algorithm.
-            var skillRegistry = new EzSkillRegistry();
-            var skillStore = new EzSkillStore(realm);
-            var beatmapMsdComputer = new EzBeatmapMsdComputer(BeatmapManager, skillStore);
-            var chartDanEstimator = new EzChartDanEstimator(BeatmapManager, beatmapMsdComputer);
-            var localProfileStore = new EzLocalProfileStore(Storage);
-            // Skill aggregators reuse localProfileStore as the per-play SSR / Dan cache (incremental backfill).
-            var playerSsrAggregator = new EzPlayerSsrAggregator(BeatmapManager, skillStore, localProfileStore);
-            var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanEstimator, skillStore, localProfileStore);
-            var skillProvider = new EzSkillProvider(skillStore, skillRegistry, chartDanEstimator, localProfileStore, BeatmapManager);
+            var localProfileDatabase = new EzLocalProfileDatabase(Storage);
+            var localProfileStore = new EzLocalProfileStore(localProfileDatabase);
+            var chartSkillStore = new EzChartSkillStore(realm);
+            var playerSkillStore = new EzPlayerSkillStore(localProfileDatabase);
+            EzPlayerSkillStore.Configure(playerSkillStore);
+            var pppEngine = new EzPPPEngine();
 
-            dependencies.Cache(skillRegistry);
-            dependencies.Cache(skillStore);
-            dependencies.Cache(localProfileStore);
+            var msdUnit = new EzMinaUnit(BeatmapManager, chartSkillStore);
+            var pppUnit = new EzPPPUnit(BeatmapManager, chartSkillStore, pppEngine);
+            var danUnit = new EzDanUnit(ezAnalysisCache, chartSkillStore);
+            var ssrUnit = new EzSSRUnit(BeatmapManager, chartSkillStore);
+            var csiUnit = new EzCSIUnit(BeatmapManager, chartSkillStore, liveMetrics);
+
+            var playerPPPAggregator = new EzPlayerPPPAggregator(BeatmapManager, playerSkillStore, pppEngine);
+
+            var playerRatingAggregator = new EzPlayerMinaAggregator(BeatmapManager, playerSkillStore, chartSkillStore, localProfileStore);
+            var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, danUnit, playerSkillStore, chartSkillStore, localProfileStore);
+            var skillProvider = new EzSkillProvider(chartSkillStore, playerSkillStore, danUnit, localProfileStore, BeatmapManager, liveMetrics);
+
+            // Only the types something actually resolves through DI are cached. Aggregators are constructed here and
+            // passed as arguments; the units are cached because the background backfill resolves them.
+            dependencies.Cache(chartSkillStore);
+            dependencies.Cache(playerSkillStore);
             dependencies.Cache(skillProvider);
-            // Write-side services still cached for LocalProfile / analysis pipelines.
-            dependencies.Cache(beatmapMsdComputer);
-            dependencies.Cache(chartDanEstimator);
-            dependencies.Cache(playerSsrAggregator);
-            dependencies.Cache(playerDanAggregator);
+            dependencies.Cache(msdUnit);
+            dependencies.Cache(pppUnit);
+            dependencies.Cache(ssrUnit);
+            dependencies.Cache(csiUnit);
+            dependencies.Cache(danUnit);
 
-            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, playerSsrAggregator, playerDanAggregator, localProfileStore, skillProvider));
+            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, playerRatingAggregator, playerDanAggregator, localProfileStore,
+                skillProvider, playerPPPAggregator, ezAnalysisCache));
             dependencies.Cache(new EzLocalProfileOnlinePullService(API, ScoreManager, BeatmapManager, realm, Storage));
             dependencies.Cache(new EzAnalysisPlayerSelection());
 
@@ -779,8 +797,7 @@ namespace osu.Game
             EzModSeed.BindUpdateScheduler(Host.UpdateThread.Scheduler);
         }
 
-        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent) =>
-            dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
+        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent) => dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
 
         public override void SetHost(GameHost host)
         {

@@ -21,6 +21,7 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
@@ -33,7 +34,6 @@ using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Screens.Select.Filter;
 using osuTK;
 
 namespace osu.Game.Screens.Select
@@ -54,6 +54,7 @@ namespace osu.Game.Screens.Select
 
         private IBindable<StarDifficulty>? starDifficultyBindable;
         private CancellationTokenSource? starDifficultyCancellationSource;
+        private StarDifficulty lastStarDifficulty;
 
         private Box backgroundBorder = null!;
         private Box backgroundDifficultyTint = null!;
@@ -64,6 +65,7 @@ namespace osu.Game.Screens.Select
         private EzDisplayKps ezDisplayKps = null!;
         private EzDisplayKpc ezDisplayKpc = null!;
         private EzDisplaySR displaySR = null!;
+        private EzDisplayPP displayPP = null!;
         private EzDisplayTag ezDisplayTag = null!;
         private EzDisplaySkillsDan ezDisplaySkillsDan = null!;
 
@@ -106,7 +108,7 @@ namespace osu.Game.Screens.Select
 
         private BeatmapInfo beatmap => ((GroupedBeatmap)Item!.Model).Beatmap;
 
-        private bool supportsEzAnalysis => EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value);
+        private bool supportsEzAnalysis => EzSSRUnit.SupportsRuleset(ruleset.Value.OnlineID);
 
         public PanelBeatmap()
         {
@@ -258,6 +260,12 @@ namespace osu.Game.Screens.Select
                                                     Anchor = Anchor.CentreLeft,
                                                     Scale = new Vector2(0.875f),
                                                 },
+                                                displayPP = new EzDisplayPP(StarRatingDisplaySize.Small)
+                                                {
+                                                    Origin = Anchor.CentreLeft,
+                                                    Anchor = Anchor.CentreLeft,
+                                                    Scale = new Vector2(0.875f),
+                                                },
                                                 starCounter = new StarCounter
                                                 {
                                                     Anchor = Anchor.CentreLeft,
@@ -326,22 +334,27 @@ namespace osu.Game.Screens.Select
             mods.BindValueChanged(_ => updateKeyCount(), true);
 
             var ezAnalysisFilter = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisFilter);
-            var sortMode = config.GetBindable<SortMode>(OsuSetting.SongSelectSortingMode);
-            var groupMode = config.GetBindable<GroupMode>(OsuSetting.SongSelectGroupMode);
+            var analysisSystemSelection = ezConfig.GetBindable<string>(Ez2Setting.AnalysisSystemSelection);
 
             void updateStarFilterIcon()
             {
-                bool useXxyMetric = EzXxyStarRatingSupport.SupportsRuleset(ruleset.Value)
-                                    && (sortMode.Value == SortMode.XxyStarRating || groupMode.Value == GroupMode.XxyStarRating);
+                // Mirrors the system sorting and grouping read from; the panel's own stars stay official.
+                bool useSunnyMetric = EzRulesetReadout.Selected(ruleset.Value?.OnlineID ?? -1)?.Id == EzRulesetReadout.SUNNY;
 
-                starCounter.Icon = useXxyMetric
+                starCounter.Icon = useSunnyMetric
                     ? FontAwesome.Solid.Moon
                     : FontAwesome.Solid.Star;
             }
 
             ruleset.BindValueChanged(_ => updateStarFilterIcon(), true);
-            sortMode.BindValueChanged(_ => updateStarFilterIcon());
-            groupMode.BindValueChanged(_ => updateStarFilterIcon());
+            analysisSystemSelection.BindValueChanged(_ =>
+            {
+                updateStarFilterIcon();
+
+                // The pills follow the selected system for every ruleset.
+                if (Item?.IsVisible == true)
+                    updateEzDisplay();
+            });
             ezAnalysisFilter.BindValueChanged(_ => updateStarFilterIcon(), true);
         }
 
@@ -355,8 +368,8 @@ namespace osu.Game.Screens.Select
             difficultyText.Text = beatmap.DifficultyName;
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
-            applyPanelKps(EzSongSelectAnalysisDisplay.Empty);
-            ezDisplayKps.SetPp(EzPanelPerformancePoints.ResolveRealmBaselinePp(beatmap));
+            applyPanelKps(EzSongSelectAnalysisDisplay.EMPTY);
+            lastStarDifficulty = default;
 
             if (ruleset.Value is RulesetInfo rulesetInfo
                 && EzPanelKpsMetrics.TryResolveBaselineFromSqlite(ezAnalysisDatabase, beatmap, rulesetInfo, mods.Value, out var baselineKps))
@@ -369,10 +382,30 @@ namespace osu.Game.Screens.Select
             ezDisplaySkillsDan.Beatmap = beatmap;
             ezDisplayTag.Beatmap = beatmap;
 
-            if (supportsEzAnalysis && beatmap.SupportsXxyStarRating())
-                displaySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay();
+            updateEzDisplay();
 
             computeEzAnalysis();
+        }
+
+        /// <summary>
+        /// Paints the Ez star and pp pills: the selected system's values, resolved by the analysis cache.
+        /// </summary>
+        /// <remarks>
+        /// The official difficulty this panel already holds is handed in as the live official half; a
+        /// non-official system ignores it.
+        /// </remarks>
+        private void updateEzDisplay()
+        {
+            var values = ezAnalysisCache.ReadVariantValues(beatmap, mods.Value, EzReadoutValues.Live(lastStarDifficulty));
+
+            displaySR.Current.Value = new EzManiaSummary(null, null, values.SkillStar);
+
+            if (values.SkillStar is null)
+                displaySR.Hide();
+            else
+                displaySR.Show();
+
+            displayPP.Current.Value = values.PerformancePoints;
         }
 
         private void resetEzDisplay()
@@ -380,15 +413,7 @@ namespace osu.Game.Screens.Select
             if (Item?.IsVisible != true)
                 return;
 
-            bool showXxy = supportsEzAnalysis && beatmap.SupportsXxyStarRating();
-
-            if (showXxy)
-                displaySR.Show();
-            else
-            {
-                displaySR.Current.Value = EzManiaSummary.EMPTY;
-                displaySR.Hide();
-            }
+            updateEzDisplay();
 
             ezDisplayKpc.ManiaSummary = null;
             ezDisplayKpc.Hide();
@@ -410,6 +435,7 @@ namespace osu.Game.Screens.Select
 
             localRank.Beatmap = null;
             starDifficultyBindable = null;
+            lastStarDifficulty = default;
 
             starDifficultyCancellationSource?.Cancel();
             starDifficultyCancellationSource?.Dispose();
@@ -437,8 +463,8 @@ namespace osu.Game.Screens.Select
             displaySR.Current.Value = EzManiaSummary.EMPTY;
             ezDisplayKpc.ManiaSummary = null;
             ezDisplayKpc.Hide();
-            applyPanelKps(EzSongSelectAnalysisDisplay.Empty);
-            ezDisplayKps.SetPp(null);
+            applyPanelKps(EzSongSelectAnalysisDisplay.EMPTY);
+            displayPP.Current.Value = null;
         }
 
         private void applyPanelKps(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
@@ -472,7 +498,10 @@ namespace osu.Game.Screens.Select
             var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, ezAnalysisResult, mods.Value);
             applyPanelKps(metrics);
 
-            if (!supportsEzAnalysis || !beatmap.SupportsXxyStarRating())
+            // The pills exist for every ruleset; only mania's live summary carries KPC and scratch on top of them.
+            updateEzDisplay();
+
+            if (!supportsEzAnalysis || !beatmap.SupportsSunnyStarRating())
                 return;
 
             var maniaSummary = metrics.ManiaSummary;
@@ -486,10 +515,6 @@ namespace osu.Game.Screens.Select
                 scratchText = scratch;
 
             updateKeyCount();
-
-            var summaryForDisplay = maniaSummary ?? EzManiaSummary.EMPTY;
-            if (displaySR.Current.Value.XxySr != summaryForDisplay.XxySr)
-                displaySR.Current.Value = summaryForDisplay;
         }
 
         private void computeEzAnalysis()
@@ -523,11 +548,17 @@ namespace osu.Game.Screens.Select
                 if (Item?.IsVisible != true)
                     return;
 
-                starRatingDisplay.Current.Value = starDifficulty.NewValue;
-                starCounter.Current = (float)starDifficulty.NewValue.Stars;
-
-                ezDisplayKps.SetPp(EzPanelPerformancePoints.ResolvePanelPp(starDifficulty.NewValue, beatmap));
+                applyPanelDifficulty(starDifficulty.NewValue);
             });
+        }
+
+        private void applyPanelDifficulty(in StarDifficulty starDifficulty)
+        {
+            lastStarDifficulty = starDifficulty;
+            starRatingDisplay.Current.Value = starDifficulty;
+            starCounter.Current = (float)starDifficulty.Stars;
+
+            updateEzDisplay();
         }
 
         protected override void Update()

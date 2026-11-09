@@ -28,16 +28,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private readonly RealmAccess realm;
         private readonly EzAnalysisPersistentStore analysisStore;
         private readonly BeatmapManager beatmapManager;
+        private readonly IEzChartAnalysisLookup? analysisLookup;
         private readonly EzLocalProfilePpResolver ppResolver;
 
         public EzLocalProfileAggregator(
             RealmAccess realm,
             EzAnalysisPersistentStore analysisStore,
-            BeatmapManager beatmapManager)
+            BeatmapManager beatmapManager,
+            IEzChartAnalysisLookup? analysisLookup = null)
         {
             this.realm = realm;
             this.analysisStore = analysisStore;
             this.beatmapManager = beatmapManager;
+            this.analysisLookup = analysisLookup;
             ppResolver = new EzLocalProfilePpResolver(beatmapManager);
         }
 
@@ -153,7 +156,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
 
             internal Dictionary<string, DifficultyAttributes?> AttributeCache { get; } = new Dictionary<string, DifficultyAttributes?>(StringComparer.Ordinal);
-            internal Dictionary<string, CachedAnalysis> AnalysisCache { get; } = new Dictionary<string, CachedAnalysis>(StringComparer.Ordinal);
+
+            /// <summary>
+            /// One entry per (chart, mods) measured in this run. Scores repeat charts heavily, and the analysis is
+            /// the most expensive thing the pass does, so a second score on the same chart and mods must not run it.
+            /// </summary>
+            internal Dictionary<(string Hash, int ModsSignature), CachedAnalysis> AnalysisCache { get; }
+                = new Dictionary<(string Hash, int ModsSignature), CachedAnalysis>();
+
             internal int PpFailures;
             internal int PpLoggedFailures;
 
@@ -236,7 +246,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var analysis = cached.Result;
             double avgKps = hasKps ? analysis.AverageKps : 0;
             double maxKps = hasKps ? analysis.MaxKps : 0;
-            double xxyStarRating = resolveXxyStarRating(beatmap, analysis, hasKps, modsAffect, starRating);
+            double sunnyStarRating = resolveSunnyStarRating(beatmap, analysis, hasKps, modsAffect, starRating);
             long durationMs = resolveDurationMs(score, beatmap);
 
             double? avgAbsOffsetMs = null;
@@ -251,7 +261,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 hasKps,
                 avgAbsOffsetMs,
                 starRating,
-                xxyStarRating));
+                sunnyStarRating));
 
             var rulesetStats = getOrCreate(result.RulesetStats, rulesetId, () => new EzLocalProfileAggregationResult.MutableRulesetStats());
             rulesetStats.TotalKeys += keys;
@@ -269,7 +279,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             incrementGrade(result, rulesetId, score.Rank);
             incrementStar(result, rulesetId, starRating);
-            incrementXxy(result, rulesetId, xxyStarRating);
+            incrementSunnySR(result, rulesetId, sunnyStarRating);
 
             if (rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID)
             {
@@ -289,13 +299,21 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// </summary>
         public Dictionary<string, List<EzSkillPlayRow>> CollectManiaPlayRows(
             IReadOnlyCollection<string> usernames,
+            CancellationToken cancellationToken = default) => CollectPlayRows(EzLocalProfileConstants.MANIA_RULESET_ID, usernames, cancellationToken);
+
+        /// <summary>
+        /// Plays for one ruleset OnlineID, reduced to <see cref="EzSkillPlayRow"/> — one Realm pass.
+        /// </summary>
+        public Dictionary<string, List<EzSkillPlayRow>> CollectPlayRows(
+            int rulesetOnlineId,
+            IReadOnlyCollection<string> usernames,
             CancellationToken cancellationToken = default)
         {
             var includeSet = new HashSet<string>(usernames.Select(normaliseUsername), StringComparer.Ordinal);
-            var maniaPlaysByUser = new Dictionary<string, List<EzSkillPlayRow>>(StringComparer.Ordinal);
+            var playsByUser = new Dictionary<string, List<EzSkillPlayRow>>(StringComparer.Ordinal);
 
             if (includeSet.Count == 0)
-                return maniaPlaysByUser;
+                return playsByUser;
 
             realm.Run(r =>
             {
@@ -303,7 +321,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (score.Ruleset.OnlineID != EzLocalProfileConstants.MANIA_RULESET_ID)
+                    if (score.Ruleset.OnlineID != rulesetOnlineId)
                         continue;
 
                     string username = normaliseUsername(score.RealmUser.Username);
@@ -313,14 +331,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     if (score.BeatmapInfo == null)
                         continue;
 
-                    if (!maniaPlaysByUser.TryGetValue(username, out var list))
-                        maniaPlaysByUser[username] = list = new List<EzSkillPlayRow>();
+                    if (!playsByUser.TryGetValue(username, out var list))
+                        playsByUser[username] = list = new List<EzSkillPlayRow>();
 
                     list.Add(new EzSkillPlayRow(score.ID, score.BeatmapHash, score.Date, score.Accuracy, score.Passed, score.Rank));
                 }
             });
 
-            return maniaPlaysByUser;
+            return playsByUser;
         }
 
         /// <summary>
@@ -333,8 +351,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             IReadOnlyList<Guid> scoreIds,
             int offset,
             int count,
-            CancellationToken cancellationToken = default)
-            => fetchDetachedScores(offset, count, i => scoreIds[i], (_, score) => into.Add(score), cancellationToken);
+            CancellationToken cancellationToken = default) => fetchDetachedScores(offset, count, i => scoreIds[i], (_, score) => into.Add(score), cancellationToken);
 
         /// <summary>
         /// Resolves the plays a per-play cache cannot answer, in bounded windows: one Realm transaction per window,
@@ -481,11 +498,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 return new CachedAnalysis(hasKps ? fallback : default, hasKps);
             }
 
-            var cache = state.AnalysisCache;
-            string cacheKey = $"{beatmap.ID:N}|{score.Ruleset.ShortName}|{score.ModsJson}";
+            // Same session store the live analysis pass fills, so a chart already measured for these mods (by the
+            // HUD, or by an earlier score in this run) is not measured a second time.
+            var cacheKey = (beatmap.Hash, EzAnalysisLookupCache.ComputeModsSignature(score.Mods));
 
-            if (cache.TryGetValue(cacheKey, out var cached))
-                return cached;
+            if (state.AnalysisCache.TryGetValue(cacheKey, out var memoised))
+                return memoised;
+
+            if (analysisLookup?.GetOrCompute(beatmap, score.Ruleset, score.Mods) is { } shared)
+                return state.AnalysisCache[cacheKey] = new CachedAnalysis(shared, true);
+
+            CachedAnalysis cached;
 
             try
             {
@@ -506,8 +529,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 cached = new CachedAnalysis(default, false);
             }
 
-            cache[cacheKey] = cached;
-            return cached;
+            return state.AnalysisCache[cacheKey] = cached;
         }
 
         private static int resolveManiaKeyCount(ScoreInfo score, EzAnalysisResult analysis, bool hasKps)
@@ -687,22 +709,22 @@ namespace osu.Game.EzOsuGame.LocalProfile
             result.StarPlayCounts[key] = existing + 1;
         }
 
-        private static void incrementXxy(EzLocalProfileAggregationResult result, int rulesetId, double xxyStarRating)
+        private static void incrementSunnySR(EzLocalProfileAggregationResult result, int rulesetId, double ssr)
         {
-            if (xxyStarRating < 0)
+            if (ssr < 0)
                 return;
 
-            int bucket = (int)Math.Floor(xxyStarRating);
+            int bucket = (int)Math.Floor(ssr);
             var key = (rulesetId, bucket);
-            result.XxyPlayCounts.TryGetValue(key, out int existing);
-            result.XxyPlayCounts[key] = existing + 1;
+            result.SunnySRPlayCounts.TryGetValue(key, out int existing);
+            result.SunnySRPlayCounts[key] = existing + 1;
         }
 
         /// <summary>
-        /// Resolve xxy SR for bucket counting. With beatmap-affecting mods, prefer playable analysis
-        /// (not Realm NoMod <see cref="BeatmapInfo.XxyStarRating"/>).
+        /// Resolve SunnySR for bucket counting. With beatmap-affecting mods, prefer playable analysis
+        /// (not the stored NoMod Sunny rating).
         /// </summary>
-        private static double resolveXxyStarRating(
+        private static double resolveSunnyStarRating(
             BeatmapInfo beatmap,
             EzAnalysisResult analysis,
             bool hasKps,
@@ -711,19 +733,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             if (modsAffectAnalysis)
             {
-                if (hasKps && analysis.ManiaSummary?.XxySr is double analysisXxy && analysisXxy >= 0)
-                    return analysisXxy;
+                if (hasKps && analysis.ManiaSummary?.SunnySR is double analysisSunnySR&& analysisSunnySR>= 0)
+                    return analysisSunnySR;
 
                 return resolvedStarRating >= 0 ? resolvedStarRating : -1;
             }
 
-            if (beatmap.XxyStarRating >= 0)
-                return beatmap.XxyStarRating;
+            if (beatmap.EzRatingData.SunnySR >= 0)
+                return beatmap.EzRatingData.SunnySR;
 
-            if (hasKps && analysis.ManiaSummary?.XxySr is double storedXxy && storedXxy >= 0)
-                return storedXxy;
+            if (hasKps && analysis.ManiaSummary?.SunnySR is double storedSunnySR&& storedSunnySR>= 0)
+                return storedSunnySR;
 
-            // Align play counts with official star buckets when dedicated xxy is unavailable.
+            // Align play counts with official star buckets when dedicated ssris unavailable.
             if (beatmap.StarRating >= 0)
                 return beatmap.StarRating;
 
@@ -737,8 +759,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                 + $" && {nameof(ScoreInfo.BeatmapInfo)}.{nameof(BeatmapInfo.Hash)} == {nameof(ScoreInfo.BeatmapHash)}");
         }
 
-        private static string normaliseUsername(string? username)
-            => EzLocalProfileConstants.NormaliseUsername(username);
+        private static string normaliseUsername(string? username) => EzLocalProfileConstants.NormaliseUsername(username);
 
         private static long countKeys(ScoreInfo score)
         {

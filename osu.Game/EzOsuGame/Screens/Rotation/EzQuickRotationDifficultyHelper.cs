@@ -7,9 +7,11 @@ using System.Linq;
 using System.Threading;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Mods.LAsMods;
+using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Utils;
@@ -21,7 +23,7 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
         public const double MIN_SPEED = 0.4;
         public const double MAX_SPEED = 3.0;
 
-        public static bool UsesXxyStarRating(RulesetInfo ruleset) => EzXxyStarRatingSupport.SupportsRuleset(ruleset);
+        public static bool UsesSunnyStarRating(RulesetInfo ruleset) => EzSSRUnit.SupportsRuleset(ruleset.OnlineID);
 
         public static double GetBaselineStarRating(BeatmapManager beatmapManager,
                                                    BeatmapInfo beatmapInfo,
@@ -43,13 +45,21 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
                                                 double speed,
                                                 CancellationToken cancellationToken)
         {
-            if (UsesXxyStarRating(ruleset))
+            if (UsesSunnyStarRating(ruleset))
             {
                 var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
                 var playable = EzPlayableBeatmapCache.GetShared(working, ruleset, mods, cancellationToken);
 
-                if (EzAnalysisProviderBridge.TryGetValue(ruleset, new EzAnalysisRequest(playable, speed), EzAnalysisFields.XXY_SR, cancellationToken, out double xxySr))
-                    return xxySr;
+                int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
+
+                if (EzSSREngine.IsPatternSupported(keyCount))
+                {
+                    var chart = EzCSIEngine.FromPlayable(playable, cancellationToken);
+                    double sunnySR = EzSSREngine.CalculateSR(chart, keyCount, playable.Difficulty.OverallDifficulty, speed);
+
+                    if (double.IsFinite(sunnySR) && sunnySR >= 0)
+                        return sunnySR;
+                }
             }
 
             return measureOfficialStarRating(beatmapManager, beatmapInfo, ruleset, mods, speed, cancellationToken);

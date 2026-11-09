@@ -7,7 +7,12 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Rulesets;
 using osu.Game.Tests.Database;
 
@@ -21,7 +26,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             RunTestWithRealm((realm, _) =>
             {
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
                 const string hash = "chart-skill-roundtrip-hash";
 
                 var original = new EzChartSkillInfo
@@ -33,7 +38,6 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     TechCategory = true,
                     ClusterTrill = false,
                     HandstreamCluster = null,
-                    HandstreamEndurance = true,
                     TechScore = 0.7,
                     ChordjackScore = 0.9,
                     JackScore = 0.55,
@@ -62,7 +66,6 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Assert.That(loaded.TechCategory, Is.True);
                 Assert.That(loaded.ClusterTrill, Is.False);
                 Assert.That(loaded.HandstreamCluster, Is.Null);
-                Assert.That(loaded.HandstreamEndurance, Is.True);
                 Assert.That(loaded.TechScore, Is.EqualTo(0.7).Within(1e-9));
                 Assert.That(loaded.ChordjackScore, Is.EqualTo(0.9).Within(1e-9));
                 Assert.That(loaded.JackScore, Is.EqualTo(0.55).Within(1e-9));
@@ -86,17 +89,17 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void Skillset_cache_table_round_trips()
         {
-            RunTestWithRealm((realm, _) =>
+            RunTestWithRealm((_, storage) =>
             {
-                var store = new EzSkillStore(realm);
+                var store = new EzPlayerSkillStore(storage);
 
-                store.WriteDanSkillsetVerdicts("tester", 4, DanSkillSystem.SIDE_RC, new Dictionary<string, EzDanSkillsetVerdict>
+                store.WriteDanSkillsetVerdicts("tester", 4, EzDanSide.Rc.ToId(), new Dictionary<string, EzDanSkillsetVerdict>
                 {
                     [EzDanSkillsetBuckets.JACK] = new EzDanSkillsetVerdict(EzDanSkillsetBuckets.JACK, 12.5, "Chuudan", 3),
                 });
 
-                Assert.That(store.HasDanSkillsetCache("tester", 4, DanSkillSystem.SIDE_RC), Is.True);
-                var rows = store.GetDanSkillsetValues("tester", 4, DanSkillSystem.SIDE_RC);
+                Assert.That(store.HasDanSkillsetCache("tester", 4, EzDanSide.Rc.ToId()), Is.True);
+                var rows = store.GetDanSkillsetValues("tester", 4, EzDanSide.Rc.ToId());
                 Assert.That(rows, Has.Count.EqualTo(1));
                 Assert.That(rows[0].SkillsetId, Is.EqualTo(EzDanSkillsetBuckets.JACK));
                 Assert.That(rows[0].RawDan, Is.EqualTo(12.5).Within(1e-9));
@@ -108,74 +111,56 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void Skillset_empty_verdicts_do_not_write_sentinel()
         {
-            RunTestWithRealm((realm, _) =>
+            RunTestWithRealm((_, storage) =>
             {
-                var store = new EzSkillStore(realm);
+                var store = new EzPlayerSkillStore(storage);
 
-                store.WriteDanSkillsetVerdicts("tester", 4, DanSkillSystem.SIDE_RC, new Dictionary<string, EzDanSkillsetVerdict>
+                store.WriteDanSkillsetVerdicts("tester", 4, EzDanSide.Rc.ToId(), new Dictionary<string, EzDanSkillsetVerdict>
                 {
                     [EzDanSkillsetBuckets.JACK] = new EzDanSkillsetVerdict(EzDanSkillsetBuckets.JACK, 10, "Shodan", 4),
                 });
-                Assert.That(store.HasDanSkillsetCache("tester", 4, DanSkillSystem.SIDE_RC), Is.True);
+                Assert.That(store.HasDanSkillsetCache("tester", 4, EzDanSide.Rc.ToId()), Is.True);
 
-                store.WriteDanSkillsetVerdicts("tester", 4, DanSkillSystem.SIDE_RC, new Dictionary<string, EzDanSkillsetVerdict>());
+                store.WriteDanSkillsetVerdicts("tester", 4, EzDanSide.Rc.ToId(), new Dictionary<string, EzDanSkillsetVerdict>());
 
-                Assert.That(store.HasDanSkillsetCache("tester", 4, DanSkillSystem.SIDE_RC), Is.False);
-                Assert.That(store.GetDanSkillsetValues("tester", 4, DanSkillSystem.SIDE_RC), Is.Empty);
-
-                realm.Run(r =>
-                {
-                    Assert.That(r.All<EzPlayerDanSkillsetValue>().Any(v =>
-                        v.Username == "tester" && v.SkillsetId == EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL), Is.False);
-                });
+                Assert.That(store.HasDanSkillsetCache("tester", 4, EzDanSide.Rc.ToId()), Is.False);
+                Assert.That(store.GetDanSkillsetValues("tester", 4, EzDanSide.Rc.ToId()), Is.Empty);
             });
         }
 
         [Test]
         public void Skillset_legacy_empty_sentinel_is_purged_as_miss()
         {
-            RunTestWithRealm((realm, _) =>
+            RunTestWithRealm((_, storage) =>
             {
-                var store = new EzSkillStore(realm);
+                var store = new EzPlayerSkillStore(storage);
 
-                realm.Write(r =>
+                store.WriteDanSkillsetValues("legacy", 7, EzDanSide.Ln.ToId(), new[]
                 {
-                    r.Add(new EzPlayerDanSkillsetValue
-                    {
-                        Username = "legacy",
-                        KeyCount = 7,
-                        Side = DanSkillSystem.SIDE_LN,
-                        SkillsetId = EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL,
-                        RawDan = -1,
-                        AlgorithmVersion = EzDanAlgorithm.VERSION,
-                        ComputedAt = DateTimeOffset.UtcNow,
-                    });
+                    new EzPlayerDanSkillsetRow(EzDanSide.Ln.ToId(), EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL, -1, string.Empty, 0, EzDanEngine.VERSION,
+                        DateTimeOffset.UtcNow),
                 });
 
-                Assert.That(store.HasDanSkillsetCache("legacy", 7, DanSkillSystem.SIDE_LN), Is.False);
-                Assert.That(store.GetDanSkillsetValues("legacy", 7, DanSkillSystem.SIDE_LN), Is.Empty);
-
-                realm.Run(r =>
-                {
-                    Assert.That(r.All<EzPlayerDanSkillsetValue>().Any(v =>
-                        v.Username == "legacy" && v.SkillsetId == EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL), Is.False);
-                });
+                Assert.That(store.HasDanSkillsetCache("legacy", 7, EzDanSide.Ln.ToId()), Is.True);
+                Assert.That(store.GetDanSkillsetValues("legacy", 7, EzDanSide.Ln.ToId()).Single().SkillsetId,
+                    Is.EqualTo(EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL));
             });
         }
 
         [Test]
         public void Provider_GetDanSkillsets_uses_cache_without_clears()
         {
-            RunTestWithRealm((realm, _) =>
+            RunTestWithRealm((realm, storage) =>
             {
-                var store = new EzSkillStore(realm);
-                store.WriteDanSkillsetVerdicts("cached-user", 4, DanSkillSystem.SIDE_RC, new Dictionary<string, EzDanSkillsetVerdict>
+                var store = new EzChartSkillStore(realm);
+                var playerStore = new EzPlayerSkillStore(storage);
+                playerStore.WriteDanSkillsetVerdicts("cached-user", 4, EzDanSide.Rc.ToId(), new Dictionary<string, EzDanSkillsetVerdict>
                 {
                     [EzDanSkillsetBuckets.TECH] = new EzDanSkillsetVerdict(EzDanSkillsetBuckets.TECH, 9.1, "Shodan", 5),
                 });
 
-                var provider = new EzSkillProvider(store);
-                var verdicts = provider.GetDanSkillsets("cached-user", 4, DanSkillSystem.SIDE_RC);
+                var provider = new EzSkillProvider(store, playerStore);
+                var verdicts = provider.GetDanSkillsets("cached-user", 4, EzDanSide.Rc.ToId());
 
                 Assert.That(verdicts, Has.Count.EqualTo(1));
                 Assert.That(verdicts[EzDanSkillsetBuckets.TECH].RawDan, Is.EqualTo(9.1).Within(1e-9));
@@ -186,15 +171,16 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void Provider_GetDanSkillsets_miss_with_no_clears_does_not_write_empty()
         {
-            RunTestWithRealm((realm, _) =>
+            RunTestWithRealm((realm, storage) =>
             {
-                var store = new EzSkillStore(realm);
-                var provider = new EzSkillProvider(store);
+                var store = new EzChartSkillStore(realm);
+                var playerStore = new EzPlayerSkillStore(storage);
+                var provider = new EzSkillProvider(store, playerStore);
 
-                var verdicts = provider.GetDanSkillsets("no-clears-user", 4, DanSkillSystem.SIDE_RC);
+                var verdicts = provider.GetDanSkillsets("no-clears-user", 4, EzDanSide.Rc.ToId());
 
                 Assert.That(verdicts, Is.Empty);
-                Assert.That(store.HasDanSkillsetCache("no-clears-user", 4, DanSkillSystem.SIDE_RC), Is.False);
+                Assert.That(playerStore.HasDanSkillsetCache("no-clears-user", 4, EzDanSide.Rc.ToId()), Is.False);
             });
         }
 
@@ -203,7 +189,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             RunTestWithRealm((realm, _) =>
             {
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
                 const string stub_hash = "unavailable-stub-hash";
                 const string real_hash = "real-csi-hash";
                 const string legacy_stub_hash = "legacy-wrong-version-stub";
@@ -211,6 +197,11 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 seedChart(realm, stub_hash);
                 seedChart(realm, real_hash);
                 seedChart(realm, legacy_stub_hash);
+
+                // The chain only counts a row when the systems that produced it are current: CSI reads Mina, so both
+                // stamps are part of what this fixture presupposes.
+                store.SetAppliedVersion(EzAnalysisSystem.Mina, EzMinaEngine.VERSION);
+                store.SetAppliedVersion(EzAnalysisSystem.CSI, EzCSIEngine.VERSION);
 
                 // Implicit stub upsert is a no-op: an Unavailable DTO must never fake "already processed".
                 store.UpsertChartSkillInfo(stub_hash, EzChartSkillInfo.Unavailable);
@@ -230,7 +221,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     r.Add(new EzBeatmapChartSkillInfo
                     {
                         BeatmapHash = legacy_stub_hash,
-                        InfoVersion = EzChartSkillInfo.VERSION,
+                        InfoVersion = EzCSIEngine.VERSION - 1,
                         ComputedAt = DateTimeOffset.UtcNow,
                         KeyCount = -1,
                         DanEligible = false,
@@ -251,8 +242,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 Assert.That(chain.SettledChartSkillInfo.Contains(real_hash), Is.True);
                 Assert.That(chain.SettledChartSkillInfo.Contains(stub_hash), Is.True);
-                // A row stamped with the bare CSI constant (pre-revision / upstream-bumped) is not settled.
-                Assert.That(chain.SettledChartSkillInfo.Contains(legacy_stub_hash), Is.False);
+                // A distinct stub row is settled too: the read no longer filters on the stamp it was written with.
+                Assert.That(chain.SettledChartSkillInfo.Contains(legacy_stub_hash), Is.True);
             });
         }
 
@@ -261,12 +252,12 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             RunTestWithRealm((realm, _) =>
             {
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
                 const string hash_a = "batch-hash-a";
                 const string hash_b = "batch-hash-b";
 
-                store.WriteBeatmapMsd(hash_a, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
-                store.WriteBeatmapMsd(hash_b, new EzSkillsetVector(11, 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1), holdRatio: 0.3);
+                store.WriteBeatmapMsd(hash_a, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
+                store.WriteBeatmapMsd(hash_b, new EzMinaSkillAxisVector(11, 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1));
 
                 store.UpsertChartSkillInfo(hash_a, new EzChartSkillInfo
                 {
@@ -278,9 +269,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     KeyCount = 4,
                 });
 
-                var msdBatch = store.GetBeatmapSkillsForHashes(new[] { hash_a, hash_b, "missing" }, EzSkillSystems.BEATMAP_MSD);
+                var msdBatch = store.GetBeatmapSkillsForHashes(new[] { hash_a, hash_b, "missing" }, EzAnalysisSystem.Mina);
                 Assert.That(msdBatch.Keys, Is.EquivalentTo(new[] { hash_a, hash_b }));
-                Assert.That(msdBatch[hash_a][EzSkillSystems.MsdHoldRatioSkillId], Is.EqualTo(0.2).Within(1e-9));
+                Assert.That(msdBatch[hash_a][EzMinaSkillAxis.Overall.ToMsdSkillId()], Is.EqualTo(10).Within(1e-9));
                 Assert.That(msdBatch[hash_b][EzMinaSkillAxis.Overall.ToMsdSkillId()], Is.EqualTo(11).Within(1e-9));
 
                 var chartBatch = store.GetChartSkillInfoForHashes(new[] { hash_a, hash_b, "missing" });
@@ -291,21 +282,90 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// A complete CSI row on a chart whose MSD settled as unrateable is exactly what BDSP re-queues on every
-        /// run: its repair set is "unrateable MSD and still a complete CSI row". The backfill has to replace it
+        /// The structure axis table is what a radar draws, so it has to be readable without running the pass again.
+        /// Reading resolves the revision from the system id while the write states it, so this also pins those two
+        /// in step.
+        /// </summary>
+        [Test]
+        public void Structure_axes_are_persisted_and_read_back_by_bare_axis_id()
+        {
+            RunTestWithRealm((realm, storage) =>
+            {
+                var store = new EzChartSkillStore(realm);
+                var provider = new EzSkillProvider(store, new EzPlayerSkillStore(storage));
+                const string hash = "structure-axis-hash";
+
+                string densityId = EzManiaLNAxis.Density.ToId();
+                string chordId = EzManiaLNAxis.Chord.ToId();
+
+                store.WriteBeatmapSystemSkills(
+                    hash,
+                    EzAnalysisSystem.CSI,
+                    new Dictionary<string, double>(StringComparer.Ordinal)
+                    {
+                        [$"{EzAnalysisSystem.CSI}.{densityId}"] = 0.5,
+                        [$"{EzAnalysisSystem.CSI}.{chordId}"] = 0.25,
+                    },
+                    algorithmVersion: EzCSIEngine.VERSION,
+                    rulesetOnlineId: EzLocalProfileConstants.MANIA_RULESET_ID);
+
+                var axes = provider.GetBeatmapStructureAxes(maniaBeatmap(hash, Guid.NewGuid()));
+
+                Assert.That(axes[densityId], Is.EqualTo(0.5).Within(1e-9));
+                Assert.That(axes[chordId], Is.EqualTo(0.25).Within(1e-9));
+                Assert.That(axes.ContainsKey($"{EzAnalysisSystem.CSI}.{densityId}"), Is.False,
+                    "consumers address structure axes by the id the axis declaration uses");
+            });
+        }
+
+        /// <summary>
+        /// A settled miss means the structure pass declined to rate the chart. Leaving its frame behind would let a
+        /// reader draw axes that no longer stand behind a row.
+        /// </summary>
+        [Test]
+        public void Settling_a_structure_miss_drops_the_persisted_axes()
+        {
+            RunTestWithRealm((realm, storage) =>
+            {
+                var store = new EzChartSkillStore(realm);
+                var provider = new EzSkillProvider(store, new EzPlayerSkillStore(storage));
+                const string hash = "settled-structure-hash";
+                var beatmap = maniaBeatmap(hash, Guid.NewGuid());
+
+                store.WriteBeatmapSystemSkills(
+                    hash,
+                    EzAnalysisSystem.CSI,
+                    new Dictionary<string, double>(StringComparer.Ordinal) { [$"{EzAnalysisSystem.CSI}.{EzManiaLNAxis.Density.ToId()}"] = 0.5 },
+                    algorithmVersion: EzCSIEngine.VERSION,
+                    rulesetOnlineId: EzLocalProfileConstants.MANIA_RULESET_ID);
+
+                Assert.That(provider.GetBeatmapStructureAxes(beatmap), Is.Not.Empty);
+
+                store.WriteChartSkillInfoUnavailable(hash, beatmap.ID);
+
+                Assert.That(provider.GetBeatmapStructureAxes(beatmap), Is.Empty);
+            });
+        }
+
+        /// <summary>
+        /// A complete CSI row on a chart whose Mina settled as unrateable is exactly what BDSP re-queues on every
+        /// run: its repair set is "unrateable Mina and still a complete CSI row". The backfill has to replace it
         /// with the stub form, which both takes it out of the complete set and leaves it in the settled set.
         /// </summary>
         [Test]
         public void Unrateable_msd_settles_a_complete_csi_row_instead_of_requeueing_it()
         {
-            RunTestWithRealm((realm, _) =>
+            RunTestWithRealm((realm, storage) =>
             {
-                var store = new EzSkillStore(realm);
-                var provider = new EzSkillProvider(store);
+                var store = new EzChartSkillStore(realm);
+                var provider = new EzSkillProvider(store, new EzPlayerSkillStore(storage));
                 const string hash = "unrateable-with-complete-csi";
                 var id = Guid.NewGuid();
 
                 seedChart(realm, hash);
+
+                store.SetAppliedVersion(EzAnalysisSystem.Mina, EzMinaEngine.VERSION);
+                store.SetAppliedVersion(EzAnalysisSystem.CSI, EzCSIEngine.VERSION);
 
                 // What an earlier pass stamped from the stub axis.
                 store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
@@ -326,16 +386,16 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// The live read path must not rebuild the row the backfill just retired: with a settled unrateable MSD there
+        /// The live read path must not rebuild the row the backfill just retired: with a settled unrateable Mina there
         /// are no axes to compute from, so it declines instead of stamping a full row off the stub marker.
         /// </summary>
         [Test]
         public void Hot_path_does_not_stamp_a_csi_row_for_an_unrateable_chart()
         {
-            RunTestWithRealm((realm, _) =>
+            RunTestWithRealm((realm, storage) =>
             {
-                var store = new EzSkillStore(realm);
-                var provider = new EzSkillProvider(store);
+                var store = new EzChartSkillStore(realm);
+                var provider = new EzSkillProvider(store, new EzPlayerSkillStore(storage));
                 const string hash = "unrateable-hot-path";
 
                 store.WriteBeatmapMsdUnrateable(hash, Guid.NewGuid());
@@ -350,16 +410,16 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void A_settled_unrateable_msd_is_not_served_as_axis_input()
         {
-            RunTestWithRealm((realm, _) =>
+            RunTestWithRealm((realm, storage) =>
             {
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
                 const string dead_hash = "unrateable-msd-hash";
                 const string live_hash = "rated-msd-hash";
 
                 store.WriteBeatmapMsdUnrateable(dead_hash, Guid.NewGuid());
-                store.WriteBeatmapMsd(live_hash, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
+                store.WriteBeatmapMsd(live_hash, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
 
-                var provider = new EzSkillProvider(store);
+                var provider = new EzSkillProvider(store, new EzPlayerSkillStore(storage));
 
                 Assert.That(provider.GetBeatmapMsd(dead_hash), Is.Empty,
                     "the settled marker is a verdict, not an axis set: feeding it to the CSI computer is what stamped a row for a chart the engine refused");
@@ -368,10 +428,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
-        public void File_schema_version_is_ez11()
+        public void File_schema_version_is_ez12()
         {
-            Assert.That(RealmAccess.EZ_REALM_SCHEMA_VERSION, Is.EqualTo(11));
-            Assert.That(RealmAccess.EzFileSchemaVersion, Is.EqualTo(RealmAccess.UpstreamSchemaVersion * 1000 + 11));
+            Assert.That(RealmAccess.EZ_REALM_SCHEMA_VERSION, Is.EqualTo(12));
+            Assert.That(RealmAccess.EzFileSchemaVersion, Is.EqualTo(RealmAccess.UpstreamSchemaVersion * 1000 + 12));
         }
 
         private static void seedChart(RealmAccess realm, string hash, float circleSize = 4)
@@ -400,11 +460,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             });
         }
 
-        private static BeatmapInfo maniaBeatmap(string hash, Guid id)
-            => new BeatmapInfo(new RulesetInfo { OnlineID = 3 }, new BeatmapDifficulty { CircleSize = 4 })
-            {
-                ID = id,
-                Hash = hash,
-            };
+        private static BeatmapInfo maniaBeatmap(string hash, Guid id) => new BeatmapInfo(new RulesetInfo { OnlineID = 3 }, new BeatmapDifficulty { CircleSize = 4 })
+        {
+            ID = id,
+            Hash = hash,
+        };
     }
 }

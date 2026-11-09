@@ -9,7 +9,7 @@ namespace osu.Game.EzOsuGame.Analysis
     /// </summary>
     public readonly record struct EzExternalBeatmapAnalysisPayload(
         double? StarRating,
-        double? XxyStarRating,
+        double? SunnyStarRating,
         double? PerformancePoints,
         EzAnalysisResult? NoModSlice);
 }

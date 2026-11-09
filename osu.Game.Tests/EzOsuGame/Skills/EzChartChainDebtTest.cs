@@ -5,7 +5,12 @@ using System;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Rulesets;
 using osu.Game.Tests.Database;
 using Realms;
@@ -33,12 +38,12 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             RunTestWithRealm((realm, _) =>
             {
                 seedCharts(realm);
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
 
-                // The two ends of the chain: fully rated, and rated up to MSD only.
-                store.WriteBeatmapMsd(settled_chart, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
+                // The two ends of the chain: fully rated, and rated up to Mina only.
+                store.WriteBeatmapMsd(settled_chart, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
                 store.UpsertChartSkillInfo(settled_chart, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
-                store.WriteBeatmapMsd(waiting_on_csi_chart, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
+                store.WriteBeatmapMsd(waiting_on_csi_chart, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
 
                 var debt = EzChartChainDebt.Collect(new[]
                 {
@@ -73,9 +78,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             RunTestWithRealm((realm, _) =>
             {
                 seedCharts(realm);
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
 
-                store.WriteBeatmapMsd(waiting_on_csi_chart, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
+                store.WriteBeatmapMsd(waiting_on_csi_chart, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
 
                 var before = EzChartChainDebt.Collect(new[] { ("alpha", waiting_on_csi_chart) }, store);
                 Assert.That(before.PlaysFor("alpha"), Is.EqualTo(1));
@@ -95,9 +100,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             RunTestWithRealm((realm, _) =>
             {
                 seedCharts(realm);
-                var store = new EzSkillStore(realm);
+                var store = new EzChartSkillStore(realm);
 
-                // The shape a pass used to leave behind: a full CSI row derived from the stub MSD axis. The chart
+                // The shape a pass used to leave behind: a full CSI row derived from the stub Mina axis. The chart
                 // is settled for the whole chain, so reporting it as waiting is what kept re-queueing the chain.
                 store.WriteBeatmapMsdUnrateable(unrateable_with_csi_chart, Guid.NewGuid());
                 store.UpsertChartSkillInfo(unrateable_with_csi_chart, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = false });
@@ -121,7 +126,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             {
                 seedCharts(realm);
 
-                var debt = EzChartChainDebt.Collect(Array.Empty<(string, string)>(), new EzSkillStore(realm));
+                var debt = EzChartChainDebt.Collect(Array.Empty<(string, string)>(), new EzChartSkillStore(realm));
 
                 Assert.That(debt.HasDebt, Is.False);
                 Assert.That(debt.Usernames, Is.Empty);
@@ -144,6 +149,15 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 addChart(r, unrateable_with_csi_chart, maniaRuleset, circleSize: 4);
                 addChart(r, osu_chart, osuRuleset, circleSize: 4);
             });
+
+            // The chain only counts a stored row when the systems that produced it are current, so the revision each
+            // one would have recorded after a real pass has to be part of the fixture.
+            var store = new EzChartSkillStore(realm);
+            store.SetAppliedVersion(EzAnalysisSystem.Mina, EzMinaEngine.VERSION);
+            store.SetAppliedVersion(EzAnalysisSystem.CSI, EzCSIEngine.VERSION);
+            store.SetAppliedVersion(EzAnalysisSystem.Dan, EzDanEngine.VERSION);
+            store.SetAppliedVersion(EzAnalysisSystem.SSR, EzSSRUnit.VERSION);
+            EzSSRTuningSnapshot.Record();
         }
 
         private static void addChart(Realm r, string hash, RulesetInfo ruleset, float circleSize)

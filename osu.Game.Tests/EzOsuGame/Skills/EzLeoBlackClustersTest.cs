@@ -4,8 +4,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
-using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.LeoBlack;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
 {
@@ -155,7 +157,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(leo!.Clusters.Count, Is.GreaterThan(0));
             Assert.That(leo.Category, Is.Not.Empty);
 
-            var info = EzChartSkillInfoComputer.Compute(input);
+            var info = EzCSIEngine.Compute(input);
             Assert.That(info.JackShare.HasValue || info.StreamShare.HasValue || info.TechCategory.HasValue, Is.True);
         }
     }

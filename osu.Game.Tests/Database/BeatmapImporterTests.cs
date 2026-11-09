@@ -100,7 +100,7 @@ namespace osu.Game.Tests.Database
                         detachedBeatmap = live.Detach();
 
                         // Nested RealmFile hashes must survive BeatmapInfo.Detach (MaxDepth).
-                        // Otherwise WorkingBeatmap.Path is null and MSD/difficulty loads empty charts.
+                        // Otherwise WorkingBeatmap.Path is null and Mina/difficulty loads empty charts.
                         ClassicAssert.NotZero(detachedBeatmap.BeatmapSet!.Files.Count);
                         ClassicAssert.IsTrue(detachedBeatmap.BeatmapSet.Files.All(f => f.File != null && !string.IsNullOrEmpty(f.File.Hash)));
                         ClassicAssert.NotNull(detachedBeatmap.File);

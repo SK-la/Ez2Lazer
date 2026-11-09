@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace osu.Game.EzOsuGame.Skills.LeoBlack
 {
@@ -61,21 +62,21 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
                 EzLeoBlackCorePattern.Stream, EzLeoBlackCorePattern.Chordstream, EzLeoBlackCorePattern.Jacks
             };
 
-            double defaultMultiplier = EzLeoBlackConfig.CORE_RATING_MULTIPLIER.TryGetValue(pattern, out double d) ? d : 1.0;
+            double defaultMultiplier = EzLeoBlackConfig.CORE_RATING_MULTIPLIER.GetValueOrDefault(pattern, 1.0);
 
             if (!EzLeoBlackConfig.SUBTYPE_RATING_MULTIPLIER_BY_MODE.TryGetValue(modeTag, out var subtypeMap))
                 subtypeMap = EzLeoBlackConfig.SUBTYPE_RATING_MULTIPLIER_BY_MODE["Mix"];
 
             double value = specificType == null
                 ? defaultMultiplier
-                : (subtypeMap.TryGetValue(specificType, out double s) ? s : defaultMultiplier);
+                : (subtypeMap.GetValueOrDefault(specificType, defaultMultiplier));
 
             if (modeTag == "RC" && lnCore.Contains(pattern))
             {
                 var mixMap = EzLeoBlackConfig.SUBTYPE_RATING_MULTIPLIER_BY_MODE["Mix"];
                 double bas = specificType == null
                     ? defaultMultiplier
-                    : (mixMap.TryGetValue(specificType, out double m) ? m : defaultMultiplier);
+                    : (mixMap.GetValueOrDefault(specificType, defaultMultiplier));
                 value = bas * EzLeoBlackConfig.RC_LN_CORE_SCALE;
             }
 
@@ -86,13 +87,16 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
         }
 
         public static List<EzLeoBlackFoundPattern> Find(EzLeoBlackChart chart)
+            => Find(chart, CancellationToken.None);
+
+        public static List<EzLeoBlackFoundPattern> Find(EzLeoBlackChart chart, CancellationToken cancellationToken)
         {
-            var primitives = EzLeoBlackPrimitives.CalculatePrimitives(chart);
+            var primitives = EzLeoBlackPrimitives.CalculatePrimitives(chart, cancellationToken);
             EzLeoBlackSpecificPatterns keymodePatterns = chart.Keys switch
             {
-                4 => specific4K(),
-                7 => specific7K(),
-                _ => specificOther(),
+                4 => four_key_patterns,
+                7 => seven_key_patterns,
+                _ => other_key_patterns,
             };
 
             return matches(keymodePatterns, chart.LastNote - chart.FirstNote, primitives);
@@ -143,7 +147,7 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             return false;
         }
 
-        private static EzLeoBlackPrimitive asHeadPointRow(EzLeoBlackPrimitive row, IReadOnlyList<int> previousHeadCols)
+        private static EzLeoBlackPrimitive asHeadPointRow(EzLeoBlackPrimitive row, IReadOnlyList<int> previousHeadCols, EzLeoBlackPrimitive target)
         {
             var headCols = row.LNHeads;
             int jacks = 0;
@@ -163,36 +167,40 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             if (previousHeadCols.Count > 0 && headCols.Count > 0)
                 (direction, roll) = EzLeoBlackPrimitives.DetectDirection(previousHeadCols, headCols);
 
-            return new EzLeoBlackPrimitive
-            {
-                Index = row.Index,
-                Time = row.Time,
-                MsPerBeat = row.MsPerBeat,
-                BeatLength = row.BeatLength,
-                Notes = headCols.Count,
-                Jacks = jacks,
-                Direction = direction,
-                Roll = roll,
-                Keys = row.Keys,
-                LeftHandKeys = row.LeftHandKeys,
-                LNHeads = row.LNHeads,
-                LNBodies = row.LNBodies,
-                LNTails = row.LNTails,
-                NormalNotes = [],
-                RawNotes = headCols,
-            };
+            target.Index = row.Index;
+            target.Time = row.Time;
+            target.MsPerBeat = row.MsPerBeat;
+            target.BeatLength = row.BeatLength;
+            target.Notes = headCols.Count;
+            target.Jacks = jacks;
+            target.Direction = direction;
+            target.Roll = roll;
+            target.Keys = row.Keys;
+            target.LeftHandKeys = row.LeftHandKeys;
+            target.LNHeads = row.LNHeads;
+            target.LNBodies = row.LNBodies;
+            target.LNTails = row.LNTails;
+            target.NormalNotes = EzLeoBlackPrimitive.EMPTY_COLUMNS;
+            target.RawNotes = headCols;
+
+            return target;
         }
 
+        /// <summary>
+        /// The head-point view of the first <paramref name="n"/> rows. Writes into the thread's reusable buffer: every
+        /// consumer reads the result and returns, so no caller may hold it past its own call.
+        /// </summary>
         private static List<EzLeoBlackPrimitive> headRows(IReadOnlyList<EzLeoBlackPrimitive> xs, int n)
         {
-            var rows = new List<EzLeoBlackPrimitive>();
-            IReadOnlyList<int> prev = Array.Empty<int>();
+            var scratch = ThreadScratch;
+            List<EzLeoBlackPrimitive> rows = scratch.BeginHeadRows();
+            IReadOnlyList<int> prev = EzLeoBlackPrimitive.EMPTY_COLUMNS;
 
             int limit = Math.Min(n, xs.Count);
 
             for (int i = 0; i < limit; i++)
             {
-                var hr = asHeadPointRow(xs[i], prev);
+                var hr = asHeadPointRow(xs[i], prev, scratch.NextHeadPrimitive());
                 rows.Add(hr);
 
                 if (hr.RawNotes.Count > 0)
@@ -255,7 +263,9 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             if (maxBodies < EzLeoBlackConfig.INVERSE_MIN_FILLED_LANES)
                 return false;
 
-            var gaps = new List<double>();
+            var scratch = ThreadScratch;
+            List<double> gaps = scratch.InverseGaps;
+            gaps.Clear();
 
             for (int i = 0; i < 4; i++)
             {
@@ -266,7 +276,16 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             if (gaps.Count < 2)
                 return false;
 
-            return gaps.Max() - gaps.Min() <= EzLeoBlackConfig.INVERSE_GAP_TOLERANCE_MS;
+            double max = gaps[0];
+            double min = gaps[0];
+
+            for (int i = 1; i < gaps.Count; i++)
+            {
+                max = Math.Max(max, gaps[i]);
+                min = Math.Min(min, gaps[i]);
+            }
+
+            return max - min <= EzLeoBlackConfig.INVERSE_GAP_TOLERANCE_MS;
         }
 
         #region Core matchers
@@ -283,11 +302,11 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             var e = xs[4];
 
             if (a.Notes == 1 && a.Jacks == 0
-                && b.Notes == 1 && b.Jacks == 0
-                && c.Notes == 1 && c.Jacks == 0
-                && d.Notes == 1 && d.Jacks == 0
-                && e.Notes == 1 && e.Jacks == 0
-                && a.RawNotes[0] != e.RawNotes[0])
+                             && b.Notes == 1 && b.Jacks == 0
+                             && c.Notes == 1 && c.Jacks == 0
+                             && d.Notes == 1 && d.Jacks == 0
+                             && e.Notes == 1 && e.Jacks == 0
+                             && a.RawNotes[0] != e.RawNotes[0])
             {
                 return 5;
             }
@@ -380,7 +399,7 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
                 foreach (int x in a.RawNotes)
                 {
                     if (containsCol(b.RawNotes, x) && containsCol(c.RawNotes, x)
-                        && containsCol(d.RawNotes, x) && containsCol(e.RawNotes, x))
+                                                   && containsCol(d.RawNotes, x) && containsCol(e.RawNotes, x))
                     {
                         return 5;
                     }
@@ -523,7 +542,7 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             var d = xs[3];
 
             if (b.Jacks == 0 && c.Jacks == 0
-                && sameCols(a.RawNotes, c.RawNotes) && !sameCols(b.RawNotes, d.RawNotes))
+                             && sameCols(a.RawNotes, c.RawNotes) && !sameCols(b.RawNotes, d.RawNotes))
             {
                 return 4;
             }
@@ -609,22 +628,29 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             if (lnCol == null)
                 return 0;
 
-            var adjCols = new List<int>();
+            var scratch = ThreadScratch;
+            List<int> adjCols = scratch.AdjacentColumns;
+            adjCols.Clear();
 
-            foreach (int c in new[] { lnCol.Value - 1, lnCol.Value + 1 })
-            {
-                if (c >= 0 && c < xs[0].Keys && isSameHandAdjacent(lnCol.Value, c, split))
-                    adjCols.Add(c);
-            }
+            int lower = lnCol.Value - 1;
+            int upper = lnCol.Value + 1;
+
+            if (lower >= 0 && lower < xs[0].Keys && isSameHandAdjacent(lnCol.Value, lower, split))
+                adjCols.Add(lower);
+
+            if (upper >= 0 && upper < xs[0].Keys && isSameHandAdjacent(lnCol.Value, upper, split))
+                adjCols.Add(upper);
 
             if (adjCols.Count == 0)
                 return 0;
 
             int scan = Math.Min(8, xs.Count);
 
-            foreach (int adj in adjCols)
+            for (int a = 0; a < adjCols.Count; a++)
             {
-                var hits = new List<double>();
+                int adj = adjCols[a];
+                List<double> hits = scratch.HitTimes;
+                hits.Clear();
 
                 for (int i = 0; i < scan; i++)
                 {
@@ -691,7 +717,9 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             if (wildcardJack(xs) != 0)
                 return 0;
 
-            var pickedRows = new List<EzLeoBlackPrimitive>();
+            var scratch = ThreadScratch;
+            List<EzLeoBlackPrimitive> pickedRows = scratch.PickedRows;
+            pickedRows.Clear();
             int scan = Math.Min(EzLeoBlackConfig.RELEASE_SCAN_ROWS, xs.Count);
 
             for (int i = 0; i < scan; i++)
@@ -704,51 +732,49 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
                 return 0;
 
             int useRows = Math.Min(EzLeoBlackConfig.RELEASE_FULL_MATCH_ROWS, pickedRows.Count);
-            int[] tails = new int[useRows];
+            List<EzLeoBlackPrimitive> rows = scratch.BeginReleaseRows();
 
-            for (int i = 0; i < useRows; i++)
-                tails[i] = pickedRows[i].LNTails[0];
-
-            var prev = new List<int> { tails[0] };
-            var rows = new List<EzLeoBlackPrimitive>();
+            List<int> prev = scratch.ReleaseColumns[0];
+            prev.Clear();
+            prev.Add(pickedRows[0].LNTails[0]);
 
             for (int i = 0; i < useRows; i++)
             {
                 var row = pickedRows[i];
-                var cur = new List<int> { tails[i] };
+                List<int> cur = scratch.ReleaseColumns[i + 1];
+                cur.Clear();
+                cur.Add(row.LNTails[0]);
                 var (direction, roll) = EzLeoBlackPrimitives.DetectDirection(prev, cur);
 
-                rows.Add(new EzLeoBlackPrimitive
-                {
-                    Index = row.Index,
-                    Time = row.Time,
-                    MsPerBeat = row.MsPerBeat,
-                    BeatLength = row.BeatLength,
-                    Notes = 1,
-                    Jacks = cur[0] == prev[0] ? 1 : 0,
-                    Direction = direction,
-                    Roll = roll,
-                    Keys = row.Keys,
-                    LeftHandKeys = row.LeftHandKeys,
-                    LNHeads = row.LNHeads,
-                    LNBodies = row.LNBodies,
-                    LNTails = row.LNTails,
-                    NormalNotes = [],
-                    RawNotes = cur,
-                });
+                var releaseRow = scratch.NextReleasePrimitive();
+                releaseRow.Index = row.Index;
+                releaseRow.Time = row.Time;
+                releaseRow.MsPerBeat = row.MsPerBeat;
+                releaseRow.BeatLength = row.BeatLength;
+                releaseRow.Notes = 1;
+                releaseRow.Jacks = cur[0] == prev[0] ? 1 : 0;
+                releaseRow.Direction = direction;
+                releaseRow.Roll = roll;
+                releaseRow.Keys = row.Keys;
+                releaseRow.LeftHandKeys = row.LeftHandKeys;
+                releaseRow.LNHeads = row.LNHeads;
+                releaseRow.LNBodies = row.LNBodies;
+                releaseRow.LNTails = row.LNTails;
+                releaseRow.NormalNotes = EzLeoBlackPrimitive.EMPTY_COLUMNS;
+                releaseRow.RawNotes = cur;
 
+                rows.Add(releaseRow);
                 prev = cur;
             }
 
-            var effectiveRows = rows.Count > 1 ? rows.Skip(1).ToList() : [];
-
-            if (effectiveRows.Count < EzLeoBlackConfig.RELEASE_ROLL_POINTS)
+            // Effective rows are everything after the first, which is what the roll check reads.
+            if (rows.Count - 1 < EzLeoBlackConfig.RELEASE_ROLL_POINTS)
                 return 0;
 
             // hub RELEASE_ROLL_POINTS is 2, so the >=3 STREAM_4K_ROLL arm never runs.
-            int aCol = effectiveRows[0].RawNotes[0];
-            int bCol = effectiveRows.Count > 1 ? effectiveRows[1].RawNotes[0] : aCol;
-            double dt = effectiveRows.Count > 1 ? effectiveRows[1].Time - effectiveRows[0].Time : 0;
+            int aCol = rows[1].RawNotes[0];
+            int bCol = rows.Count > 2 ? rows[2].RawNotes[0] : aCol;
+            double dt = rows.Count > 2 ? rows[2].Time - rows[1].Time : 0;
             bool matched = aCol != bCol && dt > 0;
 
             if (matched)
@@ -806,7 +832,9 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
                 return 0;
 
             int take = Math.Max(4, EzLeoBlackConfig.JACKY_CONTEXT_WINDOW);
-            var rows = new List<EzLeoBlackPrimitive>();
+            var scratch = ThreadScratch;
+            List<EzLeoBlackPrimitive> rows = scratch.WildcardRows;
+            rows.Clear();
 
             for (int i = 0; i < Math.Min(take, xs.Count); i++)
             {
@@ -850,11 +878,12 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             if (xs.Count < 2 || !hasLnContext(xs, 4))
                 return 0;
 
-            var rows = headRows(xs, Math.Min(4, xs.Count));
+            var scratch = ThreadScratch;
+            List<EzLeoBlackPrimitive> rows = headRows(xs, Math.Min(4, xs.Count));
 
             if (xs[0].Keys == 4)
             {
-                if (rows.Count >= 3 && stream4kRoll(rows.Take(3).ToList()) != 0)
+                if (rows.Count >= 3 && stream4kRoll(take(rows, 3, scratch)) != 0)
                     return 3;
 
                 if (rows.Count >= 2)
@@ -868,14 +897,14 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             }
             else
             {
-                if (rows.Count >= 3 && chordstream7kChordRoll(rows.Take(3).ToList()) != 0)
+                if (rows.Count >= 3 && chordstream7kChordRoll(take(rows, 3, scratch)) != 0)
                     return 3;
 
                 if (rows.Count >= 2)
                 {
                     bool cond = rows[0].Notes >= 2 && rows[1].Notes >= 2
-                                && rows[0].Direction == rows[1].Direction
-                                && rows[0].Direction is EzLeoBlackDirection.Left or EzLeoBlackDirection.Right;
+                                                   && rows[0].Direction == rows[1].Direction
+                                                   && rows[0].Direction is EzLeoBlackDirection.Left or EzLeoBlackDirection.Right;
 
                     if (cond || rows[0].MsPerBeat <= 170)
                         return 3;
@@ -886,6 +915,14 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
         }
 
         #endregion
+
+        /// <summary>
+        /// Pattern tables are pure data (name + delegate), so they are built once instead of on every chart. The
+        /// lists are read-only by convention; nothing mutates them after construction.
+        /// </summary>
+        private static readonly EzLeoBlackSpecificPatterns four_key_patterns = specific4K();
+        private static readonly EzLeoBlackSpecificPatterns seven_key_patterns = specific7K();
+        private static readonly EzLeoBlackSpecificPatterns other_key_patterns = specificOther();
 
         private static EzLeoBlackSpecificPatterns specific4K()
         {
@@ -1028,23 +1065,113 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             };
         }
 
+        /// <summary>
+        /// Per-thread buffers for one analyzer run. The scan is sequential and the matchers read their inputs and
+        /// return, so a single instance may be reused across every window of a chart. Thread-static because
+        /// <see cref="EzLeoBlackPatternAnalyzer"/> can be called from more than one worker.
+        /// </summary>
+        private sealed class MatchScratch
+        {
+            public readonly List<EzLeoBlackPrimitive> Window = new List<EzLeoBlackPrimitive>(MATCHER_WINDOW);
+            public readonly List<(int N, string SpecificType)> Matched = new List<(int N, string SpecificType)>(4);
+
+            public readonly List<EzLeoBlackPrimitive> HeadRows = new List<EzLeoBlackPrimitive>(4);
+            public readonly List<EzLeoBlackPrimitive> ReleaseRows = new List<EzLeoBlackPrimitive>(EzLeoBlackConfig.RELEASE_FULL_MATCH_ROWS);
+            public readonly List<EzLeoBlackPrimitive> WildcardRows = new List<EzLeoBlackPrimitive>(EzLeoBlackConfig.JACKY_CONTEXT_WINDOW);
+            public readonly List<EzLeoBlackPrimitive> PickedRows = new List<EzLeoBlackPrimitive>(EzLeoBlackConfig.RELEASE_SCAN_ROWS);
+            public readonly List<EzLeoBlackPrimitive> TakeRows = new List<EzLeoBlackPrimitive>(3);
+
+            public readonly List<int> AdjacentColumns = new List<int>(2);
+            public readonly List<double> HitTimes = new List<double>(8);
+            public readonly List<double> InverseGaps = new List<double>(4);
+            public readonly List<int>[] ReleaseColumns = createReleaseColumns();
+
+            private readonly List<EzLeoBlackPrimitive> headPool = new List<EzLeoBlackPrimitive>(4);
+            private readonly List<EzLeoBlackPrimitive> releasePool = new List<EzLeoBlackPrimitive>(EzLeoBlackConfig.RELEASE_FULL_MATCH_ROWS);
+            private int headCount;
+            private int releaseCount;
+
+            private static List<int>[] createReleaseColumns()
+            {
+                var columns = new List<int>[EzLeoBlackConfig.RELEASE_FULL_MATCH_ROWS + 1];
+
+                for (int i = 0; i < columns.Length; i++)
+                    columns[i] = new List<int>(1);
+
+                return columns;
+            }
+
+            public List<EzLeoBlackPrimitive> BeginHeadRows()
+            {
+                HeadRows.Clear();
+                headCount = 0;
+                return HeadRows;
+            }
+
+            public EzLeoBlackPrimitive NextHeadPrimitive()
+            {
+                if (headCount == headPool.Count)
+                    headPool.Add(new EzLeoBlackPrimitive());
+
+                return headPool[headCount++];
+            }
+
+            public List<EzLeoBlackPrimitive> BeginReleaseRows()
+            {
+                ReleaseRows.Clear();
+                releaseCount = 0;
+                return ReleaseRows;
+            }
+
+            public EzLeoBlackPrimitive NextReleasePrimitive()
+            {
+                if (releaseCount == releasePool.Count)
+                    releasePool.Add(new EzLeoBlackPrimitive());
+
+                return releasePool[releaseCount++];
+            }
+        }
+
+        [ThreadStatic]
+        private static MatchScratch? threadScratch;
+
+        private static MatchScratch ThreadScratch => threadScratch ??= new MatchScratch();
+
+        private static IReadOnlyList<EzLeoBlackPrimitive> take(List<EzLeoBlackPrimitive> rows, int count, MatchScratch scratch)
+        {
+            List<EzLeoBlackPrimitive> taken = scratch.TakeRows;
+            taken.Clear();
+
+            for (int i = 0; i < count && i < rows.Count; i++)
+                taken.Add(rows[i]);
+
+            return taken;
+        }
+
         private static List<EzLeoBlackFoundPattern> matches(
             EzLeoBlackSpecificPatterns specificPatterns,
             double lastNote,
             List<EzLeoBlackPrimitive> primitives)
         {
             var results = new List<EzLeoBlackFoundPattern>();
+            var scratch = ThreadScratch;
             int start = 0;
 
             while (start < primitives.Count)
             {
-                var remaining = primitives.GetRange(start, Math.Min(MATCHER_WINDOW, primitives.Count - start));
-                appendCoreMatches(results, EzLeoBlackCorePattern.Stream, coreStream(remaining), specificPatterns.Stream, remaining, lastNote);
-                appendCoreMatches(results, EzLeoBlackCorePattern.Chordstream, coreChordstream(remaining), specificPatterns.Chordstream, remaining, lastNote);
-                appendCoreMatches(results, EzLeoBlackCorePattern.Jacks, coreJacks(remaining), specificPatterns.Jack, remaining, lastNote);
-                appendCoreMatches(results, EzLeoBlackCorePattern.Coordination, coreCoordination(remaining), specificPatterns.Coordination, remaining, lastNote);
-                appendCoreMatches(results, EzLeoBlackCorePattern.Density, coreDensity(remaining), specificPatterns.Density, remaining, lastNote);
-                appendCoreMatches(results, EzLeoBlackCorePattern.Wildcard, coreWildcard(remaining), specificPatterns.Wildcard, remaining, lastNote);
+                int windowLength = Math.Min(MATCHER_WINDOW, primitives.Count - start);
+                List<EzLeoBlackPrimitive> remaining = scratch.Window;
+                remaining.Clear();
+
+                for (int i = 0; i < windowLength; i++)
+                    remaining.Add(primitives[start + i]);
+
+                appendCoreMatches(results, EzLeoBlackCorePattern.Stream, coreStream(remaining), specificPatterns.Stream, remaining, lastNote, scratch);
+                appendCoreMatches(results, EzLeoBlackCorePattern.Chordstream, coreChordstream(remaining), specificPatterns.Chordstream, remaining, lastNote, scratch);
+                appendCoreMatches(results, EzLeoBlackCorePattern.Jacks, coreJacks(remaining), specificPatterns.Jack, remaining, lastNote, scratch);
+                appendCoreMatches(results, EzLeoBlackCorePattern.Coordination, coreCoordination(remaining), specificPatterns.Coordination, remaining, lastNote, scratch);
+                appendCoreMatches(results, EzLeoBlackCorePattern.Density, coreDensity(remaining), specificPatterns.Density, remaining, lastNote, scratch);
+                appendCoreMatches(results, EzLeoBlackCorePattern.Wildcard, coreWildcard(remaining), specificPatterns.Wildcard, remaining, lastNote, scratch);
                 start++;
             }
 
@@ -1057,29 +1184,31 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             int coreN,
             List<(string Name, EzLeoBlackPatternMatcher Match)> specificList,
             List<EzLeoBlackPrimitive> remaining,
-            double lastNote)
+            double lastNote,
+            MatchScratch scratch)
         {
             if (coreN == 0)
                 return;
 
             // hub ENABLE_MULTI_LABEL_SAME_WINDOW is true; single-label arm omitted.
-            var matched = pickSpecificAll(specificList, remaining);
+            pickSpecificAll(specificList, remaining, scratch.Matched);
 
-            if (matched.Count == 0)
+            if (scratch.Matched.Count == 0)
             {
                 appendFoundPattern(results, pattern, null, coreN, remaining, lastNote);
                 return;
             }
 
-            foreach (var (m, specificType) in matched)
+            foreach (var (m, specificType) in scratch.Matched)
                 appendFoundPattern(results, pattern, specificType, Math.Max(coreN, m), remaining, lastNote);
         }
 
-        private static List<(int N, string SpecificType)> pickSpecificAll(
+        private static void pickSpecificAll(
             List<(string Name, EzLeoBlackPatternMatcher Match)> specificList,
-            List<EzLeoBlackPrimitive> remaining)
+            List<EzLeoBlackPrimitive> remaining,
+            List<(int N, string SpecificType)> matched)
         {
-            var matched = new List<(int, string)>();
+            matched.Clear();
 
             foreach (var (name, match) in specificList)
             {
@@ -1088,8 +1217,6 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
                 if (n != 0)
                     matched.Add((n, name));
             }
-
-            return matched;
         }
 
         private static void appendFoundPattern(
@@ -1100,9 +1227,23 @@ namespace osu.Game.EzOsuGame.Skills.LeoBlack
             List<EzLeoBlackPrimitive> remaining,
             double lastNote)
         {
-            var d = remaining.GetRange(0, Math.Min(n2, remaining.Count));
-            double meanMspb = d.Sum(x => x.MsPerBeat) / d.Count;
-            bool mixed = !d.TrueForAll(x => Math.Abs(x.MsPerBeat - meanMspb) < EzLeoBlackConfig.PATTERN_STABILITY_THRESHOLD);
+            int count = Math.Min(n2, remaining.Count);
+            double sum = 0;
+
+            for (int i = 0; i < count; i++)
+                sum += remaining[i].MsPerBeat;
+
+            double meanMspb = sum / count;
+            bool mixed = false;
+
+            for (int i = 0; i < count; i++)
+            {
+                if (!(Math.Abs(remaining[i].MsPerBeat - meanMspb) < EzLeoBlackConfig.PATTERN_STABILITY_THRESHOLD))
+                {
+                    mixed = true;
+                    break;
+                }
+            }
 
             double start = remaining[0].Time;
             double end;

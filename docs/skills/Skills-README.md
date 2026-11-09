@@ -24,7 +24,19 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
     `EzDataStateChecker` counts ready / settled / stale / missing, `EzDataStateReport` is the list the readout
     renders. Storage-agnostic, so a Realm table and a SQLite table report the same way.
   - `EzChartChainState` — the chart chain's Realm adapter: one read of MSD / CSI / Dan into facets, plus the
-    per-stage owed sets. `EzSkillStore.GetSkillDataStatus()` returns its report.
+    per-stage owed sets.
+  - `EzAnalysisDataStatus` — the readout entry for every ruleset: builds one facet per declared chart producer
+    (skill-value table, chart chain, or beatmap column, decided the same way the read path decides it), so a new
+    system appears in the settings status line without touching it. `EzChartSkillStore.CollectAnalysisStatus()`
+    runs it.
+- Per-system chart ratings:
+  - `EzRatingData` — the star rating (SR) and perfect-play pp (PP) each system gives one chart, stored flat on
+    `BeatmapInfo` (`OfficialSR` / `OfficialPP` / `SunnySR` / `SunnyPP` / `PppSR` / `PppPP` / `MinaSR` / `MinaPP`).
+    The official pair is mirrored onto `BeatmapInfo.StarRating` / `PerformancePoints`, which stay the authority for
+    upstream code.
+  - `EzRatingWriter` — the only write path; finds the field through the producer declaration.
+  - `EzMinaRatingScale` — the engine's headline to star conversion, applied once when the Mina star is written and
+    again only for the live axis. `beatmap_msd.*` keeps the engine's own scale for the radar and the dan chain.
 - Player SSR aggregation:
   - `EzPlayerSsrAggregator`
   - `EzDanPlaySsrIndex`
@@ -78,11 +90,26 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
 | `EzChartSkillInfo.VERSION` | CSI → Dan | Dan 的组合号含 CSI 版本，因此只动 CSI 也会废掉 Dan |
 | `EzDanAlgorithm.VERSION` | Dan | 只有 Dan 行受影响 |
 | `EzAnalysisRevision.CSI_POLICY` / `DAN_POLICY` | 该级 + 下游 | 生产逻辑变了但没有算法常量能表达时（新增依赖边、改动读取路径）bump 它 |
-| `EzXxyStarRatingSupport` 版本 | Dan（显式清表） | xxy 落在 `BeatmapInfo` / ruleset 标量上，不进组合号，所以由 `clearOutdatedXxyStarRatings` 显式 `ClearChartDan()` |
+| `EzXxyStarRatingSupport` 版本 | Dan（显式清表） | xxy 落在 `BeatmapInfo.EzRatingData` / ruleset 标量上，不进组合号，所以由 `clearOutdatedXxyStarRatings` 显式 `ClearChartDan()` |
+| `Ez2Setting.SsrRescaleThreshold` / `SsrLnMultiplier` | **无** | 用户对算法的永久修订，不换代：只影响此后算出的 xxy 与它落库的结果，旧行保持原值。见下节 |
 
 组合规则：`revision = compose(自身常量 + 所有上游常量)`，每槽 base-100（`SLOT_RADIX`），
 所以每个参与常量必须小于 100。`EzAnalysisRevision.DownstreamOf(facet)` 是依赖边的可执行声明；
 新增一条依赖边时，同时改它和上面这张表（`EzAnalysisRevisionTest` 覆盖了 `SLOT_RADIX` 约束和下游集合）。
+
+### SSR 的两个系数是用户设置，不是版本
+
+`Ez2Setting.SsrRescaleThreshold`（默认 8，范围 6–10）与 `SsrLnMultiplier`（默认 5.5，范围 2–8）
+是 SSR 计算的两个修正系数，位于「设置 → Ez → 分析」。
+
+- **不换代**：改动不 bump 任何存储版本，也不追溯重算已落盘的行。旧行保持用旧系数算出的值，
+  新行用新系数；两者并存是预期状态，不是不一致。
+- **不是 mod**：早先它们挂在 `ManiaModSRAdjust`（SRA）上，由 mod 构造函数写静态字段，移除 mod 后
+  残留值会继续影响此后所有评级（包括后台回填），而缓存 key 说的是"无 mod"。现在只有这一处来源。
+- **每 pass 读一次**：`SRCalculator.Tuning` 一次解析成 `EzSSRTuning` 并作为参数贯穿到各阶段，
+  中途改设置不会让同一次评级前后半段用不同系数。会话内结果缓存在系数变化时整体丢弃（纯内存）。
+- 越界写入由设置自身的范围钳制；`Tuning` 里另有一层"非法值回落默认"的兜底，只可能在配置文件被
+  手工改坏时触发。
 
 ### 为什么不用官方 star / xxySR 的单标量
 
@@ -105,13 +132,19 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
 
 - 启动日志：`Ez chart chain revisions: MSD v…, CSI v… (policy=… …), Dan v… (…)`。
 - 每一段补算仍各自 `showProgressNotification`；因为过期行对增量集合就是"缺失"，换版后启动会自动弹进度。
-- 设置 → Ez → 实验性 → **技能数据状态**：`EzSkillStore.GetSkillDataStatus()` 的
-  ready / unrateable / stale / missing，回答"数据有没有缺、有没有过期"；同一行末尾附带玩家链的
-  「玩家技能 落后账本 N」（`GetStalePlayerSkillUsernames()`）与派生的「等图表链 N」
+- 设置 → Ez → 实验性 → **数据维护…**：打开 `EzDataRebuildDialog`，Realm 与 SQLite 各一列，
+  列内按依赖链排列（MSD → CSI → Dan 紧挨；Sunny / PP+ / 官方 PP / Tag / 成绩各自独立，间距更大）。
+  选中一项后执行「补算缺失」或「完全重算」（后者先确认）。依赖关系由 `EzDataRebuildCatalog` 声明，
+  界面间距直接读它，不手工调。
+- 设置 → Ez → 实验性 → **分析数据状态**：`EzChartSkillStore.CollectAnalysisStatus()` 按规则集依次列出
+  各自分析系统（官方 / Sunny / PP+ / Mina / CSI / Dan）的 ready / unrateable / stale / missing，
+  回答"数据有没有缺、有没有过期"；只列出仍有待补算的系统，全部对齐时该规则集显示"无待补算"。
+  末尾附带玩家链的「玩家技能 落后账本 N」（`GetStalePlayerSkillUsernames()`）与派生的「等图表链 N」
   （`EzChartChainDebt`），所以两条链的状态在一个地方能看完。
-- 玩家侧另有一套可见性：`EzPlayerSkillValue.Stale` 在个人主页显示为「待更新」
-  （`LOCAL_PROFILE_SKILL_STALE`）；手动「计算成绩分析」弹 `EzLocalProfileComputeNotification` 进度
-  通知（一次点击只弹一轮）。
+  没有版本号的系统（官方星级 / PP 等基线列）只区分已填 / 未填。
+- 玩家侧另有一套可见性：落后账本在个人主页显示为「待更新」（`LOCAL_PROFILE_SKILL_STALE`，由
+  `EzPlayerSkillStore` 按账本行数派生，不存标志位）；手动「计算成绩分析」弹
+  `EzLocalProfileComputeNotification` 进度通知（一次点击只弹一轮）。
 
 ### 加一个分析 facet（xxySR / KPS …）
 
@@ -120,8 +153,10 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
 1. `EzAnalysisFacet` 加成员（`Analysis/EzAnalysisRevision.cs`），有级联就在 `DownstreamOf` 里写下依赖边。
 2. 给一个 reader：把那张表读成 `<key, EzFacetRowState>`。Realm 表直接用
    `EzRealmFacetReader.Read(...)`；SQLite / 内存来源自己产 `EzFacetRowState` 即可，内核不认识 Realm。
-3. 把 facet 挂到状态入口产出的 `EzDataStateFacet` 列表里（图表链是 `EzChartChainState.Build`）。
-   `Id` 就是显示名，`CurrentRevision` 是这条数据要对比的版本（没有版本体系就用常量的单调值）。
+3. 把 facet 挂到状态入口产出的 `EzDataStateFacet` 列表里。图表链的 facet 是 `EzChartChainState.Build`；
+   其余分析系统由 `EzAnalysisDataStatus.Collect` 按图表生产者目录自动生成，一般不在这里加代码——
+   让解析器认得新的存储位置即可。`Id` 就是显示名，`CurrentRevision` 是这条数据要对比的版本
+   （没有版本体系就用 `0`，此时只区分已填 / 未填）。
 
 `EzDataStateChecker` 与 `EzDataStateReport` 不用动：计数口径（当前修订且非 stub = ready，stub 或上游
 已结算 = settled，旧修订 = stale，无行 = missing）只有一份，UI 遍历 `report.Facets` 渲染，新 facet 自动
@@ -130,18 +165,19 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
 ## 玩家链（成绩分析）：与图表链不同的第二套失效机制
 
 图表链（上面那套）失效靠**组合修订号**；玩家链（SSR / pattern / Dan 的玩家侧汇总）失效靠
-**脏位 + 派生债务**，因为它的"上游"是 Realm 里不断新增的成绩，而不是磁盘上的一批谱面行。
+**派生的落后判据**，因为它的"上游"是不断新增的成绩，而不是磁盘上的一批谱面行。
 
 两级、各有一个真源：
 
 | 阶段 | 真源 | 写点 |
 |---|---|---|
 | SQLite 切片：`drill_scores`（每局明细 + 账本）+ `username_partitions`（每玩家计数器） | `drill_scores` 就是"已分析"账本 | 一局结算入库时立即追加（`Player.ImportScore` → `EzLocalProfileService.IngestSettledScore`） |
-| Realm 技能行：`EzPlayerSkillValue`（SSR / pattern）、`EzDanEstimate` / `EzPlayerDanSkillsetValue` | 从上一步的切片聚合而来 | 只在整段 compute 里写（`writePlayerSkills`） |
+| `ez-local-profile.sqlite` 的 `player_skill_value` / `player_skill_history` / `player_dan_estimate` / `player_dan_skillset` | 从上一步的切片聚合而来 | 只在整段 compute 里写（`EzPlayerSkillStore`），与账本同库同一事务 |
 
-一局结算只做第一步，然后把该玩家（和 `All`）的 Realm 技能行置 `Stale`——**不**在结算路径上重算，
-否则每局都要做一次玩家级聚合。第二步只在用户手动「计算成绩分析」时收口：**一次点击 = 一轮**，
-跑完不留任何后台回折（启动时、图表链收工后都不再自动补算）。
+一局结算只做第一步，**不**在结算路径上重算玩家级聚合。第二步只在用户手动「计算成绩分析」时收口：
+**一次点击 = 一轮**，跑完不留任何后台回折（启动时、图表链收工后都不再自动补算）。
+“落后账本”不落持久标志：技能行记着自己折入了多少局，与 `drill_scores` 当前行数比较即可，判据不会
+活过它的成因。
 
 ### 一轮计算覆盖谁
 
@@ -150,12 +186,27 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
 
 | 来源 | 判据 | 覆盖的场景 |
 |---|---|---|
-| 脏位 | `EzPlayerSkillValue.Stale`（`EzSkillProvider.PlayerSkills.SetStale`） | 已写进切片、技能行还没跟上（只有结算入库会置位；一次覆盖该玩家的 pass 清除） |
-| 图表链债务 | `EzChartChainDebt`：`drill_scores` 的 (玩家, 谱面) 对图表链覆盖现算 | 该谱面还没被图表链评级，这一轮读不到；跑完「重算 Realm」后再点一次即可折入 |
+| 落后账本 | 技能行的 `analyzed_plays` 小于 `drill_scores` 当前行数（`EzPlayerSkillStore.GetStalePlayerSkillUsernames`） | 已写进切片、技能行还没跟上；一次覆盖该玩家的 pass 自然让它相等 |
+| 图表链债务 | `EzChartChainDebt`：`drill_scores` 的 (玩家, 谱面) 对图表链覆盖现算 | 该谱面还没被图表链评级，这一轮读不到；在「数据维护」里补算 Realm 侧图表链后再点一次即可折入 |
 
-两类都在同一遍 compute 内收口：覆盖到的玩家按玩家整体清脏位；无法重算的玩家（该切片没有 mania
-成绩）直接删行，避免脏位永远清不掉。`Stale` 只表示"值落后账本"，不再兼表"等图表链"——后者由派生
+两类都在同一遍 compute 内收口：覆盖到的玩家整段重写成技能行；无法重算的玩家（该切片没有 mania
+成绩）直接删行，避免落后判据永远成立。落后只表示“值落后账本”，不兼表“等图表链”——后者由派生
 债务表达，链一写出行就自己消失。
+
+### 玩家侧覆盖哪些系统与规则集
+
+按 `EzAnalysisSystem` 分，玩家侧存的是**三类**结果，覆盖范围由系统自身的目录声明：
+
+| 系统 | 规则集 | 切片 | 轴来源 |
+|---|---|---|---|
+| Sunny / pattern / dan | 仅 mania | 每个 keymode 一个 | `EzManiaSkillAxis` / `EzPatternRatings` / `EzDanEngine` |
+| PP+ | osu / taiko / catch / mania（`EzPPPSkillCatalog.SupportedRulesets`） | mania 按 keymode，其他一个 | `EzPPPSkillCatalog.MetricsFor(ruleset)` |
+
+PP+ 是唯一横跨四个规则集的玩家系统，所以 `ComputeAsync` 会为每个受支持规则集各收集一次成绩、
+各跑一次聚合。行按 `(username, key_count, system_id, ruleset_online_id, skill_id)` 定位，**规则集在
+键里**：一个规则集的一轮 pass 若没有任何成绩，只清自己那一份（`ClearPlayerSystemSkills(..., ruleset)`），
+不会带走别的规则集的行。读侧同样按规则集取轴——`PPPSkillsPresenter` 的轴表来自该规则集的目录，
+不写死为 osu 的那一套。
 
 ### 为什么玩家链不复用组合修订号
 
@@ -163,18 +214,18 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
   删除的成绩则要让对应玩家整段重算（drill 明细删掉后计数必须一起扣）。
 - 因此账本 diff 本身就是最精确的失效判据，"过期"与"新增"是同一个判据的两个方向；
   再加一层组合号只会多一份会和账本漂移的簿记。
-- 代价：Realm 技能行的**删除**没有脏位可用（Dan 行无 `Stale` 字段），只能靠实际重算修正；
+- 代价：玩家技能行的**删除**不能靠判据发现（键已经不在账本里），只能靠实际重算修正；
   这也是对账选增量而非清库重建的原因——增量足够精确，清库会把每局缓存一起废掉。
 
 ### 玩家链只读图表侧数据，缺失的交回图表链
 
 玩家段需要图表侧三样东西：SSR 的 pattern 标签（CSI）、Dan 的 `EzPersistedChartDan`、以及
 mod 影响谱面时的现场估算。前两样**只读不写**：读不到就跳到下一局，并把该谱面记进
-`MissingChartHashes`。这一轮**不去排图表链**，也**不写脏位**——缺的局根本没进这一遍写的行，
+`MissingChartHashes`。这一轮**不去排图表链**，也**不写落后标志**——缺的局根本没进这一遍写的行，
 说清楚它们少算了是日志（`N chart(s) have no chart-side skill data yet`）和派生的「等图表链」的事：
-`Stale` 只表示"切片领先了这些行"，写上去只有再跑一遍才能清，把它兼给"等图表链"就会让状态行
-在链已补齐之后仍报落后（一次点击要跑两轮才算完）。状态行报「等图表链」时用户跑一次「重算 Realm」
-（scope = MSD | CSI | ChartDan），再点一次「计算成绩分析」就折进去了。
+落后只表示"切片领先了这些行"，把它兼给"等图表链"就会让状态行在链已补齐之后仍报落后
+（一次点击要跑两轮才算完）。状态行报「等图表链」时用户打开「数据维护」面板，
+在 Realm 侧把 MSD / CSI / Dan 这一链补算，再点一次「计算成绩分析」就折进去了。
 
 这样切开的理由：图表侧一行 MSD/CSI/Dan 是**谱面属性**，与玩家无关。玩家段顺手算一份，就会在
 每个玩家、每次 compute 上重复同一张谱面的 MinaCalc 计算，而且写的是临时值——正是这轮性能问题的来源。
@@ -190,9 +241,9 @@ mod 影响谱面时的现场估算。前两样**只读不写**：读不到就跳
 | MSD 结算为 unrateable | **不会**（CSI 与 Dan 都显式跳过） | 已结算，不报缺 |
 | CSI 结算为 unavailable stub | 不会 | 已结算，不报缺 |
 
-前两类由 `EzChartChainCoverage.IsRateableChart` / `EzSkillStore.GetUnrateableMsdHashes` 区分：前者按图表链
+前两类由 `EzChartChainCoverage.IsRateableChart` / `EzChartSkillStore.GetUnrateableMsdHashes` 区分：前者按图表链
 自己的候选门槛（set 非空 + `Ruleset.OnlineID == 3` + 键数）判断，不只是看有没有行，否则会给链永不看的谱面
-反复排队、把玩家的脏位永久挂住。后两者是**落结算行**的结果，所以"缺行"一定会终止：`EzBeatmapMsdComputer.ComputeAndStore` 把零向量、
+反复排队、让玩家的落后判据永久成立。后两者是**落结算行**的结果，所以"缺行"一定会终止：`EzBeatmapMsdComputer.ComputeAndStore` 把零向量、
 超出引擎列数、内容不可加载都落成 `__unrateable`；唯一允许不落的是引擎自己抛异常的瞬态失败。
 
 同一套口径也用在 `GetSkillDataStatus()` 上：不可评的键数不计入图表总数，MSD unrateable 的谱面在

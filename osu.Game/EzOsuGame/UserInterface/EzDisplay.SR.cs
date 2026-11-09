@@ -22,7 +22,7 @@ using osu.Framework.Extensions.LocalisationExtensions;
 namespace osu.Game.EzOsuGame.UserInterface
 {
     /// <summary>
-    /// 模仿 StarRatingDisplay 形式的显示XxySR
+    /// 模仿 StarRatingDisplay 形式的显示SunnySR
     /// </summary>
     public partial class EzDisplaySR : CompositeDrawable, IHasCurrentValue<EzManiaSummary>
     {
@@ -133,20 +133,20 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             Current.BindValueChanged(c =>
             {
-                sr = c.NewValue.XxySr ?? 0;
+                sr = c.NewValue.SunnySR ?? 0;
 
                 if (animated)
                 {
-                    double diff = sr - c.OldValue.XxySr ?? 0;
+                    double diff = sr - c.OldValue.SunnySR ?? 0;
                     this.TransformBindableTo(displayedStars, sr, 100 + 80 * Math.Abs(diff), Easing.OutQuint);
                 }
                 else
                     displayedStars.Value = sr;
 
-                // updateDisplay(c.NewValue.ManiaSummary?.XxySr);
+                // updateDisplay(c.NewValue.ManiaSummary?.SunnySR);
             }, true);
 
-            displayedStars.Value = Current.Value.XxySr ?? 0;
+            displayedStars.Value = Current.Value.SunnySR ?? 0;
 
             displayedStars.BindValueChanged(s =>
             {

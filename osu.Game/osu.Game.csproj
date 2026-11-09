@@ -56,7 +56,7 @@
     <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0"/>
     <PackageReference Include="TagLibSharp" Version="2.3.0"/>
     <PackageReference Include="Live2DCSharpSDK" Version="1.0.0.6"/>
-    <!-- In-process WebAssembly host for the vendored n-key MinaCalc (4-18K mania MSD/SSR). -->
+    <!-- In-process WebAssembly host for the vendored n-key MinaCalc (4-18K mania MSD/SunnySR). -->
     <PackageReference Include="Wasmtime" Version="48.0.2" />
 
     <!-- Required since Veldrid references a library that depends on Microsoft.DotNet.PlatformAbstractions (2.0.3), which doesn't play nice with Realm. -->
@@ -77,7 +77,7 @@
     <ProjectReference Include="$(Ez2LazerResourcesProjectPath)" />
   </ItemGroup>
   <ItemGroup Label="EzSkills">
-    <!-- Deterministic manifest name for the vendored n-key MinaCalc wasm (4-18K MSD/SSR). -->
+    <!-- Deterministic manifest name for the vendored n-key MinaCalc wasm (4-18K MSD/SunnySR). -->
     <EmbeddedResource Update="Resources\EzSkills\minaclac-74.0.wasm" LogicalName="osu.Game.Resources.EzSkills.minaclac-74.0.wasm" />
     <!-- Licence/provenance notes are not runtime payload. -->
     <EmbeddedResource Remove="Resources\EzSkills\NOTICE.md" />

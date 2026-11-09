@@ -54,7 +54,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 CachedDependencies = new (Type, object)[]
                 {
                     (typeof(EzLocalProfileService), profileService),
-                    (typeof(EzSkillProvider), new EzSkillProvider(new EzSkillStore(realm))),
+                    (typeof(EzSkillProvider), new EzSkillProvider(new EzChartSkillStore(realm), new EzPlayerSkillStore(profileStorage))),
                 },
                 Child = overlay,
             };
@@ -151,7 +151,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 MapperUsername = "Mapper",
                 BeatmapStatus = BeatmapOnlineStatus.Ranked,
                 StarRating = 5.42,
-                XxyStarRating = -1,
+                SunnyStarRating = -1,
                 MapPerformancePoints = 120,
                 KpsAvg = 8.75,
                 KpsMax = 12.3,

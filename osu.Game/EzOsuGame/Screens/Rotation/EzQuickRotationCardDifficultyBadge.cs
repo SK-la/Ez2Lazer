@@ -16,7 +16,7 @@ using osuTK;
 namespace osu.Game.EzOsuGame.Screens.Rotation
 {
     /// <summary>
-    /// Ranked-play card badge matching upstream layout; uses moon icons when displaying xxy SR.
+    /// Ranked-play card badge matching upstream layout; uses moon icons when displaying SunnySR.
     /// </summary>
     public partial class EzQuickRotationCardDifficultyBadge : CompositeDrawable
     {

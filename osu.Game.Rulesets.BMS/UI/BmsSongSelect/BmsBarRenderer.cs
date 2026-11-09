@@ -219,7 +219,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 {
                     analyticsLine = BmsStrings.Raja_DetailAnalytics(
                         record.Pp ?? 0,
-                        record.XxySr ?? 0,
+                        record.SunnySR ?? 0,
                         record.AvgKps ?? 0,
                         record.MaxKps ?? 0,
                         record.StarRating ?? 0);
@@ -275,7 +275,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             if (!context.Analytics.TryGet(song.PathKey, out BmsAnalyticsRecord record))
                 return BmsStrings.RAJA_PLACEHOLDER_DASH.ToString();
 
-            return BmsStrings.Raja_RowAnalyticsSuffix(record.Pp ?? 0, record.XxySr ?? 0, record.AvgKps ?? 0);
+            return BmsStrings.Raja_RowAnalyticsSuffix(record.Pp ?? 0, record.SunnySR ?? 0, record.AvgKps ?? 0);
         }
 
         protected override bool OnKeyDown(KeyDownEvent e)

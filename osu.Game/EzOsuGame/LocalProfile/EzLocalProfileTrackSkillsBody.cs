@@ -13,9 +13,9 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.HUD;
-using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -378,7 +378,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 new EzLocalProfileTrendChart(values, labels, displayName));
         }
 
-        private static string[] formatHistoryLabels(IReadOnlyList<EzPlayerSkillHistoryPoint> points)
+        private static string[] formatHistoryLabels(IReadOnlyList<EzPlayerSkillHistorySample> points)
         {
             var first = points[0].RecordedAt.ToLocalTime();
             var last = points[^1].RecordedAt.ToLocalTime();
@@ -810,7 +810,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 background.Configure(colours, transparentIdle: true);
                 nameText.Colour = EzLocalProfileColours.Plays(colours);
-                // Skill SSR uses Highlight1 — never PinkLight (reserved for PP).
+                // Skill SunnySR uses Highlight1 — never PinkLight (reserved for PP).
                 valueText.Colour = EzLocalProfileColours.Numeric(colours);
             }
 

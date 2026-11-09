@@ -68,14 +68,14 @@ namespace osu.Game.Beatmaps
                     var ruleset = working.BeatmapInfo.Ruleset.CreateInstance();
                     var calculator = ruleset.CreateDifficultyCalculator(working);
 
-                    beatmap.StarRating = calculator.Calculate().StarRating;
+                    EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.Official, calculator.Calculate().StarRating);
                     beatmap.UpdateStatisticsFromBeatmap(working.Beatmap);
 
                     var tagSummary = EzBeatmapTagParser.Parse(working);
                     beatmap.HasVideo = tagSummary.HasVideo;
                     beatmap.HasStoryboard = tagSummary.HasStoryboard;
 
-                    updateXxyStarRating(beatmap);
+                    updateSunnyStarRating(beatmap);
                     updatePerformancePoints(beatmap, working);
                 }
 
@@ -102,12 +102,12 @@ namespace osu.Game.Beatmaps
             });
         }
 
-        private void updateXxyStarRating(BeatmapInfo beatmap)
+        private void updateSunnyStarRating(BeatmapInfo beatmap)
         {
             if (beatmapManager == null)
                 return;
 
-            beatmap.XxyStarRating = EzAnalysisComputation.ComputeBaselineXxyStarRatingForRealm(beatmapManager, beatmap);
+            EzRatingWriter.WriteSR(beatmap, EzAnalysisSystem.SSR, EzAnalysisComputation.ComputeBaselineSunnySRForRealm(beatmapManager, beatmap));
         }
 
         private void updatePerformancePoints(BeatmapInfo beatmap, WorkingBeatmap working)
@@ -117,9 +117,11 @@ namespace osu.Game.Beatmaps
 
             var lookup = new EzAnalysisLookupCache(beatmap, beatmap.Ruleset, mods: null);
 
-            beatmap.PerformancePoints = EzAnalysisComputation.TryComputePerformancePoints(beatmapManager, lookup, CancellationToken.None, out double performancePoints)
+            double points = EzAnalysisComputation.TryComputePerformancePoints(beatmapManager, lookup, CancellationToken.None, out double performancePoints)
                 ? performancePoints
                 : -1;
+
+            EzRatingWriter.WritePP(beatmap, EzAnalysisSystem.Official, points);
         }
 
         #region Implementation of IDisposable

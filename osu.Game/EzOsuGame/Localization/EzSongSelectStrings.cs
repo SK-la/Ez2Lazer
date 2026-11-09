@@ -45,15 +45,11 @@ namespace osu.Game.EzOsuGame.Localization
             "Ez分析过滤",
             "Ez analysis filter");
 
-        public static readonly LocalisableString XXY_STAR_RATING = new EzLocalizationManager.EzLocalisableString(
-            "xxy SR",
-            "xxy SR");
-
         public static readonly LocalisableString EZ_ANALYSIS_FILTER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "分支曲库激活时：开启后，**xxy SR** 排序/分组/筛选改用分支库 sqlite 中的 xxy（含 mod 变体），替代 Realm 基线。"
-            + "\n**官方难度**排序/分组始终使用 StarRating，不受此开关影响。",
-            "When a songs branch is active: **xxy SR** sort/group/star filter use branch sqlite xxy (incl. mod variants) instead of Realm baseline."
-            + "\nSort/group by official **Difficulty** always uses StarRating.");
+            "分支曲库激活时：开启后，所选分析系统为 Sunny 时，排序/分组/筛选改用分支库 sqlite 中的 ssr（含 mod 变体），替代 Realm 基线。"
+            + "\n其它分析系统始终读各自基线，不受此开关影响。",
+            "When a songs branch is active: if the selected analysis system is Sunny, sort/group/star filter use branch sqlite ssr(incl. mod variants) instead of the Realm baseline."
+            + "\nOther systems always read their own baseline and ignore this switch.");
 
         public static readonly LocalisableString KEY_SOUND_PREVIEW_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "按键音预览：\n0 关闭; \n1 蓝灯开启 (全量音效预览); \n2 黄灯开启 (全量音效预览, 游戏中自动播放 note 音效, 按键不再触发样本播放) ",
@@ -83,10 +79,6 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString EZ_ANALYSIS_RADAR_RIGHT = new EzLocalizationManager.EzLocalisableString(
             "雷达 R",
             "Radar R");
-
-        public static readonly LocalisableString RADAR_MODE_SKILL = new EzLocalizationManager.EzLocalisableString(
-            "Skill",
-            "Skill");
 
         public static readonly LocalisableString RESTORE_MOD_SELECTION = new EzLocalizationManager.EzLocalisableString(
             "恢复上一次选择",

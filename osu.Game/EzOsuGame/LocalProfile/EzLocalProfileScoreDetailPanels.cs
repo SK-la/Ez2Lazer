@@ -96,6 +96,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private EzDisplayKps ezDisplayKps = null!;
         private EzDisplayKpc ezDisplayKpc = null!;
         private EzDisplaySR displaySR = null!;
+        private EzDisplayPP displayPP = null!;
         private EzDisplayTag ezDisplayTag = null!;
         private EzDisplaySkillsDan ezDisplaySkillsDan = null!;
         private Box accentStrip = null!;
@@ -252,6 +253,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                                     Origin = Anchor.CentreLeft,
                                                     Scale = new Vector2(0.875f),
                                                 },
+                                                displayPP = new EzDisplayPP(StarRatingDisplaySize.Small)
+                                                {
+                                                    Anchor = Anchor.CentreLeft,
+                                                    Origin = Anchor.CentreLeft,
+                                                    Scale = new Vector2(0.875f),
+                                                },
                                                 ezDisplayKps = new EzDisplayKps
                                                 {
                                                     Anchor = Anchor.CentreLeft,
@@ -303,10 +310,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
             starRatingDisplay.Current.Value = new StarDifficulty(row.StarRating, 0);
             accentStrip.Colour = starRatingDisplay.DisplayedDifficultyColour;
 
-            bool showXxy = row.RulesetId == EzLocalProfileConstants.MANIA_RULESET_ID && row.XxyStarRating >= 0;
+            bool showSunnySR = row.RulesetId == EzLocalProfileConstants.MANIA_RULESET_ID && row.SunnyStarRating >= 0;
             var maniaSummary = row.ReadManiaSummary();
 
-            if (showXxy)
+            if (showSunnySR)
             {
                 displaySR.Show();
                 displaySR.Current.Value = maniaSummary;
@@ -319,14 +326,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             ezDisplaySkillsDan.Beatmap = beatmap;
             ezDisplayTag.Beatmap = beatmap;
-            ezDisplayKps.SetPp(row.MapPerformancePoints > 0 ? row.MapPerformancePoints : null);
+            displayPP.Current.Value = row.MapPerformancePoints > 0 ? row.MapPerformancePoints : null;
 
             lastKpsAvg = row.KpsAvg;
             lastKpsMax = row.KpsMax;
             lastManiaSummary = maniaSummary;
             UpdateKps(kpsList);
 
-            if (showXxy && maniaSummary.ColumnCounts.Count > 0)
+            if (showSunnySR&& maniaSummary.ColumnCounts.Count > 0)
             {
                 ezDisplayKpc.ManiaSummary = maniaSummary;
                 ezDisplayKpc.Show();

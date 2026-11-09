@@ -53,25 +53,49 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString IGNORE_BETTER = new EzLocalizationManager.EzLocalisableString("忽略更好", "Ignore Better");
         public static readonly LocalisableString IGNORE_WORSE = new EzLocalizationManager.EzLocalisableString("忽略更差", "Ignore Worse");
 
-        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_TAGS = new EzLocalizationManager.EzLocalisableString("Realm Tag", "Realm Tag");
-        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_XXY = new EzLocalizationManager.EzLocalisableString("Realm Xxy 星级", "Realm Xxy SR");
-        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_PP = new EzLocalizationManager.EzLocalisableString("Realm PP", "Realm PP");
-        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_ALL = new EzLocalizationManager.EzLocalisableString("Realm 全部元数据", "Realm all metadata");
-        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_SCORES = new EzLocalizationManager.EzLocalisableString("Realm 成绩全量重算", "Realm full score recalculation");
-        public static readonly LocalisableString DATA_REBUILD_TARGET_SQLITE_MAIN = new EzLocalizationManager.EzLocalisableString("SQLite 主库 kps/KPC", "SQLite main kps/KPC");
-        public static readonly LocalisableString DATA_REBUILD_TARGET_SQLITE_BRANCHES = new EzLocalizationManager.EzLocalisableString("SQLite 分支曲库 xxy/PP", "SQLite songs branches xxy/PP");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_MINA_NAME = new EzLocalizationManager.EzLocalisableString("Mina 技能评分", "Mina skill rating");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_MINA_DETAIL = new EzLocalizationManager.EzLocalisableString(
+            "引擎评级，喂养雷达与段位", "Engine rating; feeds the radar and dan");
 
-        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_CHART_MSD = new EzLocalizationManager.EzLocalisableString(
-            "Realm chart MSD",
-            "Realm chart MSD");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_CSI_NAME = new EzLocalizationManager.EzLocalisableString("CSI 谱面结构", "CSI chart structure");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_CSI_DETAIL = new EzLocalizationManager.EzLocalisableString(
+            "结构轴与谱面标签，读 Mina", "Structure axes and chart tags; reads Mina");
 
-        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_CHART_CSI_AND_DAN = new EzLocalizationManager.EzLocalisableString(
-            "Realm DualPanel谱面 (CSI+Dan)",
-            "Realm DualPanel chart (CSI+Dan)");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_DAN_NAME = new EzLocalizationManager.EzLocalisableString("段位（Dan）", "Dan rank");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_DAN_DETAIL = new EzLocalizationManager.EzLocalisableString(
+            "由 Mina 与 CSI 推导", "Derived from Mina and CSI");
 
-        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_CHART_SKILL_CHAIN = new EzLocalizationManager.EzLocalisableString(
-            "Realm 谱面技能链 (MSD+CSI+Dan)",
-            "Realm chart skill chain (MSD+CSI+Dan)");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_PPP_NAME = new EzLocalizationManager.EzLocalisableString("PP+ 技能", "PP+ skills");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_PPP_DETAIL = new EzLocalizationManager.EzLocalisableString(
+            "四个模式各自的谱面向量，不依赖图表链", "Per-mode chart vector; independent of the chart chain");
+
+        public static readonly LocalisableString DATA_REBUILD_ACTION_SSR_NAME = new EzLocalizationManager.EzLocalisableString("Sunny 星级", "Sunny star rating");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_SSR_DETAIL = new EzLocalizationManager.EzLocalisableString(
+            "独立评级，不依赖其他系统", "Independent rating; depends on nothing else");
+
+        public static readonly LocalisableString DATA_REBUILD_ACTION_OFFICIAL_NAME = new EzLocalizationManager.EzLocalisableString("官方 PP 基线", "Official PP baseline");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_OFFICIAL_DETAIL = new EzLocalizationManager.EzLocalisableString(
+            "Perfect 成绩的 PP 列，读官方难度", "Perfect-play PP column; reads official difficulty");
+
+        public static readonly LocalisableString DATA_REBUILD_ACTION_TAGS_NAME = new EzLocalizationManager.EzLocalisableString("谱面标签", "Chart tags");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_TAGS_DETAIL = new EzLocalizationManager.EzLocalisableString(
+            "视频 / Storyboard 标记", "Video / storyboard flags");
+
+        public static readonly LocalisableString DATA_REBUILD_ACTION_SCORES_NAME = new EzLocalizationManager.EzLocalisableString("成绩全量重算", "Full score recalculation");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_SCORES_DETAIL = new EzLocalizationManager.EzLocalisableString(
+            "修复历史转换；耗时最长", "Repairs legacy conversions; the slowest action");
+
+        public static readonly LocalisableString DATA_REBUILD_ACTION_ALL_NAME = new EzLocalizationManager.EzLocalisableString("Realm 全部元数据", "All Realm metadata");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_ALL_DETAIL = new EzLocalizationManager.EzLocalisableString(
+            "以上 Realm 项目一次跑完", "Runs every Realm item above in one pass");
+
+        public static readonly LocalisableString DATA_REBUILD_ACTION_SQLITE_MAIN_NAME = new EzLocalizationManager.EzLocalisableString("主库 kps / KPC", "Main kps / KPC");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_SQLITE_MAIN_DETAIL = new EzLocalizationManager.EzLocalisableString(
+            "NoMod 分析切片", "NoMod analysis slice");
+
+        public static readonly LocalisableString DATA_REBUILD_ACTION_SQLITE_BRANCHES_NAME = new EzLocalizationManager.EzLocalisableString("分支曲库 ssr/ PP", "Songs branches ssr/ PP");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_SQLITE_BRANCHES_DETAIL = new EzLocalizationManager.EzLocalisableString(
+            "按分支快照构建，读主库切片", "Built per branch snapshot; reads the main slice");
 
         public static readonly LocalisableString LOGO_VIS_BARS = new EzLocalizationManager.EzLocalisableString("柱状", "Bars");
         public static readonly LocalisableString LOGO_VIS_POLYLINE = new EzLocalizationManager.EzLocalisableString("折线", "Polyline");

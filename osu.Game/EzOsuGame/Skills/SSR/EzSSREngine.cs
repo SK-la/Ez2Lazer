@@ -1,0 +1,1848 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading.Tasks;
+using JetBrains.Annotations;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR.SR4Pattern;
+
+namespace osu.Game.EzOsuGame.Skills.SSR
+{
+    /// <summary>
+    ///     The two coefficients the rating reads, taken from the user's Ez analysis settings.
+    /// </summary>
+    /// <remarks>
+    /// A plain struct so one pass reads the settings once and every stage uses the same pair. Resolving them per
+    /// stage would let a settings edit that lands mid-pass change the halves of one rating.
+    /// </remarks>
+    public readonly record struct EzSSRTuning(double RescaleThreshold, double LnMultiplier)
+    {
+        /// <summary>Values used when the config store is unavailable (unit tests, early startup).</summary>
+        public static readonly EzSSRTuning FALLBACK = new EzSSRTuning(8.0, 5.5);
+    }
+
+    /// <summary>
+    ///     Star Rating calculator â€“ C# port of the official Python implementation.
+    /// </summary>
+    public class EzSSREngine
+    {
+        /// <summary>
+        /// Revision stamped on the SSR rows.
+        /// </summary>
+        /// <remarks>
+        /// The number lives here because this is the algorithm. A caller that reported a different number would be a
+        /// wiring bug, not a second revision.
+        /// </remarks>
+        public const int VERSION = 20250415;
+
+        /// <summary>
+        ///     Star rating above which the high-end rescale applies, from <c>Ez2Setting.SsrRescaleThreshold</c>.
+        /// </summary>
+        /// <remarks>
+        /// A setting rather than a mod. Changing it is a deliberate, permanent revision of the user's algorithm: it
+        /// never bumps a stored-data version, and it only affects ratings produced from then on.
+        /// </remarks>
+        public static double RescaleHighThreshold => Tuning.RescaleThreshold;
+
+        /// <summary>
+        ///     Long-note integral multiplier, from <c>Ez2Setting.SsrLnMultiplier</c>. Same permanence rules as
+        ///     <see cref="RescaleHighThreshold"/>.
+        /// </summary>
+        public static double LnIntegralMultiplier => Tuning.LnMultiplier;
+
+        /// <summary>The current coefficients, read once per pass.</summary>
+        public static EzSSRTuning Tuning
+        {
+            get
+            {
+                try
+                {
+                    Ez2ConfigManager config = GlobalConfigStore.EzConfig;
+                    double threshold = config.Get<double>(Ez2Setting.SsrRescaleThreshold);
+                    double ln = config.Get<double>(Ez2Setting.SsrLnMultiplier);
+
+                    // Guard the stored file: a zero or non-finite value would make every rating degenerate.
+                    if (!double.IsFinite(threshold) || threshold <= 0)
+                        threshold = EzSSRTuning.FALLBACK.RescaleThreshold;
+                    if (!double.IsFinite(ln) || ln <= 0)
+                        ln = EzSSRTuning.FALLBACK.LnMultiplier;
+
+                    return new EzSSRTuning(threshold, ln);
+                }
+                catch
+                {
+                    return EzSSRTuning.FALLBACK;
+                }
+            }
+        }
+
+        #region å·¥å…·æ–¹æ³•
+
+        /// <summary>
+        ///     Whether this engine rates a chart with <paramref name="keyCount"/> columns.
+        /// </summary>
+        public static bool IsPatternSupported(int keyCount)
+            => keyCount >= 1 && keyCount <= CrossMatrixProvider.MAX_SUPPORTED_KEY_COUNT && CrossMatrixProvider.GetMatrix(keyCount) != null;
+
+        /// <summary>
+        ///     Computes the star rating for the supplied chart synchronously.
+        /// </summary>
+        /// <param name="chart">Chart extraction.</param>
+        /// <param name="keyCount">Column count the chart is rated as.</param>
+        /// <param name="overallDifficulty">Difficulty used for hit leniency.</param>
+        /// <param name="times">Timing breakdown produced by the calculation.</param>
+        /// <returns>Calculated SR value.</returns>
+        [UsedImplicitly]
+        public static double CalculateSRWithTime(EzManiaChartInput chart, int keyCount, double overallDifficulty, out Dictionary<string, long>? times)
+        {
+            (double sr, var collectedTimes) = computeInternalSunnySR(chart, keyCount, overallDifficulty, 1.0);
+            times = collectedTimes;
+            return sr;
+        }
+
+        [UsedImplicitly]
+        public static double CalculateSR(EzManiaChartInput chart, int keyCount, double overallDifficulty)
+        {
+            (double sr, _) = computeInternalSunnySR(chart, keyCount, overallDifficulty, 1.0);
+            return sr;
+        }
+
+        /// <summary>
+        ///     Computes the star rating with clock rate adjustment (for rate-changing mods like DT/HT).
+        /// </summary>
+        /// <param name="chart">Chart extraction.</param>
+        /// <param name="keyCount">Column count the chart is rated as.</param>
+        /// <param name="overallDifficulty">Difficulty used for hit leniency.</param>
+        /// <param name="clockRate">Clock rate multiplier (1.5 for DT, 0.75 for HT, etc.).</param>
+        /// <returns>Calculated SR value adjusted for clock rate.</returns>
+        public static double CalculateSR(EzManiaChartInput chart, int keyCount, double overallDifficulty, double clockRate)
+        {
+            (double sr, _) = computeInternalSunnySR(chart, keyCount, overallDifficulty, clockRate);
+            return sr;
+        }
+
+        /// <summary>
+        ///     Computes the star rating for the supplied chart asynchronously.
+        /// </summary>
+        /// <param name="chart">Chart extraction.</param>
+        /// <param name="keyCount">Column count the chart is rated as.</param>
+        /// <param name="overallDifficulty">Difficulty used for hit leniency.</param>
+        /// <returns>Tuple containing the SR value and timing breakdown.</returns>
+        [UsedImplicitly]
+        public Task<(double sr, Dictionary<string, long> times)> CalculateSRAsync(EzManiaChartInput chart, int keyCount, double overallDifficulty)
+            => Task.FromResult(computeInternalSunnySR(chart, keyCount, overallDifficulty, 1.0));
+
+        private static (double sr, Dictionary<string, long> times) computeInternalSunnySR(EzManiaChartInput chart, int keyCount, double overallDifficulty,
+                                                                                        double clockRate = 1.0)
+        {
+            var stopwatch = Stopwatch.StartNew();
+
+            double sr = SunnySRCalculateCore(chart, keyCount, overallDifficulty, clockRate);
+            stopwatch.Stop();
+
+            var timings = new Dictionary<string, long>
+            {
+                ["Total"] = stopwatch.ElapsedMilliseconds
+            };
+
+            return (sr, timings);
+        }
+
+        #endregion
+
+        #region ç»“æž„ä½“
+
+        private readonly struct NoteStruct
+        {
+            public NoteStruct(int column, int headTime, int tailTime)
+            {
+                Column = column;
+                HeadTime = headTime;
+                TailTime = tailTime;
+                ColumnIndex = 0;
+            }
+
+            private NoteStruct(int column, int headTime, int tailTime, int columnIndex)
+            {
+                Column = column;
+                HeadTime = headTime;
+                TailTime = tailTime;
+                ColumnIndex = columnIndex;
+            }
+
+            public int Column { get; }
+            public int HeadTime { get; }
+            public int TailTime { get; }
+
+            /// <summary>Position within <see cref="Column"/>'s notes, so a successor is one array step away.</summary>
+            public int ColumnIndex { get; }
+
+            public bool IsLongNote => TailTime >= 0 && TailTime > HeadTime;
+
+            public NoteStruct WithColumnIndex(int columnIndex) => new NoteStruct(Column, HeadTime, TailTime, columnIndex);
+        }
+
+        private readonly struct LNRepStruct
+        {
+            public LNRepStruct(int[] points, double[] cumulative, double[] values)
+            {
+                Points = points;
+                Cumulative = cumulative;
+                Values = values;
+            }
+
+            public int[] Points { get; }
+            public double[] Cumulative { get; }
+            public double[] Values { get; }
+        }
+
+        #endregion
+
+        private static readonly Comparison<NoteStruct> note_comparer = compareNotes;
+
+        public static double SunnySRCalculateCore(EzManiaChartInput chart, int keyCount, double overallDifficulty, double clockRate = 1.0)
+        {
+            var tuning = Tuning;
+            var state = buildState(chart, keyCount, overallDifficulty, clockRate, needPatternBars: false, tuning);
+
+            if (state == null)
+                return 0.0;
+
+            double sr = finaliseDifficulty(computeLocalDifficulty(state), state.EffectiveWeights, state.Notes, state.LongNotes, tuning.RescaleThreshold);
+
+            return sr;
+        }
+
+        /// <summary>
+        /// Everything the per-corner terms need, derived once. Shared by the plain rating, the SR4 breakdown and
+        /// the combined call so a chart's note list, corners and curves are only built once.
+        /// </summary>
+        private sealed class CoreState
+        {
+            public int KeyCount;
+            public List<NoteStruct> Notes = null!;
+            public List<NoteStruct> LongNotes = null!;
+            public double[] AllCorners = null!;
+            public double[] BaseCorners = null!;
+            public double[] ACorners = null!;
+            public bool[][] KeyUsage = null!;
+            public int[][] ActiveColumns = null!;
+            public double[][] DeltaKs = null!;
+            public double[] JBar = null!;
+            public double[] XBar = null!;
+            public double[] PBar = null!;
+            public double[] RBar = null!;
+            public double[] ABar = null!;
+            public double[] CArr = null!;
+            public double[] KsArr = null!;
+            public double[] Gaps = null!;
+            public double[] EffectiveWeights = null!;
+            public double[]? BurstBar;
+            public double[]? LongNoteUsageBar;
+            public double[]? AnchoredBurstBar;
+            public EzSSRTuning Tuning;
+        }
+
+        /// <summary>
+        /// Builds <paramref name="needPatternBars"/>-dependent state. The SR4 breakdown needs three burst curves where
+        /// the plain rating needs one, which is why the extra curves are not always derived.
+        /// </summary>
+        private static CoreState? buildState(EzManiaChartInput chart, int keyCount, double overallDifficulty, double clockRate, bool needPatternBars, EzSSRTuning tuning)
+        {
+            double[]? cross = CrossMatrixProvider.GetMatrix(keyCount);
+
+            if (cross == null)
+                throw new NotSupportedException($"Key mode {keyCount}k is not supported by the SR algorithm.");
+
+            var chartNotes = chart.Notes;
+            int estimatedNotes = chartNotes.Count;
+            if (estimatedNotes == 0) return null;
+
+            var notes = new List<NoteStruct>(estimatedNotes);
+            var notesByColumn = new List<NoteStruct>[keyCount];
+
+            for (int i = 0; i < keyCount; i++)
+                notesByColumn[i] = new List<NoteStruct>((estimatedNotes / keyCount) + 1);
+
+            foreach (var chartNote in chartNotes)
+            {
+                int column = Math.Clamp(chartNote.Column, 0, keyCount - 1);
+                // Apply clockRate to timing: faster rate = shorter intervals in calculation
+                int head = (int)Math.Round(chartNote.TimeMs / clockRate);
+                int tail = chartNote.IsHold ? (int)Math.Round(chartNote.EndTimeMs / clockRate) : -1;
+
+                // Align with the original library behaviour: treat non-positive durations as non-LN.
+                if (tail <= head)
+                    tail = -1;
+
+                notesByColumn[column].Add(new NoteStruct(column, head, tail));
+            }
+
+            // Each column is numbered once it is in order, so a long note can reach the note that follows it in its
+            // own column by index. The flat list is then the merge of those columns, which is the same head order a
+            // single sort of the unordered notes produced.
+            for (int column = 0; column < keyCount; column++)
+            {
+                var columnNotes = notesByColumn[column];
+                columnNotes.Sort(note_comparer);
+
+                for (int i = 0; i < columnNotes.Count; i++)
+                    columnNotes[i] = columnNotes[i].WithColumnIndex(i);
+
+                notes.AddRange(columnNotes);
+            }
+
+            notes.Sort(note_comparer);
+            var longNotes = notes.Where(n => n.IsLongNote).ToList();
+            var longNotesByTails = longNotes.OrderBy(n => n.TailTime).ToList();
+            double x = computeHitLeniency(overallDifficulty);
+
+            int maxHead = notes.Max(n => n.HeadTime);
+            int maxTail = longNotes.Count > 0 ? longNotes.Max(n => n.TailTime) : maxHead;
+            int totalTime = Math.Max(maxHead, maxTail) + 1;
+
+            (double[] allCorners, double[] baseCorners, double[] aCorners) = buildCorners(totalTime, notes);
+            bool[][] keyUsage = buildKeyUsage(keyCount, totalTime, notes, baseCorners);
+            int[][] activeColumns = deriveActiveColumns(keyUsage);
+            double[][] keyUsage400 = buildKeyUsage400(keyCount, totalTime, notes, baseCorners);
+            double[] anchorBase = computeAnchor(keyCount, keyUsage400, baseCorners);
+            LNRepStruct? lnRep = longNotes.Count > 0 ? buildLNRepresentation(longNotes, totalTime) : null;
+            (double[][] deltaKs, double[] jBarBase) = computeJBar(keyCount, totalTime, x, notesByColumn, baseCorners);
+            double[] jBar = interpValues(allCorners, baseCorners, jBarBase);
+            double[] xBarBase = computeXBar(keyCount, totalTime, x, notesByColumn, activeColumns, baseCorners, cross);
+            double[] xBar = interpValues(allCorners, baseCorners, xBarBase);
+            double[] pBarBase = computePBar(keyCount, totalTime, x, notes, lnRep, anchorBase, baseCorners, tuning.LnMultiplier);
+            double[] pBar = interpValues(allCorners, baseCorners, pBarBase);
+            double[] aBarBase = computeABar(keyCount, totalTime, deltaKs, activeColumns, aCorners, baseCorners);
+            double[] aBar = interpValues(allCorners, aCorners, aBarBase);
+            double[] rBarBase = computeRBar(keyCount, totalTime, x, notesByColumn, longNotesByTails, baseCorners);
+            double[] rBar = interpValues(allCorners, baseCorners, rBarBase);
+            (double[] cStep, double[] ksStep) = computeCAndKs(keyCount, notes, keyUsage, baseCorners);
+            double[] cArr = stepInterp(allCorners, baseCorners, cStep);
+            double[] ksArr = stepInterp(allCorners, baseCorners, ksStep);
+            double[] gaps = computeGaps(allCorners);
+            double[] effectiveWeights = new double[allCorners.Length];
+            for (int i = 0; i < allCorners.Length; i++)
+                effectiveWeights[i] = cArr[i] * gaps[i];
+
+            var state = new CoreState
+            {
+                KeyCount = keyCount,
+                Notes = notes,
+                LongNotes = longNotes,
+                AllCorners = allCorners,
+                BaseCorners = baseCorners,
+                ACorners = aCorners,
+                KeyUsage = keyUsage,
+                ActiveColumns = activeColumns,
+                DeltaKs = deltaKs,
+                JBar = jBar,
+                XBar = xBar,
+                PBar = pBar,
+                RBar = rBar,
+                ABar = aBar,
+                CArr = cArr,
+                KsArr = ksArr,
+                Gaps = gaps,
+                EffectiveWeights = effectiveWeights,
+                Tuning = tuning,
+            };
+
+            if (!needPatternBars)
+                return state;
+
+            // The breakdown splits the same burst term into its parts: without holds, with holds but a neutral
+            // anchor, and the full form. The full form is the plain rating's pBar, so it is reused rather than
+            // recomputed.
+            double[] neutralAnchorBase = Enumerable.Repeat(1.0, baseCorners.Length).ToArray();
+
+            state.BurstBar = interpValues(allCorners, baseCorners,
+                computePBar(keyCount, totalTime, x, notes, null, neutralAnchorBase, baseCorners, tuning.LnMultiplier));
+            state.LongNoteUsageBar = interpValues(allCorners, baseCorners,
+                computePBar(keyCount, totalTime, x, notes, lnRep, neutralAnchorBase, baseCorners, tuning.LnMultiplier));
+            state.AnchoredBurstBar = pBar;
+
+            return state;
+        }
+
+        /// <summary>
+        /// The per-corner difficulty terms, which is what both the total rating and the SR4 breakdown start from.
+        /// </summary>
+        private static double[] computeLocalDifficulty(CoreState state)
+        {
+            int length = state.AllCorners.Length;
+            double[] dAll = new double[length];
+
+            double[] jBar = state.JBar;
+            double[] aBar = state.ABar;
+            double[] ksArr = state.KsArr;
+            double[] rBar = state.RBar;
+            double[] cArr = state.CArr;
+            double[] pBar = state.PBar;
+            double[] xBar = state.XBar;
+
+            Parallel.For(0, length, i =>
+            {
+                double term1 = computeSR4JackTerm(jBar[i], aBar[i], ksArr[i]);
+                double term2 = computeSR4BurstTerm(pBar[i], rBar[i], aBar[i], cArr[i]);
+                dAll[i] = computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], term1, term2);
+            });
+
+            return dAll;
+        }
+
+        #region æŒ‡æ ‡æ��å�–
+
+        internal static EzManiaSR4PatternSnapshot CalculateSR4PatternSnapshot(EzManiaChartInput chart, int keyCount, double overallDifficulty, double clockRate = 1.0)
+        {
+            var tuning = Tuning;
+            var state = buildState(chart, keyCount, overallDifficulty, clockRate, needPatternBars: true, tuning);
+
+            if (state == null)
+                return emptyPatternSnapshot(keyCount);
+
+            return buildPatternSnapshot(state, computeLocalDifficulty(state), tuning.RescaleThreshold);
+        }
+
+        /// <summary>
+        /// Total star rating and the SR4 breakdown from one derivation of the chart. The breakdown embeds the same
+        /// rating, so asking for both separately ran the whole difficulty core twice for the same chart and mods.
+        /// </summary>
+        internal static (double Sr, EzManiaSR4PatternSnapshot PatternSnapshot) CalculateSRWithPatternSnapshot(EzManiaChartInput chart, int keyCount,
+                                                                                                                double overallDifficulty, double clockRate = 1.0)
+        {
+            var tuning = Tuning;
+            var state = buildState(chart, keyCount, overallDifficulty, clockRate, needPatternBars: true, tuning);
+
+            if (state == null)
+                return (0.0, emptyPatternSnapshot(keyCount));
+
+            double[] difficulty = computeLocalDifficulty(state);
+            double sr = finaliseDifficulty(difficulty, state.EffectiveWeights, state.Notes, state.LongNotes, tuning.RescaleThreshold);
+
+            return (sr, buildPatternSnapshot(state, difficulty, tuning.RescaleThreshold));
+        }
+
+        private static EzManiaSR4PatternSnapshot emptyPatternSnapshot(int keyCount)
+            => new EzManiaSR4PatternSnapshot(
+                keyCount,
+                Array.Empty<double>(),
+                Array.Empty<double>(),
+                Array.Empty<double>(),
+                Array.Empty<double>(),
+                Array.Empty<double>(),
+                Array.Empty<double>(),
+                Array.Empty<double>(),
+                Array.Empty<double>(),
+                Array.Empty<double>(),
+                0,
+                0,
+                0,
+                0,
+                0,
+                0);
+
+        /// <summary>
+        /// Splits <paramref name="totalDifficulty"/> across the measured curves. Everything it reads comes from
+        /// <paramref name="state"/>, so it is a pure function of the pass that produced it.
+        /// </summary>
+        private static EzManiaSR4PatternSnapshot buildPatternSnapshot(CoreState state, double[] totalDifficulty, double rescaleThreshold)
+        {
+            double[] xBar = state.XBar;
+            double[] aBar = state.ABar;
+            double[] ksArr = state.KsArr;
+            double[] cArr = state.CArr;
+            double[] jBar = state.JBar;
+            double[] rBar = state.RBar;
+            double[] burstBar = state.BurstBar ?? throw new InvalidOperationException("Pattern bars were not built for this pass.");
+            double[] longNoteUsageBar = state.LongNoteUsageBar ?? throw new InvalidOperationException("Pattern bars were not built for this pass.");
+            double[] anchoredBurstBar = state.AnchoredBurstBar ?? throw new InvalidOperationException("Pattern bars were not built for this pass.");
+
+            int length = state.AllCorners.Length;
+            double[] bracketContribution = new double[length];
+            double[] jackContribution = new double[length];
+            double[] burstContribution = new double[length];
+            double[] longNoteUsageContribution = new double[length];
+            double[] longNoteReleaseContribution = new double[length];
+            double[] anchorContribution = new double[length];
+            double[] bracketAllocated = new double[length];
+            double[] jackAllocated = new double[length];
+            double[] burstAllocated = new double[length];
+            double[] longNoteUsageAllocated = new double[length];
+            double[] longNoteReleaseAllocated = new double[length];
+            double[] anchorAllocated = new double[length];
+
+            for (int i = 0; i < length; i++)
+            {
+                double actualDifficulty = totalDifficulty[i];
+
+                double actualTerm1 = computeSR4JackTerm(jBar[i], aBar[i], ksArr[i]);
+                double burstOnlyTerm2 = computeSR4BurstTerm(burstBar[i], 0, aBar[i], cArr[i]);
+                double longNoteUsageTerm2 = computeSR4BurstTerm(longNoteUsageBar[i], 0, aBar[i], cArr[i]);
+                double anchoredBurstTerm2 = computeSR4BurstTerm(anchoredBurstBar[i], 0, aBar[i], cArr[i]);
+                double actualTerm2 = computeSR4BurstTerm(anchoredBurstBar[i], rBar[i], aBar[i], cArr[i]);
+
+                double difficultyWithoutBurstBranch = computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], actualTerm1, 0);
+                double difficultyWithBurstOnly = computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], actualTerm1, burstOnlyTerm2);
+                double difficultyWithLongNoteUsage = computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], actualTerm1, longNoteUsageTerm2);
+                double difficultyWithAnchor = computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], actualTerm1, anchoredBurstTerm2);
+
+                bracketContribution[i] = Math.Max(0, actualDifficulty - computeSR4LocalDifficulty(0, aBar[i], ksArr[i], actualTerm1, actualTerm2));
+                jackContribution[i] = Math.Max(0, actualDifficulty - computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], 0, actualTerm2));
+                burstContribution[i] = Math.Max(0, difficultyWithBurstOnly - difficultyWithoutBurstBranch);
+                longNoteUsageContribution[i] = Math.Max(0, difficultyWithLongNoteUsage - difficultyWithBurstOnly);
+                anchorContribution[i] = Math.Max(0, difficultyWithAnchor - difficultyWithLongNoteUsage);
+                longNoteReleaseContribution[i] = Math.Max(0, actualDifficulty - difficultyWithAnchor);
+
+                double totalMarginalContribution = bracketContribution[i] + jackContribution[i] + burstContribution[i] + longNoteUsageContribution[i] + longNoteReleaseContribution[i] + anchorContribution[i];
+
+                if (actualDifficulty <= 0 || totalMarginalContribution <= 0)
+                    continue;
+
+                double allocationScale = actualDifficulty / totalMarginalContribution;
+                bracketAllocated[i] = bracketContribution[i] * allocationScale;
+                jackAllocated[i] = jackContribution[i] * allocationScale;
+                burstAllocated[i] = burstContribution[i] * allocationScale;
+                longNoteUsageAllocated[i] = longNoteUsageContribution[i] * allocationScale;
+                longNoteReleaseAllocated[i] = longNoteReleaseContribution[i] * allocationScale;
+                anchorAllocated[i] = anchorContribution[i] * allocationScale;
+            }
+
+            double[] effectiveWeights = state.EffectiveWeights;
+            double totalSr = finaliseDifficulty(totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, rescaleThreshold);
+            double bracketStar = computeSR4ContributionStar(bracketAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr, rescaleThreshold);
+            double jackStar = computeSR4ContributionStar(jackAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr, rescaleThreshold);
+            double burstStar = computeSR4ContributionStar(burstAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr, rescaleThreshold);
+            double longNoteUsageStar = computeSR4ContributionStar(longNoteUsageAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr, rescaleThreshold);
+            double longNoteReleaseStar = computeSR4ContributionStar(longNoteReleaseAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr, rescaleThreshold);
+            double anchorStar = computeSR4ContributionStar(anchorAllocated, totalDifficulty, effectiveWeights, state.Notes, state.LongNotes, totalSr, rescaleThreshold);
+
+            normaliseSR4ComponentStars(totalSr,
+                ref bracketStar,
+                ref jackStar,
+                ref burstStar,
+                ref longNoteUsageStar,
+                ref longNoteReleaseStar,
+                ref anchorStar);
+
+            return new EzManiaSR4PatternSnapshot(
+                state.KeyCount,
+                effectiveWeights,
+                cArr,
+                ksArr,
+                bracketContribution,
+                jackContribution,
+                burstContribution,
+                longNoteUsageContribution,
+                longNoteReleaseContribution,
+                anchorContribution,
+                bracketStar,
+                jackStar,
+                burstStar,
+                longNoteUsageStar,
+                longNoteReleaseStar,
+                anchorStar);
+        }
+
+            #endregion
+
+        private static double computeHitLeniency(double overallDifficulty)
+        {
+            double leniency = 0.3 * Math.Sqrt((64.5 - Math.Ceiling(overallDifficulty * 3.0)) / 500.0);
+            double offset = leniency - 0.09;
+
+            double scaledOffset = 0.6 * offset;
+            double adjustedWindow = scaledOffset + 0.09;
+            return Math.Min(leniency, adjustedWindow);
+        }
+
+        /// <summary>
+        /// Corner positions the per-corner curves are sampled at: every note edge, plus a fixed set of offsets around
+        /// them so a curve's knee lands on a sample.
+        /// </summary>
+        /// <remarks>
+        /// The corners are a set of integers, so they are collected into plain arrays, sorted and deduplicated instead
+        /// of being built through hash sets and LINQ. Equal values mean the same corner, so the sampled positions -
+        /// and therefore every derived value - are the ones the set produced.
+        /// </remarks>
+        private static (double[] allCorners, double[] baseCorners, double[] aCorners) buildCorners(int totalTime, List<NoteStruct> notes)
+        {
+            // Head and tail each contribute themselves plus three offsets for base, and themselves plus two for a.
+            var baseRaw = new int[(notes.Count * 8) + 2];
+            var aRaw = new int[(notes.Count * 6) + 2];
+            int baseCount = 0;
+            int aCount = 0;
+
+            foreach (var note in notes)
+            {
+                baseCount = appendBaseCorners(baseRaw, baseCount, note.HeadTime);
+                aCount = appendACorners(aRaw, aCount, note.HeadTime);
+
+                if (!note.IsLongNote)
+                    continue;
+
+                baseCount = appendBaseCorners(baseRaw, baseCount, note.TailTime);
+                aCount = appendACorners(aRaw, aCount, note.TailTime);
+            }
+
+            baseRaw[baseCount++] = 0;
+            baseRaw[baseCount++] = totalTime;
+            aRaw[aCount++] = 0;
+            aRaw[aCount++] = totalTime;
+
+            double[] baseCorners = sortFilterDedupe(baseRaw, baseCount, totalTime);
+            double[] aCorners = sortFilterDedupe(aRaw, aCount, totalTime);
+            double[] allCorners = mergeSorted(baseCorners, aCorners);
+
+            return (allCorners, baseCorners, aCorners);
+
+            static int appendBaseCorners(int[] target, int index, int value)
+            {
+                target[index++] = value;
+                target[index++] = value + 501;
+                target[index++] = value - 499;
+                target[index++] = value + 1;
+                return index;
+            }
+
+            static int appendACorners(int[] target, int index, int value)
+            {
+                target[index++] = value;
+                target[index++] = value + 1000;
+                target[index++] = value - 1000;
+                return index;
+            }
+        }
+
+        private static double[] sortFilterDedupe(int[] raw, int count, int totalTime)
+        {
+            int kept = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                int value = raw[i];
+
+                if (value >= 0 && value <= totalTime)
+                    raw[kept++] = value;
+            }
+
+            Array.Sort(raw, 0, kept);
+
+            if (kept == 0)
+                return Array.Empty<double>();
+
+            int unique = 1;
+
+            for (int i = 1; i < kept; i++)
+            {
+                if (raw[i] != raw[unique - 1])
+                    raw[unique++] = raw[i];
+            }
+
+            var corners = new double[unique];
+
+            for (int i = 0; i < unique; i++)
+                corners[i] = raw[i];
+
+            return corners;
+        }
+
+        /// <summary>Union of two ascending, deduplicated arrays.</summary>
+        private static double[] mergeSorted(double[] first, double[] second)
+        {
+            var merged = new double[first.Length + second.Length];
+            int a = 0;
+            int b = 0;
+            int count = 0;
+
+            while (a < first.Length || b < second.Length)
+            {
+                double value;
+
+                if (b >= second.Length || (a < first.Length && first[a] <= second[b]))
+                    value = first[a++];
+                else
+                    value = second[b++];
+
+                if (count > 0 && merged[count - 1] == value)
+                    continue;
+
+                merged[count++] = value;
+            }
+
+            if (count != merged.Length)
+                Array.Resize(ref merged, count);
+
+            return merged;
+        }
+
+        private static bool[][] buildKeyUsage(int keyCount, int totalTime, List<NoteStruct> notes, double[] baseCorners)
+        {
+            bool[][] keyUsage = new bool[keyCount][];
+            for (int i = 0; i < keyCount; i++)
+                keyUsage[i] = new bool[baseCorners.Length];
+
+            foreach (var note in notes)
+            {
+                int start = Math.Max(note.HeadTime - 150, 0);
+                int end = note.IsLongNote ? Math.Min(note.TailTime + 150, totalTime - 1) : Math.Min(note.HeadTime + 150, totalTime - 1);
+
+                int left = lowerBound(baseCorners, start);
+                int right = lowerBound(baseCorners, end);
+                for (int idx = left; idx < right; idx++)
+                    keyUsage[note.Column][idx] = true;
+            }
+
+            return keyUsage;
+        }
+
+        private static int[][] deriveActiveColumns(bool[][] keyUsage)
+        {
+            int length = keyUsage[0].Length;
+            int keyCount = keyUsage.Length;
+            int[][] active = new int[length][];
+            var scratch = new int[keyCount];
+
+            for (int i = 0; i < length; i++)
+            {
+                int count = 0;
+
+                for (int col = 0; col < keyCount; col++)
+                {
+                    if (keyUsage[col][i])
+                        scratch[count++] = col;
+                }
+
+                if (count == 0)
+                {
+                    active[i] = Array.Empty<int>();
+                    continue;
+                }
+
+                var columns = new int[count];
+                Array.Copy(scratch, columns, count);
+                active[i] = columns;
+            }
+
+            return active;
+        }
+
+        private static double[][] buildKeyUsage400(int keyCount, int totalTime, List<NoteStruct> notes, double[] baseCorners)
+        {
+            double[][] usage = new double[keyCount][];
+            for (int k = 0; k < keyCount; k++)
+                usage[k] = new double[baseCorners.Length];
+
+            const double base_contribution = 3.75;
+            const double falloff = 3.75 / (400.0 * 400.0);
+
+            foreach (var note in notes)
+            {
+                int startTime = Math.Max(note.HeadTime, 0);
+                int endTime = note.IsLongNote ? Math.Min(note.TailTime, totalTime - 1) : note.HeadTime;
+
+                int left400 = lowerBound(baseCorners, startTime - 400);
+                int left = lowerBound(baseCorners, startTime);
+                int right = lowerBound(baseCorners, endTime);
+                int right400 = lowerBound(baseCorners, endTime + 400);
+
+                int duration = endTime - startTime;
+                double clampedDuration = Math.Min(duration, 1500);
+                double extension = clampedDuration / 150.0;
+                double contribution = base_contribution + extension;
+
+                for (int idx = left; idx < right; idx++) usage[note.Column][idx] += contribution;
+
+                for (int idx = left400; idx < left; idx++)
+                {
+                    double offset = baseCorners[idx] - startTime;
+                    double falloffContribution = falloff * offset * offset;
+                    double value = base_contribution - falloffContribution;
+                    double clamped = Math.Max(value, 0);
+                    usage[note.Column][idx] += clamped;
+                }
+
+                for (int idx = right; idx < right400; idx++)
+                {
+                    double offset = baseCorners[idx] - endTime;
+                    double falloffContribution = falloff * offset * offset;
+                    double value = base_contribution - falloffContribution;
+                    double clamped = Math.Max(value, 0);
+                    usage[note.Column][idx] += clamped;
+                }
+            }
+
+            return usage;
+        }
+
+        #region LNè®¡ç®—
+
+        private static LNRepStruct buildLNRepresentation(List<NoteStruct> longNotes, int totalTime)
+        {
+            var diff = new Dictionary<int, double>();
+
+            foreach (var note in longNotes)
+            {
+                int t0 = Math.Min(note.HeadTime + 60, note.TailTime);
+                int t1 = Math.Min(note.HeadTime + 120, note.TailTime);
+
+                addToMap(diff, t0, 1.3);
+                addToMap(diff, t1, -0.3);
+                addToMap(diff, note.TailTime, -1);
+            }
+
+            var pointsSet = new SortedSet<int> { 0, totalTime };
+            foreach (int key in diff.Keys)
+                pointsSet.Add(key);
+
+            int[] points = pointsSet.ToArray();
+            double[] cumulative = new double[points.Length];
+            double[] values = new double[points.Length - 1];
+
+            double current = 0;
+
+            for (int i = 0; i < points.Length - 1; i++)
+            {
+                if (diff.TryGetValue(points[i], out double delta))
+                    current += delta;
+
+                double fallbackOffset = 0.5 * current;
+                double fallback = 2.5 + fallbackOffset;
+                double transformed = Math.Min(current, fallback);
+                values[i] = transformed;
+
+                int length = points[i + 1] - points[i];
+                double segment = length * transformed;
+                cumulative[i + 1] = cumulative[i] + segment;
+            }
+
+            return new LNRepStruct(points, cumulative, values);
+        }
+
+        private static double lnIntegral(LNRepStruct repStruct, int a, int b)
+        {
+            int[] points = repStruct.Points;
+            double[] cumulative = repStruct.Cumulative;
+            double[] values = repStruct.Values;
+
+            int startIndex = upperBound(points, a) - 1;
+            int endIndex = upperBound(points, b) - 1;
+
+            if (startIndex < 0) startIndex = 0;
+            if (endIndex < startIndex) endIndex = startIndex;
+
+            double total = 0;
+
+            if (startIndex == endIndex)
+                total = (b - a) * values[startIndex];
+            else
+            {
+                total += (points[startIndex + 1] - a) * values[startIndex];
+                total += cumulative[endIndex] - cumulative[startIndex + 1];
+                total += (b - points[endIndex]) * values[endIndex];
+            }
+
+            return total;
+        }
+
+        private static double lnIntegralClamped(LNRepStruct repStruct, int a, int b)
+        {
+            int[] points = repStruct.Points;
+            double[] cumulative = repStruct.Cumulative;
+            double[] values = repStruct.Values;
+
+            if (values.Length == 0)
+                return 0;
+
+            a = Math.Clamp(a, points[0], points[^1]);
+            b = Math.Clamp(b, points[0], points[^1]);
+
+            if (b <= a)
+                return 0;
+
+            int lastSegmentIndex = values.Length - 1;
+            int startIndex = Math.Clamp(upperBound(points, a) - 1, 0, lastSegmentIndex);
+            int endIndex = Math.Clamp(upperBound(points, b) - 1, 0, lastSegmentIndex);
+
+            if (endIndex < startIndex)
+                endIndex = startIndex;
+
+            double total = 0;
+
+            if (startIndex == endIndex)
+                total = (b - a) * values[startIndex];
+            else
+            {
+                total += (points[startIndex + 1] - a) * values[startIndex];
+                total += cumulative[endIndex] - cumulative[startIndex + 1];
+                total += (b - points[endIndex]) * values[endIndex];
+            }
+
+            return total;
+        }
+
+        private static double[] computeLongNoteUsageBar(int totalTime, LNRepStruct? lnRep, double[] baseCorners)
+        {
+            if (!lnRep.HasValue)
+                return new double[baseCorners.Length];
+
+            double[] usage = new double[baseCorners.Length];
+
+            for (int i = 0; i < baseCorners.Length; i++)
+            {
+                int left = (int)Math.Max(Math.Round(baseCorners[i] - 250), 0);
+                int right = (int)Math.Min(Math.Round(baseCorners[i] + 250), totalTime);
+
+                if (right <= left)
+                    continue;
+
+                double average = lnIntegralClamped(lnRep.Value, left, right) / Math.Max(right - left, 1);
+                usage[i] = average;
+            }
+
+            return SmoothOnCorners(baseCorners, usage, 250, 0, SmoothMode.Average);
+        }
+
+        #endregion
+
+        #region è®¡ç®—æ ¸å¿ƒ
+
+        private static double[] computeAnchor(int keyCount, double[][] keyUsage400, double[] baseCorners)
+        {
+            double[] anchor = new double[baseCorners.Length];
+
+            // One buffer for the whole pass: this runs once per corner, so a per-corner array is the dominant
+            // allocation of the anchor term.
+            var counts = new double[keyCount];
+
+            for (int i = 0; i < baseCorners.Length; i++)
+            {
+                for (int k = 0; k < keyCount; k++)
+                    counts[k] = keyUsage400[k][i];
+
+                // Ascending order; the walk reads it from the largest value down, which is the order the previous
+                // sort-then-reverse produced without reversing.
+                Array.Sort(counts);
+
+                int firstPositive = 0;
+
+                while (firstPositive < keyCount && counts[firstPositive] <= 0)
+                    firstPositive++;
+
+                if (keyCount - firstPositive <= 1)
+                {
+                    anchor[i] = 0;
+                    continue;
+                }
+
+                double walk = 0;
+                double maxWalk = 0;
+
+                for (int idx = keyCount - 1; idx > firstPositive; idx--)
+                {
+                    double current = counts[idx];
+                    double next = counts[idx - 1];
+                    double ratio = next / current;
+                    double offset = 0.5 - ratio;
+                    double offsetPenalty = 4 * Math.Pow(offset, 2);
+                    double damping = 1 - offsetPenalty;
+                    walk += current * damping;
+                    maxWalk += current;
+                }
+
+                double value = maxWalk <= 0 ? 0 : walk / maxWalk;
+                anchor[i] = 1 + Math.Min(value - 0.18, 5 * Math.Pow(value - 0.22, 3));
+            }
+
+            return anchor;
+        }
+
+        private static (double[][] deltaKs, double[] jBar) computeJBar(int keyCount, int totalTime, double x, List<NoteStruct>[] notesByColumn, double[] baseCorners)
+        {
+            const double default_delta = 1e9;
+
+            double[][] deltaKs = new double[keyCount][];
+            double[][] jKs = new double[keyCount][];
+
+            Parallel.For(0, keyCount, k =>
+            {
+                deltaKs[k] = Enumerable.Repeat(default_delta, baseCorners.Length).ToArray();
+                jKs[k] = new double[baseCorners.Length];
+
+                var columnNotes = notesByColumn[k];
+
+                for (int i = 0; i < columnNotes.Count - 1; i++)
+                {
+                    var current = columnNotes[i];
+                    var next = columnNotes[i + 1];
+
+                    int left = lowerBound(baseCorners, current.HeadTime);
+                    int right = lowerBound(baseCorners, next.HeadTime);
+
+                    if (right <= left)
+                        continue;
+
+                    double headGap = Math.Max(next.HeadTime - current.HeadTime, 1e-6);
+                    double delta = 0.001 * headGap;
+                    double deltaShift = Math.Abs(delta - 0.08);
+                    double penalty = 0.15 + deltaShift;
+                    double attenuation = Math.Pow(penalty, -4);
+                    double nerfFactor = 7e-5 * attenuation;
+                    double jackNerfer = 1 - nerfFactor;
+
+                    double xRoot = Math.Pow(x, 0.25);
+                    double rootScale = 0.11 * xRoot;
+                    double jackBase = delta + rootScale;
+                    double inverseJack = Math.Pow(jackBase, -1);
+                    double inverseDelta = 1.0 / delta;
+                    double value = inverseDelta * inverseJack * jackNerfer;
+
+                    for (int idx = left; idx < right; idx++)
+                    {
+                        deltaKs[k][idx] = Math.Min(deltaKs[k][idx], delta);
+                        jKs[k][idx] = value;
+                    }
+                }
+
+                jKs[k] = SmoothOnCorners(baseCorners, jKs[k], 500, 0.001, SmoothMode.Sum);
+            });
+            // for (int k = 0; k < keyCount; k++)
+
+            double[] jBar = new double[baseCorners.Length];
+
+            for (int idx = 0; idx < baseCorners.Length; idx++)
+            {
+                double numerator = 0;
+                double denominator = 0;
+
+                for (int k = 0; k < keyCount; k++)
+                {
+                    double v = Math.Max(jKs[k][idx], 0);
+                    double weight = 1.0 / Math.Max(deltaKs[k][idx], 1e-9);
+                    numerator += Math.Pow(v, 5) * weight;
+                    denominator += weight;
+                }
+
+                double combined = denominator <= 0 ? 0 : numerator / denominator;
+                jBar[idx] = Math.Pow(Math.Max(combined, 0), 0.2);
+            }
+
+            return (deltaKs, jBar);
+        }
+
+        private static double[] computeXBar(int keyCount, int totalTime, double x, List<NoteStruct>[] notesByColumn, int[][] activeColumns, double[] baseCorners, double[] cross)
+        {
+            double[][] fastCross = new double[keyCount + 1][];
+
+            for (int i = 0; i < fastCross.Length; i++)
+                fastCross[i] = new double[baseCorners.Length];
+
+            // Sum of the plain term folded in as the pair walk writes it: the term is a single weighted value per
+            // corner, so keeping a full slice per adjacency pair only to sum it afterwards costs an array per pair.
+            double[] weightedX = new double[baseCorners.Length];
+
+            // Per-adjacency-pair work, run serially: it writes one slice each, and the slices below are read only
+            // after every pair is done, so there is nothing to gain from the thread pool and its per-partition state.
+            var pair = new List<NoteStruct>();
+
+            for (int k = 0; k <= keyCount; k++)
+            {
+                mergePair(notesByColumn, keyCount, k, pair);
+
+                if (pair.Count < 2)
+                    continue;
+
+                double crossWeight = cross[Math.Min(k, cross.Length - 1)];
+
+                for (int i = 1; i < pair.Count; i++)
+                {
+                    var prev = pair[i - 1];
+                    var current = pair[i];
+                    int left = lowerBound(baseCorners, prev.HeadTime);
+                    int right = lowerBound(baseCorners, current.HeadTime);
+                    if (right <= left) continue;
+
+                    double delta = 0.001 * Math.Max(current.HeadTime - prev.HeadTime, 1e-6);
+                    double val = 0.16 * Math.Pow(Math.Max(x, delta), -2);
+
+                    int idxStart = Math.Min(left, baseCorners.Length - 1);
+                    int idxEnd = Math.Min(Math.Max(right, 0), baseCorners.Length - 1);
+
+                    bool condition1 = !contains(activeColumns[idxStart], k - 1) && !contains(activeColumns[idxEnd], k - 1);
+                    bool condition2 = !contains(activeColumns[idxStart], k) && !contains(activeColumns[idxEnd], k);
+                    if (condition1 || condition2)
+                        val *= 1 - crossWeight;
+
+                    // The fast-cross value is a property of this pair, not of the corner, so it is computed once.
+                    double fast = Math.Max(0, (0.4 * Math.Pow(Math.Max(Math.Max(delta, 0.06), 0.75 * x), -2)) - 80);
+                    double weighted = crossWeight * val;
+
+                    for (int idx = left; idx < right; idx++)
+                    {
+                        weightedX[idx] += weighted;
+                        fastCross[k][idx] = fast;
+                    }
+                }
+            }
+
+            double[] xBase = new double[baseCorners.Length];
+
+            for (int idx = 0; idx < baseCorners.Length; idx++)
+            {
+                double sum = weightedX[idx];
+
+                for (int k = 0; k < keyCount; k++)
+                {
+                    double leftVal = fastCross[k][idx] * cross[Math.Min(k, cross.Length - 1)];
+                    double rightVal = fastCross[k + 1][idx] * cross[Math.Min(k + 1, cross.Length - 1)];
+                    sum += Math.Sqrt(Math.Max(leftVal * rightVal, 0));
+                }
+
+                xBase[idx] = sum;
+            }
+
+            return SmoothOnCorners(baseCorners, xBase, 500, 0.001, SmoothMode.Sum);
+        }
+
+        private static double[] computePBar(int keyCount, int totalTime, double x, List<NoteStruct> notes, LNRepStruct? lnRep, double[] anchor, double[] baseCorners, double lnMultiplier)
+        {
+            double[] pStep = new double[baseCorners.Length];
+
+            for (int i = 0; i < notes.Count - 1; i++)
+            {
+                var leftNote = notes[i];
+                var rightNote = notes[i + 1];
+
+                int deltaTime = rightNote.HeadTime - leftNote.HeadTime;
+
+                if (deltaTime <= 0)
+                {
+                    double invX = 1.0 / Math.Max(x, 1e-6);
+                    double spikeInnerBase = 4 * invX;
+                    double spikeInner = spikeInnerBase - 24;
+                    double spikeBase = 0.02 * spikeInner;
+                    if (spikeBase <= 0)
+                        continue;
+
+                    double spikeMagnitude = Math.Pow(spikeBase, 0.25);
+                    double spike = 1000 * spikeMagnitude;
+                    int leftIdx = lowerBound(baseCorners, leftNote.HeadTime);
+                    int rightIdx = upperBound(baseCorners, leftNote.HeadTime);
+                    for (int idx = leftIdx; idx < rightIdx; idx++)
+                        pStep[idx] += spike;
+
+                    continue;
+                }
+
+                int left = lowerBound(baseCorners, leftNote.HeadTime);
+                int right = lowerBound(baseCorners, rightNote.HeadTime);
+                if (right <= left) continue;
+
+                double delta = 0.001 * deltaTime;
+                double v = 1;
+                if (lnRep.HasValue)
+                    v += lnMultiplier * 0.001 * lnIntegral(lnRep.Value, leftNote.HeadTime, rightNote.HeadTime);
+
+                double booster = streamBooster(delta);
+                double effective = Math.Max(booster, v);
+
+                double inc;
+
+                if (delta < 2 * x / 3)
+                {
+                    double invX = 1.0 / Math.Max(x, 1e-6);
+                    double halfX = x / 2.0;
+                    double deltaCentre = delta - halfX;
+                    double deltaTerm = 24 * invX * deltaCentre * deltaCentre;
+                    double inner = 0.08 * invX * (1 - deltaTerm);
+                    double innerClamp = Math.Max(inner, 0);
+                    double magnitude = Math.Pow(innerClamp, 0.25);
+                    inc = magnitude / Math.Max(delta, 1e-6) * effective;
+                }
+                else
+                {
+                    double invX = 1.0 / Math.Max(x, 1e-6);
+                    double centre = x / 6.0;
+                    double centreTerm = centre * centre;
+                    double deltaTerm = 24 * invX * centreTerm;
+                    double inner = 0.08 * invX * (1 - deltaTerm);
+                    double innerClamp = Math.Max(inner, 0);
+                    double magnitude = Math.Pow(innerClamp, 0.25);
+                    inc = magnitude / Math.Max(delta, 1e-6) * effective;
+                }
+
+                for (int idx = left; idx < right; idx++)
+                {
+                    double doubled = inc * 2;
+                    double limit = Math.Max(inc, doubled - 10);
+                    double anchored = inc * anchor[idx];
+                    double contribution = Math.Min(anchored, limit);
+
+                    pStep[idx] += contribution;
+                }
+            }
+
+            return SmoothOnCorners(baseCorners, pStep, 500, 0.001, SmoothMode.Sum);
+        }
+
+        /// <summary>
+        /// Merges the two columns an adjacency pair spans into <paramref name="target"/>, in the same
+        /// (time, column) order a sort of their concatenation produced.
+        /// </summary>
+        private static void mergePair(List<NoteStruct>[] notesByColumn, int keyCount, int k, List<NoteStruct> target)
+        {
+            target.Clear();
+
+            List<NoteStruct>? left = k == 0 ? null : notesByColumn[k - 1];
+            List<NoteStruct>? right = k == keyCount ? null : notesByColumn[k];
+
+            if (left != null && right != null)
+            {
+                int l = 0;
+                int r = 0;
+
+                while (l < left.Count && r < right.Count)
+                {
+                    // Columns are ordered, so an equal-head note from the left column sorts first.
+                    target.Add(left[l].HeadTime <= right[r].HeadTime ? left[l++] : right[r++]);
+                }
+
+                while (l < left.Count)
+                    target.Add(left[l++]);
+
+                while (r < right.Count)
+                    target.Add(right[r++]);
+
+                return;
+            }
+
+            target.AddRange(left ?? right!);
+        }
+
+        private static double[] computeABar(int keyCount, int totalTime, double[][] deltaKs, int[][] activeColumns, double[] aCorners, double[] baseCorners)
+        {
+            double[] aStep = Enumerable.Repeat(1.0, aCorners.Length).ToArray();
+
+            for (int i = 0; i < aCorners.Length; i++)
+            {
+                int idx = lowerBound(baseCorners, aCorners[i]);
+                idx = Math.Min(idx, baseCorners.Length - 1);
+                int[] cols = activeColumns[idx];
+                if (cols.Length < 2) continue;
+
+                for (int j = 0; j < cols.Length - 1; j++)
+                {
+                    int c0 = cols[j];
+                    int c1 = cols[j + 1];
+
+                    double deltaGap = Math.Abs(deltaKs[c0][idx] - deltaKs[c1][idx]);
+                    double maxDelta = Math.Max(deltaKs[c0][idx], deltaKs[c1][idx]);
+                    double offset = Math.Max(maxDelta - 0.11, 0);
+                    double offsetContribution = 0.4 * offset;
+                    double diff = deltaGap + offsetContribution;
+
+                    if (diff < 0.02)
+                    {
+                        double factorBase = Math.Max(deltaKs[c0][idx], deltaKs[c1][idx]);
+                        double factorContribution = 0.5 * factorBase;
+                        double factor = 0.75 + factorContribution;
+                        aStep[i] *= Math.Min(factor, 1);
+                    }
+                    else if (diff < 0.07)
+                    {
+                        double factorBase = Math.Max(deltaKs[c0][idx], deltaKs[c1][idx]);
+                        double growth = 5 * diff;
+                        double factorContribution = 0.5 * factorBase;
+                        double factor = 0.65 + growth + factorContribution;
+                        aStep[i] *= Math.Min(factor, 1);
+                    }
+                }
+            }
+
+            return SmoothOnCorners(aCorners, aStep, 250, 0, SmoothMode.Average);
+        }
+
+        private static double[] computeRBar(int keyCount, int totalTime, double x, List<NoteStruct>[] notesByColumn, List<NoteStruct> tailNotes, double[] baseCorners)
+        {
+            if (tailNotes.Count < 2) return new double[baseCorners.Length];
+
+            double[] iList = new double[tailNotes.Count];
+
+            for (int idx = 0; idx < tailNotes.Count; idx++)
+            {
+                var note = tailNotes[idx];
+                var columnNotes = notesByColumn[note.Column];
+                int noteIndex = note.ColumnIndex;
+                double nextHead = noteIndex + 1 < columnNotes.Count ? columnNotes[noteIndex + 1].HeadTime : 1_000_000_000;
+
+                double ih = 0.001 * Math.Abs(note.TailTime - note.HeadTime - 80) / Math.Max(x, 1e-6);
+                double it = 0.001 * Math.Abs(nextHead - note.TailTime - 80) / Math.Max(x, 1e-6);
+
+                iList[idx] = 2 / (2 + Math.Exp(-5 * (ih - 0.75)) + Math.Exp(-5 * (it - 0.75)));
+            }
+
+            double[] rStep = new double[baseCorners.Length];
+
+            for (int idx = 0; idx < tailNotes.Count - 1; idx++)
+            {
+                var current = tailNotes[idx];
+                var next = tailNotes[idx + 1];
+
+                int left = lowerBound(baseCorners, current.TailTime);
+                int right = lowerBound(baseCorners, next.TailTime);
+                if (right <= left) continue;
+
+                double delta = 0.001 * Math.Max(next.TailTime - current.TailTime, 1e-6);
+                double invSqrtDelta = Math.Pow(delta, -0.5);
+                double invX = 1.0 / Math.Max(x, 1e-6);
+                double blend = iList[idx] + iList[idx + 1];
+                double blendContribution = 0.8 * blend;
+                double modulation = 1 + blendContribution;
+                double strength = 0.08 * invSqrtDelta * invX * modulation;
+
+                for (int baseIdx = left; baseIdx < right; baseIdx++)
+                    rStep[baseIdx] = Math.Max(rStep[baseIdx], strength);
+            }
+
+            return SmoothOnCorners(baseCorners, rStep, 500, 0.001, SmoothMode.Sum);
+        }
+
+        #endregion
+
+        private static (double[] cStep, double[] ksStep) computeCAndKs(int keyCount, List<NoteStruct> notes, bool[][] keyUsage, double[] baseCorners)
+        {
+            double[] cStep = new double[baseCorners.Length];
+            double[] ksStep = new double[baseCorners.Length];
+
+            var noteTimesList = new List<double>(notes.Count);
+            foreach (var note in notes)
+                noteTimesList.Add(note.HeadTime);
+            noteTimesList.Sort();
+            double[] noteTimes = noteTimesList.ToArray();
+
+            for (int idx = 0; idx < baseCorners.Length; idx++)
+            {
+                double left = baseCorners[idx] - 500;
+                double right = baseCorners[idx] + 500;
+
+                int leftIndex = lowerBound(noteTimes, left);
+                int rightIndex = lowerBound(noteTimes, right);
+                cStep[idx] = Math.Max(rightIndex - leftIndex, 0);
+
+                int activeCount = 0;
+
+                for (int col = 0; col < keyCount; col++)
+                {
+                    if (keyUsage[col][idx])
+                        activeCount++;
+                }
+
+                ksStep[idx] = Math.Max(activeCount, 1);
+            }
+
+            return (cStep, ksStep);
+        }
+
+        private static double[] computeGaps(double[] corners)
+        {
+            if (corners.Length == 0)
+                return Array.Empty<double>();
+
+            double[] gaps = new double[corners.Length];
+
+            if (corners.Length == 1)
+            {
+                gaps[0] = 0;
+                return gaps;
+            }
+
+            gaps[0] = (corners[1] - corners[0]) / 2.0;
+            gaps[^1] = (corners[^1] - corners[^2]) / 2.0;
+
+            for (int i = 1; i < corners.Length - 1; i++) gaps[i] = (corners[i + 1] - corners[i - 1]) / 2.0;
+
+            return gaps;
+        }
+
+        #region æŒ‡æ ‡æ˜ å°„
+
+        private static double computeSR4JackTerm(double jackValue, double aBar, double activeColumns)
+        {
+            double coordinationExponent = 3.0 / Math.Max(activeColumns, 1e-6);
+            double coordinationPower = aBar <= 0 ? 0 : Math.Pow(aBar, coordinationExponent);
+            double minCandidate = 8 + 0.85 * jackValue;
+            double limitedJack = Math.Min(jackValue, minCandidate);
+            double jackComponent = coordinationPower * limitedJack;
+
+            return 0.4 * safePow(jackComponent, 1.5);
+        }
+
+        private static double computeSR4BurstTerm(double burstValue, double releaseValue, double aBar, double densityValue)
+        {
+            double burstComponent = (0.8 * burstValue) + (releaseValue * 35.0 / (densityValue + 8));
+            double coordinationFactor = aBar <= 0 ? 0 : Math.Pow(aBar, 2.0 / 3.0);
+
+            return 0.6 * safePow(coordinationFactor * burstComponent, 1.5);
+        }
+
+        private static double computeSR4LocalDifficulty(double bracketValue, double aBar, double activeColumns, double jackTerm, double burstTerm)
+        {
+            double coordinationExponent = 3.0 / Math.Max(activeColumns, 1e-6);
+            double coordinationPower = aBar <= 0 ? 0 : Math.Pow(aBar, coordinationExponent);
+            double sumTerms = jackTerm + burstTerm;
+            double s = sumTerms <= 0 ? 0 : Math.Pow(sumTerms, 2.0 / 3.0);
+            double denominator = bracketValue + s + 1;
+            double tValue = denominator <= 0 ? 0 : coordinationPower * bracketValue / denominator;
+            double primaryImpact = 2.7 * Math.Sqrt(Math.Max(s, 0)) * safePow(tValue, 1.5);
+            double secondaryImpact = s * 0.27;
+
+            return primaryImpact + secondaryImpact;
+        }
+
+        private static double computeSR4ContributionStar(double[] localContribution, double[] totalDifficulty, double[] weights, List<NoteStruct> notes, List<NoteStruct> longNotes, double totalSr, double rescaleThreshold)
+        {
+            if (localContribution.Length == 0 || totalDifficulty.Length == 0 || weights.Length == 0 || totalSr <= 0)
+                return 0;
+
+            int count = Math.Min(localContribution.Length, Math.Min(totalDifficulty.Length, weights.Length));
+            double[] clampedContribution = new double[count];
+            double[] localWeights = new double[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                clampedContribution[i] = Math.Min(Math.Max(localContribution[i], 0), Math.Max(totalDifficulty[i], 0));
+                localWeights[i] = weights[i];
+            }
+
+            if (clampedContribution.All(v => v <= 0))
+                return 0;
+
+            double componentSr = finaliseDifficulty(clampedContribution, localWeights, notes, longNotes, rescaleThreshold);
+            return Math.Round(Math.Clamp(componentSr, 0, totalSr), 2, MidpointRounding.AwayFromZero);
+        }
+
+        private static void normaliseSR4ComponentStars(double totalSr,
+                                                       ref double bracketStar,
+                                                       ref double jackStar,
+                                                       ref double burstStar,
+                                                       ref double longNoteUsageStar,
+                                                       ref double longNoteReleaseStar,
+                                                       ref double anchorStar)
+        {
+            if (totalSr <= 0)
+            {
+                bracketStar = 0;
+                jackStar = 0;
+                burstStar = 0;
+                longNoteUsageStar = 0;
+                longNoteReleaseStar = 0;
+                anchorStar = 0;
+                return;
+            }
+
+            double maxComponentStar = Math.Max(
+                Math.Max(Math.Max(bracketStar, jackStar), Math.Max(burstStar, longNoteUsageStar)),
+                Math.Max(longNoteReleaseStar, anchorStar));
+
+            if (maxComponentStar <= 0)
+                return;
+
+            double scale = totalSr / maxComponentStar;
+            bracketStar = Math.Round(Math.Clamp(bracketStar * scale, 0, totalSr), 2, MidpointRounding.AwayFromZero);
+            jackStar = Math.Round(Math.Clamp(jackStar * scale, 0, totalSr), 2, MidpointRounding.AwayFromZero);
+            burstStar = Math.Round(Math.Clamp(burstStar * scale, 0, totalSr), 2, MidpointRounding.AwayFromZero);
+            longNoteUsageStar = Math.Round(Math.Clamp(longNoteUsageStar * scale, 0, totalSr), 2, MidpointRounding.AwayFromZero);
+            longNoteReleaseStar = Math.Round(Math.Clamp(longNoteReleaseStar * scale, 0, totalSr), 2, MidpointRounding.AwayFromZero);
+            anchorStar = Math.Round(Math.Clamp(anchorStar * scale, 0, totalSr), 2, MidpointRounding.AwayFromZero);
+        }
+
+        #endregion
+
+        private static double finaliseDifficulty(List<double> difficulties, List<double> weights, List<NoteStruct> notes, List<NoteStruct> longNotes, double rescaleThreshold)
+        {
+            int count = Math.Min(difficulties.Count, weights.Count);
+
+            if (count == 0)
+                return 0;
+
+            var sortedD = new double[count];
+            var sortedWeights = new double[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                sortedD[i] = difficulties[i];
+                sortedWeights[i] = Math.Max(weights[i], 0);
+            }
+
+            return finaliseFromSorted(sortedD, sortedWeights, count, notes, longNotes, rescaleThreshold);
+        }
+
+        /// <summary>
+        /// Final pass over the per-corner difficulties and their weights.
+        /// </summary>
+        /// <remarks>
+        /// Both inputs are permuted into ascending difficulty order in place. The percentile lookup below reads the
+        /// two arrays positionally, so they must be sorted together; sorting one scratch copy of the pair instead of
+        /// materialising a list of tuples keeps this pass allocation-free apart from the sort itself.
+        /// </remarks>
+        private static double finaliseFromSorted(double[] sortedD, double[] sortedWeights, int count, List<NoteStruct> notes, List<NoteStruct> longNotes,
+                                                double rescaleThreshold)
+        {
+            Array.Sort(sortedD, sortedWeights, 0, count);
+
+            double[] cumulative = new double[count];
+            cumulative[0] = sortedWeights[0];
+            for (int i = 1; i < count; i++)
+                cumulative[i] = cumulative[i - 1] + sortedWeights[i];
+
+            double totalWeight = Math.Max(cumulative[^1], 1e-9);
+
+            for (int i = 0; i < count; i++)
+                cumulative[i] /= totalWeight;
+
+            double[] targets = { 0.945, 0.935, 0.925, 0.915, 0.845, 0.835, 0.825, 0.815 };
+            double percentile93 = 0;
+            double percentile83 = 0;
+
+            for (int i = 0; i < 4; i++)
+            {
+                int index = Math.Min(bisectLeft(cumulative, targets[i]), count - 1);
+                percentile93 += sortedD[index];
+            }
+
+            percentile93 /= 4.0;
+
+            for (int i = 4; i < 8; i++)
+            {
+                int index = Math.Min(bisectLeft(cumulative, targets[i]), count - 1);
+                percentile83 += sortedD[index];
+            }
+
+            percentile83 /= 4.0;
+
+            double weightedMeanNumerator = 0;
+            for (int i = 0; i < count; i++)
+                weightedMeanNumerator += Math.Pow(sortedD[i], 5) * sortedWeights[i];
+
+            double weightedMean = Math.Pow(Math.Max(weightedMeanNumerator / totalWeight, 0), 0.2);
+
+            double topComponent = 0.25 * 0.88 * percentile93;
+            double middleComponent = 0.2 * 0.94 * percentile83;
+            double meanComponent = 0.55 * weightedMean;
+            double sr = topComponent + middleComponent + meanComponent;
+            sr = Math.Pow(sr, 1.0) / Math.Pow(8, 1.0) * 8;
+
+            double totalNotes = notes.Count;
+
+            foreach (var ln in longNotes)
+            {
+                // TODO: LN折算为额外note数量的算法
+                double len = Math.Min(ln.TailTime - ln.HeadTime, 1000);
+                totalNotes += 0.5 * (len / 200.0);
+            }
+
+            sr *= totalNotes / (totalNotes + 60);
+            sr = rescaleHigh(sr, rescaleThreshold);
+            sr *= 0.975;
+
+            return sr;
+        }
+
+        private static double finaliseDifficulty(double[] difficulties, double[] weights, List<NoteStruct> notes, List<NoteStruct> longNotes, double rescaleThreshold)
+        {
+            int count = Math.Min(difficulties.Length, weights.Length);
+
+            if (count == 0)
+                return 0;
+
+            // Copies: the callers keep using their arrays (the breakdown re-reads the same difficulty curve).
+            var sortedD = new double[count];
+            var sortedWeights = new double[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                sortedD[i] = difficulties[i];
+                sortedWeights[i] = Math.Max(weights[i], 0);
+            }
+
+            return finaliseFromSorted(sortedD, sortedWeights, count, notes, longNotes, rescaleThreshold);
+        }
+
+        private static double[] interpValues(double[] newX, double[] oldX, double[] oldVals)
+        {
+            double[] result = new double[newX.Length];
+
+            for (int i = 0; i < newX.Length; i++)
+            {
+                double x = newX[i];
+
+                if (x <= oldX[0])
+                {
+                    result[i] = oldVals[0];
+                    continue;
+                }
+
+                if (x >= oldX[^1])
+                {
+                    result[i] = oldVals[^1];
+                    continue;
+                }
+
+                int idx = lowerBound(oldX, x);
+
+                if (idx < oldX.Length && nearlyEquals(oldX[idx], x))
+                {
+                    result[i] = oldVals[idx];
+                    continue;
+                }
+
+                int prev = Math.Max(idx - 1, 0);
+                double x0 = oldX[prev];
+                double x1 = oldX[idx];
+                double y0 = oldVals[prev];
+                double y1 = oldVals[idx];
+                double deltaY = y1 - y0;
+                double deltaX = x - x0;
+                double numerator = deltaY * deltaX;
+                double fraction = numerator / (x1 - x0);
+                result[i] = y0 + fraction;
+            }
+
+            return result;
+        }
+
+        private static double[] stepInterp(double[] newX, double[] oldX, double[] oldVals)
+        {
+            double[] result = new double[newX.Length];
+
+            for (int i = 0; i < newX.Length; i++)
+            {
+                int idx = upperBound(oldX, newX[i]) - 1;
+                if (idx < 0)
+                    idx = 0;
+                result[i] = oldVals[Math.Min(idx, oldVals.Length - 1)];
+            }
+
+            return result;
+        }
+
+        private static double[] SmoothOnCorners(double[] positions, double[] values, double window, double scale, SmoothMode mode)
+        {
+            if (positions.Length == 0)
+                return Array.Empty<double>();
+
+            double[] cumulative = buildCumulative(positions, values);
+            double[] output = new double[positions.Length];
+
+            for (int i = 0; i < positions.Length; i++)
+            {
+                double s = positions[i];
+                double a = Math.Max(s - window, positions[0]);
+                double b = Math.Min(s + window, positions[^1]);
+
+                if (b <= a)
+                {
+                    output[i] = 0;
+                    continue;
+                }
+
+                double integral = queryIntegral(positions, cumulative, values, b) - queryIntegral(positions, cumulative, values, a);
+
+                if (mode == SmoothMode.Average)
+                    output[i] = integral / Math.Max(b - a, 1e-9);
+                else
+                    output[i] = integral * scale;
+            }
+
+            return output;
+        }
+
+        private static double[] buildCumulative(double[] positions, double[] values)
+        {
+            double[] cumulative = new double[positions.Length];
+
+            for (int i = 1; i < positions.Length; i++)
+            {
+                double width = positions[i] - positions[i - 1];
+                double increment = values[i - 1] * width;
+                cumulative[i] = cumulative[i - 1] + increment;
+            }
+
+            return cumulative;
+        }
+
+        private static double queryIntegral(double[] positions, double[] cumulative, double[] values, double point)
+        {
+            if (point <= positions[0])
+                return 0;
+            if (point >= positions[^1])
+                return cumulative[^1];
+
+            int idx = lowerBound(positions, point);
+            if (idx < positions.Length && nearlyEquals(positions[idx], point))
+                return cumulative[idx];
+
+            int prev = Math.Max(idx - 1, 0);
+            double delta = point - positions[prev];
+            double contribution = values[prev] * delta;
+
+            return cumulative[prev] + contribution;
+        }
+
+        private static double streamBooster(double delta)
+        {
+            double inv = 7.5 / Math.Max(delta, 1e-6);
+            if (inv <= 160 || inv >= 360)
+                return 1;
+
+            double shifted = inv - 160;
+            double distance = inv - 360;
+            double adjustment = 1.7e-7 * shifted * Math.Pow(distance, 2);
+
+            return 1 + adjustment;
+        }
+
+        private static bool contains(int[] array, int target)
+        {
+            if (target < 0)
+                return false;
+
+            for (int i = 0; i < array.Length; i++)
+            {
+                if (array[i] == target)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static int lowerBound(double[] array, double value)
+        {
+            int left = 0;
+            int right = array.Length;
+
+            while (left < right)
+            {
+                int span = right - left;
+                int mid = left + (span >> 1);
+                if (array[mid] < value)
+                    left = mid + 1;
+                else
+                    right = mid;
+            }
+
+            return left;
+        }
+
+        private static int lowerBound(double[] array, int value)
+        {
+            return lowerBound(array, (double)value);
+        }
+
+        private static int upperBound(int[] array, int value)
+        {
+            int left = 0;
+            int right = array.Length;
+
+            while (left < right)
+            {
+                int span = right - left;
+                int mid = left + (span >> 1);
+                if (array[mid] <= value)
+                    left = mid + 1;
+                else
+                    right = mid;
+            }
+
+            return left;
+        }
+
+        private static int upperBound(double[] array, double value)
+        {
+            int left = 0;
+            int right = array.Length;
+
+            while (left < right)
+            {
+                int span = right - left;
+                int mid = left + (span >> 1);
+                if (array[mid] <= value)
+                    left = mid + 1;
+                else
+                    right = mid;
+            }
+
+            return left;
+        }
+
+        private static int bisectLeft(double[] array, double value)
+        {
+            int left = 0;
+            int right = array.Length;
+
+            while (left < right)
+            {
+                int span = right - left;
+                int mid = left + (span >> 1);
+                if (array[mid] < value)
+                    left = mid + 1;
+                else
+                    right = mid;
+            }
+
+            return left;
+        }
+
+        private static double safePow(double value, double exponent)
+        {
+            if (value <= 0)
+                return 0;
+
+            double result = Math.Pow(value, exponent);
+
+            return result;
+        }
+
+        private static double rescaleHigh(double sr, double threshold)
+        {
+            double excess = sr - threshold;
+            double normalized = excess / 1.2;
+            double softened = threshold + normalized;
+
+            return sr <= threshold ? sr : softened;
+        }
+
+        private static int clamp(int value, int min, int max)
+        {
+            return Math.Min(Math.Max(value, min), max);
+        }
+
+        private static bool nearlyEquals(double a, double b, double epsilon = 1e-9)
+        {
+            return Math.Abs(a - b) <= epsilon;
+        }
+
+        private static int compareNotes(NoteStruct a, NoteStruct b)
+        {
+            int headCompare = a.HeadTime.CompareTo(b.HeadTime);
+            return headCompare != 0 ? headCompare : a.Column.CompareTo(b.Column);
+        }
+
+        private static void addToMap(Dictionary<int, double> map, int key, double value)
+        {
+            if (!map.TryAdd(key, value))
+                map[key] += value;
+        }
+
+        private enum SmoothMode
+        {
+            Sum,
+            Average
+        }
+    }
+}

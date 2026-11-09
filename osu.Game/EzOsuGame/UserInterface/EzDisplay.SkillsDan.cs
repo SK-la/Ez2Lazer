@@ -7,6 +7,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osuTK;
@@ -17,7 +19,7 @@ namespace osu.Game.EzOsuGame.UserInterface
     /// Composite skill + dan tag: e.g. <c>技 7++ (20.5)</c>.
     /// Optional secondary (player) dan + value for AB overlays.
     /// Supports <see cref="LayoutDirection"/> horizontal (default) or vertical (skill → dan → value).
-    /// Song-select panel binding is Realm/MSD read-only — never <c>TryGetChartDan</c> / Mina.
+    /// Song-select panel binding is Realm/Mina read-only — never <c>TryGetChartDan</c> / Mina.
     /// </summary>
     public partial class EzDisplaySkillsDan : FillFlowContainer
     {

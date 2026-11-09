@@ -5,17 +5,17 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
-using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Mina;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
 {
     [TestFixture]
-    public class EzPlayerSsrHistorySamplesTest
+    public class EzPlayerRatingHistorySamplesTest
     {
         [Test]
         public void SampleIndicesIncludeEndpointsAndCap()
         {
-            var indices = EzPlayerSsrAggregator.SampleIndices(100, 5);
+            var indices = EzPlayerMinaAggregator.SampleIndices(100, 5);
             Assert.That(indices.First(), Is.EqualTo(0));
             Assert.That(indices.Last(), Is.EqualTo(99));
             Assert.That(indices.Count, Is.LessThanOrEqualTo(5));
@@ -26,16 +26,16 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         public void ChronologicalSamplesUsePlayDatesNotNow()
         {
             var start = new DateTimeOffset(2019, 1, 15, 12, 0, 0, TimeSpan.Zero);
-            var plays = new List<(DateTimeOffset, EzSkillsetVector)>();
+            var plays = new List<(DateTimeOffset, EzMinaSkillAxisVector)>();
 
             for (int i = 0; i < 10; i++)
             {
                 plays.Add((
                     start.AddYears(i),
-                    new EzSkillsetVector(10 + i, 1, 1, 1, 1, 1, 1, 1)));
+                    new EzMinaSkillAxisVector(10 + i, 1, 1, 1, 1, 1, 1, 1)));
             }
 
-            var samples = EzPlayerSsrAggregator.BuildChronologicalHistorySamples(plays, maxPoints: 4);
+            var samples = EzPlayerMinaAggregator.BuildChronologicalHistorySamples(plays, maxPoints: 4);
 
             Assert.That(samples.Count, Is.EqualTo(4));
             Assert.That(samples[0].RecordedAt.Year, Is.EqualTo(2019));
@@ -48,7 +48,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             // Strong early plays then a long stretch of weak ones; after the
             // strong prefix leaves the rolling window the aggregate must drop.
-            var plays = new List<(DateTimeOffset, EzSkillsetVector)>();
+            var plays = new List<(DateTimeOffset, EzMinaSkillAxisVector)>();
             var t0 = DateTimeOffset.UtcNow;
 
             for (int i = 0; i < 5; i++)
@@ -57,7 +57,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             for (int i = 5; i < 60; i++)
                 plays.Add((t0.AddMinutes(i), vec(5)));
 
-            var samples = EzPlayerSsrAggregator.BuildChronologicalHistorySamples(
+            var samples = EzPlayerMinaAggregator.BuildChronologicalHistorySamples(
                 plays,
                 maxPoints: plays.Count,
                 rollingPlays: 10);
@@ -68,6 +68,6 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(late, Is.LessThan(early));
         }
 
-        private static EzSkillsetVector vec(double overall) => new EzSkillsetVector(overall, overall, overall, overall, overall, overall, overall, overall);
+        private static EzMinaSkillAxisVector vec(double overall) => new EzMinaSkillAxisVector(overall, overall, overall, overall, overall, overall, overall, overall);
     }
 }

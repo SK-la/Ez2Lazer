@@ -15,9 +15,9 @@ namespace osu.Game.Tests.EzOsuGame.UserInterface
     public class EzDualDifficultyDisplayTest
     {
         [Test]
-        public void CardBadgeIcon_uses_moon_for_mania_with_xxy_support()
+        public void CardBadgeIcon_uses_moon_for_mania_with_ssr_support()
         {
-            var beatmap = createManiaBeatmap(xxyStarRating: 5.2);
+            var beatmap = createManiaBeatmap(SunnySR: 5.2);
 
             Assert.That(EzQuickRotationCardDifficultyDisplay.ResolveBadgeIcon(beatmap), Is.EqualTo(FontAwesome.Solid.Moon));
         }
@@ -31,45 +31,48 @@ namespace osu.Game.Tests.EzOsuGame.UserInterface
         }
 
         [Test]
-        public void CardBadgeRating_prefers_persisted_xxy_for_mania()
+        public void CardBadgeRating_prefers_persisted_ssr_for_mania()
         {
-            var beatmap = createManiaBeatmap(starRating: 3.1, xxyStarRating: 5.8);
+            var beatmap = createManiaBeatmap(starRating: 3.1, SunnySR: 5.8);
 
             Assert.That(EzQuickRotationCardDifficultyDisplay.ResolveBadgeRating(beatmap), Is.EqualTo(5.8));
         }
 
         [Test]
-        public void CardBadgeRating_falls_back_to_official_star_when_xxy_missing()
+        public void CardBadgeRating_falls_back_to_official_star_when_ssr_missing()
         {
-            var beatmap = createManiaBeatmap(starRating: 3.1, xxyStarRating: -1);
+            var beatmap = createManiaBeatmap(starRating: 3.1, SunnySR: -1);
 
             Assert.That(EzQuickRotationCardDifficultyDisplay.ResolveBadgeRating(beatmap), Is.EqualTo(3.1));
         }
 
         [Test]
-        public void ShouldShowXxyDisplay_true_for_mania()
+        public void ShouldShowSunnySRDisplay_true_for_mania()
         {
             var beatmap = createManiaBeatmap();
 
-            Assert.That(EzDualDifficultyDisplay.ShouldShowXxyDisplay(beatmap), Is.True);
+            Assert.That(EzDualDifficultyDisplay.ShouldShowSunnySRDisplay(beatmap), Is.True);
         }
 
         [Test]
-        public void ShouldShowXxyDisplay_false_for_osu()
+        public void ShouldShowSunnySRDisplay_true_for_osu_because_its_system_has_a_skill_vector()
         {
+            // The pill is no longer gated on an analysis provider: osu reads out under PP+, which has a chart vector.
             var beatmap = new BeatmapInfo { Ruleset = new OsuRuleset().RulesetInfo };
 
-            Assert.That(EzDualDifficultyDisplay.ShouldShowXxyDisplay(beatmap), Is.False);
+            Assert.That(EzDualDifficultyDisplay.ShouldShowSunnySRDisplay(beatmap), Is.True);
         }
 
-        private static BeatmapInfo createManiaBeatmap(double starRating = 0, double xxyStarRating = 4.2)
+        private static BeatmapInfo createManiaBeatmap(double starRating = 0, double SunnySR = 4.2)
         {
-            return new BeatmapInfo
+            var beatmap = new BeatmapInfo
             {
                 Ruleset = new ManiaRuleset().RulesetInfo,
                 StarRating = starRating,
-                XxyStarRating = xxyStarRating,
             };
+
+            beatmap.EzRatingData.SunnySR = SunnySR;
+            return beatmap;
         }
     }
 }

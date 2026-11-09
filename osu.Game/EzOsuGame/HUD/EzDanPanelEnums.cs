@@ -10,11 +10,11 @@ namespace osu.Game.EzOsuGame.HUD
     /// </summary>
     public enum EzDanPanelDataSource
     {
-        /// <summary>Chart MSD only (radar primary / yellow layer).</summary>
+        /// <summary>Chart Mina only (radar primary / yellow layer).</summary>
         [Description("Chart")]
         Chart,
 
-        /// <summary>Player SSR / dan only (radar secondary / green layer).</summary>
+        /// <summary>Player SunnySR / dan only (radar secondary / green layer).</summary>
         [Description("Player")]
         Player,
 
