@@ -5,7 +5,7 @@ namespace osu.Game.EzOsuGame.Localization
 {
     public class EzSettingsAudioString
     {
-         #region 音频设备设置
+        #region 音频设备设置
 
         public static readonly EzLocalizationManager.EzLocalisableString AUDIO_DEVICE_OUTPUT_HINT = new EzLocalizationManager.EzLocalisableString(
             "| 选择 | 输出路径 |"
@@ -80,6 +80,18 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_OUTPUT_UNAVAILABLE_NOTIFICATION = new EzLocalizationManager.EzLocalisableString(
             "ASIO 输出未能启动，当前没有声音。请尝试重启游戏；若仍失败，请关闭占用该 ASIO 驱动的其他程序，或切换到其他音频设备。",
             "ASIO output failed to start; there is no audio. Try restarting the game. If it still fails, close other apps using this ASIO driver or switch to another audio device.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WASAPI_EXCLUSIVE_BUFFER_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "WASAPI Exclusive 缓冲",
+            "WASAPI Exclusive Buffer");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WASAPI_EXCLUSIVE_BUFFER_HINT = new EzLocalizationManager.EzLocalisableString(
+            "Auto 会从较低延迟开始自动阶梯尝试；手动值过低可能导致无法启动并回退到更大缓冲。",
+            "Auto tries a low-latency ladder automatically; a manual value that is too low may fail to start and step up to a larger buffer.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WASAPI_EXCLUSIVE_UNAVAILABLE_NOTIFICATION = new EzLocalizationManager.EzLocalisableString(
+            "WASAPI Exclusive 输出未能启动，当前没有声音。请尝试提高 Exclusive 缓冲，或切换到其他音频设备。",
+            "WASAPI Exclusive output failed to start; there is no audio. Try a larger Exclusive buffer, or switch to another audio device.");
 
         #endregion
     }
