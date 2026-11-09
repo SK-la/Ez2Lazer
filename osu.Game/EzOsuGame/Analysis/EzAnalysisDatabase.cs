@@ -18,6 +18,7 @@ using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Online.API;
 using osu.Game.Rulesets;
@@ -49,6 +50,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly EzAnalysisPersistentStore persistentStore;
         private readonly BeatmapManager beatmapManager;
         private readonly RulesetStore rulesetStore;
+        private readonly RealmAccess? realmAccess;
         private readonly IBindable<bool> sqliteAnalysisEnabled;
         private readonly Bindable<string?> activeSongsBranchDisplayName = new Bindable<string?>();
         private readonly Bindable<int> activeSongsBranchVersion = new Bindable<int>();
@@ -72,11 +74,119 @@ namespace osu.Game.EzOsuGame.Analysis
             int RequestedBeatmapCount,
             int StoredBeatmapCount);
 
-        public EzAnalysisDatabase(EzAnalysisPersistentStore persistentStore, BeatmapManager beatmapManager, RulesetStore rulesetStore, Ez2ConfigManager ezConfig)
+        /// <summary>
+        /// The stored per-system ratings of <paramref name="beatmaps"/>, read from Realm.
+        /// </summary>
+        /// <remarks>
+        /// A branch is a projection of what has already been computed, not another place to compute: the chart-side
+        /// systems run on their own schedule, and re-running them per branch would make building a filter cost as much
+        /// as the whole library rated again. Values that have not been computed read as absent, which is what the
+        /// readers of these columns already treat as "ask again later".
+        /// </remarks>
+        private Dictionary<Guid, EzRatingData> loadStoredRatings(IReadOnlyCollection<BeatmapInfo> beatmaps)
+        {
+            var ratings = new Dictionary<Guid, EzRatingData>();
+
+            if (realmAccess == null || beatmaps.Count == 0)
+                return ratings;
+
+            var wanted = new HashSet<Guid>(beatmaps.Select(beatmap => beatmap.ID));
+
+            try
+            {
+                realmAccess.Run(r =>
+                {
+                    foreach (var beatmap in r.All<BeatmapInfo>().AsEnumerable())
+                    {
+                        if (!wanted.Contains(beatmap.ID))
+                            continue;
+
+                        ratings[beatmap.ID] = beatmap.EzRatingData.Copy();
+                    }
+                });
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "[EzAnalysisDatabase] Failed to read stored ratings for a songs branch; the branch will be written without them.");
+            }
+
+            return ratings;
+        }
+
+        /// <summary>
+        /// The axis rows of the systems whose result is not a scalar, read from Realm.
+        /// </summary>
+        private List<EzAnalysisPersistentStore.SongsBranchSkillRow> loadSkillRows(IReadOnlyCollection<BeatmapInfo> beatmaps, int rulesetOnlineId)
+        {
+            var rows = new List<EzAnalysisPersistentStore.SongsBranchSkillRow>();
+
+            if (realmAccess == null || beatmaps.Count == 0)
+                return rows;
+
+            var idByHash = new Dictionary<string, Guid>(StringComparer.Ordinal);
+
+            foreach (var beatmap in beatmaps)
+            {
+                if (!string.IsNullOrEmpty(beatmap.Hash))
+                    idByHash[beatmap.Hash] = beatmap.ID;
+            }
+
+            if (idByHash.Count == 0)
+                return rows;
+
+            try
+            {
+                realmAccess.Run(r =>
+                {
+                    foreach (var value in r.All<EzBeatmapSkillValue>().AsEnumerable())
+                    {
+                        if (!idByHash.TryGetValue(value.BeatmapHash, out Guid beatmapId))
+                            continue;
+
+                        if ((EzSkillRowState)value.State != EzSkillRowState.Current)
+                            continue;
+
+                        rows.Add(new EzAnalysisPersistentStore.SongsBranchSkillRow(
+                            beatmapId,
+                            value.SystemId,
+                            value.RulesetOnlineId < 0 ? rulesetOnlineId : value.RulesetOnlineId,
+                            value.SkillId,
+                            value.Value,
+                            value.AlgorithmVersion));
+                    }
+                });
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "[EzAnalysisDatabase] Failed to read stored skill rows for a songs branch; the branch will be written without them.");
+                rows.Clear();
+            }
+
+            return rows;
+        }
+
+        /// <summary>
+        /// The stored per-system star and pp of one chart, as the branch row carries them.
+        /// </summary>
+        private static (double? OfficialSr, double? MinaSr, double? MinaPp, double? PppSr, double? PppPp) ratingsOf(
+            Dictionary<Guid, EzRatingData> ratings, Guid beatmapId)
+        {
+            if (!ratings.TryGetValue(beatmapId, out var data))
+                return (null, null, null, null, null);
+
+            return (present(data.OfficialSR), present(data.MinaSR), present(data.MinaPP), present(data.PppSR), present(data.PppPP));
+
+            // Realm writes -1 for "never computed"; the column stores null for the same thing.
+            static double? present(double value) => double.IsFinite(value) && value >= 0 ? value : null;
+        }
+
+        public EzAnalysisDatabase(EzAnalysisPersistentStore persistentStore, BeatmapManager beatmapManager, RulesetStore rulesetStore, Ez2ConfigManager ezConfig,
+                                  RealmAccess? realmAccess = null)
         {
             this.persistentStore = persistentStore;
             this.beatmapManager = beatmapManager;
             this.rulesetStore = rulesetStore;
+            this.realmAccess = realmAccess;
 
             sqliteAnalysisEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
         }
@@ -337,6 +447,8 @@ namespace osu.Game.EzOsuGame.Analysis
                     SourceCollectionBeatmapCount: sourceCollection?.BeatmapMd5Hashes.Count ?? beatmapList.Count);
                 string databasePath = persistentStore.CreateSongsBranchDatabasePath(metadata);
                 var rows = new List<EzAnalysisPersistentStore.SongsBranchRow>(beatmapList.Count);
+                var storedRatings = loadStoredRatings(beatmapList);
+                var skillRows = loadSkillRows(beatmapList, localRulesetInfo.OnlineID);
 
                 for (int i = 0; i < beatmapList.Count; i++)
                 {
@@ -375,7 +487,9 @@ namespace osu.Game.EzOsuGame.Analysis
                         }
                     }
 
-                    rows.Add(new EzAnalysisPersistentStore.SongsBranchRow(beatmap.ID, beatmap.Hash, beatmap.MD5Hash, sunnySR, pp));
+                    var stored = ratingsOf(storedRatings, beatmap.ID);
+                    rows.Add(new EzAnalysisPersistentStore.SongsBranchRow(beatmap.ID, beatmap.Hash, beatmap.MD5Hash, sunnySR, pp,
+                        stored.OfficialSr, stored.MinaSr, stored.MinaPp, stored.PppSr, stored.PppPp));
 
                     long now = Environment.TickCount64;
 
@@ -399,7 +513,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     if (tryGetOfficialPerformancePointsVersion(localRulesetInfo, out int resolvedPpVersion))
                         ppAlgorithmVersion = resolvedPpVersion;
 
-                    persistentStore.StoreSongsBranch(databasePath, metadata, rows, sourceCollection, sunnySRAlgorithmVersion, ppAlgorithmVersion, cancellationToken);
+                    persistentStore.StoreSongsBranch(databasePath, metadata, rows, skillRows, sourceCollection, sunnySRAlgorithmVersion, ppAlgorithmVersion, cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
 
                     deleteBranchesForSourceCollection(resolvedSourceCollectionId, databasePath);

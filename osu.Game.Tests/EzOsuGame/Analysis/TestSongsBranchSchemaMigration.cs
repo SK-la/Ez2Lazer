@@ -49,7 +49,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             using var migrated = openConnection();
             Assert.That(prepareBranch(migrated), Is.True);
             Assert.That(readMeta(migrated, "kind"), Is.EqualTo("songs_branch"));
-            Assert.That(readMeta(migrated, "schema_version"), Is.EqualTo("3"));
+            Assert.That(readMeta(migrated, "schema_version"), Is.EqualTo("4"));
             Assert.That(tableExists(migrated, "songs_branch_entry"), Is.True);
             Assert.That(tableExists(migrated, "sunny_sr_branch"), Is.False);
             Assert.That(readSunnySR(migrated), Is.EqualTo(4.56).Within(0.001));

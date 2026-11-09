@@ -44,7 +44,35 @@ namespace osu.Game.EzOsuGame.Analysis
             Mania = 1 << 1,
         }
 
-        public readonly record struct SongsBranchRow(Guid BeatmapId, string BeatmapHash, string BeatmapMd5, double SunnySR, double? Pp);
+        /// <summary>
+        /// One chart's stored analysis, mirroring what <see cref="Beatmaps.BeatmapInfo.EzRatingData"/> holds.
+        /// </summary>
+        /// <remarks>
+        /// A scalar that has never been computed is <c>-1</c> in Realm; here it is <c>null</c>, because the column is
+        /// also absent on a branch written before the scalar existed. Both read as "not computed", which is the only
+        /// question a reader asks of them.
+        /// </remarks>
+        public readonly record struct SongsBranchRow(
+            Guid BeatmapId,
+            string BeatmapHash,
+            string BeatmapMd5,
+            double SunnySR,
+            double? Pp,
+            double? OfficialSr = null,
+            double? MinaSr = null,
+            double? MinaPp = null,
+            double? PppSr = null,
+            double? PppPp = null,
+            bool SunnyPpComputed = false);
+
+        /// <summary>One axis of a system whose result is an axis set rather than one number (CSI, dan).</summary>
+        public readonly record struct SongsBranchSkillRow(
+            Guid BeatmapId,
+            string SystemId,
+            int RulesetOnlineId,
+            string SkillId,
+            double Value,
+            int AlgorithmVersion);
 
         public readonly record struct SongsBranchDescriptor(string DatabasePath, string RelativePath, SongsBranchMetadata Metadata);
 
@@ -80,7 +108,17 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private const string songs_branch_kind = "songs_branch";
         private const string legacy_sunny_sr_branch_kind = "sunny_sr_branch";
-        private const int songs_branch_schema_version = 3;
+
+        /// <summary>
+        /// Version of the songs branch file layout.
+        /// </summary>
+        /// <remarks>
+        /// v4 mirrors the whole analysis layer instead of only the Sunny star and the official pp: every scalar rating
+        /// gets a column, and CSI / dan - which are not scalars - get rows in <see cref="table_songs_branch_skill"/>.
+        /// A branch written by an older version is migrated additively and then refreshed, because the columns it
+        /// never had read as "not computed".
+        /// </remarks>
+        private const int songs_branch_schema_version = 4;
 
         /// <summary>
         /// 主分析库文件版本。仅 kps / KPC 表结构或列统计口径变更时递增。
@@ -104,6 +142,19 @@ namespace osu.Game.EzOsuGame.Analysis
         private const string col_beatmap_md5 = "beatmap_md5";
         private const string col_sunny_sr = "sunny_sr";
         private const string col_pp = "pp";
+        private const string col_official_sr = "official_sr";
+        private const string col_mina_sr = "mina_sr";
+        private const string col_mina_pp = "mina_pp";
+        private const string col_ppp_sr = "ppp_sr";
+        private const string col_ppp_pp = "ppp_pp";
+
+        private const string table_songs_branch_skill = "songs_branch_skill";
+        private const string col_skill_beatmap_id = "beatmap_id";
+        private const string col_skill_system_id = "system_id";
+        private const string col_skill_ruleset_online_id = "ruleset_online_id";
+        private const string col_skill_skill_id = "skill_id";
+        private const string col_skill_value = "value";
+        private const string col_skill_algorithm_version = "algorithm_version";
 
         private readonly Storage storage;
         private readonly Lock initLock = new Lock();
@@ -997,6 +1048,12 @@ WHERE {EzAnalysisSchemaManager.COL_UPDATED_AT} > 0;
 
         public void StoreSongsBranch(string databasePath, SongsBranchMetadata metadata, IEnumerable<SongsBranchRow> rows, SourceCollectionSnapshot? sourceCollection = null,
                                      int sunnySRAlgorithmVersion = 0, int ppAlgorithmVersion = 0, CancellationToken cancellationToken = default)
+            => StoreSongsBranch(databasePath, metadata, rows, Array.Empty<SongsBranchSkillRow>(), sourceCollection,
+                sunnySRAlgorithmVersion, ppAlgorithmVersion, cancellationToken);
+
+        public void StoreSongsBranch(string databasePath, SongsBranchMetadata metadata, IEnumerable<SongsBranchRow> rows, IEnumerable<SongsBranchSkillRow> skillRows,
+                                     SourceCollectionSnapshot? sourceCollection = null,
+                                     int sunnySRAlgorithmVersion = 0, int ppAlgorithmVersion = 0, CancellationToken cancellationToken = default)
         {
             if (!Enabled)
                 return;
@@ -1036,8 +1093,28 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_entry} (
     {col_beatmap_hash} TEXT NOT NULL,
     {col_beatmap_md5} TEXT NOT NULL,
     {col_sunny_sr} REAL NOT NULL,
-    {col_pp} REAL NULL
+    {col_pp} REAL NULL,
+    {col_official_sr} REAL NULL,
+    {col_mina_sr} REAL NULL,
+    {col_mina_pp} REAL NULL,
+    {col_ppp_sr} REAL NULL,
+    {col_ppp_pp} REAL NULL
 );
+
+-- The systems whose result is an axis set rather than one number. They are rows, not columns, so adding an axis to a
+-- system does not change this schema.
+CREATE TABLE IF NOT EXISTS {table_songs_branch_skill} (
+    {col_skill_beatmap_id} TEXT NOT NULL,
+    {col_skill_system_id} TEXT NOT NULL,
+    {col_skill_ruleset_online_id} INTEGER NOT NULL,
+    {col_skill_skill_id} TEXT NOT NULL,
+    {col_skill_value} REAL NOT NULL,
+    {col_skill_algorithm_version} INTEGER NOT NULL,
+    PRIMARY KEY ({col_skill_beatmap_id}, {col_skill_system_id}, {col_skill_ruleset_online_id}, {col_skill_skill_id})
+);
+
+CREATE INDEX IF NOT EXISTS idx_songs_branch_skill_system
+    ON {table_songs_branch_skill}({col_skill_system_id}, {col_skill_ruleset_online_id});
 
 CREATE TABLE IF NOT EXISTS {table_songs_branch_hidden_preexisting} (
     {col_beatmap_id} TEXT PRIMARY KEY
@@ -1123,20 +1200,35 @@ INSERT INTO {table_songs_branch_entry}(
     {col_beatmap_hash},
     {col_beatmap_md5},
     {col_sunny_sr},
-    {col_pp}
+    {col_pp},
+    {col_official_sr},
+    {col_mina_sr},
+    {col_mina_pp},
+    {col_ppp_sr},
+    {col_ppp_pp}
 )
 VALUES(
     $id,
     $hash,
     $md5,
     $sunny_sr,
-    $pp
+    $pp,
+    $official_sr,
+    $mina_sr,
+    $mina_pp,
+    $ppp_sr,
+    $ppp_pp
 )
 ON CONFLICT({col_beatmap_id}) DO UPDATE SET
     {col_beatmap_hash} = excluded.{col_beatmap_hash},
     {col_beatmap_md5} = excluded.{col_beatmap_md5},
     {col_sunny_sr} = excluded.{col_sunny_sr},
-    {col_pp} = excluded.{col_pp};
+    {col_pp} = COALESCE(excluded.{col_pp}, {table_songs_branch_entry}.{col_pp}),
+    {col_official_sr} = COALESCE(excluded.{col_official_sr}, {table_songs_branch_entry}.{col_official_sr}),
+    {col_mina_sr} = COALESCE(excluded.{col_mina_sr}, {table_songs_branch_entry}.{col_mina_sr}),
+    {col_mina_pp} = COALESCE(excluded.{col_mina_pp}, {table_songs_branch_entry}.{col_mina_pp}),
+    {col_ppp_sr} = COALESCE(excluded.{col_ppp_sr}, {table_songs_branch_entry}.{col_ppp_sr}),
+    {col_ppp_pp} = COALESCE(excluded.{col_ppp_pp}, {table_songs_branch_entry}.{col_ppp_pp});
 ";
 
                 var idParam = insert.CreateParameter();
@@ -1159,6 +1251,26 @@ ON CONFLICT({col_beatmap_id}) DO UPDATE SET
                 ppParam.ParameterName = "$pp";
                 insert.Parameters.Add(ppParam);
 
+                var officialSrParam = insert.CreateParameter();
+                officialSrParam.ParameterName = "$official_sr";
+                insert.Parameters.Add(officialSrParam);
+
+                var minaSrParam = insert.CreateParameter();
+                minaSrParam.ParameterName = "$mina_sr";
+                insert.Parameters.Add(minaSrParam);
+
+                var minaPpParam = insert.CreateParameter();
+                minaPpParam.ParameterName = "$mina_pp";
+                insert.Parameters.Add(minaPpParam);
+
+                var pppSrParam = insert.CreateParameter();
+                pppSrParam.ParameterName = "$ppp_sr";
+                insert.Parameters.Add(pppSrParam);
+
+                var pppPpParam = insert.CreateParameter();
+                pppPpParam.ParameterName = "$ppp_pp";
+                insert.Parameters.Add(pppPpParam);
+
                 foreach (var row in rows)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -1166,9 +1278,16 @@ ON CONFLICT({col_beatmap_id}) DO UPDATE SET
                     hashParam.Value = row.BeatmapHash;
                     md5Param.Value = row.BeatmapMd5;
                     sunnySRParam.Value = row.SunnySR;
-                    ppParam.Value = row.Pp is double pp ? pp : DBNull.Value;
+                    ppParam.Value = valueOrNull(row.Pp);
+                    officialSrParam.Value = valueOrNull(row.OfficialSr);
+                    minaSrParam.Value = valueOrNull(row.MinaSr);
+                    minaPpParam.Value = valueOrNull(row.MinaPp);
+                    pppSrParam.Value = valueOrNull(row.PppSr);
+                    pppPpParam.Value = valueOrNull(row.PppPp);
                     insert.ExecuteNonQuery();
                 }
+
+                writeSkillRows(connection, transaction, skillRows, cancellationToken);
 
                 cancellationToken.ThrowIfCancellationRequested();
                 transaction.Commit();
@@ -1189,6 +1308,80 @@ ON CONFLICT({col_beatmap_id}) DO UPDATE SET
                     {
                     }
                 }
+            }
+        }
+
+        private static object valueOrNull(double? value) => value is double actual ? actual : DBNull.Value;
+
+        /// <summary>
+        /// Reads a nullable column, treating "absent" and "not computed" as the same answer.
+        /// </summary>
+        private static double? readNullableDouble(SqliteDataReader reader, int ordinal)
+            => reader.IsDBNull(ordinal) ? null : reader.GetDouble(ordinal);
+
+        /// <summary>
+        /// Replaces the axis rows of the systems whose result is not a scalar.
+        /// </summary>
+        /// <remarks>
+        /// Replaced rather than merged: a chart's axis set is the complete answer of one compute, so a row left from an
+        /// earlier set (an axis the system no longer produces) would be read as a current axis of the chart.
+        /// </remarks>
+        private static void writeSkillRows(SqliteConnection connection, SqliteTransaction transaction,
+                                           IEnumerable<SongsBranchSkillRow> skillRows, CancellationToken cancellationToken)
+        {
+            using var delete = connection.CreateCommand();
+            delete.Transaction = transaction;
+            delete.CommandText = $"DELETE FROM {table_songs_branch_skill};";
+            delete.ExecuteNonQuery();
+
+            using var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = $@"
+INSERT OR REPLACE INTO {table_songs_branch_skill}(
+    {col_skill_beatmap_id},
+    {col_skill_system_id},
+    {col_skill_ruleset_online_id},
+    {col_skill_skill_id},
+    {col_skill_value},
+    {col_skill_algorithm_version}
+)
+VALUES($id, $system, $ruleset, $skill, $value, $version);
+";
+
+            var idParam = insert.CreateParameter();
+            idParam.ParameterName = "$id";
+            insert.Parameters.Add(idParam);
+
+            var systemParam = insert.CreateParameter();
+            systemParam.ParameterName = "$system";
+            insert.Parameters.Add(systemParam);
+
+            var rulesetParam = insert.CreateParameter();
+            rulesetParam.ParameterName = "$ruleset";
+            insert.Parameters.Add(rulesetParam);
+
+            var skillParam = insert.CreateParameter();
+            skillParam.ParameterName = "$skill";
+            insert.Parameters.Add(skillParam);
+
+            var valueParam = insert.CreateParameter();
+            valueParam.ParameterName = "$value";
+            insert.Parameters.Add(valueParam);
+
+            var versionParam = insert.CreateParameter();
+            versionParam.ParameterName = "$version";
+            insert.Parameters.Add(versionParam);
+
+            foreach (var row in skillRows)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                idParam.Value = row.BeatmapId.ToString();
+                systemParam.Value = row.SystemId;
+                rulesetParam.Value = row.RulesetOnlineId;
+                skillParam.Value = row.SkillId;
+                valueParam.Value = row.Value;
+                versionParam.Value = row.AlgorithmVersion;
+                insert.ExecuteNonQuery();
             }
         }
 
@@ -1793,7 +1986,8 @@ WHERE {col_beatmap_md5} IN ({Join(", ", parameterNames)});
 
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = $@"
-SELECT {col_beatmap_id}, {col_beatmap_hash}, {col_beatmap_md5}, {col_sunny_sr}, {col_pp}
+SELECT {col_beatmap_id}, {col_beatmap_hash}, {col_beatmap_md5}, {col_sunny_sr}, {col_pp},
+       {col_official_sr}, {col_mina_sr}, {col_mina_pp}, {col_ppp_sr}, {col_ppp_pp}
 FROM {table_songs_branch_entry};";
 
                 var rows = new List<SongsBranchRow>();
@@ -1810,7 +2004,12 @@ FROM {table_songs_branch_entry};";
                         reader.GetString(1),
                         reader.GetString(2),
                         reader.IsDBNull(3) ? 0 : reader.GetDouble(3),
-                        reader.IsDBNull(4) ? null : reader.GetDouble(4)));
+                        readNullableDouble(reader, 4),
+                        readNullableDouble(reader, 5),
+                        readNullableDouble(reader, 6),
+                        readNullableDouble(reader, 7),
+                        readNullableDouble(reader, 8),
+                        readNullableDouble(reader, 9)));
                 }
 
                 return rows;
@@ -2475,13 +2674,18 @@ FROM {legacy_table_sunny_sr_branch};
                 }
             }
 
-            if (songsBranchEntryTableExists(connection, table_songs_branch_entry)
-                && !songsBranchEntryColumnExists(connection, table_songs_branch_entry, col_pp))
+            if (songsBranchEntryTableExists(connection, table_songs_branch_entry))
             {
-                using var addPp = connection.CreateCommand();
-                addPp.Transaction = transaction;
-                addPp.CommandText = $"ALTER TABLE {table_songs_branch_entry} ADD COLUMN {col_pp} REAL NULL;";
-                addPp.ExecuteNonQuery();
+                foreach (string column in new[] { col_pp, col_official_sr, col_mina_sr, col_mina_pp, col_ppp_sr, col_ppp_pp })
+                {
+                    if (songsBranchEntryColumnExists(connection, table_songs_branch_entry, column))
+                        continue;
+
+                    using var addColumn = connection.CreateCommand();
+                    addColumn.Transaction = transaction;
+                    addColumn.CommandText = $"ALTER TABLE {table_songs_branch_entry} ADD COLUMN {column} REAL NULL;";
+                    addColumn.ExecuteNonQuery();
+                }
             }
 
             using (var ensureHidden = connection.CreateCommand())
@@ -2495,6 +2699,19 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_hidden_preexisting} (
 CREATE TABLE IF NOT EXISTS {table_songs_branch_source_collection} (
     {col_beatmap_md5} TEXT PRIMARY KEY
 );
+
+CREATE TABLE IF NOT EXISTS {table_songs_branch_skill} (
+    {col_skill_beatmap_id} TEXT NOT NULL,
+    {col_skill_system_id} TEXT NOT NULL,
+    {col_skill_ruleset_online_id} INTEGER NOT NULL,
+    {col_skill_skill_id} TEXT NOT NULL,
+    {col_skill_value} REAL NOT NULL,
+    {col_skill_algorithm_version} INTEGER NOT NULL,
+    PRIMARY KEY ({col_skill_beatmap_id}, {col_skill_system_id}, {col_skill_ruleset_online_id}, {col_skill_skill_id})
+);
+
+CREATE INDEX IF NOT EXISTS idx_songs_branch_skill_system
+    ON {table_songs_branch_skill}({col_skill_system_id}, {col_skill_ruleset_online_id});
 ";
                 ensureHidden.ExecuteNonQuery();
             }

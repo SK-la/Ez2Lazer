@@ -466,7 +466,7 @@ namespace osu.Game
             // EzAnalysisPersistentStore.Enabled = ezAnalysisSqliteEnabled.Value;
 
             ezAnalysisPersistentStore = new EzAnalysisPersistentStore(Storage);
-            var ezAnalysisDatabase = new EzAnalysisDatabase(ezAnalysisPersistentStore, BeatmapManager, RulesetStore, Ez2ConfigManager);
+            var ezAnalysisDatabase = new EzAnalysisDatabase(ezAnalysisPersistentStore, BeatmapManager, RulesetStore, Ez2ConfigManager, realm);
             dependencies.Cache(ezAnalysisPersistentStore);
             dependencies.Cache(ezAnalysisDatabase);
 
