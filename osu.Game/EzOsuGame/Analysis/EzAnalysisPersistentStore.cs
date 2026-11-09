@@ -1507,6 +1507,102 @@ VALUES($id, $system, $ruleset, $skill, $value, $text, $version);
             }
         }
 
+        /// <summary>
+        /// Retires one branch's computed columns for the systems named, and stamps them with the revision they are
+        /// about to be recomputed at.
+        /// </summary>
+        /// <remarks>
+        /// Same contract as the Realm side: clearing the value is what makes "not computed" observable per row, and
+        /// stamping the revision in the same step is what lets an interrupted pass resume on the rows still empty
+        /// instead of retiring the whole branch again. <c>-1</c> is the empty value, matching the Realm columns.
+        /// </remarks>
+        public bool RetireSongsBranchComputedValues(string databasePath, bool sunnySR, int sunnySRVersion, bool pp, int ppVersion)
+        {
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath) || (!sunnySR && !pp))
+                return false;
+
+            try
+            {
+                using var connection = openConnection(databasePath);
+
+                if (!prepareSongsBranchConnection(connection))
+                    return false;
+
+                using var transaction = connection.BeginTransaction();
+
+                if (sunnySR)
+                {
+                    using var retireSunnySR = connection.CreateCommand();
+                    retireSunnySR.Transaction = transaction;
+                    retireSunnySR.CommandText = $"UPDATE {table_songs_branch_entry} SET {col_sunny_sr} = -1 WHERE {col_sunny_sr} <> -1;";
+                    retireSunnySR.ExecuteNonQuery();
+                }
+
+                if (pp)
+                {
+                    using var retirePp = connection.CreateCommand();
+                    retirePp.Transaction = transaction;
+                    retirePp.CommandText = $"UPDATE {table_songs_branch_entry} SET {col_pp} = -1 WHERE {col_pp} IS NOT -1;";
+                    retirePp.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+
+                if (sunnySR && sunnySRVersion > 0)
+                    setMeta(connection, meta_key_sunny_sr_version, sunnySRVersion.ToString(CultureInfo.InvariantCulture));
+
+                if (pp && ppVersion > 0)
+                    setMeta(connection, meta_key_pp_version, ppVersion.ToString(CultureInfo.InvariantCulture));
+
+                return true;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore RetireSongsBranchComputedValues failed.", Ez2ConfigManager.LOGGER_NAME);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Whether a branch still holds retired values for either computed system - work a previous pass did not finish.
+        /// </summary>
+        public bool SongsBranchHasPendingComputedValues(string databasePath, out bool sunnySR, out bool pp)
+        {
+            sunnySR = false;
+            pp = false;
+
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+                return false;
+
+            try
+            {
+                using var connection = openConnection(databasePath);
+
+                if (!prepareSongsBranchConnection(connection))
+                    return false;
+
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = $@"
+SELECT EXISTS(SELECT 1 FROM {table_songs_branch_entry} WHERE {col_sunny_sr} < 0),
+       EXISTS(SELECT 1 FROM {table_songs_branch_entry} WHERE {col_pp} < 0);";
+
+                using var reader = cmd.ExecuteReader();
+
+                if (!reader.Read())
+                    return false;
+
+                sunnySR = reader.GetInt64(0) != 0;
+                pp = reader.GetInt64(1) != 0;
+
+                return sunnySR || pp;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore SongsBranchHasPendingComputedValues failed.", Ez2ConfigManager.LOGGER_NAME);
+                return false;
+            }
+        }
+
         public IReadOnlyDictionary<Guid, double> GetSongsBranchValues(string databasePath, IEnumerable<BeatmapInfo> beatmaps)
         {
             if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
@@ -1567,7 +1663,14 @@ WHERE beatmap_id IN ({Join(", ", parameterNames)});
                         if (!IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
                             continue;
 
-                        resolvedValues[beatmapId] = reader.IsDBNull(3) ? 0 : reader.GetDouble(3);
+                        // A retired value (-1) is not a rating; a reader that saw it would treat the chart as rated.
+                        if (reader.IsDBNull(3))
+                            continue;
+
+                        double storedSunnySR = reader.GetDouble(3);
+
+                        if (storedSunnySR >= 0)
+                            resolvedValues[beatmapId] = storedSunnySR;
                     }
                 }
 
@@ -1640,8 +1743,14 @@ WHERE beatmap_id IN ({Join(", ", parameterNames)});
                         if (!IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
                             continue;
 
-                        if (!reader.IsDBNull(3))
-                            resolvedValues[beatmapId] = reader.GetDouble(3);
+                        // A retired value (-1) is not a pp; it means the row still owes a recompute.
+                        if (reader.IsDBNull(3))
+                            continue;
+
+                        double storedPp = reader.GetDouble(3);
+
+                        if (storedPp >= 0)
+                            resolvedValues[beatmapId] = storedPp;
                     }
                 }
 

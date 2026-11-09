@@ -60,13 +60,18 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private readonly record struct ActiveSongsBranchState(string DatabasePath, string DisplayName, int RulesetOnlineId, string ModsFingerprint);
 
+        /// <summary>Rows written per batch during a branch refresh, so an interrupted run keeps its progress.</summary>
+        private const int songs_branch_refresh_chunk = 200;
+
         public readonly record struct SongsBranchRefreshPlan(
             EzAnalysisPersistentStore.SongsBranchDescriptor Branch,
             bool RefreshSunnySR,
             bool RefreshPp,
             int CurrentSunnySRVersion,
             int CurrentPpVersion,
-            bool RefreshMirrored = false);
+            bool RefreshMirrored = false,
+            bool RetireSunnySR = false,
+            bool RetirePp = false);
 
         public readonly record struct SongsBranchBuildResult(
             bool Success,
@@ -816,6 +821,18 @@ namespace osu.Game.EzOsuGame.Analysis
                 bool refreshPp = supportsPp && persistentStore.SongsBranchNeedsPpRefresh(storedPpVersion, currentPpVersion);
                 bool refreshMirrored = needsMirrorRefresh(branch.DatabasePath);
 
+                // A pass that was interrupted left the revision stamped and the values retired, so "still empty" is
+                // the only signal that work remains. Without it the branch would stay at -1 until something moved
+                // its revision again.
+                bool retireSunnySR = refreshSunnySR;
+                bool retirePp = refreshPp;
+
+                if (persistentStore.SongsBranchHasPendingComputedValues(branch.DatabasePath, out bool pendingSunnySR, out bool pendingPp))
+                {
+                    refreshSunnySR |= supportsSunnySR && pendingSunnySR;
+                    refreshPp |= supportsPp && pendingPp;
+                }
+
                 if (refreshSunnySR|| refreshPp || refreshMirrored)
                 {
                     plans.Add(new SongsBranchRefreshPlan(
@@ -824,7 +841,9 @@ namespace osu.Game.EzOsuGame.Analysis
                         refreshPp,
                         supportsSunnySR ? currentSunnySRVersion : 0,
                         supportsPp ? currentPpVersion : 0,
-                        refreshMirrored));
+                        refreshMirrored,
+                        retireSunnySR,
+                        retirePp));
                 }
             }
 
@@ -860,7 +879,9 @@ namespace osu.Game.EzOsuGame.Analysis
                     RefreshSunnySR: supportsSunnySR,
                     RefreshPp: supportsPp,
                     CurrentSunnySRVersion: supportsSunnySR ? currentSunnySRVersion : 0,
-                    CurrentPpVersion: supportsPp ? currentPpVersion : 0));
+                    CurrentPpVersion: supportsPp ? currentPpVersion : 0,
+                    RetireSunnySR: supportsSunnySR,
+                    RetirePp: supportsPp));
             }
 
             return plans;
@@ -890,6 +911,18 @@ namespace osu.Game.EzOsuGame.Analysis
                     return;
                 }
 
+                // Retire before computing: the revision is stamped here, and the values go to -1, so "still -1" is
+                // the work list. A pass that is interrupted keeps both its stamp and the rows it finished.
+                if (plan.RetireSunnySR || plan.RetirePp)
+                {
+                    persistentStore.RetireSongsBranchComputedValues(
+                        plan.Branch.DatabasePath,
+                        plan.RetireSunnySR,
+                        plan.CurrentSunnySRVersion,
+                        plan.RetirePp,
+                        plan.CurrentPpVersion);
+                }
+
                 // The mirrored columns are a projection of Realm, so refreshing them is a re-read rather than a compute.
                 // It is a separate question from the two computed columns above and is planned separately.
                 var mirroredRatings = plan.RefreshMirrored ? loadStoredRatings(chartsOf(storedRows)) : null;
@@ -897,7 +930,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 var beatmapLookup = buildLocalBeatmapLookup();
                 var mods = restoreModsFromJson(localRulesetInfo, plan.Branch.Metadata.ModsJson);
-                var updatedRows = new List<EzAnalysisPersistentStore.SongsBranchRow>(storedRows.Count);
+                var pendingWrites = new List<EzAnalysisPersistentStore.SongsBranchRow>(songs_branch_refresh_chunk);
                 long lastProgressReportAt = Environment.TickCount64;
 
                 for (int i = 0; i < storedRows.Count; i++)
@@ -905,24 +938,32 @@ namespace osu.Game.EzOsuGame.Analysis
                     cancellationToken.ThrowIfCancellationRequested();
 
                     var storedRow = storedRows[i];
+
+                    // Retired rows are the work list; everything else already answers the current revision.
+                    bool needsSunny = plan.RefreshSunnySR && storedRow.SunnySR < 0;
+                    bool needsPp = plan.RefreshPp && storedRow.Pp is < 0;
+
                     double sunnySR = storedRow.SunnySR;
                     double? pp = storedRow.Pp;
                     var mirrored = mirroredRatings != null ? ratingsOf(mirroredRatings, storedRow.BeatmapId) : default;
 
-                    if (beatmapLookup.TryGetValue(storedRow.BeatmapId, out var beatmap)
+                    if ((needsSunny || needsPp)
+                        && beatmapLookup.TryGetValue(storedRow.BeatmapId, out var beatmap)
                         && string.Equals(beatmap.Hash, storedRow.BeatmapHash, StringComparison.Ordinal))
                     {
                         try
                         {
                             var lookup = new EzAnalysisLookupCache(beatmap, localRulesetInfo, mods);
 
-                            if (plan.RefreshSunnySR
+                            // A chart that fails keeps its retired value, so the next refresh retries it instead of
+                            // reading as done.
+                            if (needsSunny
                                 && EzAnalysisComputation.TryComputeSunnySR(beatmapManager, lookup, cancellationToken, out double computedSunnySR))
                             {
                                 sunnySR = computedSunnySR;
                             }
 
-                            if (plan.RefreshPp
+                            if (needsPp
                                 && EzAnalysisComputation.TryComputePerformancePoints(beatmapManager, lookup, cancellationToken, out double computedPp))
                             {
                                 pp = computedPp;
@@ -946,12 +987,30 @@ namespace osu.Game.EzOsuGame.Analysis
                         }
                     }
 
-                    updatedRows.Add(new EzAnalysisPersistentStore.SongsBranchRow(storedRow.BeatmapId, storedRow.BeatmapHash, storedRow.BeatmapMd5, sunnySR, pp,
+                    pendingWrites.Add(new EzAnalysisPersistentStore.SongsBranchRow(storedRow.BeatmapId, storedRow.BeatmapHash, storedRow.BeatmapMd5, sunnySR, pp,
                         mirrored.OfficialSr, mirrored.MinaSr, mirrored.MinaPp, mirrored.PppSr, mirrored.PppPp));
+
+                    bool isLast = i + 1 == storedRows.Count;
+
+                    // Written in chunks so an interrupted pass keeps what it finished; the revision is already stamped,
+                    // so the rows still holding -1 are exactly the remaining work.
+                    if (isLast || pendingWrites.Count >= songs_branch_refresh_chunk)
+                    {
+                        persistentStore.UpdateSongsBranchRows(
+                            plan.Branch.DatabasePath,
+                            pendingWrites,
+                            null,
+                            null,
+                            isLast && plan.RefreshMirrored ? mirroredSkills : null,
+                            isLast && plan.RefreshMirrored ? mirroredVersionsOfPlan() : null,
+                            writeMirrored: plan.RefreshMirrored);
+
+                        pendingWrites.Clear();
+                    }
 
                     long now = Environment.TickCount64;
 
-                    if (i == 0 || i + 1 == storedRows.Count || now - lastProgressReportAt >= 100)
+                    if (i == 0 || isLast || now - lastProgressReportAt >= 100)
                     {
                         lastProgressReportAt = now;
                         progress?.Invoke(i + 1, storedRows.Count);
@@ -959,15 +1018,6 @@ namespace osu.Game.EzOsuGame.Analysis
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
-
-                persistentStore.UpdateSongsBranchRows(
-                    plan.Branch.DatabasePath,
-                    updatedRows,
-                    plan.RefreshSunnySR ? plan.CurrentSunnySRVersion : null,
-                    plan.RefreshPp ? plan.CurrentPpVersion : null,
-                    plan.RefreshMirrored ? mirroredSkills : null,
-                    plan.RefreshMirrored ? mirroredVersionsOfPlan() : null,
-                    writeMirrored: plan.RefreshMirrored);
 
                 persistentStore.ClearSongsBranchPostMigrationRefresh(plan.Branch.DatabasePath);
 
