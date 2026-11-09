@@ -12,8 +12,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
 {
     /// <summary>
     /// Progress notification shared by every entry point that runs <see cref="EzLocalProfileService.ComputeAsync"/>
-    /// (the settings dialog and the startup reconcile), so a long analysis reports itself identically wherever it
-    /// was started from — the user should never have to guess whether data is being recomputed.
+    /// (the experimental settings dialog today), so a long analysis reports itself identically wherever the user
+    /// started it — there is no automatic reconcile on startup.
     /// </summary>
     public static class EzLocalProfileComputeNotification
     {
@@ -63,7 +63,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 bool finished = processed >= total;
 
                 if (!phaseChanged && !finished
-                    && !(basisPoints / 100 != lastBasisPoints / 100 && sinceLastReport.ElapsedMilliseconds >= min_report_interval_ms))
+                                  && !(basisPoints / 100 != lastBasisPoints / 100 && sinceLastReport.ElapsedMilliseconds >= min_report_interval_ms))
                     return;
 
                 lastPhase = value.Phase;

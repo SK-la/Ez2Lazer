@@ -220,7 +220,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             foreach (string hash in hashSet)
             {
-                if (chartSkillTagsSessionCache.TryGetValue(hash, out var tags))
+                if (chartSkillTagsSessionCache.TryGetValue(hash, out string[]? tags))
                     result[hash] = tags;
             }
 
@@ -459,17 +459,17 @@ namespace osu.Game.EzOsuGame.Skills
             }
 
             /// <summary>
-            /// Players whose stored rows are flagged as trailing the SQLite slice. The startup reconcile reads this to
-            /// decide whose skills to re-derive, and it is the manual compute's default scope.
+            /// Players whose stored rows trail the drill ledger or a superseded <c>algorithm_version</c>. The settings
+            /// status readout and a manual local-profile compute consult this list; nothing re-derives player skills on
+            /// startup.
             /// </summary>
             public IReadOnlyList<string> StaleUsernames => provider.PlayerStore.GetStalePlayerSkillUsernames();
 
             /// <summary>
-            /// Set or clear the stale flag for one player without changing any value. Setting it happens when a
-            /// settled play was folded into the SQLite slice (or skipped awaiting the chart chain) and these rows have
-            /// not been recomputed since; clearing it is the pass that covered that player saying so.
+            /// Clears session memo after ingest; persisted staleness is derived only from the ledger and algorithm
+            /// revision — this does not write a stale bit to SQLite (see <see cref="EzPlayerSkillStore.SetPlayerSkillStale"/>).
             /// </summary>
-            /// <returns>Number of rows whose flag changed.</returns>
+            /// <returns>Always zero; retained for call-site symmetry.</returns>
             public int SetStale(string username, bool stale)
             {
                 if (string.IsNullOrWhiteSpace(username))

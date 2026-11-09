@@ -52,6 +52,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private Container loadingHost = null!;
         private EzLocalProfileInsights? insights;
         private CancellationTokenSource? rebuildCts;
+        private int rebuildGeneration;
 
         [Resolved]
         private EzLocalProfileService profileService { get; set; } = null!;
@@ -124,23 +125,53 @@ namespace osu.Game.EzOsuGame.LocalProfile
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            rebuild();
+            Schedule(rebuild);
         }
 
         protected override void Dispose(bool isDisposing)
         {
-            rebuildCts?.Cancel();
-            rebuildCts?.Dispose();
+            rebuildGeneration++;
+            endRebuildCts(rebuildCts);
             rebuildCts = null;
             base.Dispose(isDisposing);
         }
 
+        private static void endRebuildCts(CancellationTokenSource? cts)
+        {
+            if (cts == null)
+                return;
+
+            try
+            {
+                cts.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            try
+            {
+                cts.Dispose();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
+
         private void rebuild()
         {
-            rebuildCts?.Cancel();
-            rebuildCts?.Dispose();
-            rebuildCts = new CancellationTokenSource();
-            var token = rebuildCts.Token;
+            try
+            {
+                rebuildCts?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                rebuildCts = null;
+            }
+
+            var localCts = rebuildCts = new CancellationTokenSource();
+            var token = localCts.Token;
+            int generation = ++rebuildGeneration;
 
             summaryFlow.Clear();
             detailContainer.Clear();
@@ -167,23 +198,39 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 var calculated = EzLocalProfileInsightsCalculator.Calculate(plays);
                 localProfileService.SetCachedInsights(localUsername, calculated);
                 return calculated;
-            }, token).ContinueWith(task => Schedule(() =>
+            }, token).ContinueWith(task =>
             {
-                if (token.IsCancellationRequested || task.IsCanceled)
-                    return;
-
-                loadingHost.Hide();
-
-                if (task.IsFaulted)
+                try
                 {
-                    emptyHint.Text = EzSettingsProfile.LOCAL_PROFILE_INSIGHTS_EMPTY;
-                    emptyHint.Show();
-                    return;
-                }
+                    Schedule(() =>
+                    {
+                        if (!IsLoaded || generation != rebuildGeneration)
+                            return;
 
-                insights = task.GetResultSafely();
-                applyInsightsUi(insights);
-            }), token);
+                        loadingHost.Hide();
+
+                        if (task.IsCanceled)
+                            return;
+
+                        if (task.IsFaulted)
+                        {
+                            emptyHint.Text = EzSettingsProfile.LOCAL_PROFILE_INSIGHTS_EMPTY;
+                            emptyHint.Show();
+                            return;
+                        }
+
+                        insights = task.GetResultSafely();
+                        applyInsightsUi(insights);
+                    });
+                }
+                finally
+                {
+                    if (ReferenceEquals(rebuildCts, localCts))
+                        rebuildCts = null;
+
+                    localCts.Dispose();
+                }
+            }, TaskScheduler.Default);
         }
 
         private void applyInsightsUi(EzLocalProfileInsights insights)

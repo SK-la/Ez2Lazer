@@ -1742,7 +1742,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 cmd.Parameters["$mapper_username"].Value = row.MapperUsername;
                 cmd.Parameters["$beatmap_status"].Value = (int)row.BeatmapStatus;
                 cmd.Parameters["$star_rating"].Value = row.StarRating;
-                cmd.Parameters["$ssr_star_rating"].Value = row.SunnyStarRating;
+                cmd.Parameters["$ssr_star_rating"].Value = normalizeStoredSunnyStar(row.SunnyStarRating);
                 cmd.Parameters["$map_performance_points"].Value = row.MapPerformancePoints;
                 cmd.Parameters["$kps_avg"].Value = row.KpsAvg;
                 cmd.Parameters["$kps_max"].Value = row.KpsMax;
@@ -2227,6 +2227,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
             ensureColumn(connection, "username_partitions", "excluded", "INTEGER NOT NULL DEFAULT 0");
             ensureColumn(connection, "dan_clear_evidence", "algorithm_version", "INTEGER NOT NULL DEFAULT 1");
             ensureColumn(connection, "axis_play_evidence", "algorithm_version", "INTEGER NOT NULL DEFAULT 1");
+            ensureColumn(connection, "drill_scores", "ssr_star_rating", "REAL NOT NULL DEFAULT -1");
+            ensureColumn(connection, "drill_scores", "map_performance_points", "REAL NOT NULL DEFAULT 0");
+            reconcileLegacyDrillSunnyStarColumn(connection);
             ensureColumn(connection, "drill_scores", "bpm", "REAL NOT NULL DEFAULT 0");
             ensureColumn(connection, "drill_scores", "key_count", "INTEGER NOT NULL DEFAULT 0");
             ensureColumn(connection, "drill_scores", "is_convert", "INTEGER NOT NULL DEFAULT 0");
@@ -2278,6 +2281,59 @@ namespace osu.Game.EzOsuGame.LocalProfile
             alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {typeSql};";
             alter.ExecuteNonQuery();
         }
+
+        /// <summary>
+        /// Older builds named the Sunny column <c>xxy_star_rating</c>. Leaving it alongside <c>ssr_star_rating</c>
+        /// breaks inserts because the legacy column stays NOT NULL without a default.
+        /// </summary>
+        private static void reconcileLegacyDrillSunnyStarColumn(SqliteConnection connection)
+        {
+            var columns = drillScoreColumnNames(connection);
+            bool hasXxy = columns.Contains("xxy_star_rating");
+            bool hasSsr = columns.Contains("ssr_star_rating");
+
+            if (!hasXxy)
+                return;
+
+            if (!hasSsr)
+            {
+                using var rename = connection.CreateCommand();
+                rename.CommandText = "ALTER TABLE drill_scores RENAME COLUMN xxy_star_rating TO ssr_star_rating;";
+                rename.ExecuteNonQuery();
+                return;
+            }
+
+            using (var copy = connection.CreateCommand())
+            {
+                copy.CommandText = """
+                                   UPDATE drill_scores
+                                   SET ssr_star_rating = xxy_star_rating
+                                   WHERE ssr_star_rating < 0 AND xxy_star_rating >= 0;
+                                   """;
+                copy.ExecuteNonQuery();
+            }
+
+            using var drop = connection.CreateCommand();
+            drop.CommandText = "ALTER TABLE drill_scores DROP COLUMN xxy_star_rating;";
+            drop.ExecuteNonQuery();
+        }
+
+        private static HashSet<string> drillScoreColumnNames(SqliteConnection connection)
+        {
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "PRAGMA table_info(drill_scores);";
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+                names.Add(reader.GetString(1));
+
+            return names;
+        }
+
+        private static double normalizeStoredSunnyStar(double sunnyStarRating)
+            => double.IsFinite(sunnyStarRating) && sunnyStarRating >= 0 ? sunnyStarRating : -1;
 
         private static void recreateManiaColumnTable(SqliteConnection connection)
         {

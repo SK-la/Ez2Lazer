@@ -238,11 +238,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// <param name="progress">Optional progress reporter for UI notifications.</param>
         /// <param name="cancellationToken">Cancels in-flight aggregation; progress flushed so far is kept.</param>
         /// <param name="skillsUsernames">
-        /// Players whose Realm-side skill rows additionally need re-deriving, e.g. the ones a caller found flagged
-        /// stale. Players with no new plays and no flag are skipped — unless <paramref name="clearRebuild"/> is set,
-        /// which discards the per-play caches and therefore forces a full re-derive. When omitted, the persisted
-        /// stale flag is used as the fallback scope, so a bare compute still refreshes exactly the rows a settled
-        /// play left trailing its slice.
+        /// Players whose SQLite <c>player_skill_*</c> rows additionally need re-deriving. When omitted on a manual
+        /// compute, <see cref="EzPlayerSkillStore.GetStalePlayerSkillUsernames"/> and chart-chain debt extend the scope
+        /// — there is no startup auto-pass and no stored stale bit. Players with no new plays and not derived-stale are
+        /// skipped unless <paramref name="clearRebuild"/> forces a full re-derive.
         /// </param>
         public Task ComputeAsync(
             IReadOnlyCollection<string> usernamesToRecompute,
@@ -311,13 +310,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                     }
                                     else
                                     {
-                                        // No caller-supplied scope (the manual compute): cover both reasons a player's
-                                        // Realm rows can be behind. A settled play is folded into the SQLite slice by
-                                        // the ingest path, so the ledger diff cannot tell that player apart from one with
-                                        // nothing to do — the flag is the only record that their rows trail the slice.
-                                        // Plays the chain has not rated yet are the other reason: the skills pass skips
-                                        // them, so re-deriving that player is what folds them in once the chain is done.
-                                        // Without both, a manual compute would leave the readout reporting work for good.
+                                        // Manual compute: include every username the status readout would list as behind
+                                        // (derived staleness — ledger vs analyzed_plays, or superseded algorithm_version)
+                                        // plus players waiting on the chart chain. Nothing here runs at startup.
                                         IReadOnlyList<string> stale = skillProvider?.PlayerSkills.StaleUsernames ?? Array.Empty<string>();
 
                                         foreach (string staleUsername in stale)
@@ -442,9 +437,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// no polling and no process-level watcher.
         /// </summary>
         /// <remarks>
-        /// Only the SQLite slice is written here (drill row + partition + archive totals); the player's Realm skill
-        /// rows are flagged stale rather than recomputed, so the hot path stays proportional to one score and the
-        /// startup warmup does the expensive skill aggregation. The call is fire-and-forget and idempotent: the drill
+        /// Only the SQLite slice is written here (drill row + partition + archive totals). Player skill rows in the
+        /// same file are not updated; staleness is derived later from the ledger. The call is fire-and-forget and
+        /// idempotent: the drill
         /// table is the ledger, and a play whose online id was already pulled as a contribution retires that row first
         /// so the two cannot both be counted. Replays the same id are a no-op.
         /// <para>
@@ -517,7 +512,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         return false;
                 }
 
-                // The Realm-side skill rows now trail the SQLite slice: flag them and let the startup warmup refresh.
+                // Invalidate in-memory skill UI memo; persisted rows go stale only via ledger diff (no auto recompute).
                 skillProvider?.PlayerSkills.SetStale(username, true);
                 skillProvider?.PlayerSkills.SetStale(EzLocalProfileConstants.ALL_PLAYERS, true);
 
@@ -530,8 +525,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         /// <summary>
         /// Fire-and-forget form of <see cref="IngestSettledScoreAsync"/> for the gameplay import path: it never blocks
-        /// the caller and never faults at it. A failure is harmless — the score stays unanalysed and the startup
-        /// backfill picks it up from the drill ledger.
+        /// the caller and never faults at it. A failure is harmless — the score stays unanalysed until the user runs a
+        /// manual local-profile compute.
         /// </summary>
         public void IngestSettledScore(Guid scoreId)
         {
