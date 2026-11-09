@@ -543,7 +543,9 @@ namespace osu.Game.Database
                         Logger.Log("Startup Ez Realm metadata backfill deferred: another backfill is running; it will run again when that one finishes.");
                     }
 
-                    populateMissingStarRatings();
+                    // The backfill above fills the official pair when Official is in its scope. This call covers the
+                    // case where it was not (a deferred or narrower pass), and is a query-only no-op otherwise.
+                    populateOfficialBaselines();
                     populateMissingMultiSystemBaselines();
                     processOnlineBeatmapSetsWithNoUpdate();
                     // Note that the previous method will also update these on a fresh run.
@@ -646,7 +648,7 @@ namespace osu.Game.Database
             }
 
             if (scope.HasFlag(EzAnalysisSystem.Official))
-                populateMissingPerformancePoints();
+                populateOfficialBaselines();
 
             if (scope.HasFlag(EzAnalysisSystem.MetadataTags))
                 populateMissingBeatmapTagFlags();
@@ -802,91 +804,9 @@ namespace osu.Game.Database
 
         private void forceEzRealmMetadataRecalculation() => clearEzRealmMetadata(EzAnalysisSystem.All);
 
-        /// <remarks>
-        /// This is split out from <see cref="processOnlineBeatmapSetsWithNoUpdate"/> as a separate process to prevent high server-side load
-        /// from the <see cref="beatmapUpdater"/> firing online requests as part of the update.
-        /// Star rating recalculations can be ran strictly locally.
-        /// </remarks>
-        private void populateMissingStarRatings()
-        {
-            HashSet<Guid> beatmapIds = new HashSet<Guid>();
-
-            Logger.Log("Querying for beatmaps with missing star ratings...");
-
-            realmAccess.Run(r =>
-            {
-                foreach (var b in r.All<BeatmapInfo>().Where(b => b.StarRating < 0 && b.BeatmapSet != null))
-                    beatmapIds.Add(b.ID);
-            });
-
-            if (beatmapIds.Count == 0)
-                return;
-
-            Logger.Log($"Found {beatmapIds.Count} beatmaps which require star rating reprocessing.");
-
-            var notification = showProgressNotification(beatmapIds.Count, "Reprocessing star rating for beatmaps", "beatmaps' star ratings have been updated");
-
-            int processedCount = 0;
-            int failedCount = 0;
-
-            Dictionary<string, Ruleset> rulesetCache = new Dictionary<string, Ruleset>();
-
-            Ruleset getRuleset(RulesetInfo rulesetInfo)
-            {
-                if (!rulesetCache.TryGetValue(rulesetInfo.ShortName, out var ruleset))
-                    ruleset = rulesetCache[rulesetInfo.ShortName] = rulesetInfo.CreateInstance();
-
-                return ruleset;
-            }
-
-            foreach (Guid id in beatmapIds)
-            {
-                if (notification?.State == ProgressNotificationState.Cancelled)
-                    break;
-
-                updateNotificationProgress(notification, processedCount, beatmapIds.Count);
-
-                sleepIfRequired();
-
-                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
-
-                if (beatmap == null)
-                {
-                    ++failedCount;
-                    continue;
-                }
-
-                try
-                {
-                    var working = beatmapManager.GetWorkingBeatmap(beatmap);
-                    var ruleset = getRuleset(working.BeatmapInfo.Ruleset);
-
-                    Debug.Assert(ruleset != null);
-
-                    var calculator = ruleset.CreateDifficultyCalculator(working);
-
-                    double starRating = calculator.Calculate().StarRating;
-                    realmAccess.Write(r =>
-                    {
-                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
-                            EzRatingWriter.WriteSR(liveBeatmapInfo, EzAnalysisSystem.Official, starRating);
-                    });
-                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
-                    ++processedCount;
-                }
-                catch (Exception e)
-                {
-                    Logger.Log($"Background processing failed on {beatmap}: {e}");
-                    ++failedCount;
-                }
-            }
-
-            completeNotification(notification, processedCount, beatmapIds.Count, failedCount);
-        }
-
         /// <summary>
         /// Incrementally backfill missing baseline SunnyStarRatings on <see cref="BeatmapInfo"/>.
-        /// Behaviour intentionally mirrors <see cref="populateMissingStarRatings"/>: beatmap-level query, beatmap-level compute and write.
+        /// Behaviour intentionally mirrors <see cref="populateOfficialBaselines"/>: beatmap-level query, beatmap-level compute and write.
         /// </summary>
         private void populateMissingSunnyStarRatings()
         {
@@ -1224,15 +1144,25 @@ namespace osu.Game.Database
             completeNotification(notification, processedCount, totalBeatmaps, failedCount);
         }
 
-        private void populateMissingPerformancePoints()
+        /// <summary>
+        /// Fills the official star and perfect-play pp of charts that are missing either half.
+        /// </summary>
+        /// <remarks>
+        /// Both halves come from one difficulty calculation, so they are produced and written together. That is also
+        /// what keeps them consistent: a chart holding a fresh star with a stale pp reads as a valid pair to every
+        /// consumer. Charts the SSR pass already filled (it computes the same official pair while rating) are not
+        /// selected here.
+        /// </remarks>
+        private void populateOfficialBaselines()
         {
             HashSet<Guid> beatmapIds = new HashSet<Guid>();
 
-            Logger.Log("Querying for beatmaps with missing baseline PP...");
+            Logger.Log("Querying for beatmaps with missing official star or baseline PP...");
 
             realmAccess.Run(r =>
             {
-                foreach (var b in r.All<BeatmapInfo>().Where(b => b.PerformancePoints < 0 && b.BeatmapSet != null))
+                foreach (var b in r.All<BeatmapInfo>()
+                                 .Where(b => b.BeatmapSet != null && (b.StarRating < 0 || b.PerformancePoints < 0)))
                 {
                     if (!b.Ruleset.Available)
                         continue;
@@ -1244,31 +1174,33 @@ namespace osu.Game.Database
             if (beatmapIds.Count == 0)
                 return;
 
-            Logger.Log($"Found {beatmapIds.Count} beatmaps which require PP reprocessing.");
+            Logger.Log($"Found {beatmapIds.Count} beatmaps which require official star and PP reprocessing.");
 
-            var notification = showProgressNotification(beatmapIds.Count, "Reprocessing baseline PP for beatmaps", "beatmaps' baseline PP has been updated");
+            var notification = showProgressNotification(beatmapIds.Count,
+                "Reprocessing official star and baseline PP for beatmaps",
+                "beatmaps' official star and baseline PP have been updated");
 
-            ChartBatchResult batch = runChartBatch(beatmapIds.ToList(), processPerformancePoints, notification);
+            ChartBatchResult batch = runChartBatch(beatmapIds.ToList(), processBaseline, notification);
 
             completeNotification(notification, batch.Processed, beatmapIds.Count, batch.Failed);
 
-            bool processPerformancePoints(Guid id)
+            bool processBaseline(Guid id)
             {
                 var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
 
                 if (beatmap == null)
                     return false;
 
-                var lookup = new EzAnalysisLookupCache(beatmap, beatmap.Ruleset, mods: null);
+                bool computed = EzAnalysisComputation.TryComputeOfficialBaseline(beatmapManager, beatmap, CancellationToken.None,
+                    out double starRating, out double performancePoints);
 
-                double performancePoints = EzAnalysisComputation.TryComputePerformancePoints(beatmapManager, lookup, CancellationToken.None, out double computedPp)
-                    ? computedPp
-                    : -1;
+                if (!computed)
+                    return false;
 
                 realmAccess.Write(r =>
                 {
                     if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
-                        liveBeatmapInfo.PerformancePoints = performancePoints;
+                        EzRatingWriter.Write(liveBeatmapInfo, EzAnalysisSystem.Official, starRating, performancePoints >= 0 ? performancePoints : null);
                 });
 
                 ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);

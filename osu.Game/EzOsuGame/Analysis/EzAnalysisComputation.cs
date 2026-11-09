@@ -187,6 +187,34 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
+        /// The official star and perfect-play pp for a chart, from one difficulty calculation.
+        /// </summary>
+        /// <remarks>
+        /// One pass, because both come from the same calculation: asking for them separately converted the chart, ran
+        /// the difficulty calculator and scored the performance twice for every chart in the library.
+        /// </remarks>
+        internal static bool TryComputeOfficialBaseline(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo, CancellationToken cancellationToken,
+                                                        out double starRating, out double performancePoints)
+        {
+            ArgumentNullException.ThrowIfNull(beatmapInfo);
+
+            starRating = -1;
+            performancePoints = -1;
+
+            var lookup = new EzAnalysisLookupCache(beatmapInfo, beatmapInfo.Ruleset, mods: null);
+            var playable = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(beatmapInfo));
+            IBeatmap analysisBeatmap = playable.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+
+            if (computeOfficial(playable, analysisBeatmap, lookup, cancellationToken) is not { } official)
+                return false;
+
+            starRating = official.StarRating;
+            performancePoints = official.PerformancePoints ?? -1;
+
+            return true;
+        }
+
+        /// <summary>
         /// Computes the baseline performance points implied by the stored Sunny star rating, for persisting to the
         /// Sunny pp slot. Returns -1 when the ruleset cannot express it.
         /// </summary>

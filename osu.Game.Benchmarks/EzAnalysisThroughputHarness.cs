@@ -148,12 +148,21 @@ namespace osu.Game.Benchmarks
                 GC.KeepAlive(computeOfficial(playable, ruleset, mods));
             };
 
+            // The merged official pass: one conversion and one difficulty calculation, which is both halves.
+            Action officialPassAction = () =>
+            {
+                IBeatmap playable = loadPlayable(rawBeatmap, rulesetInfo, mods);
+                DifficultyAttributes attributes = computeOfficial(playable, ruleset, mods);
+                GC.KeepAlive(computePp(playable, ruleset, mods, attributes));
+                GC.KeepAlive(attributes.StarRating);
+            };
+
             // Every action is warmed before anything is measured: tiered compilation promotes a method after enough
             // calls, and a row measured before its callees are promoted reads as a regression that is not there.
             Action[] allActions =
             {
                 decodeAction, loadAction, extractAction, starAction, starOnlyAction, difficultyAction, officialPpAction,
-                ssrPassAction, officialPpPassAction, officialStarPassAction, chainPassAction,
+                ssrPassAction, officialPpPassAction, officialStarPassAction, officialPassAction, chainPassAction,
             };
 
             for (int warmup = 0; warmup < 40; warmup++)
@@ -172,6 +181,7 @@ namespace osu.Game.Benchmarks
             Measurement ssrPassRow = measure("ssr_pass", iterations, ssrPassAction);
             Measurement officialPpPassRow = measure("official_pp_pass", iterations, officialPpPassAction);
             Measurement officialStarPassRow = measure("official_star_pass", iterations, officialStarPassAction);
+            Measurement officialPassRow = measure("official_pass", iterations, officialPassAction);
             Measurement chainPassRow = measure("chain_pass", iterations, chainPassAction);
 
             print(decodeRow);
@@ -184,15 +194,18 @@ namespace osu.Game.Benchmarks
             print(ssrPassRow);
             print(officialPpPassRow);
             print(officialStarPassRow);
+            print(officialPassRow);
             print(chainPassRow);
 
-            // Per chart, across every pass a first backfill runs. `ssr_pass` now also produces the official star and
-            // pp, which is why the official passes no longer have to touch the same chart.
-            Measurement before = add("backfill_before", officialStarPassRow, officialPpPassRow, ssrPassRow, chainPassRow);
-            Measurement after = add("backfill_after", ssrPassRow, chainPassRow);
+            // What an official difficulty version bump costs per chart: the star and the pp used to be two passes,
+            // each with its own conversion of the same chart, and are now one pass that produces both halves.
+            print(add("official_bump_before", officialStarPassRow, officialPpPassRow));
+            print(officialPassRow);
 
-            print(before);
-            print(after);
+            // A first backfill on a mania chart: the SSR pass already computes the same official pair while rating,
+            // so the official pass finds nothing left to do for it.
+            print(add("backfill_before", ssrPassRow, officialStarPassRow, officialPpPassRow, chainPassRow));
+            print(add("backfill_after", ssrPassRow, chainPassRow));
 
             Console.WriteLine();
 
