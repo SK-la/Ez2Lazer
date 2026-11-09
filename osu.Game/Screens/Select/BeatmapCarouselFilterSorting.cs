@@ -6,8 +6,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Screens.Select.Filter;
 using osu.Game.Utils;
@@ -21,14 +21,18 @@ namespace osu.Game.Screens.Select
         private readonly Func<FilterCriteria> getCriteria;
         private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync;
         private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getPpForOperationsAsync;
+        private readonly Func<IEnumerable<BeatmapInfo>, EzAnalysisSystem, string, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getSkillAxisForOperationsAsync;
 
         public BeatmapCarouselFilterSorting(Func<FilterCriteria> getCriteria,
                                             Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync,
-                                            Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>>? getPpForOperationsAsync = null)
+                                            Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>>? getPpForOperationsAsync = null,
+                                            Func<IEnumerable<BeatmapInfo>, EzAnalysisSystem, string, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>>? getSkillAxisForOperationsAsync = null)
         {
             this.getCriteria = getCriteria;
             this.getDifficultiesForOperationsAsync = getDifficultiesForOperationsAsync;
             this.getPpForOperationsAsync = getPpForOperationsAsync ?? ((_, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(new Dictionary<BeatmapInfo, double>()));
+            this.getSkillAxisForOperationsAsync = getSkillAxisForOperationsAsync
+                                                  ?? ((_, _, _, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(new Dictionary<BeatmapInfo, double>()));
         }
 
         public async Task<List<CarouselItem>> Run(IEnumerable<CarouselItem> items, CancellationToken cancellationToken)
@@ -39,23 +43,41 @@ namespace osu.Game.Screens.Select
             bool groupedSets = BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);
             bool usesDifficultyValues = criteria.Sort == SortMode.Difficulty;
             bool usePpValues = criteria.Sort == SortMode.PP;
+            bool useSkillAxisValues = criteria.Sort == SortMode.SkillAxis
+                                      && !string.IsNullOrEmpty(criteria.SkillAxisSortId)
+                                      && criteria.SkillAxisSortSystem != EzAnalysisSystem.None;
             bool useSortOperationValues = itemList.Count > 1
-                                          && (usesDifficultyValues || usePpValues);
+                                          && (usesDifficultyValues || usePpValues || useSkillAxisValues);
 
             IReadOnlyDictionary<BeatmapInfo, double>? operationSortValues = null;
 
             if (useSortOperationValues)
             {
                 var uniqueBeatmaps = itemList.Select(i => (BeatmapInfo)i.Model).Distinct().ToList();
-                operationSortValues = usePpValues
-                    ? await getPpForOperationsAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false)
-                    : await getDifficultiesForOperationsAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false);
+
+                if (useSkillAxisValues)
+                {
+                    operationSortValues = await getSkillAxisForOperationsAsync(
+                        uniqueBeatmaps,
+                        criteria.SkillAxisSortSystem,
+                        criteria.SkillAxisSortId!,
+                        cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    operationSortValues = usePpValues
+                        ? await getPpForOperationsAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false)
+                        : await getDifficultiesForOperationsAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false);
+                }
             }
 
             double getSortValue(BeatmapInfo beatmap)
             {
                 if (operationSortValues != null && operationSortValues.TryGetValue(beatmap, out double sortValue))
                     return sortValue;
+
+                if (criteria.Sort == SortMode.SkillAxis)
+                    return double.NegativeInfinity;
 
                 // Difficulty and PP are read from the analysis system this beatmap's ruleset is set to. The pair is
                 // read once so a beatmap cannot be sorted by one system's star next to another's pp.
@@ -120,6 +142,14 @@ namespace osu.Game.Screens.Select
                         comparison = compareUsingAggregateMax(a, b, getSortValue);
                     else
                         comparison = getSortValue(a).CompareTo(getSortValue(b));
+                    break;
+
+                case SortMode.SkillAxis:
+                    // Higher axis value first; missing charts (NegativeInfinity) sink to the end.
+                    if (aggregate)
+                        comparison = compareUsingAggregateMax(b, a, getSortValue);
+                    else
+                        comparison = getSortValue(b).CompareTo(getSortValue(a));
                     break;
 
                 case SortMode.DateAdded:

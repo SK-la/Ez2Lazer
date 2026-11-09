@@ -136,6 +136,14 @@ namespace osu.Game.Screens.Select
                     criteria.UserTags.Add(tagFilter);
                     return true;
 
+                case "skill":
+                case "pattern":
+                case "csi":
+                    var skillTagFilter = new FilterCriteria.OptionalTextFilter();
+                    TryUpdateCriteriaText(ref skillTagFilter, op, value);
+                    criteria.SkillTags.Add(skillTagFilter);
+                    return true;
+
                 case "video":
                     if (!tryParseBool(value, out bool hasVideo))
                         return false;

@@ -21,8 +21,11 @@ using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
@@ -55,11 +58,17 @@ namespace osu.Game.Screens.Select
         private ShearedToggleButton showConvertedBeatmapsButton = null!;
         private DifficultyRangeSlider difficultyRangeSlider = null!;
         private SortModeDropdown sortDropdown = null!; // Ez功能
+        private SkillAxisDropdown sortAxisDropdown = null!;
         private ShearedDropdown<GroupModeDropdownItem> groupDropdown = null!;
+        private SkillAxisDropdown groupAxisDropdown = null!;
+        private GridContainer skillAxisRow = null!;
         private EzKeyModeSelector csSelector = null!;
         private ShearedKSPreviewButton ksPreviewButton = null!;
         private ShearedToggleButton ezAnalysisFilterButton = null!;
         private readonly Bindable<string> configCollectionFilter = new Bindable<string>();
+        private Bindable<string> configSkillSortAxis = null!;
+        private Bindable<string> configSkillGroupAxis = null!;
+        private Bindable<string> configAnalysisSystemSelection = null!;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
@@ -229,6 +238,43 @@ namespace osu.Game.Screens.Select
                                             {
                                                 RelativeSizeAxes = Axes.X,
                                             },
+                                            Empty(),
+                                        }
+                                    }
+                                },
+                                // Second row for skill-axis pickers; collapses when neither sort nor group uses SkillAxis.
+                                skillAxisRow = new GridContainer
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    Height = 30,
+                                    Shear = -OsuGame.SHEAR,
+                                    Alpha = 0,
+                                    RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
+                                    ColumnDimensions = new[]
+                                    {
+                                        new Dimension(maxSize: 180),
+                                        new Dimension(GridSizeMode.Absolute, 5),
+                                        new Dimension(maxSize: 180),
+                                        new Dimension(GridSizeMode.Absolute, 5),
+                                        new Dimension(),
+                                    },
+                                    Content = new[]
+                                    {
+                                        new[]
+                                        {
+                                            sortAxisDropdown = new SkillAxisDropdown(EzSongSelectStrings.SKILL_AXIS_SORT)
+                                            {
+                                                RelativeSizeAxes = Axes.X,
+                                                Alpha = 0,
+                                            },
+                                            Empty(),
+                                            groupAxisDropdown = new SkillAxisDropdown(EzSongSelectStrings.SKILL_AXIS_GROUP)
+                                            {
+                                                RelativeSizeAxes = Axes.X,
+                                                Alpha = 0,
+                                            },
+                                            Empty(),
+                                            Empty(),
                                         }
                                     }
                                 },
@@ -286,16 +332,25 @@ namespace osu.Game.Screens.Select
             difficultyRangeSlider.LowerBound = config.GetBindable<double>(OsuSetting.DisplayStarsMinimum);
             difficultyRangeSlider.UpperBound = config.GetBindable<double>(OsuSetting.DisplayStarsMaximum);
             config.BindWith(OsuSetting.ShowConvertedBeatmaps, showConvertedBeatmapsButton.Active);
-            config.BindWith(OsuSetting.SongSelectSortingMode, sortDropdown.Current);
+            // SortModeDropdown owns the SongSelectSortingMode binding itself.
             config.BindWith(OsuSetting.SongSelectCollectionFilter, configCollectionFilter);
 
             ezConfig.BindWith(Ez2Setting.EzAnalysisFilter, ezAnalysisFilterButton.Active);
             ezConfig.BindWith(Ez2Setting.KeySoundPreviewMode, ksPreviewButton.State);
+            configSkillSortAxis = ezConfig.GetBindable<string>(Ez2Setting.SongSelectSkillSortAxis);
+            configSkillGroupAxis = ezConfig.GetBindable<string>(Ez2Setting.SongSelectSkillGroupAxis);
+            configAnalysisSystemSelection = ezConfig.GetBindable<string>(Ez2Setting.AnalysisSystemSelection);
 
             ruleset.BindValueChanged(_ =>
             {
+                refreshSkillAxisDropdowns();
                 updateCriteria();
                 updateEzControlVisibility();
+            });
+            configAnalysisSystemSelection.BindValueChanged(_ =>
+            {
+                refreshSkillAxisDropdowns();
+                updateCriteria();
             });
             mods.BindValueChanged(m =>
             {
@@ -309,7 +364,7 @@ namespace osu.Game.Screens.Select
                     return;
 
                 var rulesetCriteria = currentCriteria.RulesetCriteria;
-                if (sortDropdown.Current.Value is SortMode.PP || rulesetCriteria?.FilterMayChangeFromMods(currentCriteria, m) == true)
+                if (sortDropdown.Current.Value is SortMode.PP or SortMode.SkillAxis || rulesetCriteria?.FilterMayChangeFromMods(currentCriteria, m) == true)
                     updateCriteria();
             });
 
@@ -341,8 +396,28 @@ namespace osu.Game.Screens.Select
             difficultyRangeSlider.UpperBound.BindValueChanged(_ => debouncedUpdateCriteria());
 
             showConvertedBeatmapsButton.Active.BindValueChanged(_ => updateCriteria());
-            sortDropdown.Current.BindValueChanged(_ => updateCriteria());
-            groupDropdown.Current.BindValueChanged(_ => updateCriteria());
+            sortDropdown.Current.BindValueChanged(_ =>
+            {
+                updateSkillAxisDropdownVisibility();
+                updateCriteria();
+            });
+            groupDropdown.Current.BindValueChanged(_ =>
+            {
+                updateSkillAxisDropdownVisibility();
+                updateCriteria();
+            });
+            sortAxisDropdown.Current.BindValueChanged(e =>
+            {
+                if (e.NewValue != null)
+                    configSkillSortAxis.Value = formatAxisConfig(e.NewValue.System, e.NewValue.AxisId);
+                updateCriteria();
+            });
+            groupAxisDropdown.Current.BindValueChanged(e =>
+            {
+                if (e.NewValue != null)
+                    configSkillGroupAxis.Value = formatAxisConfig(e.NewValue.System, e.NewValue.AxisId);
+                updateCriteria();
+            });
             configCollectionFilter.BindValueChanged(_ => updateCriteria());
             collectionsSubscription = realm.RegisterForNotifications(r => r.All<BeatmapCollection>(), (_, changeSet) =>
             {
@@ -357,6 +432,7 @@ namespace osu.Game.Screens.Select
             csSelector.Current.BindValueChanged(_ => updateCriteria());
             ezAnalysisFilterButton.Active.BindValueChanged(_ => updateCriteria());
 
+            refreshSkillAxisDropdowns();
             updateEzControlVisibility();
             updateVisibleResultsActionAvailability();
             updateCriteria();
@@ -369,18 +445,103 @@ namespace osu.Game.Screens.Select
             if (id == 3)
             {
                 csSelector.Show();
-
+                updateSkillAxisDropdownVisibility();
                 return;
             }
 
             if (id == 1) // Taiko
             {
                 csSelector.Hide();
-
+                updateSkillAxisDropdownVisibility();
                 return;
             }
 
             csSelector.Show();
+            updateSkillAxisDropdownVisibility();
+        }
+
+        private void refreshSkillAxisDropdowns()
+        {
+            var axes = buildSkillAxisItems(ruleset.Value?.OnlineID ?? -1);
+            sortAxisDropdown.SetAxes(axes, configSkillSortAxis.Value);
+            groupAxisDropdown.SetAxes(axes, configSkillGroupAxis.Value);
+            updateSkillAxisDropdownVisibility();
+        }
+
+        private void updateSkillAxisDropdownVisibility()
+        {
+            if (sortDropdown.Current.Value == SortMode.SkillAxis && !sortAxisDropdown.HasAxes)
+                sortDropdown.Current.Value = SortMode.Title;
+
+            if (groupDropdown.Current.Value?.Value == GroupMode.SkillAxis && !groupAxisDropdown.HasAxes)
+            {
+                var noneItem = groupDropdown.Items.FirstOrDefault(i => i.Value == GroupMode.None);
+                if (noneItem != null)
+                    groupDropdown.Current.Value = noneItem;
+            }
+
+            bool showSortAxis = sortDropdown.Current.Value == SortMode.SkillAxis && sortAxisDropdown.HasAxes;
+            bool showGroupAxis = groupDropdown.Current.Value?.Value == GroupMode.SkillAxis && groupAxisDropdown.HasAxes;
+            bool showRow = showSortAxis || showGroupAxis;
+
+            skillAxisRow.Alpha = showRow ? 1 : 0;
+            sortAxisDropdown.Alpha = showSortAxis ? 1 : 0;
+            groupAxisDropdown.Alpha = showGroupAxis ? 1 : 0;
+
+            if (!showSortAxis && !string.IsNullOrEmpty(configSkillSortAxis.Value) && sortDropdown.Current.Value != SortMode.SkillAxis)
+                configSkillSortAxis.Value = string.Empty;
+
+            if (!showGroupAxis && !string.IsNullOrEmpty(configSkillGroupAxis.Value) && groupDropdown.Current.Value?.Value != GroupMode.SkillAxis)
+                configSkillGroupAxis.Value = string.Empty;
+        }
+
+        private static List<SkillAxisDropdownItem> buildSkillAxisItems(int rulesetOnlineId)
+        {
+            var items = new List<SkillAxisDropdownItem>();
+
+            if (EzRulesetReadout.Selected(rulesetOnlineId) is not { } readout)
+                return items;
+
+            switch (readout.SkillRating)
+            {
+                case EzAnalysisSystem.Mina:
+                    foreach (var axis in EzMinaSkillAxisExtensions.RadarAxes)
+                        items.Add(new SkillAxisDropdownItem(EzAnalysisSystem.Mina, axis.ToId(), axis.Meta().DisplayName));
+                    break;
+
+                case EzAnalysisSystem.PPP:
+                    foreach (var spec in EzPPPSkillCatalog.MetricsFor(rulesetOnlineId))
+                    {
+                        if (!spec.InRadar || spec.MetricId.StartsWith("_pad", StringComparison.Ordinal))
+                            continue;
+
+                        items.Add(new SkillAxisDropdownItem(EzAnalysisSystem.PPP, spec.MetricId, spec.DisplayName));
+                    }
+
+                    break;
+            }
+
+            return items;
+        }
+
+        private static string formatAxisConfig(EzAnalysisSystem system, string axisId)
+            => $"{system.ToStorageId()}:{axisId}";
+
+        private static bool tryParseAxisConfig(string? raw, out EzAnalysisSystem system, out string axisId)
+        {
+            system = EzAnalysisSystem.None;
+            axisId = string.Empty;
+
+            if (string.IsNullOrEmpty(raw))
+                return false;
+
+            int separator = raw.IndexOf(':');
+            if (separator <= 0 || separator >= raw.Length - 1)
+                return false;
+
+            system = EzAnalysisSystemStorage.FromStorageId(raw[..separator]);
+            axisId = raw[(separator + 1)..];
+            return system != EzAnalysisSystem.None && !string.IsNullOrEmpty(axisId);
         }
 
         private void updateVisibleResultsActionAvailability()
@@ -420,6 +581,18 @@ namespace osu.Game.Screens.Select
                 LocalUserId = isValidUser ? localUser.Value.Id : null,
                 LocalUserUsername = isValidUser ? localUser.Value.Username : null,
             };
+
+            if (criteria.Sort == SortMode.SkillAxis && sortAxisDropdown.Current.Value is { } sortAxis)
+            {
+                criteria.SkillAxisSortSystem = sortAxis.System;
+                criteria.SkillAxisSortId = sortAxis.AxisId;
+            }
+
+            if (criteria.Group == GroupMode.SkillAxis && groupAxisDropdown.Current.Value is { } groupAxis)
+            {
+                criteria.SkillAxisGroupSystem = groupAxis.System;
+                criteria.SkillAxisGroupId = groupAxis.AxisId;
+            }
 
             if (!difficultyRangeSlider.LowerBound.IsDefault)
                 criteria.UserStarDifficulty.Min = difficultyRangeSlider.LowerBound.Value;
@@ -616,6 +789,7 @@ namespace osu.Game.Screens.Select
             private IBindable<RulesetInfo> ruleset { get; set; } = null!;
 
             private Bindable<SortMode> configSortMode { get; } = new Bindable<SortMode>();
+            private Bindable<string>? analysisSystemSelection;
 
             public SortModeDropdown(LocalisableString label)
                 : base(label)
@@ -623,9 +797,10 @@ namespace osu.Game.Screens.Select
             }
 
             [BackgroundDependencyLoader]
-            private void load(OsuConfigManager config)
+            private void load(OsuConfigManager config, Ez2ConfigManager ezConfig)
             {
                 config.BindWith(OsuSetting.SongSelectSortingMode, configSortMode);
+                analysisSystemSelection = ezConfig.GetBindable<string>(Ez2Setting.AnalysisSystemSelection);
             }
 
             protected override void LoadAsyncComplete()
@@ -635,6 +810,11 @@ namespace osu.Game.Screens.Select
                     updateAvailableItems();
                     updateCurrentFromConfig();
                 }, true);
+                analysisSystemSelection?.BindValueChanged(_ =>
+                {
+                    updateAvailableItems();
+                    updateCurrentFromConfig();
+                });
                 configSortMode.BindValueChanged(_ => updateCurrentFromConfig());
                 Current.BindValueChanged(currentChanged);
 
@@ -643,7 +823,8 @@ namespace osu.Game.Screens.Select
 
             private void updateAvailableItems()
             {
-                Items = Enum.GetValues<SortMode>();
+                bool hasSkillAxes = buildSkillAxisItems(ruleset.Value?.OnlineID ?? -1).Count > 0;
+                Items = Enum.GetValues<SortMode>().Where(m => m != SortMode.SkillAxis || hasSkillAxes).ToArray();
             }
 
             private bool synchronisingBindables;
@@ -663,10 +844,46 @@ namespace osu.Game.Screens.Select
                 if (synchronisingBindables)
                     return;
 
+                // Keep a skill-axis selection out of the upstream config when the active readout has no axes
+                // (same pattern as GroupMode.Variant).
+                if (current.NewValue == SortMode.SkillAxis && !Items.Contains(SortMode.SkillAxis))
+                    return;
+
                 configSortMode.Value = current.NewValue;
             }
 
-            protected override LocalisableString GenerateItemText(SortMode item) => item.GetLocalisableDescription();
+            protected override LocalisableString GenerateItemText(SortMode item)
+                => item == SortMode.SkillAxis ? EzSongSelectStrings.SKILL_AXIS : item.GetLocalisableDescription();
+        }
+
+        private partial class SkillAxisDropdown : ShearedDropdown<SkillAxisDropdownItem>
+        {
+            public bool HasAxes => Items.Any();
+
+            public SkillAxisDropdown(LocalisableString label)
+                : base(label)
+            {
+            }
+
+            public void SetAxes(IReadOnlyList<SkillAxisDropdownItem> axes, string? preferredConfig)
+            {
+                Items = axes.ToArray();
+
+                if (axes.Count == 0)
+                {
+                    Current.Value = null!;
+                    return;
+                }
+
+                SkillAxisDropdownItem? preferred = null;
+
+                if (tryParseAxisConfig(preferredConfig, out var system, out string axisId))
+                    preferred = axes.FirstOrDefault(a => a.System == system && string.Equals(a.AxisId, axisId, StringComparison.Ordinal));
+
+                Current.Value = preferred ?? axes[0];
+            }
+
+            protected override LocalisableString GenerateItemText(SkillAxisDropdownItem item) => item.Text;
         }
 
         private partial class GroupModeDropdown : ShearedDropdown<GroupModeDropdownItem>
@@ -675,6 +892,7 @@ namespace osu.Game.Screens.Select
             private IBindable<RulesetInfo> ruleset { get; set; } = null!;
 
             private Bindable<GroupMode> configGroupMode { get; } = new Bindable<GroupMode>();
+            private Bindable<string>? analysisSystemSelection;
 
             public GroupModeDropdown(LocalisableString label)
                 : base(label)
@@ -682,9 +900,10 @@ namespace osu.Game.Screens.Select
             }
 
             [BackgroundDependencyLoader]
-            private void load(OsuConfigManager config)
+            private void load(OsuConfigManager config, Ez2ConfigManager ezConfig)
             {
                 config.BindWith(OsuSetting.SongSelectGroupMode, configGroupMode);
+                analysisSystemSelection = ezConfig.GetBindable<string>(Ez2Setting.AnalysisSystemSelection);
             }
 
             protected override void LoadAsyncComplete()
@@ -696,6 +915,11 @@ namespace osu.Game.Screens.Select
                     updateAvailableItems();
                     updateCurrentFromConfig();
                 }, true);
+                analysisSystemSelection?.BindValueChanged(_ =>
+                {
+                    updateAvailableItems();
+                    updateCurrentFromConfig();
+                });
                 configGroupMode.BindValueChanged(_ => updateCurrentFromConfig());
                 Current.BindValueChanged(currentChanged);
 
@@ -715,6 +939,13 @@ namespace osu.Game.Screens.Select
                     {
                         case GroupMode.PP:
                             items.Add(new GroupModeDropdownItem(GroupMode.PP, "PP"));
+                            break;
+
+                        case GroupMode.SkillAxis:
+                            if (buildSkillAxisItems(ruleset.Value?.OnlineID ?? -1).Count == 0)
+                                break;
+
+                            items.Add(new GroupModeDropdownItem(GroupMode.SkillAxis, EzSongSelectStrings.SKILL_AXIS));
                             break;
 
                         default:
@@ -760,6 +991,9 @@ namespace osu.Game.Screens.Select
                 if (current.OldValue.Value == GroupMode.Variant && Items.All(i => i.Value != GroupMode.Variant))
                     return;
 
+                if (current.OldValue.Value == GroupMode.SkillAxis && Items.All(i => i.Value != GroupMode.SkillAxis))
+                    return;
+
                 synchronisingBindables = true;
                 configGroupMode.Value = current.NewValue.Value;
                 synchronisingBindables = false;
@@ -769,5 +1003,7 @@ namespace osu.Game.Screens.Select
         }
 
         private record GroupModeDropdownItem(GroupMode Value, LocalisableString Text);
+
+        private record SkillAxisDropdownItem(EzAnalysisSystem System, string AxisId, LocalisableString Text);
     }
 }

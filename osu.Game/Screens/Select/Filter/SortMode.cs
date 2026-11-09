@@ -31,6 +31,9 @@ namespace osu.Game.Screens.Select.Filter
 
         PP,
 
+        /// <summary>Sort by one chart skill axis of the active analysis system (axis id lives on FilterCriteria).</summary>
+        SkillAxis,
+
         [LocalisableDescription(typeof(SongSelectStrings), nameof(SongSelectStrings.LastPlayed))]
         LastPlayed,
 
