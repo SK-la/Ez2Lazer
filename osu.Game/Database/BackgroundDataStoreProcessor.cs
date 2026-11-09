@@ -15,8 +15,8 @@ using osu.Framework.Bindables;
 using osu.Framework.Development;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
-using osu.Framework.Logging;
 using osu.Framework.Localisation;
+using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -872,10 +872,27 @@ namespace osu.Game.Database
                 if (beatmap == null)
                     return false;
 
-                if (!ezSSRUnit.ComputeAndStore(beatmap, CancellationToken.None))
+                bool computed = ezSSRUnit.ComputeAndStore(beatmap, CancellationToken.None);
+
+                // Load failures and "nothing to rate" paths must leave a settled star (>= 0), or the same chart is
+                // selected again on every launch. Zero is the failure / N/A stamp; a manual SSR rebuild clears it.
+                bool settled = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.EzRatingData.SunnySR >= 0);
+
+                if (!settled)
+                {
+                    realmAccess.Write(r =>
+                    {
+                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo live)
+                            EzRatingWriter.MarkProcessingFailed(live, EzAnalysisSystem.SSR);
+                    });
+                }
+
+                if (!computed)
                     return false;
 
-                ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+                if (settled)
+                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+
                 return true;
             }
         }
@@ -1141,26 +1158,25 @@ namespace osu.Game.Database
         }
 
         /// <summary>
-        /// Fills the official star and perfect-play pp of charts that are missing either half.
+        /// Fills the official star (and pp when the calculator can produce one) for charts that have never been rated.
         /// </summary>
         /// <remarks>
-        /// Both halves come from one difficulty calculation, so they are produced and written together. That is also
-        /// what keeps them consistent: a chart holding a fresh star with a stale pp reads as a valid pair to every
-        /// consumer. Charts the SSR pass already filled (it computes the same official pair while rating) are not
-        /// selected here.
+        /// Selection is <c>StarRating &lt; 0</c> only: both halves come from one difficulty calculation, so a chart
+        /// that already holds a star is settled even when its pp stayed at the empty sentinel. A chart that cannot be
+        /// loaded is stamped with zero (see <see cref="EzRatingWriter.MarkProcessingFailed"/>) so the next automatic
+        /// pass skips it; a manual force rebuild clears back to <c>-1</c> and retries.
         /// </remarks>
         private void populateOfficialBaselines()
         {
             HashSet<Guid> beatmapIds = new HashSet<Guid>();
 
-            Logger.Log("Querying for beatmaps with missing official star or baseline PP...");
+            Logger.Log("Querying for beatmaps with missing official star ratings...");
 
             realmAccess.Run(r =>
             {
-                foreach (var b in r.All<BeatmapInfo>()
-                                   .Where(b => b.BeatmapSet != null && (b.StarRating < 0 || b.PerformancePoints < 0)))
+                foreach (var b in r.All<BeatmapInfo>())
                 {
-                    if (!b.Ruleset.Available)
+                    if (!EzRatingWriter.NeedsOfficialBackfill(b))
                         continue;
 
                     beatmapIds.Add(b.ID);
@@ -1191,7 +1207,14 @@ namespace osu.Game.Database
                     out double starRating, out double performancePoints);
 
                 if (!computed)
+                {
+                    realmAccess.Write(r =>
+                    {
+                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
+                            EzRatingWriter.MarkProcessingFailed(liveBeatmapInfo, EzAnalysisSystem.Official);
+                    });
                     return false;
+                }
 
                 realmAccess.Write(r =>
                 {
@@ -1205,61 +1228,53 @@ namespace osu.Game.Database
         }
 
         /// <summary>
-        /// Fills the per-system baseline columns (Sunny pp, PP+ star and pp, Mina rating) from what is already stored.
+        /// Fills Sunny pp and Mina star convenience columns from values that are already stored elsewhere.
         /// </summary>
         /// <remarks>
-        /// These are read-side convenience columns: each value already exists in a value table or can be derived from
-        /// a stored star rating, so filling them never re-runs an analysis that has not already run. The PP+ columns
-        /// are not filled here: they need the PP+ chart vector and the mode's own PP+ formula, which the PP+ stage
-        /// owns.
+        /// Only charts that are missing a column <em>and</em> already hold its source are selected: Sunny pp needs a
+        /// stored Sunny star, Mina star needs a stored Mina overall axis. Charts with neither source are left alone
+        /// (they are not "failed" - there is simply nothing this pass can write), so they do not reappear as a full
+        /// library workload on every launch. PP+ columns are owned by the PP+ stage and are not filled here.
         /// </remarks>
         private void populateMissingMultiSystemBaselines()
         {
-            var candidates = new List<(Guid Id, string Hash, int RulesetId)>();
-
-            realmAccess.Run(r =>
-            {
-                foreach (var b in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null))
-                {
-                    if (b.EzRatingData.SunnyPP >= 0 && b.EzRatingData.MinaSR >= 0)
-                        continue;
-
-                    candidates.Add((b.ID, b.Hash, b.Ruleset.OnlineID));
-                }
-            });
+            var candidates = collectMultiSystemBaselineCandidates();
 
             if (candidates.Count == 0)
                 return;
 
-            Logger.Log($"Found {candidates.Count} beatmaps which require Sunny pp, PP+ star and pp, Mina rating.");
+            Logger.Log($"Found {candidates.Count} beatmaps which require Sunny pp / Mina star baseline fill.");
 
-            // TODO: 这里的计算剔除了 SSR? 很奇怪
             var notification = showProgressNotification(candidates.Count,
                 EzAnalysisNotificationStrings.BASELINE_RUNNING,
                 EzAnalysisNotificationStrings.BASELINE_COMPLETED);
 
             ChartBatchResult batch = runChartBatch(candidates, processBaseline, notification);
 
-            completeNotification(notification, batch.Processed, candidates.Count);
+            completeNotification(notification, batch.Processed, candidates.Count, batch.Failed);
 
-            bool processBaseline((Guid Id, string Hash, int RulesetId) candidate)
+            bool processBaseline((Guid Id, string Hash, bool NeedSunnyPp, bool NeedMinaSr) candidate)
             {
                 var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(candidate.Id)?.Detach());
 
                 if (beatmap == null)
                     return false;
 
-                double sunnyPp = beatmap.EzRatingData.SunnyPP;
-                double minaSr = beatmap.EzRatingData.MinaSR;
+                double sunnyPp = -1;
+                double minaSr = -1;
 
-                if (sunnyPp < 0)
+                if (candidate.NeedSunnyPp)
                     sunnyPp = EzAnalysisComputation.ComputeBaselineSunnyPerformancePointsForRealm(beatmapManager, beatmap, CancellationToken.None);
 
-                var minaRows = skillStore.GetBeatmapSkills(candidate.Hash, EzAnalysisSystem.Mina);
-                if (minaSr < 0
-                    && minaRows.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double storedMina)
-                    && storedMina > 0)
-                    minaSr = EzMinaRatingScale.ToStarRating(storedMina);
+                if (candidate.NeedMinaSr)
+                {
+                    var minaRows = skillStore.GetBeatmapSkills(candidate.Hash, EzAnalysisSystem.Mina);
+
+                    if (minaRows.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double storedMina) && storedMina > 0)
+                        minaSr = EzMinaRatingScale.ToStarRating(storedMina);
+                }
+
+                bool wrote = false;
 
                 realmAccess.Write(r =>
                 {
@@ -1267,15 +1282,78 @@ namespace osu.Game.Database
                         return;
 
                     if (sunnyPp >= 0)
+                    {
                         EzRatingWriter.WritePP(liveBeatmapInfo, EzAnalysisSystem.SSR, sunnyPp);
+                        wrote = true;
+                    }
 
                     if (minaSr >= 0)
+                    {
                         EzRatingWriter.WriteSR(liveBeatmapInfo, EzAnalysisSystem.Mina, minaSr);
+                        wrote = true;
+                    }
                 });
+
+                if (!wrote)
+                    return false;
 
                 ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
                 return true;
             }
+        }
+
+        /// <summary>
+        /// Charts that are missing a baseline column whose source is already stored.
+        /// </summary>
+        private List<(Guid Id, string Hash, bool NeedSunnyPp, bool NeedMinaSr)> collectMultiSystemBaselineCandidates()
+        {
+            var provisional = new List<(Guid Id, string Hash, bool NeedSunnyPp, bool NeedMinaSr)>();
+
+            realmAccess.Run(r =>
+            {
+                foreach (var b in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null))
+                {
+                    // Mina overall is resolved in bulk below; here only remember charts that still lack MinaSR.
+                    bool maybeMina = b.EzRatingData.MinaSR < 0;
+                    bool needSunnyPp = b.EzRatingData.SunnyPP < 0 && b.EzRatingData.SunnySR > 0;
+
+                    if (!needSunnyPp && !maybeMina)
+                        continue;
+
+                    provisional.Add((b.ID, b.Hash, needSunnyPp, maybeMina));
+                }
+            });
+
+            if (provisional.Count == 0)
+                return provisional;
+
+            string overallId = EzMinaSkillAxis.Overall.ToMsdSkillId();
+            var minaSkills = skillStore.GetBeatmapSkillsForHashes(
+                provisional.Where(p => p.NeedMinaSr).Select(p => p.Hash),
+                EzAnalysisSystem.Mina);
+
+            var candidates = new List<(Guid Id, string Hash, bool NeedSunnyPp, bool NeedMinaSr)>(provisional.Count);
+
+            foreach (var p in provisional)
+            {
+                double? minaOverall = null;
+
+                if (p.NeedMinaSr
+                    && minaSkills.TryGetValue(p.Hash, out var skills)
+                    && skills.TryGetValue(overallId, out double overall))
+                {
+                    minaOverall = overall;
+                }
+
+                bool needMinaSr = p.NeedMinaSr && minaOverall is double axis && axis > 0;
+
+                if (!p.NeedSunnyPp && !needMinaSr)
+                    continue;
+
+                candidates.Add((p.Id, p.Hash, p.NeedSunnyPp, needMinaSr));
+            }
+
+            return candidates;
         }
 
         private void processOnlineBeatmapSetsWithNoUpdate()

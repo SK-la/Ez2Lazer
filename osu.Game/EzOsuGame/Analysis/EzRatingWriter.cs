@@ -72,5 +72,58 @@ namespace osu.Game.EzOsuGame.Analysis
             WriteSR(beatmap, system, -1);
             WritePP(beatmap, system, -1);
         }
+
+        /// <summary>
+        /// Whether automatic official backfill still owes this chart a difficulty calculation.
+        /// </summary>
+        /// <remarks>
+        /// <c>-1</c> is missing; <c>0</c> is the settled-failure stamp (same role as
+        /// <c>ScoreInfo.BackgroundReprocessingFailed</c>). A manual force rebuild clears back to <c>-1</c>.
+        /// </remarks>
+        public static bool NeedsOfficialBackfill(BeatmapInfo beatmap)
+        {
+            ArgumentNullException.ThrowIfNull(beatmap);
+
+            return beatmap.BeatmapSet != null && beatmap.Ruleset.Available && beatmap.StarRating < 0;
+        }
+
+        /// <summary>
+        /// Marks a chart as tried-and-failed so automatic backfill skips it until a manual rebuild clears the stamp.
+        /// </summary>
+        /// <remarks>
+        /// Writes <c>0</c> (not <c>-1</c>): the pass selects on <c>&lt; 0</c>, so zero is settled. Official covers both
+        /// halves; Sunny only needs the star column to leave the missing set.
+        /// </remarks>
+        public static void MarkProcessingFailed(BeatmapInfo beatmap, EzAnalysisSystem system)
+        {
+            ArgumentNullException.ThrowIfNull(beatmap);
+
+            switch (system)
+            {
+                case EzAnalysisSystem.Official:
+                    Write(beatmap, system, 0, 0);
+                    break;
+
+                case EzAnalysisSystem.SSR:
+                    WriteSR(beatmap, system, 0);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Which multi-system baseline columns are still owed, given the stored values and an optional Mina overall axis.
+        /// </summary>
+        /// <remarks>
+        /// Sunny pp is only owed when a Sunny star is already stored; Mina star is only owed when an overall axis is.
+        /// A chart with neither source is not owed - that is what stops the pass from scanning the whole library every
+        /// launch for columns it can never fill.
+        /// </remarks>
+        public static (bool NeedSunnyPp, bool NeedMinaSr) MultiSystemBaselineDebt(
+            double sunnySr, double sunnyPp, double minaSr, double? minaOverall)
+        {
+            bool needSunnyPp = sunnyPp < 0 && sunnySr > 0;
+            bool needMinaSr = minaSr < 0 && minaOverall is double overall && overall > 0;
+            return (needSunnyPp, needMinaSr);
+        }
     }
 }
