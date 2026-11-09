@@ -16,6 +16,7 @@ using osu.Framework.Development;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
+using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -23,6 +24,7 @@ using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Database;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
@@ -386,7 +388,9 @@ namespace osu.Game.Database
             if (scoreIds.Count == 0)
                 return;
 
-            var notification = showProgressNotification(scoreIds.Count, "Recalculating local scores", "local scores have been recalculated");
+            var notification = showProgressNotification(scoreIds.Count,
+                EzAnalysisNotificationStrings.SCORES_RUNNING,
+                EzAnalysisNotificationStrings.SCORES_COMPLETED);
 
             int processedCount = 0;
             int failedCount = 0;
@@ -851,7 +855,9 @@ namespace osu.Game.Database
 
             Logger.Log($"Found {beatmapIds.Count} beatmaps which require SunnyStarRating reprocessing.");
 
-            var notification = showProgressNotification(beatmapIds.Count, "Reprocessing SunnyStarRating for beatmaps", "beatmaps' SunnyStarRatings have been updated");
+            var notification = showProgressNotification(beatmapIds.Count,
+                EzAnalysisNotificationStrings.SUNNY_RUNNING,
+                EzAnalysisNotificationStrings.SUNNY_COMPLETED);
 
             ChartBatchResult batch = runChartBatch(beatmapIds.ToList(), processSunnyRating, notification);
 
@@ -914,21 +920,17 @@ namespace osu.Game.Database
             }
 
             Logger.Log(
-                $"Found {work.Count} beatmaps which require chart chain reprocessing (Mina v{EzMinaEngine.VERSION}, CSI v{EzCSIEngine.VERSION}, Dan v{EzDanEngine.VERSION}).");
+                $"Found {work.Count} beatmaps which require chart chain reprocessing ({describeChartStages(csi, msd, ppp, dan)}; Mina v{EzMinaEngine.VERSION}, CSI v{EzCSIEngine.VERSION}, Dan v{EzDanEngine.VERSION}).");
 
             var notification = showProgressNotification(work.Count,
-                $"Reprocessing chart analysis chain ({describeChartStages(csi, msd, ppp, dan)})",
-                "beatmaps' analysis chain has been updated");
-
-            int processedCount = 0;
-            int failedCount = 0;
-            int attemptedCount = 0;
+                EzAnalysisNotificationStrings.ChartChainRunning(msd, csi, dan, ppp),
+                EzAnalysisNotificationStrings.ChartChainCompleted(msd, csi, dan, ppp));
 
             ChartBatchResult result = runChartBatch(work, processChart, notification);
 
-            attemptedCount = result.Attempted;
-            processedCount = result.Processed;
-            failedCount = result.Failed;
+            int attemptedCount = result.Attempted;
+            int processedCount = result.Processed;
+            int failedCount = result.Failed;
 
             if (result.Aborted)
                 Logger.Log($"Chart chain backfill aborted during shutdown after {attemptedCount} of {work.Count}.");
@@ -1001,25 +1003,24 @@ namespace osu.Game.Database
             }
         }
 
-        // Names the stages a chart chain pass runs, in order, so the progress notification says which systems are
-        // being computed rather than "chain".
+        // Names the stages a chart chain pass runs, in abbreviation form, for the log line that explains the pass.
         private static string describeChartStages(bool csi, bool msd, bool ppp, bool dan)
         {
             var labels = new List<string>(4);
 
             if (msd)
-                labels.Add(EzEnumMetaCache<EzAnalysisSystem>.Meta(EzAnalysisSystem.Mina).NameEn);
+                labels.Add(EzAnalysisNotificationStrings.DataAbbreviation(EzAnalysisSystem.Mina));
 
             if (csi)
-                labels.Add(EzEnumMetaCache<EzAnalysisSystem>.Meta(EzAnalysisSystem.CSI).NameEn);
+                labels.Add(EzAnalysisNotificationStrings.DataAbbreviation(EzAnalysisSystem.CSI));
 
             if (dan)
-                labels.Add(EzEnumMetaCache<EzAnalysisSystem>.Meta(EzAnalysisSystem.Dan).NameEn);
+                labels.Add(EzAnalysisNotificationStrings.DataAbbreviation(EzAnalysisSystem.Dan));
 
             if (ppp)
-                labels.Add(EzEnumMetaCache<EzAnalysisSystem>.Meta(EzAnalysisSystem.PPP).NameEn);
+                labels.Add(EzAnalysisNotificationStrings.DataAbbreviation(EzAnalysisSystem.PPP));
 
-            return string.Join(", ", labels);
+            return string.Join(" / ", labels);
         }
 
         /// <summary>
@@ -1059,8 +1060,8 @@ namespace osu.Game.Database
 
             var notification = showProgressNotification(
                 totalBeatmaps,
-                "Populating Ez beatmap tags in Realm",
-                "beatmaps have been updated with Ez tags");
+                EzAnalysisNotificationStrings.TAGS_RUNNING,
+                EzAnalysisNotificationStrings.TAGS_COMPLETED);
 
             int processedCount = 0;
             int failedCount = 0;
@@ -1157,7 +1158,7 @@ namespace osu.Game.Database
             realmAccess.Run(r =>
             {
                 foreach (var b in r.All<BeatmapInfo>()
-                                 .Where(b => b.BeatmapSet != null && (b.StarRating < 0 || b.PerformancePoints < 0)))
+                                   .Where(b => b.BeatmapSet != null && (b.StarRating < 0 || b.PerformancePoints < 0)))
                 {
                     if (!b.Ruleset.Available)
                         continue;
@@ -1172,8 +1173,8 @@ namespace osu.Game.Database
             Logger.Log($"Found {beatmapIds.Count} beatmaps which require official star and PP reprocessing.");
 
             var notification = showProgressNotification(beatmapIds.Count,
-                "Reprocessing official star and baseline PP for beatmaps",
-                "beatmaps' official star and baseline PP have been updated");
+                EzAnalysisNotificationStrings.OFFICIAL_RUNNING,
+                EzAnalysisNotificationStrings.OFFICIAL_COMPLETED);
 
             ChartBatchResult batch = runChartBatch(beatmapIds.ToList(), processBaseline, notification);
 
@@ -1233,7 +1234,9 @@ namespace osu.Game.Database
             Logger.Log($"Found {candidates.Count} beatmaps which require Sunny pp, PP+ star and pp, Mina rating.");
 
             // TODO: 这里的计算剔除了 SSR? 很奇怪
-            var notification = showProgressNotification(candidates.Count, "Filling Sunny pp, PP+ star and pp, Mina rating", "beatmaps' per-system baselines have been updated");
+            var notification = showProgressNotification(candidates.Count,
+                EzAnalysisNotificationStrings.BASELINE_RUNNING,
+                EzAnalysisNotificationStrings.BASELINE_COMPLETED);
 
             ChartBatchResult batch = runChartBatch(candidates, processBaseline, notification);
 
@@ -2266,6 +2269,14 @@ namespace osu.Game.Database
 
         private const int notification_progress_update_interval = 25;
 
+        /// <summary>
+        /// Base text per notification, so a progress update replaces the count instead of parsing the current text.
+        /// Parsing would cut a localized running line at its own parenthesis and drop the stage list.
+        /// </summary>
+        private readonly Dictionary<ProgressNotification, LocalisableString> notificationBaseText = new Dictionary<ProgressNotification, LocalisableString>();
+
+        private readonly Lock notificationTextLock = new Lock();
+
         private void updateNotificationProgress(ProgressNotification? notification, int processedCount, int totalCount)
         {
             if (notification == null)
@@ -2290,7 +2301,15 @@ namespace osu.Game.Database
                 if (notification.State == ProgressNotificationState.Cancelled)
                     return;
 
-                notification.Text = notification.Text.ToString().Split('(').First().TrimEnd() + $" ({processedCount} of {totalCount})";
+                LocalisableString baseText;
+
+                lock (notificationTextLock)
+                {
+                    if (!notificationBaseText.TryGetValue(notification, out baseText))
+                        baseText = notification.Text;
+                }
+
+                notification.Text = $"{baseText} ({EzAnalysisNotificationStrings.Progress(processedCount, totalCount)})";
                 notification.Progress = (float)processedCount / totalCount;
             });
 
@@ -2311,24 +2330,35 @@ namespace osu.Game.Database
                 }
                 else if (processedCount == totalCount)
                 {
-                    notification.CompletionText = $"{processedCount} {notification.CompletionText}";
+                    notification.CompletionText = $"{EzAnalysisNotificationStrings.CompletedCount(processedCount)}{notification.CompletionText}";
                     notification.Progress = 1;
                     notification.State = ProgressNotificationState.Completed;
                 }
                 else
                 {
-                    notification.Text = $"{processedCount} of {totalCount} {notification.CompletionText}";
+                    LocalisableString baseText;
+
+                    lock (notificationTextLock)
+                    {
+                        if (!notificationBaseText.TryGetValue(notification, out baseText))
+                            baseText = notification.Text;
+                    }
+
+                    notification.Text = $"{EzAnalysisNotificationStrings.Progress(processedCount, totalCount)} {baseText}";
 
                     // We may have arrived here due to user cancellation or completion with failures.
                     if (failedCount > 0)
-                        notification.Text += $" Check logs for issues with {failedCount} failed items.";
+                        notification.Text = $"{notification.Text}{EzAnalysisNotificationStrings.FailedCount(failedCount.Value)}";
 
                     notification.State = ProgressNotificationState.Cancelled;
                 }
+
+                lock (notificationTextLock)
+                    notificationBaseText.Remove(notification);
             });
         }
 
-        private ProgressNotification? showProgressNotification(int totalCount, string running, string completed)
+        private ProgressNotification? showProgressNotification(int totalCount, LocalisableString running, LocalisableString completed)
         {
             if (notificationOverlay == null)
             {
@@ -2342,6 +2372,11 @@ namespace osu.Game.Database
                 CompletionText = completed,
                 State = ProgressNotificationState.Active
             };
+
+            notification.Text = $"{running} ({EzAnalysisNotificationStrings.Progress(0, totalCount)})";
+
+            lock (notificationTextLock)
+                notificationBaseText[notification] = running;
 
             lastNotificationProgressReported = -1;
 

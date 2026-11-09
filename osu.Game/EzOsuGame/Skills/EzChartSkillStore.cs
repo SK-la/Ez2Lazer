@@ -62,7 +62,6 @@ namespace osu.Game.EzOsuGame.Skills
         /// </summary>
         public EzSkillRowState GetBeatmapSystemState(string beatmapHash, EzAnalysisSystem system)
         {
-
             string systemId = system.ToStorageId();
 
             if (string.IsNullOrEmpty(beatmapHash) || string.IsNullOrEmpty(systemId))
@@ -613,7 +612,7 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentException.ThrowIfNullOrWhiteSpace(beatmapHash);
 
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
-            int revision = EzCSIEngine.VERSION;
+            const int revision = EzCSIEngine.VERSION;
 
             realmAccess.Write(r =>
             {
@@ -708,7 +707,7 @@ namespace osu.Game.EzOsuGame.Skills
             // Stamped with the facet revision (not chartDan.AlgorithmVersion, which stays the pure
             // dan algorithm version on the DTO) so a later Mina/CSI bump retires this row.
             DateTimeOffset at = chartDan.ComputedAt == default ? DateTimeOffset.UtcNow : chartDan.ComputedAt;
-            int version = EzDanEngine.VERSION;
+            const int version = EzDanEngine.VERSION;
 
             realmAccess.Write(r =>
             {
@@ -882,7 +881,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             if (rulesetOnlineId >= 0 && system == EzAnalysisSystem.PPP)
             {
-                int bundle = EzPPPEngine.VERSION;
+                const int bundle = EzPPPEngine.VERSION;
 
                 if (bundle > 0)
                     return bundle;
@@ -900,11 +899,11 @@ namespace osu.Game.EzOsuGame.Skills
 
             // The row's revision is part of the answer: a complete axis set produced by an older bundle is a result of
             // that bundle, not of the one in force. Reading only the axis set made a PP+ revision bump a no-op.
-            int revision = EzPPPEngine.VERSION;
+            const int revision = EzPPPEngine.VERSION;
 
             foreach (var row in stored)
             {
-                if (revision > 0 && row.AlgorithmVersion != revision)
+                if (row.AlgorithmVersion != revision)
                     continue;
 
                 current[row.SkillId] = row.Value;

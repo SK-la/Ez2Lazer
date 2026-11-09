@@ -966,8 +966,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 bool persisted = false;
 
                 if (allBags[EzLocalProfileConstants.MANIA_RULESET_ID].Count > 0)
+                {
                     persisted |= persistUserSkills(EzLocalProfileConstants.ALL_PLAYERS, allBags[EzLocalProfileConstants.MANIA_RULESET_ID], tick, token,
                         ssrPlayCache, danPlayCache, missingCharts);
+                }
 
                 foreach (int rulesetId in EzPPPSkillCatalog.SupportedRulesets)
                 {

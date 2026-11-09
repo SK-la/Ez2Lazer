@@ -63,10 +63,7 @@ namespace osu.Game.Tests.Database
                         ruleset.LastAppliedDifficultyVersion = difficultyVersion;
                     }
                     catch (RulesetLoadException)
-                    {
-                        continue;
-                    }
-
+                    { }
                 }
 
                 foreach (var beatmap in r.All<BeatmapInfo>())
