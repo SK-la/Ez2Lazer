@@ -2227,6 +2227,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
             ensureColumn(connection, "username_partitions", "excluded", "INTEGER NOT NULL DEFAULT 0");
             ensureColumn(connection, "dan_clear_evidence", "algorithm_version", "INTEGER NOT NULL DEFAULT 1");
             ensureColumn(connection, "axis_play_evidence", "algorithm_version", "INTEGER NOT NULL DEFAULT 1");
+            ensureColumn(connection, "drill_scores", "ssr_star_rating", "REAL NOT NULL DEFAULT -1");
+            ensureColumn(connection, "drill_scores", "map_performance_points", "REAL NOT NULL DEFAULT 0");
             ensureColumn(connection, "drill_scores", "bpm", "REAL NOT NULL DEFAULT 0");
             ensureColumn(connection, "drill_scores", "key_count", "INTEGER NOT NULL DEFAULT 0");
             ensureColumn(connection, "drill_scores", "is_convert", "INTEGER NOT NULL DEFAULT 0");
