@@ -19,6 +19,7 @@ using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.Online.API;
 using osu.Game.Rulesets;
@@ -64,7 +65,8 @@ namespace osu.Game.EzOsuGame.Analysis
             bool RefreshSunnySR,
             bool RefreshPp,
             int CurrentSunnySRVersion,
-            int CurrentPpVersion);
+            int CurrentPpVersion,
+            bool RefreshMirrored = false);
 
         public readonly record struct SongsBranchBuildResult(
             bool Success,
@@ -85,12 +87,25 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </remarks>
         private Dictionary<Guid, EzRatingData> loadStoredRatings(IReadOnlyCollection<BeatmapInfo> beatmaps)
         {
+            var ids = new List<(Guid Id, string Hash)>(beatmaps.Count);
+
+            foreach (var beatmap in beatmaps)
+                ids.Add((beatmap.ID, beatmap.Hash));
+
+            return loadStoredRatings(ids);
+        }
+
+        private Dictionary<Guid, EzRatingData> loadStoredRatings(IReadOnlyCollection<(Guid Id, string Hash)> charts)
+        {
             var ratings = new Dictionary<Guid, EzRatingData>();
 
-            if (realmAccess == null || beatmaps.Count == 0)
+            if (realmAccess == null || charts.Count == 0)
                 return ratings;
 
-            var wanted = new HashSet<Guid>(beatmaps.Select(beatmap => beatmap.ID));
+            var wanted = new HashSet<Guid>();
+
+            foreach (var (id, _) in charts)
+                wanted.Add(id);
 
             try
             {
@@ -118,18 +133,28 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         private List<EzAnalysisPersistentStore.SongsBranchSkillRow> loadSkillRows(IReadOnlyCollection<BeatmapInfo> beatmaps, int rulesetOnlineId)
         {
-            var rows = new List<EzAnalysisPersistentStore.SongsBranchSkillRow>();
-
-            if (realmAccess == null || beatmaps.Count == 0)
-                return rows;
-
-            var idByHash = new Dictionary<string, Guid>(StringComparer.Ordinal);
+            var charts = new List<(Guid Id, string Hash)>(beatmaps.Count);
 
             foreach (var beatmap in beatmaps)
             {
                 if (!string.IsNullOrEmpty(beatmap.Hash))
-                    idByHash[beatmap.Hash] = beatmap.ID;
+                    charts.Add((beatmap.ID, beatmap.Hash));
             }
+
+            return loadSkillRowsForHashes(charts, rulesetOnlineId);
+        }
+
+        private List<EzAnalysisPersistentStore.SongsBranchSkillRow> loadSkillRowsForHashes(IReadOnlyCollection<(Guid Id, string Hash)> charts, int rulesetOnlineId)
+        {
+            var rows = new List<EzAnalysisPersistentStore.SongsBranchSkillRow>();
+
+            if (realmAccess == null || charts.Count == 0)
+                return rows;
+
+            var idByHash = new Dictionary<string, Guid>(StringComparer.Ordinal);
+
+            foreach (var (id, hash) in charts)
+                idByHash[hash] = id;
 
             if (idByHash.Count == 0)
                 return rows;
@@ -154,6 +179,32 @@ namespace osu.Game.EzOsuGame.Analysis
                             value.Value,
                             value.AlgorithmVersion));
                     }
+
+                    // Dan lives in its own table rather than the shared value table: its result is a per-side verdict
+                    // with a label, not a set of axes. Flattened here so a branch carries every system's stored result.
+                    foreach (var chartDan in r.All<EzChartDan>().AsEnumerable())
+                    {
+                        if (!idByHash.TryGetValue(chartDan.BeatmapHash, out Guid beatmapId))
+                            continue;
+
+                        rows.Add(new EzAnalysisPersistentStore.SongsBranchSkillRow(
+                            beatmapId, EzAnalysisSystem.Dan.ToStorageId(), rulesetOnlineId, "rc.raw_dan", chartDan.RcRawDan, chartDan.AlgorithmVersion));
+
+                        rows.Add(new EzAnalysisPersistentStore.SongsBranchSkillRow(
+                            beatmapId, EzAnalysisSystem.Dan.ToStorageId(), rulesetOnlineId, "ln.raw_dan", chartDan.LnRawDan, chartDan.AlgorithmVersion));
+
+                        if (!string.IsNullOrEmpty(chartDan.RcLabel))
+                        {
+                            rows.Add(new EzAnalysisPersistentStore.SongsBranchSkillRow(
+                                beatmapId, EzAnalysisSystem.Dan.ToStorageId(), rulesetOnlineId, "rc.label", 0, chartDan.AlgorithmVersion, chartDan.RcLabel));
+                        }
+
+                        if (!string.IsNullOrEmpty(chartDan.LnLabel))
+                        {
+                            rows.Add(new EzAnalysisPersistentStore.SongsBranchSkillRow(
+                                beatmapId, EzAnalysisSystem.Dan.ToStorageId(), rulesetOnlineId, "ln.label", 0, chartDan.AlgorithmVersion, chartDan.LnLabel));
+                        }
+                    }
                 });
             }
             catch (Exception e)
@@ -163,6 +214,20 @@ namespace osu.Game.EzOsuGame.Analysis
             }
 
             return rows;
+        }
+
+        private static IReadOnlyCollection<(Guid Id, string Hash)> chartsOf(IEnumerable<EzAnalysisPersistentStore.SongsBranchRow> rows)
+        {
+            var charts = new List<(Guid Id, string Hash)>();
+            var seen = new HashSet<Guid>();
+
+            foreach (var row in rows)
+            {
+                if (seen.Add(row.BeatmapId))
+                    charts.Add((row.BeatmapId, row.BeatmapHash));
+            }
+
+            return charts;
         }
 
         /// <summary>
@@ -668,6 +733,29 @@ namespace osu.Game.EzOsuGame.Analysis
         public void EnsureInitialised() => persistentStore.Initialise();
 
         /// <summary>
+        /// Whether a branch's mirrored values were written by an older revision of a system that produces them.
+        /// </summary>
+        /// <remarks>
+        /// Missing stamps mean the branch predates the mirror (it was migrated from an older schema), so its mirrored
+        /// columns hold nothing and have to be filled. That is a re-read from Realm, not a recompute.
+        /// </remarks>
+        private bool needsMirrorRefresh(string databasePath)
+        {
+            var stored = persistentStore.GetSongsBranchMirroredSystemVersions(databasePath);
+
+            foreach (var (systemId, version) in mirroredVersionsOfPlan())
+            {
+                if (!stored.TryGetValue(systemId, out int storedVersion))
+                    return true;
+
+                if (version > 0 && storedVersion != version)
+                    return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// 扫描所有分支库：v2+ legacy 库补写版本 meta；v1 迁移后标记全量 refresh；返回 ssr或 PP 算法落后、需要重算的分支计划。
         /// </summary>
         public IReadOnlyList<SongsBranchRefreshPlan> GetSongsBranchesNeedingRefresh()
@@ -699,7 +787,9 @@ namespace osu.Game.EzOsuGame.Analysis
                         RefreshSunnySR: supportsSunnySR,
                         RefreshPp: supportsPp,
                         CurrentSunnySRVersion: supportsSunnySR ? currentSunnySRVersion : 0,
-                        CurrentPpVersion: supportsPp ? currentPpVersion : 0));
+                        CurrentPpVersion: supportsPp ? currentPpVersion : 0,
+                        // The migration that got here also added the mirrored columns, so they are empty too.
+                        RefreshMirrored: true));
                     continue;
                 }
 
@@ -724,15 +814,17 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 bool refreshSunnySR = supportsSunnySR&& persistentStore.SongsBranchNeedsSunnySRRefresh(storedSunnySRVersion, currentSunnySRVersion);
                 bool refreshPp = supportsPp && persistentStore.SongsBranchNeedsPpRefresh(storedPpVersion, currentPpVersion);
+                bool refreshMirrored = needsMirrorRefresh(branch.DatabasePath);
 
-                if (refreshSunnySR|| refreshPp)
+                if (refreshSunnySR|| refreshPp || refreshMirrored)
                 {
                     plans.Add(new SongsBranchRefreshPlan(
                         branch,
                         refreshSunnySR,
                         refreshPp,
                         supportsSunnySR ? currentSunnySRVersion : 0,
-                        supportsPp ? currentPpVersion : 0));
+                        supportsPp ? currentPpVersion : 0,
+                        refreshMirrored));
                 }
             }
 
@@ -779,7 +871,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
                 return Task.CompletedTask;
 
-            if (!plan.RefreshSunnySR&& !plan.RefreshPp)
+            if (!plan.RefreshSunnySR&& !plan.RefreshPp && !plan.RefreshMirrored)
                 return Task.CompletedTask;
 
             return Task.Run(() =>
@@ -798,6 +890,11 @@ namespace osu.Game.EzOsuGame.Analysis
                     return;
                 }
 
+                // The mirrored columns are a projection of Realm, so refreshing them is a re-read rather than a compute.
+                // It is a separate question from the two computed columns above and is planned separately.
+                var mirroredRatings = plan.RefreshMirrored ? loadStoredRatings(chartsOf(storedRows)) : null;
+                var mirroredSkills = plan.RefreshMirrored ? loadSkillRowsForHashes(chartsOf(storedRows), plan.Branch.Metadata.RulesetOnlineId) : null;
+
                 var beatmapLookup = buildLocalBeatmapLookup();
                 var mods = restoreModsFromJson(localRulesetInfo, plan.Branch.Metadata.ModsJson);
                 var updatedRows = new List<EzAnalysisPersistentStore.SongsBranchRow>(storedRows.Count);
@@ -810,6 +907,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     var storedRow = storedRows[i];
                     double sunnySR = storedRow.SunnySR;
                     double? pp = storedRow.Pp;
+                    var mirrored = mirroredRatings != null ? ratingsOf(mirroredRatings, storedRow.BeatmapId) : default;
 
                     if (beatmapLookup.TryGetValue(storedRow.BeatmapId, out var beatmap)
                         && string.Equals(beatmap.Hash, storedRow.BeatmapHash, StringComparison.Ordinal))
@@ -848,7 +946,8 @@ namespace osu.Game.EzOsuGame.Analysis
                         }
                     }
 
-                    updatedRows.Add(new EzAnalysisPersistentStore.SongsBranchRow(storedRow.BeatmapId, storedRow.BeatmapHash, storedRow.BeatmapMd5, sunnySR, pp));
+                    updatedRows.Add(new EzAnalysisPersistentStore.SongsBranchRow(storedRow.BeatmapId, storedRow.BeatmapHash, storedRow.BeatmapMd5, sunnySR, pp,
+                        mirrored.OfficialSr, mirrored.MinaSr, mirrored.MinaPp, mirrored.PppSr, mirrored.PppPp));
 
                     long now = Environment.TickCount64;
 
@@ -865,7 +964,10 @@ namespace osu.Game.EzOsuGame.Analysis
                     plan.Branch.DatabasePath,
                     updatedRows,
                     plan.RefreshSunnySR ? plan.CurrentSunnySRVersion : null,
-                    plan.RefreshPp ? plan.CurrentPpVersion : null);
+                    plan.RefreshPp ? plan.CurrentPpVersion : null,
+                    plan.RefreshMirrored ? mirroredSkills : null,
+                    plan.RefreshMirrored ? mirroredVersionsOfPlan() : null,
+                    writeMirrored: plan.RefreshMirrored);
 
                 persistentStore.ClearSongsBranchPostMigrationRefresh(plan.Branch.DatabasePath);
 
@@ -875,6 +977,17 @@ namespace osu.Game.EzOsuGame.Analysis
                         activeSongsBranchVersion.Value++;
                 }
             }, cancellationToken);
+        }
+
+        /// <summary>The revision each mirrored system is currently at, for stamping a branch that was just re-read.</summary>
+        private static IReadOnlyDictionary<string, int> mirroredVersionsOfPlan()
+        {
+            var versions = new Dictionary<string, int>(StringComparer.Ordinal);
+
+            foreach (var system in new[] { EzAnalysisSystem.Mina, EzAnalysisSystem.CSI, EzAnalysisSystem.Dan, EzAnalysisSystem.PPP })
+                versions[system.ToStorageId()] = system.CurrentVersion();
+
+            return versions;
         }
 
         public bool NeedsOnDemandBackfill(IBeatmapInfo beatmapInfo)

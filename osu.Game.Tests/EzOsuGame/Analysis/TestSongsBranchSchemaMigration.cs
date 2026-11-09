@@ -53,7 +53,12 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             Assert.That(tableExists(migrated, "songs_branch_entry"), Is.True);
             Assert.That(tableExists(migrated, "sunny_sr_branch"), Is.False);
             Assert.That(readSunnySR(migrated), Is.EqualTo(4.56).Within(0.001));
-            Assert.That(readMeta(migrated, "sunny_sr_version"), Is.Null);
+
+            // v1 has no pp column, so its Sunny stars cannot be reused either (they came from a build that predates the
+            // current one): both stamps are dropped and the branch is scheduled for a full refresh.
+            Assert.That(readMeta(migrated, legacy_meta_key), Is.Null, "the legacy key must not survive migration");
+            Assert.That(readMeta(migrated, "ssr"), Is.Null, "a full recompute drops the stamp it is recomputing");
+            Assert.That(readMeta(migrated, "official"), Is.Null);
             Assert.That(readMeta(migrated, "requires_post_migration_refresh"), Is.EqualTo("1"));
         }
 
@@ -69,9 +74,16 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             using var migrated = openConnection();
             Assert.That(prepareBranch(migrated), Is.True);
             Assert.That(readPp(migrated), Is.EqualTo(123.4).Within(0.001));
-            Assert.That(readMeta(migrated, "pp_version"), Is.EqualTo("20241007"));
             Assert.That(readMeta(migrated, "requires_post_migration_refresh"), Is.Null);
+
+            // v2 can be reused, but only if its stamps survive under the names the reader asks for. Left under the
+            // legacy names they read as absent, and the planner would stamp the branch current instead of refreshing it.
+            Assert.That(readMeta(migrated, legacy_meta_key), Is.Null, "the legacy key must not survive migration");
+            Assert.That(readMeta(migrated, "ssr"), Is.EqualTo("20250415"));
+            Assert.That(readMeta(migrated, "official"), Is.EqualTo("20241007"));
         }
+
+        private const string legacy_meta_key = "sunny_sr_version";
 
         private SqliteConnection openConnection()
         {

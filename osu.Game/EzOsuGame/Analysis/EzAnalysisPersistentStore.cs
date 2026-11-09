@@ -65,14 +65,19 @@ namespace osu.Game.EzOsuGame.Analysis
             double? PppPp = null,
             bool SunnyPpComputed = false);
 
-        /// <summary>One axis of a system whose result is an axis set rather than one number (CSI, dan).</summary>
+        /// <summary>One value of a system whose result is an axis set rather than one number (CSI, dan).</summary>
+        /// <remarks>
+        /// <see cref="Value"/> carries the numeric axes; <see cref="TextValue"/> carries what a numeric column cannot
+        /// hold (dan's label stamps). A row has one or the other.
+        /// </remarks>
         public readonly record struct SongsBranchSkillRow(
             Guid BeatmapId,
             string SystemId,
             int RulesetOnlineId,
             string SkillId,
             double Value,
-            int AlgorithmVersion);
+            int AlgorithmVersion,
+            string? TextValue = null);
 
         public readonly record struct SongsBranchDescriptor(string DatabasePath, string RelativePath, SongsBranchMetadata Metadata);
 
@@ -154,6 +159,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private const string col_skill_ruleset_online_id = "ruleset_online_id";
         private const string col_skill_skill_id = "skill_id";
         private const string col_skill_value = "value";
+        private const string col_skill_text_value = "text_value";
         private const string col_skill_algorithm_version = "algorithm_version";
 
         private readonly Storage storage;
@@ -218,6 +224,12 @@ namespace osu.Game.EzOsuGame.Analysis
         // same question with the same vocabulary.
         private static readonly string meta_key_sunny_sr_version = EzAnalysisSystem.SSR.ToStorageId();
         private static readonly string meta_key_pp_version = EzAnalysisSystem.Official.ToStorageId();
+
+        /// <summary>
+        /// The literal names branches were stamped with before the keys became system ids. Only migration reads these.
+        /// </summary>
+        private const string legacy_meta_key_sunny_sr_version = "sunny_sr_version";
+        private const string legacy_meta_key_pp_version = "pp_version";
         private const string meta_key_analysis_version = "analysis_version";
         private const string meta_key_kind = "kind";
         private const string meta_key_schema_version = "schema_version";
@@ -1108,7 +1120,8 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_skill} (
     {col_skill_system_id} TEXT NOT NULL,
     {col_skill_ruleset_online_id} INTEGER NOT NULL,
     {col_skill_skill_id} TEXT NOT NULL,
-    {col_skill_value} REAL NOT NULL,
+    {col_skill_value} REAL NULL,
+    {col_skill_text_value} TEXT NULL,
     {col_skill_algorithm_version} INTEGER NOT NULL,
     PRIMARY KEY ({col_skill_beatmap_id}, {col_skill_system_id}, {col_skill_ruleset_online_id}, {col_skill_skill_id})
 );
@@ -1139,6 +1152,14 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_source_collection} (
 
                 if (ppAlgorithmVersion > 0)
                     setMeta(connection, meta_key_pp_version, ppAlgorithmVersion.ToString(CultureInfo.InvariantCulture));
+
+                // One stamp per mirrored system, keyed by the same vocabulary as the Realm applied-version table. The
+                // branch reader compares these to decide whether the mirrored values still answer the question.
+                foreach (var (systemId, version) in mirroredSystemVersions())
+                {
+                    if (version > 0)
+                        setMeta(connection, systemId, version.ToString(CultureInfo.InvariantCulture));
+                }
                 setMeta(connection, meta_key_ruleset_online_id, metadata.RulesetOnlineId.ToString(CultureInfo.InvariantCulture));
                 setMeta(connection, meta_key_ruleset_short_name, metadata.RulesetShortName);
                 setMeta(connection, meta_key_mods_fingerprint, metadata.ModsFingerprint);
@@ -1314,6 +1335,101 @@ ON CONFLICT({col_beatmap_id}) DO UPDATE SET
         private static object valueOrNull(double? value) => value is double actual ? actual : DBNull.Value;
 
         /// <summary>
+        /// The systems whose result a branch mirrors, with the revision each is currently computed at.
+        /// </summary>
+        /// <remarks>
+        /// Official and Sunny are excluded: they have a planner of their own (they are recomputed, not re-read), and
+        /// their stamps already exist under the same keys this uses for the mirror.
+        /// </remarks>
+        private static IEnumerable<(string SystemId, int Version)> mirroredSystemVersions()
+        {
+            foreach (var system in new[] { EzAnalysisSystem.Mina, EzAnalysisSystem.CSI, EzAnalysisSystem.Dan, EzAnalysisSystem.PPP })
+                yield return (system.ToStorageId(), system.CurrentVersion());
+        }
+
+        /// <summary>
+        /// The revision each mirrored system was at when a branch was written.
+        /// </summary>
+        /// <remarks>
+        /// A system missing from the result is one the branch never recorded, which the planner reads as "these values
+        /// predate the mirror and have to be filled", not as "up to date".
+        /// </remarks>
+        public IReadOnlyDictionary<string, int> GetSongsBranchMirroredSystemVersions(string databasePath)
+        {
+            var versions = new Dictionary<string, int>(StringComparer.Ordinal);
+
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+                return versions;
+
+            try
+            {
+                using var connection = openConnection(databasePath);
+
+                if (!prepareSongsBranchConnection(connection))
+                    return versions;
+
+                foreach (var (systemId, _) in mirroredSystemVersions())
+                {
+                    if (int.TryParse(tryGetMeta(connection, systemId), NumberStyles.Integer, CultureInfo.InvariantCulture, out int stored))
+                        versions[systemId] = stored;
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore GetSongsBranchMirroredSystemVersions failed.", Ez2ConfigManager.LOGGER_NAME);
+            }
+
+            return versions;
+        }
+
+        /// <summary>The axis rows of a branch, as written.</summary>
+        public IReadOnlyList<SongsBranchSkillRow> ReadSongsBranchSkillRows(string databasePath)
+        {
+            var rows = new List<SongsBranchSkillRow>();
+
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+                return rows;
+
+            try
+            {
+                using var connection = openConnection(databasePath);
+
+                if (!prepareSongsBranchConnection(connection))
+                    return rows;
+
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = $@"
+SELECT {col_skill_beatmap_id}, {col_skill_system_id}, {col_skill_ruleset_online_id},
+       {col_skill_skill_id}, {col_skill_value}, {col_skill_text_value}, {col_skill_algorithm_version}
+FROM {table_songs_branch_skill};";
+
+                using var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    if (!Guid.TryParse(reader.GetString(0), out Guid beatmapId))
+                        continue;
+
+                    rows.Add(new SongsBranchSkillRow(
+                        beatmapId,
+                        reader.GetString(1),
+                        reader.GetInt32(2),
+                        reader.GetString(3),
+                        reader.IsDBNull(4) ? 0 : reader.GetDouble(4),
+                        reader.GetInt32(6),
+                        reader.IsDBNull(5) ? null : reader.GetString(5)));
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore ReadSongsBranchSkillRows failed.", Ez2ConfigManager.LOGGER_NAME);
+                rows.Clear();
+            }
+
+            return rows;
+        }
+
+        /// <summary>
         /// Reads a nullable column, treating "absent" and "not computed" as the same answer.
         /// </summary>
         private static double? readNullableDouble(SqliteDataReader reader, int ordinal)
@@ -1343,9 +1459,10 @@ INSERT OR REPLACE INTO {table_songs_branch_skill}(
     {col_skill_ruleset_online_id},
     {col_skill_skill_id},
     {col_skill_value},
+    {col_skill_text_value},
     {col_skill_algorithm_version}
 )
-VALUES($id, $system, $ruleset, $skill, $value, $version);
+VALUES($id, $system, $ruleset, $skill, $value, $text, $version);
 ";
 
             var idParam = insert.CreateParameter();
@@ -1368,6 +1485,10 @@ VALUES($id, $system, $ruleset, $skill, $value, $version);
             valueParam.ParameterName = "$value";
             insert.Parameters.Add(valueParam);
 
+            var textParam = insert.CreateParameter();
+            textParam.ParameterName = "$text";
+            insert.Parameters.Add(textParam);
+
             var versionParam = insert.CreateParameter();
             versionParam.ParameterName = "$version";
             insert.Parameters.Add(versionParam);
@@ -1379,7 +1500,8 @@ VALUES($id, $system, $ruleset, $skill, $value, $version);
                 systemParam.Value = row.SystemId;
                 rulesetParam.Value = row.RulesetOnlineId;
                 skillParam.Value = row.SkillId;
-                valueParam.Value = row.Value;
+                valueParam.Value = row.TextValue == null ? row.Value : DBNull.Value;
+                textParam.Value = row.TextValue ?? (object)DBNull.Value;
                 versionParam.Value = row.AlgorithmVersion;
                 insert.ExecuteNonQuery();
             }
@@ -2058,7 +2180,17 @@ FROM {table_songs_branch_entry};";
             }
         }
 
-        public bool UpdateSongsBranchRows(string databasePath, IEnumerable<SongsBranchRow> rows, int? newSunnySRAlgorithmVersion, int? newPpAlgorithmVersion)
+        /// <summary>
+        /// Rewrites the rows of a branch in place, and optionally replaces its axis rows and its system revisions.
+        /// </summary>
+        /// <param name="skillRows">The complete axis set of every chart in the branch, or null to leave them untouched.</param>
+        /// <param name="systemVersions">
+        /// Revision per mirrored system, or null to leave the stamps untouched. Only systems whose values were just
+        /// rewritten are passed, so an untouched stamp keeps describing the rows it was written for.
+        /// </param>
+        public bool UpdateSongsBranchRows(string databasePath, IEnumerable<SongsBranchRow> rows, int? newSunnySRAlgorithmVersion, int? newPpAlgorithmVersion,
+                                          IEnumerable<SongsBranchSkillRow>? skillRows = null, IReadOnlyDictionary<string, int>? systemVersions = null,
+                                          bool writeMirrored = false)
         {
             if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return false;
@@ -2072,12 +2204,23 @@ FROM {table_songs_branch_entry};";
 
                 using var transaction = connection.BeginTransaction();
 
+                // The mirrored columns are only written when the caller re-read them. Writing "the value is absent" for
+                // a column the caller did not look at would make a Sunny-only refresh erase Mina and PP+.
+                string mirroredAssignments = writeMirrored
+                    ? $@",
+    {col_official_sr} = $official_sr,
+    {col_mina_sr} = $mina_sr,
+    {col_mina_pp} = $mina_pp,
+    {col_ppp_sr} = $ppp_sr,
+    {col_ppp_pp} = $ppp_pp"
+                    : string.Empty;
+
                 using var update = connection.CreateCommand();
                 update.Transaction = transaction;
                 update.CommandText = $@"
 UPDATE {table_songs_branch_entry}
 SET {col_sunny_sr} = $ssr,
-    {col_pp} = $pp
+    {col_pp} = $pp{mirroredAssignments}
 WHERE {col_beatmap_id} = $id;
 ";
 
@@ -2093,13 +2236,41 @@ WHERE {col_beatmap_id} = $id;
                 ppParam.ParameterName = "$pp";
                 update.Parameters.Add(ppParam);
 
+                var officialSrParam = update.CreateParameter();
+                officialSrParam.ParameterName = "$official_sr";
+                update.Parameters.Add(officialSrParam);
+
+                var minaSrParam = update.CreateParameter();
+                minaSrParam.ParameterName = "$mina_sr";
+                update.Parameters.Add(minaSrParam);
+
+                var minaPpParam = update.CreateParameter();
+                minaPpParam.ParameterName = "$mina_pp";
+                update.Parameters.Add(minaPpParam);
+
+                var pppSrParam = update.CreateParameter();
+                pppSrParam.ParameterName = "$ppp_sr";
+                update.Parameters.Add(pppSrParam);
+
+                var pppPpParam = update.CreateParameter();
+                pppPpParam.ParameterName = "$ppp_pp";
+                update.Parameters.Add(pppPpParam);
+
                 foreach (var row in rows)
                 {
                     idParam.Value = row.BeatmapId.ToString();
                     ssrParam.Value = row.SunnySR;
-                    ppParam.Value = row.Pp.HasValue ? row.Pp.Value : DBNull.Value;
+                    ppParam.Value = valueOrNull(row.Pp);
+                    officialSrParam.Value = valueOrNull(row.OfficialSr);
+                    minaSrParam.Value = valueOrNull(row.MinaSr);
+                    minaPpParam.Value = valueOrNull(row.MinaPp);
+                    pppSrParam.Value = valueOrNull(row.PppSr);
+                    pppPpParam.Value = valueOrNull(row.PppPp);
                     update.ExecuteNonQuery();
                 }
+
+                if (skillRows != null)
+                    writeSkillRows(connection, transaction, skillRows, CancellationToken.None);
 
                 transaction.Commit();
 
@@ -2108,6 +2279,15 @@ WHERE {col_beatmap_id} = $id;
 
                 if (newPpAlgorithmVersion is > 0)
                     setMeta(connection, meta_key_pp_version, newPpAlgorithmVersion.Value.ToString(CultureInfo.InvariantCulture));
+
+                if (systemVersions != null)
+                {
+                    foreach (var (systemId, version) in systemVersions)
+                    {
+                        if (version > 0)
+                            setMeta(connection, systemId, version.ToString(CultureInfo.InvariantCulture));
+                    }
+                }
 
                 setMeta(connection, meta_key_analysis_version, ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
                 return true;
@@ -2705,7 +2885,8 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_skill} (
     {col_skill_system_id} TEXT NOT NULL,
     {col_skill_ruleset_online_id} INTEGER NOT NULL,
     {col_skill_skill_id} TEXT NOT NULL,
-    {col_skill_value} REAL NOT NULL,
+    {col_skill_value} REAL NULL,
+    {col_skill_text_value} TEXT NULL,
     {col_skill_algorithm_version} INTEGER NOT NULL,
     PRIMARY KEY ({col_skill_beatmap_id}, {col_skill_system_id}, {col_skill_ruleset_online_id}, {col_skill_skill_id})
 );
@@ -2718,6 +2899,12 @@ CREATE INDEX IF NOT EXISTS idx_songs_branch_skill_system
 
             setMeta(connection, meta_key_kind, songs_branch_kind);
             setMeta(connection, meta_key_schema_version, songs_branch_schema_version.ToString(CultureInfo.InvariantCulture));
+
+            // Branches written before the keys became system ids carry their versions under literal names. Moving them
+            // first is what lets the recompute decision below read them: a version left behind reads as "never
+            // stamped", and the planner then stamps the branch with the current revision instead of refreshing it.
+            migrateLegacyMetaKey(connection, legacy_meta_key_sunny_sr_version, meta_key_sunny_sr_version);
+            migrateLegacyMetaKey(connection, legacy_meta_key_pp_version, meta_key_pp_version);
 
             if (requiresFullRecompute)
             {
@@ -2738,6 +2925,26 @@ CREATE INDEX IF NOT EXISTS idx_songs_branch_skill_system
                     : $"[EzAnalysisPersistentStore] Migrated legacy songs branch schema v{legacySchemaVersion} to kind={songs_branch_kind}, schema v{songs_branch_schema_version}; reusing cached ssr/PP.",
                 Ez2ConfigManager.LOGGER_NAME,
                 LogLevel.Important);
+        }
+
+        /// <summary>
+        /// Moves a legacy meta value onto the key the current code reads, dropping the legacy key.
+        /// </summary>
+        /// <remarks>
+        /// A branch stamped before the keys became system ids would otherwise read its version as absent. That is not a
+        /// neutral reading: the refresh planner treats "no stamp" as "written by the current algorithm" and stamps the
+        /// current revision, so an old branch would be kept instead of recomputed. The value is only written when the
+        /// current key is empty, so a branch that already has one is not overwritten.
+        /// </remarks>
+        private static void migrateLegacyMetaKey(SqliteConnection connection, string legacyKey, string currentKey)
+        {
+            if (tryGetMeta(connection, legacyKey) is not { } legacy)
+                return;
+
+            if (IsNullOrEmpty(tryGetMeta(connection, currentKey)))
+                setMeta(connection, currentKey, legacy);
+
+            deleteMeta(connection, legacyKey);
         }
 
         private static int readLegacySongsBranchSchemaVersion(SqliteConnection connection)
