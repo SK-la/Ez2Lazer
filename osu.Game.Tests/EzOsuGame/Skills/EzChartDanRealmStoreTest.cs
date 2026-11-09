@@ -155,15 +155,36 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
-        public void Invalidating_a_system_also_marks_the_systems_derived_from_it()
+        public void Invalidating_a_system_also_retires_the_systems_derived_from_it()
         {
             RunTestWithRealm((realm, _) =>
             {
                 var store = new EzChartSkillStore(realm);
+                const string hash = "chart-dan-invalidated";
 
-                store.SetAppliedVersion(EzAnalysisSystem.Mina, EzMinaEngine.VERSION);
-                store.SetAppliedVersion(EzAnalysisSystem.CSI, EzCSIEngine.VERSION);
-                store.SetAppliedVersion(EzAnalysisSystem.Dan, EzDanEngine.VERSION);
+                seedChart(realm, hash);
+                stampWholeChain(store);
+
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6));
+                store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
+
+                realm.Write(r =>
+                {
+                    r.Add(new EzChartDan
+                    {
+                        BeatmapHash = hash,
+                        AlgorithmVersion = EzDanEngine.VERSION,
+                        KeyCount = 4,
+                        HoldRatio = 0.1,
+                        OverallMsd = 10,
+                        RcRawDan = 5,
+                        RcLabel = "Invalidated",
+                        LnRawDan = -1,
+                        ComputedAt = DateTimeOffset.UtcNow,
+                    });
+                });
+
+                Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Contain(hash));
 
                 var invalidated = store.Invalidate(EzAnalysisSystem.CSI);
 
@@ -171,9 +192,40 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Assert.That(invalidated, Does.Contain(EzAnalysisSystem.Dan), "Dan reads CSI");
                 Assert.That(invalidated, Does.Not.Contain(EzAnalysisSystem.Mina), "Mina is upstream of CSI");
 
-                Assert.That(store.IsExpired(EzAnalysisSystem.CSI), Is.True);
-                Assert.That(store.IsExpired(EzAnalysisSystem.Dan), Is.True);
+                var chain = store.CollectChartChainState();
+
+                Assert.That(chain.CompleteChartSkillInfo, Does.Not.Contain(hash), "the CSI row is retired");
+                Assert.That(chain.CompleteChartDan, Does.Not.Contain(hash), "the dan row is retired");
+                Assert.That(chain.MsdOwed, Does.Not.Contain(hash), "Mina is upstream of CSI and keeps its row");
+
+                // The revision is recorded as part of the retirement, so the next pass fills what is missing instead
+                // of retiring the same rows again on every launch.
+                Assert.That(store.IsExpired(EzAnalysisSystem.CSI), Is.False);
+                Assert.That(store.IsExpired(EzAnalysisSystem.Dan), Is.False);
                 Assert.That(store.IsExpired(EzAnalysisSystem.Mina), Is.False);
+            });
+        }
+
+        [Test]
+        public void Retiring_a_rating_drops_the_stored_pair()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzChartSkillStore(realm);
+                const string hash = "chart-ssr-retired";
+
+                seedChart(realm, hash);
+
+                Guid id = realm.Run(r => r.All<BeatmapInfo>().First(b => b.Hash == hash).ID);
+                store.WriteRating(id, EzAnalysisSystem.SSR, 4.5, 250);
+
+                Assert.That(realm.Run(r => r.Find<BeatmapInfo>(id)!.EzRatingData.SunnySR), Is.EqualTo(4.5));
+
+                store.Invalidate(EzAnalysisSystem.SSR);
+
+                Assert.That(realm.Run(r => r.Find<BeatmapInfo>(id)!.EzRatingData.SunnySR), Is.EqualTo(-1));
+                Assert.That(realm.Run(r => r.Find<BeatmapInfo>(id)!.EzRatingData.SunnyPP), Is.EqualTo(-1));
+                Assert.That(store.IsExpired(EzAnalysisSystem.SSR), Is.False, "the retirement records the revision");
             });
         }
 
