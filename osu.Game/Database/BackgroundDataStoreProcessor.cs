@@ -1008,13 +1008,14 @@ namespace osu.Game.Database
 
                 try
                 {
-                    double xxyStarRating = EzAnalysisComputation.ComputeBaselineXxyStarRatingForRealm(beatmapManager, beatmap, CancellationToken.None);
-
-                    realmAccess.Write(r =>
-                    {
-                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
-                            liveBeatmapInfo.XxyStarRating = xxyStarRating;
-                    });
+                    // [EZ-REALTIME] 分析回写已临时屏蔽（实时验证期）；恢复时取消注释。
+                    // double xxyStarRating = EzAnalysisComputation.ComputeBaselineXxyStarRatingForRealm(beatmapManager, beatmap, CancellationToken.None);
+                    //
+                    // realmAccess.Write(r =>
+                    // {
+                    //     if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
+                    //         liveBeatmapInfo.XxyStarRating = xxyStarRating;
+                    // });
                     ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
                     ++processedCount;
                 }
@@ -1504,18 +1505,18 @@ namespace osu.Game.Database
 
                 try
                 {
-                    var lookup = new EzAnalysisLookupCache(beatmap, beatmap.Ruleset, mods: null);
-
-                    double performancePoints = EzAnalysisComputation.TryComputePerformancePoints(beatmapManager, lookup, CancellationToken.None, out double computedPp)
-                        ? computedPp
-                        : -1;
-
-                    realmAccess.Write(r =>
-                    {
-                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
-                            liveBeatmapInfo.PerformancePoints = performancePoints;
-                    });
-
+                    // [EZ-REALTIME] 分析回写已临时屏蔽（实时验证期）；恢复时取消注释。
+                    // var lookup = new EzAnalysisLookupCache(beatmap, beatmap.Ruleset, mods: null);
+                    //
+                    // double performancePoints = EzAnalysisComputation.TryComputePerformancePoints(beatmapManager, lookup, CancellationToken.None, out double computedPp)
+                    //     ? computedPp
+                    //     : -1;
+                    //
+                    // realmAccess.Write(r =>
+                    // {
+                    //     if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
+                    //         liveBeatmapInfo.PerformancePoints = performancePoints;
+                    // });
                     ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
                     ++processedCount;
                 }

@@ -22,6 +22,9 @@ namespace osu.Game.EzOsuGame.Skills
     /// </summary>
     public sealed class EzSkillStore
     {
+        // [EZ-REALTIME] 分析回写已临时屏蔽（实时验证期）；恢复时删除此开关与各处 early return。
+        private static readonly bool analysis_writes_blocked = true;
+
         private readonly RealmAccess realmAccess;
 
         public EzSkillStore(RealmAccess realmAccess)
@@ -120,6 +123,9 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentException.ThrowIfNullOrWhiteSpace(systemId);
             ArgumentNullException.ThrowIfNull(skills);
 
+            if (analysis_writes_blocked)
+                return;
+
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
 
@@ -166,6 +172,9 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentException.ThrowIfNullOrWhiteSpace(systemId);
             ArgumentNullException.ThrowIfNull(skills);
 
+            if (analysis_writes_blocked)
+                return;
+
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
 
@@ -201,6 +210,9 @@ namespace osu.Game.EzOsuGame.Skills
 
         public void WriteBeatmapMsd(string beatmapHash, EzMinaSkillAxisVector vector, Guid beatmapId = default, DateTimeOffset? computedAt = null, double? holdRatio = null)
         {
+            if (analysis_writes_blocked)
+                return;
+
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             const int version = EzMinaSkillAlgorithm.VERSION;
 
@@ -250,6 +262,9 @@ namespace osu.Game.EzOsuGame.Skills
         public void WriteBeatmapMsdUnrateable(string beatmapHash, Guid beatmapId = default, DateTimeOffset? computedAt = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(beatmapHash);
+
+            if (analysis_writes_blocked)
+                return;
 
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             const int version = EzMinaSkillAlgorithm.VERSION;
@@ -458,6 +473,9 @@ namespace osu.Game.EzOsuGame.Skills
             DateTimeOffset? computedAt = null,
             bool appendHistory = true)
         {
+            if (analysis_writes_blocked)
+                return;
+
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             const int version = EzMinaSkillAlgorithm.VERSION;
 
@@ -484,6 +502,9 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
             ArgumentNullException.ThrowIfNull(historySamples);
             ArgumentNullException.ThrowIfNull(patternRatings);
+
+            if (analysis_writes_blocked)
+                return;
 
             DateTimeOffset at = DateTimeOffset.UtcNow;
             const int version = EzMinaSkillAlgorithm.VERSION;
@@ -594,6 +615,9 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
             ArgumentNullException.ThrowIfNull(ratings);
 
+            if (analysis_writes_blocked)
+                return;
+
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             const int version = EzMinaSkillAlgorithm.VERSION;
 
@@ -651,6 +675,9 @@ namespace osu.Game.EzOsuGame.Skills
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
             ArgumentNullException.ThrowIfNull(samples);
+
+            if (analysis_writes_blocked)
+                return;
 
             const int version = EzMinaSkillAlgorithm.VERSION;
 
@@ -735,6 +762,9 @@ namespace osu.Game.EzOsuGame.Skills
         {
             ArgumentNullException.ThrowIfNull(estimate);
 
+            if (analysis_writes_blocked)
+                return;
+
             realmAccess.Write(r =>
             {
                 var existing = r.All<EzDanEstimate>()
@@ -805,6 +835,9 @@ namespace osu.Game.EzOsuGame.Skills
             if (info.IsUnavailable)
                 return;
 
+            if (analysis_writes_blocked)
+                return;
+
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
 
             realmAccess.Write(r =>
@@ -856,6 +889,9 @@ namespace osu.Game.EzOsuGame.Skills
         public void WriteChartSkillInfoUnavailable(string beatmapHash, Guid beatmapId = default, DateTimeOffset? computedAt = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(beatmapHash);
+
+            if (analysis_writes_blocked)
+                return;
 
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int revision = EzAnalysisRevision.ChartSkillInfo;
@@ -926,6 +962,9 @@ namespace osu.Game.EzOsuGame.Skills
         {
             ArgumentNullException.ThrowIfNull(chartDan);
             ArgumentException.ThrowIfNullOrWhiteSpace(chartDan.BeatmapHash);
+
+            if (analysis_writes_blocked)
+                return;
 
             DateTimeOffset at = chartDan.ComputedAt == default ? DateTimeOffset.UtcNow : chartDan.ComputedAt;
 
@@ -1113,6 +1152,9 @@ namespace osu.Game.EzOsuGame.Skills
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
             ArgumentNullException.ThrowIfNull(verdicts);
+
+            if (analysis_writes_blocked)
+                return;
 
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             const int version = EzDanAlgorithm.VERSION;

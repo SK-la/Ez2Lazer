@@ -75,8 +75,9 @@ namespace osu.Game.Beatmaps
                     beatmap.HasVideo = tagSummary.HasVideo;
                     beatmap.HasStoryboard = tagSummary.HasStoryboard;
 
-                    updateXxyStarRating(beatmap);
-                    updatePerformancePoints(beatmap, working);
+                    // [EZ-REALTIME] 分析回写已临时屏蔽（实时验证期）；恢复时取消注释。
+                    // updateXxyStarRating(beatmap);
+                    // updatePerformancePoints(beatmap, working);
                 }
 
                 // And invalidate again afterwards as re-fetching the most up-to-date database metadata will be required.

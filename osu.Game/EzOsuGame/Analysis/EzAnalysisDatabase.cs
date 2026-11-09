@@ -855,14 +855,16 @@ namespace osu.Game.EzOsuGame.Analysis
 
             if (payload.XxyStarRating is double xxy && double.IsFinite(xxy) && xxy >= 0)
             {
-                beatmap.XxyStarRating = xxy;
-                wrote = true;
+                // [EZ-REALTIME] 分析回写已临时屏蔽（实时验证期）；恢复时取消注释。
+                // beatmap.XxyStarRating = xxy;
+                // wrote = true;
             }
 
             if (payload.PerformancePoints is double pp && double.IsFinite(pp) && pp >= 0)
             {
-                beatmap.PerformancePoints = pp;
-                wrote = true;
+                // [EZ-REALTIME] 分析回写已临时屏蔽（实时验证期）；恢复时取消注释。
+                // beatmap.PerformancePoints = pp;
+                // wrote = true;
             }
 
             return wrote;
