@@ -99,9 +99,19 @@ namespace osu.Game.EzOsuGame.Skills
         /// Batch-read beatmap Mina (or other system) rows for many hashes in one Realm run.
         /// Missing hashes are omitted from the result.
         /// </summary>
+        /// <param name="rulesetOnlineId">
+        /// When non-negative, only rows stamped for that ruleset are returned. Pass a negative value to accept any
+        /// ruleset attribution (Mina / CSI rows are ruleset-scoped but historically read without a filter).
+        /// </param>
+        /// <param name="algorithmVersion">
+        /// When non-null, only rows stamped at that revision are returned. PPP callers must pass the current bundle
+        /// revision so an older complete set is not treated as current.
+        /// </param>
         public IReadOnlyDictionary<string, IReadOnlyDictionary<string, double>> GetBeatmapSkillsForHashes(
             IEnumerable<string> beatmapHashes,
-            EzAnalysisSystem system)
+            EzAnalysisSystem system,
+            int rulesetOnlineId = -1,
+            int? algorithmVersion = null)
         {
             ArgumentNullException.ThrowIfNull(beatmapHashes);
 
@@ -122,10 +132,118 @@ namespace osu.Game.EzOsuGame.Skills
                             .AsEnumerable()
                             .Where(v => hashSet.Contains(v.BeatmapHash));
 
+                if (rulesetOnlineId >= 0)
+                    rows = rows.Where(v => v.RulesetOnlineId == rulesetOnlineId);
+
+                if (algorithmVersion is int revision)
+                    rows = rows.Where(v => v.AlgorithmVersion == revision);
+
                 foreach (var group in rows.GroupBy(v => v.BeatmapHash, StringComparer.Ordinal))
                     result[group.Key] = group.ToDictionary(v => v.SkillId, v => v.Value, StringComparer.Ordinal);
 
                 return result;
+            });
+        }
+
+        /// <summary>
+        /// Batch-read one bare skill axis for many hashes. Missing / unrateable hashes are omitted.
+        /// Pass <paramref name="beatmapHashes"/> as null to read every current row for the axis.
+        /// </summary>
+        public IReadOnlyDictionary<string, double> GetBeatmapSkillAxisForHashes(
+            IEnumerable<string>? beatmapHashes,
+            EzAnalysisSystem system,
+            string axisId,
+            int rulesetOnlineId = -1,
+            int? algorithmVersion = null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(axisId);
+
+            HashSet<string>? hashSet = null;
+
+            if (beatmapHashes != null)
+            {
+                hashSet = beatmapHashes
+                          .Where(static h => !string.IsNullOrEmpty(h))
+                          .ToHashSet(StringComparer.Ordinal);
+
+                if (hashSet.Count == 0)
+                    return new Dictionary<string, double>(StringComparer.Ordinal);
+            }
+
+            return realmAccess.Run(r =>
+            {
+                string systemId = system.ToStorageId();
+                var result = new Dictionary<string, double>(StringComparer.Ordinal);
+
+                var rows = r.All<EzBeatmapSkillValue>()
+                            .Where(v => v.SystemId == systemId
+                                        && v.SkillId == axisId
+                                        && (EzSkillRowState)v.State == EzSkillRowState.Current)
+                            .AsEnumerable();
+
+                if (rulesetOnlineId >= 0)
+                    rows = rows.Where(v => v.RulesetOnlineId == rulesetOnlineId);
+
+                if (algorithmVersion is int revision)
+                    rows = rows.Where(v => v.AlgorithmVersion == revision);
+
+                foreach (var row in rows)
+                {
+                    if (hashSet != null && !hashSet.Contains(row.BeatmapHash))
+                        continue;
+
+                    if (!double.IsFinite(row.Value))
+                        continue;
+
+                    result[row.BeatmapHash] = row.Value;
+                }
+
+                return result;
+            });
+        }
+
+        /// <summary>
+        /// Every current ChartSkillInfo row keyed by hash. Unavailable stubs are omitted.
+        /// </summary>
+        public IReadOnlyDictionary<string, EzChartSkillInfo> GetAllChartSkillInfo()
+        {
+            return realmAccess.Run(r =>
+            {
+                var result = new Dictionary<string, EzChartSkillInfo>(StringComparer.Ordinal);
+
+                foreach (var row in r.All<EzBeatmapChartSkillInfo>())
+                {
+                    var dto = chartSkillInfoToDto(row);
+                    if (dto.IsUnavailable)
+                        continue;
+
+                    result[row.BeatmapHash] = dto;
+                }
+
+                return result;
+            });
+        }
+
+        /// <summary>
+        /// Distinct beatmap hashes that currently have at least one skill row for <paramref name="system"/>.
+        /// </summary>
+        public IReadOnlyList<string> CollectSkillHashes(EzAnalysisSystem system, int rulesetOnlineId = -1, int? algorithmVersion = null)
+        {
+            string systemId = system.ToStorageId();
+
+            return realmAccess.Run(r =>
+            {
+                var rows = r.All<EzBeatmapSkillValue>()
+                            .Where(v => v.SystemId == systemId && (EzSkillRowState)v.State == EzSkillRowState.Current)
+                            .AsEnumerable();
+
+                if (rulesetOnlineId >= 0)
+                    rows = rows.Where(v => v.RulesetOnlineId == rulesetOnlineId);
+
+                if (algorithmVersion is int revision)
+                    rows = rows.Where(v => v.AlgorithmVersion == revision);
+
+                return (IReadOnlyList<string>)rows.Select(v => v.BeatmapHash).Distinct(StringComparer.Ordinal).ToList();
             });
         }
 

@@ -69,6 +69,56 @@ namespace osu.Game.Tests.Visual.SongSelect
             Assert.That(results.Select(i => (BeatmapInfo)i.Model), Is.EquivalentTo(new[] { inRange }));
         }
 
+        [Test]
+        public async Task TestSkillTagFilterMatchesExactIdsOnly()
+        {
+            var jackOnly = createBeatmap(ssr: 1.0, starRating: 5.0);
+            var chordjack = createBeatmap(ssr: 1.0, starRating: 5.0);
+            var both = createBeatmap(ssr: 1.0, starRating: 5.0);
+
+            var criteria = new FilterCriteria
+            {
+                SkillTags =
+                {
+                    new FilterCriteria.OptionalTextFilter { SearchTerm = "jack" },
+                },
+            };
+
+            var tags = new Dictionary<BeatmapInfo, string[]>
+            {
+                [jackOnly] = ["jack"],
+                [chordjack] = ["chordjack"],
+                [both] = ["jack", "chordjack"],
+            };
+
+            var matcher = new BeatmapCarouselFilterMatching(
+                () => criteria,
+                (_, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(new Dictionary<BeatmapInfo, double>()),
+                (_, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(new Dictionary<BeatmapInfo, double>()),
+                (items, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, string[]>>(
+                    items.ToDictionary(b => b, b => tags.TryGetValue(b, out var t) ? t : [])));
+
+            var results = await matcher.Run(new[] { jackOnly, chordjack, both }.Select(b => new CarouselItem(b)), CancellationToken.None);
+
+            Assert.That(results.Select(i => (BeatmapInfo)i.Model), Is.EquivalentTo(new[] { jackOnly, both }));
+        }
+
+        [Test]
+        public void TestSkillTagExcludeRejectsExactId()
+        {
+            var jack = createBeatmap(ssr: 1.0, starRating: 5.0);
+            var criteria = new FilterCriteria
+            {
+                SkillTags =
+                {
+                    new FilterCriteria.OptionalTextFilter { SearchTerm = "jack", ExcludeTerm = true },
+                },
+            };
+
+            Assert.That(BeatmapCarouselFilterMatching.CheckCriteriaMatch(jack, criteria, starDifficultyForFilter: 5, skillTags: ["jack"]), Is.False);
+            Assert.That(BeatmapCarouselFilterMatching.CheckCriteriaMatch(jack, criteria, starDifficultyForFilter: 5, skillTags: ["chordjack"]), Is.True);
+        }
+
         private static FilterCriteria criteriaFor(SortMode sort) => new FilterCriteria
         {
             Sort = sort,

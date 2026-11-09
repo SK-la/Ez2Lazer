@@ -34,6 +34,9 @@ namespace osu.Game.Screens.Select.Filter
 
         PP,
 
+        /// <summary>Group by one chart skill axis of the active analysis system (axis id lives on FilterCriteria).</summary>
+        SkillAxis,
+
         [LocalisableDescription(typeof(SongSelectStrings), nameof(SongSelectStrings.Favourites))]
         Favourites,
 

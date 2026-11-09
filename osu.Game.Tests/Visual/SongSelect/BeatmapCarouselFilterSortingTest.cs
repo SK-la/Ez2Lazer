@@ -233,6 +233,33 @@ namespace osu.Game.Tests.Visual.SongSelect
             Assert.That(results.First(), Is.EqualTo(highSunnySRLowSr.Beatmaps[0]));
         }
 
+        [Test]
+        public async Task TestSortBySkillAxisOrdersDescendingAndSinksMissing()
+        {
+            var beatmapSets = new List<BeatmapSetInfo>();
+
+            addBeatmapSet(_ => { }, beatmapSets, out var low);
+            addBeatmapSet(_ => { }, beatmapSets, out var high);
+            addBeatmapSet(_ => { }, beatmapSets, out var missing);
+
+            var axisValues = new Dictionary<BeatmapInfo, double>
+            {
+                [low.Beatmaps[0]] = 5,
+                [high.Beatmaps[0]] = 12,
+            };
+
+            var results = (await runSorting(
+                SortMode.SkillAxis,
+                beatmapSets,
+                skillAxisValueProvider: _ => axisValues,
+                skillAxisSystem: osu.Game.EzOsuGame.Analysis.EzAnalysisSystem.Mina,
+                skillAxisId: "stream")).ToList();
+
+            Assert.That(results[0], Is.EqualTo(high.Beatmaps[0]));
+            Assert.That(results[1], Is.EqualTo(low.Beatmaps[0]));
+            Assert.That(results[2], Is.EqualTo(missing.Beatmaps[0]));
+        }
+
         private static void addBeatmapSet(Action<BeatmapSetInfo> change, List<BeatmapSetInfo> list, out BeatmapSetInfo added)
         {
             var set = TestResources.CreateTestBeatmapSetInfo(1);
@@ -254,12 +281,21 @@ namespace osu.Game.Tests.Visual.SongSelect
 
         private static async Task<IEnumerable<BeatmapInfo>> runSorting(SortMode sort, List<BeatmapSetInfo> beatmapSets,
                                                                        Func<IEnumerable<BeatmapInfo>, IReadOnlyDictionary<BeatmapInfo, double>>? ssrValueProvider = null,
-                                                                       Func<IEnumerable<BeatmapInfo>, IReadOnlyDictionary<BeatmapInfo, double>>? ppValueProvider = null)
+                                                                       Func<IEnumerable<BeatmapInfo>, IReadOnlyDictionary<BeatmapInfo, double>>? ppValueProvider = null,
+                                                                       Func<IEnumerable<BeatmapInfo>, IReadOnlyDictionary<BeatmapInfo, double>>? skillAxisValueProvider = null,
+                                                                       osu.Game.EzOsuGame.Analysis.EzAnalysisSystem skillAxisSystem = default,
+                                                                       string? skillAxisId = null)
         {
             var sorter = new BeatmapCarouselFilterSorting(
-                () => new FilterCriteria { Sort = sort },
+                () => new FilterCriteria
+                {
+                    Sort = sort,
+                    SkillAxisSortSystem = skillAxisSystem,
+                    SkillAxisSortId = skillAxisId,
+                },
                 (beatmaps, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(ssrValueProvider?.Invoke(beatmaps) ?? new Dictionary<BeatmapInfo, double>()),
-                (beatmaps, _) => Task.FromResult(ppValueProvider?.Invoke(beatmaps) ?? new Dictionary<BeatmapInfo, double>()));
+                (beatmaps, _) => Task.FromResult(ppValueProvider?.Invoke(beatmaps) ?? new Dictionary<BeatmapInfo, double>()),
+                (beatmaps, _, _, _) => Task.FromResult(skillAxisValueProvider?.Invoke(beatmaps) ?? new Dictionary<BeatmapInfo, double>()));
             var carouselItems = await sorter.Run(beatmapSets.SelectMany(s => s.Beatmaps.Select(b => new CarouselItem(b))), CancellationToken.None);
             return carouselItems.Select(ci => ci.Model).OfType<BeatmapInfo>();
         }

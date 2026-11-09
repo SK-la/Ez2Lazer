@@ -99,6 +99,8 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.EzAnalysisRecEnabled, true);
             SetDefault(Ez2Setting.EzAnalysisSqliteEnabled, true);
             SetDefault(Ez2Setting.AnalysisSystemSelection, string.Empty);
+            SetDefault(Ez2Setting.SongSelectSkillSortAxis, string.Empty);
+            SetDefault(Ez2Setting.SongSelectSkillGroupAxis, string.Empty);
             SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
             SetDefault(Ez2Setting.MenuLogoPath, @"Menu/logo");
             SetDefault(Ez2Setting.MenuLogoText, "(´・ω・｀),120");
@@ -1036,6 +1038,12 @@ namespace osu.Game.EzOsuGame.Configuration
         /// 选歌界面的难度、PP、显示与雷达都按这里的选择读取同一套基线。
         /// </summary>
         AnalysisSystemSelection,
+
+        /// <summary>选歌「技能轴」排序所选轴，格式 <c>mina:stream</c> / <c>ppp:strain</c>；空表示未选。</summary>
+        SongSelectSkillSortAxis,
+
+        /// <summary>选歌「技能轴」分组所选轴，格式同 <see cref="SongSelectSkillSortAxis"/>。</summary>
+        SongSelectSkillGroupAxis,
 
         HideMainMenuOnlineBanner,
 

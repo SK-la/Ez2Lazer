@@ -797,5 +797,20 @@ namespace osu.Game.Tests.NonVisual.Filtering
             Assert.That(filterCriteria.UserTags[1].SearchTerm, Is.EqualTo("clean"));
             Assert.That(filterCriteria.UserTags[1].MatchMode, Is.EqualTo(FilterCriteria.MatchMode.FullPhrase));
         }
+
+        [TestCase("skill")]
+        [TestCase("pattern")]
+        [TestCase("csi")]
+        public void TestApplySkillTagQueries(string key)
+        {
+            var filterCriteria = new FilterCriteria();
+            FilterQueryParser.ApplyQueries(filterCriteria, $"{key}:jack {key}!:chordjack");
+            Assert.That(filterCriteria.SkillTags, Has.Count.EqualTo(2));
+            Assert.That(filterCriteria.SkillTags[0].SearchTerm, Is.EqualTo("jack"));
+            Assert.That(filterCriteria.SkillTags[0].ExcludeTerm, Is.False);
+            Assert.That(filterCriteria.SkillTags[1].SearchTerm, Is.EqualTo("chordjack"));
+            Assert.That(filterCriteria.SkillTags[1].ExcludeTerm, Is.True);
+            Assert.That(filterCriteria.SearchText.Trim(), Is.Empty);
+        }
     }
 }

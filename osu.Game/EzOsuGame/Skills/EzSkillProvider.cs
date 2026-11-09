@@ -145,6 +145,111 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
+        /// Session memo of one chart skill axis across many hashes. Song-select sort/group re-reads the same
+        /// (system, axis, ruleset) while the user types a filter; the memo collapses those into one Realm scan.
+        /// </summary>
+        private readonly ConcurrentDictionary<(EzAnalysisSystem System, string AxisId, int Ruleset, int Version), IReadOnlyDictionary<string, double>> skillAxisSessionCache
+            = new ConcurrentDictionary<(EzAnalysisSystem, string, int, int), IReadOnlyDictionary<string, double>>();
+
+        /// <summary>
+        /// Session memo of CSI pattern tags by hash. Matching filters that mention <c>skill:</c> re-read this on
+        /// every keystroke; the memo keeps the tag table for the session.
+        /// </summary>
+        private IReadOnlyDictionary<string, string[]>? chartSkillTagsSessionCache;
+
+        /// <summary>
+        /// One bare chart skill axis for many hashes. Missing charts are omitted. The full axis table for
+        /// <paramref name="system"/>×ruleset is memoised for the session so sort/group re-filters only intersect.
+        /// </summary>
+        public IReadOnlyDictionary<string, double> GetBeatmapSkillAxisForHashes(
+            IEnumerable<string> beatmapHashes,
+            EzAnalysisSystem system,
+            string axisId,
+            int rulesetOnlineId = -1)
+        {
+            ArgumentNullException.ThrowIfNull(beatmapHashes);
+            ArgumentException.ThrowIfNullOrWhiteSpace(axisId);
+
+            if (system == EzAnalysisSystem.None)
+                return new Dictionary<string, double>(StringComparer.Ordinal);
+
+            int version = system.CurrentVersion();
+            var key = (system, axisId, rulesetOnlineId, version);
+            var table = skillAxisSessionCache.GetOrAdd(key, static (k, store) => store.GetBeatmapSkillAxisForHashes(
+                null,
+                k.System,
+                k.AxisId,
+                k.Ruleset,
+                k.Version > 0 ? k.Version : null), ChartStore);
+
+            var hashSet = beatmapHashes
+                          .Where(static h => !string.IsNullOrEmpty(h))
+                          .ToHashSet(StringComparer.Ordinal);
+
+            if (hashSet.Count == 0 || table.Count == 0)
+                return new Dictionary<string, double>(StringComparer.Ordinal);
+
+            var result = new Dictionary<string, double>(Math.Min(hashSet.Count, table.Count), StringComparer.Ordinal);
+
+            foreach (string hash in hashSet)
+            {
+                if (table.TryGetValue(hash, out double value))
+                    result[hash] = value;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// CSI pattern tags for many hashes. Missing / unavailable charts are omitted. Exact tag ids only.
+        /// </summary>
+        public IReadOnlyDictionary<string, string[]> GetChartSkillTagsForHashes(IEnumerable<string> beatmapHashes)
+        {
+            ArgumentNullException.ThrowIfNull(beatmapHashes);
+
+            var hashSet = beatmapHashes
+                          .Where(static h => !string.IsNullOrEmpty(h))
+                          .ToHashSet(StringComparer.Ordinal);
+
+            if (hashSet.Count == 0)
+                return new Dictionary<string, string[]>(StringComparer.Ordinal);
+
+            chartSkillTagsSessionCache ??= buildAllChartSkillTagsCache();
+
+            var result = new Dictionary<string, string[]>(Math.Min(hashSet.Count, chartSkillTagsSessionCache.Count), StringComparer.Ordinal);
+
+            foreach (string hash in hashSet)
+            {
+                if (chartSkillTagsSessionCache.TryGetValue(hash, out var tags))
+                    result[hash] = tags;
+            }
+
+            return result;
+        }
+
+        private IReadOnlyDictionary<string, string[]> buildAllChartSkillTagsCache()
+        {
+            // Empty enumerable → store returns empty; pass a sentinel that means "every stored CSI row".
+            var infos = ChartStore.GetAllChartSkillInfo();
+            var result = new Dictionary<string, string[]>(infos.Count, StringComparer.Ordinal);
+
+            foreach (var (hash, info) in infos)
+            {
+                if (info.Patterns is { Length: > 0 })
+                    result[hash] = info.Patterns;
+            }
+
+            return result;
+        }
+
+        /// <summary>Drop song-select skill-axis / CSI-tag session memos (after a chart-skill rebuild).</summary>
+        public void InvalidateSongSelectSkillFilters()
+        {
+            skillAxisSessionCache.Clear();
+            chartSkillTagsSessionCache = null;
+        }
+
+        /// <summary>
         /// Generic player skill read. <paramref name="sliceKey"/> is keymode for mania, or
         /// <see cref="EzAxisIds.UNSLICED_KEY"/> for osu. <paramref name="rulesetOnlineId"/> selects the
         /// ruleset slice; pass a negative value for systems whose rows are not ruleset-attributed.

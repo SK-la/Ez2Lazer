@@ -41,6 +41,18 @@ namespace osu.Game.EzOsuGame.Localization
             "移除交集",
             "Remove intersection");
 
+        public static readonly LocalisableString SKILL_AXIS = new EzLocalizationManager.EzLocalisableString(
+            "技能轴",
+            "Skill axis");
+
+        public static readonly LocalisableString SKILL_AXIS_SORT = new EzLocalizationManager.EzLocalisableString(
+            "排序轴",
+            "Sort axis");
+
+        public static readonly LocalisableString SKILL_AXIS_GROUP = new EzLocalizationManager.EzLocalisableString(
+            "分组轴",
+            "Group axis");
+
         public static readonly LocalisableString EZ_ANALYSIS_FILTER = new EzLocalizationManager.EzLocalisableString(
             "Ez分析过滤",
             "Ez analysis filter");

@@ -3,7 +3,9 @@
 
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
@@ -13,6 +15,9 @@ using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.Database;
+using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -23,30 +28,23 @@ using osu.Game.Screens.Select;
 using osuTK;
 using osuTK.Input;
 
-// using System.Threading.Tasks;
-// using osu.Framework.Extensions;
-// using osu.Game.Database;
-// using osu.Game.EzOsuGame.Skills;
-
 namespace osu.Game.EzOsuGame.UserInterface
 {
     /// <summary>
-    /// 难度卡底部标签行：用户标签 / 视频 / 故事版。
-    /// （技能段位已挪到 Grade 旁的纵排 <see cref="EzDisplaySkillsDan"/>；下方注释块可恢复旧布局。）
+    /// 难度卡底部标签行：CSI 技能标签（首位）/ 视频 / 故事版 / 用户标签。
     /// Video/Storyboard 标记由 <see cref="BeatmapUpdater"/> 写入 <see cref="BeatmapInfo"/>，此处只读 Realm 字段。
     /// </summary>
     public partial class EzDisplayTag : CompositeDrawable
     {
         private const int max_visible_tags = 10;
+        private const int max_skill_tags = 3;
         private const float tag_corner_radius = EzUIStyleV1.CORNER_RADIUS_CHIP;
 
         private readonly FillFlowContainer rootFlow;
         private readonly FillFlowContainer tagFlow;
 
-        // private readonly EzDisplaySkillsDan skillsDan;
-        // private int chartDanRequestId;
-
         private ScheduledDelegate? scheduledTagUpdate;
+        private int skillTagRequestId;
 
         private bool altHighlightActive;
 
@@ -61,7 +59,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                     return;
 
                 beatmap = value;
-                // chartDanRequestId++;
+                skillTagRequestId++;
                 scheduleTagUpdate();
             }
         }
@@ -69,22 +67,13 @@ namespace osu.Game.EzOsuGame.UserInterface
         [Resolved]
         private ISongSelect? songSelect { get; set; }
 
-        // [Resolved(canBeNull: true)]
-        // private EzSkillProvider? skillProvider { get; set; }
+        [Resolved(canBeNull: true)]
+        private EzSkillProvider? skillProvider { get; set; }
 
         public EzDisplayTag()
         {
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
-
-            // skillsDan = new EzDisplaySkillsDan
-            // {
-            //     Anchor = Anchor.CentreLeft,
-            //     Origin = Anchor.CentreLeft,
-            //     PreferDanImage = true,
-            //     Alpha = 0,
-            //     BypassAutoSizeAxes = Axes.Both,
-            // };
 
             tagFlow = new FillFlowContainer
             {
@@ -95,7 +84,6 @@ namespace osu.Game.EzOsuGame.UserInterface
                 Origin = Anchor.CentreLeft,
             };
 
-            // skillsDan is always the leftmost child; visibility via Alpha / BypassAutoSizeAxes.
             InternalChild = rootFlow = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
@@ -104,7 +92,6 @@ namespace osu.Game.EzOsuGame.UserInterface
                 Spacing = new Vector2(4, 0),
                 Children = new Drawable[]
                 {
-                    // skillsDan,
                     tagFlow,
                 },
             };
@@ -146,6 +133,8 @@ namespace osu.Game.EzOsuGame.UserInterface
                     simpleTag.SetAltHighlight(altHighlightActive);
                 else if (tag is IconTag iconTag)
                     iconTag.SetAltHighlight(altHighlightActive);
+                else if (tag is SkillChipTag skillTag)
+                    skillTag.SetAltHighlight(altHighlightActive);
             }
         }
 
@@ -154,46 +143,95 @@ namespace osu.Game.EzOsuGame.UserInterface
             tagFlow.Clear();
 
             if (beatmap == null)
+                return;
+
+            int requestId = ++skillTagRequestId;
+            var target = beatmap;
+            var provider = skillProvider;
+
+            if (provider != null && target.Ruleset.OnlineID == 3)
             {
-                // hideSkillsDan();
+                var detached = target.Detach();
+
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        return provider.TryGetStoredChartSkillInfo(detached, out var info) ? info : null;
+                    }
+                    catch
+                    {
+                        return null;
+                    }
+                }).ContinueWith(t => Schedule(() =>
+                {
+                    if (requestId != skillTagRequestId || beatmap == null || !string.Equals(beatmap.Hash, detached.Hash, StringComparison.Ordinal))
+                        return;
+
+                    string[] patterns = t.Status == TaskStatus.RanToCompletion
+                        ? t.GetResultSafely()?.Patterns ?? []
+                        : [];
+
+                    rebuildTagFlow(patterns);
+                }));
+
+                // Icons / user tags first; skill chips replace the row once CSI returns.
+                rebuildTagFlow([]);
                 return;
             }
 
-            // var cached = skillProvider?.TryGetCachedChartDan(beatmap);
-            //
-            // if (cached != null)
-            // {
-            //     showSkillsDan(cached);
-            // }
-            // else if (skillProvider != null)
-            // {
-            //     hideSkillsDan();
-            //     requestChartDanCompute(beatmap);
-            // }
-            // else
-            // {
-            //     hideSkillsDan();
-            // }
+            rebuildTagFlow([]);
+        }
 
-            var userTags = beatmap.Metadata.UserTags.Take(max_visible_tags);
+        private void rebuildTagFlow(string[] skillPatterns)
+        {
+            tagFlow.Clear();
 
-            if (beatmap.HasVideo == true)
+            if (beatmap == null)
+                return;
+
+            int remaining = max_visible_tags;
+
+            foreach (string patternId in skillPatterns.Take(max_skill_tags))
             {
-                tagFlow.Add(new IconTag(FontAwesome.Solid.Film, BeatmapsetsStrings.ShowInfoVideo)
+                if (remaining <= 0)
+                    break;
+
+                if (!tryResolveSkillChip(patternId, out var chip, out string id))
+                    continue;
+
+                var skillTag = new SkillChipTag(chip)
+                {
+                    Action = () => songSelect?.AddToSearch($@"skill:{id}"),
+                };
+                tagFlow.Add(skillTag);
+                skillTag.SetAltHighlight(altHighlightActive);
+                remaining--;
+            }
+
+            if (beatmap.HasVideo == true && remaining > 0)
+            {
+                var icon = new IconTag(FontAwesome.Solid.Film, BeatmapsetsStrings.ShowInfoVideo)
                 {
                     Action = () => songSelect?.AddToSearch(@"video:true"),
-                });
+                };
+                tagFlow.Add(icon);
+                icon.SetAltHighlight(altHighlightActive);
+                remaining--;
             }
 
-            if (beatmap.HasStoryboard == true)
+            if (beatmap.HasStoryboard == true && remaining > 0)
             {
-                tagFlow.Add(new IconTag(FontAwesome.Solid.Image, BeatmapsetsStrings.ShowInfoStoryboard)
+                var icon = new IconTag(FontAwesome.Solid.Image, BeatmapsetsStrings.ShowInfoStoryboard)
                 {
                     Action = () => songSelect?.AddToSearch(@"storyboard:true"),
-                });
+                };
+                tagFlow.Add(icon);
+                icon.SetAltHighlight(altHighlightActive);
+                remaining--;
             }
 
-            foreach (string tag in userTags)
+            foreach (string tag in beatmap.Metadata.UserTags.Take(remaining))
             {
                 var simpleTag = new SimpleTag(tag)
                 {
@@ -204,48 +242,26 @@ namespace osu.Game.EzOsuGame.UserInterface
             }
         }
 
-        // private void showSkillsDan(EzChartDanVerdict verdict)
-        // {
-        //     skillsDan.BypassAutoSizeAxes = Axes.None;
-        //     skillsDan.SetFrom(verdict);
-        //     skillsDan.Show();
-        // }
-        //
-        // private void hideSkillsDan()
-        // {
-        //     skillsDan.Clear();
-        //     skillsDan.Hide();
-        //     skillsDan.BypassAutoSizeAxes = Axes.Both;
-        // }
-        //
-        // private void requestChartDanCompute(BeatmapInfo target)
-        // {
-        //     int requestId = ++chartDanRequestId;
-        //     var provider = skillProvider;
-        //     // Detach so MinaCalc can run off the update thread without touching live Realm.
-        //     var detached = target.Detach();
-        //
-        //     Task.Run(() =>
-        //     {
-        //         try
-        //         {
-        //             return provider?.TryGetChartDan(detached);
-        //         }
-        //         catch
-        //         {
-        //             return null;
-        //         }
-        //     }).ContinueWith(t => Schedule(() =>
-        //     {
-        //         if (requestId != chartDanRequestId || beatmap == null || !string.Equals(beatmap.Hash, detached.Hash, StringComparison.Ordinal))
-        //             return;
-        //
-        //         if (t.Status == TaskStatus.RanToCompletion && t.GetResultSafely() is EzChartDanVerdict verdict)
-        //             showSkillsDan(verdict);
-        //         else
-        //             hideSkillsDan();
-        //     }));
-        // }
+        private static bool tryResolveSkillChip(string patternId, out EzSkillChip chip, out string id)
+        {
+            if (EzManiaRCAxisExtensions.TryParse(patternId, out var rc))
+            {
+                chip = rc.Chip();
+                id = rc.ToId();
+                return true;
+            }
+
+            if (EzManiaLNAxisExtensions.TryParse(patternId, out var ln))
+            {
+                chip = ln.Meta().Chip;
+                id = ln.ToId();
+                return true;
+            }
+
+            chip = new EzSkillChip(patternId, EzSkillChip.FALLBACK.AccentHex);
+            id = patternId;
+            return !string.IsNullOrWhiteSpace(patternId);
+        }
 
         protected override void Dispose(bool isDisposing)
         {
@@ -256,8 +272,99 @@ namespace osu.Game.EzOsuGame.UserInterface
                 EzDisplayTagAltHighlight.ActiveChanged -= onAltHighlightChanged;
                 scheduledTagUpdate?.Cancel();
                 scheduledTagUpdate = null;
-                // chartDanRequestId++;
+                skillTagRequestId++;
                 beatmap = null;
+            }
+        }
+
+        private partial class SkillChipTag : OsuClickableContainer
+        {
+            private readonly EzSkillChip chip;
+
+            private Box background = null!;
+            private OsuSpriteText label = null!;
+            private bool altHighlightActive;
+            private Colour4 accent;
+            private Colour4 idleBackground;
+            private Colour4 idleForeground;
+
+            public SkillChipTag(EzSkillChip chip)
+            {
+                this.chip = chip;
+                AutoSizeAxes = Axes.Both;
+            }
+
+            public void SetAltHighlight(bool active)
+            {
+                if (altHighlightActive == active)
+                    return;
+
+                altHighlightActive = active;
+                refreshColours();
+            }
+
+            protected override bool OnClick(ClickEvent e)
+            {
+                if (!e.CurrentState.Keyboard.Keys.IsPressed(Key.LAlt))
+                    return false;
+
+                return base.OnClick(e);
+            }
+
+            protected override bool OnHover(HoverEvent e) => altHighlightActive && base.OnHover(e);
+
+            protected override void OnHoverLost(HoverLostEvent e)
+            {
+                if (!altHighlightActive)
+                    refreshColours();
+
+                base.OnHoverLost(e);
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+                refreshColours();
+            }
+
+            [BackgroundDependencyLoader]
+            private void load(OverlayColourProvider colourProvider)
+            {
+                accent = Colour4.FromHex(chip.AccentHex);
+                idleBackground = accent.Opacity(0.18f);
+                idleForeground = accent;
+
+                CornerRadius = tag_corner_radius;
+                Masking = true;
+
+                Child = new Container
+                {
+                    AutoSizeAxes = Axes.Both,
+                    Children = new Drawable[]
+                    {
+                        background = new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Colour = idleBackground,
+                        },
+                        label = new OsuSpriteText
+                        {
+                            Text = chip.Name,
+                            Font = OsuFont.GetFont(size: 10, weight: FontWeight.SemiBold),
+                            Colour = idleForeground,
+                            Margin = new MarginPadding { Horizontal = 4, Vertical = 1 },
+                        }
+                    }
+                };
+            }
+
+            private void refreshColours()
+            {
+                if (!IsLoaded)
+                    return;
+
+                background.FadeColour(altHighlightActive ? accent.Opacity(0.55f) : idleBackground, 200, Easing.OutQuint);
+                label.FadeColour(altHighlightActive ? Colour4.White : idleForeground, 200, Easing.OutQuint);
             }
         }
 

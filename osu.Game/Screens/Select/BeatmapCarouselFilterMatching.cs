@@ -18,16 +18,20 @@ namespace osu.Game.Screens.Select
         private readonly Func<FilterCriteria> getCriteria;
         private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync;
         private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getPpForOperationsAsync;
+        private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, string[]>>> getSkillTagsForOperationsAsync;
 
         public int BeatmapItemsCount { get; private set; }
 
         public BeatmapCarouselFilterMatching(Func<FilterCriteria> getCriteria,
                                              Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync,
-                                             Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getPpForOperationsAsync)
+                                             Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getPpForOperationsAsync,
+                                             Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, string[]>>>? getSkillTagsForOperationsAsync = null)
         {
             this.getCriteria = getCriteria;
             this.getDifficultiesForOperationsAsync = getDifficultiesForOperationsAsync;
             this.getPpForOperationsAsync = getPpForOperationsAsync;
+            this.getSkillTagsForOperationsAsync = getSkillTagsForOperationsAsync
+                                                  ?? ((_, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, string[]>>(new Dictionary<BeatmapInfo, string[]>()));
         }
 
         public async Task<List<CarouselItem>> Run(IEnumerable<CarouselItem> items, CancellationToken cancellationToken)
@@ -39,9 +43,11 @@ namespace osu.Game.Screens.Select
 
             bool requiresDifficultyForFiltering = criteria.StarDifficulty.HasFilter || criteria.UserStarDifficulty.HasFilter;
             bool requiresPpForFiltering = criteria.Pp.HasFilter;
+            bool requiresSkillTags = criteria.SkillTags.Count > 0;
 
             IReadOnlyDictionary<BeatmapInfo, double>? operationDifficulties = null;
             IReadOnlyDictionary<BeatmapInfo, double>? operationPpValues = null;
+            IReadOnlyDictionary<BeatmapInfo, string[]>? operationSkillTags = null;
 
             var uniqueBeatmaps = itemList.Select(i => (BeatmapInfo)i.Model)
                                          .Where(b => !b.Hidden)
@@ -53,6 +59,9 @@ namespace osu.Game.Screens.Select
 
             if (requiresPpForFiltering)
                 operationPpValues = await getPpForOperationsAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false);
+
+            if (requiresSkillTags)
+                operationSkillTags = await getSkillTagsForOperationsAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false);
 
             foreach (var item in itemList)
             {
@@ -72,7 +81,10 @@ namespace osu.Game.Screens.Select
                 if (operationDifficulties != null && operationDifficulties.TryGetValue(beatmap, out double operationDifficulty))
                     starDifficultyForFilter = operationDifficulty;
 
-                if (!CheckCriteriaMatch(beatmap, criteria, starDifficultyForFilter, tryGetPpForFilter(beatmap, operationPpValues, values)))
+                string[]? skillTags = null;
+                operationSkillTags?.TryGetValue(beatmap, out skillTags);
+
+                if (!CheckCriteriaMatch(beatmap, criteria, starDifficultyForFilter, tryGetPpForFilter(beatmap, operationPpValues, values), skillTags))
                     continue;
 
                 countMatching++;
@@ -83,7 +95,8 @@ namespace osu.Game.Screens.Select
             return matchedItems;
         }
 
-        public static bool CheckCriteriaMatch(BeatmapInfo beatmap, FilterCriteria criteria, double starDifficultyForFilter, double? ppForFilter = null)
+        public static bool CheckCriteriaMatch(BeatmapInfo beatmap, FilterCriteria criteria, double starDifficultyForFilter, double? ppForFilter = null,
+                                              IReadOnlyList<string>? skillTags = null)
         {
             bool match = criteria.Ruleset == null || beatmap.AllowGameplayWithRuleset(criteria.Ruleset!, criteria.AllowConvertedBeatmaps);
 
@@ -182,6 +195,9 @@ namespace osu.Game.Screens.Select
             if (criteria.HasStoryboard.HasValue)
                 match &= beatmap.HasStoryboard == criteria.HasStoryboard.Value;
 
+            if (criteria.SkillTags.Count > 0)
+                match &= matchesSkillTags(skillTags, criteria.SkillTags);
+
             if (!match) return false;
 
             match &= criteria.CollectionBeatmapMD5Hashes?.Contains(beatmap.MD5Hash) ?? true;
@@ -204,6 +220,43 @@ namespace osu.Game.Screens.Select
                 return pp;
 
             return selected.PerformancePoints;
+        }
+
+        /// <summary>
+        /// Exact tag-id match (ordinal ignore-case). Substring matching would let <c>jack</c> hit <c>chordjack</c>.
+        /// </summary>
+        private static bool matchesSkillTags(IReadOnlyList<string>? tags, List<FilterCriteria.OptionalTextFilter> filters)
+        {
+            tags ??= Array.Empty<string>();
+
+            foreach (var filter in filters)
+            {
+                if (!filter.HasFilter)
+                    continue;
+
+                bool anyMatched = false;
+
+                foreach (string tag in tags)
+                {
+                    if (string.Equals(tag, filter.SearchTerm, StringComparison.OrdinalIgnoreCase))
+                    {
+                        anyMatched = true;
+                        break;
+                    }
+                }
+
+                if (filter.ExcludeTerm)
+                {
+                    if (anyMatched)
+                        return false;
+                }
+                else if (!anyMatched)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }

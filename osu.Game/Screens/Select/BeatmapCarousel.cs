@@ -29,6 +29,7 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
@@ -139,8 +140,8 @@ namespace osu.Game.Screens.Select
 
             Filters = new ICarouselFilter[]
             {
-                new BeatmapCarouselFilterMatching(() => Criteria!, getDifficultiesForOperationsAsync, getPpValuesForOperationsAsync),
-                new BeatmapCarouselFilterSorting(() => Criteria!, getDifficultiesForOperationsAsync, getPpValuesForOperationsAsync),
+                new BeatmapCarouselFilterMatching(() => Criteria!, getDifficultiesForOperationsAsync, getPpValuesForOperationsAsync, getSkillTagsForOperationsAsync),
+                new BeatmapCarouselFilterSorting(() => Criteria!, getDifficultiesForOperationsAsync, getPpValuesForOperationsAsync, getSkillAxisForOperationsAsync),
                 grouping = new BeatmapCarouselFilterGrouping
                 {
                     GetCriteria = () => Criteria!,
@@ -149,6 +150,7 @@ namespace osu.Game.Screens.Select
                     GetFavouriteBeatmapSets = GetFavouriteBeatmapSets,
                     GetDifficultiesForOperationsAsync = getDifficultiesForOperationsAsync,
                     GetPpForOperationsAsync = getPpValuesForOperationsAsync,
+                    GetSkillAxisForOperationsAsync = getSkillAxisForOperationsAsync,
                 }
             };
 
@@ -204,6 +206,66 @@ namespace osu.Game.Screens.Select
                 return getStrictActiveBranchDifficultiesAsync(beatmaps.Distinct().ToList(), Criteria.Mods, cancellationToken);
 
             return Task.FromResult(empty_operation_difficulties);
+        }
+
+        private Task<IReadOnlyDictionary<BeatmapInfo, double>> getSkillAxisForOperationsAsync(
+            IEnumerable<BeatmapInfo> beatmaps,
+            EzAnalysisSystem system,
+            string axisId,
+            CancellationToken cancellationToken)
+        {
+            var beatmapList = beatmaps.Distinct().ToList();
+
+            if (beatmapList.Count == 0 || ezSkillProvider == null || system == EzAnalysisSystem.None || string.IsNullOrEmpty(axisId))
+                return Task.FromResult(empty_operation_difficulties);
+
+            return Task.Run(() =>
+            {
+                int rulesetOnlineId = ruleset.Value?.OnlineID ?? -1;
+                var byHash = ezSkillProvider.GetBeatmapSkillAxisForHashes(
+                    beatmapList.Select(static b => b.Hash),
+                    system,
+                    axisId,
+                    rulesetOnlineId);
+
+                var resolved = new Dictionary<BeatmapInfo, double>(beatmapList.Count);
+
+                foreach (var beatmap in beatmapList)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (byHash.TryGetValue(beatmap.Hash, out double value))
+                        resolved[beatmap] = value;
+                }
+
+                return (IReadOnlyDictionary<BeatmapInfo, double>)resolved;
+            }, cancellationToken);
+        }
+
+        private Task<IReadOnlyDictionary<BeatmapInfo, string[]>> getSkillTagsForOperationsAsync(
+            IEnumerable<BeatmapInfo> beatmaps,
+            CancellationToken cancellationToken)
+        {
+            var beatmapList = beatmaps.Distinct().ToList();
+
+            if (beatmapList.Count == 0 || ezSkillProvider == null)
+                return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, string[]>>(new Dictionary<BeatmapInfo, string[]>());
+
+            return Task.Run(() =>
+            {
+                var byHash = ezSkillProvider.GetChartSkillTagsForHashes(beatmapList.Select(static b => b.Hash));
+                var resolved = new Dictionary<BeatmapInfo, string[]>(beatmapList.Count);
+
+                foreach (var beatmap in beatmapList)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (byHash.TryGetValue(beatmap.Hash, out var tags))
+                        resolved[beatmap] = tags;
+                }
+
+                return (IReadOnlyDictionary<BeatmapInfo, string[]>)resolved;
+            }, cancellationToken);
         }
 
         private Task<IReadOnlyDictionary<BeatmapInfo, double>> getPpValuesForOperationsAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
@@ -983,10 +1045,11 @@ namespace osu.Game.Screens.Select
             if (Criteria is not { } criteria)
                 return;
 
-            bool usesSystem = criteria.Sort is SortMode.Difficulty or SortMode.PP
-                              || criteria.Group is GroupMode.Difficulty or GroupMode.PP
+            bool usesSystem = criteria.Sort is SortMode.Difficulty or SortMode.PP or SortMode.SkillAxis
+                              || criteria.Group is GroupMode.Difficulty or GroupMode.PP or GroupMode.SkillAxis
                               || criteria.StarDifficulty.HasFilter
-                              || criteria.Pp.HasFilter;
+                              || criteria.Pp.HasFilter
+                              || criteria.SkillTags.Count > 0;
 
             if (usesSystem)
                 Filter(criteria);
@@ -1058,6 +1121,9 @@ namespace osu.Game.Screens.Select
 
         [Resolved]
         private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
+
+        [Resolved(canBeNull: true)]
+        private EzSkillProvider? ezSkillProvider { get; set; }
 
         /// <remarks>
         /// FOOTGUN WARNING: this being sorted on the realm side before detaching is IMPORTANT.
