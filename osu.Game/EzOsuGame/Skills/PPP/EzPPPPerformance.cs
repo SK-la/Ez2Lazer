@@ -63,7 +63,7 @@ namespace osu.Game.EzOsuGame.Skills.PPP
         /// <summary>Taiko performance points (section 2.7).</summary>
         /// <param name="greatHitWindow">Great hit window in milliseconds, already clock-rate adjusted.</param>
         /// <param name="okHitWindow">Ok hit window in milliseconds, already clock-rate adjusted.</param>
-        public static double Taiko(double starRating, int totalHits, double greatHitWindow, double okHitWindow, bool hidden, bool easy, bool hardRock, bool flashlight)
+        public static double Taiko(double starRating, int totalHits, double greatHitWindow, double okHitWindow, bool hidden, bool easy, bool hardRock, bool flashlight, bool isConvert)
         {
             if (totalHits <= 0 || !double.IsFinite(starRating) || starRating <= 0)
                 return -1;
@@ -86,7 +86,7 @@ namespace osu.Game.EzOsuGame.Skills.PPP
             double difficulty = Math.Pow(5 * Math.Max(1, starRating / 0.115) - 4, 2.25) / 1150
                                 * lengthBonus
                                 * (easy ? 0.985 : 1)
-                                * (hidden ? 1.025 : 1)
+                                * (hidden && !isConvert ? 1.025 : 1)
                                 * (hardRock ? 1.10 : 1)
                                 * (flashlight ? 1 + 0.05 * lengthBonus : 1)
                                 * Math.Pow(erf(400 / (Math.Sqrt(2) * urgency)), 2);
@@ -95,7 +95,7 @@ namespace osu.Game.EzOsuGame.Skills.PPP
                               * Math.Pow(starRating, 0.4)
                               * 100;
 
-            if (flashlight && hidden)
+            if (flashlight && hidden && !isConvert)
                 accuracy *= Math.Max(1, 1.05 * Math.Min(1.15, Math.Pow(totalHits / 1500.0, 0.3)));
 
             double total = Math.Pow(Math.Max(0, difficulty), 1.1) + Math.Pow(Math.Max(0, accuracy), 1.1);

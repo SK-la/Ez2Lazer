@@ -23,7 +23,7 @@ namespace osu.Game.EzOsuGame.Skills.PPP
         /// Bump when any mode's PPP math changes. One number covers every ruleset: a per-ruleset bundle would give
         /// one system several revisions, which is exactly what this replaces.
         /// </remarks>
-        public const int VERSION = 20240401;
+        public const int VERSION = 20251109;
 
         public IReadOnlyDictionary<string, double> CalculateChart(IBeatmap beatmap, IReadOnlyList<Mod>? mods)
         {

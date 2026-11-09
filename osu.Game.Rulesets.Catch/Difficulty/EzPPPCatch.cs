@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills.PPP;
+using osu.Game.Rulesets.Catch.Beatmaps;
 using osu.Game.Rulesets.Catch.Objects;
 using osu.Game.Rulesets.Catch.UI;
 using osu.Game.Rulesets.Mods;
@@ -21,7 +22,7 @@ namespace osu.Game.Rulesets.Catch.Difficulty
 #pragma warning restore CA2255
         internal static void Register()
         {
-            EzPPPCalculators.Register(EzLocalProfileConstants.CATCH_RULESET_ID, static (beatmap, mods, rate) => EzPPPCatch.Calculate(beatmap, rate));
+            EzPPPCalculators.Register(EzLocalProfileConstants.CATCH_RULESET_ID, static (beatmap, mods, rate) => EzPPPCatch.Calculate(beatmap, mods, rate));
             EzPPPPerformanceCalculators.Register(EzLocalProfileConstants.CATCH_RULESET_ID, static (skills, beatmap, mods, rate) => performance(skills, beatmap, mods, rate));
         }
 
@@ -107,21 +108,32 @@ namespace osu.Game.Rulesets.Catch.Difficulty
     /// <summary>osu!catch PPP movement skill and its star rating.</summary>
     internal static class EzPPPCatch
     {
-        public static Dictionary<string, double> Calculate(IBeatmap beatmap, double clockRate)
+        public static Dictionary<string, double> Calculate(IBeatmap beatmap, IReadOnlyList<Mod> mods, double clockRate)
         {
+            var difficulty = beatmap.Difficulty.Clone();
+
+            foreach (var mod in mods)
+            {
+                if (mod is IApplicableToDifficulty applicable)
+                    applicable.ApplyToDifficulty(difficulty);
+            }
+
             var fruits = new List<PalpableCatchHitObject>();
 
-            foreach (var hitObject in beatmap.HitObjects)
-                collect(hitObject, fruits);
+            foreach (var hitObject in CatchBeatmap.GetPalpableObjects(beatmap.HitObjects))
+            {
+                if (hitObject is Banana or TinyDroplet)
+                    continue;
+
+                fruits.Add(hitObject);
+            }
 
             if (fruits.Count < 2)
                 return new Dictionary<string, double>(EzPPPSkillCatalog.ChartZeros(EzLocalProfileConstants.CATCH_RULESET_ID), StringComparer.Ordinal);
 
-            fruits.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
-
-            double rate = Math.Max(0.1, clockRate);
-            float halfWidth = Catcher.CalculateCatchWidth(beatmap.Difficulty) * 0.5f;
-            halfWidth *= Math.Max(0.1f, 1f - 0.0625f * Math.Max(0, beatmap.Difficulty.CircleSize - 5.5f));
+            double rate = clockRate > 0 ? clockRate : 1;
+            float halfWidth = Catcher.CalculateCatchWidth(difficulty) * 0.5f;
+            halfWidth *= Math.Max(0.1f, 1f - 0.0625f * Math.Max(0, difficulty.CircleSize - 5.5f));
             halfWidth = Math.Max(1, halfWidth);
 
             var times = new List<double>();
@@ -140,7 +152,7 @@ namespace osu.Game.Rulesets.Catch.Difficulty
                     player = x;
 
                 double delta = player - previousPlayer;
-                double strainTime = Math.Max(40, fruits[i].StartTime - fruits[i - 1].StartTime);
+                double strainTime = Math.Max(40, (fruits[i].StartTime - fruits[i - 1].StartTime) / rate);
                 double timeWeight = strainTime + 13 + 3 / rate;
                 double basis = Math.Pow(Math.Abs(delta), 1.3) / 510.0;
                 double stream = 12.5 * Math.Min(Math.Abs(delta), 82) / 246.0 * (1 / Math.Sqrt(timeWeight));
@@ -166,7 +178,7 @@ namespace osu.Game.Rulesets.Catch.Difficulty
 
                 double strain = (basis + stream + turn) / timeWeight * edge;
                 state = EzPPPMath.Decay(strainTime, 0.2) * state + strain;
-                times.Add(fruits[i].StartTime);
+                times.Add(fruits[i].StartTime / rate);
                 strains.Add(state);
                 previousPlayer = player;
                 previousDelta = delta;
@@ -181,18 +193,6 @@ namespace osu.Game.Rulesets.Catch.Difficulty
                 [EzPPPSkillCatalog.ChartSkillId(EzPPPSkillCatalog.MOVEMENT)] = EzPPPMath.Finite(star),
                 [EzPPPSkillCatalog.ChartSkillId(EzPPPSkillCatalog.STAR_RATING)] = EzPPPMath.Finite(star),
             };
-        }
-
-        private static void collect(HitObject hitObject, List<PalpableCatchHitObject> fruits)
-        {
-            if (hitObject is Banana or TinyDroplet)
-                return;
-
-            if (hitObject is PalpableCatchHitObject fruit)
-                fruits.Add(fruit);
-
-            foreach (var nested in hitObject.NestedHitObjects)
-                collect(nested, fruits);
         }
     }
 }

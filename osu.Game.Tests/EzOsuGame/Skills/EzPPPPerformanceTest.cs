@@ -53,12 +53,12 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void Taiko_total_grows_with_rating_and_is_zero_free()
         {
-            double low = EzPPPPerformance.Taiko(3, 800, 25, 50, false, false, false, false);
-            double high = EzPPPPerformance.Taiko(6, 800, 25, 50, false, false, false, false);
+            double low = EzPPPPerformance.Taiko(3, 800, 25, 50, false, false, false, false, isConvert: false);
+            double high = EzPPPPerformance.Taiko(6, 800, 25, 50, false, false, false, false, isConvert: false);
 
             Assert.That(low, Is.GreaterThan(0));
             Assert.That(high, Is.GreaterThan(low));
-            Assert.That(EzPPPPerformance.Taiko(6, 800, 25, 50, false, true, false, false), Is.LessThan(high));
+            Assert.That(EzPPPPerformance.Taiko(6, 800, 25, 50, false, true, false, false, isConvert: false), Is.LessThan(high));
         }
 
         [Test]
