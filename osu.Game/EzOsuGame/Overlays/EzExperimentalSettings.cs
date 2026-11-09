@@ -107,6 +107,35 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "camera", "webcam", "hud", "fps", "摄像头", "帧率" }
                 },
+                new SettingsItemV2(new FormEnumDropdown<EzDisplayOutputMode>
+                {
+                    Current = ezConfig.GetBindable<EzDisplayOutputMode>(Ez2Setting.DisplayOutputMode),
+                    Caption = EZ_DISPLAY_OUTPUT_MODE,
+                    HintText = EZ_DISPLAY_OUTPUT_MODE_TOOLTIP,
+                })
+                {
+                    Keywords = new[] { "display", "10bit", "hdr", "d3d11", "色深", "显示", "原生" }
+                },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.DisplayOutputSdrExposure),
+                    Caption = EZ_DISPLAY_OUTPUT_SDR_EXPOSURE,
+                    HintText = EZ_DISPLAY_OUTPUT_SDR_EXPOSURE_TOOLTIP,
+                    KeyboardStep = 0.05f,
+                })
+                {
+                    Keywords = new[] { "display", "brightness", "sdr", "exposure", "明暗" }
+                },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.DisplayOutputHdrPaperWhiteNits),
+                    Caption = EZ_DISPLAY_OUTPUT_HDR_PAPER_WHITE,
+                    HintText = EZ_DISPLAY_OUTPUT_HDR_PAPER_WHITE_TOOLTIP,
+                    KeyboardStep = 5f,
+                })
+                {
+                    Keywords = new[] { "display", "hdr", "paper white", "nits", "亮度" }
+                },
                 new SettingsItemV2(new FormCheckBox
                 {
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.EzScoreRaceServiceEnabled),
@@ -311,6 +340,29 @@ namespace osu.Game.EzOsuGame.Overlays
 
         internal static readonly LocalisableString EZ_EXPERIMENTAL_SECTION_HEADER = new EzLocalizationManager.EzLocalisableString(
             "实验性功能", "Experimental Features");
+
+        internal static readonly LocalisableString EZ_DISPLAY_OUTPUT_MODE = new EzLocalizationManager.EzLocalisableString(
+            "显示输出（实验性）", "Display output (experimental)");
+
+        internal static readonly LocalisableString EZ_DISPLAY_OUTPUT_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "Standard 与改这项之前相同。原生 10-bit 只提高色深，色域仍是现在的 SDR。HDR10 在 Direct3D 11 上按 BT.2020 + PQ 输出。"
+            + "\n不改渲染器选择。改模式需完全重启。下方 SDR 明暗和 HDR 纸白立即生效（纸白 0 = 显示器全屏持续亮度）。",
+            "Standard is unchanged. Native 10-bit is extra colour depth on the current SDR picture. HDR10 on Direct3D 11 is BT.2020 + PQ."
+            + "\nRenderer choice is left alone. Changing the mode needs a full restart. SDR exposure and HDR paper white apply immediately (paper white 0 = monitor full-frame luminance).");
+
+        internal static readonly LocalisableString EZ_DISPLAY_OUTPUT_SDR_EXPOSURE = new EzLocalizationManager.EzLocalisableString(
+            "显示输出 SDR 明暗", "Display output SDR exposure");
+
+        internal static readonly LocalisableString EZ_DISPLAY_OUTPUT_SDR_EXPOSURE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "SDR UI/游戏画面的明暗倍数（1 为不变）。与 Windows「SDR 内容亮度」可叠加。立即生效。",
+            "SDR brightness multiplier for UI/gameplay (1 = unchanged). Works alongside Windows SDR content brightness. Applies immediately.");
+
+        internal static readonly LocalisableString EZ_DISPLAY_OUTPUT_HDR_PAPER_WHITE = new EzLocalizationManager.EzLocalisableString(
+            "HDR 纸白亮度 (nits)", "HDR paper white (nits)");
+
+        internal static readonly LocalisableString EZ_DISPLAY_OUTPUT_HDR_PAPER_WHITE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "HDR 输出时，画面白色对应的亮度。0 使用当前显示器的全屏持续亮度（FFL）。手动最高 10000 nits。立即生效。",
+            "Nits that HDR output assigns to scene white. 0 uses the monitor's full-frame luminance (FFL). Manual values go up to 10000 nits. Applies immediately.");
 
         internal static readonly LocalisableString EZ_SUB_FRAME_CORRECTION_ENABLED = new EzLocalizationManager.EzLocalisableString(
             "启用 Ez 子帧时序校正", "Enable Ez Sub-frame Timing Correction");

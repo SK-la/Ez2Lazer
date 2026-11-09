@@ -18,6 +18,7 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.IO;
 using osu.Game.IPC;
 using osu.Game.Performance;
@@ -151,6 +152,9 @@ namespace osu.Desktop
 
             base.LoadComplete();
 
+            Ez2ConfigManager.GetBindable<double>(Ez2Setting.DisplayOutputSdrExposure).BindValueChanged(_ => applyDisplayOutputTone(), true);
+            Ez2ConfigManager.GetBindable<double>(Ez2Setting.DisplayOutputHdrPaperWhiteNits).BindValueChanged(_ => applyDisplayOutputTone());
+
             LoadComponentAsync(new DiscordRichPresence(), Add);
 
             switch (RuntimeInfo.OS)
@@ -187,6 +191,13 @@ namespace osu.Desktop
             }
 
             host.Window.Title = Name;
+        }
+
+        private void applyDisplayOutputTone()
+        {
+            HostStartupDisplayOutput.SetTone(
+                (float)Ez2ConfigManager.Get<double>(Ez2Setting.DisplayOutputSdrExposure),
+                (float)Ez2ConfigManager.Get<double>(Ez2Setting.DisplayOutputHdrPaperWhiteNits));
         }
 
         protected override BatteryInfo CreateBatteryInfo() => FrameworkEnvironment.UseSDL3 ? new SDL3BatteryInfo() : new SDL2BatteryInfo();
