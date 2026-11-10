@@ -40,6 +40,8 @@ using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Rulesets.UI.Scrolling.Algorithms;
+using osu.Game.Rulesets.Mania.EzMania.Scrolling;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
@@ -92,6 +94,9 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly Track speedAdjustmentTrack = new TrackVirtual(0);
 
         private ISkinSource currentSkin = null!;
+
+        private IScrollAlgorithm? baseScrollAlgorithm;
+        private Bindable<double> speedCompensation = null!;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
@@ -261,6 +266,51 @@ namespace osu.Game.Rulesets.Mania.UI
                 FrameStableComponents.Add(HoldTailSpeedTracker = new EzBeatmapSpeedTracker());
 
             setupReplayInputNotes(replayPlayer);
+
+            setupSpeedCompensation();
+            setupHoldNoteLengthUpdaters();
+        }
+
+        /// <summary>
+        /// 每列挂一个长条长度更新组件；没有速度补偿时它在第一帧就返回。
+        /// </summary>
+        private void setupHoldNoteLengthUpdaters()
+        {
+            foreach (var stage in Playfield.Stages)
+            {
+                foreach (var column in stage.Columns)
+                    column.TopLevelContainer.Add(new EzHoldNoteLengthUpdater(column));
+            }
+        }
+
+        /// <summary>
+        /// 速度补偿：包住布局期设定的滚动算法。倍率 1 时还原原算法，保持零开销。
+        /// </summary>
+        private void setupSpeedCompensation()
+        {
+            if (ScrollingInfo.Algorithm is not Bindable<IScrollAlgorithm> algorithm)
+                return;
+
+            baseScrollAlgorithm ??= algorithm.Value;
+
+            speedCompensation = ezConfig.GetBindable<double>(Ez2Setting.ManiaSpeedCompensation);
+            speedCompensation.BindValueChanged(_ => applySpeedCompensation(algorithm), true);
+        }
+
+        private void applySpeedCompensation(Bindable<IScrollAlgorithm> algorithm)
+        {
+            if (baseScrollAlgorithm == null)
+                return;
+
+            if (Math.Abs(speedCompensation.Value - 1.0) < 1e-3)
+            {
+                if (!ReferenceEquals(algorithm.Value, baseScrollAlgorithm))
+                    algorithm.Value = baseScrollAlgorithm;
+
+                return;
+            }
+
+            algorithm.Value = new EzSpeedCompensationScrollAlgorithm(baseScrollAlgorithm, (float)speedCompensation.Value);
         }
 
         /// <summary>

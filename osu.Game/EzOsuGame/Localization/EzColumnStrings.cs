@@ -15,6 +15,16 @@ namespace osu.Game.EzOsuGame.Localization
             "通过透视映射模拟轨道旋转。0为关闭（需要重载游戏场景），角度越大越明显（上窄下宽）。",
             "Simulate lane rotation using perspective mapping. 0° is the original look, larger angles increase the effect (narrower top and wider bottom).");
 
+        public static readonly LocalisableString SPEED_COMPENSATION = new EzLocalizationManager.EzLocalisableString(
+            "Mania 速度补偿",
+            "Mania speed compensation");
+
+        public static readonly LocalisableString SPEED_COMPENSATION_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "下落速度补偿。100% 为不补偿（匀速下落）；低于 100% 时远端运动加快、落线变慢，高于 100% 时相反。"
+            + "\n只改变运动在屏幕上的分布，判定时刻不变。",
+            "Mania fall speed compensation. 100% leaves the fall uniform; below 100% speeds up the far end and slows the approach to the line, above 100% does the opposite."
+            + "\nOnly the on-screen motion distribution changes; judgement timing is untouched.");
+
         public static readonly LocalisableString STAGE_POSITION_X = new EzLocalizationManager.EzLocalisableString(
             "Mania Stage 水平位置",
             "Mania Stage X position");

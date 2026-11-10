@@ -86,6 +86,14 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                     KeyboardStep = 1f,
                     DisplayAsPercentage = false,
                 },
+                new SettingsSlider<double>
+                {
+                    LabelText = EzColumnStrings.SPEED_COMPENSATION,
+                    TooltipText = EzColumnStrings.SPEED_COMPENSATION_TOOLTIP,
+                    Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaSpeedCompensation),
+                    KeyboardStep = 0.01f,
+                    DisplayAsPercentage = true,
+                },
             };
         }
     }
