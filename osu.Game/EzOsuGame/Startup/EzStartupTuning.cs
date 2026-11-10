@@ -54,6 +54,12 @@ namespace osu.Game.EzOsuGame.Startup
         public static bool EnableStartupTrace { get; set; }
 
         /// <summary>
+        /// Post–main-menu frame/GC window for startup investigation. Default off; also enabled when
+        /// <c>EZ2LAZER_STARTUP_TRACE=1</c>. Emits one summary line after the window, not per-second spam.
+        /// </summary>
+        public static bool EnableStartupFrameSampling { get; set; }
+
+        /// <summary>
         /// Diagnostic: skip the settings-section async preload entirely.
         /// Used to A/B whether the startup frame-rate dip is caused by settings preload or by other
         /// startup work (BDSP backfill, song-select preload). Sections then load on first PopIn instead.

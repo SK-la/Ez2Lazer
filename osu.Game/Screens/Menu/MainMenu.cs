@@ -11,7 +11,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
-using osu.Framework.Development;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
@@ -282,10 +281,7 @@ namespace osu.Game.Screens.Menu
             NotifyMainMenuEnteredForStartup();
             startupWorkCoordinator?.OnMainMenuEntered(this);
 
-            // Diagnostic: sample the post-startup frame-rate dip from main-menu entry. Debug-only, and one sampler
-            // only: every return from a subscreen enters the menu again, so adding unconditionally stacked samplers
-            // that each reported their own window.
-            if (DebugUtils.IsDebugBuild && !InternalChildren.OfType<EzStartupFrameSampler>().Any())
+            if (EzStartupFrameSampler.TryClaimSessionAttach())
                 AddInternal(new EzStartupFrameSampler { Depth = float.MinValue });
             Buttons.FadeInFromZero(500);
 

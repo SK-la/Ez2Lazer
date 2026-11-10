@@ -3,32 +3,52 @@
 
 using System;
 using System.Globalization;
+using osu.Framework.Development;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 
 namespace osu.Game.EzOsuGame.Startup
 {
     /// <summary>
-    /// Diagnostic sampler for the post-startup frame-rate dip. Once per second it reports frame count,
-    /// worst frame time, allocated bytes and GC collection counts through <see cref="EzStartupTrace"/>.
-    ///
-    /// Exists purely to attribute a startup dip (GC pauses vs CPU contention vs main-thread work) instead
-    /// of only measuring its total length. Runs for a bounded window, then removes itself.
+    /// Diagnostic sampler for the post-startup frame-rate dip. Accumulates metrics for a fixed wall-clock window,
+    /// emits one summary through <see cref="EzStartupTrace"/>, then ends its lifetime. At most once per process.
     /// </summary>
     public partial class EzStartupFrameSampler : CompositeDrawable
     {
-        private const int max_report_seconds = 30;
+        private const int window_seconds = 30;
+        private const string startup_trace_env = "EZ2LAZER_STARTUP_TRACE";
 
+        private static bool sessionAttached;
+
+        private double samplingStartTime;
         private double windowStart;
-        private double lastFrameTime;
-        private int frames;
-        private double worstFrameMs;
-        private int secondsReported;
+        private double lastUpdateTime;
+        private int secondsElapsed;
+        private int totalUpdates;
+        private double worstUpdateGapMs;
 
-        private long lastAllocatedBytes;
-        private int lastGc0;
-        private int lastGc1;
-        private int lastGc2;
+        private long windowStartAllocatedBytes;
+        private int windowStartGc0;
+        private int windowStartGc1;
+        private int windowStartGc2;
+
+        private bool finished;
+
+        public static bool IsEnabledForSession =>
+            EzStartupTuning.EnableStartupFrameSampling
+            || Environment.GetEnvironmentVariable(startup_trace_env) == "1";
+
+        /// <summary>
+        /// Returns whether <see cref="MainMenu"/> should attach the one session sampler (debug + opt-in only).
+        /// </summary>
+        public static bool TryClaimSessionAttach()
+        {
+            if (!DebugUtils.IsDebugBuild || !IsEnabledForSession || sessionAttached)
+                return false;
+
+            sessionAttached = true;
+            return true;
+        }
 
         public EzStartupFrameSampler()
         {
@@ -40,60 +60,61 @@ namespace osu.Game.EzOsuGame.Startup
             base.LoadComplete();
 
             double now = Clock.CurrentTime;
-            windowStart = now;
-            lastFrameTime = now;
-            lastAllocatedBytes = GC.GetTotalAllocatedBytes();
-            lastGc0 = GC.CollectionCount(0);
-            lastGc1 = GC.CollectionCount(1);
-            lastGc2 = GC.CollectionCount(2);
+            samplingStartTime = windowStart = lastUpdateTime = now;
+            windowStartAllocatedBytes = GC.GetTotalAllocatedBytes();
+            windowStartGc0 = GC.CollectionCount(0);
+            windowStartGc1 = GC.CollectionCount(1);
+            windowStartGc2 = GC.CollectionCount(2);
         }
 
         protected override void Update()
         {
+            if (finished)
+                return;
+
             base.Update();
 
-            if (secondsReported >= max_report_seconds)
-            {
-                // Expiry is asynchronous; without this guard the sampler keeps reporting until it is removed.
-                Expire();
-                return;
-            }
-
             double now = Clock.CurrentTime;
-            double elapsedMs = now - lastFrameTime;
-            lastFrameTime = now;
+            double elapsedMs = now - lastUpdateTime;
+            lastUpdateTime = now;
 
-            frames++;
+            totalUpdates++;
 
-            if (elapsedMs > worstFrameMs)
-                worstFrameMs = elapsedMs;
+            if (elapsedMs > worstUpdateGapMs)
+                worstUpdateGapMs = elapsedMs;
 
             if (now - windowStart < 1000)
                 return;
 
-            secondsReported++;
+            secondsElapsed++;
+            windowStart = now;
+
+            if (secondsElapsed >= window_seconds)
+                finishSampling();
+        }
+
+        private void finishSampling()
+        {
+            if (finished)
+                return;
+
+            finished = true;
 
             long allocated = GC.GetTotalAllocatedBytes();
             int gc0 = GC.CollectionCount(0);
             int gc1 = GC.CollectionCount(1);
             int gc2 = GC.CollectionCount(2);
 
-            double avgMs = frames > 0 ? (now - windowStart) / frames : 0;
-            double allocMb = (allocated - lastAllocatedBytes) / 1024.0 / 1024.0;
+            double wallMs = Math.Max(1, Clock.CurrentTime - samplingStartTime);
+            double avgMs = totalUpdates > 0 ? wallMs / totalUpdates : 0;
+            double allocMb = (allocated - windowStartAllocatedBytes) / 1024.0 / 1024.0;
 
-            EzStartupTrace.LogDiagnostic($"FrameSample {secondsReported}s frames={frames} avg={fmt(avgMs)}ms worst={fmt(worstFrameMs)}ms "
-                                         + $"alloc={fmt(allocMb)}MB gc0={gc0 - lastGc0} gc1={gc1 - lastGc1} gc2={gc2 - lastGc2}");
+            EzStartupTrace.LogDiagnostic($"FrameSample summary window={window_seconds}s frames={totalUpdates} avg={fmt(avgMs)}ms "
+                                         + $"worst={fmt(worstUpdateGapMs)}ms alloc={fmt(allocMb)}MB "
+                                         + $"gc0={gc0 - windowStartGc0} gc1={gc1 - windowStartGc1} gc2={gc2 - windowStartGc2}");
 
-            windowStart = now;
-            frames = 0;
-            worstFrameMs = 0;
-            lastAllocatedBytes = allocated;
-            lastGc0 = gc0;
-            lastGc1 = gc1;
-            lastGc2 = gc2;
-
-            if (secondsReported >= max_report_seconds)
-                Expire();
+            LifetimeEnd = Time.Current;
+            Expire();
         }
 
         private static string fmt(double value) => value.ToString("0.0", CultureInfo.InvariantCulture);
