@@ -96,7 +96,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         protected override void AddBlueprintFor(ISerialisableDrawable item)
         {
-            if (!item.IsEditable)
+            if (!item.CanBeSelected)
                 return;
 
             base.AddBlueprintFor(item);
