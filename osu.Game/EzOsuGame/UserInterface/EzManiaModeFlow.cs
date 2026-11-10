@@ -2,17 +2,28 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Cursor;
+using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Input.Events;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
+using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics.UserInterface;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osuTK;
+using osuTK.Input;
 
 namespace osu.Game.EzOsuGame.UserInterface
 {
@@ -23,19 +34,20 @@ namespace osu.Game.EzOsuGame.UserInterface
         private const float min_gap = 10f;
         private const float label_value_spacing = 4f;
         private const float stacked_row_spacing = 2f;
+        private const float block_content_horizontal_padding = 8f;
         private static readonly float block_row_height = OsuFont.Style.Caption1.Size;
 
         private readonly GridContainer layoutGrid;
-        private readonly ModeBlock blockA;
-        private readonly ModeBlock blockB;
+        private readonly AltEnumModeBlock<EzEnumJudgeMode> blockA;
+        private readonly AltEnumModeBlock<EzEnumHealthMode> blockB;
         private readonly OsuSpriteText widthMeasureText;
 
         private float availableWidth;
         private bool displayedHorizontal = true;
         private float lastAppliedWidth = -1f;
 
-        private IBindable<EzEnumJudgeMode> maniaJudgeModeBindable = null!;
-        private IBindable<EzEnumHealthMode> maniaHealthModeBindable = null!;
+        private Bindable<EzEnumJudgeMode> maniaJudgeModeBindable = null!;
+        private Bindable<EzEnumHealthMode> maniaHealthModeBindable = null!;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -54,8 +66,8 @@ namespace osu.Game.EzOsuGame.UserInterface
         {
             Alpha = 0f;
 
-            blockA = new ModeBlock();
-            blockB = new ModeBlock();
+            blockA = new AltEnumModeBlock<EzEnumJudgeMode>("Hit", EzScoreInfoExtensions.GetJudgeModeDisplayName);
+            blockB = new AltEnumModeBlock<EzEnumHealthMode>("HP", EzScoreInfoExtensions.GetHealthModeDisplayName);
 
             InternalChildren = new Drawable[]
             {
@@ -81,6 +93,9 @@ namespace osu.Game.EzOsuGame.UserInterface
         {
             maniaJudgeModeBindable = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
             maniaHealthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
+
+            blockA.Attach(maniaJudgeModeBindable);
+            blockB.Attach(maniaHealthModeBindable);
         }
 
         protected override void LoadComplete()
@@ -158,13 +173,13 @@ namespace osu.Game.EzOsuGame.UserInterface
             foreach (EzEnumJudgeMode mode in Enum.GetValues<EzEnumJudgeMode>())
             {
                 widthMeasureText.Text = EzScoreInfoExtensions.GetJudgeModeDisplayName((int)mode);
-                maxContentWidth = Math.Max(maxContentWidth, maxLabelWidth + label_value_spacing + widthMeasureText.DrawWidth);
+                maxContentWidth = Math.Max(maxContentWidth, maxLabelWidth + label_value_spacing + widthMeasureText.DrawWidth + block_content_horizontal_padding);
             }
 
             foreach (EzEnumHealthMode mode in Enum.GetValues<EzEnumHealthMode>())
             {
                 widthMeasureText.Text = EzScoreInfoExtensions.GetHealthModeDisplayName((int)mode);
-                maxContentWidth = Math.Max(maxContentWidth, maxLabelWidth + label_value_spacing + widthMeasureText.DrawWidth);
+                maxContentWidth = Math.Max(maxContentWidth, maxLabelWidth + label_value_spacing + widthMeasureText.DrawWidth + block_content_horizontal_padding);
             }
 
             if (maxContentWidth <= 0)
@@ -277,53 +292,170 @@ namespace osu.Game.EzOsuGame.UserInterface
             new Dimension(GridSizeMode.Absolute, width),
         };
 
-        private partial class ModeBlock : CompositeDrawable
+        private partial class AltEnumModeBlock<TEnum> : OsuClickableContainer, IHasPopover
+            where TEnum : struct, Enum
         {
-            private readonly OsuSpriteText labelText;
-            private readonly TruncatingSpriteText valueText;
+            private static readonly MarginPadding block_padding = new() { Horizontal = 4, Vertical = 1 };
 
-            public ModeBlock()
+            private readonly string fixedLabel;
+            private readonly Func<int, string> getDisplayName;
+
+            private Bindable<TEnum>? bindable;
+            private bool altHighlightActive;
+
+            private OverlayColourProvider colourProvider = null!;
+            private Box background = null!;
+            private OsuSpriteText labelText = null!;
+            private TruncatingSpriteText valueText = null!;
+
+            public AltEnumModeBlock(string fixedLabel, Func<int, string> getDisplayName)
             {
+                this.fixedLabel = fixedLabel;
+                this.getDisplayName = getDisplayName;
+
                 Height = block_row_height;
+                CornerRadius = EzUIStyleV1.CORNER_RADIUS_CHIP;
                 Masking = true;
-
-                InternalChild = new FillFlowContainer
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Direction = FillDirection.Horizontal,
-                    Spacing = new Vector2(label_value_spacing),
-                    Anchor = Anchor.CentreLeft,
-                    Origin = Anchor.CentreLeft,
-                    Children = new Drawable[]
-                    {
-                        labelText = new OsuSpriteText
-                        {
-                            Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold),
-                            Anchor = Anchor.CentreLeft,
-                            Origin = Anchor.CentreLeft,
-                        },
-                        valueText = new TruncatingSpriteText
-                        {
-                            RelativeSizeAxes = Axes.X,
-                            Font = OsuFont.Style.Caption1,
-                            Anchor = Anchor.CentreLeft,
-                            Origin = Anchor.CentreLeft,
-                        },
-                    },
-                };
             }
 
-            [BackgroundDependencyLoader]
-            private void load(OverlayColourProvider colourProvider)
-            {
-                labelText.Colour = colourProvider.Content2;
-                valueText.Colour = colourProvider.Content1;
-            }
+            public void Attach(Bindable<TEnum> current) => bindable = current;
 
             public void SetValues(string label, string value)
             {
                 labelText.Text = label;
                 valueText.Text = value;
+            }
+
+            protected override bool OnClick(ClickEvent e)
+            {
+                if (!altHighlightActive || !e.CurrentState.Keyboard.Keys.IsPressed(Key.LAlt))
+                    return false;
+
+                this.ShowPopover();
+                return true;
+            }
+
+            protected override bool OnHover(HoverEvent e) => altHighlightActive && base.OnHover(e);
+
+            protected override void OnHoverLost(HoverLostEvent e)
+            {
+                if (!altHighlightActive)
+                    refreshColours();
+
+                base.OnHoverLost(e);
+            }
+
+            [BackgroundDependencyLoader]
+            private void load(OverlayColourProvider colourProvider)
+            {
+                this.colourProvider = colourProvider;
+
+                Child = new Container
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Padding = block_padding,
+                    Children = new Drawable[]
+                    {
+                        background = new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Colour = Colour4.Transparent,
+                        },
+                        new FillFlowContainer
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Direction = FillDirection.Horizontal,
+                            Spacing = new Vector2(label_value_spacing),
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Children = new Drawable[]
+                            {
+                                labelText = new OsuSpriteText
+                                {
+                                    Text = fixedLabel,
+                                    Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold),
+                                    Anchor = Anchor.CentreLeft,
+                                    Origin = Anchor.CentreLeft,
+                                    Colour = colourProvider.Content2,
+                                },
+                                valueText = new TruncatingSpriteText
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    Font = OsuFont.Style.Caption1,
+                                    Anchor = Anchor.CentreLeft,
+                                    Origin = Anchor.CentreLeft,
+                                    Colour = colourProvider.Content1,
+                                },
+                            },
+                        },
+                    },
+                };
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+                EzDisplayTagAltHighlight.ActiveChanged += onAltHighlightChanged;
+                onAltHighlightChanged(EzDisplayTagAltHighlight.Active);
+            }
+
+            protected override void Dispose(bool isDisposing)
+            {
+                base.Dispose(isDisposing);
+
+                if (isDisposing)
+                    EzDisplayTagAltHighlight.ActiveChanged -= onAltHighlightChanged;
+            }
+
+            public Popover GetPopover()
+            {
+                if (bindable == null)
+                    throw new InvalidOperationException();
+
+                return new ModeEnumPopover(bindable, getDisplayName);
+            }
+
+            private void onAltHighlightChanged(bool active)
+            {
+                if (altHighlightActive == active)
+                    return;
+
+                altHighlightActive = active;
+                refreshColours();
+            }
+
+            private void refreshColours()
+            {
+                if (!IsLoaded)
+                    return;
+
+                background.FadeColour(altHighlightActive ? colourProvider.Highlight1 : Colour4.Transparent, 200, Easing.OutQuint);
+                labelText.FadeColour(altHighlightActive ? colourProvider.Content1 : colourProvider.Content2, 200, Easing.OutQuint);
+                valueText.FadeColour(colourProvider.Content1, 200, Easing.OutQuint);
+            }
+
+            private partial class ModeEnumPopover : OsuPopover
+            {
+                public ModeEnumPopover(Bindable<TEnum> current, Func<int, string> getDisplayName)
+                    : base(false)
+                {
+                    Body.CornerRadius = 4;
+                    AllowableAnchors = new[] { Anchor.BottomCentre, Anchor.TopCentre };
+
+                    Children = new[]
+                    {
+                        new OsuMenu(Direction.Vertical, true)
+                        {
+                            Items = Enum.GetValues<TEnum>()
+                                .Select(mode => new OsuMenuItem(
+                                    getDisplayName(Convert.ToInt32(mode)),
+                                    MenuItemType.Standard,
+                                    () => current.Value = mode))
+                                .ToArray(),
+                            MaxHeight = 375,
+                        },
+                    };
+                }
             }
         }
     }
