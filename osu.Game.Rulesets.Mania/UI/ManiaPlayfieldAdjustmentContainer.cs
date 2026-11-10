@@ -62,7 +62,9 @@ namespace osu.Game.Rulesets.Mania.UI
 
             var rotation = GlobalConfigStore.EzConfig.GetBindable<double>(Ez2Setting.ManiaPseudo3DRotation);
 
-            if (!rotation.IsDefault)
+            // 用实际角度而非 IsDefault：皮肤编辑器的对比快照会把 Default 改写成当前值，
+            // 那时 IsDefault 为 true 会导致透视容器不被创建，斜轨角度整局失效。
+            if (rotation.Value > 0)
             {
                 positionContainer.Child = perspectiveContainer = new BufferedContainer(pixelSnapping: true)
                 {
@@ -102,6 +104,8 @@ namespace osu.Game.Rulesets.Mania.UI
             }
 
             perspectiveContainer.VerticalPerspective = t;
+            // 分量顺序易错：shader 的 g_Scale 是 (TopHeightScale, TopWidthScale)，
+            // 因此 .x 是远端纵向比例（决定间距压缩），.y 是远端横向比例（决定梯形收窄）。
             perspectiveContainer.PerspectiveScale = new Vector2(1.0f - t * 0.9f, 1.0f - t * 0.8f);
             perspectiveContainer.PerspectiveVerticalOffset = 0.0f;
         }
