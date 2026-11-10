@@ -132,7 +132,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 current.BindValueChanged(c =>
                 {
-                    if (c.NewValue != null && !ReferenceEquals(c.NewValue, c.OldValue))
+                    if (!ReferenceEquals(c.NewValue, c.OldValue))
                         EzReadoutSelection.Store(ruleset.OnlineID, c.NewValue.Id);
                 });
 
