@@ -549,7 +549,7 @@ namespace osu.Game.Screens.Select
                     return;
 
                 applyPanelDifficulty(starDifficulty.NewValue);
-            });
+            }, true);
         }
 
         private void applyPanelDifficulty(in StarDifficulty starDifficulty)

@@ -145,7 +145,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             {
                 Drawable instance = (Drawable)Activator.CreateInstance(type)!;
 
-                if (!((ISerialisableDrawable)instance).IsEditable)
+                if (!((ISerialisableDrawable)instance).CanBeSelected)
                     return;
 
                 list.Add(new ComponentPlaceButton(type, instance, hudLayer?.ActiveTarget)

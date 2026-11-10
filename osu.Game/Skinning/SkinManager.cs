@@ -51,6 +51,11 @@ namespace osu.Game.Skinning
         /// </summary>
         public Skin DefaultClassicSkin { get; }
 
+        /// <summary>
+        /// The "retro" skin.
+        /// </summary>
+        public Skin RetroSkin { get; }
+
         private readonly AudioManager audio;
 
         private readonly Scheduler scheduler;
@@ -98,8 +103,6 @@ namespace osu.Game.Skinning
 
         private Skin trianglesSkin { get; }
 
-        private Skin retroSkin { get; }
-
         private static readonly Live<SkinInfo> random_skin_info = new SkinInfo
         {
             ID = SkinInfo.RANDOM_SKIN,
@@ -141,7 +144,7 @@ namespace osu.Game.Skinning
 
             var defaultSkins = new[]
             {
-                retroSkin = new RetroSkin(this),
+                RetroSkin = new RetroSkin(this),
                 DefaultClassicSkin = new DefaultLegacySkin(this),
                 trianglesSkin = new TrianglesSkin(this),
                 argonSkin = new ArgonSkin(this),
@@ -773,7 +776,7 @@ namespace osu.Game.Skinning
                     skinInfo = DefaultClassicSkin.SkinInfo;
 
                 if (guid == SkinInfo.RETRO_SKIN)
-                    skinInfo = retroSkin.SkinInfo;
+                    skinInfo = RetroSkin.SkinInfo;
 
                 // 此处为匹配皮肤换版的信息同步
                 if (guid == SkinInfo.EZ_STYLE_PRO_SKIN)
