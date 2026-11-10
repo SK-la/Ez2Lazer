@@ -287,7 +287,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             double? skillStar = readout.SkillRating == EzAnalysisSystem.None
                 ? null
-                : positiveAxis(analysis, readout.SkillRating, EzRulesetReadout.RatingAxisOf(readout.SkillRating));
+                : EzRulesetReadout.LiveSkillStar(readout.SkillRating, analysis);
 
             return new EzReadoutValues(positive(rating.StarRating), positive(rating.PerformancePoints), skillStar);
         }

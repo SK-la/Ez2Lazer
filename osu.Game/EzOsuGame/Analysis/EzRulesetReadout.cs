@@ -164,11 +164,29 @@ namespace osu.Game.EzOsuGame.Analysis
             if (Selected(beatmap.Ruleset.OnlineID) is not { } readout || readout.SkillRating == EzAnalysisSystem.None)
                 return null;
 
-            if (analysis is { } live && live.RatingOf(readout.SkillRating).StarRating is double measured
-                                     && double.IsFinite(measured) && measured > 0)
-                return liveSkillStar(readout.SkillRating, measured);
+            if (analysis is { } live && LiveSkillStar(readout.SkillRating, live) is double measured)
+                return measured;
 
             return EzReadoutValues.Positive(StoredStar(beatmap, readout.SkillRating));
+        }
+
+        /// <summary>
+        /// The skill star from a live L3 pass. Mina measures on an axis; every other system's star is a scalar rating.
+        /// </summary>
+        public static double? LiveSkillStar(EzAnalysisSystem system, in EzAnalysisResult analysis)
+        {
+            if (system == EzAnalysisSystem.None)
+                return null;
+
+            if (system == EzAnalysisSystem.Mina
+                && analysis.AxesOf(EzAnalysisSystem.Mina).TryGetValue(RatingAxisOf(EzAnalysisSystem.Mina), out double axis)
+                && double.IsFinite(axis) && axis > 0)
+                return liveSkillStar(EzAnalysisSystem.Mina, axis);
+
+            if (analysis.RatingOf(system).StarRating is double star && double.IsFinite(star) && star > 0)
+                return liveSkillStar(system, star);
+
+            return null;
         }
 
         /// <summary>
