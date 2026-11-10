@@ -74,7 +74,7 @@ namespace osu.Game.Overlays.SkinEditor
 
         protected override void AddBlueprintFor(ISerialisableDrawable item)
         {
-            if (!item.IsEditable)
+            if (!item.CanBeSelected)
                 return;
 
             base.AddBlueprintFor(item);

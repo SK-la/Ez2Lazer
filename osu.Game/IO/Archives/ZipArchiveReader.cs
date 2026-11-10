@@ -42,7 +42,7 @@ namespace osu.Game.IO.Archives
         /// If a ZIP archive specifies a file entry which exceeds this size,
         /// attempting to access this file via <see cref="GetStream"/> will fail with <see cref="InsufficientMemoryException"/>.
         /// </summary>
-        public long MaximumEntrySize { get; set; } = 100 * 1024 * 1024; // bytes
+        public long MaximumEntrySize { get; set; } = 200 * 1024 * 1024; // bytes
 
         /// <summary>
         /// 谱面（<c>.osu</c>）条目允许的最大字节数。

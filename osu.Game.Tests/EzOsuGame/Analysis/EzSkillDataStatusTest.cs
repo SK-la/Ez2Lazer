@@ -20,7 +20,6 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 {
     /// <summary>
     /// The status report must agree with what the backfill filters on: it is counted from the same
-    /// <see cref="EzAnalysisRevision"/> stamps, so a bump has to show up as "stale".
     /// </summary>
     [TestFixture]
     public class EzSkillDataStatusTest : RealmTest

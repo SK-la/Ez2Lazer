@@ -45,7 +45,7 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// One chart's stored analysis, mirroring what <see cref="Beatmaps.BeatmapInfo.EzRatingData"/> holds.
+        /// One chart's stored analysis, mirroring what <see cref="EzRatingData"/> holds.
         /// </summary>
         /// <remarks>
         /// A scalar that has never been computed is <c>-1</c> in Realm; here it is <c>null</c>, because the column is
@@ -208,6 +208,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         /// <summary>Upper bound on <see cref="dirtyEntries"/>; older stamps are dropped wholesale.</summary>
         private const int dirty_entries_capacity = 16384;
+
         private CancellationTokenSource? writeCts;
         private Task? backgroundWriterTask;
         private bool isDisposed;
@@ -220,6 +221,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         // 常量化的表名与 meta key，避免在代码中散落硬编码字符串。
         private const string meta_key_requires_post_migration_refresh = "requires_post_migration_refresh";
+
         // The system's declared id is the key, so the branch stamp and the Realm applied-version table answer the
         // same question with the same vocabulary.
         private static readonly string meta_key_sunny_sr_version = EzAnalysisSystem.SSR.ToStorageId();
@@ -229,6 +231,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// The literal names branches were stamped with before the keys became system ids. Only migration reads these.
         /// </summary>
         private const string legacy_meta_key_sunny_sr_version = "sunny_sr_version";
+
         private const string legacy_meta_key_pp_version = "pp_version";
         private const string meta_key_analysis_version = "analysis_version";
         private const string meta_key_kind = "kind";
@@ -1160,6 +1163,7 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_source_collection} (
                     if (version > 0)
                         setMeta(connection, systemId, version.ToString(CultureInfo.InvariantCulture));
                 }
+
                 setMeta(connection, meta_key_ruleset_online_id, metadata.RulesetOnlineId.ToString(CultureInfo.InvariantCulture));
                 setMeta(connection, meta_key_ruleset_short_name, metadata.RulesetShortName);
                 setMeta(connection, meta_key_mods_fingerprint, metadata.ModsFingerprint);
@@ -2322,7 +2326,7 @@ FROM {table_songs_branch_entry};";
     {col_mina_pp} = $mina_pp,
     {col_ppp_sr} = $ppp_sr,
     {col_ppp_pp} = $ppp_pp"
-                    : string.Empty;
+                    : Empty;
 
                 using var update = connection.CreateCommand();
                 update.Transaction = transaction;

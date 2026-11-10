@@ -492,13 +492,15 @@ namespace osu.Game.Screens.Select
             if (Item == null)
                 return;
 
+            // L3 may finish before KPS is ready under mods; star/pp pills still need the live cache entry.
+            updateEzDisplay();
+
             if (!EzSongSelectAnalysisDisplay.ShouldApplyPanelKpsUpdate(ezAnalysisResult, mods.Value))
                 return;
 
             var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, ezAnalysisResult, mods.Value);
             applyPanelKps(metrics);
 
-            // The pills exist for every ruleset; only mania's live summary carries KPC and scratch on top of them.
             updateEzDisplay();
 
             if (!supportsEzAnalysis || !beatmap.SupportsSunnyStarRating())
@@ -549,7 +551,7 @@ namespace osu.Game.Screens.Select
                     return;
 
                 applyPanelDifficulty(starDifficulty.NewValue);
-            });
+            }, true);
         }
 
         private void applyPanelDifficulty(in StarDifficulty starDifficulty)

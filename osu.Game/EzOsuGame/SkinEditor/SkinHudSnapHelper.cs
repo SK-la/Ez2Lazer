@@ -388,7 +388,7 @@ namespace osu.Game.EzOsuGame.SkinEditor
                 if (component is not Drawable drawable)
                     continue;
 
-                if (!component.IsEditable || !drawable.IsPresent || selectionSet.Contains(drawable))
+                if (!component.CanBeSelected || !drawable.IsPresent || selectionSet.Contains(drawable))
                     continue;
 
                 result.Add(getSnapBounds(drawable, usePixelBounds));

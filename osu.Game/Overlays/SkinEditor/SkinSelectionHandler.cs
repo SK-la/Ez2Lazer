@@ -94,6 +94,9 @@ namespace osu.Game.Overlays.SkinEditor
 
         public override bool HandleFlip(Direction direction, bool flipOverOrigin)
         {
+            if (SelectedBlueprints.Any(b => !b.Item.CanBeScaled(direction == Direction.Horizontal ? Axes.X : Axes.Y)))
+                return false;
+
             var selectionQuad = getSelectionQuad();
             Vector2 scaleFactor = direction == Direction.Horizontal ? new Vector2(-1, 1) : new Vector2(1, -1);
 
@@ -101,7 +104,7 @@ namespace osu.Game.Overlays.SkinEditor
             {
                 var drawableItem = (Drawable)b.Item;
 
-                var flippedPosition = GeometryUtils.GetFlippedPosition(direction, flipOverOrigin ? drawableItem.Parent!.ScreenSpaceDrawQuad : selectionQuad, b.ScreenSpaceSelectionPoint);
+                var flippedPosition = GeometryUtils.GetFlippedPosition(direction, flipOverOrigin ? drawableItem.Parent!.ScreenSpaceDrawQuad : selectionQuad, drawableItem.ToScreenSpace(drawableItem.OriginPosition));
 
                 updateDrawablePosition(drawableItem, flippedPosition);
 
@@ -114,6 +117,9 @@ namespace osu.Game.Overlays.SkinEditor
 
         public override bool HandleMovement(MoveSelectionEvent<ISerialisableDrawable> moveEvent)
         {
+            if (SelectedBlueprints.Any(b => !b.Item.CanBeMoved))
+                return false;
+
             foreach (var c in SelectedBlueprints)
             {
                 var item = c.Item;
@@ -140,8 +146,8 @@ namespace osu.Game.Overlays.SkinEditor
         {
             base.OnSelectionChanged();
 
-            SelectionBox.CanFlipX = true;
-            SelectionBox.CanFlipY = true;
+            SelectionBox.CanFlipX = SelectedItems.All(i => i.CanBeScaled(Axes.X));
+            SelectionBox.CanFlipY = SelectedItems.All(i => i.CanBeScaled(Axes.Y));
             SelectionBox.CanReverse = false;
         }
 
