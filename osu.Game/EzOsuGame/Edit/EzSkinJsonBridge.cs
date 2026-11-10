@@ -162,7 +162,7 @@ namespace osu.Game.EzOsuGame.Edit
                 Ez2Setting.GameThemeName => typeof(string),
                 Ez2Setting.StageName or Ez2Setting.NoteSetName or Ez2Setting.StageBackground or Ez2Setting.ColumnLightName
                     or Ez2Setting.JudgementLineName => typeof(string),
-                Ez2Setting.ManiaPseudo3DRotation or Ez2Setting.ColumnDim or Ez2Setting.ColumnBlur or Ez2Setting.ColumnWidth or Ez2Setting.SpecialFactor
+                Ez2Setting.ManiaPseudo3DRotation or Ez2Setting.ManiaSpeedCompensation or Ez2Setting.ColumnDim or Ez2Setting.ColumnBlur or Ez2Setting.ColumnWidth or Ez2Setting.SpecialFactor
                     or Ez2Setting.HitPosition or Ez2Setting.HitTargetFloatFixed or Ez2Setting.HitTargetAlpha or Ez2Setting.NoteHeightScaleToWidth
                     or Ez2Setting.NoteCornerRadius or Ez2Setting.ManiaHoldTailAlpha or Ez2Setting.NoteTrackLineHeight
                     or Ez2Setting.ManiaHoldTailMaskGradientHeight => typeof(double),

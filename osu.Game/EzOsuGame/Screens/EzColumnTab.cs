@@ -128,6 +128,14 @@ namespace osu.Game.EzOsuGame.Screens
                         KeyboardStep = 1f,
                         DisplayAsPercentage = false
                     },
+                    new SettingsSlider<double>
+                    {
+                        LabelText = EzColumnStrings.SPEED_COMPENSATION,
+                        TooltipText = EzColumnStrings.SPEED_COMPENSATION_TOOLTIP,
+                        Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaSpeedCompensation),
+                        KeyboardStep = 0.01f,
+                        DisplayAsPercentage = true
+                    },
                     new SettingsSlider<float>
                     {
                         LabelText = EzColumnStrings.STAGE_POSITION_X,
