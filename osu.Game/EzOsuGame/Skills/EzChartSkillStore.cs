@@ -271,7 +271,7 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Replace all beatmap skill rows for <paramref name="systemId"/> with <paramref name="skills"/>.
+        /// Replace all beatmap skill rows for <paramref name="system"/> with <paramref name="skills"/>.
         /// </summary>
         /// <param name="rulesetOnlineId">
         /// Ruleset the rows belong to. Pass a negative value when the caller cannot name one; reads then treat the

@@ -111,7 +111,7 @@ namespace osu.Game.EzOsuGame.Scoring
                     // 避免嵌套 Task.Run + GetResult 同步阻塞额外占用线程池线程。
                     timeline = session.RunTimelineDirect(
                         databasedScore,
-                        playableBeatmap,
+                        playableBeatmap!,
                         ReplayRunPurpose.ForLive,
                         cancellationToken);
                     break;

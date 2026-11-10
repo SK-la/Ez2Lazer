@@ -128,7 +128,7 @@ namespace osu.Game.EzOsuGame.Skills
         public EzSkillProfile? GetPlayerProfile(int rulesetOnlineId) => EzSkillProfile.ForPlayer(rulesetOnlineId);
 
         /// <summary>
-        /// Generic beatmap skill read for any registered <paramref name="systemId"/>.
+        /// Generic beatmap skill read for any registered <paramref name="system"/>.
         /// Prefer this over mania-specific helpers when the caller already knows the system.
         /// </summary>
         public IReadOnlyDictionary<string, double> GetBeatmapSystemSkills(BeatmapInfo beatmapInfo, EzAnalysisSystem system)
