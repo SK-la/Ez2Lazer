@@ -152,7 +152,8 @@ namespace osu.Game.Screens.Select
                         {
                             RelativeSizeAxes = Axes.Both,
                             CornerRadius = CORNER_RADIUS,
-                            Masking = true,
+                            // TopLevelContent already clips to the same rounded rect.
+                            Masking = false,
                         },
                     },
                     hoverLayer = new Box
