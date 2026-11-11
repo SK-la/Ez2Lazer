@@ -6,6 +6,7 @@ using System.Globalization;
 using osu.Framework.Development;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.Screens.Menu;
 
 namespace osu.Game.EzOsuGame.Startup
 {

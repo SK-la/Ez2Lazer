@@ -43,7 +43,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private const string meta_content_version = "content_version";
 
-        private readonly Storage storage;
         private readonly Lock sync;
         private bool isDisposed;
 
@@ -61,7 +60,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             ArgumentNullException.ThrowIfNull(database);
             this.database = database;
-            storage = null!;
+
             sync = database.Sync;
         }
 
@@ -1872,10 +1871,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                        .Select(kv => new EzLocalProfileStarPlayCount(kv.Key.RulesetId, kv.Key.StarBucket, kv.Value))
                                        .ToList(),
                 SunnySRPlayCounts = result.SunnySRPlayCounts
-                                      .OrderBy(kv => kv.Key.RulesetId)
-                                      .ThenBy(kv => kv.Key.StarBucket)
-                                      .Select(kv => new EzLocalProfileSunnySRPlayCount(kv.Key.RulesetId, kv.Key.StarBucket, kv.Value))
-                                      .ToList(),
+                                          .OrderBy(kv => kv.Key.RulesetId)
+                                          .ThenBy(kv => kv.Key.StarBucket)
+                                          .Select(kv => new EzLocalProfileSunnySRPlayCount(kv.Key.RulesetId, kv.Key.StarBucket, kv.Value))
+                                          .ToList(),
                 StdAttrAffinities = result.StdAttrAffinities
                                           .OrderBy(kv => kv.Key.Attr)
                                           .ThenByDescending(kv => kv.Value.PlayCount)

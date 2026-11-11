@@ -132,14 +132,14 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 current.BindValueChanged(c =>
                 {
-                    if (!ReferenceEquals(c.NewValue, c.OldValue))
+                    if (c.NewValue != c.OldValue)
                         EzReadoutSelection.Store(ruleset.OnlineID, c.NewValue.Id);
                 });
 
                 // The song select chip writes the same setting; follow it so both stay one value.
                 selection.BindValueChanged(_ =>
                 {
-                    if (EzRulesetReadout.Selected(ruleset.OnlineID) is { } selected && !ReferenceEquals(selected, current.Value))
+                    if (EzRulesetReadout.Selected(ruleset.OnlineID) is { } selected && selected != current.Value)
                         current.Value = selected;
                 });
 
