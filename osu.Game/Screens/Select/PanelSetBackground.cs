@@ -151,7 +151,12 @@ namespace osu.Game.Screens.Select
 
             materialUiMode.BindValueChanged(e =>
             {
-                if (EzMaterialOverlayAlpha.IsEnabled(e.NewValue))
+                bool material = EzMaterialOverlayAlpha.IsEnabled(e.NewValue);
+
+                // 穿透材质时封面和渐变都不画，父级 Panel 已经圆角裁剪，这里的 Masking 是空跑。
+                Masking = !material;
+
+                if (material)
                 {
                     // Penetrate to the global song-select background — drop panel cover art.
                     loadCancellation?.Cancel();
