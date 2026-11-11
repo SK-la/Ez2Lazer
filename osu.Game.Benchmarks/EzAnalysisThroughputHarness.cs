@@ -278,7 +278,7 @@ namespace osu.Game.Benchmarks
                 {
                     var sample = converted.HitObjects[0];
                     long beforeCtor = GC.GetAllocatedBytesForCurrentThread();
-                    var windows = new osu.Game.Rulesets.Mania.Scoring.ManiaHitWindows(osu.Game.EzOsuGame.Configuration.EzEnumJudgeMode.Lazer);
+                    var windows = new osu.Game.Rulesets.Mania.Scoring.ManiaHitWindows(EzEnumJudgeMode.Lazer);
                     long afterCtor = GC.GetAllocatedBytesForCurrentThread();
                     windows.SetDifficulty(converted.Difficulty.OverallDifficulty);
                     long afterDifficulty = GC.GetAllocatedBytesForCurrentThread();
@@ -286,14 +286,14 @@ namespace osu.Game.Benchmarks
                     converted.ControlPointInfo.EffectPointAt(sample.StartTime);
                     long afterEffect = GC.GetAllocatedBytesForCurrentThread();
                     long beforeDefaultWindows = GC.GetAllocatedBytesForCurrentThread();
-                    _ = new osu.Game.Rulesets.Scoring.DefaultHitWindows();
+                    _ = new DefaultHitWindows();
                     long afterDefaultWindows = GC.GetAllocatedBytesForCurrentThread();
                     long beforeTiming = GC.GetAllocatedBytesForCurrentThread();
                     converted.ControlPointInfo.TimingPointAt(sample.StartTime);
                     long afterTiming = GC.GetAllocatedBytesForCurrentThread();
-                    var hold = converted.HitObjects.FirstOrDefault(h => h is osu.Game.Rulesets.Mania.Objects.HoldNote) as osu.Game.Rulesets.Mania.Objects.HoldNote;
+                    var hold = converted.HitObjects.FirstOrDefault(h => h is Rulesets.Mania.Objects.HoldNote) as Rulesets.Mania.Objects.HoldNote;
                     long beforeDefaultSamples = GC.GetAllocatedBytesForCurrentThread();
-                    var nodeSamples = hold == null ? null : osu.Game.Rulesets.Mania.Objects.HoldNote.CreateDefaultNodeSamples(hold);
+                    var nodeSamples = hold == null ? null : Rulesets.Mania.Objects.HoldNote.CreateDefaultNodeSamples(hold);
                     long afterDefaultSamples = GC.GetAllocatedBytesForCurrentThread();
                     Console.WriteLine($"  maniaWindows={afterCtor - beforeCtor}B defaultWindows={afterDefaultWindows - beforeDefaultWindows}B setDifficulty={afterDifficulty - afterCtor}B effectPoint={afterEffect - beforeEffect}B timingPoint={afterTiming - beforeTiming}B defaultNodeSamples={afterDefaultSamples - beforeDefaultSamples}B hop={hold?.Samples.Count}/{nodeSamples?.Count}");
                 }
@@ -302,7 +302,7 @@ namespace osu.Game.Benchmarks
                     Console.WriteLine($"  {type} count={entry.Count} avg={entry.Bytes / entry.Count / 1024.0:F1}KB total={entry.Bytes / 1024}KB");
 
                 stopwatch.Restart();
-                var processor = rulesetInfo.CreateInstance()?.CreateBeatmapProcessor(converted);
+                var processor = rulesetInfo.CreateInstance().CreateBeatmapProcessor(converted);
                 processor?.PreProcess();
                 processor?.PostProcess();
                 long processorMs = stopwatch.ElapsedMilliseconds;
@@ -557,7 +557,7 @@ namespace osu.Game.Benchmarks
 
             public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods) => playable;
 
-            public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, System.Threading.CancellationToken cancellationToken) => playable;
+            public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken) => playable;
 
             IBeatmapInfo IWorkingBeatmap.BeatmapInfo => playable.BeatmapInfo;
             bool IWorkingBeatmap.BeatmapLoaded => true;

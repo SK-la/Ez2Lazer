@@ -18,7 +18,7 @@ namespace osu.Game
 
         private void notifyDetachedBeatmapStoreScreenTransition()
         {
-            detachedBeatmapSyncPolicy?.NotifyScreenTransition(Clock.CurrentTime);
+            detachedBeatmapSyncPolicy.NotifyScreenTransition(Clock.CurrentTime);
         }
 
         private void onEzDetachedBeatmapStoreScreenPushed(IScreen lastScreen, IScreen newScreen)
