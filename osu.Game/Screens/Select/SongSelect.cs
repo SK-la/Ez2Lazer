@@ -139,6 +139,8 @@ namespace osu.Game.Screens.Select
         private SkinnableContainer skinnableContent = null!;
 
         private GridContainer mainGridContainer = null!;
+        private float lastLeftColumnMaxSize = float.NaN;
+        private float lastRightColumnMaxSize = float.NaN;
 
         private NoResultsPlaceholder noResultsPlaceholder = null!;
 
@@ -515,13 +517,21 @@ namespace osu.Game.Screens.Select
             detailsArea.Height = wedgesContainer.ChildSize.Y - titleWedge.LayoutSize.Y - 4;
 
             float widescreenBonusWidth = Math.Max(0, DrawWidth / DrawHeight - 2f);
+            float leftMax = 700 + widescreenBonusWidth * 100;
+            float rightMax = 700 + widescreenBonusWidth * 300;
 
-            mainGridContainer.ColumnDimensions = new[]
+            // GridContainer.ColumnDimensions uses array reference equality; Dimension is a class.
+            if (leftMax != lastLeftColumnMaxSize || rightMax != lastRightColumnMaxSize)
             {
-                new Dimension(GridSizeMode.Relative, 0.5f, maxSize: 700 + widescreenBonusWidth * 100),
-                new Dimension(),
-                new Dimension(GridSizeMode.Relative, 0.5f, minSize: 500, maxSize: 700 + widescreenBonusWidth * 300),
-            };
+                lastLeftColumnMaxSize = leftMax;
+                lastRightColumnMaxSize = rightMax;
+                mainGridContainer.ColumnDimensions = new[]
+                {
+                    new Dimension(GridSizeMode.Relative, 0.5f, maxSize: leftMax),
+                    new Dimension(),
+                    new Dimension(GridSizeMode.Relative, 0.5f, minSize: 500, maxSize: rightMax),
+                };
+            }
 
             if (this.IsCurrentScreen())
                 updateDebounce();
