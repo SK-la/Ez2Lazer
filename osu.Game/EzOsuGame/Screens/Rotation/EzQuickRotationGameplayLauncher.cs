@@ -23,7 +23,7 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
                                  RulesetInfo rulesetInfo,
                                  IReadOnlyList<Mod> modList)
         {
-            beatmap.Value = beatmapManager.GetWorkingBeatmap(beatmapInfo, true);
+            beatmap.Value = beatmapManager.GetWorkingBeatmap(beatmapInfo);
 
             if (beatmap.IsDefault)
                 return;

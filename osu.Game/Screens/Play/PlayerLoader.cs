@@ -194,6 +194,9 @@ namespace osu.Game.Screens.Play
         [Resolved]
         private LeaderboardManager? leaderboardManager { get; set; }
 
+        [Resolved]
+        private BeatmapManager beatmaps { get; set; } = null!;
+
         [Resolved(canBeNull: true)]
         private IEzScoreRacePlayerStartGate? scoreRacePlayerStartGate { get; set; }
 
@@ -392,6 +395,34 @@ namespace osu.Game.Screens.Play
 
             showMuteWarningIfNeeded();
             showBatteryWarningIfNeeded();
+
+            // After the first frame so this screen is visible before cache invalidation.
+            Schedule(refetchWorkingBeatmap);
+        }
+
+        private void refetchWorkingBeatmap()
+        {
+            if (!this.IsCurrentScreen())
+                return;
+
+            var previous = Beatmap.Value;
+            var next = beatmaps.GetWorkingBeatmap(previous.BeatmapInfo, true);
+
+            if (ReferenceEquals(previous, next))
+                return;
+
+            Beatmap.Value = next;
+
+            if (!next.TrackLoaded)
+                return;
+
+            if (previous.TrackLoaded && ReferenceEquals(previous.Track, next.Track))
+                return;
+
+            if (previous.TrackLoaded)
+                previous.Track.RemoveAdjustment(AdjustableProperty.Volume, volumeAdjustment);
+
+            next.Track.AddAdjustment(AdjustableProperty.Volume, volumeAdjustment);
         }
 
         public override void OnResuming(ScreenTransitionEvent e)

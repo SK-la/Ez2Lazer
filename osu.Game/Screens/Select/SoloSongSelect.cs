@@ -61,7 +61,7 @@ namespace osu.Game.Screens.Select
 
             AddInternal(new SongSelectTouchInputDetector());
             // 常规选曲界面：转盘转动 → 逐格选曲（等价 ↑/↓），见 Ez2Setting.ScratchAxisSongSelectEnabled
-            AddInternal(new EzSongSelectScratchAxisHandler(() => this.IsCurrentScreen()));
+            AddInternal(new EzSongSelectScratchAxisHandler(this.IsCurrentScreen));
         }
 
         public override IEnumerable<OsuMenuItem> GetForwardActions(BeatmapInfo beatmap)
@@ -156,7 +156,7 @@ namespace osu.Game.Screens.Select
             if (!this.IsCurrentScreen())
                 return;
 
-            SelectAndRun(beatmap, () => this.Push(new EditorLoader()));
+            SelectAndRun(beatmap, () => this.Push(new EditorLoader()), refetchWorkingBeatmap: true);
         }
 
         public override void OnResuming(ScreenTransitionEvent e)

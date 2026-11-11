@@ -668,7 +668,11 @@ namespace osu.Game.Screens.Select
         /// </summary>
         /// <param name="beatmap">The beatmap which should be selected. If not provided, the current globally selected beatmap will be used.</param>
         /// <param name="startAction">The action to perform if conditions are met to be able to proceed. May not be invoked if in an invalid state.</param>
-        protected void SelectAndRun(BeatmapInfo beatmap, Action startAction)
+        /// <param name="refetchWorkingBeatmap">
+        /// Whether to force a new <see cref="WorkingBeatmap"/> from the database before <paramref name="startAction"/>.
+        /// Required for the editor so difficulty files are re-read. Gameplay leaves this false so <see cref="PlayerLoader"/> can appear first.
+        /// </param>
+        protected void SelectAndRun(BeatmapInfo beatmap, Action startAction, bool refetchWorkingBeatmap = false)
         {
             if (!this.IsCurrentScreen())
                 return;
@@ -680,8 +684,7 @@ namespace osu.Game.Screens.Select
             // Carousel selection will update to the forced selection via a call of `ensureGlobalBeatmapValid` below, or when song select becomes current again.
             cancelDebounceSelection();
 
-            // Forced refetch is important here to guarantee correct invalidation across all difficulties (editor specific).
-            Beatmap.Value = beatmaps.GetWorkingBeatmap(beatmap, true);
+            Beatmap.Value = beatmaps.GetWorkingBeatmap(beatmap, refetchWorkingBeatmap);
 
             if (Beatmap.IsDefault)
                 return;
