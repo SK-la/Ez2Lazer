@@ -432,7 +432,9 @@ namespace osu.Game.EzOsuGame.UserInterface
 
                 protected override void Draw(IRenderer renderer)
                 {
-                    if (pointCount < 2)
+                    base.Draw(renderer);
+
+                    if (pointCount < 2 || DrawColourInfo.Colour.MaxAlpha < 0.001f)
                         return;
 
                     Color4 colour = DrawColourInfo.Colour.TopLeft;

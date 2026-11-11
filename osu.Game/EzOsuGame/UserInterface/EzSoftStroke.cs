@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Rendering;
@@ -16,6 +17,13 @@ namespace osu.Game.EzOsuGame.UserInterface
     /// </summary>
     internal static class EzSoftStroke
     {
+        public static Color4 Tint(Color4 colour, DrawColourInfo drawColourInfo)
+        {
+            var tinted = drawColourInfo.Colour;
+            tinted.ApplyChild(colour);
+            return tinted.TopLeft;
+        }
+
         public static void Draw(IRenderer renderer, Texture texture, ReadOnlySpan<Vector2> points, float thickness, Color4 colour, bool closed)
         {
             int count = points.Length;

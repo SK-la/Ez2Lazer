@@ -5,10 +5,10 @@ using System;
 using System.Collections.Generic;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
-using osu.Framework.Graphics.Textures;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Textures;
 using osu.Framework.Layout;
 using osuTK;
 using osuTK.Graphics;
@@ -371,6 +371,11 @@ namespace osu.Game.EzOsuGame.UserInterface
 
                 protected override void Draw(IRenderer renderer)
                 {
+                    base.Draw(renderer);
+
+                    if (DrawColourInfo.Colour.MaxAlpha < 0.001f)
+                        return;
+
                     float radius = Math.Min(drawSize.X, drawSize.Y) * 0.5f * radiusRatio;
                     if (radius <= 0)
                         return;
@@ -381,13 +386,13 @@ namespace osu.Game.EzOsuGame.UserInterface
                     renderer.PushLocalMatrix(DrawInfo.Matrix);
 
                     fillVerticesUniform(outerVertices, center, radius, 1, axisCount);
-                    drawPolygonFill(renderer, whitePixel, outerVertices, baseFillColour);
+                    drawPolygonFill(renderer, whitePixel, outerVertices, tintFill(baseFillColour));
 
                     fillVerticesFromRatios(primaryVertices, center, radius, ratios, axisCount);
 
                     if (secondaryRatios == null)
                     {
-                        drawFanFill(renderer, whitePixel, center, primaryVertices, dataFillColour);
+                        drawFanFill(renderer, whitePixel, center, primaryVertices, tintFill(dataFillColour));
                         drawStrokes(renderer, whitePixel, center, radius, primaryOnTop: true);
                     }
                     else
@@ -397,13 +402,13 @@ namespace osu.Game.EzOsuGame.UserInterface
 
                         if (primaryIsSmaller)
                         {
-                            drawFanFill(renderer, whitePixel, center, secondaryVertices, secondaryDataFillColour);
-                            drawFanFill(renderer, whitePixel, center, primaryVertices, dataFillColour);
+                            drawFanFill(renderer, whitePixel, center, secondaryVertices, tintFill(secondaryDataFillColour));
+                            drawFanFill(renderer, whitePixel, center, primaryVertices, tintFill(dataFillColour));
                         }
                         else
                         {
-                            drawFanFill(renderer, whitePixel, center, primaryVertices, dataFillColour);
-                            drawFanFill(renderer, whitePixel, center, secondaryVertices, secondaryDataFillColour);
+                            drawFanFill(renderer, whitePixel, center, primaryVertices, tintFill(dataFillColour));
+                            drawFanFill(renderer, whitePixel, center, secondaryVertices, tintFill(secondaryDataFillColour));
                         }
 
                         drawStrokes(renderer, whitePixel, center, radius, primaryOnTop: primaryIsSmaller);
@@ -412,6 +417,16 @@ namespace osu.Game.EzOsuGame.UserInterface
                     renderer.PopLocalMatrix();
                 }
 
+                private ColourInfo tintFill(Color4 colour)
+                {
+                    var tinted = DrawColourInfo.Colour;
+                    tinted.ApplyChild(colour);
+                    return tinted;
+                }
+
+                private void drawStroke(IRenderer renderer, Texture whitePixel, ReadOnlySpan<Vector2> points, float thickness, Color4 colour, bool closed)
+                    => EzSoftStroke.Draw(renderer, whitePixel, points, thickness, EzSoftStroke.Tint(colour, DrawColourInfo), closed);
+
                 private void drawStrokes(IRenderer renderer, Texture whitePixel, Vector2 center, float radius, bool primaryOnTop)
                 {
                     int internalLevels = Math.Max(0, gridLevels - 1);
@@ -419,11 +434,11 @@ namespace osu.Game.EzOsuGame.UserInterface
                     for (int level = 1; level <= internalLevels; level++)
                     {
                         fillVerticesUniform(outerVertices, center, radius, level / (float)gridLevels, axisCount);
-                        EzSoftStroke.Draw(renderer, whitePixel, outerVertices.AsSpan(0, axisCount), gridThickness, gridColour, true);
+                        drawStroke(renderer, whitePixel, outerVertices.AsSpan(0, axisCount), gridThickness, gridColour, true);
                     }
 
                     fillVerticesUniform(outerVertices, center, radius + outerRingRadialOffset, 1, axisCount);
-                    EzSoftStroke.Draw(renderer, whitePixel, outerVertices.AsSpan(0, axisCount), outerRingThickness, outerRingColour, true);
+                    drawStroke(renderer, whitePixel, outerVertices.AsSpan(0, axisCount), outerRingThickness, outerRingColour, true);
 
                     Span<Vector2> axis = stackalloc Vector2[2];
                     axis[0] = center;
@@ -432,16 +447,16 @@ namespace osu.Game.EzOsuGame.UserInterface
                     for (int i = 0; i < axisCount; i++)
                     {
                         axis[1] = outerVertices[i];
-                        EzSoftStroke.Draw(renderer, whitePixel, axis, axisThickness, axisColour, false);
+                        drawStroke(renderer, whitePixel, axis, axisThickness, axisColour, false);
                     }
 
                     if (primaryOnTop && secondaryRatios != null)
-                        EzSoftStroke.Draw(renderer, whitePixel, secondaryVertices.AsSpan(0, axisCount), dataOutlineThickness, secondaryDataStrokeColour, true);
+                        drawStroke(renderer, whitePixel, secondaryVertices.AsSpan(0, axisCount), dataOutlineThickness, secondaryDataStrokeColour, true);
 
-                    EzSoftStroke.Draw(renderer, whitePixel, primaryVertices.AsSpan(0, axisCount), dataOutlineThickness, dataStrokeColour, true);
+                    drawStroke(renderer, whitePixel, primaryVertices.AsSpan(0, axisCount), dataOutlineThickness, dataStrokeColour, true);
 
                     if (!primaryOnTop && secondaryRatios != null)
-                        EzSoftStroke.Draw(renderer, whitePixel, secondaryVertices.AsSpan(0, axisCount), dataOutlineThickness, secondaryDataStrokeColour, true);
+                        drawStroke(renderer, whitePixel, secondaryVertices.AsSpan(0, axisCount), dataOutlineThickness, secondaryDataStrokeColour, true);
                 }
 
                 private static void ensureVertexCapacity(ref Vector2[] buffer, int count)
@@ -461,7 +476,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                     }
                 }
 
-                private static void drawPolygonFill(IRenderer renderer, Texture texture, IReadOnlyList<Vector2> polygonVertices, Color4 colour)
+                private static void drawPolygonFill(IRenderer renderer, Texture texture, IReadOnlyList<Vector2> polygonVertices, ColourInfo colour)
                 {
                     for (int i = 1; i < polygonVertices.Count - 1; i++)
                     {
@@ -487,7 +502,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                     }
                 }
 
-                private static void drawFanFill(IRenderer renderer, Texture texture, Vector2 center, IReadOnlyList<Vector2> polygonVertices, Color4 colour)
+                private static void drawFanFill(IRenderer renderer, Texture texture, Vector2 center, IReadOnlyList<Vector2> polygonVertices, ColourInfo colour)
                 {
                     for (int i = 0; i < polygonVertices.Count; i++)
                     {
