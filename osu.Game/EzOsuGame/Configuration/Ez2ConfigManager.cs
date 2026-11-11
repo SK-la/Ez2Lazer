@@ -314,6 +314,9 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.EzScoreRaceServiceEnabled, true);
             SetDefault(Ez2Setting.EzScoreRaceFeedMode, EzReplayFeedMode.BatchAllEvents);
             SetDefault(Ez2Setting.EzHudCameraEnabled, false);
+            SetDefault(Ez2Setting.DisplayOutputMode, EzDisplayOutputMode.Standard);
+            SetDefault(Ez2Setting.DisplayOutputSdrExposure, 1.0, 0.5, 2.0, 0.01);
+            SetDefault(Ez2Setting.DisplayOutputHdrPaperWhiteNits, 0.0, 0.0, 10000.0, 1.0);
 
             #endregion
         }
@@ -1476,6 +1479,15 @@ namespace osu.Game.EzOsuGame.Configuration
         /// <summary>摄像头 HUD 总开关。关闭时不加载采集后端、不枚举设备、不打开摄像头、不上传纹理。</summary>
         EzHudCameraEnabled,
 
+        /// <summary>显示输出（10-bit / HDR）。交换链在进程启动时确定，见 <c>osu.Desktop/EzDisplayOutputBootstrap</c>。</summary>
+        DisplayOutputMode,
+
+        /// <summary>SDR 明暗度倍数；present 立即使用。</summary>
+        DisplayOutputSdrExposure,
+
+        /// <summary>HDR 纸白亮度（nits）；0 表示显示器全屏持续亮度。present 立即使用。</summary>
+        DisplayOutputHdrPaperWhiteNits,
+
         // Ez 技能
         /// <summary>
         /// ChartDan「LN 半」判定的绝对门槛（hold 物件数）：大于此值即认定 LN，无需达到比例线。
@@ -1494,6 +1506,16 @@ namespace osu.Game.EzOsuGame.Configuration
         S,
         E,
         P
+    }
+
+    /// <summary>
+    /// 显示输出模式（进程启动期确定，改动需重启）。见 <c>osu.Desktop/EzDisplayOutputBootstrap</c>。
+    /// </summary>
+    public enum EzDisplayOutputMode
+    {
+        Standard,
+        Native10Bit,
+        Hdr10,
     }
 
     /// <summary>

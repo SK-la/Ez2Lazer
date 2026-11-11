@@ -110,12 +110,19 @@ namespace osu.Desktop
             if (EzGcModeBootstrap.EnsureRequestedGcMode(gameName, args))
                 return;
 
+            var displayOutputMode = EzDisplayOutputBootstrap.ReadRequestedMode(gameName);
+            var displayOutputTone = EzDisplayOutputBootstrap.ReadStartupTone(gameName);
+            EzDisplayOutputBootstrap.ApplyRendererEnvironment(displayOutputMode);
+
             EzStartupTrace.LogDiagnostic("Host options resolved");
 
             var hostOptions = new HostOptions
             {
                 IPCPipeName = !tournamentClient ? OsuGame.IPC_PIPE_NAME : null,
                 FriendlyGameName = OsuGameBase.GAME_NAME,
+                DisplayOutputMode = displayOutputMode,
+                DisplayOutputSdrExposure = displayOutputTone.SdrExposure,
+                DisplayOutputHdrPaperWhiteNits = displayOutputTone.HdrPaperWhiteNits,
             };
 
             using (DesktopGameHost host = Host.GetSuitableDesktopHost(gameName, hostOptions))
