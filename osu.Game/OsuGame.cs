@@ -1577,7 +1577,7 @@ namespace osu.Game
             if (entry.Message?.Contains("Please ensure that you are using the latest version of the official game releases", StringComparison.OrdinalIgnoreCase) == true)
                 return;
 
-            if (entry.Message?.Contains("Your score will not be submitted", StringComparison.OrdinalIgnoreCase) == true)
+            if (entry.Message?.Contains("score will not be submitted", StringComparison.OrdinalIgnoreCase) == true)
                 return;
 
             if (entry.Message?.Contains("This is not an official build of the game", StringComparison.OrdinalIgnoreCase) == true)
