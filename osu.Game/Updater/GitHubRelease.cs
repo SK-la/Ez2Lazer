@@ -24,7 +24,11 @@ namespace osu.Game.Updater
         [JsonProperty("prerelease")]
         public bool Prerelease { get; set; }
 
+        [JsonProperty("published_at")]
         [JsonPropertyName("published_at")]
         public DateTime? PublishedAt { get; set; }
+
+        [JsonProperty("body")]
+        public string Body { get; set; }
     }
 }

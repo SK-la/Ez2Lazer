@@ -41,7 +41,8 @@ namespace osu.Game.Online.API.Requests.Responses
             ["cuttingedge"] = new Color4(238, 170, 0, 255),
             ["lazer"] = new Color4(237, 18, 33, 255),
             ["tachyon"] = new Color4(206, 0, 255, 255),
-            ["web"] = new Color4(136, 102, 238, 255)
+            ["web"] = new Color4(136, 102, 238, 255),
+            ["ez2lazer"] = new Color4(161, 121, 242, 255),
         };
 
         public ColourInfo Colour => KNOWN_STREAMS.TryGetValue(Name, out var colour) ? colour : new Color4(0, 0, 0, 255);
