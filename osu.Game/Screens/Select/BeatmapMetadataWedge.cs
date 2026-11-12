@@ -412,6 +412,7 @@ namespace osu.Game.Screens.Select
         private void updateUserTags()
         {
             userTagsCancellationSource?.Cancel();
+            userTagsCancellationSource?.Dispose();
             userTagsCancellationSource = new CancellationTokenSource();
 
             var token = userTagsCancellationSource.Token;
@@ -445,6 +446,7 @@ namespace osu.Game.Screens.Select
         protected override void Dispose(bool isDisposing)
         {
             userTagsCancellationSource?.Cancel();
+            userTagsCancellationSource?.Dispose();
             userTagsCancellationSource = null;
             base.Dispose(isDisposing);
         }

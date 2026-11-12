@@ -385,6 +385,7 @@ namespace osu.Game.Screens.Select
         private void updateLengthAndBpmStatistics()
         {
             lengthBpmCancellationSource?.Cancel();
+            lengthBpmCancellationSource?.Dispose();
             lengthBpmCancellationSource = new CancellationTokenSource();
 
             var token = lengthBpmCancellationSource.Token;
@@ -443,6 +444,7 @@ namespace osu.Game.Screens.Select
         private void updateOnlineDisplay()
         {
             onlineDisplayCancellationSource?.Cancel();
+            onlineDisplayCancellationSource?.Dispose();
             onlineDisplayCancellationSource = null;
 
             if (onlineLookupResult.Value?.Status != SongSelect.BeatmapSetLookupStatus.Completed)

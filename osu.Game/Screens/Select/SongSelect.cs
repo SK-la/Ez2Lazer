@@ -1468,6 +1468,7 @@ namespace osu.Game.Screens.Select
                 return;
 
             onlineLookupCancellation?.Cancel();
+            onlineLookupCancellation?.Dispose();
             onlineLookupCancellation = null;
 
             if (onlineSetId < 0)
@@ -1661,6 +1662,9 @@ namespace osu.Game.Screens.Select
         {
             base.Dispose(isDisposing);
             modSelectOverlayRegistration?.Dispose();
+            onlineLookupCancellation?.Cancel();
+            onlineLookupCancellation?.Dispose();
+            onlineLookupCancellation = null;
         }
     }
 }
