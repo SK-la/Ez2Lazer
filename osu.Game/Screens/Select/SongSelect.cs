@@ -743,7 +743,13 @@ namespace osu.Game.Screens.Select
             {
                 var id = Beatmap.Value.BeatmapInfo.ID;
 
-                if (beatmaps.QueryBeatmap(b => b.ID == id) == null)
+                bool stillPresent = realm.Run(r =>
+                {
+                    var found = r.Find<BeatmapInfo>(id);
+                    return found?.BeatmapSet is { DeletePending: false };
+                });
+
+                if (!stillPresent)
                 {
                     Beatmap.SetDefault();
                     performDebounceSelection();
