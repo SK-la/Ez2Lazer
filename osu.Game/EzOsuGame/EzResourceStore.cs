@@ -42,6 +42,9 @@ namespace osu.Game.EzOsuGame
         // 256 约为菜单光标显示尺寸（900px 视口下约 46px）的 5 倍，覆盖到 4K 仍有余量。
         private const int shell_texture_edge = 256;
 
+        // 选择器缩略图规范边长。卡片预览区最大约 128px，256 覆盖 2x HiDPI。
+        private const int thumbnail_texture_edge = 256;
+
         #region IStorageResourceProvider 实现
 
         public IRenderer Renderer { get; }
@@ -77,6 +80,8 @@ namespace osu.Game.EzOsuGame
         private readonly TextureStore glyphStore;
         private readonly TextureStore shellStore;
         private readonly TextureStore danStore;
+        // 选择器缩略图：引用计数，最后一个引用释放即回收；上传期压到规范边长。
+        private readonly LargeTextureStore thumbnailStore;
 
         // 层1 目录索引：帧查找的文件事实来源（用户 EzResources 与内置根双根合并）
         private readonly EzResourceDirectoryIndex directoryIndex;
@@ -139,6 +144,10 @@ namespace osu.Game.EzOsuGame
             refCountedTextureStore = new LargeTextureStore(renderer, new TextureLoaderStore(combinedStore));
             refCountedTextureStore.AddTextureSource(baseTextureLoader);
 
+            // 选择器缩略图：上传前压到规范边长，引用计数，最后一个引用释放即回收。
+            var thumbnailLoader = new MaxDimensionLimitedTextureLoaderStore(new TextureLoaderStore(combinedStore), thumbnail_texture_edge, ResizeMode.Max);
+            thumbnailStore = new LargeTextureStore(renderer, thumbnailLoader);
+
             // HUD combo / score 与舞台数字共用。超过 100 的图先缩小再进一页。
             var glyphLoader = new MaxDimensionLimitedTextureLoaderStore(new TextureLoaderStore(combinedStore), glyph_upload_edge, ResizeMode.Max);
             glyphStore = new TextureStore(renderer, glyphLoader, true, TextureFilteringMode.Linear, false, 2, null, "EzGlyph");
@@ -190,6 +199,7 @@ namespace osu.Game.EzOsuGame
                 EzTextureUsage.Glyph => glyphStore.Get(path),
                 EzTextureUsage.Badge => danStore.Get(path),
                 EzTextureUsage.Shell => shellStore.Get(path),
+                EzTextureUsage.Thumbnail => thumbnailStore.Get(path),
                 _ => textureStore.Get(path),
             };
         }
@@ -235,6 +245,7 @@ namespace osu.Game.EzOsuGame
                 EzTextureUsage.Glyph => glyphStore,
                 EzTextureUsage.Badge => danStore,
                 EzTextureUsage.Shell => shellStore,
+                EzTextureUsage.Thumbnail => thumbnailStore,
                 _ => textureStore,
             };
         }
@@ -322,6 +333,7 @@ namespace osu.Game.EzOsuGame
             animationSafeStore.ClearCache();
 
             refCountedTextureStore.ClearFailedCache();
+            thumbnailStore.ClearFailedCache();
         }
 
         #endregion
@@ -395,6 +407,7 @@ namespace osu.Game.EzOsuGame
                 glyphStore.Dispose();
                 shellStore.Dispose();
                 danStore.Dispose();
+                thumbnailStore.Dispose();
                 sampleStore.Dispose();
 
                 if (Files is IDisposable filesDisposable)

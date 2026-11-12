@@ -63,6 +63,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         public Bindable<float> RememberedX { get; }
 
         private Box background = null!;
+        private EzEditorSectionComponentsSidebar section = null!;
         private InputManager inputManager = null!;
 
         private bool dragging;
@@ -93,10 +94,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             CornerRadius = corner_radius;
 
-            var section = new EzEditorSectionComponentsSidebar(showComponentTypeSelector: false)
+            section = new EzEditorSectionComponentsSidebar(showComponentTypeSelector: false)
             {
                 RelativeSizeAxes = Axes.X,
             };
+
+            // Closed by default: the card list is only materialised while the picker is open, so preview
+            // textures are not decoded at editor startup.
+            section.Displayed.Value = false;
 
             InternalChildren = new Drawable[]
             {
@@ -176,7 +181,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 },
             };
 
-            Open.BindValueChanged(e => this.FadeTo(e.NewValue ? 1 : 0, 200, Easing.OutQuint), true);
+            Open.BindValueChanged(e =>
+            {
+                this.FadeTo(e.NewValue ? 1 : 0, 200, Easing.OutQuint);
+                updateSectionDisplayed();
+            }, true);
         }
 
         protected override void LoadComplete()
@@ -184,8 +193,18 @@ namespace osu.Game.EzOsuGame.Edit.Components
             base.LoadComplete();
 
             inputManager = GetContainingInputManager()!;
-            Expanded.BindValueChanged(v => updateExpandedState(v.NewValue), true);
+            Expanded.BindValueChanged(v =>
+            {
+                updateExpandedState(v.NewValue);
+                updateSectionDisplayed();
+            }, true);
         }
+
+        /// <summary>
+        /// Materialises the card list only while the picker is both open and expanded; folding or closing it
+        /// empties the list so preview textures can leave the pools.
+        /// </summary>
+        private void updateSectionDisplayed() => section.Displayed.Value = Open.Value && Expanded.Value;
 
         protected override void Update()
         {

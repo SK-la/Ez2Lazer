@@ -79,8 +79,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
                     string name = Path.GetFileNameWithoutExtension(file);
 
-                    if (name.StartsWith(judgement_line_prefix, StringComparison.OrdinalIgnoreCase))
-                        name = name[judgement_line_prefix.Length..];
+                    if (name.StartsWith(JUDGEMENT_LINE_PREFIX, StringComparison.OrdinalIgnoreCase))
+                        name = name[JUDGEMENT_LINE_PREFIX.Length..];
 
                     if (!string.IsNullOrEmpty(name))
                         list.Add(name);
@@ -95,7 +95,7 @@ namespace osu.Game.EzOsuGame.Overlays
             return list;
         }
 
-        internal const string judgement_line_prefix = "JudgementLine_";
+        internal const string JUDGEMENT_LINE_PREFIX = "JudgementLine_";
 
         private static List<string> listSubdirectories(Storage storage, string relativePath)
         {
@@ -136,21 +136,21 @@ namespace osu.Game.EzOsuGame.Overlays
                     return tryStagePreview(provider, key);
 
                 case EzResourcePickerCategory.JudgementLine:
-                    return provider.Get($"JudgementLine/{judgement_line_prefix}{key}", EzTextureUsage.Large);
+                    return provider.Get($"JudgementLine/{JUDGEMENT_LINE_PREFIX}{key}", EzTextureUsage.Thumbnail);
 
                 default:
                     return null;
             }
         }
 
-        // 预览缩略图走 Atlas 池（小图，与既有行为一致），帧上限 1 —— 只解一张，不为一格预览拉起整段动画。
+        // 预览缩略图走 Thumbnail 池（引用计数、上传期压边），帧上限 1 —— 只解一张，不为一格预览拉起整段动画。
         private static Texture? tryNoteSetPreview(EzResourceStore provider, string key)
         {
             Texture[] frames = provider.GetTextureFrames(new EzAnimationRequest
             {
                 Path = $"note/{key}/whitenote",
                 MaxFrames = 1,
-                Usage = EzTextureUsage.Atlas,
+                Usage = EzTextureUsage.Thumbnail,
             });
 
             return frames.Length > 0 ? frames[0] : null;
@@ -162,7 +162,7 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             foreach (string imageKey in provider.ListImageKeys($"GameTheme/{key}/judgement"))
             {
-                Texture? texture = provider.Get(imageKey, EzTextureUsage.Atlas);
+                Texture? texture = provider.Get(imageKey, EzTextureUsage.Thumbnail);
 
                 if (texture != null)
                     return texture;
@@ -180,15 +180,15 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 Path = basePath,
                 MaxFrames = 1,
-                Usage = EzTextureUsage.Atlas,
+                Usage = EzTextureUsage.Thumbnail,
                 AllowSingleFallback = false,
             });
 
             if (frames.Length > 0)
                 return frames[0];
 
-            // 单张静态图与原实现一致走 Large：这类图可能超出图集页，进页只会被绕过并打日志。
-            return provider.Get(basePath, EzTextureUsage.Large);
+            // 单张静态图也走 Thumbnail：这类图可能超出图集页，且预览不应驻留到 session 结束。
+            return provider.Get(basePath, EzTextureUsage.Thumbnail);
         }
     }
 }

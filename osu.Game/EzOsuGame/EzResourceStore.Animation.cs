@@ -47,7 +47,7 @@ namespace osu.Game.EzOsuGame
 
         /// <summary>
         /// 取请求对应的帧纹理；无资源时返回空数组。同一请求只解析一次并复用帧纹理，
-        /// 但 <see cref="EzTextureUsage.Large"/> 例外。
+        /// 但引用计数的 <see cref="EzTextureUsage.Large"/> / <see cref="EzTextureUsage.Thumbnail"/> 例外。
         /// </summary>
         public Texture[] GetTextureFrames(EzAnimationRequest request)
         {
@@ -63,9 +63,10 @@ namespace osu.Game.EzOsuGame
 
             Texture[] materialised = materialiseFrames(set.Keys, request.Usage);
 
-            // Large 池是 LargeTextureStore：取像带引用计数，全部引用释放后才 Purge 掉纹理（见框架该实现）。
+            // Large / Thumbnail 是 LargeTextureStore：取像带引用计数，全部引用释放后才 Purge 掉纹理（见框架该实现）。
+            // 不能把这类 wrapper 缓进帧集，否则帧集自身会永久持有引用，池永不回收。
             // AnimationSafe 使用非计数 animationSafeStore；帧级缓存可长期持有帧纹理引用。
-            return request.Usage == EzTextureUsage.Large ? materialised : set.CacheTextures(materialised);
+            return request.Usage is EzTextureUsage.Large or EzTextureUsage.Thumbnail ? materialised : set.CacheTextures(materialised);
         }
 
         // 只解析帧键、不解码：供工厂按自己的节奏做预解码（工厂的并行预解码是既有、已验证做法）。

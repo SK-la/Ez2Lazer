@@ -715,12 +715,12 @@ namespace osu.Game.EzOsuGame
 
             if (name.Length > 0)
             {
-                if (name.StartsWith(EzResourceDiscovery.judgement_line_prefix, StringComparison.OrdinalIgnoreCase))
-                    name = name[EzResourceDiscovery.judgement_line_prefix.Length..];
+                if (name.StartsWith(EzResourceDiscovery.JUDGEMENT_LINE_PREFIX, StringComparison.OrdinalIgnoreCase))
+                    name = name[EzResourceDiscovery.JUDGEMENT_LINE_PREFIX.Length..];
 
                 if (name.Length > 0)
                 {
-                    List<Texture> overrideFrames = loadStageComponentFrames($"JudgementLine/{EzResourceDiscovery.judgement_line_prefix}{name}");
+                    List<Texture> overrideFrames = loadStageComponentFrames($"JudgementLine/{EzResourceDiscovery.JUDGEMENT_LINE_PREFIX}{name}");
 
                     // 不带前缀的 {name}.png 也接受，与资源选择列表的口径一致。
                     if (overrideFrames.Count == 0)
