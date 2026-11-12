@@ -20,6 +20,16 @@
       <PackagePath>icon.png</PackagePath>
     </None>
   </ItemGroup>
+  <PropertyGroup Label="Fody">
+    <EzFodyVersion>6.9.3</EzFodyVersion>
+    <!-- 已有 .nupkg.metadata 时 NuGet 不再解压。缺 build\Fody.targets 时生成的导入带 Exists 条件，条件失败则编织被整段跳过，删 obj 也只会记下这个缺口。 -->
+    <EzFodyPackageDir>$([MSBuild]::EnsureTrailingSlash('$(NuGetPackageRoot)'))fody\$(EzFodyVersion)</EzFodyPackageDir>
+    <EzFodyNupkgPath>$(EzFodyPackageDir)\fody.$(EzFodyVersion).nupkg</EzFodyNupkgPath>
+    <EzFodyTargetsPath>$(EzFodyPackageDir)\build\Fody.targets</EzFodyTargetsPath>
+    <EzNugetGeneratedTargets>$(MSBuildProjectExtensionsPath)$(MSBuildProjectFile).nuget.g.targets</EzNugetGeneratedTargets>
+    <EzNugetGeneratedTargetsText Condition="Exists('$(EzNugetGeneratedTargets)')">$([System.IO.File]::ReadAllText('$(EzNugetGeneratedTargets)'))</EzNugetGeneratedTargetsText>
+    <EzFodyImportedByNuget Condition="$(EzNugetGeneratedTargetsText.Contains('Fody.targets'))">true</EzFodyImportedByNuget>
+  </PropertyGroup>
   <ItemGroup Label="Package References">
     <!-- Held back due to licencing change stupidness. Silenced vulnerability does not affect us. -->
     <PackageReference Include="AutoMapper" Version="13.0.1">
@@ -41,9 +51,8 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <!-- Realm 只把 Fody 作为传递依赖带入，而 Fody 的编织目标位于 build/ 下，传递依赖不会导入它。
-         一旦还原记录里丢掉该资产，编织会静默不执行，产物运行期才报 Realm 错误。显式引用可保证导入。 -->
-    <PackageReference Include="Fody" Version="6.9.3">
+    <!-- 直接引用。Fody 的编织目标在 build/，只作为 Realm 的传递依赖时不会导入。 -->
+    <PackageReference Include="Fody" Version="$(EzFodyVersion)">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Realm" Version="20.1.0"/>
@@ -82,13 +91,34 @@
     <!-- Licence/provenance notes are not runtime payload. -->
     <EmbeddedResource Remove="Resources\EzSkills\NOTICE.md" />
   </ItemGroup>
-  <!-- Fody 的编织目标来自 Fody 包的 build/ 目录；一旦还原记录丢失该资源，编织会静默不执行，
-       产物在运行期才报 Realm 错误。$(FodyAssembly) 只在 Fody.targets 被导入时存在，用它提前拦截。 -->
+  <Import Project="$(EzFodyTargetsPath)"
+          Condition="'$(DisableFody)' != 'true' and Exists('$(EzFodyTargetsPath)') and '$(EzFodyImportedByNuget)' != 'true'" />
+  <!-- Restore 时 ExcludeRestorePackageImports 会跳过 nuget.g.props，NuGetPackageRoot 为空。路径必须在目标内重算。 -->
+  <Target Name="RepairEzFodyTargetsExtract">
+    <PropertyGroup>
+      <_EzFodyRoot Condition="'$(NuGetPackageRoot)' != ''">$(NuGetPackageRoot)</_EzFodyRoot>
+      <_EzFodyRoot Condition="'$(_EzFodyRoot)' == '' and '$(NUGET_PACKAGES)' != ''">$(NUGET_PACKAGES)</_EzFodyRoot>
+      <_EzFodyRoot Condition="'$(_EzFodyRoot)' == ''">$(UserProfile)\.nuget\packages\</_EzFodyRoot>
+      <_EzFodyDir>$([MSBuild]::EnsureTrailingSlash('$(_EzFodyRoot)'))fody\$(EzFodyVersion)</_EzFodyDir>
+      <_EzFodyNupkg>$(_EzFodyDir)\fody.$(EzFodyVersion).nupkg</_EzFodyNupkg>
+      <_EzFodyTargets>$(_EzFodyDir)\build\Fody.targets</_EzFodyTargets>
+    </PropertyGroup>
+    <Message Importance="high" Condition="!Exists('$(_EzFodyTargets)') and Exists('$(_EzFodyNupkg)')" Text="Fody 包缓存缺少 build\Fody.targets，正在从 nupkg 补回。" />
+    <Exec Condition="!Exists('$(_EzFodyTargets)') and Exists('$(_EzFodyNupkg)')" Command="tar -xf &quot;$(_EzFodyNupkg)&quot; -C &quot;$(_EzFodyDir)&quot; build/Fody.targets" />
+  </Target>
+  <Target Name="RepairEzFodyTargetsExtractBeforeRestore" BeforeTargets="Restore">
+    <CallTarget Targets="RepairEzFodyTargetsExtract" />
+  </Target>
+  <Target Name="RepairEzFodyTargetsExtractAfterRestore" AfterTargets="Restore">
+    <CallTarget Targets="RepairEzFodyTargetsExtract" />
+  </Target>
+  <!-- $(FodyAssembly) 只在 Fody.targets 被导入时存在。包缓存缺文件时 NuGet 的导入不会执行。 -->
   <Target Name="ValidateEzFodyImport"
           BeforeTargets="BeforeBuild"
+          DependsOnTargets="RepairEzFodyTargetsExtract"
           Condition="'$(DisableFody)' != 'true' and '$(DesignTimeBuild)' != 'true' and Exists('$(MSBuildProjectDirectory)\FodyWeavers.xml')">
     <Error Condition="'$(FodyAssembly)' == ''"
-           Text="Fody.targets 未被导入，$(AssemblyName) 不会被编织，Realm 会在运行期报错。请删除 osu.Game\obj 后重新还原并构建。" />
+           Text="Fody.targets 未被导入，$(AssemblyName) 不会被编织，Realm 会在运行期报错。请删除 $(EzFodyPackageDir) 后重新构建。" />
   </Target>
   <Target Name="ValidateEz2LazerSiblingProjects" BeforeTargets="BeforeBuild">
     <Error Condition="'$(UseEz2LazerLocalFrameworkProject)' == 'true' and !Exists('$(Ez2LazerFrameworkProjectPath)')" Text="Missing sibling directory ez2lazer-framework. Please clone https://github.com/SK-la/ez2lazer-framework into $(MSBuildThisFileDirectory)..\..\ez2lazer-framework, or disable UseEz2LazerLocalFrameworkProject to rely on NuGet." />
