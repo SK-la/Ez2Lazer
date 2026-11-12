@@ -51,6 +51,7 @@ using osu.Game.EzOsuGame.Performance;
 using osu.Game.EzOsuGame.Pets;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Screens.Play;
+using osu.Game.EzOsuGame.Wiki;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
@@ -1309,7 +1310,7 @@ namespace osu.Game
             loadComponentSingleFile(userProfile = new UserProfileOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(ezLocalProfile = new EzLocalProfileOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(beatmapSetOverlay = new BeatmapSetOverlay(), overlayContent.Add, true);
-            loadComponentSingleFile(wikiOverlay = new WikiOverlay(), overlayContent.Add, true);
+            loadComponentSingleFile(wikiOverlay = new EzWikiOverlay(), overlayContent.Add, true);
             // Above screens, below logo / footer / sheared overlays (higher Depth = further back).
             loadComponentSingleFile(new EzLayoutLayer { Depth = 0.5f }, screenCaptureContent.Add, true);
             // Ez 编辑器须先于官方 SkinEditor 入树，供 SkinEditorOverlay [Resolved] 注入。

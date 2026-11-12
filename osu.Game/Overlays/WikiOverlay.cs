@@ -7,6 +7,7 @@ using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Game.Extensions;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
@@ -20,21 +21,25 @@ namespace osu.Game.Overlays
     {
         public const string INDEX_PATH = @"Main_page";
 
-        public string CurrentPath => path.Value;
+        public string CurrentPath => Path.Value;
 
-        private readonly Bindable<string> path = new Bindable<string>(INDEX_PATH);
-        private readonly Bindable<APIWikiPage?> wikiData = new Bindable<APIWikiPage?>();
+        protected readonly Bindable<string> Path = new Bindable<string>(INDEX_PATH);
+        protected readonly Bindable<APIWikiPage?> WikiData = new Bindable<APIWikiPage?>();
         private readonly IBindable<Language> language = new Bindable<Language>();
 
         [Resolved]
-        private IAPIProvider api { get; set; } = null!;
+        private IAPIProvider apiProvider { get; set; } = null!;
 
         [Resolved]
-        private OsuGameBase game { get; set; } = null!;
+        private OsuGameBase gameBase { get; set; } = null!;
+
+        protected IAPIProvider APIProvider => apiProvider;
+
+        protected OsuGameBase Game => gameBase;
 
         private GetWikiRequest? request;
-        private CancellationTokenSource? cancellationToken;
-        private WikiArticlePage? articlePage;
+        protected CancellationTokenSource? CancellationToken;
+        protected CompositeDrawable? ArticlePage;
 
         private bool displayUpdateRequired = true;
 
@@ -47,23 +52,25 @@ namespace osu.Game.Overlays
         {
             base.LoadComplete();
 
-            path.BindValueChanged(onPathChanged);
-            wikiData.BindTo(Header.WikiPageData);
+            Path.BindValueChanged(onPathChanged);
+            WikiData.BindTo(Header.WikiPageData);
 
-            language.BindTo(game.CurrentLanguage);
+            language.BindTo(Game.CurrentLanguage);
             language.BindValueChanged(onLangChanged);
         }
 
-        public void ShowPage(string pagePath = INDEX_PATH)
+        public virtual void ShowPage(string pagePath = INDEX_PATH)
         {
-            path.Value = pagePath.Trim('/');
+            Path.Value = pagePath.Trim('/');
             Show();
         }
 
-        protected override WikiHeader CreateHeader() => new WikiHeader
+        protected override WikiHeader CreateHeader() => CreateWikiHeader();
+
+        protected virtual WikiHeader CreateWikiHeader() => new WikiHeader
         {
             ShowIndexPage = () => ShowPage(),
-            ShowParentPage = showParentPage,
+            ShowParentPage = ShowParentPage,
         };
 
         protected override void PopIn()
@@ -72,7 +79,7 @@ namespace osu.Game.Overlays
 
             if (displayUpdateRequired)
             {
-                path.TriggerChange();
+                Path.TriggerChange();
                 displayUpdateRequired = false;
             }
         }
@@ -90,23 +97,49 @@ namespace osu.Game.Overlays
             {
                 Child = loaded;
                 Loading.Hide();
-            }, (cancellationToken = new CancellationTokenSource()).Token);
+            }, (CancellationToken = new CancellationTokenSource()).Token);
         }
 
         protected override void UpdateAfterChildren()
         {
             base.UpdateAfterChildren();
 
-            if (articlePage != null)
+            switch (ArticlePage)
             {
-                articlePage.SidebarContainer.Height = DrawHeight;
-                articlePage.SidebarContainer.Y = (float)Math.Clamp(ScrollFlow.Current - Header.DrawHeight, 0, Math.Max(ScrollFlow.ScrollContent.DrawHeight - DrawHeight - Header.DrawHeight, 0));
+                case WikiArticlePage official:
+                    official.SidebarContainer.Height = DrawHeight;
+                    official.SidebarContainer.Y = (float)Math.Clamp(ScrollFlow.Current - Header.DrawHeight, 0, Math.Max(ScrollFlow.ScrollContent.DrawHeight - DrawHeight - Header.DrawHeight, 0));
+                    break;
+
+                case EzOsuGame.Wiki.EzWikiArticlePage ez:
+                    ez.SidebarContainer.Height = DrawHeight;
+                    ez.SidebarContainer.Y = (float)Math.Clamp(ScrollFlow.Current - Header.DrawHeight, 0, Math.Max(ScrollFlow.ScrollContent.DrawHeight - DrawHeight - Header.DrawHeight, 0));
+                    break;
             }
         }
 
-        private void loadPage(string path, Language lang)
+        private void onPathChanged(ValueChangedEvent<string> e)
         {
-            cancellationToken?.Cancel();
+            // the path could change as a result of redirecting to a newer location of the same page.
+            // we already have the correct wiki data, so we can safely return here.
+            if (e.NewValue == WikiData.Value?.Path)
+                return;
+
+            if (e.NewValue == "error")
+                return;
+
+            loadPage(e.NewValue, language.Value);
+        }
+
+        private void onLangChanged(ValueChangedEvent<Language> e)
+        {
+            // Path unmodified, just reload the page with new language value.
+            loadPage(Path.Value, e.NewValue);
+        }
+
+        protected virtual void FetchWikiPage(string path, Language lang)
+        {
+            CancellationToken?.Cancel();
             request?.Cancel();
 
             // Language code + path, or just path1 + path2 in case
@@ -119,41 +152,24 @@ namespace osu.Game.Overlays
 
             Loading.Show();
 
-            request.Success += response => Schedule(() => onSuccess(response));
+            request.Success += response => Schedule(() => OnWikiFetchSuccess(response));
             request.Failure += ex =>
             {
                 if (ex is not OperationCanceledException)
-                    Schedule(onFail, request.Path);
+                    Schedule(() => OnWikiFetchFailure(request.Path));
             };
 
-            api.PerformAsync(request);
+            APIProvider.PerformAsync(request);
         }
 
-        private void onPathChanged(ValueChangedEvent<string> e)
+        private void loadPage(string path, Language lang) => FetchWikiPage(path, lang);
+
+        protected virtual void OnWikiFetchSuccess(APIWikiPage response)
         {
-            // the path could change as a result of redirecting to a newer location of the same page.
-            // we already have the correct wiki data, so we can safely return here.
-            if (e.NewValue == wikiData.Value?.Path)
-                return;
+            WikiData.Value = response;
+            Path.Value = response.Path;
 
-            if (e.NewValue == "error")
-                return;
-
-            loadPage(e.NewValue, language.Value);
-        }
-
-        private void onLangChanged(ValueChangedEvent<Language> e)
-        {
-            // Path unmodified, just reload the page with new language value.
-            loadPage(path.Value, e.NewValue);
-        }
-
-        private void onSuccess(APIWikiPage response)
-        {
-            wikiData.Value = response;
-            path.Value = response.Path;
-
-            if (response.Layout.Equals(INDEX_PATH, StringComparison.OrdinalIgnoreCase))
+            if (ShouldUseMainPageLayout(response))
             {
                 LoadDisplay(new WikiMainPage
                 {
@@ -167,28 +183,37 @@ namespace osu.Game.Overlays
             }
             else
             {
-                LoadDisplay(articlePage = new WikiArticlePage($@"{api.Endpoints.WebsiteUrl}/wiki/{path.Value}/", response.Markdown));
+                LoadDisplay(ArticlePage = CreateArticlePage(GetArticleDocumentBase(Path.Value), response.Markdown));
             }
         }
 
-        private void onFail(string originalPath)
-        {
-            wikiData.Value = null;
-            path.Value = "error";
+        protected virtual bool ShouldUseMainPageLayout(APIWikiPage response) =>
+            response.Layout.Equals(INDEX_PATH, StringComparison.OrdinalIgnoreCase);
 
-            LoadDisplay(articlePage = new WikiArticlePage($@"{api.Endpoints.WebsiteUrl}/wiki/",
-                $"Something went wrong when trying to fetch page \"{originalPath}\".\n\n[Return to the main page]({INDEX_PATH})."));
+        protected virtual CompositeDrawable CreateArticlePage(string documentBase, string markdown) =>
+            new WikiArticlePage(documentBase, markdown);
+
+        protected virtual string GetArticleDocumentBase(string wikiPath) =>
+            $@"{APIProvider.Endpoints.WebsiteUrl}/wiki/{wikiPath}/";
+
+        protected virtual void OnWikiFetchFailure(string originalPath)
+        {
+            WikiData.Value = null;
+            Path.Value = "error";
+
+            LoadDisplay(ArticlePage = CreateArticlePage(GetArticleDocumentBase(string.Empty),
+                $"Something went wrong when trying to fetch page \"{originalPath}\".\n\n[Return to the main page](./{INDEX_PATH})."));
         }
 
-        private void showParentPage()
+        protected void ShowParentPage()
         {
-            string parentPath = string.Join("/", path.Value.Split('/').SkipLast(1));
+            string parentPath = string.Join("/", Path.Value.Split('/').SkipLast(1));
             ShowPage(parentPath);
         }
 
         protected override void Dispose(bool isDisposing)
         {
-            cancellationToken?.Cancel();
+            CancellationToken?.Cancel();
             request?.Cancel();
             base.Dispose(isDisposing);
         }

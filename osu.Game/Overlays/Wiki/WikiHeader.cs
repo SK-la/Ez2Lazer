@@ -26,7 +26,7 @@ namespace osu.Game.Overlays.Wiki
     {
         public static LocalisableString IndexPageString => LayoutStrings.HeaderHelpIndex;
 
-        private const string github_wiki_base = @"https://github.com/ppy/osu-wiki/blob/master/wiki";
+        protected virtual string GithubWikiEditBase => @"https://github.com/ppy/osu-wiki/blob/master/wiki";
 
         public readonly Bindable<APIWikiPage> WikiPageData = new Bindable<APIWikiPage>();
 
@@ -44,6 +44,12 @@ namespace osu.Game.Overlays.Wiki
             Current.BindValueChanged(onCurrentChange);
         }
 
+        protected virtual bool IsIndexPage(string wikiPath) =>
+            wikiPath == WikiOverlay.INDEX_PATH;
+
+        protected virtual string GetGitHubEditPath(APIWikiPage page) =>
+            $"{GithubWikiEditBase}/{page.Path}/{page.Locale}.md";
+
         private void onWikiPageChange(ValueChangedEvent<APIWikiPage> e)
         {
             // Clear the path beforehand in case we got an error page.
@@ -56,9 +62,9 @@ namespace osu.Game.Overlays.Wiki
             Current.Value = null;
 
             TabControl.AddItem(IndexPageString);
-            githubPath.Value = $"{github_wiki_base}/{e.NewValue.Path}/{e.NewValue.Locale}.md";
+            githubPath.Value = GetGitHubEditPath(e.NewValue);
 
-            if (e.NewValue.Path == WikiOverlay.INDEX_PATH)
+            if (IsIndexPage(e.NewValue.Path))
             {
                 Current.Value = IndexPageString;
                 return;
