@@ -93,6 +93,37 @@ namespace osu.Game.Beatmaps
 
         public event Action<WorkingBeatmap> OnInvalidated;
 
+        internal WorkingBeatmap FindCached(BeatmapInfo beatmapInfo)
+        {
+            if (beatmapInfo == null || ReferenceEquals(beatmapInfo, DefaultBeatmap.BeatmapInfo))
+                return null;
+
+            lock (workingCache)
+                return workingCache.FirstOrDefault(w => beatmapInfo.Equals(w.BeatmapInfo));
+        }
+
+        internal static void RefreshDetachedSetFromRealm(BeatmapSetInfo beatmapSet, RealmAccess realmAccess)
+        {
+            realmAccess?.Run(r =>
+            {
+                var freshSet = r.Find<BeatmapSetInfo>(beatmapSet.ID);
+
+                if (freshSet == null)
+                    return;
+
+                beatmapSet.HostingKind = freshSet.HostingKind;
+                beatmapSet.ExternalContentRoot = freshSet.ExternalContentRoot;
+                beatmapSet.Hash = freshSet.Hash;
+
+                // Carousel detach omits Files (see RealmObjectExtensions.beatmap_set_mapper).
+                if (beatmapSet.Files.Count == 0 && freshSet.Files.Count > 0)
+                {
+                    foreach (var file in freshSet.Files)
+                        beatmapSet.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = file.File.Hash }, file.Filename));
+                }
+            });
+        }
+
         public virtual WorkingBeatmap GetWorkingBeatmap([CanBeNull] BeatmapInfo beatmapInfo)
         {
             if (beatmapInfo == null || ReferenceEquals(beatmapInfo, DefaultBeatmap.BeatmapInfo))
@@ -172,7 +203,7 @@ namespace osu.Game.Beatmaps
                 if (beatmapSet == null)
                     return resources.Files;
 
-                refreshExternalHostingFromRealm(beatmapSet, resources.RealmAccess);
+                RefreshDetachedSetFromRealm(beatmapSet, resources.RealmAccess);
 
                 if (!ExternalBeatmapPathEncoding.TryResolveContentRoot(beatmapSet, out string contentRoot))
                 {
@@ -184,28 +215,6 @@ namespace osu.Game.Beatmaps
                 }
 
                 return new ExternalBeatmapFileStore(contentRoot, ExternalBeatmapFileMappingsBuilder.Build(beatmapInfo, resources.RealmAccess));
-            }
-
-            private static void refreshExternalHostingFromRealm(BeatmapSetInfo beatmapSet, RealmAccess realmAccess)
-            {
-                realmAccess?.Run(r =>
-                {
-                    var freshSet = r.Find<BeatmapSetInfo>(beatmapSet.ID);
-
-                    if (freshSet == null)
-                        return;
-
-                    beatmapSet.HostingKind = freshSet.HostingKind;
-                    beatmapSet.ExternalContentRoot = freshSet.ExternalContentRoot;
-                    beatmapSet.Hash = freshSet.Hash;
-
-                    // Carousel detach omits Files (see RealmObjectExtensions.beatmap_set_mapper); copy for external lookups.
-                    if (beatmapSet.Files.Count == 0 && freshSet.Files.Count > 0)
-                    {
-                        foreach (var file in freshSet.Files)
-                            beatmapSet.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = file.File.Hash }, file.Filename));
-                    }
-                });
             }
 
             protected override IBeatmap GetBeatmap()
