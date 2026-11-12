@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -178,17 +178,19 @@ namespace osu.Game.Overlays.Changelog
             if (string.IsNullOrEmpty(entry.Message))
                 return Empty();
 
-            var message = new ChangelogMarkdownContainer
-            {
-                AutoSizeAxes = Axes.Y,
-                RelativeSizeAxes = Axes.X,
-                DocumentMargin = new MarginPadding { Bottom = 10 },
-                DocumentPadding = new MarginPadding(0),
-                Text = entry.Message,
-            };
+            var message = CreateMessageMarkdown();
+            message.Text = entry.Message;
 
             return message;
         }
+
+        protected virtual ChangelogMarkdownContainer CreateMessageMarkdown() => new ChangelogMarkdownContainer
+        {
+            AutoSizeAxes = Axes.Y,
+            RelativeSizeAxes = Axes.X,
+            DocumentMargin = new MarginPadding { Bottom = 10 },
+            DocumentPadding = new MarginPadding(0),
+        };
 
         private static IconUsage getIconForChangelogEntry(ChangelogEntryType entryType)
         {

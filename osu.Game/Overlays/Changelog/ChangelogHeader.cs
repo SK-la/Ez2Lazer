@@ -54,7 +54,7 @@ namespace osu.Game.Overlays.Changelog
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider colourProvider)
         {
-            streamsBackground.Colour = colourProvider.Background5;
+            streamsBackground?.Colour = colourProvider.Background5;
         }
 
         private void showBuild(ValueChangedEvent<APIChangelogBuild> e)
@@ -104,15 +104,18 @@ namespace osu.Game.Overlays.Changelog
 
         protected override OverlayTitle CreateTitle() => new ChangelogHeaderTitle();
 
-        public void Populate(List<APIUpdateStream> streams)
+        public virtual void Populate(List<APIUpdateStream> streams)
         {
+            if (Streams == null)
+                return;
+
             Streams.Populate(streams);
             updateCurrentStream();
         }
 
         private void updateCurrentStream()
         {
-            if (Build.Value == null)
+            if (Build.Value == null || Streams == null)
                 return;
 
             currentStream.Value = Streams.Items.FirstOrDefault(s => s.Name == Build.Value.UpdateStream.Name);

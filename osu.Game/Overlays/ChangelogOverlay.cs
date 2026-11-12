@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 #nullable disable
@@ -14,7 +14,11 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Events;
+using osu.Framework.Logging;
+using osu.Framework.Platform;
+using osu.Game.EzOsuGame.Changelog;
 using osu.Game.Input.Bindings;
+using osu.Game.Localisation;
 using osu.Game.Online.API.Requests;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Overlays.Changelog;
@@ -30,6 +34,16 @@ namespace osu.Game.Overlays
 
         protected List<APIUpdateStream> Streams;
 
+        private readonly EzGitHubChangelogCatalogue ezCatalogue = new EzGitHubChangelogCatalogue();
+
+        [Resolved]
+        private OsuGameBase game { get; set; } = null!;
+
+        [Resolved]
+        private Storage storage { get; set; } = null!;
+
+        private readonly Bindable<Language> ezLanguage = new Bindable<Language>();
+
         public ChangelogOverlay()
             : base(OverlayColourScheme.Purple, false)
         {
@@ -40,24 +54,63 @@ namespace osu.Game.Overlays
         {
             Header.Build.BindTarget = Current;
 
+            ezLanguage.BindTo(game.CurrentLanguage);
+            ezLanguage.BindValueChanged(_ =>
+            {
+                if (Current.Value != null)
+                    Current.TriggerChange();
+            });
+
             Current.BindValueChanged(e =>
             {
                 if (e.NewValue != null)
-                    loadContent(new ChangelogSingleBuild(e.NewValue));
+                    loadContent(CreateSingleBuildContent(e.NewValue));
                 else
-                    loadContent(new ChangelogListing(builds));
+                    loadContent(CreateListingContent(builds));
             });
         }
 
-        protected override ChangelogHeader CreateHeader() => new ChangelogHeader
+        protected virtual ChangelogContent CreateListingContent(List<APIChangelogBuild> buildList) => new EzChangelogListing(buildList);
+
+        protected virtual ChangelogContent CreateSingleBuildContent(APIChangelogBuild build)
+        {
+            string body = ezCatalogue.GetBody(build.DisplayVersion) ?? string.Empty;
+            return new EzChangelogReleaseContent(build, body, ezLanguage);
+        }
+
+        protected override ChangelogHeader CreateHeader() => CreateChangelogHeader();
+
+        protected virtual ChangelogHeader CreateChangelogHeader() => new EzChangelogHeader
         {
             ListingSelected = ShowListing,
         };
+
+        /// <summary>
+        /// When implemented, fetches build listing from a non-ppy source and returns <see langword="true"/>.
+        /// </summary>
+        protected virtual Task<bool> TryFetchListingAsync(Action<List<APIChangelogBuild>> onSuccess, Action<Exception> onFailure) =>
+            fetchEzReleasesAsync(onSuccess, onFailure);
+
+        private async Task<bool> fetchEzReleasesAsync(Action<List<APIChangelogBuild>> onSuccess, Action<Exception> onFailure)
+        {
+            try
+            {
+                var releaseBuilds = await ezCatalogue.FetchBuildsAsync(storage).ConfigureAwait(false);
+                onSuccess(new List<APIChangelogBuild>(releaseBuilds));
+                return true;
+            }
+            catch (Exception ex)
+            {
+                onFailure(ex);
+                return true;
+            }
+        }
 
         protected override Color4 BackgroundColour => ColourProvider.Background4;
 
         public void ShowListing()
         {
+            ezOpenedLatestBuild = true;
             Current.Value = null;
             Show();
         }
@@ -72,6 +125,7 @@ namespace osu.Game.Overlays
         {
             ArgumentNullException.ThrowIfNull(build);
 
+            ezOpenedLatestBuild = true;
             Current.Value = build;
             Show();
         }
@@ -128,11 +182,29 @@ namespace osu.Game.Overlays
             base.PopIn();
 
             if (initialFetchTask == null)
-                // fetch and refresh to show listing, if no other request was made via Show methods
-                performAfterFetch(() => Current.TriggerChange());
+            {
+                performAfterFetch(() =>
+                {
+                    if (!ezOpenedLatestBuild && Current.Value == null && builds?.Count > 0)
+                    {
+                        ezOpenedLatestBuild = true;
+                        Current.Value = builds[0];
+                    }
+                    else
+                        Current.TriggerChange();
+                });
+            }
         }
 
         private Task initialFetchTask;
+
+        private bool ezOpenedLatestBuild;
+
+        protected override void PopOut()
+        {
+            ezOpenedLatestBuild = false;
+            base.PopOut();
+        }
 
         private void performAfterFetch(Action action)
         {
@@ -153,6 +225,28 @@ namespace osu.Game.Overlays
             return initialFetchTask = Task.Run(async () =>
             {
                 var tcs = new TaskCompletionSource<bool>();
+
+                if (await TryFetchListingAsync(
+                        buildList => Schedule(() =>
+                        {
+                            builds = new List<APIChangelogBuild>(buildList);
+                            Streams = new List<APIUpdateStream>(EzGitHubChangelogCatalogue.CreateUpdateStreams(builds));
+                            Header.Populate(Streams);
+                            tcs.SetResult(true);
+                        }),
+                        ex => Schedule(() =>
+                        {
+                            initialFetchTask = null;
+                            builds = new List<APIChangelogBuild>();
+                            Streams = new List<APIUpdateStream>(EzGitHubChangelogCatalogue.CreateUpdateStreams(builds));
+                            Header.Populate(Streams);
+                            Logger.Log($"Ez changelog listing failed: {ex.Message}", level: LogLevel.Important);
+                            tcs.SetResult(true);
+                        })).ConfigureAwait(false))
+                {
+                    await tcs.Task.ConfigureAwait(false);
+                    return;
+                }
 
                 var req = new GetChangelogRequest();
 
@@ -178,8 +272,8 @@ namespace osu.Game.Overlays
 
                 await API.PerformAsync(req).ConfigureAwait(false);
 
-                return tcs.Task;
-            }).Unwrap();
+                await tcs.Task.ConfigureAwait(false);
+            });
         }
 
         private CancellationTokenSource loadContentCancellation;
