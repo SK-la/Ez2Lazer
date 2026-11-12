@@ -238,6 +238,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.HitPosition, DefaultHitPosition, 0, 500, 1.0);
             SetDefault(Ez2Setting.HitTargetFloatFixed, 6, 0, 10, 0.1);
             SetDefault(Ez2Setting.HitTargetAlpha, 0.6, 0, 1, 0.01);
+            SetDefault(Ez2Setting.HitTargetColouringEnabled, false);
             SetDefault(Ez2Setting.NoteHeightScaleToWidth, 1, 0.1, 10, 0.1);
             SetDefault(Ez2Setting.NoteCornerRadius, 5, 0.0, 80, 1);
             SetDefault(Ez2Setting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
@@ -250,6 +251,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ColumnBlur, 0.3, 0.0, 1, 0.01);
 
             SetDefault(Ez2Setting.ColorSettingsEnabled, true);
+            SetDefault(Ez2Setting.ColouringMode, EzColouringMode.Direct);
             SetDefault(Ez2Setting.ColumnTypeA, Colour4.FromHex("#F5F5F5"));
             SetDefault(Ez2Setting.ColumnTypeB, Colour4.FromHex("#648FFF"));
             SetDefault(Ez2Setting.ColumnTypeS, Colour4.FromHex("#FF4A4A"));
@@ -1383,6 +1385,12 @@ namespace osu.Game.EzOsuGame.Configuration
 
         HitTargetFloatFixed,
         HitTargetAlpha,
+
+        /// <summary>
+        /// 命中靶是否套用列色。关闭时靶固定白色贴图原色；只影响 EzPro / Ez2 这类有浮动靶的内置皮肤。
+        /// </summary>
+        HitTargetColouringEnabled,
+
         NoteHeightScaleToWidth,
         NoteTrackLineHeight,
 
@@ -1405,6 +1413,12 @@ namespace osu.Game.EzOsuGame.Configuration
 
         // 列着色与配色系统
         ColorSettingsEnabled,
+
+        /// <summary>
+        /// 着色算法。所有走列色 / 节拍线色的着色点共用；只改颜色计算，不改贴图选择。
+        /// </summary>
+        ColouringMode,
+
         ColumnDim,
         ColumnBlur,
 
