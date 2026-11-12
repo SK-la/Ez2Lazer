@@ -54,6 +54,7 @@ namespace osu.Game.Tests.Visual.SongSelect
         private bool disableEdgeGlow;
         private double nextLogAt;
         private string lastLoggedVariant = string.Empty;
+        private long lastConstructed;
 
         protected override void LoadComplete()
         {
@@ -103,6 +104,50 @@ namespace osu.Game.Tests.Visual.SongSelect
             nextLogAt = Time.Current + log_interval_ms;
             logSample("idle");
         }
+
+        [Test]
+        public void TestIdleDrawableConstruction()
+        {
+            prepareScene();
+            AddWaitStep("settle", 10);
+
+            measureConstruction("all");
+            AddStep("hide carousel", () => tryGetCarousel()?.Hide());
+            AddWaitStep("settle no carousel", 5);
+            measureConstruction("no-carousel");
+
+            AddStep("show carousel", () => tryGetCarousel()?.Show());
+            AddStep("hide wedges", () =>
+            {
+                foreach (var wedge in SongSelect.ChildrenOfType<BeatmapTitleWedge>())
+                    wedge.Hide();
+                foreach (var wedge in SongSelect.ChildrenOfType<BeatmapMetadataWedge>())
+                    wedge.Hide();
+            });
+            AddWaitStep("settle no wedges", 5);
+            measureConstruction("no-wedges");
+        }
+
+        private void measureConstruction(string variant)
+        {
+            long before = 0;
+            double start = 0;
+
+            AddStep($"start measure {variant}", () =>
+            {
+                before = constructed;
+                start = Time.Current;
+            });
+            AddUntilStep($"measure {variant} window", () => Time.Current - start >= 2000);
+            AddStep($"log measure {variant}", () =>
+            {
+                double seconds = Math.Max(0.001, (Time.Current - start) / 1000);
+                long delta = constructed - before;
+                Logger.Log($"[SS-CONSTRUCT] variant={variant} delta={delta} perSecond={delta / seconds:F1}", LoggingTarget.Runtime, LogLevel.Important);
+            });
+        }
+
+        private static long constructed => GlobalStatistics.Get<int>(nameof(Drawable), "Total constructed").Value;
 
         [Test]
         public void TestCollapsedExpandedAblationLogs()
@@ -318,6 +363,7 @@ namespace osu.Game.Tests.Visual.SongSelect
                 + $"glass={glassOn}/{glassTotal} allGlass={allGlassOn} "
                 + $"masking={carousel.ChildrenOfType<CompositeDrawable>().Count(d => d.Masking && d.Alpha > 0)} "
                 + $"texts={carousel.ChildrenOfType<SpriteText>().Count(d => d.Alpha > 0)} "
+                + $"constructed={constructed} constructedDelta={constructed - lastConstructed} "
                 + $"surface={surface} renderer={host.Renderer.GetType().Name} copy={copy} parentFbo={parentFbo} "
                 + $"glassScale={glassScale:0.##} path={path} "
                 + $"ablate(glass/kps/glow)={(disablePanelGlass ? "off" : "on")}/{(hideKpsGraphs ? "off" : "on")}/{(disableEdgeGlow ? "off" : "on")} "
@@ -330,6 +376,7 @@ namespace osu.Game.Tests.Visual.SongSelect
             if (variant != lastLoggedVariant || variant == "idle")
                 Logger.Log($"[SS-DRAW] {line}", LoggingTarget.Runtime, LogLevel.Important);
 
+            lastConstructed = constructed;
             lastLoggedVariant = variant;
         }
 

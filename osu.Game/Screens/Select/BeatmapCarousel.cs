@@ -168,7 +168,20 @@ namespace osu.Game.Screens.Select
             };
 
             AddInternal(debugText);
-            Scheduler.AddDelayed(() => debugText.Text = $"filter: {LastFilterMs:F1}ms items: {LastFilterItems} panels: {LastFilterPanels} runs: {FilterRuns}", 250, true);
+
+            (double ms, int items, int panels, int runs) lastDebug = (-1, -1, -1, -1);
+
+            Scheduler.AddDelayed(() =>
+            {
+                // Formatting the string on every idle tick is pure churn; only rebuild when the numbers move.
+                var current = (LastFilterMs, LastFilterItems, LastFilterPanels, FilterRuns);
+
+                if (current == lastDebug)
+                    return;
+
+                lastDebug = current;
+                debugText.Text = $"filter: {current.LastFilterMs:F1}ms items: {current.LastFilterItems} panels: {current.LastFilterPanels} runs: {current.FilterRuns}";
+            }, 250, true);
 #endif
         }
 
@@ -260,7 +273,7 @@ namespace osu.Game.Screens.Select
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (byHash.TryGetValue(beatmap.Hash, out var tags))
+                    if (byHash.TryGetValue(beatmap.Hash, out string[]? tags))
                         resolved[beatmap] = tags;
                 }
 
