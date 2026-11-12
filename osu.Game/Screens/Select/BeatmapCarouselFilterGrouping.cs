@@ -10,6 +10,7 @@ using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Localisation;
 using osu.Game.Rulesets;
@@ -359,6 +360,9 @@ namespace osu.Game.Screens.Select
 
             if (char.IsAsciiLetter(firstChar))
                 return new GroupDefinition(char.ToUpperInvariant(firstChar) - 'A', char.ToUpperInvariant(firstChar).ToString()).Yield();
+
+            if (EzSortComparer.TryGetPinyinGroupLetter(name, out char pinyinInitial))
+                return new GroupDefinition(pinyinInitial - 'A', pinyinInitial.ToString()).Yield();
 
             return new GroupDefinition(int.MaxValue, BeatmapCarouselFilterGroupingStrings.OtherSymbols).Yield();
         }

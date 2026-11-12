@@ -8,9 +8,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Screens.Select.Filter;
-using osu.Game.Utils;
 
 namespace osu.Game.Screens.Select
 {
@@ -91,6 +91,8 @@ namespace osu.Game.Screens.Select
 
             BeatmapItemsCount = itemList.Count;
 
+            var stringComparer = EzSortComparer.ForCurrentUiCulture;
+
             return itemList.Order(Comparer<CarouselItem>.Create((a, b) =>
             {
                 var ab = (BeatmapInfo)a.Model;
@@ -102,35 +104,35 @@ namespace osu.Game.Screens.Select
                         return compareDifficulty(ab, bb, criteria.Sort, getSortValue);
 
                     // If we're grouping by sets, all fallback sorts need to be aggregates for the set.
-                    return compare(ab, bb, criteria.Sort, aggregate: true, getSortValue);
+                    return compare(ab, bb, criteria.Sort, aggregate: true, getSortValue, stringComparer);
                 }
 
-                return compare(ab, bb, criteria.Sort, aggregate: false, getSortValue);
+                return compare(ab, bb, criteria.Sort, aggregate: false, getSortValue, stringComparer);
             })).ToList();
         }
 
-        private static int compare(BeatmapInfo a, BeatmapInfo b, SortMode sort, bool aggregate, Func<BeatmapInfo, double> getSortValue)
+        private static int compare(BeatmapInfo a, BeatmapInfo b, SortMode sort, bool aggregate, Func<BeatmapInfo, double> getSortValue, IComparer<string> stringComparer)
         {
             int comparison;
 
             switch (sort)
             {
                 case SortMode.Artist:
-                    comparison = OrdinalSortByCaseStringComparer.DEFAULT.Compare(a.BeatmapSet!.Metadata.Artist, b.BeatmapSet!.Metadata.Artist);
+                    comparison = stringComparer.Compare(a.BeatmapSet!.Metadata.Artist, b.BeatmapSet!.Metadata.Artist);
                     if (comparison == 0)
                         goto case SortMode.Title;
                     break;
 
                 case SortMode.Title:
-                    comparison = OrdinalSortByCaseStringComparer.DEFAULT.Compare(a.BeatmapSet!.Metadata.Title, b.BeatmapSet!.Metadata.Title);
+                    comparison = stringComparer.Compare(a.BeatmapSet!.Metadata.Title, b.BeatmapSet!.Metadata.Title);
                     break;
 
                 case SortMode.Author:
-                    comparison = OrdinalSortByCaseStringComparer.DEFAULT.Compare(a.BeatmapSet!.Metadata.Author.Username, b.BeatmapSet!.Metadata.Author.Username);
+                    comparison = stringComparer.Compare(a.BeatmapSet!.Metadata.Author.Username, b.BeatmapSet!.Metadata.Author.Username);
                     break;
 
                 case SortMode.Source:
-                    comparison = OrdinalSortByCaseStringComparer.DEFAULT.Compare(a.BeatmapSet!.Metadata.Source, b.BeatmapSet!.Metadata.Source);
+                    comparison = stringComparer.Compare(a.BeatmapSet!.Metadata.Source, b.BeatmapSet!.Metadata.Source);
                     break;
 
                 case SortMode.Difficulty:
@@ -191,7 +193,7 @@ namespace osu.Game.Screens.Select
 
             // If the initial sort could not differentiate, attempt to use Title then DateAdded to order sets in a stable fashion.
             if (comparison == 0)
-                comparison = OrdinalSortByCaseStringComparer.DEFAULT.Compare(a.BeatmapSet!.Metadata.Title, b.BeatmapSet!.Metadata.Title);
+                comparison = stringComparer.Compare(a.BeatmapSet!.Metadata.Title, b.BeatmapSet!.Metadata.Title);
 
             // The directionality of this matches the current SortMode.DateAdded, but we may want to reconsider if that becomes a user decision (ie. asc / desc).
             if (comparison == 0)
