@@ -33,6 +33,8 @@ namespace osu.Game.EzOsuGame.UserInterface
     /// <summary>
     /// 难度卡底部标签行：CSI 技能标签（首位）/ 视频 / 故事版 / 用户标签。
     /// Video/Storyboard 标记由 <see cref="BeatmapUpdater"/> 写入 <see cref="BeatmapInfo"/>，此处只读 Realm 字段。
+    /// 技能标签平时读 <see cref="EzSkillProvider.GetChartSkillTagsForHashes"/> 的会话缓存（一次 Realm 批量读取），
+    /// 只有被选中的卡再用 <see cref="EzSkillProvider.TryGetOrComputeChartSkillInfo"/> 复算一次。
     /// </summary>
     public partial class EzDisplayTag : CompositeDrawable
     {
@@ -40,13 +42,13 @@ namespace osu.Game.EzOsuGame.UserInterface
         private const int max_skill_tags = 3;
         private const float tag_corner_radius = EzUIStyleV1.CORNER_RADIUS_CHIP;
 
-        private readonly FillFlowContainer rootFlow;
         private readonly FillFlowContainer tagFlow;
 
         private ScheduledDelegate? scheduledTagUpdate;
         private int skillTagRequestId;
 
         private bool altHighlightActive;
+        private bool selected;
 
         private BeatmapInfo? beatmap;
 
@@ -61,6 +63,24 @@ namespace osu.Game.EzOsuGame.UserInterface
                 beatmap = value;
                 skillTagRequestId++;
                 scheduleTagUpdate();
+            }
+        }
+
+        /// <summary>
+        /// 选歌 carousel 的当前选中。未选中的卡只读会话缓存；选中时额外做一次 live 复算。
+        /// </summary>
+        public bool Selected
+        {
+            get => selected;
+            set
+            {
+                if (selected == value)
+                    return;
+
+                selected = value;
+
+                if (selected)
+                    scheduleTagUpdate();
             }
         }
 
@@ -84,7 +104,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 Origin = Anchor.CentreLeft,
             };
 
-            InternalChild = rootFlow = new FillFlowContainer
+            InternalChild = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
@@ -148,40 +168,86 @@ namespace osu.Game.EzOsuGame.UserInterface
             int requestId = ++skillTagRequestId;
             var target = beatmap;
             var provider = skillProvider;
+            string hash = target.Hash;
 
-            if (provider != null && target.Ruleset.OnlineID == 3)
+            // Icons / user tags first; skill chips replace the row once the session cache answers.
+            rebuildTagFlow([]);
+
+            if (provider == null || target.Ruleset.OnlineID != 3 || string.IsNullOrEmpty(hash))
+                return;
+
+            Task.Run(() => getSessionSkillPatterns(provider, hash)).ContinueWith(t =>
             {
-                var detached = target.Detach();
+                string[] cachedPatterns = t.Status == TaskStatus.RanToCompletion ? t.GetResultSafely() : [];
 
-                Task.Run(() =>
+                Schedule(() =>
                 {
-                    try
-                    {
-                        return provider.TryGetStoredChartSkillInfo(detached, out var info) ? info : null;
-                    }
-                    catch
-                    {
-                        return null;
-                    }
-                }).ContinueWith(t => Schedule(() =>
-                {
-                    if (requestId != skillTagRequestId || beatmap == null || !string.Equals(beatmap.Hash, detached.Hash, StringComparison.Ordinal))
+                    if (!isCurrent(requestId, hash))
                         return;
 
-                    string[] patterns = t.Status == TaskStatus.RanToCompletion
-                        ? t.GetResultSafely()?.Patterns ?? []
-                        : [];
+                    rebuildTagFlow(cachedPatterns);
 
-                    rebuildTagFlow(patterns);
-                }));
-
-                // Icons / user tags first; skill chips replace the row once CSI returns.
-                rebuildTagFlow([]);
-                return;
-            }
-
-            rebuildTagFlow([]);
+                    if (selected)
+                        recheckLivePatterns(provider, target, requestId, hash, cachedPatterns);
+                });
+            });
         }
+
+        /// <summary>
+        /// Session dictionary warmed by one Realm pass over every stored ChartSkillInfo row; repeated calls are
+        /// dictionary lookups, so a browsing carousel does not issue one Realm read per card.
+        /// </summary>
+        private static string[] getSessionSkillPatterns(EzSkillProvider provider, string hash)
+        {
+            try
+            {
+                return provider.GetChartSkillTagsForHashes([hash]).TryGetValue(hash, out string[]? tags) ? tags : [];
+            }
+            catch
+            {
+                return [];
+            }
+        }
+
+        /// <summary>
+        /// Re-runs the chart skill pass for the selected card only; a chart whose row is already current answers
+        /// from the provider's session caches without recomputing.
+        /// </summary>
+        private void recheckLivePatterns(EzSkillProvider provider, BeatmapInfo target, int requestId, string hash, string[] cachedPatterns)
+        {
+            var detached = target.Detach();
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    return provider.TryGetOrComputeChartSkillInfo(detached)?.Patterns;
+                }
+                catch
+                {
+                    return null;
+                }
+            }).ContinueWith(t =>
+            {
+                string[]? livePatterns = t.Status == TaskStatus.RanToCompletion ? t.GetResultSafely() : null;
+
+                if (livePatterns == null || livePatterns.SequenceEqual(cachedPatterns))
+                    return;
+
+                Schedule(() =>
+                {
+                    if (!isCurrent(requestId, hash))
+                        return;
+
+                    rebuildTagFlow(livePatterns);
+                });
+            });
+        }
+
+        private bool isCurrent(int requestId, string hash)
+            => requestId == skillTagRequestId
+               && beatmap != null
+               && string.Equals(beatmap.Hash, hash, StringComparison.Ordinal);
 
         private void rebuildTagFlow(string[] skillPatterns)
         {

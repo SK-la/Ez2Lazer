@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
@@ -158,6 +159,12 @@ namespace osu.Game.EzOsuGame.Skills
         private IReadOnlyDictionary<string, string[]>? chartSkillTagsSessionCache;
 
         /// <summary>
+        /// Serialises the one Realm pass that fills <see cref="chartSkillTagsSessionCache"/>; several carousel
+        /// panels ask for it at once, and each miss would otherwise scan the whole chart skill table again.
+        /// </summary>
+        private readonly Lock chartSkillTagsSessionLock = new Lock();
+
+        /// <summary>
         /// One bare chart skill axis for many hashes. Missing charts are omitted. The full axis table for
         /// <paramref name="system"/>×ruleset is memoised for the session so sort/group re-filters only intersect.
         /// </summary>
@@ -214,17 +221,28 @@ namespace osu.Game.EzOsuGame.Skills
             if (hashSet.Count == 0)
                 return new Dictionary<string, string[]>(StringComparer.Ordinal);
 
-            chartSkillTagsSessionCache ??= buildAllChartSkillTagsCache();
+            var table = getChartSkillTagsSessionCache();
 
-            var result = new Dictionary<string, string[]>(Math.Min(hashSet.Count, chartSkillTagsSessionCache.Count), StringComparer.Ordinal);
+            var result = new Dictionary<string, string[]>(Math.Min(hashSet.Count, table.Count), StringComparer.Ordinal);
 
             foreach (string hash in hashSet)
             {
-                if (chartSkillTagsSessionCache.TryGetValue(hash, out string[]? tags))
+                if (table.TryGetValue(hash, out string[]? tags))
                     result[hash] = tags;
             }
 
             return result;
+        }
+
+        private IReadOnlyDictionary<string, string[]> getChartSkillTagsSessionCache()
+        {
+            var cached = chartSkillTagsSessionCache;
+
+            if (cached != null)
+                return cached;
+
+            lock (chartSkillTagsSessionLock)
+                return chartSkillTagsSessionCache ??= buildAllChartSkillTagsCache();
         }
 
         private IReadOnlyDictionary<string, string[]> buildAllChartSkillTagsCache()
@@ -246,7 +264,9 @@ namespace osu.Game.EzOsuGame.Skills
         public void InvalidateSongSelectSkillFilters()
         {
             skillAxisSessionCache.Clear();
-            chartSkillTagsSessionCache = null;
+
+            lock (chartSkillTagsSessionLock)
+                chartSkillTagsSessionCache = null;
         }
 
         /// <summary>

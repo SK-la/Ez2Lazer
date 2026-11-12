@@ -17,7 +17,6 @@ using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
-using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
@@ -78,9 +77,6 @@ namespace osu.Game.Screens.Select
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
-
-        [Resolved]
-        private OsuConfigManager config { get; set; } = null!;
 
         [Resolved]
         private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
@@ -356,6 +352,9 @@ namespace osu.Game.Screens.Select
                     updateEzDisplay();
             });
             ezAnalysisFilter.BindValueChanged(_ => updateStarFilterIcon(), true);
+
+            // Only the selected card runs the live chart-skill recheck; the rest read the session cache.
+            Selected.BindValueChanged(s => ezDisplayTag.Selected = s.NewValue, true);
         }
 
         protected override void PrepareForUse()

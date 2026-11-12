@@ -348,6 +348,7 @@ namespace osu.Game.Screens.Select
             Selected.BindValueChanged(s =>
             {
                 Expanded.Value = s.NewValue;
+                ezDisplayTag.Selected = s.NewValue;
             }, true);
         }
 
