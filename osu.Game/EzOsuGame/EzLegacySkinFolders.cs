@@ -33,51 +33,114 @@ namespace osu.Game.EzOsuGame
 
         private static string? root;
 
+        public static string? RootDirectory => root;
+
+        public static bool IsMigrationFinished
+        {
+            get
+            {
+                try
+                {
+                    return root != null && File.Exists(Path.Combine(root, migration_marker));
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "无法确认传统皮肤是否已经迁移。");
+                    return false;
+                }
+            }
+        }
+
         public static void BindRoot(Storage storage)
         {
-            root = storage.GetFullPath(EzModifyPath.LEGACY_SKIN_PATH);
-            Directory.CreateDirectory(root);
+            try
+            {
+                root = storage.GetFullPath(EzModifyPath.LEGACY_SKIN_PATH);
+                Directory.CreateDirectory(root);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, $"无法创建 {EzModifyPath.LEGACY_SKIN_PATH}。");
+            }
         }
 
         public static bool TryGetDirectory(SkinInfo skin, out string directory)
         {
             directory = string.Empty;
 
-            if (root == null || string.IsNullOrEmpty(skin.Hash) || skin.InstantiationInfo != legacy_instantiation)
+            try
+            {
+                if (root == null || string.IsNullOrEmpty(skin.Hash) || skin.InstantiationInfo != legacy_instantiation)
+                    return false;
+
+                string candidate = Path.Combine(root, skin.Hash);
+
+                if (!Directory.Exists(candidate))
+                    return false;
+
+                directory = candidate;
+                return true;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "读取传统皮肤目录失败。");
                 return false;
-
-            string candidate = Path.Combine(root, skin.Hash);
-
-            if (!Directory.Exists(candidate))
-                return false;
-
-            directory = candidate;
-            return true;
+            }
         }
 
         public static bool AnyFolders()
         {
-            if (root == null || !Directory.Exists(root))
-                return false;
+            try
+            {
+                if (root == null || !Directory.Exists(root))
+                    return false;
 
-            return Directory.EnumerateDirectories(root).Any();
+                return Directory.EnumerateDirectories(root).Any();
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "无法枚举传统皮肤目录。");
+                return false;
+            }
         }
 
         public static List<SkinInfo> Scan()
         {
             var skins = new List<SkinInfo>();
 
-            if (root == null || !Directory.Exists(root))
+            if (root == null)
                 return skins;
 
-            foreach (string directory in Directory.EnumerateDirectories(root))
+            IEnumerable<string> directories;
+
+            try
+            {
+                if (!Directory.Exists(root))
+                    return skins;
+
+                directories = Directory.EnumerateDirectories(root);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "无法枚举传统皮肤目录。");
+                return skins;
+            }
+
+            foreach (string directory in directories)
             {
                 string folderName = Path.GetFileName(directory);
 
-                if (string.IsNullOrEmpty(folderName))
+                if (string.IsNullOrEmpty(folderName) || folderName[0] == '.' || folderName.EndsWith(".deleting", StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                skins.Add(createInfo(folderName, directory));
+                try
+                {
+                    skins.Add(createInfo(folderName, directory));
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, $"跳过无法读取的传统皮肤文件夹「{folderName}」。");
+                }
             }
 
             return skins;
@@ -85,18 +148,32 @@ namespace osu.Game.EzOsuGame
 
         public static IEnumerable<string> ImageFileNames(string directory)
         {
-            foreach (string path in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
-            {
-                string relative = Path.GetRelativePath(directory, path).Replace('\\', '/');
+            var names = new List<string>();
 
-                if (SupportedExtensions.IMAGE_EXTENSIONS.Contains(Path.GetExtension(relative).ToLowerInvariant()))
-                    yield return relative;
+            try
+            {
+                foreach (string path in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
+                {
+                    string relative = Path.GetRelativePath(directory, path).Replace('\\', '/');
+
+                    if (SupportedExtensions.IMAGE_EXTENSIONS.Contains(Path.GetExtension(relative).ToLowerInvariant()))
+                        names.Add(relative);
+                }
             }
+            catch (Exception e)
+            {
+                Logger.Error(e, $"无法列出传统皮肤图片：{directory}");
+            }
+
+            return names;
         }
 
         public static SkinInfo ImportArchive(Storage storage, ArchiveReader archive, IEnumerable<(string original, string shortened)> files)
         {
             BindRoot(storage);
+
+            if (root == null)
+                throw new IOException($"无法创建 {EzModifyPath.LEGACY_SKIN_PATH}。");
 
             string folderName = nextFolderName(sanitize(Path.GetFileNameWithoutExtension(archive.Name ?? "skin")));
             string directory = Path.Combine(root!, folderName);
@@ -187,69 +264,118 @@ namespace osu.Game.EzOsuGame
             string renamed = nextFolderName(sanitize(updatedName), info.Hash);
 
             if (!string.Equals(renamed, info.Hash, StringComparison.OrdinalIgnoreCase))
-                Directory.Move(directory, Path.Combine(root!, renamed));
+            {
+                try
+                {
+                    Directory.Move(directory, Path.Combine(root!, renamed));
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, $"无法重命名传统皮肤文件夹「{info.Hash}」。");
+                    return info.Hash;
+                }
+            }
 
             return renamed;
         }
 
         public static void Delete(SkinInfo info)
         {
-            if (!TryGetDirectory(info, out string directory))
-                return;
+            try
+            {
+                if (!TryGetDirectory(info, out string directory))
+                    return;
 
-            string temporary = directory + ".deleting";
+                string temporary = directory + ".deleting";
 
-            if (Directory.Exists(temporary))
+                if (Directory.Exists(temporary))
+                    Directory.Delete(temporary, true);
+
+                Directory.Move(directory, temporary);
                 Directory.Delete(temporary, true);
-
-            Directory.Move(directory, temporary);
-            Directory.Delete(temporary, true);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, $"无法删除传统皮肤「{info.Name}」。");
+            }
         }
 
         /// <summary>
-        /// 把 Realm 里的传统皮肤复制到目录。全部成功才写标记；失败的行保持原样，下次启动重试。
+        /// 复制传统皮肤到目录。<paramref name="report"/> 在调用线程上回调，参数是已处理数、总数、当前名称。
+        /// 返回 false 表示被取消或有失败，下次启动会重试。
         /// </summary>
-        public static void Migrate(RealmAccess realm, Storage storage)
+        public static bool Migrate(RealmAccess realm, Storage storage, Action<int, int, string>? report = null, Func<bool>? cancelled = null)
         {
-            BindRoot(storage);
-
-            string marker = Path.Combine(root!, migration_marker);
-
-            if (File.Exists(marker))
-                return;
-
-            string filesRoot = storage.GetFullPath("files");
-            List<MigrationSource> sources = realm.Run(collectSources);
-            var failed = new HashSet<Guid>();
-
-            foreach (MigrationSource source in sources)
+            try
             {
-                try
+                BindRoot(storage);
+
+                if (root == null)
+                    return false;
+
+                if (IsMigrationFinished)
+                    return true;
+
+                string filesRoot = storage.GetFullPath("files");
+                List<MigrationSource> sources = realm.Run(collectSources);
+                var succeeded = new List<Guid>();
+                int failed = 0;
+                bool stopped = false;
+
+                for (int i = 0; i < sources.Count; i++)
                 {
-                    migrateOne(source, filesRoot);
+                    if (cancelled?.Invoke() == true)
+                    {
+                        stopped = true;
+                        break;
+                    }
+
+                    MigrationSource source = sources[i];
+                    report?.Invoke(i, sources.Count, source.Name);
+
+                    try
+                    {
+                        migrateOne(source, filesRoot);
+                        succeeded.Add(source.ID);
+                    }
+                    catch (Exception e)
+                    {
+                        failed++;
+                        Logger.Error(e, $"未能把传统皮肤「{source.Name}」迁到 {EzModifyPath.LEGACY_SKIN_PATH}。");
+                    }
                 }
-                catch (Exception e)
+
+                report?.Invoke(sources.Count, sources.Count, string.Empty);
+                markMigrated(realm, succeeded, writeMarker: !stopped && failed == 0);
+                return !stopped && failed == 0;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "传统皮肤迁移中断。下次启动会重试。");
+                return false;
+            }
+        }
+
+        private static void markMigrated(RealmAccess realm, List<Guid> succeeded, bool writeMarker)
+        {
+            if (succeeded.Count > 0)
+            {
+                realm.Write(r =>
                 {
-                    failed.Add(source.ID);
-                    Logger.Error(e, $"未能把传统皮肤「{source.Name}」迁到 {EzModifyPath.LEGACY_SKIN_PATH}。");
-                }
+                    foreach (Guid id in succeeded)
+                    {
+                        SkinInfo? row = r.Find<SkinInfo>(id);
+
+                        if (row != null)
+                            row.DeletePending = true;
+                    }
+                });
             }
 
-            realm.Write(r =>
-            {
-                foreach (MigrationSource source in sources)
-                {
-                    if (failed.Contains(source.ID))
-                        continue;
+            if (!writeMarker || root == null)
+                return;
 
-                    SkinInfo? row = r.Find<SkinInfo>(source.ID);
-
-                    row?.DeletePending = true;
-                }
-            });
-
-            if (failed.Count == 0)
-                File.WriteAllText(marker, "1");
+            File.WriteAllText(Path.Combine(root, migration_marker), "1");
         }
 
         private static List<MigrationSource> collectSources(Realms.Realm realm)
@@ -261,17 +387,27 @@ namespace osu.Game.EzOsuGame
                 if (!isMigratable(skin))
                     continue;
 
-                var files = new List<(string Filename, string StoragePath)>();
-
-                if (skin.Files.Count != 0)
+                try
                 {
-                    foreach (var file in skin.Files)
-                    {
-                        files.Add((file.Filename, file.File.GetStoragePath()));
-                    }
-                }
+                    var files = new List<(string Filename, string StoragePath)>();
 
-                sources.Add(new MigrationSource(skin.ID, skin.Name, skin.Creator, files));
+                    if (skin.Files != null)
+                    {
+                        foreach (var file in skin.Files)
+                        {
+                            if (file?.File == null || string.IsNullOrEmpty(file.Filename))
+                                continue;
+
+                            files.Add((file.Filename, file.File.GetStoragePath()));
+                        }
+                    }
+
+                    sources.Add(new MigrationSource(skin.ID, skin.Name, skin.Creator, files));
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, $"跳过无法读取的传统皮肤「{skin.Name}」。");
+                }
             }
 
             return sources;
@@ -439,11 +575,19 @@ namespace osu.Game.EzOsuGame
 
         private static bool writeIfDifferent(string path, string contents)
         {
-            if (File.Exists(path) && File.ReadAllText(path) == contents)
-                return false;
+            try
+            {
+                if (File.Exists(path) && File.ReadAllText(path) == contents)
+                    return false;
 
-            File.WriteAllText(path, contents, Encoding.UTF8);
-            return true;
+                File.WriteAllText(path, contents, Encoding.UTF8);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, $"无法写入 {path}。");
+                return false;
+            }
         }
 
         private sealed class FolderMeta

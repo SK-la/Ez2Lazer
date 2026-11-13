@@ -217,5 +217,20 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString LEGACY_SKIN_FOLDER_NOTE = new EzLocalizationManager.EzLocalisableString(
             "把传统皮肤文件夹或导入的 .osk 放在 EzResources/LegacySkin/。每个子文件夹是一套皮肤。Classic 仍是内置皮肤；目录为空时不影响它。",
             "Place legacy skin folders, or imported .osk files, under EzResources/LegacySkin/. Each subfolder is one skin. Classic stays built in, including when this folder is empty.");
+
+        public static readonly LocalisableString LEGACY_SKIN_STORAGE_HEADER = new EzLocalizationManager.EzLocalisableString(
+            "传统皮肤改为文件夹保存", "Legacy skins now live in a folder");
+
+        public static readonly LocalisableString LEGACY_SKIN_MIGRATION_PROGRESS = new EzLocalizationManager.EzLocalisableString(
+            "正在迁移传统皮肤", "Migrating legacy skins");
+
+        public static readonly LocalisableString LEGACY_SKIN_MIGRATION_DONE = new EzLocalizationManager.EzLocalisableString(
+            "传统皮肤已迁到 EzResources/LegacySkin。", "Legacy skins were moved to EzResources/LegacySkin.");
+
+        public static readonly LocalisableString LEGACY_SKIN_MIGRATION_INCOMPLETE = new EzLocalizationManager.EzLocalisableString(
+            "传统皮肤迁移没有全部完成，下次启动会重试失败的部分。", "Some legacy skins were not moved. The failed ones will be retried next launch.");
+
+        public static readonly LocalisableString FIRST_USE_ACKNOWLEDGE = new EzLocalizationManager.EzLocalisableString(
+            "知道了", "Got it");
     }
 }
