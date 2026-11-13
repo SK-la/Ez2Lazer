@@ -18,6 +18,8 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Game.Database;
+using osu.Game.EzOsuGame;
+using osu.Game.EzOsuGame.ScriptedSkin;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -27,7 +29,6 @@ using osu.Game.Input.Bindings;
 using osu.Game.Localisation;
 using osu.Game.Online.Multiplayer;
 using osu.Game.Screens.OnlinePlay.Match.Components;
-using osu.Game.EzOsuGame.ScriptedSkin;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -284,7 +285,12 @@ namespace osu.Game.Overlays.SkinEditor
                 Schedule(() =>
                 {
                     setGlobalSkinDisabled(false);
-                    skinManager.ReloadCurrentScriptedSkinIfActive();
+
+                    if (skinManager.CurrentSkinInfo.Value.PerformRead(s => EzLegacySkinFolders.TryGetDirectory(s, out _)))
+                        skinManager.ReloadCurrentLegacyFolderSkinIfActive();
+                    else
+                        skinManager.ReloadCurrentScriptedSkinIfActive();
+
                     Hide();
                 });
 

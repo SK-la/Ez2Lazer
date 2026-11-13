@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -45,34 +45,36 @@ namespace osu.Game.Database
 
             using (var writer = new ZipWriter(outputStream, zipWriterOptions))
             {
+                var entries = EnumerateExportEntries(model).ToList();
                 int i = 0;
-                int fileCount = model.Files.Count();
+                int fileCount = entries.Count;
                 bool anyFileMissing = false;
                 HashSet<string> filesWritten = [];
 
-                foreach (var file in model.Files)
+                foreach ((string filename, Stream? stream) in entries)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (filesWritten.Contains(file.Filename))
-                        throw new InvalidOperationException($"Error when exporting {model.GetDisplayString()}: Multiple files specify filename of {file.Filename}");
+                    if (filesWritten.Contains(filename))
+                        throw new InvalidOperationException($"Error when exporting {model.GetDisplayString()}: Multiple files specify filename of {filename}");
 
-                    using (var stream = GetFileContents(model, file))
+                    using (stream)
                     {
                         if (stream == null)
                         {
-                            Logger.Log($"File {file.Filename} is missing in local storage and will not be included in the export", LoggingTarget.Database);
+                            Logger.Log($"File {filename} is missing in local storage and will not be included in the export", LoggingTarget.Database);
                             anyFileMissing = true;
                             continue;
                         }
 
-                        writer.Write(file.Filename, stream);
-                        filesWritten.Add(file.Filename);
+                        writer.Write(filename, stream);
+                        filesWritten.Add(filename);
                     }
 
                     i++;
 
-                    notification?.Progress = (float)i / fileCount;
+                    if (fileCount > 0)
+                        notification?.Progress = (float)i / fileCount;
                 }
 
                 if (anyFileMissing)
@@ -80,6 +82,12 @@ namespace osu.Game.Database
                     Logger.Log("Some files are missing in local storage and will not be included in the export", LoggingTarget.Database, LogLevel.Error);
                 }
             }
+        }
+
+        protected virtual IEnumerable<(string Filename, Stream? Contents)> EnumerateExportEntries(TModel model)
+        {
+            foreach (var file in model.Files)
+                yield return (file.Filename, GetFileContents(model, file));
         }
 
         protected virtual Stream? GetFileContents(TModel model, INamedFileUsage file) => UserFileStorage.GetStream(file.File.GetStoragePath());

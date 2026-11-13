@@ -11,7 +11,8 @@ namespace osu.Game.EzOsuGame.Edit
     /// </summary>
     public static class EzSkinJsonSupport
     {
-        public static bool IsSupported(SkinInfo skin) => !skin.Protected && skin.IsManaged;
+        public static bool IsSupported(SkinInfo skin) =>
+            !skin.Protected && (skin.IsManaged || EzLegacySkinFolders.TryGetDirectory(skin, out _));
 
         public static bool IsSupported(Live<SkinInfo> skinInfo) => skinInfo.PerformRead(IsSupported);
     }

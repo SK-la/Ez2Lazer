@@ -26,6 +26,10 @@ namespace osu.Game.EzOsuGame.Edit
                 return null;
 
             string backupFilename = FormattableString.Invariant($"Backup/{EzSkinJsonDocument.FILENAME}.{DateTime.Now:yyyyMMdd_HHmmss}");
+
+            if (EzLegacySkinFolders.TryGetDirectory(skin, out string directory))
+                return EzSkinJsonStorage.BackupJson(directory, savedJson);
+
             using var stream = new MemoryStream(Encoding.UTF8.GetBytes(savedJson));
             skinManager.AddFile(skin, stream, backupFilename);
             return backupFilename;

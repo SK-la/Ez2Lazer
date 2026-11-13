@@ -22,6 +22,7 @@ using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Framework.Testing;
 using osu.Game.Database;
+using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Playback;
@@ -179,7 +180,7 @@ namespace osu.Game.Overlays.SkinEditor
                                                         new EditorMenuItem(Web.CommonStrings.ButtonsSave, MenuItemType.Standard, () => Save()) { Hotkey = new Hotkey(PlatformAction.Save) },
                                                         new EditorMenuItem(CommonStrings.Export, MenuItemType.Standard, () => skins.ExportCurrentSkin()) { Action = { Disabled = !RuntimeInfo.IsDesktop } },
                                                         editExternallyMenuItem = new EditorMenuItem(EditorStrings.EditExternally, MenuItemType.Standard, () => _ = editExternally()) { Action = { Disabled = !RuntimeInfo.IsDesktop } },
-                                                        openScriptFolderMenuItem = new EditorMenuItem("Open script folder", MenuItemType.Standard, () => _ = openScriptedSkinFolder()) { Action = { Disabled = !RuntimeInfo.IsDesktop } },
+                                                        openScriptFolderMenuItem = new EditorMenuItem("Open folder", MenuItemType.Standard, () => _ = openScriptedSkinFolder()) { Action = { Disabled = !RuntimeInfo.IsDesktop } },
                                                         new OsuMenuItemSpacer(),
                                                         new EditorMenuItem(CommonStrings.RevertToDefault, MenuItemType.Destructive, () => dialogOverlay?.Push(new RevertConfirmDialog(RevertToDefault))),
                                                         new OsuMenuItemSpacer(),
@@ -336,26 +337,33 @@ namespace osu.Game.Overlays.SkinEditor
 
         private async Task openScriptedSkinFolder()
         {
-            if (!ScriptedSkinSupport.IsScriptedSkin(currentSkin.Value.SkinInfo))
+            var info = currentSkin.Value.SkinInfo;
+            bool scripted = ScriptedSkinSupport.IsScriptedSkin(info);
+            bool folder = info.PerformRead(s => EzLegacySkinFolders.TryGetDirectory(s, out _));
+
+            if (!scripted && !folder)
                 return;
 
             Save();
 
-            string? scriptDirectory = skins.GetScriptDirectory(currentSkin.Value.SkinInfo.Value);
+            string? directory = scripted
+                ? skins.GetScriptDirectory(info.Value)
+                : info.PerformRead(s => EzLegacySkinFolders.TryGetDirectory(s, out string skinDirectory) ? skinDirectory : null);
 
-            if (string.IsNullOrEmpty(scriptDirectory))
+            if (string.IsNullOrEmpty(directory))
                 return;
 
-            externalEditOperation = await externalEditOverlay!.BeginScripted(scriptDirectory).ConfigureAwait(false);
+            externalEditOperation = await externalEditOverlay!.BeginScripted(directory).ConfigureAwait(false);
         }
 
         private void updateExternalEditMenuState()
         {
             bool isScripted = ScriptedSkinSupport.IsScriptedSkin(currentSkin.Value.SkinInfo);
+            bool isFolder = currentSkin.Value.SkinInfo.PerformRead(s => EzLegacySkinFolders.TryGetDirectory(s, out _));
             bool canRealmEdit = ScriptedSkinSupport.CanUseRealmExternalEdit(currentSkin.Value.SkinInfo);
 
             editExternallyMenuItem.Action.Disabled = !RuntimeInfo.IsDesktop || !canRealmEdit;
-            openScriptFolderMenuItem.Action.Disabled = !RuntimeInfo.IsDesktop || !isScripted;
+            openScriptFolderMenuItem.Action.Disabled = !RuntimeInfo.IsDesktop || !(isScripted || isFolder);
         }
 
         public bool OnPressed(KeyBindingPressEvent<PlatformAction> e)

@@ -22,9 +22,11 @@ using osu.Framework.Logging;
 using osu.Game.Audio;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.Database;
+using osu.Game.EzOsuGame;
 using osu.Game.IO;
 using osu.Game.Rulesets;
 using osu.Game.Screens.Play.HUD;
+using osu.Game.Utils;
 using osuTK.Graphics;
 
 namespace osu.Game.Skinning
@@ -75,6 +77,25 @@ namespace osu.Game.Skinning
         private readonly ResourceStore<byte[]> store = new ResourceStore<byte[]>();
 
         public string Name { get; }
+
+        /// <summary>
+        /// Image filenames this skin exposes to the skin editor.
+        /// Realm skins read <see cref="SkinInfo.Files"/>; folder skins enumerate their directory.
+        /// </summary>
+        public virtual IEnumerable<string> UserFileNames
+        {
+            get
+            {
+                if (EzLegacySkinFolders.TryGetDirectory(SkinInfo.Value, out string directory))
+                    return EzLegacySkinFolders.ImageFileNames(directory).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+                return SkinInfo.PerformRead(skin => skin.Files
+                                                        .Where(f => SupportedExtensions.IMAGE_EXTENSIONS.Contains(Path.GetExtension(f.Filename).ToLowerInvariant()))
+                                                        .Select(f => f.Filename)
+                                                        .Distinct()
+                                                        .ToArray());
+            }
+        }
 
         protected IResourceStore<byte[]>? FallbackStore { get; }
 

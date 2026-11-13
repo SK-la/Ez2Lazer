@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.IO;
 using System.Text;
 using osu.Framework.Platform;
@@ -16,6 +17,12 @@ namespace osu.Game.EzOsuGame.Edit
     {
         public static string? TryReadJson(SkinManager skinManager, SkinInfo skin)
         {
+            if (EzLegacySkinFolders.TryGetDirectory(skin, out string directory))
+            {
+                string path = Path.Combine(directory, EzSkinJsonDocument.FILENAME);
+                return File.Exists(path) ? File.ReadAllText(path) : null;
+            }
+
             var existingFile = skin.GetFile(EzSkinJsonDocument.FILENAME);
 
             if (existingFile == null)
@@ -43,6 +50,33 @@ namespace osu.Game.EzOsuGame.Edit
                 writer.Write(document.Serialize());
 
             return exportStorage.GetFullPath(filename);
+        }
+
+        public static void WriteJson(string directory, string json) =>
+            File.WriteAllText(Path.Combine(directory, EzSkinJsonDocument.FILENAME), json, Encoding.UTF8);
+
+        public static void DeleteJson(string directory)
+        {
+            string path = Path.Combine(directory, EzSkinJsonDocument.FILENAME);
+
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+
+        public static string? BackupJson(string directory, string savedJson)
+        {
+            if (string.IsNullOrWhiteSpace(savedJson))
+                return null;
+
+            string backupFilename = FormattableString.Invariant($"Backup/{EzSkinJsonDocument.FILENAME}.{DateTime.Now:yyyyMMdd_HHmmss}");
+            string path = Path.Combine(directory, backupFilename.Replace('/', Path.DirectorySeparatorChar));
+            string? parent = Path.GetDirectoryName(path);
+
+            if (!string.IsNullOrEmpty(parent))
+                Directory.CreateDirectory(parent);
+
+            File.WriteAllText(path, savedJson, Encoding.UTF8);
+            return backupFilename;
         }
 
         private static string sanitizeFileName(string skinName)

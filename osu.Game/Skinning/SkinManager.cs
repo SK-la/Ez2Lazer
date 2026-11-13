@@ -82,6 +82,9 @@ namespace osu.Game.Skinning
         private readonly Lock scriptedCatalogLock = new Lock();
         private List<Live<SkinInfo>> scriptedSkinCatalog = new List<Live<SkinInfo>>();
 
+        private readonly Lock legacyCatalogLock = new Lock();
+        private List<Live<SkinInfo>> legacySkinCatalog = new List<Live<SkinInfo>>();
+
         private readonly Lock scriptedSkinInstanceLock = new Lock();
         private readonly Dictionary<Guid, Skin> scriptedSkinInstances = new Dictionary<Guid, Skin>();
         private readonly Dictionary<Guid, Task<Skin>> scriptedSkinLoadTasks = new Dictionary<Guid, Task<Skin>>();
@@ -90,6 +93,8 @@ namespace osu.Game.Skinning
         /// 脚本皮肤目录扫描/编译完成后触发（于更新线程调度）。
         /// </summary>
         public event Action ScriptedSkinsCatalogUpdated;
+
+        public event Action LegacySkinsCatalogUpdated;
 
         /// <summary>
         /// 脚本皮肤总开关的启动期快照，来自 <see cref="Ez2Setting.EnableScriptedSkins"/>。
@@ -142,9 +147,10 @@ namespace osu.Game.Skinning
                 PostNotification = obj => PostNotification?.Invoke(obj),
             };
 
+            RetroSkin = new RetroSkin(this);
+
             var defaultSkins = new[]
             {
-                RetroSkin = new RetroSkin(this),
                 DefaultClassicSkin = new DefaultLegacySkin(this),
                 trianglesSkin = new TrianglesSkin(this),
                 argonSkin = new ArgonSkin(this),
@@ -182,6 +188,10 @@ namespace osu.Game.Skinning
                     if (existing.InstantiationInfo != codeInfo.InstantiationInfo)
                         existing.InstantiationInfo = codeInfo.InstantiationInfo;
                 }
+
+                SkinInfo retro = r.Find<SkinInfo>(SkinInfo.RETRO_SKIN);
+
+                retro?.DeletePending = true;
             });
 
             CurrentSkinInfo.ValueChanged += skin =>
@@ -202,6 +212,9 @@ namespace osu.Game.Skinning
             {
                 PostNotification = obj => PostNotification?.Invoke(obj)
             };
+
+            EzLegacySkinFolders.BindRoot(storage);
+            RefreshLegacySkinCatalog();
         }
 
         /// <summary>
@@ -219,7 +232,6 @@ namespace osu.Game.Skinning
                 skins.Add(realm.Find<SkinInfo>(SkinInfo.ARGON_PRO_SKIN).ToLive(Realm));
                 skins.Add(realm.Find<SkinInfo>(SkinInfo.TRIANGLES_SKIN).ToLive(Realm));
                 skins.Add(realm.Find<SkinInfo>(SkinInfo.CLASSIC_SKIN).ToLive(Realm));
-                skins.Add(realm.Find<SkinInfo>(SkinInfo.RETRO_SKIN).ToLive(Realm));
                 skins.Add(realm.Find<SkinInfo>(SkinInfo.EZ2_SKIN).ToLive(Realm));
                 skins.Add(realm.Find<SkinInfo>(SkinInfo.EZ_STYLE_PRO_SKIN).ToLive(Realm));
                 skins.Add(realm.Find<SkinInfo>(SkinInfo.SBI_SKIN).ToLive(Realm));
@@ -228,6 +240,9 @@ namespace osu.Game.Skinning
                 // 脚本皮肤：使用缓存目录列表，避免在 UI 线程同步编译
                 lock (scriptedCatalogLock)
                     skins.AddRange(scriptedSkinCatalog);
+
+                lock (legacyCatalogLock)
+                    skins.AddRange(legacySkinCatalog);
 
                 var userSkins = realm.All<SkinInfo>()
                                      .Where(s => !s.DeletePending && !s.Protected)
@@ -258,15 +273,22 @@ namespace osu.Game.Skinning
                                      .Where(s => !s.DeletePending && s.ID != currentSkinId)
                                      .ToArray();
 
-                if (randomChoices.Length == 0)
+                Live<SkinInfo>[] folderChoices;
+
+                lock (legacyCatalogLock)
+                    folderChoices = legacySkinCatalog.Where(s => s.ID != currentSkinId).ToArray();
+
+                if (randomChoices.Length == 0 && folderChoices.Length == 0)
                 {
                     CurrentSkinInfo.Value = ArgonSkin.CreateInfo().ToLiveUnmanaged();
                     return;
                 }
 
-                var chosen = randomChoices.ElementAt(RNG.Next(0, randomChoices.Length));
+                int index = RNG.Next(0, randomChoices.Length + folderChoices.Length);
 
-                CurrentSkinInfo.Value = chosen.ToLive(Realm);
+                CurrentSkinInfo.Value = index < randomChoices.Length
+                    ? randomChoices[index].ToLive(Realm)
+                    : folderChoices[index - randomChoices.Length];
             });
         }
 
@@ -315,7 +337,11 @@ namespace osu.Game.Skinning
             if (isScriptedSkin(skinInfo))
                 return getOrLoadScriptedSkin(skinInfo);
 
-            // 传统皮肤加载逻辑
+            if (!skinInfo.IsManaged
+                && skinInfo.InstantiationInfo == typeof(LegacySkin).GetInvariantInstantiationInfo()
+                && !EzLegacySkinFolders.TryGetDirectory(skinInfo, out _))
+                return trianglesSkin;
+
             return skinInfo.CreateInstance(this);
         }
 
@@ -544,6 +570,9 @@ namespace osu.Game.Skinning
         {
             return CurrentSkinInfo.Value.PerformRead(s =>
             {
+                if (EzLegacySkinFolders.TryGetDirectory(s, out _))
+                    return false;
+
                 if (!s.Protected)
                     return false;
 
@@ -587,6 +616,9 @@ namespace osu.Game.Skinning
             if (ScriptedSkinSupport.IsScriptedSkin(skin.SkinInfo))
                 return SaveScriptedSkinLayout(skin);
 
+            if (EzLegacySkinFolders.TryGetDirectory(skin.SkinInfo.Value, out _))
+                return skinImporter.Save(skin);
+
             if (!skin.SkinInfo.IsManaged)
                 throw new InvalidOperationException($"Attempting to save a skin which is not yet tracked. Call {nameof(EnsureMutableSkin)} first.");
 
@@ -620,6 +652,36 @@ namespace osu.Game.Skinning
             SourceChanged.Invoke();
         }
 
+        public void ReloadCurrentLegacyFolderSkinIfActive()
+        {
+            CurrentSkinInfo.Value.PerformRead(skinInfo =>
+            {
+                if (!EzLegacySkinFolders.TryGetDirectory(skinInfo, out _))
+                    return;
+
+                Skin previous = CurrentSkin.Value;
+                CurrentSkin.Value = GetSkin(skinInfo);
+
+                if (!ReferenceEquals(previous, CurrentSkin.Value))
+                    previous?.Dispose();
+            });
+
+            SourceChanged.Invoke();
+        }
+
+        public void RefreshLegacySkinCatalog()
+        {
+            var scanned = EzLegacySkinFolders.Scan()
+                                             .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+                                             .Select(s => s.ToLiveUnmanaged())
+                                             .ToList();
+
+            lock (legacyCatalogLock)
+                legacySkinCatalog = scanned;
+
+            scheduler.Add(() => LegacySkinsCatalogUpdated?.Invoke());
+        }
+
         /// <summary>
         /// Resolves the on-disk directory for a scripted skin.
         /// </summary>
@@ -632,7 +694,31 @@ namespace osu.Game.Skinning
         /// <returns>The first result for the provided query, or null if no results were found.</returns>
         public Live<SkinInfo> Query(Expression<Func<SkinInfo, bool>> query)
         {
-            return Realm.Run(r => r.All<SkinInfo>().FirstOrDefault(query)?.ToLive(Realm));
+            Live<SkinInfo> realmMatch = Realm.Run(r =>
+            {
+                SkinInfo match = r.All<SkinInfo>().FirstOrDefault(query);
+
+                if (match == null || match.DeletePending)
+                    return null;
+
+                return match.ToLive(Realm);
+            });
+
+            if (realmMatch != null)
+                return realmMatch;
+
+            Func<SkinInfo, bool> predicate = query.Compile();
+
+            lock (legacyCatalogLock)
+            {
+                foreach (Live<SkinInfo> skin in legacySkinCatalog)
+                {
+                    if (skin.PerformRead(predicate))
+                        return skin;
+                }
+            }
+
+            return null;
         }
 
         public event Action SourceChanged;
@@ -713,27 +799,61 @@ namespace osu.Game.Skinning
             set => skinImporter.PresentImport = value;
         }
 
-        public Task Import(params string[] paths) => skinImporter.Import(paths);
+        public Task Import(params string[] paths) => importThenRefresh(skinImporter.Import(paths));
 
-        public Task Import(ImportTask[] imports, ImportParameters parameters = default) => skinImporter.Import(imports, parameters);
+        public Task Import(ImportTask[] imports, ImportParameters parameters = default) => importThenRefresh(skinImporter.Import(imports, parameters));
 
         public IEnumerable<string> HandledExtensions => skinImporter.HandledExtensions;
 
-        public Task<IEnumerable<Live<SkinInfo>>> Import(ProgressNotification notification, ImportTask[] tasks, ImportParameters parameters = default) =>
-            skinImporter.Import(notification, tasks, parameters);
+        public async Task<IEnumerable<Live<SkinInfo>>> Import(ProgressNotification notification, ImportTask[] tasks, ImportParameters parameters = default)
+        {
+            var imported = await skinImporter.Import(notification, tasks, parameters).ConfigureAwait(false);
+            RefreshLegacySkinCatalog();
+            return imported;
+        }
 
         public Task<Live<SkinInfo>> ImportAsUpdate(ProgressNotification notification, ImportTask task, SkinInfo original) => skinImporter.ImportAsUpdate(notification, task, original);
 
         public Task<ExternalEditOperation<SkinInfo>> BeginExternalEditing(SkinInfo model) => skinImporter.BeginExternalEditing(model);
 
         public Task<Live<SkinInfo>> Import(ImportTask task, ImportParameters parameters = default, CancellationToken cancellationToken = default) =>
-            skinImporter.Import(task, parameters, cancellationToken);
+            importThenRefresh(skinImporter.Import(task, parameters, cancellationToken));
+
+        private async Task importThenRefresh(Task import)
+        {
+            await import.ConfigureAwait(false);
+            RefreshLegacySkinCatalog();
+        }
+
+        private async Task<T> importThenRefresh<T>(Task<T> import)
+        {
+            T result = await import.ConfigureAwait(false);
+            RefreshLegacySkinCatalog();
+            return result;
+        }
 
         public Task ExportCurrentSkin() => ExportSkin(CurrentSkinInfo.Value);
 
         public Task ExportSkin(Live<SkinInfo> skin) => skinExporter.ExportAsync(skin);
 
         #endregion
+
+        public void Delete(SkinInfo skin, bool silent = false)
+        {
+            if (EzLegacySkinFolders.TryGetDirectory(skin, out _))
+            {
+                Guid id = skin.ID;
+                EzLegacySkinFolders.Delete(skin);
+                RefreshLegacySkinCatalog();
+
+                if (CurrentSkinInfo.Value.ID == id)
+                    scheduler.Add(() => CurrentSkinInfo.Value = ArgonSkin.CreateInfo().ToLiveUnmanaged());
+
+                return;
+            }
+
+            Delete(s => s.ID == skin.ID, silent);
+        }
 
         public void Delete([CanBeNull] Expression<Func<SkinInfo, bool>> filter = null, bool silent = false)
         {
@@ -756,6 +876,22 @@ namespace osu.Game.Skinning
 
         public void Rename(Live<SkinInfo> skin, string newName)
         {
+            if (skin.PerformRead(s => EzLegacySkinFolders.TryGetDirectory(s, out _)))
+            {
+                skin.PerformRead(s => EzLegacySkinFolders.Rename(s, newName, this));
+                RefreshLegacySkinCatalog();
+
+                if (CurrentSkinInfo.Value.ID == skin.ID)
+                {
+                    Live<SkinInfo> updated = Query(s => s.ID == skin.ID);
+
+                    if (updated != null)
+                        CurrentSkinInfo.Value = updated;
+                }
+
+                return;
+            }
+
             skin.PerformWrite(s =>
             {
                 s.Name = newName;
@@ -774,9 +910,6 @@ namespace osu.Game.Skinning
             {
                 if (guid == SkinInfo.CLASSIC_SKIN)
                     skinInfo = DefaultClassicSkin.SkinInfo;
-
-                if (guid == SkinInfo.RETRO_SKIN)
-                    skinInfo = RetroSkin.SkinInfo;
 
                 // 此处为匹配皮肤换版的信息同步
                 if (guid == SkinInfo.EZ_STYLE_PRO_SKIN)
