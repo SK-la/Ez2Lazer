@@ -75,7 +75,9 @@ namespace osu.Game.EzOsuGame.Wiki
             {
                 case 2:
                 case 3:
-                    tableOfContents.AddEntry(getTitle(headingBlock.Inline), heading, headingBlock.Level == 3);
+                    if (headingBlock.Inline != null)
+                        tableOfContents.AddEntry(getTitle(headingBlock.Inline), heading, headingBlock.Level == 3);
+
                     break;
             }
         }

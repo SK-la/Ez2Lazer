@@ -45,7 +45,6 @@ namespace osu.Game.EzOsuGame.Pets
         private float currentEyeOpen = 1f;
         private float reactionRemaining;
         private float reactionAngleX;
-        private float reactionMouth;
         private static bool frameworkStarted;
 
         private readonly EzPetCubismExpressionStack expressionStack = new EzPetCubismExpressionStack(EzPetCubismExpressionLibrary.CreateDefaults());
@@ -262,7 +261,6 @@ namespace osu.Game.EzOsuGame.Pets
                 {
                     reactionRemaining = 0.55f;
                     reactionAngleX = (Random.Shared.NextSingle() * 2f - 1f) * 18f;
-                    reactionMouth = 0.7f;
                 }
             }
             else if (string.Equals(clip, "grabbed", StringComparison.OrdinalIgnoreCase)
@@ -273,7 +271,6 @@ namespace osu.Game.EzOsuGame.Pets
                 {
                     reactionRemaining = 0.35f;
                     reactionAngleX = 12f;
-                    reactionMouth = 0.35f;
                 }
             }
         }
