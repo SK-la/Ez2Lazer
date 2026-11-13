@@ -3,6 +3,7 @@
 
 using NUnit.Framework;
 using osu.Framework.Testing;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.Skinning;
 
@@ -15,13 +16,16 @@ namespace osu.Game.Tests.NonVisual
         public void TestUseSetRebindsStoreWithoutReplacingInstance()
         {
             using var storage = new TemporaryNativeStorage("ez-layout-theme-host");
-            var store = new EzConfigLayoutStore(storage);
+            var config = new Ez2ConfigManager(storage);
+            var host = new EzLayoutThemeHost(storage, config);
+            var store = host.Store;
 
             store.Save(EzLayoutFiles.SONG_SELECT, new SkinLayoutInfo());
 
-            store.UseSet("layout-alt");
+            host.SelectSet("layout-alt");
 
             Assert.That(store.LayoutSetName, Is.EqualTo("layout-alt"));
+            Assert.That(config.GetBindable<string>(Ez2Setting.LayoutSetName).Value, Is.EqualTo("layout-alt"));
         }
     }
 }
