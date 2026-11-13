@@ -51,6 +51,12 @@ namespace osu.Game.EzOsuGame.Screens
         /// </summary>
         public Bindable<EzEditorComponentType> ComponentType { get; } = new Bindable<EzEditorComponentType>(EzEditorComponentType.Note);
 
+        /// <summary>
+        /// Whether the card list is materialised. Hosts bind this to their open state; while false the list
+        /// is emptied so preview textures can leave the pools.
+        /// </summary>
+        public BindableBool Displayed { get; } = new BindableBool(true);
+
         private readonly bool showComponentTypeSelector;
         private FillFlowContainer cardFlow = null!;
 
@@ -119,15 +125,22 @@ namespace osu.Game.EzOsuGame.Screens
                 Children = children,
             };
 
-            noteSetName!.BindValueChanged(_ => rebuildVisualLists());
-            stageName!.BindValueChanged(_ => rebuildVisualLists());
-            panelName!.BindValueChanged(_ => rebuildVisualLists());
-            gameThemeName!.BindValueChanged(_ => rebuildVisualLists());
-            judgementLineName!.BindValueChanged(_ => rebuildVisualLists());
-            columnLightName!.BindValueChanged(_ => rebuildVisualLists());
-            ComponentType.BindValueChanged(_ => rebuildVisualLists());
+            noteSetName!.BindValueChanged(_ => rebuildIfDisplayed());
+            stageName!.BindValueChanged(_ => rebuildIfDisplayed());
+            panelName!.BindValueChanged(_ => rebuildIfDisplayed());
+            gameThemeName!.BindValueChanged(_ => rebuildIfDisplayed());
+            judgementLineName!.BindValueChanged(_ => rebuildIfDisplayed());
+            columnLightName!.BindValueChanged(_ => rebuildIfDisplayed());
+            ComponentType.BindValueChanged(_ => rebuildIfDisplayed());
             EzGameThemeCandidates.Refresh(storage);
-            rebuildVisualLists();
+
+            Displayed.BindValueChanged(v =>
+            {
+                if (v.NewValue)
+                    rebuildVisualLists();
+                else
+                    cardFlow.Clear(true);
+            }, true);
         }
 
         protected override void LoadComplete()
@@ -142,7 +155,13 @@ namespace osu.Game.EzOsuGame.Screens
             base.Dispose(isDisposing);
         }
 
-        private void onGameThemeCandidatesChanged() => rebuildVisualLists();
+        private void onGameThemeCandidatesChanged() => rebuildIfDisplayed();
+
+        private void rebuildIfDisplayed()
+        {
+            if (Displayed.Value)
+                rebuildVisualLists();
+        }
 
         private void ensureEzSkinBindings()
         {
@@ -268,7 +287,7 @@ namespace osu.Game.EzOsuGame.Screens
             {
                 cardFlow.Add(new VisualTextureItem(
                     panel,
-                    resources.Get($"Panel/{panel}", EzTextureUsage.Large),
+                    resources.Get($"Panel/{panel}", EzTextureUsage.Thumbnail),
                     () => panelName!.Value = panel,
                     () => panelName!.Value == panel));
             }
@@ -340,18 +359,18 @@ namespace osu.Game.EzOsuGame.Screens
             if (string.IsNullOrEmpty(name))
                 return null;
 
-            return resources.Get($"JudgementLine/{EzResourceDiscovery.judgement_line_prefix}{name}", EzTextureUsage.Large)
-                   ?? resources.Get($"JudgementLine/{name}", EzTextureUsage.Large);
+            return resources.Get($"JudgementLine/{EzResourceDiscovery.JUDGEMENT_LINE_PREFIX}{name}", EzTextureUsage.Thumbnail)
+                   ?? resources.Get($"JudgementLine/{name}", EzTextureUsage.Thumbnail);
         }
 
         private Texture? namedPreview(string path)
-            => resources.Get(path, EzTextureUsage.Large) ?? firstFolderImage(path);
+            => resources.Get(path, EzTextureUsage.Thumbnail) ?? firstFolderImage(path);
 
         private Texture? firstFolderImage(string directory)
         {
             foreach (string key in resources.ListImageKeys(directory))
             {
-                Texture? texture = resources.Get(key, EzTextureUsage.Large);
+                Texture? texture = resources.Get(key, EzTextureUsage.Thumbnail);
 
                 if (texture != null)
                     return texture;
@@ -361,7 +380,7 @@ namespace osu.Game.EzOsuGame.Screens
             {
                 foreach (string key in resources.ListImageKeys($"{directory}/{child}"))
                 {
-                    Texture? texture = resources.Get(key, EzTextureUsage.Large);
+                    Texture? texture = resources.Get(key, EzTextureUsage.Thumbnail);
 
                     if (texture != null)
                         return texture;
@@ -372,8 +391,8 @@ namespace osu.Game.EzOsuGame.Screens
         }
 
         private Texture? createNotePreview(string noteSet)
-            => resources.Get($"note/{noteSet}/whitenote/000", EzTextureUsage.AnimationSafe)
-               ?? resources.Get($"note/{noteSet}/whitenote/001", EzTextureUsage.AnimationSafe);
+            => resources.Get($"note/{noteSet}/whitenote/000", EzTextureUsage.Thumbnail)
+               ?? resources.Get($"note/{noteSet}/whitenote/001", EzTextureUsage.Thumbnail);
 
         private Texture? createStagePreview(string stageSet)
         {
@@ -383,7 +402,7 @@ namespace osu.Game.EzOsuGame.Screens
             if (keyFolder == null)
                 return null;
 
-            return resources.Get($"{basePath}/{keyFolder}/Body", EzTextureUsage.Large);
+            return resources.Get($"{basePath}/{keyFolder}/Body", EzTextureUsage.Thumbnail);
         }
 
         private partial class VisualTextureItem : CompositeDrawable
@@ -547,6 +566,15 @@ namespace osu.Game.EzOsuGame.Screens
             {
                 onClick();
                 return true;
+            }
+
+            protected override void Dispose(bool isDisposing)
+            {
+                base.Dispose(isDisposing);
+
+                // Thumbnail 池按引用计数回收：卡片下树后主动释放，不等 GC。
+                if (isDisposing)
+                    preview?.Dispose();
             }
         }
     }

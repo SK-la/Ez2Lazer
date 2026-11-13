@@ -55,5 +55,13 @@ namespace osu.Game.EzOsuGame
         /// 故在「创建纹理」这一步把尺寸定死（见 <see cref="EzResourceStore"/> 的 dan 页）。
         /// </remarks>
         Badge,
+
+        /// <summary>
+        /// 一次性预览缩略图：引用计数，最后一个引用释放即回收；上传期压到规范边长。
+        /// </summary>
+        /// <remarks>
+        /// 勿用于 gameplay：缩略图在创建纹理时已缩放，显示尺寸变化后重新取图也不会更清晰。
+        /// </remarks>
+        Thumbnail,
     }
 }

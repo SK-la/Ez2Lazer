@@ -8,12 +8,13 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Events;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.EzOsuGame.UI;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.Overlays
@@ -329,6 +330,7 @@ namespace osu.Game.EzOsuGame.Overlays
             private readonly Action onCommit;
 
             private Box? hoverBox;
+            private Texture? previewTexture;
 
             public PreviewSelectCell(EzResourceStore provider, EzResourcePickerDescriptor descriptor, string key, bool selected,
                                      OsuColour osuColour, Action onCommit)
@@ -351,7 +353,7 @@ namespace osu.Game.EzOsuGame.Overlays
             [BackgroundDependencyLoader]
             private void load()
             {
-                var tex = EzResourceDiscovery.TryGetPreviewTexture(provider, descriptor.Category, key);
+                var tex = previewTexture = EzResourceDiscovery.TryGetPreviewTexture(provider, descriptor.Category, key);
 
                 hoverBox = new Box
                 {
@@ -424,6 +426,15 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 onCommit();
                 return true;
+            }
+
+            protected override void Dispose(bool isDisposing)
+            {
+                base.Dispose(isDisposing);
+
+                // Thumbnail 池按引用计数回收：格子下树后主动释放，不等 GC。
+                if (isDisposing)
+                    previewTexture?.Dispose();
             }
         }
     }
