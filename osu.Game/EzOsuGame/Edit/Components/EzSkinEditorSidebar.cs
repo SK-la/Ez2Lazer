@@ -50,6 +50,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private EzSkinEditorSidebarGroupRail rail = null!;
         private OsuScrollContainer contentScroll = null!;
         private FillFlowContainer contentFlow = null!;
+        private SettingsCheckbox pinSwitch = null!;
         private readonly List<EzSkinEditorSettingsGroup> groupDrawables = new List<EzSkinEditorSettingsGroup>();
 
         private IEzSkinEditorSceneStrategy? shownStrategy;
@@ -163,6 +164,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                 Direction = FillDirection.Vertical,
                                 Spacing = new Vector2(0, 20),
                                 Padding = new MarginPadding(padding),
+                                Children = new Drawable[]
+                                {
+                                    pinSwitch = new SettingsCheckbox
+                                    {
+                                        LabelText = EzEditorStrings.SIDEBAR_PIN_LABEL,
+                                        Current = Pinned,
+                                    },
+                                },
                             },
                         },
                         footerContainer = new Container
@@ -205,12 +214,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 contentPanel.FadeTo(v.NewValue ? 1 : 0, transition_duration, Easing.OutQuint);
                 updateReservedWidth();
             }, true);
-
-            contentFlow.Add(new SettingsCheckbox
-            {
-                LabelText = EzEditorStrings.SIDEBAR_PIN_LABEL,
-                Current = Pinned,
-            });
         }
 
         /// <summary>
@@ -299,6 +302,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 contentFlow.Add(section);
             }
 
+            ensurePinSwitchAtTop();
+
             navigation.ShowSections(strategy.SceneType, groupDrawables);
             navigation.SuspendSync();
             Scheduler.AddOnce(navigation.ResumeSync);
@@ -316,6 +321,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }
             else
                 clearFooter();
+        }
+
+        private void ensurePinSwitchAtTop()
+        {
+            if (pinSwitch.Parent != contentFlow)
+                return;
+
+            contentFlow.SetLayoutPosition(pinSwitch, 0);
         }
 
         private void detachSections()
