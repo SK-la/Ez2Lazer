@@ -25,6 +25,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         Bindable<double> HitTargetFloatFixed { get; }
         Bindable<double> HitTargetAlpha { get; }
+        Bindable<bool> HitTargetColouringEnabled { get; }
 
         Bindable<double> HoldTailAlpha { get; }
         Bindable<double> HoldTailMaskHeight { get; }
@@ -66,6 +67,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         public Bindable<double> HitTargetFloatFixed { get; } = new Bindable<double>();
         public Bindable<double> HitTargetAlpha { get; } = new Bindable<double>();
+        public Bindable<bool> HitTargetColouringEnabled { get; } = new Bindable<bool>();
 
         public Bindable<double> HoldTailAlpha { get; } = new Bindable<double>();
         public Bindable<double> HoldTailMaskHeight { get; } = new Bindable<double>();
@@ -84,6 +86,7 @@ namespace osu.Game.EzOsuGame.Configuration
             ezConfig.BindWith(Ez2Setting.NoteTrackLineHeight, NoteTrackLineHeight);
             ezConfig.BindWith(Ez2Setting.HitTargetFloatFixed, HitTargetFloatFixed);
             ezConfig.BindWith(Ez2Setting.HitTargetAlpha, HitTargetAlpha);
+            ezConfig.BindWith(Ez2Setting.HitTargetColouringEnabled, HitTargetColouringEnabled);
             ezConfig.BindWith(Ez2Setting.ManiaHoldTailAlpha, HoldTailAlpha);
             ezConfig.BindWith(Ez2Setting.ManiaHoldTailMaskGradientHeight, HoldTailMaskHeight);
         }

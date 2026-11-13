@@ -2,20 +2,26 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Graphics;
-using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Settings;
 using osu.Game.Graphics;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning
 {
+    /// <summary>
+    /// 把原始列色 / 节拍线色按皮肤全局着色算法换成显示色。所有着色点都从这里取，算法只此一处分支。
+    /// </summary>
     public static class ManiaNoteDisplayColour
     {
         /// <summary>
-        ///     Column-assigned note tint (Column bindables).
+        ///     Column-assigned note tint (Column bindables), shaped by the skin-wide colouring algorithm.
         /// </summary>
-        public static Colour4 ForColumnNoteDisplayTint(Colour4 columnColour)
+        public static Colour4 ForColumnNoteDisplayTint(Colour4 columnColour, EzColouringMode colouringMode)
         {
+            if (colouringMode == EzColouringMode.Direct)
+                return columnColour;
+
             return ManiaNoteDisplayTint.ApplyTo(
                 columnColour,
                 ManiaNoteDisplayTint.DEFAULT_TARGET_GRAYSCALE,
@@ -23,17 +29,14 @@ namespace osu.Game.Rulesets.Mania.Skinning
         }
 
         /// <summary>
-        ///     Beat-line note tint from <c>BeatmapEditor.json</c> (or official defaults when a palette entry is unset).
+        ///     Beat-line colour for one line divisor, shaped by the skin-wide colouring algorithm.
         /// </summary>
-        public static Color4 ForBeatLineDivisorNoteDisplayTint(
-            IBeatmap beatmap,
-            double startTime,
-            int beatDivisor,
-            bool fixedGrid,
-            OsuColour colours,
-            ManiaEditorBeatLinePalette? palette = null)
+        public static Color4 ForBeatLineDisplayColour(int lineDivisor, OsuColour colours, ManiaEditorBeatLinePalette? palette, EzColouringMode colouringMode)
         {
-            return ManiaNoteDisplayTint.GetBeatLineDivisorNoteColour(beatmap, startTime, beatDivisor, fixedGrid, colours, palette);
+            if (colouringMode == EzColouringMode.Direct)
+                return ManiaEditorBeatLinePalette.LineColour(lineDivisor, colours, palette);
+
+            return ManiaNoteDisplayTint.GetDivisorNoteColourFromLineDivisor(lineDivisor, colours, palette);
         }
     }
 }

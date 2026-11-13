@@ -21,6 +21,21 @@ namespace osu.Game.EzOsuGame.Configuration
         GlobalTotalWidth = 2,
     }
 
+    public enum EzColouringMode
+    {
+        /// <summary>
+        /// 直接绘制颜色，不做灰度目标混合。
+        /// </summary>
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.COLOURING_MODE_DIRECT))]
+        Direct = 0,
+
+        /// <summary>
+        /// 先按灰度目标混合再加权，颜色更淡；与 <c>ManiaNoteDisplayTint.ApplyTo</c> 同一算法。
+        /// </summary>
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.COLOURING_MODE_TINT))]
+        Tint = 1,
+    }
+
     public enum EzEnumJudgeMode
     {
         [Description("Lazer")]

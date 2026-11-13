@@ -60,6 +60,12 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                     TooltipText = EzColumnStrings.COLUMN_COLOURING_ENABLE_BUTTON_TOOLTIP,
                     Current = columnColorEnabled,
                 },
+                new SettingsEnumDropdown<EzColouringMode>
+                {
+                    LabelText = EzSkinStrings.COLOURING_MODE,
+                    TooltipText = EzSkinStrings.COLOURING_MODE_TOOLTIP,
+                    Current = ezSkinConfig.GetBindable<EzColouringMode>(Ez2Setting.ColouringMode),
+                },
                 baseColorsContainer = new FillFlowContainer
                 {
                     RelativeSizeAxes = Axes.X,

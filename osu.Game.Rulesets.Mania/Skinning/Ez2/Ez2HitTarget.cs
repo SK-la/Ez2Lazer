@@ -9,6 +9,7 @@ using osu.Framework.Platform;
 using osu.Framework.Timing;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Mods;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Play;
 using osuTK.Graphics;
@@ -19,10 +20,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
     {
         private readonly IBindable<double> hitTargetFloatFixed = new Bindable<double>();
         private readonly IBindable<double> hitTargetAlpha = new Bindable<double>();
+        private readonly IBindable<bool> hitTargetColouringEnabled = new Bindable<bool>();
 
         private IBindable<ScrollingDirection> direction = null!;
 
         private double beatPhase;
+
+        [Resolved(CanBeNull = true)]
+        private ManiaPlayfieldNoteDisplayTint? noteDisplayTint { get; set; }
 
         [Resolved]
         private IGameplayClock gameplayClock { get; set; } = null!;
@@ -54,7 +59,21 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
             hitTargetFloatFixed.BindTo(ezSkinInfo.HitTargetFloatFixed);
             hitTargetAlpha.BindTo(ezSkinInfo.HitTargetAlpha);
+            hitTargetColouringEnabled.BindTo(ezSkinInfo.HitTargetColouringEnabled);
+
             hitTargetAlpha.BindValueChanged(v => Alpha = (float)v.NewValue, true);
+            hitTargetColouringEnabled.BindValueChanged(_ => UpdateColor(), true);
+        }
+
+        protected override void UpdateColor()
+        {
+            if (!hitTargetColouringEnabled.Value || noteDisplayTint == null)
+            {
+                Colour = Color4.Gray;
+                return;
+            }
+
+            Colour = noteDisplayTint.GetDisplayColour(ManiaNoteDisplayColourPart.HitTarget, Column, 0);
         }
 
         protected override void Update()

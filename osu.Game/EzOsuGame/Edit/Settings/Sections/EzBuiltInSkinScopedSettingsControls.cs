@@ -99,6 +99,12 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                 Current = ezSkinConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha),
                 KeyboardStep = 0.01f,
             },
+            new SettingsCheckbox
+            {
+                LabelText = EzSkinStrings.HIT_TARGET_COLOURING_ENABLED,
+                TooltipText = EzSkinStrings.HIT_TARGET_COLOURING_ENABLED_TOOLTIP,
+                Current = ezSkinConfig.GetBindable<bool>(Ez2Setting.HitTargetColouringEnabled),
+            },
         };
 
         private IEnumerable<Drawable> createLnSettings() => new Drawable[]

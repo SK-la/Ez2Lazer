@@ -162,7 +162,9 @@ namespace osu.Game.Rulesets.Mania.UI
         private Action? onNoteSizeChangedHandler;
         private Action? onNoteColourChangedHandler;
         private Action? onBeatLineNoteTintChangedHandler;
-        private Action<ValueChangedEvent<Colour4>>? onEzNoteColourChanged;
+        private Action<ValueChangedEvent<Colour4>>? onColumnColourChanged;
+        private Action<ValueChangedEvent<EzColouringMode>>? onColouringModeChanged;
+        private Bindable<EzColouringMode> colouringMode = null!;
 
         // 缓存计算参数，避免闭包捕获
         public int KeyMode;
@@ -205,8 +207,11 @@ namespace osu.Game.Rulesets.Mania.UI
             EzNoteTypeBindable = ezConfig.GetColumnTypeBindable(KeyMode, Index);
             EzNoteSizeBindable = ezFactory.GetNoteSizeBindable(KeyMode, Index);
             EzNoteColourBindable = ezConfig.GetColumnColorBindable(KeyMode, Index);
-            onEzNoteColourChanged = refreshNoteDisplayColour;
-            EzNoteColourBindable.BindValueChanged(onEzNoteColourChanged, true);
+            colouringMode = ezConfig.GetBindable<EzColouringMode>(Ez2Setting.ColouringMode);
+            onColumnColourChanged = _ => refreshNoteDisplayColour();
+            onColouringModeChanged = _ => refreshNoteDisplayColour();
+            EzNoteColourBindable.BindValueChanged(onColumnColourChanged, true);
+            colouringMode.BindValueChanged(onColouringModeChanged);
             NoteSetNameBindable = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
             ColorSettingsEnabledBindable = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
 
@@ -259,9 +264,9 @@ namespace osu.Game.Rulesets.Mania.UI
             keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
         }
 
-        private void refreshNoteDisplayColour(ValueChangedEvent<Colour4> change)
+        private void refreshNoteDisplayColour()
         {
-            NoteDisplayColour = ManiaNoteDisplayColour.ForColumnNoteDisplayTint(change.NewValue);
+            NoteDisplayColour = ManiaNoteDisplayColour.ForColumnNoteDisplayTint(EzNoteColourBindable.Value, colouringMode.Value);
             NoteColourChanged?.Invoke();
         }
 
@@ -346,8 +351,11 @@ namespace osu.Game.Rulesets.Mania.UI
             if (onBeatLineNoteTintChangedHandler != null && beatLineNoteTint != null)
                 beatLineNoteTint.Changed -= onBeatLineNoteTintChangedHandler;
 
-            if (onEzNoteColourChanged != null)
-                EzNoteColourBindable.ValueChanged -= onEzNoteColourChanged;
+            if (onColumnColourChanged != null)
+                EzNoteColourBindable.ValueChanged -= onColumnColourChanged;
+
+            if (onColouringModeChanged != null)
+                colouringMode.ValueChanged -= onColouringModeChanged;
 
             base.Dispose(isDisposing);
 

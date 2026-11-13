@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using NUnit.Framework;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Skinning;
 using osuTK.Graphics;
 
@@ -44,12 +45,21 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
         public void TestForColumnHubUsesApplyTo()
         {
             var columnColour = new osu.Framework.Graphics.Colour4(1f, 0f, 0f, 1f);
-            var hub = ManiaNoteDisplayColour.ForColumnNoteDisplayTint(columnColour);
+            var hub = ManiaNoteDisplayColour.ForColumnNoteDisplayTint(columnColour, EzColouringMode.Tint);
             var direct = ManiaNoteDisplayTint.ApplyTo(columnColour, ManiaNoteDisplayTint.DEFAULT_TARGET_GRAYSCALE, ManiaNoteDisplayTint.DEFAULT_COLOUR_ALPHA);
 
             Assert.That(hub.R, Is.EqualTo(direct.R).Within(0.001));
             Assert.That(hub.G, Is.EqualTo(direct.G).Within(0.001));
             Assert.That(hub.B, Is.EqualTo(direct.B).Within(0.001));
+        }
+
+        [Test]
+        public void TestForColumnHubDirectKeepsSourceColour()
+        {
+            var columnColour = new osu.Framework.Graphics.Colour4(1f, 0f, 0f, 1f);
+            var hub = ManiaNoteDisplayColour.ForColumnNoteDisplayTint(columnColour, EzColouringMode.Direct);
+
+            Assert.That(hub, Is.EqualTo(columnColour));
         }
 
         [Test]

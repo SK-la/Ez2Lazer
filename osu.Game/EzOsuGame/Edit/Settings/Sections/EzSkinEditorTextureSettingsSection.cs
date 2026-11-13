@@ -87,6 +87,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                     new SettingsButton
                     {
                         Text = EzSkinStrings.RESCAN_GAME_THEME_LIST,
+                        TooltipText = EzSkinStrings.RESCAN_GAME_THEME_LIST_TOOLTIP,
                         Action = () => EzGameThemeCandidates.Refresh(storage),
                     },
                 }

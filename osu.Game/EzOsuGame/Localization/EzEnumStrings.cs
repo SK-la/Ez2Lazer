@@ -14,6 +14,9 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString GLOBAL_WIDTH = new EzLocalizationManager.EzLocalisableString("全局宽度", "Global Width");
         public static readonly LocalisableString GLOBAL_TOTAL_WIDTH = new EzLocalizationManager.EzLocalisableString("全局总宽度", "Global Total Width");
 
+        public static readonly LocalisableString COLOURING_MODE_DIRECT = new EzLocalizationManager.EzLocalisableString("直接着色（默认）", "Direct (default)");
+        public static readonly LocalisableString COLOURING_MODE_TINT = new EzLocalizationManager.EzLocalisableString("Tint 着色", "Tint");
+
         public static readonly LocalisableString SCALE = new EzLocalizationManager.EzLocalisableString("缩放动效", "Scale");
         public static readonly LocalisableString BOUNCE = new EzLocalizationManager.EzLocalisableString("跳跃动效", "Bounce");
 

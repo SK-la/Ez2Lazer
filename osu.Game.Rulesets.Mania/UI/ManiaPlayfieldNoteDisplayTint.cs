@@ -26,6 +26,7 @@ namespace osu.Game.Rulesets.Mania.UI
         public const bool COLOUR_NOTE = true;
         public const bool COLOUR_HOLD_HEAD = true;
         public const bool COLOUR_HOLD_BODY = true;
+        public const bool COLOUR_HIT_TARGET = true;
     }
 
     public enum ManiaNoteDisplayColourPart
@@ -34,6 +35,11 @@ namespace osu.Game.Rulesets.Mania.UI
         Note,
         HoldHead,
         HoldBody,
+
+        /// <summary>
+        /// 命中靶。只有列色，没有时刻，因此不参与节拍线着色。
+        /// </summary>
+        HitTarget,
     }
 
     /// <summary>
@@ -89,7 +95,9 @@ namespace osu.Game.Rulesets.Mania.UI
         private Bindable<bool> gameplayDivisorNoteColouring = null!;
         private Bindable<bool> colorSettingsEnabled = null!;
         private Bindable<bool> builtInColourTemplate = null!;
+        private Bindable<EzColouringMode> colouringMode = null!;
         private Action<ValueChangedEvent<bool>>? onDisplaySettingsChanged;
+        private Action<ValueChangedEvent<EzColouringMode>>? onColouringModeChanged;
 
         private readonly Dictionary<long, int> lineDivisorBySnapMs = new Dictionary<long, int>();
         private readonly Dictionary<int, Color4> tintByLineDivisor = new Dictionary<int, Color4>();
@@ -104,6 +112,10 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             if (!AllowsDisplayColour(part))
                 return Color4.White;
+
+            // 命中靶没有命中时刻：只吃列色，节拍线着色对它是无定义的。
+            if (part == ManiaNoteDisplayColourPart.HitTarget)
+                return ColumnNoteColouringEnabled ? column.NoteDisplayColour : Color4.White;
 
             if (DivisorNoteColouringEnabled)
                 return getNoteTint(startTime);
@@ -138,6 +150,7 @@ namespace osu.Game.Rulesets.Mania.UI
             ManiaNoteDisplayColourPart.Note => ManiaNoteDisplayColourParts.COLOUR_NOTE,
             ManiaNoteDisplayColourPart.HoldHead => ManiaNoteDisplayColourParts.COLOUR_HOLD_HEAD,
             ManiaNoteDisplayColourPart.HoldBody => ManiaNoteDisplayColourParts.COLOUR_HOLD_BODY,
+            ManiaNoteDisplayColourPart.HitTarget => ManiaNoteDisplayColourParts.COLOUR_HIT_TARGET,
             _ => false,
         };
 
@@ -153,12 +166,16 @@ namespace osu.Game.Rulesets.Mania.UI
 
             colorSettingsEnabled = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
             builtInColourTemplate = ezConfig.GetBindable<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns);
+            colouringMode = ezConfig.GetBindable<EzColouringMode>(Ez2Setting.ColouringMode);
             applyColumnNoteColouring();
             applyBuiltInLayoutTemplate();
 
             onDisplaySettingsChanged = syncDisplaySettings;
             colorSettingsEnabled.BindValueChanged(onDisplaySettingsChanged);
             builtInColourTemplate.BindValueChanged(onDisplaySettingsChanged);
+
+            onColouringModeChanged = syncColouringMode;
+            colouringMode.BindValueChanged(onColouringModeChanged);
 
             paletteBinding = new ManiaEditorDivisorPaletteBinding(configStore);
             onPaletteChanged = invalidateTintColours;
@@ -189,6 +206,9 @@ namespace osu.Game.Rulesets.Mania.UI
                     colorSettingsEnabled.ValueChanged -= onDisplaySettingsChanged;
                     builtInColourTemplate.ValueChanged -= onDisplaySettingsChanged;
                 }
+
+                if (onColouringModeChanged != null)
+                    colouringMode.ValueChanged -= onColouringModeChanged;
             }
 
             base.Dispose(isDisposing);
@@ -210,6 +230,12 @@ namespace osu.Game.Rulesets.Mania.UI
         private void applyColumnNoteColouring() => ColumnNoteColouringEnabled = colorSettingsEnabled.Value;
 
         private void applyBuiltInLayoutTemplate() => BuiltInLayoutTemplateColourEnabled = builtInColourTemplate.Value;
+
+        private void syncColouringMode(ValueChangedEvent<EzColouringMode> _)
+        {
+            // 缓存里存的是按旧算法算出的节拍线色，换算法必须整批丢弃。
+            invalidateTintColours();
+        }
 
         private void applyDivisorNoteColouring()
         {
@@ -240,7 +266,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
             if (!tintByLineDivisor.TryGetValue(lineDivisor, out Color4 tint))
             {
-                tint = ManiaNoteDisplayTint.GetDivisorNoteColourFromLineDivisor(lineDivisor, colours, palette);
+                tint = ManiaNoteDisplayColour.ForBeatLineDisplayColour(lineDivisor, colours, palette, colouringMode.Value);
                 tintByLineDivisor[lineDivisor] = tint;
             }
 

@@ -76,15 +76,6 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString COMPONENT_TYPE_COLUMN_LIGHT = new EzLocalizationManager.EzLocalisableString(
             "ColumnLight", "ColumnLight");
 
-        public static readonly LocalisableString VISUAL_PICKER_GAME_THEME_BUTTON = new EzLocalizationManager.EzLocalisableString(
-            "大图选择：全局纹理主题", "Visual picker: global GameTheme");
-
-        public static readonly LocalisableString VISUAL_PICKER_NOTE_SET_BUTTON = new EzLocalizationManager.EzLocalisableString(
-            "大图选择：Note Set", "Visual picker: Note Set");
-
-        public static readonly LocalisableString VISUAL_PICKER_STAGE_BUTTON = new EzLocalizationManager.EzLocalisableString(
-            "大图选择：Stage Set", "Visual picker: Stage Set");
-
         public static readonly LocalisableString NOTE_SET_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "修改EzPro皮肤中的整套note, 含所有note和打击光效。"
             + "\n在本地EzResources/note中，支持自定义子文件夹增减修改, 选项会在重载时重新读取文件夹名称。"
@@ -142,6 +133,26 @@ namespace osu.Game.EzOsuGame.Localization
             "设置 EzStylePro / Ez2Circle 命中靶浮动幅度（正弦运动范围）。",
             "Hit-target bob amplitude for EzStylePro / Ez2Circle (sine motion range).");
 
+        public static readonly LocalisableString HIT_TARGET_COLOURING_ENABLED = new EzLocalizationManager.EzLocalisableString(
+            "[Ez] 命中靶应用着色", "[Ez] Hit-Target Colouring");
+
+        public static readonly LocalisableString HIT_TARGET_COLOURING_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后 EzStylePro / Ez2Circle 命中靶套用所在列的列色。"
+            + "\nEzStylePro 的靶固定使用 whitenote 贴图，因此不会因为音符集缺少 bluenote / greennote 而消失。",
+            "Colours the EzStylePro / Ez2Circle hit target with its column colour."
+            + "\nEzStylePro always uses the whitenote texture, so the target never disappears when the note set lacks bluenote / greennote.");
+
+        public static readonly LocalisableString COLOURING_MODE = new EzLocalizationManager.EzLocalisableString(
+            "着色算法", "Colouring Mode");
+
+        public static readonly LocalisableString COLOURING_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "皮肤全局着色算法，控制着色计算，不改贴图选择。"
+            + "\n直接着色：列色直接作为绘制颜色。"
+            + "\nTint 着色：先按灰度目标混合再加权，颜色更淡。",
+            "Skin-wide colouring algorithm for every place that applies a column or beat-line colour; it only changes the colour maths, not texture selection."
+            + "\nDirect: the source colour is used as-is."
+            + "\nTint: the source colour is blended onto a grey target first, giving a paler result.");
+
         public static readonly LocalisableString NOTE_HEIGHT_SCALE = new EzLocalizationManager.EzLocalisableString(
             "note 高度比例", "Note Height Scale");
 
@@ -192,17 +203,5 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString NOTE_TRACK_LINE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "EzPro皮肤中, note两侧辅助轨道线的高度",
             "Height of note-side auxiliary track lines in EzPro skins.");
-
-        public static readonly LocalisableString REFRESH_SAVE_SKIN = new EzLocalizationManager.EzLocalisableString(
-            "强制刷新&保存", "Force Refresh & Save Skin");
-
-        public static readonly LocalisableString REFRESH_SAVE_SKIN_TOOLTIP = new EzLocalizationManager.EzLocalisableString("没遇到问题不需要点，测试用按钮，触发皮肤重载。",
-            "If you haven't encountered any issues, don't click this. Use it for adjustments.");
-
-        public static readonly LocalisableString SWITCH_TO_ABSOLUTE = new EzLocalizationManager.EzLocalisableString(
-            "强制刷新, 并切换至 绝对位置 (不稳定) ", "Refresh, Switch to Absolute(Unstable)");
-
-        public static readonly LocalisableString SWITCH_TO_RELATIVE = new EzLocalizationManager.EzLocalisableString(
-            "强制刷新, 并切换至 相对位置 (不稳定) ", "Refresh, Switch to Relative(Unstable)");
     }
 }

@@ -16,12 +16,21 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzHitTarget : EzNote
     {
-        protected override ManiaNoteDisplayColourPart DisplayColourPart => ManiaNoteDisplayColourPart.None;
+        protected override ManiaNoteDisplayColourPart DisplayColourPart => ManiaNoteDisplayColourPart.HitTarget;
 
         protected override bool ShowSeparators => false;
 
+        /// <summary>
+        /// 命中靶固定读 whitenote：按列类型取色的贴图（blue / green）在缺少该色的音符集里会让靶整列消失。
+        /// </summary>
+        protected override string ColorPrefix => "white";
+
         private readonly IBindable<double> hitTargetFloatFixed = new Bindable<double>();
         private readonly IBindable<double> hitTargetAlpha = new Bindable<double>();
+        private readonly IBindable<bool> hitTargetColouringEnabled = new Bindable<bool>();
+
+        [Resolved(CanBeNull = true)]
+        private ManiaPlayfieldNoteDisplayTint? noteDisplayTint { get; set; }
 
         [Resolved]
         private IGameplayClock gameplayClock { get; set; } = null!;
@@ -56,8 +65,24 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             hitTargetFloatFixed.BindTo(ezSkinInfo.HitTargetFloatFixed);
             hitTargetAlpha.BindTo(ezSkinInfo.HitTargetAlpha);
+            hitTargetColouringEnabled.BindTo(ezSkinInfo.HitTargetColouringEnabled);
 
             hitTargetAlpha.BindValueChanged(v => Alpha = (float)v.NewValue, true);
+            hitTargetColouringEnabled.BindValueChanged(_ => UpdateColor(), true);
+        }
+
+        /// <summary>
+        /// 命中靶没有命中时刻，只取所在列的显示色；关闭靶着色时保持 whitenote 原色。
+        /// </summary>
+        protected override void UpdateColor()
+        {
+            if (!hitTargetColouringEnabled.Value || noteDisplayTint == null)
+            {
+                Colour = Colour4.White;
+                return;
+            }
+
+            Colour = noteDisplayTint.GetDisplayColour(ManiaNoteDisplayColourPart.HitTarget, Column, 0);
         }
 
         protected override void Update()
