@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -10,6 +11,7 @@ using Newtonsoft.Json;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Edit.Settings;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Overlays.Preview;
 
 namespace osu.Game.EzOsuGame.Layout
@@ -36,6 +38,8 @@ namespace osu.Game.EzOsuGame.Layout
 
         public BeatmapEditorSettings BeatmapEditor { get; }
 
+        private readonly EzModLayoutDocument modLayout = new EzModLayoutDocument();
+
         public EzConfigStore(Storage gameStorage)
         {
             storage = gameStorage.GetStorageForDirectory(EzModifyPath.CONFIG_ROOT_PATH);
@@ -43,6 +47,7 @@ namespace osu.Game.EzOsuGame.Layout
             BeatmapEditor = new BeatmapEditorSettings();
             reloadPreview();
             reloadBeatmapEditor();
+            reloadModLayout();
 
             PreviewManiaSettings.Style.BindValueChanged(_ => queuePreviewSave(), false);
             PreviewManiaSettings.NoteColour.BindValueChanged(_ => queuePreviewSave(), false);
@@ -77,6 +82,27 @@ namespace osu.Game.EzOsuGame.Layout
             }
         }
 
+        public EzRulesetModLayout? GetModLayout(string ruleset)
+        {
+            if (string.IsNullOrEmpty(ruleset))
+                return null;
+
+            lock (saveLock)
+                return modLayout.Rulesets.GetValueOrDefault(ruleset);
+        }
+
+        public void SaveModLayout(string ruleset, EzRulesetModLayout layout)
+        {
+            if (string.IsNullOrEmpty(ruleset))
+                return;
+
+            lock (saveLock)
+            {
+                modLayout.Rulesets[ruleset] = layout;
+                writeText(EzModLayoutDocument.FILENAME, JsonConvert.SerializeObject(modLayout, json_settings));
+            }
+        }
+
         private void reloadPreview()
         {
             lock (saveLock)
@@ -99,6 +125,31 @@ namespace osu.Game.EzOsuGame.Layout
                 finally
                 {
                     suppressSave = false;
+                }
+            }
+        }
+
+        private void reloadModLayout()
+        {
+            lock (saveLock)
+            {
+                try
+                {
+                    string? json = readTextUnlocked(EzModLayoutDocument.FILENAME);
+
+                    if (string.IsNullOrEmpty(json))
+                        return;
+
+                    var loaded = JsonConvert.DeserializeObject<EzModLayoutDocument>(json, json_settings);
+
+                    if (loaded?.Rulesets == null)
+                        return;
+
+                    modLayout.Rulesets = loaded.Rulesets;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, $"Failed to load Ez mod layout {EzModLayoutDocument.FILENAME}");
                 }
             }
         }

@@ -37,7 +37,7 @@ namespace osu.Game.Overlays.Mods.Input
 
         private readonly Key[] toggleKeys;
 
-        private SequentialModHotkeyHandler(Key[] keys)
+        public SequentialModHotkeyHandler(Key[] keys)
         {
             toggleKeys = keys;
         }
