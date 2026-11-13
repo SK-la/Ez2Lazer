@@ -22,6 +22,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -31,6 +32,7 @@ using osu.Game.Online.Notifications.WebSocket;
 using osu.Game.Online.Notifications.WebSocket.Events;
 using osu.Game.Overlays;
 using osu.Game.Overlays.BeatmapListing;
+using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Mods;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Toolbar;
@@ -1410,6 +1412,10 @@ namespace osu.Game.Tests.Visual.Navigation
             AddUntilStep("wait for selected", () => !Game.Beatmap.IsDefault);
 
             AddStep("set mods", () => Game.SelectedMods.Value = new Mod[] { new OsuModNoFail(), new OsuModDoubleTime { SpeedChange = { Value = 2 } } });
+
+            // 第一次进选歌会弹出传统皮肤目录说明。回车会被它吃掉。
+            AddStep("acknowledge first-use dialog", () => Game.ChildrenOfType<EzFirstUseDialog>().FirstOrDefault()?.PerformAction<PopupDialogOkButton>());
+            AddUntilStep("first-use dialog closed", () => !Game.ChildrenOfType<EzFirstUseDialog>().Any());
 
             AddStep("press enter", () => InputManager.Key(Key.Enter));
 

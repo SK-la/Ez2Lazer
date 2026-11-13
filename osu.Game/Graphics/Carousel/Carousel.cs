@@ -126,7 +126,7 @@ namespace osu.Game.Graphics.Carousel
 
                     currentSelection = new Selection(value);
                     currentKeyboardSelection = currentSelection;
-                    selectionValid.Invalidate();
+                    invalidateSelection(centre: true);
                 }
 
                 // Check keyboard selection equality separately.
@@ -140,7 +140,7 @@ namespace osu.Game.Graphics.Carousel
                 if (!CheckModelEquality(currentKeyboardSelection.Model, value))
                 {
                     currentKeyboardSelection = currentSelection;
-                    selectionValid.Invalidate();
+                    invalidateSelection(centre: true);
                 }
             }
         }
@@ -159,7 +159,7 @@ namespace osu.Game.Graphics.Carousel
             (GetMaterialisedDrawableForItem(item) as ICarouselPanel)?.Activated();
             HandleItemActivated(item);
 
-            selectionValid.Invalidate();
+            invalidateSelection(centre: true);
         }
 
         /// <summary>
@@ -845,13 +845,24 @@ namespace osu.Game.Graphics.Carousel
         /// </summary>
         private readonly Cached selectionValid = new Cached();
 
+        // 这次失效是因为选中项变了。布局高度变化不置这个标记，避免把用户滚动清掉。
+        private bool centreOnSelection;
+
+        private void invalidateSelection(bool centre)
+        {
+            selectionValid.Invalidate();
+
+            if (centre)
+                centreOnSelection = true;
+        }
+
         private Selection currentKeyboardSelection = new Selection();
         private Selection currentSelection = new Selection();
 
         private void setKeyboardSelection(object? model)
         {
             currentKeyboardSelection = new Selection(model);
-            selectionValid.Invalidate();
+            invalidateSelection(centre: true);
         }
 
         /// <summary>
@@ -970,9 +981,11 @@ namespace osu.Game.Graphics.Carousel
             {
                 refreshAfterSelection();
 
-                // Always scroll to selection in this case (regardless of `UserScrolling` state), centering the selection.
-                ScrollToSelection();
+                // 选中项变了就滚过去。只有高度变化时留下用户自己滚到的位置。
+                if (centreOnSelection || !Scroll.UserScrolling)
+                    ScrollToSelection();
 
+                centreOnSelection = false;
                 selectionValid.Validate();
             }
 
@@ -1170,13 +1183,13 @@ namespace osu.Game.Graphics.Carousel
         /// <summary>
         /// Force <see cref="refreshAfterSelection"/> so panel Y positions recompute (e.g. spacing policy change).
         /// </summary>
-        protected void InvalidateSelectionLayout() => selectionValid.Invalidate();
+        protected void InvalidateSelectionLayout() => invalidateSelection(centre: false);
 
         protected override bool OnInvalidate(Invalidation invalidation, InvalidationSource source)
         {
             // handles the vertical size of the carousel changing (ie. on window resize when aspect ratio has changed).
             if (invalidation.HasFlag(Invalidation.DrawSize))
-                selectionValid.Invalidate();
+                invalidateSelection(centre: false);
 
             return base.OnInvalidate(invalidation, source);
         }

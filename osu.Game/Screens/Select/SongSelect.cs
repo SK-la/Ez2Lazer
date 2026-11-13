@@ -1140,15 +1140,13 @@ namespace osu.Game.Screens.Select
 
                 // [Ez] Only while acrylic UI is on: apply gameplay DimLevel / BlurLevel.
                 // Off = official IgnoreUserSettings path (fixed 0.1 dim; SongSelectBackgroundBlur only).
+                // 关掉用户变暗后仍回到选歌的 0.1。亚克力开着时选歌本身用用户设置，但这个回退值要留着。
+                backgroundModeBeatmap.DimWhenUserSettingsIgnored.Value = 0.1f;
+
                 if (EzMaterialOverlayAlpha.IsEnabled(materialUiMode.Value))
-                {
                     backgroundModeBeatmap.IgnoreUserSettings.Value = false;
-                }
                 else
-                {
                     backgroundModeBeatmap.IgnoreUserSettings.Value = true;
-                    backgroundModeBeatmap.DimWhenUserSettingsIgnored.Value = 0.1f;
-                }
 
                 // Required to undo results screen dimming the background.
                 // Probably needs more thought because this needs to be in every `ApplyToBackground` currently to restore sane defaults.
