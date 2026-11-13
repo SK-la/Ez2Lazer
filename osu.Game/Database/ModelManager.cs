@@ -36,7 +36,11 @@ namespace osu.Game.Database
         }
 
         public void DeleteFile(TModel item, RealmNamedFileUsage file) =>
-            performFileOperation(item, managed => DeleteFile(managed, managed.Files.First(f => f.Filename == file.Filename), managed.Realm!));
+            performFileOperation(item, managed =>
+            {
+                foreach (var match in managed.GetFiles(file.Filename).ToList())
+                    DeleteFile(managed, match, managed.Realm!);
+            });
 
         public void ReplaceFile(TModel item, RealmNamedFileUsage file, Stream contents) =>
             performFileOperation(item, managed => ReplaceFile(file, contents, managed.Realm!));
@@ -92,11 +96,15 @@ namespace osu.Game.Database
             if (FilesystemSanityCheckHelpers.IncursPathTraversalRisk(filename))
                 throw new InvalidOperationException($@"Filename ""{filename}"" is not allowed.");
 
-            var existing = item.GetFile(filename);
+            var existingMatches = item.GetFiles(filename).ToList();
 
-            if (existing != null)
+            if (existingMatches.Count > 0)
             {
-                ReplaceFile(existing, contents, realm);
+                ReplaceFile(existingMatches[0], contents, realm);
+
+                foreach (var duplicate in existingMatches.Skip(1))
+                    item.Files.Remove(duplicate);
+
                 return;
             }
 
