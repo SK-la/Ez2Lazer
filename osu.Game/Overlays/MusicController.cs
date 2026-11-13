@@ -85,8 +85,8 @@ namespace osu.Game.Overlays
 
         private readonly Bindable<RandomSelectAlgorithm> randomSelectAlgorithm = new Bindable<RandomSelectAlgorithm>();
 
-        private readonly LinkedList<Live<BeatmapSetInfo>> randomHistory = new LinkedList<Live<BeatmapSetInfo>>();
-        private LinkedListNode<Live<BeatmapSetInfo>>? currentRandomHistoryPosition;
+        private readonly LinkedList<Guid> randomHistory = new LinkedList<Guid>();
+        private LinkedListNode<Guid>? currentRandomHistoryPosition;
 
         [BackgroundDependencyLoader]
         private void load(AudioManager audio, OsuConfigManager configManager)
@@ -294,19 +294,13 @@ namespace osu.Game.Overlays
 
             queuedDirection = TrackChangeDirection.Prev;
 
-            Live<BeatmapSetInfo>? playableSet;
+            BeatmapInfo? playableBeatmap = LoopMode.Value == MusicLoopMode.Shuffle
+                ? getNextRandom(-1, allowProtectedTracks)
+                : getAdjacentPlayableBeatmap(previous: true, allowProtectedTracks);
 
-            if (LoopMode.Value == MusicLoopMode.Shuffle)
-                playableSet = getNextRandom(-1, allowProtectedTracks);
-            else
+            if (playableBeatmap != null)
             {
-                playableSet = getBeatmapSets(allowProtectedTracks).TakeWhile(i => !i.Value.Equals(current?.BeatmapSetInfo)).LastOrDefault()
-                              ?? getBeatmapSets(allowProtectedTracks).LastOrDefault();
-            }
-
-            if (playableSet != null)
-            {
-                changeBeatmap(beatmaps.GetWorkingBeatmap(playableSet.Value.Beatmaps.First()));
+                changeBeatmap(beatmaps.GetWorkingBeatmap(playableBeatmap));
                 restartTrack();
                 return PreviousTrackResult.Previous;
             }
@@ -390,17 +384,9 @@ namespace osu.Game.Overlays
 
             queuedDirection = TrackChangeDirection.Next;
 
-            Live<BeatmapSetInfo>? playableSet;
-
-            if (LoopMode.Value == MusicLoopMode.Shuffle)
-                playableSet = getNextRandom(1, allowProtectedTracks);
-            else
-            {
-                playableSet = getBeatmapSets(allowProtectedTracks).SkipWhile(i => !i.Value.Equals(current?.BeatmapSetInfo)).ElementAtOrDefault(1)
-                              ?? getBeatmapSets(allowProtectedTracks).FirstOrDefault();
-            }
-
-            var playableBeatmap = playableSet?.Value.Beatmaps.FirstOrDefault();
+            BeatmapInfo? playableBeatmap = LoopMode.Value == MusicLoopMode.Shuffle
+                ? getNextRandom(1, allowProtectedTracks)
+                : getAdjacentPlayableBeatmap(previous: false, allowProtectedTracks);
 
             if (playableBeatmap != null)
             {
@@ -412,11 +398,11 @@ namespace osu.Game.Overlays
             return false;
         }
 
-        private Live<BeatmapSetInfo>? getNextRandom(int direction, bool allowProtectedTracks)
+        private BeatmapInfo? getNextRandom(int direction, bool allowProtectedTracks)
         {
-            Live<BeatmapSetInfo> result;
+            BeatmapSetInfo result;
 
-            var possibleSets = getBeatmapSets(allowProtectedTracks).ToList();
+            var possibleSets = getPlayableSets(allowProtectedTracks).ToList();
 
             if (possibleSets.Count == 0)
                 return null;
@@ -424,23 +410,23 @@ namespace osu.Game.Overlays
             // if there is only one possible set left, play it, even if it is the same as the current track.
             // looping is preferable over playing nothing.
             if (possibleSets.Count == 1)
-                return possibleSets.Single();
+                return firstBeatmap(possibleSets[0]);
 
             // now that we actually know there is a choice, do not allow the current track to be played again.
-            possibleSets.RemoveAll(s => s.Value.Equals(current?.BeatmapSetInfo));
+            possibleSets.RemoveAll(s => s.Equals(current?.BeatmapSetInfo));
 
             if (currentRandomHistoryPosition != null)
             {
                 if (direction < 0 && currentRandomHistoryPosition.Previous != null)
                 {
                     currentRandomHistoryPosition = currentRandomHistoryPosition.Previous;
-                    return currentRandomHistoryPosition.Value;
+                    return beatmapFromSetId(currentRandomHistoryPosition.Value);
                 }
 
                 if (direction > 0 && currentRandomHistoryPosition.Next != null)
                 {
                     currentRandomHistoryPosition = currentRandomHistoryPosition.Next;
-                    return currentRandomHistoryPosition.Value;
+                    return beatmapFromSetId(currentRandomHistoryPosition.Value);
                 }
             }
 
@@ -454,11 +440,12 @@ namespace osu.Game.Overlays
                     break;
 
                 case RandomSelectAlgorithm.RandomPermutation:
-                    var notYetPlayedSets = possibleSets.Except(randomHistory).ToList();
+                    var historyIds = randomHistory.ToHashSet();
+                    var notYetPlayedSets = possibleSets.Where(s => !historyIds.Contains(s.ID)).ToList();
 
                     if (notYetPlayedSets.Count == 0)
                     {
-                        possibleSets.RemoveAll(s => s.Value.Equals(current?.BeatmapSetInfo));
+                        possibleSets.RemoveAll(s => s.Equals(current?.BeatmapSetInfo));
                         notYetPlayedSets = possibleSets;
                         randomHistory.Clear();
                     }
@@ -473,16 +460,16 @@ namespace osu.Game.Overlays
                     // we have `randomHistory.First == randomHistory.Last` (either `null` if no items, or the single item).
                     // the assert above should make that safe to depend on.
                     if (direction > 0)
-                        currentRandomHistoryPosition = randomHistory.AddLast(result);
+                        currentRandomHistoryPosition = randomHistory.AddLast(result.ID);
                     else if (direction < 0)
-                        currentRandomHistoryPosition = randomHistory.AddFirst(result);
+                        currentRandomHistoryPosition = randomHistory.AddFirst(result.ID);
                     break;
 
                 default:
                     throw new ArgumentOutOfRangeException(nameof(randomSelectAlgorithm), randomSelectAlgorithm.Value, "Unsupported random select algorithm");
             }
 
-            return result;
+            return firstBeatmap(result);
         }
 
         private void restartTrack()
@@ -496,13 +483,55 @@ namespace osu.Game.Overlays
 
         private TrackChangeDirection? queuedDirection;
 
-        private IEnumerable<Live<BeatmapSetInfo>> getBeatmapSets(bool allowProtectedTracks) =>
-            realm.Realm.All<BeatmapSetInfo>().Where(s => !s.DeletePending)
-                 .AsEnumerable()
-                 .Select(s => new RealmLive<BeatmapSetInfo>(s, realm))
-                 .Where(i => i.Value.HostingKind != BeatmapSetHostingKind.External
-                             && (allowProtectedTracks || !i.Value.Protected)
-                             && (SeasonalUIConfig.ENABLED || i.Value.Hash != IntroChristmas.CHRISTMAS_BEATMAP_SET_HASH));
+        private IEnumerable<BeatmapSetInfo> getPlayableSets(bool allowProtectedTracks)
+        {
+            foreach (var s in realm.Realm.All<BeatmapSetInfo>().Where(s => !s.DeletePending))
+            {
+                if (s.HostingKind == BeatmapSetHostingKind.External)
+                    continue;
+                if (!allowProtectedTracks && s.Protected)
+                    continue;
+                if (!SeasonalUIConfig.ENABLED && s.Hash == IntroChristmas.CHRISTMAS_BEATMAP_SET_HASH)
+                    continue;
+
+                yield return s;
+            }
+        }
+
+        private BeatmapInfo? getAdjacentPlayableBeatmap(bool previous, bool allowProtectedTracks)
+        {
+            BeatmapSetInfo? previousSet = null;
+            BeatmapSetInfo? first = null;
+            BeatmapSetInfo? last = null;
+            BeatmapSetInfo? afterCurrent = null;
+            bool seenCurrent = false;
+
+            foreach (var set in getPlayableSets(allowProtectedTracks))
+            {
+                first ??= set;
+                last = set;
+
+                if (set.Equals(current?.BeatmapSetInfo))
+                {
+                    seenCurrent = true;
+                    continue;
+                }
+
+                if (!seenCurrent)
+                    previousSet = set;
+                else if (afterCurrent == null)
+                    afterCurrent = set;
+            }
+
+            if (previous)
+                return firstBeatmap(previousSet ?? last);
+
+            return firstBeatmap(afterCurrent ?? first);
+        }
+
+        private static BeatmapInfo? firstBeatmap(BeatmapSetInfo? set) => set?.Beatmaps.FirstOrDefault();
+
+        private BeatmapInfo? beatmapFromSetId(Guid id) => firstBeatmap(realm.Realm.Find<BeatmapSetInfo>(id));
 
         private void changeBeatmap(WorkingBeatmap newWorking)
         {
@@ -528,11 +557,26 @@ namespace osu.Game.Overlays
                 }
                 else
                 {
-                    // figure out the best direction based on order in playlist.
-                    int last = getBeatmapSets(allowProtectedTracks: false).TakeWhile(b => !b.Value.Equals(current.BeatmapSetInfo)).Count();
-                    int next = getBeatmapSets(allowProtectedTracks: false).TakeWhile(b => !b.Value.Equals(newWorking.BeatmapSetInfo)).Count();
+                    Guid lastId = current.BeatmapSetInfo.ID;
+                    Guid nextId = newWorking.BeatmapSetInfo.ID;
+                    int lastIndex = -1;
+                    int nextIndex = -1;
+                    int i = 0;
 
-                    direction = last > next ? TrackChangeDirection.Prev : TrackChangeDirection.Next;
+                    foreach (var set in getPlayableSets(allowProtectedTracks: false))
+                    {
+                        if (set.ID == lastId)
+                            lastIndex = i;
+                        if (set.ID == nextId)
+                            nextIndex = i;
+
+                        if (lastIndex >= 0 && nextIndex >= 0)
+                            break;
+
+                        i++;
+                    }
+
+                    direction = lastIndex > nextIndex ? TrackChangeDirection.Prev : TrackChangeDirection.Next;
                 }
             }
 

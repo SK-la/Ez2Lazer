@@ -700,31 +700,41 @@ namespace osu.Game.Beatmaps
             {
                 if (refetch)
                     workingBeatmapCache.Invalidate(beatmapInfo);
+                else if (workingBeatmapCache.FindCached(beatmapInfo) is WorkingBeatmap cached)
+                    return cached;
 
                 // Detached beatmapsets don't come with files as an optimisation (see `RealmObjectExtensions.beatmap_set_mapper`).
-                // If we seem to be missing files, now is a good time to re-fetch.
                 bool missingFiles = beatmapInfo.BeatmapSet?.Files.Count == 0;
-                bool missingExternalHosting = beatmapInfo.BeatmapSet != null
-                                              && (beatmapInfo.BeatmapSet.IsExternallyHosted
-                                                  || ExternalBeatmapPathEncoding.IsExternalSetHash(beatmapInfo.BeatmapSet.Hash))
-                                              && (string.IsNullOrWhiteSpace(beatmapInfo.BeatmapSet.ExternalContentRoot)
-                                                  || missingFiles
-                                                  || !ExternalBeatmapPathEncoding.TryResolveContentRoot(beatmapInfo.BeatmapSet, out _));
+                bool missingExternalHosting = isMissingExternalHosting(beatmapInfo, missingFiles);
 
                 if (beatmapInfo.IsManaged)
                 {
                     beatmapInfo = beatmapInfo.Detach();
                 }
-                else if (refetch || missingFiles || missingExternalHosting)
+                else if (refetch)
                 {
                     Guid id = beatmapInfo.ID;
                     beatmapInfo = Realm.Run(r => r.Find<BeatmapInfo>(id)?.Detach()) ?? beatmapInfo;
+                }
+                else if ((missingFiles || missingExternalHosting) && beatmapInfo.BeatmapSet != null)
+                {
+                    WorkingBeatmapCache.RefreshDetachedSetFromRealm(beatmapInfo.BeatmapSet, Realm);
                 }
 
                 Debug.Assert(beatmapInfo.IsManaged != true);
             }
 
             return workingBeatmapCache.GetWorkingBeatmap(beatmapInfo);
+        }
+
+        private static bool isMissingExternalHosting(BeatmapInfo beatmapInfo, bool missingFiles)
+        {
+            return beatmapInfo.BeatmapSet != null
+                   && (beatmapInfo.BeatmapSet.IsExternallyHosted
+                       || ExternalBeatmapPathEncoding.IsExternalSetHash(beatmapInfo.BeatmapSet.Hash))
+                   && (string.IsNullOrWhiteSpace(beatmapInfo.BeatmapSet.ExternalContentRoot)
+                       || missingFiles
+                       || !ExternalBeatmapPathEncoding.TryResolveContentRoot(beatmapInfo.BeatmapSet, out _));
         }
 
         WorkingBeatmap IWorkingBeatmapCache.GetWorkingBeatmap(BeatmapInfo beatmapInfo) => GetWorkingBeatmap(beatmapInfo);
