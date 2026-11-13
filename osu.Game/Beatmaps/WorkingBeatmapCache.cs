@@ -119,7 +119,12 @@ namespace osu.Game.Beatmaps
                 if (beatmapSet.Files.Count == 0 && freshSet.Files.Count > 0)
                 {
                     foreach (var file in freshSet.Files)
+                    {
+                        if (beatmapSet.GetFile(file.Filename) != null)
+                            continue;
+
                         beatmapSet.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = file.File.Hash }, file.Filename));
+                    }
                 }
             });
         }

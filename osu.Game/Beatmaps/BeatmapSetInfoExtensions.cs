@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Database;
 using osu.Game.Extensions;
@@ -23,14 +24,23 @@ namespace osu.Game.Beatmaps
         public static string? GetPathForFile(this IHasRealmFiles model, string filename) => model.GetFile(filename)?.File.GetStoragePath();
 
         /// <summary>
+        /// Returns all file usages in this model with the given filename.
+        /// The lookup is case insensitive.
+        /// </summary>
+        /// <param name="model">The model to operate on.</param>
+        /// <param name="filename">The name of the file to match.</param>
+        public static IEnumerable<RealmNamedFileUsage> GetFiles(this IHasRealmFiles model, string filename) =>
+            model.Files.Where(f => string.Equals(f.Filename, filename, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>
         /// Returns the file usage for the file in this beatmapset with the given filename, if any exists, otherwise null.
-        /// The path returned is relative to the user file storage.
+        /// If multiple entries match, the first is returned.
         /// The lookup is case insensitive.
         /// </summary>
         /// <param name="model">The model to operate on.</param>
         /// <param name="filename">The name of the file to get the storage path of.</param>
         public static RealmNamedFileUsage? GetFile(this IHasRealmFiles model, string filename) =>
-            model.Files.SingleOrDefault(f => string.Equals(f.Filename, filename, StringComparison.OrdinalIgnoreCase));
+            model.GetFiles(filename).FirstOrDefault();
 
         /// <summary>
         /// Get the beatmapset info page URL, or <c>null</c> if unavailable.
