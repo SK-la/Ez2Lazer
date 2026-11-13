@@ -146,8 +146,13 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 Drawable instance = (Drawable)Activator.CreateInstance(type)!;
 
                 if (!((ISerialisableDrawable)instance).CanBeSelected)
+                {
+                    instance.Dispose();
                     return;
+                }
 
+                // The probe instance is handed to the card and only enters the tree once the card is shown,
+                // so creating the entry does not decode anything.
                 list.Add(new ComponentPlaceButton(type, instance, hudLayer?.ActiveTarget)
                 {
                     Action = () => place(type),
@@ -181,35 +186,41 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         protected override void Dispose(bool isDisposing)
         {
-            base.Dispose(isDisposing);
-
-            if (!IsLoaded)
-                return;
-
-            if (hudLayer != null)
+            if (isDisposing && hudLayer != null)
                 hudLayer.ActiveTargetChanged -= rebuild;
+
+            base.Dispose(isDisposing);
         }
 
         /// <summary>
         /// Library entry: a live instance of the component (scaled to fit a thumbnail), its type name,
         /// and a click handler that places it into the active layer.
         /// </summary>
+        /// <remarks>
+        /// The preview is a live component, so it is only materialised while the card is on screen and is
+        /// disposed once the card scrolls away or the group folds. Otherwise every available component would
+        /// stay loaded (with its textures and update loops) for the whole editor session.
+        /// </remarks>
         private partial class ComponentPlaceButton : EzButton
         {
             private const float thumbnail_height = 72;
 
-            private readonly Drawable component;
+            // Shorter than the framework default so a scrolling user sees the preview almost immediately.
+            private const double time_before_load = 200;
 
-            private readonly Container previewContainer;
+            // Long enough that scrolling back and forth does not rebuild the preview each time.
+            private const double time_before_unload = 2000;
 
-            public ComponentPlaceButton(Type type, Drawable component, CompositeDrawable? dependencySource)
+            private Drawable? probePreview;
+
+            public ComponentPlaceButton(Type type, Drawable probePreview, CompositeDrawable? dependencySource)
             {
-                this.component = component;
+                this.probePreview = probePreview;
 
                 RelativeSizeAxes = Axes.X;
                 Height = thumbnail_height + 24;
 
-                previewContainer = new Container
+                Add(new Container
                 {
                     RelativeSizeAxes = Axes.X,
                     Height = thumbnail_height,
@@ -217,13 +228,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
                     Origin = Anchor.TopCentre,
                     Masking = true,
                     Padding = new MarginPadding(8),
-                };
-
-                component.Anchor = Anchor.Centre;
-                component.Origin = Anchor.Centre;
-                previewContainer.Add(new DependencyBorrowingContainer(dependencySource) { RelativeSizeAxes = Axes.Both, Child = component });
-
-                Add(previewContainer);
+                    Child = new DelayedLoadUnloadWrapper(() => new PreviewHost(type, dependencySource, takeProbePreview), time_before_load, time_before_unload)
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                    },
+                });
 
                 Add(new OsuSpriteText
                 {
@@ -234,23 +243,82 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 });
             }
 
+            private Drawable? takeProbePreview()
+            {
+                Drawable? preview = probePreview;
+                probePreview = null;
+                return preview;
+            }
+
+            protected override void Dispose(bool isDisposing)
+            {
+                base.Dispose(isDisposing);
+
+                // A card disposed before ever being shown still holds the instance created for the
+                // selection check.
+                if (isDisposing)
+                    probePreview?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Hosts the live component preview and scales it to fit. One instance per materialisation: the
+        /// wrapper disposes it, and with it the component, once the card leaves the screen.
+        /// </summary>
+        private partial class PreviewHost : Container
+        {
+            private readonly Drawable? component;
+
+            public PreviewHost(Type type, CompositeDrawable? dependencySource, Func<Drawable?> takeProbePreview)
+            {
+                RelativeSizeAxes = Axes.Both;
+
+                component = takeProbePreview() ?? createInstance(type);
+
+                if (component == null)
+                    return;
+
+                component.Anchor = Anchor.Centre;
+                component.Origin = Anchor.Centre;
+
+                Child = new DependencyBorrowingContainer(dependencySource)
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Child = component,
+                };
+            }
+
+            private static Drawable? createInstance(Type type)
+            {
+                try
+                {
+                    return (Drawable)Activator.CreateInstance(type)!;
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, $"Ez skin component {type} could not be previewed in the library");
+                    return null;
+                }
+            }
+
             protected override void UpdateAfterChildren()
             {
                 base.UpdateAfterChildren();
 
+                if (component == null)
+                    return;
+
                 // A component with a zero-size axis (not yet laid out, or scrolled out of view and
                 // culled) would otherwise divide to infinity. Guard every axis, not just the vector.
-                if (!float.IsFinite(previewContainer.DrawWidth) || !float.IsFinite(previewContainer.DrawHeight)
+                if (!float.IsFinite(DrawWidth) || !float.IsFinite(DrawHeight)
                     || !float.IsFinite(component.DrawWidth) || !float.IsFinite(component.DrawHeight)
-                    || component.DrawWidth <= 0 || component.DrawHeight <= 0
-                    || previewContainer.DrawWidth <= 0 || previewContainer.DrawHeight <= 0)
+                    || DrawWidth <= 0 || DrawHeight <= 0
+                    || component.DrawWidth <= 0 || component.DrawHeight <= 0)
                 {
                     return;
                 }
 
-                float bestScale = Math.Min(
-                    previewContainer.DrawWidth / component.DrawWidth,
-                    previewContainer.DrawHeight / component.DrawHeight);
+                float bestScale = Math.Min(DrawWidth / component.DrawWidth, DrawHeight / component.DrawHeight);
 
                 if (float.IsFinite(bestScale) && bestScale > 0)
                     component.Scale = new Vector2(bestScale);
