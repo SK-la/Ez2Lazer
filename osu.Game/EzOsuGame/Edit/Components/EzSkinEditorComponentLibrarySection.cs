@@ -267,25 +267,50 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// </summary>
         private partial class PreviewHost : Container
         {
-            private readonly Drawable? component;
+            private Drawable? component;
+
+            private readonly CompositeDrawable? dependencySource;
 
             public PreviewHost(Type type, CompositeDrawable? dependencySource, Func<Drawable?> takeProbePreview)
             {
                 RelativeSizeAxes = Axes.Both;
 
+                this.dependencySource = dependencySource;
                 component = takeProbePreview() ?? createInstance(type);
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
 
                 if (component == null)
                     return;
 
-                component.Anchor = Anchor.Centre;
-                component.Origin = Anchor.Centre;
-
-                Child = new DependencyBorrowingContainer(dependencySource)
+                // Load on the update thread and swallow the failure. DelayedLoadUnloadWrapper reports an
+                // uncaught load exception as a process crash, which is how a results or gameplay component
+                // (no score / health processor in this scene) used to take the editor down on open.
+                try
                 {
-                    RelativeSizeAxes = Axes.Both,
-                    Child = component,
-                };
+                    component.Anchor = Anchor.Centre;
+                    component.Origin = Anchor.Centre;
+
+                    Child = new DependencyBorrowingContainer(dependencySource)
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Child = component,
+                    };
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Ez skin component {component.GetType().Name} is not available in this editor scene ({e.GetType().Name}).");
+
+                    if (component.Parent != null)
+                        Clear(false);
+                    else
+                        component.Dispose();
+
+                    component = null;
+                }
             }
 
             private static Drawable? createInstance(Type type)

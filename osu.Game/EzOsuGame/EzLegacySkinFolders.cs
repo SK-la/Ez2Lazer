@@ -31,9 +31,7 @@ namespace osu.Game.EzOsuGame
 
         private static readonly string legacy_instantiation = typeof(LegacySkin).GetInvariantInstantiationInfo();
 
-        private static string? root;
-
-        public static string? RootDirectory => root;
+        public static string? RootDirectory { get; private set; }
 
         public static bool IsMigrationFinished
         {
@@ -41,7 +39,7 @@ namespace osu.Game.EzOsuGame
             {
                 try
                 {
-                    return root != null && File.Exists(Path.Combine(root, migration_marker));
+                    return RootDirectory != null && File.Exists(Path.Combine(RootDirectory, migration_marker));
                 }
                 catch (Exception e)
                 {
@@ -55,8 +53,8 @@ namespace osu.Game.EzOsuGame
         {
             try
             {
-                root = storage.GetFullPath(EzModifyPath.LEGACY_SKIN_PATH);
-                Directory.CreateDirectory(root);
+                RootDirectory = storage.GetFullPath(EzModifyPath.LEGACY_SKIN_PATH);
+                Directory.CreateDirectory(RootDirectory);
             }
             catch (Exception e)
             {
@@ -70,10 +68,10 @@ namespace osu.Game.EzOsuGame
 
             try
             {
-                if (root == null || string.IsNullOrEmpty(skin.Hash) || skin.InstantiationInfo != legacy_instantiation)
+                if (RootDirectory == null || string.IsNullOrEmpty(skin.Hash) || skin.InstantiationInfo != legacy_instantiation)
                     return false;
 
-                string candidate = Path.Combine(root, skin.Hash);
+                string candidate = Path.Combine(RootDirectory, skin.Hash);
 
                 if (!Directory.Exists(candidate))
                     return false;
@@ -92,10 +90,10 @@ namespace osu.Game.EzOsuGame
         {
             try
             {
-                if (root == null || !Directory.Exists(root))
+                if (RootDirectory == null || !Directory.Exists(RootDirectory))
                     return false;
 
-                return Directory.EnumerateDirectories(root).Any();
+                return Directory.EnumerateDirectories(RootDirectory).Any();
             }
             catch (Exception e)
             {
@@ -108,17 +106,17 @@ namespace osu.Game.EzOsuGame
         {
             var skins = new List<SkinInfo>();
 
-            if (root == null)
+            if (RootDirectory == null)
                 return skins;
 
             IEnumerable<string> directories;
 
             try
             {
-                if (!Directory.Exists(root))
+                if (!Directory.Exists(RootDirectory))
                     return skins;
 
-                directories = Directory.EnumerateDirectories(root);
+                directories = Directory.EnumerateDirectories(RootDirectory);
             }
             catch (Exception e)
             {
@@ -172,30 +170,32 @@ namespace osu.Game.EzOsuGame
         {
             BindRoot(storage);
 
-            if (root == null)
+            if (RootDirectory == null)
                 throw new IOException($"无法创建 {EzModifyPath.LEGACY_SKIN_PATH}。");
 
             string folderName = nextFolderName(sanitize(Path.GetFileNameWithoutExtension(archive.Name ?? "skin")));
-            string directory = Path.Combine(root!, folderName);
+            string directory = Path.Combine(RootDirectory, folderName);
             Directory.CreateDirectory(directory);
 
             try
             {
+                var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var renames = new List<(string from, string to)>();
+
                 foreach ((string original, string shortened) in files)
                 {
                     if (FilesystemSanityCheckHelpers.IncursPathTraversalRisk(shortened))
                         throw new InvalidOperationException($@"Filename ""{original}"" is not allowed.");
 
-                    string destination = Path.Combine(directory, shortened.Replace('/', Path.DirectorySeparatorChar));
-                    string? parent = Path.GetDirectoryName(destination);
-
-                    if (!string.IsNullOrEmpty(parent))
-                        Directory.CreateDirectory(parent);
-
-                    using (Stream input = archive.GetStream(original))
-                    using (FileStream output = File.Create(destination))
+                    tryWriteRelativeFile(directory, folderName, shortened, used, renames, destination =>
+                    {
+                        using Stream input = archive.GetStream(original);
+                        using FileStream output = File.Create(destination);
                         input.CopyTo(output);
+                    });
                 }
+
+                rewriteRenamedReferences(directory, renames);
             }
             catch
             {
@@ -267,7 +267,7 @@ namespace osu.Game.EzOsuGame
             {
                 try
                 {
-                    Directory.Move(directory, Path.Combine(root!, renamed));
+                    Directory.Move(directory, Path.Combine(RootDirectory!, renamed));
                 }
                 catch (Exception e)
                 {
@@ -310,7 +310,7 @@ namespace osu.Game.EzOsuGame
             {
                 BindRoot(storage);
 
-                if (root == null)
+                if (RootDirectory == null)
                     return false;
 
                 if (IsMigrationFinished)
@@ -372,10 +372,10 @@ namespace osu.Game.EzOsuGame
                 });
             }
 
-            if (!writeMarker || root == null)
+            if (!writeMarker || RootDirectory == null)
                 return;
 
-            File.WriteAllText(Path.Combine(root, migration_marker), "1");
+            File.WriteAllText(Path.Combine(RootDirectory, migration_marker), "1");
         }
 
         private static List<MigrationSource> collectSources(Realms.Realm realm)
@@ -391,15 +391,12 @@ namespace osu.Game.EzOsuGame
                 {
                     var files = new List<(string Filename, string StoragePath)>();
 
-                    if (skin.Files != null)
+                    foreach (var file in skin.Files)
                     {
-                        foreach (var file in skin.Files)
-                        {
-                            if (file?.File == null || string.IsNullOrEmpty(file.Filename))
-                                continue;
+                        if (string.IsNullOrEmpty(file.Filename))
+                            continue;
 
-                            files.Add((file.Filename, file.File.GetStoragePath()));
-                        }
+                        files.Add((file.Filename, file.File.GetStoragePath()));
                     }
 
                     sources.Add(new MigrationSource(skin.ID, skin.Name, skin.Creator, files));
@@ -419,25 +416,24 @@ namespace osu.Game.EzOsuGame
                 return;
 
             string folderName = nextFolderName(sanitize(string.IsNullOrWhiteSpace(source.Name) ? "skin" : source.Name));
-            string directory = Path.Combine(root!, folderName);
+            string directory = Path.Combine(RootDirectory!, folderName);
             Directory.CreateDirectory(directory);
 
             try
             {
+                var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var renames = new List<(string from, string to)>();
+
                 foreach ((string filename, string storagePath) in source.Files)
                 {
                     if (FilesystemSanityCheckHelpers.IncursPathTraversalRisk(filename))
                         throw new InvalidOperationException($@"Filename ""{filename}"" is not allowed.");
 
                     string sourcePath = Path.Combine(filesRoot, storagePath);
-                    string destination = Path.Combine(directory, filename.Replace('/', Path.DirectorySeparatorChar));
-                    string? parent = Path.GetDirectoryName(destination);
-
-                    if (!string.IsNullOrEmpty(parent))
-                        Directory.CreateDirectory(parent);
-
-                    File.Copy(sourcePath, destination, true);
+                    tryWriteRelativeFile(directory, folderName, filename, used, renames, destination => File.Copy(sourcePath, destination, true));
                 }
+
+                rewriteRenamedReferences(directory, renames);
 
                 writeMeta(directory, new FolderMeta
                 {
@@ -496,10 +492,10 @@ namespace osu.Game.EzOsuGame
 
         private static string? findDirectoryById(Guid id)
         {
-            if (root == null || !Directory.Exists(root))
+            if (RootDirectory == null || !Directory.Exists(RootDirectory))
                 return null;
 
-            foreach (string directory in Directory.EnumerateDirectories(root))
+            foreach (string directory in Directory.EnumerateDirectories(RootDirectory))
             {
                 if (readMeta(directory)?.ID == id)
                     return directory;
@@ -524,7 +520,242 @@ namespace osu.Game.EzOsuGame
 
         private static bool isFree(string folderName, string? keep) =>
             string.Equals(folderName, keep, StringComparison.OrdinalIgnoreCase)
-            || !Directory.Exists(Path.Combine(root!, folderName));
+            || !Directory.Exists(Path.Combine(RootDirectory!, folderName));
+
+        private static readonly HashSet<string> reserved_names = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "CON", "PRN", "AUX", "NUL",
+            "COM0", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+            "LPT0", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        };
+
+        private static void tryWriteRelativeFile(string directory, string skinName, string relativeName, HashSet<string> used, List<(string from, string to)> renames, Action<string> write)
+        {
+            string normalized = normalizeRelative(relativeName);
+            string writable = writableRelative(normalized);
+            string destination = Path.Combine(directory, writable.Replace('/', Path.DirectorySeparatorChar));
+
+            if (!used.Add(destination))
+            {
+                string? folder = Path.GetDirectoryName(destination);
+                string stem = Path.GetFileNameWithoutExtension(destination);
+                string ext = Path.GetExtension(destination);
+                string relativeDir = writable.Contains('/') ? writable[..writable.LastIndexOf('/')] : string.Empty;
+
+                for (int i = 2; ; i++)
+                {
+                    string file = $"{stem}_{i}{ext}";
+                    destination = string.IsNullOrEmpty(folder) ? file : Path.Combine(folder, file);
+
+                    if (!used.Add(destination))
+                        continue;
+
+                    writable = string.IsNullOrEmpty(relativeDir) ? file : relativeDir + "/" + file;
+                    break;
+                }
+            }
+
+            try
+            {
+                string? parent = Path.GetDirectoryName(destination);
+
+                if (!string.IsNullOrEmpty(parent))
+                    Directory.CreateDirectory(parent);
+
+                write(destination);
+
+                if (!string.Equals(normalized, writable, StringComparison.Ordinal))
+                {
+                    Logger.Log($"传统皮肤「{skinName}」的「{normalized}」已改名为「{writable}」。", LoggingTarget.Database, LogLevel.Important);
+                    rememberRename(renames, normalized, writable);
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Log($"传统皮肤「{skinName}」的「{normalized}」写入失败：{e.Message}", LoggingTarget.Database, LogLevel.Error);
+            }
+        }
+
+        private static string normalizeRelative(string relativeName)
+        {
+            var parts = new List<string>();
+
+            foreach (string segment in relativeName.Split('/', '\\'))
+            {
+                if (segment.Length > 0)
+                    parts.Add(segment);
+            }
+
+            return parts.Count == 0 ? "skin" : string.Join("/", parts);
+        }
+
+        private static string writableRelative(string normalized)
+        {
+            var parts = new List<string>();
+
+            foreach (string segment in normalized.Split('/'))
+                parts.Add(sanitizeSegment(segment));
+
+            return string.Join("/", parts);
+        }
+
+        private static readonly string[] reference_extensions = { ".ini", ".json", ".txt", ".cfg" };
+
+        private static void rememberRename(List<(string from, string to)> renames, string from, string to)
+        {
+            renames.Add((from, to));
+
+            string[] fromParts = from.Split('/');
+            string[] toParts = to.Split('/');
+            int count = Math.Min(fromParts.Length, toParts.Length);
+
+            for (int i = 0; i < count; i++)
+            {
+                if (string.Equals(fromParts[i], toParts[i], StringComparison.Ordinal))
+                    continue;
+
+                string prefixFrom = string.Join("/", fromParts.Take(i + 1));
+                string prefixTo = string.Join("/", toParts.Take(i + 1));
+
+                if (!renames.Exists(rename => rename.from == prefixFrom))
+                    renames.Add((prefixFrom, prefixTo));
+
+                break;
+            }
+        }
+
+        // ASCII 路径按字节替换，避免把 Shift-JIS 的 skin.ini 整文件重编码。
+        private static void rewriteRenamedReferences(string directory, List<(string from, string to)> renames)
+        {
+            renames.RemoveAll(rename => !isAscii(rename.from) || !isAscii(rename.to));
+
+            if (renames.Count == 0)
+                return;
+
+            renames.Sort((a, b) => b.from.Length.CompareTo(a.from.Length));
+
+            try
+            {
+                foreach (string path in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
+                {
+                    if (!reference_extensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
+                        continue;
+
+                    byte[] data;
+
+                    try
+                    {
+                        data = File.ReadAllBytes(path);
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Log($"无法读取 {path} 以更新文件名：{e.Message}", LoggingTarget.Database, LogLevel.Error);
+                        continue;
+                    }
+
+                    byte[] updated = data;
+
+                    foreach ((string from, string to) in renames)
+                    {
+                        updated = replaceAscii(updated, from, to);
+                        updated = replaceAscii(updated, from.Replace('/', '\\'), to.Replace('/', '\\'));
+                    }
+
+                    if (updated == data)
+                        continue;
+
+                    try
+                    {
+                        File.WriteAllBytes(path, updated);
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Log($"无法写回 {path}：{e.Message}", LoggingTarget.Database, LogLevel.Error);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Log($"更新皮肤内文件名引用失败：{e.Message}", LoggingTarget.Database, LogLevel.Error);
+            }
+        }
+
+        private static bool isAscii(string value)
+        {
+            foreach (char c in value)
+            {
+                if (c > 127)
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static byte[] replaceAscii(byte[] data, string from, string to)
+        {
+            if (string.IsNullOrEmpty(from) || string.Equals(from, to, StringComparison.Ordinal))
+                return data;
+
+            byte[] fromBytes = Encoding.ASCII.GetBytes(from);
+            byte[] toBytes = Encoding.ASCII.GetBytes(to);
+
+            if (fromBytes.Length == 0 || fromBytes.Length > data.Length)
+                return data;
+
+            bool found = false;
+
+            for (int i = 0; i <= data.Length - fromBytes.Length; i++)
+            {
+                if (!matchesAt(data, i, fromBytes))
+                    continue;
+
+                found = true;
+                break;
+            }
+
+            if (!found)
+                return data;
+
+            var output = new List<byte>(data.Length);
+
+            for (int i = 0; i < data.Length;)
+            {
+                if (i <= data.Length - fromBytes.Length && matchesAt(data, i, fromBytes))
+                {
+                    output.AddRange(toBytes);
+                    i += fromBytes.Length;
+                }
+                else
+                {
+                    output.Add(data[i]);
+                    i++;
+                }
+            }
+
+            return output.ToArray();
+        }
+
+        private static bool matchesAt(byte[] data, int index, byte[] needle)
+        {
+            for (int i = 0; i < needle.Length; i++)
+            {
+                if (data[index + i] != needle[i])
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static string sanitizeSegment(string segment)
+        {
+            string name = sanitize(segment);
+            string stem = Path.GetFileNameWithoutExtension(name);
+
+            if (reserved_names.Contains(stem))
+                name = "_" + name;
+
+            return name;
+        }
 
         private static string sanitize(string name)
         {
