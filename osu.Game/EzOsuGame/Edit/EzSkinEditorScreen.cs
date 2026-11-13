@@ -112,6 +112,9 @@ namespace osu.Game.EzOsuGame.Edit
         [Resolved]
         private EzPlaybackController playback { get; set; } = null!;
 
+        [Resolved]
+        private EzLayoutThemeHost layoutThemeHost { get; set; } = null!;
+
         private DependencyContainer dependencies = null!;
         private Container gameplayHole = null!;
         private Drawable? activeSceneHost;
@@ -341,6 +344,11 @@ namespace osu.Game.EzOsuGame.Edit
                                                 CanCut = () => hudLayer.SelectedComponents.Count > 0,
                                                 CanCopy = () => hudLayer.SelectedComponents.Count > 0,
                                                 CanPaste = () => hudLayer.CanPaste,
+                                                ExportLayoutPackAction = exportLayoutPack,
+                                                ImportLayoutPackAction = importLayoutPack,
+                                                ExportCurrentLayoutLayerAction = exportCurrentLayoutLayer,
+                                                ImportCurrentLayoutLayerAction = importCurrentLayoutLayer,
+                                                CanImportExportCurrentLayoutLayer = canImportExportCurrentLayoutLayer,
                                             },
                                             // Ez-only (official menu has skin dropdown alone). Right→left: skin, mode, progress+play.
                                             new FillFlowContainer
@@ -887,6 +895,146 @@ namespace osu.Game.EzOsuGame.Edit
             EzSkinJsonBridge.Apply(EzSkinJsonDocument.Parse(json), ezSkinConfig);
             postNotification(EzEditorStrings.NOTIFY_IMPORTED_FROM_SKIN_TO_MEMORY);
             refreshScene();
+        }
+
+        private bool canImportExportCurrentLayoutLayer() =>
+            EzSkinEditorSceneRegistry.SupportsHudLayer(sceneBar.CurrentScene.Value)
+            && hudLayer.ActiveTarget != null;
+
+        private void exportLayoutPack()
+        {
+            try
+            {
+                var exportStorage = (storage as OsuStorage)?.GetExportStorage() ?? storage.GetStorageForDirectory(@"exports");
+                string path = EzLayoutPackIO.ExportPack(storage, layoutThemeHost.CurrentSetName, exportStorage);
+                postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_EXPORTED_TO, path));
+
+                if (RuntimeInfo.IsDesktop)
+                    host.OpenFileExternally(path + Path.DirectorySeparatorChar);
+            }
+            catch (Exception e)
+            {
+                postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_EXPORT_FAILED, e.Message));
+            }
+        }
+
+        private void importLayoutPack()
+        {
+            if (dialogOverlay == null)
+            {
+                postNotification(EzEditorStrings.NOTIFY_FILE_SELECTOR_NOT_SUPPORTED);
+                return;
+            }
+
+            dialogOverlay.Push(new EzLayoutThemeImportDialog(themeSuffix => beginLayoutPackImport(themeSuffix)));
+        }
+
+        private void beginLayoutPackImport(string themeSuffix)
+        {
+            if (string.IsNullOrWhiteSpace(themeSuffix))
+            {
+                postNotification(EzEditorStrings.NOTIFY_LAYOUT_THEME_NAME_REQUIRED);
+                return;
+            }
+
+            var selector = host.CreateSystemFileSelector(new[] { ".json" });
+
+            if (selector == null)
+            {
+                postNotification(EzEditorStrings.NOTIFY_FILE_SELECTOR_NOT_SUPPORTED);
+                return;
+            }
+
+            selector.Selected += file =>
+            {
+                try
+                {
+                    string? directory = Path.GetDirectoryName(file.FullName);
+
+                    if (string.IsNullOrEmpty(directory))
+                        throw new InvalidOperationException("Missing directory");
+
+                    string setName = EzLayoutPackIO.ImportPackFromDirectory(storage, directory, themeSuffix);
+                    EzLayoutSetCandidates.Refresh(storage);
+                    layoutThemeHost.SelectSet(setName);
+                    postNotification(EzEditorStrings.NOTIFY_LAYOUT_IMPORTED_PACK);
+                }
+                catch (Exception e)
+                {
+                    postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_IMPORT_FAILED, e.Message));
+                }
+                finally
+                {
+                    selector.Dispose();
+                }
+            };
+
+            selector.Present();
+        }
+
+        private void exportCurrentLayoutLayer()
+        {
+            var target = hudLayer.ActiveTarget;
+
+            if (target == null)
+            {
+                postNotification(EzEditorStrings.NOTIFY_LAYOUT_NO_CURRENT_LAYER);
+                return;
+            }
+
+            try
+            {
+                hudLayer.PersistLayoutToCurrentSkin();
+                var exportStorage = (storage as OsuStorage)?.GetExportStorage() ?? storage.GetStorageForDirectory(@"exports");
+                string path = EzLayoutPackIO.ExportLayerJson(storage, layoutThemeHost.Store, target.LayoutFile, exportStorage);
+                postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_EXPORTED_TO, path));
+            }
+            catch (Exception e)
+            {
+                postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_EXPORT_FAILED, e.Message));
+            }
+        }
+
+        private void importCurrentLayoutLayer()
+        {
+            var target = hudLayer.ActiveTarget;
+
+            if (target == null)
+            {
+                postNotification(EzEditorStrings.NOTIFY_LAYOUT_NO_CURRENT_LAYER);
+                return;
+            }
+
+            var selector = host.CreateSystemFileSelector(new[] { ".json" });
+
+            if (selector == null)
+            {
+                postNotification(EzEditorStrings.NOTIFY_FILE_SELECTOR_NOT_SUPPORTED);
+                return;
+            }
+
+            string layoutFile = target.LayoutFile;
+
+            selector.Selected += file =>
+            {
+                try
+                {
+                    EzLayoutPackIO.ImportLayerJson(storage, layoutThemeHost.Store, layoutFile, file.FullName);
+                    target.LoadFromStore();
+                    hudLayer.ChangeHandler?.SaveState();
+                    postNotification(EzEditorStrings.NOTIFY_LAYOUT_IMPORTED_LAYER);
+                }
+                catch (Exception e)
+                {
+                    postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_IMPORT_FAILED, e.Message));
+                }
+                finally
+                {
+                    selector.Dispose();
+                }
+            };
+
+            selector.Present();
         }
 
         private void importJson()

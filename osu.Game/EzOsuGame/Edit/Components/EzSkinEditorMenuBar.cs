@@ -2,13 +2,17 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input;
+using osu.Framework.Localisation;
+using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.SkinEditor;
 using osu.Game.Graphics.UserInterface;
@@ -53,6 +57,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Action? ExportPreviewImageAction { get; set; }
 
+        public Action? ExportLayoutPackAction { get; set; }
+
+        public Action? ImportLayoutPackAction { get; set; }
+
+        public Action? ExportCurrentLayoutLayerAction { get; set; }
+
+        public Action? ImportCurrentLayoutLayerAction { get; set; }
+
         public Action? UndoAction { get; set; }
 
         public Action? RedoAction { get; set; }
@@ -93,6 +105,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Func<bool>? CanUseConfigSnapshot { get; set; }
 
+        public Func<bool>? CanImportExportCurrentLayoutLayer { get; set; }
+
         private readonly EditorMenuItem createConfigSnapshotItem;
         private readonly EditorMenuItem restoreConfigSnapshotItem;
         private readonly EditorMenuItem exportPreviewImageItem;
@@ -111,12 +125,24 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private readonly EditorMenuItem copyItem;
         private readonly EditorMenuItem pasteItem;
         private readonly EditorMenuItem cloneItem;
+        private readonly EditorMenuItem exportLayoutPackItem;
+        private readonly EditorMenuItem importLayoutPackItem;
+        private readonly EditorMenuItem exportCurrentLayoutLayerItem;
+        private readonly EditorMenuItem importCurrentLayoutLayerItem;
 
         private Bindable<bool> hudSnapEnabled = null!;
         private Bindable<float> hudSnapDistance = null!;
         private Bindable<bool> hudSnapPixelFlush = null!;
         private SkinHudSnapDistanceMenuItem? hudSnapDistanceMenuItem;
         private ToggleMenuItem? hudSnapPixelFlushMenuItem;
+
+        private readonly EditorMenuItem layoutThemeSelectMenu;
+
+        [Resolved]
+        private EzLayoutThemeHost layoutThemeHost { get; set; } = null!;
+
+        [Resolved]
+        private Storage storage { get; set; } = null!;
 
         public EzSkinEditorMenuBar()
         {
@@ -150,6 +176,18 @@ namespace osu.Game.EzOsuGame.Edit.Components
                         cloneItem = new EditorMenuItem(CommonStrings.Clone, MenuItemType.Standard, () => CloneAction?.Invoke()) { Hotkey = new Hotkey(GlobalAction.EditorCloneSelection) },
                     },
                 },
+                new MenuItem(EzEditorStrings.MENU_LAYOUT)
+                {
+                    Items = new OsuMenuItem[]
+                    {
+                        layoutThemeSelectMenu = new EditorMenuItem(EzEditorStrings.MENU_LAYOUT_THEME_SELECT),
+                        exportLayoutPackItem = new EditorMenuItem(EzEditorStrings.MENU_LAYOUT_EXPORT_PACK, MenuItemType.Standard, () => ExportLayoutPackAction?.Invoke()),
+                        importLayoutPackItem = new EditorMenuItem(EzEditorStrings.MENU_LAYOUT_IMPORT_PACK, MenuItemType.Standard, () => ImportLayoutPackAction?.Invoke()),
+                        new OsuMenuItemSpacer(),
+                        exportCurrentLayoutLayerItem = new EditorMenuItem(EzEditorStrings.MENU_LAYOUT_EXPORT_LAYER, MenuItemType.Standard, () => ExportCurrentLayoutLayerAction?.Invoke()),
+                        importCurrentLayoutLayerItem = new EditorMenuItem(EzEditorStrings.MENU_LAYOUT_IMPORT_LAYER, MenuItemType.Standard, () => ImportCurrentLayoutLayerAction?.Invoke()),
+                    },
+                },
                 new MenuItem(EzEditorStrings.MENU_CONFIG)
                 {
                     Items = new OsuMenuItem[]
@@ -177,6 +215,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
         {
+            rebuildLayoutThemeSelectMenu();
+
             hudSnapEnabled = ezConfig.GetBindable<bool>(Ez2Setting.SkinEditorHudSnapEnabled);
             hudSnapDistance = ezConfig.GetBindable<float>(Ez2Setting.SkinEditorHudSnapDistance);
             hudSnapPixelFlush = ezConfig.GetBindable<bool>(Ez2Setting.SkinEditorHudSnapPixelFlush);
@@ -217,6 +257,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public void RefreshMenuState()
         {
+            rebuildLayoutThemeSelectMenu();
+
             undoItem.Action.Disabled = !(CanUndo?.Invoke() ?? false);
             redoItem.Action.Disabled = !(CanRedo?.Invoke() ?? false);
             cutItem.Action.Disabled = !(CanCut?.Invoke() ?? false);
@@ -236,6 +278,37 @@ namespace osu.Game.EzOsuGame.Edit.Components
             exportOskItem.Action.Disabled = !(CanExportOsk?.Invoke() ?? false);
             importJsonItem.Action.Disabled = false;
             exportJsonItem.Action.Disabled = false;
+
+            bool canLayer = CanImportExportCurrentLayoutLayer?.Invoke() ?? false;
+            exportCurrentLayoutLayerItem.Action.Disabled = !canLayer;
+            importCurrentLayoutLayerItem.Action.Disabled = !canLayer;
+        }
+
+        private void rebuildLayoutThemeSelectMenu()
+        {
+            string current = layoutThemeHost.CurrentSetName;
+            var items = new List<MenuItem>
+            {
+                new EditorMenuItem(EzEditorStrings.MENU_LAYOUT_THEME_RESCAN, MenuItemType.Standard, () =>
+                {
+                    EzLayoutSetCandidates.Refresh(storage);
+                    rebuildLayoutThemeSelectMenu();
+                }),
+                new OsuMenuItemSpacer(),
+            };
+
+            foreach (string setName in EzLayoutSetCandidates.Items)
+            {
+                string captured = setName;
+                string label = setName;
+
+                if (setName.Equals(current, StringComparison.OrdinalIgnoreCase))
+                    label += " ✓";
+
+                items.Add(new EditorMenuItem(new LocalisableString(label), MenuItemType.Standard, () => layoutThemeHost.SelectSet(captured)));
+            }
+
+            layoutThemeSelectMenu.Items = items.ToArray();
         }
     }
 }

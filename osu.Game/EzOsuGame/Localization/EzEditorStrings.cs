@@ -15,9 +15,9 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SETTINGS_SKIN_EDITOR_BUTTON_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "此编辑器中的HUD均修改Ez布局图层，不会修改皮肤HUD图层"
-            + "\nEz布局存于 EzResources/Config/layout",
+            + "\n主题 HUD 布局存于 EzResources/Config/layout 与 layout-{主题} 文件夹",
             "Editor HUDs in this editor modify the Ez layout layer, not the skin HUD layer"
-            + "\nEz layout is stored in EzResources/Config/layout");
+            + "\nThemed HUD layouts live under EzResources/Config/layout and layout-{theme} folders");
 
         public static readonly LocalisableString LAYOUT_SAVED = new EzLocalizationManager.EzLocalisableString(
             "布局已保存",
@@ -58,6 +58,48 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString MENU_EXPORT_OSK = new EzLocalizationManager.EzLocalisableString("导出 .osk", "Export .osk");
 
         public static readonly LocalisableString MENU_CONFIG = new EzLocalizationManager.EzLocalisableString("配置", "Config");
+
+        public static readonly LocalisableString MENU_LAYOUT = new EzLocalizationManager.EzLocalisableString("布局", "Layout");
+
+        public static readonly LocalisableString MENU_LAYOUT_THEME_SELECT = new EzLocalizationManager.EzLocalisableString(
+            "全局层选择",
+            "Theme pack");
+
+        public static readonly LocalisableString MENU_LAYOUT_EXPORT_PACK = new EzLocalizationManager.EzLocalisableString(
+            "全局层导出",
+            "Export theme pack");
+
+        public static readonly LocalisableString MENU_LAYOUT_IMPORT_PACK = new EzLocalizationManager.EzLocalisableString(
+            "全局层导入",
+            "Import theme pack");
+
+        public static readonly LocalisableString MENU_LAYOUT_EXPORT_LAYER = new EzLocalizationManager.EzLocalisableString(
+            "当前层导出",
+            "Export current layer");
+
+        public static readonly LocalisableString MENU_LAYOUT_IMPORT_LAYER = new EzLocalizationManager.EzLocalisableString(
+            "当前层导入",
+            "Import current layer");
+
+        public static readonly LocalisableString MENU_LAYOUT_THEME_RESCAN = new EzLocalizationManager.EzLocalisableString(
+            "重扫 layout 文件夹",
+            "Rescan layout folders");
+
+        public static readonly LocalisableString LAYOUT_IMPORT_THEME_HEADER = new EzLocalizationManager.EzLocalisableString(
+            "导入全局层",
+            "Import theme pack");
+
+        public static readonly LocalisableString LAYOUT_IMPORT_THEME_BODY = new EzLocalizationManager.EzLocalisableString(
+            "输入主题名（将保存为 layout-主题）。下一步请选择该包内任意一个 JSON 文件以定位文件夹。",
+            "Enter a theme name (saved as layout-{name}). Next, pick any JSON file inside that pack folder.");
+
+        public static readonly LocalisableString LAYOUT_IMPORT_THEME_PLACEHOLDER = new EzLocalizationManager.EzLocalisableString(
+            "主题名",
+            "Theme name");
+
+        public static readonly LocalisableString LAYOUT_IMPORT_THEME_CONFIRM = new EzLocalizationManager.EzLocalisableString(
+            "选择文件夹",
+            "Choose folder");
 
         public static readonly LocalisableString MENU_CREATE_EZSKIN_JSON = new EzLocalizationManager.EzLocalisableString(
             "创建 EzSkin.json",
@@ -192,6 +234,22 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString NOTIFY_EXPORTED_TO = new EzLocalizationManager.EzLocalisableString("已导出到 {0}", "Exported to {0}");
 
         public static readonly EzLocalizationManager.EzLocalisableString NOTIFY_EXPORT_FAILED = new EzLocalizationManager.EzLocalisableString("导出失败: {0}", "Export failed: {0}");
+
+        public static readonly LocalisableString NOTIFY_LAYOUT_NO_CURRENT_LAYER = new EzLocalizationManager.EzLocalisableString(
+            "当前场景没有可导入导出的布局层",
+            "No editable layout layer in this scene");
+
+        public static readonly LocalisableString NOTIFY_LAYOUT_IMPORTED_PACK = new EzLocalizationManager.EzLocalisableString(
+            "已导入全局层",
+            "Theme pack imported");
+
+        public static readonly LocalisableString NOTIFY_LAYOUT_IMPORTED_LAYER = new EzLocalizationManager.EzLocalisableString(
+            "已导入当前层",
+            "Current layer imported");
+
+        public static readonly LocalisableString NOTIFY_LAYOUT_THEME_NAME_REQUIRED = new EzLocalizationManager.EzLocalisableString(
+            "请输入主题名",
+            "Enter a theme name");
 
         public static readonly LocalisableString NOTIFY_CANNOT_WRITE_SKIN_INI_COLOURS = new EzLocalizationManager.EzLocalisableString(
             "无法写入 skin.ini 列色",

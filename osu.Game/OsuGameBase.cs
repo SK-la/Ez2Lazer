@@ -396,7 +396,9 @@ namespace osu.Game
             dependencies.CacheAs(EzResourceStore = new EzResourceStore(Ez2ConfigManager, Host.Renderer, Audio, Storage, realm));
             dependencies.CacheAs<IStorageResourceProvider>(EzResourceStore);
             dependencies.Cache(new EzLocalTextureFactory(Ez2ConfigManager, EzResourceStore));
-            dependencies.Cache(new EzConfigLayoutStore(Storage));
+            var layoutThemeHost = new EzLayoutThemeHost(Storage, Ez2ConfigManager);
+            dependencies.Cache(layoutThemeHost);
+            dependencies.CacheAs<EzConfigLayoutStore>(layoutThemeHost.Store);
             dependencies.Cache(new EzConfigStore(Storage));
             dependencies.Cache(EzGameplayWarmUp = new EzGameplayWarmUpService());
 

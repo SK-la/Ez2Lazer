@@ -216,6 +216,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
             SetDefault(Ez2Setting.GlobalTextureName, 4);
             SetDefault(Ez2Setting.GameThemeName, EzGameThemeNames.DEFAULT);
+            SetDefault(Ez2Setting.LayoutSetName, EzModifyPath.LAYOUT_SET_DEFAULT);
             SetDefault(Ez2Setting.NoteSetName, "lucenteclat");
             SetDefault(Ez2Setting.StageName, "Celeste_Lumiere");
             SetDefault(Ez2Setting.StagePanelEnabled, true);
@@ -1342,6 +1343,11 @@ namespace osu.Game.EzOsuGame.Configuration
         EnableScriptedSkins,
         GlobalTextureName,
         GameThemeName,
+
+        /// <summary>
+        /// Active theme layout pack under <c>EzResources/Config/</c> (<c>layout</c> or <c>layout-*</c>).
+        /// </summary>
+        LayoutSetName,
 
         NoteSetName,
         StageName,

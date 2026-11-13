@@ -27,9 +27,8 @@ namespace osu.Game.EzOsuGame
         public const string CONFIG_LAYOUT_PATH = @"EzResources/Config/layout";
 
         /// <summary>
-        /// Root directory holding one layout set. Multiple sets (for example <c>layout</c>,
-        /// <c>layout-O2jam</c>) live side by side under <see cref="CONFIG_ROOT_PATH"/> and can be
-        /// switched as a whole later.
+        /// Ez JSON config root. Theme HUD packs are sibling folders here: default <c>layout</c> plus
+        /// <c>layout-{主题}</c>. Theme packs are never nested under <c>layout/</c>.
         /// </summary>
         public const string CONFIG_ROOT_PATH = @"EzResources/Config";
 
