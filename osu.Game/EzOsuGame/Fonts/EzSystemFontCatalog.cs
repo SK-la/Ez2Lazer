@@ -309,11 +309,15 @@ namespace osu.Game.EzOsuGame.Fonts
         /// Resolves the platform colour emoji font (TTF/OTF/TTC) for global glyph fallback.
         /// Does not require a full catalog scan when well-known paths exist.
         /// </summary>
+        // Noto Color Emoji is a bitmap/COLR face. FreeType rejects its pixel size and the game host exits.
+        private static bool isUnsupportedBitmapColorEmoji(string path)
+            => Path.GetFileName(path).Contains("NotoColorEmoji", StringComparison.OrdinalIgnoreCase);
+
         public static EzSystemFontEntry? FindSystemEmojiFont()
         {
             foreach (var candidate in enumerateSystemEmojiCandidates())
             {
-                if (!File.Exists(candidate.Path))
+                if (!File.Exists(candidate.Path) || isUnsupportedBitmapColorEmoji(candidate.Path))
                     continue;
 
                 try
@@ -335,6 +339,8 @@ namespace osu.Game.EzOsuGame.Fonts
             {
                 var entry = TryResolveFamily(family);
 
+                if (entry != null && isUnsupportedBitmapColorEmoji(entry.Value.Path))
+                    continue;
                 if (entry != null)
                     return entry;
             }

@@ -66,5 +66,10 @@ namespace osu.Game.EzOsuGame.Edit
         /// Which Game layout directory persists this scene's HUD JSON when edited.
         /// </summary>
         EzLayoutRoot LayoutRoot => EzLayoutRoot.Theme;
+
+        /// <summary>
+        /// 策略是进程级单例，栏目却跟着编辑器一起释放。关掉编辑器时丢掉缓存，下次重新建。
+        /// </summary>
+        void ReleaseCachedDrawables();
     }
 }

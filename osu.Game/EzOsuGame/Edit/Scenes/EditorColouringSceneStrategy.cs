@@ -33,6 +33,8 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
             this.rulesets = rulesets.ToArray();
         }
 
+        public void ReleaseCachedDrawables() => sections = null;
+
         public IReadOnlyList<EzSkinEditorSettingsGroup> Sections => sections ??= createSections();
 
         private EzSkinEditorSettingsGroup[] createSections()

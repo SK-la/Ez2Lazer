@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.Osu.Mods
     /// 谱面行为与改动前完全一致。
     /// </para>
     /// </remarks>
-    public class OsuModAspire : Mod, IApplicableAfterBeatmapConversion, IEzApplyOrder, ICreateReplayData, IConditionalReplayGeneration
+    public class OsuModAspire : Mod, IApplicableAfterBeatmapConversion, IEzApplyOrder, ICreateReplayData, IConditionalReplayGeneration, IIncompatibleWithAdaptiveSpeed
     {
         public override string Name => "Aspire";
 
@@ -55,6 +55,7 @@ namespace osu.Game.Rulesets.Osu.Mods
             typeof(ModCinema),
             typeof(ModRelax),
             typeof(ModAdaptiveSpeed),
+            typeof(ModTouchDevice),
         };
 
         [SettingSource("Autoplay", "Watch a perfect automated play instead of playing the beatmap yourself.")]

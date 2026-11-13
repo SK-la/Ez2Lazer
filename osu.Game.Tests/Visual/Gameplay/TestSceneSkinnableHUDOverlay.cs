@@ -50,7 +50,8 @@ namespace osu.Game.Tests.Visual.Gameplay
 
         // best way to check without exposing.
         private Drawable hideTarget => hudOverlay.ChildrenOfType<SkinnableContainer>().First();
-        private Drawable keyCounterFlow => hudOverlay.ChildrenOfType<KeyCounterDisplay>().First().ChildrenOfType<FillFlowContainer<KeyCounter>>().Single();
+        // 网格里最后一张是 retro。它的规则集层不一定带按键计数，从有计数器的那张上取。
+        private Drawable keyCounterFlow => hudOverlays.SelectMany(h => h.ChildrenOfType<KeyCounterDisplay>()).First().ChildrenOfType<FillFlowContainer<KeyCounter>>().Single();
 
         public TestSceneSkinnableHUDOverlay()
         {

@@ -24,6 +24,8 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
 
         public bool IsAvailable => true;
 
+        public void ReleaseCachedDrawables() => sections = null;
+
         public IReadOnlyList<EzSkinEditorSettingsGroup> Sections => sections ??= new EzSkinEditorSettingsGroup[]
         {
             new BeatmapPreviewManiaSettingsSection(),

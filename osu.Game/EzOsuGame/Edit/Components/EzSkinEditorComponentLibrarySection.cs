@@ -286,18 +286,15 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 if (component == null)
                     return;
 
-                // Load on the update thread and swallow the failure. DelayedLoadUnloadWrapper reports an
-                // uncaught load exception as a process crash, which is how a results or gameplay component
-                // (no score / health processor in this scene) used to take the editor down on open.
+                // 缺依赖的预览在加载时抛错。DelayedLoadUnloadWrapper 会把没接住的异常当成进程崩溃。
                 try
                 {
                     component.Anchor = Anchor.Centre;
                     component.Origin = Anchor.Centre;
 
-                    Child = new DependencyBorrowingContainer(dependencySource)
+                    Child = new DependencyBorrowingContainer(component, dependencySource)
                     {
                         RelativeSizeAxes = Axes.Both,
-                        Child = component,
                     };
                 }
                 catch (Exception e)
@@ -356,11 +353,30 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// </summary>
         private partial class DependencyBorrowingContainer : Container
         {
+            private readonly Drawable preview;
+
             private readonly CompositeDrawable? donor;
 
-            public DependencyBorrowingContainer(CompositeDrawable? donor)
+            public DependencyBorrowingContainer(Drawable preview, CompositeDrawable? donor)
             {
+                this.preview = preview;
                 this.donor = donor;
+            }
+
+            [BackgroundDependencyLoader]
+            private void load()
+            {
+                try
+                {
+                    LoadComponent(preview);
+                }
+                catch (Exception e) when (SkinEditorPreviewDependencies.IsUnplaceable(e))
+                {
+                    preview.Dispose();
+                    return;
+                }
+
+                Child = preview;
             }
 
             protected override bool ShouldBeConsideredForInput(Drawable child) => false;
@@ -372,11 +388,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
             protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
             {
                 var baseDependencies = base.CreateChildDependencies(parent);
-
-                if (donor?.Dependencies == null)
-                    return baseDependencies;
-
-                return new DependencyContainer(donor.Dependencies);
+                var source = donor?.Dependencies ?? baseDependencies;
+                var dependencies = new DependencyContainer(source);
+                SkinEditorPreviewDependencies.ApplyFallbacks(dependencies, source);
+                return dependencies;
             }
         }
     }

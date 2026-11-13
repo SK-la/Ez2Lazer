@@ -21,6 +21,7 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -51,8 +52,11 @@ namespace osu.Game.Tests.Visual.Background
         private UpdateCounter storyboardUpdateCounter;
 
         [BackgroundDependencyLoader]
-        private void load(GameHost host, AudioManager audio)
+        private void load(GameHost host, AudioManager audio, Ez2ConfigManager ezConfig)
         {
+            // 这组断言写的是官方选歌：忽略用户变暗，固定 0.1。亚克力是另一条路径。
+            ezConfig.SetValue(Ez2Setting.MaterialUiMode, EzMaterialUiMode.Default);
+
             BeatmapStore beatmapStore;
 
             Dependencies.Cache(rulesets = new RealmRulesetStore(Realm));

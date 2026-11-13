@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
@@ -258,7 +259,7 @@ namespace osu.Game.Tests.Visual.UserInterface
 
             AddStep("show overlay", () => screen.Overlay.Show());
             contentDisplayed();
-            AddAssert("left buttons hidden", () => ScreenFooter.ChildrenOfType<ScreenFooterButton>().Skip(1).All(b => b.Child.Parent!.Y > 0));
+            AddAssert("left buttons hidden", () => contentButtons().Skip(1).All(b => b.Child.Parent!.Y > 0));
             AddAssert("right buttons hidden", () => ScreenFooter.ChildrenOfType<ShearedButton>().Any(b => b.ChildrenOfType<Container>().ElementAt(1).Y > 0));
             AddAssert(
                 "right overlay content is at edge of footer",
@@ -272,7 +273,7 @@ namespace osu.Game.Tests.Visual.UserInterface
 
             AddStep("hide overlay", () => screen.Overlay.Hide());
             contentHidden();
-            AddAssert("left buttons returned", () => ScreenFooter.ChildrenOfType<ScreenFooterButton>().Skip(1).All(b => b.ChildrenOfType<Container>().First().Y == 0));
+            AddAssert("left buttons returned", () => contentButtons().Skip(1).All(b => b.ChildrenOfType<Container>().First().Y == 0));
             AddAssert("right buttons returned", () => ScreenFooter.ChildrenOfType<ShearedButton>().All(b => b.ChildrenOfType<Container>().ElementAt(1).Y == 0));
         }
 
@@ -323,7 +324,7 @@ namespace osu.Game.Tests.Visual.UserInterface
             AddStep("show overlay", () => screen.Overlay.Show());
             contentDisplayed();
 
-            AddStep("try direct click on left button", () => ScreenFooter.ChildrenOfType<ScreenFooterButton>().ElementAt(1).TriggerClick());
+            AddStep("try direct click on left button", () => contentButtons().ElementAt(1).TriggerClick());
             AddAssert("action not triggered", () => buttonTriggered, () => Is.False);
 
             AddStep("try left button hotkey", () => InputManager.Key(Key.Enter));
@@ -389,15 +390,15 @@ namespace osu.Game.Tests.Visual.UserInterface
 
             AddStep("show mods overlay", () => ScreenFooter.ChildrenOfType<FooterButtonMods>().First().TriggerClick());
             AddUntilStep("wait until overlay is shown", () => screen.SecondOverlay.State.Value, () => Is.EqualTo(Visibility.Visible));
-            AddAssert("first button still visible", () => ScreenFooter.ChildrenOfType<ScreenFooterButton>().First(b => b.Text == "One").Y, () => Is.EqualTo(0));
+            AddAssert("first button still visible", () => contentButtons().First(b => b.Text == "One").Y, () => Is.EqualTo(0));
 
-            AddStep("show test overlay", () => ScreenFooter.ChildrenOfType<ScreenFooterButton>().First(b => b.Text == "One").TriggerClick());
+            AddStep("show test overlay", () => contentButtons().First(b => b.Text == "One").TriggerClick());
             AddUntilStep("wait until overlay is shown", () => screen.Overlay.State.Value, () => Is.EqualTo(Visibility.Visible));
             AddAssert("mod overlay is hidden", () => screen.SecondOverlay.State.Value, () => Is.EqualTo(Visibility.Hidden));
 
             AddStep("hide test overlay", () => screen.Overlay.Hide());
             contentHidden();
-            AddAssert("other buttons returned", () => ScreenFooter.ChildrenOfType<ScreenFooterButton>().Skip(1).All(b => b.ChildrenOfType<Container>().First().Y == 0));
+            AddAssert("other buttons returned", () => contentButtons().Skip(1).All(b => b.ChildrenOfType<Container>().First().Y == 0));
         }
 
         [Test]
@@ -435,27 +436,31 @@ namespace osu.Game.Tests.Visual.UserInterface
                 });
             });
             AddUntilStep("wait until screen is loaded", () => screen.IsCurrentScreen(), () => Is.True);
-            AddStep("save second button position", () => secondButtonX = ScreenFooter.ChildrenOfType<ScreenFooterButton>().ElementAt(1).X);
+            AddStep("save second button position", () => secondButtonX = contentButtons().ElementAt(1).X);
 
-            AddStep("resize active button", () => ScreenFooter.ChildrenOfType<ScreenFooterButton>().First().ResizeWidthTo(initial_width + width_increase, 300, Easing.OutQuint));
-            AddUntilStep("second button moved", () => ScreenFooter.ChildrenOfType<ScreenFooterButton>().ElementAt(1).X, () => Is.EqualTo(secondButtonX + width_increase).Within(0.001));
-            AddStep("resize active button back", () => this.ChildrenOfType<ScreenFooterButton>().First().ResizeWidthTo(initial_width, 300, Easing.OutQuint));
-            AddUntilStep("second button moved back", () => ScreenFooter.ChildrenOfType<ScreenFooterButton>().ElementAt(1).X, () => Is.EqualTo(secondButtonX).Within(0.001));
+            AddStep("resize active button", () => contentButtons().First().ResizeWidthTo(initial_width + width_increase, 300, Easing.OutQuint));
+            AddUntilStep("second button moved", () => contentButtons().ElementAt(1).X, () => Is.EqualTo(secondButtonX + width_increase).Within(0.001));
+            AddStep("resize active button back", () => contentButtons().First().ResizeWidthTo(initial_width, 300, Easing.OutQuint));
+            AddUntilStep("second button moved back", () => contentButtons().ElementAt(1).X, () => Is.EqualTo(secondButtonX).Within(0.001));
 
             AddStep("show overlay", () => screen.Overlay.Show());
             contentDisplayed();
-            AddAssert("other buttons hidden", () => ScreenFooter.ChildrenOfType<ScreenFooterButton>().Skip(1).All(b => b.Child.Parent!.Y > 0));
+            AddAssert("other buttons hidden", () => contentButtons().Skip(1).All(b => b.Child.Parent!.Y > 0));
             AddStep("save overlay content position", () => overlayContentX = ScreenFooter.ChildrenOfType<TestShearedOverlayContainer.TestFooterContent>().First().Parent!.Parent!.X);
 
-            AddStep("resize active button", () => ScreenFooter.ChildrenOfType<ScreenFooterButton>().First().ResizeWidthTo(initial_width + width_increase, 300, Easing.OutQuint));
+            AddStep("resize active button", () => contentButtons().First().ResizeWidthTo(initial_width + width_increase, 300, Easing.OutQuint));
             AddUntilStep("overlay content moved", () => ScreenFooter.ChildrenOfType<TestShearedOverlayContainer.TestFooterContent>().First().Parent!.Parent!.X, () => Is.EqualTo(overlayContentX + width_increase).Within(0.001));
-            AddStep("resize active button back", () => this.ChildrenOfType<ScreenFooterButton>().First().ResizeWidthTo(initial_width, 300, Easing.OutQuint));
+            AddStep("resize active button back", () => contentButtons().First().ResizeWidthTo(initial_width, 300, Easing.OutQuint));
             AddUntilStep("overlay content moved back", () => ScreenFooter.ChildrenOfType<TestShearedOverlayContainer.TestFooterContent>().First().Parent!.Parent!.X, () => Is.EqualTo(overlayContentX).Within(0.001));
 
             AddStep("hide overlay", () => screen.Overlay.Hide());
             contentHidden();
-            AddUntilStep("other buttons returned", () => ScreenFooter.ChildrenOfType<ScreenFooterButton>().Skip(1).All(b => b.ChildrenOfType<Container>().First().Y == 0));
+            AddUntilStep("other buttons returned", () => contentButtons().Skip(1).All(b => b.ChildrenOfType<Container>().First().Y == 0));
         }
+
+        // 返回键也是 ScreenFooterButton，插在仍显示的入口和被收起的按钮之间。按树顺序取下标会点到返回键。
+        private IEnumerable<ScreenFooterButton> contentButtons() =>
+            ScreenFooter.ChildrenOfType<ScreenFooterButton>().Where(b => b is not ScreenBackButton);
 
         private void contentHidden()
         {

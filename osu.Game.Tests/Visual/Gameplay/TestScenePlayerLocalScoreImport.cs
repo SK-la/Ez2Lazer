@@ -25,7 +25,6 @@ using osu.Game.Rulesets.Osu;
 using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
-using osu.Game.Screens;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Ranking;
 using osu.Game.Tests.Resources;
@@ -209,10 +208,8 @@ namespace osu.Game.Tests.Visual.Gameplay
             AddUntilStep("results displayed", () => (Player.GetChildScreen() as ResultsScreen)?.IsLoaded == true);
             AddUntilStep("score in database", () => Realm.Run(r => r.Find<ScoreInfo>(Player.Score.ScoreInfo.ID) != null));
 
-            AddUntilStep("wait for button clickable", () => ((OsuScreen)Player.GetChildScreen())
-                                                            .ChildrenOfType<ReplayDownloadButton>().FirstOrDefault()?
-                                                            .ChildrenOfType<OsuClickableContainer>().FirstOrDefault()?
-                                                            .Enabled.Value == true);
+            // 回放按钮挂在全局页脚上，不在结算屏里面。
+            AddUntilStep("wait for button clickable", () => this.ChildrenOfType<ReplayDownloadButton>().Any(b => b.Enabled.Value));
 
             AddAssert("no export files", () => !LocalStorage.GetFiles("exports").Any());
 

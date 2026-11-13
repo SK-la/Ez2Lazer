@@ -12,6 +12,7 @@ using osu.Framework.Testing;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests;
 using osu.Game.Online.API.Requests.Responses;
+using osu.Game.EzOsuGame.Changelog;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Changelog;
 
@@ -167,9 +168,16 @@ namespace osu.Game.Tests.Visual.Online
 
             AddUntilStep(@"wait for streams", () => changelog.Streams?.Count > 0);
             AddAssert(@"correct build displayed", () => changelog.Current.Value.Version == "2018.712.0");
-            AddAssert(@"correct stream selected", () => changelog.Header.Streams.Current.Value.Id == 5);
-            AddUntilStep(@"wait for content load", () => changelog.ChildrenOfType<ChangelogSupporterPromo>().Any());
-            AddAssert(@"supporter promo showed", () => changelog.ChildrenOfType<ChangelogSupporterPromo>().First().Alpha == (isSupporter ? 0 : 1));
+            // 更新日志改成只列 Ez2Lazer 这一条更新流。示意用的 lazer 流对不上时，页眉不会选中。
+            AddAssert(@"stream follows catalogue", () =>
+            {
+                var current = changelog.Header.Streams.Current.Value;
+                bool catalogueHasStream = changelog.Streams.Any(s => s.Name == requestedBuild.UpdateStream.Name);
+                return catalogueHasStream ? current?.Name == requestedBuild.UpdateStream.Name : current == null;
+            });
+            // 正文改成 GitHub release，不再放官方的支持者推广。
+            AddUntilStep(@"wait for content load", () => changelog.ChildrenOfType<EzChangelogReleaseContent>().Any());
+            AddAssert(@"release content shown", () => changelog.ChildrenOfType<EzChangelogReleaseContent>().First().IsPresent);
         }
 
         [Test]

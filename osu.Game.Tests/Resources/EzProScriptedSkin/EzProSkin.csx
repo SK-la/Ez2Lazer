@@ -84,7 +84,7 @@ public class EzProSkin : Skin
                                 r1.Anchor = Anchor.BottomLeft;
                                 r1.Origin = Anchor.BottomLeft;
                                 r1.Position = new Vector2(-1, -65);
-                                r1.RadarDisplayMode.Value = EzRadarDisplayMode.SunnySRPattern;
+                                r1.RadarDisplayMode.Value = EzRadarDisplayMode.SunnySRSkill;
 
                                 r2.Anchor = Anchor.BottomLeft;
                                 r2.Origin = Anchor.BottomLeft;
@@ -149,7 +149,7 @@ public class EzProSkin : Skin
                                     score.Origin = Anchor.TopLeft;
                                     score.Position = new Vector2(x_offset, x_offset);
                                     score.ShowLabel.Value = false;
-                                    score.ThemeName.Value = EzEnumGameThemeName.Celeste_Lumiere;
+                                    score.ThemeName.Value = nameof(EzEnumGameThemeName.Celeste_Lumiere);
                                 }
 
                                 var attributeTexts = container.OfType<BeatmapAttributeText>().ToArray();

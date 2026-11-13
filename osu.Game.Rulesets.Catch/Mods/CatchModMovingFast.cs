@@ -24,7 +24,7 @@ namespace osu.Game.Rulesets.Catch.Mods
         public override LocalisableString Description => "Dashing by default, slow down!";
         public override ModType Type => ModType.Fun;
         public override IconUsage? Icon => OsuIcon.ModMovingFast;
-        public override Type[] IncompatibleMods => new[] { typeof(ModAutoplay), typeof(ModRelax) };
+        public override Type[] IncompatibleMods => new[] { typeof(ModAutoplay), typeof(ModRelax), typeof(CatchModTouchMove) };
 
         private DrawableCatchRuleset drawableRuleset = null!;
 

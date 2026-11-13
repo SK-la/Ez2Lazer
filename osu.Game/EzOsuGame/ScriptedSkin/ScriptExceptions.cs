@@ -23,9 +23,14 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
         /// </summary>
         /// <param name="diagnostics">编译诊断信息。</param>
         public ScriptCompilationException(IEnumerable<Diagnostic> diagnostics)
-            : base($"Script compilation failed with {diagnostics.Count()} error(s).")
+            : this(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToList())
         {
-            Diagnostics = diagnostics.ToList();
+        }
+
+        private ScriptCompilationException(List<Diagnostic> errors)
+            : base($"Script compilation failed with {errors.Count} error(s).\n{string.Join("\n", errors.Select(d => $"[{d.Id}] {d.GetMessage()} (Line {d.Location.GetLineSpan().StartLinePosition.Line + 1})"))}")
+        {
+            Diagnostics = errors;
         }
 
         /// <summary>
