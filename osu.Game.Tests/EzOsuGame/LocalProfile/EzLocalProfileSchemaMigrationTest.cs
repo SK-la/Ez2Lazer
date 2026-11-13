@@ -99,7 +99,7 @@ namespace osu.Game.Tests.EzOsuGame.LocalProfile
 
             using var store = new EzLocalProfileStore(storage);
 
-            Assert.DoesNotThrow(() => store.LoadDrillScores(EzLocalProfileConstants.MANIA_RULESET_ID, null));
+            Assert.That(store.LoadDrillScores(EzLocalProfileConstants.MANIA_RULESET_ID, null), Is.Empty);
         }
 
         [Test]
@@ -111,7 +111,7 @@ namespace osu.Game.Tests.EzOsuGame.LocalProfile
 
             using var store = new EzLocalProfileStore(storage);
 
-            Assert.DoesNotThrow(() => store.AppendDrills(new[] { createMinimalDrill() }));
+            store.AppendDrills(new[] { createMinimalDrill() });
             Assert.That(drillTableHasColumn(storage, "ssr_star_rating"), Is.True);
             Assert.That(drillTableHasColumn(storage, "xxy_star_rating"), Is.False);
         }
@@ -125,7 +125,7 @@ namespace osu.Game.Tests.EzOsuGame.LocalProfile
 
             using var store = new EzLocalProfileStore(storage);
 
-            Assert.DoesNotThrow(() => store.AppendDrills(new[] { createMinimalDrill() }));
+            store.AppendDrills(new[] { createMinimalDrill() });
             Assert.That(drillTableHasColumn(storage, "xxy_star_rating"), Is.False);
         }
 
