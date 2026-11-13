@@ -56,6 +56,7 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             configStore = modLayoutStore;
             game = osuGame;
+            loadEzSongSelectKeyboardHandler();
         }
 
         private protected override IEnumerable<ModSelectOverlay.ColumnDimContainer> CreateColumns()
