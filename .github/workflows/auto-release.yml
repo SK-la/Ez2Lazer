@@ -402,10 +402,10 @@ jobs:
           if (-not $zipFound) { Write-Error "zip asset not found in $osuArtifacts"; exit 1 }
           Copy-Item -Path $zipFound.FullName -Destination (Join-Path $uploadDir $zipDest) -Force
 
-          $tag = '${{ needs.prepare.outputs.release_tag }}'
-          $gameNuget = Join-Path $osuArtifacts "nuget-pack/ez2lazer.Game.$tag.nupkg"
+          $packageVersion = '${{ needs.prepare.outputs.publish_version_tag }}'
+          $gameNuget = Join-Path $osuArtifacts "nuget-pack/ez2lazer.Game.$packageVersion.nupkg"
           if (Test-Path $gameNuget) {
-            Copy-Item -Path $gameNuget -Destination (Join-Path $uploadDir "ez2lazer.Game.$tag.nupkg") -Force
+            Copy-Item -Path $gameNuget -Destination (Join-Path $uploadDir "ez2lazer.Game.$packageVersion.nupkg") -Force
             $gameHash = Get-FileHash -Path $gameNuget -Algorithm SHA256
             Write-Output "ez2lazer.Game NuGet package SHA256: $($gameHash.Hash)"
           }

@@ -31,9 +31,9 @@ if (-not (Test-Path $releaseDll)) {
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
-Write-Host "Pack ez2lazer.Game $releaseTag (AssemblyVersion $publishVersion; deps from Ez2Lazer.Dependencies.props)..."
+Write-Host "Pack ez2lazer.Game $publishVersion (tag $releaseTag; deps from Ez2Lazer.Dependencies.props)..."
 dotnet pack osu.Game/osu.Game.csproj -c Release `
-    /p:Version=$releaseTag `
+    /p:Version=$publishVersion `
     /p:OfficialEz2Build=true `
     /p:ReleaseVersion=$publishVersion `
     /p:UseEz2LazerLocalFrameworkProject=false `
@@ -41,7 +41,7 @@ dotnet pack osu.Game/osu.Game.csproj -c Release `
     /p:IncludeSymbols=false `
     -o $OutDir
 
-$nupkg = Join-Path $OutDir "ez2lazer.Game.$releaseTag.nupkg"
+$nupkg = Join-Path $OutDir "ez2lazer.Game.$publishVersion.nupkg"
 if (-not (Test-Path $nupkg)) {
     throw "未生成 nupkg: $nupkg"
 }

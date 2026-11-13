@@ -1,4 +1,5 @@
-# auto-release 已在 linux x64 任务中生成 ez2lazer.Game.{tag}.nupkg（与安装包内 osu.Game.dll 字节一致）。
+# auto-release 已在 linux x64 任务中生成 ez2lazer.Game.{version}.nupkg（与安装包内 osu.Game.dll 字节一致）。
+# NuGet 版本是去掉 -ez2lazer 的稳定版；GitHub Release tag 仍带后缀。
 # 本工作流：手动触发 → 确认 GitHub Release 已发布且资产齐全 → 校验哈希 → 推送到 nuget.org。
 # 注意：不会因推送 git tag 自动运行；必须等 Auto Release 创建发布页后再手动执行。
 
@@ -70,13 +71,13 @@ jobs:
           has_linux_zip=false
           for name in "${ASSET_NAMES[@]}"; do
             case "$name" in
-              ez2lazer.Game.${TAG}.nupkg) has_nupkg=true ;;
+              ez2lazer.Game.${CORE}.nupkg) has_nupkg=true ;;
               Ez2Lazer_release_linux_x64*.zip) has_linux_zip=true ;;
             esac
           done
 
           missing=()
-          $has_nupkg || missing+=("ez2lazer.Game.${TAG}.nupkg")
+          $has_nupkg || missing+=("ez2lazer.Game.${CORE}.nupkg")
           $has_linux_zip || missing+=("Ez2Lazer_release_linux_x64*.zip")
 
           if [[ ${#missing[@]} -gt 0 ]]; then
@@ -103,9 +104,10 @@ jobs:
         run: |
           set -euo pipefail
           TAG='${{ needs.gate.outputs.tag }}'
+          CORE="${TAG%-ez2lazer}"
           mkdir -p artifacts
           gh release download "$TAG" --repo '${{ github.repository }}' \
-            --pattern "ez2lazer.Game.${TAG}.nupkg" \
+            --pattern "ez2lazer.Game.${CORE}.nupkg" \
             --dir artifacts
           ls -la artifacts/
 
@@ -115,6 +117,7 @@ jobs:
         run: |
           set -euo pipefail
           TAG='${{ needs.gate.outputs.tag }}'
+          CORE="${TAG%-ez2lazer}"
           WORK="${RUNNER_TEMP}/hash-verify"
           rm -rf "$WORK"
           mkdir -p "$WORK"
@@ -131,7 +134,7 @@ jobs:
             exit 1
           fi
 
-          unzip -q "artifacts/ez2lazer.Game.${TAG}.nupkg" -d "$WORK/nupkg-extract"
+          unzip -q "artifacts/ez2lazer.Game.${CORE}.nupkg" -d "$WORK/nupkg-extract"
           NUGET_DLL="$WORK/nupkg-extract/lib/net10.0/osu.Game.dll"
           if [[ ! -f "$NUGET_DLL" ]]; then
             echo "::error::nupkg 中未找到 lib/net10.0/osu.Game.dll"
@@ -160,9 +163,10 @@ jobs:
         run: |
           set -euo pipefail
           TAG='${{ needs.gate.outputs.tag }}'
+          CORE="${TAG%-ez2lazer}"
           LOG="${RUNNER_TEMP}/nuget-push.log"
           set +e
-          dotnet nuget push "artifacts/ez2lazer.Game.${TAG}.nupkg" \
+          dotnet nuget push "artifacts/ez2lazer.Game.${CORE}.nupkg" \
             --api-key "${{ steps.nuget_login.outputs.NUGET_API_KEY }}" \
             --source "https://api.nuget.org/v3/index.json" \
             2>&1 | tee "$LOG"
@@ -170,9 +174,9 @@ jobs:
           set -e
           if [[ $STATUS -ne 0 ]]; then
             if grep -qiE 'already exists|409' "$LOG"; then
-              echo "::error::版本 ${TAG} 已在 nuget.org 存在，无法重复推送。"
-              echo "https://www.nuget.org/packages/ez2lazer.Game/${TAG}"
+              echo "::error::版本 ${CORE} 已在 nuget.org 存在，无法重复推送。"
+              echo "https://www.nuget.org/packages/ez2lazer.Game/${CORE}"
             fi
             exit 1
           fi
-          echo "Published: https://www.nuget.org/packages/ez2lazer.Game/${TAG}"
+          echo "Published: https://www.nuget.org/packages/ez2lazer.Game/${CORE}"
