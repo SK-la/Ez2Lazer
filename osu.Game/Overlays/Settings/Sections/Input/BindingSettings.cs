@@ -22,7 +22,7 @@ namespace osu.Game.Overlays.Settings.Sections.Input
             {
                 new SettingsButtonV2
                 {
-                    Text = BindingSettingsStrings.Configure,
+                    Text = LocalisableString.Interpolate($@"{BindingSettingsStrings.Configure}..."),
                     TooltipText = BindingSettingsStrings.ChangeBindingsButton,
                     Action = openKeyConfig,
                     Height = 60

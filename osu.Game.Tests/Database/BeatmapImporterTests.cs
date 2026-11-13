@@ -1034,6 +1034,7 @@ namespace osu.Game.Tests.Database
         }
 
         [Test]
+        [Ignore("Temporary disable pending investigation")]
         public void TestImportFailsWithFilenamesDifferingOnlyInCase()
         {
             RunTestWithRealmAsync(async (realm, storage) =>

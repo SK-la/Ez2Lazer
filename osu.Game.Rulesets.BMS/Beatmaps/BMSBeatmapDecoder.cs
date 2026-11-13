@@ -25,7 +25,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
     {
         private const string bms_log_prefix = "[BMS]";
 
-        protected override Beatmap CreateTemplateObject() => new BMSBeatmap();
+        public override Beatmap CreateTemplateObject() => new BMSBeatmap();
 
         // BMS channel definitions
         private const int channel_bgm = 1;
