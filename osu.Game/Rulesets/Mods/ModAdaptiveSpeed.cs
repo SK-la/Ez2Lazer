@@ -36,7 +36,7 @@ namespace osu.Game.Rulesets.Mods
         public sealed override bool ValidForMultiplayer => false;
         public sealed override bool ValidForMultiplayerAsFreeMod => false;
 
-        public override Type[] IncompatibleMods => new[] { typeof(ModRateAdjust), typeof(ModTimeRamp), typeof(ModAutoplay) };
+        public override Type[] IncompatibleMods => new[] { typeof(ModRateAdjust), typeof(ModTimeRamp), typeof(ModAutoplay), typeof(IIncompatibleWithAdaptiveSpeed) };
 
         [SettingSource("Initial rate", "The starting speed of the track", SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> InitialRate { get; } = new BindableDouble(1)
@@ -254,5 +254,13 @@ namespace osu.Game.Rulesets.Mods
             // Scale the rate adjustment based on consistency
             targetRate = Interpolation.Lerp(targetRate, recentRates.Average(), Math.Abs(consistency) / (recent_rate_count - 1d));
         }
+    }
+
+    /// <summary>
+    /// A mod that cannot be enabled together with <see cref="ModAdaptiveSpeed"/>.
+    /// Lives here so ruleset mods can opt in without <c>osu.Game</c> referencing a ruleset assembly.
+    /// </summary>
+    public interface IIncompatibleWithAdaptiveSpeed
+    {
     }
 }

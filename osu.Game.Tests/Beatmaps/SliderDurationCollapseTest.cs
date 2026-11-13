@@ -73,10 +73,12 @@ namespace osu.Game.Tests.Beatmaps
         [Test]
         public void TestRepeatsScaleTheEffectiveDistance()
         {
-            var slider = createSlider(geometryDistance: 100, declaredDistance: 2_000_000_000, limitToGeometry: true, repeatCount: 3);
+            // 几何要长过一个评分间距，否则稳定端规则不会放折返标记。
+            var slider = createSlider(geometryDistance: 400, declaredDistance: 2_000_000_000, limitToGeometry: true, repeatCount: 3);
 
-            Assert.That(slider.Duration, Is.EqualTo(3 * 100 / velocity).Within(0.01));
-            Assert.That(slider.NestedHitObjects.OfType<SliderRepeat>(), Has.Count.EqualTo(3));
+            // RepeatCount 是折返次数，总时长按 SpanCount（折返 + 1）段计算。
+            Assert.That(slider.Duration, Is.EqualTo(4 * 400 / velocity).Within(0.01));
+            Assert.That(slider.NestedHitObjects.OfType<SliderRepeat>().Count(), Is.EqualTo(3));
         }
 
         [Test]

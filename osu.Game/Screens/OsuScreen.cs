@@ -362,7 +362,8 @@ namespace osu.Game.Screens
             if (!this.IsCurrentScreen())
                 return;
 
-            RefreshBackground();
+            // 皮肤编辑器关层时，背景屏已经在更新线程上。从别的线程直接退屏会改它的变换。
+            Schedule(RefreshBackground);
         }
 
         /// <summary>

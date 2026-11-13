@@ -1053,13 +1053,25 @@ namespace osu.Game.Tests.Database
 
                     string background = Directory.GetFiles(extractedFolder, "*.jpg").First();
 
-                    using (var zip = ZipArchive.CreateArchive())
+                    // SharpCompress 把只差大小写的路径当成同一个条目，写不进这种压缩包。
+                    // 导入器要拒绝的是别的工具打出来的包，所以这里用大小写敏感的写入。
+                    if (File.Exists(temp))
+                        File.Delete(temp);
+
+                    using (var archive = System.IO.Compression.ZipFile.Open(temp, System.IO.Compression.ZipArchiveMode.Create))
                     {
-                        zip.AddAllFromDirectory(extractedFolder);
+                        void addFile(string source, string entryName)
+                        {
+                            var entry = archive.CreateEntry(entryName, System.IO.Compression.CompressionLevel.Optimal);
+                            using var entryStream = entry.Open();
+                            using var sourceStream = File.OpenRead(source);
+                            sourceStream.CopyTo(entryStream);
+                        }
 
-                        zip.AddEntry(Path.GetFileName(background).ToUpperInvariant(), background);
+                        foreach (string file in Directory.GetFiles(extractedFolder, "*", SearchOption.AllDirectories))
+                            addFile(file, Path.GetRelativePath(extractedFolder, file).Replace('\\', '/'));
 
-                        zip.SaveTo(temp, new ZipWriterOptions(CompressionType.Deflate));
+                        addFile(background, Path.GetFileName(background).ToUpperInvariant());
                     }
                 }
                 finally

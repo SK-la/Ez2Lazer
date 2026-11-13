@@ -25,9 +25,14 @@ namespace osu.Game.Rulesets.Osu.Tests
         [Test]
         public void Probe()
         {
+            string directory = Path.Combine(Path.GetTempPath(), "aspire-measure");
+
+            if (!Directory.Exists(directory))
+                Assert.Ignore("本机没有 aspire 测量谱，CI 上不跑。");
+
             File.WriteAllText(log_path, string.Empty);
 
-            string path = Directory.GetFiles(Path.Combine(Path.GetTempPath(), "aspire-measure"), "*.osu").Single();
+            string path = Directory.GetFiles(directory, "*.osu").Single();
 
             Beatmap decoded;
 

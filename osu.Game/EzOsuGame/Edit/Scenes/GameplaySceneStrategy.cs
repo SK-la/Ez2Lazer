@@ -22,6 +22,8 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
 
         public bool HoverExpandsSidebar => false;
 
+        public void ReleaseCachedDrawables() => sections = null;
+
         public IReadOnlyList<EzSkinEditorSettingsGroup> Sections => sections ??= new EzSkinEditorSettingsGroup[]
         {
             new EzSkinEditorHudWorkspaceSection(),

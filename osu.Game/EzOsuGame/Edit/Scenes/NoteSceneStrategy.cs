@@ -19,6 +19,8 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
 
         public LocalisableString TabTitle => EzEditorStrings.TAB_NOTE;
 
+        public void ReleaseCachedDrawables() => sections = null;
+
         public IReadOnlyList<EzSkinEditorSettingsGroup> Sections => sections ??= new EzSkinEditorSettingsGroup[]
         {
             new EzSkinEditorNoteRulesetSettingsSection(),

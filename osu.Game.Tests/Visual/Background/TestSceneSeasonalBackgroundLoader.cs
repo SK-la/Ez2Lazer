@@ -94,7 +94,8 @@ namespace osu.Game.Tests.Visual.Background
             for (int i = 0; i < 4; ++i)
                 loadNextBackground();
 
-            AddAssert("all backgrounds cycled", () => new HashSet<string>(textureStore.PerformedLookups).SetEquals(seasonal_background_urls));
+            // 纹理找不到时会再查一次默认背景，查找记录里可以多出这一条。
+            AddAssert("all backgrounds cycled", () => seasonal_background_urls.All(url => textureStore.PerformedLookups.Contains(url)));
         }
 
         [TestCase(-5)]

@@ -76,7 +76,9 @@ namespace osu.Game.Screens.Play
         [BackgroundDependencyLoader]
         private void load(AudioManager audio, IBindable<WorkingBeatmap> beatmap)
         {
-            track = beatmap.Value.Track;
+            // 观众席每个玩家用自己的谱面，全局谱面的音轨不一定已经加载。
+            var working = beatmap.Value;
+            track = working.TrackLoaded ? working.Track : working.LoadTrack();
             AddInternal(failSample = new SkinnableSound(new SampleInfo("Gameplay/failsound")));
 
             AddRangeInternal(new Drawable[]

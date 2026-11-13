@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Linq;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using ManagedBass.Fx;
@@ -35,6 +36,8 @@ using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Volume;
 using osu.Game.Performance;
 using osu.Game.Resources.Localisation.Web;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Screens.Backgrounds;
 using osu.Game.Screens.Footer;
 using osu.Game.Screens.Menu;
 using osu.Game.Screens.Play.HUD;
@@ -411,7 +414,29 @@ namespace osu.Game.Screens.Play
             if (ReferenceEquals(previous, next))
                 return;
 
+            // 只存在于内存的谱没有库里的文件。重取会得到一张没有物件的谱，玩家随即退出。
+            if (previous.Beatmap.HitObjects.Count > 0 && next.Beatmap.HitObjects.Count == 0)
+                return;
+
             Beatmap.Value = next;
+
+            // 背景屏记着旧实例。不改的话，后面的界面会再推一张背景，原先的亮度调整就落空了。
+            ApplyToBackground(b =>
+            {
+                if (b is BackgroundScreenBeatmap beatmapBackground)
+                    beatmapBackground.Beatmap = next;
+            });
+
+            bool sameTrack = previous.TrackLoaded && next.TrackLoaded && ReferenceEquals(previous.Track, next.Track);
+
+            if (!sameTrack)
+            {
+                if (!next.TrackLoaded)
+                    next.LoadTrack();
+
+                foreach (var mod in Mods.Value?.OfType<IApplicableToTrack>() ?? Enumerable.Empty<IApplicableToTrack>())
+                    mod.ApplyToTrack(next.Track);
+            }
 
             if (!next.TrackLoaded)
                 return;

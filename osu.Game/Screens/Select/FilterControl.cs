@@ -343,9 +343,20 @@ namespace osu.Game.Screens.Select
 
             ruleset.BindValueChanged(_ =>
             {
-                refreshSkillAxisDropdowns();
+                // 切模式会顺带刷新技能轴和分组。那些控件自己也会请求筛选，这里收成一次。
+                criteriaUpdateSuppression++;
+
+                try
+                {
+                    refreshSkillAxisDropdowns();
+                    updateEzControlVisibility();
+                }
+                finally
+                {
+                    criteriaUpdateSuppression--;
+                }
+
                 updateCriteria();
-                updateEzControlVisibility();
             });
             configAnalysisSystemSelection.BindValueChanged(_ =>
             {
@@ -613,8 +624,13 @@ namespace osu.Game.Screens.Select
 
         private void applyCircleSizeFilter(FilterCriteria criteria) => csSelector.ApplyToFilterCriteria(criteria);
 
+        private int criteriaUpdateSuppression;
+
         private void updateCriteria(bool clearScopedSet = true)
         {
+            if (criteriaUpdateSuppression > 0)
+                return;
+
             if (clearScopedSet && ScopedBeatmapSet.Value != null)
             {
                 songSelect?.UnscopeBeatmapSet();

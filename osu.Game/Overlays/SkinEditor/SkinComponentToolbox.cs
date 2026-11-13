@@ -191,12 +191,11 @@ namespace osu.Game.Overlays.SkinEditor
                         RelativeSizeAxes = Axes.Both,
                         Padding = new MarginPadding(10) { Bottom = 20 },
                         Masking = true,
-                        Child = innerContainer = new DependencyBorrowingContainer(dependencySource)
+                        Child = innerContainer = new DependencyBorrowingContainer(component, dependencySource)
                         {
                             RelativeSizeAxes = Axes.Both,
                             Anchor = Anchor.Centre,
                             Origin = Anchor.Centre,
-                            Child = component
                         },
                     },
                     new OsuSpriteText
@@ -240,11 +239,34 @@ namespace osu.Game.Overlays.SkinEditor
 
             public override bool PropagateNonPositionalInputSubTree => false;
 
+            private readonly Drawable preview;
+
             private readonly CompositeDrawable? donor;
 
-            public DependencyBorrowingContainer(CompositeDrawable? donor)
+            public DependencyBorrowingContainer(Drawable preview, CompositeDrawable? donor)
             {
+                this.preview = preview;
                 this.donor = donor;
+            }
+
+            [BackgroundDependencyLoader]
+            private void load()
+            {
+                if (donor == null)
+                    return;
+
+                // 预览在加载时才注入依赖。缺依赖是「这个目标放不了」，不能把编辑器打崩。
+                try
+                {
+                    LoadComponent(preview);
+                }
+                catch (Exception e) when (SkinEditorPreviewDependencies.IsUnplaceable(e))
+                {
+                    preview.Dispose();
+                    return;
+                }
+
+                Child = preview;
             }
 
             protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
@@ -258,6 +280,8 @@ namespace osu.Game.Overlays.SkinEditor
                 // this is designed to let components know when they are being displayed in the context of the skin editor
                 // via attempting to resolve `SkinEditor`.
                 dependencies.CacheAs(baseDependencies.Get<SkinEditor>());
+                SkinEditorPreviewDependencies.ApplyFallbacks(dependencies, donor.Dependencies);
+
                 return dependencies;
             }
         }

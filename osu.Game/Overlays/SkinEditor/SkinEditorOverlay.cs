@@ -64,8 +64,8 @@ namespace osu.Game.Overlays.SkinEditor
         [Resolved]
         private OsuGame? game { get; set; }
 
-        [Resolved]
-        private EzSkinEditorOverlay ezSkinEditor { get; set; } = null!;
+        [Resolved(canBeNull: true)]
+        private EzSkinEditorOverlay? ezSkinEditor { get; set; }
 
         [Resolved]
         private MusicController music { get; set; } = null!;
@@ -191,6 +191,9 @@ namespace osu.Game.Overlays.SkinEditor
         /// </summary>
         public void ToggleEzSkinEditor()
         {
+            if (ezSkinEditor == null)
+                return;
+
             Hide();
             ezSkinEditor.Toggle();
         }

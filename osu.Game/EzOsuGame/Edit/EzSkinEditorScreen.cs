@@ -1276,5 +1276,16 @@ namespace osu.Game.EzOsuGame.Edit
                 return null;
             }
         }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                foreach (var strategy in EzSkinEditorSceneRegistry.All)
+                    strategy.ReleaseCachedDrawables();
+            }
+
+            base.Dispose(isDisposing);
+        }
     }
 }
