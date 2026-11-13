@@ -67,7 +67,10 @@ namespace osu.Game.Skinning
         private Dictionary<string, string> initialiseFileCache() => liveSource.PerformRead(source =>
         {
             var dictionary = new Dictionary<string, string>();
-            dictionary.Clear();
+
+            if (source.Files.Count == 0)
+                return dictionary;
+
             foreach (var f in source.Files)
                 dictionary[f.Filename.ToLowerInvariant()] = f.File.GetStoragePath();
 

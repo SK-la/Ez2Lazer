@@ -341,7 +341,7 @@ namespace osu.Game.Database
                     // note that this should really be checking filesizes on disk (of existing files) for some degree of sanity.
                     // or alternatively doing a faster hash check. either of these require database changes and reprocessing of existing files.
                     if (CanSkipImport(existing, item) &&
-                        getFilenames(existing.Files).SequenceEqual(getShortenedFilenames(archive).Select(p => p.shortened).Order()) &&
+                        getFilenames(existing.Files).SequenceEqual(GetShortenedFilenames(archive).Select(p => p.shortened).Order()) &&
                         checkAllFilesExist(existing))
                     {
                         LogForModel(item, @$"Found existing (optimised) {HumanisedModelName} for {item} (ID {existing.ID}) – skipping import.");
@@ -370,7 +370,7 @@ namespace osu.Game.Database
                 {
                     // Import files to the disk store.
                     // We intentionally delay adding to realm to avoid blocking on a write during disk operations.
-                    foreach (var filenames in getShortenedFilenames(archive))
+                    foreach (var filenames in GetShortenedFilenames(archive))
                     {
                         if (FilesystemSanityCheckHelpers.IncursPathTraversalRisk(filenames.shortened))
                             throw new InvalidOperationException($@"Filename ""{filenames.original}"" is not allowed.");
@@ -516,7 +516,7 @@ namespace osu.Game.Database
             return reader.Name.ComputeSHA2Hash();
         }
 
-        private IEnumerable<(string original, string shortened)> getShortenedFilenames(ArchiveReader reader)
+        protected IEnumerable<(string original, string shortened)> GetShortenedFilenames(ArchiveReader reader)
         {
             string prefix = reader.Filenames.GetCommonPrefix();
             if (!(prefix.EndsWith('/') || prefix.EndsWith('\\')))

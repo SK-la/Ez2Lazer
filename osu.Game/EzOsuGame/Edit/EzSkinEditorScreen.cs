@@ -1135,9 +1135,16 @@ namespace osu.Game.EzOsuGame.Edit
             {
                 try
                 {
-                    string? directory = ScriptedSkinSupport.IsScriptedSkin(skinInfo)
-                        ? skinManager.GetScriptDirectory(skinInfo.Value)
-                        : null;
+                    string? directory = null;
+
+                    skinInfo.PerformRead(s =>
+                    {
+                        if (EzLegacySkinFolders.TryGetDirectory(s, out string folder))
+                            directory = folder;
+                    });
+
+                    if (directory == null && ScriptedSkinSupport.IsScriptedSkin(skinInfo))
+                        directory = skinManager.GetScriptDirectory(skinInfo.Value);
 
                     ExternalEditOperation<SkinInfo>? edit = null;
 

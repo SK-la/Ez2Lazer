@@ -5,6 +5,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
@@ -17,7 +18,9 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
+using osu.Framework.Platform;
 using osu.Game.Database;
+using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
@@ -57,6 +60,12 @@ namespace osu.Game.Overlays.Settings.Sections
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; }
+
+        [Resolved]
+        private GameHost host { get; set; }
+
+        [Resolved]
+        private Storage storage { get; set; }
 
         private IDisposable realmSubscription;
         private Bindable<bool> autoApplyOnSkinChangeBindable;
@@ -109,6 +118,18 @@ namespace osu.Game.Overlays.Settings.Sections
                     Note = { Value = new SettingsNote.Data(EzEditorStrings.SETTINGS_AUTO_APPLY_SKIN_JSON_NOTE, SettingsNote.Type.Informational) },
                 },
                 new ScriptedSkinSettings(),
+                new SettingsButtonV2
+                {
+                    Text = EzSkinStrings.OPEN_LEGACY_SKIN_FOLDER,
+                    TooltipText = EzSkinStrings.LEGACY_SKIN_FOLDER_NOTE,
+                    Action = openLegacySkinFolder,
+                },
+                new SettingsButtonV2
+                {
+                    Text = EzSkinStrings.RESCAN_LEGACY_SKINS,
+                    TooltipText = EzSkinStrings.RESCAN_LEGACY_SKINS_TOOLTIP,
+                    Action = () => skins.RefreshLegacySkinCatalog(),
+                },
             };
         }
 
@@ -133,6 +154,7 @@ namespace osu.Game.Overlays.Settings.Sections
             autoApplyOnSkinChangeBindable.BindValueChanged(onAutoApplyOnSkinChangeChanged);
 
             skins.ScriptedSkinsCatalogUpdated += refreshSkinsList;
+            skins.LegacySkinsCatalogUpdated += refreshSkinsList;
 
             // A full SkinInfo scan plus a Realm notification registration. Both are deferred out of the
             // settings preload window; the dropdown renders the current skin from `Current` in the meantime.
@@ -203,10 +225,20 @@ namespace osu.Game.Overlays.Settings.Sections
             Schedule(() => skinDropdown.Items = dropdownItems);
         }
 
+        private void openLegacySkinFolder()
+        {
+            string full = storage.GetFullPath(EzModifyPath.LEGACY_SKIN_PATH);
+            Directory.CreateDirectory(full);
+            host.OpenFileExternally(full);
+        }
+
         protected override void Dispose(bool isDisposing)
         {
             if (isDisposing && skins != null)
+            {
                 skins.ScriptedSkinsCatalogUpdated -= refreshSkinsList;
+                skins.LegacySkinsCatalogUpdated -= refreshSkinsList;
+            }
 
             base.Dispose(isDisposing);
 

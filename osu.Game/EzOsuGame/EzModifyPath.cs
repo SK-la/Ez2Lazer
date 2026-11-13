@@ -44,6 +44,11 @@ namespace osu.Game.EzOsuGame
         public const string PETS_PATH = @"EzResources/Pets";
 
         /// <summary>
+        /// Imported and manually placed legacy skins. One folder per skin.
+        /// </summary>
+        public const string LEGACY_SKIN_PATH = @"EzResources/LegacySkin";
+
+        /// <summary>
         /// Local custom avatars: <c>{Username}.png</c> or <c>{Username}/{clip}/000.png</c>.
         /// </summary>
         public const string AVATARS_PATH = @"EzResources/Modify/avatars";

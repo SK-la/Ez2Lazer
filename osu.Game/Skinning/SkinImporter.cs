@@ -14,6 +14,7 @@ using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame;
 using osu.Game.IO;
 using osu.Game.IO.Archives;
 using osu.Game.Overlays.Notifications;
@@ -29,9 +30,12 @@ namespace osu.Game.Skinning
 
         private readonly ModelManager<SkinInfo> modelManager;
 
+        private readonly Storage gameStorage;
+
         public SkinImporter(Storage storage, RealmAccess realm, IStorageResourceProvider skinResources)
             : base(storage, realm)
         {
+            gameStorage = storage;
             this.skinResources = skinResources;
 
             modelManager = new ModelManager<SkinInfo>(storage, realm);
@@ -41,7 +45,16 @@ namespace osu.Game.Skinning
 
         protected override string[] HashableFileTypes => new[] { ".ini", ".json" };
 
-        protected override bool ShouldDeleteArchive(string path) => string.Equals(Path.GetExtension(path), @".osk", StringComparison.OrdinalIgnoreCase);
+        protected override bool ShouldDeleteArchive(string path) => false;
+
+        public override Live<SkinInfo>? ImportModel(SkinInfo item, ArchiveReader? archive = null, ImportParameters parameters = default, CancellationToken cancellationToken = default)
+        {
+            if (archive == null)
+                return base.ImportModel(item, archive, parameters, cancellationToken);
+
+            SkinInfo imported = EzLegacySkinFolders.ImportArchive(gameStorage, archive, GetShortenedFilenames(archive));
+            return imported.ToLiveUnmanaged();
+        }
 
         protected override SkinInfo CreateModel(ArchiveReader archive, ImportParameters parameters) => new SkinInfo { Name = archive.Name ?? @"No name" };
 
@@ -170,6 +183,24 @@ namespace osu.Game.Skinning
 
         public void UpdateSkinIniMetadata(SkinInfo item, Realm realm)
         {
+            if (EzLegacySkinFolders.TryGetDirectory(item, out string directory))
+            {
+                var folderSkin = createInstance(item);
+
+                try
+                {
+                    folderSkin.Configuration.SkinInfo.Name = item.Name;
+                    folderSkin.Configuration.SkinInfo.Creator = item.Creator;
+                    EzLegacySkinFolders.WriteSkinIni(folderSkin, directory);
+                }
+                finally
+                {
+                    folderSkin.Dispose();
+                }
+
+                return;
+            }
+
             var existingFile = item.GetFile(@"skin.ini");
 
             // create a working instance of the skin.
@@ -210,6 +241,9 @@ namespace osu.Game.Skinning
         /// <returns>Whether any change actually occurred.</returns>
         public bool Save(Skin skin)
         {
+            if (EzLegacySkinFolders.TryGetDirectory(skin.SkinInfo.Value, out string directory))
+                return EzLegacySkinFolders.Save(skin, directory);
+
             bool hadChanges = false;
 
             skin.SkinInfo.PerformWrite(s =>

@@ -401,6 +401,7 @@ namespace osu.Game
             dependencies.Cache(EzGameplayWarmUp = new EzGameplayWarmUpService());
 
             dependencies.Cache(realm = new RealmAccess(Storage, CLIENT_DATABASE_FILENAME, Host.UpdateThread));
+            EzLegacySkinFolders.BindRoot(Storage);
 
             dependencies.CacheAs<RulesetStore>(RulesetStore = new EzRealmRulesetStore(realm, Storage));
             dependencies.CacheAs<IRulesetStore>(RulesetStore);

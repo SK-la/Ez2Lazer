@@ -1,12 +1,15 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
-using osu.Game.Extensions;
+using osu.Framework.IO.Stores;
+using osu.Framework.Platform;
 using osu.Game.Database;
+using osu.Game.Extensions;
+using osu.Game.EzOsuGame;
 using osu.Game.IO;
 using osu.Game.Models;
 using Realms;
@@ -46,6 +49,9 @@ namespace osu.Game.Skinning
 
         public virtual Skin CreateInstance(IStorageResourceProvider resources)
         {
+            if (EzLegacySkinFolders.TryGetDirectory(this, out string directory))
+                return new LegacySkin(this, resources, new StorageBackedResourceStore(new NativeStorage(directory)));
+
             var type = string.IsNullOrEmpty(InstantiationInfo)
                 // handle the case of skins imported before InstantiationInfo was added.
                 ? typeof(LegacySkin)

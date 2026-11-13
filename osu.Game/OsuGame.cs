@@ -1124,6 +1124,7 @@ namespace osu.Game
             // todo: all archive managers should be able to be looped here.
             SkinManager.PostNotification = n => Notifications.Post(n);
             SkinManager.PresentImport = items => PresentSkin(items.First().Value);
+            waitForReady(() => dialogOverlay, overlay => SkinManager.IntroduceLegacySkinStorage(overlay));
 
             BeatmapManager.PostNotification = n => Notifications.Post(n);
             BeatmapManager.PresentImport = items => PresentBeatmap(items.First().Value);

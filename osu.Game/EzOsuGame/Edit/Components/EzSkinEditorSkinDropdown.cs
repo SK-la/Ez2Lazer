@@ -65,6 +65,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             skins.CurrentSkinInfo.BindValueChanged(e => Text = e.NewValue.ToString() ?? string.Empty, true);
 
             skins.ScriptedSkinsCatalogUpdated += refreshSkinsList;
+            skins.LegacySkinsCatalogUpdated += refreshSkinsList;
             refreshSkinsList();
         }
 
@@ -93,6 +94,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 return;
 
             skins.ScriptedSkinsCatalogUpdated -= refreshSkinsList;
+            skins.LegacySkinsCatalogUpdated -= refreshSkinsList;
             realmSubscription?.Dispose();
         }
 
