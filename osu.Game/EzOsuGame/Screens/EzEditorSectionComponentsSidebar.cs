@@ -219,7 +219,7 @@ namespace osu.Game.EzOsuGame.Screens
         private void rebuildVisualLists()
         {
             refreshEzSkinOptions();
-            cardFlow.Clear();
+            cardFlow.Clear(true);
 
             switch (ComponentType.Value)
             {
@@ -263,7 +263,7 @@ namespace osu.Game.EzOsuGame.Screens
             {
                 cardFlow.Add(new VisualTextureItem(
                     noteSet,
-                    createNotePreview(noteSet),
+                    () => createNotePreview(noteSet),
                     () => noteSetName!.Value = noteSet,
                     () => noteSetName!.Value == noteSet));
             }
@@ -275,7 +275,7 @@ namespace osu.Game.EzOsuGame.Screens
             {
                 cardFlow.Add(new VisualTextureItem(
                     stageSet,
-                    createStagePreview(stageSet),
+                    () => createStagePreview(stageSet),
                     () => stageName!.Value = stageSet,
                     () => stageName!.Value == stageSet));
             }
@@ -287,7 +287,7 @@ namespace osu.Game.EzOsuGame.Screens
             {
                 cardFlow.Add(new VisualTextureItem(
                     panel,
-                    resources.Get($"Panel/{panel}", EzTextureUsage.Thumbnail),
+                    () => resources.Get($"Panel/{panel}", EzTextureUsage.Thumbnail),
                     () => panelName!.Value = panel,
                     () => panelName!.Value == panel));
             }
@@ -299,7 +299,7 @@ namespace osu.Game.EzOsuGame.Screens
             {
                 cardFlow.Add(new VisualTextureItem(
                     theme,
-                    preview(theme),
+                    () => preview(theme),
                     () => applyHudTheme(slot, theme),
                     () => shown == theme));
             }
@@ -336,7 +336,7 @@ namespace osu.Game.EzOsuGame.Screens
             {
                 cardFlow.Add(new VisualTextureItem(
                     setName,
-                    firstFolderImage($"ColumnLight/{setName}"),
+                    () => firstFolderImage($"ColumnLight/{setName}"),
                     () => columnLightName!.Value = setName,
                     () => columnLightName!.Value == setName));
             }
@@ -348,7 +348,7 @@ namespace osu.Game.EzOsuGame.Screens
             {
                 cardFlow.Add(new VisualTextureItem(
                     string.IsNullOrEmpty(name) ? EzSkinStrings.JUDGEMENT_LINE_NONE : name,
-                    createJudgementLinePreview(name),
+                    () => createJudgementLinePreview(name),
                     () => judgementLineName!.Value = name,
                     () => judgementLineName!.Value == name));
             }
@@ -407,22 +407,26 @@ namespace osu.Game.EzOsuGame.Screens
 
         private partial class VisualTextureItem : CompositeDrawable
         {
+            private const double time_before_load = 0;
+            private const double time_before_unload = 1500;
+
             private readonly LocalisableString name;
-            private readonly Texture? preview;
+            private readonly Func<Texture?> loadPreview;
             private readonly Action onClick;
             private readonly Func<bool> isSelected;
 
             private Box stateBox = null!;
             private OsuSpriteText nameText = null!;
             private OverlayColourProvider colourProvider = null!;
+            private DelayedLoadUnloadWrapper? previewWrapper;
 
             private float? appliedStateAlpha;
             private Color4? appliedNameColour;
 
-            public VisualTextureItem(LocalisableString name, Texture? preview, Action onClick, Func<bool> isSelected)
+            public VisualTextureItem(LocalisableString name, Func<Texture?> loadPreview, Action onClick, Func<bool> isSelected)
             {
                 this.name = name;
-                this.preview = preview;
+                this.loadPreview = loadPreview;
                 this.onClick = onClick;
                 this.isSelected = isSelected;
 
@@ -475,21 +479,13 @@ namespace osu.Game.EzOsuGame.Screens
                                         RelativeSizeAxes = Axes.Both,
                                         Colour = colourProvider.Background6,
                                     },
-                                    preview != null
-                                        ? new Sprite
-                                        {
-                                            RelativeSizeAxes = Axes.Both,
-                                            Anchor = Anchor.Centre,
-                                            Origin = Anchor.Centre,
-                                            FillMode = FillMode.Fit,
-                                            Texture = preview,
-                                        }
-                                        : new OsuSpriteText
-                                        {
-                                            Anchor = Anchor.Centre,
-                                            Origin = Anchor.Centre,
-                                            Text = "-",
-                                        }
+                                    previewWrapper = new DelayedLoadUnloadWrapper(
+                                        () => new LazyThumbnailSprite(loadPreview, colourProvider),
+                                        time_before_load,
+                                        time_before_unload)
+                                    {
+                                        RelativeSizeAxes = Axes.Both,
+                                    },
                                 }
                             },
                             new Container
@@ -572,9 +568,51 @@ namespace osu.Game.EzOsuGame.Screens
             {
                 base.Dispose(isDisposing);
 
-                // Thumbnail 池按引用计数回收：卡片下树后主动释放，不等 GC。
                 if (isDisposing)
-                    preview?.Dispose();
+                    previewWrapper?.Expire();
+            }
+        }
+
+        private partial class LazyThumbnailSprite : CompositeDrawable
+        {
+            private readonly Texture? texture;
+
+            public LazyThumbnailSprite(Func<Texture?> loadPreview, OverlayColourProvider colourProvider)
+            {
+                RelativeSizeAxes = Axes.Both;
+
+                texture = loadPreview();
+
+                if (texture != null)
+                {
+                    InternalChild = new Sprite
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                        FillMode = FillMode.Fit,
+                        Texture = texture,
+                    };
+                }
+                else
+                {
+                    InternalChild = new OsuSpriteText
+                    {
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                        Text = "-",
+                        Colour = colourProvider.Content1,
+                    };
+                }
+            }
+
+            protected override void Dispose(bool isDisposing)
+            {
+                base.Dispose(isDisposing);
+
+                // Thumbnail 池按引用计数回收：下树后主动释放，不等 GC。
+                if (isDisposing)
+                    texture?.Dispose();
             }
         }
     }

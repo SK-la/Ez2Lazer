@@ -159,6 +159,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
                             {
                                 RelativeSizeAxes = Axes.X,
                                 AutoSizeAxes = Axes.Y,
+                                // Smaller depth draws in front of the card list if a scroll child escapes its cell.
+                                Depth = float.MinValue,
                                 Padding = new MarginPadding { Horizontal = 0, Top = 5 },
                                 Child = new SettingsEnumDropdown<EzEditorComponentType>
                                 {
@@ -169,12 +171,19 @@ namespace osu.Game.EzOsuGame.Edit.Components
                         },
                         new Drawable[]
                         {
-                            new OsuScrollContainer
+                            new Container
                             {
                                 RelativeSizeAxes = Axes.Both,
-                                ScrollbarVisible = false,
-                                Margin = new MarginPadding { Left = 0, Right = 10, Top = 5, Bottom = 10 },
-                                Child = section,
+                                Depth = 0,
+                                Masking = true,
+                                Child = new OsuScrollContainer
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                    Masking = true,
+                                    ScrollbarVisible = false,
+                                    Margin = new MarginPadding { Left = 0, Right = 10, Top = 5, Bottom = 10 },
+                                    Child = section,
+                                },
                             },
                         },
                     },

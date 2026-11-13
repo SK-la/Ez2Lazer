@@ -1052,12 +1052,23 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected override void Dispose(bool isDisposing)
         {
+            // This override runs before Drawable's IsDisposed guard. A second dispose must not Cancel a source
+            // that the first call already disposed.
+            if (IsDisposed)
+                return;
+
             if (isDisposing)
             {
-                difficultyCancellationSource?.Cancel();
-                difficultyCancellationSource?.Dispose();
+                if (difficultyCancellationSource != null)
+                {
+                    difficultyCancellationSource.Cancel();
+                    difficultyCancellationSource.Dispose();
+                    difficultyCancellationSource = null;
+                }
+
                 cancelRadarAnalysis();
                 modSettingTracker?.Dispose();
+                modSettingTracker = null;
             }
 
             base.Dispose(isDisposing);

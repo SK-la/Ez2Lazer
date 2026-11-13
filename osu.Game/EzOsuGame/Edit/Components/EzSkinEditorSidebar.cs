@@ -113,6 +113,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         public EzSkinEditorSidebar()
         {
             RelativeSizeAxes = Axes.Y;
+            Depth = -1;
             // 占位宽度由 ReservedWidth 驱动（固定+展开时为面板+轨，其余为 0）；面板 BypassAutoSize
             // 并向左悬停，不撑大自身宽度。
             Width = 0;
@@ -140,6 +141,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                     Margin = new MarginPadding { Right = EzVerticalRail.WIDTH },
                     RelativeSizeAxes = Axes.Y,
                     Width = CONTENT_WIDTH,
+                    Masking = true,
                     BypassAutoSizeAxes = Axes.Both,
                     Children = new Drawable[]
                     {
@@ -151,6 +153,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                         contentScroll = new OsuScrollContainer
                         {
                             RelativeSizeAxes = Axes.Both,
+                            Masking = true,
                             ScrollbarVisible = false,
                             Margin = new MarginPadding { Bottom = 10 },
                             Child = contentFlow = new FillFlowContainer

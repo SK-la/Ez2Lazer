@@ -49,6 +49,9 @@ namespace osu.Game.Overlays.SkinEditor
 
         protected SkinEditor? Editor;
 
+        /// <summary>Official skin editor instance when loaded; used by Ez workspace for toolbox previews.</summary>
+        internal SkinEditor? ToolboxSkinEditor => Editor;
+
         [Resolved]
         private IPerformFromScreenRunner? performer { get; set; }
 

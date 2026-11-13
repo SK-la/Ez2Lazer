@@ -34,6 +34,7 @@ using osu.Game.Input.Bindings;
 using osu.Game.IO;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
+using osu.Game.Overlays.SkinEditor;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
@@ -102,6 +103,9 @@ namespace osu.Game.EzOsuGame.Edit
 
         [Resolved(canBeNull: true)]
         private INotificationOverlay? notifications { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private SkinEditorOverlay? skinEditorOverlay { get; set; }
 
         [Resolved]
         private MusicController musicController { get; set; } = null!;
@@ -303,6 +307,7 @@ namespace osu.Game.EzOsuGame.Edit
                                     {
                                         Name = @"Menu container",
                                         RelativeSizeAxes = Axes.X,
+                                        // Smaller depth draws in front. The menu and its open dropdown must stay above the workspace.
                                         Depth = float.MinValue,
                                         Height = osu.Game.Overlays.SkinEditor.SkinEditor.MENU_HEIGHT,
                                         Children = new Drawable[]
@@ -390,6 +395,8 @@ namespace osu.Game.EzOsuGame.Edit
                                     sceneBar = new EzSkinEditorSceneBar
                                     {
                                         RelativeSizeAxes = Axes.X,
+                                        // In front of the workspace row so a scrolling sidebar cannot paint over these controls.
+                                        Depth = -1,
                                         GroupRequested = requestSceneGroup,
                                         OpenOfficialHudEditorRequested = () => OpenOfficialHudEditor?.Invoke(),
                                     },
@@ -437,6 +444,13 @@ namespace osu.Game.EzOsuGame.Edit
             };
 
             dependencies.CacheAs(sceneBar);
+            cacheSkinEditorForToolboxPreviews();
+        }
+
+        private void cacheSkinEditorForToolboxPreviews()
+        {
+            if (skinEditorOverlay?.ToolboxSkinEditor is global::osu.Game.Overlays.SkinEditor.SkinEditor official)
+                dependencies.CacheAs(official);
         }
 
         protected override void LoadComplete()
@@ -926,7 +940,7 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
-            dialogOverlay.Push(new EzLayoutThemeImportDialog(themeSuffix => beginLayoutPackImport(themeSuffix)));
+            dialogOverlay.Push(new EzLayoutThemeImportDialog(beginLayoutPackImport));
         }
 
         private void beginLayoutPackImport(string themeSuffix)
