@@ -7,6 +7,7 @@ using osu.Framework.Bindables;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Screens.Footer;
 using osu.Game.Screens.OnlinePlay;
 
 namespace osu.Game.Overlays.Mods
@@ -19,6 +20,8 @@ namespace osu.Game.Overlays.Mods
 
         public SelectAllModsButton(FreeModSelectOverlay modSelectOverlay)
         {
+            ApplyCornerRadius(ScreenFooterButton.CORNER_RADIUS);
+
             Width = ModSelectOverlay.BUTTON_WIDTH;
 
             Text = CommonStrings.SelectAll;

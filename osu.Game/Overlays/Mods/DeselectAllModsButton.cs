@@ -7,6 +7,7 @@ using osu.Framework.Bindables;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Screens.Footer;
 
 namespace osu.Game.Overlays.Mods
 {
@@ -16,6 +17,8 @@ namespace osu.Game.Overlays.Mods
 
         public DeselectAllModsButton(ModSelectOverlay modSelectOverlay)
         {
+            ApplyCornerRadius(ScreenFooterButton.CORNER_RADIUS);
+
             Width = ModSelectOverlay.BUTTON_WIDTH;
 
             Text = CommonStrings.DeselectAll;

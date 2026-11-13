@@ -76,6 +76,12 @@ namespace osu.Game.Graphics.UserInterface
 
         protected readonly Container ButtonContent;
 
+        protected void ApplyCornerRadius(float radius)
+        {
+            Content.CornerRadius = radius;
+            backgroundLayer.CornerRadius = radius;
+        }
+
         /// <summary>
         /// Creates a new <see cref="ShearedButton"/>
         /// </summary>
