@@ -181,7 +181,7 @@ namespace osu.Game.Overlays.Mods
                                         AutoSizeAxes = Axes.X,
                                         Margin = new MarginPadding { Horizontal = 70 },
                                         Padding = new MarginPadding { Bottom = 10 },
-                                        ChildrenEnumerable = createColumns()
+                                        ChildrenEnumerable = CreateColumns()
                                     }
                                 }
                             }
@@ -317,13 +317,13 @@ namespace osu.Game.Overlays.Mods
         /// <summary>
         /// Deselect all visible mods in all columns.
         /// </summary>
-        public void DeselectAll()
+        public virtual void DeselectAll()
         {
             foreach (var column in columnFlow.Columns.OfType<ModColumn>())
                 column.DeselectAll();
         }
 
-        private IEnumerable<ColumnDimContainer> createColumns()
+        private protected virtual IEnumerable<ColumnDimContainer> CreateColumns()
         {
             if (ShowPresets)
             {
@@ -374,10 +374,32 @@ namespace osu.Game.Overlays.Mods
 
             AvailableMods.Value = newLocalAvailableMods;
             filterMods();
+            AssignModsToColumns();
+        }
 
+        protected virtual void AssignModsToColumns()
+        {
             foreach (var column in columnFlow.Columns.OfType<ModColumn>())
                 column.AvailableMods = AvailableMods.Value.GetValueOrDefault(column.ModType, Array.Empty<ModState>());
         }
+
+        private protected void ReplaceModColumns(IEnumerable<ColumnDimContainer> columns)
+        {
+            var existing = columnFlow.Children.Where(child => child.Column is ModColumn).ToArray();
+
+            foreach (var child in existing)
+                columnFlow.Remove(child, true);
+
+            foreach (var column in columns)
+                columnFlow.Add(column);
+        }
+
+        protected void SetColumnFlowBottomPadding(float bottom)
+        {
+            columnFlow.Padding = columnFlow.Padding with { Bottom = bottom };
+        }
+
+        protected void AddAboveColumns(Drawable drawable) => aboveColumnsContent.Add(drawable);
 
         private void filterMods()
         {

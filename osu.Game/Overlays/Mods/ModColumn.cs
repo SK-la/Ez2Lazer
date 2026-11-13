@@ -39,8 +39,6 @@ namespace osu.Game.Overlays.Mods
             get => availableMods;
             set
             {
-                Debug.Assert(value.All(mod => mod.Mod.Type == ModType));
-
                 availableMods = value;
 
                 foreach (var mod in availableMods)
@@ -136,7 +134,7 @@ namespace osu.Game.Overlays.Mods
             base.LoadComplete();
 
             toggleAllCheckbox?.Current.BindValueChanged(_ => updateToggleAllText(), true);
-            hotkeyStyle.BindValueChanged(val => hotkeyHandler = createHotkeyHandler(val.NewValue), true);
+            hotkeyStyle.BindValueChanged(val => hotkeyHandler = CreateHotkeyHandler(val.NewValue), true);
             asyncLoadPanels();
         }
 
@@ -162,9 +160,13 @@ namespace osu.Game.Overlays.Mods
             }, (cancellationTokenSource = new CancellationTokenSource()).Token);
         }
 
+        protected virtual bool HidesWhenEmpty => true;
+
+        protected void RefreshColumnState() => updateState();
+
         private void updateState()
         {
-            Alpha = availableMods.All(mod => !mod.Visible) ? 0 : 1;
+            Alpha = HidesWhenEmpty && availableMods.All(mod => !mod.Visible) ? 0 : 1;
 
             if (toggleAllCheckbox != null && !SelectionAnimationRunning)
             {
@@ -327,7 +329,7 @@ namespace osu.Game.Overlays.Mods
         /// Creates an appropriate <see cref="IModHotkeyHandler"/> for this column's <see cref="ModType"/> and
         /// the supplied <paramref name="hotkeyStyle"/>.
         /// </summary>
-        private IModHotkeyHandler createHotkeyHandler(ModSelectHotkeyStyle hotkeyStyle)
+        protected virtual IModHotkeyHandler CreateHotkeyHandler(ModSelectHotkeyStyle hotkeyStyle)
         {
             switch (ModType)
             {
