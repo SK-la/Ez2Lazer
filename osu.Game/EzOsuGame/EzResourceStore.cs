@@ -401,6 +401,10 @@ namespace osu.Game.EzOsuGame
         {
             if (isDisposing)
             {
+                // 帧集缓存持有 Texture 引用；须在底层 store ClearCache 前丢弃，避免退出后仍占显存。
+                frameSets.Clear();
+                directoryIndex.Invalidate();
+
                 textureStore.Dispose();
                 animationSafeStore.Dispose();
                 refCountedTextureStore.Dispose();
