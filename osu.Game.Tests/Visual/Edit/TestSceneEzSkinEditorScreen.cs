@@ -67,25 +67,36 @@ namespace osu.Game.Tests.Visual.Edit
             AddAssert("appearance has no hud", () => !EzSkinEditorSceneRegistry.SupportsHudLayer(EzEditorSceneType.Appearance));
             AddAssert("note has no hud", () => !EzSkinEditorSceneRegistry.SupportsHudLayer(EzEditorSceneType.Note));
 
-            AddAssert("gameplay offers ez hud + ruleset layers", () =>
+            AddAssert("gameplay offers ez + skin hud layers", () =>
             {
                 var layers = EzSkinEditorLayerOptions.For(EzEditorSceneType.GameplayHud);
-                return layers.Any(d => d.Layer == EzHUDLayer.EzHud)
+                return layers.Count == 7
+                       && layers.Any(d => d.Layer == EzHUDLayer.EzHud)
                        && layers.Any(d => d.Layer == EzHUDLayer.EzHudRuleset)
-                       && layers.Any(d => d.Layer == EzHUDLayer.EzPlayfieldRuleset);
+                       && layers.Any(d => d.Layer == EzHUDLayer.EzPlayfieldRuleset)
+                       && layers.Any(d => d.Layer == EzHUDLayer.SkinHud)
+                       && layers.Any(d => d.Layer == EzHUDLayer.SkinHudRuleset)
+                       && layers.Any(d => d.Layer == EzHUDLayer.SkinPlayfieldRuleset);
             });
-            AddAssert("song select offers only global ez hud", () =>
+            AddAssert("song select offers global ez + skin hud", () =>
             {
                 var layers = EzSkinEditorLayerOptions.For(EzEditorSceneType.SongSelectHud);
-                return layers.Any(d => d.Layer == EzHUDLayer.EzHud) && !layers.Any(d => d.RulesetScoped);
+                return layers.Any(d => d.Layer == EzHUDLayer.EzHud)
+                       && layers.Any(d => d.Layer == EzHUDLayer.SkinHud)
+                       && !layers.Any(d => d.RulesetScoped);
             });
             AddAssert("appearance offers full layers (shown but not editable)", () =>
             {
                 var layers = EzSkinEditorLayerOptions.For(EzEditorSceneType.Appearance);
                 return layers.Any(d => d.Layer == EzHUDLayer.EzHud)
                        && layers.Any(d => d.Layer == EzHUDLayer.EzHudRuleset)
-                       && layers.Any(d => d.Layer == EzHUDLayer.EzPlayfieldRuleset);
+                       && layers.Any(d => d.Layer == EzHUDLayer.EzPlayfieldRuleset)
+                       && layers.Any(d => d.Layer == EzHUDLayer.SkinHud)
+                       && layers.Any(d => d.Layer == EzHUDLayer.SkinHudRuleset)
+                       && layers.Any(d => d.Layer == EzHUDLayer.SkinPlayfieldRuleset);
             });
+            AddAssert("ez layers use layout store", () => EzSkinEditorLayerOptions.UsesEzLayoutStore(EzHUDLayer.EzHud));
+            AddAssert("skin layers use active skin", () => !EzSkinEditorLayerOptions.UsesEzLayoutStore(EzHUDLayer.SkinHud));
 
             AddAssert("global ez hud targets main hud without ruleset", () =>
             {
@@ -102,6 +113,34 @@ namespace osu.Game.Tests.Visual.Edit
             {
                 var lookup = EzSkinEditorLayerOptions.ResolveLookup(EzEditorSceneType.GameplayHud, EzHUDLayer.EzPlayfieldRuleset, new ManiaRuleset().RulesetInfo);
                 return lookup != null && lookup.Lookup == GlobalSkinnableContainers.Playfield;
+            });
+            AddAssert("skin hud shares lookup with ez hud", () =>
+            {
+                var ruleset = new ManiaRuleset().RulesetInfo;
+                var ez = EzSkinEditorLayerOptions.ResolveLookup(EzEditorSceneType.GameplayHud, EzHUDLayer.EzHud, ruleset);
+                var skin = EzSkinEditorLayerOptions.ResolveLookup(EzEditorSceneType.GameplayHud, EzHUDLayer.SkinHud, ruleset);
+                return ez != null && skin != null && ez.Equals(skin);
+            });
+            AddAssert("skin ruleset hud matches ez ruleset hud lookup", () =>
+            {
+                var ruleset = new ManiaRuleset().RulesetInfo;
+                var ez = EzSkinEditorLayerOptions.ResolveLookup(EzEditorSceneType.GameplayHud, EzHUDLayer.EzHudRuleset, ruleset);
+                var skin = EzSkinEditorLayerOptions.ResolveLookup(EzEditorSceneType.GameplayHud, EzHUDLayer.SkinHudRuleset, ruleset);
+                return ez != null && skin != null && ez.Equals(skin);
+            });
+            AddAssert("skin hud shares lookup with ez hud", () =>
+            {
+                var ruleset = new ManiaRuleset().RulesetInfo;
+                var ez = EzSkinEditorLayerOptions.ResolveLookup(EzEditorSceneType.GameplayHud, EzHUDLayer.EzHud, ruleset);
+                var skin = EzSkinEditorLayerOptions.ResolveLookup(EzEditorSceneType.GameplayHud, EzHUDLayer.SkinHud, ruleset);
+                return ez != null && skin != null && ez.Equals(skin);
+            });
+            AddAssert("skin ruleset hud matches ez ruleset hud lookup", () =>
+            {
+                var ruleset = new ManiaRuleset().RulesetInfo;
+                var ez = EzSkinEditorLayerOptions.ResolveLookup(EzEditorSceneType.GameplayHud, EzHUDLayer.EzHudRuleset, ruleset);
+                var skin = EzSkinEditorLayerOptions.ResolveLookup(EzEditorSceneType.GameplayHud, EzHUDLayer.SkinHudRuleset, ruleset);
+                return ez != null && skin != null && ez.Equals(skin);
             });
             AddAssert("song select resolves its own container", () =>
             {
@@ -513,6 +552,9 @@ namespace osu.Game.Tests.Visual.Edit
 
             AddStep("select mode layer", () => sceneBar.ActiveLayer.Value = EzHUDLayer.EzHudRuleset);
             AddUntilStep("both libraries visible as separate groups", () => visibleLibraryCount() == 2);
+
+            AddStep("select skin mode layer", () => sceneBar.ActiveLayer.Value = EzHUDLayer.SkinHudRuleset);
+            AddUntilStep("skin mode layer shows both libraries", () => visibleLibraryCount() == 2);
 
             AddStep("hide hud layer", () => sceneBar.ActiveLayer.Value = EzHUDLayer.HudOff);
             AddUntilStep("no library visible", () => visibleLibraryCount() == 0);
