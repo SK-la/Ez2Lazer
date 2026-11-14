@@ -838,7 +838,7 @@ namespace osu.Game.Overlays.SkinEditor
             }
 
             LastLayoutSaveAttempted = true;
-            skin.UpdateDrawableTarget(target);
+            PersistInMemoryLayout(skin);
 
             bool saved = skins.Save(skin);
             LastLayoutSaveSucceeded = saved;
