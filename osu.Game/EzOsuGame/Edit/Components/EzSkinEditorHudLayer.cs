@@ -110,6 +110,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private EzEditorSceneType scene = EzEditorSceneType.GameplayHud;
         private EzHUDLayer layer = EzHUDLayer.EzHud;
         private bool skinLayoutDirty;
+        private Guid dirtySkinId;
+
+        /// <summary>
+        /// Pending skin HUD layout writes not yet flushed to disk.
+        /// </summary>
+        public bool HasPendingSkinLayoutSave => skinLayoutDirty;
 
         [Resolved]
         private SkinManager skins { get; set; } = null!;
@@ -266,9 +272,29 @@ namespace osu.Game.EzOsuGame.Edit.Components
             if (!skinLayoutDirty)
                 return;
 
-            var skin = skins.CurrentSkin.Value;
+            FlushPendingForSkin(skins.CurrentSkin.Value);
+        }
+
+        /// <summary>
+        /// Writes pending layout JSON for <paramref name="skin"/> when it matches the dirty session skin.
+        /// </summary>
+        public void FlushPendingForSkin(Skin skin)
+        {
+            if (!skinLayoutDirty)
+                return;
+
+            if (dirtySkinId != Guid.Empty && skin.SkinInfo.Value.ID != dirtySkinId)
+                return;
+
             skins.Save(skin);
             skinLayoutDirty = false;
+            dirtySkinId = Guid.Empty;
+        }
+
+        public void DiscardPendingSkinLayoutSave()
+        {
+            skinLayoutDirty = false;
+            dirtySkinId = Guid.Empty;
         }
 
         /// <summary>
@@ -400,6 +426,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             skins.EnsureMutableSkin();
             skins.CurrentSkin.Value.UpdateDrawableTarget(target);
             skinLayoutDirty = true;
+            dirtySkinId = skins.CurrentSkinInfo.Value.ID;
         }
 
         /// <summary>

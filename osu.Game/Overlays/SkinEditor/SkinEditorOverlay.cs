@@ -21,6 +21,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Edit;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
 using osu.Game.Rulesets;
@@ -182,7 +183,17 @@ namespace osu.Game.Overlays.SkinEditor
 
         protected override void PopOut()
         {
-            Editor?.Save(false);
+            if (Editor != null)
+            {
+                bool hadUnsaved = Editor.HasUnsavedLayoutChanges();
+                Editor.Save(false);
+
+                if (hadUnsaved && Editor.LastLayoutSaveAttempted && !Editor.LastLayoutSaveSucceeded)
+                    Logger.Log(EzEditorStrings.NOTIFY_SKIN_LAYOUT_EXIT_SAVE_FAILED, LoggingTarget.Runtime, LogLevel.Important);
+                else if (hadUnsaved && !Editor.LastLayoutSaveAttempted)
+                    Logger.Log(EzEditorStrings.NOTIFY_SKIN_LAYOUT_EXIT_CONTAINERS_LOADING, LoggingTarget.Runtime, LogLevel.Important);
+            }
+
             Editor?.Hide();
             nestedInputManagerDisable?.Dispose();
             nestedInputManagerDisable = null;

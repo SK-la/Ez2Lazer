@@ -609,7 +609,11 @@ namespace osu.Game.Skinning
                 {
                     // save once to ensure the required json content is populated.
                     // currently this only happens on save.
-                    result.PerformRead(skin => Save(skin.CreateInstance(this)));
+                    result.PerformRead(skin =>
+                    {
+                        Save(skin.CreateInstance(this));
+                        Logger.Log(EzSkinStrings.NOTIFY_MUTABLE_SKIN_COPY_CREATED.Format(skin.Name), LoggingTarget.Runtime, LogLevel.Important);
+                    });
                     CurrentSkinInfo.Value = result;
                     return true;
                 }
@@ -630,8 +634,18 @@ namespace osu.Game.Skinning
             if (ScriptedSkinSupport.IsScriptedSkin(skin.SkinInfo))
                 return SaveScriptedSkinLayout(skin);
 
-            if (EzLegacySkinFolders.TryGetDirectory(skin.SkinInfo.Value, out _))
-                return skinImporter.Save(skin);
+            if (EzLegacySkinFolders.TryGetDirectory(skin.SkinInfo.Value, out string legacyDirectory))
+            {
+                bool written = skinImporter.Save(skin);
+
+                if (written)
+                {
+                    Logger.Log($"Wrote legacy skin layout to {legacyDirectory} (skin {skin.SkinInfo.Value.ID}, name {skin.SkinInfo.Value.Name}).",
+                        LoggingTarget.Runtime, LogLevel.Debug);
+                }
+
+                return written;
+            }
 
             if (!skin.SkinInfo.IsManaged)
                 throw new InvalidOperationException($"Attempting to save a skin which is not yet tracked. Call {nameof(EnsureMutableSkin)} first.");
@@ -849,6 +863,15 @@ namespace osu.Game.Skinning
                 try
                 {
                     RefreshLegacySkinCatalog();
+
+                    if (EzSkinEditorHostScope.CanWriteSkinLayout)
+                    {
+                        CurrentSkinInfo.Value.PerformRead(skinInfo =>
+                        {
+                            if (EzLegacySkinFolders.TryGetDirectory(skinInfo, out _))
+                                ReloadCurrentLegacyFolderSkinIfActive();
+                        });
+                    }
                 }
                 catch (Exception e)
                 {

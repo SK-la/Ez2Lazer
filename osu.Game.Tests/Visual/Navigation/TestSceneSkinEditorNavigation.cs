@@ -203,6 +203,242 @@ namespace osu.Game.Tests.Visual.Navigation
         }
 
         [Test]
+        public void TestEzEditorInEditorSkinRoundTripPreservesLegacyLayout()
+        {
+            Live<SkinInfo> legacySkin = null!;
+            string layoutSnapshot = null!;
+
+            AddStep("import legacy skin", () =>
+            {
+                var skinManager = Game.Dependencies.Get<SkinManager>();
+                legacySkin = skinManager.Import(new ImportTask(TestResources.OpenResource(@"Archives/modified-ezSkin.osk"), "modified-ezSkin.osk")).GetResultSafely();
+                skinManager.CurrentSkinInfo.Value = legacySkin;
+            });
+
+            advanceToSongSelect();
+            openEzEditor();
+            AddUntilStep("song select scene selected", () => ezSkinEditor.Workspace!.CurrentScene.Value == EzEditorSceneType.SongSelectHud);
+
+            AddStep("place song select component", () =>
+            {
+                var hud = ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorHudLayer>().Single();
+                hud.TryPlaceComponent(SerialisedDrawableInfo.GetAllAvailableDrawables().First());
+            });
+
+            AddStep("capture legacy song select json", () =>
+            {
+                legacySkin.PerformRead(s =>
+                {
+                    if (!EzLegacySkinFolders.TryGetDirectory(s, out string directory))
+                        throw new InvalidOperationException("Expected legacy skin on disk.");
+
+                    string path = Path.Combine(directory, $"{GlobalSkinnableContainers.SongSelect}.json");
+                    layoutSnapshot = File.Exists(path) ? File.ReadAllText(path) : string.Empty;
+                });
+            });
+
+            AddStep("switch to another skin inside Ez editor", () =>
+            {
+                var skinManager = Game.Dependencies.Get<SkinManager>();
+                skinManager.CurrentSkinInfo.Value = skinManager.GetAllUsableSkins().First(s => s.ID == SkinInfo.EZ_STYLE_PRO_SKIN);
+            });
+
+            AddStep("switch back to legacy", () => Game.Dependencies.Get<SkinManager>().CurrentSkinInfo.Value = legacySkin);
+
+            AddAssert("legacy song select json unchanged", () =>
+            {
+                bool unchanged = false;
+
+                legacySkin.PerformRead(s =>
+                {
+                    if (!EzLegacySkinFolders.TryGetDirectory(s, out string directory))
+                        return;
+
+                    string path = Path.Combine(directory, $"{GlobalSkinnableContainers.SongSelect}.json");
+                    string onDisk = File.Exists(path) ? File.ReadAllText(path) : string.Empty;
+                    unchanged = onDisk == layoutSnapshot;
+                });
+
+                return unchanged;
+            });
+        }
+
+        [Test]
+        public void TestOfficialEditorExitWithoutEditsDoesNotWriteLegacyJson()
+        {
+            Live<SkinInfo> legacySkin = null!;
+            string layoutSnapshot = null!;
+
+            AddStep("import legacy skin", () =>
+            {
+                var skinManager = Game.Dependencies.Get<SkinManager>();
+                legacySkin = skinManager.Import(new ImportTask(TestResources.OpenResource(@"Archives/modified-ezSkin.osk"), "modified-ezSkin.osk")).GetResultSafely();
+                skinManager.CurrentSkinInfo.Value = legacySkin;
+            });
+
+            advanceToSongSelect();
+            openSkinEditor();
+            AddUntilStep("official skin editor visible", () => skinEditor!.State.Value == Visibility.Visible);
+
+            AddStep("capture json", () =>
+            {
+                legacySkin.PerformRead(s =>
+                {
+                    if (!EzLegacySkinFolders.TryGetDirectory(s, out string directory))
+                        throw new InvalidOperationException("Expected legacy skin on disk.");
+
+                    string path = Path.Combine(directory, $"{GlobalSkinnableContainers.SongSelect}.json");
+                    layoutSnapshot = File.Exists(path) ? File.ReadAllText(path) : string.Empty;
+                });
+            });
+
+            toggleSkinEditor();
+            AddUntilStep("official skin editor hidden", () => skinEditorOverlay.State.Value == Visibility.Hidden);
+
+            AddAssert("legacy json unchanged after open/close without edits", () =>
+            {
+                bool unchanged = false;
+
+                legacySkin.PerformRead(s =>
+                {
+                    if (!EzLegacySkinFolders.TryGetDirectory(s, out string directory))
+                        return;
+
+                    string path = Path.Combine(directory, $"{GlobalSkinnableContainers.SongSelect}.json");
+                    string onDisk = File.Exists(path) ? File.ReadAllText(path) : string.Empty;
+                    unchanged = onDisk == layoutSnapshot;
+                });
+
+                return unchanged;
+            });
+        }
+
+        [Test]
+        public void TestLegacyLayoutSurvivesClosedEditorRoundTripThroughOtherSkin()
+        {
+            Live<SkinInfo> legacySkin = null!;
+            string layoutAfterLegacySession = null!;
+
+            AddStep("import legacy skin", () =>
+            {
+                var skinManager = Game.Dependencies.Get<SkinManager>();
+                legacySkin = skinManager.Import(new ImportTask(TestResources.OpenResource(@"Archives/modified-ezSkin.osk"), "modified-ezSkin.osk")).GetResultSafely();
+                skinManager.CurrentSkinInfo.Value = legacySkin;
+            });
+
+            advanceToSongSelect();
+            openSkinEditor();
+            AddUntilStep("official skin editor visible", () => skinEditor!.State.Value == Visibility.Visible);
+
+            AddStep("add song select component", () =>
+                skinEditor!.ChildrenOfType<SkinComponentToolbox.ToolboxComponentButton>().First().TriggerClick());
+
+            toggleSkinEditor();
+            AddUntilStep("official skin editor hidden", () => skinEditorOverlay.State.Value == Visibility.Hidden);
+
+            AddStep("capture legacy json after first session", () =>
+            {
+                legacySkin.PerformRead(s =>
+                {
+                    if (!EzLegacySkinFolders.TryGetDirectory(s, out string directory))
+                        throw new InvalidOperationException("Expected legacy skin on disk.");
+
+                    layoutAfterLegacySession = File.ReadAllText(Path.Combine(directory, $"{GlobalSkinnableContainers.SongSelect}.json"));
+                });
+            });
+
+            AddStep("select other skin", () =>
+            {
+                var skinManager = Game.Dependencies.Get<SkinManager>();
+                skinManager.CurrentSkinInfo.Value = skinManager.GetAllUsableSkins().First(s => s.ID == SkinInfo.EZ_STYLE_PRO_SKIN);
+            });
+
+            openSkinEditor();
+            toggleSkinEditor();
+            AddUntilStep("overlay hidden", () => skinEditorOverlay.State.Value == Visibility.Hidden);
+
+            AddStep("select legacy again", () =>
+            {
+                var skinManager = Game.Dependencies.Get<SkinManager>();
+                skinManager.CurrentSkinInfo.Value = legacySkin;
+            });
+
+            AddAssert("legacy json matches first session", () =>
+            {
+                bool ok = false;
+
+                legacySkin.PerformRead(s =>
+                {
+                    if (!EzLegacySkinFolders.TryGetDirectory(s, out string directory))
+                        return;
+
+                    string onDisk = File.ReadAllText(Path.Combine(directory, $"{GlobalSkinnableContainers.SongSelect}.json"));
+                    ok = onDisk == layoutAfterLegacySession;
+                });
+
+                return ok;
+            });
+        }
+
+        [Test]
+        public void TestLegacyLayoutPersistedWhenSwitchingSkinsInsideOfficialEditor()
+        {
+            Live<SkinInfo> legacySkin = null!;
+            Live<SkinInfo> otherLegacySkin = null!;
+            string layoutAfterEdit = null!;
+
+            AddStep("import legacy skins", () =>
+            {
+                var skinManager = Game.Dependencies.Get<SkinManager>();
+                legacySkin = skinManager.Import(new ImportTask(TestResources.OpenResource(@"Archives/modified-ezSkin.osk"), "modified-ezSkin.osk")).GetResultSafely();
+                otherLegacySkin = skinManager.Import(new ImportTask(TestResources.OpenResource(@"Archives/modified-ezSkin.osk"), "modified-ezSkin-alt.osk")).GetResultSafely();
+                skinManager.CurrentSkinInfo.Value = legacySkin;
+            });
+
+            advanceToSongSelect();
+            openSkinEditor();
+            AddUntilStep("official skin editor visible", () => skinEditor!.State.Value == Visibility.Visible);
+
+            AddStep("add song select component", () =>
+                skinEditor!.ChildrenOfType<SkinComponentToolbox.ToolboxComponentButton>().First().TriggerClick());
+
+            AddStep("save legacy layout before snapshot", () => skinEditor!.Save());
+
+            AddStep("capture legacy json after edit", () =>
+            {
+                legacySkin.PerformRead(s =>
+                {
+                    if (!EzLegacySkinFolders.TryGetDirectory(s, out string directory))
+                        throw new InvalidOperationException("Expected legacy skin on disk.");
+
+                    layoutAfterEdit = File.ReadAllText(Path.Combine(directory, $"{GlobalSkinnableContainers.SongSelect}.json"));
+                });
+            });
+
+            AddStep("switch to another legacy skin while editor visible", () => Game.Dependencies.Get<SkinManager>().CurrentSkinInfo.Value = otherLegacySkin);
+
+            AddStep("switch back to legacy", () => Game.Dependencies.Get<SkinManager>().CurrentSkinInfo.Value = legacySkin);
+
+            toggleSkinEditor();
+
+            AddAssert("legacy json persisted layout edits", () =>
+            {
+                bool ok = false;
+
+                legacySkin.PerformRead(s =>
+                {
+                    if (!EzLegacySkinFolders.TryGetDirectory(s, out string directory))
+                        return;
+
+                    string onDisk = File.ReadAllText(Path.Combine(directory, $"{GlobalSkinnableContainers.SongSelect}.json"));
+                    ok = onDisk == layoutAfterEdit;
+                });
+
+                return ok;
+            });
+        }
+
+        [Test]
         public void TestOpeningEzEditorClosesOfficialSkinEditor()
         {
             advanceToSongSelect();

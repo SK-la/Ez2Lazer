@@ -454,8 +454,36 @@ namespace osu.Game.EzOsuGame
         private static bool isMigratable(SkinInfo skin) =>
             string.IsNullOrEmpty(skin.InstantiationInfo) || skin.InstantiationInfo == legacy_instantiation;
 
+        private static void promoteLayoutLayersIfPresent(string directory)
+        {
+            string nested = Path.Combine(directory, "layout-layers");
+
+            if (!Directory.Exists(nested))
+                return;
+
+            try
+            {
+                foreach (string source in Directory.EnumerateFiles(nested, "*.json"))
+                {
+                    string fileName = Path.GetFileName(source);
+                    string destination = Path.Combine(directory, fileName);
+
+                    if (File.Exists(destination))
+                        continue;
+
+                    File.Move(source, destination);
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, $"无法把 layout-layers 中的布局 JSON 提升到皮肤根目录：{directory}");
+            }
+        }
+
         private static SkinInfo createInfo(string folderName, string directory)
         {
+            promoteLayoutLayersIfPresent(directory);
+
             (string iniName, string iniCreator) = readIni(directory);
             FolderMeta? meta = readMeta(directory);
 

@@ -23,6 +23,18 @@ namespace osu.Game.EzOsuGame.Localization
             "布局已保存",
             "Layout saved");
 
+        public static readonly EzLocalizationManager.EzLocalisableString NOTIFY_SKIN_LAYOUT_EXIT_SAVE_FAILED = new(
+            "皮肤 HUD 布局未写入磁盘，请退出前再试保存。",
+            "Skin HUD layout was not written to disk. Try saving again before exiting.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString NOTIFY_SKIN_LAYOUT_EXIT_CONTAINERS_LOADING = new(
+            "皮肤 HUD 容器仍在加载，未写入布局。",
+            "Skin HUD layout was not written because skinnable containers were still loading.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString NOTIFY_SKIN_LAYOUT_SAVE_CONTAINERS_LOADING = new(
+            "HUD 容器仍在加载，已跳过保存。",
+            "Skipped saving skin HUD layout because skinnable containers are still loading.");
+
         public static readonly LocalisableString SETTINGS_AUTO_APPLY_SKIN_JSON = new EzLocalizationManager.EzLocalisableString(
             "自动切换皮肤配置",
             "Auto-apply skin configuration");
