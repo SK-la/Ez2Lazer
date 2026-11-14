@@ -290,6 +290,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
             if (!HasPendingSkinLayoutSave)
                 return false;
 
+            if (skins.EnsureMutableSkin())
+            {
+                skin = skins.CurrentSkin.Value;
+                dirtySkinId = skin.SkinInfo.Value.ID;
+            }
+
             if (dirtySkinId != Guid.Empty && skin.SkinInfo.Value.ID != dirtySkinId)
                 return false;
 
