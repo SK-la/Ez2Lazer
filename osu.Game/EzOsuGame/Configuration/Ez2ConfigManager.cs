@@ -726,6 +726,18 @@ namespace osu.Game.EzOsuGame.Configuration
             if (runtime_column_data.TryGetValue(keyMode, out var data))
                 return data;
 
+            if (!key_mode_to_column_color_setting.ContainsKey(keyMode))
+            {
+                var typesBytes = new byte[keyMode];
+
+                for (int i = 0; i < keyMode; i++)
+                    typesBytes[i] = getDefaultColumnTypeByte(keyMode, i);
+
+                data = createRuntimeData(typesBytes);
+                runtime_column_data[keyMode] = data;
+                return data;
+            }
+
             return buildKeyModeColumnDataFromSetting(keyMode);
         }
 

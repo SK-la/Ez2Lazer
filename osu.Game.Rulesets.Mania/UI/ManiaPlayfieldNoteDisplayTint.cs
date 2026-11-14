@@ -78,8 +78,8 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved]
         private OsuColour colours { get; set; } = null!;
 
-        [Resolved]
-        private IBeatmap beatmap { get; set; } = null!;
+        [Resolved(CanBeNull = true)]
+        private IBeatmap? beatmap { get; set; }
 
         [Resolved(CanBeNull = true)]
         private EditorBeatmap? editorBeatmap { get; set; }
@@ -242,6 +242,9 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private Color4 getNoteTint(double startTime)
         {
+            if (beatmap == null)
+                return Color4.White;
+
             refreshGridStateIfNeeded();
 
             ManiaEditorBeatLinePalette palette = configStore.BeatmapEditor.Colouring.BeatLines;
@@ -287,7 +290,7 @@ namespace osu.Game.Rulesets.Mania.UI
             if (IsEditorCompose)
                 return beatDivisor?.Value ?? 4;
 
-            return beatmap.BeatmapInfo.BeatDivisor;
+            return beatmap?.BeatmapInfo.BeatDivisor ?? 4;
         }
 
         private void invalidateLineDivisors()

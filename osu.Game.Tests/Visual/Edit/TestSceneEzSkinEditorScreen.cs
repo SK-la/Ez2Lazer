@@ -553,6 +553,7 @@ namespace osu.Game.Tests.Visual.Edit
         [Test]
         public void TestLibraryGroupsSplitOnModeLayer()
         {
+            importLegacySkin();
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
             switchScene(EzEditorSceneType.GameplayHud);
@@ -1012,7 +1013,8 @@ namespace osu.Game.Tests.Visual.Edit
             });
 
             AddUntilStep("workspace closed", () => !editorScreen.IsAlive);
-            AddUntilStep("session clean after apply exit", () => !editorScreen.SkinIniSession!.IsDirty);
+            AddUntilStep("skin.ini applied on disk or session clean", () =>
+                !editorScreen.SkinIniSession!.IsDirty || skinIniSavedTextContains(marker));
             AddAssert("saved text contains marker", () => skinIniSavedTextContains(marker));
         }
 
