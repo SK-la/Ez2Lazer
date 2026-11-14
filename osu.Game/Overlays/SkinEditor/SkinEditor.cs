@@ -983,7 +983,7 @@ namespace osu.Game.Overlays.SkinEditor
             game?.UnregisterImportHandler(this);
         }
 
-        protected partial class SkinEditorToast : Toast
+        public partial class SkinEditorToast : Toast
         {
             public SkinEditorToast(LocalisableString value, string skinDisplayName)
                 : base(SkinSettingsStrings.SkinLayoutEditor, value)

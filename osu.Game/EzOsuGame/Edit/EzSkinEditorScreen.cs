@@ -31,10 +31,12 @@ using osu.Game.EzOsuGame.ScriptedSkin;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Input.Bindings;
+using osu.Game.Localisation;
 using osu.Game.IO;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.SkinEditor;
+using OfficialSkinEditor = osu.Game.Overlays.SkinEditor.SkinEditor;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
@@ -103,6 +105,9 @@ namespace osu.Game.EzOsuGame.Edit
 
         [Resolved(canBeNull: true)]
         private INotificationOverlay? notifications { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private OnScreenDisplay? onScreenDisplay { get; set; }
 
         [Resolved(canBeNull: true)]
         private SkinEditorOverlay? skinEditorOverlay { get; set; }
@@ -1250,7 +1255,13 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void postNotification(LocalisableString text) => notifications?.Post(new SimpleNotification { Text = text });
 
-        private void onLayoutWritten() => postNotification(EzEditorStrings.LAYOUT_SAVED);
+        private void onLayoutWritten()
+        {
+            onScreenDisplay?.Display(new osu.Game.Overlays.SkinEditor.SkinEditor.SkinEditorToast(
+                ToastStrings.SkinSaved,
+                skinManager.CurrentSkin.Value.SkinInfo.ToString() ?? "Unknown"));
+            postNotification(EzEditorStrings.LAYOUT_SAVED);
+        }
 
         private void onCurrentSkinChanged(ValueChangedEvent<Skin> skin)
         {
