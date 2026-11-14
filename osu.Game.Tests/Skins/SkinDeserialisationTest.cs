@@ -12,6 +12,7 @@ using osu.Framework.IO.Stores;
 using osu.Game.Audio;
 using osu.Game.IO;
 using osu.Game.IO.Archives;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.Screens.Menu;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
@@ -116,7 +117,9 @@ namespace osu.Game.Tests.Skins
                 }
             }
 
-            var availableTypes = SerialisedDrawableInfo.GetAllAvailableDrawables();
+            // Scene HUD (results / music player) is stored in Ez layout JSON, not skin archives.
+            var availableTypes = SerialisedDrawableInfo.GetAllAvailableDrawables()
+                                                       .Where(t => !typeof(IEzSceneHudComponent).IsAssignableFrom(t));
 
             Assert.That(instantiatedTypes, Is.EquivalentTo(availableTypes));
         }
