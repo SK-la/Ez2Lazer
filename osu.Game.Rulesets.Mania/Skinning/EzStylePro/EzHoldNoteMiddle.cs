@@ -103,12 +103,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 hittingLayer = null;
             }
 
-            Drawable? body = Factory.CreateAnimation(ColorPrefix + "longnote/middle");
-            Drawable? tail = Factory.CreateAnimation(ColorPrefix + "longnote/tail");
+            Drawable? body = LoadEzProNoteComponent(EzManiaNotePart.HoldBody);
+            Drawable? tail = LoadEzProNoteComponent(EzManiaNotePart.HoldTail);
 
-            string newComponentName = ColorPrefix + "note";
-            body ??= Factory.CreateAnimation(newComponentName);
-            tail ??= Factory.CreateAnimation(newComponentName);
+            body ??= LoadEzProNoteComponent(EzManiaNotePart.Note);
+            tail ??= LoadEzProNoteComponent(EzManiaNotePart.Note);
 
             topContainer?.Expire();
             bodyContainer?.Expire();

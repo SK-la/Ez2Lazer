@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         /// <summary>
         /// 命中靶固定读 whitenote：按列类型取色的贴图（blue / green）在缺少该色的音符集里会让靶整列消失。
         /// </summary>
-        protected override string ColorPrefix => "white";
+        protected override string ColorPrefix => EzColumnResourceLookup.NOTE_TEXTURE_AFFIX_A;
 
         private readonly IBindable<double> hitTargetFloatFixed = new Bindable<double>();
         private readonly IBindable<double> hitTargetAlpha = new Bindable<double>();

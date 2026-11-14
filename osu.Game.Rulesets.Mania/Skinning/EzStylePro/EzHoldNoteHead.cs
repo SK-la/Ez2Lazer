@@ -5,6 +5,7 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -26,11 +27,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void UpdateTexture()
         {
-            noteDrawable = Factory.CreateAnimation(HeadName);
+            noteDrawable = LoadEzProNoteComponent(EzManiaNotePart.HoldHead);
 
             if (noteDrawable == null)
             {
-                noteDrawable = Factory.CreateAnimation(NoteName);
+                noteDrawable = LoadEzProNoteComponent(EzManiaNotePart.Note);
 
                 if (noteDrawable == null)
                     return;

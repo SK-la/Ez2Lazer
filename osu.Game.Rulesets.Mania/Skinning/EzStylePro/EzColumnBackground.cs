@@ -28,7 +28,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     {
         private const string default_column_set = "EzColumnLight";
         private const string builtin_column_light_path = "ColumnLight/ColumnLight";
-        private static readonly EzColumnType[] type_fallback_order = { EzColumnType.S, EzColumnType.E, EzColumnType.P, EzColumnType.B, EzColumnType.A };
 
         private Container lightContainer = null!;
         private Drawable light = null!;
@@ -149,16 +148,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private Drawable? loadFromFolder(string setName, out bool tint)
         {
-            int start = Array.IndexOf(type_fallback_order, column.EzNoteTypeBindable.Value);
-
-            if (start < 0)
-                start = type_fallback_order.Length - 1;
-
             string? tried = null;
 
-            for (int i = start; i < type_fallback_order.Length; i++)
+            foreach (var columnType in EzColumnResourceLookup.EnumerateDegradeOrder(column.EzNoteTypeBindable.Value))
             {
-                string name = colourName(type_fallback_order[i]);
+                string name = EzColumnResourceLookup.ColumnLightColourName(columnType);
 
                 if (tried != null && string.Equals(name, tried, StringComparison.Ordinal))
                     continue;
@@ -194,14 +188,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private static bool isDefaultSet(string setName)
             => string.Equals(setName, default_column_set, StringComparison.OrdinalIgnoreCase);
-
-        private static string colourName(EzColumnType type) => type switch
-        {
-            EzColumnType.S or EzColumnType.E => "Red",
-            EzColumnType.P => "Green",
-            EzColumnType.B => "Blue",
-            _ => "White",
-        };
 
         private static void prepareLight(Drawable drawable)
         {

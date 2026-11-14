@@ -5,6 +5,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -58,18 +59,28 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected float NoteHeight => Column.EzNoteSizeBindable.Value.Y;
 
-        protected string NoteName => ColorPrefix + "note";
-        protected string HeadName => ColorPrefix + "longnote/head";
-        protected string TailName => ColorPrefix + "longnote/tail";
-
         protected virtual string ColorPrefix
-            => noteDisplayTint?.GetEzProTextureColourPrefix(DisplayColourPart, Column) ?? "white";
+            => noteDisplayTint?.GetEzProTextureColourPrefix(DisplayColourPart, Column) ?? EzColumnResourceLookup.NOTE_TEXTURE_AFFIX_A;
 
         protected virtual void UpdateTexture() { }
         protected virtual void UpdateDrawable() { }
 
         protected virtual void UpdateColor()
         {
+        }
+
+        protected Drawable? LoadEzProNoteComponent(EzManiaNotePart part)
+            => LoadEzProNoteComponent(EzColumnResourceLookup.EzProNoteComponent(part));
+
+        /// <summary>
+        /// 经 <see cref="EzLocalTextureFactory.CreateEzProNoteComponent"/> 按列类型降级加载 note 组件。
+        /// </summary>
+        protected Drawable? LoadEzProNoteComponent(string componentAfterPrefix)
+        {
+            bool useTintBase = noteDisplayTint?.UseTintBaseTexture(DisplayColourPart, Column) == true;
+            var drawable = Factory.CreateEzProNoteComponent(componentAfterPrefix, Column.EzNoteTypeBindable.Value, useTintBase, out string resolvedPrefix);
+            appliedPrefix = resolvedPrefix;
+            return drawable;
         }
 
         protected void OnLoadChanged()
@@ -79,7 +90,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 return;
 
             tintBaseApplied = noteDisplayTint?.UseTintBaseTexture(DisplayColourPart, Column) == true;
-            appliedPrefix = ColorPrefix;
             MainContainer.Clear();
             UpdateTexture();
             OnDrawableChanged();

@@ -15,7 +15,7 @@ using osu.Game.Rulesets.Objects.Drawables;
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     /// <summary>
-    /// 优先 <see cref="EzNoteBase.TailName"/>；缺失时复用 <see cref="EzHoldNoteHead"/> 的加载与裁切逻辑，并整体旋转 180°。
+    /// 优先 HoldTail 部件；缺失时复用 <see cref="EzHoldNoteHead"/> 的加载与裁切逻辑，并整体旋转 180°。
     /// </summary>
     public partial class EzHoldNoteTail : EzNote
     {
@@ -74,7 +74,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (gradient)
                 return;
 
-            tailDrawable = Factory.CreateAnimation(TailName);
+            tailDrawable = LoadEzProNoteComponent(EzManiaNotePart.HoldTail);
 
             if (tailDrawable != null)
             {
@@ -83,8 +83,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 return;
             }
 
-            // 与 EzHoldNoteHead 相同：HeadName -> NoteName
-            tailDrawable = Factory.CreateAnimation(HeadName);
+            // 与 EzHoldNoteHead 相同：HoldHead → Note
+            tailDrawable = LoadEzProNoteComponent(EzManiaNotePart.HoldHead);
 
             if (tailDrawable != null)
             {
@@ -93,7 +93,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 return;
             }
 
-            tailDrawable = Factory.CreateAnimation(NoteName);
+            tailDrawable = LoadEzProNoteComponent(EzManiaNotePart.Note);
 
             if (tailDrawable == null)
                 return;
