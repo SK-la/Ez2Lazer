@@ -297,6 +297,8 @@ namespace osu.Game.Skinning
 
         private SkinLayoutInfo? parseLayoutInfo(string jsonContent, GlobalSkinnableContainers target)
         {
+            jsonContent = EzLegacySkinFolders.StripUtf8Bom(jsonContent);
+
             SkinLayoutInfo? layout = null;
 
             // handle namespace changes...

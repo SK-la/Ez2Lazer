@@ -31,10 +31,12 @@ using osu.Game.EzOsuGame.ScriptedSkin;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Input.Bindings;
+using osu.Game.Localisation;
 using osu.Game.IO;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.SkinEditor;
+using OfficialSkinEditor = osu.Game.Overlays.SkinEditor.SkinEditor;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
@@ -103,6 +105,9 @@ namespace osu.Game.EzOsuGame.Edit
 
         [Resolved(canBeNull: true)]
         private INotificationOverlay? notifications { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private OnScreenDisplay? onScreenDisplay { get; set; }
 
         [Resolved(canBeNull: true)]
         private SkinEditorOverlay? skinEditorOverlay { get; set; }
@@ -717,20 +722,30 @@ namespace osu.Game.EzOsuGame.Edit
             if (!EzSkinEditorHostScope.CanWriteSkinLayout)
                 return;
 
+            bool configDirty = hasUnsavedConfigChanges();
+            bool iniDirty = SkinIniSession.IsDirty;
+            bool jsonDirty = SkinJsonSession is { IsSupported: true, HasFile: true } && SkinJsonSession.IsDirty(ezSkinConfig);
+
             ezSkinConfig.Save();
             hudLayer.PersistAllLayouts();
 
-            if (SkinJsonSession is { IsSupported: true, HasFile: true } && SkinJsonSession.IsDirty(ezSkinConfig))
-                SkinJsonSession.Commit(ezSkinConfig);
+            if (jsonDirty)
+                SkinJsonSession!.Commit(ezSkinConfig);
 
-            if (SkinIniSession is { IsSupported: true, IsDirty: true })
+            if (iniDirty)
                 SkinIniSession.Commit();
 
             recaptureAppliedConfigBaseline();
 
+            if (!configDirty && !iniDirty && !jsonDirty)
+                return;
+
             refreshScene();
             invalidateResourceCaches();
-            skinManager.CurrentSkinInfo.TriggerChange();
+
+            if (iniDirty)
+                skinManager.CurrentSkinInfo.TriggerChange();
+
             refreshScene();
         }
 
@@ -772,7 +787,16 @@ namespace osu.Game.EzOsuGame.Edit
 
         public bool OnPressed(KeyBindingPressEvent<PlatformAction> e)
         {
-            if (e.Repeat || !hudLayer.InteractionEnabled.Value)
+            if (e.Repeat)
+                return false;
+
+            if (e.Action == PlatformAction.Save)
+            {
+                applySettings();
+                return true;
+            }
+
+            if (!hudLayer.InteractionEnabled.Value)
                 return false;
 
             switch (e.Action)
@@ -1231,7 +1255,13 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void postNotification(LocalisableString text) => notifications?.Post(new SimpleNotification { Text = text });
 
-        private void onLayoutWritten() => postNotification(EzEditorStrings.LAYOUT_SAVED);
+        private void onLayoutWritten()
+        {
+            onScreenDisplay?.Display(new OfficialSkinEditor.SkinEditorToast(
+                ToastStrings.SkinSaved,
+                skinManager.CurrentSkin.Value.SkinInfo.ToString() ?? "Unknown"));
+            postNotification(EzEditorStrings.LAYOUT_SAVED);
+        }
 
         private void onCurrentSkinChanged(ValueChangedEvent<Skin> skin)
         {

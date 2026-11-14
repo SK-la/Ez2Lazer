@@ -156,7 +156,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 {
                     Items = new OsuMenuItem[]
                     {
-                        new EditorMenuItem(EzEditorStrings.MENU_APPLY, MenuItemType.Standard, () => ApplyAction?.Invoke()),
+                        new EditorMenuItem(EzEditorStrings.MENU_APPLY, MenuItemType.Standard, () => ApplyAction?.Invoke()) { Hotkey = new Hotkey(PlatformAction.Save) },
                         new OsuMenuItemSpacer(),
                         exportOskItem = new EditorMenuItem(EzEditorStrings.MENU_EXPORT_OSK, MenuItemType.Standard, () => ExportOskAction?.Invoke()),
                         new OsuMenuItemSpacer(),

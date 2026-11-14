@@ -7,6 +7,7 @@ using System.Text;
 using osu.Framework.IO.Stores;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame;
 using osu.Game.Extensions;
 using osu.Game.IO;
 using osu.Game.Skinning;
@@ -83,18 +84,34 @@ namespace osu.Game.EzOsuGame.Edit
             if (live.ID != SkinId)
                 throw new InvalidOperationException("Cannot commit skin.ini for a skin that is no longer current.");
 
-            if (!live.IsManaged)
-                throw new InvalidOperationException("Cannot commit skin.ini because the current skin is not writable.");
-
             string textToCommit = DraftText;
             string savedTextForBackup = SavedText;
 
-            live.PerformWrite(skin =>
+            if (live.PerformRead(s => EzLegacySkinFolders.TryGetDirectory(s, out _)))
             {
-                LastBackupFilename = backupService.BackupCurrentSkinIni(skin, savedTextForBackup);
-                writeSkinIniText(skin, textToCommit);
-            });
-            skinManager.CurrentSkinInfo.TriggerChange();
+                live.PerformRead(s =>
+                {
+                    if (!EzLegacySkinFolders.TryGetDirectory(s, out string directory))
+                        return;
+
+                    LastBackupFilename = backupFolderSkinIni(directory, savedTextForBackup);
+                    File.WriteAllText(Path.Combine(directory, @"skin.ini"), textToCommit, EzLegacySkinFolders.Utf8NoBom);
+                });
+
+                skinManager.ReloadCurrentLegacyFolderSkinIfActive();
+            }
+            else
+            {
+                if (!live.IsManaged)
+                    throw new InvalidOperationException("Cannot commit skin.ini because the current skin is not writable.");
+
+                live.PerformWrite(skin =>
+                {
+                    LastBackupFilename = backupService.BackupCurrentSkinIni(skin, savedTextForBackup);
+                    writeSkinIniText(skin, textToCommit);
+                });
+                skinManager.CurrentSkinInfo.TriggerChange();
+            }
 
             SavedText = textToCommit;
             DraftText = textToCommit;
@@ -103,6 +120,16 @@ namespace osu.Game.EzOsuGame.Edit
 
         private string readSkinIniText(SkinInfo skin)
         {
+            if (EzLegacySkinFolders.TryGetDirectory(skin, out string directory))
+            {
+                string path = Path.Combine(directory, @"skin.ini");
+
+                if (!File.Exists(path))
+                    return createDefaultSkinIniText(skin);
+
+                return EzLegacySkinFolders.StripUtf8Bom(File.ReadAllText(path));
+            }
+
             var existingFile = skin.GetFile(@"skin.ini");
 
             if (existingFile == null)
@@ -127,6 +154,18 @@ namespace osu.Game.EzOsuGame.Edit
                 skinManager.ReplaceFile(skin, existingFile, stream);
             else
                 skinManager.AddFile(skin, stream, @"skin.ini");
+        }
+
+        private static string? backupFolderSkinIni(string directory, string savedText)
+        {
+            if (string.IsNullOrWhiteSpace(savedText))
+                return null;
+
+            string backupFilename = FormattableString.Invariant($"Backup/skin.ini.{DateTime.Now:yyyyMMdd_HHmmss}");
+            string backupPath = Path.Combine(directory, backupFilename);
+            Directory.CreateDirectory(Path.GetDirectoryName(backupPath)!);
+            File.WriteAllText(backupPath, savedText, EzLegacySkinFolders.Utf8NoBom);
+            return backupFilename;
         }
 
         private static string createDefaultSkinIniText(SkinInfo skin)

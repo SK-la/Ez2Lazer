@@ -4,7 +4,6 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Text;
 using Newtonsoft.Json;
 using osu.Framework.Logging;
 using osu.Game.Database;
@@ -107,7 +106,7 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
 
                 try
                 {
-                    File.WriteAllText(path, json, Encoding.UTF8);
+                    File.WriteAllText(path, json, EzLegacySkinFolders.Utf8NoBom);
                     hadChanges = true;
                 }
                 catch (Exception ex)
