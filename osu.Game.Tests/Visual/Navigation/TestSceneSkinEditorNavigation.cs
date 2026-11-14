@@ -402,6 +402,8 @@ namespace osu.Game.Tests.Visual.Navigation
             AddStep("add song select component", () =>
                 skinEditor!.ChildrenOfType<SkinComponentToolbox.ToolboxComponentButton>().First().TriggerClick());
 
+            AddStep("save legacy layout before snapshot", () => skinEditor!.Save());
+
             AddStep("capture legacy json after edit", () =>
             {
                 legacySkin.PerformRead(s =>
