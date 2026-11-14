@@ -29,6 +29,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
     {
         private readonly bool rulesetScoped;
         private readonly EzHudComponentFamily family;
+        private bool hasPlaceable;
 
         [Resolved(canBeNull: true)]
         private EzSkinEditorHudLayer? hudLayer { get; set; }
@@ -68,7 +69,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            sceneBar.ActiveLayer.BindValueChanged(_ => rebuild(), true);
+            sceneBar.ActiveLayer.BindValueChanged(_ => syncSectionVisible(hasPlaceable), true);
         }
 
         private void rebuild()
@@ -78,7 +79,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
             if (hudLayer == null)
             {
                 showMessage(EzEditorStrings.LIBRARY_PLACEHOLDER);
-                syncSectionVisible(false);
+                hasPlaceable = false;
+                syncSectionVisible(hasPlaceable);
                 return;
             }
 
@@ -112,7 +114,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
             if (rulesetScoped && target == null)
             {
                 list.Add(emptyLabel());
-                syncSectionVisible(false);
+                hasPlaceable = false;
+                syncSectionVisible(hasPlaceable);
                 return;
             }
 
@@ -130,7 +133,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
             if (placeableCount == 0)
                 list.Add(emptyLabel());
 
-            syncSectionVisible(placeableCount > 0);
+            hasPlaceable = placeableCount > 0;
+            syncSectionVisible(hasPlaceable);
         }
 
         private void syncSectionVisible(bool hasPlaceable)
