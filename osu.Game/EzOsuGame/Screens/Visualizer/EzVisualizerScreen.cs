@@ -52,7 +52,9 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
         [BackgroundDependencyLoader]
         private void load()
         {
-            if (layoutLayer?.MusicPlayerContainer != null)
+            // MusicPlayerContainer is created after this screen loads. Presence of the layout
+            // layer is enough: it will attach the HUD (with defaults) once the screen is current.
+            if (layoutLayer != null)
                 return;
 
             InternalChildren = new Drawable[]
