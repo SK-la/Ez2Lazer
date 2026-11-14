@@ -216,6 +216,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         public void Deactivate()
         {
+            hudLayer.PersistAllLayouts();
             hudLayer.DetachLiveTargets();
         }
 
@@ -225,6 +226,7 @@ namespace osu.Game.EzOsuGame.Edit
         {
             if (!hasUnsavedWorkspaceChanges())
             {
+                flushWorkspaceLayouts();
                 persistEditorConfig();
                 onContinued();
                 return;
@@ -486,7 +488,7 @@ namespace osu.Game.EzOsuGame.Edit
             beatmapPicker = new EzSkinEditorBeatmapPicker(realm, beatmapManager);
             sceneRail.CurrentScene.BindTo(sceneBar.CurrentScene);
             sceneBar.CurrentScene.BindValueChanged(onSceneChanged, true);
-            skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
+            skinManager.CurrentSkin.BindValueChanged(onCurrentSkinChanged);
             PreviewState.LoopBeatmap.BindValueChanged(_ => refreshScene());
             PreviewState.Ruleset.BindValueChanged(_ =>
             {
@@ -1212,12 +1214,20 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void postNotification(LocalisableString text) => notifications?.Post(new SimpleNotification { Text = text });
 
-        private void onCurrentSkinInfoChanged(ValueChangedEvent<Live<SkinInfo>> skin)
+        private void onCurrentSkinChanged(ValueChangedEvent<Skin> skin)
         {
-            if (skin.OldValue.ID != skin.NewValue.ID)
+            if (skin.OldValue != null && skin.NewValue.SkinInfo.Value.ID != skin.OldValue.SkinInfo.Value.ID)
+                hudLayer.FlushPendingForSkin(skin.OldValue);
+
+            if (skin.OldValue != null && skin.NewValue.SkinInfo.Value.ID != skin.OldValue.SkinInfo.Value.ID)
                 persistEditorConfig();
 
             Schedule(refreshScene);
+        }
+
+        private void flushWorkspaceLayouts()
+        {
+            hudLayer.PersistAllLayouts();
         }
 
         private void ensureComparisonSnapshotForCurrentSkin()
@@ -1437,6 +1447,7 @@ namespace osu.Game.EzOsuGame.Edit
         private bool hasUnsavedWorkspaceChanges() =>
             SkinIniSession.IsDirty
             || (hudLayer.ChangeHandler?.CanUndo.Value ?? false)
+            || hudLayer.HasPendingSkinLayoutSave
             || (SkinJsonSession?.IsDirty(ezSkinConfig) ?? false);
 
         private void discardWorkspaceChanges()
@@ -1444,6 +1455,7 @@ namespace osu.Game.EzOsuGame.Edit
             if (SkinIniSession.IsDirty)
                 SkinIniSession.Discard();
 
+            hudLayer.DiscardPendingSkinLayoutSave();
             skinManager.CurrentSkinInfo.TriggerChange();
         }
 

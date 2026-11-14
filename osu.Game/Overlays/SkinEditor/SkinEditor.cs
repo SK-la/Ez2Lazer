@@ -20,6 +20,7 @@ using osu.Framework.Input;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Framework.Logging;
 using osu.Framework.Testing;
 using osu.Game.Database;
 using osu.Game.EzOsuGame;
@@ -315,8 +316,8 @@ namespace osu.Game.Overlays.SkinEditor
                 if (State.Value != Visibility.Visible)
                     return;
 
-                if (val.OldValue != null && HasBegunMutating)
-                    SaveLayout(val.OldValue);
+                if (val.OldValue != null && HasUnsavedLayoutChanges())
+                    trySaveLayout(val.OldValue);
 
                 HasBegunMutating = false;
                 Scheduler.AddOnce(OnSkinChanged);
@@ -335,7 +336,8 @@ namespace osu.Game.Overlays.SkinEditor
             if (!ScriptedSkinSupport.CanUseRealmExternalEdit(currentSkin.Value.SkinInfo))
                 return;
 
-            Save();
+            if (HasUnsavedLayoutChanges())
+                Save();
 
             var skin = currentSkin.Value.SkinInfo.PerformRead(s => s.Detach());
 
@@ -350,8 +352,6 @@ namespace osu.Game.Overlays.SkinEditor
 
             if (!scripted && !folder)
                 return;
-
-            Save();
 
             string? directory = scripted
                 ? skins.GetScriptDirectory(info.Value)
@@ -618,8 +618,6 @@ namespace osu.Game.Overlays.SkinEditor
                 if (targetContainer != null)
                     changeHandler = new SkinEditorChangeHandler(targetContainer);
 
-                HasBegunMutating = true;
-
                 // Reload sidebar components.
                 SelectedTarget.TriggerChange();
             });
@@ -770,31 +768,71 @@ namespace osu.Game.Overlays.SkinEditor
         public void Save(bool userTriggered = true)
         {
             if (currentSkin.IsNotNull())
-                SaveLayout(currentSkin.Value, userTriggered);
+                trySaveLayout(currentSkin.Value, userTriggered);
         }
 
-        protected virtual void SaveLayout(Skin skin, bool userTriggered = true)
-        {
-            if (!EzSkinEditorHostScope.CanWriteSkinLayout)
-                return;
+        /// <summary>
+        /// Whether a layout save was attempted during the last <see cref="trySaveLayout"/> call.
+        /// </summary>
+        public bool LastLayoutSaveAttempted { get; private set; }
 
-            if (!HasBegunMutating)
-                return;
+        /// <summary>
+        /// Whether the last <see cref="trySaveLayout"/> call wrote skin layout files.
+        /// </summary>
+        public bool LastLayoutSaveSucceeded { get; private set; }
+
+        /// <summary>
+        /// Persists in-memory layout from loaded containers into <paramref name="skin"/> without writing to disk.
+        /// </summary>
+        protected void persistInMemoryLayout(Skin skin)
+        {
+            foreach (var target in AvailableTargets)
+            {
+                if (target.ComponentsLoaded)
+                    skin.UpdateDrawableTarget(target);
+            }
+        }
+
+        /// <returns>Whether layout files were written.</returns>
+        protected bool trySaveLayout(Skin skin, bool userTriggered = false)
+        {
+            LastLayoutSaveAttempted = false;
+            LastLayoutSaveSucceeded = false;
+
+            if (!EzSkinEditorHostScope.CanWriteSkinLayout)
+                return false;
+
+            if (!userTriggered && !HasUnsavedLayoutChanges())
+                return false;
 
             if (TargetScreen?.IsLoaded != true)
-                return;
+                return false;
 
             SkinnableContainer[] targetContainers = AvailableTargets.ToArray();
 
+            if (targetContainers.Length == 0)
+                return false;
+
             if (!targetContainers.All(c => c.ComponentsLoaded))
-                return;
+            {
+                if (userTriggered)
+                    Logger.Log(EzEditorStrings.NOTIFY_SKIN_LAYOUT_SAVE_CONTAINERS_LOADING, LoggingTarget.Runtime, LogLevel.Important);
+
+                return false;
+            }
+
+            LastLayoutSaveAttempted = true;
 
             foreach (var t in targetContainers)
                 skin.UpdateDrawableTarget(t);
 
-            // In the case the save was user triggered, always show the save message to make them feel confident.
-            if (skins.Save(skin) || userTriggered)
+            bool saved = skins.Save(skin);
+            LastLayoutSaveSucceeded = saved;
+
+            if (saved || userTriggered)
                 onScreenDisplay?.Display(new SkinEditorToast(ToastStrings.SkinSaved, skin.SkinInfo.ToString() ?? "Unknown"));
+
+            return saved;
         }
 
         protected override bool OnHover(HoverEvent e) => true;

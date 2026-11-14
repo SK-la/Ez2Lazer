@@ -232,5 +232,9 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString FIRST_USE_ACKNOWLEDGE = new EzLocalizationManager.EzLocalisableString(
             "知道了", "Got it");
+
+        public static readonly EzLocalizationManager.EzLocalisableString NOTIFY_MUTABLE_SKIN_COPY_CREATED = new(
+            "已创建可编辑副本「{0}」，后续布局改动写入该副本",
+            "Created editable copy \"{0}\"; layout changes will save to this copy.");
     }
 }
