@@ -18,8 +18,10 @@ using osu.Game.Database;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Screens;
 using osu.Game.EzOsuGame.Layout;
+using osu.Game.EzOsuGame.Screens.Visualizer;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
+using osu.Game.Online.API;
 using osu.Game.Overlays;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets;
@@ -28,6 +30,7 @@ using osu.Game.Scoring;
 using osu.Game.Screens;
 using osu.Game.Screens.Menu;
 using osu.Game.Screens.Play;
+using osu.Game.Screens.Ranking;
 using osu.Game.Screens.Select;
 using osu.Game.Skinning;
 using osu.Game.Users;
@@ -83,6 +86,9 @@ namespace osu.Game.EzOsuGame.Edit
 
         [Resolved]
         private MusicController musicController { get; set; } = null!;
+
+        [Resolved]
+        private IAPIProvider api { get; set; } = null!;
 
         private EzSkinEditorBeatmapPicker? beatmapPicker;
 
@@ -270,7 +276,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void initializeSceneCoordinator(EzSkinEditorScreen workspace)
         {
-            sceneCoordinator = new EzSkinEditorSceneCoordinator(scalingContainer, workspace, layoutLayer, updateScreenSizing, canPresentScene, () => game.ScreenStack.CurrentScreen, enterSongSelect, enterGameplay, enterFullMapPreview, enterBeatmapCompose);
+            sceneCoordinator = new EzSkinEditorSceneCoordinator(scalingContainer, workspace, layoutLayer, updateScreenSizing, canPresentScene, () => game.ScreenStack.CurrentScreen, enterSongSelect, enterGameplay, enterFullMapPreview, enterBeatmapCompose, enterResults, enterMusicPlayer);
             workspace.SceneApplied = scene => sceneCoordinator?.Present(scene, game.ScreenStack.CurrentScreen as OsuScreen);
             workspace.CanPresentScene = canPresentScene;
 
@@ -328,6 +334,42 @@ namespace osu.Game.EzOsuGame.Edit
                     Workspace.PreviewState.Ruleset.Value));
             }, new[] { typeof(MainMenu) });
         }
+
+        private void enterResults()
+        {
+            performer?.PerformFromScreen(screen =>
+            {
+                if (screen is ResultsScreen || State.Value != Visibility.Visible)
+                    return;
+
+                screen.Push(new SoloResultsScreen(createEditorPreviewScore())
+                {
+                    AllowRetry = false,
+                });
+            }, new[] { typeof(MainMenu) });
+        }
+
+        private void enterMusicPlayer()
+        {
+            performer?.PerformFromScreen(screen =>
+            {
+                if (screen is EzVisualizerScreen || State.Value != Visibility.Visible)
+                    return;
+
+                screen.Push(new EzVisualizerScreen());
+            }, new[] { typeof(MainMenu) });
+        }
+
+        private ScoreInfo createEditorPreviewScore() => new ScoreInfo(beatmap.Value.BeatmapInfo, ruleset.Value)
+        {
+            User = api.LocalUser.Value,
+            TotalScore = 1_000_000,
+            Accuracy = 1,
+            MaxCombo = 1000,
+            Rank = ScoreRank.X,
+            Date = DateTimeOffset.Now,
+            Position = 1,
+        };
 
         private void enterBeatmapCompose()
         {

@@ -13,7 +13,9 @@ using osu.Framework.Graphics.Rendering.Vertices;
 using osu.Framework.Graphics.Shaders;
 using osu.Framework.Graphics.Textures;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.Screens.Menu;
+using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
 
@@ -22,8 +24,12 @@ namespace osu.Game.EzOsuGame.Screens.Menu
     /// <summary>
     /// Menu logo visualiser with selectable geometry around the cookie.
     /// </summary>
-    public partial class EzMenuLogoVisualisation : MenuLogoVisualisation
+    public partial class EzMenuLogoVisualisation : MenuLogoVisualisation, ISerialisableDrawable, IEzSceneHudComponent
     {
+        public bool UsesFixedAnchor { get; set; }
+
+        public GlobalSkinnableContainers LayoutTarget => GlobalSkinnableContainers.MusicPlayer;
+
         private const float bar_length = 600;
         private const int bars_per_visualiser = 200;
         private const int visualiser_rounds = 2;

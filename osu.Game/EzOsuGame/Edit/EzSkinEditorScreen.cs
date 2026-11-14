@@ -1169,7 +1169,7 @@ namespace osu.Game.EzOsuGame.Edit
                 hudLayer.PersistLayoutToCurrentSkin();
                 var exportStorage = (storage as OsuStorage)?.GetExportStorage() ?? storage.GetStorageForDirectory(@"exports");
                 string path = target is EzLayoutContainer ezLayout
-                    ? EzLayoutPackIO.ExportLayerJson(storage, layoutThemeHost.Store, ezLayout.LayoutFile, exportStorage)
+                    ? EzLayoutPackIO.ExportLayerJson(storage, ezLayout.Store, ezLayout.LayoutFile, exportStorage)
                     : EzSkinLayoutIO.ExportLayerJson(target, skinManager.CurrentSkin.Value, exportStorage);
                 postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_EXPORTED_TO, path));
             }
@@ -1203,7 +1203,7 @@ namespace osu.Game.EzOsuGame.Edit
                 {
                     if (target is EzLayoutContainer ezLayout)
                     {
-                        EzLayoutPackIO.ImportLayerJson(storage, layoutThemeHost.Store, ezLayout.LayoutFile, file.FullName);
+                        EzLayoutPackIO.ImportLayerJson(storage, ezLayout.Store, ezLayout.LayoutFile, file.FullName);
                         ezLayout.LoadFromStore();
                     }
                     else

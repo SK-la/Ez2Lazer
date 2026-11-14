@@ -9,6 +9,8 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.HUD.MusicPlayer;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
@@ -37,30 +39,30 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
         /// </summary>
         private static readonly Vector2 back_reveal_size = TwoLayerButton.SIZE_EXTENDED + new Vector2(48, 48);
 
-        private const float playlist_width = 400;
-
         private readonly Bindable<WorkingBeatmap> beatmap = new Bindable<WorkingBeatmap>();
+        private readonly Bindable<Visibility> playlistVisibility = new Bindable<Visibility>();
 
-        private PlaylistOverlay playlist = null!;
+        private PlaylistOverlay? playlist;
+
+        [Resolved(canBeNull: true)]
+        private EzLayoutLayer? layoutLayer { get; set; }
+
+        public IBindable<Visibility> PlaylistState => playlistVisibility;
 
         [BackgroundDependencyLoader]
         private void load()
         {
+            if (layoutLayer?.MusicPlayerContainer != null)
+                return;
+
             InternalChildren = new Drawable[]
             {
                 new EzVisualizerStage(),
-                new Container
+                new EzVisualizerPlaylist
                 {
                     Anchor = Anchor.CentreRight,
                     Origin = Anchor.CentreRight,
-                    Width = playlist_width,
-                    Height = PlaylistOverlay.PLAYLIST_HEIGHT,
                     Margin = new MarginPadding { Right = 24 },
-                    Masking = true,
-                    Child = playlist = new PlaylistOverlay
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                    }
                 },
             };
         }
@@ -78,15 +80,20 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
             });
         }
 
+        public void AttachPlaylist(PlaylistOverlay overlay)
+        {
+            playlist = overlay;
+            playlistVisibility.UnbindBindings();
+            playlistVisibility.BindTo(overlay.State);
+        }
+
         public void TogglePlaylist()
         {
             if (Beatmap.Disabled)
                 return;
 
-            playlist.ToggleVisibility();
+            playlist?.ToggleVisibility();
         }
-
-        public IBindable<Visibility> PlaylistState => playlist.State;
 
         protected override void Update()
         {
@@ -133,7 +140,7 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
 
         public override bool OnExiting(ScreenExitEvent e)
         {
-            playlist.Hide();
+            playlist?.Hide();
             setBackButtonVisibility(false);
 
             this.FadeOut(250, Easing.OutQuint);
@@ -148,7 +155,7 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
             switch (e.Action)
             {
                 case GlobalAction.Back:
-                    if (playlist.State.Value == Visibility.Visible)
+                    if (playlist?.State.Value == Visibility.Visible)
                     {
                         playlist.Hide();
                         return true;

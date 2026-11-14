@@ -426,7 +426,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             if (target is EzLayoutContainer ezLayout)
             {
-                layoutLayer?.Store.Save(ezLayout);
+                ezLayout.Store.Save(ezLayout);
                 LayoutWritten?.Invoke();
             }
             else
