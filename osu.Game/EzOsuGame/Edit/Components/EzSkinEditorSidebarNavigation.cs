@@ -55,7 +55,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             scene = nextScene;
             Pages = sections;
 
-            rail.SetItems(sections.Select(s => (s.SectionTitle, s.SectionVisible.Value)).ToList());
+            rail.SetItems(sections.Select(s => (s.RailTitlePrimary, s.RailTitleSecondary, s.SectionVisible.Value)).ToList());
 
             if (scene is EzEditorSceneType currentScene
                 && rememberedIndex.TryGetValue(currentScene, out int remembered)

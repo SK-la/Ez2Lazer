@@ -265,10 +265,10 @@ namespace osu.Game.Tests.Visual.Edit
                 editorScreen.ChildrenOfType<EzSkinEditorSceneRail>().SingleOrDefault() is { Alpha: > 0, DrawHeight: > 1, DrawWidth: > 1 });
             AddAssert("scene bar lists both groups", () =>
             {
-                var texts = editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Single()
-                                        .ChildrenOfType<EzSceneBarButton>()
-                                        .Select(b => b.Text.ToString())
-                                        .ToArray();
+                string[] texts = editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Single()
+                                             .ChildrenOfType<EzSceneBarButton>()
+                                             .Select(b => b.Text.ToString())
+                                             .ToArray();
 
                 return texts.Contains(EzEditorStrings.SCENE_GROUP_SONG_SELECT.ToString())
                        && texts.Contains(EzEditorStrings.SCENE_GROUP_GAMEPLAY.ToString());
@@ -564,22 +564,33 @@ namespace osu.Game.Tests.Visual.Edit
 
             AddUntilStep("scene bar loaded", () => sceneBar.IsLoaded);
 
-            // Invisible sidebar groups create no content, so counting the library sections counts visible ones.
             AddStep("select global layer", () => sceneBar.ActiveLayer.Value = EzHUDLayer.EzHud);
-            AddUntilStep("only global library visible", () => visibleLibraryCount() == 1);
+            AddUntilStep("global family libraries visible", () =>
+            {
+                int count = visibleLibraryCount();
+                return count >= 1 && count <= 4;
+            });
 
             AddStep("select mode layer", () => sceneBar.ActiveLayer.Value = EzHUDLayer.EzHudRuleset);
-            AddUntilStep("both libraries visible as separate groups", () => visibleLibraryCount() == 2);
+            AddUntilStep("global and mode family libraries visible", () =>
+            {
+                int count = visibleLibraryCount();
+                return count >= 2 && count <= 8;
+            });
 
             AddStep("select skin mode layer", () => sceneBar.ActiveLayer.Value = EzHUDLayer.SkinHudRuleset);
-            AddUntilStep("skin mode layer shows both libraries", () => visibleLibraryCount() == 2);
+            AddUntilStep("skin mode layer shows family libraries", () =>
+            {
+                int count = visibleLibraryCount();
+                return count >= 2 && count <= 8;
+            });
 
             AddStep("hide hud layer", () => sceneBar.ActiveLayer.Value = EzHUDLayer.HudOff);
             AddUntilStep("no library visible", () => visibleLibraryCount() == 0);
         }
 
         private int visibleLibraryCount() =>
-            editorScreen.ChildrenOfType<EzSkinEditorComponentLibrarySection>().Count(s => s.Parent != null);
+            editorScreen.ChildrenOfType<EzSkinEditorComponentLibrarySection>().Count(s => s.SectionVisible.Value);
 
         [Test]
         public void TestComponentPickerOpenAndClamped()
@@ -922,7 +933,7 @@ namespace osu.Game.Tests.Visual.Edit
             AddAssert("session clean after commit", () => !editorScreen.SkinIniSession!.IsDirty);
             AddAssert("saved text updated", () => editorScreen.SkinIniSession!.SavedText, () => Is.EqualTo(dirtyText));
             AddAssert("backup filename recorded", () => editorScreen.SkinIniSession!.LastBackupFilename!.StartsWith("Backup/skin.ini.", StringComparison.Ordinal));
-            AddAssert("backup file stored on skin", () => skinHasSkinIniBackupOnDiskOrRealm());
+            AddAssert("backup file stored on skin", skinHasSkinIniBackupOnDiskOrRealm);
         }
 
         [Test]
@@ -1283,7 +1294,7 @@ namespace osu.Game.Tests.Visual.Edit
 
             AddStep("create EzSkin.json", () => editorScreen.CreateEzSkinJsonForTesting());
             AddAssert("has file", () => editorScreen.SkinJsonSession!.HasFile);
-            AddAssert("json stored on skin", () => skinStoresEzSkinJsonOnDiskOrRealm());
+            AddAssert("json stored on skin", skinStoresEzSkinJsonOnDiskOrRealm);
         }
 
         [Test]

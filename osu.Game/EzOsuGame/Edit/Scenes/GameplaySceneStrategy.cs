@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Localization;
@@ -24,11 +25,10 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
 
         public void ReleaseCachedDrawables() => sections = null;
 
-        public IReadOnlyList<EzSkinEditorSettingsGroup> Sections => sections ??= new EzSkinEditorSettingsGroup[]
-        {
-            new EzSkinEditorHudWorkspaceSection(),
-            new EzSkinEditorComponentLibrarySection(rulesetScoped: false),
-            new EzSkinEditorComponentLibrarySection(rulesetScoped: true),
-        };
+        public IReadOnlyList<EzSkinEditorSettingsGroup> Sections => sections ??=
+            new[] { new EzSkinEditorHudWorkspaceSection() }
+                .Concat(EzSkinEditorComponentLibrarySections.Create(rulesetScoped: false))
+                .Concat(EzSkinEditorComponentLibrarySections.Create(rulesetScoped: true))
+                .ToArray();
     }
 }

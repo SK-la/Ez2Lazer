@@ -16,12 +16,23 @@ namespace osu.Game.EzOsuGame.Edit.Components
     {
         public LocalisableString SectionTitle { get; }
 
+        public LocalisableString RailTitlePrimary { get; }
+
+        public LocalisableString? RailTitleSecondary { get; }
+
         public BindableBool SectionVisible { get; } = new BindableBool(true);
 
         protected EzSkinEditorSettingsGroup(LocalisableString title)
-            : base(title)
+            : this(title, title, null)
         {
-            SectionTitle = title;
+        }
+
+        protected EzSkinEditorSettingsGroup(LocalisableString sectionTitle, LocalisableString railPrimary, LocalisableString? railSecondary)
+            : base(sectionTitle)
+        {
+            SectionTitle = sectionTitle;
+            RailTitlePrimary = railPrimary;
+            RailTitleSecondary = railSecondary;
         }
 
         protected override bool OnHover(HoverEvent e)
