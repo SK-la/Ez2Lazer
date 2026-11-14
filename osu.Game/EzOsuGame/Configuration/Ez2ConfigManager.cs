@@ -5,6 +5,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Text;
 using System.Threading;
 using JetBrains.Annotations;
@@ -28,6 +29,7 @@ namespace osu.Game.EzOsuGame.Configuration
     {
         public static readonly string LOGGER_NAME = "ez_runtime";
         protected override string Filename => "EzSkinSettings.ini";
+        private readonly Storage configStorage;
         private readonly int[] commonKeyModes = { 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
         public float DefaultHitPosition = 180f;
 
@@ -74,7 +76,51 @@ namespace osu.Game.EzOsuGame.Configuration
 
         public Ez2ConfigManager(Storage storage)
             : base(storage)
-        { }
+        {
+            configStorage = storage;
+
+            if (!DebugUtils.IsNUnitRunning)
+                migrateHitPositionReach();
+        }
+
+        /// <summary>
+        /// 曾短暂存成 AllSkins / CodeSkin。布尔解析失败时按原文字写回。
+        /// </summary>
+        private void migrateHitPositionReach()
+        {
+            string? raw = readConfigRaw(Ez2Setting.HitPositionGlobalEnable);
+
+            if (raw is "1" or "True" or "true" or "AllSkins")
+                SetValue(Ez2Setting.HitPositionGlobalEnable, true);
+            else if (raw is "0" or "False" or "false" or "CodeSkin")
+                SetValue(Ez2Setting.HitPositionGlobalEnable, false);
+        }
+
+        private string? readConfigRaw(Ez2Setting setting)
+        {
+            using var stream = configStorage.GetStream(Filename);
+
+            if (stream == null)
+                return null;
+
+            using var reader = new StreamReader(stream);
+            string keyName = setting.ToString();
+
+            while (reader.ReadLine() is string line)
+            {
+                int equalsIndex = line.IndexOf('=');
+
+                if (line.Length == 0 || line[0] == '#' || equalsIndex < 0)
+                    continue;
+
+                if (line.AsSpan(0, equalsIndex).Trim().ToString() != keyName)
+                    continue;
+
+                return line.AsSpan(equalsIndex + 1).Trim().ToString();
+            }
+
+            return null;
+        }
 
         protected override void PerformLoad()
         {
@@ -1329,7 +1375,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         // 皮肤与舞台资源
         ColumnWidthStyle,
-        HitPositionGlobalEnable, // 未来要考虑，是否统一成，整套系统套用在传统皮肤上，变成切换设置
+        HitPositionGlobalEnable,
 
         /// <summary>
         /// When enabled, switching skins applies per-skin EzSkin.json to in-memory Ez config only.

@@ -66,9 +66,6 @@ namespace osu.Game.Rulesets.Mania.Skinning
 
             ColumnWatcher.GetOrCreate(Column).Add(this);
 
-            if (noteDisplayTint != null)
-                noteDisplayTint.Changed += OnColourChanged;
-
             Scheduler.AddOnce(OnLoadChanged);
         }
 
@@ -117,9 +114,6 @@ namespace osu.Game.Rulesets.Mania.Skinning
             if (isDisposing)
             {
                 ColumnWatcher.Remove(Column, this);
-
-                if (noteDisplayTint != null)
-                    noteDisplayTint.Changed -= OnColourChanged;
             }
 
             base.Dispose(isDisposing);

@@ -6,6 +6,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.EzMania;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Skinning;
 
@@ -21,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         private readonly Container content;
 
         private float hitPosition;
-        private float skinHitPosition;
+        private ISkinSource skin = null!;
 
         public HitTargetInsetContainer()
         {
@@ -39,7 +40,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
             hitPositon.BindTo(ezSkinInfo.HitPosition);
             hitPositon.BindValueChanged(_ => updateDrawable());
 
-            skinHitPosition = skin.GetManiaSkinConfig<float>(LegacyManiaSkinConfigurationLookups.HitPosition)?.Value ?? (float)hitPositon.Value;
+            this.skin = skin;
             updateHitPosition();
 
             direction.BindTo(scrollingInfo.Direction);
@@ -49,9 +50,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         private void updateHitPosition()
         {
             // 缓存 hitPosition 值，避免每次布局都查询 skin
-            hitPosition = enableGlobalHitPosition.Value
-                ? (float)hitPositon.Value
-                : skinHitPosition;
+            hitPosition = ManiaPlayfieldLayoutHelper.GetHitPosition(skin, enableGlobalHitPosition.Value, hitPositon.Value);
         }
 
         private void updateDrawable()

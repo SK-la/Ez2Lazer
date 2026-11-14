@@ -31,9 +31,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         protected string FallbackColumnIndex { get; private set; } = null!;
 
         protected string ResolveNoteTextureFileIndex(ManiaNoteDisplayColourPart part)
-            => noteDisplayTint?.UseTintBaseTexture(part, Column) == true
-                ? "1"
-                : FallbackColumnIndex;
+        {
+            if (noteDisplayTint?.UseTintBaseTexture(part, Column) == true)
+                return "1";
+
+            return FallbackColumnIndex;
+        }
 
         [BackgroundDependencyLoader]
         private void load()
@@ -46,29 +49,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
                 int distanceToEdge = Math.Min(columnInStage, (stage.Columns - 1) - columnInStage);
                 FallbackColumnIndex = distanceToEdge % 2 == 0 ? "1" : "2";
             }
-        }
-
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            if (noteDisplayTint != null)
-                noteDisplayTint.Changed += OnTintDisplaySettingsChanged;
-
-            // Subclasses (e.g. LegacyNotePiece) build children in load(); notify only after the hierarchy is ready.
-            OnTintDisplaySettingsChanged();
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing && noteDisplayTint != null)
-                noteDisplayTint.Changed -= OnTintDisplaySettingsChanged;
-
-            base.Dispose(isDisposing);
-        }
-
-        protected virtual void OnTintDisplaySettingsChanged()
-        {
         }
 
         protected IBindable<T>? GetColumnSkinConfig<T>(ISkin skin, LegacyManiaSkinConfigurationLookups lookup) where T : notnull

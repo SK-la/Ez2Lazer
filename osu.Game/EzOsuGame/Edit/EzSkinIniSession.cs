@@ -7,7 +7,6 @@ using System.Text;
 using osu.Framework.IO.Stores;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
-using osu.Game.EzOsuGame;
 using osu.Game.Extensions;
 using osu.Game.IO;
 using osu.Game.Skinning;
