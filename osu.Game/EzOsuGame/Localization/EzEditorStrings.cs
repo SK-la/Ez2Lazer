@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Edit;
 
 namespace osu.Game.EzOsuGame.Localization
 {
@@ -23,15 +24,15 @@ namespace osu.Game.EzOsuGame.Localization
             "布局已保存",
             "Layout saved");
 
-        public static readonly EzLocalizationManager.EzLocalisableString NOTIFY_SKIN_LAYOUT_EXIT_SAVE_FAILED = new(
+        public static readonly EzLocalizationManager.EzLocalisableString NOTIFY_SKIN_LAYOUT_EXIT_SAVE_FAILED = new EzLocalizationManager.EzLocalisableString(
             "皮肤 HUD 布局未写入磁盘，请退出前再试保存。",
             "Skin HUD layout was not written to disk. Try saving again before exiting.");
 
-        public static readonly EzLocalizationManager.EzLocalisableString NOTIFY_SKIN_LAYOUT_EXIT_CONTAINERS_LOADING = new(
+        public static readonly EzLocalizationManager.EzLocalisableString NOTIFY_SKIN_LAYOUT_EXIT_CONTAINERS_LOADING = new EzLocalizationManager.EzLocalisableString(
             "皮肤 HUD 容器仍在加载，未写入布局。",
             "Skin HUD layout was not written because skinnable containers were still loading.");
 
-        public static readonly EzLocalizationManager.EzLocalisableString NOTIFY_SKIN_LAYOUT_SAVE_CONTAINERS_LOADING = new(
+        public static readonly EzLocalizationManager.EzLocalisableString NOTIFY_SKIN_LAYOUT_SAVE_CONTAINERS_LOADING = new EzLocalizationManager.EzLocalisableString(
             "HUD 容器仍在加载，已跳过保存。",
             "Skipped saving skin HUD layout because skinnable containers are still loading.");
 
@@ -519,11 +520,33 @@ namespace osu.Game.EzOsuGame.Localization
             "在预览中点击 HUD 组件以选中并显示设置。",
             "Click a HUD component in the preview to select it and show settings.");
 
-        public static readonly LocalisableString LIBRARY_GLOBAL_TITLE = new EzLocalizationManager.EzLocalisableString(
-            "组件库(通用)", "Component library (global)");
+        public static readonly LocalisableString LIBRARY_RAIL_COMPONENT = new EzLocalizationManager.EzLocalisableString(
+            "组件", "Parts");
 
-        public static readonly LocalisableString LIBRARY_RULESET_TITLE = new EzLocalizationManager.EzLocalisableString(
-            "组件库(模式)", "Component library (mode)");
+        public static readonly LocalisableString LIBRARY_RAIL_FAMILY_EZ = new EzLocalizationManager.EzLocalisableString("Ez", "Ez");
+        public static readonly LocalisableString LIBRARY_RAIL_FAMILY_ARGON = new EzLocalizationManager.EzLocalisableString("Argon", "Argon");
+        public static readonly LocalisableString LIBRARY_RAIL_FAMILY_LEGACY = new EzLocalizationManager.EzLocalisableString("Legacy", "Legacy");
+        public static readonly LocalisableString LIBRARY_RAIL_FAMILY_OTHER = new EzLocalizationManager.EzLocalisableString("其他", "Other");
+
+        public static LocalisableString LibraryRailFamilyName(EzHudComponentFamily family) => family switch
+        {
+            EzHudComponentFamily.Ez => LIBRARY_RAIL_FAMILY_EZ,
+            EzHudComponentFamily.Argon => LIBRARY_RAIL_FAMILY_ARGON,
+            EzHudComponentFamily.Legacy => LIBRARY_RAIL_FAMILY_LEGACY,
+            _ => LIBRARY_RAIL_FAMILY_OTHER,
+        };
+
+        public static LocalisableString LibraryPanelTitle(EzHudComponentFamily family, bool rulesetScoped) => (family, rulesetScoped) switch
+        {
+            (EzHudComponentFamily.Ez, false) => new EzLocalizationManager.EzLocalisableString("Ez HUD 组件（通用）", "Ez HUD parts (global)"),
+            (EzHudComponentFamily.Ez, true) => new EzLocalizationManager.EzLocalisableString("Ez HUD 组件（模式）", "Ez HUD parts (mode)"),
+            (EzHudComponentFamily.Argon, false) => new EzLocalizationManager.EzLocalisableString("Argon HUD 组件（通用）", "Argon HUD parts (global)"),
+            (EzHudComponentFamily.Argon, true) => new EzLocalizationManager.EzLocalisableString("Argon HUD 组件（模式）", "Argon HUD parts (mode)"),
+            (EzHudComponentFamily.Legacy, false) => new EzLocalizationManager.EzLocalisableString("Legacy HUD 组件（通用）", "Legacy HUD parts (global)"),
+            (EzHudComponentFamily.Legacy, true) => new EzLocalizationManager.EzLocalisableString("Legacy HUD 组件（模式）", "Legacy HUD parts (mode)"),
+            (_, false) => new EzLocalizationManager.EzLocalisableString("其他 HUD 组件（通用）", "Other HUD parts (global)"),
+            (_, true) => new EzLocalizationManager.EzLocalisableString("其他 HUD 组件（模式）", "Other HUD parts (mode)"),
+        };
 
         public static readonly LocalisableString LIBRARY_PLACEHOLDER = new EzLocalizationManager.EzLocalisableString(
             "请先进入 HUD 场景并选择编辑层。",

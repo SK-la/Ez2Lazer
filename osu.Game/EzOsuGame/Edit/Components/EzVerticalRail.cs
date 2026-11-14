@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -11,7 +12,9 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
+using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osuTK;
 
@@ -24,6 +27,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
     public abstract partial class EzVerticalRail : CompositeDrawable
     {
         public const float WIDTH = 56;
+
+        private const float dual_line_extra_height = 14;
 
         /// <summary>
         /// Raised only when the user picks an item by pressing its button. Programmatic changes to
@@ -78,22 +83,20 @@ namespace osu.Game.EzOsuGame.Edit.Components
             SelectedIndex.BindValueChanged(_ => updateActive(), true);
         }
 
-        public void SetItems(IReadOnlyList<(LocalisableString Title, bool Visible)> next)
+        public void SetItems(IReadOnlyList<(LocalisableString Title, bool Visible)> next) =>
+            SetItems(next.Select(i => (i.Title, (LocalisableString?)null, i.Visible)).ToList());
+
+        public void SetItems(IReadOnlyList<(LocalisableString Primary, LocalisableString? Secondary, bool Visible)> next)
         {
             items.Clear();
 
-            foreach (var (title, visible) in next)
-                items.Add(new Item(title, visible));
+            foreach (var (primary, secondary, visible) in next)
+                items.Add(new Item(primary, secondary, visible));
 
-            // 允许在 BDL 之前调用（子类可能在构造期就设好项目）；真正确立按钮树等加载完成后。
             if (buttonFlow != null)
                 rebuildButtons();
         }
 
-        /// <summary>
-        /// Shows or hides a single item without rebuilding the rail. Runtime visibility (e.g. a scene the
-        /// current skin cannot present) uses this so the selection is not reset.
-        /// </summary>
         public void SetItemVisible(int index, bool visible)
         {
             if (index < 0 || index >= items.Count)
@@ -112,7 +115,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             {
                 int index = i;
 
-                var button = new RailButton(items[i].Title, () =>
+                var button = new RailButton(items[i].Primary, items[i].Secondary, () =>
                 {
                     SelectedIndex.Value = index;
                     SelectionChanged?.Invoke(index);
@@ -179,13 +182,15 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private sealed class Item
         {
-            public readonly LocalisableString Title;
+            public readonly LocalisableString Primary;
+            public readonly LocalisableString? Secondary;
 
             public bool Visible;
 
-            public Item(LocalisableString title, bool visible)
+            public Item(LocalisableString primary, LocalisableString? secondary, bool visible)
             {
-                Title = title;
+                Primary = primary;
+                Secondary = secondary;
                 Visible = visible;
             }
         }
@@ -198,14 +203,44 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 set => Accented = value;
             }
 
-            public RailButton(LocalisableString title, Action action)
+            public RailButton(LocalisableString primary, LocalisableString? secondary, Action action)
             {
-                Text = title;
                 Action = action;
                 RelativeSizeAxes = Axes.X;
-                Height = EzUIStyleV1.SceneBarControlHeight();
-                TextSize = 12;
-                TextMargin = new MarginPadding(4);
+
+                if (secondary == null)
+                {
+                    Text = primary;
+                    Height = EzUIStyleV1.SceneBarControlHeight();
+                    TextSize = 12;
+                    TextMargin = new MarginPadding(4);
+                    return;
+                }
+
+                Height = EzUIStyleV1.SceneBarControlHeight() + dual_line_extra_height;
+                TextSize = 0.001f;
+
+                Add(new FillFlowContainer
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    AutoSizeAxes = Axes.Both,
+                    Direction = FillDirection.Vertical,
+                    Spacing = new Vector2(0, 1),
+                    Children = new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = primary,
+                            Font = OsuFont.TorusAlternate.With(size: 10),
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = secondary.Value,
+                            Font = OsuFont.TorusAlternate.With(size: 9),
+                        },
+                    },
+                });
             }
         }
     }

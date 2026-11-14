@@ -23,11 +23,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// Ez-style replacement for the official <see cref="osu.Game.Overlays.SkinEditor.SkinComponentToolbox"/>.
     /// Lists the components that can be placed into the active editing layer; clicking one places it,
     /// persists the layout, and selects it. Global and ruleset-specific libraries are separate
-    /// instances of this section.
+    /// instances, each split by <see cref="EzHudComponentFamily"/>.
     /// </summary>
     public partial class EzSkinEditorComponentLibrarySection : EzSkinEditorSettingsGroup
     {
         private readonly bool rulesetScoped;
+        private readonly EzHudComponentFamily family;
 
         [Resolved(canBeNull: true)]
         private EzSkinEditorHudLayer? hudLayer { get; set; }
@@ -38,19 +39,17 @@ namespace osu.Game.EzOsuGame.Edit.Components
         [Resolved]
         private EzSkinEditorSceneBar sceneBar { get; set; } = null!;
 
-        /// <param name="rulesetScoped">
-        /// When true the library lists ruleset-specific components for the ruleset the editor is editing;
-        /// when false it lists global components only. The ruleset is resolved live from the HUD layer so
-        /// it always matches the container the components are placed into.
-        /// </param>
-        public EzSkinEditorComponentLibrarySection(bool rulesetScoped)
-            : base(rulesetScoped ? EzEditorStrings.LIBRARY_RULESET_TITLE : EzEditorStrings.LIBRARY_GLOBAL_TITLE)
+        public EzSkinEditorComponentLibrarySection(bool rulesetScoped, EzHudComponentFamily family)
+            : base(
+                EzEditorStrings.LibraryPanelTitle(family, rulesetScoped),
+                EzEditorStrings.LibraryRailFamilyName(family),
+                EzEditorStrings.LIBRARY_RAIL_COMPONENT)
         {
             this.rulesetScoped = rulesetScoped;
+            this.family = family;
             Spacing = new Vector2(0, 8);
         }
 
-        /// <summary>The ruleset whose components this library lists, or null for the global library.</summary>
         private RulesetInfo? resolvedRuleset => rulesetScoped ? hudLayer?.CurrentRuleset : null;
 
         [BackgroundDependencyLoader]
@@ -69,20 +68,19 @@ namespace osu.Game.EzOsuGame.Edit.Components
         protected override void LoadComplete()
         {
             base.LoadComplete();
-
-            sceneBar.ActiveLayer.BindValueChanged(_ =>
-            {
-                var layer = sceneBar.ActiveLayer.Value;
-                SectionVisible.Value = rulesetScoped
-                    ? layer is EzHUDLayer.EzHudRuleset or EzHUDLayer.EzPlayfieldRuleset
-                        or EzHUDLayer.SkinHudRuleset or EzHUDLayer.SkinPlayfieldRuleset
-                    : layer != EzHUDLayer.HudOff;
-            }, true);
+            sceneBar.ActiveLayer.BindValueChanged(_ => rebuild(), true);
         }
 
         private void rebuild()
         {
             Clear();
+
+            if (hudLayer == null)
+            {
+                showMessage(EzEditorStrings.LIBRARY_PLACEHOLDER);
+                syncSectionVisible(false);
+                return;
+            }
 
             Add(new OsuSpriteText
             {
@@ -109,25 +107,42 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             Add(list);
 
-            if (hudLayer == null)
-                return;
-
-            // A ruleset-scoped layer only accepts ruleset components; the global layer only global ones.
-            // With no resolved ruleset yet, a mode library would otherwise list the global set under a
-            // mode heading, so keep it empty until a ruleset is known.
             RulesetInfo? target = resolvedRuleset;
 
             if (rulesetScoped && target == null)
             {
                 list.Add(emptyLabel());
+                syncSectionVisible(false);
                 return;
             }
 
-            foreach (var type in SerialisedDrawableInfo.GetAllAvailableDrawables(target))
-                attemptAddComponent(list, type);
+            int placeableCount = 0;
 
-            if (list.Count == 0)
+            foreach (var type in SerialisedDrawableInfo.GetAllAvailableDrawables(target))
+            {
+                if (EzHudComponentFamilyResolver.Resolve(type) != family)
+                    continue;
+
+                if (attemptAddComponent(list, type))
+                    placeableCount++;
+            }
+
+            if (placeableCount == 0)
                 list.Add(emptyLabel());
+
+            syncSectionVisible(placeableCount > 0);
+        }
+
+        private void syncSectionVisible(bool hasPlaceable)
+        {
+            var layer = sceneBar.ActiveLayer.Value;
+
+            bool layerAllows = rulesetScoped
+                ? layer is EzHUDLayer.EzHudRuleset or EzHUDLayer.EzPlayfieldRuleset
+                    or EzHUDLayer.SkinHudRuleset or EzHUDLayer.SkinPlayfieldRuleset
+                : layer != EzHUDLayer.HudOff;
+
+            SectionVisible.Value = layerAllows && hasPlaceable;
         }
 
         private OsuSpriteText emptyLabel() => new OsuSpriteText
@@ -137,13 +152,13 @@ namespace osu.Game.EzOsuGame.Edit.Components
             Font = OsuFont.Default.With(size: 13),
         };
 
-        private void attemptAddComponent(FillFlowContainer list, Type type)
+        private bool attemptAddComponent(FillFlowContainer list, Type type)
         {
             if (typeFilter?.IsExcluded(type) == true)
-                return;
+                return false;
 
             if (hudLayer == null)
-                return;
+                return false;
 
             SkinnableContainer? target = hudLayer.ActiveTarget;
             CompositeDrawable dependencySource = (CompositeDrawable?)target ?? hudLayer;
@@ -160,21 +175,24 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 if (!placeable)
                 {
                     instance.Dispose();
-                    return;
+                    return false;
                 }
 
                 list.Add(new ComponentPlaceButton(instance, dependencySource)
                 {
                     Action = () => place(type),
                 });
+
+                return true;
             }
             catch (DependencyNotRegisteredException)
             {
-                // The component needs dependencies this layer cannot provide; hide it from the library.
+                return false;
             }
             catch (Exception e)
             {
                 Logger.Error(e, $"Ez skin component {type} could not be listed in the library");
+                return false;
             }
         }
 
@@ -202,14 +220,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
             base.Dispose(isDisposing);
         }
 
-        /// <summary>
-        /// Library entry: a live instance of the component (scaled to fit a thumbnail), its type name,
-        /// and a click handler that places it into the active layer.
-        /// </summary>
-        /// <remarks>
-        /// Preview structure matches <see cref="SkinComponentToolbox.ToolboxComponentButton"/> so scaling
-        /// and dependency injection behave like the official skin editor toolbox.
-        /// </remarks>
         private partial class ComponentPlaceButton : EzButton
         {
             private const float thumbnail_height = 72;
@@ -269,8 +279,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             protected override void Dispose(bool isDisposing)
             {
-                // Parent dispose already releases a preview that was added as a child. Disposing it again
-                // runs component Dispose before the base IsDisposed guard and cancels a disposed token.
                 if (isDisposing && component.Parent == null)
                     component.Dispose();
 
@@ -278,10 +286,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }
         }
 
-        /// <summary>
-        /// Hosts a component preview using another container's dependency container, so components
-        /// needing screen-scoped dependencies (score processor, etc.) still instantiate for preview.
-        /// </summary>
         private partial class DependencyBorrowingContainer : Container
         {
             private readonly Drawable preview;
@@ -300,8 +304,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 if (donor == null)
                     return;
 
-                // A preview that cannot resolve its dependencies must not fail the button load,
-                // or one missing dependency removes the whole library entry.
                 try
                 {
                     LoadComponent(preview);
