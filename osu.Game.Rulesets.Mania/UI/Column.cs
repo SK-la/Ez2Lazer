@@ -270,6 +270,8 @@ namespace osu.Game.Rulesets.Mania.UI
             NoteColourChanged?.Invoke();
         }
 
+        internal void SyncNoteDisplayColourCache() => refreshNoteDisplayColour();
+
         private void onSourceChanged()
         {
             AccentColour.Value = skin.GetManiaSkinConfig<Color4>(LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour, Index)?.Value ?? Color4.Black;
@@ -287,8 +289,13 @@ namespace osu.Game.Rulesets.Mania.UI
             rightColumnSpacing = columnSize.Margin.Right;
         }
 
+        /// <summary>note 集 / 列类型等：Ez Pro 走 <see cref="IColumnNote.ForwardOnNoteSetChanged"/>（纹理，并连带尺寸与显色）。</summary>
         public event Action? NoteSetChanged;
+
+        /// <summary>列宽高等：仅 <see cref="IColumnNote.ForwardOnNoteSizeChanged"/>。</summary>
         public event Action? NoteSizeChanged;
+
+        /// <summary>列色 / 节拍线着色开关等：仅 <see cref="IColumnNote.ForwardOnColourChanged"/>（必要时皮肤内再触发纹理）。</summary>
         public event Action? NoteColourChanged;
 
         protected override void LoadComplete()
@@ -303,15 +310,19 @@ namespace osu.Game.Rulesets.Mania.UI
 
             onColumnTypeChangedHandler = (keyMode, columnIndex, _) =>
             {
-                if (keyMode == KeyMode && columnIndex == Index)
-                    NoteSetChanged?.Invoke();
+                if (keyMode != KeyMode || columnIndex != Index)
+                    return;
+
+                // 类型切换：先刷新列色缓存并通知显色，再通知纹理（前缀随类型变）。
+                refreshNoteDisplayColour();
+                NoteSetChanged?.Invoke();
             };
             ezConfig.ColumnTypeChanged += onColumnTypeChangedHandler;
 
             onNoteSizeChangedHandler = () => NoteSizeChanged?.Invoke();
             ezFactory.OnNoteSizeChanged += onNoteSizeChangedHandler;
 
-            onNoteColourChangedHandler = () => NoteColourChanged?.Invoke();
+            onNoteColourChangedHandler = refreshNoteDisplayColour;
             ezFactory.OnNoteColourChanged += onNoteColourChangedHandler;
         }
 
