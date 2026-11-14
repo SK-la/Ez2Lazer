@@ -1257,7 +1257,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void onLayoutWritten()
         {
-            onScreenDisplay?.Display(new osu.Game.Overlays.SkinEditor.SkinEditor.SkinEditorToast(
+            onScreenDisplay?.Display(new OfficialSkinEditor.SkinEditorToast(
                 ToastStrings.SkinSaved,
                 skinManager.CurrentSkin.Value.SkinInfo.ToString() ?? "Unknown"));
             postNotification(EzEditorStrings.LAYOUT_SAVED);
