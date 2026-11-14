@@ -730,7 +730,8 @@ namespace osu.Game.EzOsuGame.Edit
             bool jsonDirty = SkinJsonSession is { IsSupported: true, HasFile: true } && SkinJsonSession.IsDirty(ezSkinConfig);
             bool layoutDirty = hudLayer.HasPendingSkinLayoutSave;
 
-            if (needsMutableSkinBeforeWrite(iniDirty, jsonDirty, layoutDirty)
+            if ((iniDirty || jsonDirty || layoutDirty)
+                && needsMutableSkinBeforeWrite(iniDirty, jsonDirty, layoutDirty)
                 && !ensureMutableSkinPreservingWorkspaceDrafts(iniDirty, jsonDirty))
             {
                 postNotification(EzEditorStrings.NOTIFY_SKIN_LAYOUT_EXIT_SAVE_FAILED);
