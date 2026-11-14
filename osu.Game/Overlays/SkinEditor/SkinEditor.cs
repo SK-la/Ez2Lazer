@@ -824,12 +824,12 @@ namespace osu.Game.Overlays.SkinEditor
             if (TargetScreen?.IsLoaded != true)
                 return false;
 
-            SkinnableContainer[] targetContainers = AvailableTargets.ToArray();
+            SkinnableContainer? target = GetTarget(SelectedTarget.Value) ?? GetFirstTarget();
 
-            if (targetContainers.Length == 0)
+            if (target == null)
                 return false;
 
-            if (!targetContainers.All(c => c.ComponentsLoaded))
+            if (!target.ComponentsLoaded)
             {
                 if (userTriggered)
                     Logger.Log(EzEditorStrings.NOTIFY_SKIN_LAYOUT_SAVE_CONTAINERS_LOADING, LoggingTarget.Runtime, LogLevel.Important);
@@ -838,9 +838,7 @@ namespace osu.Game.Overlays.SkinEditor
             }
 
             LastLayoutSaveAttempted = true;
-
-            foreach (var t in targetContainers)
-                skin.UpdateDrawableTarget(t);
+            skin.UpdateDrawableTarget(target);
 
             bool saved = skins.Save(skin);
             LastLayoutSaveSucceeded = saved;

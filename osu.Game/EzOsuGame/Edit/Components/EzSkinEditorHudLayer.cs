@@ -261,17 +261,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
         }
 
         /// <summary>
-        /// Persists every Ez layout container and flushes pending skin layout writes. Used on apply/save.
+        /// Writes the active layer (Ez layout file or pending skin HUD JSON). Used on apply/save.
         /// </summary>
         /// <returns>是否把皮肤 HUD 布局写入了磁盘。</returns>
         public bool PersistAllLayouts()
         {
-            if (layoutLayer != null)
-            {
-                foreach (var target in layoutLayer.LayoutContainers)
-                    layoutLayer.Store.Save(target);
-            }
-
+            persistActiveTarget();
             return FlushSkinLayoutSave();
         }
 

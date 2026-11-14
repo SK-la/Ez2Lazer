@@ -3,7 +3,6 @@
 
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using Newtonsoft.Json;
 using osu.Framework.IO.Serialization;
 using osu.Framework.Platform;
@@ -38,7 +37,7 @@ namespace osu.Game.EzOsuGame.Edit
             string json = JsonConvert.SerializeObject(layout, json_settings);
 
             using (var stream = exportRoot.GetStorageForDirectory("layout-layers").CreateFileSafely(fileName))
-            using (var writer = new StreamWriter(stream, Encoding.UTF8))
+            using (var writer = new StreamWriter(stream, EzLegacySkinFolders.Utf8NoBom))
                 writer.Write(json);
 
             return exportRoot.GetFullPath(relativeDest);

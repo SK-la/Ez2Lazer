@@ -77,6 +77,8 @@ namespace osu.Game.EzOsuGame.Layout
             if (string.IsNullOrEmpty(json))
                 return new SkinLayoutInfo();
 
+            json = EzLegacySkinFolders.StripUtf8Bom(json);
+
             try
             {
                 return JsonConvert.DeserializeObject<SkinLayoutInfo>(json, json_settings) ?? new SkinLayoutInfo();
@@ -219,8 +221,11 @@ namespace osu.Game.EzOsuGame.Layout
 
         private void writeText(string filename, string contents)
         {
+            if (readText(filename) == contents)
+                return;
+
             using (var stream = storage.CreateFileSafely(filename))
-            using (var writer = new StreamWriter(stream, Encoding.UTF8))
+            using (var writer = new StreamWriter(stream, EzLegacySkinFolders.Utf8NoBom))
                 writer.Write(contents);
         }
     }

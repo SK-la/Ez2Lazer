@@ -717,20 +717,30 @@ namespace osu.Game.EzOsuGame.Edit
             if (!EzSkinEditorHostScope.CanWriteSkinLayout)
                 return;
 
+            bool configDirty = hasUnsavedConfigChanges();
+            bool iniDirty = SkinIniSession.IsDirty;
+            bool jsonDirty = SkinJsonSession is { IsSupported: true, HasFile: true } && SkinJsonSession.IsDirty(ezSkinConfig);
+
             ezSkinConfig.Save();
             hudLayer.PersistAllLayouts();
 
-            if (SkinJsonSession is { IsSupported: true, HasFile: true } && SkinJsonSession.IsDirty(ezSkinConfig))
-                SkinJsonSession.Commit(ezSkinConfig);
+            if (jsonDirty)
+                SkinJsonSession!.Commit(ezSkinConfig);
 
-            if (SkinIniSession is { IsSupported: true, IsDirty: true })
+            if (iniDirty)
                 SkinIniSession.Commit();
 
             recaptureAppliedConfigBaseline();
 
+            if (!configDirty && !iniDirty && !jsonDirty)
+                return;
+
             refreshScene();
             invalidateResourceCaches();
-            skinManager.CurrentSkinInfo.TriggerChange();
+
+            if (iniDirty)
+                skinManager.CurrentSkinInfo.TriggerChange();
+
             refreshScene();
         }
 
@@ -772,7 +782,16 @@ namespace osu.Game.EzOsuGame.Edit
 
         public bool OnPressed(KeyBindingPressEvent<PlatformAction> e)
         {
-            if (e.Repeat || !hudLayer.InteractionEnabled.Value)
+            if (e.Repeat)
+                return false;
+
+            if (e.Action == PlatformAction.Save)
+            {
+                applySettings();
+                return true;
+            }
+
+            if (!hudLayer.InteractionEnabled.Value)
                 return false;
 
             switch (e.Action)
