@@ -89,9 +89,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected Drawable? LoadEzProNoteComponent(string componentAfterPrefix)
         {
             bool useTintBase = noteDisplayTint?.UseTintBaseTexture(DisplayColourPart, Column) == true;
-            var drawable = Factory.CreateEzProNoteComponent(componentAfterPrefix, Column.EzNoteTypeBindable.Value, useTintBase, out string resolvedPrefix);
-            appliedPrefix = resolvedPrefix;
-            return drawable;
+            return Factory.CreateEzProNoteComponent(componentAfterPrefix, Column.EzNoteTypeBindable.Value, useTintBase, out _);
         }
 
         protected void OnLoadChanged()
@@ -103,6 +101,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             tintBaseApplied = noteDisplayTint?.UseTintBaseTexture(DisplayColourPart, Column) == true;
             MainContainer.Clear();
             UpdateTexture();
+            appliedPrefix = ColorPrefix;
             OnDrawableChanged();
             UpdateColor();
         }

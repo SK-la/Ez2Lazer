@@ -137,6 +137,8 @@ namespace osu.Game.EzOsuGame.Edit
 
         private bool comparisonSnapshotInitialized;
         private Guid comparisonSnapshotSkinId;
+        private bool appliedConfigBaselineInitialized;
+        private Guid appliedConfigBaselineSkinId;
         private bool noteSnapshotInitialized;
         private Guid noteSnapshotSkinId;
 
@@ -618,6 +620,8 @@ namespace osu.Game.EzOsuGame.Edit
 
         internal EzSkinEditorComparisonSnapshot ComparisonSnapshotForTesting { get; } = new EzSkinEditorComparisonSnapshot();
 
+        private readonly EzSkinEditorComparisonSnapshot appliedConfigBaseline = new EzSkinEditorComparisonSnapshot();
+
         internal EzSkinEditorNoteEditSession NoteSessionForTesting { get; } = new EzSkinEditorNoteEditSession();
 
         internal EzSkinEditorNoteEditSnapshot NoteSnapshotForTesting { get; } = new EzSkinEditorNoteEditSnapshot();
@@ -634,6 +638,7 @@ namespace osu.Game.EzOsuGame.Edit
             ensureSkinSpecificSceneVisibility();
             ensureSkinJsonSession();
             ensureComparisonSnapshotForCurrentSkin();
+            ensureAppliedConfigBaselineForCurrentSkin();
             ensureNoteSnapshotForCurrentSkin();
 
             applyCurrentScene();
@@ -714,6 +719,8 @@ namespace osu.Game.EzOsuGame.Edit
 
             if (SkinIniSession is { IsSupported: true, IsDirty: true })
                 SkinIniSession.Commit();
+
+            recaptureAppliedConfigBaseline();
 
             refreshScene();
             invalidateResourceCaches();
@@ -1251,6 +1258,24 @@ namespace osu.Game.EzOsuGame.Edit
             ComparisonSnapshotForTesting.SyncBindableDefaults(ezSkinConfig);
         }
 
+        private void ensureAppliedConfigBaselineForCurrentSkin()
+        {
+            var currentSkinId = skinManager.CurrentSkinInfo.Value.ID;
+
+            if (appliedConfigBaselineInitialized && appliedConfigBaselineSkinId == currentSkinId)
+                return;
+
+            recaptureAppliedConfigBaseline();
+            appliedConfigBaselineInitialized = true;
+            appliedConfigBaselineSkinId = currentSkinId;
+        }
+
+        private void recaptureAppliedConfigBaseline()
+        {
+            appliedConfigBaseline.CaptureFrom(ezSkinConfig, SkinIniSession);
+            appliedConfigBaseline.SyncBindableDefaults(ezSkinConfig);
+        }
+
         private void createConfigSnapshot()
         {
             recaptureComparisonSnapshot();
@@ -1456,11 +1481,11 @@ namespace osu.Game.EzOsuGame.Edit
 
         private bool hasUnsavedConfigChanges()
         {
-            if (!comparisonSnapshotInitialized)
+            if (!appliedConfigBaselineInitialized)
                 return false;
 
             string current = EzSkinJsonBridge.CreateNormalizedSnapshot(ezSkinConfig);
-            string baseline = EzSkinJsonDocument.SerializeNormalized(ComparisonSnapshotForTesting.Document);
+            string baseline = EzSkinJsonDocument.SerializeNormalized(appliedConfigBaseline.Document);
             return current != baseline;
         }
 
@@ -1471,8 +1496,8 @@ namespace osu.Game.EzOsuGame.Edit
 
             if (hasUnsavedConfigChanges())
             {
-                ComparisonSnapshotForTesting.ApplyConfigTo(ezSkinConfig);
-                ezSkinConfig.Save();
+                appliedConfigBaseline.ApplyConfigTo(ezSkinConfig);
+                appliedConfigBaseline.ApplyTo(ezSkinConfig, SkinIniSession);
             }
 
             hudLayer.DiscardPendingSkinLayoutSave();

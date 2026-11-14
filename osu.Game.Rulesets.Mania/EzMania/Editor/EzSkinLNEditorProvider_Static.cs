@@ -271,6 +271,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
                 if (request.UseEzNoteVariants && Enum.TryParse(request.VariantId, out EzColumnType type))
                     columnDependency.EzNoteTypeBindable = new Bindable<EzColumnType>(type);
 
+                columnDependency.IsolateNoteColourForPreview = true;
                 columnDependency.QueueInvalidate(ManiaNoteAppearanceInvalidation.FullLoad);
             }
 

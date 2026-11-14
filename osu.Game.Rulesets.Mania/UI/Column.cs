@@ -170,6 +170,11 @@ namespace osu.Game.Rulesets.Mania.UI
         private bool appearanceInvalidationQueued;
         private bool lastDisplayTintActive;
 
+        /// <summary>
+        /// 皮肤编辑器静态预览等隔离列色：不从 <see cref="Ez2ConfigManager"/> 把全局列色写回 <see cref="EzNoteColourBindable"/>。
+        /// </summary>
+        internal bool IsolateNoteColourForPreview { get; set; }
+
         // 缓存计算参数，避免闭包捕获
         public int KeyMode;
 
@@ -272,10 +277,12 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void syncNoteDisplayColourCache()
         {
-            // 配置里的类型色是源头。列上的 ColourBindable 只是绑过去的副本，改基础色时副本可能还停在旧值。
-            Colour4 raw = ezConfig.GetColumnColor(KeyMode, Index);
+            Colour4 raw = IsolateNoteColourForPreview
+                ? EzNoteColourBindable.Value
+                : ezConfig.GetColumnColor(KeyMode, Index);
 
-            if (!EzNoteColourBindable.Value.Equals(raw))
+            // 配置里的类型色是源头。列上的 ColourBindable 只是绑过去的副本，改基础色时副本可能还停在旧值。
+            if (!IsolateNoteColourForPreview && !EzNoteColourBindable.Value.Equals(raw))
                 EzNoteColourBindable.Value = raw;
 
             NoteDisplayColour = ManiaNoteDisplayColour.ForColumnNoteDisplayTint(raw, colouringMode.Value);
