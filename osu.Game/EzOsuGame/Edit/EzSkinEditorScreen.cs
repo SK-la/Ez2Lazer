@@ -1355,7 +1355,6 @@ namespace osu.Game.EzOsuGame.Edit
             onScreenDisplay?.Display(new OfficialSkinEditor.SkinEditorToast(
                 ToastStrings.SkinSaved,
                 skinManager.CurrentSkin.Value.SkinInfo.ToString() ?? "Unknown"));
-            postNotification(EzEditorStrings.LAYOUT_SAVED);
         }
 
         private void onCurrentSkinChanged(ValueChangedEvent<Skin> skin)

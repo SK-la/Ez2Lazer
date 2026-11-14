@@ -20,10 +20,6 @@ namespace osu.Game.EzOsuGame.Localization
             "Editor HUDs in this editor modify the Ez layout layer, not the skin HUD layer"
             + "\nThemed HUD layouts live under EzResources/Config/layout and layout-{theme} folders");
 
-        public static readonly LocalisableString LAYOUT_SAVED = new EzLocalizationManager.EzLocalisableString(
-            "布局已保存",
-            "Layout saved");
-
         public static readonly EzLocalizationManager.EzLocalisableString NOTIFY_SKIN_LAYOUT_EXIT_SAVE_FAILED = new EzLocalizationManager.EzLocalisableString(
             "皮肤 HUD 布局未写入磁盘，请退出前再试保存。",
             "Skin HUD layout was not written to disk. Try saving again before exiting.");
