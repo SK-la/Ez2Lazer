@@ -321,6 +321,7 @@ namespace osu.Game.Overlays.SkinEditor
                     trySaveLayout(val.OldValue);
 
                 HasBegunMutating = false;
+                layoutDirty = false;
                 Scheduler.AddOnce(OnSkinChanged);
             }, true);
 
