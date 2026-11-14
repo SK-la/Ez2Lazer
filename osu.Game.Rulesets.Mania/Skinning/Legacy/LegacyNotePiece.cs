@@ -15,14 +15,15 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Legacy
 {
-    public partial class LegacyNotePiece : LegacyManiaColumnElement
+    public partial class LegacyNotePiece : LegacyManiaColumnElement, IColumnNote
     {
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
 
         private Container directionContainer = null!;
 
         private Drawable noteAnimation = null!;
-        private ISkinSource skin = null!;
+        protected ISkinSource Skin = null!;
+        private string? appliedTextureName;
 
         private float? widthForNoteHeightScale;
 
@@ -35,7 +36,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         [BackgroundDependencyLoader(true)]
         private void load(ISkinSource skin, IScrollingInfo scrollingInfo)
         {
-            this.skin = skin;
+            Skin = skin;
 
             widthForNoteHeightScale = skin.GetConfig<ManiaSkinConfigurationLookup, float>(new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale))?.Value;
 
@@ -52,17 +53,43 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
             direction.BindValueChanged(OnDirectionChanged, true);
         }
 
-        protected override void OnTintDisplaySettingsChanged()
+        protected override void LoadComplete()
         {
-            reloadAnimation();
+            base.LoadComplete();
+            ColumnWatcher.GetOrCreate(Column).Add(this);
         }
 
         private void reloadAnimation()
         {
-            if (directionContainer == null || skin == null)
+            if (directionContainer == null || Skin == null)
                 return;
 
-            directionContainer.Child = noteAnimation = GetAnimation(skin) ?? Empty();
+            appliedTextureName = CurrentTextureName();
+            directionContainer.Child = noteAnimation = GetAnimation(Skin) ?? Empty();
+        }
+
+        private void reloadAnimationIfTextureChanged()
+        {
+            if (Skin == null || CurrentTextureName() == appliedTextureName)
+                return;
+
+            reloadAnimation();
+        }
+
+        protected virtual string CurrentTextureName()
+            => GetNoteImageName(Skin, LegacyManiaSkinConfigurationLookups.NoteImage);
+
+        protected string GetNoteImageName(ISkin skin, LegacyManiaSkinConfigurationLookups lookup)
+        {
+            string suffix = lookup switch
+            {
+                LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage => "H",
+                LegacyManiaSkinConfigurationLookups.HoldNoteTailImage => "T",
+                _ => string.Empty,
+            };
+
+            return GetColumnSkinConfig<string>(skin, lookup)?.Value
+                   ?? $"mania-note{ResolveNoteTextureFileIndex(partForLookup(lookup))}{suffix}";
         }
 
         protected override void Update()
@@ -100,25 +127,23 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         protected virtual Drawable? GetAnimation(ISkinSource skin) => GetAnimationFromLookup(skin, LegacyManiaSkinConfigurationLookups.NoteImage);
 
         protected Drawable? GetAnimationFromLookup(ISkin skin, LegacyManiaSkinConfigurationLookups lookup)
+            => skin.GetAnimation(GetNoteImageName(skin, lookup), WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true);
+
+        protected override void Dispose(bool isDisposing)
         {
-            string suffix = string.Empty;
+            if (isDisposing)
+                ColumnWatcher.Remove(Column, this);
 
-            switch (lookup)
-            {
-                case LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage:
-                    suffix = "H";
-                    break;
-
-                case LegacyManiaSkinConfigurationLookups.HoldNoteTailImage:
-                    suffix = "T";
-                    break;
-            }
-
-            string noteImage = GetColumnSkinConfig<string>(skin, lookup)?.Value
-                               ?? $"mania-note{ResolveNoteTextureFileIndex(partForLookup(lookup))}{suffix}";
-
-            return skin.GetAnimation(noteImage, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true);
+            base.Dispose(isDisposing);
         }
+
+        void IColumnNote.ForwardOnNoteSetChanged() => reloadAnimation();
+
+        void IColumnNote.ForwardOnNoteSizeChanged()
+        {
+        }
+
+        void IColumnNote.ForwardOnColourChanged() => reloadAnimationIfTextureChanged();
 
         private static ManiaNoteDisplayColourPart partForLookup(LegacyManiaSkinConfigurationLookups lookup) => lookup switch
         {

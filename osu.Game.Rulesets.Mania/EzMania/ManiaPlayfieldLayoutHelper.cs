@@ -123,15 +123,7 @@ namespace osu.Game.Rulesets.Mania.EzMania
         /// Returns the effective hit position using the same rules as the in-game playfield.
         /// </summary>
         public static float GetHitPosition(ISkinSource skin, Ez2ConfigManager ezSkinConfig)
-        {
-            if (ezSkinConfig.Get<bool>(Ez2Setting.HitPositionGlobalEnable))
-                return (float)ezSkinConfig.Get<double>(Ez2Setting.HitPosition);
-
-            return skin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                           new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))
-                       ?.Value
-                   ?? (float)ezSkinConfig.Get<double>(Ez2Setting.HitPosition);
-        }
+            => GetHitPosition(skin, ezSkinConfig.Get<bool>(Ez2Setting.HitPositionGlobalEnable), ezSkinConfig.Get<double>(Ez2Setting.HitPosition));
 
         /// <summary>
         /// Returns the effective hit position using the same rules as the in-game playfield.
@@ -145,6 +137,26 @@ namespace osu.Game.Rulesets.Mania.EzMania
                            new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))
                        ?.Value
                    ?? (float)hitPosition;
+        }
+
+        /// <summary>
+        /// Ez、Ez2、SbI。与列宽 <see cref="ColumnWidthStyle.EzSkinOnly"/> 同一范围。
+        /// </summary>
+        public static bool IsCodeSkin(ISkinSource skin, SkinManager? skinManager = null)
+        {
+            foreach (var source in skin.AllSources)
+            {
+                if (source is EzStyleProSkin or Ez2Skin or SbISkin)
+                    return true;
+            }
+
+            if (skinManager == null)
+                return false;
+
+            string instantiationInfo = skinManager.CurrentSkinInfo.Value.PerformRead(s => s.InstantiationInfo);
+            return instantiationInfo == typeof(EzStyleProSkin).GetInvariantInstantiationInfo()
+                   || instantiationInfo == typeof(Ez2Skin).GetInvariantInstantiationInfo()
+                   || instantiationInfo == typeof(SbISkin).GetInvariantInstantiationInfo();
         }
 
         /// When <c>false</c>, only skin column width (or the configured base width) is used.
@@ -205,7 +217,7 @@ namespace osu.Game.Rulesets.Mania.EzMania
             switch (columnWidthStyle)
             {
                 case ColumnWidthStyle.EzSkinOnly:
-                    if (usesEzColumnWidth(skin, skinManager))
+                    if (IsCodeSkin(skin, skinManager))
                         width = ezWidth;
                     break;
 
@@ -278,19 +290,5 @@ namespace osu.Game.Rulesets.Mania.EzMania
         /// </summary>
         public static bool ShouldSkipBeatmapColumn(StageDefinition stage, int beatmapColumnIndex)
             => beatmapColumnIndex >= GetDisplayColumnCount(stage);
-
-        private static bool usesEzColumnWidth(ISkinSource skin, SkinManager skinManager)
-        {
-            foreach (var source in skin.AllSources)
-            {
-                if (source is EzStyleProSkin or Ez2Skin or SbISkin)
-                    return true;
-            }
-
-            string instantiationInfo = skinManager.CurrentSkinInfo.Value.PerformRead(s => s.InstantiationInfo);
-            return instantiationInfo == typeof(EzStyleProSkin).GetInvariantInstantiationInfo()
-                   || instantiationInfo == typeof(Ez2Skin).GetInvariantInstantiationInfo()
-                   || instantiationInfo == typeof(SbISkin).GetInvariantInstantiationInfo();
-        }
     }
 }

@@ -722,9 +722,21 @@ namespace osu.Game.EzOsuGame.Edit
             if (!EzSkinEditorHostScope.CanWriteSkinLayout)
                 return;
 
+            ensureSkinIniSession();
+            ensureSkinJsonSession();
+
             bool configDirty = hasUnsavedConfigChanges();
             bool iniDirty = SkinIniSession.IsDirty;
             bool jsonDirty = SkinJsonSession is { IsSupported: true, HasFile: true } && SkinJsonSession.IsDirty(ezSkinConfig);
+            bool layoutDirty = hudLayer.HasPendingSkinLayoutSave;
+
+            if ((iniDirty || jsonDirty || layoutDirty)
+                && needsMutableSkinBeforeWrite(iniDirty, jsonDirty, layoutDirty)
+                && !ensureMutableSkinPreservingWorkspaceDrafts(iniDirty, jsonDirty))
+            {
+                postNotification(EzEditorStrings.NOTIFY_SKIN_LAYOUT_EXIT_SAVE_FAILED);
+                return;
+            }
 
             ezSkinConfig.Save();
             hudLayer.PersistAllLayouts();
@@ -852,6 +864,10 @@ namespace osu.Game.EzOsuGame.Edit
             if (SkinIniSession is not { IsSupported: true, IsDirty: true })
                 return;
 
+            if (needsMutableSkinBeforeWrite(iniDirty: true, jsonDirty: false, layoutDirty: false)
+                && !ensureMutableSkinPreservingWorkspaceDrafts(iniDirty: true, jsonDirty: false))
+                return;
+
             SkinIniSession.Commit();
             refreshScene();
             invalidateResourceCaches();
@@ -867,6 +883,60 @@ namespace osu.Game.EzOsuGame.Edit
         {
             // 左栏 SkinSpecific 为占位壳，按钮已隐藏；专用设置在 Appearance 侧栏「皮肤专用」栏。
             sceneRail.SetSceneVisible(EzEditorSceneType.SkinSpecific, false);
+        }
+
+        private static bool usesLegacySkinFolder(Live<SkinInfo> live) =>
+            live.PerformRead(s => EzLegacySkinFolders.TryGetDirectory(s, out _));
+
+        private bool needsMutableSkinBeforeWrite(bool iniDirty, bool jsonDirty, bool layoutDirty)
+        {
+            if (usesLegacySkinFolder(skinManager.CurrentSkinInfo.Value))
+                return false;
+
+            if (layoutDirty)
+                return true;
+
+            if (iniDirty && SkinIniSession.IsSupported)
+                return true;
+
+            if (jsonDirty)
+                return true;
+
+            if (SkinJsonSession is { HasFile: true })
+                return true;
+
+            return skinManager.CurrentSkinInfo.Value.PerformRead(s => s.Protected);
+        }
+
+        /// <summary>
+        /// Mirrors official skin editor: built-in protected skins are copied before the first write.
+        /// Preserves in-memory workspace drafts when <see cref="SkinManager.EnsureMutableSkin"/> switches the active skin.
+        /// </summary>
+        private bool ensureMutableSkinPreservingWorkspaceDrafts(bool iniDirty, bool jsonDirty)
+        {
+            var live = skinManager.CurrentSkinInfo.Value;
+
+            if (usesLegacySkinFolder(live))
+                return true;
+
+            if (!live.PerformRead(s => s.Protected))
+                return live.IsManaged;
+
+            string? iniDraft = iniDirty ? SkinIniSession.DraftText : null;
+
+            if (!skinManager.EnsureMutableSkin())
+                return false;
+
+            if (iniDraft != null)
+            {
+                SkinIniSession.LoadFromSkin(skinManager.CurrentSkinInfo.Value);
+                SkinIniSession.SetDraftText(iniDraft);
+            }
+            else
+                ensureSkinIniSession();
+
+            ensureSkinJsonSession();
+            return true;
         }
 
         private void ensureSkinIniSession()
@@ -923,6 +993,13 @@ namespace osu.Game.EzOsuGame.Edit
         {
             ensureSkinJsonSession();
 
+            if (needsMutableSkinBeforeWrite(iniDirty: false, jsonDirty: false, layoutDirty: false)
+                && !ensureMutableSkinPreservingWorkspaceDrafts(iniDirty: false, jsonDirty: false))
+            {
+                postNotification(EzEditorStrings.NOTIFY_CANNOT_CREATE_EZSKIN_JSON);
+                return;
+            }
+
             if (SkinJsonSession == null || !SkinJsonSession.CreateInitial(ezSkinConfig))
             {
                 postNotification(EzEditorStrings.NOTIFY_CANNOT_CREATE_EZSKIN_JSON);
@@ -937,6 +1014,16 @@ namespace osu.Game.EzOsuGame.Edit
         {
             ensureSkinJsonSession();
 
+            bool jsonDirty = SkinJsonSession is { HasFile: true } && SkinJsonSession.IsDirty(ezSkinConfig);
+
+            if (jsonDirty
+                && needsMutableSkinBeforeWrite(iniDirty: false, jsonDirty: true, layoutDirty: false)
+                && !ensureMutableSkinPreservingWorkspaceDrafts(iniDirty: false, jsonDirty: true))
+            {
+                postNotification(EzEditorStrings.NOTIFY_CANNOT_UPDATE_EZSKIN_JSON_SNAPSHOT);
+                return;
+            }
+
             if (SkinJsonSession == null || !SkinJsonSession.Commit(ezSkinConfig))
             {
                 postNotification(EzEditorStrings.NOTIFY_CANNOT_UPDATE_EZSKIN_JSON_SNAPSHOT);
@@ -950,6 +1037,14 @@ namespace osu.Game.EzOsuGame.Edit
         private void removeEzSkinJson()
         {
             ensureSkinJsonSession();
+
+            if (SkinJsonSession is { HasFile: true }
+                && needsMutableSkinBeforeWrite(iniDirty: false, jsonDirty: false, layoutDirty: false)
+                && !ensureMutableSkinPreservingWorkspaceDrafts(iniDirty: false, jsonDirty: false))
+            {
+                postNotification(EzEditorStrings.NOTIFY_CANNOT_REMOVE_EZSKIN_JSON);
+                return;
+            }
 
             if (SkinJsonSession == null || !SkinJsonSession.Remove())
             {

@@ -74,7 +74,8 @@ namespace osu.Game.EzOsuGame.Configuration
 
         public Ez2ConfigManager(Storage storage)
             : base(storage)
-        { }
+        {
+        }
 
         protected override void PerformLoad()
         {
@@ -1329,7 +1330,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         // 皮肤与舞台资源
         ColumnWidthStyle,
-        HitPositionGlobalEnable, // 未来要考虑，是否统一成，整套系统套用在传统皮肤上，变成切换设置
+        HitPositionGlobalEnable,
 
         /// <summary>
         /// When enabled, switching skins applies per-skin EzSkin.json to in-memory Ez config only.

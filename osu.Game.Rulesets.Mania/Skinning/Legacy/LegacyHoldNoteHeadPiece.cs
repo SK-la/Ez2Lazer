@@ -43,6 +43,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
                 this.FadeColour(Colour4.DarkGray, 60);
         }
 
+        protected override string CurrentTextureName()
+            => GetNoteImageName(Skin, LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage);
+
         protected override Drawable? GetAnimation(ISkinSource skin)
         {
             // TODO: Should fallback to the head from default legacy skin instead of note.

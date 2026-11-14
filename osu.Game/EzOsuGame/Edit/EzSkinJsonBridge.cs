@@ -40,7 +40,7 @@ namespace osu.Game.EzOsuGame.Edit
                 if (!EzSkinJsonSettingCatalog.Contains(setting))
                     continue;
 
-                tryApplySetting(config, setting, pair.Value);
+                tryApplySetting(config, setting, normalizeStoredValue(setting, pair.Value));
             }
         }
 
@@ -60,7 +60,7 @@ namespace osu.Game.EzOsuGame.Edit
                 if (!EzSkinJsonSettingCatalog.Contains(setting))
                     continue;
 
-                syncBindableDefault(config, setting, pair.Value);
+                syncBindableDefault(config, setting, normalizeStoredValue(setting, pair.Value));
             }
         }
 
@@ -79,7 +79,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             // Parse into a detached instance of the same bindable type. Parsing on the live bindable would write the value first and restore it
             // afterwards, firing ValueChanged (and background saves) for every snapshotted setting just to update Default.
-            if (Activator.CreateInstance(bindable.GetType(), new[] { valueProperty.GetValue(bindable) }) is not IParseable parseable)
+            if (Activator.CreateInstance(bindable.GetType(), valueProperty.GetValue(bindable)) is not IParseable parseable)
                 return;
 
             parseable.Parse(value, CultureInfo.InvariantCulture);
@@ -106,6 +106,19 @@ namespace osu.Game.EzOsuGame.Edit
                 return formattable.ToString(null, CultureInfo.InvariantCulture);
 
             return bindable.ToString() ?? string.Empty;
+        }
+
+        private static string normalizeStoredValue(Ez2Setting setting, string value)
+        {
+            if (setting != Ez2Setting.HitPositionGlobalEnable)
+                return value;
+
+            return value switch
+            {
+                "1" or "True" or "true" or "AllSkins" => "1",
+                "0" or "False" or "false" or "CodeSkin" => "0",
+                _ => value,
+            };
         }
 
         private static void tryApplySetting(Ez2ConfigManager config, Ez2Setting setting, string value)

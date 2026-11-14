@@ -69,10 +69,13 @@ namespace osu.Game.EzOsuGame.Edit
                 return false;
 
             if (live.ID != SkinId)
-                throw new InvalidOperationException("Cannot create EzSkin.json for a skin that is no longer current.");
+                return false;
 
             string json = EzSkinJsonBridge.CreateNormalizedSnapshot(config);
-            writeJson(live, json, backup: false);
+
+            if (!writeJson(live, json, backup: false))
+                return false;
+
             skinManager.CurrentSkinInfo.TriggerChange();
             HasFile = true;
             savedSnapshot = json;
@@ -90,10 +93,13 @@ namespace osu.Game.EzOsuGame.Edit
                 return false;
 
             if (live.ID != SkinId)
-                throw new InvalidOperationException("Cannot commit EzSkin.json for a skin that is no longer current.");
+                return false;
 
             string jsonToCommit = EzSkinJsonBridge.CreateNormalizedSnapshot(config);
-            writeJson(live, jsonToCommit, backup: true);
+
+            if (!writeJson(live, jsonToCommit, backup: true))
+                return false;
+
             skinManager.CurrentSkinInfo.TriggerChange();
             savedSnapshot = jsonToCommit;
             return true;
@@ -110,7 +116,7 @@ namespace osu.Game.EzOsuGame.Edit
                 return false;
 
             if (live.ID != SkinId)
-                throw new InvalidOperationException("Cannot remove EzSkin.json for a skin that is no longer current.");
+                return false;
 
             if (live.PerformRead(s => EzLegacySkinFolders.TryGetDirectory(s, out _)))
             {
@@ -123,7 +129,7 @@ namespace osu.Game.EzOsuGame.Edit
             else
             {
                 if (!live.IsManaged)
-                    throw new InvalidOperationException("Cannot remove EzSkin.json because the current skin is not writable.");
+                    return false;
 
                 live.PerformWrite(skin =>
                 {
@@ -145,10 +151,12 @@ namespace osu.Game.EzOsuGame.Edit
             EzSkinJsonBridge.Apply(document, config);
         }
 
-        private void writeJson(Live<SkinInfo> live, string json, bool backup)
+        private bool writeJson(Live<SkinInfo> live, string json, bool backup)
         {
             if (live.PerformRead(s => EzLegacySkinFolders.TryGetDirectory(s, out _)))
             {
+                bool wrote = false;
+
                 live.PerformRead(s =>
                 {
                     if (!EzLegacySkinFolders.TryGetDirectory(s, out string directory))
@@ -158,13 +166,14 @@ namespace osu.Game.EzOsuGame.Edit
                         LastBackupFilename = EzSkinJsonStorage.BackupJson(directory, savedSnapshot);
 
                     EzSkinJsonStorage.WriteJson(directory, json);
+                    wrote = true;
                 });
 
-                return;
+                return wrote;
             }
 
             if (!live.IsManaged)
-                throw new InvalidOperationException("Cannot write EzSkin.json because the current skin is not writable.");
+                return false;
 
             live.PerformWrite(skin =>
             {
@@ -173,6 +182,8 @@ namespace osu.Game.EzOsuGame.Edit
 
                 writeSkinJsonText(skin, json);
             });
+
+            return true;
         }
 
         private string? readSkinJsonText(SkinInfo skin) => EzSkinJsonStorage.TryReadJson(skinManager, skin);

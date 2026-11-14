@@ -51,9 +51,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             ColumnWatcher.GetOrCreate(Column).Add(this);
 
-            if (noteDisplayTint != null)
-                noteDisplayTint.Changed += OnColourChanged;
-
             Scheduler.AddOnce(OnLoadChanged);
         }
 
@@ -167,9 +164,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (isDisposing)
             {
                 ColumnWatcher.Remove(Column, this);
-
-                if (noteDisplayTint != null)
-                    noteDisplayTint.Changed -= OnColourChanged;
             }
             base.Dispose(isDisposing);
         }

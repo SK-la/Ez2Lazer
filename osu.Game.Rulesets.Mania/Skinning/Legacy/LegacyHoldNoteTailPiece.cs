@@ -52,6 +52,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
                 : new ValueChangedEvent<ScrollingDirection>(ScrollingDirection.Up, ScrollingDirection.Up));
         }
 
+        protected override string CurrentTextureName()
+            => GetNoteImageName(Skin, LegacyManiaSkinConfigurationLookups.HoldNoteTailImage)
+               + GetNoteImageName(Skin, LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage)
+               + GetNoteImageName(Skin, LegacyManiaSkinConfigurationLookups.NoteImage);
+
         protected override Drawable? GetAnimation(ISkinSource skin)
         {
             // TODO: Should fallback to the head from default legacy skin instead of note.
