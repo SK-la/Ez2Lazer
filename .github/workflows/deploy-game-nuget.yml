@@ -13,6 +13,11 @@ on:
         required: true
         type: string
 
+# 同一 tag 手动发布串行，不取消进行中的 run
+concurrency:
+  group: deploy-game-nuget-${{ github.event.inputs.tag || github.run_id }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
   id-token: write

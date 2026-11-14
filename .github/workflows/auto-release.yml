@@ -23,6 +23,11 @@ on:
         required: false
         default: ''
 
+# 发布不取消进行中的 run；同一 tag/ref 串行
+concurrency:
+  group: auto-release-${{ github.ref }}-${{ github.event.inputs.tag || 'tag' }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
   packages: read

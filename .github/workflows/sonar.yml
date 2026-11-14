@@ -9,6 +9,11 @@ on:
   issue_comment:
     types: [created]
 
+# 同一 PR 只保留最新 Sonar；不与 ci.yml 共用 group
+concurrency:
+  group: sonar-${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pull-requests: read
