@@ -342,6 +342,12 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString LAYER_EZ_PLAYFIELD_RULESET = new EzLocalizationManager.EzLocalisableString("Ez Playfield（{0}）", "Ez Playfield ({0})");
 
+        public static readonly LocalisableString LAYER_SKIN_HUD = new EzLocalizationManager.EzLocalisableString("Skin HUD", "Skin HUD");
+
+        public static readonly LocalisableString LAYER_SKIN_HUD_RULESET = new EzLocalizationManager.EzLocalisableString("Skin HUD（{0}）", "Skin HUD ({0})");
+
+        public static readonly LocalisableString LAYER_SKIN_PLAYFIELD_RULESET = new EzLocalizationManager.EzLocalisableString("Skin Playfield（{0}）", "Skin Playfield ({0})");
+
         /// <summary>
         /// Fallback used in place of the ruleset name when no ruleset is active yet.
         /// </summary>
