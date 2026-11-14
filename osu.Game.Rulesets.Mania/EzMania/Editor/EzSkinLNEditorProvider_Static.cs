@@ -18,6 +18,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
+using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Objects.Types;
@@ -187,6 +188,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             private readonly PreviewGameplayClock gameplayClockDependency = new PreviewGameplayClock();
             private readonly ManualClock previewClock = new ManualClock();
             private readonly EzSkinEditorNotePreviewRequest? previewRequest;
+            private ManiaPlayfieldNoteDisplayTint? noteDisplayTint;
 
             [Resolved(CanBeNull = true)]
             private Ez2ConfigManager? ezConfig { get; set; }
@@ -232,6 +234,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
                 dependencies.Cache(columnDependency);
                 dependencies.CacheAs<IBindable<ManiaAction>>(columnDependency.Action);
 
+                noteDisplayTint = new ManiaPlayfieldNoteDisplayTint();
+                dependencies.CacheAs(noteDisplayTint);
+
                 // Note skins derive their height from the column width times this scale. Give the preview a scoped copy so
                 // the drawn note follows the request instead of the live config (the shared bindables stay untouched).
                 if (previewRequest is { } request && ezConfig != null)
@@ -251,6 +256,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             {
                 base.LoadComplete();
 
+                if (noteDisplayTint != null)
+                    LoadComponentAsync(noteDisplayTint, AddInternal);
+
                 if (previewRequest is not { } request)
                     return;
 
@@ -262,6 +270,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
 
                 if (request.UseEzNoteVariants && Enum.TryParse(request.VariantId, out EzColumnType type))
                     columnDependency.EzNoteTypeBindable = new Bindable<EzColumnType>(type);
+
+                // FullLoad 会走列色缓存；须隔离以免全局列色盖住 request 预览色。
+                columnDependency.IsolateNoteColourForPreview = true;
+                columnDependency.QueueInvalidate(ManiaNoteAppearanceInvalidation.FullLoad);
             }
 
             protected override void Update()

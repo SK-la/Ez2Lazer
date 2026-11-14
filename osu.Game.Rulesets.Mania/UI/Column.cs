@@ -166,6 +166,15 @@ namespace osu.Game.Rulesets.Mania.UI
         private Action<ValueChangedEvent<EzColouringMode>>? onColouringModeChanged;
         private Bindable<EzColouringMode> colouringMode = null!;
 
+        private ManiaNoteAppearanceInvalidation? pendingAppearanceInvalidation;
+        private bool appearanceInvalidationQueued;
+        private bool lastDisplayTintActive;
+
+        /// <summary>
+        /// 带 <see cref="EzSkinEditorNotePreviewRequest"/> 的静态 note 预览：列显色只读本列 bindable，<see cref="syncNoteDisplayColourCache"/> 不同步全局列色。
+        /// </summary>
+        internal bool IsolateNoteColourForPreview { get; set; }
+
         // 缓存计算参数，避免闭包捕获
         public int KeyMode;
 
@@ -208,17 +217,19 @@ namespace osu.Game.Rulesets.Mania.UI
             EzNoteSizeBindable = ezFactory.GetNoteSizeBindable(KeyMode, Index);
             EzNoteColourBindable = ezConfig.GetColumnColorBindable(KeyMode, Index);
             colouringMode = ezConfig.GetBindable<EzColouringMode>(Ez2Setting.ColouringMode);
-            onColumnColourChanged = _ => refreshNoteDisplayColour();
-            onColouringModeChanged = _ => refreshNoteDisplayColour();
+            onColumnColourChanged = _ => QueueInvalidate(ManiaNoteAppearanceInvalidation.Colour);
+            onColouringModeChanged = _ => QueueInvalidate(ManiaNoteAppearanceInvalidation.Colour);
             EzNoteColourBindable.BindValueChanged(onColumnColourChanged, true);
             colouringMode.BindValueChanged(onColouringModeChanged);
             NoteSetNameBindable = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
             ColorSettingsEnabledBindable = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
 
-            onBeatLineNoteTintChangedHandler = () => NoteColourChanged?.Invoke();
-
             if (beatLineNoteTint != null)
+            {
+                lastDisplayTintActive = beatLineNoteTint.DisplayTintActive;
+                onBeatLineNoteTintChangedHandler = onBeatLineNoteTintChanged;
                 beatLineNoteTint.Changed += onBeatLineNoteTintChangedHandler;
+            }
 
             SkinnableDrawable keyArea;
 
@@ -264,10 +275,83 @@ namespace osu.Game.Rulesets.Mania.UI
             keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
         }
 
+        private void syncNoteDisplayColourCache()
+        {
+            // 进图列：配置为源头，bindable 副本可能被基础色事件滞后；预览列：bindable 已是 request 上下文，禁止写回全局。
+            Colour4 raw = IsolateNoteColourForPreview
+                ? EzNoteColourBindable.Value
+                : ezConfig.GetColumnColor(KeyMode, Index);
+
+            // 配置里的类型色是源头。列上的 ColourBindable 只是绑过去的副本，改基础色时副本可能还停在旧值。
+            if (!IsolateNoteColourForPreview && !EzNoteColourBindable.Value.Equals(raw))
+                EzNoteColourBindable.Value = raw;
+
+            NoteDisplayColour = ManiaNoteDisplayColour.ForColumnNoteDisplayTint(raw, colouringMode.Value);
+        }
+
         private void refreshNoteDisplayColour()
         {
-            NoteDisplayColour = ManiaNoteDisplayColour.ForColumnNoteDisplayTint(EzNoteColourBindable.Value, colouringMode.Value);
+            syncNoteDisplayColourCache();
             NoteColourChanged?.Invoke();
+        }
+
+        internal void SyncNoteDisplayColourCache() => syncNoteDisplayColourCache();
+
+        internal void QueueInvalidate(ManiaNoteAppearanceInvalidation level)
+        {
+            pendingAppearanceInvalidation = pendingAppearanceInvalidation?.Merge(level) ?? level;
+
+            if (appearanceInvalidationQueued)
+                return;
+
+            appearanceInvalidationQueued = true;
+            Scheduler.AddOnce(flushAppearanceInvalidation);
+        }
+
+        private void onBeatLineNoteTintChanged()
+        {
+            if (beatLineNoteTint == null)
+                return;
+
+            bool active = beatLineNoteTint.DisplayTintActive;
+
+            if (active != lastDisplayTintActive)
+            {
+                lastDisplayTintActive = active;
+                QueueInvalidate(ManiaNoteAppearanceInvalidation.FullLoad);
+                return;
+            }
+
+            QueueInvalidate(ManiaNoteAppearanceInvalidation.Colour);
+        }
+
+        private void flushAppearanceInvalidation()
+        {
+            appearanceInvalidationQueued = false;
+
+            if (pendingAppearanceInvalidation is not { } level)
+                return;
+
+            pendingAppearanceInvalidation = null;
+
+            // 与 NoteBase 一致：Set→OnLoadChanged（纹理→尺寸→上色）；Size→OnDrawableChanged；Colour→OnColourChanged。
+            // FullLoad 必须先走 Set，再刷新列色缓存并广播给 Drawable 包裹层。
+            switch (level)
+            {
+                case ManiaNoteAppearanceInvalidation.FullLoad:
+                    syncNoteDisplayColourCache();
+                    NoteSetChanged?.Invoke();
+                    NoteColourChanged?.Invoke();
+                    break;
+
+                case ManiaNoteAppearanceInvalidation.Layout:
+                    NoteSizeChanged?.Invoke();
+                    break;
+
+                default:
+                    refreshNoteDisplayColour();
+                    break;
+            }
         }
 
         private void onSourceChanged()
@@ -287,8 +371,13 @@ namespace osu.Game.Rulesets.Mania.UI
             rightColumnSpacing = columnSize.Margin.Right;
         }
 
+        /// <summary>纹理重载：<see cref="IColumnNote.ForwardOnNoteSetChanged"/> → OnLoadChanged。</summary>
         public event Action? NoteSetChanged;
+
+        /// <summary>尺寸：<see cref="IColumnNote.ForwardOnNoteSizeChanged"/> → OnDrawableChanged。</summary>
         public event Action? NoteSizeChanged;
+
+        /// <summary>显色：<see cref="IColumnNote.ForwardOnColourChanged"/> → OnColourChanged（并刷新列色缓存）。</summary>
         public event Action? NoteColourChanged;
 
         protected override void LoadComplete()
@@ -298,20 +387,22 @@ namespace osu.Game.Rulesets.Mania.UI
             drawableRuleset ??= this.FindClosestParent<DrawableManiaRuleset>();
             NewResult += OnNewResult;
 
-            onNoteDrawableChangedHandler = () => NoteSetChanged?.Invoke();
+            onNoteDrawableChangedHandler = () => QueueInvalidate(ManiaNoteAppearanceInvalidation.FullLoad);
             ezFactory.OnNoteDrawableChanged += onNoteDrawableChangedHandler;
 
             onColumnTypeChangedHandler = (keyMode, columnIndex, _) =>
             {
-                if (keyMode == KeyMode && columnIndex == Index)
-                    NoteSetChanged?.Invoke();
+                if (keyMode != KeyMode || columnIndex != Index)
+                    return;
+
+                QueueInvalidate(ManiaNoteAppearanceInvalidation.FullLoad);
             };
             ezConfig.ColumnTypeChanged += onColumnTypeChangedHandler;
 
-            onNoteSizeChangedHandler = () => NoteSizeChanged?.Invoke();
+            onNoteSizeChangedHandler = () => QueueInvalidate(ManiaNoteAppearanceInvalidation.Layout);
             ezFactory.OnNoteSizeChanged += onNoteSizeChangedHandler;
 
-            onNoteColourChangedHandler = () => NoteColourChanged?.Invoke();
+            onNoteColourChangedHandler = () => QueueInvalidate(ManiaNoteAppearanceInvalidation.Colour);
             ezFactory.OnNoteColourChanged += onNoteColourChangedHandler;
         }
 

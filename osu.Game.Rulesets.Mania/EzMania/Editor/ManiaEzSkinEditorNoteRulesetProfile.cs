@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Textures;
@@ -93,20 +94,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
 
         private static string resolveEzTextureName(EzManiaNotePart part, string variantId)
         {
-            string prefix = variantId switch
-            {
-                nameof(EzColumnType.B) => "blue",
-                nameof(EzColumnType.S) or nameof(EzColumnType.P) => "green",
-                _ => "white",
-            };
+            if (!Enum.TryParse(variantId, out EzColumnType columnType))
+                columnType = EzColumnType.A;
 
-            return part switch
-            {
-                EzManiaNotePart.HoldHead => $"{prefix}longnote/head",
-                EzManiaNotePart.HoldBody => $"{prefix}longnote/middle",
-                EzManiaNotePart.HoldTail => $"{prefix}longnote/tail",
-                _ => $"{prefix}note",
-            };
+            return EzColumnResourceLookup.ResolveEzProNoteResourceName(columnType, part);
         }
     }
 }

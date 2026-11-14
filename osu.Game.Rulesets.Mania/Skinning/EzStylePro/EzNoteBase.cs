@@ -5,6 +5,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -58,18 +59,37 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected float NoteHeight => Column.EzNoteSizeBindable.Value.Y;
 
-        protected string NoteName => ColorPrefix + "note";
-        protected string HeadName => ColorPrefix + "longnote/head";
-        protected string TailName => ColorPrefix + "longnote/tail";
-
         protected virtual string ColorPrefix
-            => noteDisplayTint?.GetEzProTextureColourPrefix(DisplayColourPart, Column) ?? "white";
+            => noteDisplayTint?.GetEzProTextureColourPrefix(DisplayColourPart, Column) ?? EzColumnResourceLookup.NOTE_TEXTURE_AFFIX_A;
 
         protected virtual void UpdateTexture() { }
         protected virtual void UpdateDrawable() { }
 
         protected virtual void UpdateColor()
         {
+            if (Column == null)
+                return;
+
+            // 节拍线色按 note 时刻区分，由 Drawable 外壳乘上去。这里只负责列色。
+            if (noteDisplayTint?.DivisorNoteColouringEnabled == true)
+            {
+                Colour = Colour4.White;
+                return;
+            }
+
+            Colour = noteDisplayTint?.GetDisplayColour(DisplayColourPart, Column, 0) ?? Colour4.White;
+        }
+
+        protected Drawable? LoadEzProNoteComponent(EzManiaNotePart part)
+            => LoadEzProNoteComponent(EzColumnResourceLookup.EzProNoteComponent(part));
+
+        /// <summary>
+        /// 按 <see cref="ManiaPlayfieldNoteDisplayTint.UseTintBaseTexture"/> 与列型降级加载；降级实际命中前缀不写入 <see cref="appliedPrefix"/>。
+        /// </summary>
+        protected Drawable? LoadEzProNoteComponent(string componentAfterPrefix)
+        {
+            bool useTintBase = noteDisplayTint?.UseTintBaseTexture(DisplayColourPart, Column) == true;
+            return Factory.CreateEzProNoteComponent(componentAfterPrefix, Column.EzNoteTypeBindable.Value, useTintBase, out _);
         }
 
         protected void OnLoadChanged()
@@ -79,9 +99,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 return;
 
             tintBaseApplied = noteDisplayTint?.UseTintBaseTexture(DisplayColourPart, Column) == true;
-            appliedPrefix = ColorPrefix;
             MainContainer.Clear();
             UpdateTexture();
+            // 与 ColorPrefix 对齐：仅 tint 模式/逻辑前缀变才重载；降级 file 前缀与 ColorPrefix 不同是正常的。
+            appliedPrefix = ColorPrefix;
             OnDrawableChanged();
             UpdateColor();
         }

@@ -311,6 +311,35 @@ namespace osu.Game.EzOsuGame
             return animation;
         }
 
+        /// <summary>
+        /// 按列类型与 <see cref="EzColumnResourceLookup.DEGRADE_ORDER"/> 解析 Ez Pro note 组件（前缀由查找表给出，<paramref name="componentAfterPrefix"/> 为后缀段）。
+        /// </summary>
+        /// <param name="resolvedPrefix">成功时使用的路径前缀名，失败时为首选前缀。</param>
+        public Drawable? CreateEzProNoteComponent(string componentAfterPrefix, EzColumnType columnType, bool useTintBaseTexture, out string resolvedPrefix)
+        {
+            if (useTintBaseTexture)
+            {
+                resolvedPrefix = EzColumnResourceLookup.TINT_BASE_TEXTURE_AFFIX;
+                return CreateAnimation(EzColumnResourceLookup.FormatEzProNoteResource(resolvedPrefix, componentAfterPrefix));
+            }
+
+            resolvedPrefix = EzColumnResourceLookup.EzProNoteTexturePrefix(columnType);
+
+            foreach (var type in EzColumnResourceLookup.EnumerateDegradeOrder(columnType))
+            {
+                string prefix = EzColumnResourceLookup.EzProNoteTexturePrefix(type);
+                var drawable = CreateAnimation(EzColumnResourceLookup.FormatEzProNoteResource(prefix, componentAfterPrefix));
+
+                if (drawable == null)
+                    continue;
+
+                resolvedPrefix = prefix;
+                return drawable;
+            }
+
+            return null;
+        }
+
         // note 帧的**命名**交由层2 三模板统一解析（子目录 {i:D3}、同层 {name}-0、{name}/frame_0 都在覆盖范围内），
         // JudgementLine 这类单图由单图回退自然覆盖。比例由 store 构造期的 scaleAdjust 决定，故这里不再改写共享纹理。
         // 帧的**并行预解码**保留在本工厂：这是既有并已验证的做法，且并行只作用于这一处。

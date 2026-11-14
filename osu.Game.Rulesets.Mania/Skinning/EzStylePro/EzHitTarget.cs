@@ -21,9 +21,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override bool ShowSeparators => false;
 
         /// <summary>
-        /// 命中靶固定读 whitenote：按列类型取色的贴图（blue / green）在缺少该色的音符集里会让靶整列消失。
+        /// 重载判定用前缀，与 <see cref="EzNoteBase.LoadEzProNoteComponent"/> 里实际加载路径无关。
+        /// 贴图：<see cref="ManiaPlayfieldNoteDisplayTint.UseTintBaseTexture"/> 为真→白底；为假→列型/降级查找（与 note 同源）。
+        /// 乘色：<see cref="IEzSkinInfo.HitTargetColouringEnabled"/> 与列色开关；靶不吃节拍线时刻色。
         /// </summary>
-        protected override string ColorPrefix => "white";
+        protected override string ColorPrefix => EzColumnResourceLookup.NOTE_TEXTURE_AFFIX_A;
 
         private readonly IBindable<double> hitTargetFloatFixed = new Bindable<double>();
         private readonly IBindable<double> hitTargetAlpha = new Bindable<double>();
@@ -72,7 +74,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         /// <summary>
-        /// 命中靶没有命中时刻，只取所在列的显示色；关闭靶着色时保持 whitenote 原色。
+        /// 命中靶没有命中时刻；关闭靶着色时乘色为白（贴图仍由 tint 基/列型路径决定，见 <see cref="ColorPrefix"/> 说明）。
         /// </summary>
         protected override void UpdateColor()
         {

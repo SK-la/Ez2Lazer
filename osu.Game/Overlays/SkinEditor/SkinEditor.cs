@@ -37,6 +37,7 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Dialog;
+using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.OSD;
 using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Edit;
@@ -119,6 +120,9 @@ namespace osu.Game.Overlays.SkinEditor
 
         [Resolved]
         private IDialogOverlay? dialogOverlay { get; set; }
+
+        [Resolved]
+        private INotificationOverlay? notifications { get; set; }
 
         [Resolved]
         private ExternalEditOverlay? externalEditOverlay { get; set; }
@@ -318,7 +322,7 @@ namespace osu.Game.Overlays.SkinEditor
                     return;
 
                 if (val.OldValue != null && HasUnsavedLayoutChanges())
-                    trySaveLayout(val.OldValue);
+                    TrySaveLayout(val.OldValue);
 
                 HasBegunMutating = false;
                 layoutDirty = false;
@@ -774,26 +778,29 @@ namespace osu.Game.Overlays.SkinEditor
 
         void IEditorChangeHandler.RestoreState(int direction) => changeHandler?.RestoreState(direction);
 
+        public void PostLayoutNotice(LocalisableString text) =>
+            notifications?.Post(new SimpleNotification { Text = text });
+
         public void Save(bool userTriggered = true)
         {
             if (currentSkin.IsNotNull())
-                trySaveLayout(currentSkin.Value, userTriggered);
+                TrySaveLayout(currentSkin.Value, userTriggered);
         }
 
         /// <summary>
-        /// Whether a layout save was attempted during the last <see cref="trySaveLayout"/> call.
+        /// Whether a layout save was attempted during the last <see cref="TrySaveLayout"/> call.
         /// </summary>
         public bool LastLayoutSaveAttempted { get; private set; }
 
         /// <summary>
-        /// Whether the last <see cref="trySaveLayout"/> call wrote skin layout files.
+        /// Whether the last <see cref="TrySaveLayout"/> call wrote skin layout files.
         /// </summary>
         public bool LastLayoutSaveSucceeded { get; private set; }
 
         /// <summary>
         /// Persists in-memory layout from loaded containers into <paramref name="skin"/> without writing to disk.
         /// </summary>
-        protected void persistInMemoryLayout(Skin skin)
+        protected void PersistInMemoryLayout(Skin skin)
         {
             foreach (var target in AvailableTargets)
             {
@@ -803,7 +810,7 @@ namespace osu.Game.Overlays.SkinEditor
         }
 
         /// <returns>Whether layout files were written.</returns>
-        protected bool trySaveLayout(Skin skin, bool userTriggered = false)
+        protected bool TrySaveLayout(Skin skin, bool userTriggered = false)
         {
             LastLayoutSaveAttempted = false;
             LastLayoutSaveSucceeded = false;
@@ -842,7 +849,10 @@ namespace osu.Game.Overlays.SkinEditor
                 layoutDirty = false;
 
             if (saved || userTriggered)
+            {
                 onScreenDisplay?.Display(new SkinEditorToast(ToastStrings.SkinSaved, skin.SkinInfo.ToString() ?? "Unknown"));
+                PostLayoutNotice(EzEditorStrings.LAYOUT_SAVED);
+            }
 
             return saved;
         }

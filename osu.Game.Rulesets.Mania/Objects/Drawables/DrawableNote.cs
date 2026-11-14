@@ -14,6 +14,7 @@ using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.Skinning.Default;
+using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI.Scrolling;
@@ -42,6 +43,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         private Drawable headPiece;
 
         private bool displayColourBound;
+        private bool layoutColourBound;
 
         public DrawableNote()
             : this(null)
@@ -78,7 +80,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 if (column != null)
                 {
                     column.NoteColourChanged += onColumnNoteColourSettingsChanged;
+                    column.NoteSizeChanged += onColumnNoteColourSettingsChanged;
                     displayColourBound = true;
+                    layoutColourBound = true;
                 }
             }
 
@@ -94,6 +98,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
                 if (displayColourBound && column != null)
                     column.NoteColourChanged -= onColumnNoteColourSettingsChanged;
+
+                if (layoutColourBound && column != null)
+                    column.NoteSizeChanged -= onColumnNoteColourSettingsChanged;
             }
 
             base.Dispose(isDisposing);
@@ -166,13 +173,21 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         private bool receivesDisplayColour()
             => UseColorization && ManiaPlayfieldNoteDisplayTint.AllowsDisplayColour(DisplayColourPart);
 
+        private bool skinOwnsDisplayColour(SkinnableDrawable skin)
+        {
+            if (skin.Drawable is FastNoteBase piece && piece.OwnsDisplayColour)
+                return true;
+
+            return noteDisplayTint?.DivisorNoteColouringEnabled != true && skin.Drawable is EzNoteBase;
+        }
+
         private void updateSnapColour()
         {
             if (headPiece == null)
                 return;
 
             if (!receivesDisplayColour() || noteDisplayTint == null || column == null
-                || headPiece is SkinnableDrawable skin && skin.Drawable is FastNoteBase piece && piece.OwnsDisplayColour)
+                || headPiece is SkinnableDrawable skin && skinOwnsDisplayColour(skin))
             {
                 headPiece.Colour = Color4.White;
                 return;

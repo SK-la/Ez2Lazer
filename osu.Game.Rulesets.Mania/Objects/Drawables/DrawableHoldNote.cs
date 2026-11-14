@@ -19,7 +19,9 @@ using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 #endif
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Judgements;
+using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.Skinning.Default;
+using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -59,6 +61,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         protected virtual bool UseColorization => true;
 
         private bool displayColourBound;
+        private bool layoutColourBound;
 
         /// <summary>
         /// The time at which the user starting missing the hold note.
@@ -162,7 +165,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 if (column != null)
                 {
                     column.NoteColourChanged += updateBodyColour;
+                    column.NoteSizeChanged += updateBodyColour;
                     displayColourBound = true;
+                    layoutColourBound = true;
                 }
             }
 
@@ -180,12 +185,21 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         private bool receivesBodyColour()
             => UseColorization && ManiaPlayfieldNoteDisplayTint.AllowsDisplayColour(ManiaNoteDisplayColourPart.HoldBody);
 
+        private bool skinOwnsBodyColour(SkinnableDrawable skin)
+        {
+            if (skin.Drawable is FastNoteBase piece && piece.OwnsDisplayColour)
+                return true;
+
+            return noteDisplayTint.DivisorNoteColouringEnabled != true && skin.Drawable is EzNoteBase;
+        }
+
         private void updateBodyColour()
         {
             if (bodyPiece == null)
                 return;
 
-            if (!receivesBodyColour() || noteDisplayTint == null || column == null)
+            if (!receivesBodyColour() || noteDisplayTint == null || column == null
+                || bodyPiece is SkinnableDrawable skin && skinOwnsBodyColour(skin))
             {
                 bodyPiece.Colour = Colour4.White;
                 return;
@@ -196,8 +210,14 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         protected override void Dispose(bool isDisposing)
         {
-            if (isDisposing && displayColourBound && column != null)
-                column.NoteColourChanged -= updateBodyColour;
+            if (isDisposing && column != null)
+            {
+                if (displayColourBound)
+                    column.NoteColourChanged -= updateBodyColour;
+
+                if (layoutColourBound)
+                    column.NoteSizeChanged -= updateBodyColour;
+            }
 
             base.Dispose(isDisposing);
         }

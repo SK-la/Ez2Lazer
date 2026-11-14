@@ -126,23 +126,18 @@ namespace osu.Game.Rulesets.Mania.UI
             return Color4.White;
         }
 
+        /// <summary>
+        /// 列色或节拍线着色任一开着即用白底贴图乘色。命中靶贴图与此一致，但 <see cref="GetDisplayColour"/> 对靶不吃节拍线时刻色。
+        /// </summary>
         public bool UseTintBaseTexture(ManiaNoteDisplayColourPart part, Column column)
             => AllowsDisplayColour(part) && DisplayTintActive;
 
         public string GetEzProTextureColourPrefix(ManiaNoteDisplayColourPart part, Column column)
         {
             if (UseTintBaseTexture(part, column))
-                return "white";
+                return EzColumnResourceLookup.TINT_BASE_TEXTURE_AFFIX;
 
-            return column.EzNoteTypeBindable.Value switch
-            {
-                EzColumnType.A => "white",
-                EzColumnType.B => "blue",
-                EzColumnType.S => "green",
-                EzColumnType.E => "white",
-                EzColumnType.P => "green",
-                _ => "white",
-            };
+            return EzColumnResourceLookup.EzProNoteTexturePrefix(column.EzNoteTypeBindable.Value);
         }
 
         public static bool AllowsDisplayColour(ManiaNoteDisplayColourPart part) => part switch
