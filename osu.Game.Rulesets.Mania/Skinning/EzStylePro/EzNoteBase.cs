@@ -84,7 +84,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             => LoadEzProNoteComponent(EzColumnResourceLookup.EzProNoteComponent(part));
 
         /// <summary>
-        /// 经 <see cref="EzLocalTextureFactory.CreateEzProNoteComponent"/> 按列类型降级加载 note 组件。
+        /// 按 <see cref="ManiaPlayfieldNoteDisplayTint.UseTintBaseTexture"/> 与列型降级加载；降级实际命中前缀不写入 <see cref="appliedPrefix"/>。
         /// </summary>
         protected Drawable? LoadEzProNoteComponent(string componentAfterPrefix)
         {
@@ -101,6 +101,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             tintBaseApplied = noteDisplayTint?.UseTintBaseTexture(DisplayColourPart, Column) == true;
             MainContainer.Clear();
             UpdateTexture();
+            // 与 ColorPrefix 对齐：仅 tint 模式/逻辑前缀变才重载；降级 file 前缀与 ColorPrefix 不同是正常的。
             appliedPrefix = ColorPrefix;
             OnDrawableChanged();
             UpdateColor();

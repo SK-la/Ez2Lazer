@@ -171,7 +171,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private bool lastDisplayTintActive;
 
         /// <summary>
-        /// 皮肤编辑器静态预览等隔离列色：不从 <see cref="Ez2ConfigManager"/> 把全局列色写回 <see cref="EzNoteColourBindable"/>。
+        /// 带 <see cref="EzSkinEditorNotePreviewRequest"/> 的静态 note 预览：列显色只读本列 bindable，<see cref="syncNoteDisplayColourCache"/> 不同步全局列色。
         /// </summary>
         internal bool IsolateNoteColourForPreview { get; set; }
 
@@ -277,6 +277,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void syncNoteDisplayColourCache()
         {
+            // 进图列：配置为源头，bindable 副本可能被基础色事件滞后；预览列：bindable 已是 request 上下文，禁止写回全局。
             Colour4 raw = IsolateNoteColourForPreview
                 ? EzNoteColourBindable.Value
                 : ezConfig.GetColumnColor(KeyMode, Index);

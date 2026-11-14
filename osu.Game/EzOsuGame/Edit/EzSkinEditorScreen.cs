@@ -137,6 +137,8 @@ namespace osu.Game.EzOsuGame.Edit
 
         private bool comparisonSnapshotInitialized;
         private Guid comparisonSnapshotSkinId;
+
+        // 菜单「配置快照」与左右对比：用户手动创建/恢复，不参与退出放弃。
         private bool appliedConfigBaselineInitialized;
         private Guid appliedConfigBaselineSkinId;
         private bool noteSnapshotInitialized;
@@ -620,6 +622,10 @@ namespace osu.Game.EzOsuGame.Edit
 
         internal EzSkinEditorComparisonSnapshot ComparisonSnapshotForTesting { get; } = new EzSkinEditorComparisonSnapshot();
 
+        /// <summary>
+        /// 本会话「已落地」基线：进皮肤 capture，每次菜单 Apply 后刷新。退出脏判与放弃只对照此锚点（还原内存与 skin.ini 草稿，不写盘）。
+        /// 本会话从未 Apply 时等价于进编辑器时磁盘状态。
+        /// </summary>
         private readonly EzSkinEditorComparisonSnapshot appliedConfigBaseline = new EzSkinEditorComparisonSnapshot();
 
         internal EzSkinEditorNoteEditSession NoteSessionForTesting { get; } = new EzSkinEditorNoteEditSession();

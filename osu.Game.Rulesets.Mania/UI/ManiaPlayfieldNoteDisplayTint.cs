@@ -126,6 +126,9 @@ namespace osu.Game.Rulesets.Mania.UI
             return Color4.White;
         }
 
+        /// <summary>
+        /// 列色或节拍线着色任一开着即用白底贴图乘色。命中靶贴图与此一致，但 <see cref="GetDisplayColour"/> 对靶不吃节拍线时刻色。
+        /// </summary>
         public bool UseTintBaseTexture(ManiaNoteDisplayColourPart part, Column column)
             => AllowsDisplayColour(part) && DisplayTintActive;
 
