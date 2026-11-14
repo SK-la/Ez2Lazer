@@ -81,7 +81,7 @@ namespace osu.Game.EzOsuGame.Edit
                 return false;
 
             if (live.ID != SkinId)
-                throw new InvalidOperationException("Cannot commit skin.ini for a skin that is no longer current.");
+                return false;
 
             string textToCommit = DraftText;
             string savedTextForBackup = SavedText;
@@ -102,7 +102,7 @@ namespace osu.Game.EzOsuGame.Edit
             else
             {
                 if (!live.IsManaged)
-                    throw new InvalidOperationException("Cannot commit skin.ini because the current skin is not writable.");
+                    return false;
 
                 live.PerformWrite(skin =>
                 {

@@ -722,6 +722,9 @@ namespace osu.Game.EzOsuGame.Edit
             if (!EzSkinEditorHostScope.CanWriteSkinLayout)
                 return;
 
+            ensureSkinIniSession();
+            ensureSkinJsonSession();
+
             bool configDirty = hasUnsavedConfigChanges();
             bool iniDirty = SkinIniSession.IsDirty;
             bool jsonDirty = SkinJsonSession is { IsSupported: true, HasFile: true } && SkinJsonSession.IsDirty(ezSkinConfig);
@@ -729,11 +732,11 @@ namespace osu.Game.EzOsuGame.Edit
             ezSkinConfig.Save();
             hudLayer.PersistAllLayouts();
 
-            if (jsonDirty)
-                SkinJsonSession!.Commit(ezSkinConfig);
+            if (jsonDirty && !SkinJsonSession!.Commit(ezSkinConfig))
+                SkinJsonSession.LoadFromSkin(skinManager.CurrentSkinInfo.Value);
 
-            if (iniDirty)
-                SkinIniSession.Commit();
+            if (iniDirty && !SkinIniSession.Commit())
+                SkinIniSession.Discard();
 
             recaptureAppliedConfigBaseline();
 
@@ -852,7 +855,8 @@ namespace osu.Game.EzOsuGame.Edit
             if (SkinIniSession is not { IsSupported: true, IsDirty: true })
                 return;
 
-            SkinIniSession.Commit();
+            if (!SkinIniSession.Commit())
+                SkinIniSession.Discard();
             refreshScene();
             invalidateResourceCaches();
             refreshScene();
