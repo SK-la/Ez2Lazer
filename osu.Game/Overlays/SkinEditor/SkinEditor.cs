@@ -847,10 +847,7 @@ namespace osu.Game.Overlays.SkinEditor
                 layoutDirty = false;
 
             if (saved || userTriggered)
-            {
                 onScreenDisplay?.Display(new SkinEditorToast(ToastStrings.SkinSaved, skin.SkinInfo.ToString() ?? "Unknown"));
-                PostLayoutNotice(EzEditorStrings.LAYOUT_SAVED);
-            }
 
             return saved;
         }
