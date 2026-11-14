@@ -24,10 +24,13 @@ namespace osu.Game.EzOsuGame.Edit
         /// <summary>Ez layout layer, ruleset-specific playfield components.</summary>
         EzPlayfieldRuleset,
 
-        // Skin layers are reserved for a later phase. The options are intentionally left out of
-        // the enum until the skin-layer editing path exists, so no unused members are declared.
-        // SkinHud,
-        // SkinHudRuleset,
-        // SkinPlayfieldRuleset,
+        /// <summary>Current skin layout, global (non-ruleset) HUD components.</summary>
+        SkinHud,
+
+        /// <summary>Current skin layout, ruleset-specific HUD components.</summary>
+        SkinHudRuleset,
+
+        /// <summary>Current skin layout, ruleset-specific playfield components.</summary>
+        SkinPlayfieldRuleset,
     }
 }

@@ -492,6 +492,7 @@ namespace osu.Game.EzOsuGame.Edit
             {
                 syncHudRuleset();
                 hudLayer.Apply(sceneBar.CurrentScene.Value, hudTargetScreen, layoutLayer, sceneBar.ActiveLayer.Value);
+                updateHudInteraction();
             }, true);
             sceneBar.ActiveLayer.BindValueChanged(v =>
             {
@@ -511,8 +512,8 @@ namespace osu.Game.EzOsuGame.Edit
         /// </summary>
         private void updateHudInteraction()
         {
-            hudLayer.InteractionEnabled.Value = EzSkinEditorSceneRegistry.SupportsHudLayer(sceneBar.CurrentScene.Value)
-                                                && sceneBar.ActiveLayer.Value != EzHUDLayer.HudOff;
+            hudLayer.InteractionEnabled.Value = EzSkinEditorLayerOptions.HasEditingTarget(
+                sceneBar.CurrentScene.Value, sceneBar.ActiveLayer.Value, sceneBar.Ruleset.Value);
         }
 
         protected override void Update()
@@ -1029,7 +1030,9 @@ namespace osu.Game.EzOsuGame.Edit
             {
                 hudLayer.PersistLayoutToCurrentSkin();
                 var exportStorage = (storage as OsuStorage)?.GetExportStorage() ?? storage.GetStorageForDirectory(@"exports");
-                string path = EzLayoutPackIO.ExportLayerJson(storage, layoutThemeHost.Store, target.LayoutFile, exportStorage);
+                string path = target is EzLayoutContainer ezLayout
+                    ? EzLayoutPackIO.ExportLayerJson(storage, layoutThemeHost.Store, ezLayout.LayoutFile, exportStorage)
+                    : EzSkinLayoutIO.ExportLayerJson(target, skinManager.CurrentSkin.Value, exportStorage);
                 postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_EXPORTED_TO, path));
             }
             catch (Exception e)
@@ -1056,14 +1059,18 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
-            string layoutFile = target.LayoutFile;
-
             selector.Selected += file =>
             {
                 try
                 {
-                    EzLayoutPackIO.ImportLayerJson(storage, layoutThemeHost.Store, layoutFile, file.FullName);
-                    target.LoadFromStore();
+                    if (target is EzLayoutContainer ezLayout)
+                    {
+                        EzLayoutPackIO.ImportLayerJson(storage, layoutThemeHost.Store, ezLayout.LayoutFile, file.FullName);
+                        ezLayout.LoadFromStore();
+                    }
+                    else
+                        EzSkinLayoutIO.ImportLayerJson(target, skinManager, file.FullName);
+
                     hudLayer.ChangeHandler?.SaveState();
                     postNotification(EzEditorStrings.NOTIFY_LAYOUT_IMPORTED_LAYER);
                 }

@@ -26,6 +26,12 @@ namespace osu.Game.EzOsuGame.Edit
         /// The layout target this layer edits.
         /// </summary>
         public required GlobalSkinnableContainers Target { get; init; }
+
+        /// <summary>
+        /// Whether layout changes persist through <see cref="Layout.EzConfigLayoutStore"/> (Ez layers)
+        /// instead of the active skin.
+        /// </summary>
+        public required bool UsesEzLayoutStore { get; init; }
     }
 
     /// <summary>
@@ -39,6 +45,7 @@ namespace osu.Game.EzOsuGame.Edit
             Layer = EzHUDLayer.HudOff,
             RulesetScoped = false,
             Target = GlobalSkinnableContainers.MainHUDComponents,
+            UsesEzLayoutStore = false,
         };
 
         public static readonly EzSkinEditorLayerDefinition EZ_HUD = new EzSkinEditorLayerDefinition
@@ -46,6 +53,7 @@ namespace osu.Game.EzOsuGame.Edit
             Layer = EzHUDLayer.EzHud,
             RulesetScoped = false,
             Target = GlobalSkinnableContainers.MainHUDComponents,
+            UsesEzLayoutStore = true,
         };
 
         public static readonly EzSkinEditorLayerDefinition EZ_HUD_RULESET = new EzSkinEditorLayerDefinition
@@ -53,6 +61,7 @@ namespace osu.Game.EzOsuGame.Edit
             Layer = EzHUDLayer.EzHudRuleset,
             RulesetScoped = true,
             Target = GlobalSkinnableContainers.MainHUDComponents,
+            UsesEzLayoutStore = true,
         };
 
         public static readonly EzSkinEditorLayerDefinition EZ_PLAYFIELD_RULESET = new EzSkinEditorLayerDefinition
@@ -60,17 +69,48 @@ namespace osu.Game.EzOsuGame.Edit
             Layer = EzHUDLayer.EzPlayfieldRuleset,
             RulesetScoped = true,
             Target = GlobalSkinnableContainers.Playfield,
+            UsesEzLayoutStore = true,
+        };
+
+        public static readonly EzSkinEditorLayerDefinition SKIN_HUD = new EzSkinEditorLayerDefinition
+        {
+            Layer = EzHUDLayer.SkinHud,
+            RulesetScoped = false,
+            Target = GlobalSkinnableContainers.MainHUDComponents,
+            UsesEzLayoutStore = false,
+        };
+
+        public static readonly EzSkinEditorLayerDefinition SKIN_HUD_RULESET = new EzSkinEditorLayerDefinition
+        {
+            Layer = EzHUDLayer.SkinHudRuleset,
+            RulesetScoped = true,
+            Target = GlobalSkinnableContainers.MainHUDComponents,
+            UsesEzLayoutStore = false,
+        };
+
+        public static readonly EzSkinEditorLayerDefinition SKIN_PLAYFIELD_RULESET = new EzSkinEditorLayerDefinition
+        {
+            Layer = EzHUDLayer.SkinPlayfieldRuleset,
+            RulesetScoped = true,
+            Target = GlobalSkinnableContainers.Playfield,
+            UsesEzLayoutStore = false,
+        };
+
+        private static readonly EzSkinEditorLayerDefinition[] gameplay_layers =
+        {
+            HUD_OFF, EZ_HUD, EZ_HUD_RULESET, EZ_PLAYFIELD_RULESET,
+            SKIN_HUD, SKIN_HUD_RULESET, SKIN_PLAYFIELD_RULESET,
         };
 
         /// <summary>
         /// Layers offered for a scene. Song select only has the global song-select layout, so it lists
-        /// the hidden state and the global Ez HUD layer. Every other scene runs inside gameplay, where
-        /// the HUD is shown (even when not interactively editable), so it offers the full layer set.
+        /// the hidden state and the global Ez / skin HUD layers. HUD-capable gameplay scenes offer the
+        /// full layer set.
         /// </summary>
         public static IReadOnlyList<EzSkinEditorLayerDefinition> For(EzEditorSceneType sceneType) => sceneType switch
         {
-            EzEditorSceneType.SongSelectHud => new[] { HUD_OFF, EZ_HUD },
-            _ => new[] { HUD_OFF, EZ_HUD, EZ_HUD_RULESET, EZ_PLAYFIELD_RULESET },
+            EzEditorSceneType.SongSelectHud => new[] { HUD_OFF, EZ_HUD, SKIN_HUD },
+            _ => gameplay_layers,
         };
 
         public static EzSkinEditorLayerDefinition Get(EzHUDLayer layer) => layer switch
@@ -78,8 +118,13 @@ namespace osu.Game.EzOsuGame.Edit
             EzHUDLayer.EzHud => EZ_HUD,
             EzHUDLayer.EzHudRuleset => EZ_HUD_RULESET,
             EzHUDLayer.EzPlayfieldRuleset => EZ_PLAYFIELD_RULESET,
+            EzHUDLayer.SkinHud => SKIN_HUD,
+            EzHUDLayer.SkinHudRuleset => SKIN_HUD_RULESET,
+            EzHUDLayer.SkinPlayfieldRuleset => SKIN_PLAYFIELD_RULESET,
             _ => HUD_OFF,
         };
+
+        public static bool UsesEzLayoutStore(EzHUDLayer layer) => Get(layer).UsesEzLayoutStore;
 
         /// <summary>
         /// The layout lookup a layer edits in a scene, given the ruleset active in the editor.
@@ -126,6 +171,15 @@ namespace osu.Game.EzOsuGame.Edit
 
                 case EzHUDLayer.EzPlayfieldRuleset:
                     return LocalisableString.Format(EzEditorStrings.LAYER_EZ_PLAYFIELD_RULESET.ToString(), getRulesetName(ruleset));
+
+                case EzHUDLayer.SkinHud:
+                    return EzEditorStrings.LAYER_SKIN_HUD;
+
+                case EzHUDLayer.SkinHudRuleset:
+                    return LocalisableString.Format(EzEditorStrings.LAYER_SKIN_HUD_RULESET.ToString(), getRulesetName(ruleset));
+
+                case EzHUDLayer.SkinPlayfieldRuleset:
+                    return LocalisableString.Format(EzEditorStrings.LAYER_SKIN_PLAYFIELD_RULESET.ToString(), getRulesetName(ruleset));
 
                 default:
                     return EzEditorStrings.LAYER_HUD_OFF;

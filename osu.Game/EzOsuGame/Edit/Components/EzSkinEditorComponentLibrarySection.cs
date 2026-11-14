@@ -9,7 +9,6 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
@@ -76,6 +75,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 var layer = sceneBar.ActiveLayer.Value;
                 SectionVisible.Value = rulesetScoped
                     ? layer is EzHUDLayer.EzHudRuleset or EzHUDLayer.EzPlayfieldRuleset
+                        or EzHUDLayer.SkinHudRuleset or EzHUDLayer.SkinPlayfieldRuleset
                     : layer != EzHUDLayer.HudOff;
             }, true);
         }
@@ -145,7 +145,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             if (hudLayer == null)
                 return;
 
-            EzLayoutContainer? target = hudLayer.ActiveTarget;
+            SkinnableContainer? target = hudLayer.ActiveTarget;
             CompositeDrawable dependencySource = (CompositeDrawable?)target ?? hudLayer;
 
             try
