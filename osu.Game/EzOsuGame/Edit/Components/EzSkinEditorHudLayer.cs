@@ -109,13 +109,17 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private OsuScreen? liveScreen;
         private EzEditorSceneType scene = EzEditorSceneType.GameplayHud;
         private EzHUDLayer layer = EzHUDLayer.EzHud;
-        private bool skinLayoutDirty;
         private Guid dirtySkinId;
 
         /// <summary>
         /// Pending skin HUD layout writes not yet flushed to disk.
         /// </summary>
-        public bool HasPendingSkinLayoutSave => skinLayoutDirty;
+        public bool HasPendingSkinLayoutSave { get; private set; }
+
+        /// <summary>
+        /// 布局写入磁盘后触发，供编辑器弹出保存通知。
+        /// </summary>
+        public event Action? LayoutWritten;
 
         [Resolved]
         private SkinManager skins { get; set; } = null!;
@@ -245,7 +249,13 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 return;
 
             var handler = new SkinEditorChangeHandler(target);
-            handler.CanUndo.BindValueChanged(_ => raiseStateChange());
+            handler.CanUndo.BindValueChanged(v =>
+            {
+                raiseStateChange();
+
+                if (v.NewValue)
+                    persistActiveTarget();
+            });
             handler.CanRedo.BindValueChanged(_ => raiseStateChange());
             ChangeHandler = handler;
         }
@@ -253,7 +263,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// <summary>
         /// Persists every Ez layout container and flushes pending skin layout writes. Used on apply/save.
         /// </summary>
-        public void PersistAllLayouts()
+        /// <returns>是否把皮肤 HUD 布局写入了磁盘。</returns>
+        public bool PersistAllLayouts()
         {
             if (layoutLayer != null)
             {
@@ -261,39 +272,42 @@ namespace osu.Game.EzOsuGame.Edit.Components
                     layoutLayer.Store.Save(target);
             }
 
-            FlushSkinLayoutSave();
+            return FlushSkinLayoutSave();
         }
 
         /// <summary>
         /// Writes skin HUD layout JSON when skin layers were edited this session.
         /// </summary>
-        public void FlushSkinLayoutSave()
+        /// <returns>是否写入了磁盘。</returns>
+        public bool FlushSkinLayoutSave()
         {
-            if (!skinLayoutDirty)
-                return;
+            if (!HasPendingSkinLayoutSave)
+                return false;
 
-            FlushPendingForSkin(skins.CurrentSkin.Value);
+            return FlushPendingForSkin(skins.CurrentSkin.Value);
         }
 
         /// <summary>
         /// Writes pending layout JSON for <paramref name="skin"/> when it matches the dirty session skin.
         /// </summary>
-        public void FlushPendingForSkin(Skin skin)
+        public bool FlushPendingForSkin(Skin skin)
         {
-            if (!skinLayoutDirty)
-                return;
+            if (!HasPendingSkinLayoutSave)
+                return false;
 
             if (dirtySkinId != Guid.Empty && skin.SkinInfo.Value.ID != dirtySkinId)
-                return;
+                return false;
 
             skins.Save(skin);
-            skinLayoutDirty = false;
+            HasPendingSkinLayoutSave = false;
             dirtySkinId = Guid.Empty;
+            LayoutWritten?.Invoke();
+            return true;
         }
 
         public void DiscardPendingSkinLayoutSave()
         {
-            skinLayoutDirty = false;
+            HasPendingSkinLayoutSave = false;
             dirtySkinId = Guid.Empty;
         }
 
@@ -321,7 +335,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                     yield break;
 
                 foreach (var container in liveScreen.ChildrenOfType<SkinnableContainer>()
-                             .Where(c => c is not EzLayoutContainer && c.Lookup.Equals(wanted)))
+                                                    .Where(c => c is not EzLayoutContainer && c.Lookup.Equals(wanted)))
                     yield return container;
             }
         }
@@ -416,16 +430,21 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private void persistTarget(SkinnableContainer target)
         {
             if (target is EzLayoutContainer ezLayout)
+            {
                 layoutLayer?.Store.Save(ezLayout);
+                LayoutWritten?.Invoke();
+            }
             else
+            {
                 persistSkinTarget(target);
+            }
         }
 
         private void persistSkinTarget(SkinnableContainer target)
         {
             skins.EnsureMutableSkin();
             skins.CurrentSkin.Value.UpdateDrawableTarget(target);
-            skinLayoutDirty = true;
+            HasPendingSkinLayoutSave = true;
             dirtySkinId = skins.CurrentSkinInfo.Value.ID;
         }
 

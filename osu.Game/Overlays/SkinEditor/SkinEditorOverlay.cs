@@ -127,7 +127,7 @@ namespace osu.Game.Overlays.SkinEditor
                     if (Editor?.State.Value != Visibility.Visible)
                         break;
 
-                    Hide();
+                    Editor.RequestEndSession(Hide);
                     return true;
             }
 
@@ -189,9 +189,9 @@ namespace osu.Game.Overlays.SkinEditor
                 Editor.Save(false);
 
                 if (hadUnsaved && Editor.LastLayoutSaveAttempted && !Editor.LastLayoutSaveSucceeded)
-                    Logger.Log(EzEditorStrings.NOTIFY_SKIN_LAYOUT_EXIT_SAVE_FAILED, LoggingTarget.Runtime, LogLevel.Important);
+                    Editor.PostLayoutNotice(EzEditorStrings.NOTIFY_SKIN_LAYOUT_EXIT_SAVE_FAILED);
                 else if (hadUnsaved && !Editor.LastLayoutSaveAttempted)
-                    Logger.Log(EzEditorStrings.NOTIFY_SKIN_LAYOUT_EXIT_CONTAINERS_LOADING, LoggingTarget.Runtime, LogLevel.Important);
+                    Editor.PostLayoutNotice(EzEditorStrings.NOTIFY_SKIN_LAYOUT_EXIT_CONTAINERS_LOADING);
             }
 
             Editor?.Hide();

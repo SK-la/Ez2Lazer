@@ -484,6 +484,7 @@ namespace osu.Game.EzOsuGame.Edit
         protected override void LoadComplete()
         {
             base.LoadComplete();
+            hudLayer.LayoutWritten += onLayoutWritten;
             SkinEditorProviderResolver.EnsureDefaultProviderRegistered();
             beatmapPicker = new EzSkinEditorBeatmapPicker(realm, beatmapManager);
             sceneRail.CurrentScene.BindTo(sceneBar.CurrentScene);
@@ -1217,6 +1218,8 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void postNotification(LocalisableString text) => notifications?.Post(new SimpleNotification { Text = text });
 
+        private void onLayoutWritten() => postNotification(EzEditorStrings.LAYOUT_SAVED);
+
         private void onCurrentSkinChanged(ValueChangedEvent<Skin> skin)
         {
             if (skin.OldValue != null && skin.NewValue.SkinInfo.Value.ID != skin.OldValue.SkinInfo.Value.ID)
@@ -1228,10 +1231,7 @@ namespace osu.Game.EzOsuGame.Edit
             Schedule(refreshScene);
         }
 
-        private void flushWorkspaceLayouts()
-        {
-            hudLayer.PersistAllLayouts();
-        }
+        private bool flushWorkspaceLayouts() => hudLayer.PersistAllLayouts();
 
         private void ensureComparisonSnapshotForCurrentSkin()
         {
