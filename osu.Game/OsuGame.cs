@@ -1318,13 +1318,7 @@ namespace osu.Game
             loadComponentSingleFile(ezSkinEditor = new EzSkinEditorOverlay(ScreenContainer), overlayContent.Add, true);
             loadComponentSingleFile(skinEditor = new SkinEditorOverlay(ScreenContainer), overlayContent.Add, true);
 
-            // 官方皮肤编辑器可由热键直接打开，不一定经过 Ez 盖层的入口，故在此兜一互斥。
-            // 反向（打开 Ez 盖层时关官方）由各入口显式 Hide() 保证，不在这里回灌。
-            skinEditor.State.ValueChanged += state =>
-            {
-                if (state.NewValue == Visibility.Visible)
-                    ezSkinEditor.Hide();
-            };
+            // 官方与 Ez 互斥显示；切换前须先结束对端会话（保存确认见 SkinEditorOverlay.Show / ToggleEzSkinEditor）。
 
             loadComponentSingleFile(loginOverlay = new LoginOverlay
             {

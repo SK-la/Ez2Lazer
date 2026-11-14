@@ -23,7 +23,9 @@ using osu.Framework.Localisation;
 using osu.Framework.Testing;
 using osu.Game.Database;
 using osu.Game.EzOsuGame;
+using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Playback;
 using osu.Game.EzOsuGame.Screens;
@@ -429,7 +431,42 @@ namespace osu.Game.Overlays.SkinEditor
         {
         }
 
-        protected virtual void RequestClose() => skinEditorOverlay?.Hide();
+        public bool HasUnsavedLayoutChanges() =>
+            State.Value == Visibility.Visible && (changeHandler?.CanUndo.Value ?? false);
+
+        /// <summary>
+        /// Ends the session after optional save/discard confirmation (same contract as exiting to the menu).
+        /// </summary>
+        public void RequestEndSession(Action onContinued)
+        {
+            if (!HasUnsavedLayoutChanges())
+            {
+                onContinued();
+                return;
+            }
+
+            if (dialogOverlay == null)
+            {
+                Save(true);
+                HasBegunMutating = false;
+                onContinued();
+                return;
+            }
+
+            dialogOverlay.Push(new ConfirmDialog(EzEditorStrings.SWITCH_EDITOR_SAVE_OFFICIAL_LAYOUT, () =>
+            {
+                Save(true);
+                HasBegunMutating = false;
+                onContinued();
+            }, () =>
+            {
+                skins.CurrentSkinInfo.TriggerChange();
+                HasBegunMutating = false;
+                onContinued();
+            }));
+        }
+
+        protected virtual void RequestClose() => RequestEndSession(() => skinEditorOverlay?.Hide());
 
         public void UpdateTargetScreen(Drawable targetScreen)
         {
@@ -738,6 +775,9 @@ namespace osu.Game.Overlays.SkinEditor
 
         protected virtual void SaveLayout(Skin skin, bool userTriggered = true)
         {
+            if (!EzSkinEditorHostScope.CanWriteSkinLayout)
+                return;
+
             if (!HasBegunMutating)
                 return;
 

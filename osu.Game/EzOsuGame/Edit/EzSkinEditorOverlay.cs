@@ -113,13 +113,36 @@ namespace osu.Game.EzOsuGame.Edit
         public void Toggle()
         {
             if (State.Value == Visibility.Visible)
+            {
                 Hide();
-            else
-                Show();
+                return;
+            }
+
+            void openEz()
+            {
+                try
+                {
+                    Show();
+                }
+                finally
+                {
+                    EzSkinEditorHostScope.EndTransition();
+                }
+            }
+
+            if (officialSkinEditor?.State.Value == Visibility.Visible)
+            {
+                EzSkinEditorHostScope.BeginTransition();
+                officialSkinEditor.RequestEndEditorSession(openEz);
+                return;
+            }
+
+            Show();
         }
 
         protected override void PopIn()
         {
+            EzSkinEditorHostScope.Enter(EzSkinEditorHostScope.Host.Ez);
             sessionTarget = game.ScreenStack.CurrentScreen as OsuScreen;
             overrideSkinEditorRelevantSettings();
 
@@ -203,6 +226,7 @@ namespace osu.Game.EzOsuGame.Edit
                 EzSkinEditorActiveState.RestoreBackgroundDraw();
 
             sessionTarget = null;
+            EzSkinEditorHostScope.Exit(EzSkinEditorHostScope.Host.Ez);
         }
 
         private void onReservedWidthChanged(ValueChangedEvent<float> _) => updateScreenSizing();
@@ -428,16 +452,31 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void openOfficialHudEditor()
         {
-            // 关掉 Ez 盖层（恢复插拔屏缩放），再拉起官方 HUD 皮肤编辑器接续编辑。
-            Hide();
-
-            if (officialSkinEditor == null)
+            if (Workspace == null)
                 return;
 
-            if (officialSkinEditor.State.Value != Visibility.Visible)
-                officialSkinEditor.Show();
+            void openOfficialEditor()
+            {
+                try
+                {
+                    Hide();
 
-            officialSkinEditor.PresentGameplay();
+                    if (officialSkinEditor == null)
+                        return;
+
+                    if (officialSkinEditor.State.Value != Visibility.Visible)
+                        officialSkinEditor.Show();
+
+                    officialSkinEditor.PresentGameplay();
+                }
+                finally
+                {
+                    EzSkinEditorHostScope.EndTransition();
+                }
+            }
+
+            EzSkinEditorHostScope.BeginTransition();
+            Workspace.RequestEndSession(openOfficialEditor);
         }
 
         private void overrideSkinEditorRelevantSettings()

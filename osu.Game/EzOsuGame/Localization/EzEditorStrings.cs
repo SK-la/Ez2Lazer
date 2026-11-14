@@ -289,6 +289,10 @@ namespace osu.Game.EzOsuGame.Localization
             "应用更改到皮肤？",
             "Apply changes to skin?");
 
+        public static readonly LocalisableString SWITCH_EDITOR_SAVE_OFFICIAL_LAYOUT = new EzLocalizationManager.EzLocalisableString(
+            "保存 HUD 布局到当前皮肤？",
+            "Save HUD layout to the current skin?");
+
         #endregion
 
         #region Mania editor extension columns

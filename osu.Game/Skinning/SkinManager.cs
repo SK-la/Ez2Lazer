@@ -30,6 +30,7 @@ using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.EzOsuGame.ScriptedSkin;
@@ -623,6 +624,9 @@ namespace osu.Game.Skinning
         /// <returns>Whether any change actually occurred.</returns>
         public bool Save(Skin skin)
         {
+            if (EzSkinEditorHostScope.TransitionInProgress)
+                return false;
+
             if (ScriptedSkinSupport.IsScriptedSkin(skin.SkinInfo))
                 return SaveScriptedSkinLayout(skin);
 

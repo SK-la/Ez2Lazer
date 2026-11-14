@@ -216,11 +216,37 @@ namespace osu.Game.EzOsuGame.Edit
 
         public void Deactivate()
         {
-            persistEditorConfig();
             hudLayer.DetachLiveTargets();
         }
 
-        public void RequestCloseFromUser() => tryExit();
+        public void RequestCloseFromUser() => RequestEndSession(() => RequestClose?.Invoke());
+
+        public void RequestEndSession(Action onContinued)
+        {
+            if (!hasUnsavedWorkspaceChanges())
+            {
+                persistEditorConfig();
+                onContinued();
+                return;
+            }
+
+            if (dialogOverlay == null)
+            {
+                applySettings();
+                onContinued();
+                return;
+            }
+
+            dialogOverlay.Push(new ConfirmDialog(EzEditorStrings.EXIT_CONFIRM_APPLY_TO_SKIN, () =>
+            {
+                applySettings();
+                onContinued();
+            }, () =>
+            {
+                discardWorkspaceChanges();
+                onContinued();
+            }));
+        }
 
         public void SetSceneHost(Drawable? host)
         {
@@ -315,7 +341,7 @@ namespace osu.Game.EzOsuGame.Edit
                                             menuBar = new EzSkinEditorMenuBar
                                             {
                                                 ApplyAction = applySettings,
-                                                ExitAction = tryExit,
+                                                ExitAction = RequestCloseFromUser,
                                                 CreateEzSkinJsonAction = createEzSkinJson,
                                                 UpdateEzSkinJsonSnapshotAction = updateEzSkinJsonSnapshot,
                                                 RemoveEzSkinJsonAction = removeEzSkinJson,
@@ -673,6 +699,9 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void applySettings()
         {
+            if (!EzSkinEditorHostScope.CanWriteSkinLayout)
+                return;
+
             ezSkinConfig.Save();
             hudLayer.PersistAllLayouts();
 
@@ -1396,25 +1425,19 @@ namespace osu.Game.EzOsuGame.Edit
                 : new EzStyleProSkin(skinManager);
         }
 
-        public void ShowExitDialog() => tryExit();
+        public void ShowExitDialog() => RequestCloseFromUser();
 
-        private void tryExit()
+        private bool hasUnsavedWorkspaceChanges() =>
+            SkinIniSession.IsDirty
+            || (hudLayer.ChangeHandler?.CanUndo.Value ?? false)
+            || (SkinJsonSession?.IsDirty(ezSkinConfig) ?? false);
+
+        private void discardWorkspaceChanges()
         {
-            if (dialogOverlay == null || !SkinIniSession.IsDirty)
-            {
-                RequestClose?.Invoke();
-                return;
-            }
-
-            dialogOverlay.Push(new ConfirmDialog(EzEditorStrings.EXIT_CONFIRM_APPLY_TO_SKIN, () =>
-            {
-                applySettings();
-                RequestClose?.Invoke();
-            }, () =>
-            {
+            if (SkinIniSession.IsDirty)
                 SkinIniSession.Discard();
-                RequestClose?.Invoke();
-            }));
+
+            skinManager.CurrentSkinInfo.TriggerChange();
         }
 
         private static ISkinComponentLookup? tryCreateManiaSkinComponentLookupOrNull(string componentName)
