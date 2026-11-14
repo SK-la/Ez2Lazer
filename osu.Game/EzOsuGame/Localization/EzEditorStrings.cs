@@ -376,6 +376,10 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString TAB_BEATMAP_PREVIEW = new EzLocalizationManager.EzLocalisableString("谱面预览", "Beatmap preview");
 
+        public static readonly LocalisableString TAB_RESULTS = new EzLocalizationManager.EzLocalisableString("结算界面", "Results");
+
+        public static readonly LocalisableString TAB_MUSIC_PLAYER = new EzLocalizationManager.EzLocalisableString("音乐播放器", "Music player");
+
         public static readonly LocalisableString TAB_EDITOR_COLOURING = new EzLocalizationManager.EzLocalisableString("配色", "Colouring");
 
         #endregion

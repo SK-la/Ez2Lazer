@@ -19,8 +19,12 @@ using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
+using osu.Game.EzOsuGame.HUD.MusicPlayer;
+using osu.Game.EzOsuGame.HUD.Results;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Screens;
+using osu.Game.EzOsuGame.Screens.Visualizer;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -33,6 +37,7 @@ using osu.Game.Rulesets.Mania.EzMania.Editor;
 using osu.Game.Screens.Edit.Components.Menus;
 using osu.Game.Screens.Menu;
 using osu.Game.Screens.Play;
+using osu.Game.Screens.Ranking;
 using osu.Game.Screens.Select;
 using osu.Game.Skinning;
 using osu.Game.Tests.Resources;
@@ -59,6 +64,8 @@ namespace osu.Game.Tests.Visual.Edit
             AddAssert("main menu falls back to gameplay", () => EzSkinEditorSceneRegistry.ResolveCurrentScene(typeof(MainMenu)) == EzEditorSceneType.GameplayHud);
             AddAssert("player maps to gameplay", () => EzSkinEditorSceneRegistry.ResolveCurrentScene(typeof(Player)) == EzEditorSceneType.GameplayHud);
             AddAssert("song select maps to song select", () => EzSkinEditorSceneRegistry.ResolveCurrentScene(typeof(SoloSongSelect)) == EzEditorSceneType.SongSelectHud);
+            AddAssert("results maps to results", () => EzSkinEditorSceneRegistry.ResolveCurrentScene(typeof(SoloResultsScreen)) == EzEditorSceneType.ResultsHud);
+            AddAssert("visualizer maps to music player", () => EzSkinEditorSceneRegistry.ResolveCurrentScene(typeof(EzVisualizerScreen)) == EzEditorSceneType.MusicPlayerHud);
         }
 
         [Test]
@@ -66,6 +73,8 @@ namespace osu.Game.Tests.Visual.Edit
         {
             AddAssert("gameplay supports hud", () => EzSkinEditorSceneRegistry.SupportsHudLayer(EzEditorSceneType.GameplayHud));
             AddAssert("song select supports hud", () => EzSkinEditorSceneRegistry.SupportsHudLayer(EzEditorSceneType.SongSelectHud));
+            AddAssert("results supports hud", () => EzSkinEditorSceneRegistry.SupportsHudLayer(EzEditorSceneType.ResultsHud));
+            AddAssert("music player supports hud", () => EzSkinEditorSceneRegistry.SupportsHudLayer(EzEditorSceneType.MusicPlayerHud));
             AddAssert("appearance has no hud", () => !EzSkinEditorSceneRegistry.SupportsHudLayer(EzEditorSceneType.Appearance));
             AddAssert("note has no hud", () => !EzSkinEditorSceneRegistry.SupportsHudLayer(EzEditorSceneType.Note));
 
@@ -86,6 +95,21 @@ namespace osu.Game.Tests.Visual.Edit
                 return layers.Any(d => d.Layer == EzHUDLayer.EzHud)
                        && layers.Any(d => d.Layer == EzHUDLayer.SkinHud)
                        && !layers.Any(d => d.RulesetScoped);
+            });
+            AddAssert("results offers ez hud only", () =>
+            {
+                var layers = EzSkinEditorLayerOptions.For(EzEditorSceneType.ResultsHud);
+                return layers.Count == 2
+                       && layers.Any(d => d.Layer == EzHUDLayer.EzHud)
+                       && !layers.Any(d => d.Layer == EzHUDLayer.SkinHud)
+                       && !layers.Any(d => d.RulesetScoped);
+            });
+            AddAssert("music player offers ez hud only", () =>
+            {
+                var layers = EzSkinEditorLayerOptions.For(EzEditorSceneType.MusicPlayerHud);
+                return layers.Count == 2
+                       && layers.Any(d => d.Layer == EzHUDLayer.EzHud)
+                       && !layers.Any(d => d.Layer == EzHUDLayer.SkinHud);
             });
             AddAssert("appearance offers full layers (shown but not editable)", () =>
             {
@@ -149,6 +173,26 @@ namespace osu.Game.Tests.Visual.Edit
                 var lookup = EzSkinEditorLayerOptions.ResolveLookup(EzEditorSceneType.SongSelectHud, EzHUDLayer.EzHud, new ManiaRuleset().RulesetInfo);
                 return lookup != null && lookup.Lookup == GlobalSkinnableContainers.SongSelect;
             });
+            AddAssert("results resolves results container", () =>
+            {
+                var lookup = EzSkinEditorLayerOptions.ResolveLookup(EzEditorSceneType.ResultsHud, EzHUDLayer.EzHud, new ManiaRuleset().RulesetInfo);
+                return lookup is { Ruleset: null, Lookup: GlobalSkinnableContainers.Results };
+            });
+            AddAssert("music player resolves music player container", () =>
+            {
+                var lookup = EzSkinEditorLayerOptions.ResolveLookup(EzEditorSceneType.MusicPlayerHud, EzHUDLayer.EzHud, null);
+                return lookup is { Ruleset: null, Lookup: GlobalSkinnableContainers.MusicPlayer };
+            });
+            AddAssert("results layout is theme", () => EzSkinEditorSceneRegistry.LayoutRootOf(EzEditorSceneType.ResultsHud) == EzLayoutRoot.Theme);
+            AddAssert("music player layout is client", () => EzSkinEditorSceneRegistry.LayoutRootOf(EzEditorSceneType.MusicPlayerHud) == EzLayoutRoot.Client);
+            AddAssert("results whitelist is scene-local", () =>
+                EzSkinEditorHudWhitelist.IsAllowed(EzEditorSceneType.ResultsHud, typeof(EzResultsScorePanelList))
+                && !EzSkinEditorHudWhitelist.IsAllowed(EzEditorSceneType.GameplayHud, typeof(EzResultsScorePanelList))
+                && !EzSkinEditorHudWhitelist.IsAllowed(EzEditorSceneType.MusicPlayerHud, typeof(EzResultsScorePanelList)));
+            AddAssert("music player whitelist is scene-local", () =>
+                EzSkinEditorHudWhitelist.IsAllowed(EzEditorSceneType.MusicPlayerHud, typeof(EzVisualizerPlaylist))
+                && EzSkinEditorHudWhitelist.IsAllowed(EzEditorSceneType.MusicPlayerHud, typeof(EzVisualizerBeatmapLogo))
+                && !EzSkinEditorHudWhitelist.IsAllowed(EzEditorSceneType.SongSelectHud, typeof(EzVisualizerBeatmapLogo)));
             AddAssert("hud off has no editing target", () =>
                 EzSkinEditorLayerOptions.ResolveLookup(EzEditorSceneType.GameplayHud, EzHUDLayer.HudOff, new ManiaRuleset().RulesetInfo) == null);
 
@@ -295,6 +339,11 @@ namespace osu.Game.Tests.Visual.Edit
             AddAssert("song select group lists beatmap preview", () =>
                 EzSkinEditorSceneRegistry.ForGroup(EzEditorSceneGroup.SongSelect)
                                           .Any(s => s.SceneType == EzEditorSceneType.BeatmapPreview && s.IsAvailable));
+            AddAssert("song select group lists results and music player", () =>
+            {
+                var scenes = EzSkinEditorSceneRegistry.ForGroup(EzEditorSceneGroup.SongSelect).Select(s => s.SceneType).ToArray();
+                return scenes.Contains(EzEditorSceneType.ResultsHud) && scenes.Contains(EzEditorSceneType.MusicPlayerHud);
+            });
         }
 
         [Test]

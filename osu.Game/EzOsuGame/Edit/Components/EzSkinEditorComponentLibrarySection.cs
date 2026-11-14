@@ -126,6 +126,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 if (EzHudComponentFamilyResolver.Resolve(type) != family)
                     continue;
 
+                if (!EzSkinEditorHudWhitelist.IsAllowed(sceneBar.CurrentScene.Value, type))
+                    continue;
+
                 if (attemptAddComponent(list, type))
                     placeableCount++;
             }

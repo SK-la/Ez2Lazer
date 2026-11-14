@@ -7,9 +7,13 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Platform;
 using osu.Framework.Screens;
+using osu.Game.EzOsuGame.HUD.MusicPlayer;
+using osu.Game.EzOsuGame.Screens.Visualizer;
 using osu.Game.Rulesets;
 using osu.Game.Screens.Play;
+using osu.Game.Screens.Ranking;
 using osu.Game.Screens.Select;
 using osuTK;
 
@@ -27,17 +31,25 @@ namespace osu.Game.EzOsuGame.Layout
 
         public EzLayoutContainer? SongSelectContainer { get; private set; }
 
+        public EzLayoutContainer? ResultsContainer { get; private set; }
+
+        public EzLayoutContainer? MusicPlayerContainer { get; private set; }
+
         /// <summary>
         /// Fired after song-select / gameplay containers are shown, hidden, or recreated.
         /// </summary>
         public event Action? LayoutTargetsChanged;
 
+        private EzConfigLayoutStore clientStore = null!;
         private EzLayoutContainer? gameplayContainer;
         private EzLayoutContainer? rulesetGameplayContainer;
         private EzLayoutContainer? rulesetPlayfieldContainer;
         private Player? pendingPlayer;
+        private Drawable? pendingDonor;
 
         private bool onSongSelect;
+        private bool onResults;
+        private bool onMusicPlayer;
         private bool songSelectLayoutSuppressed;
         private bool editorHidden;
 
@@ -75,6 +87,8 @@ namespace osu.Game.EzOsuGame.Layout
 
                 editorHidden = value;
                 updateSongSelectContainerVisibility();
+                updateResultsContainerVisibility();
+                updateMusicPlayerContainerVisibility();
                 updateGameplayContainerVisibility();
             }
         }
@@ -86,8 +100,9 @@ namespace osu.Game.EzOsuGame.Layout
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(Storage storage)
         {
+            clientStore = EzConfigLayoutStore.CreateClientRoot(storage);
             InternalChild = SongSelectContainer = new EzLayoutContainer(Store, EzLayoutFiles.SONG_SELECT, null);
         }
 
@@ -111,6 +126,11 @@ namespace osu.Game.EzOsuGame.Layout
                 AddInternal(SongSelectContainer);
                 updateSongSelectContainerVisibility();
             }
+
+            if (game.ScreenStack.CurrentScreen is ResultsScreen results && results.IsLoaded)
+                recreateResultsContainer(results);
+            else
+                expireResultsContainer();
 
             if (game.ScreenStack.CurrentScreen is Player player && canAttachGameplayLayout(player))
                 recreateGameplayContainers(player);
@@ -147,9 +167,13 @@ namespace osu.Game.EzOsuGame.Layout
             unbindPendingPlayer();
 
             onSongSelect = screen is SongSelect;
+            onResults = screen is ResultsScreen;
+            onMusicPlayer = screen is EzVisualizerScreen;
             bool onPlayer = screen is Player;
 
             updateSongSelectContainerVisibility();
+            attachOrExpireScene(onResults, screen as CompositeDrawable, recreateResultsContainer, expireResultsContainer);
+            attachOrExpireScene(onMusicPlayer, screen as CompositeDrawable, recreateMusicPlayerContainer, expireMusicPlayerContainer);
 
             if (onPlayer && screen is Player player)
             {
@@ -189,11 +213,87 @@ namespace osu.Game.EzOsuGame.Layout
 
         private void unbindPendingPlayer()
         {
-            if (pendingPlayer == null)
-                return;
+            if (pendingPlayer != null)
+            {
+                pendingPlayer.OnLoadComplete -= onPendingPlayerLoaded;
+                pendingPlayer = null;
+            }
 
-            pendingPlayer.OnLoadComplete -= onPendingPlayerLoaded;
-            pendingPlayer = null;
+            if (pendingDonor != null)
+            {
+                pendingDonor.OnLoadComplete -= onPendingDonorLoaded;
+                pendingDonor = null;
+            }
+        }
+
+        private void attachOrExpireScene(bool visible, CompositeDrawable? screen, Action<CompositeDrawable> recreate, Action expire)
+        {
+            if (!visible || screen == null)
+            {
+                expire();
+                return;
+            }
+
+            if (screen.IsLoaded && screen.Dependencies != null)
+                recreate(screen);
+            else
+            {
+                pendingDonor = screen;
+                pendingDonor.OnLoadComplete += onPendingDonorLoaded;
+            }
+        }
+
+        private void onPendingDonorLoaded(Drawable loaded)
+        {
+            if (pendingDonor != null)
+            {
+                pendingDonor.OnLoadComplete -= onPendingDonorLoaded;
+                pendingDonor = null;
+            }
+
+            Schedule(() =>
+            {
+                if (!ReferenceEquals(game.ScreenStack.CurrentScreen, loaded) || loaded is not CompositeDrawable screen)
+                    return;
+
+                if (onResults)
+                    recreateResultsContainer(screen);
+                else if (onMusicPlayer)
+                    recreateMusicPlayerContainer(screen);
+
+                notifyTargetsChanged();
+            });
+        }
+
+        private void recreateResultsContainer(CompositeDrawable screen)
+        {
+            expireResultsContainer();
+            ResultsContainer = new EzLayoutContainer(Store, EzLayoutFiles.RESULTS, null);
+            ResultsContainer.SetDependencyDonor(screen);
+            AddInternal(ResultsContainer);
+            updateResultsContainerVisibility();
+        }
+
+        private void recreateMusicPlayerContainer(CompositeDrawable screen)
+        {
+            expireMusicPlayerContainer();
+            MusicPlayerContainer = new EzLayoutContainer(clientStore, EzLayoutFiles.MUSIC_PLAYER, null);
+            MusicPlayerContainer.SetDependencyDonor(screen);
+            AddInternal(MusicPlayerContainer);
+            EzMusicPlayerHudDefaults.ApplyIfEmpty(MusicPlayerContainer);
+            updateMusicPlayerContainerVisibility();
+        }
+
+        private void expireResultsContainer()
+        {
+            ResultsContainer?.Expire();
+            ResultsContainer = null;
+        }
+
+        private void expireMusicPlayerContainer()
+        {
+            MusicPlayerContainer?.Expire();
+            MusicPlayerContainer = null;
         }
 
         private void recreateGameplayContainers(Player player)
@@ -244,6 +344,16 @@ namespace osu.Game.EzOsuGame.Layout
         private void updateSongSelectContainerVisibility()
         {
             SongSelectContainer?.Alpha = onSongSelect && !songSelectLayoutSuppressed && !editorHidden ? 1 : 0;
+        }
+
+        private void updateResultsContainerVisibility()
+        {
+            ResultsContainer?.Alpha = onResults && !editorHidden ? 1 : 0;
+        }
+
+        private void updateMusicPlayerContainerVisibility()
+        {
+            MusicPlayerContainer?.Alpha = onMusicPlayer && !editorHidden ? 1 : 0;
         }
 
         private void updateGameplayContainerVisibility()

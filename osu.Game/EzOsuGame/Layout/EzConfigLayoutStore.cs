@@ -34,6 +34,7 @@ namespace osu.Game.EzOsuGame.Layout
         private const int playfield_save_debounce_ms = 200;
 
         private readonly Storage gameStorage;
+        private readonly bool clientRoot;
         private readonly Lock playfieldSaveLock = new Lock();
         private Storage storage = null!;
         private int lastPlayfieldSave;
@@ -41,16 +42,38 @@ namespace osu.Game.EzOsuGame.Layout
 
         public string LayoutSetName { get; private set; }
 
+        public bool IsClientRoot => clientRoot;
+
         public ManiaPlayfieldLayoutConfig PlayfieldLayout { get; }
 
         public event Action? SetChanged;
 
         public EzConfigLayoutStore(Storage gameStorage)
+            : this(gameStorage, clientRoot: false)
+        {
+        }
+
+        /// <summary>
+        /// JSON under <see cref="EzModifyPath.CONFIG_ROOT_PATH"/>. <see cref="UseSet"/> is a no-op.
+        /// </summary>
+        public static EzConfigLayoutStore CreateClientRoot(Storage gameStorage) =>
+            new EzConfigLayoutStore(gameStorage, clientRoot: true);
+
+        private EzConfigLayoutStore(Storage gameStorage, bool clientRoot)
         {
             this.gameStorage = gameStorage;
+            this.clientRoot = clientRoot;
+            PlayfieldLayout = new ManiaPlayfieldLayoutConfig();
+
+            if (clientRoot)
+            {
+                LayoutSetName = string.Empty;
+                storage = gameStorage.GetStorageForDirectory(EzModifyPath.CONFIG_ROOT_PATH);
+                return;
+            }
+
             LayoutSetName = EzModifyPath.LAYOUT_SET_DEFAULT;
             bind(LayoutSetName);
-            PlayfieldLayout = new ManiaPlayfieldLayoutConfig();
             reloadPlayfield();
             PlayfieldLayout.StageX.BindValueChanged(_ => queuePlayfieldSave());
             PlayfieldLayout.StageY.BindValueChanged(_ => queuePlayfieldSave());
@@ -61,6 +84,9 @@ namespace osu.Game.EzOsuGame.Layout
         /// </summary>
         public void UseSet(string layoutSetName)
         {
+            if (clientRoot)
+                return;
+
             if (LayoutSetName == layoutSetName)
                 return;
 

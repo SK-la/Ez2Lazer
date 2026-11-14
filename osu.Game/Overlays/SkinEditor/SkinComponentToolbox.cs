@@ -10,6 +10,7 @@ using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
@@ -85,6 +86,10 @@ namespace osu.Game.Overlays.SkinEditor
             try
             {
                 Drawable instance = (Drawable)Activator.CreateInstance(type)!;
+
+                if (instance is IEzSceneHudComponent sceneHud
+                    && (target.Lookup is not GlobalSkinnableContainerLookup global || global.Lookup != sceneHud.LayoutTarget))
+                    return;
 
                 if (!((ISerialisableDrawable)instance).CanBePlaced(target.Components)) return;
 

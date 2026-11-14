@@ -50,23 +50,28 @@ namespace osu.Game.EzOsuGame.Layout
         /// </summary>
         public static string ExportLayerJson(Storage gameStorage, EzConfigLayoutStore store, string layoutFile, Storage exportRoot)
         {
-            var source = gameStorage.GetStorageForDirectory(EzModifyPath.LayoutSetPath(store.LayoutSetName));
+            var source = layoutDirectory(gameStorage, store);
             string relativeDest = $"layout-layers/{layoutFile}";
             copySingleFile(source, exportRoot, layoutFile, relativeDest);
             return exportRoot.GetFullPath(relativeDest);
         }
 
         /// <summary>
-        /// Replaces one layout JSON in the active theme store from an on-disk file.
+        /// Replaces one layout JSON in the given store from an on-disk file.
         /// </summary>
         public static void ImportLayerJson(Storage gameStorage, EzConfigLayoutStore store, string layoutFile, string sourceFile)
         {
-            var destination = gameStorage.GetStorageForDirectory(EzModifyPath.LayoutSetPath(store.LayoutSetName));
+            var destination = layoutDirectory(gameStorage, store);
 
             using (var input = File.OpenRead(sourceFile))
             using (var output = destination.CreateFileSafely(layoutFile))
                 input.CopyTo(output);
         }
+
+        private static Storage layoutDirectory(Storage gameStorage, EzConfigLayoutStore store) =>
+            gameStorage.GetStorageForDirectory(store.IsClientRoot
+                ? EzModifyPath.CONFIG_ROOT_PATH
+                : EzModifyPath.LayoutSetPath(store.LayoutSetName));
 
         private static void copyJsonFiles(Storage source, Storage destination)
         {

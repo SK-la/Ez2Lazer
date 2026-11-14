@@ -22,6 +22,8 @@ namespace osu.Game.EzOsuGame.Layout
         private readonly EzConfigLayoutStore store;
         private CompositeDrawable? dependencyDonor;
 
+        public EzConfigLayoutStore Store => store;
+
         public string LayoutFile { get; }
 
         public RulesetInfo? Ruleset { get; }

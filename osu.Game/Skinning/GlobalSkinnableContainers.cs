@@ -21,5 +21,8 @@ namespace osu.Game.Skinning
 
         [Description("Results")]
         Results,
+
+        [Description("Music player")]
+        MusicPlayer,
     }
 }

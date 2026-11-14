@@ -21,6 +21,8 @@ namespace osu.Game.EzOsuGame.Edit
     {
         SongSelectHud,
         BeatmapPreview,
+        ResultsHud,
+        MusicPlayerHud,
         GameplayHud,
         Appearance,
         Note,
