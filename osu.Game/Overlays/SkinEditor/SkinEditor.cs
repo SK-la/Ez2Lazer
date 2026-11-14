@@ -308,6 +308,11 @@ namespace osu.Game.Overlays.SkinEditor
             // probably something which will be factored out in a future database refactor so not too concerning for now.
             currentSkin.BindValueChanged(val =>
             {
+                // Overlay can close while this component stays alive; ignore global skin changes then
+                // (e.g. Ez editor switching to Ez2Pro would otherwise flush layout onto the previous legacy skin).
+                if (State.Value != Visibility.Visible)
+                    return;
+
                 if (val.OldValue != null && HasBegunMutating)
                     SaveLayout(val.OldValue);
 
@@ -551,6 +556,9 @@ namespace osu.Game.Overlays.SkinEditor
 
         protected virtual void OnSkinChanged()
         {
+            if (State.Value != Visibility.Visible)
+                return;
+
             if (skins.EnsureMutableSkin())
                 // Another skin changed event will arrive which will complete the process.
                 return;
@@ -757,6 +765,7 @@ namespace osu.Game.Overlays.SkinEditor
         {
             base.Hide();
             SelectedComponents.Clear();
+            HasBegunMutating = false;
         }
 
         protected override void PopIn()

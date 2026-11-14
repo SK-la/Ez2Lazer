@@ -4,6 +4,7 @@
 #nullable disable
 
 using System;
+using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
 using NUnit.Framework;
@@ -16,6 +17,8 @@ using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.Database;
+using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Screens;
@@ -35,6 +38,7 @@ using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Select;
 using osu.Game.Skinning;
 using osu.Game.Tests.Beatmaps.IO;
+using osu.Game.Tests.Resources;
 using osuTK;
 using osuTK.Input;
 
@@ -134,6 +138,68 @@ namespace osu.Game.Tests.Visual.Navigation
 
             AddUntilStep("official skin editor visible", () => skinEditorOverlay.State.Value == Visibility.Visible);
             AddUntilStep("Ez editor hidden", () => ezSkinEditor.State.Value == Visibility.Hidden);
+        }
+
+        [Test]
+        public void TestClosedOfficialEditorDoesNotRewriteLegacyLayoutWhenSwitchingSkinsInEzEditor()
+        {
+            Live<SkinInfo> legacySkin = null!;
+            string layoutSnapshot = null!;
+
+            AddStep("import legacy skin", () =>
+            {
+                var skinManager = Game.Dependencies.Get<SkinManager>();
+                legacySkin = skinManager.Import(new ImportTask(TestResources.OpenResource(@"Archives/modified-ezSkin.osk"), "modified-ezSkin.osk")).GetResultSafely();
+                skinManager.CurrentSkinInfo.Value = legacySkin;
+            });
+
+            advanceToSongSelect();
+            openSkinEditor();
+            AddUntilStep("official skin editor visible", () => skinEditor!.State.Value == Visibility.Visible);
+
+            AddStep("add hud component", () =>
+                skinEditor!.ChildrenOfType<SkinComponentToolbox.ToolboxComponentButton>().First().TriggerClick());
+
+            toggleSkinEditor();
+            AddUntilStep("official skin editor hidden", () => skinEditor!.State.Value == Visibility.Hidden);
+            AddUntilStep("overlay hidden", () => skinEditorOverlay.State.Value == Visibility.Hidden);
+
+            AddStep("capture legacy hud json", () =>
+            {
+                legacySkin.PerformRead(s =>
+                {
+                    if (!EzLegacySkinFolders.TryGetDirectory(s, out string directory))
+                        throw new InvalidOperationException("Expected imported legacy skin to be stored on disk.");
+
+                    string path = Path.Combine(directory, $"{GlobalSkinnableContainers.MainHUDComponents}.json");
+                    layoutSnapshot = File.Exists(path) ? File.ReadAllText(path) : string.Empty;
+                });
+            });
+
+            openEzEditor();
+
+            AddStep("switch to Ez2Pro", () =>
+            {
+                var skinManager = Game.Dependencies.Get<SkinManager>();
+                skinManager.CurrentSkinInfo.Value = skinManager.GetAllUsableSkins().First(s => s.ID == SkinInfo.EZ_STYLE_PRO_SKIN);
+            });
+
+            AddAssert("legacy hud json unchanged", () =>
+            {
+                bool unchanged = false;
+
+                legacySkin.PerformRead(s =>
+                {
+                    if (!EzLegacySkinFolders.TryGetDirectory(s, out string directory))
+                        return;
+
+                    string path = Path.Combine(directory, $"{GlobalSkinnableContainers.MainHUDComponents}.json");
+                    string onDisk = File.Exists(path) ? File.ReadAllText(path) : string.Empty;
+                    unchanged = onDisk == layoutSnapshot;
+                });
+
+                return unchanged;
+            });
         }
 
         [Test]
