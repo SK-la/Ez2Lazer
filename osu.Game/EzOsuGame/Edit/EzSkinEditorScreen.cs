@@ -708,6 +708,9 @@ namespace osu.Game.EzOsuGame.Edit
             ezSkinConfig.Save();
             hudLayer.PersistAllLayouts();
 
+            if (SkinJsonSession is { IsSupported: true, HasFile: true } && SkinJsonSession.IsDirty(ezSkinConfig))
+                SkinJsonSession.Commit(ezSkinConfig);
+
             if (SkinIniSession is { IsSupported: true, IsDirty: true })
                 SkinIniSession.Commit();
 
@@ -1446,14 +1449,31 @@ namespace osu.Game.EzOsuGame.Edit
 
         private bool hasUnsavedWorkspaceChanges() =>
             SkinIniSession.IsDirty
+            || hasUnsavedConfigChanges()
             || (hudLayer.ChangeHandler?.CanUndo.Value ?? false)
             || hudLayer.HasPendingSkinLayoutSave
             || (SkinJsonSession?.IsDirty(ezSkinConfig) ?? false);
+
+        private bool hasUnsavedConfigChanges()
+        {
+            if (!comparisonSnapshotInitialized)
+                return false;
+
+            string current = EzSkinJsonBridge.CreateNormalizedSnapshot(ezSkinConfig);
+            string baseline = EzSkinJsonDocument.SerializeNormalized(ComparisonSnapshotForTesting.Document);
+            return current != baseline;
+        }
 
         private void discardWorkspaceChanges()
         {
             if (SkinIniSession.IsDirty)
                 SkinIniSession.Discard();
+
+            if (hasUnsavedConfigChanges())
+            {
+                ComparisonSnapshotForTesting.ApplyConfigTo(ezSkinConfig);
+                ezSkinConfig.Save();
+            }
 
             hudLayer.DiscardPendingSkinLayoutSave();
             skinManager.CurrentSkinInfo.TriggerChange();

@@ -50,9 +50,11 @@ namespace osu.Game.EzOsuGame.Edit
                 : Colour4.White;
         }
 
+        public void ApplyConfigTo(Ez2ConfigManager config) => EzSkinJsonBridge.Apply(Document, config);
+
         public void ApplyTo(Ez2ConfigManager config, EzSkinIniSession? skinIniSession = null)
         {
-            EzSkinJsonBridge.Apply(Document, config);
+            ApplyConfigTo(config);
 
             if (SkinIniDraftText != null && skinIniSession is { IsSupported: true })
                 skinIniSession.SetDraftText(SkinIniDraftText);
