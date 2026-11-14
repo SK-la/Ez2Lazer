@@ -186,6 +186,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void UpdateColor()
         {
+            base.UpdateColor();
+
             if (!lnGradient)
             {
                 bodyContainer?.Colour = Colour4.White;

@@ -10,7 +10,7 @@ using osu.Game.Rulesets.Mania.UI;
 namespace osu.Game.Rulesets.Mania.Skinning
 {
     /// <summary>
-    /// 列级更新广播接口，使用<see cref="ColumnWatcher"/>
+    /// 列级更新广播：Set→OnLoadChanged，Size→OnDrawableChanged，Colour→OnColourChanged（见 EzNoteBase / FastNoteBase）。
     /// </summary>
     public interface IColumnNote
     {

@@ -18,6 +18,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
+using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Objects.Types;
@@ -270,7 +271,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
                 if (request.UseEzNoteVariants && Enum.TryParse(request.VariantId, out EzColumnType type))
                     columnDependency.EzNoteTypeBindable = new Bindable<EzColumnType>(type);
 
-                columnDependency.SyncNoteDisplayColourCache();
+                columnDependency.QueueInvalidate(ManiaNoteAppearanceInvalidation.FullLoad);
             }
 
             protected override void Update()
