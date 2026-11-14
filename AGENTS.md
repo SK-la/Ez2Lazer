@@ -4,26 +4,32 @@
 
 ## 范围
 
-- 本仓库是 ppy/osu 的 Ez2Lazer fork。优先改 Ez 代码。
+- 本仓库是 ppy/osu 的 Ez2Lazer fork，主仓库为 SK-la/Ez2Lazer。
 - 搜索限定在当前仓库、项目工作区、osu 数据库文件夹或用户指定目录。
+- 不要忽略AGENTS.md。它是协作约定，包含了对代码、提交、PR、验证、回复等的约束。
+- 尽量通过 Rider 的MCP进行代码导航、搜索、重构、重命名、调试、报错检查。不要用 VSCode 的全局搜索或重构。
+- MCP失败时尝试重载MCP，依然失败时提醒用户，用户会决定是否继续。不要在失败时自行改用 VSCode。
+- 任何矛盾点直接 Ask 用户，由用户决定解决方案。
 
 ## 改动
 
 - 新功能先分析实现细节、指定路线，确认再做改动。跨文件重构、语义变更、schema 或迁移，先确认方案内容再改。
 - 一次只处理一个关切。
-- 需要修改 Framework 时先征询意见，用户同意后再继续。
+- 需要修改 Framework 时先征询意见，用户同意后再继续。用户主动要求检查 Framework 时视为同意。
 - 改 Drawable 或 UI 前先读 `.cursor/rules/ui-layout.mdc`。那里是 osu!framework 布局约束，违反会在布局阶段崩溃。
+- 上游没有的大型功能，优先改 Ez 代码；与上游功能高度重叠的 重构/改进，询问用户 原地改/Ez新增。
 
 ## Git
 
 - 禁止向 `ppy/*` 或 `upstream` 推送、开官方 PR、提交到官方分支、删除其 tag。
 - 合并上游只用 `fetch` 之后的本地 merge 或 rebase。
-- 只有用户明确要求创建 PR 时才推送。先签出 PR 分支，推送一次，再执行 `gh pr create --repo SK-la/<仓库名>`。
+- 只有用户明确要求创建 PR 时才推送远程。先签出 PR 分支，推送一次，再执行 `gh pr create --repo SK-la/<仓库名>`。
 - PR 已存在时，后续提交留在本地，不要自动推送。
 - **commit 后默认不 `git push`。** 仅当用户本句明确要求 push / 推送 / 更新远程时才推送。
 - 大改动按模块分成多次提交。
-- 提交 C# 前运行 `Format-AgentCommit.ps1`。它只补上缺少的 ppy MIT 文件头、删除 IDE0005 确认的未使用 using、把连续空行收成一行、补上缺少的文件末尾换行。不要另外跑 `dotnet format`。
+- 有新建文件的提交 C# 前运行 `Format-AgentCommit.ps1`。它只补上缺少的 MIT 文件头、删除 IDE0005 确认的未使用 using、把连续空行收成一行、补上缺少的文件末尾换行。不要另外跑 `dotnet format`。
 - 提交被中断时：放弃**这一次**提交，不要在同轮或通知 follow-up 里补交/重跑；工作区改动保留。之后若有新的可审查改动，仍按惯例本地 commit；不需要提交时用户会再中断。
+- 提交信息默认用中文，不写代码动作，结尾不加句号。必要时在结尾加 `#<issue>`。PR 里写中文摘要。
 
 ## C#
 
@@ -36,6 +42,7 @@
 
 - 改了 schema 或迁移之后，不要 `dotnet run`，不要打开用户库。
 - 版本号、`ScoreInfo` / `BeatmapInfo`、sqlite 和 `DELETE` 的细则在 `.cursor/skills/ez-realm-schema/SKILL.md`。改这些之前先读它。
+- 涉及 Realm schema 的改动，不考虑本地Realm文件状态。
 
 ## 验证与回复
 
