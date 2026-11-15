@@ -10,7 +10,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
     /// Only the star-facing value converts. The engine's axes, the dan chain and the stored
     /// <c>beatmap_msd</c> rows keep the engine's own scale.
     /// </remarks>
-    public static class EzMinaRatingScale
+    public static class EzMinaStarRatingScale
     {
         /// <summary>Fixed divisor from the Mina rating to a star rating.</summary>
         public const double STAR_DIVISOR = 4.5;

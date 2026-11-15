@@ -95,7 +95,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
             if (vector.Overall <= 0)
                 return;
 
-            skillStore.WriteRating(beatmapInfo.ID, EzAnalysisSystem.Mina, EzMinaRatingScale.ToStarRating(vector.Overall));
+            skillStore.WriteRating(beatmapInfo.ID, EzAnalysisSystem.Mina, EzMinaStarRatingScale.ToStarRating(vector.Overall));
         }
 
         private static EzMinaSkillAxisVector? computeVector(

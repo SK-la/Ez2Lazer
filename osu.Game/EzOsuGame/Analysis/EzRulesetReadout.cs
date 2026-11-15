@@ -231,7 +231,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         /// <summary>The live chart-skill axis as the pill prints it: Mina measures in Etterna units.</summary>
         private static double liveSkillStar(EzAnalysisSystem system, double value)
-            => system == EzAnalysisSystem.Mina ? EzMinaRatingScale.ToStarRating(value) : value;
+            => system == EzAnalysisSystem.Mina ? EzMinaStarRatingScale.ToStarRating(value) : value;
     }
 
     /// <summary>

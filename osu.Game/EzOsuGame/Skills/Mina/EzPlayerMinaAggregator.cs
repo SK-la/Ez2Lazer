@@ -20,7 +20,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
     /// Aggregates per-play <see cref="IEzMinaEngine.CalculatePlayerMinaSkillAxis"/> vectors into persisted player Mina skill rows.
-    /// Goal via <see cref="EzMinaRatingGoal"/> (Wife subset when statistics exist).
+    /// Goal via <see cref="EzMinaStarRatingGoal"/> (Wife subset when statistics exist).
     /// </summary>
     public sealed class EzPlayerMinaAggregator
     {
@@ -58,9 +58,9 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         /// </summary>
         public IReadOnlyCollection<string> MissingChartHashes { get; private set; } = Array.Empty<string>();
 
-        private readonly record struct TimedPlay(DateTimeOffset ScoredAt, EzMinaSkillAxisVector Vector);
+        private readonly record struct SkillVectorPlayTimeLine(DateTimeOffset ScoredAt, EzMinaSkillAxisVector Vector);
 
-        private readonly record struct PatternPlay(double Overall, IReadOnlyList<string> Patterns);
+        private readonly record struct SkillVectorPlayOverall(double Overall, IReadOnlyList<string> SkillVector);
 
         /// <summary>
         /// One load of the per-play cache for a whole pass, so a multi-player run does not re-read (and re-parse the
@@ -87,8 +87,8 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
-            var byKey = new Dictionary<int, List<TimedPlay>>();
-            var patternPlaysByKey = new Dictionary<int, List<PatternPlay>>();
+            var byKey = new Dictionary<int, List<SkillVectorPlayTimeLine>>();
+            var patternPlaysByKey = new Dictionary<int, List<SkillVectorPlayOverall>>();
             var evidence = new List<EzAxisPlayEvidenceRow>();
             var missingCharts = new HashSet<string>(StringComparer.Ordinal);
             var patternsByHash = new Dictionary<string, string[]>(StringComparer.Ordinal);
@@ -150,7 +150,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                             double holdRatio = EzHoldMetrics.ComputeHoldRatio(playable);
                             double od = beatmapInfo.Difficulty.OverallDifficulty;
 
-                            float? goal = EzMinaRatingGoal.ForScore(score, holdRatio, od);
+                            float? goal = EzMinaStarRatingGoal.ForScore(score, holdRatio, od);
 
                             if (goal is not float goalValue)
                             {
@@ -215,7 +215,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                 flushCache(pendingCacheWrites);
             }
 
-            foreach ((int keyCount, List<TimedPlay> timed) in byKey)
+            foreach ((int keyCount, List<SkillVectorPlayTimeLine> timed) in byKey)
             {
                 timed.Sort(static (a, b) => a.ScoredAt.CompareTo(b.ScoredAt));
 
@@ -223,12 +223,12 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                 var aggregated = EzMinaRatingAggregator.AggregateVectors(keymodeVectors);
                 bool provisional = keymodeVectors.Count < EzPlayerMinaSkillAxis.QUALIFYING_PLAYS;
 
-                IReadOnlyList<PatternPlay> patternPlays = patternPlaysByKey.TryGetValue(keyCount, out var pp)
+                IReadOnlyList<SkillVectorPlayOverall> patternPlays = patternPlaysByKey.TryGetValue(keyCount, out var pp)
                     ? pp
-                    : Array.Empty<PatternPlay>();
+                    : Array.Empty<SkillVectorPlayOverall>();
 
                 var patternRatings = EzPatternRatings.AggregateModePatternRatings(
-                    patternPlays.Select(static p => (p.Overall, p.Patterns)));
+                    patternPlays.Select(static p => (p.Overall, Patterns: p.SkillVector)));
 
                 // One transaction for the keymode: the aggregated rating skills, the replaced history curve and the pattern
                 // ratings. Issued separately they were three transactions per keymode per player.
@@ -316,21 +316,21 @@ namespace osu.Game.EzOsuGame.Skills.Mina
             float rate,
             EzMinaSkillAxisVector vector,
             string[] patterns,
-            Dictionary<int, List<TimedPlay>> byKey,
-            Dictionary<int, List<PatternPlay>> patternPlaysByKey,
+            Dictionary<int, List<SkillVectorPlayTimeLine>> byKey,
+            Dictionary<int, List<SkillVectorPlayOverall>> patternPlaysByKey,
             List<EzAxisPlayEvidenceRow> evidence)
         {
             if (!byKey.TryGetValue(keyCount, out var list))
-                byKey[keyCount] = list = new List<TimedPlay>();
+                byKey[keyCount] = list = new List<SkillVectorPlayTimeLine>();
 
-            list.Add(new TimedPlay(play.ScoredAt, vector));
+            list.Add(new SkillVectorPlayTimeLine(play.ScoredAt, vector));
 
             if (patterns.Length > 0)
             {
                 if (!patternPlaysByKey.TryGetValue(keyCount, out var patternList))
-                    patternPlaysByKey[keyCount] = patternList = new List<PatternPlay>();
+                    patternPlaysByKey[keyCount] = patternList = new List<SkillVectorPlayOverall>();
 
-                patternList.Add(new PatternPlay(vector.Overall, patterns));
+                patternList.Add(new SkillVectorPlayOverall(vector.Overall, patterns));
 
                 foreach (string patternId in patterns.Distinct(StringComparer.Ordinal))
                 {
@@ -408,7 +408,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         }
 
         private static IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisVector Vector)> buildChronologicalHistorySamples(
-            IReadOnlyList<TimedPlay> orderedPlays)
+            IReadOnlyList<SkillVectorPlayTimeLine> orderedPlays)
             => BuildChronologicalHistorySamples(
                 orderedPlays.Select(t => (t.ScoredAt, t.Vector)).ToList());
 
@@ -439,6 +439,6 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         }
 
         /// <summary>Accuracy-only clamp path (tests / callers without full score).</summary>
-        public static float AccuracyToGoal(double accuracy) => EzMinaRatingGoal.ForAccuracy(accuracy);
+        public static float AccuracyToGoal(double accuracy) => EzMinaStarRatingGoal.ForAccuracy(accuracy);
     }
 }

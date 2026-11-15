@@ -1333,7 +1333,7 @@ namespace osu.Game.Database
                     var minaRows = skillStore.GetBeatmapSkills(candidate.Hash, EzAnalysisSystem.Mina);
 
                     if (minaRows.TryGetValue(EzMinaSkillAxis.Overall.ToMetaId(), out double storedMina) && storedMina > 0)
-                        minaSr = EzMinaRatingScale.ToStarRating(storedMina);
+                        minaSr = EzMinaStarRatingScale.ToStarRating(storedMina);
                 }
 
                 bool wrote = false;

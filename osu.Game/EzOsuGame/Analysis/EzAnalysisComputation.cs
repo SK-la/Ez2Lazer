@@ -300,7 +300,7 @@ namespace osu.Game.EzOsuGame.Analysis
                         minaAxes = mina.Axes;
 
                         if (mina.Vector.Overall > 0)
-                            minaSr = EzMinaRatingScale.ToStarRating(mina.Vector.Overall);
+                            minaSr = EzMinaStarRatingScale.ToStarRating(mina.Vector.Overall);
                     }
                 }
 
