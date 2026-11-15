@@ -5,6 +5,7 @@ using System;
 using System.Linq;
 using System.Reflection;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
@@ -39,9 +40,21 @@ namespace osu.Game.EzOsuGame.Screens.Play
 
             if (!scoreProcessor.HasCompleted.Value && scoreProcessor.JudgedHits >= scoreProcessor.MaximumJudgements)
             {
-                double seekTarget = Math.Max(beatmap.GetLastObjectTime(), 0) + 500;
-                clock.Seek(seekTarget);
+                double seekTarget = getLatestJudgementTime(beatmap);
+
+                if (clock.CurrentTime < seekTarget)
+                    clock.Seek(seekTarget);
             }
+        }
+
+        private static double getLatestJudgementTime(IBeatmap beatmap, double margin = 100)
+        {
+            double latest = 0;
+
+            foreach (var hitObject in beatmap.HitObjects)
+                latest = Math.Max(latest, hitObject.GetEndTime() + hitObject.MaximumJudgementOffset);
+
+            return latest + margin;
         }
 
         private static void forceMissAllDrawables(DrawableRuleset ruleset)

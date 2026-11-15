@@ -1,15 +1,14 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.IO;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
-using osu.Framework.Logging;
-using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.UI;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.EzOsuGame.Diagnostics
 {
@@ -19,18 +18,16 @@ namespace osu.Game.EzOsuGame.Diagnostics
     /// </summary>
     public static class EzJudgmentDiagnostics
     {
-        /// <summary>
-        /// 是否启用采集（运行时可切换）。
-        /// </summary>
-        public static bool Enabled { get; set; }
+        /// <summary>是否采集。进局前由 <see cref="EzDiagnosticSwitches.Enabled"/> 赋值时写一次；关闭时热路径上只剩一次静态 bool 读取。</summary>
+        public static bool Enabled { get; private set; }
+
+        /// <summary>唯一的生产写入口；测试可直接调用。</summary>
+        public static void SetEnabled(bool enabled) => Enabled = enabled;
 
         private static ConcurrentQueue<JudgmentSample> samples = new ConcurrentQueue<JudgmentSample>();
 
         /// <summary>采样上限，防止 OOM。</summary>
         private const int max_samples = 8000;
-
-        /// <summary>高精度计时器，提供微秒级别 wallclock。</summary>
-        private static readonly Stopwatch wallclock = Stopwatch.StartNew();
 
         /// <summary>按键 wall 戳到本条判定检查的耗时（ms）；无有效按键戳时为 NaN。</summary>
         public readonly record struct JudgmentSample(
@@ -38,39 +35,147 @@ namespace osu.Game.EzOsuGame.Diagnostics
             double GameTime,
             double NoteStartTime,
             double TimeOffset,
-            double InterpolatedClockTime,
-            double BassSourceTime,
             double InterpolatedDrift,
             double FrameElapsed,
             double InputToJudgeMs);
 
         /// <summary>
+        /// 本局首次「判定真正落地」那一次的内部构成（ms）。
+        /// </summary>
+        public readonly record struct JudgeChain(
+            double WallMs,
+            double UpdatePrologueMs,
+            double CheckForResultMs,
+            double ApplyResultMs);
+
+        private static bool chainRecorded;
+        private static long tEnter;
+        private static long tCheckStart;
+        private static long tCheckEnd;
+        private static long tApplyStart;
+        private static long tApplyEnd;
+
+        /// <summary>首次判定链是否仍在等样本；关闭探针或已取到样本后恒为 false。</summary>
+        public static bool ChainWanted => Enabled && !chainRecorded;
+
+        /// <summary><c>UpdateResult</c> 入口。</summary>
+        public static void ChainEnterUpdateResult()
+        {
+            if (!ChainWanted)
+                return;
+
+            tEnter = Stopwatch.GetTimestamp();
+        }
+
+        /// <summary><c>CheckForResult</c> 入口。</summary>
+        public static void ChainEnterCheckForResult()
+        {
+            if (!ChainWanted || tEnter == 0)
+                return;
+
+            tCheckStart = Stopwatch.GetTimestamp();
+        }
+
+        /// <summary>
+        /// <c>CheckForResult</c> 出口。<paramref name="judged"/> 为 false 表示这次按键没有落地判定，
+        /// 本次链记录作废，等下一次真正落地的判定。
+        /// </summary>
+        public static void ChainExitCheckForResult(bool judged)
+        {
+            if (!ChainWanted || !judged)
+                return;
+
+            tCheckEnd = Stopwatch.GetTimestamp();
+        }
+
+        /// <summary><c>ApplyResult</c> 入口。</summary>
+        public static void ChainEnterApplyResult()
+        {
+            if (!ChainWanted)
+                return;
+
+            if (tApplyStart == 0)
+                tApplyStart = Stopwatch.GetTimestamp();
+        }
+
+        /// <summary><c>ApplyResult</c> 出口（<c>OnNewResult</c> 扇出之后）；在此提交整条链。</summary>
+        public static void ChainExitApplyResult()
+        {
+            if (!ChainWanted)
+                return;
+
+            if (tApplyEnd == 0)
+                tApplyEnd = Stopwatch.GetTimestamp();
+
+            commitChain();
+        }
+
+        private static void commitChain()
+        {
+            if (tEnter == 0 || tCheckStart == 0 || tCheckEnd == 0 || tApplyStart == 0 || tApplyEnd == 0)
+                return;
+
+            double tickToMs = 1000.0 / Stopwatch.Frequency;
+
+            chainRecorded = true;
+
+            chain = new JudgeChain(
+                EzProbeOutput.WallClockMs,
+                (tCheckStart - tEnter) * tickToMs,
+                (tCheckEnd - tCheckStart) * tickToMs,
+                (tApplyEnd - tApplyStart) * tickToMs);
+        }
+
+        private static JudgeChain chain;
+
+        private static string formatChain()
+        {
+            if (!chainRecorded)
+                return "[EzJudgmentDiag.firstJudge] no sample";
+
+            var c = chain;
+
+            return string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"[EzJudgmentDiag.firstJudge] wall={c.WallMs:F1} prologue={c.UpdatePrologueMs:F3} "
+                + $"CheckForResult={c.CheckForResultMs:F3}(own={c.CheckForResultMs - c.ApplyResultMs:F3}) "
+                + $"ApplyResult={c.ApplyResultMs:F3}");
+        }
+
+        /// <summary>
         /// 记录一次判定的完整时序上下文。
         /// </summary>
-        /// <param name="inputToJudgeMs">按键 → 本检查点的 wall 耗时（ms）；未知传 <see cref="double.NaN"/>。</param>
-        public static void Record(
-            double gameTime,
-            double noteStartTime,
-            double timeOffset,
-            double interpClockTime,
-            double bassSourceTime,
-            double interpDrift,
-            double frameElapsed,
-            double inputToJudgeMs = double.NaN)
+        /// <param name="keyTs">触发本次判定的按键的 wall 戳（<see cref="Stopwatch.GetTimestamp"/> 基准）；无按键传 0。</param>
+        public static void Capture(DrawableHitObject hitObject, double timeOffset, long keyTs)
         {
             if (!Enabled) return;
             if (samples.Count >= max_samples) return;
 
+            double interpDrift = 0;
+
+            if (hitObject.EzDrawableRuleset?.FrameStableClock is FrameStabilityContainer fsc
+                && fsc.ParentGameplayClock is GameplayClockContainer gcc)
+            {
+                interpDrift = gcc.InterpolatedDrift;
+            }
+
             samples.Enqueue(new JudgmentSample(
-                wallclock.Elapsed.TotalMilliseconds,
-                gameTime,
-                noteStartTime,
+                EzProbeOutput.WallClockMs,
+                hitObject.Time.Current,
+                hitObject.HitObject.GetEndTime(),
                 timeOffset,
-                interpClockTime,
-                bassSourceTime,
                 interpDrift,
-                frameElapsed,
-                inputToJudgeMs));
+                hitObject.Clock.ElapsedFrameTime,
+                resolveInputToJudgeMs(keyTs)));
+        }
+
+        private static double resolveInputToJudgeMs(long keyTs)
+        {
+            if (keyTs <= 0)
+                return double.NaN;
+
+            double ms = (Stopwatch.GetTimestamp() - keyTs) / (double)Stopwatch.Frequency * 1000.0;
+
+            return ms is < 0 or > 1000 ? double.NaN : ms;
         }
 
         /// <summary>
@@ -79,47 +184,24 @@ namespace osu.Game.EzOsuGame.Diagnostics
         public static string Flush()
         {
             var sb = new StringBuilder();
-            sb.AppendLine("WallMs,GameTime,NoteStart,TimeOffset,InterpClock,BassSource,Drift,FrameElapsed,InputToJudgeMs");
+            sb.AppendLine("WallMs,GameTime,NoteStart,TimeOffset,Drift,FrameElapsed,InputToJudgeMs");
 
-            // Drain current queue snapshot into the CSV builder.
+            int sampleCount = 0;
+
             while (samples.TryDequeue(out var s))
             {
-                sb.Append(s.WallMs.ToString("F3")).Append(',');
-                sb.Append(s.GameTime.ToString("F3")).Append(',');
-                sb.Append(s.NoteStartTime.ToString("F3")).Append(',');
-                sb.Append(s.TimeOffset.ToString("F3")).Append(',');
-                sb.Append(s.InterpolatedClockTime.ToString("F3")).Append(',');
-                sb.Append(s.BassSourceTime.ToString("F3")).Append(',');
-                sb.Append(s.InterpolatedDrift.ToString("F3")).Append(',');
-                sb.Append(s.FrameElapsed.ToString("F3")).Append(',');
-                sb.Append(double.IsNaN(s.InputToJudgeMs) ? string.Empty : s.InputToJudgeMs.ToString("F3"));
+                sampleCount++;
+                sb.Append(EzProbeOutput.Csv(s.WallMs)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.GameTime)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.NoteStartTime)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.TimeOffset)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.InterpolatedDrift)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.FrameElapsed)).Append(',');
+                sb.Append(EzProbeOutput.CsvOrEmpty(s.InputToJudgeMs));
                 sb.AppendLine();
             }
 
-            string dir = getDiagnosticsDirectory();
-            string path = Path.Combine(dir, $"judgment_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
-
-            // Perform actual disk IO on a background thread to avoid blocking callers.
-            try
-            {
-                string content = sb.ToString();
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await File.WriteAllTextAsync(path, content).ConfigureAwait(false);
-                        Logger.Log($"[EzJudgmentDiag] flushed to {path}", Ez2ConfigManager.LOGGER_NAME);
-                    }
-                    catch (Exception ex)
-                    {
-                        try { Logger.Log($"[EzJudgmentDiag] flush failed: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, level: LogLevel.Error); }
-                        catch { }
-                    }
-                });
-            }
-            catch { }
-
-            return path;
+            return EzProbeOutput.WriteAsync("judgment", sb.ToString(), sampleCount, "EzJudgmentDiag", formatChain());
         }
 
         /// <summary>
@@ -127,43 +209,11 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// </summary>
         public static void Clear()
         {
-            // Atomically replace the queue to avoid long-running dequeue loops on the caller thread.
             Interlocked.Exchange(ref samples, new ConcurrentQueue<JudgmentSample>());
-        }
 
-        private static string getDiagnosticsDirectory()
-        {
-            try
-            {
-                // Try to locate repository root by searching upwards for osu.sln or a .git folder.
-                var di = new DirectoryInfo(AppContext.BaseDirectory);
-
-                for (int i = 0; i < 8 && di != null; i++, di = di.Parent)
-                {
-                    if (di.GetFiles("osu.sln").Length > 0 || di.GetDirectories(".git").Length > 0)
-                    {
-                        string d = Path.Combine(di.FullName, "diagnostics");
-                        Directory.CreateDirectory(d);
-                        return d;
-                    }
-                }
-            }
-            catch { }
-
-            try
-            {
-                string d = Path.Combine(Environment.CurrentDirectory, "diagnostics");
-                Directory.CreateDirectory(d);
-                return d;
-            }
-            catch { }
-
-            string fallback = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "EzDiag");
-
-            try { Directory.CreateDirectory(fallback); }
-            catch { }
-
-            return fallback;
+            chainRecorded = false;
+            chain = default;
+            tEnter = tCheckStart = tCheckEnd = tApplyStart = tApplyEnd = 0;
         }
     }
 }
