@@ -180,6 +180,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.SkinEditorHudSnapDistance, 20, 10, 50, 5);
             SetDefault(Ez2Setting.SkinEditorHudSnapPixelFlush, false);
             SetDefault(Ez2Setting.SkinEditorComponentPickerX, 0.5f);
+            SetDefault(Ez2Setting.SkinEditorColouringPreviewerX, 0f);
 
             SetDefault(Ez2Setting.EzAnalysisFilter, false);
             SetDefault(Ez2Setting.EzSelectCsMode, string.Empty);
@@ -730,7 +731,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
             if (!key_mode_to_column_color_setting.ContainsKey(keyMode))
             {
-                var typesBytes = new byte[keyMode];
+                byte[] typesBytes = new byte[keyMode];
 
                 for (int i = 0; i < keyMode; i++)
                     typesBytes[i] = getDefaultColumnTypeByte(keyMode, i);
@@ -1325,6 +1326,12 @@ namespace osu.Game.EzOsuGame.Configuration
         /// (0 = left edge, 1 = right edge). Resolution-independent so it survives window resizes.
         /// </summary>
         SkinEditorComponentPickerX,
+
+        /// <summary>
+        /// Remembered horizontal position of the colouring previewer as a fraction of its free travel
+        /// (0 = left edge, 1 = right edge). Resolution-independent so it survives window resizes.
+        /// </summary>
+        SkinEditorColouringPreviewerX,
 
         EzAnalysisFilter,
 

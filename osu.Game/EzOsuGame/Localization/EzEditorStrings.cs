@@ -603,6 +603,18 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString TOOLBAR_VISUAL_PICKER = new EzLocalizationManager.EzLocalisableString(
             "可视化选择器", "Visual picker");
 
+        public static readonly LocalisableString TOOLBAR_COLOURING_PREVIEWER = new EzLocalizationManager.EzLocalisableString(
+            "着色预览器", "Colouring previewer");
+
+        public static readonly LocalisableString COLOURING_PREVIEWER_WINDOW_TITLE = new EzLocalizationManager.EzLocalisableString(
+            "着色预览器", "Colouring previewer");
+
+        public static readonly LocalisableString COLOURING_PREVIEWER_BASE = new EzLocalizationManager.EzLocalisableString(
+            "底图", "Base texture");
+
+        public static readonly LocalisableString COLOURING_PREVIEWER_WHITE_MAX = new EzLocalizationManager.EzLocalisableString(
+            "仅白·满", "White (max)");
+
         public static readonly LocalisableString SIDEBAR_SKIN_SCOPED_EMPTY = new EzLocalizationManager.EzLocalisableString(
             "当前皮肤没有专用设置。",
             "This skin has no scoped settings.");

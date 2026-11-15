@@ -57,7 +57,13 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// </summary>
         public BindableBool VisualPickerOpen { get; } = new BindableBool();
 
+        /// <summary>
+        /// Whether the colouring previewer window is shown.
+        /// </summary>
+        public BindableBool ColouringPreviewerOpen { get; } = new BindableBool();
+
         private EzEditorLayerButton layerButton = null!;
+        private EzToggleButton colouringPreviewerButton = null!;
         private EzToggleButton visualPickerButton = null!;
 
         private readonly Dictionary<EzEditorSceneGroup, GroupTabButton> groupButtons = new Dictionary<EzEditorSceneGroup, GroupTabButton>();
@@ -72,7 +78,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider overlayColourProvider)
         {
-            float gap = EzUIStyleV1.SCENE_BAR_GAP;
+            const float gap = EzUIStyleV1.SCENE_BAR_GAP;
 
             InternalChildren = new Drawable[]
             {
@@ -128,6 +134,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                 Direction = FillDirection.Horizontal,
                                 Children = new Drawable[]
                                 {
+                                    colouringPreviewerButton = new EzToggleButton
+                                    {
+                                        AutoSizeAxes = Axes.X,
+                                        Height = EzUIStyleV1.SceneBarControlHeight(),
+                                        Text = EzEditorStrings.TOOLBAR_COLOURING_PREVIEWER,
+                                        TextSize = 14,
+                                        Active = { BindTarget = ColouringPreviewerOpen },
+                                    },
                                     visualPickerButton = new EzToggleButton
                                     {
                                         AutoSizeAxes = Axes.X,
@@ -157,6 +171,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             {
                 updateActiveTab(e.NewValue);
                 ActiveLayer.Value = EzSkinEditorLayerOptions.Normalize(e.NewValue, ActiveLayer.Value);
+                updateColouringPreviewerButton(e.NewValue);
             }, true);
 
             Ruleset.BindValueChanged(_ => layerButton.RefreshDisplayText(), true);
@@ -182,6 +197,19 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             foreach (var (group, button) in groupButtons)
                 button.Active = group == activeGroup;
+        }
+
+        private void updateColouringPreviewerButton(EzEditorSceneType scene)
+        {
+            bool visible = scene is EzEditorSceneType.Appearance or EzEditorSceneType.Note;
+
+            if (visible)
+                colouringPreviewerButton.Show();
+            else
+            {
+                colouringPreviewerButton.Hide();
+                ColouringPreviewerOpen.Value = false;
+            }
         }
 
         private partial class GroupTabButton : EzSceneBarButton

@@ -46,7 +46,6 @@ using osu.Game.Skinning;
 using osuTK;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-using OfficialSkinEditor = osu.Game.Overlays.SkinEditor.SkinEditor;
 
 namespace osu.Game.EzOsuGame.Edit
 {
@@ -135,6 +134,7 @@ namespace osu.Game.EzOsuGame.Edit
         private EzSkinEditorSidebar sidebar = null!;
         private EzPlaybackBar playbackBar = null!;
         private EzSkinEditorComponentPickerWindow componentPicker = null!;
+        private EzSkinEditorColouringPreviewerWindow colouringPreviewer = null!;
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
             => dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
@@ -468,6 +468,7 @@ namespace osu.Game.EzOsuGame.Edit
                                                     {
                                                         hudLayer,
                                                         componentPicker = new EzSkinEditorComponentPickerWindow(ezSkinConfig.GetBindable<float>(Ez2Setting.SkinEditorComponentPickerX)),
+                                                        colouringPreviewer = new EzSkinEditorColouringPreviewerWindow(ezSkinConfig.GetBindable<float>(Ez2Setting.SkinEditorColouringPreviewerX)),
                                                     },
                                                 },
                                                 sidebar = new EzSkinEditorSidebar
@@ -525,6 +526,8 @@ namespace osu.Game.EzOsuGame.Edit
             // 侧栏设置面板叠在游玩区右缘上；选择器右界跟随面板当前可见宽度，面板收起时贴到轨道左缘。
             componentPicker.RightReserve = () => sidebar.VisiblePanelReserve;
             sceneBar.VisualPickerOpen.BindTo(componentPicker.Open);
+            colouringPreviewer.RightReserve = () => sidebar.VisiblePanelReserve;
+            sceneBar.ColouringPreviewerOpen.BindTo(colouringPreviewer.Open);
             bindSceneBarPlayback();
         }
 
