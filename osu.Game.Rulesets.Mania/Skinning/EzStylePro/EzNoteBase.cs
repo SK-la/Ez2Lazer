@@ -7,6 +7,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.UI;
+using osu.Game.Rulesets.Objects.Drawables;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
@@ -21,6 +22,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         [Resolved(CanBeNull = true)]
         private ManiaPlayfieldNoteDisplayTint? noteDisplayTint { get; set; }
+
+        [Resolved(CanBeNull = true)]
+        private DrawableHitObject? drawableObject { get; set; }
 
         [Resolved]
         protected EzLocalTextureFactory Factory { get; private set; } = null!;
@@ -64,17 +68,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected virtual void UpdateColor()
         {
-            if (Column == null)
-                return;
-
-            // 节拍线色按 note 时刻区分，由 Drawable 外壳乘上去。这里只负责列色。
-            if (noteDisplayTint?.DivisorNoteColouringEnabled == true)
+            if (Column == null || noteDisplayTint == null)
             {
                 Colour = Colour4.White;
                 return;
             }
 
-            Colour = noteDisplayTint?.GetDisplayColour(DisplayColourPart, Column, 0) ?? Colour4.White;
+            double time = noteDisplayTint.DivisorNoteColouringEnabled ? (drawableObject?.HitObject?.StartTime ?? 0) : 0;
+            noteDisplayTint.ApplyDisplayColour(this, DisplayColourPart, Column, time);
         }
 
         protected Drawable? LoadEzProNoteComponent(EzManiaNotePart part)

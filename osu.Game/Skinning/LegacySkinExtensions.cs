@@ -20,11 +20,11 @@ namespace osu.Game.Skinning
     public static partial class LegacySkinExtensions
     {
         public static Drawable? GetAnimation(this ISkin? source, string componentName, bool animatable, bool looping, bool applyConfigFrameRate = false, string animationSeparator = "-",
-                                             bool startAtCurrentTime = true, double? frameLength = null, Vector2? maxSize = null)
-            => source.GetAnimation(componentName, default, default, animatable, looping, applyConfigFrameRate, animationSeparator, startAtCurrentTime, frameLength, maxSize);
+                                             bool startAtCurrentTime = true, double? frameLength = null, Vector2? maxSize = null, bool colorize = false)
+            => source.GetAnimation(componentName, default, default, animatable, looping, applyConfigFrameRate, animationSeparator, startAtCurrentTime, frameLength, maxSize, colorize);
 
         public static Drawable? GetAnimation(this ISkin? source, string componentName, WrapMode wrapModeS, WrapMode wrapModeT, bool animatable, bool looping, bool applyConfigFrameRate = false,
-                                             string animationSeparator = "-", bool startAtCurrentTime = true, double? frameLength = null, Vector2? maxSize = null)
+                                             string animationSeparator = "-", bool startAtCurrentTime = true, double? frameLength = null, Vector2? maxSize = null, bool colorize = false)
         {
             if (source == null)
                 return null;
@@ -37,12 +37,14 @@ namespace osu.Game.Skinning
                     return null;
 
                 case 1:
-                    return new Sprite { Texture = textures[0] };
+                    return colorize
+                        ? new ColorizeSprite { Texture = textures[0], Algorithm = ColorizeAlgorithm.Multiply }
+                        : new Sprite { Texture = textures[0] };
 
                 default:
                     Debug.Assert(retrievalSource != null);
 
-                    var animation = new SkinnableTextureAnimation(startAtCurrentTime)
+                    var animation = new SkinnableTextureAnimation(startAtCurrentTime, colorize)
                     {
                         DefaultFrameLength = frameLength ?? getFrameLength(retrievalSource, applyConfigFrameRate, textures),
                         Loop = looping,
@@ -190,11 +192,17 @@ namespace osu.Game.Skinning
             private IAnimationTimeReference? timeReference { get; set; }
 
             private readonly Bindable<double> animationStartTime = new BindableDouble();
+            private readonly bool colorize;
 
-            public SkinnableTextureAnimation(bool startAtCurrentTime = true)
+            public SkinnableTextureAnimation(bool startAtCurrentTime = true, bool colorize = false)
                 : base(startAtCurrentTime)
             {
+                this.colorize = colorize;
             }
+
+            protected override Sprite CreateSprite() => colorize
+                ? new ColorizeSprite { Algorithm = ColorizeAlgorithm.Multiply }
+                : new Sprite();
 
             protected override void LoadComplete()
             {

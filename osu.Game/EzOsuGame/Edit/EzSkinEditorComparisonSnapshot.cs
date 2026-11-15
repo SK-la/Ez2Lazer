@@ -37,6 +37,12 @@ namespace osu.Game.EzOsuGame.Edit
         /// </summary>
         public Colour4 NotePreviewColour { get; private set; } = Colour4.White;
 
+        public EzColouringMode NotePreviewColouringMode { get; private set; } = EzColouringMode.True;
+
+        public EzColouringRange NotePreviewColouringRange { get; private set; } = EzColouringRange.Gray;
+
+        public double NotePreviewColouringStrength { get; private set; }
+
         public void CaptureFrom(Ez2ConfigManager config, EzSkinIniSession? skinIniSession = null)
         {
             Document = EzSkinJsonBridge.Capture(config);
@@ -48,6 +54,9 @@ namespace osu.Game.EzOsuGame.Edit
             NotePreviewColour = config.Get<bool>(Ez2Setting.ColorSettingsEnabled)
                 ? config.GetColumnColorByType(EzColumnType.A)
                 : Colour4.White;
+            NotePreviewColouringMode = config.Get<EzColouringMode>(Ez2Setting.ColouringMode);
+            NotePreviewColouringRange = config.Get<EzColouringRange>(Ez2Setting.ColouringRange);
+            NotePreviewColouringStrength = config.Get<double>(Ez2Setting.ColouringStrength);
         }
 
         public void ApplyConfigTo(Ez2ConfigManager config) => EzSkinJsonBridge.Apply(Document, config);

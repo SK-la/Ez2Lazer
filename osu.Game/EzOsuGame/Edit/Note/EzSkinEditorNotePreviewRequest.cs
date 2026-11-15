@@ -24,6 +24,12 @@ namespace osu.Game.EzOsuGame.Edit.Note
 
         public Colour4 NoteColour { get; init; }
 
+        public EzColouringMode ColouringMode { get; init; }
+
+        public EzColouringRange ColouringRange { get; init; }
+
+        public double ColouringStrength { get; init; }
+
         public double Width { get; init; }
 
         public double Height { get; init; }

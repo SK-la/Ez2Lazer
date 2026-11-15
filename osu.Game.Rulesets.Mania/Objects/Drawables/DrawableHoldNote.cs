@@ -205,7 +205,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 return;
             }
 
-            bodyPiece.Colour = noteDisplayTint.GetDisplayColour(ManiaNoteDisplayColourPart.HoldBody, column, HitObject?.StartTime ?? 0);
+            noteDisplayTint.ApplyDisplayColour(bodyPiece, ManiaNoteDisplayColourPart.HoldBody, column, HitObject?.StartTime ?? 0);
         }
 
         protected override void Dispose(bool isDisposing)

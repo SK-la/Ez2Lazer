@@ -35,9 +35,9 @@ using osu.Game.IO;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
+using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.OSD;
 using osu.Game.Overlays.SkinEditor;
-using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
 using osu.Game.Screens.Edit;
@@ -134,6 +134,7 @@ namespace osu.Game.EzOsuGame.Edit
         private EzSkinEditorSidebar sidebar = null!;
         private EzPlaybackBar playbackBar = null!;
         private EzSkinEditorComponentPickerWindow componentPicker = null!;
+        private EzSkinEditorColouringPreviewerWindow colouringPreviewer = null!;
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
             => dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
@@ -467,6 +468,7 @@ namespace osu.Game.EzOsuGame.Edit
                                                     {
                                                         hudLayer,
                                                         componentPicker = new EzSkinEditorComponentPickerWindow(ezSkinConfig.GetBindable<float>(Ez2Setting.SkinEditorComponentPickerX)),
+                                                        colouringPreviewer = new EzSkinEditorColouringPreviewerWindow(ezSkinConfig.GetBindable<float>(Ez2Setting.SkinEditorColouringPreviewerX)),
                                                     },
                                                 },
                                                 sidebar = new EzSkinEditorSidebar
@@ -498,6 +500,9 @@ namespace osu.Game.EzOsuGame.Edit
         protected override void LoadComplete()
         {
             base.LoadComplete();
+            NoteSessionForTesting.ColouringMode.BindTo(ezSkinConfig.GetBindable<EzColouringMode>(Ez2Setting.ColouringMode));
+            NoteSessionForTesting.ColouringRange.BindTo(ezSkinConfig.GetBindable<EzColouringRange>(Ez2Setting.ColouringRange));
+            NoteSessionForTesting.ColouringStrength.BindTo(ezSkinConfig.GetBindable<double>(Ez2Setting.ColouringStrength));
             hudLayer.LayoutWritten += onLayoutWritten;
             SkinEditorProviderResolver.EnsureDefaultProviderRegistered();
             beatmapPicker = new EzSkinEditorBeatmapPicker(realm, beatmapManager);
@@ -521,6 +526,8 @@ namespace osu.Game.EzOsuGame.Edit
             // 侧栏设置面板叠在游玩区右缘上；选择器右界跟随面板当前可见宽度，面板收起时贴到轨道左缘。
             componentPicker.RightReserve = () => sidebar.VisiblePanelReserve;
             sceneBar.VisualPickerOpen.BindTo(componentPicker.Open);
+            colouringPreviewer.RightReserve = () => sidebar.VisiblePanelReserve;
+            sceneBar.ColouringPreviewerOpen.BindTo(colouringPreviewer.Open);
             bindSceneBarPlayback();
         }
 

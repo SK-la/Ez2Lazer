@@ -63,6 +63,15 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
         }
 
         [Test]
+        public void TestForColumnHubTrueKeepsSourceColour()
+        {
+            var columnColour = new osu.Framework.Graphics.Colour4(1f, 0f, 0f, 1f);
+            var hub = ManiaNoteDisplayColour.ForColumnNoteDisplayTint(columnColour, EzColouringMode.True);
+
+            Assert.That(hub, Is.EqualTo(columnColour));
+        }
+
+        [Test]
         public void TestDivisorEnabledRespectsEditorCompose()
         {
             Assert.That(ManiaDivisorNoteColouring.IsEnabled(true, false, true), Is.True);

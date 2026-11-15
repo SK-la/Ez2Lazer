@@ -25,6 +25,9 @@ namespace osu.Game.EzOsuGame.Edit.Note
                 Part = exportPart,
                 VariantId = variantId,
                 NoteColour = resolveConfigNoteColour(config),
+                ColouringMode = config.Get<EzColouringMode>(Ez2Setting.ColouringMode),
+                ColouringRange = config.Get<EzColouringRange>(Ez2Setting.ColouringRange),
+                ColouringStrength = config.Get<double>(Ez2Setting.ColouringStrength),
                 Width = config.Get<double>(Ez2Setting.ColumnWidth),
                 Height = Math.Max(1, config.Get<double>(Ez2Setting.ColumnWidth) * config.Get<double>(Ez2Setting.NoteHeightScaleToWidth)),
             };
@@ -53,6 +56,9 @@ namespace osu.Game.EzOsuGame.Edit.Note
                 Part = exportPart,
                 VariantId = variantId,
                 NoteColour = snapshot.NotePreviewColour,
+                ColouringMode = snapshot.NotePreviewColouringMode,
+                ColouringRange = snapshot.NotePreviewColouringRange,
+                ColouringStrength = snapshot.NotePreviewColouringStrength,
                 Width = snapshot.NotePreviewWidth,
                 Height = snapshot.NotePreviewHeight,
             };

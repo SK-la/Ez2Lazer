@@ -14,8 +14,14 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString GLOBAL_WIDTH = new EzLocalizationManager.EzLocalisableString("全局宽度", "Global Width");
         public static readonly LocalisableString GLOBAL_TOTAL_WIDTH = new EzLocalizationManager.EzLocalisableString("全局总宽度", "Global Total Width");
 
-        public static readonly LocalisableString COLOURING_MODE_DIRECT = new EzLocalizationManager.EzLocalisableString("直接着色（默认）", "Direct (default)");
+        public static readonly LocalisableString COLOURING_MODE_DIRECT = new EzLocalizationManager.EzLocalisableString("直接着色", "Direct");
         public static readonly LocalisableString COLOURING_MODE_TINT = new EzLocalizationManager.EzLocalisableString("Tint 着色", "Tint");
+        public static readonly LocalisableString COLOURING_MODE_TRUE = new EzLocalizationManager.EzLocalisableString("真着色", "True");
+
+        public static readonly LocalisableString COLOURING_RANGE_ALL = new EzLocalizationManager.EzLocalisableString("全体", "All");
+        public static readonly LocalisableString COLOURING_RANGE_GRAY = new EzLocalizationManager.EzLocalisableString("灰度", "Gray");
+        public static readonly LocalisableString COLOURING_RANGE_KEEP_WHITE = new EzLocalizationManager.EzLocalisableString("留白", "Keep white");
+        public static readonly LocalisableString COLOURING_RANGE_WHITE = new EzLocalizationManager.EzLocalisableString("仅白色", "White only");
 
         public static readonly LocalisableString SCALE = new EzLocalizationManager.EzLocalisableString("缩放动效", "Scale");
         public static readonly LocalisableString BOUNCE = new EzLocalizationManager.EzLocalisableString("跳跃动效", "Bounce");

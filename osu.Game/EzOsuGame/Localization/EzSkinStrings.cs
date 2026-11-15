@@ -147,11 +147,35 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString COLOURING_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "皮肤全局着色算法，控制着色计算，不改贴图选择。"
-            + "\n直接着色：列色直接作为绘制颜色。"
-            + "\nTint 着色：先按灰度目标混合再加权，颜色更淡。",
+            + "\n直接着色：列色直接乘到贴图上，暗部会更暗。"
+            + "\nTint 着色：先按灰度目标混合再加权，颜色更淡。"
+            + "\n真着色：按像素保留贴图明度，只换色相。",
             "Skin-wide colouring algorithm for every place that applies a column or beat-line colour; it only changes the colour maths, not texture selection."
-            + "\nDirect: the source colour is used as-is."
-            + "\nTint: the source colour is blended onto a grey target first, giving a paler result.");
+            + "\nDirect: multiply the source colour onto the texture; dark areas get darker."
+            + "\nTint: the source colour is blended onto a grey target first, giving a paler result."
+            + "\nTrue: keep each pixel's luminance and replace only hue.");
+
+        public static readonly LocalisableString COLOURING_RANGE = new EzLocalizationManager.EzLocalisableString(
+            "着色范围", "Colouring Range");
+
+        public static readonly LocalisableString COLOURING_RANGE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "哪些像素参与着色，与算法独立。"
+            + "\n全体：每个像素都着色。"
+            + "\n仅灰度：只给接近灰色的像素着色，彩色阴影/发光保持原样。"
+            + "\n保白：接近白色的高光不着色。"
+            + "\n仅白色：只染近白。力度 0 只换纯白；加大后把离 255 不超过该值的近白也染上，白端是目标色、向原色平滑过渡。",
+            "Which pixels receive colouring; independent of the algorithm."
+            + "\nAll: every pixel is recoloured."
+            + "\nGray only: only near-grey pixels are recoloured; coloured shadows and glows stay as they are."
+            + "\nKeep white: near-white highlights are left unchanged."
+            + "\nWhite only: near-white pixels. Strength 0 is RGB(255,255,255) only; higher values also tint colours within that many 8-bit units of white, fading smoothly from the target colour back to the original.");
+
+        public static readonly LocalisableString COLOURING_STRENGTH = new EzLocalizationManager.EzLocalisableString(
+            "着色强度", "Colouring Strength");
+
+        public static readonly LocalisableString COLOURING_STRENGTH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "仅白色范围有效。0 只把纯白 RGB(255,255,255) 染成目标色。增大后，离纯白不超过该值的近白也按距离软衰减着色，白-红会平滑变成目标色-红。255 时按白量满范围混色。",
+            "Used by White only. 0 dyes exact RGB(255,255,255). Higher values also tint pixels within that many 8-bit units of white, with a linear falloff so a white-to-red ramp stays smooth as tint-to-red. At 255 the mix uses the white amount over the full range.");
 
         public static readonly LocalisableString NOTE_HEIGHT_SCALE = new EzLocalizationManager.EzLocalisableString(
             "note 高度比例", "Note Height Scale");

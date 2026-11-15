@@ -5,6 +5,7 @@ using System;
 using System.IO;
 using osu.Framework.Graphics;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Skinning;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -40,7 +41,7 @@ namespace osu.Game.EzOsuGame.Edit.Note
             int height = Math.Max(1, (int)Math.Round(request.Height));
             var result = new Image<Rgba32>(width, height);
 
-            drawLayer(result, source, y: 0, width, height, request.NoteColour);
+            drawLayer(result, source, y: 0, width, height, request);
 
             return result;
         }
@@ -65,29 +66,29 @@ namespace osu.Game.EzOsuGame.Edit.Note
 
             if (head != null)
             {
-                drawLayer(result, head, y, width, headHeight, request.NoteColour);
+                drawLayer(result, head, y, width, headHeight, request);
                 y += headHeight;
             }
 
             if (body != null)
             {
-                drawLayer(result, body, y, width, bodyHeight, request.NoteColour);
+                drawLayer(result, body, y, width, bodyHeight, request);
                 y += bodyHeight;
             }
 
             if (tail != null)
-                drawLayer(result, tail, y, width, tailHeight, request.NoteColour);
+                drawLayer(result, tail, y, width, tailHeight, request);
 
             return result;
         }
 
-        private static void drawLayer(Image<Rgba32> result, Image<Rgba32> source, int y, int width, int height, Colour4 tint)
+        private static void drawLayer(Image<Rgba32> result, Image<Rgba32> source, int y, int width, int height, EzSkinEditorNotePreviewRequest request)
         {
             result.Mutate(ctx =>
             {
                 using var layer = source.Clone();
                 layer.Mutate(c => c.Resize(width, height));
-                applyTint(layer, tint);
+                applyTint(layer, request.NoteColour, request.ColouringMode, request.ColouringRange, request.ColouringStrength);
                 ctx.DrawImage(layer, new Point(0, y), 1f);
             });
         }
@@ -105,8 +106,11 @@ namespace osu.Game.EzOsuGame.Edit.Note
             return Image.Load<Rgba32>(filePath);
         }
 
-        private static void applyTint(Image<Rgba32> image, Colour4 tint)
+        private static void applyTint(Image<Rgba32> image, Colour4 tint, EzColouringMode mode, EzColouringRange range, double strength)
         {
+            var algorithm = EzNoteRecolour.ToAlgorithm(mode);
+            float whiteTolerance = (float)strength / 255f;
+
             image.ProcessPixelRows(accessor =>
             {
                 for (int y = 0; y < accessor.Height; y++)
@@ -116,13 +120,17 @@ namespace osu.Game.EzOsuGame.Edit.Note
                     for (int x = 0; x < row.Length; x++)
                     {
                         ref Rgba32 pixel = ref row[x];
-                        pixel.R = (byte)(pixel.R * tint.R);
-                        pixel.G = (byte)(pixel.G * tint.G);
-                        pixel.B = (byte)(pixel.B * tint.B);
-                        pixel.A = (byte)(pixel.A * tint.A);
+                        var source = new Colour4(pixel.R / 255f, pixel.G / 255f, pixel.B / 255f, pixel.A / 255f);
+                        var result = EzNoteRecolour.ApplyStraight(source, tint, algorithm, range, whiteTolerance: whiteTolerance);
+                        pixel.R = toByte(result.R);
+                        pixel.G = toByte(result.G);
+                        pixel.B = toByte(result.B);
+                        pixel.A = toByte(result.A);
                     }
                 }
             });
         }
+
+        private static byte toByte(float channel) => (byte)Math.Clamp((int)Math.Round(channel * 255f), 0, 255);
     }
 }

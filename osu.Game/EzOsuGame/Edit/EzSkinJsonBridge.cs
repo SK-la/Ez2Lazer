@@ -177,6 +177,7 @@ namespace osu.Game.EzOsuGame.Edit
                     or Ez2Setting.JudgementLineName => typeof(string),
                 Ez2Setting.ManiaPseudo3DRotation or Ez2Setting.ColumnDim or Ez2Setting.ColumnBlur or Ez2Setting.ColumnWidth or Ez2Setting.SpecialFactor
                     or Ez2Setting.HitPosition or Ez2Setting.HitTargetFloatFixed or Ez2Setting.HitTargetAlpha or Ez2Setting.NoteHeightScaleToWidth
+                    or Ez2Setting.ColouringStrength
                     or Ez2Setting.NoteCornerRadius or Ez2Setting.ManiaHoldTailAlpha or Ez2Setting.NoteTrackLineHeight
                     or Ez2Setting.ManiaHoldTailMaskGradientHeight => typeof(double),
                 Ez2Setting.StagePanelEnabled or Ez2Setting.HitPositionGlobalEnable or Ez2Setting.ManiaLNGradientEnable
@@ -184,6 +185,7 @@ namespace osu.Game.EzOsuGame.Edit
                     or Ez2Setting.HitTargetColouringEnabled => typeof(bool),
                 Ez2Setting.ColumnWidthStyle => typeof(ColumnWidthStyle),
                 Ez2Setting.ColouringMode => typeof(EzColouringMode),
+                Ez2Setting.ColouringRange => typeof(EzColouringRange),
                 Ez2Setting.ColumnTypeListSelect => typeof(int),
                 Ez2Setting.StageBackgroundColour or Ez2Setting.ColumnTypeA or Ez2Setting.ColumnTypeB or Ez2Setting.ColumnTypeS or Ez2Setting.ColumnTypeE or Ez2Setting.ColumnTypeP => typeof(Colour4),
                 Ez2Setting.ColumnTypeOf4K or Ez2Setting.ColumnTypeOf5K or Ez2Setting.ColumnTypeOf6K or Ez2Setting.ColumnTypeOf7K or Ez2Setting.ColumnTypeOf8K
