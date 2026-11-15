@@ -95,8 +95,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             using var engine = new EzMinaEngine();
 
-            var atMax = engine.CalculateRating(notes, 4, 1f, EzMinaEngine.MAX_SunnySR_GOAL);
-            var atMin = engine.CalculateRating(notes, 4, 1f, EzMinaEngine.MIN_SunnySR_GOAL);
+            var atMax = engine.CalculateRating(notes, 4, 1f, EzMinaEngine.MAX_RATING_GOAL);
+            var atMin = engine.CalculateRating(notes, 4, 1f, EzMinaEngine.MIN_RATING_GOAL);
 
             Assert.That(engine.CalculateRating(notes, 4, 1f, 4f).Overall, Is.EqualTo(atMax.Overall).Within(1e-4));
             Assert.That(engine.CalculateRating(notes, 4, 1f, 0.1f).Overall, Is.EqualTo(atMin.Overall).Within(1e-4));

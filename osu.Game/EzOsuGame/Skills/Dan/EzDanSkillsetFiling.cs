@@ -105,7 +105,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         ///     averages over all filings into that tile (shared clears included).
         /// </summary>
         /// <param name="resolvePlayValues">
-        ///     Hub <c>play.values</c> — per-clear Mina SunnySR vector (not beatmap Mina).
+        ///     Hub <c>play.values</c> — per-clear <see cref="IEzMinaEngine.CalculateRating"/> axis values (not chart Mina MSD or chart SSR).
         /// </param>
         public static IReadOnlyDictionary<string, EzDanSkillsetVerdict> ComputeVerdicts(
             int keyCount,

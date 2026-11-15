@@ -8,7 +8,8 @@ using System.Linq;
 namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
-    /// Etterna ScoreManager::AggregateSunnySRs port (mania-hub player-skills.ts aggregateSsrs).
+    /// Aggregates per-play <see cref="IEzMinaEngine.CalculateRating"/> axis values into player skill ratings
+    /// (Etterna ScoreManager::AggregateSunnySRs / mania-hub <c>aggregateSsrs</c> — upstream name, not chart SSR).
     /// </summary>
     public static class EzMinaRatingAggregator
     {
@@ -16,8 +17,8 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 
         public static double Aggregate(IEnumerable<double> values)
         {
-            double[] ssrs = values.Where(v => double.IsFinite(v) && v > 0).ToArray();
-            if (ssrs.Length == 0)
+            double[] playValues = values.Where(v => double.IsFinite(v) && v > 0).ToArray();
+            if (playValues.Length == 0)
                 return 0;
 
             double rating = 0;
@@ -32,8 +33,8 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                     rating += res;
                     sum = 0;
 
-                    foreach (double ssr in ssrs)
-                        sum += Math.Max(0, 2 / (1 - EzAbramowitzErf.Erf(0.1 * (ssr - rating))) - 2);
+                    foreach (double playValue in playValues)
+                        sum += Math.Max(0, 2 / (1 - EzAbramowitzErf.Erf(0.1 * (playValue - rating))) - 2);
                 }
                 while (Math.Pow(2, rating * 0.1) < sum);
 

@@ -29,7 +29,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private const int yield_every = 32;
 
         private readonly EzLocalProfileAggregator aggregator;
-        private readonly EzPlayerMinaAggregator? ssrAggregator;
+        private readonly EzPlayerMinaAggregator? minaRatingAggregator;
         private readonly EzPlayerDanAggregator? danAggregator;
         private readonly EzPlayerPPPAggregator? osuPPPAggregator;
         private readonly EzSkillProvider? skillProvider;
@@ -77,7 +77,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             RealmAccess realm,
             EzAnalysisPersistentStore analysisStore,
             BeatmapManager beatmapManager,
-            EzPlayerMinaAggregator? ssrAggregator = null,
+            EzPlayerMinaAggregator? minaRatingAggregator = null,
             EzPlayerDanAggregator? danAggregator = null,
             EzLocalProfileStore? sharedStore = null,
             EzSkillProvider? skillProvider = null,
@@ -86,7 +86,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             Store = sharedStore ?? new EzLocalProfileStore(storage);
             aggregator = new EzLocalProfileAggregator(realm, analysisStore, beatmapManager, analysisLookup);
-            this.ssrAggregator = ssrAggregator;
+            this.minaRatingAggregator = minaRatingAggregator;
             this.danAggregator = danAggregator;
             this.osuPPPAggregator = osuPPPAggregator;
             this.skillProvider = skillProvider;
@@ -563,7 +563,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// </summary>
         private void refreshAllPlayerSkills()
         {
-            if (ssrAggregator == null && danAggregator == null && osuPPPAggregator == null)
+            if (minaRatingAggregator == null && danAggregator == null && osuPPPAggregator == null)
                 return;
 
             var included = Store.LoadIncludedUsernames()
@@ -610,7 +610,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     maniaCombined,
                     () => { },
                     CancellationToken.None,
-                    ssrAggregator?.LoadPlayCache(),
+                    minaRatingAggregator?.LoadPlayCache(),
                     danAggregator?.LoadPlayCache(),
                     new HashSet<string>(StringComparer.Ordinal));
             }
@@ -798,10 +798,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
             CancellationToken token,
             IReadOnlyCollection<string>? skillsUsernames = null)
         {
-            if (ssrAggregator == null && danAggregator == null)
+            if (minaRatingAggregator == null && danAggregator == null)
                 return;
 
-            int passCount = (ssrAggregator != null ? 1 : 0) + (danAggregator != null ? 1 : 0);
+            int passCount = (minaRatingAggregator != null ? 1 : 0) + (danAggregator != null ? 1 : 0);
             if (passCount == 0)
                 return;
 
@@ -884,7 +884,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             // Loaded once for the whole pass: both aggregators and every player reuse these, instead of each player
             // re-reading (and re-parsing the vectors of) the entire per-play table.
-            var ssrPlayCache = ssrAggregator?.LoadPlayCache();
+            var minaPlayRatingCache = minaRatingAggregator?.LoadPlayCache();
             var danPlayCache = danAggregator?.LoadPlayCache();
 
             // New pass: drop anything the dan aggregator memoised against the previous one.
@@ -941,7 +941,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 {
                     // Mania's own systems first: SSR / pattern / dan, then PP+ over the same plays. PP+ is the one
                     // system that also covers mania, so it is not covered by persistUserSkills.
-                    persisted |= persistUserSkills(username, maniaScores, tick, token, ssrPlayCache, danPlayCache, missingCharts);
+                    persisted |= persistUserSkills(username, maniaScores, tick, token, minaPlayRatingCache, danPlayCache, missingCharts);
                     persisted |= persistPppUserSkills(username, maniaScores, EzLocalProfileConstants.MANIA_RULESET_ID, tick, token);
                 }
 
@@ -963,7 +963,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 if (allBags[EzLocalProfileConstants.MANIA_RULESET_ID].Count > 0)
                 {
                     persisted |= persistUserSkills(EzLocalProfileConstants.ALL_PLAYERS, allBags[EzLocalProfileConstants.MANIA_RULESET_ID], tick, token,
-                        ssrPlayCache, danPlayCache, missingCharts);
+                        minaPlayRatingCache, danPlayCache, missingCharts);
                 }
 
                 foreach (int rulesetId in EzPPPSkillCatalog.SupportedRulesets)
@@ -1014,7 +1014,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             List<EzSkillPlayRow> plays,
             Action tick,
             CancellationToken token,
-            IReadOnlyDictionary<Guid, EzMinaPlayCacheRow>? ssrPlayCache,
+            IReadOnlyDictionary<Guid, EzMinaPlayCacheRow>? minaPlayRatingCache,
             IReadOnlyDictionary<Guid, EzDanPlayCacheRow>? danPlayCache,
             HashSet<string> missingCharts)
         {
@@ -1028,16 +1028,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 username,
                 () =>
                 {
-                    ssrAggregator!.ComputeAndStore(username, plays, aggregator.CreateWindowedScoreResolver(plays, token), token, tick, ssrPlayCache);
+                    minaRatingAggregator!.ComputeAndStore(username, plays, aggregator.CreateWindowedScoreResolver(plays, token), token, tick, minaPlayRatingCache);
                     // All: keep SunnySR/pattern/history under the sentinel key; do not duplicate axis evidence rows.
                     Store.ReplaceAxisPlays(
                         username,
-                        allPlayers ? Array.Empty<EzAxisPlayEvidenceRow>() : ssrAggregator.PendingEvidence);
+                        allPlayers ? Array.Empty<EzAxisPlayEvidenceRow>() : minaRatingAggregator.PendingEvidence);
 
                     if (!allPlayers)
-                        playerMissed.UnionWith(ssrAggregator.MissingChartHashes);
+                        playerMissed.UnionWith(minaRatingAggregator.MissingChartHashes);
                 },
-                ssrAggregator != null,
+                minaRatingAggregator != null,
                 "[EzLocalProfile] Failed to compute/persist player SunnySR skills after profile save.");
 
             persisted |= tryComputeAndPersist(

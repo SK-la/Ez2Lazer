@@ -1246,8 +1246,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        /// <summary>Per-play SunnySR cache for one algorithm version, keyed by score id (score id is globally unique).</summary>
-        public Dictionary<Guid, EzMinaPlayCacheRow> LoadSsrPlayCache(int? algorithmVersion = null)
+        /// <summary>Per-play Mina rating cache (<c>ssr_score_cache</c>) for one algorithm version, keyed by score id.</summary>
+        public Dictionary<Guid, EzMinaPlayCacheRow> LoadMinaPlayRatingCache(int? algorithmVersion = null)
         {
             int version = algorithmVersion ?? EzMinaEngine.VERSION;
 
@@ -1287,7 +1287,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        public void UpsertSsrPlayCache(IReadOnlyList<EzMinaPlayCacheRow> rows)
+        public void UpsertMinaPlayRatingCache(IReadOnlyList<EzMinaPlayCacheRow> rows)
         {
             if (rows.Count == 0)
                 return;
@@ -1322,7 +1322,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     cmd.Parameters.AddWithValue("$key_count", row.KeyCount);
                     cmd.Parameters.AddWithValue("$rate", row.Rate);
                     cmd.Parameters.AddWithValue("$scored_at_ms", row.ScoredAt.ToUnixTimeMilliseconds());
-                    cmd.Parameters.AddWithValue("$has_ssr", row.HasSsr ? 1 : 0);
+                    cmd.Parameters.AddWithValue("$has_ssr", row.HasPlayRating ? 1 : 0);
                     cmd.Parameters.AddWithValue("$vector_json", serializeVector(row.Vector));
                     cmd.Parameters.AddWithValue("$algorithm_version", row.AlgorithmVersion);
                     cmd.ExecuteNonQuery();

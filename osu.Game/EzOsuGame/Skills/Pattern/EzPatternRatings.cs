@@ -12,7 +12,7 @@ using osu.Game.EzOsuGame.Skills.SkillTag;
 namespace osu.Game.EzOsuGame.Skills.Pattern
 {
     /// <summary>
-    /// One hub <c>PlayerSkillPatternRating</c>: Overall-SunnySR aggregate on charts tagged with <see cref="Id"/>.
+    /// One hub <c>PlayerSkillPatternRating</c>: per-play rating Overall aggregate on charts tagged with <see cref="Id"/>.
     /// </summary>
     public readonly record struct EzPatternRating(string Id, double Rating, int Plays);
 
@@ -57,7 +57,7 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
 
         /// <summary>
         /// Skill radar axes for 6/7/8K: the player axes minus <see cref="EzManiaRCAxis.Ln"/> (LN has its own layer).
-        /// Dual source (4+2): pattern Overall buckets + Mina SunnySR↔Mina — each axis compares same algorithm.
+        /// Dual source (4+2): pattern Overall buckets + player rating↔chart Mina — each axis compares same algorithm family.
         /// </summary>
         public static IReadOnlyList<EzManiaRCAxis> RadarAxes { get; } = EzManiaRCAxisExtensions.PlayerRadarAxes;
 
@@ -79,7 +79,7 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
         /// <summary>
         /// Pattern-Overall axes (player_pattern ↔ chart Overall Mina when tagged):
         /// chordstream / bracket / delay / stream.
-        /// Mina axes (SunnySR ↔ Mina): jack / tech.
+        /// Mina axes (player rating ↔ chart Mina): jack / tech.
         /// </summary>
         public static bool UsesMinaRadarSource(EzManiaRCAxis axis)
             => axis is EzManiaRCAxis.Jack or EzManiaRCAxis.Tech;
@@ -156,7 +156,7 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
         /// <summary>
         /// Same-algorithm green/yellow for one radar axis.
         /// Pattern axes: player pattern rating ↔ Overall Mina if chart tagged.
-        /// Mina axes: player SunnySR ↔ chart Mina.
+        /// Mina axes: player rating ↔ chart Mina.
         /// </summary>
         public static EzRadarAxisPair ResolveRadarAxisPair(
             EzManiaRCAxis axis,
@@ -272,7 +272,7 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
                     chip.AccentHex));
             }
 
-            // Hub: graft LN pattern axis onto non-pattern keymodes (same Overall-SunnySR scale).
+            // Hub: graft LN pattern axis onto non-pattern keymodes (same per-play rating Overall scale).
             var ln = patterns.FirstOrDefault(static p => p.Id == EzManiaRCAxis.Ln.ToId());
 
             if (ln.Rating >= DISPLAY_MIN)
