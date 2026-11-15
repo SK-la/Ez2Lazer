@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
@@ -40,6 +41,9 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
         public bool UsesFixedAnchor { get; set; }
 
         public GlobalSkinnableContainers LayoutTarget => GlobalSkinnableContainers.MusicPlayer;
+
+        public bool CanBePlaced(IEnumerable<ISerialisableDrawable> otherComponents) =>
+            otherComponents.All(c => c.GetType() != GetType());
 
         private const float bar_height = 55;
         private const float bar_width = 400;

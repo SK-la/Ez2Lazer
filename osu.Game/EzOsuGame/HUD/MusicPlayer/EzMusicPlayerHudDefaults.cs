@@ -37,7 +37,7 @@ namespace osu.Game.EzOsuGame.HUD.MusicPlayer
             if (!container.ComponentsLoaded)
                 return;
 
-            TrimDuplicateDefaults(container);
+            TrimExactDuplicatedDefaultSet(container);
 
             if (container.Components.Count > 0)
                 return;
@@ -66,13 +66,23 @@ namespace osu.Game.EzOsuGame.HUD.MusicPlayer
         }
 
         /// <summary>
-        /// Drops extra copies of the four default HUD types left by duplicated serialisation.
+        /// Repairs the serialisation bug that wrote N identical default sets. Leaves any other layout
+        /// alone, including an extra visualisation or playlist the user placed.
         /// </summary>
-        public static void TrimDuplicateDefaults(EzLayoutContainer container)
+        public static void TrimExactDuplicatedDefaultSet(EzLayoutContainer container)
         {
+            var components = container.Components;
+            int[] counts = default_types.Select(t => components.Count(c => c.GetType() == t)).ToArray();
+
+            if (counts.Any(c => c <= 1) || counts.Any(c => c != counts[0]))
+                return;
+
+            if (components.Count != counts[0] * default_types.Length)
+                return;
+
             foreach (var type in default_types)
             {
-                foreach (var extra in container.Components.Where(c => c.GetType() == type).Skip(1).ToArray())
+                foreach (var extra in components.Where(c => c.GetType() == type).Skip(1).ToArray())
                     container.Remove(extra, true);
             }
         }

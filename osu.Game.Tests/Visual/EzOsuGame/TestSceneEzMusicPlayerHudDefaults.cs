@@ -63,6 +63,40 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         }
 
         [Test]
+        public void TestSecondVisualisationInJsonIsRejectedOnLoad()
+        {
+            AddStep("write one extra visualisation", () =>
+            {
+                var layout = new SkinLayoutInfo();
+                layout.Update(null, new[]
+                {
+                    new SerialisedDrawableInfo(EzMusicPlayerHudDefaults.CreateVisualisation()),
+                    new SerialisedDrawableInfo(EzMusicPlayerHudDefaults.CreateVisualisation()),
+                    new SerialisedDrawableInfo(new EzVisualizerBeatmapLogo { UsesFixedAnchor = true }),
+                    new SerialisedDrawableInfo(new EzVisualizerPlaybackBar { UsesFixedAnchor = true }),
+                    new SerialisedDrawableInfo(new EzVisualizerPlaylist { UsesFixedAnchor = true }),
+                });
+                store.Save(EzLayoutFiles.MUSIC_PLAYER, layout);
+            });
+
+            loadContainer();
+            AddUntilStep("sole instances loaded", () => container.ComponentsLoaded && container.Components.Count == 4);
+            AddAssert("one visualisation remains", () =>
+                container.Components.Count(c => c is EzMenuLogoVisualisation) == 1);
+        }
+
+        [Test]
+        public void TestDefaultTypesAreSoleInstances()
+        {
+            AddAssert("second visualisation rejected", () =>
+                !EzMusicPlayerHudDefaults.CreateVisualisation().CanBePlaced(new ISerialisableDrawable[] { EzMusicPlayerHudDefaults.CreateVisualisation() }));
+            AddAssert("second playlist rejected", () =>
+                !new EzVisualizerPlaylist().CanBePlaced(new ISerialisableDrawable[] { new EzVisualizerPlaylist() }));
+            AddAssert("visualisation allowed in empty container", () =>
+                EzMusicPlayerHudDefaults.CreateVisualisation().CanBePlaced(System.Array.Empty<ISerialisableDrawable>()));
+        }
+
+        [Test]
         public void TestUndoAfterMoveDoesNotThrow()
         {
             loadContainer();

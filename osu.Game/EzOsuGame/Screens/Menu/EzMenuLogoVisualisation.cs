@@ -2,6 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
@@ -29,6 +31,9 @@ namespace osu.Game.EzOsuGame.Screens.Menu
         public bool UsesFixedAnchor { get; set; }
 
         public GlobalSkinnableContainers LayoutTarget => GlobalSkinnableContainers.MusicPlayer;
+
+        public bool CanBePlaced(IEnumerable<ISerialisableDrawable> otherComponents) =>
+            otherComponents.All(c => c.GetType() != GetType());
 
         private const float bar_length = 600;
         private const int bars_per_visualiser = 200;
