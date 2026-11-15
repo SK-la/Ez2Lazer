@@ -45,9 +45,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var msd = new Dictionary<string, double>
             {
-                [EzMinaSkillAxis.Overall.ToMsdSkillId()] = 6.5,
-                [EzMinaSkillAxis.Stream.ToMsdSkillId()] = 6.0,
-                [EzMinaSkillAxis.Jumpstream.ToMsdSkillId()] = 5.0,
+                [EzMinaSkillAxis.Overall.ToMetaId()] = 6.5,
+                [EzMinaSkillAxis.Stream.ToMetaId()] = 6.0,
+                [EzMinaSkillAxis.Jumpstream.ToMetaId()] = 5.0,
             };
 
             var rc = EzDanEngine.FromMsd(msd, keyCount: 4, holdRatio: 0.1);

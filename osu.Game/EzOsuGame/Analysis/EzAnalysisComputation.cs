@@ -727,7 +727,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 var axes = new Dictionary<string, double>(StringComparer.Ordinal);
 
                 foreach (var (axis, value) in vector.Enumerate())
-                    axes[axis.ToId()] = value;
+                    axes[axis.ToMetaId()] = value;
 
                 return new MinaResult(axes, vector);
             }

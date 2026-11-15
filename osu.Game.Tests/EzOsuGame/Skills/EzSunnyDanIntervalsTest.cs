@@ -43,9 +43,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var msd = new Dictionary<string, double>
             {
-                [EzMinaSkillAxis.Overall.ToMsdSkillId()] = 20.5,
-                [EzMinaSkillAxis.Technical.ToMsdSkillId()] = 22.0,
-                [EzMinaSkillAxis.Stream.ToMsdSkillId()] = 10.0,
+                [EzMinaSkillAxis.Overall.ToMetaId()] = 20.5,
+                [EzMinaSkillAxis.Technical.ToMetaId()] = 22.0,
+                [EzMinaSkillAxis.Stream.ToMetaId()] = 10.0,
             };
 
             var withSunnySR = EzDanEngine.FromMsd(msd, keyCount: 6, holdRatio: 0.1, sunnySR: 7.03);
@@ -64,8 +64,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var msd = new Dictionary<string, double>
             {
-                [EzMinaSkillAxis.Overall.ToMsdSkillId()] = 20.5,
-                [EzMinaSkillAxis.Technical.ToMsdSkillId()] = 22.0,
+                [EzMinaSkillAxis.Overall.ToMetaId()] = 20.5,
+                [EzMinaSkillAxis.Technical.ToMetaId()] = 22.0,
             };
 
             var computed = EzPersistedChartDan.TryComputeFromStored(
@@ -90,8 +90,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var msd = new Dictionary<string, double>
             {
-                [EzMinaSkillAxis.Overall.ToMsdSkillId()] = 20.5,
-                [EzMinaSkillAxis.Technical.ToMsdSkillId()] = 22.0,
+                [EzMinaSkillAxis.Overall.ToMetaId()] = 20.5,
+                [EzMinaSkillAxis.Technical.ToMetaId()] = 22.0,
             };
 
             var live = EzPersistedChartDan.TryComputeFromStored(
@@ -121,8 +121,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void SkillPresentationMapsEnumsAndWireIds()
         {
-            Assert.That(EzMinaSkillAxis.JackSpeed.ToId(), Is.EqualTo("jack"));
-            Assert.That(EzMinaSkillAxis.Technical.ToId(), Is.EqualTo("tech"));
+            Assert.That(EzMinaSkillAxis.JackSpeed.ToMetaId(), Is.EqualTo("jack"));
+            Assert.That(EzMinaSkillAxis.Technical.ToMetaId(), Is.EqualTo("tech"));
             Assert.That(EzMinaSkillAxisExtensions.TryParse("tech", out var axis), Is.True);
             Assert.That(axis, Is.EqualTo(EzMinaSkillAxis.Technical));
             Assert.That(EzMinaSkillAxis.Technical.Chip().Name.ToString(), Is.EqualTo("技").Or.EqualTo("Tech"));

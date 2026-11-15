@@ -52,7 +52,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 var overallMeta = EzMinaSkillAxis.Overall.Meta();
                 bars.Add(new EzTrackSkillsAxis(
-                    EzMinaSkillAxis.Overall.ToPlayerSkillId(),
+                    EzMinaSkillAxis.Overall.ToMetaId(),
                     overallMeta.DisplayName,
                     playerRating.Overall,
                     overallMeta.AccentHex));

@@ -239,14 +239,14 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 var msd = new Dictionary<string, double>
                 {
-                    [EzMinaSkillAxis.Overall.ToMsdSkillId()] = 20,
-                    [EzMinaSkillAxis.Stream.ToMsdSkillId()] = 18,
-                    [EzMinaSkillAxis.Jumpstream.ToMsdSkillId()] = 16,
-                    [EzMinaSkillAxis.Handstream.ToMsdSkillId()] = 14,
-                    [EzMinaSkillAxis.Stamina.ToMsdSkillId()] = 12,
-                    [EzMinaSkillAxis.JackSpeed.ToMsdSkillId()] = 10,
-                    [EzMinaSkillAxis.Chordjack.ToMsdSkillId()] = 8,
-                    [EzMinaSkillAxis.Technical.ToMsdSkillId()] = 6,
+                    [EzMinaSkillAxis.Overall.ToMetaId()] = 20,
+                    [EzMinaSkillAxis.Stream.ToMetaId()] = 18,
+                    [EzMinaSkillAxis.Jumpstream.ToMetaId()] = 16,
+                    [EzMinaSkillAxis.Handstream.ToMetaId()] = 14,
+                    [EzMinaSkillAxis.Stamina.ToMetaId()] = 12,
+                    [EzMinaSkillAxis.JackSpeed.ToMetaId()] = 10,
+                    [EzMinaSkillAxis.Chordjack.ToMetaId()] = 8,
+                    [EzMinaSkillAxis.Technical.ToMetaId()] = 6,
                 };
 
                 store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6));

@@ -37,7 +37,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             ArgumentNullException.ThrowIfNull(msd);
             ArgumentNullException.ThrowIfNull(playable);
 
-            if (!msd.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double overall) || overall <= 0)
+            if (!msd.TryGetValue(EzMinaSkillAxis.Overall.ToMetaId(), out double overall) || overall <= 0)
                 return null;
 
             int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
@@ -60,7 +60,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             if (keyCount <= 0)
                 return null;
 
-            if (!msd.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double overall) || overall <= 0)
+            if (!msd.TryGetValue(EzMinaSkillAxis.Overall.ToMetaId(), out double overall) || overall <= 0)
                 return null;
 
             var dominantAxis = EzDanLabels.DominantAxis(msd);
@@ -173,6 +173,6 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         public static int TryHoldCountFromBeatmapInfo(BeatmapInfo beatmapInfo) => EzHoldMetrics.TryHoldCountFromBeatmapInfo(beatmapInfo);
 
         public static IReadOnlyDictionary<string, double> VectorToMsdDict(EzMinaSkillAxisVector vector)
-            => vector.Enumerate().ToDictionary(p => p.Axis.ToMsdSkillId(), p => p.Value, StringComparer.Ordinal);
+            => vector.Enumerate().ToDictionary(p => p.Axis.ToMetaId(), p => p.Value, StringComparer.Ordinal);
     }
 }

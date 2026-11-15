@@ -46,18 +46,9 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         /// <summary>Axes with <see cref="EzSkillMetaAttribute.InRadar"/> (excludes Overall).</summary>
         public static EzMinaSkillAxis[] RadarAxes { get; } = All.Where(a => a.Meta().InRadar).ToArray();
 
-        public static EzSkillMetaAttribute Meta(this EzMinaSkillAxis axis)
-            => EzEnumMetaCache<EzMinaSkillAxis>.Meta(axis);
+        public static EzSkillMetaAttribute Meta(this EzMinaSkillAxis axis) => EzEnumMetaCache<EzMinaSkillAxis>.Meta(axis);
 
-        public static string ToId(this EzMinaSkillAxis axis) => axis.Meta().Id;
-
-        public static string ToMsdSkillId(this EzMinaSkillAxis axis) => axis.ToId();
-
-        /// <summary>
-        /// Skill id on player rows (<c>system_id = mina</c>). Same bare id as <see cref="ToMsdSkillId"/>; not
-        /// <see cref="EzOsuGame.Analysis.EzAnalysisSystem.SSR"/> chart Sunny.
-        /// </summary>
-        public static string ToPlayerSkillId(this EzMinaSkillAxis axis) => axis.ToId();
+        public static string ToMetaId(this EzMinaSkillAxis axis) => axis.Meta().Id;
 
         public static EzSkillChip Chip(this EzMinaSkillAxis axis) => axis.Meta().Chip;
 

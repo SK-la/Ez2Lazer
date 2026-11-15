@@ -315,15 +315,15 @@ namespace osu.Game.Rulesets.Osu.Difficulty
 
             return new Dictionary<string, double>(StringComparer.Ordinal)
             {
-                [EzPPPSkillAxis.Aim.ToChartSkillId()] = EzPPPMath.Finite(aimRating),
-                [EzPPPSkillAxis.RawAim.ToChartSkillId()] = EzPPPMath.Finite(rawRating),
-                [EzPPPSkillAxis.JumpAim.ToChartSkillId()] = EzPPPMath.Finite(jumpRating),
-                [EzPPPSkillAxis.FlowAim.ToChartSkillId()] = EzPPPMath.Finite(flowRating),
-                [EzPPPSkillAxis.Precision.ToChartSkillId()] = EzPPPMath.Finite(precision),
-                [EzPPPSkillAxis.Speed.ToChartSkillId()] = EzPPPMath.Finite(speedRating),
-                [EzPPPSkillAxis.Stamina.ToChartSkillId()] = EzPPPMath.Finite(staminaRating),
-                [EzPPPSkillAxis.Accuracy.ToChartSkillId()] = EzPPPMath.Finite(accuracy),
-                [EzPPPSkillAxis.StarRating.ToChartSkillId()] = EzPPPMath.Finite(star),
+                [EzPPPSkillAxis.Aim.ToId()] = EzPPPMath.Finite(aimRating),
+                [EzPPPSkillAxis.RawAim.ToId()] = EzPPPMath.Finite(rawRating),
+                [EzPPPSkillAxis.JumpAim.ToId()] = EzPPPMath.Finite(jumpRating),
+                [EzPPPSkillAxis.FlowAim.ToId()] = EzPPPMath.Finite(flowRating),
+                [EzPPPSkillAxis.Precision.ToId()] = EzPPPMath.Finite(precision),
+                [EzPPPSkillAxis.Speed.ToId()] = EzPPPMath.Finite(speedRating),
+                [EzPPPSkillAxis.Stamina.ToId()] = EzPPPMath.Finite(staminaRating),
+                [EzPPPSkillAxis.Accuracy.ToId()] = EzPPPMath.Finite(accuracy),
+                [EzPPPSkillAxis.StarRating.ToId()] = EzPPPMath.Finite(star),
                 [EzPPPSkillCatalog.ChartSkillId(EzPPPSkillCatalog.ACCURACY_DIFFICULTY)] = EzPPPMath.Finite(accuracy),
             };
         }

@@ -418,7 +418,7 @@ namespace osu.Game.EzOsuGame.Skills
         public bool TryGetBeatmapMsdSkill(string beatmapHash, string axisId, out double value)
         {
             string skillId = EzMinaSkillAxisExtensions.TryParse(axisId, out var axis)
-                ? axis.ToMsdSkillId()
+                ? axis.ToMetaId()
                 : axisId;
             return ChartStore.TryGetBeatmapSkill(beatmapHash, skillId, out value);
         }

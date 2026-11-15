@@ -36,7 +36,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 if (row.SkillId.StartsWith(EzAnalysisSystem.Pattern + ".", StringComparison.Ordinal))
                     continue;
 
-                // Legacy prefixed ids; current writes use bare axis ids (see ToPlayerSkillId).
+                // Legacy prefixed ids; current writes use bare axis ids (see ToMetaId).
                 if (!row.SkillId.StartsWith(EzAnalysisSystem.SSR + ".", StringComparison.Ordinal)
                     && !row.SkillId.StartsWith("player_ssr.", StringComparison.Ordinal)
                     && !EzMinaSkillAxisExtensions.TryParse(row.SkillId, out _))

@@ -271,8 +271,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 var msdBatch = store.GetBeatmapSkillsForHashes(new[] { hash_a, hash_b, "missing" }, EzAnalysisSystem.Mina);
                 Assert.That(msdBatch.Keys, Is.EquivalentTo(new[] { hash_a, hash_b }));
-                Assert.That(msdBatch[hash_a][EzMinaSkillAxis.Overall.ToMsdSkillId()], Is.EqualTo(10).Within(1e-9));
-                Assert.That(msdBatch[hash_b][EzMinaSkillAxis.Overall.ToMsdSkillId()], Is.EqualTo(11).Within(1e-9));
+                Assert.That(msdBatch[hash_a][EzMinaSkillAxis.Overall.ToMetaId()], Is.EqualTo(10).Within(1e-9));
+                Assert.That(msdBatch[hash_b][EzMinaSkillAxis.Overall.ToMetaId()], Is.EqualTo(11).Within(1e-9));
 
                 var chartBatch = store.GetChartSkillInfoForHashes(new[] { hash_a, hash_b, "missing" });
                 Assert.That(chartBatch.Keys, Is.EquivalentTo(new[] { hash_a }));
@@ -423,7 +423,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 Assert.That(provider.GetBeatmapMsd(dead_hash), Is.Empty,
                     "the settled marker is a verdict, not an axis set: feeding it to the CSI computer is what stamped a row for a chart the engine refused");
-                Assert.That(provider.GetBeatmapMsd(live_hash)[EzMinaSkillAxis.Overall.ToMsdSkillId()], Is.EqualTo(10).Within(1e-9));
+                Assert.That(provider.GetBeatmapMsd(live_hash)[EzMinaSkillAxis.Overall.ToMetaId()], Is.EqualTo(10).Within(1e-9));
             });
         }
 

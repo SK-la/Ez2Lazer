@@ -317,7 +317,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var msd = new Dictionary<string, double>(StringComparer.Ordinal);
 
             foreach (var (axis, value) in vector.Enumerate())
-                msd[axis.ToMsdSkillId()] = value;
+                msd[axis.ToMetaId()] = value;
 
             return msd;
         }

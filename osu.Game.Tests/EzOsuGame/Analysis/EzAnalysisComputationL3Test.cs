@@ -31,7 +31,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
             Assert.That(mina, Is.Not.Empty);
             Assert.That(ppp, Is.Not.Empty);
-            Assert.That(mina[EzMinaSkillAxis.Overall.ToId()], Is.GreaterThan(0));
+            Assert.That(mina[EzMinaSkillAxis.Overall.ToMetaId()], Is.GreaterThan(0));
             Assert.That(result.RatingOf(EzAnalysisSystem.PPP).StarRating, Is.GreaterThan(0));
         }
 

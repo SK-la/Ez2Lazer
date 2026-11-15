@@ -59,7 +59,7 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
 
         public static string ToSkillId(string patternId) => patternId;
 
-        public static string ToSkillId(EzManiaRCAxis axis) => axis.ToSkillId();
+        public static string ToSkillId(EzManiaRCAxis axis) => axis.ToId();
 
         public static bool TryParseSkillId(string? skillId, out string patternId)
         {
@@ -140,7 +140,7 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
                 var meta = axis.Meta();
                 double value = byId.TryGetValue(meta.Id, out var rating) ? rating.Rating : 0;
                 result.Add(new EzSkillModeEntry(
-                    axis.ToSkillId(),
+                    axis.ToId(),
                     meta.DisplayName,
                     value,
                     meta.AccentHex));
@@ -156,23 +156,23 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
         /// </summary>
         public static EzRadarAxisPair ResolveRadarAxisPair(
             EzManiaRCAxis axis,
-            IReadOnlyDictionary<string, double> msd,
-            IReadOnlyDictionary<string, double> ssr,
+            IReadOnlyDictionary<string, double> chartSkillAxis,
+            IReadOnlyDictionary<string, double> playerSkillAxis,
             IReadOnlyList<EzPatternRating> patterns,
             IReadOnlyDictionary<string, double>? rcPatternScores = null,
             IReadOnlyList<string>? chartPatternTags = null)
         {
             if (UsesMinaRadarSource(axis) && ToMinaRadarAxis(axis) is EzMinaSkillAxis mina)
             {
-                double chart = msd.GetValueOrDefault(mina.ToMsdSkillId(), 0);
-                double player = ssr.GetValueOrDefault(mina.ToPlayerSkillId(), 0);
+                double chart = chartSkillAxis.GetValueOrDefault(mina.ToMetaId(), 0);
+                double player = playerSkillAxis.GetValueOrDefault(mina.ToMetaId(), 0);
                 if (player < DISPLAY_MIN)
                     player = 0;
                 return new EzRadarAxisPair(player, chart);
             }
 
             string id = axis.ToId();
-            double overall = msd.GetValueOrDefault(EzMinaSkillAxis.Overall.ToMsdSkillId(), 0);
+            double overall = chartSkillAxis.GetValueOrDefault(EzMinaSkillAxis.Overall.ToMetaId(), 0);
             double playerPattern = 0;
 
             foreach (var rating in patterns)
@@ -242,7 +242,7 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
                         continue;
 
                     patternEntries.Add(new EzSkillModeEntry(
-                        axis.ToSkillId(),
+                        axis.ToId(),
                         meta.DisplayName,
                         value,
                         meta.AccentHex));
@@ -256,13 +256,13 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
 
             foreach (var axis in EzMinaSkillAxisExtensions.RadarAxes)
             {
-                double value = ssrValues.GetValueOrDefault(axis.ToPlayerSkillId(), 0);
+                double value = ssrValues.GetValueOrDefault(axis.ToMetaId(), 0);
                 if (value < DISPLAY_MIN)
                     continue;
 
                 var chip = axis.Chip();
                 entries.Add(new EzSkillModeEntry(
-                    axis.ToPlayerSkillId(),
+                    axis.ToMetaId(),
                     chip.Name,
                     value,
                     chip.AccentHex));
@@ -275,7 +275,7 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
             {
                 var lnMeta = EzManiaRCAxis.Ln.Meta();
                 entries.Add(new EzSkillModeEntry(
-                    EzManiaRCAxis.Ln.ToSkillId(),
+                    EzManiaRCAxis.Ln.ToId(),
                     lnMeta.DisplayName,
                     ln.Rating,
                     lnMeta.AccentHex));

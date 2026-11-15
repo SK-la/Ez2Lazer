@@ -429,7 +429,7 @@ namespace osu.Game.EzOsuGame.HUD
                                          : KeyCount.Value;
 
                                      double overall = result.AxesOf(EzAnalysisSystem.Mina)
-                                                            .GetValueOrDefault(EzMinaSkillAxis.Overall.ToId(), 0);
+                                                            .GetValueOrDefault(EzMinaSkillAxis.Overall.ToMetaId(), 0);
 
                                      applyLive(result.Dan, overall, liveKeys);
                                  });

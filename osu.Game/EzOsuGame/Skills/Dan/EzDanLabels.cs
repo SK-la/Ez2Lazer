@@ -186,7 +186,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// <summary>Look up one axis via its current Mina skill id.</summary>
         private static bool tryGetAxisMsd(IReadOnlyDictionary<string, double> msdSkills, EzMinaSkillAxis axis, out double value)
         {
-            if (msdSkills.TryGetValue(axis.ToMsdSkillId(), out value))
+            if (msdSkills.TryGetValue(axis.ToMetaId(), out value))
                 return true;
 
             value = 0;

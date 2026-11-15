@@ -134,7 +134,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
             var result = new Dictionary<string, double>(StringComparer.Ordinal);
 
             foreach (var (axis, value) in vector.Enumerate())
-                result[axis.ToMsdSkillId()] = value;
+                result[axis.ToMetaId()] = value;
 
             return result;
         }
@@ -150,7 +150,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 
             foreach (var axis in EzMinaSkillAxisExtensions.All)
             {
-                if (!existing.ContainsKey(axis.ToId()))
+                if (!existing.ContainsKey(axis.ToMetaId()))
                     return false;
             }
 

@@ -46,7 +46,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 {
                     [EzAnalysisSystem.Mina] = new Dictionary<string, double>
                     {
-                        [EzMinaSkillAxis.Overall.ToId()] = 20,
+                        [EzMinaSkillAxis.Overall.ToMetaId()] = 20,
                     },
                 });
 

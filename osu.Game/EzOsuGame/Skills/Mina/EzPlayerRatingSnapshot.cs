@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         public DateTimeOffset? ComputedAt { get; init; }
 
         public double Overall =>
-            Values.GetValueOrDefault(EzMinaSkillAxis.Overall.ToPlayerSkillId(), 0);
+            Values.GetValueOrDefault(EzMinaSkillAxis.Overall.ToMetaId(), 0);
 
         /// <summary>Hub-style provisional: stored flag or fewer than qualifying plays.</summary>
         public bool IsEffectivelyProvisional => Provisional || AnalyzedPlays < QUALIFYING_PLAYS;

@@ -130,7 +130,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             {
                 // A chart the tables cannot rate still has a rating axis; keep it so callers can display the
                 // overall value even when no side resolves. Read straight off the axes, not re-derived.
-                if (!msd.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out overallMean) || overallMean <= 0)
+                if (!msd.TryGetValue(EzMinaSkillAxis.Overall.ToMetaId(), out overallMean) || overallMean <= 0)
                     return null;
             }
 

@@ -506,7 +506,7 @@ namespace osu.Game.EzOsuGame.Skills
                         BeatmapId = beatmapId,
                         SystemId = EzAnalysisSystem.Mina.ToStorageId(),
                         RulesetOnlineId = EzLocalProfileConstants.MANIA_RULESET_ID,
-                        SkillId = axis.ToMsdSkillId(),
+                        SkillId = axis.ToMetaId(),
                         Value = value,
                         AlgorithmVersion = version,
                         ComputedAt = at,

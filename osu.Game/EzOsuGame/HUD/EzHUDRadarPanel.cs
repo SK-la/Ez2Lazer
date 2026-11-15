@@ -619,8 +619,8 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 spokes.Add(new SkillSpoke(
                     skillAxisDisplayName(axis),
-                    displayValue(msd.GetValueOrDefault(axis.ToId(), 0)),
-                    displayValue(playerRatingSkills.GetValueOrDefault(axis.ToPlayerSkillId(), 0))));
+                    displayValue(msd.GetValueOrDefault(axis.ToMetaId(), 0)),
+                    displayValue(playerRatingSkills.GetValueOrDefault(axis.ToMetaId(), 0))));
             }
 
             applySkillSpokes(spokes, beatmapOnly);

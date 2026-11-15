@@ -861,7 +861,7 @@ namespace osu.Game.EzOsuGame.Skills
             var values = new Dictionary<string, double>(StringComparer.Ordinal);
 
             foreach (var (axis, value) in vector.Enumerate())
-                values[axis.ToPlayerSkillId()] = value;
+                values[axis.ToMetaId()] = value;
 
             return values;
         }
