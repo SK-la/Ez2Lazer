@@ -1549,18 +1549,25 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             try
             {
-                if (JsonSerializer.Deserialize<Dictionary<string, double>>(json) is { Count: > 0 } byId)
+                using var doc = JsonDocument.Parse(json);
+
+                if (doc.RootElement.ValueKind == JsonValueKind.Object)
                 {
-                    return vectorFromIds(byId);
+                    var byId = doc.RootElement.Deserialize<Dictionary<string, double>>();
+
+                    if (byId is { Count: > 0 })
+                        return vectorFromIds(byId);
                 }
-
-                double[]? values = JsonSerializer.Deserialize<double[]>(json);
-
-                if (values is { Length: >= EzMinaSkillAxisData.RAW_LENGTH })
+                else if (doc.RootElement.ValueKind == JsonValueKind.Array)
                 {
-                    return new EzMinaSkillAxisData(
-                        values[0], values[1], values[2], values[3],
-                        values[4], values[5], values[6], values[7]);
+                    double[]? values = doc.RootElement.Deserialize<double[]>();
+
+                    if (values is { Length: >= EzMinaSkillAxisData.RAW_LENGTH })
+                    {
+                        return new EzMinaSkillAxisData(
+                            values[0], values[1], values[2], values[3],
+                            values[4], values[5], values[6], values[7]);
+                    }
                 }
             }
             catch (Exception ex)
