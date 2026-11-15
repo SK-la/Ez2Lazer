@@ -109,7 +109,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 
             try
             {
-                vector = calc.CalculateMinaSkillAxis(EzMinaNoteConverter.Convert(playable), keyCount, rate: 1f);
+                vector = calc.CalculateChartMinaSkillAxis(EzMinaNoteConverter.Convert(playable), keyCount, rate: 1f);
             }
             catch (Exception e)
             {

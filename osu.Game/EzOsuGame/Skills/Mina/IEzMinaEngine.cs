@@ -6,7 +6,7 @@ using System;
 namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
-    /// Mania MinaCalc engine. <see cref="CalculateMinaSkillAxis"/> is chart baseline (Mina);
+    /// Mania MinaCalc engine. <see cref="CalculateChartMinaSkillAxis"/> is chart baseline (Mina);
     /// <see cref="CalculatePlayerMinaSkillAxis"/> is per-play skill rating at a Wife/accuracy goal (not chart <see cref="EzOsuGame.Analysis.EzAnalysisSystem.SSR"/>).
     /// </summary>
     /// <remarks>
@@ -32,7 +32,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         /// Chart difficulty (Mina) for the given rows. <paramref name="rate"/> applies a music-rate mod.
         /// Returns the zero vector when the keymode is unsupported or there are too few rows to rate.
         /// </summary>
-        EzMinaSkillAxisVector CalculateMinaSkillAxis(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate = 1f);
+        EzMinaSkillAxisVector CalculateChartMinaSkillAxis(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate = 1f);
 
         /// <summary>
         /// Per-play Mina skill rating vector for the given rows at a Wife/accuracy goal.

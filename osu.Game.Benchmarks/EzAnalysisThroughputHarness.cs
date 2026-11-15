@@ -240,7 +240,7 @@ namespace osu.Game.Benchmarks
             var chart = EzCSIEngine.FromPlayable(playable);
 
             if (EzMinaEngine.IsSupportedKeyCount(keys))
-                GC.KeepAlive(EzMinaEnginePool.Rent().CalculateMinaSkillAxis(EzMinaNoteConverter.Convert(chart.Notes), keys, 1f));
+                GC.KeepAlive(EzMinaEnginePool.Rent().CalculateChartMinaSkillAxis(EzMinaNoteConverter.Convert(chart.Notes), keys, 1f));
 
             GC.KeepAlive(EzCSIEngine.ComputeAxes(chart, out _));
         }

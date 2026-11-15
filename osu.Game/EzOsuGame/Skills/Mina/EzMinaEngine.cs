@@ -97,7 +97,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 
         private bool disposed;
 
-        public EzMinaSkillAxisVector CalculateMinaSkillAxis(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate = 1f)
+        public EzMinaSkillAxisVector CalculateChartMinaSkillAxis(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate = 1f)
             => calculate(notes, keyCount, rate, MSD_GOAL);
 
         public EzMinaSkillAxisVector CalculatePlayerMinaSkillAxis(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate, float goal)

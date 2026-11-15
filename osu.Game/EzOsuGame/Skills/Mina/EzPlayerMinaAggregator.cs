@@ -221,7 +221,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 
                 var keymodeVectors = timed.Select(t => t.Vector).ToList();
                 var aggregated = EzMinaRatingAggregator.AggregateVectors(keymodeVectors);
-                bool provisional = keymodeVectors.Count < EzPlayerRatingSnapshot.QUALIFYING_PLAYS;
+                bool provisional = keymodeVectors.Count < EzPlayerMinaSkillAxis.QUALIFYING_PLAYS;
 
                 IReadOnlyList<PatternPlay> patternPlays = patternPlaysByKey.TryGetValue(keyCount, out var pp)
                     ? pp

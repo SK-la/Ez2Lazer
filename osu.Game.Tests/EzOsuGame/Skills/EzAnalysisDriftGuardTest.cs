@@ -115,7 +115,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
         private static IReadOnlyDictionary<string, double> computeMsd(EzManiaChartInput chart, int keyCount)
         {
-            var vector = EzMinaEnginePool.Rent().CalculateMinaSkillAxis(EzMinaNoteConverter.Convert(chart.Notes), keyCount, 1f);
+            var vector = EzMinaEnginePool.Rent().CalculateChartMinaSkillAxis(EzMinaNoteConverter.Convert(chart.Notes), keyCount, 1f);
             var msd = new Dictionary<string, double>(StringComparer.Ordinal);
 
             foreach (var (axis, value) in vector.Enumerate())

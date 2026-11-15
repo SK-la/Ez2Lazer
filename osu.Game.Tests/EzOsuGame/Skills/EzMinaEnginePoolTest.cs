@@ -43,8 +43,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 new EzCalcNote(0b1000, 0.3f),
             };
 
-            var first = EzMinaEnginePool.Rent().CalculateMinaSkillAxis(notes, 4);
-            var second = EzMinaEnginePool.Rent().CalculateMinaSkillAxis(notes, 4);
+            var first = EzMinaEnginePool.Rent().CalculateChartMinaSkillAxis(notes, 4);
+            var second = EzMinaEnginePool.Rent().CalculateChartMinaSkillAxis(notes, 4);
 
             Assert.That(first.Overall, Is.GreaterThan(0));
             Assert.That(second.Overall, Is.EqualTo(first.Overall).Within(1e-9));

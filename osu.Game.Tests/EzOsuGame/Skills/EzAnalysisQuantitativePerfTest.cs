@@ -90,7 +90,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             // Pin the interpreter/wasm module before the first timed run.
             var rows = EzMinaNoteConverter.Convert(notes);
             using (var engine = new EzMinaEngine())
-                engine.CalculateMinaSkillAxis(rows, keyCount, 1f);
+                engine.CalculateChartMinaSkillAxis(rows, keyCount, 1f);
 
             var features = EzPerfMeasurer.Measure("features", runs, () => EzChartFeatureExtractor.Extract(chart));
             var patterns = EzPerfMeasurer.Measure("patterns", runs, () => EzPatternAnalyzer.Analyze(chart));
@@ -108,7 +108,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 () =>
                 {
                     using (var engine = new EzMinaEngine())
-                        engine.CalculateMinaSkillAxis(rows, keyCount, 1f);
+                        engine.CalculateChartMinaSkillAxis(rows, keyCount, 1f);
                 });
 
             TestContext.Progress.WriteLine($"{keyCount}K holdRatio={holdRatio:P0} rows={notes.Count}");
@@ -313,7 +313,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         /// <summary>The Mina vector in the msd skill-id space the dan tables read.</summary>
         private static IReadOnlyDictionary<string, double> computeMsd(EzManiaChartInput chart, int keyCount)
         {
-            var vector = EzMinaEnginePool.Rent().CalculateMinaSkillAxis(EzMinaNoteConverter.Convert(chart.Notes), keyCount, 1f);
+            var vector = EzMinaEnginePool.Rent().CalculateChartMinaSkillAxis(EzMinaNoteConverter.Convert(chart.Notes), keyCount, 1f);
             var msd = new Dictionary<string, double>(StringComparer.Ordinal);
 
             foreach (var (axis, value) in vector.Enumerate())
