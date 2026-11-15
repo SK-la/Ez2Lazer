@@ -38,7 +38,7 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
   - `EzMinaRatingScale` — the engine's headline to star conversion, applied once when the Mina star is written and
     again only for the live axis. `beatmap_msd.*` keeps the engine's own scale for the radar and the dan chain.
 - Player SSR aggregation:
-  - `EzPlayerSsrAggregator`
+  - `EzPlayerMinaAggregator`
   - `EzDanPlaySsrIndex`
 - Pattern / motion / jack / LN helpers:
   - `EzManiaPatternAnalyzer`
@@ -262,7 +262,7 @@ CSI 行（那种行由 BDSP 的修复集改写为 stub）。否则"全部最新"
 - `EzChartSkillInfoComputer`: chart metadata, pattern tags, motion, LeoBlack cluster fallback.
 - `EzChartDanEstimator`: chart dan calculation and live snapshot flow.
 - `EzDanSkillsetFiling`: skillset bucketing and quorum logic.
-- `EzPlayerSsrAggregator` / `EzPlayerDanAggregator`: player-side folds. Both take `EzSkillPlayRow` sets plus a
+- `EzPlayerMinaAggregator` / `EzPlayerDanAggregator`: player-side folds. Both take `EzSkillPlayRow` sets plus a
   resolver rather than scores, so a cached play folds straight from its cache row (no mods re-parse, no beatmap) and
   only the plays no cache answers are detached — in bounded windows, never a whole library.
 - `EzLocalProfileService` (`LocalProfile/`): the SQLite slice + Realm skill writer; `IngestSettledScore`

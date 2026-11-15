@@ -214,7 +214,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             {
                 var store = new EzPlayerSkillStore(storage);
 
-                store.WritePlayerSsr("alpha", 4, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
+                store.WritePlayerRatingSkills("alpha", 4, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
 
                 // No ledger rows behind the slice: the rows cannot be behind anything, so nothing reports stale.
                 Assert.That(store.GetStalePlayerSkillUsernames(), Is.Empty);
@@ -223,7 +223,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(store.SetPlayerSkillStale("alpha", true), Is.Zero);
                 Assert.That(store.GetStalePlayerSkillUsernames(), Is.Empty);
 
-                var snapshot = store.GetPlayerSsrSnapshot("alpha", 4);
+                var snapshot = store.GetPlayerRatingSnapshot("alpha", 4);
                 Assert.That(snapshot.Stale, Is.False);
                 Assert.That(snapshot.Values, Is.Not.Empty);
                 Assert.That(snapshot.Values.Values.Max(), Is.EqualTo(10).Within(1e-9));
@@ -242,8 +242,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             {
                 var store = new EzPlayerSkillStore(storage);
 
-                store.WritePlayerSsr("alpha", 4, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
-                store.WritePlayerSsr("beta", 4, new EzMinaSkillAxisVector(11, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
+                store.WritePlayerRatingSkills("alpha", 4, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
+                store.WritePlayerRatingSkills("beta", 4, new EzMinaSkillAxisVector(11, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
 
                 // Staleness is derived from the ledger, so a slice nobody has played since its write is current.
                 Assert.That(store.GetStalePlayerSkillDetails(), Is.Empty);

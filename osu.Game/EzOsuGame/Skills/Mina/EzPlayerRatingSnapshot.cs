@@ -7,7 +7,7 @@ using System.Collections.Generic;
 namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
-    /// Detached SunnySR snapshot for one username + keymode (values + row metadata).
+    /// Detached player Mina rating snapshot for one username + keymode (values + row metadata; not chart SSR).
     /// </summary>
     public sealed class EzPlayerRatingSnapshot
     {
@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         public DateTimeOffset? ComputedAt { get; init; }
 
         public double Overall =>
-            Values.GetValueOrDefault(EzMinaSkillAxis.Overall.ToSsrSkillId(), 0);
+            Values.GetValueOrDefault(EzMinaSkillAxis.Overall.ToPlayerSkillId(), 0);
 
         /// <summary>Hub-style provisional: stored flag or fewer than qualifying plays.</summary>
         public bool IsEffectivelyProvisional => Provisional || AnalyzedPlays < QUALIFYING_PLAYS;

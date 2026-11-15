@@ -361,7 +361,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                 {
                     Username = username,
                     KeyCount = keyCount,
-                    SkillId = axis.ToSsrSkillId(),
+                    SkillId = axis.ToPlayerSkillId(),
                     BeatmapHash = play.BeatmapHash,
                     AxisValue = axisValue,
                     Accuracy = play.Accuracy,

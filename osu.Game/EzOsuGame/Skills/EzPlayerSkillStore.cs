@@ -100,7 +100,11 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
-        public EzPlayerRatingSnapshot GetPlayerSsrSnapshot(string username, int keyCount, int? algorithmVersion = null)
+        /// <summary>
+        /// Aggregated player Mina rating skills (MinaCalc rating axes). Stored under <see cref="EzAnalysisSystem.Mina"/>,
+        /// not chart <see cref="EzAnalysisSystem.SSR"/> (Sunny).
+        /// </summary>
+        public EzPlayerRatingSnapshot GetPlayerRatingSnapshot(string username, int keyCount, int? algorithmVersion = null)
         {
             int version = algorithmVersion ?? EzMinaEngine.VERSION;
 
@@ -155,7 +159,8 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
-        public IReadOnlyList<int> GetPlayerSsrKeyCounts(string username, int? algorithmVersion = null)
+        /// <inheritdoc cref="GetPlayerRatingSnapshot"/>
+        public IReadOnlyList<int> GetPlayerRatingKeyCounts(string username, int? algorithmVersion = null)
         {
             int version = algorithmVersion ?? EzMinaEngine.VERSION;
 
@@ -204,7 +209,10 @@ namespace osu.Game.EzOsuGame.Skills
                 toRows(skills, analyzedPlays, provisional, version, at), version));
         }
 
-        public void WritePlayerSsr(
+        /// <summary>
+        /// Writes player Mina rating skill rows only (see <see cref="GetPlayerRatingSnapshot"/>).
+        /// </summary>
+        public void WritePlayerRatingSkills(
             string username,
             int keyCount,
             EzMinaSkillAxisVector vector,
@@ -219,20 +227,20 @@ namespace osu.Game.EzOsuGame.Skills
             database.Write((c, tx) =>
             {
                 replaceValues(c, tx, username, keyCount, EzAnalysisSystem.Mina.ToStorageId(), EzLocalProfileConstants.MANIA_RULESET_ID,
-                    toRows(ssrValues(vector), analyzedPlays, provisional, version, at), version);
+                    toRows(playerMinaSkillRowValues(vector), analyzedPlays, provisional, version, at), version);
 
                 if (appendHistory)
-                    insertHistory(c, tx, username, keyCount, ssrValues(vector), at, version);
+                    insertHistory(c, tx, username, keyCount, playerMinaSkillRowValues(vector), at, version);
             });
         }
 
         /// <summary>
-        /// Write one player × keymode's SunnySR values, history samples and pattern ratings in a single transaction.
+        /// Write one player × keymode's Mina rating skills, history samples and pattern ratings in a single transaction.
         /// </summary>
         public void WritePlayerSkillBundle(
             string username,
             int keyCount,
-            EzMinaSkillAxisVector ssr,
+            EzMinaSkillAxisVector minaRating,
             int analyzedPlays,
             bool provisional,
             IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisVector Vector)> historySamples,
@@ -248,7 +256,7 @@ namespace osu.Game.EzOsuGame.Skills
             database.Write((c, tx) =>
             {
                 replaceValues(c, tx, username, keyCount, EzAnalysisSystem.Mina.ToStorageId(), EzLocalProfileConstants.MANIA_RULESET_ID,
-                    toRows(ssrValues(ssr), analyzedPlays, provisional, version, at), version);
+                    toRows(playerMinaSkillRowValues(minaRating), analyzedPlays, provisional, version, at), version);
 
                 replaceHistory(c, tx, username, keyCount, historySamples, version);
 
@@ -796,7 +804,7 @@ namespace osu.Game.EzOsuGame.Skills
                 });
 
             foreach (var (recordedAt, vector) in samples)
-                insertHistory(connection, transaction, username, keyCount, ssrValues(vector), recordedAt, version);
+                insertHistory(connection, transaction, username, keyCount, playerMinaSkillRowValues(vector), recordedAt, version);
         }
 
         private static void writeDanEstimate(SqliteConnection connection, SqliteTransaction transaction, EzPlayerDanEstimateRow estimate)
@@ -848,12 +856,12 @@ namespace osu.Game.EzOsuGame.Skills
             return rows;
         }
 
-        private static IReadOnlyDictionary<string, double> ssrValues(EzMinaSkillAxisVector vector)
+        private static IReadOnlyDictionary<string, double> playerMinaSkillRowValues(EzMinaSkillAxisVector vector)
         {
             var values = new Dictionary<string, double>(StringComparer.Ordinal);
 
             foreach (var (axis, value) in vector.Enumerate())
-                values[axis.ToSsrSkillId()] = value;
+                values[axis.ToPlayerSkillId()] = value;
 
             return values;
         }

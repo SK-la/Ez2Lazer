@@ -14,7 +14,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
     public class EzDanPlayRatingIndexTest
     {
         [Test]
-        public void RebuildsPlayValuesFromPlayerSsrAxisEvidence()
+        public void RebuildsPlayValuesFromLegacyPrefixedAxisEvidence()
         {
             var scoredAt = DateTimeOffset.UnixEpoch.AddHours(1);
             var rows = new List<EzAxisPlayEvidenceRow>

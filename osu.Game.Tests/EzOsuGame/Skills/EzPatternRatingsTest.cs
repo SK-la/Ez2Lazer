@@ -38,9 +38,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var ssr = new Dictionary<string, double>(StringComparer.Ordinal)
             {
-                [EzMinaSkillAxis.Overall.ToSsrSkillId()] = 30,
-                [EzMinaSkillAxis.Technical.ToSsrSkillId()] = 0.15,
-                [EzMinaSkillAxis.Stream.ToSsrSkillId()] = 20,
+                [EzMinaSkillAxis.Overall.ToPlayerSkillId()] = 30,
+                [EzMinaSkillAxis.Technical.ToPlayerSkillId()] = 0.15,
+                [EzMinaSkillAxis.Stream.ToPlayerSkillId()] = 20,
             };
 
             var patterns = new[]
@@ -63,13 +63,13 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var ssr = new Dictionary<string, double>(StringComparer.Ordinal)
             {
-                [EzMinaSkillAxis.Stream.ToSsrSkillId()] = 20,
-                [EzMinaSkillAxis.Technical.ToSsrSkillId()] = 0.2,
+                [EzMinaSkillAxis.Stream.ToPlayerSkillId()] = 20,
+                [EzMinaSkillAxis.Technical.ToPlayerSkillId()] = 0.2,
             };
 
             var entries = EzPatternRatings.SkillModeEntries(4, ssr, Array.Empty<EzPatternRating>());
 
-            Assert.That(entries.Any(e => e.SkillId == EzMinaSkillAxis.Stream.ToSsrSkillId()));
+            Assert.That(entries.Any(e => e.SkillId == EzMinaSkillAxis.Stream.ToPlayerSkillId()));
             Assert.That(entries.All(e => e.Value >= EzPatternRatings.DISPLAY_MIN));
         }
     }

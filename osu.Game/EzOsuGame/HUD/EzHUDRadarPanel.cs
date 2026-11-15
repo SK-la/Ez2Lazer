@@ -607,10 +607,10 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             string? username = TargetUsername.Value;
-            IReadOnlyDictionary<string, double> ssr = no_skill_values;
+            IReadOnlyDictionary<string, double> playerRatingSkills = no_skill_values;
 
             if (!string.IsNullOrWhiteSpace(username) && keyCount > 0 && skillProvider != null)
-                ssr = skillProvider.GetPlayerSsrSnapshot(username, keyCount).Values;
+                playerRatingSkills = skillProvider.GetPlayerRatingSnapshot(username, keyCount).Values;
 
             bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.MSDSkillChart;
             var spokes = new List<SkillSpoke>(skill_radar_axes.Length);
@@ -620,7 +620,7 @@ namespace osu.Game.EzOsuGame.HUD
                 spokes.Add(new SkillSpoke(
                     skillAxisDisplayName(axis),
                     displayValue(msd.GetValueOrDefault(axis.ToId(), 0)),
-                    displayValue(ssr.GetValueOrDefault(axis.ToSsrSkillId(), 0))));
+                    displayValue(playerRatingSkills.GetValueOrDefault(axis.ToPlayerSkillId(), 0))));
             }
 
             applySkillSpokes(spokes, beatmapOnly);

@@ -472,7 +472,7 @@ namespace osu.Game.EzOsuGame.HUD
 
             if (wantPlayer && hasUser && skillProvider != null)
             {
-                double overall = skillProvider.GetPlayerSsrSnapshot(user!, keys).Overall;
+                double overall = skillProvider.GetPlayerRatingSnapshot(user!, keys).Overall;
                 if (overall > 0 && double.IsFinite(overall))
                     playerOverall = overall;
             }

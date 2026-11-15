@@ -12,9 +12,9 @@ namespace osu.Game.EzOsuGame.Skills.Dan
     /// <summary>
     ///     Pure port of mania-hub <c>player-skills.ts</c> dan skillset filing
     ///     (<c>bucketingSkillset</c> / <c>bucketsForClear</c> / <c>groupDanClearsBySkillset</c> primary quorum).
-    ///     4K filing uses hub <c>play.values</c> (per-clear Mina SunnySR); keys are Mina names
-    ///     (<c>Stream</c>, <c>JackSpeed</c>, …). <see cref="NormalizeMsdValues"/> also accepts
-    ///     <c>player_ssr.*</c> and legacy <c>beatmap_msd.*</c> ids.
+    ///     4K filing uses hub <c>play.values</c> (per-clear Mina rating axes); keys are bare axis ids
+    ///     (<c>stream</c>, <c>jack</c>, …). <see cref="NormalizeMsdValues"/> also accepts legacy
+    ///     <c>ssr.*</c> / <c>player_ssr.*</c> prefixes and <c>beatmap_msd.*</c> ids.
     /// </summary>
     public static class EzDanSkillsetFiling
     {

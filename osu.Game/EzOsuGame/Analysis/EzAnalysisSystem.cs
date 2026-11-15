@@ -23,8 +23,8 @@ namespace osu.Game.EzOsuGame.Analysis
     /// system and the scope that covers it are the same vocabulary.
     /// <para>
     /// A system may have any subset of a chart vector, a player vector and a scalar rating; which subset it has
-    /// follows from what it computes, not from a declaration. Mina owns both of its vectors; SSR owns one chart
-    /// star and nothing else.
+    /// follows from what it computes, not from a declaration. Mina owns chart MSD and player rating aggregates
+    /// (product “Sunny skills”, stored as <c>system_id = mina</c>). SSR owns chart Sunny star (<c>SunnySR</c>) only.
     /// </para>
     /// </remarks>
     [Flags]

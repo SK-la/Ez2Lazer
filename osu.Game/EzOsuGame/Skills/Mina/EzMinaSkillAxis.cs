@@ -53,7 +53,11 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 
         public static string ToMsdSkillId(this EzMinaSkillAxis axis) => axis.ToId();
 
-        public static string ToSsrSkillId(this EzMinaSkillAxis axis) => axis.ToId();
+        /// <summary>
+        /// Skill id on player rows (<c>system_id = mina</c>). Same bare id as <see cref="ToMsdSkillId"/>; not
+        /// <see cref="EzOsuGame.Analysis.EzAnalysisSystem.SSR"/> chart Sunny.
+        /// </summary>
+        public static string ToPlayerSkillId(this EzMinaSkillAxis axis) => axis.ToId();
 
         public static EzSkillChip Chip(this EzMinaSkillAxis axis) => axis.Meta().Chip;
 

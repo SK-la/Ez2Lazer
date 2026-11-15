@@ -169,7 +169,7 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
             if (UsesMinaRadarSource(axis) && ToMinaRadarAxis(axis) is EzMinaSkillAxis mina)
             {
                 double chart = msd.GetValueOrDefault(mina.ToMsdSkillId(), 0);
-                double player = ssr.GetValueOrDefault(mina.ToSsrSkillId(), 0);
+                double player = ssr.GetValueOrDefault(mina.ToPlayerSkillId(), 0);
                 if (player < DISPLAY_MIN)
                     player = 0;
                 return new EzRadarAxisPair(player, chart);
@@ -260,13 +260,13 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
 
             foreach (var axis in EzMinaSkillAxisExtensions.RadarAxes)
             {
-                double value = ssrValues.GetValueOrDefault(axis.ToSsrSkillId(), 0);
+                double value = ssrValues.GetValueOrDefault(axis.ToPlayerSkillId(), 0);
                 if (value < DISPLAY_MIN)
                     continue;
 
                 var chip = axis.Chip();
                 entries.Add(new EzSkillModeEntry(
-                    axis.ToSsrSkillId(),
+                    axis.ToPlayerSkillId(),
                     chip.Name,
                     value,
                     chip.AccentHex));

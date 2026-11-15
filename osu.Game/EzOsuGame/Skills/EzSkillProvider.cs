@@ -65,12 +65,12 @@ namespace osu.Game.EzOsuGame.Skills
             = new ConcurrentDictionary<string, EzPersistedChartDan>(StringComparer.Ordinal);
 
         /// <summary>
-        /// Short-lived player SunnySR memo (see <see cref="GetPlayerSsrSnapshot"/>). Keyed by (username, keyCount).
+        /// Short-lived player Sunny skill memo (see <see cref="GetPlayerRatingSnapshot"/>). Keyed by (username, keyCount).
         /// </summary>
-        private readonly ConcurrentDictionary<(string Username, int KeyCount), SsrSnapshotMemo> ssrSnapshotMemo
-            = new ConcurrentDictionary<(string Username, int KeyCount), SsrSnapshotMemo>();
+        private readonly ConcurrentDictionary<(string Username, int KeyCount), PlayerRatingMemo> playerRatingSnapshotMemo
+            = new ConcurrentDictionary<(string Username, int KeyCount), PlayerRatingMemo>();
 
-        private readonly record struct SsrSnapshotMemo(EzPlayerRatingSnapshot Snapshot, long Timestamp);
+        private readonly record struct PlayerRatingMemo(EzPlayerRatingSnapshot Snapshot, long Timestamp);
 
         /// <summary>Short-lived dan label/rating memo (see <see cref="GetDanDisplay"/>); plain values only.</summary>
         private readonly ConcurrentDictionary<(string Username, int KeyCount, string Side), DanDisplayMemo> danDisplayMemo
@@ -423,42 +423,43 @@ namespace osu.Game.EzOsuGame.Skills
             return ChartStore.TryGetBeatmapSkill(beatmapHash, skillId, out value);
         }
 
-        public IReadOnlyDictionary<string, double> GetPlayerSsr(string username, int keyCount) => GetPlayerSsrSnapshot(username, keyCount).Values;
+        public IReadOnlyDictionary<string, double> GetPlayerSunnySkills(string username, int keyCount)
+            => GetPlayerRatingSnapshot(username, keyCount).Values;
 
         /// <summary>
-        /// Player SunnySR snapshot with a short-lived memo. Song select re-reads this several times per switch
+        /// Player Sunny skills (Mina system rows) with a short-lived memo. Song select re-reads this several times per switch
         /// (once per bindable-driven DualPanel/radar refresh); the TTL collapses those into one Realm read.
         /// Mirrors the other session caches here — a fresh compute becomes visible within the TTL at worst.
         /// </summary>
-        public EzPlayerRatingSnapshot GetPlayerSsrSnapshot(string username, int keyCount)
+        public EzPlayerRatingSnapshot GetPlayerRatingSnapshot(string username, int keyCount)
         {
             var key = (username, keyCount);
 
-            if (ssrSnapshotMemo.TryGetValue(key, out var memo))
+            if (playerRatingSnapshotMemo.TryGetValue(key, out var memo))
             {
                 if (Stopwatch.GetElapsedTime(memo.Timestamp).TotalSeconds < display_memo_seconds)
                     return memo.Snapshot;
 
                 // An expired entry is dropped rather than overwritten in place: nothing else ever revisits it.
-                ssrSnapshotMemo.TryRemove(key, out _);
+                playerRatingSnapshotMemo.TryRemove(key, out _);
             }
 
-            var snapshot = loadPlayerSsrSnapshot(username, keyCount);
-            storeBounded(ssrSnapshotMemo, key, new SsrSnapshotMemo(snapshot, Stopwatch.GetTimestamp()));
+            var snapshot = loadPlayerRatingSnapshot(username, keyCount);
+            storeBounded(playerRatingSnapshotMemo, key, new PlayerRatingMemo(snapshot, Stopwatch.GetTimestamp()));
             return snapshot;
         }
 
-        private EzPlayerRatingSnapshot loadPlayerSsrSnapshot(string username, int keyCount)
+        private EzPlayerRatingSnapshot loadPlayerRatingSnapshot(string username, int keyCount)
         {
-            var snapshot = PlayerStore.GetPlayerSsrSnapshot(username, keyCount);
+            var snapshot = PlayerStore.GetPlayerRatingSnapshot(username, keyCount);
             if (snapshot.Values.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
                 return snapshot;
 
-            return PlayerStore.GetPlayerSsrSnapshot(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount);
+            return PlayerStore.GetPlayerRatingSnapshot(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount);
         }
 
-        /// <summary>Drop the SunnySR snapshot memo (after a recompute / write).</summary>
-        public void InvalidatePlayerSsrSnapshot() => ssrSnapshotMemo.Clear();
+        /// <summary>Drop the player Sunny skill snapshot memo (after a recompute / write).</summary>
+        public void InvalidatePlayerRatingSnapshot() => playerRatingSnapshotMemo.Clear();
 
         /// <summary>
         /// Maintenance of the player-side skill rows (SunnySR / pattern / history / Dan) - the writes and identity reads the
@@ -497,7 +498,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                 int changed = provider.PlayerStore.SetPlayerSkillStale(username, stale);
 
-                provider.InvalidatePlayerSsrSnapshot();
+                provider.InvalidatePlayerRatingSnapshot();
 
                 return changed;
             }
@@ -515,7 +516,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                 int removed = provider.PlayerStore.DeletePlayerSkillData(username);
 
-                provider.InvalidatePlayerSsrSnapshot();
+                provider.InvalidatePlayerRatingSnapshot();
                 provider.InvalidateDanDisplay();
 
                 return removed;
@@ -534,18 +535,18 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Hub <c>skillModeEntries</c> for LocalProfile Track / Skills HUD.</summary>
         public IReadOnlyList<EzSkillModeEntry> GetSkillModeEntries(string username, int keyCount)
         {
-            var snapshot = GetPlayerSsrSnapshot(username, keyCount);
+            var snapshot = GetPlayerRatingSnapshot(username, keyCount);
             var patterns = GetPlayerPatternRatings(username, keyCount);
             return EzPatternRatings.SkillModeEntries(keyCount, snapshot.Values, patterns);
         }
 
-        public IReadOnlyList<int> GetPlayerSsrKeyCounts(string username)
+        public IReadOnlyList<int> GetPlayerRatingKeyCounts(string username)
         {
-            var keys = PlayerStore.GetPlayerSsrKeyCounts(username);
+            var keys = PlayerStore.GetPlayerRatingKeyCounts(username);
             if (keys.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
                 return keys;
 
-            return PlayerStore.GetPlayerSsrKeyCounts(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME);
+            return PlayerStore.GetPlayerRatingKeyCounts(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME);
         }
 
         /// <summary>

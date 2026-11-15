@@ -205,7 +205,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 Technical: 20.0);
 
             skillStore.WriteBeatmapMsd(hash, chartMsd, beatmap.BeatmapInfo.ID);
-            playerStore.WritePlayerSsr(test_player, test_keys, playerSsr, analyzedPlays: 40, provisional: false);
+            playerStore.WritePlayerRatingSkills(test_player, test_keys, playerSsr, analyzedPlays: 40, provisional: false);
 
             writeDan(test_player, EzDanSide.Rc, chartMsd.Overall, clears: 12);
             writeDan(test_player, EzDanSide.Ln, chartMsd.Overall * 0.92, clears: 5);

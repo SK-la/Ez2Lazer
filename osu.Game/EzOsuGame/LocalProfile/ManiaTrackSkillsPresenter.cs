@@ -32,14 +32,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public bool HasSidePanel => true;
 
         public IReadOnlyList<int> GetSliceKeys(string username)
-            => provider.GetPlayerSsrKeyCounts(username);
+            => provider.GetPlayerRatingKeyCounts(username);
 
         public EzTrackSkillsSnapshot Load(string username, int sliceKey)
         {
             if (sliceKey <= 0)
                 return EzTrackSkillsSnapshot.Empty;
 
-            var ssr = provider.GetPlayerSsrSnapshot(username, sliceKey);
+            var playerRating = provider.GetPlayerRatingSnapshot(username, sliceKey);
             var modeEntries = provider.GetSkillModeEntries(username, sliceKey);
 
             var radar = modeEntries
@@ -48,13 +48,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             var bars = new List<EzTrackSkillsAxis>(radar.Count + 1);
 
-            if (ssr.Overall >= EzPatternRatings.DISPLAY_MIN)
+            if (playerRating.Overall >= EzPatternRatings.DISPLAY_MIN)
             {
                 var overallMeta = EzMinaSkillAxis.Overall.Meta();
                 bars.Add(new EzTrackSkillsAxis(
-                    EzMinaSkillAxis.Overall.ToSsrSkillId(),
+                    EzMinaSkillAxis.Overall.ToPlayerSkillId(),
                     overallMeta.DisplayName,
-                    ssr.Overall,
+                    playerRating.Overall,
                     overallMeta.AccentHex));
             }
 
@@ -63,10 +63,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return new EzTrackSkillsSnapshot
             {
                 HeaderTitle = EzSettingsProfile.LOCAL_PROFILE_SKILL_RATING.Format(sliceKey),
-                Overall = ssr.Overall,
-                PlaysAnalyzed = ssr.AnalyzedPlays,
-                Provisional = ssr.Provisional,
-                Stale = ssr.Stale,
+                Overall = playerRating.Overall,
+                PlaysAnalyzed = playerRating.AnalyzedPlays,
+                Provisional = playerRating.Provisional,
+                Stale = playerRating.Stale,
                 RadarAxes = radar,
                 BarAxes = bars,
             };

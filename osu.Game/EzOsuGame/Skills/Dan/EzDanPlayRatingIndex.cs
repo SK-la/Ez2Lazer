@@ -9,7 +9,7 @@ using osu.Game.EzOsuGame.Skills.Mina;
 namespace osu.Game.EzOsuGame.Skills.Dan
 {
     /// <summary>
-    /// Hub <c>play.values</c> lookup for dan skillset filing: rebuild Mina SunnySR vectors from
+    /// Hub <c>play.values</c> lookup for dan skillset filing: rebuild Mina per-play rating vectors from
     /// <see cref="EzAxisPlayEvidenceRow"/> (written by <see cref="EzPlayerMinaAggregator"/>).
     /// </summary>
     public sealed class EzDanPlayRatingIndex
@@ -36,7 +36,9 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 if (row.SkillId.StartsWith(EzAnalysisSystem.Pattern + ".", StringComparison.Ordinal))
                     continue;
 
+                // Legacy prefixed ids; current writes use bare axis ids (see ToPlayerSkillId).
                 if (!row.SkillId.StartsWith(EzAnalysisSystem.SSR + ".", StringComparison.Ordinal)
+                    && !row.SkillId.StartsWith("player_ssr.", StringComparison.Ordinal)
                     && !EzMinaSkillAxisExtensions.TryParse(row.SkillId, out _))
                     continue;
 
