@@ -29,6 +29,29 @@ namespace osu.Game.EzOsuGame.Layout
 
         public EzConfigLayoutStore Store => layoutStore;
 
+        public EzConfigLayoutStore ClientStore => clientStore;
+
+        public bool HasUnflushedLayoutChanges =>
+            layoutStore.HasUnflushedChanges() || (IsLoaded && clientStore.HasUnflushedChanges());
+
+        public bool FlushPendingLayouts()
+        {
+            bool written = layoutStore.FlushPending();
+
+            if (IsLoaded)
+                written |= clientStore.FlushPending();
+
+            return written;
+        }
+
+        public void DiscardPendingLayouts()
+        {
+            layoutStore.DiscardPending();
+
+            if (IsLoaded)
+                clientStore.DiscardPending();
+        }
+
         public EzLayoutContainer? SongSelectContainer { get; private set; }
 
         public EzLayoutContainer? ResultsContainer { get; private set; }

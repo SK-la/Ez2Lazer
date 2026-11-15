@@ -61,6 +61,7 @@ namespace osu.Game.EzOsuGame.Layout
         /// </summary>
         public static void ImportLayerJson(Storage gameStorage, EzConfigLayoutStore store, string layoutFile, string sourceFile)
         {
+            store.DiscardPending(layoutFile);
             var destination = layoutDirectory(gameStorage, store);
 
             using (var input = File.OpenRead(sourceFile))

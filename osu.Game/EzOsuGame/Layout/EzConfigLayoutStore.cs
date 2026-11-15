@@ -36,6 +36,7 @@ namespace osu.Game.EzOsuGame.Layout
         private readonly Storage gameStorage;
         private readonly bool clientRoot;
         private readonly Lock playfieldSaveLock = new Lock();
+        private readonly Dictionary<string, SkinLayoutInfo> pendingLayouts = new Dictionary<string, SkinLayoutInfo>();
         private Storage storage = null!;
         private int lastPlayfieldSave;
         private bool suppressPlayfieldSave;
@@ -91,6 +92,7 @@ namespace osu.Game.EzOsuGame.Layout
                 return;
 
             LayoutSetName = layoutSetName;
+            DiscardPending();
             bind(layoutSetName);
             reloadPlayfield();
             SetChanged?.Invoke();
@@ -98,6 +100,9 @@ namespace osu.Game.EzOsuGame.Layout
 
         public SkinLayoutInfo Load(string layoutFile)
         {
+            if (pendingLayouts.TryGetValue(layoutFile, out var pending))
+                return cloneLayout(pending);
+
             string? json = readText(layoutFile);
 
             if (string.IsNullOrEmpty(json))
@@ -116,18 +121,84 @@ namespace osu.Game.EzOsuGame.Layout
             }
         }
 
-        public void Save(EzLayoutContainer container)
+        /// <summary>
+        /// Keeps the live container in the session cache. Does not write JSON until <see cref="FlushPending"/>.
+        /// </summary>
+        public void Capture(EzLayoutContainer container) =>
+            Capture(container.LayoutFile, container.Ruleset, ((ISerialisableDrawableContainer)container).CreateSerialisedInfo().ToArray());
+
+        public void Capture(string layoutFile, RulesetInfo? ruleset, SerialisedDrawableInfo[] components)
         {
-            var layout = Load(container.LayoutFile);
-            layout.Update(container.Ruleset, ((ISerialisableDrawableContainer)container).CreateSerialisedInfo().ToArray());
-            Save(container.LayoutFile, layout);
+            var layout = Load(layoutFile);
+            layout.Update(ruleset, components);
+            pendingLayouts[layoutFile] = layout;
         }
 
-        public void Save(string layoutFile, SkinLayoutInfo layout) =>
+        /// <summary>
+        /// Whether any captured layout serialises differently from the on-disk JSON.
+        /// </summary>
+        public bool HasUnflushedChanges()
+        {
+            foreach ((string file, SkinLayoutInfo layout) in pendingLayouts)
+            {
+                string json = JsonConvert.SerializeObject(layout, json_settings);
+
+                if (readText(file) != json)
+                    return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Writes captured layouts that differ from disk. Returns whether any file changed.
+        /// </summary>
+        public bool FlushPending(string? layoutFile = null)
+        {
+            bool written = false;
+            string[] files = layoutFile == null
+                ? pendingLayouts.Keys.ToArray()
+                : pendingLayouts.ContainsKey(layoutFile)
+                    ? new[] { layoutFile }
+                    : Array.Empty<string>();
+
+            foreach (string file in files)
+            {
+                if (!pendingLayouts.TryGetValue(file, out var layout))
+                    continue;
+
+                string json = JsonConvert.SerializeObject(layout, json_settings);
+
+                if (readText(file) != json)
+                {
+                    writeText(file, json);
+                    written = true;
+                }
+
+                pendingLayouts.Remove(file);
+            }
+
+            return written;
+        }
+
+        public void DiscardPending(string? layoutFile = null)
+        {
+            if (layoutFile == null)
+                pendingLayouts.Clear();
+            else
+                pendingLayouts.Remove(layoutFile);
+        }
+
+        public void Save(string layoutFile, SkinLayoutInfo layout)
+        {
+            pendingLayouts.Remove(layoutFile);
             writeText(layoutFile, JsonConvert.SerializeObject(layout, json_settings));
+        }
 
         public void Reset(string layoutFile)
         {
+            pendingLayouts.Remove(layoutFile);
+
             if (storage.Exists(layoutFile))
                 storage.Delete(layoutFile);
         }
@@ -221,6 +292,12 @@ namespace osu.Game.EzOsuGame.Layout
 
         private void bind(string layoutSetName) =>
             storage = gameStorage.GetStorageForDirectory(EzModifyPath.LayoutSetPath(layoutSetName));
+
+        private static SkinLayoutInfo cloneLayout(SkinLayoutInfo layout)
+        {
+            string json = JsonConvert.SerializeObject(layout, json_settings);
+            return JsonConvert.DeserializeObject<SkinLayoutInfo>(json, json_settings) ?? new SkinLayoutInfo();
+        }
 
         private string? readText(string filename)
         {

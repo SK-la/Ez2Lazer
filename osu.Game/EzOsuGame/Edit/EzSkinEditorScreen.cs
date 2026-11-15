@@ -1607,6 +1607,7 @@ namespace osu.Game.EzOsuGame.Edit
             || hasUnsavedConfigChanges()
             || (hudLayer.ChangeHandler?.CanUndo.Value ?? false)
             || hudLayer.HasPendingSkinLayoutSave
+            || hudLayer.HasPendingEzLayoutSave
             || (SkinJsonSession?.IsDirty(ezSkinConfig) ?? false);
 
         private bool hasUnsavedConfigChanges()
@@ -1630,7 +1631,7 @@ namespace osu.Game.EzOsuGame.Edit
                 appliedConfigBaseline.ApplyTo(ezSkinConfig, SkinIniSession);
             }
 
-            hudLayer.DiscardPendingSkinLayoutSave();
+            hudLayer.DiscardPendingLayouts();
             skinManager.CurrentSkinInfo.TriggerChange();
         }
 
