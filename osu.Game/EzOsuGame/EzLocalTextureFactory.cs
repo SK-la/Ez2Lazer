@@ -414,7 +414,7 @@ namespace osu.Game.EzOsuGame
             // 按键与数字都要能在 Body 之后，序号来自 layout；这里先算出来供后面复用。
             int keyOrder = layout.GetKeys(columnCount)?.FirstOrDefault()?.Order ?? EzStagePlateLayout.ORDER_KEYS;
 
-            place(addPlateSprite(layout.GrooveLight, $"{basePath}/GrooveLight"), layout.GrooveLight?.Order ?? EzStagePlateLayout.ORDER_GROOVE_LIGHT);
+            Drawable? grooveLight = addPlateSprite(layout.GrooveLight, $"{basePath}/GrooveLight");
 
             if (layout.Meter != null)
             {
@@ -466,6 +466,10 @@ namespace osu.Game.EzOsuGame
 
                 place(character, layout.Character.Order ?? EzStagePlateLayout.ORDER_CHARACTER);
             }
+
+            // layout 里常与 overObject、keys 等同 order（如 JIYU 的 11）。稳定排序下后加入的在上层，
+            // 因此 GrooveLight 延后入表，避免发光区被同层部件盖住。
+            place(grooveLight, layout.GrooveLight?.Order ?? EzStagePlateLayout.ORDER_GROOVE_LIGHT);
 
             // 判定线的偏移决定整块舞台板的上移量，必须在加子项前算出来。
             Drawable? judgementLine = createJudgementLine(layout.JudgementLine, basePath, bodySize, out float judgementLineOffset);
@@ -942,7 +946,7 @@ namespace osu.Game.EzOsuGame
             // 首帧的显示尺寸就是 drawable 铺开后的尺寸；动画在布局前 Height 还是 0，所以这里按帧取。
             contentSize = new Vector2(frames[0].DisplayWidth, frames[0].DisplayHeight);
 
-            BlendingParameters blending = piece.IsAdditive ? BlendingParameters.Additive : BlendingParameters.Inherit;
+            BlendingParameters blending = resolvePlateBlending(piece, texturePath);
 
             if (frames.Count == 1)
             {
@@ -1015,6 +1019,14 @@ namespace osu.Game.EzOsuGame
         private static bool isSingleFrameGlow(string texturePath)
             => texturePath.EndsWith("/GrooveLight", StringComparison.OrdinalIgnoreCase)
                || texturePath.EndsWith("/GrooveGaugeLight", StringComparison.OrdinalIgnoreCase);
+
+        private static BlendingParameters resolvePlateBlending(EzStagePlateSprite piece, string texturePath)
+        {
+            if (!string.IsNullOrEmpty(piece.Blend))
+                return piece.IsAdditive ? BlendingParameters.Additive : BlendingParameters.Inherit;
+
+            return isSingleFrameGlow(texturePath) ? BlendingParameters.Additive : BlendingParameters.Inherit;
+        }
 
         // Stage 组件帧：交给层2/层3 同一规则（多帧 AnimationSafe，空则回退 Large 单图）。
         private List<Texture> loadStageComponentFrames(string basePath) => resource.LoadStageFrames(basePath);

@@ -25,10 +25,10 @@ namespace osu.Game.EzOsuGame
         {
             this.light = light;
 
+            AutoSizeAxes = Axes.Both;
             Anchor = light.Anchor;
             Origin = light.Origin;
             Position = light.Position;
-            Size = light.Size;
 
             light.Anchor = Anchor.Centre;
             light.Origin = Anchor.Centre;
