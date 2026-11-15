@@ -52,8 +52,8 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
         [BackgroundDependencyLoader]
         private void load()
         {
-            // MusicPlayerContainer is created after this screen loads. Presence of the layout
-            // layer is enough: it will attach the HUD (with defaults) once the screen is current.
+            // HUD lives on EzLayoutLayer.MusicPlayerContainer, which is attached after this screen
+            // is current. Do not build a second stage here or every visit stacks another copy.
             if (layoutLayer != null)
                 return;
 

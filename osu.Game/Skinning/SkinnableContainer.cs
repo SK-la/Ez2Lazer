@@ -71,6 +71,9 @@ namespace osu.Game.Skinning
             {
                 foreach (var component in wrapper.Children.OfType<ISerialisableDrawable>().ToArray())
                 {
+                    if (components.Contains(component))
+                        continue;
+
                     if (component.CanBePlaced(components))
                         components.Add(component);
                     else

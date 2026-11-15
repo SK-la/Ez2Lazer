@@ -302,8 +302,12 @@ namespace osu.Game.EzOsuGame.Layout
             expireMusicPlayerContainer();
             MusicPlayerContainer = new EzLayoutContainer(clientStore, EzLayoutFiles.MUSIC_PLAYER, null);
             MusicPlayerContainer.SetDependencyDonor(screen);
+            MusicPlayerContainer.OnComponentsLoaded += d =>
+            {
+                if (d is EzLayoutContainer loaded && loaded.IsLoaded)
+                    EzMusicPlayerHudDefaults.ApplyIfEmpty(loaded);
+            };
             AddInternal(MusicPlayerContainer);
-            EzMusicPlayerHudDefaults.ApplyIfEmpty(MusicPlayerContainer);
             updateMusicPlayerContainerVisibility();
         }
 

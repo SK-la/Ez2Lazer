@@ -1,6 +1,8 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using System.Linq;
 using osu.Framework.Graphics;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Screens.Menu;
@@ -16,8 +18,27 @@ namespace osu.Game.EzOsuGame.HUD.MusicPlayer
         public const float VISUALISER_ALPHA = 0.5f;
         public const float LOGO_TO_CONTROLS_SPACING = 20;
 
+        private static readonly Type[] default_types =
+        {
+            typeof(EzMenuLogoVisualisation),
+            typeof(EzVisualizerBeatmapLogo),
+            typeof(EzVisualizerPlaybackBar),
+            typeof(EzVisualizerPlaylist),
+        };
+
+        /// <summary>
+        /// Fills an empty loaded container with the built-in music player HUD. Must run after
+        /// <see cref="SkinnableContainer.ComponentsLoaded"/>: calling it during <c>Reload</c> adds
+        /// the same instances to <see cref="SkinnableContainer.Components"/> twice, which serialises
+        /// as extra copies and crashes undo with "drawable in multiple containers".
+        /// </summary>
         public static void ApplyIfEmpty(EzLayoutContainer container)
         {
+            if (!container.ComponentsLoaded)
+                return;
+
+            TrimDuplicateDefaults(container);
+
             if (container.Components.Count > 0)
                 return;
 
@@ -42,6 +63,18 @@ namespace osu.Game.EzOsuGame.HUD.MusicPlayer
                 Margin = new MarginPadding { Right = 24 },
                 UsesFixedAnchor = true,
             });
+        }
+
+        /// <summary>
+        /// Drops extra copies of the four default HUD types left by duplicated serialisation.
+        /// </summary>
+        public static void TrimDuplicateDefaults(EzLayoutContainer container)
+        {
+            foreach (var type in default_types)
+            {
+                foreach (var extra in container.Components.Where(c => c.GetType() == type).Skip(1).ToArray())
+                    container.Remove(extra, true);
+            }
         }
 
         public static EzMenuLogoVisualisation CreateVisualisation() => new EzMenuLogoVisualisation
