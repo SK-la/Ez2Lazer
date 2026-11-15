@@ -397,6 +397,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (maxWhiteStrength)
                 colouringStrength.Value = max_white_strength;
+            else if (range == EzColouringRange.White && colouringStrength.Value >= max_white_strength)
+                colouringStrength.SetDefault();
         }
 
         private bool isCellSelected(PreviewCell cell)
