@@ -140,6 +140,57 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
         }
 
         [Test]
+        public void WhiteRangeDirectColoursPureWhite()
+        {
+            Colour4 result = EzNoteRecolour.Apply(white, red, EzNoteRecolourAlgorithm.Direct, EzColouringRange.White);
+
+            Assert.That(result.R, Is.EqualTo(1f).Within(0.001f));
+            Assert.That(result.G, Is.EqualTo(0f).Within(0.001f));
+            Assert.That(result.B, Is.EqualTo(0f).Within(0.001f));
+        }
+
+        [Test]
+        public void WhiteRangeDirectColoursNearWhite()
+        {
+            Colour4 result = EzNoteRecolour.Apply(near_white, red, EzNoteRecolourAlgorithm.Direct, EzColouringRange.White);
+
+            Assert.That(result.R, Is.GreaterThan(result.G));
+            Assert.That(result.R, Is.GreaterThan(result.B));
+        }
+
+        [Test]
+        public void WhiteRangeLeavesMidGreyAndSaturatedBlue()
+        {
+            foreach (var source in new[] { mid_grey, saturated_blue })
+            {
+                Colour4 result = EzNoteRecolour.Apply(source, red, EzNoteRecolourAlgorithm.Direct, EzColouringRange.White);
+                assertColourEqual(result, source);
+            }
+        }
+
+        [Test]
+        public void WhiteRangeDirectColoursPremultipliedWhiteGlow()
+        {
+            Colour4 result = EzNoteRecolour.Apply(premul_white_glow, red, EzNoteRecolourAlgorithm.Direct, EzColouringRange.White);
+            Colour4 straight = unpremultiply(result);
+
+            Assert.That(result.A, Is.EqualTo(premul_white_glow.A).Within(0.0001f));
+            Assert.That(straight.R, Is.GreaterThan(straight.G));
+        }
+
+        [Test]
+        public void StrengthHalfBlendsDirectWhite()
+        {
+            Colour4 full = EzNoteRecolour.Apply(white, red, EzNoteRecolourAlgorithm.Direct, EzColouringRange.White);
+            Colour4 half = EzNoteRecolour.Apply(white, red, EzNoteRecolourAlgorithm.Direct, EzColouringRange.White, strength: 0.5f);
+
+            Assert.That(half.G, Is.EqualTo(0.5f).Within(0.001f));
+            Assert.That(half.B, Is.EqualTo(0.5f).Within(0.001f));
+            Assert.That(half.R, Is.EqualTo(1f).Within(0.001f));
+            Assert.That(full.G, Is.EqualTo(0f).Within(0.001f));
+        }
+
+        [Test]
         public void SetLumPremultipliedWhiteGlowKeepsStraightLuma()
         {
             Colour4 result = EzNoteRecolour.Apply(premul_white_glow, red, EzNoteRecolourAlgorithm.SetLum);

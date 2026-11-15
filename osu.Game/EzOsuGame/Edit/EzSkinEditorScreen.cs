@@ -501,6 +501,7 @@ namespace osu.Game.EzOsuGame.Edit
             base.LoadComplete();
             NoteSessionForTesting.ColouringMode.BindTo(ezSkinConfig.GetBindable<EzColouringMode>(Ez2Setting.ColouringMode));
             NoteSessionForTesting.ColouringRange.BindTo(ezSkinConfig.GetBindable<EzColouringRange>(Ez2Setting.ColouringRange));
+            NoteSessionForTesting.ColouringStrength.BindTo(ezSkinConfig.GetBindable<double>(Ez2Setting.ColouringStrength));
             hudLayer.LayoutWritten += onLayoutWritten;
             SkinEditorProviderResolver.EnsureDefaultProviderRegistered();
             beatmapPicker = new EzSkinEditorBeatmapPicker(realm, beatmapManager);

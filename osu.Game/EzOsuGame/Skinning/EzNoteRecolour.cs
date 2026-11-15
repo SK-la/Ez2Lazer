@@ -62,6 +62,7 @@ namespace osu.Game.EzOsuGame.Skinning
         {
             EzColouringRange.Gray => ColorizeRange.Gray,
             EzColouringRange.KeepWhite => ColorizeRange.KeepWhite,
+            EzColouringRange.White => ColorizeRange.White,
             _ => ColorizeRange.All,
         };
 
@@ -69,12 +70,13 @@ namespace osu.Game.EzOsuGame.Skinning
         /// 给 <see cref="ColorizeSprite"/> 写 Tint/算法/范围；没有着色 sprite 时退回父级乘色。
         /// 父级 <see cref="Drawable.Colour"/> 保持白色，淡出仍走父级。
         /// </summary>
-        public static void ApplyToDrawable(Drawable target, Colour4 tint, EzColouringMode mode, EzColouringRange range)
+        public static void ApplyToDrawable(Drawable target, Colour4 tint, EzColouringMode mode, EzColouringRange range, float strength = 1f)
         {
             ColorizeAlgorithm algorithm = isIdentityTint(tint)
                 ? ColorizeAlgorithm.Multiply
                 : ToColorizeAlgorithm(mode);
             ColorizeRange colorizeRange = ToColorizeRange(range);
+            float clampedStrength = Math.Clamp(strength, 0f, 1f);
 
             bool found = false;
 
@@ -83,6 +85,7 @@ namespace osu.Game.EzOsuGame.Skinning
                 sprite.Tint = tint;
                 sprite.Algorithm = algorithm;
                 sprite.Range = colorizeRange;
+                sprite.Strength = clampedStrength;
                 found = true;
             }
 
@@ -96,9 +99,10 @@ namespace osu.Game.EzOsuGame.Skinning
             EzColouringRange range = EzColouringRange.All,
             float chromaEpsilon = DEFAULT_CHROMA_EPSILON,
             float whiteLuma = DEFAULT_WHITE_LUMA,
-            float whiteChroma = DEFAULT_WHITE_CHROMA)
+            float whiteChroma = DEFAULT_WHITE_CHROMA,
+            float strength = 1f)
         {
-            if (source.A <= 0f || isIdentityTint(tint))
+            if (source.A <= 0f || isIdentityTint(tint) || strength <= 0f)
                 return source;
 
             Colour4 straight = unpremultiply(source);
@@ -107,6 +111,10 @@ namespace osu.Game.EzOsuGame.Skinning
                 return source;
 
             Colour4 recoloured = applyAlgorithm(straight, tint, algorithm);
+
+            if (strength < 1f)
+                recoloured = lerpRgb(straight, recoloured, strength);
+
             return premultiply(recoloured);
         }
 
@@ -120,15 +128,21 @@ namespace osu.Game.EzOsuGame.Skinning
             EzColouringRange range = EzColouringRange.All,
             float chromaEpsilon = DEFAULT_CHROMA_EPSILON,
             float whiteLuma = DEFAULT_WHITE_LUMA,
-            float whiteChroma = DEFAULT_WHITE_CHROMA)
+            float whiteChroma = DEFAULT_WHITE_CHROMA,
+            float strength = 1f)
         {
-            if (source.A <= 0f || isIdentityTint(tint))
+            if (source.A <= 0f || isIdentityTint(tint) || strength <= 0f)
                 return source;
 
             if (!passesRange(source, range, chromaEpsilon, whiteLuma, whiteChroma))
                 return source;
 
-            return applyAlgorithm(source, tint, algorithm);
+            Colour4 recoloured = applyAlgorithm(source, tint, algorithm);
+
+            if (strength < 1f)
+                return lerpRgb(source, recoloured, strength);
+
+            return recoloured;
         }
 
         private static bool isIdentityTint(Colour4 tint)
@@ -145,6 +159,9 @@ namespace osu.Game.EzOsuGame.Skinning
 
                 case EzColouringRange.KeepWhite:
                     return Luma(straight) < whiteLuma || chroma > whiteChroma;
+
+                case EzColouringRange.White:
+                    return Luma(straight) >= whiteLuma && chroma <= whiteChroma;
 
                 default:
                     return true;
@@ -264,6 +281,13 @@ namespace osu.Game.EzOsuGame.Skinning
 
             return new Colour4(straight.R * straight.A, straight.G * straight.A, straight.B * straight.A, straight.A);
         }
+
+        private static Colour4 lerpRgb(Colour4 from, Colour4 to, float t)
+            => new Colour4(
+                from.R + (to.R - from.R) * t,
+                from.G + (to.G - from.G) * t,
+                from.B + (to.B - from.B) * t,
+                from.A + (to.A - from.A) * t);
 
         private static Colour4 clampRgb(float r, float g, float b, float alpha)
             => new Colour4(Math.Clamp(r, 0f, 1f), Math.Clamp(g, 0f, 1f), Math.Clamp(b, 0f, 1f), alpha);

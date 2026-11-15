@@ -52,6 +52,9 @@ namespace osu.Game.EzOsuGame.Configuration
 
         [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.COLOURING_RANGE_KEEP_WHITE))]
         KeepWhite = 2,
+
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.COLOURING_RANGE_WHITE))]
+        White = 3,
     }
 
     public enum EzEnumJudgeMode

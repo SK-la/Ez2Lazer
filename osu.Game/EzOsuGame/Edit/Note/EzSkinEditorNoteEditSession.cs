@@ -27,6 +27,8 @@ namespace osu.Game.EzOsuGame.Edit.Note
 
         public Bindable<EzColouringRange> ColouringRange { get; } = new Bindable<EzColouringRange>(EzColouringRange.Gray);
 
+        public BindableNumber<double> ColouringStrength { get; } = new BindableDouble(1) { MinValue = 0, MaxValue = 1 };
+
         public BindableNumber<double> Width { get; } = new BindableDouble(100) { MinValue = 1, MaxValue = 512 };
 
         public BindableNumber<double> Height { get; } = new BindableDouble(100) { MinValue = 1, MaxValue = 512 };
@@ -43,6 +45,7 @@ namespace osu.Game.EzOsuGame.Edit.Note
             NoteColour = NoteColour.Value,
             ColouringMode = ColouringMode.Value,
             ColouringRange = ColouringRange.Value,
+            ColouringStrength = ColouringStrength.Value,
             Width = Width.Value,
             Height = Height.Value,
             ExportName = ExportName.Value,

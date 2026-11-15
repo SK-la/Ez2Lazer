@@ -162,11 +162,20 @@ namespace osu.Game.EzOsuGame.Localization
             "哪些像素参与着色，与算法独立。"
             + "\n全体：每个像素都着色。"
             + "\n仅灰度：只给接近灰色的像素着色，彩色阴影/发光保持原样。"
-            + "\n保白：接近白色的高光不着色。",
+            + "\n保白：接近白色的高光不着色。"
+            + "\n仅白色：只给纯白和接近白色的像素着色（白条、预乘白发光）；中间灰度和彩色不动。真着色无法给纯白换色相，白条请配直接着色。",
             "Which pixels receive colouring; independent of the algorithm."
             + "\nAll: every pixel is recoloured."
             + "\nGray only: only near-grey pixels are recoloured; coloured shadows and glows stay as they are."
-            + "\nKeep white: near-white highlights are left unchanged.");
+            + "\nKeep white: near-white highlights are left unchanged."
+            + "\nWhite only: only pure and near-white pixels are recoloured (white bar, premultiplied white glow); mid-greys and saturated colours stay. True colouring cannot hue-shift pure white; pair the white bar with Direct.");
+
+        public static readonly LocalisableString COLOURING_STRENGTH = new EzLocalizationManager.EzLocalisableString(
+            "着色力度", "Colouring Strength");
+
+        public static readonly LocalisableString COLOURING_STRENGTH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "着色结果与原图像素的混合。不影响范围判定，只改混合量。",
+            "Blend between the original pixel and the recoloured result. Range selection is unchanged; this only scales how much colouring is applied.");
 
         public static readonly LocalisableString NOTE_HEIGHT_SCALE = new EzLocalizationManager.EzLocalisableString(
             "note 高度比例", "Note Height Scale");

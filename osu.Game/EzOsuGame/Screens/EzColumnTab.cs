@@ -184,6 +184,14 @@ namespace osu.Game.EzOsuGame.Screens
                         TooltipText = EzSkinStrings.COLOURING_RANGE_TOOLTIP,
                         Current = ezSkinConfig.GetBindable<EzColouringRange>(Ez2Setting.ColouringRange),
                     },
+                    new SettingsSlider<double>
+                    {
+                        LabelText = EzSkinStrings.COLOURING_STRENGTH,
+                        TooltipText = EzSkinStrings.COLOURING_STRENGTH_TOOLTIP,
+                        Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ColouringStrength),
+                        KeyboardStep = 0.01f,
+                        DisplayAsPercentage = true,
+                    },
                     baseColorsContainer = new FillFlowContainer
                     {
                         RelativeSizeAxes = Axes.X,

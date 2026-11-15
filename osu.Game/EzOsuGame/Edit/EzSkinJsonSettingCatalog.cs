@@ -52,6 +52,7 @@ namespace osu.Game.EzOsuGame.Edit
             Ez2Setting.ColorSettingsEnabled,
             Ez2Setting.ColouringMode,
             Ez2Setting.ColouringRange,
+            Ez2Setting.ColouringStrength,
             Ez2Setting.ColumnTypeListSelect,
             Ez2Setting.ColumnTypeA,
             Ez2Setting.ColumnTypeB,
