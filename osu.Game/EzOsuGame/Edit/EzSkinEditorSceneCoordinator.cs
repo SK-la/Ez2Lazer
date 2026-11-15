@@ -47,6 +47,17 @@ namespace osu.Game.EzOsuGame.Edit
         private Drawable? hiddenStoryboard;
         private float previousStoryboardAlpha;
 
+        private bool sceneLoadingActive;
+        private double sceneLoadingStartTime;
+        private int presentSettleFrames;
+
+        private const double max_scene_plug_stall_ms = 10000;
+
+        /// <summary>
+        /// 游玩首帧展示后再露出一帧，让舞台材质（含 GrooveLight 混合与单帧呼吸）完成布局与混合。
+        /// </summary>
+        private const int gameplay_present_settle_frames = 12;
+
         public EzSkinEditorSceneCoordinator(ScalingContainer scalingContainer, EzSkinEditorScreen workspace, EzLayoutLayer? layoutLayer, Action updateScreenSizing, Func<EzEditorSceneType, bool> sceneIsAvailable, Func<IScreen?> getCurrentScreen, Action enterSongSelect, Action enterGameplay, Action enterFullMapPreview, Action enterBeatmapCompose, Action enterResults, Action enterMusicPlayer)
         {
             this.scalingContainer = scalingContainer;
@@ -111,6 +122,8 @@ namespace osu.Game.EzOsuGame.Edit
         /// </summary>
         public void Tick(OsuScreen? current)
         {
+            updateScenePlugLoading(current);
+
             if (EzSkinEditorSceneRegistry.GroupOf(desiredScene) == EzEditorSceneGroup.SongSelect)
             {
                 switch (desiredScene)
@@ -154,6 +167,8 @@ namespace osu.Game.EzOsuGame.Edit
         /// </summary>
         public void Close()
         {
+            forceEndSceneLoading();
+
             restorePlayerChrome();
             boundPlayer = null;
             boundSongSelect = null;
@@ -178,6 +193,7 @@ namespace osu.Game.EzOsuGame.Edit
                 restorePlayerChrome();
                 clearBoundScreens();
                 workspace.BindHudToTarget(null, layoutLayer);
+                beginSceneLoading();
                 enterGameplay();
             }
         }
@@ -203,6 +219,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             workspace.BindHudToTarget(player, layoutLayer);
             updateScreenSizing();
+            tryCompleteSceneLoading(player);
         }
 
         private void presentSongSelect()
@@ -221,6 +238,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             boundSongSelect = null;
             workspace.BindHudToTarget(null, layoutLayer);
+            beginSceneLoading();
             enterSongSelect();
         }
 
@@ -250,6 +268,7 @@ namespace osu.Game.EzOsuGame.Edit
             }
 
             boundFullMapPreview = null;
+            beginSceneLoading();
             enterFullMapPreview();
         }
 
@@ -267,6 +286,7 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
+            beginSceneLoading();
             enterResults();
         }
 
@@ -284,6 +304,7 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
+            beginSceneLoading();
             enterMusicPlayer();
         }
 
@@ -309,6 +330,7 @@ namespace osu.Game.EzOsuGame.Edit
             }
 
             boundBeatmapCompose = null;
+            beginSceneLoading();
             enterBeatmapCompose();
         }
 
@@ -316,12 +338,14 @@ namespace osu.Game.EzOsuGame.Edit
         {
             boundBeatmapCompose = composeScreen;
             updateScreenSizing();
+            tryCompleteSceneLoading(composeScreen);
         }
 
         private void bindFullMapPreview(EzSkinEditorPreviewManiaScreen maniaScreen)
         {
             boundFullMapPreview = maniaScreen;
             updateScreenSizing();
+            tryCompleteSceneLoading(maniaScreen);
         }
 
         private void bindSongSelect(SongSelect songSelect)
@@ -337,6 +361,7 @@ namespace osu.Game.EzOsuGame.Edit
             songSelect.SuspendForSkinEditor();
             workspace.BindHudToTarget(songSelect, layoutLayer);
             updateScreenSizing();
+            tryCompleteSceneLoading(songSelect);
         }
 
         private void bindResults(ResultsScreen results)
@@ -348,6 +373,7 @@ namespace osu.Game.EzOsuGame.Edit
             boundMusicPlayer = null;
             workspace.BindHudToTarget(results, layoutLayer);
             updateScreenSizing();
+            tryCompleteSceneLoading(results);
         }
 
         private void bindMusicPlayer(EzVisualizerScreen musicPlayer)
@@ -359,6 +385,7 @@ namespace osu.Game.EzOsuGame.Edit
             boundResults = null;
             workspace.BindHudToTarget(musicPlayer, layoutLayer);
             updateScreenSizing();
+            tryCompleteSceneLoading(musicPlayer);
         }
 
         private void clearBoundScreens()
@@ -379,5 +406,98 @@ namespace osu.Game.EzOsuGame.Edit
                 hiddenStoryboard = null;
             }
         }
+
+        private void beginSceneLoading()
+        {
+            sceneLoadingStartTime = workspace.Time.Current;
+            presentSettleFrames = 0;
+
+            if (sceneLoadingActive)
+                return;
+
+            sceneLoadingActive = true;
+            workspace.ShowSceneLoading();
+        }
+
+        private void endSceneLoading()
+        {
+            presentSettleFrames = 0;
+
+            if (!sceneLoadingActive)
+                return;
+
+            sceneLoadingActive = false;
+            workspace.HideSceneLoading();
+        }
+
+        private void forceEndSceneLoading() => endSceneLoading();
+
+        private void updateScenePlugLoading(OsuScreen? current)
+        {
+            if (!sceneLoadingActive)
+                return;
+
+            if (tryCompleteSceneLoading(current))
+                return;
+
+            if (workspace.Time.Current - sceneLoadingStartTime < max_scene_plug_stall_ms)
+                return;
+
+            forceEndSceneLoading();
+        }
+
+        private bool tryCompleteSceneLoading(OsuScreen? current)
+        {
+            if (!isBoundForDesiredScene())
+                return false;
+
+            if (!hasPresentSettled(current))
+                return false;
+
+            endSceneLoading();
+            return true;
+        }
+
+        private bool hasPresentSettled(OsuScreen? current)
+        {
+            if (!isScenePresentReady(desiredScene, current))
+            {
+                presentSettleFrames = 0;
+                return false;
+            }
+
+            if (desiredScene == EzEditorSceneType.GameplayHud)
+            {
+                presentSettleFrames++;
+                return presentSettleFrames >= gameplay_present_settle_frames;
+            }
+
+            return true;
+        }
+
+        private static bool isScenePresentReady(EzEditorSceneType scene, OsuScreen? screen)
+        {
+            if (screen == null)
+                return false;
+
+            return scene switch
+            {
+                EzEditorSceneType.GameplayHud => screen is Player player && player.IsCurrentScreen() && player.IsReadyForSkinEditorScenePresent(),
+                EzEditorSceneType.SongSelectHud => screen is SongSelect { IsLoaded: true, CarouselItemsPresented: true },
+                _ => screen.IsLoaded,
+            };
+        }
+
+        private bool isBoundForDesiredScene() =>
+            desiredScene switch
+            {
+                EzEditorSceneType.GameplayHud => boundPlayer != null,
+                EzEditorSceneType.SongSelectHud => boundSongSelect != null,
+                EzEditorSceneType.BeatmapPreview => boundFullMapPreview != null,
+                EzEditorSceneType.ResultsHud => boundResults != null,
+                EzEditorSceneType.MusicPlayerHud => boundMusicPlayer != null,
+                EzEditorSceneType.EditorColouring => boundBeatmapCompose != null,
+                _ => true,
+            };
     }
 }

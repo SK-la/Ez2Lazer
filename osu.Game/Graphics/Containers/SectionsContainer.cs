@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using osu.Framework.Allocation;
@@ -212,6 +213,28 @@ namespace osu.Game.Graphics.Containers
         }
 
         public void ScrollToTop() => scrollContainer.ScrollTo(0);
+
+        /// <summary>
+        /// Returns the entry from <paramref name="candidates"/> considered active at the current scroll offset,
+        /// using the same centre line as <see cref="ScrollTo"/>.
+        /// </summary>
+        public Drawable? GetActiveDrawableAtScrollPosition(IEnumerable<Drawable> candidates)
+        {
+            var present = candidates.Where(c => c.IsPresent).ToList();
+
+            if (present.Count == 0)
+                return null;
+
+            float fixedHeaderSize = FixedHeader?.LayoutSize.Y ?? 0;
+            float smallestHeight = present.Min(d => d.Height);
+            float selectionLenienceAbove = Math.Min(smallestHeight / 2.0f, scrollContainer.DisplayableContent * 0.05f);
+            float scrollCentre = fixedHeaderSize + scrollContainer.DisplayableContent * scroll_y_centre + selectionLenienceAbove;
+            float currentScroll = (float)scrollContainer.Current;
+
+            return present
+                   .TakeWhile(drawable => scrollContainer.GetChildPosInContent(drawable) - currentScroll - scrollCentre <= 0)
+                   .LastOrDefault() ?? present.First();
+        }
 
         protected virtual UserTrackingScrollContainer CreateScrollContainer() => new UserTrackingScrollContainer();
 
