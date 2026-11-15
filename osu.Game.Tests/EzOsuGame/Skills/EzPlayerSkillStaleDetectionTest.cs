@@ -66,7 +66,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             using var cmd = connection.CreateCommand();
             cmd.CommandText = """
                               INSERT INTO player_skill_value
-                                  (username, key_count, system_id, ruleset_online_id, skill_id, value, state, analyzed_plays,
+                                  (username, key_count, system_id, ruleset_online_id, skill_id, skill_value, state, analyzed_plays,
                                    provisional, algorithm_version, computed_at_ms)
                               VALUES
                                   ($username, 4, $system, $ruleset, 'overall', 10, 0, $plays, 0, $version, $at);

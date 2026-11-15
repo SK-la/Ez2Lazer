@@ -250,17 +250,18 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentNullException.ThrowIfNull(skillRatings);
 
             DateTimeOffset at = DateTimeOffset.UtcNow;
-            const int version = EzMinaEngine.VERSION;
+            const int minaVersion = EzMinaEngine.VERSION;
+            const int tagVersion = EzMinaPlayerSkillModeData.VERSION;
 
             database.Write((c, tx) =>
             {
                 replaceValues(c, tx, username, keyCount, EzAnalysisSystem.Mina.ToStorageId(), EzLocalProfileConstants.MANIA_RULESET_ID,
-                    toRows(playerMinaSkillRowValues(minaRating), analyzedPlays, provisional, version, at), version);
+                    toRows(playerMinaSkillRowValues(minaRating), analyzedPlays, provisional, minaVersion, at), minaVersion);
 
-                replaceHistory(c, tx, username, keyCount, historySamples, version);
+                replaceHistory(c, tx, username, keyCount, historySamples, minaVersion);
 
                 replaceValues(c, tx, username, keyCount, EzAnalysisSystem.Pattern.ToStorageId(), -1,
-                    toRows(patternValues(skillRatings), analyzedPlays, provisional, version, at), version);
+                    toRows(patternValues(skillRatings), analyzedPlays, provisional, tagVersion, at), tagVersion);
             });
         }
 
@@ -272,10 +273,10 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 using var cmd = c.CreateCommand();
                 cmd.CommandText = """
-                                  SELECT skill_id, value, analyzed_plays FROM player_skill_value
+                                  SELECT skill_id, skill_value, analyzed_plays FROM player_skill_value
                                   WHERE username = $username AND key_count = $key_count
                                     AND system_id = $system AND algorithm_version = $version
-                                  ORDER BY value DESC;
+                                  ORDER BY skill_value DESC;
                                   """;
                 cmd.Parameters.AddWithValue("$username", username);
                 cmd.Parameters.AddWithValue("$key_count", keyCount);
@@ -617,7 +618,7 @@ namespace osu.Game.EzOsuGame.Skills
         {
             using var cmd = connection.CreateCommand();
             cmd.CommandText = $"""
-                               SELECT skill_id, value FROM player_skill_value
+                               SELECT skill_id, skill_value FROM player_skill_value
                                WHERE username = $username AND key_count = $key_count
                                  AND system_id = $system AND algorithm_version = $version
                                  {(query.RulesetOnlineId >= 0 ? "AND ruleset_online_id = $ruleset" : string.Empty)};
@@ -718,10 +719,10 @@ namespace osu.Game.EzOsuGame.Skills
                 ins.Transaction = transaction;
                 ins.CommandText = """
                                   INSERT OR REPLACE INTO player_skill_value
-                                      (username, key_count, system_id, ruleset_online_id, skill_id, value, state,
+                                      (username, key_count, system_id, ruleset_online_id, skill_id, skill_value, state,
                                        analyzed_plays, provisional, algorithm_version, computed_at_ms)
                                   VALUES
-                                      ($username, $key_count, $system, $ruleset, $skill_id, $value, $state,
+                                      ($username, $key_count, $system, $ruleset, $skill_id, $skill_value, $state,
                                        $analyzed_plays, $provisional, $version, $computed_at);
                                   """;
                 ins.Parameters.AddWithValue("$username", username);
@@ -729,7 +730,7 @@ namespace osu.Game.EzOsuGame.Skills
                 ins.Parameters.AddWithValue("$system", systemId);
                 ins.Parameters.AddWithValue("$ruleset", rulesetOnlineId);
                 ins.Parameters.AddWithValue("$skill_id", row.SkillId);
-                ins.Parameters.AddWithValue("$value", row.Value);
+                ins.Parameters.AddWithValue("$skill_value", row.Value);
                 ins.Parameters.AddWithValue("$state", EzSkillRowState.Current);
                 ins.Parameters.AddWithValue("$analyzed_plays", row.AnalyzedPlays);
                 ins.Parameters.AddWithValue("$provisional", row.Provisional ? 1 : 0);
@@ -750,13 +751,13 @@ namespace osu.Game.EzOsuGame.Skills
                 using var ins = connection.CreateCommand();
                 ins.Transaction = transaction;
                 ins.CommandText = """
-                                  INSERT INTO player_skill_history (username, key_count, skill_id, value, recorded_at_ms, algorithm_version)
-                                  VALUES ($username, $key_count, $skill_id, $value, $recorded_at, $version);
+                                  INSERT INTO player_skill_history (username, key_count, skill_id, skill_value, recorded_at_ms, algorithm_version)
+                                  VALUES ($username, $key_count, $skill_id, $skill_value, $recorded_at, $version);
                                   """;
                 ins.Parameters.AddWithValue("$username", username);
                 ins.Parameters.AddWithValue("$key_count", keyCount);
                 ins.Parameters.AddWithValue("$skill_id", skillId);
-                ins.Parameters.AddWithValue("$value", value);
+                ins.Parameters.AddWithValue("$skill_value", value);
                 ins.Parameters.AddWithValue("$recorded_at", at.ToUnixTimeMilliseconds());
                 ins.Parameters.AddWithValue("$version", version);
                 ins.ExecuteNonQuery();
@@ -767,7 +768,7 @@ namespace osu.Game.EzOsuGame.Skills
         {
             using var cmd = connection.CreateCommand();
             cmd.CommandText = """
-                              SELECT value, recorded_at_ms, algorithm_version FROM player_skill_history
+                              SELECT skill_value, recorded_at_ms, algorithm_version FROM player_skill_history
                               WHERE username = $username AND key_count = $key_count AND skill_id = $skill_id
                               ORDER BY recorded_at_ms DESC
                               LIMIT $limit;

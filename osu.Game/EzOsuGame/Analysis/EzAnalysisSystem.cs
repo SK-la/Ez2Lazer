@@ -57,8 +57,8 @@ namespace osu.Game.EzOsuGame.Analysis
         [EzSkillMeta("dan", "段位", "Dan")]
         Dan = 1 << 5,
 
-        /// <summary>Player pattern ratings derived from plays.</summary>
-        [EzSkillMeta("pattern", "键型", "Pattern")]
+        /// <summary>Player SkillTag buckets derived from plays.</summary>
+        [EzSkillMeta("player_skill_tag", "键型", "Pattern")]
         Pattern = 1 << 6,
 
         /// <summary>Lightweight chart tags. A data group, not a system.</summary>
