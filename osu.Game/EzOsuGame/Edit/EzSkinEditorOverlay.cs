@@ -152,6 +152,9 @@ namespace osu.Game.EzOsuGame.Edit
             sessionTarget = game.ScreenStack.CurrentScreen as OsuScreen;
             overrideSkinEditorRelevantSettings();
 
+            game.Toolbar.Hide();
+            game.CloseAllOverlays(hideToolbar: false);
+
             // Keep the global (main menu) background alive behind plugged screens: stop screens from
             // pushing their own beatmap background, and drop the one already on the stack.
             EzSkinEditorActiveState.SetActive(true);
@@ -227,6 +230,9 @@ namespace osu.Game.EzOsuGame.Edit
                     EzSkinEditorActiveState.RestoreBackgroundDraw();
 
                 current.RestoreOwnedBackground();
+
+                if (!current.HideOverlaysOnEnter)
+                    game.Toolbar.Show();
             }
             else
                 EzSkinEditorActiveState.RestoreBackgroundDraw();

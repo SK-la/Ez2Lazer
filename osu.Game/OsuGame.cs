@@ -1101,6 +1101,10 @@ namespace osu.Game
             };
         }
 
+        private bool skinEditorOwnsToolbar() =>
+            skinEditor.State.Value == Visibility.Visible
+            || ezSkinEditor?.State.Value == Visibility.Visible;
+
         private void onCurrentSkinChangedForEzJson(ValueChangedEvent<Live<SkinInfo>> skin)
         {
             if (ezSkinEditor?.State.Value == Visibility.Visible)
@@ -1971,6 +1975,8 @@ namespace osu.Game
 
                 if (newScreen.HideOverlaysOnEnter)
                     CloseAllOverlays();
+                else if (skinEditorOwnsToolbar())
+                    Toolbar.Hide();
                 else
                     Toolbar.Show();
 
