@@ -33,6 +33,7 @@ using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Input.Bindings;
 using osu.Game.IO;
+using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.OSD;
@@ -248,15 +249,19 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
-            dialogOverlay.Push(new ConfirmDialog(unsavedApplyPrompt(), () =>
+            var dialog = new ConfirmDialog(EzEditorStrings.EXIT_CONFIRM_APPLY_UNSAVED, () =>
             {
-                applySettings();
-                onContinued();
+                applyUnsavedAndContinue(onContinued);
             }, () =>
             {
                 discardWorkspaceChanges();
                 onContinued();
-            }));
+            })
+            {
+                BodyText = unsavedApplyBody(),
+            };
+
+            dialogOverlay.Push(dialog);
         }
 
         public void SetSceneHost(Drawable? host)
@@ -725,33 +730,25 @@ namespace osu.Game.EzOsuGame.Edit
             ensureSkinIniSession();
             ensureSkinJsonSession();
 
-            bool configDirty = hasUnsavedConfigChanges();
             bool iniDirty = SkinIniSession.IsDirty;
-            bool jsonDirty = SkinJsonSession is { IsSupported: true, HasFile: true } && SkinJsonSession.IsDirty(ezSkinConfig);
             bool layoutDirty = hudLayer.HasPendingSkinLayoutSave;
 
-            if ((iniDirty || jsonDirty || layoutDirty)
-                && needsMutableSkinBeforeWrite(iniDirty, jsonDirty, layoutDirty)
-                && !ensureMutableSkinPreservingWorkspaceDrafts(iniDirty, jsonDirty))
+            if ((iniDirty || layoutDirty)
+                && needsMutableSkinBeforeWrite(iniDirty, jsonDirty: false, layoutDirty)
+                && !ensureMutableSkinPreservingWorkspaceDrafts(iniDirty, jsonDirty: false))
             {
                 postNotification(EzEditorStrings.NOTIFY_SKIN_LAYOUT_EXIT_SAVE_FAILED);
                 return;
             }
 
-            if (configDirty)
-                ezSkinConfig.Save();
-
             hudLayer.PersistAllLayouts();
-
-            if (jsonDirty)
-                SkinJsonSession!.Commit(ezSkinConfig);
 
             if (iniDirty)
                 SkinIniSession.Commit();
 
             recaptureAppliedConfigBaseline();
 
-            if (!configDirty && !iniDirty && !jsonDirty)
+            if (!iniDirty)
                 return;
 
             refreshScene();
@@ -1395,36 +1392,73 @@ namespace osu.Game.EzOsuGame.Edit
             return string.Join(" · ", parts);
         }
 
-        private LocalisableString unsavedApplyPrompt()
+        private void applyUnsavedAndContinue(Action onContinued)
         {
-            bool skinSide = hudLayer.HasPendingSkinLayoutSave
-                            || SkinIniSession.IsDirty
-                            || hasUnsavedConfigChanges()
-                            || (SkinJsonSession?.IsDirty(ezSkinConfig) ?? false);
+            applySettings();
+            commitDirtySkinJson();
+            onContinued();
+        }
+
+        private void commitDirtySkinJson()
+        {
+            ensureSkinJsonSession();
+
+            if (SkinJsonSession is not { IsSupported: true, HasFile: true } || !SkinJsonSession.IsDirty(ezSkinConfig))
+                return;
+
+            if (needsMutableSkinBeforeWrite(iniDirty: false, jsonDirty: true, layoutDirty: false)
+                && !ensureMutableSkinPreservingWorkspaceDrafts(iniDirty: false, jsonDirty: true))
+                return;
+
+            SkinJsonSession.Commit(ezSkinConfig);
+        }
+
+        private LocalisableString unsavedApplyBody()
+        {
+            var names = collectUnsavedLayers().Select(l => l.ToString()).ToArray();
+
+            if (names.Length == 0)
+                return DialogStrings.ConfirmDialogBodyText;
+
+            return EzEditorStrings.EXIT_CONFIRM_MODIFIED.Format(string.Join("、", names));
+        }
+
+        private List<LocalisableString> collectUnsavedLayers()
+        {
+            bool skinHud = hudLayer.HasPendingSkinLayoutSave;
             bool theme = hudLayer.HasPendingThemeLayoutSave;
             bool client = hudLayer.HasPendingClientLayoutSave;
-            int layers = (skinSide ? 1 : 0) + (theme ? 1 : 0) + (client ? 1 : 0);
+            bool json = SkinJsonSession is { IsSupported: true, HasFile: true } && SkinJsonSession.IsDirty(ezSkinConfig);
+            bool ini = SkinIniSession.IsDirty;
+            bool hudUndo = hudLayer.ChangeHandler?.CanUndo.Value ?? false;
 
-            if (layers > 1)
-                return EzEditorStrings.EXIT_CONFIRM_APPLY_UNSAVED;
-
-            if (client)
-                return EzEditorStrings.EXIT_CONFIRM_APPLY_TO_CLIENT;
-
-            if (theme)
-                return EzEditorStrings.EXIT_CONFIRM_APPLY_TO_THEME;
-
-            if (layers == 0)
+            if (hudUndo && !skinHud && !theme && !client)
             {
-                return EzSkinEditorSceneRegistry.LayoutRootOf(sceneBar.CurrentScene.Value) switch
+                if (hudLayer.ActiveTarget is EzLayoutContainer ezLayout)
                 {
-                    EzLayoutRoot.Client => EzEditorStrings.EXIT_CONFIRM_APPLY_TO_CLIENT,
-                    EzLayoutRoot.Theme => EzEditorStrings.EXIT_CONFIRM_APPLY_TO_THEME,
-                    _ => EzEditorStrings.EXIT_CONFIRM_APPLY_TO_SKIN,
-                };
+                    if (ezLayout.Store.IsClientRoot)
+                        client = true;
+                    else
+                        theme = true;
+                }
+                else
+                    skinHud = true;
             }
 
-            return EzEditorStrings.EXIT_CONFIRM_APPLY_TO_SKIN;
+            var layers = new List<LocalisableString>();
+
+            if (skinHud)
+                layers.Add(EzEditorStrings.TOAST_HEADER_SKIN_LAYOUT);
+            if (theme)
+                layers.Add(EzEditorStrings.TOAST_HEADER_THEME_LAYOUT);
+            if (client)
+                layers.Add(EzEditorStrings.TOAST_HEADER_CLIENT_LAYOUT);
+            if (json)
+                layers.Add(EzEditorStrings.LAYER_SKIN_JSON);
+            if (ini)
+                layers.Add(EzEditorStrings.LAYER_SKIN_INI);
+
+            return layers;
         }
 
         private void onCurrentSkinChanged(ValueChangedEvent<Skin> skin)
@@ -1674,32 +1708,15 @@ namespace osu.Game.EzOsuGame.Edit
 
         private bool hasUnsavedWorkspaceChanges() =>
             SkinIniSession.IsDirty
-            || hasUnsavedConfigChanges()
             || (hudLayer.ChangeHandler?.CanUndo.Value ?? false)
             || hudLayer.HasPendingSkinLayoutSave
             || hudLayer.HasPendingEzLayoutSave
-            || (SkinJsonSession?.IsDirty(ezSkinConfig) ?? false);
-
-        private bool hasUnsavedConfigChanges()
-        {
-            if (!appliedConfigBaselineInitialized)
-                return false;
-
-            string current = EzSkinJsonBridge.CreateNormalizedSnapshot(ezSkinConfig);
-            string baseline = EzSkinJsonDocument.SerializeNormalized(appliedConfigBaseline.Document);
-            return current != baseline;
-        }
+            || (SkinJsonSession is { IsSupported: true, HasFile: true } && SkinJsonSession.IsDirty(ezSkinConfig));
 
         private void discardWorkspaceChanges()
         {
             if (SkinIniSession.IsDirty)
                 SkinIniSession.Discard();
-
-            if (hasUnsavedConfigChanges())
-            {
-                appliedConfigBaseline.ApplyConfigTo(ezSkinConfig);
-                appliedConfigBaseline.ApplyTo(ezSkinConfig, SkinIniSession);
-            }
 
             hudLayer.DiscardPendingLayouts();
             skinManager.CurrentSkinInfo.TriggerChange();

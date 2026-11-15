@@ -300,17 +300,21 @@ namespace osu.Game.EzOsuGame.Localization
             "应用更改到皮肤？",
             "Apply changes to skin?");
 
-        public static readonly LocalisableString EXIT_CONFIRM_APPLY_TO_THEME = new EzLocalizationManager.EzLocalisableString(
-            "应用更改到主题布局？",
-            "Apply changes to the theme layout?");
-
-        public static readonly LocalisableString EXIT_CONFIRM_APPLY_TO_CLIENT = new EzLocalizationManager.EzLocalisableString(
-            "应用更改到全局布局？",
-            "Apply changes to the client layout?");
-
         public static readonly LocalisableString EXIT_CONFIRM_APPLY_UNSAVED = new EzLocalizationManager.EzLocalisableString(
             "应用未保存的更改？",
             "Apply unsaved changes?");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXIT_CONFIRM_MODIFIED = new EzLocalizationManager.EzLocalisableString(
+            "当前已修改：{0}",
+            "Currently modified: {0}");
+
+        public static readonly LocalisableString LAYER_SKIN_JSON = new EzLocalizationManager.EzLocalisableString(
+            "EzSkin.json",
+            "EzSkin.json");
+
+        public static readonly LocalisableString LAYER_SKIN_INI = new EzLocalizationManager.EzLocalisableString(
+            "skin.ini",
+            "skin.ini");
 
         public static readonly LocalisableString TOAST_LAYOUT_SAVED = new EzLocalizationManager.EzLocalisableString(
             "已保存",

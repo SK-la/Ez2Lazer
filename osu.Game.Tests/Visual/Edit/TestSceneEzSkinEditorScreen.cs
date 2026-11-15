@@ -1032,6 +1032,8 @@ namespace osu.Game.Tests.Visual.Edit
             AddStep("set dirty draft", () => editorScreen.SkinIniSession!.SetDraftText(editorScreen.SkinIniSession.SavedText + "\n; exit test"));
             AddStep("show exit dialog", () => editorScreen.ShowExitDialog());
             AddUntilStep("dialog visible", () => DialogOverlay.CurrentDialog is ConfirmDialog);
+            AddAssert("lists skin.ini", () =>
+                DialogOverlay.CurrentDialog!.BodyText.ToString().Contains("skin.ini", StringComparison.Ordinal));
 
             AddStep("discard via cancel", () =>
             {
@@ -1076,6 +1078,34 @@ namespace osu.Game.Tests.Visual.Edit
             AddUntilStep("skin.ini applied on disk or session clean", () =>
                 !editorScreen.SkinIniSession!.IsDirty || skinIniSavedTextContains(marker));
             AddAssert("saved text contains marker", () => skinIniSavedTextContains(marker));
+        }
+
+        [Test]
+        public void TestAppearanceChangeDoesNotPromptExit()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            AddStep("change ez config", () => ezConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha).Value = 0.41);
+            AddStep("show exit dialog", () => editorScreen.ShowExitDialog());
+            AddUntilStep("workspace closed without prompt", () => !editorScreen.IsAlive);
+            AddAssert("no confirm dialog", () => DialogOverlay.CurrentDialog == null);
+            AddAssert("config kept", () => ezConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha).Value, () => Is.EqualTo(0.41));
+        }
+
+        [Test]
+        public void TestExitDialogListsSkinJson()
+        {
+            importLegacySkin();
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            AddStep("create EzSkin.json", () => editorScreen.CreateEzSkinJsonForTesting());
+            AddStep("change ez config", () => ezConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha).Value = 0.43);
+            AddStep("show exit dialog", () => editorScreen.ShowExitDialog());
+            AddUntilStep("dialog visible", () => DialogOverlay.CurrentDialog is ConfirmDialog);
+            AddAssert("lists EzSkin.json", () =>
+                DialogOverlay.CurrentDialog!.BodyText.ToString().Contains("EzSkin.json", StringComparison.Ordinal));
         }
 
         [Test]
