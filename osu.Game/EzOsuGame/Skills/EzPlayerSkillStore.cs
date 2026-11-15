@@ -104,7 +104,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// Aggregated player Mina rating skills (MinaCalc rating axes). Stored under <see cref="EzAnalysisSystem.Mina"/>,
         /// not chart <see cref="EzAnalysisSystem.SSR"/> (Sunny).
         /// </summary>
-        public EzPlayerRatingSnapshot GetPlayerRatingSnapshot(string username, int keyCount, int? algorithmVersion = null)
+        public EzPlayerRatingSnapshot GetPlayerMinaSkillAxisSnapshot(string username, int keyCount, int? algorithmVersion = null)
         {
             int version = algorithmVersion ?? EzMinaEngine.VERSION;
 
@@ -159,7 +159,7 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
-        /// <inheritdoc cref="GetPlayerRatingSnapshot"/>
+        /// <inheritdoc cref="GetPlayerMinaSkillAxisSnapshot"/>
         public IReadOnlyList<int> GetPlayerRatingKeyCounts(string username, int? algorithmVersion = null)
         {
             int version = algorithmVersion ?? EzMinaEngine.VERSION;
@@ -210,7 +210,7 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Writes player Mina rating skill rows only (see <see cref="GetPlayerRatingSnapshot"/>).
+        /// Writes player Mina rating skill rows only (see <see cref="GetPlayerMinaSkillAxisSnapshot"/>).
         /// </summary>
         public void WritePlayerRatingSkills(
             string username,

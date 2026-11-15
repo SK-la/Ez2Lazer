@@ -223,7 +223,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(store.SetPlayerSkillStale("alpha", true), Is.Zero);
                 Assert.That(store.GetStalePlayerSkillUsernames(), Is.Empty);
 
-                var snapshot = store.GetPlayerRatingSnapshot("alpha", 4);
+                var snapshot = store.GetPlayerMinaSkillAxisSnapshot("alpha", 4);
                 Assert.That(snapshot.Stale, Is.False);
                 Assert.That(snapshot.Values, Is.Not.Empty);
                 Assert.That(snapshot.Values.Values.Max(), Is.EqualTo(10).Within(1e-9));

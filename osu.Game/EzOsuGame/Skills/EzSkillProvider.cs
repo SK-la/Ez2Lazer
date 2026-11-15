@@ -448,11 +448,11 @@ namespace osu.Game.EzOsuGame.Skills
 
         private EzPlayerRatingSnapshot loadPlayerRatingSnapshot(string username, int keyCount)
         {
-            var snapshot = PlayerStore.GetPlayerRatingSnapshot(username, keyCount);
+            var snapshot = PlayerStore.GetPlayerMinaSkillAxisSnapshot(username, keyCount);
             if (snapshot.Values.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
                 return snapshot;
 
-            return PlayerStore.GetPlayerRatingSnapshot(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount);
+            return PlayerStore.GetPlayerMinaSkillAxisSnapshot(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount);
         }
 
         /// <summary>Drop the player rating snapshot memo (after a recompute / write).</summary>
