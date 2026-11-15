@@ -253,6 +253,8 @@ namespace osu.Game.EzOsuGame.Edit
                 applyUnsavedAndContinue(onContinued);
             }, () =>
             {
+                // HUD / skin.ini drafts only. EzSkin.json stays dirty vs already-saved ini
+                // until the user updates the snapshot or confirms; do not recapture it here.
                 discardWorkspaceChanges();
                 onContinued();
             })
@@ -989,6 +991,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void createEzSkinJson()
         {
+            // First write of EzSkin.json onto the current skin. Apply / exit never create it.
             ensureSkinJsonSession();
 
             if (needsMutableSkinBeforeWrite(iniDirty: false, jsonDirty: false, layoutDirty: false)
@@ -1710,10 +1713,13 @@ namespace osu.Game.EzOsuGame.Edit
             || (hudLayer.ChangeHandler?.CanUndo.Value ?? false)
             || hudLayer.HasPendingSkinLayoutSave
             || hudLayer.HasPendingEzLayoutSave
+            // Existing EzSkin.json that lags live (already-saved) ini. Not auto-created.
             || (SkinJsonSession is { IsSupported: true, HasFile: true } && SkinJsonSession.IsDirty(ezSkinConfig));
 
         private void discardWorkspaceChanges()
         {
+            // Do not revert EzSkinSettings.ini (saved on change) and do not recapture
+            // EzSkin.json as clean — cancel means the skin snapshot stays old.
             if (SkinIniSession.IsDirty)
                 SkinIniSession.Discard();
 
