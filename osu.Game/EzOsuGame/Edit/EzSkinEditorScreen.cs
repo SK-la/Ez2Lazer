@@ -226,7 +226,8 @@ namespace osu.Game.EzOsuGame.Edit
 
         public void Deactivate()
         {
-            hudLayer.PersistAllLayouts();
+            // 落盘仅在 RequestEndSession（无脏数据 flush / 确认应用）或菜单 Apply 中完成；此处再 Persist 会在用户
+            // 点「取消」放弃修改后仍从插拔屏上的实时 HUD 写盘并弹出布局已保存提示。
             hudLayer.DetachLiveTargets();
         }
 
