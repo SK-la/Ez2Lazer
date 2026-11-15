@@ -970,7 +970,7 @@ namespace osu.Game.EzOsuGame.Skills
         {
             var owed = CollectSunnySrSkillDebt();
 
-            int universe = realmAccess.Run(r => r.All<BeatmapInfo>().Count(b =>
+            int universe = realmAccess.Run(r => r.All<BeatmapInfo>().AsEnumerable().Count(b =>
                 b.BeatmapSet != null
                 && !string.IsNullOrEmpty(b.Hash)
                 && EzSSRUnit.SupportsRuleset(b.Ruleset.OnlineID)

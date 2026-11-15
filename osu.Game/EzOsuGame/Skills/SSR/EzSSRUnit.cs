@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
@@ -95,6 +96,7 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             if (playable.HitObjects.Count == 0)
             {
                 star = 0;
+                storeEmptySunnySrSkillAxes(beatmapInfo);
             }
             else
             {
@@ -156,12 +158,34 @@ namespace osu.Game.EzOsuGame.Skills.SSR
                 return true;
 
             if (playable.HitObjects.Count == 0)
+            {
+                storeEmptySunnySrSkillAxes(beatmapInfo);
                 return true;
+            }
 
             var chart = EzCSIEngine.FromPlayable(playable, cancellationToken);
             var combined = EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, playable.Difficulty.OverallDifficulty);
             storeSunnySrSkillAxes(beatmapInfo, combined.PatternSnapshot);
             return true;
+        }
+
+        private void storeEmptySunnySrSkillAxes(BeatmapInfo beatmapInfo)
+        {
+            if (string.IsNullOrEmpty(beatmapInfo.Hash))
+                return;
+
+            var values = new Dictionary<string, double>(EzSunnySrSkillAxisExtensions.ChartAxisIds.Count, StringComparer.Ordinal);
+
+            foreach (string axisId in EzSunnySrSkillAxisExtensions.ChartAxisIds)
+                values[axisId] = 0;
+
+            skillStore.WriteBeatmapSystemSkills(
+                beatmapInfo.Hash,
+                EzAnalysisSystem.SSR,
+                values,
+                beatmapInfo.ID,
+                algorithmVersion: VERSION,
+                rulesetOnlineId: EzLocalProfileConstants.MANIA_RULESET_ID);
         }
 
         private void storeSunnySrSkillAxes(BeatmapInfo beatmapInfo, EzManiaSR4PatternSnapshot snapshot)
