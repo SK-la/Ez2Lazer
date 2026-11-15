@@ -19,11 +19,7 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
     /// <summary>
     /// One Skills-card axis entry after hub <c>skillModeEntries</c> selection.
     /// </summary>
-    public readonly record struct EzSkillModeEntry(
-        string SkillId,
-        LocalisableString DisplayName,
-        double Value,
-        string AccentHex);
+    public readonly record struct EzSkillModeEntry(string SkillId, LocalisableString DisplayName, double Value, string AccentHex);
 
     /// <summary>Per-axis green/yellow pair on 6/7/8K Skill radar (same algorithm both sides).</summary>
     public readonly record struct EzRadarAxisPair(double Player, double Chart);

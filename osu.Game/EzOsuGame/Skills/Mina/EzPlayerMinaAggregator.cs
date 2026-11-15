@@ -19,7 +19,7 @@ using osu.Game.Scoring;
 namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
-    /// Aggregates per-play <see cref="IEzMinaEngine.CalculateRating"/> vectors into persisted player Mina skill rows.
+    /// Aggregates per-play <see cref="IEzMinaEngine.CalculatePlayerMinaSkillAxis"/> vectors into persisted player Mina skill rows.
     /// Goal via <see cref="EzMinaRatingGoal"/> (Wife subset when statistics exist).
     /// </summary>
     public sealed class EzPlayerMinaAggregator
@@ -168,7 +168,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 
                             try
                             {
-                                vector = calc.CalculateRating(notes, keyCount, rate, goalValue);
+                                vector = calc.CalculatePlayerMinaSkillAxis(notes, keyCount, rate, goalValue);
                             }
                             catch (EzMinaEngineException e)
                             {

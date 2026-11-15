@@ -82,7 +82,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             return new EzDanPlayRatingIndex(list);
         }
 
-        /// <summary>Hub: the rated play's <see cref="IEzMinaEngine.CalculateRating"/> vector for this clear; null when no matching axis evidence.</summary>
+        /// <summary>Hub: the rated play's <see cref="IEzMinaEngine.CalculatePlayerMinaSkillAxis"/> vector for this clear; null when no matching axis evidence.</summary>
         public IReadOnlyDictionary<string, double>? Resolve(EzDanClearEvidenceRow clear)
         {
             if (string.IsNullOrEmpty(clear.BeatmapHash) || plays.Count == 0)

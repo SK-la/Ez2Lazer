@@ -7,7 +7,7 @@ using System.Collections.Generic;
 namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
-    /// One MinaCalc skillset vector: chart Mina (<see cref="IEzMinaEngine.CalculateMsd"/>) or per-play rating (<see cref="IEzMinaEngine.CalculateRating"/>).
+    /// One MinaCalc skillset vector: chart Mina (<see cref="IEzMinaEngine.CalculateMinaSkillAxis"/>) or per-play rating (<see cref="IEzMinaEngine.CalculatePlayerMinaSkillAxis"/>).
     /// Axes follow <see cref="EzMinaSkillAxis"/>.
     /// </summary>
     public readonly record struct EzMinaSkillAxisVector(

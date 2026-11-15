@@ -719,7 +719,7 @@ namespace osu.Game.EzOsuGame.Analysis
             try
             {
                 var engine = EzMinaEnginePool.Rent();
-                var vector = engine.CalculateMsd(EzMinaNoteConverter.Convert(measured.Chart.Notes), keyCount, (float)rate);
+                var vector = engine.CalculateMinaSkillAxis(EzMinaNoteConverter.Convert(measured.Chart.Notes), keyCount, (float)rate);
 
                 if (vector.Overall <= 0 && vector.Stream <= 0)
                     return null;

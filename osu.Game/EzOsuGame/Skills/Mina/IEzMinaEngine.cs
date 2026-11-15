@@ -6,8 +6,8 @@ using System;
 namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
-    /// Mania MinaCalc engine. <see cref="CalculateMsd"/> is chart baseline (Mina);
-    /// <see cref="CalculateRating"/> is per-play skill rating at a Wife/accuracy goal (not chart <see cref="EzOsuGame.Analysis.EzAnalysisSystem.SSR"/>).
+    /// Mania MinaCalc engine. <see cref="CalculateMinaSkillAxis"/> is chart baseline (Mina);
+    /// <see cref="CalculatePlayerMinaSkillAxis"/> is per-play skill rating at a Wife/accuracy goal (not chart <see cref="EzOsuGame.Analysis.EzAnalysisSystem.SSR"/>).
     /// </summary>
     /// <remarks>
     /// Implementations are <b>not thread-safe</b>: keep one engine per thread / call site,
@@ -32,13 +32,13 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         /// Chart difficulty (Mina) for the given rows. <paramref name="rate"/> applies a music-rate mod.
         /// Returns the zero vector when the keymode is unsupported or there are too few rows to rate.
         /// </summary>
-        EzMinaSkillAxisVector CalculateMsd(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate = 1f);
+        EzMinaSkillAxisVector CalculateMinaSkillAxis(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate = 1f);
 
         /// <summary>
         /// Per-play Mina skill rating vector for the given rows at a Wife/accuracy goal.
         /// <paramref name="goal"/> is clamped to <see cref="EzMinaEngine.MIN_RATING_GOAL"/> … <see cref="EzMinaEngine.MAX_RATING_GOAL"/>.
         /// Returns the zero vector when the keymode is unsupported or there are too few rows to rate.
         /// </summary>
-        EzMinaSkillAxisVector CalculateRating(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate, float goal);
+        EzMinaSkillAxisVector CalculatePlayerMinaSkillAxis(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate, float goal);
     }
 }
